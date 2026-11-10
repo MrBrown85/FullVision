@@ -7,9 +7,12 @@
 -- every file in migrations/ as something to be applied, and this is only to
 -- be run if Batch A has to come out.
 --
--- Run it in the SQL editor (or psql), one part at a time, by pasting that
+-- Run it in the SQL editor (or psql), ONE PART AT A TIME, by pasting that
 -- part from its banner to the next. Not through apply_migration: the parts
 -- open and close their own transactions.
+--
+-- DO NOT PASTE THE WHOLE FILE. Pasted whole it runs every part in turn,
+-- PART 2 included: the page goes off for every class and Batch A is removed.
 --
 -- ── BEFORE ANY PART ─────────────────────────────────────────────────────────
 -- Nothing here turns off what calls Batch A. Before PART 2, these must
@@ -22,7 +25,8 @@
 --     unlock_all_student_cards, reissue_student_card, set_cards_work_until).
 --     (update_course goes back to ignoring student_page_enabled and
 --     return_grades: a build that sends them gets no error and no effect.)
--- PART 1 and PART 1B remove nothing those call, so they need nothing off.
+-- PART 1, PART 1A and PART 1B remove nothing those call, so they need
+-- nothing off.
 --
 -- ── PART 1: the fast stop ───────────────────────────────────────────────────
 -- Drops Batch A's 18 triggers and nothing else: the 12 statement triggers
@@ -53,7 +57,13 @@
 --
 -- What does NOT stop. Batch A's own functions all stay, and these still run:
 --   file 01's five row-security policies, on every save, until PART 1B;
---   Return Grades: it still returns a waiting draft;
+--   Return Grades: it still returns a draft that was waiting at the stop
+--     (and finds nothing to return for a grade first saved after it);
+--   the teacher's own screens: list_course_grade_returns and
+--     course_draft_count still answer, from what was there at the stop (the
+--     draft count does not move when a new grade is saved);
+--   Duplicate Class (duplicate_course) still copies the Return Grades
+--     setting; the slip-code functions still check card codes;
 --   a rubric move (move_rubric_scores) still re-points, in grade_return,
 --     the copy a student was given;
 --   a restore (import_json_restore) still writes grade_return rows for the
@@ -74,21 +84,34 @@
 --     is shown the change AT ONCE. It does not wait to be returned. (In an
 --     As Soon As I Save class that is what happens anyway.)
 --   a first grade on a piece that had none: NOT shown at all, in either
---     kind of class, however long it waits, unless the teacher uses Return
---     Grades on it or file 02 is run again.
+--     kind of class, however long it waits. Return Grades does not help: it
+--     answers "returned: 0", because there is no row for it to return. The
+--     ONE thing that gets a student that grade is running file 02 again
+--     (below), and that is one transaction on all seven tables, so for a
+--     quiet moment.
 --   a draft that was waiting: stays hidden, whatever is saved on it. If the
 --     piece had been returned before, the student keeps seeing that
 --     returned grade.
 -- So while PART 1 stands, a class with the page on shows students some
 -- grades early and hides others. If any class has it on and Batch A is not
--- going straight back, turn the page off for those classes AFTER PART 1
--- (before PART 1 that same change would return every waiting draft):
---     select id, name from public.course where student_page_enabled;   -- keep this list
---     update public.course set student_page_enabled = false where student_page_enabled;
--- Then the page and every card scan answer "closed", and nothing is shown
--- early or hidden; turned on again, students see what they saw (tested).
--- While no class has the page on, none of this matters: nothing reads
--- grade_return.
+-- going straight back, run PART 1A. While no class has the page on, none of
+-- this matters: nothing reads grade_return.
+--
+-- ── PART 1A: the Student Page off, for every class that has it on ───────────
+-- ONLY AFTER PART 1's last query lists none of Batch A's triggers. One of
+-- them, grade_return_release on course, returns every waiting draft to the
+-- students when a class's page is turned off: that is Batch A's rule, and
+-- with Batch A whole a plain UPDATE of the setting does exactly that. So
+-- PART 1A refuses, with nothing changed, while any of Batch A's 18 triggers
+-- is left, and says which; and its UPDATE carries the same condition, so it
+-- cannot turn a class off even if it is pasted without the check. (PART 1
+-- takes course first, so the release trigger is the first thing gone.)
+-- It answers with the classes it turned off. KEEP THAT LIST: nothing else
+-- remembers which classes had the page on; the statement to turn them on
+-- again is beside PART 1A. After it the page and every card scan answer
+-- "closed", no draft was returned, and nothing is shown early or hidden;
+-- turned on again, students see what they saw (tested at every point of
+-- PART 1). DESTROYS: nothing.
 --
 -- To turn Batch A back on after PART 1 alone: run 2026110902_grade_return.sql
 -- again. It recreates the triggers; its backfill makes a Returned row for
@@ -122,13 +145,202 @@
 -- out, 9 or 10 of 10 finished (one was stopped by a deadlock, with nothing
 -- changed) and between 1 and 5 saves were killed. If it stops, run it again.
 --
--- With S0-M4b (2026110905, PR 989) applied, PART 2 stops before it changes
--- anything and says so: run S0-M4b's undo first
--- (migrations/local-test/s0-m4b-undo.sql, on PR 989), then this. Tested in
--- that order: the database comes back as before Batch A. It stops the same
--- way for anything else built on Batch A that it does not know: a trigger
--- or table named grade_return_..., or a function that names grade_return
--- and is not one of the 54 Batch A made or patched. It lists what it found.
+-- What stops PART 2 before it changes anything. It knows what Batch A made:
+-- its 47 functions and the 7 it patched, by signature; its four tables with
+-- their columns, indexes, constraints and policies; its three class
+-- settings; its 18 triggers and file 01's five policies. It stops, and lists
+-- every one, if anything else
+--   depends on one of those in Postgres's own record (a view, a policy, a
+--     trigger, a foreign key, an index on a class setting, a SQL-standard
+--     function): Postgres would refuse the drop half-way, with a raw error;
+--   sits on one of Batch A's four tables without being Batch A's (a column
+--     or index a later migration added): it would go with the table, unseen;
+--   is a function, in any schema, whose text names one of them (comments
+--     left out; the everyday names card, done, page and seen count only as
+--     student_submit.card and so on): Postgres records nothing for these,
+--     and after PART 2 they would fail when next called, a trigger function
+--     on score on every save;
+--   is a pg_cron job whose command names one of them.
+-- S0-M4b (2026110905, PR 989) is such a thing: with it applied, run its own
+-- undo first (migrations/local-test/s0-m4b-undo.sql, on PR 989), then this.
+-- Tested in that order: the database comes back as before Batch A.
+-- The same list, read-only, to run before PART 2 (no rows: PART 2 will not
+-- be stopped by this check; it is PART 2's own query, and one more branch
+-- for pg_cron's cron.job, which gradebook-prod has):
+-- precheck:
+--   with own_fn(sig) as (values   -- the 47 functions Batch A made (PART 2 drops each by name)
+--               ('public.fv_owns_rubric_check_cell(uuid,uuid,uuid)'), ('public.fv_owns_rubric_score_cell(uuid,uuid,uuid)'),
+--               ('public.fv_owns_score_cell(uuid,uuid)'), ('public.fv_owns_tag_score_cell(uuid,uuid,uuid)'),
+--               ('student_submit._card_lookup(text,text)'), ('student_submit._card_refusal(uuid)'),
+--               ('student_submit._device_session(text)'), ('student_submit._midnight(text)'),
+--               ('student_submit._returned_grade(uuid,uuid)'), ('student_submit._session_class(text,uuid)'),
+--               ('student_submit._session_classes(uuid)'), ('student_submit.card(text,text)'),
+--               ('student_submit.done(text,text)'), ('student_submit.page(text,uuid,text)'),
+--               ('student_submit.seen(text,uuid,uuid[],text)'), ('student_submit.verify_card(text,text,text,text,text,text,boolean)'),
+--               ('fv_private.grade_return_remap(uuid,jsonb,jsonb)'), ('fv_private.restore_grade_returns(jsonb)'),
+--               ('public._cards_work_until(uuid)'), ('public._fv_date(text)'),
+--               ('public._fv_timezone(text)'), ('public._grade_copy(uuid,uuid)'),
+--               ('public._grade_copy_entry(integer,integer,text,text,boolean)'), ('public._grade_copy_in_use(jsonb,uuid)'),
+--               ('public._grade_copy_of(numeric,integer,text,jsonb,jsonb,jsonb)'), ('public._grade_copy_remap(jsonb,jsonb,jsonb,jsonb)'),
+--               ('public._grade_return_apply(uuid,uuid,jsonb,jsonb)'), ('public._grade_return_gone()'),
+--               ('public._grade_return_holds(uuid)'), ('public._grade_return_lock(uuid)'),
+--               ('public._grade_return_lock_first(uuid)'), ('public._grade_return_on_change()'),
+--               ('public._grade_return_one(uuid,uuid,timestamp with time zone)'), ('public._grade_return_release()'),
+--               ('public._grade_return_repoint()'), ('public._issue_student_card(uuid,text)'),
+--               ('public._student_card_json(uuid)'), ('public.course_draft_count(uuid)'),
+--               ('public.issue_student_cards(uuid,uuid[],uuid)'), ('public.list_course_grade_returns(uuid)'),
+--               ('public.list_student_cards(uuid)'), ('public.mark_student_cards_printed(uuid[],uuid)'),
+--               ('public.reissue_student_card(uuid,uuid)'), ('public.return_grades(uuid,uuid[],uuid)'),
+--               ('public.set_cards_work_until(uuid,date,uuid)'), ('public.unlock_all_student_cards(uuid,uuid)'),
+--               ('public.unlock_student_card(uuid,uuid)')
+--        ), patched(sig) as (values   -- the 7 it patched (PART 2 puts each back)
+--               ('public.update_course(uuid,jsonb)'), ('public.move_rubric_scores(uuid,uuid,jsonb,jsonb,uuid)'),
+--               ('public.duplicate_course(uuid,uuid)'), ('public.import_json_restore(jsonb,uuid)'),
+--               ('public._issue_access_code(uuid,uuid,timestamptz)'), ('public._issue_report_code(uuid,uuid,timestamptz)'),
+--               ('student_submit.open(text,text)')
+--        ), fn as (
+--            select to_regprocedure(sig)::oid as oid from own_fn where to_regprocedure(sig) is not null
+--        ), known as (
+--            select oid from fn union select to_regprocedure(sig)::oid from patched where to_regprocedure(sig) is not null
+--        ), tbl as (   -- its four tables
+--            select to_regclass(t)::oid as oid
+--              from (values ('public.grade_return'), ('public.student_card'), ('student_submit.device_session'),
+--                           ('student_submit.device_session_enrollment')) v(t)
+--             where to_regclass(t) is not null
+--        ), col as (   -- its three class settings
+--            select a.attrelid, a.attnum from pg_attribute a
+--             where a.attrelid = to_regclass('public.course') and not a.attisdropped
+--               and a.attname in ('student_page_enabled', 'return_grades', 'cards_work_until')
+--        ), dep as (   -- everything Postgres records as depending on one of those, and the table it belongs to
+--            select d.classid, d.objid, d.objsubid, o.kind,
+--                   case d.classid
+--                        when 'pg_class'::regclass      then coalesce((select i.indrelid from pg_index i where i.indexrelid = d.objid), d.objid)
+--                        when 'pg_rewrite'::regclass    then (select r.ev_class from pg_rewrite r where r.oid = d.objid)
+--                        when 'pg_constraint'::regclass then (select nullif(k.conrelid, 0) from pg_constraint k where k.oid = d.objid)
+--                        when 'pg_trigger'::regclass    then (select t.tgrelid from pg_trigger t where t.oid = d.objid)
+--                        when 'pg_policy'::regclass     then (select p.polrelid from pg_policy p where p.oid = d.objid)
+--                        when 'pg_attrdef'::regclass    then (select a.adrelid from pg_attrdef a where a.oid = d.objid)
+--                        when 'pg_type'::regclass       then (select nullif(t.typrelid, 0) from pg_type t where t.oid = d.objid)
+--                   end as home,
+--                   case d.classid
+--                        when 'pg_trigger'::regclass    then (select t.tgname::text from pg_trigger t where t.oid = d.objid)
+--                        when 'pg_policy'::regclass     then (select p.polname::text from pg_policy p where p.oid = d.objid)
+--                        when 'pg_constraint'::regclass then (select k.conname::text from pg_constraint k where k.oid = d.objid)
+--                   end as name
+--              from pg_depend d
+--              join (select 'pg_proc'::regclass as cls, oid, null::int as sub, 'function' as kind from fn
+--                    union all select 'pg_class'::regclass, oid, null, 'table' from tbl
+--                    union all select 'pg_class'::regclass, attrelid, attnum, 'setting' from col) o
+--                on d.refclassid = o.cls and d.refobjid = o.oid and (o.sub is null or d.refobjsubid = o.sub)
+--             where d.deptype in ('n', 'a')
+--        )
+--   select distinct what as would_stop_part_2 from (
+--       -- 1. Something that is not Batch A's depends on a function, table or class setting Batch A made:
+--       --    a view, a policy, a trigger, a foreign key, a default, a SQL-standard function. Postgres
+--       --    would refuse the drop half-way; this finds it first.
+--       select 'depends on Batch A: ' || pg_describe_object(d.classid, d.objid, d.objsubid) as what
+--         from dep d
+--        where not (d.classid = 'pg_proc'::regclass and exists (select 1 from known k where k.oid = d.objid))
+--          and not exists (select 1 from tbl t where t.oid = d.home)          -- part of one of its own tables: 2 below
+--          and not (d.kind = 'function' and d.classid = 'pg_policy'::regclass   -- file 01's five policies
+--                   and coalesce(d.name in ('score_same_class', 'tag_score_same_class', 'rubric_score_same_class',
+--                                           'rubric_check_score_same_class', 'dibels_score_same_class'), false))
+--          and not (d.kind = 'function' and d.classid = 'pg_trigger'::regclass  -- its 18 triggers
+--                   and coalesce(d.name in ('grade_return_delete', 'grade_return_insert', 'grade_return_update',
+--                                           'grade_return_repoint', 'grade_return_gone', 'grade_return_release'), false))
+--          and not (d.kind = 'setting'                                          -- what Batch A itself hung on the three settings
+--                   and (coalesce(d.classid = 'pg_constraint'::regclass and d.name = 'course_return_grades_check', false)
+--                        or coalesce(d.classid = 'pg_attrdef'::regclass and d.home = to_regclass('public.course'), false)
+--                        or coalesce(d.classid = 'pg_trigger'::regclass and d.name = 'grade_return_release', false)))
+--       union all
+--       -- 2. Something on one of Batch A's four tables that Batch A did not put there: it would go with
+--       --    the table, unseen.
+--       select 'not Batch A''s, on its table: column ' || a.attname || ' of ' || a.attrelid::regclass::text
+--         from pg_attribute a join tbl on tbl.oid = a.attrelid
+--        where a.attnum > 0 and not a.attisdropped
+--          and ((select c.relname::text from pg_class c where c.oid = a.attrelid), a.attname::text) not in (values
+--               ('grade_return', 'enrollment_id'), ('grade_return', 'assessment_id'), ('grade_return', 'is_draft'), ('grade_return', 'returned_at'), ('grade_return', 'returned_copy'), ('grade_return', 'previous_copy'), ('grade_return', 'updated_at'), ('grade_return', 'seen_at'), ('grade_return', 'working_copy'),
+--               ('student_card', 'id'), ('student_card', 'enrollment_id'), ('student_card', 'code'), ('student_card', 'code_hash'), ('student_card', 'salt'), ('student_card', 'created_at'), ('student_card', 'printed_at'), ('student_card', 'last_opened_at'), ('student_card', 'wrong_tries'), ('student_card', 'wrong_times'), ('student_card', 'locked_at'), ('student_card', 'stopped_at'), ('student_card', 'works_until'), ('student_card', 'password'),
+--               ('device_session', 'id'), ('device_session', 'token_hash'), ('device_session', 'created_at'), ('device_session', 'expires_at'),
+--               ('device_session_enrollment', 'session_id'), ('device_session_enrollment', 'enrollment_id'), ('device_session_enrollment', 'card_id'), ('device_session_enrollment', 'added_at'))
+--       union all
+--       select 'not Batch A''s, on its table: index ' || i.indexrelid::regclass::text
+--         from pg_index i join tbl on tbl.oid = i.indrelid
+--        where (select c.relname::text from pg_class c where c.oid = i.indexrelid) not in (
+--               'grade_return_assessment_idx', 'grade_return_pkey', 'student_card_code_hash_key', 'student_card_enrollment_idx',
+--               'student_card_live_code', 'student_card_one_live', 'student_card_pkey', 'device_session_expires',
+--               'device_session_pkey', 'device_session_token_hash_key', 'device_session_enrollment_card', 'device_session_enrollment_enrollment',
+--               'device_session_enrollment_pkey')
+--       union all
+--       select 'not Batch A''s, on its table: constraint ' || k.conname || ' on ' || k.conrelid::regclass::text
+--         from pg_constraint k join tbl on tbl.oid = k.conrelid
+--        where k.contype <> 'n' and k.conname::text not in (
+--               'grade_return_copy_while_draft', 'grade_return_pkey', 'grade_return_previous_copy_object', 'grade_return_returned_copy_object',
+--               'grade_return_working_copy_object', 'student_card_code_hash_key', 'student_card_enrollment_id_fkey', 'student_card_pkey',
+--               'student_card_wrong_tries_check', 'device_session_pkey', 'device_session_token_hash_key', 'device_session_enrollment_card_id_fkey',
+--               'device_session_enrollment_enrollment_id_fkey', 'device_session_enrollment_pkey', 'device_session_enrollment_session_id_fkey')
+--       union all
+--       select 'not Batch A''s, on its table: trigger ' || t.tgname || ' on ' || t.tgrelid::regclass::text
+--         from pg_trigger t join tbl on tbl.oid = t.tgrelid
+--        where not t.tgisinternal
+--       union all
+--       select 'not Batch A''s, on its table: policy ' || p.polname || ' on ' || p.polrelid::regclass::text
+--         from pg_policy p join tbl on tbl.oid = p.polrelid
+--        where p.polname::text not in ('grade_return_read', 'student_card_read')
+--       union all
+--       -- 3. A function that is not Batch A's and names something Batch A made (comments left out).
+--       --    Postgres records nothing for these: after PART 2 they would fail when next called.
+--       select 'names Batch A: function ' || n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')'
+--         from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+--        where n.nspname !~ '^pg_' and n.nspname <> 'information_schema' and p.prokind in ('f', 'p')
+--          and not exists (select 1 from known k where k.oid = p.oid)
+--          and exists (select 1 from fn union all select 1 from tbl union all select 1 from col)   -- Batch A is here at all
+--          and regexp_replace(regexp_replace(p.prosrc, '/\*.*?\*/', '', 'g'), '--[^\n]*', '', 'g') ~ (
+--               '\m(grade_return|student_card|device_session|device_session_enrollment|student_page_enabled|'
+--               || 'return_grades|cards_work_until|_card_lookup|_card_refusal|_cards_work_until|_device_session|'
+--               || '_fv_date|_fv_timezone|_grade_copy|_grade_copy_entry|_grade_copy_in_use|_grade_copy_of|'
+--               || '_grade_copy_remap|_grade_return_apply|_grade_return_gone|_grade_return_holds|_grade_return_lock|'
+--               || '_grade_return_lock_first|_grade_return_on_change|_grade_return_one|_grade_return_release|'
+--               || '_grade_return_repoint|_issue_student_card|_midnight|_returned_grade|_session_class|'
+--               || '_session_classes|_student_card_json|course_draft_count|fv_owns_rubric_check_cell|'
+--               || 'fv_owns_rubric_score_cell|fv_owns_score_cell|fv_owns_tag_score_cell|grade_return_remap|'
+--               || 'issue_student_cards|list_course_grade_returns|list_student_cards|mark_student_cards_printed|'
+--               || 'reissue_student_card|restore_grade_returns|set_cards_work_until|unlock_all_student_cards|'
+--               || 'unlock_student_card|verify_card)\M|student_submit\.(card|done|page|seen)\M')
+--       union all
+--       -- 4. By name: a trigger called grade_return_... that is not one of Batch A's, a table called
+--       --    grade_return_..., anything else in Batch A's schema fv_private.
+--       select 'trigger ' || t.tgname || ' on ' || t.tgrelid::regclass::text
+--         from pg_trigger t
+--        where not t.tgisinternal and t.tgname like 'grade\_return\_%'
+--          and t.tgname not in ('grade_return_delete', 'grade_return_insert', 'grade_return_update',
+--                               'grade_return_repoint', 'grade_return_gone', 'grade_return_release')
+--       union all
+--       select 'table ' || c.oid::regclass::text
+--         from pg_class c join pg_namespace n on n.oid = c.relnamespace
+--        where c.relkind = 'r' and n.nspname in ('public', 'fv_private', 'student_submit') and c.relname like 'grade\_return\_%'
+--       union all
+--       select 'in fv_private, not Batch A''s: ' || pg_describe_object(x.cls, x.oid, 0)
+--         from (select 'pg_proc'::regclass as cls, p.oid from pg_proc p where p.pronamespace = to_regnamespace('fv_private')
+--               union all select 'pg_class'::regclass, c.oid from pg_class c where c.relnamespace = to_regnamespace('fv_private')) x
+--        where not exists (select 1 from fn where fn.oid = x.oid)
+--   ) found
+--   union all
+--   select 'names Batch A: cron job ' || jobname from cron.job
+--    where to_regclass('public.grade_return') is not null and command ~ (
+--               '\m(grade_return|student_card|device_session|device_session_enrollment|student_page_enabled|'
+--               || 'return_grades|cards_work_until|_card_lookup|_card_refusal|_cards_work_until|_device_session|'
+--               || '_fv_date|_fv_timezone|_grade_copy|_grade_copy_entry|_grade_copy_in_use|_grade_copy_of|'
+--               || '_grade_copy_remap|_grade_return_apply|_grade_return_gone|_grade_return_holds|_grade_return_lock|'
+--               || '_grade_return_lock_first|_grade_return_on_change|_grade_return_one|_grade_return_release|'
+--               || '_grade_return_repoint|_issue_student_card|_midnight|_returned_grade|_session_class|'
+--               || '_session_classes|_student_card_json|course_draft_count|fv_owns_rubric_check_cell|'
+--               || 'fv_owns_rubric_score_cell|fv_owns_score_cell|fv_owns_tag_score_cell|grade_return_remap|'
+--               || 'issue_student_cards|list_course_grade_returns|list_student_cards|mark_student_cards_printed|'
+--               || 'reissue_student_card|restore_grade_returns|set_cards_work_until|unlock_all_student_cards|'
+--               || 'unlock_student_card|verify_card)\M|student_submit\.(card|done|page|seen)\M')
+--   order by 1;
+-- end precheck
 --
 -- S0-M5 (2026111002, pg_temp last in search_path; applied to gradebook-prod
 -- after Batch A, on 2026-11-10): LEAVE IT. No part of this script touches
@@ -183,6 +395,10 @@
 --   delete from supabase_migrations.schema_migrations
 --    where name in ('score_rows_same_class', 'grade_return', 'student_card', 'student_sessions_page');
 -- end record
+--   The idempotency rows (fv_idempotency) of Batch A's own calls: Return
+--     Grades and the card calls. They stay, a few rows a day's use; nothing
+--     reads them again once their functions are gone, and the 24-hour
+--     cleanup takes them.
 --   pg_cron. Batch A schedules nothing. (S0-M4b does; its undo unschedules.)
 --
 -- After PART 2 the four files apply again cleanly. batch_a_undo.py proves
@@ -207,6 +423,42 @@
 -- that cannot be had after 40 tries stops the run there; the tables before
 -- it are done and stay done. Run PART 1 again from the top: a table whose
 -- triggers are gone is skipped without a lock.
+--
+-- course goes first: its trigger (grade_return_release) is the one that
+-- returns every waiting draft when a class's Student Page is turned off or
+-- the class leaves When I Return Them. With it gone first, no half-way
+-- state of PART 1 can hand students drafts their teacher never returned.
+
+-- public.course
+begin;
+set local lock_timeout = '200ms';
+do $stop$
+declare
+    _try int := 0;
+begin
+    if (select setting::int from pg_settings where name = 'deadlock_timeout') <= 400 then
+        raise exception 'deadlock_timeout is under half a second: PART 1 counts on giving up (200 ms) before Postgres looks for a deadlock. Nothing was changed.';
+    end if;
+    -- Already gone (a second run): take no lock at all.
+    if not exists (select 1 from pg_trigger where tgrelid = 'public.course'::regclass and not tgisinternal
+                      and tgname in ('grade_return_release')) then
+        return;
+    end if;
+    loop
+        _try := _try + 1;
+        begin
+            drop trigger if exists grade_return_release on public.course;
+            exit;
+        exception when lock_not_available then
+            if _try >= 40 then
+                raise exception 'PART 1 could not get public.course in % tries. Its triggers are still there; the tables before it are done. Run PART 1 again.', _try;
+            end if;
+            perform pg_sleep(0.1);
+        end;
+    end loop;
+end
+$stop$;
+commit;
 
 -- public.score
 begin;
@@ -405,37 +657,6 @@ end
 $stop$;
 commit;
 
--- public.course
-begin;
-set local lock_timeout = '200ms';
-do $stop$
-declare
-    _try int := 0;
-begin
-    if (select setting::int from pg_settings where name = 'deadlock_timeout') <= 400 then
-        raise exception 'deadlock_timeout is under half a second: PART 1 counts on giving up (200 ms) before Postgres looks for a deadlock. Nothing was changed.';
-    end if;
-    -- Already gone (a second run): take no lock at all.
-    if not exists (select 1 from pg_trigger where tgrelid = 'public.course'::regclass and not tgisinternal
-                      and tgname in ('grade_return_release')) then
-        return;
-    end if;
-    loop
-        _try := _try + 1;
-        begin
-            drop trigger if exists grade_return_release on public.course;
-            exit;
-        exception when lock_not_available then
-            if _try >= 40 then
-                raise exception 'PART 1 could not get public.course in % tries. Its triggers are still there; the tables before it are done. Run PART 1 again.', _try;
-            end if;
-            perform pg_sleep(0.1);
-        end;
-    end loop;
-end
-$stop$;
-commit;
-
 -- What is left with grade_return in its name. No rows: Batch A's 18 are gone
 -- and nothing else was there. With S0-M4b (2026110905, PR 989) applied this
 -- lists its three, which PART 1 leaves alone: grade_return_mode on
@@ -448,6 +669,44 @@ select t.tgrelid::regclass::text as on_table, t.tgname as trigger_still_there,
   from pg_trigger t
  where not t.tgisinternal and t.tgname like 'grade\_return\_%'
  order by 1, 2;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- PART 1A: the Student Page off, for every class that has it on
+-- ════════════════════════════════════════════════════════════════════════════
+-- Only after PART 1's last query lists none of Batch A's triggers. While one
+-- of them is left this refuses and changes nothing: with grade_return_release
+-- still on course, turning the page off would RETURN every waiting draft to
+-- the students. The UPDATE carries the same condition itself, so it cannot
+-- do that even if it is pasted without the check above it.
+-- It answers with the classes it turned off. KEEP THAT LIST: nothing else
+-- remembers which classes had the page on. To turn them on again:
+--     update public.course set student_page_enabled = true where id in ('...', '...');
+do $guard$
+declare
+    _left text;
+begin
+    if not exists (select 1 from pg_attribute where attrelid = to_regclass('public.course') and attname = 'student_page_enabled' and not attisdropped) then
+        raise exception 'course has no student_page_enabled: Batch A is not applied. Nothing was changed.';
+    end if;
+    select string_agg(t.tgname || ' on ' || t.tgrelid::regclass::text, ', ' order by t.tgrelid::regclass::text, t.tgname) into _left
+      from pg_trigger t
+     where not t.tgisinternal
+       and t.tgname in ('grade_return_delete', 'grade_return_insert', 'grade_return_update',
+                        'grade_return_repoint', 'grade_return_gone', 'grade_return_release');
+    if _left is not null then
+        raise exception 'Batch A''s triggers are not all gone (%). With grade_return_release in place, turning the Student Page off returns every waiting draft to the students. Run PART 1 until its last query lists none of Batch A''s triggers, then this. Nothing was changed.', _left;
+    end if;
+end
+$guard$;
+
+update public.course
+   set student_page_enabled = false
+ where student_page_enabled
+   and not exists (select 1 from pg_trigger t
+                    where not t.tgisinternal
+                      and t.tgname in ('grade_return_delete', 'grade_return_insert', 'grade_return_update',
+                                       'grade_return_repoint', 'grade_return_gone', 'grade_return_release'))
+returning id, name;
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- PART 1B: the five score-table policies as they were before file 01
@@ -500,60 +759,195 @@ declare
     _f   record;
     _def text;
     _strangers text;
-    -- Every function Batch A made (PART 2 drops each by name, below) and the
-    -- seven it patched.
-    _known text[] := array[
-            'public.fv_owns_rubric_check_cell(uuid,uuid,uuid)', 'public.fv_owns_rubric_score_cell(uuid,uuid,uuid)',
-            'public.fv_owns_score_cell(uuid,uuid)', 'public.fv_owns_tag_score_cell(uuid,uuid,uuid)',
-            'student_submit._card_lookup(text,text)', 'student_submit._card_refusal(uuid)',
-            'student_submit._device_session(text)', 'student_submit._midnight(text)',
-            'student_submit._returned_grade(uuid,uuid)', 'student_submit._session_class(text,uuid)',
-            'student_submit._session_classes(uuid)', 'student_submit.card(text,text)',
-            'student_submit.done(text,text)', 'student_submit.page(text,uuid,text)',
-            'student_submit.seen(text,uuid,uuid[],text)', 'student_submit.verify_card(text,text,text,text,text,text,boolean)',
-            'fv_private.grade_return_remap(uuid,jsonb,jsonb)', 'fv_private.restore_grade_returns(jsonb)',
-            'public._cards_work_until(uuid)', 'public._fv_date(text)',
-            'public._fv_timezone(text)', 'public._grade_copy(uuid,uuid)',
-            'public._grade_copy_entry(integer,integer,text,text,boolean)', 'public._grade_copy_in_use(jsonb,uuid)',
-            'public._grade_copy_of(numeric,integer,text,jsonb,jsonb,jsonb)', 'public._grade_copy_remap(jsonb,jsonb,jsonb,jsonb)',
-            'public._grade_return_apply(uuid,uuid,jsonb,jsonb)', 'public._grade_return_gone()',
-            'public._grade_return_holds(uuid)', 'public._grade_return_lock(uuid)',
-            'public._grade_return_lock_first(uuid)', 'public._grade_return_on_change()',
-            'public._grade_return_one(uuid,uuid,timestamp with time zone)', 'public._grade_return_release()',
-            'public._grade_return_repoint()', 'public._issue_student_card(uuid,text)',
-            'public._student_card_json(uuid)', 'public.course_draft_count(uuid)',
-            'public.issue_student_cards(uuid,uuid[],uuid)', 'public.list_course_grade_returns(uuid)',
-            'public.list_student_cards(uuid)', 'public.mark_student_cards_printed(uuid[],uuid)',
-            'public.reissue_student_card(uuid,uuid)', 'public.return_grades(uuid,uuid[],uuid)',
-            'public.set_cards_work_until(uuid,date,uuid)', 'public.unlock_all_student_cards(uuid,uuid)',
-            'public.unlock_student_card(uuid,uuid)', 'public.update_course(uuid,jsonb)',
-            'public.move_rubric_scores(uuid,uuid,jsonb,jsonb,uuid)', 'public.duplicate_course(uuid,uuid)',
-            'public.import_json_restore(jsonb,uuid)', 'public._issue_access_code(uuid,uuid,timestamptz)',
-            'public._issue_report_code(uuid,uuid,timestamptz)', 'student_submit.open(text,text)'
-    ];
+    _jobs text;
 begin
-    -- Anything built on Batch A since, which this script does not know and
-    -- would leave broken: a trigger named grade_return_... that is not one of
-    -- Batch A's 18, a table named grade_return_..., or a function that names
-    -- grade_return and is neither one Batch A made nor one of the seven it
-    -- patched. S0-M4b (2026110905, PR 989) is all three.
-    select string_agg(what, ', ' order by what) into _strangers from (
-        select 'trigger ' || t.tgname || ' on ' || t.tgrelid::regclass::text as what
-          from pg_trigger t
-         where not t.tgisinternal and t.tgname like 'grade\_return\_%'
-           and t.tgname not in ('grade_return_delete', 'grade_return_insert', 'grade_return_update',
-                                'grade_return_repoint', 'grade_return_gone', 'grade_return_release')
-        union all
-        select 'table ' || c.oid::regclass::text
-          from pg_class c join pg_namespace n on n.oid = c.relnamespace
-         where c.relkind = 'r' and n.nspname in ('public', 'fv_private', 'student_submit') and c.relname like 'grade\_return\_%'
-        union all
-        select 'function ' || n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')'
-          from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-         where n.nspname in ('public', 'fv_private', 'student_submit') and p.prosrc like '%grade_return%'
-           and p.oid not in (select to_regprocedure(f) from unnest(_known) f where to_regprocedure(f) is not null)) x;
+    -- What else stands on Batch A. PART 2 knows what Batch A made: its 47
+    -- functions and the 7 it patched (by signature), its four tables with
+    -- their columns, indexes, constraints and policies, its three class
+    -- settings, its 18 triggers and file 01's five policies. Anything else
+    -- that depends on one of those, sits on one of its tables, or is a
+    -- function whose text names one of them, stops PART 2 here, before
+    -- anything is dropped, with the whole list. S0-M4b (2026110905, PR 989)
+    -- is such a thing.
+    select string_agg(what, '; ' order by what) into _strangers from (
+        with own_fn(sig) as (values   -- the 47 functions Batch A made (PART 2 drops each by name)
+                    ('public.fv_owns_rubric_check_cell(uuid,uuid,uuid)'), ('public.fv_owns_rubric_score_cell(uuid,uuid,uuid)'),
+                    ('public.fv_owns_score_cell(uuid,uuid)'), ('public.fv_owns_tag_score_cell(uuid,uuid,uuid)'),
+                    ('student_submit._card_lookup(text,text)'), ('student_submit._card_refusal(uuid)'),
+                    ('student_submit._device_session(text)'), ('student_submit._midnight(text)'),
+                    ('student_submit._returned_grade(uuid,uuid)'), ('student_submit._session_class(text,uuid)'),
+                    ('student_submit._session_classes(uuid)'), ('student_submit.card(text,text)'),
+                    ('student_submit.done(text,text)'), ('student_submit.page(text,uuid,text)'),
+                    ('student_submit.seen(text,uuid,uuid[],text)'), ('student_submit.verify_card(text,text,text,text,text,text,boolean)'),
+                    ('fv_private.grade_return_remap(uuid,jsonb,jsonb)'), ('fv_private.restore_grade_returns(jsonb)'),
+                    ('public._cards_work_until(uuid)'), ('public._fv_date(text)'),
+                    ('public._fv_timezone(text)'), ('public._grade_copy(uuid,uuid)'),
+                    ('public._grade_copy_entry(integer,integer,text,text,boolean)'), ('public._grade_copy_in_use(jsonb,uuid)'),
+                    ('public._grade_copy_of(numeric,integer,text,jsonb,jsonb,jsonb)'), ('public._grade_copy_remap(jsonb,jsonb,jsonb,jsonb)'),
+                    ('public._grade_return_apply(uuid,uuid,jsonb,jsonb)'), ('public._grade_return_gone()'),
+                    ('public._grade_return_holds(uuid)'), ('public._grade_return_lock(uuid)'),
+                    ('public._grade_return_lock_first(uuid)'), ('public._grade_return_on_change()'),
+                    ('public._grade_return_one(uuid,uuid,timestamp with time zone)'), ('public._grade_return_release()'),
+                    ('public._grade_return_repoint()'), ('public._issue_student_card(uuid,text)'),
+                    ('public._student_card_json(uuid)'), ('public.course_draft_count(uuid)'),
+                    ('public.issue_student_cards(uuid,uuid[],uuid)'), ('public.list_course_grade_returns(uuid)'),
+                    ('public.list_student_cards(uuid)'), ('public.mark_student_cards_printed(uuid[],uuid)'),
+                    ('public.reissue_student_card(uuid,uuid)'), ('public.return_grades(uuid,uuid[],uuid)'),
+                    ('public.set_cards_work_until(uuid,date,uuid)'), ('public.unlock_all_student_cards(uuid,uuid)'),
+                    ('public.unlock_student_card(uuid,uuid)')
+             ), patched(sig) as (values   -- the 7 it patched (PART 2 puts each back)
+                    ('public.update_course(uuid,jsonb)'), ('public.move_rubric_scores(uuid,uuid,jsonb,jsonb,uuid)'),
+                    ('public.duplicate_course(uuid,uuid)'), ('public.import_json_restore(jsonb,uuid)'),
+                    ('public._issue_access_code(uuid,uuid,timestamptz)'), ('public._issue_report_code(uuid,uuid,timestamptz)'),
+                    ('student_submit.open(text,text)')
+             ), fn as (
+                 select to_regprocedure(sig)::oid as oid from own_fn where to_regprocedure(sig) is not null
+             ), known as (
+                 select oid from fn union select to_regprocedure(sig)::oid from patched where to_regprocedure(sig) is not null
+             ), tbl as (   -- its four tables
+                 select to_regclass(t)::oid as oid
+                   from (values ('public.grade_return'), ('public.student_card'), ('student_submit.device_session'),
+                                ('student_submit.device_session_enrollment')) v(t)
+                  where to_regclass(t) is not null
+             ), col as (   -- its three class settings
+                 select a.attrelid, a.attnum from pg_attribute a
+                  where a.attrelid = to_regclass('public.course') and not a.attisdropped
+                    and a.attname in ('student_page_enabled', 'return_grades', 'cards_work_until')
+             ), dep as (   -- everything Postgres records as depending on one of those, and the table it belongs to
+                 select d.classid, d.objid, d.objsubid, o.kind,
+                        case d.classid
+                             when 'pg_class'::regclass      then coalesce((select i.indrelid from pg_index i where i.indexrelid = d.objid), d.objid)
+                             when 'pg_rewrite'::regclass    then (select r.ev_class from pg_rewrite r where r.oid = d.objid)
+                             when 'pg_constraint'::regclass then (select nullif(k.conrelid, 0) from pg_constraint k where k.oid = d.objid)
+                             when 'pg_trigger'::regclass    then (select t.tgrelid from pg_trigger t where t.oid = d.objid)
+                             when 'pg_policy'::regclass     then (select p.polrelid from pg_policy p where p.oid = d.objid)
+                             when 'pg_attrdef'::regclass    then (select a.adrelid from pg_attrdef a where a.oid = d.objid)
+                             when 'pg_type'::regclass       then (select nullif(t.typrelid, 0) from pg_type t where t.oid = d.objid)
+                        end as home,
+                        case d.classid
+                             when 'pg_trigger'::regclass    then (select t.tgname::text from pg_trigger t where t.oid = d.objid)
+                             when 'pg_policy'::regclass     then (select p.polname::text from pg_policy p where p.oid = d.objid)
+                             when 'pg_constraint'::regclass then (select k.conname::text from pg_constraint k where k.oid = d.objid)
+                        end as name
+                   from pg_depend d
+                   join (select 'pg_proc'::regclass as cls, oid, null::int as sub, 'function' as kind from fn
+                         union all select 'pg_class'::regclass, oid, null, 'table' from tbl
+                         union all select 'pg_class'::regclass, attrelid, attnum, 'setting' from col) o
+                     on d.refclassid = o.cls and d.refobjid = o.oid and (o.sub is null or d.refobjsubid = o.sub)
+                  where d.deptype in ('n', 'a')
+             )
+        select distinct what from (
+            -- 1. Something that is not Batch A's depends on a function, table or class setting Batch A made:
+            --    a view, a policy, a trigger, a foreign key, a default, a SQL-standard function. Postgres
+            --    would refuse the drop half-way; this finds it first.
+            select 'depends on Batch A: ' || pg_describe_object(d.classid, d.objid, d.objsubid) as what
+              from dep d
+             where not (d.classid = 'pg_proc'::regclass and exists (select 1 from known k where k.oid = d.objid))
+               and not exists (select 1 from tbl t where t.oid = d.home)          -- part of one of its own tables: 2 below
+               and not (d.kind = 'function' and d.classid = 'pg_policy'::regclass   -- file 01's five policies
+                        and coalesce(d.name in ('score_same_class', 'tag_score_same_class', 'rubric_score_same_class',
+                                                'rubric_check_score_same_class', 'dibels_score_same_class'), false))
+               and not (d.kind = 'function' and d.classid = 'pg_trigger'::regclass  -- its 18 triggers
+                        and coalesce(d.name in ('grade_return_delete', 'grade_return_insert', 'grade_return_update',
+                                                'grade_return_repoint', 'grade_return_gone', 'grade_return_release'), false))
+               and not (d.kind = 'setting'                                          -- what Batch A itself hung on the three settings
+                        and (coalesce(d.classid = 'pg_constraint'::regclass and d.name = 'course_return_grades_check', false)
+                             or coalesce(d.classid = 'pg_attrdef'::regclass and d.home = to_regclass('public.course'), false)
+                             or coalesce(d.classid = 'pg_trigger'::regclass and d.name = 'grade_return_release', false)))
+            union all
+            -- 2. Something on one of Batch A's four tables that Batch A did not put there: it would go with
+            --    the table, unseen.
+            select 'not Batch A''s, on its table: column ' || a.attname || ' of ' || a.attrelid::regclass::text
+              from pg_attribute a join tbl on tbl.oid = a.attrelid
+             where a.attnum > 0 and not a.attisdropped
+               and ((select c.relname::text from pg_class c where c.oid = a.attrelid), a.attname::text) not in (values
+                    ('grade_return', 'enrollment_id'), ('grade_return', 'assessment_id'), ('grade_return', 'is_draft'), ('grade_return', 'returned_at'), ('grade_return', 'returned_copy'), ('grade_return', 'previous_copy'), ('grade_return', 'updated_at'), ('grade_return', 'seen_at'), ('grade_return', 'working_copy'),
+                    ('student_card', 'id'), ('student_card', 'enrollment_id'), ('student_card', 'code'), ('student_card', 'code_hash'), ('student_card', 'salt'), ('student_card', 'created_at'), ('student_card', 'printed_at'), ('student_card', 'last_opened_at'), ('student_card', 'wrong_tries'), ('student_card', 'wrong_times'), ('student_card', 'locked_at'), ('student_card', 'stopped_at'), ('student_card', 'works_until'), ('student_card', 'password'),
+                    ('device_session', 'id'), ('device_session', 'token_hash'), ('device_session', 'created_at'), ('device_session', 'expires_at'),
+                    ('device_session_enrollment', 'session_id'), ('device_session_enrollment', 'enrollment_id'), ('device_session_enrollment', 'card_id'), ('device_session_enrollment', 'added_at'))
+            union all
+            select 'not Batch A''s, on its table: index ' || i.indexrelid::regclass::text
+              from pg_index i join tbl on tbl.oid = i.indrelid
+             where (select c.relname::text from pg_class c where c.oid = i.indexrelid) not in (
+                    'grade_return_assessment_idx', 'grade_return_pkey', 'student_card_code_hash_key', 'student_card_enrollment_idx',
+                    'student_card_live_code', 'student_card_one_live', 'student_card_pkey', 'device_session_expires',
+                    'device_session_pkey', 'device_session_token_hash_key', 'device_session_enrollment_card', 'device_session_enrollment_enrollment',
+                    'device_session_enrollment_pkey')
+            union all
+            select 'not Batch A''s, on its table: constraint ' || k.conname || ' on ' || k.conrelid::regclass::text
+              from pg_constraint k join tbl on tbl.oid = k.conrelid
+             where k.contype <> 'n' and k.conname::text not in (
+                    'grade_return_copy_while_draft', 'grade_return_pkey', 'grade_return_previous_copy_object', 'grade_return_returned_copy_object',
+                    'grade_return_working_copy_object', 'student_card_code_hash_key', 'student_card_enrollment_id_fkey', 'student_card_pkey',
+                    'student_card_wrong_tries_check', 'device_session_pkey', 'device_session_token_hash_key', 'device_session_enrollment_card_id_fkey',
+                    'device_session_enrollment_enrollment_id_fkey', 'device_session_enrollment_pkey', 'device_session_enrollment_session_id_fkey')
+            union all
+            select 'not Batch A''s, on its table: trigger ' || t.tgname || ' on ' || t.tgrelid::regclass::text
+              from pg_trigger t join tbl on tbl.oid = t.tgrelid
+             where not t.tgisinternal
+            union all
+            select 'not Batch A''s, on its table: policy ' || p.polname || ' on ' || p.polrelid::regclass::text
+              from pg_policy p join tbl on tbl.oid = p.polrelid
+             where p.polname::text not in ('grade_return_read', 'student_card_read')
+            union all
+            -- 3. A function that is not Batch A's and names something Batch A made (comments left out).
+            --    Postgres records nothing for these: after PART 2 they would fail when next called.
+            select 'names Batch A: function ' || n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')'
+              from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+             where n.nspname !~ '^pg_' and n.nspname <> 'information_schema' and p.prokind in ('f', 'p')
+               and not exists (select 1 from known k where k.oid = p.oid)
+               and exists (select 1 from fn union all select 1 from tbl union all select 1 from col)   -- Batch A is here at all
+               and regexp_replace(regexp_replace(p.prosrc, '/\*.*?\*/', '', 'g'), '--[^\n]*', '', 'g') ~ (
+                    '\m(grade_return|student_card|device_session|device_session_enrollment|student_page_enabled|'
+                    || 'return_grades|cards_work_until|_card_lookup|_card_refusal|_cards_work_until|_device_session|'
+                    || '_fv_date|_fv_timezone|_grade_copy|_grade_copy_entry|_grade_copy_in_use|_grade_copy_of|'
+                    || '_grade_copy_remap|_grade_return_apply|_grade_return_gone|_grade_return_holds|_grade_return_lock|'
+                    || '_grade_return_lock_first|_grade_return_on_change|_grade_return_one|_grade_return_release|'
+                    || '_grade_return_repoint|_issue_student_card|_midnight|_returned_grade|_session_class|'
+                    || '_session_classes|_student_card_json|course_draft_count|fv_owns_rubric_check_cell|'
+                    || 'fv_owns_rubric_score_cell|fv_owns_score_cell|fv_owns_tag_score_cell|grade_return_remap|'
+                    || 'issue_student_cards|list_course_grade_returns|list_student_cards|mark_student_cards_printed|'
+                    || 'reissue_student_card|restore_grade_returns|set_cards_work_until|unlock_all_student_cards|'
+                    || 'unlock_student_card|verify_card)\M|student_submit\.(card|done|page|seen)\M')
+            union all
+            -- 4. By name: a trigger called grade_return_... that is not one of Batch A's, a table called
+            --    grade_return_..., anything else in Batch A's schema fv_private.
+            select 'trigger ' || t.tgname || ' on ' || t.tgrelid::regclass::text
+              from pg_trigger t
+             where not t.tgisinternal and t.tgname like 'grade\_return\_%'
+               and t.tgname not in ('grade_return_delete', 'grade_return_insert', 'grade_return_update',
+                                    'grade_return_repoint', 'grade_return_gone', 'grade_return_release')
+            union all
+            select 'table ' || c.oid::regclass::text
+              from pg_class c join pg_namespace n on n.oid = c.relnamespace
+             where c.relkind = 'r' and n.nspname in ('public', 'fv_private', 'student_submit') and c.relname like 'grade\_return\_%'
+            union all
+            select 'in fv_private, not Batch A''s: ' || pg_describe_object(x.cls, x.oid, 0)
+              from (select 'pg_proc'::regclass as cls, p.oid from pg_proc p where p.pronamespace = to_regnamespace('fv_private')
+                    union all select 'pg_class'::regclass, c.oid from pg_class c where c.relnamespace = to_regnamespace('fv_private')) x
+             where not exists (select 1 from fn where fn.oid = x.oid)
+        ) found
+    ) q;
+    -- A pg_cron job whose command names something Batch A made. (Two steps:
+    -- the query names cron.job, and must not be planned where it is missing.)
+    if to_regclass('cron.job') is not null and to_regclass('public.grade_return') is not null then
+        execute $q$select string_agg('names Batch A: cron job ' || jobname, '; ' order by jobname) from cron.job where command ~ $1$q$
+           into _jobs
+          using '\m(grade_return|student_card|device_session|device_session_enrollment|student_page_enabled|'
+                || 'return_grades|cards_work_until|_card_lookup|_card_refusal|_cards_work_until|_device_session|'
+                || '_fv_date|_fv_timezone|_grade_copy|_grade_copy_entry|_grade_copy_in_use|_grade_copy_of|'
+                || '_grade_copy_remap|_grade_return_apply|_grade_return_gone|_grade_return_holds|_grade_return_lock|'
+                || '_grade_return_lock_first|_grade_return_on_change|_grade_return_one|_grade_return_release|'
+                || '_grade_return_repoint|_issue_student_card|_midnight|_returned_grade|_session_class|'
+                || '_session_classes|_student_card_json|course_draft_count|fv_owns_rubric_check_cell|'
+                || 'fv_owns_rubric_score_cell|fv_owns_score_cell|fv_owns_tag_score_cell|grade_return_remap|'
+                || 'issue_student_cards|list_course_grade_returns|list_student_cards|mark_student_cards_printed|'
+                || 'reissue_student_card|restore_grade_returns|set_cards_work_until|unlock_all_student_cards|'
+                || 'unlock_student_card|verify_card)\M|student_submit\.(card|done|page|seen)\M';
+        _strangers := concat_ws('; ', _strangers, _jobs);
+    end if;
     if _strangers is not null then
-        raise exception 'Something is built on top of Batch A that this script does not know. If it is S0-M4b (2026110905, PR 989), run S0-M4b''s undo first, then this. Found: %. Nothing was changed.', _strangers;
+        raise exception 'Something else stands on Batch A, and PART 2 would break it or lose it. If it is S0-M4b (2026110905, PR 989), run S0-M4b''s undo first, then this. Found: %. Nothing was changed.', _strangers;
     end if;
     -- Each of the seven functions must be either the function Batch A left
     -- (it carries the line Batch A added) or already the one from before (a

@@ -42,6 +42,11 @@ some run other scripts of this folder against their copy.
   back-on     PART 1, saves while it is off, then file 02 again: the
               triggers are back and grade_return holds every grade.
   half-way    PART 1 stopped after each of its seven tables, then run whole.
+  page-off    PART 1A (the Student Page off) before PART 1 and at every
+              point of it: refused while a Batch A trigger is left.
+  fooled      Fourteen things a later migration might build on Batch A:
+              PART 2 stops for each before it changes anything, and the
+              header's read-only pre-check lists the same.
   s0-m4b      With PR 989's file on top: PART 1 leaves its three triggers
               and lists them; PART 2 stops, saying to undo S0-M4b first.
   notices     The catalog notices each kind of thing it claims to cover.
@@ -94,6 +99,8 @@ ENR1 = 'eeeeeeee-1111-0000-0000-0000000000d1'; ENR2 = 'eeeeeeee-1111-0000-0000-0
 ENR3 = 'eeeeeeee-1111-0000-0000-0000000000d3'        # the first student again, in the second class
 STU1 = 'aaaaaaaa-1111-0000-0000-0000000000d1'; STU2 = 'aaaaaaaa-1111-0000-0000-0000000000d2'
 SCORE_TABLES = ['public.score', 'public.tag_score', 'public.rubric_score', 'public.rubric_check_score', 'public.dibels_score']
+BATCH_A_CALLS = ['return_grades', 'issue_student_cards', 'mark_student_cards_printed', 'unlock_student_card', 'unlock_all_student_cards',
+                 'reissue_student_card', 'set_cards_work_until']
 TRIGGERS = "select count(*) from pg_trigger where tgname like 'grade\\_return\\_%' and not tgisinternal"
 passed = []; failed = []
 def ok(name, cond, detail=''):
@@ -120,7 +127,7 @@ def text_of(name, ref=None):
 def sections(text=None):
     """{'PART 1': [statements], 'PART 1B': [...], 'PART 2': [...]} of the undo script."""
     text = text or open(os.path.join(HERE, UNDO)).read()
-    marks = [(name, text.index('\n-- %s: ' % name)) for name in ('PART 1', 'PART 1B', 'PART 2')]
+    marks = [(name, text.index('\n-- %s: ' % name)) for name in ('PART 1', 'PART 1A', 'PART 1B', 'PART 2')]
     out = {}
     for n, (name, at) in enumerate(marks):
         out[name] = split(text[at:marks[n + 1][1]] if n + 1 < len(marks) else text[at:])
@@ -132,6 +139,12 @@ def transactions(statements):
         cur.append(st)
         if bare(st).lower() == 'commit': out.append(cur); cur = []
     return out + ([cur] if cur else [])
+def precheck(with_cron=False):
+    """The read-only query in the script's header that lists what would stop PART 2. Its last
+    branch reads pg_cron's cron.job, which gradebook-prod has and this harness does not."""
+    body = open(os.path.join(HERE, UNDO)).read().split('-- precheck:\n')[1].split('-- end precheck')[0]
+    sql = '\n'.join(l[5:] if l.startswith('--   ') else '' for l in body.splitlines()).strip().rstrip(';')
+    return sql if with_cron else sql.split("\nunion all\nselect 'names Batch A: cron job '")[0]
 def record_statement():
     """The optional statement in the script's header, between `-- record:` and `-- end record`."""
     body = open(os.path.join(HERE, UNDO)).read().split('-- record:\n')[1].split('-- end record')[0]
@@ -158,10 +171,11 @@ class Db:
         finally: self.c.run('reset role')
     def statements(self, sts):
         """'ok', or 'STOPPED: <message>' with the open transaction rolled back. Keeps the rows of the last query."""
+        self.rows = []
         try:
             for st in sts:
                 r = self.c.run(st)
-                if bare(st).lower().startswith('select'): self.rows = [list(x) for x in r]
+                if bare(st).lower().startswith(('select', 'update')): self.rows = [list(x) for x in (r or [])]
             return 'ok'
         except Exception as e:
             self.c.run('rollback'); return 'STOPPED: ' + message(e)
@@ -350,6 +364,7 @@ def scen_main():
        len([l for l in gone if l.startswith('trigger ')]) == 18 and all(l.startswith(('trigger ', 'depends pg_trigger ')) for l in gone)
        and all(l.startswith('depends pg_trigger ') for l in new), ([l for l in gone if not l.startswith('trigger ')], new))
     gr = grade_rows(d)
+    drafts_at_stop = d.teacher('course_draft_count(:c)', c=COURSE)
 
     # What a student is shown after it. When I Return Them:
     new_piece, save_new = nid(), nid()
@@ -373,19 +388,28 @@ def scen_main():
     d.teacher("save_score_comment(:e, :a, 'After the stop')", e=ENR2, a=k['quiz']); d.teacher('clear_score(:e, :a)', e=ENR2, a=k['lab'])
     ok('PART 1: none of those saves, a comment or a clear changed a row of grade_return', grade_rows(d) == gr)
 
-    # Turning the Student Page off is what stops students seeing anything.
-    d.run('update course set student_page_enabled = false where id in (:c, :c2)', c=COURSE, c2=COURSE2)
+    # Return Grades does not reach a first grade saved after PART 1: there is no row for it to return.
+    r = d.teacher('return_grades(:a, :ids::uuid[], :k)', a=new_piece, ids='{%s}' % ENR1, k=nid())
+    ok('PART 1: Return Grades on that first grade returns nothing (returned: 0) and the student still sees no result',
+       r.get('returned') == 0 and sees(d, k['token'], ENR1).get('Undo new') is None and grade_rows(d) == gr, r)
+    ok('PART 1: the teacher\'s draft count and Returned list answer from what was there at the stop: the count is what it was (%d) after four saves, and the list has no line for the new piece' % drafts_at_stop,
+       d.teacher('course_draft_count(:c)', c=COURSE) == drafts_at_stop
+       and new_piece not in json.dumps(d.teacher('list_course_grade_returns(:c)', c=COURSE)), d.teacher('course_draft_count(:c)', c=COURSE))
+
+    # Turning the Student Page off is what stops students seeing anything: PART 1A.
+    ok('PART 1A runs once PART 1 is through, and answers with the two classes it turned off',
+       d.part('PART 1A') == 'ok' and sorted(str(r[0]) for r in d.rows) == sorted([COURSE, COURSE2]), d.rows)
     off = [sees(d, k['token'], ENR1), sees(d, k['token2'], ENR3), d.service("student_submit.card(:c, 'undo-ip')", c=k['token_code'])]
-    ok('PART 1, then the Student Page turned off (one UPDATE of course): the signed-in page and a card scan are both refused',
-       all(x.get('ok') is False for x in off), off)
-    d.run('update course set student_page_enabled = true where id in (:c, :c2)', c=COURSE, c2=COURSE2)
+    ok('PART 1, then PART 1A: the signed-in page and a card scan are both refused, no draft was returned and no row of grade_return changed',
+       all(x.get('ok') is False for x in off) and grade_rows(d) == gr, off)
+    d.run('update public.course set student_page_enabled = true where id in (:c, :c2)', c=COURSE, c2=COURSE2)
     ok('... and turned on again, students see what they saw', sees(d, k['token'], ENR1) == seen and sees(d, k['token2'], ENR3) == seen2)
 
     # What of Batch A still runs after PART 1.
     ok('PART 1 leaves file 01\'s five same-class policies: they run on every save until PART 1B',
        d.one("select count(*) from pg_policies where policyname like '%\\_same\\_class'") == 5)
     d.teacher('return_grades(:a, :ids::uuid[], :k)', a=k['lab'], ids='{%s}' % ENR1, k=nid())
-    ok('after PART 1, Return Grades still works: the draft is returned and the student sees it (5)',
+    ok('after PART 1, Return Grades still returns a draft that was waiting at the stop: the student sees it (5)',
        sees(d, k['token'], ENR1).get('Undo lab') == 5 and grade_rows(d) != gr, sees(d, k['token'], ENR1))
     gr = grade_rows(d)
     d.teacher("update_course(:c, :p::jsonb)", c=COURSE, p='{"return_grades": "on_save"}')
@@ -407,6 +431,10 @@ def scen_main():
     d.teacher('import_json_restore(:p::jsonb, :k)', p=json.dumps(backup), k=nid())
     ok('after PART 1, a restore still calls Batch A\'s helper: the restored grade gets its grade_return row',
        d.one('select count(*) from grade_return g join enrollment e on e.id = g.enrollment_id join course c on c.id = e.course_id where c.name = :n', n='Restored') == 1)
+    copy = d.teacher('duplicate_course(:c, :k)', c=COURSE, k=nid())
+    ok('after PART 1, Duplicate Class still copies the Return Grades setting, and the slip-code functions still check card codes',
+       d.one('select return_grades from course where id = :c', c=str(copy['id'] if isinstance(copy, dict) else copy)) == 'on_return'
+       and d.one("select count(*) from pg_proc where proname in ('_issue_access_code', '_issue_report_code') and prosrc like '%student_card%'") == 2, copy)
     d.service("student_submit.seen(:t, :e, :ids::uuid[], 'undo-ip')", t=k['token'], e=ENR1, ids='{%s}' % k['essay'])
     ok('after PART 1, the cards and the student\'s own functions go on working and writing: a new card, and "seen" on a piece',
        d.teacher('reissue_student_card(:id, :k)', id=str(d.one('select id from student_card where enrollment_id = :e and stopped_at is null', e=ENR2)), k=nid()) is not None
@@ -439,6 +467,8 @@ def scen_main():
     d.run('drop table public.undo_attempt')
     sixteen_lines = lambda lines: [l for l in lines if l.startswith(('function ', 'function more ')) and l.split(' | ')[0].split('(')[0].split('.')[-1] in SIXTEEN]
     m5_before = sixteen_lines(catalog(d.c))
+    idem = d.run("select endpoint from fv_idempotency where endpoint = any (cast(:e as text[])) order by 1", e=BATCH_A_CALLS)
+    ok('just before PART 2 the header\'s pre-check lists nothing: nothing else stands on Batch A', d.run(precheck()) == [], d.run(precheck()))
     ok('PART 2 runs, with S0-M5 applied on top of Batch A', d.part('PART 2') == 'ok')
     cat2 = catalog(d.c)
     ok('PART 2: the catalog is the one from before Batch A, line by line (%d lines), but for S0-M5, which it leaves, and two things it says it leaves' % len(cat0),
@@ -466,6 +496,8 @@ def scen_main():
     left = d.run("select count(*), coalesce(md5(string_agg(x::text, '|' order by x::text)), '') from student_submit.attempt x")[0]
     ok('PART 2: the sign-in log lost its card rows and nothing else', list(left) == list(kept) and d.one("select count(*) from student_submit.attempt where route = 'card'") == 0, (kept, left))
     ok('PART 2: the four of the seven with a live fingerprint on file carry it again', all(md5(f) == LIVE[n] for n, f in SEVEN.items()))
+    ok('PART 2 leaves the idempotency rows of Batch A\'s own calls (%d here: Return Grades, the card calls): the calls are gone, the rows are harmless' % len(idem),
+       len(idem) >= 6 and d.run("select endpoint from fv_idempotency where endpoint = any (cast(:e as text[])) order by 1", e=BATCH_A_CALLS) == idem, idem)
     ok('PART 2: grade_return, student_card, the session tables, fv_private and the three class settings are gone',
        d.one("""select to_regclass('public.grade_return') is null and to_regclass('public.student_card') is null
                        and to_regclass('student_submit.device_session') is null and to_regnamespace('fv_private') is null
@@ -575,8 +607,9 @@ def scen_half_way():
     d = Db('halfway'); seed(d)
     ok('half-way: Batch A applied', d.apply() == 'ok')
     txs = transactions(PARTS['PART 1'])
-    ok('PART 1 is seven transactions, one table each, and one closing query', len(txs) == 8 and all(bare(t[0]).lower() == 'begin' for t in txs[:7])
-       and [len(re.findall(r'\bon public\.(\w+);', ' '.join(t))) for t in txs[:7]] == [3, 4, 4, 4, 1, 1, 1], len(txs))
+    ok('PART 1 is seven transactions, one table each, course first, and one closing query', len(txs) == 8 and all(bare(t[0]).lower() == 'begin' for t in txs[:7])
+       and [len(re.findall(r'\bon public\.(\w+);', ' '.join(t))) for t in txs[:7]] == [1, 3, 4, 4, 4, 1, 1]
+       and 'public.course' in txs[0][2], len(txs))
     results = []
     for stop_after in range(1, 7):
         for t in txs[:stop_after]: d.statements(t)
@@ -584,14 +617,14 @@ def scen_half_way():
         results.append((stop_after, mid, d.part('PART 1'), d.one(TRIGGERS), d.file(FILES[1]), d.one(TRIGGERS)))
     ok('half-way: stopped after each of its first six tables, PART 1 run again from the top finishes the job (then file 02 puts the 18 back for the next try)',
        all(r[2] == 'ok' and r[3] == 0 and r[4] == 'ok' and r[5] == 18 for r in results)
-       and [r[1] for r in results] == [15, 11, 7, 3, 2, 1], results)
+       and [r[1] for r in results] == [17, 14, 10, 6, 2, 1], results)
     # A table it cannot get: it gives up on that table and says so; the tables before it are done.
     holder = connect(d.name); holder.run('begin'); holder.run('lock table public.rubric_score in access exclusive mode')
     t0 = time.time(); r = d.part('PART 1'); took = time.time() - t0
     left = d.one(TRIGGERS)
     holder.run('rollback'); holder.close()
     ok('half-way: a table held by another session for good: PART 1 tries 40 times (about twelve seconds), stops with a message naming it, and keeps what it had done',
-       r.startswith('STOPPED: PART 1 could not get public.rubric_score in 40 tries') and left == 11 and 8 < took < 20, (r, left, round(took, 1)))
+       r.startswith('STOPPED: PART 1 could not get public.rubric_score in 40 tries') and left == 10 and 8 < took < 20, (r, left, round(took, 1)))
     ok('half-way: and run again once the table is free, it finishes', d.part('PART 1') == 'ok' and d.one(TRIGGERS) == 0)
     # Pasted whole, as the SQL editor sends it: one message, many statements.
     # Its own begin and commit must still make seven transactions of it.
@@ -603,8 +636,8 @@ def scen_half_way():
     except Exception as e: r = message(e); d.run('rollback')
     left = d.one(TRIGGERS)
     holder.run('rollback'); holder.close()
-    ok('half-way: PART 1 sent as ONE message (a paste) is still seven transactions: stopped at the third table, the first two are done and stay done',
-       r.startswith('PART 1 could not get public.rubric_score') and left == 11, (r, left))
+    ok('half-way: PART 1 sent as ONE message (a paste) is still seven transactions: stopped at the fourth table, the first three are done and stay done',
+       r.startswith('PART 1 could not get public.rubric_score') and left == 10, (r, left))
     d.file(FILES[1])
     try: d.run(whole); r = 'ok'
     except Exception as e: r = message(e); d.run('rollback')
@@ -628,8 +661,9 @@ def scen_s0_m4b():
     d.apply(); d.file(S0_M4B, S0_M4B_REF)
     cat = catalog(d.c); r = d.part('PART 2')
     ok('s0-m4b: PART 2 stops before it changes anything, saying to run S0-M4b\'s undo first and naming what it found',
-       r.startswith("STOPPED: Something is built on top of Batch A that this script does not know. If it is S0-M4b (2026110905, PR 989), run S0-M4b's undo first, then this. Found: ")
-       and all(x in r for x in ('trigger grade_return_mode on assessment', 'trigger grade_return_truncate on enrollment', 'function public.'))
+       r.startswith("STOPPED: Something else stands on Batch A, and PART 2 would break it or lose it. If it is S0-M4b (2026110905, PR 989), run S0-M4b's undo first, then this. Found: ")
+       and all(x in r for x in ('trigger grade_return_mode on assessment', 'trigger grade_return_truncate on enrollment', 'names Batch A: function public.'))
+       and all(row[0] in r for row in d.run(precheck()))
        and r.endswith('Nothing was changed.') and catalog(d.c) == cat, r)
     # The whole way back: S0-M4b's own undo (from its branch), then PART 2.
     theirs = d.file('local-test/s0-m4b-undo.sql', S0_M4B_REF)
@@ -637,6 +671,105 @@ def scen_s0_m4b():
     ok('s0-m4b: after S0-M4b\'s own undo, PART 2 runs, and the catalog is the one from before Batch A but for S0-M5 (left in place) and the three dropped-column slots; no row of any table differs',
        theirs == 'ok' and back == 'ok' and s0_m5_and(cat0, catalog(d.c), ['dropped columns public.course | 3']) and row_checksums(d.c, cols0) == rows0,
        (theirs, back, trace(cat0, catalog(d.c))))
+    d.close()
+
+# ── page-off: PART 1A at every point of PART 1 ──────────────────────────────
+def scen_page_off():
+    d = Db('pageoff'); seed(d)
+    ok('page-off: Batch A applied and in use', d.apply() == 'ok'); k = use(d)
+    txs = transactions(PARTS['PART 1'])
+    drafts = "select count(*) from grade_return where is_draft"
+    flags = "select id::text, student_page_enabled from course order by 1"
+    bare_update = PARTS['PART 1A'][-1]
+    n_drafts = d.one(drafts)
+    # Why it matters: before PART 1, the plain statement returns every waiting draft.
+    d.run('begin'); d.run('update public.course set student_page_enabled = false where student_page_enabled')
+    returned = n_drafts - d.one(drafts); d.run('rollback')
+    ok('page-off, why it is guarded: with Batch A whole, a plain UPDATE turning the page off returns every waiting draft (%d of %d here) to the students' % (returned, n_drafts),
+       returned == n_drafts and n_drafts >= 3, (returned, n_drafts))
+    stops = []
+    for cut in range(0, 7):                       # PART 1 not started, then stopped after each of its first six tables
+        for t in txs[:cut]: d.statements(t)
+        gr = grade_rows(d); fl = d.run(flags); left = d.one(TRIGGERS)
+        r = d.part('PART 1A')
+        alone = d.statements([bare_update]); alone_rows = list(d.rows) if alone == 'ok' else alone
+        d.run('begin'); d.run('update public.course set student_page_enabled = false where student_page_enabled')
+        plain = n_drafts - d.one(drafts); d.run('rollback')
+        stops.append((cut, left, r.startswith("STOPPED: Batch A's triggers are not all gone (") and r.endswith('Nothing was changed.'),
+                      ('grade_return_release on course' in r) == (cut == 0), alone_rows == [], grade_rows(d) == gr and d.run(flags) == fl, plain))
+        d.file(FILES[1])
+    ok('page-off: with PART 1 not started, and stopped after each of its first six tables, PART 1A refuses, names the triggers that are left, and changes nothing',
+       all(x[2] and x[3] and x[5] for x in stops) and [x[1] for x in stops] == [18, 17, 14, 10, 6, 2, 1], stops)
+    ok('page-off: its UPDATE pasted alone, without the check above it, turns no class off at any of those points either', all(x[4] for x in stops), stops)
+    ok('page-off: course goes first in PART 1, so from its first table on even a plain UPDATE returns no draft; only before PART 1 does it (%d)' % stops[0][6],
+       stops[0][6] == n_drafts and all(x[6] == 0 for x in stops[1:]), [x[6] for x in stops])
+    ok('page-off: after the whole of PART 1, PART 1A turns the two classes off and lists them; no draft is returned and no row of grade_return changes',
+       d.part('PART 1') == 'ok' and d.one(TRIGGERS) == 0 and d.part('PART 1A') == 'ok'
+       and sorted(str(r[0]) for r in d.rows) == sorted([COURSE, COURSE2]) and d.one(drafts) == n_drafts and grade_rows(d) == gr, d.rows)
+    ok('page-off: run again it turns nothing off and lists nothing', d.part('PART 1A') == 'ok' and d.rows == [])
+    d.close()
+
+# ── fooled: what else stands on Batch A ─────────────────────────────────────
+def scen_fooled():
+    """Each thing a later migration might have built on Batch A, one at a time: PART 2 must stop
+    before it changes anything and name it, and the header's read-only pre-check must list the same."""
+    d = Db('fooled'); seed(d)
+    ok('fooled: Batch A applied and in use', d.apply() == 'ok'); k = use(d)
+    cases = [
+        ('a function that reads student_card and never names grade_return',
+         ["create function public.zz_cards(c uuid) returns bigint language plpgsql as $$ begin return (select count(*) from public.student_card k join public.enrollment e on e.id = k.enrollment_id where e.course_id = c); end $$"],
+         ['drop function public.zz_cards(uuid)'], 'names Batch A: function public.zz_cards(c uuid)'),
+        ('a function that calls return_grades',
+         ["create function public.zz_return_all(a uuid) returns jsonb language plpgsql as $$ begin return public.return_grades(a, null, gen_random_uuid()); end $$"],
+         ['drop function public.zz_return_all(uuid)'], 'names Batch A: function public.zz_return_all(a uuid)'),
+        ('a function that reads course.student_page_enabled',
+         ["create function public.zz_on(c uuid) returns boolean language plpgsql as $$ begin return (select student_page_enabled from public.course where id = c); end $$"],
+         ['drop function public.zz_on(uuid)'], 'names Batch A: function public.zz_on(c uuid)'),
+        ('a trigger on score, named otherwise, whose function calls _grade_copy',
+         ["create function public.zz_on_score() returns trigger language plpgsql as $$ begin perform public._grade_copy(new.enrollment_id, new.assessment_id); return null; end $$",
+          "create trigger zz_on_score after insert or update on public.score for each row execute function public.zz_on_score()"],
+         ['drop trigger zz_on_score on public.score', 'drop function public.zz_on_score()'], 'names Batch A: function public.zz_on_score()'),
+        ('a function in another schema that calls student_submit.page',
+         ["create schema zz", "create function zz.peek(t text, e uuid) returns jsonb language plpgsql as $$ begin return student_submit.page(t, e, 'x'); end $$"],
+         ['drop schema zz cascade'], 'names Batch A: function zz.peek(t text, e uuid)'),
+        ('a view over grade_return', ["create view public.zz_drafts as select enrollment_id, assessment_id from public.grade_return where is_draft"],
+         ['drop view public.zz_drafts'], 'depends on Batch A: rule _RETURN on view zz_drafts'),
+        ('a view over the class setting', ["create view public.zz_on_classes as select id from public.course where student_page_enabled"],
+         ['drop view public.zz_on_classes'], 'depends on Batch A: rule _RETURN on view zz_on_classes'),
+        ('a SQL-standard function over grade_return (Postgres keeps no text of it to search)',
+         ["create function public.zz_n() returns bigint language sql begin atomic select count(*) from public.grade_return; end"],
+         ['drop function public.zz_n()'], 'depends on Batch A: function zz_n()'),
+        ('a policy on another table that calls fv_owns_score_cell',
+         ["create policy zz_pol on public.score_audit for select using (public.fv_owns_score_cell(null, null))"],
+         ['drop policy zz_pol on public.score_audit'], 'depends on Batch A: policy zz_pol on table score_audit'),
+        ('a foreign key from another table to student_card', ["create table public.zz_fk (card uuid references public.student_card(id))"],
+         ['drop table public.zz_fk'], 'depends on Batch A: constraint zz_fk_card_fkey on table zz_fk'),
+        ('an index on a class setting', ["create index zz_rg on public.course (return_grades)"], ['drop index public.zz_rg'], 'depends on Batch A: index zz_rg'),
+        ('a column added to grade_return and an index added to student_card',
+         ["alter table public.grade_return add column zz_note text", "create index zz_card_idx on public.student_card (printed_at)"],
+         ['alter table public.grade_return drop column zz_note', 'drop index public.zz_card_idx'], "not Batch A's, on its table: column zz_note of grade_return"),
+        ('another function in fv_private', ["create function fv_private.zz_other() returns int language sql as 'select 1'"],
+         ['drop function fv_private.zz_other()'], "in fv_private, not Batch A's: function fv_private.zz_other()"),
+        ('a pg_cron job that calls something of Batch A (a stand-in cron.job)',
+         ["create schema cron", "create table cron.job (jobname text, schedule text, command text, database text, username text, active boolean)",
+          "insert into cron.job values ('zz_nightly', '47 10 * * *', 'select public.course_draft_count(null)', 'd', 'u', true)"],
+         ['drop schema cron cascade'], 'names Batch A: cron job zz_nightly'),
+    ]
+    for what, setup, cleanup, names in cases:
+        for st in setup: d.run(st)
+        listed = [r[0] for r in d.run(precheck(with_cron='cron' in what))]
+        cat = catalog(d.c); r = d.part('PART 2')
+        ok('fooled: %s: PART 2 stops before it changes anything and names it, and the pre-check lists the same' % what,
+           r.startswith('STOPPED: Something else stands on Batch A') and r.endswith('Nothing was changed.') and names in r
+           and names in listed and all(x in r for x in listed) and catalog(d.c) == cat, (r[:300], listed))
+        for st in cleanup: d.run(st)
+    # What must NOT stop it.
+    d.run("create function public.zz_note() returns int language sql as $$ select 1 -- see the grade return notes, and grade_return too $$")
+    d.run("create function public.zz_page(page int, done boolean, seen int, card text) returns int language sql as $$ select page + seen /* student_card */ $$")
+    ok('fooled: functions that only mention Batch A in a comment, or use the words page, done, seen and card for their own things, are not listed', d.run(precheck()) == [], d.run(precheck()))
+    r = d.part('PART 2')
+    ok('fooled: with every one of those taken away again, and the two harmless functions left, PART 2 runs', r == 'ok' and d.one("select to_regclass('public.grade_return') is null"), r)
+    ok('fooled: and after it a save still works', d.teacher('upsert_score(:e, :a, 2)', e=ENR1, a=k['quiz']) is not None)
     d.close()
 
 # ── notices: the catalog sees each kind of thing ────────────────────────────
@@ -676,9 +809,10 @@ if __name__ == '__main__':
         build(); sys.exit(0)
     c = connect(BASE_DB); has = c.run("select to_regclass('public.grade_return') is not null")[0][0]; c.close()
     if has: sys.exit('this database already has Batch A: build one without the four migrations')
-    ok('the undo script: PART 1 (seven transactions and a query), PART 1B and PART 2 (one transaction each)',
-       [len(transactions(PARTS[p])) for p in ('PART 1', 'PART 1B', 'PART 2')] == [8, 1, 1])
-    which = sys.argv[1:] or ['main', 'apply-only', 'partial', 'back-on', 'half-way', 's0-m4b', 'notices']
+    ok('the undo script: PART 1 (seven transactions and a query), PART 1A (a check and one UPDATE), PART 1B and PART 2 (one transaction each)',
+       [len(transactions(PARTS[p])) for p in ('PART 1', 'PART 1B', 'PART 2')] == [8, 1, 1] and len(PARTS['PART 1A']) == 2
+       and bare(PARTS['PART 1A'][1]).lower().startswith('update public.course'))
+    which = sys.argv[1:] or ['main', 'apply-only', 'partial', 'back-on', 'half-way', 'page-off', 'fooled', 's0-m4b', 'notices']
     for name in which:
         globals()['scen_' + name.replace('-', '_')]()
     print('\n'.join('PASS ' + p for p in passed))

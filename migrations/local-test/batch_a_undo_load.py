@@ -1,7 +1,8 @@
 """batch-a-undo.sql's PART 1 (the fast stop) while teachers are saving.
 
-Four connections save in a loop as Teacher A (points, a rubric fill, one
-rubric criterion, a comment: the mix a class produces). PART 1 is run
+Six connections save in a loop as Teacher A (points, a rubric fill, one
+rubric criterion, a comment, a clear, a change to the class itself: the
+reviewer's mix, which also takes the course table). PART 1 is run
 against them again and again; between runs the saves are paused and file 02
 puts the triggers back. Counted: saves that failed, by SQLSTATE (40P01 is a
 save Postgres killed to break a deadlock), the slowest save, and PART 1 runs
@@ -20,7 +21,7 @@ Needs the template database batch_a_undo.py uses; works on a copy.
 PGPORT=54331 PGDATABASE=fv_undo python3 batch_a_undo_load.py            # about three minutes
 RUNS=160 PGPORT=54331 PGDATABASE=fv_undo python3 batch_a_undo_load.py   # the long run
 """
-import os, random, sys, threading, time
+import json, os, random, sys, threading, time
 import batch_a_undo as U
 from batch_a_undo import Db, ok, nid, connect, A, FILES, PARTS
 
@@ -47,13 +48,14 @@ crit = [str(r[0]) for r in d.run('select id from criterion where rubric_id = :r 
 d.run('analyze')
 
 stop = threading.Event(); hold = threading.Event()
-idle = [threading.Event() for _ in range(4)]
-stats = [dict(calls=0, errors={}, max_ms=0.0, slow=0) for _ in range(4)]
+WRITERS = 6
+idle = [threading.Event() for _ in range(WRITERS)]
+stats = [dict(calls=0, errors={}, max_ms=0.0, slow=0) for _ in range(WRITERS)]
 pause = [0.0]
 def writer(i):
     w = connect(d.name)
     w.run("select set_config('request.jwt.claim.sub', :u, false)", u=A); w.run('set role authenticated')
-    mine = enr[i::4]; rnd = random.Random(i); st = stats[i]
+    mine = enr[i::WRITERS]; rnd = random.Random(i); st = stats[i]
     while not stop.is_set():
         if hold.is_set():
             idle[i].set(); time.sleep(0.005); continue
@@ -61,10 +63,12 @@ def writer(i):
         e = rnd.choice(mine); v = rnd.randint(1, 4); op = rnd.random()
         t0 = time.perf_counter()
         try:
-            if op < 0.4: w.run('select upsert_score(:e, :a, :v)', e=e, a=pts, v=v)
-            elif op < 0.7: w.run('select fill_rubric(:e, :a, :v, 0::smallint)', e=e, a=rw, v=v)
-            elif op < 0.95: w.run('select upsert_rubric_score(:e, :a, :x, :v)', e=e, a=rw, x=rnd.choice(crit), v=v)
-            else: w.run("select save_score_comment(:e, :a, 'x')", e=e, a=pts)
+            if op < 0.35: w.run('select upsert_score(:e, :a, :v)', e=e, a=pts, v=v)
+            elif op < 0.6: w.run('select fill_rubric(:e, :a, :v, 0::smallint)', e=e, a=rw, v=v)
+            elif op < 0.8: w.run('select upsert_rubric_score(:e, :a, :x, :v)', e=e, a=rw, x=rnd.choice(crit), v=v)
+            elif op < 0.9: w.run("select save_score_comment(:e, :a, 'x')", e=e, a=pts)
+            elif op < 0.95: w.run('select clear_score(:e, :a)', e=e, a=rw)
+            else: w.run('select update_course(:c, :p::jsonb)', c=U.COURSE, p=json.dumps({'name': 'Undo class %d' % rnd.randint(1, 9)}))
         except Exception as ex:
             code = ex.args[0].get('C') if ex.args and isinstance(ex.args[0], dict) else 'other'
             st['errors'][code] = st['errors'].get(code, 0) + 1
@@ -72,7 +76,7 @@ def writer(i):
         st['calls'] += 1; st['max_ms'] = max(st['max_ms'], ms); st['slow'] += ms > 250
         if pause[0]: time.sleep(pause[0] * (0.5 + rnd.random()))
     w.close()
-threads = [threading.Thread(target=writer, args=(i,)) for i in range(4)]
+threads = [threading.Thread(target=writer, args=(i,)) for i in range(WRITERS)]
 [t.start() for t in threads]
 
 def quiet(fn):
@@ -109,8 +113,14 @@ def measure(label, statements, runs, restore):
     return done, errs, calls
 
 restore_triggers = lambda: d.file(FILES[1])
+def alone(speed, seconds=8):
+    """The saves by themselves, nothing run against them: what they do to each other."""
+    reset(); time.sleep(seconds); calls, errs, slowest, slow = totals()
+    print('%-42s %6d saves, %5.1f a second | saves that FAILED: %s | slowest save %4.0f ms, over 250 ms: %d'
+          % ('the saves alone, %s:' % speed, calls, calls / seconds, errs or 'none', slowest, slow))
 for speed, p in (('a class at work', 0.25), ('flat out', 0.0)):
     pause[0] = p; time.sleep(0.5)
+    alone(speed)
     runs = RUNS if p else max(20, RUNS // 2)
     measure('PART 1 as first written, %s:' % speed, OLD_PART_1, runs, restore_triggers)
     done, errs, calls = measure('PART 1 as it is now, %s:' % speed, PARTS['PART 1'], runs, restore_triggers)
