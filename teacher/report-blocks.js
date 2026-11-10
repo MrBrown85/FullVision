@@ -685,7 +685,9 @@ window.ReportBlocks = (function () {
      mark per assessment. Each mark is the competency's on the piece, as the
      gradebook shows it: rubric criteria that disagree give the lowest
      (Colin, 2026-11-03). Progress in One Area, Next Steps and Ways to
-     Support at Home read it. */
+     Support at Home read it. Pieces with the same date are in the order the
+     grades count them in (calc.js samePieceDateOrder: the one made later is
+     later), so "Latest" here is the piece the grade treats as latest. */
   function _sectionWork(cid, sid, sec) {
     const byId = {};
     getAssessments(cid).forEach(a => (byId[a.id] = a));
@@ -703,7 +705,7 @@ window.ReportBlocks = (function () {
         d: typeof _assessmentDate === 'function' ? _assessmentDate(byId[id]) : byId[id].date || '',
         score: best[id],
       }))
-      .sort((x, y) => (x.d || '').localeCompare(y.d || ''));
+      .sort((x, y) => (x.d || '').localeCompare(y.d || '') || samePieceDateOrder(cid, x.a.id, y.a.id));
   }
   /* "Chemical Reactions Lab, Oct 12 · 3.3 / 4 Proficient" */
   /* A mark as the class reads it: "3.3 / 4 Proficient", "83%" for a
