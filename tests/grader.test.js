@@ -158,13 +158,7 @@ describe('Grader: each action passes through to one data.js writer', () => {
       [CID, 's1', 'essay', 't1', 3, '2026-10-10', 'summative', 'Clear thesis', -1],
       [CID, 's1', 'essay', 'plusMinus'],
     ],
-    [
-      'undoOnPhone',
-      [CID, 's1', 'essay', { s1: [{ score: 3 }] }, { s1: [] }],
-      'saveScores',
-      [CID, { s1: [] }],
-      [CID, 's1', 'essay', 'undo'],
-    ],
+    ['undoOnPhone', [CID, 's1', 'essay', { s1: [] }], 'saveScores', [CID, { s1: [] }], [CID, 's1', 'essay', 'undo']],
     [
       'undo',
       [CID, { s1: [] }, { s1: [{ score: 3 }] }],
@@ -266,24 +260,13 @@ describe('Grader: the phone’s level and Undo actions', () => {
     expect(getScores(CID).s1.map(e => [e.score, e.date])).toEqual([[2, '2026-09-01']]);
   });
 
-  it('Undo saves the list, then sends what changed between the two lists, and answers what the save did', () => {
-    const before = { s1: [{ score: 3 }] };
-    const after = { s1: [] };
-    const calls = [];
-    const real = { saveScores, persistScoreDiffToCanonical };
-    globalThis.saveScores = (...args) => (calls.push(['saveScores', ...args]), 'saved');
-    globalThis.persistScoreDiffToCanonical = (...args) => {
-      calls.push(['persistScoreDiffToCanonical', ...args]);
-    };
-    try {
-      expect(Grader.undoOnPhone(CID, 's1', 'essay', before, after)).toBe('saved');
-    } finally {
-      Object.assign(globalThis, real);
-    }
-    expect(calls).toEqual([
-      ['saveScores', CID, after],
-      ['persistScoreDiffToCanonical', CID, before, after],
-    ]);
+  it('Undo saves the list, which sends what changed, and sends nothing more itself', () => {
+    const scores = { s1: [] };
+    const save = stand('saveScores', 'saved');
+    const send = stand('persistScoreDiffToCanonical', undefined);
+    expect(Grader.undoOnPhone(CID, 's1', 'essay', scores)).toBe('saved');
+    expect(save.calls).toEqual([[CID, scores]]);
+    expect(send.calls).toEqual([]);
   });
 });
 
