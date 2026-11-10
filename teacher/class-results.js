@@ -1642,7 +1642,7 @@ window.ClassResults = (function () {
       }
     });
     if (!marked.length) return;
-    saveAssignmentStatuses(cid, statuses);
+    Grader.markBlankCells(cid, aid, statuses);
     _changed();
     showUndoToast(
       marked.length +
@@ -1654,7 +1654,7 @@ window.ClassResults = (function () {
         marked.forEach(function (sid) {
           if (st[sid + ':' + aid] === status) delete st[sid + ':' + aid];
         });
-        saveAssignmentStatuses(cid, st);
+        Grader.undoMarkBlankCells(cid, aid, st);
         _changed();
       },
       null,
