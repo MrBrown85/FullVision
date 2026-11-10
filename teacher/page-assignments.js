@@ -1332,7 +1332,7 @@ window.PageAssignments = (function () {
   }
   function _setTagScore(cid, sid, aid, tagId, value, mod) {
     _tagScoreKeys(cid, aid, tagId).forEach(function (key) {
-      setScore(cid, sid, aid, key, value, mod);
+      Grader.setLevel(cid, sid, aid, key, value, mod);
     });
   }
   function _tagState(cid, sid, aid, tagId) {
@@ -6445,7 +6445,7 @@ window.PageAssignments = (function () {
     saveAssessments(activeCourse, assessments);
     var move = _scoreMoveAfterSave;
     _scoreMoveAfterSave = null;
-    if (move && move.aid === aid && after.rubricId === move.rubricId) moveRubricScores(activeCourse, aid, move);
+    if (move && move.aid === aid && after.rubricId === move.rubricId) Grader.moveToRubric(activeCourse, aid, move);
     var carried = _carryOverallToCompetencies(activeCourse, before, after);
     openAssessIds.add(aid);
     hideNewForm();
@@ -6485,7 +6485,7 @@ window.PageAssignments = (function () {
           return e.assessmentId === after.id && e.tagId === tid;
         });
         if (scored) return;
-        upsertScore(cid, sid, after.id, tid, overall.score, overall.date, overall.type, '', overall.mod);
+        Grader.carryOverall(cid, sid, after.id, tid, overall);
         copied++;
       });
     });
@@ -6536,7 +6536,7 @@ window.PageAssignments = (function () {
             return s.assessmentId !== aid;
           });
         });
-        saveScores(cid, scores);
+        Grader.deleteAssessmentScores(cid, aid, scores);
         var statuses = getAssignmentStatuses(cid);
         var statusChanged = false;
         Object.keys(statuses).forEach(function (k) {
@@ -6545,7 +6545,7 @@ window.PageAssignments = (function () {
             statusChanged = true;
           }
         });
-        if (statusChanged) saveAssignmentStatuses(cid, statuses);
+        if (statusChanged) Grader.deleteAssessmentStatuses(cid, aid, statuses);
         // P6.5: dispatch delete_observation RPC for each linked observation
         // before clearing LS. Replaces a bare saveQuickObs call that left
         // server rows orphaned with stale assignmentContext.assessmentId.
@@ -6888,7 +6888,7 @@ window.PageAssignments = (function () {
     var next = getCompletionMark(cid, sid, aid) === el.dataset.mark ? null : el.dataset.mark;
     // Missing and Excused work takes no mark (isScoreLocked); C and I reach here by key.
     if (next && isScoreLocked(cid, sid, aid)) return;
-    setCompletionMark(cid, sid, aid, next);
+    Grader.setMark(cid, sid, aid, next);
     var cell = el.closest('.cmp-cell');
     var grid = el.closest('.ldg-grid');
     if (cell) cell.innerHTML = completionButtonsHtml(aid, sid, next);
@@ -6908,13 +6908,13 @@ window.PageAssignments = (function () {
         var statuses = getAssignmentStatuses(cid);
         getStudents(cid).forEach(function (st) {
           if (statuses[st.id + ':' + aid] || getCompletionMark(cid, st.id, aid)) return;
-          setCompletionMark(cid, st.id, aid, 'complete');
+          Grader.setMark(cid, st.id, aid, 'complete');
         });
         render();
         refreshSidebarGrades();
         var filled = structuredClone(getScores(cid));
         showUndoToast('Unmarked students set to Complete', function () {
-          restoreScoreCells(cid, prevScores, filled);
+          Grader.undo(cid, prevScores, filled);
           render();
           refreshSidebarGrades();
         });
@@ -6992,7 +6992,7 @@ window.PageAssignments = (function () {
         getStudents(cid).forEach(function (st) {
           if (statuses[st.id + ':' + aid] || getPointsScore(cid, st.id, aid) != null) return;
           if (!canSetAssignmentStatus(cid, st.id, aid, 'NS')) return;
-          applyAssignmentStatus(cid, st.id, aid, 'NS');
+          Grader.setStatus(cid, st.id, aid, 'NS');
           marked.push(st.id);
         });
         render();
@@ -7000,7 +7000,7 @@ window.PageAssignments = (function () {
         if (!marked.length) return;
         showUndoToast('Unmarked students set to Missing', function () {
           marked.forEach(function (sid) {
-            setAssignmentStatus(cid, sid, aid, null);
+            Grader.undoMissing(cid, sid, aid);
           });
           render();
           refreshSidebarGrades();
@@ -7028,13 +7028,13 @@ window.PageAssignments = (function () {
         getStudents(cid).forEach(function (st) {
           // Same rule as Set Unmarked to Complete: any status, Late included, is left alone.
           if (statuses[st.id + ':' + aid] || getPointsScore(cid, st.id, aid) != null) return;
-          setPointsScore(cid, st.id, aid, max);
+          Grader.setPoints(cid, st.id, aid, max);
         });
         render();
         refreshSidebarGrades();
         var filled = structuredClone(getScores(cid));
         showUndoToast('Unmarked students set to ' + label, function () {
-          restoreScoreCells(cid, prevScores, filled);
+          Grader.undo(cid, prevScores, filled);
           render();
           refreshSidebarGrades();
         });
@@ -7061,10 +7061,10 @@ window.PageAssignments = (function () {
     // Leaving a field without changing it saves nothing; an untouched blank
     // field used to write a 0. A typed 0 is a score; blank clears.
     if (raw === prev) return;
-    // setPointsScore saves the one score, as the gradebook and phone do. A
+    // Grader.setPoints saves the one score, as the gradebook and phone do. A
     // second write under the assessment's own id left a stray entry and
     // sent the score twice.
-    setPointsScore(cid, sid, aid, raw);
+    Grader.setPoints(cid, sid, aid, raw);
     var pctSpan = inp.closest('.score-row').querySelector('.gb-pts-live-pct');
     if (pctSpan) pctSpan.innerHTML = pointsPctHtml(raw, max, 0);
     refreshLedgerSummary(inp.closest('.ldg-grid'));
@@ -7255,13 +7255,6 @@ window.PageAssignments = (function () {
     refreshSidebarGrades(sid);
   }
 
-  function setScore(cid, sid, aid, tagId, value, mod) {
-    var assess = getAssessments(cid).find(function (a) {
-      return a.id === aid;
-    });
-    upsertScore(cid, sid, aid, tagId, value, assess ? assess.date : '', scoreTypeFor(assess), '', mod);
-  }
-
   /* ── + / − on a proficiency level ───────────────────────── */
   // The level and modifier a grading row's entries share. A rubric criterion
   // whose tags disagree is mixed and takes no +/−.
@@ -7356,7 +7349,7 @@ window.PageAssignments = (function () {
     var next = st.mod === mod ? 0 : mod;
     if (normalizeScoreMod(st.level, next) !== next) return;
     st.tagIds.forEach(function (tid) {
-      setScore(activeCourse, row.dataset.student, row.dataset.assess, tid, st.level, next);
+      Grader.setPlusMinus(activeCourse, row.dataset.student, row.dataset.assess, tid, st.level, next);
     });
     if (row.dataset.tag) _syncTagRows(row.dataset.assess, row.dataset.student);
     else syncModRow(row);
@@ -7407,12 +7400,9 @@ window.PageAssignments = (function () {
     var sid = group.dataset.student;
     var aid = group.dataset.assess;
     var tagId = group.dataset.tag;
-    var assess = getAssessments(cid).find(function (a) {
-      return a.id === aid;
-    });
     var wasActive = el.classList.contains('active');
     var next = wasActive ? 0 : value;
-    upsertScore(cid, sid, aid, tagId, next, assess ? assess.date : '', scoreTypeFor(assess), '');
+    Grader.setLevel(cid, sid, aid, tagId, next);
     group.querySelectorAll('.score-opt').forEach(function (o) {
       o.classList.remove('active');
     });
@@ -7513,7 +7503,7 @@ window.PageAssignments = (function () {
       var sid = tagId;
       if (!statuses[sid + ':' + aid])
         scoreTagIds(assess, cid).forEach(function (tid) {
-          setScore(cid, sid, aid, tid, value);
+          Grader.setLevel(cid, sid, aid, tid, value);
         });
       selector = '.rsg-criterion-row.is-tag[data-assess="' + aid + '"][data-student="' + sid + '"]';
       toastMsg = value ? 'Row filled' : 'Row cleared';
@@ -7522,7 +7512,7 @@ window.PageAssignments = (function () {
       var plan = _setEveryonePlan(cid, aid);
       plan.cells.forEach(function (cell) {
         cell.keys.forEach(function (tid) {
-          setScore(cid, cell.sid, aid, tid, value);
+          Grader.setLevel(cid, cell.sid, aid, tid, value);
         });
       });
       selector = '.rsg-criterion-row.is-tag[data-assess="' + aid + '"]';
@@ -7541,7 +7531,7 @@ window.PageAssignments = (function () {
     refreshSidebarGrades();
     var filled = structuredClone(getScores(cid));
     _showFillUndo(toastMsg, function () {
-      restoreScoreCells(cid, prevScores, filled);
+      Grader.undo(cid, prevScores, filled);
       render();
       refreshSidebarGrades();
     });
@@ -7568,7 +7558,7 @@ window.PageAssignments = (function () {
     if (next && isScoreLocked(activeCourse, sid, aid)) return;
     var before = wasActive ? structuredClone(getScores(activeCourse)) : null;
     rubricCriterionScoreKeys(crit).forEach(function (tagId) {
-      setScore(activeCourse, sid, aid, tagId, next);
+      Grader.setLevel(activeCourse, sid, aid, tagId, next);
     });
     el.parentElement.querySelectorAll('.rsg-level').forEach(function (o) {
       o.classList.remove('active', 'mixed');
@@ -7606,7 +7596,7 @@ window.PageAssignments = (function () {
       students.forEach(function (st) {
         if (statuses[st.id + ':' + aid]) return;
         rubricCriterionScoreKeys(crit).forEach(function (tagId) {
-          setScore(cid, st.id, aid, tagId, value);
+          Grader.setLevel(cid, st.id, aid, tagId, value);
         });
       });
       selector = '.rsg-criterion-row[data-assess="' + aid + '"][data-criterion="' + critId + '"]';
@@ -7619,7 +7609,7 @@ window.PageAssignments = (function () {
       if (!statuses[sid + ':' + aid])
         rubric.criteria.forEach(function (crit) {
           rubricCriterionScoreKeys(crit).forEach(function (tagId) {
-            setScore(cid, sid, aid, tagId, value);
+            Grader.setLevel(cid, sid, aid, tagId, value);
           });
         });
       selector = '.rsg-criterion-row[data-assess="' + aid + '"][data-student="' + sid + '"]';
@@ -7629,7 +7619,7 @@ window.PageAssignments = (function () {
       var plan = _setEveryonePlan(cid, aid);
       plan.cells.forEach(function (cell) {
         cell.keys.forEach(function (tagId) {
-          setScore(cid, cell.sid, aid, tagId, value);
+          Grader.setLevel(cid, cell.sid, aid, tagId, value);
         });
       });
       selector = '.rsg-criterion-row[data-assess="' + aid + '"]';
@@ -7648,7 +7638,7 @@ window.PageAssignments = (function () {
     refreshSidebarGrades();
     var filled = structuredClone(getScores(cid));
     _showFillUndo(toastMsg, function () {
-      restoreScoreCells(cid, prevScores, filled);
+      Grader.undo(cid, prevScores, filled);
       render();
       refreshSidebarGrades();
     });
@@ -8409,12 +8399,12 @@ window.PageAssignments = (function () {
       return;
     }
     var before = getRubricCheckIds(cid, sid, aid);
-    var after = setRubricCheck(cid, sid, aid, checkId, el.checked);
+    var after = Grader.setTick(cid, sid, aid, checkId, el.checked);
     var current = _criterionLevelNow(cid, aid, sid, crit);
     var next = RubricChecks.levelAfterTick(crit, current, before, after);
     if (next !== current) {
       rubricCriterionScoreKeys(crit).forEach(function (tagId) {
-        setScore(cid, sid, aid, tagId, next);
+        Grader.setLevel(cid, sid, aid, tagId, next);
       });
       var row = _criterionRow(aid, sid, critId);
       if (row) {
@@ -10004,7 +9994,7 @@ window.PageAssignments = (function () {
       return;
     }
     if (_commentEditId === OVERALL_COMMENT_ID) {
-      saveScoreComment(cid, sid, _commentPopoverState.aid, text);
+      Grader.setOverallComment(cid, sid, _commentPopoverState.aid, text);
     } else {
       // The comment may have been re-keyed to its server id since the list drew.
       updateQuickOb(cid, sid, resolveObservationId(cid, _commentEditId), { text: text });
@@ -10017,7 +10007,7 @@ window.PageAssignments = (function () {
       sid = _commentPopoverState.sid,
       aid = _commentPopoverState.aid;
     if (obId === _commentEditId) _commentEditId = null;
-    if (obId === OVERALL_COMMENT_ID) saveScoreComment(cid, sid, aid, '');
+    if (obId === OVERALL_COMMENT_ID) Grader.setOverallComment(cid, sid, aid, '');
     else deleteQuickOb(cid, sid, obId);
     renderCommentPopover();
     updateCommentBadge(sid, aid);
@@ -10192,7 +10182,7 @@ window.PageAssignments = (function () {
   function _commitCriterionComment(text) {
     var st = _critCommentState;
     if (!st) return;
-    if (text !== (st.original || '')) saveRubricCriterionComment(st.cid, st.sid, st.aid, st.critId, text);
+    if (text !== (st.original || '')) Grader.setCriterionComment(st.cid, st.sid, st.aid, st.critId, text);
     var btn = document.querySelector(
       '.rsg-crit-comment[data-aid="' + st.aid + '"][data-sid="' + st.sid + '"][data-critid="' + st.critId + '"]',
     );
@@ -10952,7 +10942,7 @@ window.PageAssignments = (function () {
         _toggleGroupMenu(el);
       },
       groupGradeSeparately: function () {
-        setGradedSeparately(activeCourse, el.dataset.aid, el.dataset.sid, true);
+        Grader.gradeSeparately(activeCourse, el.dataset.aid, el.dataset.sid);
         refreshSidebarGrades();
         render();
       },
@@ -11234,8 +11224,8 @@ window.PageAssignments = (function () {
         ? getRubricCriterionBeyond(activeCourse, el.dataset.sid, el.dataset.aid, spCrit)
         : getRubricCriterionComment(activeCourse, el.dataset.sid, el.dataset.aid, spCrit);
       if (spText === spSaved) return;
-      if (beyond) saveRubricCriterionBeyond(activeCourse, el.dataset.sid, el.dataset.aid, el.dataset.critid, spText);
-      else saveRubricCriterionComment(activeCourse, el.dataset.sid, el.dataset.aid, el.dataset.critid, spText);
+      if (beyond) Grader.setWentBeyond(activeCourse, el.dataset.sid, el.dataset.aid, el.dataset.critid, spText);
+      else Grader.setCriterionComment(activeCourse, el.dataset.sid, el.dataset.aid, el.dataset.critid, spText);
       return;
     }
     if (el.dataset.actionBlur === 'graderCritBeyond') {
@@ -12770,7 +12760,7 @@ window.PageAssignments = (function () {
     var sid = input.dataset.sid;
     var aid = input.dataset.aid;
     if (!cid || !sid || !aid || input.disabled) return;
-    saveScoreReportNote(cid, sid, aid, input.value);
+    Grader.setReportNote(cid, sid, aid, input.value);
     input.value = getScoreReportNote(cid, sid, aid);
     _reportNotePreview(input);
   }
@@ -12904,12 +12894,12 @@ window.PageAssignments = (function () {
       inp.value = raw != null ? formatPoints(raw) : '';
       return;
     }
-    // One save, through setPointsScore, as the ledger, gradebook and phone
+    // One save, through Grader.setPoints, as the ledger, gradebook and phone
     // do. A second write under the assessment's own id left an entry later
     // edits elsewhere never updated, so the cell and course % kept the old
     // points.
     var sid = focusStudentId;
-    setPointsScore(cid, focusStudentId, aid, raw);
+    Grader.setPoints(cid, focusStudentId, aid, raw);
     refreshSidebarGrades(sid);
     var nextId = next && _grader && _grader.overlay.contains(next) ? next.id : '';
     render();

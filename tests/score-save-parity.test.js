@@ -91,20 +91,23 @@ describe('No score writer works out the type on its own', () => {
     expect(fn).not.toContain('upsertScore(');
   });
 
+  // Through Grader.setPoints since S1-T3; tests/grader.test.js holds that
+  // setPoints calls setPointsScore with the same arguments.
   it('desktop points entry saves the score once, through setPointsScore', () => {
     const src = readFileSync(new URL('../teacher/page-assignments.js', import.meta.url), 'utf-8');
     const fn = src.slice(src.indexOf('function commitPointsScore('), src.indexOf('function focusPointsBox('));
-    expect(fn).toContain('setPointsScore(cid, sid, aid, raw)');
+    expect(fn).toContain('Grader.setPoints(cid, sid, aid, raw)');
     expect(fn).not.toContain('setScore(cid, sid, aid, aid');
   });
 
+  // Both through Grader.setPoints since S1-T3, as the points entry above.
   it('the grader dialog and Set Unmarked to max save points once, through setPointsScore', () => {
     const src = readFileSync(new URL('../teacher/page-assignments.js', import.meta.url), 'utf-8');
     const grader = src.slice(src.indexOf('function _graderCommitPoints('), src.indexOf('function _focusGraderCard('));
-    expect(grader).toContain('setPointsScore(cid, focusStudentId, aid, raw)');
+    expect(grader).toContain('Grader.setPoints(cid, focusStudentId, aid, raw)');
     expect(grader).not.toMatch(/\bsetScore\(/);
     const fill = src.slice(src.indexOf('function confirmFillPoints('), src.indexOf('function livePointsUpdate('));
-    expect(fill).toContain('setPointsScore(cid, st.id, aid, max)');
+    expect(fill).toContain('Grader.setPoints(cid, st.id, aid, max)');
     expect(fill).not.toMatch(/\bsetScore\(/);
     // No points writer anywhere keys a score by the assessment's own id.
     expect(src).not.toMatch(/setScore\([^)]*\baid, aid\b/);
