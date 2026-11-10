@@ -9,6 +9,15 @@
 #     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
 #    where n.nspname = 'public' and p.proname in (...) order by 1;
 # get_gradebook was read the same way on 2026-11-10 (22 functions now).
+# 2026111001_assessment_created_at_in_bundle.sql (S0-M4) was APPLIED to
+# gradebook-prod on 2026-11-10 (recorded as 20261110131526). The two lines
+# below for get_class_bundle and get_gradebook are the definitions from
+# BEFORE it, which the harness rebuilds and that migration's guard expects.
+# Live after it, confirmed by read-only query the same minute:
+#   get_class_bundle 845b42513d1f556dc941a1cc11cf9567 22591
+#   get_gradebook    beec0fae104cd7f4a0e96364130f267d 6859
+# A migration written after S0-M4 (S0-M5 changes get_class_bundle's
+# search_path) must guard on these, not on the lines below.
 # function md5 length
 clear_column_scores 2eef90e77ca6c84c36832bdd18bb53e5 746
 clear_row_scores 326e27cf74efda1aba93850f4b64baed 1136
