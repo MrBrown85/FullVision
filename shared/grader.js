@@ -2,13 +2,14 @@
  *
  * The one module a screen writes a grade through
  * (docs/plans/student-page-build-plan.md, 1.4). Each action is named for
- * what the teacher does. Today each is a pass-through: it calls the
+ * what the teacher does. Each is a pass-through: it calls the
  * shared/data.js writer the screen called before, with the same arguments,
- * returns what the writer returns, and tells GradeState a grade was saved
- * (which changes nothing yet). No rule lives here. The rules that go with
- * the actions (locks, the points limit, the state of a piece, the To Grade
- * and To Return counts) move in behind them in later PRs, with Return,
- * Return for Revision and Return N Graded.
+ * and returns what the writer returns. data.js runs the Draft and Returned
+ * rule on the write (shared/grade-state.js), and a screen reads the state a
+ * piece is in from GradeState.stateOf. The other rules that go with the
+ * actions (locks, the points
+ * limit, the To Grade and To Return counts) move in behind them in later
+ * PRs, with Return for Revision and Return N Graded.
  *
  * Clearing is the same action with nothing in it: level 0, points null, a
  * null mark, a null status.
@@ -245,6 +246,14 @@ window.Grader = (function () {
     return _saved(cid, null, null, 'undo', restoreScoreCells(cid, before, after));
   }
 
+  /* Return: the students in `studentIds` (one id or a list) are given
+     their grade on `aid`. Only drafts are returned. Answers
+     { returned, enrollment_ids, returned_at }. */
+  function returnTo(cid, aid, studentIds) {
+    var ids = Array.isArray(studentIds) ? studentIds : [studentIds];
+    return _saved(cid, ids.length === 1 ? ids[0] : null, aid, 'return', returnGrades(cid, aid, ids));
+  }
+
   return {
     setLevel: setLevel,
     setPlusMinus: setPlusMinus,
@@ -274,5 +283,6 @@ window.Grader = (function () {
     setPlusMinusOnPhone: setPlusMinusOnPhone,
     undoOnPhone: undoOnPhone,
     undo: undo,
+    returnGrades: returnTo,
   };
 })();

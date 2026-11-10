@@ -172,6 +172,8 @@ describe('returned grades fail closed', () => {
 
   it.each(Object.keys(READS))('with nothing to give the returned set, %s throws', name => {
     installed.remove();
+    // shared/data.js has its own builder since S0-F2: it is taken away too.
+    globalThis.getReturnedScores = undefined;
     expect(typeof getReturnedScores).toBe('undefined');
     expect(() => withReturnedOnly(READS[name])).toThrow(/Returned grades were asked for.*No grade was worked out/);
     expect(_scoreSet).toBe('all');
@@ -184,6 +186,7 @@ describe('returned grades fail closed', () => {
 
   it('never falls back to every score: no draft value comes out', () => {
     installed.remove();
+    globalThis.getReturnedScores = undefined;
     let got = 'nothing';
     try {
       got = withReturnedOnly(() => getTagProficiency(CID, 's1', TAG));

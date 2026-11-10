@@ -180,21 +180,24 @@ describe('scores saved under competencies before', () => {
     expect(byKey[CRIT_Q2]).toMatchObject({ score: 3, critNote: 'Nice.' });
   });
 
-  it('is reused from schema 3 only when it keeps no rubric score under a competency', () => {
-    expect(_BUNDLE_SCHEMA).toBe(5);
+  it('is downloaded again from any earlier schema; only a copy this code saved is reused', () => {
+    // Since schema 6 (S0-F1e: assessments carry when they were made), no
+    // older copy is used as it is, with or without old rubric keys
+    // (tests/saved-copy-created-at.test.js).
+    expect(_BUNDLE_SCHEMA).toBe(6);
     seed([entry(CRIT_Q1, 3)]);
     _teacherId = 'teacher-uuid';
     _saveClassMeta(CID, { schema: 3, owner: _teacherId, version: 9, lastOpenedAt: Date.now(), savedAt: Date.now() });
     expect(_savedCopyHasLegacyRubricKeys(CID)).toBe(false);
-    expect(_savedCopyUsable(CID)).toBe(true);
-    // The same copy with an old competency-keyed rubric score is downloaded again.
+    expect(_savedCopyUsable(CID)).toBe(false);
     localStorage.setItem('gb-scores-' + CID, JSON.stringify({ [SID]: [entry(CI, 3)] }));
     expect(_savedCopyHasLegacyRubricKeys(CID)).toBe(true);
     expect(_savedCopyUsable(CID)).toBe(false);
-    // Schema 4 differs only in having no whole-rubric competencies (PR 6).
     _saveClassMeta(CID, { schema: 4 });
-    expect(_savedCopyUsable(CID)).toBe(true);
+    expect(_savedCopyUsable(CID)).toBe(false);
     _saveClassMeta(CID, { schema: 5 });
+    expect(_savedCopyUsable(CID)).toBe(false);
+    _saveClassMeta(CID, { schema: 6 });
     expect(_savedCopyUsable(CID)).toBe(true);
   });
 

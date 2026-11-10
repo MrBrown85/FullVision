@@ -58,8 +58,13 @@
 -- fill_rubric call 2.8 ms: 17 plans an SQL-language function again in
 -- every statement that calls it, where 18 keeps the plan (on 18.6 the fill
 -- took 21 ms either way, which is the figure this comment used to give).
--- Class loads do not run these policies: get_class_bundle is SECURITY
--- DEFINER.
+-- Reads are another matter: the policies make a longer check for every row
+-- read. On 17.11, reading a class's 3,840 rubric_score rows as its teacher
+-- took 10.5 ms before this file and 20.4 ms with it (18.1 ms while the
+-- helpers were SQL); get_gradebook, the fallback class load, took 49 ms
+-- and 68 ms. A read through these policies costs about twice what it costs
+-- today. The normal class load does not run them and is unchanged (11.4 ms
+-- and 11.6 ms): get_class_bundle is SECURITY DEFINER.
 --
 -- Existing rows: none change. The file's first step counts the rows below
 -- and stops, with nothing changed, unless the answer is 0: a row it counts

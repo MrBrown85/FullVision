@@ -6416,6 +6416,89 @@ button.grader-member-name {
   display: none;
 }
 
+/* ── Draft and Returned in the dialog (S0-F2) ────────────────
+   Return and where the grade stands, in a row above the footer that does
+   not scroll away: Return on the left, the Draft mark and its line on the
+   right; "Returned Nov 3" once the grade is given. In the grading cards'
+   lane. The level-wording bar moves up to sit above the row. */
+.grader-return {
+  flex-shrink: 0;
+  min-height: 56px;
+  box-sizing: border-box;
+  padding: 6px 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  box-shadow: 0 -0.5px 0 var(--divider-heavy);
+  color: var(--text);
+}
+.grader-dialog.has-return .grdl-wording-bar {
+  bottom: 120px;
+}
+.grader-return-btn {
+  height: 34px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 17px;
+  background: var(--active);
+  color: #fff;
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+}
+.grader-return-btn:hover {
+  background: var(--btn-hover-blue);
+}
+.grader-return-btn:disabled {
+  background: var(--seg-track);
+  color: var(--text-3);
+  cursor: default;
+}
+.grader-returned {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 17px;
+  display: inline-flex;
+  align-items: center;
+  background: var(--score-3-bg);
+  color: var(--score-3-text);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+.grader-draft {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 0;
+}
+.grader-draft-line {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.grader-draft-mark {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 12px;
+  border: 1.5px dashed var(--score-3);
+  color: var(--score-3-text);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.grader-draft-text,
+.grader-draft-still {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+
 /* ── Rubric tiles (grader, one student) ─────────────────────── */
 .grdt-tiles {
   display: flex;

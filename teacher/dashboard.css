@@ -6706,6 +6706,43 @@ label.cm-cr-row {
   gap: 8px;
 }
 
+/* ── Student Page tab (teacher/cm-student-page.js; board "Teacher: Class
+   Settings, Student Page") ── */
+/* One card of rows, a rule above each: a title and a line saying what it
+   decides, the control, then any line about what follows from it. */
+.sp-card {
+  display: flex;
+  flex-direction: column;
+}
+.sp-card > .cm-grade-title {
+  margin-bottom: 14px;
+}
+.sp-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 16px 0;
+  border-top: 0.5px solid var(--divider-strong);
+}
+.sp-row:last-child {
+  padding-bottom: 0;
+}
+.sp-row-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sp-row-title {
+  font-family: var(--font-base);
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text);
+}
+.sp-row .cm-hint {
+  margin: 0;
+}
+
 /* ── Questionnaires tab (teacher/cm-questionnaires.js; canvas 6b) ── */
 .sq-section {
   display: flex;
