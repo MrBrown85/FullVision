@@ -348,6 +348,10 @@ describe('restore class from backup', () => {
         level_order: 'asc',
         folders_count_as_one: false,
         courses_count_equally: true,
+        // The student page: a restored class starts with it off, and with
+        // the backup's Return Grades choice (none in this backup).
+        student_page_enabled: false,
+        return_grades: null,
       },
     ]);
     expect(plan.payload.report_configs).toEqual([
@@ -683,6 +687,83 @@ describe('restoreClassFromBackup', () => {
     clearProfCache();
     expect(getOverallProficiency(cid, newE1)).toBe(getOverallProficiency(CID, E1));
     expect(getOverallProficiency(cid, newE1)).toBeGreaterThan(0);
+  });
+
+  /* S0-W1 (PR 999 review, finding 5): a backup of a class whose student
+     page is on carries both settings. The restored class starts with the
+     page off, on this device and on the server, as a duplicated class does;
+     its Return Grades choice comes along. */
+  describe('a backup of a class whose student page is on', () => {
+    beforeEach(() => {
+      resetClass();
+      var b = bundle();
+      b.gradebook.course.student_page_enabled = true;
+      b.gradebook.course.return_grades = 'on_return';
+      _bundleToCache(CID, b);
+      backup = downloadBackup();
+    });
+    afterEach(() => {
+      CmStudentPage._reset();
+    });
+
+    it('the backup holds both settings, as the class had them', () => {
+      expect(backup.config).toMatchObject({ student_page_enabled: true, return_grades: 'on_return' });
+    });
+
+    it('signed in: the restored class has the page off here and in what is sent, and keeps its choice', async () => {
+      globalThis._isDemoSession = () => false;
+      globalThis._writesEnabled = () => true;
+      var sent = [];
+      globalThis._writeRpc = vi.fn((name, params) => {
+        sent.push([name, params]);
+        return Promise.resolve({ data: { courses: 1 }, error: null });
+      });
+      var restored = FVBackupRestore.restoreClassFromBackup(backup, { name: 'Science 8 Copy' });
+      await restored.sent;
+      var cid = restored.cid;
+      // On this device: no switch, no tab, the choice kept.
+      expect('student_page_enabled' in getCourseConfig(cid)).toBe(false);
+      expect(JSON.parse(localStorage.getItem('gb-courseconfig-' + cid)).student_page_enabled).toBeUndefined();
+      expect(getReturnSettings(cid)).toEqual({ student_page: false, return_grades: 'on_return' });
+      expect(CmStudentPage.isShown(cid)).toBe(false);
+      expect(CmStudentPage.render(cid)).toBe('');
+      // In what the server is sent: off, and the same choice.
+      var row = sent[0][1].p_payload.courses[0];
+      expect(row.student_page_enabled).toBe(false);
+      expect(row.return_grades).toBe('on_return');
+      // And the next settings save sends neither.
+      sent.length = 0;
+      saveCourseConfig(cid, Object.assign({}, getCourseConfig(cid), { calcMethod: 'mostRecent' }));
+      expect(sent.map(c => c[0])).toEqual(['update_course']);
+      expect('student_page_enabled' in sent[0][1].p_patch).toBe(false);
+      expect('return_grades' in sent[0][1].p_patch).toBe(false);
+      expect(getReturnSettings(cid).student_page).toBe(false);
+    });
+
+    it('in Demo Mode too the restored class starts with the page off, its choice kept', async () => {
+      globalThis._isDemoSession = () => true;
+      globalThis._writeRpc = vi.fn();
+      var restored = FVBackupRestore.restoreClassFromBackup(backup, { name: 'Science 8 Copy' });
+      await restored.sent;
+      expect(getReturnSettings(restored.cid)).toEqual({ student_page: false, return_grades: 'on_return' });
+      expect('student_page_enabled' in getCourseConfig(restored.cid)).toBe(false);
+      expect(CmStudentPage.isShown(restored.cid)).toBe(false);
+    });
+
+    it('a backup with no choice made restores with none', () => {
+      var plain = structuredClone(backup);
+      delete plain.config.return_grades;
+      var plan = FVBackupRestore.planRestore(plain, { name: 'Copy' });
+      expect(plan.payload.courses[0].return_grades).toBe(null);
+      expect(plan.payload.courses[0].student_page_enabled).toBe(false);
+      expect('student_page_enabled' in plan.cache.courseConfigs).toBe(false);
+    });
+
+    it('the backup handed in is not changed', () => {
+      var before = JSON.stringify(backup);
+      FVBackupRestore.planRestore(backup, { name: 'Copy' });
+      expect(JSON.stringify(backup)).toBe(before);
+    });
   });
 
   it('signed in sends one import_json_restore through the outbox', async () => {

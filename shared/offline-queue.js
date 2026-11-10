@@ -148,6 +148,18 @@
     if (payload.p_enrollment_id && payload.p_assessment_id) {
       return 'cell:' + payload.p_enrollment_id + ':' + payload.p_assessment_id;
     }
+    // Return for one student (return_grades names its students as a list) is
+    // a write to that student's cell: it goes after the score writes queued
+    // for the cell and before any made after it. shared/data.js sends one
+    // student to a call for this.
+    if (
+      endpoint === 'return_grades' &&
+      payload.p_assessment_id &&
+      Array.isArray(payload.p_enrollment_ids) &&
+      payload.p_enrollment_ids.length === 1
+    ) {
+      return 'cell:' + payload.p_enrollment_ids[0] + ':' + payload.p_assessment_id;
+    }
     if (payload.p_id) return 'id:' + payload.p_id;
     if (payload.p_course_id) return 'course:' + payload.p_course_id;
     if (payload.p_enrollment_id) return 'enrollment:' + payload.p_enrollment_id;
@@ -202,6 +214,29 @@
         })
       );
     });
+  }
+
+  /* Return (return_grades) gives a student what a cell holds when it lands,
+     so it must land after every earlier write that can change that cell, and
+     before every later one. Writes to the cell itself share its key and stay
+     in order that way. The rest are writes to the whole student (every score
+     of theirs cleared) or the whole piece of work (its scores moved to a
+     copy of its rubric, the work edited, its column cleared): they have
+     another key or none, so _pump holds a Return behind an earlier one of
+     them, and one of them behind an earlier Return. A write to another cell
+     (another student's score or Return on the same work) holds nothing. */
+  function _returnOf(entry) {
+    var p = entry.payload || {};
+    if (entry.endpoint !== 'return_grades' || !p.p_assessment_id) return null;
+    var ids = {};
+    ids[p.p_assessment_id] = true;
+    (Array.isArray(p.p_enrollment_ids) ? p.p_enrollment_ids : []).forEach(function (sid) {
+      if (typeof sid === 'string') ids[sid] = true;
+    });
+    return ids;
+  }
+  function _isCellWrite(entry) {
+    return typeof entry.key === 'string' && entry.key.indexOf('cell:') === 0;
   }
 
   function _isTransient(res) {
@@ -1102,6 +1137,8 @@
     var touched = {}; // assessment → an earlier entry names it
     var barred = {}; // assessment → an earlier column write is still queued
     var restoring = []; // ids of each earlier class restore still queued
+    var returned = []; // the student and work of each earlier Return still queued
+    var wide = []; // each earlier write that is not to one cell
     var entries = _readQueue().entries;
     for (var i = 0; i < entries.length; i++) {
       var entry = entries[i];
@@ -1121,6 +1158,26 @@
         gated = true;
       var restored = _restoredIds(entry);
       if (restored) restoring.push(restored);
+      // A Return and a write to its whole student or piece of work go in
+      // the order they were made (see _returnOf).
+      var giving = _returnOf(entry);
+      if (giving) {
+        if (
+          wide.some(function (w) {
+            return _namesAny(w, giving);
+          })
+        )
+          gated = true;
+        returned.push(giving);
+      } else if (!_isCellWrite(entry)) {
+        if (
+          returned.some(function (ids) {
+            return _namesAny(entry, ids);
+          })
+        )
+          gated = true;
+        wide.push(entry);
+      }
       if (busyKeys[key]) continue;
       busyKeys[key] = true;
       if (gated) continue;

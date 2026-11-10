@@ -141,8 +141,12 @@ function rubric(v: unknown): Json {
 
 /* One assessment and the student's returned grade for it. status (Missing,
    Excused, Late) is never a draft, so it stands outside the grade. A piece
-   with no return date carries no grade, whatever the database sent. */
-const ASSESSMENT = ['id', 'title', 'date', 'due_date', 'score_mode', 'max_points', 'weight', 'rubric_id'];
+   with no return date carries no grade, whatever the database sent.
+   created_at is when the teacher made the piece: two pieces with the same
+   date are listed with the one made later counting later (Colin, Nov 10).
+   The database sends it since S0-M4b (2026110905); where it is absent,
+   nothing is put in its place. */
+const ASSESSMENT = ['id', 'title', 'date', 'due_date', 'created_at', 'score_mode', 'max_points', 'weight', 'rubric_id'];
 const RETURN = ['status', 'returned_at', 'updated_at', 'seen_at'];
 function assessment(v: unknown): Json {
   const a = object(v);

@@ -136,6 +136,7 @@ test.describe('student card: the card’s password and the lock', () => {
     expect(posts).toEqual([]);
   });
 
+  // Since S0-W1 the card is asked first; a code that is no card still goes to open.
   test('a code typed on the slip screen still goes to open, and an unknown one says so', async ({ page }) => {
     const posts = [];
     await page.route('**/functions/v1/student-submit**', async route => {
@@ -160,7 +161,10 @@ test.describe('student card: the card’s password and the lock', () => {
     await expect(page.getByRole('alert')).toContainText(
       "That code didn't work. Check the letters and numbers on your slip.",
     );
-    expect(posts).toEqual([{ route: 'open', code: 'P3R8WD' }]);
+    expect(posts).toEqual([
+      { route: 'card', code: 'P3R8WD' },
+      { route: 'open', code: 'P3R8WD' },
+    ]);
   });
 
   test('a slip page asks for neither calc.js nor constants.js', async ({ page }) => {

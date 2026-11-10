@@ -134,15 +134,34 @@ describe('Demo Mode sends nothing to Supabase', () => {
 /* The student page's card path (s/app.js, s/assignments.js,
    s/student-data.js; docs/plans/student-page-build-plan.md, 1.10). Demo Mode
    builds the card, the identity check and the page for one class on the
-   device. The edge function is never asked, and until its routes exist the
-   three files hold no way to ask it. */
+   device, and the edge function is never asked.
+   Since S0-W1 a real card does ask it, from one place: `ask` in s/app.js,
+   which answers on the device and returns before the call whenever the
+   page is in Demo Mode. The other two files still hold no way to ask. */
 describe('Demo Mode sends nothing from the student page', () => {
   const CARD_FILES = ['s/app.js', 's/assignments.js', 's/student-data.js'];
+  const source = file => readFileSync(new URL('../' + file, import.meta.url), 'utf-8');
 
-  it.each(CARD_FILES)('%s has no way to reach a server', file => {
-    const src = readFileSync(new URL('../' + file, import.meta.url), 'utf-8');
+  it.each(CARD_FILES)('%s has no way of its own to reach a server', file => {
+    const src = source(file);
     expect(src).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|sendBeacon|WebSocket|EventSource/);
-    expect(src).not.toMatch(/StudentPage\.call\b|functions\/v1|supabase/i);
+    expect(src).not.toMatch(/functions\/v1|supabase\.co|__ENV/i);
+    if (file !== 's/app.js') expect(src).not.toMatch(/StudentPage\.call\b|supabase/i);
+  });
+
+  it('s/app.js asks the function from one place, and never from Demo Mode', () => {
+    const src = source('s/app.js');
+    // One call, and no other name for it.
+    expect(src.match(/StudentPage\.call\b/g)).toHaveLength(1);
+    expect(src).not.toMatch(/=\s*StudentPage\.call\b|StudentPage\[/);
+    // It is the last line of `fromFunction` (all `ask` calls), after Demo Mode has returned its own answer.
+    expect(src.match(/\bfromFunction\(/g)).toHaveLength(2);
+    const ask = /\n {2}function fromFunction\(route, body\) \{\n([\s\S]*?)\n {2}\}\n/.exec(src)[1];
+    expect(ask.replace(/\s+/g, ' ').trim()).toBe(
+      'if (S.demo) { var answer = demo ? DEMO_ANSWERS[route] : null; ' +
+        "return Promise.resolve(answer ? answer(body || {}) : { ok: false, error: 'not_found' }); } " +
+        'return StudentPage.call(Object.assign({ route: route }, body));',
+    );
   });
 
   it.each(['#demo-card', '#demo-card-password', '#demo-card-letter', '#demo-card-both'])(
@@ -249,16 +268,63 @@ describe('Demo Mode sends nothing for Draft and Returned', () => {
     expect(JSON.parse(localStorage.getItem('gb-grade-returns-' + CID)).essay.s1.is_draft).toBe(false);
   });
 
+  // Student cards (S0-W1): made, listed and marked printed on the device.
+  it.each([false, true])(
+    'student cards: Make Cards and marking them printed (signed in behind it: %s)',
+    async signedIn => {
+      _useSupabase = signedIn;
+      setStudentPageSwitch(CID, true);
+      expect((await listStudentCards(CID)).data).toEqual([]);
+      const made = (await issueStudentCards(CID)).data;
+      expect(made.issued).toBe(1);
+      expect((await markStudentCardsPrinted(CID, [made.cards[0].id])).data.printed).toBe(1);
+      StudentCards._reset();
+      StudentCards.render(CID);
+      await StudentCards.load(CID);
+      await StudentCards.make(CID);
+      await tick();
+      expect(calls).toEqual([]);
+      expect(JSON.parse(localStorage.getItem('gb-student-cards-' + CID)).length).toBe(1);
+      // Nothing waits in an outbox either.
+      expect(localStorage.getItem('fv-sync-queue-v1')).toBe(null);
+    },
+  );
+
+  it.each([false, true])(
+    'the two settings’ own writer and the count of drafts (signed in behind it: %s)',
+    async signedIn => {
+      _useSupabase = signedIn;
+      expect(saveReturnSettings(CID, { student_page_enabled: true }).now).toEqual({ ok: true });
+      expect(saveReturnSettings(CID, { return_grades: 'on_return' }).now).toEqual({ ok: true });
+      Grader.setLevel(CID, 's1', 'essay', 't1', 3, 0);
+      expect(draftsWaitingToReturn(CID).now).toEqual({ count: 1 });
+      expect(saveReturnSettings(CID, { return_grades: 'on_save' }).now).toEqual({ ok: true });
+      expect(GradeState.stateOf(CID, 's1', 'essay')).toBe('returned');
+      expect(draftsWaitingToReturn(CID).now).toEqual({ count: 0 });
+      expect(saveReturnSettings(CID, { student_page_enabled: false }).now).toEqual({ ok: true });
+      await tick();
+      expect(calls).toEqual([]);
+      expect(localStorage.getItem('fv-sync-queue-v1')).toBe(null);
+    },
+  );
+
   it('the rule and the grader name no server function', () => {
     ['shared/grade-state.js', 'shared/grader.js'].forEach(file => {
       const src = readFileSync(new URL('../' + file, import.meta.url), 'utf-8');
       expect(src, file).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|sendBeacon|_writeRpc|\.rpc\(|getSupabase/);
     });
-    // Nothing the client sends names the server's return or its list of rows
-    // until S0-W1: the live database has neither yet.
-    ['shared/data.js', 'shared/grade-state.js', 'shared/grader.js', 'teacher/page-assignments.js'].forEach(file => {
+    // Until S0-W1 nothing the client sent named the server's return, its
+    // list of rows or its count of drafts. Now shared/data.js sends all
+    // three, for a signed-in teacher only (tests/grade-return-server.test.js);
+    // no other file names them.
+    ['shared/grade-state.js', 'shared/grader.js', 'teacher/page-assignments.js'].forEach(file => {
       const src = readFileSync(new URL('../' + file, import.meta.url), 'utf-8');
       expect(src, file).not.toMatch(/['"`](return_grades|list_course_grade_returns|course_draft_count)['"`]\s*,/);
+      expect(src, file).not.toMatch(/rpc:\s*['"`](return_grades|list_course_grade_returns|course_draft_count)/);
+    });
+    ['shared/data.js'].forEach(file => {
+      const src = readFileSync(new URL('../' + file, import.meta.url), 'utf-8');
+      // Each through the guarded calls, never as a bare { rpc: … } op.
       expect(src, file).not.toMatch(/rpc:\s*['"`](return_grades|list_course_grade_returns|course_draft_count)/);
     });
   });
