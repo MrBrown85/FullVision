@@ -16,10 +16,11 @@
  * Who writes through it: the desktop grader dialog
  * (teacher/page-assignments.js), but for its points box and its Note for
  * the Report, which still call data.js (two older tests look for those
- * calls in the page's text). The gradebook and Class Results follow in
- * S1-T1, the phone's Grade tab in S1-T2 and the rest of the Assignments
- * page (its grids, ledgers, fills and Set Everyone To) in S1-T3; Clear
- * Score, the fills and their Undo get their actions there.
+ * calls in the page's text); the gradebook (teacher/page-gradebook.js)
+ * and Class Results (teacher/class-results.js), whose own actions are
+ * together below (S1-T1). The phone's Grade tab follows in S1-T2 and the
+ * rest of the Assignments page (its grids, ledgers, fills and Set Everyone
+ * To) in S1-T3; the fills and their Undo get their actions there.
  * tests/grader-guard.test.js counts the calls each file still makes to the
  * score writers in data.js and fails when one is added.
  */
@@ -107,6 +108,83 @@ window.Grader = (function () {
     return _saved(cid, sid, aid, 'backToGroupGrade', setGradedSeparately(cid, aid, sid, false));
   }
 
+  /* ── The gradebook and Class Results (S1-T1) ─────────────────────────
+     What the gradebook's cells, keys and menus write, and Class Results'
+     Mark Missing. A click on a gradebook cell opens the grader dialog,
+     which writes through the actions above; so do the gradebook's points,
+     Complete / Incomplete marks, statuses and ticks (setPoints, setMark,
+     setStatus, setTick). The actions here are the rest. Each passes on
+     what the screen passed to data.js before, in the same order, so some
+     take a whole list the screen has built. */
+
+  /* A level typed into a gradebook cell: a digit, or 0 for a cleared cell.
+     The gradebook dates and types the score itself and passes its own
+     note, as it did before it wrote through here. Its two views differ on
+     work with no date: Edit Score in the Scores view passes today's date,
+     a key in the Competencies view passes none. */
+  function typeLevel(cid, sid, aid, key, level, date, type, note) {
+    return _saved(cid, sid, aid, 'level', upsertScore(cid, sid, aid, key, level, date, type, note));
+  }
+
+  /* + or − typed on a gradebook cell: `mod` is 1, -1, or 0 to take it
+     off. `note` is the comment the cell's entry holds, which goes up
+     again with the level. */
+  function typePlusMinus(cid, sid, aid, key, level, date, type, note, mod) {
+    return _saved(cid, sid, aid, 'plusMinus', upsertScore(cid, sid, aid, key, level, date, type, note, mod));
+  }
+
+  /* Clear Score, in the gradebook's cell menu: `keys` come off `sid`'s
+     entries for the assessment in `scores` (the class's score list), an
+     Overall Comment or Note for the Report staying on one entry, and the
+     list is saved. The ticks come off first, through setTick. */
+  function clearScore(cid, scores, sid, assessment, keys) {
+    clearScoreEntries(cid, scores, sid, assessment, keys);
+    return _saved(cid, sid, assessment.id, 'clear', saveScores(cid, scores));
+  }
+
+  /* Clear Score's last step: the server clears the cell as well
+     (clear_score). The gradebook asks once it has redrawn, as before, so
+     it is an action of its own. */
+  function clearScoreOnServer(cid, sid, aid) {
+    return _saved(cid, sid, aid, 'clear', window.clearScore(sid, aid));
+  }
+
+  /* Undo for one gradebook cell (Cmd+Z, or the Score Cleared toast):
+     `scores` is the class's score list with the cell's old entries put
+     back; it is saved, then what changed since `before` is sent. Saving
+     the list sends the change too, so it goes up twice, as before. The
+     ticks Clear Score took off go back through setTick. */
+  function undoCell(cid, sid, aid, before, scores) {
+    var out = saveScores(cid, scores);
+    persistScoreDiffToCanonical(cid, before, scores);
+    return _saved(cid, sid, aid, 'undo', out);
+  }
+
+  /* Mark Blank Cells Missing or Excused, in the gradebook's column menu
+     and on Class Results' Unmarked list: `statuses` is the class's whole
+     status list with the blank cells of `aid` marked. */
+  function markBlankCells(cid, aid, statuses) {
+    return _saved(cid, null, aid, 'status', saveAssignmentStatuses(cid, statuses));
+  }
+
+  /* Its undo (the toast, Cmd+Z, or Undo Marking Blank Cells): the list
+     with those marks taken off. */
+  function undoMarkBlankCells(cid, aid, statuses) {
+    return _saved(cid, null, aid, 'undo', saveAssignmentStatuses(cid, statuses));
+  }
+
+  /* Delete Assessment, in the gradebook's column menu: `scores` is the
+     class's score list with the work's scores taken out. The gradebook
+     deletes the work itself. */
+  function deleteAssessmentScores(cid, aid, scores) {
+    return _saved(cid, null, aid, 'delete', saveScores(cid, scores));
+  }
+
+  /* And `statuses`, the class's status list with the work's taken out. */
+  function deleteAssessmentStatuses(cid, aid, statuses) {
+    return _saved(cid, null, aid, 'delete', saveAssignmentStatuses(cid, statuses));
+  }
+
   /* ── The phone's Grade tab (S1-T2) ──────────────────────────────────
      The phone's points, marks, statuses, ticks, comments and group
      actions go through the actions above. Its levels and its Undo pass
@@ -181,6 +259,16 @@ window.Grader = (function () {
     setDibels: setDibels,
     gradeSeparately: gradeSeparately,
     backToGroupGrade: backToGroupGrade,
+    // The gradebook and Class Results (S1-T1)
+    typeLevel: typeLevel,
+    typePlusMinus: typePlusMinus,
+    clearScore: clearScore,
+    clearScoreOnServer: clearScoreOnServer,
+    undoCell: undoCell,
+    markBlankCells: markBlankCells,
+    undoMarkBlankCells: undoMarkBlankCells,
+    deleteAssessmentScores: deleteAssessmentScores,
+    deleteAssessmentStatuses: deleteAssessmentStatuses,
     // The phone's Grade tab (S1-T2)
     setLevelOnPhone: setLevelOnPhone,
     setPlusMinusOnPhone: setPlusMinusOnPhone,
