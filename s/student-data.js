@@ -14,6 +14,12 @@
    last returned while a newer draft waits. fromServer checks again, keeping
    a grade only where `returned_at` is set, and copies named fields only.
 
+   A grade arrives as a copy (migrations/2026110902_grade_return.sql, 3):
+   { v, value, modifier, comment, tags: { id: level }, criteria: { id:
+   level }, checks: [id] }. `previous` is the copy the student had before
+   the newest return; it is compared with `grade` here, to mark a piece
+   Updated, and is not kept.
+
    This file comes with the page and needs nothing else to read a reply.
    calc.js and constants.js are fetched later, when the Assignments list is
    about to open (app.js): the score entries calc.js reads are built from
@@ -34,6 +40,34 @@ var StudentData = (function () {
     if (v == null || v === '') return null;
     var n = Number(v);
     return isFinite(n) ? n : null;
+  }
+
+  /* A time as the server writes it, in milliseconds, or null. The server
+     writes to the microsecond; a browser is only sure to read three decimal
+     places, so the rest are dropped first. */
+  function when(v) {
+    var t = v ? Date.parse(String(v).replace(/(\.\d{3})\d+/, '$1')) : NaN;
+    return isFinite(t) ? t : null;
+  }
+
+  /* One value as text with its keys in order, so two copies of a grade
+     compare equal whatever order their keys came in (7 and 7.0 are one
+     number already). */
+  function canon(v) {
+    if (Array.isArray(v)) return '[' + v.map(canon).join(',') + ']';
+    if (v && typeof v === 'object') {
+      return (
+        '{' +
+        Object.keys(v)
+          .sort()
+          .map(function (k) {
+            return JSON.stringify(k) + ':' + canon(v[k]);
+          })
+          .join(',') +
+        '}'
+      );
+    }
+    return JSON.stringify(v === undefined ? null : v);
   }
 
   var STATUSES = { NS: 'NS', EXC: 'EXC', LATE: 'LATE' };
@@ -77,28 +111,38 @@ var StudentData = (function () {
       rubricId: row.rubric_id ? str(row.rubric_id) : '',
       status: STATUSES[row.status] || null,
       returnedAt: row.returned_at ? str(row.returned_at) : '',
+      // When the teacher made the piece, under the name calc.js reads. Two
+      // pieces with one date: the one made later counts later (Colin, Nov
+      // 10). '' until the server sends it.
+      created_at: row.created_at ? str(row.created_at) : '',
+      updated: false, // set by fromServer, with `unseen`
+      unseen: false,
     };
   }
 
   /* One returned grade, named fields only: the one score of points and
-     Complete/Incomplete work, the Overall Comment, a level per competency
-     and a level per rubric criterion. */
-  function gradeFrom(grade) {
-    function levels(rows, key) {
-      return (rows || [])
-        .filter(function (r) {
-          return r && r[key] && num(r.value) != null;
+     Complete/Incomplete work (or the Overall level of work linked to no
+     competency, with its + or −), the Overall Comment, a level per
+     competency and a level per rubric criterion. */
+  function gradeFrom(copy) {
+    function levels(byId) {
+      byId = byId && typeof byId === 'object' && !Array.isArray(byId) ? byId : {};
+      return Object.keys(byId)
+        .filter(function (id) {
+          return byId[id] && num(byId[id].value) != null;
         })
-        .map(function (r) {
-          return { id: str(r[key]), value: num(r.value), modifier: num(r.modifier) || 0 };
+        .map(function (id) {
+          return { id: str(id), value: num(byId[id].value), modifier: num(byId[id].modifier) || 0 };
         });
     }
-    return {
-      value: num(grade.score && grade.score.value),
-      comment: str(grade.score && grade.score.comment),
-      tagScores: levels(grade.tag_scores, 'tag_id'),
-      rubricScores: levels(grade.rubric_scores, 'criterion_id'),
+    var grade = {
+      value: num(copy.value),
+      comment: str(copy.comment),
+      tagScores: levels(copy.tags),
+      rubricScores: levels(copy.criteria),
     };
+    if (num(copy.modifier)) grade.modifier = num(copy.modifier);
+    return grade;
   }
 
   /* One returned grade as the score entries calc.js reads. Called only by
@@ -120,7 +164,7 @@ var StudentData = (function () {
       return entry(s.id, s.value, s.modifier);
     });
     // Work linked to no competency keeps its one level on the score itself.
-    if (!rubric && !out.length && grade.value != null) out.push(entry(scoreTagIds(a)[0], grade.value));
+    if (!rubric && !out.length && grade.value != null) out.push(entry(scoreTagIds(a)[0], grade.value, grade.modifier));
     return out;
   }
 
@@ -155,13 +199,27 @@ var StudentData = (function () {
       var a = assessmentFrom(row);
       assessments.push(a);
       // Returned grades only. A grade with no return date is not kept.
-      if (a.returnedAt && row.grade) grades[a.id] = gradeFrom(row.grade);
+      // Missing and Excused win at once: the server sends no grade under
+      // either, and one sent by mistake is not kept.
+      var hidden = a.status === 'NS' || a.status === 'EXC';
+      if (!a.returnedAt || hidden || !row.grade || typeof row.grade !== 'object') return;
+      grades[a.id] = gradeFrom(row.grade);
+      var returned = when(row.returned_at);
+      var changed = when(row.updated_at);
+      var seen = when(row.seen_at);
+      // Updated: the grade was changed and returned again since the student
+      // last opened the piece, and it is not the grade they had before.
+      a.updated = changed != null && !(seen != null && seen >= changed) && canon(row.previous) !== canon(row.grade);
+      // Not opened since it last came back.
+      a.unseen = !(seen != null && seen >= Math.max(returned || 0, changed || 0));
     });
     return {
       v: 1,
       student: { id: str(student.enrollment_id), firstName: str(student.first_name) },
       course: {
-        id: str(course.id),
+        // The class's key on this page. The server sends no class id (the
+        // page needs none); Demo Mode's sample class has one.
+        id: str(course.id) || 'class',
         name: str(course.name),
         block: str(course.block),
         gradingSystem: SYSTEMS[course.grading_system] || 'proficiency',

@@ -802,6 +802,44 @@ describe('student-submit: the page route', () => {
     expect(page.assessments[1].grade).toEqual({ ...LAB_GRADE, criteria: {}, checks: [] });
   });
 
+  /* S0-M4b makes page() send when each piece was made, so two pieces with
+     one date are listed with the one made later counting later. */
+  it('hands on created_at when the database sends it, where the database put it', async () => {
+    const sent = clone(PAGE_OK);
+    const made = ['2026-10-27T16:04:11.482913+00:00', '2026-10-27T16:04:11.482914+00:00', '2026-10-20T09:00:00+00:00'];
+    sent.assessments.forEach((a, i) => (a.created_at = made[i]));
+    const { handle } = setup({ page: () => clone(sent) });
+    const page = await (await handle(post(GOOD.page))).json();
+    expect(page).toEqual(sent);
+    expect(page.assessments.map(a => a.created_at)).toEqual(made);
+    // To the microsecond, as text: nothing is parsed or rounded on the way.
+    expect(JSON.stringify(page)).toContain('"created_at":"2026-10-27T16:04:11.482913+00:00"');
+  });
+
+  it('sends no created_at until the database does, and none it was not told about', async () => {
+    const { handle } = setup();
+    const before = await (await handle(post(GOOD.page))).json();
+    expect(before.assessments.every(a => !('created_at' in a))).toBe(true);
+    expect(before).toEqual(PAGE_OK);
+
+    // Only a plain value under that name is copied, and only on an assessment.
+    const dirty = clone(PAGE_OK);
+    dirty.assessments[0].created_at = { is_draft: true };
+    dirty.assessments[1].created_by = 'DRAFT-ONLY';
+    dirty.assessments[1].updated_by = 'DRAFT-ONLY';
+    dirty.created_at = '2026-10-27T16:04:11+00:00';
+    dirty.course.created_at = '2026-09-02T16:00:00+00:00';
+    dirty.student.created_at = '2026-09-02T16:00:00+00:00';
+    dirty.rubrics[0].created_at = '2026-09-02T16:00:00+00:00';
+    const { handle: second } = setup({ page: () => dirty });
+    const text = await (await second(post(GOOD.page))).text();
+    const clean = clone(PAGE_OK);
+    clean.assessments[0].created_at = null;
+    expect(JSON.parse(text)).toEqual(clean);
+    expect(text).not.toContain('DRAFT-ONLY');
+    expect(text).not.toContain('2026-09-02');
+  });
+
   it('answers an empty class with an empty page', async () => {
     const { handle } = setup({ page: () => ({ ok: true, v: 1, expires_at: EXPIRES, tags: {}, rubrics: [] }) });
     const page = await (await handle(post(GOOD.page))).json();

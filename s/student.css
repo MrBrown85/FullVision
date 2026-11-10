@@ -660,8 +660,34 @@ button {
   margin: 0;
 }
 
+/* A card's page in a tab nobody is looking at is covered, and uncovered
+   only once its session has been checked (app.js, cover and uncover). */
+.sp-away #app {
+  visibility: hidden;
+}
+/* The page's header: the class on the left, Done on the right, both in
+   reach as the list scrolls. */
+.sp-head-page {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sp-head-words {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sp-done {
+  flex: none;
+  padding: 0 18px;
+}
 .sp-page {
   gap: 10px;
+}
+.sp-page-title:focus {
+  outline: none;
 }
 .sp-page-title {
   margin: 4px 4px 2px;

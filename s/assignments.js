@@ -16,6 +16,20 @@
    this screen opens; the fetch can fail) a returned piece shows when it
    came back and no result, and the list says the results didn't load.
 
+   One list, two sources: the server's `page` reply for a real card and
+   Demo Mode's reply built on the device both go through
+   StudentData.fromServer and then through this file, so the two cannot
+   show a piece differently.
+
+   A returned grade that was changed and returned again is marked Updated
+   until the student has opened it. In this build the list is where a
+   result is read, so a piece counts as opened once its row has been on
+   screen in a visible tab (Colin, Nov 10). A row that could be opened
+   (returned, its result drawn, not opened since it came back) carries its
+   piece's id as data-unseen; app.js watches those rows and tells the
+   server (`seen`). No other row carries a mark, so a piece with a draft
+   still reads exactly as a piece never graded.
+
    app.js opens this screen after Is This You? and draws the frame around
    it. This file adds its screen with StudentPage.addScreens. */
 (function () {
@@ -70,22 +84,44 @@
       view.result = cell.mark === 'complete' ? 'Complete' : 'Incomplete';
     }
     if (a.status === 'LATE') bits.push('Late');
+    if (a.updated) bits.push('Updated');
     view.sub = bits.join(SEP);
+    // A result is on the row and the student has not opened it since it came back.
+    if (a.unseen && view.result !== '') view.unseen = a.id;
     return view;
   }
 
-  // Newest first, by due date, or the date with none.
+  // When the teacher made a piece, in milliseconds, or null when the
+  // server has not said.
+  function madeAt(a) {
+    // To the millisecond, as calc.js reads it and as every browser can.
+    var t = a.created_at ? Date.parse(String(a.created_at).replace(/(\.\d{3})\d+/, '$1')) : NaN;
+    return isFinite(t) ? t : null;
+  }
+
+  /* Newest first, by due date, or the date with none. Two pieces with the
+     same date: the one made later is the later one (Colin, Nov 10), so it
+     is listed first; two made at the same instant fall to their ids. Where
+     the server has not said when a piece was made, the two stay in the
+     order they came in, as before. */
   function inOrder(assessments) {
     return assessments.slice().sort(function (x, y) {
       var a = x.dueDate || x.date || '';
       var b = y.dueDate || y.date || '';
-      return a < b ? 1 : a > b ? -1 : 0;
+      if (a !== b) return a < b ? 1 : -1;
+      var m = madeAt(x);
+      var n = madeAt(y);
+      if (m == null || n == null) return 0;
+      if (m !== n) return m < n ? 1 : -1;
+      return x.id < y.id ? 1 : x.id > y.id ? -1 : 0;
     });
   }
 
   function rowHtml(view) {
     return (
-      '<li class="sp-row"><span class="sp-dot sp-dot-' +
+      '<li class="sp-row"' +
+      (view.unseen ? ' data-unseen="' + esc(view.unseen) + '"' : '') +
+      '><span class="sp-dot sp-dot-' +
       view.kind +
       '" aria-hidden="true"></span>' +
       '<span class="sp-row-text"><span class="sp-row-title">' +
@@ -136,7 +172,8 @@
   function renderAssignments(state) {
     return StudentPage.pageFrame(
       state,
-      '<h1 class="sp-page-title">Assignments</h1>' + noResultsHtml(state) + listHtml(state.page),
+      // The page's first words, where the keyboard and a screen reader start (app.js moves there).
+      '<h1 class="sp-page-title" tabindex="-1">Assignments</h1>' + noResultsHtml(state) + listHtml(state.page),
     );
   }
 
@@ -145,6 +182,6 @@
     render: { assignments: renderAssignments },
     // The screen reads the state it is handed; it keeps none of its own.
     share: function () {},
-    test: { rowView: rowView, listHtml: listHtml },
+    test: { rowView: rowView, listHtml: listHtml, inOrder: inOrder },
   });
 })();
