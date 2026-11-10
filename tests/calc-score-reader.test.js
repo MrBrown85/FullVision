@@ -8,7 +8,8 @@
  *
  * - The source guard fails when calc.js names one of the data layer's score
  *   readers, or reaches into its cache, anywhere but inside _scoreRead; and
- *   inside it, when it names any but the three it is built on.
+ *   inside it, when it names any but the three it is built on, or names the
+ *   returned set's builder (S0-F1) anywhere but in scores().
  * - _scoreRead gives what the data layer's own readers give, on a class
  *   whose rows are picked so each small difference between the two shows.
  * - Every cache key carries the score set, and a second set gets its own
@@ -56,9 +57,13 @@ const READERS = [
   '_getRubricCriterionNote',
   '_groupGradeHolder',
   '_holdsGroupCopy',
+  // The returned set's builder (S0-F1): _scoreRead.scores alone may name it.
+  'getReturnedScores',
 ];
 // The three _scoreRead is built on, once each.
 const INSIDE_READER = { getScores: 1, getAssignmentStatuses: 1, getDibelsScore: 1 };
+const RETURNED = 'getReturnedScores';
+const RETURNED_ELSEWHERE = RETURNED + ' outside scores()';
 
 /* The one line outside _scoreRead that names a reader. It is from before the
    reader: the DIBELS cell asks whether the data layer has DIBELS at all
@@ -98,9 +103,24 @@ function outsideReads(source) {
   return directReads(rest).map(h => h.what + ' at "' + h.line + '"');
 }
 
+// _scoreRead's scores member, up to the next one.
+function scoresMember(source) {
+  const reader = readerAndRest(source).reader;
+  const start = reader.indexOf('\n  scores: function');
+  const end = reader.indexOf('\n  statuses: function');
+  expect(start).toBeGreaterThan(-1);
+  expect(end).toBeGreaterThan(start);
+  return reader.slice(start, end);
+}
+
+/* How often _scoreRead names each reader. The returned set's builder is
+   counted only where it is named outside scores(), which is never right. */
 function insideReads(source) {
   const counts = {};
   directReads(readerAndRest(source).reader).forEach(h => (counts[h.what] = (counts[h.what] || 0) + 1));
+  const elsewhere = (counts[RETURNED] || 0) - directReads(scoresMember(source)).filter(h => h.what === RETURNED).length;
+  delete counts[RETURNED];
+  if (elsewhere) counts[RETURNED_ELSEWHERE] = elsewhere;
   return counts;
 }
 
@@ -111,6 +131,13 @@ describe('calc.js reads scores only through _scoreRead', () => {
 
   it('builds _scoreRead on getScores, getAssignmentStatuses and getDibelsScore alone, once each', () => {
     expect(insideReads(SOURCE)).toEqual(INSIDE_READER);
+  });
+
+  it('reads both sets in scores(), and names the returned set nowhere else', () => {
+    const names = directReads(scoresMember(SOURCE)).map(h => h.what);
+    expect(names.filter(n => n === 'getScores')).toHaveLength(1);
+    expect(names.filter(n => n === RETURNED).length).toBeGreaterThan(0);
+    expect(names.filter(n => n !== 'getScores' && n !== RETURNED)).toEqual([]);
   });
 
   // The guard itself: each of these, added to calc.js outside _scoreRead, is caught.
@@ -148,6 +175,7 @@ describe('calc.js reads scores only through _scoreRead', () => {
     ['the ticks on a criterion', 'var x = getRubricCheckIds(cid, sid, aid, crit);', ['getRubricCheckIds']],
     ['a withheld group grade', 'var x = isGroupWithheld(cid, sid, aid);', ['isGroupWithheld']],
     ['score or feedback', 'var x = hasScoreOrFeedback(cid, sid, aid);', ['hasScoreOrFeedback']],
+    ['the returned set, past the reader', 'var x = getReturnedScores(cid)[sid];', ['getReturnedScores']],
   ];
   it.each(SNEAKS)('catches %s', (_name, line, names) => {
     const hits = outsideReads(SOURCE + '\nfunction _sneak(cid, sid, aid, crit, p) {\n  ' + line + '\n}\n');
@@ -177,6 +205,7 @@ describe('calc.js reads scores only through _scoreRead', () => {
     ['a data-layer reader in place of a copy', '    return getScoreComment(cid, sid, aid);', { getScoreComment: 1 }],
     ['a second read of the scores', '    return getScores(cid)[sid];', { getScores: 2 }],
     ['the cache', '    return _cache.scores[cid];', { _cache: 1 }],
+    ['the returned set outside scores()', '    return getReturnedScores(cid)[sid];', { [RETURNED_ELSEWHERE]: 1 }],
   ];
   it.each(INSIDE_SNEAKS)('catches %s inside _scoreRead', (_name, line, extra) => {
     const at = SOURCE.indexOf('var _scoreRead = {') + 'var _scoreRead = {'.length;
@@ -438,14 +467,18 @@ describe('the score set is in the cache key', () => {
     const before = getTagProficiency(CID, 's1', TAG);
     const beforePct = getCourseLetterData(CID, 's1').R;
     expect(before).toBe(3);
-    // Another set, reading other scores, with no cache clear between.
-    _scoreSet = 'another';
-    _cache.scores[CID] = scoresAt(1);
-    expect(getTagProficiency(CID, 's1', TAG)).toBe(1);
-    expect(getCourseLetterData(CID, 's1').R).toBeLessThan(beforePct);
-    // Back on the first set: its cached numbers were never touched.
-    _scoreSet = 'all';
-    expect(getTagProficiency(CID, 's1', TAG)).toBe(before);
-    expect(getCourseLetterData(CID, 's1').R).toBe(beforePct);
+    // The returned set, reading other scores, with no cache clear between.
+    globalThis.getReturnedScores = () => scoresAt(1);
+    try {
+      _scoreSet = 'returned';
+      expect(getTagProficiency(CID, 's1', TAG)).toBe(1);
+      expect(getCourseLetterData(CID, 's1').R).toBeLessThan(beforePct);
+      // Back on the first set: its cached numbers were never touched.
+      _scoreSet = 'all';
+      expect(getTagProficiency(CID, 's1', TAG)).toBe(before);
+      expect(getCourseLetterData(CID, 's1').R).toBe(beforePct);
+    } finally {
+      delete globalThis.getReturnedScores;
+    }
   });
 });

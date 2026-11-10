@@ -14,8 +14,10 @@
 
    This file is the shell: the code box, the identity check, the edge
    function, drafts, Demo Mode, and which screen shows. The questionnaire's
-   screens are in questionnaire.js and the phone report's in report.js. Both
-   load after this file and hand their screens to StudentPage.addScreens.
+   screens are in questionnaire.js and the phone report's in report.js; a
+   student card's are in app.js (the card, Is This You?) and assignments.js
+   (the Assignments list). They load after this file and hand their screens
+   to StudentPage.addScreens.
 
    The render functions are pure (state in, HTML out) and exposed as
    StudentPage._test for tests. */
@@ -42,6 +44,10 @@ var StudentPage = (function () {
     wrong_password: "That password doesn't match. Check the password on your slip.",
     slip_locked: 'This slip is locked after too many wrong tries. Ask your teacher for a new slip.',
     reprint: 'This slip needs to be printed again. Ask your teacher for a new slip.',
+    // A student card (app.js). A teacher unlocks a card; a slip is replaced.
+    card_not_found: "That code didn't work. Check the letters and numbers on your card.",
+    wrong_card_password: "That password doesn't match. Check the password on your card.",
+    card_locked: 'This card is locked after too many wrong tries. Ask your teacher to unlock it.',
   };
   var MONTHS = [
     'January',
@@ -75,6 +81,7 @@ var StudentPage = (function () {
       number: '', // the student number or slip password as typed
       bday: { m: '', d: '', y: '' }, // the pickers as chosen
       report: null, // the report as the teacher sent it
+      page: null, // a card's page for one class, as student-data.js reads it
     };
   }
 
@@ -119,11 +126,15 @@ var StudentPage = (function () {
     );
   }
 
-  function codeBox(state, label, top) {
+  /* `form` names the form for a screen file that opens the code itself
+     (addScreens' submit); without it the shell opens the code as a slip. */
+  function codeBox(state, label, top, form) {
     return (
       '<form class="sp-code-box' +
       (top ? ' sp-code-box-top' : '') +
-      '" data-form="code" novalidate>' +
+      '" data-form="' +
+      (form || 'code') +
+      '" novalidate>' +
       '<label for="sp-code">' +
       esc(label) +
       '</label><div class="sp-code-row">' +
@@ -179,13 +190,22 @@ var StudentPage = (function () {
     return d.preview || [];
   }
 
-  /* Who are you? A birthday or student number, or the slip's password. */
+  /* What the student is holding: a card (app.js) or a slip. */
+  function paperOf(data) {
+    return data && data.kind === 'card' ? 'card' : 'slip';
+  }
+
+  /* Who are you? A birthday or student number, or the slip's or card's
+     password. */
   function identityFields(state) {
     var by = state.data.check;
+    var paper = paperOf(state.data);
     var msg = state.message ? '<p class="sp-msg" role="alert">' + esc(state.message) + '</p>' : '';
     if (by === 'password') {
       return (
-        '<p class="sp-lead">To make sure it\u2019s you, type the password printed on your slip.</p>' +
+        '<p class="sp-lead">To make sure it\u2019s you, type the password printed on your ' +
+        paper +
+        '.</p>' +
         '<label class="sp-sub-label" for="sp-ident">Password</label>' +
         '<input id="sp-ident" class="sp-input" inputmode="numeric" autocomplete="off" maxlength="16" value="' +
         esc(state.number) +
@@ -198,7 +218,7 @@ var StudentPage = (function () {
     var pw = !!state.data.also_password;
     return (
       '<p class="sp-lead">To make sure it\u2019s you, enter your birthday or your student number' +
-      (pw ? ', or the password on your slip' : '') +
+      (pw ? ', or the password on your ' + paper : '') +
       '.</p>' +
       birthdayPickers(state) +
       '<div class="sp-or" aria-hidden="true">or</div>' +
@@ -283,12 +303,16 @@ var StudentPage = (function () {
 
   /* ── The screen files ──────────────────────────────────────── */
 
-  /* questionnaire.js and report.js each hand over
-       {file, render: {screen name: function}, click, input, share, test}.
-     render joins the screens below. click(act, el) and input(el) get what
-     this file's own handlers don't take. A screen file keeps its own S and
-     root, the same objects as the ones here: share(S, root) hands them over
-     again each time either is replaced. test adds to StudentPage._test. */
+  /* questionnaire.js, report.js, app.js and assignments.js each hand over
+       {file, render: {screen name: function}, click, input, submit, start,
+        share, test}.
+     render joins the screens below. click(act, el), input(el) and
+     submit(name, form) get what this file's own handlers don't take.
+     start(hash) is asked first when the page opens and returns true when
+     the address is its own (a demo address). A screen file keeps its own S
+     and root, the same objects as the ones here: share(S, root) hands them
+     over again each time either is replaced. test adds to
+     StudentPage._test. */
   var SCREENS = { loading: renderLoading, notme: renderNotMe, message: renderMessage };
   var files = [];
 
@@ -465,7 +489,7 @@ var StudentPage = (function () {
 
   function paint(focusSel) {
     if (!root) return;
-    // html-safe: the page's render (the name is shared), over this file's screens and the ones questionnaire.js and report.js add: every screen escapes server and typed text with esc; q.id is a question uuid; PhoneReportView.html escapes the report.
+    // html-safe: the page's render (the name is shared), over this file's screens and the ones questionnaire.js, report.js, app.js and assignments.js add: every screen escapes server and typed text with esc; q.id is a question uuid; PhoneReportView.html escapes the report; a result on the Assignments list is calc.js's text, escaped.
     root.innerHTML = render(S);
     if (S.screen === 'loading' && window.FVLoading) window.FVLoading.start(root, 'student');
     root.querySelectorAll('textarea.sp-text').forEach(grow);
@@ -515,8 +539,10 @@ var StudentPage = (function () {
   }
 
   /* "2 tries left." and, before the last, what happens after it. */
-  function triesLeftText(n) {
+  function triesLeftText(n, paper) {
     if (n == null) return '';
+    if (n === 1 && paper === 'card')
+      return ' 1 try left. One more wrong try locks this card, and your teacher will need to unlock it.';
     if (n === 1)
       return ' 1 try left. One more wrong try locks this slip, and you will need a new one from your teacher.';
     return ' ' + n + ' tries left.';
@@ -564,9 +590,15 @@ var StudentPage = (function () {
 
   /* A questionnaire slip: the birthday, student number or slip password
      hands over the questions. A session that ran out opens again from the
-     code, once. */
-  function verifyIdentity() {
+     code, once.
+
+     A student card (app.js) reads the same fields and gets the same
+     messages, and does its own asking and its own next step:
+       card = { send(ident) → a promise of the reply, ok(reply),
+                messageScreen: the screen a refusal shows on }. */
+  function verifyIdentity(card) {
     var by = S.data.check;
+    var paper = paperOf(S.data);
     var typed = ((root.querySelector('#sp-ident') || {}).value || '').trim();
     var m = (root.querySelector('#sp-bm') || {}).value || '';
     var dd = (root.querySelector('#sp-bd') || {}).value || '';
@@ -576,7 +608,7 @@ var StudentPage = (function () {
     var ident = { birthday: null, student_number: null, password: null };
     if (by === 'password') {
       if (!typed) {
-        S.message = 'Type the password printed on your slip.';
+        S.message = 'Type the password printed on your ' + paper + '.';
         paint('#sp-ident');
         return Promise.resolve();
       }
@@ -600,6 +632,7 @@ var StudentPage = (function () {
     S.message = '';
     var done = function (res) {
       S.sending = false;
+      if (res && res.ok && card) return card.ok(res);
       if (res && res.ok) {
         S.ident = ident;
         S.data.parts = res.parts || [];
@@ -616,13 +649,19 @@ var StudentPage = (function () {
       var e = res && res.error;
       if (e === 'slip_locked' && !S.demo) markSlipLocked(S.code);
       if (e === 'wrong_identity') {
-        S.message = MESSAGES[by === 'password' ? 'wrong_password' : 'wrong_identity'] + triesLeftText(res.tries_left);
+        var wrong = by !== 'password' ? 'wrong_identity' : card ? 'wrong_card_password' : 'wrong_password';
+        S.message = MESSAGES[wrong] + triesLeftText(res.tries_left, paper);
       } else {
         S.message = messageFor(res);
-        if (e !== 'network' && e !== 'busy') S.screen = 'message';
+        if (e !== 'network' && e !== 'busy') S.screen = card ? card.messageScreen : 'message';
       }
       paint();
     };
+    if (card) {
+      S.sending = true;
+      paint();
+      return card.send(ident).then(done);
+    }
     if (S.demo) {
       return Promise.resolve(done({ ok: true, parts: S.demoParts, context: S.demoContext }));
     }
@@ -642,6 +681,13 @@ var StudentPage = (function () {
       .then(done);
   }
 
+  /* A clean state, handed to every screen file. */
+  function reset() {
+    S = freshState();
+    share();
+    return S;
+  }
+
   function onClick(e) {
     var el = e.target.closest('[data-act]');
     if (!el || !root.contains(el)) return;
@@ -650,8 +696,7 @@ var StudentPage = (function () {
       S.screen = 'notme';
       paint();
     } else if (act === 'restart') {
-      S = freshState();
-      share();
+      reset();
       try {
         history.replaceState(null, '', location.pathname);
       } catch (err) {
@@ -681,9 +726,16 @@ var StudentPage = (function () {
   }
 
   function onSubmit(e) {
-    var form = e.target.closest('[data-form="code"]');
+    var form = e.target.closest('[data-form]');
     if (!form) return;
     e.preventDefault();
+    var name = form.getAttribute('data-form');
+    if (name !== 'code') {
+      files.forEach(function (f) {
+        if (f.submit) f.submit(name, form);
+      });
+      return;
+    }
     var input = form.querySelector('#sp-code');
     openCode(input ? input.value : '');
   }
@@ -723,6 +775,11 @@ var StudentPage = (function () {
     root.addEventListener('submit', onSubmit);
     root.addEventListener('keydown', onKeydown);
     var h = String(hash || '').replace(/^#/, '');
+    // A screen file's own address (app.js: #demo-card).
+    var theirs = files.some(function (f) {
+      return !!(f.start && f.start(h));
+    });
+    if (theirs) return;
     if (/^demo-report$/i.test(h)) {
       S.demo = true;
       var until = new Date(Date.now() + 60 * 864e5).toISOString().slice(0, 10);
@@ -767,12 +824,13 @@ var StudentPage = (function () {
     paint();
   }
 
-  /* questionnaire.js and report.js load after this file, so the page starts
-     once its scripts are read. A copy of index.html from before the split
-     names only this file: a screen file that hasn't joined is fetched here. */
+  /* The screen files load after this file, so the page starts once its
+     scripts are read. A copy of index.html from before the split names only
+     this file, and one from before student cards leaves out app.js and
+     assignments.js: a screen file that hasn't joined is fetched here. */
   function whenScreensAreIn(done) {
     function fetchMissing() {
-      var missing = ['questionnaire', 'report'].filter(function (name) {
+      var missing = ['questionnaire', 'report', 'app', 'assignments'].filter(function (name) {
         return !files.some(function (f) {
           return f.file === name;
         });
@@ -815,6 +873,12 @@ var StudentPage = (function () {
     fmtDate: fmtDate,
     header: header,
     codeBox: codeBox,
+    cleanCode: cleanCode,
+    prettyCode: prettyCode,
+    isCode: function (c) {
+      return CODE_RE.test(c);
+    },
+    reset: reset,
     slipParts: slipParts,
     identityFields: identityFields,
     birthdayPickers: birthdayPickers,

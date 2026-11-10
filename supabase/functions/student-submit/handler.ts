@@ -1,24 +1,30 @@
 // The student-submit request handler (docs/STUDENT-VOICE-PLAN.md, PR 6).
 //
-// A student's phone posts here; nothing else does. Four routes:
+// A student's phone posts here; nothing else does. Four routes for a slip:
 //   {route: 'open', code}             -> student_submit.open
 //   {route: 'verify', token, birthday | student_number | password}
 //                                     -> student_submit.verify (questionnaires)
 //   {route: 'check', token, birthday} -> student_submit.check (phone reports)
 //   {route: 'submit', token, answers} -> student_submit.submit
-// The SQL functions (migrations/20261025_student_submit.sql) hold every
+// and the student card's routes, in card-routes.ts: card, verify (with a
+// code in place of a token), add-card, page, seen and done.
+// The SQL functions (migrations/20261025_student_submit.sql, and
+// migrations/2026110904_student_sessions_page.sql for a card) hold every
 // rule; this file only checks the request's shape, refuses to run outside
 // ca-central-1, turns the caller's IP into a keyed hash, and answers with
 // what the database said.
 //
 // Kept free of Deno and database imports so the tests run it under Node
 // with stand-in database calls. index.ts wires the real ones.
+import { CARD_ROUTES, cardReply, type Param } from './card-routes.ts';
 
 export type Db = {
   open: (code: string, ipHash: string) => Promise<Record<string, unknown>>;
   verify: (token: string, who: Identity, ipHash: string) => Promise<Record<string, unknown>>;
   check: (token: string, birthday: string, ipHash: string) => Promise<Record<string, unknown>>;
   submit: (token: string, answers: unknown, ipHash: string) => Promise<Record<string, unknown>>;
+  // A card route's one statement (card-routes.ts), with its parameters. Gives back the function's reply.
+  call: (sql: string, params: Param[]) => Promise<unknown>;
 };
 
 // What the student typed to show the slip is theirs; any one may match.
@@ -139,10 +145,21 @@ export function makeHandler(opts: Options) {
     }
 
     const route = body.route;
+    // A verify with a token is a slip's, as it always was; with a code and no token, a card's.
+    const card =
+      typeof route === 'string' &&
+      Object.hasOwn(CARD_ROUTES, route) &&
+      (route !== 'verify' || (body.token == null && body.code != null))
+        ? CARD_ROUTES[route]
+        : null;
     let result: Record<string, unknown>;
     try {
       const hash = await ipHash(req, opts.ipKey);
-      if (route === 'open') {
+      if (card) {
+        const params = card.params(body, identity(body));
+        if (!params) return reply(400, { ok: false, error: 'bad_request' }, origin);
+        result = cardReply(card, await opts.db.call(card.sql, [...params, hash]));
+      } else if (route === 'open') {
         if (typeof body.code !== 'string' || body.code.length > 32) {
           return reply(400, { ok: false, error: 'bad_request' }, origin);
         }
@@ -177,8 +194,8 @@ export function makeHandler(opts: Options) {
       return reply(500, { ok: false, error: 'server' }, origin);
     }
 
-    // Route, outcome and time. Never the code, token, birthday, student
-    // number, password, answers or name.
+    // Route, outcome and time. Never the code, token, session token,
+    // birthday, student number, password, answers or name.
     log({
       route,
       outcome: result && result.ok ? 'ok' : (result && result.error) || 'unknown',

@@ -7,7 +7,9 @@
  * locally.
  */
 import './setup.js';
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { openStudentPage } from './helpers/student-page-context.js';
 
 const tick = (ms = 20) => new Promise(r => setTimeout(r, ms));
 
@@ -126,5 +128,60 @@ describe('Demo Mode sends nothing to Supabase', () => {
     expect(getSections(cid).map(s => s.tags[0].code)).toEqual(['QAP1']);
     expect(alerts).toEqual([]);
     expect(calls).toEqual([]);
+  });
+});
+
+/* The student page's card path (s/app.js, s/assignments.js,
+   s/student-data.js; docs/plans/student-page-build-plan.md, 1.10). Demo Mode
+   builds the card, the identity check and the page for one class on the
+   device. The edge function is never asked, and until its routes exist the
+   three files hold no way to ask it. */
+describe('Demo Mode sends nothing from the student page', () => {
+  const CARD_FILES = ['s/app.js', 's/assignments.js', 's/student-data.js'];
+
+  it.each(CARD_FILES)('%s has no way to reach a server', file => {
+    const src = readFileSync(new URL('../' + file, import.meta.url), 'utf-8');
+    expect(src).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|sendBeacon|WebSocket|EventSource/);
+    expect(src).not.toMatch(/StudentPage\.call\b|functions\/v1|supabase/i);
+  });
+
+  it.each(['#demo-card', '#demo-card-password', '#demo-card-letter', '#demo-card-both'])(
+    '%s walks card, Is This You? and Assignments with no request',
+    async hash => {
+      const page = openStudentPage();
+      await page.start(hash);
+      expect(page.root().querySelector('form[data-form="card"]')).toBeTruthy();
+      await page.submit('form[data-form="card"]');
+      expect(page.root().querySelector('.sp-big').textContent).toBe('Is this you, Cece?');
+      // No, That's Not Me, and back to the card.
+      await page.click('[data-act="card-notme"]');
+      await page.click('[data-act="card-restart"]');
+      await page.submit('form[data-form="card"]');
+      // The code box under Is This You? opens the sample card again, on the device.
+      page.type('#sp-code', 'K7M-4QX');
+      await page.submit('form.sp-code-box');
+      expect(page.root().querySelector('.sp-big').textContent).toBe('Is this you, Cece?');
+      // A wrong try, then the right one.
+      page.type('#sp-ident', '0');
+      await page.click('[data-act="card-yes"]');
+      expect(page.root().querySelector('.sp-msg').textContent).toContain('4 tries left.');
+      page.type('#sp-ident', hash === '#demo-card-password' ? page.T.DEMO.password : page.T.DEMO.number);
+      await page.click('[data-act="card-yes"]');
+      expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+      expect(page.root().querySelectorAll('.sp-row').length).toBeGreaterThan(0);
+      expect(page.calls).toEqual([]);
+      // The only files fetched late are the site's own calc.js and constants.js.
+      expect(page.fetched).toEqual(['../shared/constants.js', '../shared/calc.js']);
+    },
+  );
+
+  it('the other demo addresses still call nothing', async () => {
+    for (const hash of ['#demo', '#demo-about', '#demo-report']) {
+      const page = openStudentPage();
+      await page.start(hash);
+      expect(page.calls, hash).toEqual([]);
+      // Demo Mode's questions come from the site's own templates file.
+      expect(page.fetched, hash).toEqual(hash === '#demo-report' ? [] : ['../shared/questionnaire-templates.js']);
+    }
   });
 });
