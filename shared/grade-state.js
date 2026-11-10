@@ -5,7 +5,8 @@
  * stays in the scores, as always. Beside it, one row per student per
  * assessment says what the student has been given. This file is the rule
  * that keeps that row, as plain functions: no DOM, no network, and nothing
- * read from the data layer but in afterSave and stateOf at the bottom.
+ * read from the data layer but in afterSave, stateOf and draftsWaiting at
+ * the bottom.
  *
  * The server keeps the same rule in database triggers. One file of worked
  * cases (tests/fixtures/grade-state-cases.json) runs through both, so the
@@ -501,6 +502,32 @@ window.GradeState = (function () {
     return stateOf(cid, sid, aid);
   }
 
+  /* How many grades in the class wait as drafts: every cell a screen shows
+     as Draft (stateOf), counted from the class's rows. A draft under Missing
+     or Excused shows its status and is not counted. Nor is a row whose
+     student or assessment is no longer in the class: it is on no screen. */
+  function draftsWaiting(cid) {
+    var rows = typeof getGradeReturns === 'function' ? getGradeReturns(cid) : null;
+    if (!rows) return 0;
+    var ids = function (list) {
+      var out = {};
+      (list || []).forEach(function (x) {
+        if (x && x.id) out[x.id] = true;
+      });
+      return out;
+    };
+    var students = ids(getStudents(cid));
+    var assessments = ids(getAssessments(cid));
+    var n = 0;
+    Object.keys(rows).forEach(function (aid) {
+      if (!assessments[aid]) return;
+      Object.keys(rows[aid] || {}).forEach(function (sid) {
+        if (students[sid] && stateOf(cid, sid, aid) === DRAFT) n++;
+      });
+    });
+    return n;
+  }
+
   return {
     DRAFT: DRAFT,
     RETURNED: RETURNED,
@@ -521,5 +548,6 @@ window.GradeState = (function () {
     afterSave: afterSave,
     stateOf: stateOf,
     draftsIn: draftsIn,
+    draftsWaiting: draftsWaiting,
   };
 })();
