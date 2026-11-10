@@ -1,9 +1,10 @@
 -- GENERATED: the other RPCs that write a class's tables, for grade_return_race.py.
 -- Each is copied whole and unchanged from the migration that last defined it.
 -- Four have no migration (they date from the April design and were applied by
--- hand): those are copied from docs/backend-design/write-paths.sql and are NOT
--- checked against gradebook-prod. None of these is in live-function-md5.txt;
--- README.md, "Batch A", has the query that would fingerprint them.
+-- hand): those are copied from docs/backend-design/write-paths.sql.
+-- grade_return_race.py compares each with live-function-md5.txt (the lines
+-- marked class-writer) and names the ones that are not the live body; README.md,
+-- "Batch A", says which are confirmed.
 -- Load after batch-a-prelude.sql.
 
 -- create_assessment: migrations/20261027_assessment_core_competencies.sql

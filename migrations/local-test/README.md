@@ -151,7 +151,7 @@ Two files build the score paths on top of `harness.sql`:
   `save_score_comment`, `clear_row_scores` and `clear_column_scores` have no
   migration; theirs are the live bodies, read from `gradebook-prod` on
   2026-11-09.
-- `live-function-md5.txt`: `md5(pg_get_functiondef)` of 21 live functions.
+- `live-function-md5.txt`: `md5(pg_get_functiondef)` of 21 live functions (and, further down, of eleven of the class writers Batch A's race test loads).
   `score_rpcs.py` compares every function it loads that is in the table (the
   twelve RPCs and `fv_owns_course`, `fv_owns_enrollment`,
   `fv_owns_assessment`), so each is the live one byte for byte. The check
@@ -224,12 +224,18 @@ Three more files build what they need on top of the score paths:
   students (`create_student_and_enroll`, `update_enrollment`,
   `withdraw_student`, `reenrol_student`, `delete_withdrawn_student`). Each is
   copied whole and unchanged from the migration that last defined it.
-  **Four have no migration** (`delete_assessment`, `save_assessment_tags`,
+  Four have no migration (`delete_assessment`, `save_assessment_tags`,
   `delete_rubric`, `update_enrollment`): those are from
-  `docs/backend-design/write-paths.sql`, the April design. **None of the 21
-  is checked against `gradebook-prod`**: they are not in
-  `live-function-md5.txt`. To fingerprint them, run the query at the top of
-  that file with these 21 names.
+  `docs/backend-design/write-paths.sql`, the April design.
+  `grade_return_race.py` compares each with `live-function-md5.txt` (the
+  lines marked `class-writer`, eleven so far). **Eight are the live
+  functions**: `create_assessment`, `update_assessment`, `delete_assessment`,
+  `upsert_rubric`, `delete_tag`, `delete_section`, `delete_subject`,
+  `delete_competency_group`. **Three are not**, all from the April file:
+  `delete_rubric`, `save_assessment_tags`, `update_enrollment`; the script
+  names them (`NOT_LIVE`) until their live bodies are loaded. **Ten have no
+  live fingerprint yet**: the four upserts, `remove_section`,
+  `restore_section` and the five student RPCs.
 
 Two databases, one without the four migrations (for `batch_a_apply.py`,
 which applies them itself) and one with:
@@ -316,7 +322,7 @@ What each covers:
 Result on 2026-11-09 (Postgres 18.6, local; production is 17):
 `batch_a_apply.py` 82 of 82, `grade_return.py` 280 of 280, `student_page.py`
 216 of 216, `score_rpcs.py` 234 of 234 (176 of 176 without Batch A),
-`grade_return_race.py` 414 of 414; each three times. With Batch A loaded the earlier suites pass
+`grade_return_race.py` 414 of 414; each three times (425 of 425 since the eleven fingerprint checks were added, run once). With Batch A loaded the earlier suites pass
 as before: `student_submit.py` 79 of 79, `questionnaire_identity.py` 47 of
 47, `phone_reports.py` 37 of 37, `questionnaires.py` 42 of 42.
 
@@ -417,8 +423,10 @@ A Return or a student's `seen()` waiting in line when two such calls collide
 could be the one Postgres stops; it holds nothing they want, so it waits
 again (`_grade_return_lock_first`). In these runs no Return died.
 
-The 21 RPCs in `class-writers-prelude.sql` are from the repo, not checked
-against the live database; four of them from the April design file.
+`delete_rubric`'s row is for the April design file's body, which is not the
+live one (above); it is to be run again once the live body is loaded.
+`save_assessment_tags` and `update_enrollment`, also not the live bodies,
+are among the clean ones.
 
 Timing: a rubric fill for 30 students with 5 criteria (30 `fill_rubric`
 calls, 150 rows) took about 15 ms before the batch, 20 ms with the

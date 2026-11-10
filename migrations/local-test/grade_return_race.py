@@ -43,6 +43,11 @@ With Batch A loaded:
    dead call was waiting on a grade_return row and that a Return was never
    the call that died. Against returns alone all of them are clean.
 
+First, every function in class-writers-prelude.sql is compared with its live
+fingerprint (live-function-md5.txt, the lines marked class-writer). One that
+differs is named in NOT_LIVE until its live body is loaded: its row of the
+matrix is then for the body the repo has, not the live one.
+
 Without Batch A (the same database before the four migrations) only the
 matrix runs, against saves alone, and nothing is asserted: it is the
 baseline, the deadlocks the live functions have between themselves today.
@@ -93,6 +98,28 @@ def purge(keep):
         o.run('delete from %s where course_id = :c and not (id = any (:k::uuid[]))' % t, c=COURSE_A, k=arr(map(str, keep[t])))
     o.run('delete from student where teacher_id = :t and not (id = any (:k::uuid[]))', t=A, k=arr(map(str, keep['student'])))
     o.run('delete from course where teacher_id = :t and not (id = any (:k::uuid[]))', t=A, k=arr(map(str, keep['course'])))
+
+# ── The class writers against their live fingerprints ───────────────────
+HERE = os.path.dirname(os.path.abspath(__file__))
+WRITERS = re.findall(r'^-- (\w+): \S+$', open(os.path.join(HERE, 'class-writers-prelude.sql')).read(), re.M)
+LIVE = {}
+for line in open(os.path.join(HERE, 'live-function-md5.txt')):
+    parts = line.split()
+    if len(parts) == 4 and not line.startswith('#'): LIVE[parts[0]] = parts[1]
+# Loaded from the April design file (docs/backend-design/write-paths.sql),
+# which is not what the live database runs. Take a name out when its live
+# body is in class-writers-prelude.sql.
+NOT_LIVE = ('delete_rubric', 'save_assessment_tags', 'update_enrollment')
+LOADED = {r[0]: r[1] for r in o.run("""select p.proname, md5(pg_get_functiondef(p.oid)) from pg_proc p
+                                         where p.pronamespace = 'public'::regnamespace and p.proname = any (:n)""", n=WRITERS)}
+def writers():
+    for name in sorted(LIVE):
+        if name in NOT_LIVE:
+            ok('today: %s is NOT the live function (the April design file\'s body is loaded; the live one has been asked for)' % name,
+               LOADED.get(name) is not None and LOADED[name] != LIVE[name], LOADED.get(name))
+        else:
+            ok('%s is the live function, byte for byte' % name, LOADED.get(name) == LIVE[name], LOADED.get(name))
+    return sorted(n for n in WRITERS if n not in LIVE)
 
 def cleanup():
     for t in SCORE_TABLES:
@@ -561,6 +588,7 @@ def judge(r, name, versus):
     odd = {k: v for k, v in r['refused'].items() if k not in EXPECTED}
     ok('%s: the only calls refused lost a race for a row that was deleted' % label, not odd, {k: r['first'][k] for k in odd})
 try:
+    unchecked = writers() if BATCH_A else sorted(n for n in WRITERS if n not in LIVE)
     if BATCH_A:
         o.run("update course set student_page_enabled = true, return_grades = 'on_return' where id = :c", c=COURSE_A)
         if not ONLY:
@@ -615,6 +643,8 @@ finally:
     cleanup()
 
 print('\n'.join('PASS ' + p for p in passed))
+print('class writers: %d compared with the live database, %d of them not the live body (%s), %d with no live fingerprint yet (%s)'
+      % (len(LIVE), len(NOT_LIVE), ', '.join(NOT_LIVE), len(unchecked), ', '.join(unchecked)))
 print('%-34s %-18s %7s %9s  %s' % ('RPC', 'against', 'calls', 'deadlocks', 'refused (SQLSTATE: calls)'))
 for r in results:
     print('%-34s %-18s %7d %9d  %s%s' % (r['x'][:34], r['versus'], r['calls'], r['dead'], ', '.join('%s: %d' % kv for kv in sorted(r['refused'].items())) or '-',

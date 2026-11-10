@@ -108,6 +108,6 @@ def score_fingerprint():
 def live_md5():
     want = {}
     for line in open(os.path.join(HERE, 'live-function-md5.txt')):
-        if line.strip() and not line.startswith('#'):
+        if line.strip() and not line.startswith('#') and len(line.split()) == 3:   # a fourth word: grade_return_race.py's
             name, md5, _length = line.split(); want[name] = md5
     return want

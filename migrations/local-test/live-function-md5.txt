@@ -30,3 +30,20 @@ update_course 8aacf4f24b0b7133352379e89978776b 3747
 upsert_rubric_score 969a701836ca6c50a92327e66efa0055 2307
 upsert_score 4422dd90a27fea0e5f50ec2425d07bf3 1360
 upsert_tag_score 3a878c46479fef1f84c18ffc0802e0cf 2448
+
+# The class writers grade_return_race.py loads from class-writers-prelude.sql,
+# read from gradebook-prod the same way on 2026-11-09 by the orchestrator. A
+# fourth word marks these lines: score_rpcs.py and batch_a_apply.py compare
+# the lines above, grade_return_race.py compares these. The other ten
+# functions in that prelude have no line here yet.
+create_assessment b3f6055028ea0ea1bdcb2f481959d9cf 2237 class-writer
+delete_assessment b0557c759c662175194a75bff27c7001 407 class-writer
+delete_competency_group 01ac8ad9471a683ea1aa0dbb48296065 424 class-writer
+delete_rubric 8800838f8148a080b9042c1e646c1ca7 517 class-writer
+delete_section a970727ecbd4a513bfa2e43a1a263d14 319 class-writer
+delete_subject 507635467c25f6756ddd01010fdcc5a8 319 class-writer
+delete_tag 47f70892bd70be92dafe0e8c7a6488de 311 class-writer
+save_assessment_tags feafcae04a90f26cd44707e26f911a45 747 class-writer
+update_assessment 523f9491dc3b689dc3d6473e411e4876 2939 class-writer
+update_enrollment 3cfcb3dd88253a54a5fc5b65a749ac82 1249 class-writer
+upsert_rubric 09bf9d14cf82a5b2c29abe3822227c2c 7572 class-writer

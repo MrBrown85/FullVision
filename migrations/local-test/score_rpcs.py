@@ -87,7 +87,7 @@ ok('none of them is SECURITY DEFINER: row security is their ownership check',
 # compared, not only the body.
 want = {}
 for line in open(os.path.join(HERE, 'live-function-md5.txt')):
-    if line.strip() and not line.startswith('#'):
+    if line.strip() and not line.startswith('#') and len(line.split()) == 3:   # a fourth word: grade_return_race.py's
         name, md5, _length = line.split(); want[name] = md5
 got = {r[0]: r[1] for r in c.run("""select p.proname, md5(pg_get_functiondef(p.oid)) from pg_proc p
                                      join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public'""")}
