@@ -151,7 +151,7 @@ Two files build the score paths on top of `harness.sql`:
   `save_score_comment`, `clear_row_scores` and `clear_column_scores` have no
   migration; theirs are the live bodies, read from `gradebook-prod` on
   2026-11-09.
-- `live-function-md5.txt`: `md5(pg_get_functiondef)` of 21 live functions (and, further down, of eleven of the class writers Batch A's race test loads).
+- `live-function-md5.txt`: `md5(pg_get_functiondef)` of 22 live functions (and, further down, of the class writers Batch A's race test loads).
   `score_rpcs.py` compares every function it loads that is in the table (the
   twelve RPCs and `fv_owns_course`, `fv_owns_enrollment`,
   `fv_owns_assessment`), so each is the live one byte for byte. The check
@@ -171,7 +171,8 @@ PGPORT=54329 PGDATABASE=fv_score python3 score_rpcs.py
 
 Result on 2026-11-09 (Postgres 18.6, local; production is 17): 176 of 176.
 Against a database with Batch A loaded (below) the same script finds it and
-expects the one gap Batch A closes to be refused: 234 of 234.
+expects the one gap Batch A closes to be refused: 236 of 236 (234 before
+that database also held `get_class_bundle` and `get_gradebook`).
 
 Checks named "today:" pin a gap as it is. Batch A closes one and its
 database flips those checks to "refused": row security on the score tables
@@ -209,8 +210,11 @@ Four migrations, tested here only (no Supabase branch, never
 
 Three more files build what they need on top of the score paths:
 
-- `batch-a-tables.sql`: seven more tables from the live snapshot
-  (`python3 make-score-tables.py batch-a`).
+- `batch-a-tables.sql`: two more tables from the live snapshot,
+  `teacher_preference` and `dibels_score`
+  (`python3 make-score-tables.py batch-a`). It held seven until S0-M4 was
+  merged; the other five are in `bundle-tables.sql` (below), which now
+  loads first.
 - `batch-a-prelude.sql`: `update_course`, `import_json_restore`,
   `create_course`, `duplicate_course` and `duplicate_assessment`. No one
   migration holds any of them whole; each is the migration that last wrote
@@ -236,10 +240,16 @@ Three more files build what they need on top of the score paths:
   functions.**
 
 Two databases, one without the four migrations (for `batch_a_apply.py`,
-which applies them itself) and one with:
+which applies them itself) and one with. Both start from the live database
+as it is now, which since 2026-11-10 has S0-M4 applied (see "The bundle
+sends created_at" below): they load `get_class_bundle` and `get_gradebook`
+as they were before it and then that migration, so the two come out as the
+live functions of today and `live-function-md5.txt` holds those
+fingerprints.
 
 ```bash
-BASE="harness.sql score-prelude.sql score-tables.sql student-submit-prelude.sql \
+BASE="harness.sql score-prelude.sql score-tables.sql bundle-prelude.sql bundle-tables.sql \
+  ../2026111001_assessment_created_at_in_bundle.sql student-submit-prelude.sql \
   ../20261025_questionnaires_tables_and_functions.sql ../20261025_questionnaires_templates.sql \
   ../20261025_student_submit.sql ../20261025_student_submit_phone.sql \
   ../20261025_student_submit_token_80.sql ../20261025_phone_reports.sql \
@@ -317,12 +327,16 @@ What each covers:
   student and assessment still there, and no draft may be left in a class
   that does not hold grades.
 
-Result on 2026-11-09 (Postgres 18.6, local; production is 17):
-`batch_a_apply.py` 82 of 82, `grade_return.py` 280 of 280, `student_page.py`
-216 of 216, `score_rpcs.py` 234 of 234 (176 of 176 without Batch A),
-`grade_return_race.py` 414 of 414; each three times (435 of 435 since the 21 fingerprint checks were added, run once). With Batch A loaded the earlier suites pass
-as before: `student_submit.py` 79 of 79, `questionnaire_identity.py` 47 of
-47, `phone_reports.py` 37 of 37, `questionnaires.py` 42 of 42.
+Result on 2026-11-10, on Postgres 17.11 (what production runs) and on 18.6,
+the same on both: `batch_a_apply.py` 84 of 84, `grade_return.py` 280 of 280,
+`student_page.py` 216 of 216, `score_rpcs.py` 236 of 236 (176 of 176 without
+Batch A), `grade_return_race.py` 435 of 435. With Batch A loaded the earlier
+suites pass as before: `student_submit.py` 79 of 79,
+`questionnaire_identity.py` 47 of 47, `phone_reports.py` 37 of 37,
+`questionnaires.py` 42 of 42. (Before S0-M4 was applied live and the two
+bundle functions joined these databases, `batch_a_apply.py` was 82 of 82
+and `score_rpcs.py` 234 of 234: the two more checks in each are that
+`get_class_bundle` and `get_gradebook` are the live functions.)
 
 File 04 also raises the slip route's per-address limit from 60 unknown codes
 in 15 minutes to 300, as for cards (one number in `student_submit.open`,
@@ -429,22 +443,70 @@ of the table is for live functions. Nothing changed: `delete_rubric` still
 deadlocks with saves, the other four are still clean, and the count of RPCs
 that are not clean is still nine.
 
-Timing, measured by the reviewer of the last verify pass on a
-production-sized class (32 students, 70 pieces), one quiet call each:
+Timing on Postgres 17.11, which is what production runs, measured with
+`batch_a_cost.py` on a production-sized class (32 students, 70 pieces), one
+quiet call each as a signed-in teacher, the best of up to three runs (the
+machine is shared, and a run now and then comes out two or three times
+slower). The script commits the class it makes, so it wants a database of
+its own:
 
-| One quiet call                      | without Batch A | with           |
-| ----------------------------------- | --------------- | -------------- |
-| `upsert_score`                      | 0.45 ms         | 0.65 to 0.8 ms |
-| `clear_score` on one rubric grade   | 0.5 ms          | 0.9 ms         |
-| `fill_rubric`, 5 criteria           | 0.6 ms          | 1.5 ms         |
-| `clear_row_scores`, one student     | 4.1 ms          | 9.2 ms         |
-| `clear_column_scores`, 32 students  | 3.0 ms          | 5.4 ms         |
-| deleting a section                  | 12.6 ms         | 59.5 ms        |
-| deleting a rubric used by 24 pieces | 178 ms          | 265 ms         |
+```bash
+PGPORT=54331 PGDATABASE=fv_cost_pre python3 run.py $BASE          # without Batch A
+PGPORT=54331 PGDATABASE=fv_cost python3 run.py $BASE $MIGRATIONS  # with the four files
+PGPORT=54331 PGDATABASE=fv_cost_pre python3 batch_a_cost.py
+PGPORT=54331 PGDATABASE=fv_cost python3 batch_a_cost.py
+```
 
-Every save does a little more work; bulk clears and deletes take 1.5 to 5
-times as long, all still well under a second. A restore of a 30 by 40 class
-(4,800 score rows) took between 0.3 and 0.7 s here; the triggers stand aside
+| One quiet call                                | without Batch A | with, helpers as SQL (as first verified) | with, helpers as plpgsql (now) | Postgres 18.6: without, with |
+| --------------------------------------------- | --------------- | ---------------------------------------- | ------------------------------ | ---------------------------- |
+| `upsert_score`                                | 0.46 ms         | 0.88 ms                                  | 0.68 ms                        | 0.28, 0.42 ms                |
+| `upsert_tag_score`                            | 0.37 ms         | 1.13 ms                                  | 0.71 ms                        | 0.25, 0.42 ms                |
+| `upsert_rubric_score`                         | 0.33 ms         | 1.12 ms                                  | 0.70 ms                        | 0.27, 0.45 ms                |
+| `clear_score` on one rubric grade             | 0.31 ms         | 0.70 ms                                  | 0.70 ms                        | 0.33, 0.47 ms                |
+| `fill_rubric`, 5 criteria                     | 0.84 ms         | 3.85 ms                                  | 1.74 ms                        | 0.47, 1.44 ms                |
+| `clear_row_scores`, one student               | 5.2 ms          | 11.4 ms                                  | 11.6 ms                        | 4.9, 9.7 ms                  |
+| `clear_column_scores`, 32 students            | 2.7 ms          | 5.6 ms                                   | 5.7 ms                         | 2.7, 5.4 ms                  |
+| deleting a section                            | 4.2 ms          | 15.3 ms                                  | 15.1 ms                        | 4.5, 11.8 ms                 |
+| deleting a rubric used by 24 pieces           | 503 ms          | 717 ms                                   | 720 ms                         | 519, 699 ms                  |
+| a fill for 30 students, 5 criteria (30 calls) | 28 ms           | 117 ms                                   | 56 ms                          | 19, 44 ms                    |
+
+Every save does a little more work: a quarter to a third of a millisecond on a
+single score, and a rubric fill takes about twice as long. Bulk clears and
+deletes take 1.4 to 3.6 times as long, all still under a second.
+
+**The figures this README and the PR gave before were measured on Postgres
+18 only.** File 01's four helpers were SQL-language functions, and Postgres
+17 plans an SQL-language function again in every statement that calls it,
+where 18 keeps the plan. On 17 that made a 30-student fill take 81 ms with
+file 01 alone, against 28 ms without it. The helpers are plpgsql now (the
+owner's ruling: rewrite before applying), which keeps its plan for the life
+of the connection on both versions:
+
+| File 01 alone, Postgres 17.11      | without | helpers as SQL | helpers as plpgsql |
+| ---------------------------------- | ------- | -------------- | ------------------ |
+| `upsert_score`                     | 0.46 ms | 0.53 ms        | 0.33 ms            |
+| `upsert_tag_score`                 | 0.37 ms | 0.85 ms        | 0.30 ms            |
+| `upsert_rubric_score`              | 0.33 ms | 0.82 ms        | 0.28 ms            |
+| `fill_rubric`, 5 criteria          | 0.84 ms | 2.75 ms        | 0.66 ms            |
+| a fill for 30 students, 5 criteria | 28 ms   | 81 ms          | 23 ms              |
+
+With the helpers in plpgsql, file 01 costs nothing that can be measured on
+either version, and reads through row security cost the same as before
+(3,840 rubric rows read as a teacher: 35 ms with the SQL form, 32 ms with
+plpgsql; the plan is the same, the helper called once a row in the filter:
+the SQL form was never inlined, being SECURITY DEFINER with a search_path
+of its own).
+
+File 02's own SQL-language helpers (`_grade_copy`, `_grade_copy_of`,
+`_grade_copy_entry`, `_grade_return_holds`, `_grade_copy_in_use`) and file
+04's `_returned_grade` are slower on 17 than on 18 for the same reason
+(`_grade_copy` of a rubric grade: 0.36 ms a call on 17 against 0.24 on 18,
+both with a 0.2 ms round trip in them). Each was tried as plpgsql on 17 and
+none got reliably faster (the copy is built by nested calls, and the gain
+on one is lost on the next), so they are left as they were verified.
+
+A restore of a 30 by 40 class
+(4,800 score rows) took between 0.3 and 0.7 s on 18.6; the triggers stand aside
 during a restore and it sets the state in a few statements. `grade_return`
 holds a second copy of every grade: 851 kB at 2,240 graded cells, 389 bytes
 a cell on average, beside 2.0 MB for the four score tables together.
@@ -461,6 +523,59 @@ sixth fail, with nothing in the server log for the five.
 Not verified: Postgres 17 (everything here ran on 18.6), cascades from the
 tables this harness does not carry, and how often a collision happens in
 real use.
+
+## The bundle sends created_at (S0-M4, 2026-11-10)
+
+`../2026111001_assessment_created_at_in_bundle.sql` patches `get_class_bundle`
+and `get_gradebook` in place so each assessment carries its `created_at`.
+Tested here only (no Supabase branch, never `gradebook-prod`).
+
+Two more files build what it needs on top of the score paths:
+
+- `bundle-prelude.sql`: `get_class_bundle` and `get_gradebook`. No one
+  migration holds either whole. Each is the migration that last wrote it in
+  full, then every later in-place patch run as its migration wrote it, in
+  file order, and printed with `pg_get_functiondef` (the file's header lists
+  them: 17 patches for the bundle, 3 for `get_gradebook`). Both come out as
+  the live functions were before S0-M4 (md5 `119165287207814181c5875d81451147`,
+  length 22538, and `2876cd40c373b8a59bff4464008c8601`, length 6816; the
+  orchestrator confirmed both against `gradebook-prod` on Nov 10 before the
+  migration was applied), which is what the migration's own check expects.
+  S0-M4 was applied the same day, so `live-function-md5.txt` now holds the
+  two as they are after it, and a harness that wants today's live functions
+  loads this file and then the migration. Also
+  `fv_owns_term_rating`, and four stand-ins for the server's old grade
+  calculation that `get_gradebook` calls for its cells (`fv_assessment_overall`
+  and three more): they have the live signatures and return nothing, because
+  the migration does not touch that part.
+- `bundle-tables.sql`: the 17 other tables `get_class_bundle` reads, from the
+  live snapshot (`python3 make-score-tables.py bundle`).
+
+```bash
+PGPORT=54329 PGDATABASE=fv_bundle python3 run.py harness.sql score-prelude.sql score-tables.sql \
+  bundle-prelude.sql bundle-tables.sql
+PGPORT=54329 PGDATABASE=fv_bundle python3 bundle_created_at.py
+```
+
+`bundle_created_at.py` makes a class with five pieces (two with one date and
+one display order, made a second apart), reads both payloads as Teacher A,
+Teacher B, with no JWT and as anon, applies the migration and reads them
+again. Every assessment then has `created_at`, equal to the table's to the
+microsecond; every other key of both payloads is the same, compared key by
+key; the other callers get what they got; owner, grants, SECURITY DEFINER,
+volatility and `search_path` are unchanged and each body is the old one plus
+the one key; no row changes and no class's sync version moves; a browser
+sending the version it holds is still told `not_modified`; a second run
+changes nothing; and a body that is not the expected one stops the file at
+its first check with nothing changed. It starts from the two functions as
+the migration's check expects them and, after the migration, compares both
+with the live fingerprints of today.
+
+Result on 2026-11-10, on Postgres 17.11 and on 18.6: 39 of 39 (40 while the
+fingerprint file still held the functions from before the migration; four
+checks on the starting point became two, and one on the result was added).
+On a database with the score paths alone `score_rpcs.py` is unchanged, and `make-score-tables.py` still
+writes `score-tables.sql` byte for byte.
 
 ## Batch A: the way back (2026-11-10)
 
@@ -502,15 +617,16 @@ the parts in turn:
 - after PART 1 no Batch A trigger is left, everything else of Batch A is as
   it was, saves, a clear, a setting change and a delete work,
   `grade_return` no longer changes, and `score_rpcs.py` passes as it does
-  with Batch A loaded (234 of 234: file 01's policies are still there);
+  with Batch A loaded (236 of 236: file 01's policies are still there);
 - after PART 1B the five policies are the ones from before;
 - after PART 2 the catalog is identical to the one taken first, line by
-  line (829 lines on Postgres 17, 875 on 18); no row of any table that was
-  there before has changed (42 tables compared) except the sign-in log, which lost its card rows and
+  line (1,007 lines on both versions); no row of any table that was
+  there before has changed (54 tables compared) except the sign-in log, which lost its card rows and
   nothing else; the five score tables are row for row what they were;
-- the suites from before Batch A pass on it: `score_rpcs.py` (181 of 181 on
-  this database; it is 176 on the score-only one, and the five more are the
-  functions Batch A patches, each compared with its live fingerprint),
+- the suites from before Batch A pass on it: `score_rpcs.py` (183 of 183 on
+  this database; it is 176 on the score-only one, and the seven more are the
+  five functions Batch A patches and the two bundle functions, each compared
+  with its live fingerprint),
   `student_submit.py` 79, `questionnaire_identity.py` 47, `phone_reports.py`
   37, `questionnaires.py` 42;
 - every part run again changes nothing;
@@ -519,4 +635,8 @@ the parts in turn:
   and Returned does not survive the undo.
 
 Result on 2026-11-10: 27 of 27 on Postgres 18.6 (port 54329) and 27 of 27 on
-Postgres 17.11 (port 54331), which is what production runs.
+Postgres 17.11 (port 54331), which is what production runs. Run again after
+file 01's four helpers became plpgsql and the harness began loading S0-M4:
+`make_undo`'s output, `batch-a-undo.sql`, came out byte for byte the same
+(the helpers are dropped by name and arguments, whatever their language),
+and the counts above are the ones from that run.

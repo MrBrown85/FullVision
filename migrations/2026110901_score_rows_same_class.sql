@@ -44,12 +44,22 @@
 -- score, and ticked checkboxes left behind by the three clear functions.
 --
 -- Cost: one helper call per row, as today. fv_owns_enrollment joins two
--- tables by primary key; these join three (five for a checkbox), all by
--- primary key, no scans. Filling a rubric for 30 students with 5 criteria
--- is 30 fill_rubric calls writing 150 rows; on the local harness all 30 took
--- about 15 ms before and 21 ms after (migrations/local-test/batch_a_apply.py
--- prints it). Class loads do not run these policies: get_class_bundle is
--- SECURITY DEFINER.
+-- tables by primary key; these join three (six for a checkbox), all by
+-- primary key, no scans. Measured on PostgreSQL 17.11, which production
+-- runs, on a class of 32 students and 70 pieces
+-- (migrations/local-test/batch_a_cost.py, the best of three runs): filling
+-- a rubric for 30 students with 5 criteria (30 fill_rubric calls, 150 rows)
+-- took 28 ms before this file and 23 ms with it; one fill_rubric call 0.8
+-- ms and 0.7 ms; one upsert_score 0.5 ms and 0.3 ms. The differences are
+-- inside the run-to-run noise: with this file a save costs what it costs
+-- today.
+-- That is with the helpers written in plpgsql. This file first had them as
+-- SQL-language functions, and on 17 the same fill then took 81 ms and one
+-- fill_rubric call 2.8 ms: 17 plans an SQL-language function again in
+-- every statement that calls it, where 18 keeps the plan (on 18.6 the fill
+-- took 21 ms either way, which is the figure this comment used to give).
+-- Class loads do not run these policies: get_class_bundle is SECURITY
+-- DEFINER.
 --
 -- Existing rows: none change. The file's first step counts the rows below
 -- and stops, with nothing changed, unless the answer is 0: a row it counts
@@ -123,67 +133,79 @@ $guard$;
 -- pg_temp is named last in each search_path, so a temporary table called
 -- `course` or `enrollment` cannot stand in for the real one (the older
 -- fv_owns_* helpers lack this; see the PR).
+-- They are plpgsql, not SQL, for one reason: cost on PostgreSQL 17, which is
+-- what production runs. 17 plans an SQL-language function again in every
+-- statement that calls it; a plpgsql function keeps its plan for the life
+-- of the connection. Each returns exactly what the SQL form returned.
 create or replace function public.fv_owns_score_cell(eid uuid, aid uuid)
  returns boolean
- language sql
+ language plpgsql
  stable security definer
  set search_path to 'public', 'pg_temp'
 as $function$
-    select exists (select 1 from enrollment e
-                     join course c on c.id = e.course_id
-                     join assessment a on a.course_id = e.course_id
-                   where e.id = eid and a.id = aid
-                     and c.teacher_id = (select auth.uid())
-                     and c.deleted_at is null);
+begin
+    return exists (select 1 from enrollment e
+                         join course c on c.id = e.course_id
+                         join assessment a on a.course_id = e.course_id
+                       where e.id = eid and a.id = aid
+                         and c.teacher_id = (select auth.uid())
+                         and c.deleted_at is null);
+end;
 $function$;
 
 create or replace function public.fv_owns_tag_score_cell(eid uuid, aid uuid, tid uuid)
  returns boolean
- language sql
+ language plpgsql
  stable security definer
  set search_path to 'public', 'pg_temp'
 as $function$
-    select exists (select 1 from enrollment e
-                     join course c on c.id = e.course_id
-                     join assessment a on a.course_id = e.course_id
-                     join section s on s.course_id = e.course_id
-                     join tag t on t.section_id = s.id
-                   where e.id = eid and a.id = aid and t.id = tid
-                     and c.teacher_id = (select auth.uid())
-                     and c.deleted_at is null);
+begin
+    return exists (select 1 from enrollment e
+                         join course c on c.id = e.course_id
+                         join assessment a on a.course_id = e.course_id
+                         join section s on s.course_id = e.course_id
+                         join tag t on t.section_id = s.id
+                       where e.id = eid and a.id = aid and t.id = tid
+                         and c.teacher_id = (select auth.uid())
+                         and c.deleted_at is null);
+end;
 $function$;
 
 create or replace function public.fv_owns_rubric_score_cell(eid uuid, aid uuid, crid uuid)
  returns boolean
- language sql
+ language plpgsql
  stable security definer
  set search_path to 'public', 'pg_temp'
 as $function$
-    select exists (select 1 from enrollment e
-                     join course c on c.id = e.course_id
-                     join assessment a on a.course_id = e.course_id
-                     join rubric r on r.course_id = e.course_id
-                     join criterion cr on cr.rubric_id = r.id
-                   where e.id = eid and a.id = aid and cr.id = crid
-                     and c.teacher_id = (select auth.uid())
-                     and c.deleted_at is null);
+begin
+    return exists (select 1 from enrollment e
+                         join course c on c.id = e.course_id
+                         join assessment a on a.course_id = e.course_id
+                         join rubric r on r.course_id = e.course_id
+                         join criterion cr on cr.rubric_id = r.id
+                       where e.id = eid and a.id = aid and cr.id = crid
+                         and c.teacher_id = (select auth.uid())
+                         and c.deleted_at is null);
+end;
 $function$;
 
 create or replace function public.fv_owns_rubric_check_cell(eid uuid, aid uuid, ckid uuid)
  returns boolean
- language sql
+ language plpgsql
  stable security definer
  set search_path to 'public', 'pg_temp'
 as $function$
-    select exists (select 1 from enrollment e
-                     join course c on c.id = e.course_id
-                     join assessment a on a.course_id = e.course_id
-                     join rubric r on r.course_id = e.course_id
-                     join criterion cr on cr.rubric_id = r.id
-                     join criterion_check ck on ck.criterion_id = cr.id
-                   where e.id = eid and a.id = aid and ck.id = ckid
-                     and c.teacher_id = (select auth.uid())
-                     and c.deleted_at is null);
+begin
+    return exists (select 1 from enrollment e
+                         join course c on c.id = e.course_id
+                         join assessment a on a.course_id = e.course_id
+                         join rubric r on r.course_id = e.course_id
+                         join criterion cr on cr.rubric_id = r.id
+                         join criterion_check ck on ck.criterion_id = cr.id
+                       where e.id = eid and a.id = aid and ck.id = ckid
+                         and c.teacher_id = (select auth.uid())
+                         and c.deleted_at is null);
+end;
 $function$;
 
 -- Policies run as the caller, so signed-in teachers need EXECUTE.

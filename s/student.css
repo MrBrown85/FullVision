@@ -16,6 +16,7 @@
   --sp-green: #166534;
   --sp-green-soft: #bbf7d0;
   --sp-green-line: #2e7d32;
+  --sp-amber: #b45309;
   --sp-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
@@ -587,4 +588,225 @@ button {
 }
 .pr-view {
   min-height: 100vh;
+}
+
+/* A student card (app.js): Scan or Type Your Card, Is This You?, and the
+   page for one class with its Assignments list (assignments.js). A phone
+   first; from 900px wide, a Chromebook. */
+.sp-wide {
+  display: none;
+}
+.sp-brand {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--sp-blue-text);
+}
+.sp-card-start {
+  align-items: center;
+  text-align: center;
+  padding-top: 48px;
+  gap: 20px;
+}
+.sp-scan {
+  display: block;
+  width: 200px;
+  height: 200px;
+}
+.sp-card-form {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.sp-card-form .sp-or {
+  margin: 0;
+  font-weight: 600;
+}
+.sp-card-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+.sp-input.sp-card-code {
+  width: 220px;
+  height: 54px;
+  border-width: 1.5px;
+  border-radius: 14px;
+  text-align: center;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  font-family: ui-monospace, Menlo, monospace;
+  text-transform: uppercase;
+}
+.sp-card-form .sp-btn {
+  width: 100%;
+  margin-top: auto;
+}
+.sp-card-form .sp-fine {
+  margin: 0;
+}
+.sp-ident-card {
+  margin-top: 6px;
+  padding-top: 18px;
+  border-top: 1px solid var(--sp-fill);
+}
+.sp-demo-note {
+  margin: 0;
+}
+
+.sp-page {
+  gap: 10px;
+}
+.sp-page-title {
+  margin: 4px 4px 2px;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.sp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--sp-card);
+  border-radius: 14px;
+  box-shadow: var(--sp-shadow);
+  overflow: hidden;
+}
+.sp-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 10px 14px;
+}
+.sp-row + .sp-row {
+  border-top: 1px solid var(--sp-fill);
+}
+.sp-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--sp-field);
+}
+.sp-dot-back {
+  background: var(--sp-green);
+}
+.sp-dot-missing {
+  background: var(--sp-amber);
+}
+.sp-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.sp-row-title {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.sp-row-sub {
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--sp-text-2);
+}
+.sp-row-result {
+  flex: none;
+  max-width: 45%;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.sp-empty {
+  padding: 24px 4px;
+  color: var(--sp-text-2);
+}
+.sp-page .sp-demo-note {
+  margin-top: 8px;
+}
+/* The results didn't load (calc.js could not be fetched). */
+.sp-no-results {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--sp-card);
+  border: 1px solid var(--sp-line);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.sp-no-results .sp-msg {
+  flex: 1;
+  color: var(--sp-text);
+}
+.sp-no-results .sp-btn {
+  flex: none;
+}
+
+@media (min-width: 900px) {
+  .sp-narrow {
+    display: none;
+  }
+  .sp-wide {
+    display: inline;
+  }
+  /* The card's code in a card of its own, as on the Chromebook board. */
+  .sp-card-start {
+    flex: none;
+    align-items: stretch;
+    text-align: left;
+    width: 440px;
+    max-width: 100%;
+    margin: 96px auto 0;
+    padding: 32px 36px;
+    gap: 16px;
+    background: var(--sp-card);
+    border-radius: 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  }
+  .sp-card-form {
+    align-items: stretch;
+    gap: 8px;
+  }
+  .sp-card-label {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+  }
+  .sp-input.sp-card-code {
+    width: 100%;
+    height: 48px;
+    border-width: 1px;
+    border-radius: 12px;
+    text-align: left;
+    font-size: 17px;
+    letter-spacing: 0.12em;
+  }
+  .sp-card-form .sp-btn {
+    margin-top: 8px;
+  }
+  .sp-card-form .sp-fine {
+    text-align: left;
+  }
+  /* The page for one class gets a wider column. */
+  .sp-app:has(.sp-page) {
+    max-width: 760px;
+  }
+  .sp-page {
+    padding: 24px;
+  }
+  .sp-page-title {
+    font-size: 26px;
+  }
 }

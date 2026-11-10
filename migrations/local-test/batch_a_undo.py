@@ -126,7 +126,8 @@ used = {t: c.run('select count(*) from ' + t)[0][0] for t in ('public.grade_retu
 ok('Batch A is in use: a returned grade with a draft on it, a draft, cards, a signed-in phone, card rows in the sign-in log',
    page.get('ok') and used['public.grade_return'] == 3 and used['public.student_card'] == 2 and used['student_submit.device_session'] == 1
    and c.run("select count(*) from student_submit.attempt where route = 'card'")[0][0] >= 2
-   and [a['grade']['value'] if a['grade'] else None for a in page['assessments']] == [7, None], (used, page))
+   # by id: the two pieces have one date and may have been made in the same instant, so their order is not fixed
+   and {a['id']: a['grade']['value'] if a['grade'] else None for a in page['assessments']} == {quiz: 7, lab: None}, (used, page))
 
 # ── 3. PART 1: the fast stop ───────────────────────────────────────────
 run_part(0)
@@ -142,7 +143,7 @@ ok('PART 1: saves, a clear, a setting change and a delete go on working',
    and c.run('select count(*) from score where assessment_id = :a', a=lab)[0][0] == 0)
 ok('PART 1: and grade_return no longer changes', row_checksums(c, {'public.grade_return': ['enrollment_id', 'assessment_id', 'is_draft', 'returned_at', 'returned_copy', 'previous_copy', 'updated_at', 'seen_at', 'working_copy']}) == gr)
 r = suite('score_rpcs.py')
-ok('PART 1: score_rpcs.py passes as it does with Batch A loaded, 234 of 234 (every pin of today, and the same-class refusals file 01 still makes)', r == '234 passed, 0 failed', r)
+ok('PART 1: score_rpcs.py passes as it does with Batch A loaded, 236 of 236 (every pin of today, and the same-class refusals file 01 still makes)', r == '236 passed, 0 failed', r)
 before_again = catalog(c); run_part(0)
 ok('PART 1 run again changes nothing', catalog(c) == before_again)
 
@@ -182,9 +183,10 @@ run_part(0); run_part(1)
 ok('PART 1 and PART 1B run after it change nothing either', catalog(c) == cat0)
 
 # ── 6. The suites from before Batch A ──────────────────────────────────
-# score_rpcs.py makes 176 checks on the score-only database and 181 on this one, which also loads the
-# five functions Batch A patches or copies and compares each with its live fingerprint.
-for script, want in (('score_rpcs.py', '181 passed, 0 failed'), ('student_submit.py', '79 passed, 0 failed'),
+# score_rpcs.py makes 176 checks on the score-only database and 183 on this one, which also loads the
+# five functions Batch A patches or copies, and get_class_bundle and get_gradebook, and compares each with
+# its live fingerprint.
+for script, want in (('score_rpcs.py', '183 passed, 0 failed'), ('student_submit.py', '79 passed, 0 failed'),
                      ('questionnaire_identity.py', '47 passed, 0 failed'), ('phone_reports.py', '37 passed, 0 failed'),
                      ('questionnaires.py', '42 passed, 0 failed')):
     r = suite(script)
