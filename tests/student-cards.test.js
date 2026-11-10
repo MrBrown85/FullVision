@@ -13,7 +13,7 @@
 import './setup.js';
 import { parseHTML } from 'linkedom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { U, signIn, seedClass, clearClass, settle } from './helpers/pin-save-paths.js';
+import { U, signIn, seedClass, clearClass, settle, serverSaysStudentPageOn } from './helpers/pin-save-paths.js';
 
 const CID = 'c-cards';
 const LIVE = U(1);
@@ -53,11 +53,34 @@ function seedDemo(config, students) {
 const storedCards = cid => JSON.parse(localStorage.getItem('gb-student-cards-' + (cid || CID)) || 'null');
 const cardKeys = () => Object.keys(localStorage._store).filter(k => k.indexOf('student-cards') >= 0);
 
+/* The list reads its cards only when its own card is on the page
+   (StudentCards looks for .sc-card a moment after a draw). `onPage` is the
+   class whose card the page holds; shown() draws the card as the open
+   Student Page tab does and waits for the read. */
+let onPage = null;
+const realQuery = document.querySelector;
+const afterDraw = async () => {
+  await new Promise(r => setTimeout(r, 5));
+  await settle();
+};
+async function shown(cid) {
+  onPage = cid;
+  StudentCards.render(cid);
+  await afterDraw();
+}
+
 beforeEach(() => {
   localStorage.clear();
   StudentCards._reset();
+  onPage = null;
+  document.querySelector = function (selector) {
+    if (selector === '.sc-card') return onPage ? { dataset: { cid: onPage } } : null;
+    return realQuery.call(document, selector);
+  };
 });
 afterEach(() => {
+  document.querySelector = realQuery;
+  serverSaysStudentPageOn(LIVE, false);
   clearClass(CID);
   clearClass(LIVE);
   StudentCards._reset();
@@ -161,6 +184,7 @@ describe('a signed-in teacher: the cards are the server’s', () => {
   let session;
   beforeEach(() => {
     seedClass(LIVE, { students: LIVE_STUDENTS, courseConfigs: ON });
+    serverSaysStudentPageOn(LIVE);
     session = signIn();
   });
   afterEach(() => session.signOut());
@@ -222,8 +246,9 @@ describe('a signed-in teacher: the cards are the server’s', () => {
     expect((await markStudentCardsPrinted(LIVE, [U(901)])).data).toBe(null);
     await settle();
     expect(session.sent()).toEqual([]);
+    onPage = LIVE;
     expect(StudentCards.render(LIVE)).toContain('sc-card'); // drawn only if asked; the tab never asks
-    await settle();
+    await afterDraw();
     expect(session.sent()).toEqual([]);
   });
 });
@@ -242,12 +267,13 @@ describe('the list in Class Settings › Student Page', () => {
   beforeEach(() => seedDemo());
 
   it('first says it is loading, then lists every student, A to Z, with no card yet', async () => {
+    onPage = CID;
     let box = parse(StudentCards.render(CID));
     expect(box.querySelector('h2').textContent).toBe('Student Cards');
     expect(box.querySelector('.sc-note').textContent).toBe('Loading cards…');
     expect(box.querySelector('.sc-table')).toBe(null);
     expect(buttons(box)).toEqual([]);
-    await settle();
+    await afterDraw();
     box = parse(StudentCards.render(CID));
     expect(box.querySelector('.sc-note')).toBe(null);
     expect(Array.from(box.querySelectorAll('.sc-table thead th')).map(th => th.textContent)).toEqual([
@@ -266,8 +292,7 @@ describe('the list in Class Settings › Student Page', () => {
   });
 
   it('Make Cards fills in the codes and offers Print All; with every student carded it is gone', async () => {
-    StudentCards.render(CID);
-    await settle();
+    await shown(CID);
     await StudentCards.make(CID);
     const box = parse(StudentCards.render(CID));
     const rows = rowsOf(box);
@@ -285,6 +310,7 @@ describe('the list in Class Settings › Student Page', () => {
     const session = signIn();
     try {
       seedClass(LIVE, { students: LIVE_STUDENTS, courseConfigs: ON });
+      serverSaysStudentPageOn(LIVE);
       session.fake.on('list_student_cards', () => ({
         data: [
           card(1, U(11), { printed_at: '2026-11-10T19:30:00+00:00', locked_at: '2026-11-10T20:00:00+00:00' }),
@@ -292,8 +318,7 @@ describe('the list in Class Settings › Student Page', () => {
         ],
         error: null,
       }));
-      StudentCards.render(LIVE);
-      await settle();
+      await shown(LIVE);
       const box = parse(StudentCards.render(LIVE));
       expect(rowsOf(box)).toEqual([
         ['Jordan Abel', 'K7M-4Q1', 'Printed Nov 10Locked'],
@@ -310,19 +335,30 @@ describe('the list in Class Settings › Student Page', () => {
     const session = signIn();
     try {
       seedClass(LIVE, { students: LIVE_STUDENTS, courseConfigs: ON });
+      serverSaysStudentPageOn(LIVE);
       session.fake.on('list_student_cards', () => ({ data: null, error: { message: 'network: failed to fetch' } }));
-      StudentCards.render(LIVE);
-      await settle();
+      await shown(LIVE);
       const box = parse(StudentCards.render(LIVE));
       expect(box.querySelector('.sc-note').textContent).toBe(
         'Could not load the cards. Check the connection and try again.',
       );
       expect(box.querySelector('.sc-table')).toBe(null);
-      expect(buttons(box)).toEqual([]);
-      // Drawn again at once, it does not ask again: one read a minute at most.
-      StudentCards.render(LIVE);
-      await settle();
+      // Something to press.
+      expect(buttons(box)).toEqual(['Try Again']);
+      // Drawn again, it does not ask again by itself: no loop of failing reads.
+      await shown(LIVE);
+      await shown(LIVE);
       expect(session.sent().length).toBe(1);
+      // Try Again reads at once, and says so while it does.
+      session.fake.on('list_student_cards', () => ({ data: [card(1, U(11))], error: null }));
+      expect(CmStudentPage.handleAction('spCardsRetry', { closest: () => ({ dataset: { cid: LIVE } }) })).toBe(true);
+      expect(parse(StudentCards.render(LIVE)).querySelector('.sc-note').textContent).toBe('Loading cards…');
+      await afterDraw();
+      expect(session.sent().length).toBe(2);
+      const again = parse(StudentCards.render(LIVE));
+      expect(again.querySelector('.sc-note')).toBe(null);
+      expect(rowsOf(again)[0]).toEqual(['Jordan Abel', 'K7M-4Q1', 'Not Printed']);
+      expect(buttons(again)).toEqual(['Make Cards', 'Print All']);
     } finally {
       session.signOut();
     }
@@ -332,10 +368,10 @@ describe('the list in Class Settings › Student Page', () => {
     const session = signIn();
     try {
       seedClass(LIVE, { students: LIVE_STUDENTS, courseConfigs: ON });
+      serverSaysStudentPageOn(LIVE);
       session.fake.on('list_student_cards', () => ({ data: [card(1, U(11))], error: null }));
       session.fake.on('issue_student_cards', () => ({ data: null, error: { message: 'network: failed to fetch' } }));
-      StudentCards.render(LIVE);
-      await settle();
+      await shown(LIVE);
       await StudentCards.make(LIVE);
       const box = parse(StudentCards.render(LIVE));
       expect(box.querySelector('.sc-note').textContent).toBe(
@@ -351,10 +387,105 @@ describe('the list in Class Settings › Student Page', () => {
     }
   });
 
+  it('the codes are read only when the list is on the page: not when Class Settings merely builds the tab', async () => {
+    const session = signIn();
+    try {
+      seedClass(LIVE, { students: LIVE_STUDENTS, courseConfigs: ON });
+      serverSaysStudentPageOn(LIVE);
+      session.fake.on('list_student_cards', () => ({ data: [card(1, U(11))], error: null }));
+      // Class Settings draws every tab's panel, whichever tab is open.
+      onPage = null;
+      StudentCards.render(LIVE);
+      CmStudentPage.render(LIVE);
+      await afterDraw();
+      expect(session.sent()).toEqual([]);
+      // Another class's card on the page is not this one's either.
+      onPage = CID;
+      StudentCards.render(LIVE);
+      await afterDraw();
+      expect(session.sent()).toEqual([]);
+      // The Student Page tab is opened: now they are read, once.
+      await shown(LIVE);
+      await shown(LIVE);
+      expect(session.sent()).toEqual([['list_student_cards', { p_course_id: LIVE }]]);
+    } finally {
+      session.signOut();
+    }
+  });
+
+  it('a list a minute old is read again when shown; if that fails the old list stays, with Try Again', async () => {
+    const session = signIn();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2026-11-10T18:00:00.000Z'));
+      seedClass(LIVE, { students: LIVE_STUDENTS, courseConfigs: ON });
+      serverSaysStudentPageOn(LIVE);
+      session.fake.on('list_student_cards', () => ({ data: [card(1, U(11))], error: null }));
+      await shown(LIVE);
+      vi.setSystemTime(new Date('2026-11-10T18:00:30.000Z'));
+      await shown(LIVE);
+      expect(session.sent().length).toBe(1);
+      vi.setSystemTime(new Date('2026-11-10T18:01:30.000Z'));
+      session.fake.on('list_student_cards', () => ({ data: null, error: { message: 'network: failed to fetch' } }));
+      await shown(LIVE);
+      expect(session.sent().length).toBe(2);
+      const box = parse(StudentCards.render(LIVE));
+      expect(box.querySelector('.sc-note').textContent).toBe(
+        'Could not load the cards. Check the connection and try again.',
+      );
+      expect(rowsOf(box)[0]).toEqual(['Jordan Abel', 'K7M-4Q1', 'Not Printed']);
+      expect(buttons(box)).toEqual(['Try Again', 'Make Cards', 'Print All']);
+    } finally {
+      vi.useRealTimers();
+      session.signOut();
+    }
+  });
+
+  it('Make Cards pressed twice is one request, with one key; the button is off while it is out', async () => {
+    const session = signIn();
+    try {
+      seedClass(LIVE, { students: LIVE_STUDENTS, courseConfigs: ON });
+      serverSaysStudentPageOn(LIVE);
+      session.fake.on('list_student_cards', () => ({ data: [], error: null }));
+      let answer;
+      session.fake.on(
+        'issue_student_cards',
+        () =>
+          new Promise(
+            r => (answer = () => r({ data: { issued: 2, cards: [card(1, U(11)), card(2, U(12))] }, error: null })),
+          ),
+      );
+      await shown(LIVE);
+      const press = () => CmStudentPage.handleAction('spCardsMake', { closest: () => ({ dataset: { cid: LIVE } }) });
+      press();
+      press();
+      press();
+      await settle();
+      const asked = session.fake.calls.filter(c => c.name === 'issue_student_cards');
+      expect(asked.length).toBe(1);
+      const waiting = parse(StudentCards.render(LIVE));
+      expect(waiting.querySelector('.sc-note').textContent).toBe('Making cards…');
+      expect(waiting.querySelector('[data-action="spCardsMake"]').hasAttribute('disabled')).toBe(true);
+      answer();
+      await settle();
+      expect(rowsOf(parse(StudentCards.render(LIVE))).map(r => r[1])).toEqual(['K7M-4Q1', 'K7M-4Q2']);
+      // A later press is a new request, with a key of its own.
+      session.fake.on('issue_student_cards', () => ({
+        data: { issued: 0, cards: [card(1, U(11)), card(2, U(12))] },
+        error: null,
+      }));
+      await StudentCards.make(LIVE);
+      const all = session.fake.calls.filter(c => c.name === 'issue_student_cards');
+      expect(all.length).toBe(2);
+      expect(all[1].params.p_idempotency_key).not.toBe(all[0].params.p_idempotency_key);
+    } finally {
+      session.signOut();
+    }
+  });
+
   it('a class with no students says so', async () => {
     seedDemo(ON, []);
-    StudentCards.render(CID);
-    await settle();
+    await shown(CID);
     const box = parse(StudentCards.render(CID));
     expect(box.querySelector('.sc-note').textContent).toBe('No students to make cards for.');
     expect(buttons(box)).toEqual([]);
@@ -362,8 +493,7 @@ describe('the list in Class Settings › Student Page', () => {
 
   it('a name is escaped', async () => {
     seedDemo(ON, [{ id: 's1', firstName: '<img src=x onerror=alert(1)>', lastName: 'O’Neil & Co' }]);
-    StudentCards.render(CID);
-    await settle();
+    await shown(CID);
     const html = StudentCards.render(CID);
     expect(html).not.toContain('<img');
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt; O’Neil &amp; Co');
@@ -484,8 +614,7 @@ describe('the printed card', () => {
     it.each([1, 8, 9, 27])('%i cards go on the slips’ sheet, eight to a page, then are marked printed', async n => {
       seedDemo(ON, manyStudents(n));
       COURSES[CID].block = 'B';
-      StudentCards.render(CID);
-      await settle();
+      await StudentCards.load(CID);
       await StudentCards.make(CID);
       let shot = null;
       window.print = () => {
@@ -522,8 +651,7 @@ describe('the printed card', () => {
       seedDemo();
       let printed = 0;
       window.print = () => printed++;
-      StudentCards.render(CID);
-      await settle();
+      await StudentCards.load(CID);
       expect(StudentCards.printAll(CID)).toBe(0);
       expect(printed).toBe(0);
     });

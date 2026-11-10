@@ -21,7 +21,10 @@
    markStudentCardsPrinted): the server's for a signed-in teacher, made on
    this device in Demo Mode. A signed-in teacher's are held here, in
    memory, only while the app is open: a card's code and password are
-   never saved on the device.
+   never saved on the device. And they are read only when this list is on
+   the page: Class Settings builds every tab's panel each time it draws,
+   so render() reads nothing itself. It looks, a moment after the draw,
+   for its own card on the page (_readIfShown), and reads then.
 
    teacher/cm-student-page.js draws render(cid) under Return Grades, only
    for a class whose student page is on, and hands over the spCards*
@@ -35,7 +38,10 @@ var StudentCards = (function () {
   var _state = {}; // cid → { cards, at, loading, failed, msg }
 
   function _st(cid) {
-    return _state[cid] || (_state[cid] = { cards: null, at: 0, loading: null, failed: false, msg: '' });
+    return (
+      _state[cid] ||
+      (_state[cid] = { cards: null, at: 0, loading: null, looking: false, making: null, failed: false, msg: '' })
+    );
   }
 
   function _rerender() {
@@ -76,6 +82,28 @@ var StudentCards = (function () {
       _rerender();
     });
     return st.loading;
+  }
+
+  // True when this class's Student Cards card is on the page now.
+  function _onPage(cid) {
+    if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return false;
+    var el = document.querySelector('.sc-card');
+    return !!el && !!el.dataset && el.dataset.cid === cid;
+  }
+
+  /* After a draw: if the card is on the page (the Student Page tab is the
+     open one, for this class) and its cards have not been read, or were
+     read a minute or more ago, read them. Never in a loop, whether the
+     last read worked or not: a failed one waits for Try Again. */
+  function _readIfShown(cid) {
+    var st = _st(cid);
+    if (st.looking || st.loading) return;
+    if (st.at && (st.failed || Date.now() - st.at <= STALE_MS)) return;
+    st.looking = true;
+    setTimeout(function () {
+      st.looking = false;
+      if (_onPage(cid) && !st.loading) load(cid);
+    }, 0);
   }
 
   function _byStudent(cards) {
@@ -192,11 +220,13 @@ var StudentCards = (function () {
 
   /* ── Making cards ──────────────────────────────────────────── */
 
+  // One press makes one request: a second press while it is out is the first.
   function make(cid) {
     var st = _st(cid);
+    if (st.making) return st.making;
     st.msg = 'Making cards…';
-    _rerender();
-    return issueStudentCards(cid).then(function (res) {
+    st.making = issueStudentCards(cid).then(function (res) {
+      st.making = null;
       var out = res && res.data;
       if (!out) {
         st.msg = 'Could not make the cards. Check the connection and try again.';
@@ -210,6 +240,8 @@ var StudentCards = (function () {
       st.failed = false;
       _rerender();
     });
+    _rerender();
+    return st.making;
   }
 
   /* ── The list ──────────────────────────────────────────────── */
@@ -237,9 +269,7 @@ var StudentCards = (function () {
   // The Student Cards card for a class whose student page is on.
   function render(cid) {
     var st = _st(cid);
-    // Read when first drawn, and again when drawn a minute or more later:
-    // never in a loop, whether the read worked or not.
-    if (!st.loading && (!st.at || Date.now() - st.at > STALE_MS)) load(cid);
+    _readIfShown(cid);
     var students = _roster(cid);
     var byStudent = _byStudent(st.cards);
     var known = st.cards !== null;
@@ -247,15 +277,16 @@ var StudentCards = (function () {
       return !byStudent[s.id];
     }).length;
     var withCard = students.length - without;
+    var failed = st.failed && !st.loading;
     var note = st.msg
       ? st.msg
-      : !known
-        ? st.failed
-          ? 'Could not load the cards. Check the connection and try again.'
-          : 'Loading cards…'
-        : !students.length
-          ? 'No students to make cards for.'
-          : '';
+      : failed
+        ? 'Could not load the cards. Check the connection and try again.'
+        : !known
+          ? 'Loading cards…'
+          : !students.length
+            ? 'No students to make cards for.'
+            : '';
     return (
       '<div class="cm-section sc-card" data-cid="' +
       esc(cid) +
@@ -265,8 +296,11 @@ var StudentCards = (function () {
       esc('One card for each student. They scan it, or type its code, to open their page.') +
       '</div></div>' +
       '<div class="sc-actions">' +
+      (failed ? '<button type="button" class="cm-action-btn" data-action="spCardsRetry">Try Again</button>' : '') +
       (known && without
-        ? '<button type="button" class="cm-action-btn" data-action="spCardsMake">Make Cards</button>'
+        ? '<button type="button" class="cm-action-btn" data-action="spCardsMake"' +
+          (st.making ? ' disabled' : '') +
+          '>Make Cards</button>'
         : '') +
       (known && withCard
         ? '<button type="button" class="btn btn-primary" data-action="spCardsPrint">Print All</button>'
@@ -297,6 +331,14 @@ var StudentCards = (function () {
     }
     if (action === 'spCardsPrint') {
       if (cid) printAll(cid);
+      return true;
+    }
+    if (action === 'spCardsRetry') {
+      if (cid) {
+        // At once: it does not wait for the list to be a minute old.
+        load(cid);
+        _rerender();
+      }
       return true;
     }
     return false;
