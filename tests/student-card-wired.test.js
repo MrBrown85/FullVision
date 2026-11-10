@@ -1235,7 +1235,7 @@ describe('Demo Mode and a real card cannot drift', () => {
     // Done starts the sample again and keeps nothing.
     await demo.click('[data-act="card-done"]');
     expect(demo.root().querySelector('form[data-form="card"]')).toBeTruthy();
-    expect(demo.root().querySelector('#sp-code').getAttribute('value')).toBe('P3R-8WD');
+    expect(demo.root().querySelector('#sp-code').getAttribute('value')).toBe('P3R8-WDK4');
     expect(demo.calls).toEqual([]);
     expect(demo.store).toEqual({});
     expect(demo.tab).toEqual({});

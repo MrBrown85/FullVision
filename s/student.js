@@ -1,7 +1,8 @@
 /* The student phone page (docs/STUDENT-VOICE-PLAN.md, PR 7; canvas screens
    1–5). A student scans their slip (fullvision.ca/s/#K7M-4QX) or types the
    code, checks it's them, answers one page per part (the questionnaire,
-   then its Goal Check-In), and sends.
+   then its Goal Check-In), and sends. A student card's code is eight
+   characters (K7M4-QX2P); a slip's is six.
 
    It talks only to the student-submit edge function, pinned to
    ca-central-1, with no key: the slip's code is the credential. The code
@@ -30,7 +31,9 @@
 var StudentPage = (function () {
   'use strict';
 
-  var CODE_RE = /^[ABCDEFGHJKMNPQRTUVWXYZ2346789]{6}$/;
+  // A slip's code is six characters, a card's eight (Colin, Nov 10), from
+  // the same alphabet. Only the server says which a code is.
+  var CODE_RE = /^[ABCDEFGHJKMNPQRTUVWXYZ2346789]{6}(?:[ABCDEFGHJKMNPQRTUVWXYZ2346789]{2})?$/;
 
   var MESSAGES = {
     not_found:
@@ -119,8 +122,11 @@ var StudentPage = (function () {
     return name.toLowerCase().indexOf(label.toLowerCase()) >= 0 ? name : name + ' \u00b7 ' + label;
   }
 
+  /* As it is printed: a slip's K7M-4QX, a card's K7M4-QX2P. Anything
+     else is shown as typed. */
   function prettyCode(c) {
-    return c.length === 6 ? c.slice(0, 3) + '-' + c.slice(3) : c;
+    var half = c.length === 6 || c.length === 8 ? c.length / 2 : 0;
+    return half ? c.slice(0, half) + '-' + c.slice(half) : c;
   }
 
   function fmtDate(iso, opts) {
