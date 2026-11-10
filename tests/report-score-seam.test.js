@@ -177,11 +177,28 @@ const LEFT_OUTSIDE = {
 
 /* The functions each file runs inside withReportScores, by surface: the
    lines `name = _inReportScores(name)` or `name = ReportScores.scoped(…)`
-   at the top of the file, before anything can call or keep the function. */
+   at the top of the file, before anything can call or keep the function.
+   `late` names any that is wrapped anywhere else: further down, or inside a
+   function that might not have run yet. */
 function doorsOf(source) {
   const ast = parse(source, { ecmaVersion: 'latest', sourceType: 'script' });
   const out = { surface: null, names: [], late: [] };
   let surfaceOfHelper = null;
+  // The file's module: the first function called where it is written.
+  let moduleBody = null;
+  eachNode(ast, (node, parent) => {
+    const called = parent && parent.type === 'CallExpression' && parent.callee === node;
+    if (!moduleBody && called && /Function/.test(node.type)) moduleBody = node.body.body;
+  });
+  // Its first lines: 'use strict', the helper, and the wrapped functions, up to anything else.
+  const firstLines = new Set();
+  for (const statement of moduleBody || []) {
+    const helper =
+      statement.type === 'VariableDeclaration' && statement.declarations.every(d => d.id.name === '_inReportScores');
+    const wraps = statement.type === 'ExpressionStatement' && statement.expression.type === 'AssignmentExpression';
+    if (!statement.directive && !helper && !wraps) break;
+    firstLines.add(statement);
+  }
   const scopedSurface = call =>
     call &&
     call.type === 'CallExpression' &&
@@ -210,8 +227,7 @@ function doorsOf(source) {
     expect(out.surface === null || out.surface === surface, 'one surface for each file').toBe(true);
     out.surface = surface;
     out.names.push(node.left.name);
-    // A statement of its own (never inside a function that might not have run).
-    if (!parent || parent.type !== 'ExpressionStatement') out.late.push(node.left.name);
+    if (!firstLines.has(parent)) out.late.push(node.left.name);
   });
   return out;
 }
@@ -378,6 +394,25 @@ describe('report files read scores only through ReportScores', () => {
     expect(doors.surface).toBe(DOORS[file].surface);
     expect(doors.names).toEqual(DOORS[file].names);
     expect(doors.late).toEqual([]);
+  });
+
+  it('sees a function wrapped too late to count', () => {
+    const file = wrapping =>
+      "window.X = (function () {\n  'use strict';\n" +
+      wrapping +
+      '\n  function draw() {}\n  return { draw: draw };\n})();';
+    const first = "  draw = ReportScores.scoped('progress', draw);";
+    expect(doorsOf(file(first))).toEqual({ surface: 'progress', names: ['draw'], late: [] });
+    const helper = "  var _inReportScores = function (fn) {\n    return ReportScores.scoped('phones', fn);\n  };\n";
+    expect(doorsOf(file(helper + '  draw = _inReportScores(draw);'))).toEqual({
+      surface: 'phones',
+      names: ['draw'],
+      late: [],
+    });
+    // After something else has run, or inside a function, the function may already be kept unwrapped.
+    expect(doorsOf(file('  var kept = draw;\n' + first)).late).toEqual(['draw']);
+    expect(doorsOf(file('  function later() {\n  ' + first + '\n  }\n  later();')).late).toEqual(['draw']);
+    expect(doorsOf(file('  if (window.fast) {\n  ' + first + '\n  }')).late).toEqual(['draw']);
   });
 
   it('no other report file has functions of its own to run there', () => {
