@@ -80,15 +80,22 @@
 -- sync version moves. The browser sees no difference: every function
 -- returns what it returned.
 --
--- ── Order: AFTER Batch A (2026110901 to 2026110904) and AFTER S0-M4 ─────────
+-- ── Order: AFTER S0-M4 (applied Nov 10) and AFTER Batch A; PR 989 either side ─
+-- The order is: S0-M4 (2026111001, applied to gradebook-prod on 2026-11-10),
+-- Batch A's four files (2026110901 to 2026110904), then this file.
+-- S0-M4b (2026110905_grade_return_limits.sql, PR 989) goes on top of Batch A
+-- and is expected before this file too. This file neither checks for S0-M4b
+-- nor needs it: with S0-M4b applied before it or after it, both apply and
+-- the functions end up the same (search_path.py runs both orders; so did the
+-- independent reviewer).
+--
 -- pg_get_functiondef prints the SET search_path line, so all sixteen
 -- fingerprints (md5 of pg_get_functiondef) change, though no body does.
 --
---   If this ran before S0-M4 (2026111001): S0-M4 checks that
---     get_class_bundle is the definition it was written against (md5
---     119165287207814181c5875d81451147) before it patches it. This file
---     changes that md5, so S0-M4 would stop at its first check, with nothing
---     changed, and would have to be rewritten against the new one.
+--   If this had run before S0-M4: S0-M4 checked that get_class_bundle was
+--     the definition it was written against (md5
+--     119165287207814181c5875d81451147) before it patched it. This file
+--     changes that md5, so S0-M4 would have stopped at its first check.
 --   If this ran before Batch A: Batch A's four files would still apply (the
 --     seven functions they check are not among these sixteen). But Batch A
 --     was tested with these sixteen as they are today, and its test harness
@@ -98,12 +105,13 @@
 --
 -- So this file refuses to run, with nothing changed, until all four Batch A
 -- files and S0-M4 are in: the one order that was tested. For S0-M4 it goes
--- by get_class_bundle's fingerprint: it must be the one S0-M4 leaves
--- (845b42513d1f556dc941a1cc11cf9567, length 22591); today's
--- (119165287207814181c5875d81451147) stops the file with a message naming
--- S0-M4, and any other stops it too. Its last step checks that no SECURITY
--- DEFINER function in public, student_submit or fv_private is left without
--- pg_temp last, Batch A's new ones included, and undoes everything if one is.
+-- by get_class_bundle's fingerprint: it must be the one S0-M4 left
+-- (845b42513d1f556dc941a1cc11cf9567, length 22591, live since Nov 10); the
+-- one before it (119165287207814181c5875d81451147) stops the file with a
+-- message naming S0-M4, and any other stops it too. Its last step checks
+-- that no SECURITY DEFINER function in public, student_submit or fv_private
+-- is left without pg_temp last, Batch A's and S0-M4b's new ones included,
+-- and undoes everything if one is.
 --
 -- ── Taking it back out ──────────────────────────────────────────────────────
 -- migrations/local-test/s0-m5-undo.sql puts each function's search_path back
@@ -140,8 +148,20 @@
 --
 -- A row whose only difference is the md5 does not stop this file (it
 -- replaces no body); it means that function has changed since it was
--- tested. The exception is get_class_bundle, which the file does check. It
--- has two md5s here: as it was before S0-M4, and with S0-M4 applied.
+-- tested. The exception is get_class_bundle, which the file does check.
+--
+-- Owners. ALTER FUNCTION is refused unless the role applying the file owns
+-- the function (or is a member of the role that does). The repo's own
+-- migrations made fifteen of the sixteen, so those belong to the role that
+-- applies migrations; rls_auto_enable came with the Supabase project and is
+-- the one that might not. The query takes the owner of fv_owns_course as the
+-- applying role and lists any of the sixteen owned by another (live_owner).
+-- If it lists one, do not apply. The file would run its checks, reach that
+-- function's ALTER, and stop there with "must be owner of function ..." and
+-- nothing changed (search_path.py does this with a function owned by
+-- another role). The ways on from there are for the owner to choose: apply
+-- the file as a role that owns all sixteen; or have it rewritten without
+-- that function, which also means its last check must excuse it.
 --
 -- precheck:
 --   with v(fn, setting, md5) as (values
@@ -159,19 +179,24 @@
 --       ('public.fv_owns_enrollment(uuid)',                              'search_path=public',     '9c1d01d07ad0e2402784a2257e13aecb'),
 --       ('public.fv_owns_term_rating(uuid)',                             'search_path=public',     '1d3c31d45026472c3d3055a6b8718ea6'),
 --       ('public.fv_retention_cleanup()',                                'search_path=public',     '3133ad798bfe7c82d9d203abc3826a94'),
---       ('public.get_class_bundle(uuid,bigint)',                         'search_path=""',         '119165287207814181c5875d81451147 845b42513d1f556dc941a1cc11cf9567'),
+--       ('public.get_class_bundle(uuid,bigint)',                         'search_path=""',         '845b42513d1f556dc941a1cc11cf9567'),
 --       ('public.rls_auto_enable()',                                     'search_path=pg_catalog', '846ec2fbff751d24b890656d63c3a9bf')
+--   ), applier as (
+--     select proowner from pg_proc where oid = to_regprocedure('public.fv_owns_course(uuid)')
 --   )
 --   select v.fn, v.setting as tested_setting, array_to_string(p.proconfig, '; ') as live_setting,
 --          p.prosecdef as live_security_definer, v.md5 as tested_md5,
---          md5(pg_get_functiondef(p.oid)) as live_md5, pg_get_functiondef(p.oid) as live_definition
+--          md5(pg_get_functiondef(p.oid)) as live_md5,
+--          (select proowner::regrole::text from applier) as owner_of_fv_owns_course,
+--          p.proowner::regrole::text as live_owner, pg_get_functiondef(p.oid) as live_definition
 --     from v left join pg_proc p on p.oid = to_regprocedure(v.fn)
 --    where p.oid is null or not p.prosecdef or p.proconfig is distinct from array[v.setting]
---       or md5(pg_get_functiondef(p.oid)) <> all (string_to_array(v.md5, ' '))
+--       or md5(pg_get_functiondef(p.oid)) <> v.md5
+--       or p.proowner is distinct from (select proowner from applier)
 --   union all
 --   select n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')',
 --          'not one of the sixteen', array_to_string(p.proconfig, '; '), p.prosecdef, null,
---          md5(pg_get_functiondef(p.oid)), null
+--          md5(pg_get_functiondef(p.oid)), null, p.proowner::regrole::text, null
 --     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
 --    where n.nspname in ('public', 'student_submit', 'fv_private') and p.prosecdef
 --      and not exists (select 1 from unnest(coalesce(p.proconfig, '{}')) s where s ~ '^search_path=(.*, )?pg_temp$')
@@ -266,12 +291,12 @@ begin
         end if;
     end loop;
 
-    -- The order (header, "Order"): Batch A's four files, then S0-M4, then this.
+    -- The order (header, "Order"): S0-M4, Batch A's four files, then this.
     if to_regprocedure('public.fv_owns_score_cell(uuid,uuid)') is null
        or to_regclass('public.grade_return') is null
        or to_regclass('public.student_card') is null
        or to_regclass('student_submit.device_session') is null then
-        raise exception 'Batch A is not all applied (2026110901 to 2026110904): apply it, then S0-M4, then this file. Nothing was changed.';
+        raise exception 'Batch A is not all applied (2026110901 to 2026110904): apply it, then this file. Nothing was changed.';
     end if;
     -- get_class_bundle must be the definition S0-M4 leaves (md5 of
     -- pg_get_functiondef on PostgreSQL 17, confirmed by PR 985's reviewer),

@@ -3,12 +3,14 @@ sixteen SECURITY DEFINER functions get pg_temp named last in their
 search_path, and nothing else about them changes.
 
     python3 search_path.py build     load an EMPTY database in the order
-                                     production will be in: the harness,
-                                     Batch A's four files, S0-M4's file
+                                     production will be in: the harness
+                                     with S0-M4's file (applied on Nov 10),
+                                     then Batch A's four files
     python3 search_path.py           the checks
 
-`build` reads each file from this checkout, or, while PR 966 (Batch A) is
-not merged, from its branch with `git show` (it prints which). The checks:
+`build` reads each file from this checkout, or, while PR 966 (Batch A) and
+PR 989 (S0-M4b) are not merged, from their branches with `git show` (it
+prints which). The checks:
 
 - the file's shape, and where the sixteen start;
 - every caller gets what they got: Teacher A, Teacher B, no JWT and anon,
@@ -38,18 +40,19 @@ MIGRATION = '../2026111002_security_definer_search_path.sql'
 BATCH_A = ['../2026110901_score_rows_same_class.sql', '../2026110902_grade_return.sql',
            '../2026110903_student_card.sql', '../2026110904_student_sessions_page.sql']
 S0_M4 = '../2026111001_assessment_created_at_in_bundle.sql'
-# Until Batch A is merged, its files are read from here. (S0-M4's are on main.)
-REFS = ['origin/batch-a-grade-return-cards-sessions']
-# Batch A's list (README.md, "Batch A"), then what get_class_bundle needs
-# (README.md, "The bundle sends created_at"), then the rest of the sixteen.
-BUILD = ['harness.sql', 'score-prelude.sql', 'score-tables.sql', 'student-submit-prelude.sql',
+S0_M4B = '../2026110905_grade_return_limits.sql'     # PR 989: this file neither needs it nor minds it
+# Until they are merged, their files are read from here. (S0-M4's are on main.)
+REFS = ['origin/batch-a-grade-return-cards-sessions', 'origin/s0-m4b-grade-return-limits']
+# Batch A's own list (its README section: the harness with S0-M4 applied, as
+# live is), then the rest of the sixteen, then Batch A's four files.
+BUILD = ['harness.sql', 'score-prelude.sql', 'score-tables.sql', 'bundle-prelude.sql', 'bundle-tables.sql', S0_M4,
+         'student-submit-prelude.sql',
          '../20261025_questionnaires_tables_and_functions.sql', '../20261025_questionnaires_templates.sql',
          '../20261025_student_submit.sql', '../20261025_student_submit_phone.sql',
          '../20261025_student_submit_token_80.sql', '../20261025_phone_reports.sql',
          '../20261101_questionnaire_identity_check.sql', '../20261101_questionnaire_slip_fixes.sql',
          '../20261103_slip_password_kept_for_live_slips.sql', 'batch-a-tables.sql', 'batch-a-prelude.sql',
-         'class-writers-prelude.sql', 'bundle-prelude.sql', 'bundle-tables.sql', 'search-path-prelude.sql',
-         *BATCH_A, S0_M4]
+         'class-writers-prelude.sql', 'search-path-prelude.sql', *BATCH_A]
 LIVE_BUNDLE_MD5 = '119165287207814181c5875d81451147'   # live-function-md5.txt, before S0-M4
 LIVE_RLS_MD5 = '846ec2fbff751d24b890656d63c3a9bf'      # rls_auto_enable, read from gradebook-prod on 2026-11-10
 
@@ -79,7 +82,6 @@ def build(files=BUILD):
     if c.run("select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public'")[0][0]:
         sys.exit('this database is not empty: build needs a new one')
     roles = {r[0] for r in c.run("select rolname from pg_roles")}
-    made = set()
     for rel in files:
         text, where = source(rel)
         ran = skipped = 0
@@ -88,17 +90,11 @@ def build(files=BUILD):
             # Roles belong to the whole server: make only the ones it lacks.
             if rel == 'harness.sql' and words[:2] == ['create', 'role'] and words[2] in roles:
                 skipped += 1; continue
-            # bundle-tables.sql and batch-a-tables.sql are both written from
-            # the live snapshot and share five tables: a statement that has
-            # already run, word for word, is not run again.
-            if rel == 'bundle-tables.sql' and bare(st) in made:
-                skipped += 1; continue
             try:
                 c.run(st)
             except Exception as e:
                 sys.exit('FAILED in %s:\n%s\n-> %s' % (rel, st[:300], e))
             ran += 1
-            if rel == 'batch-a-tables.sql': made.add(bare(st))
         print('%s: %d statements%s%s' % (rel, ran, ', %d skipped' % skipped if skipped else '',
                                          '' if where == 'this checkout' else '  (from %s)' % where))
         if rel == 'bundle-prelude.sql':
@@ -110,14 +106,16 @@ def build(files=BUILD):
 
 def wrong_order():
     """On an EMPTY database: this file's sixteen changes first, then Batch A,
-    then S0-M4, to see what the wrong order does (the file's own check
-    refuses it; here its ALTER statements are run by hand)."""
+    to see what the wrong order does (the file's own check refuses it; here
+    its ALTER statements are run by hand). S0-M4 is already live, so that
+    half of the wrong order can no longer happen; the checks still show what
+    it would have done."""
     build(BUILD[:BUILD.index(BATCH_A[0])])
     c = connect()
     for st in statements():
         if bare(st).lower().startswith('alter function'): c.run(st)
-    print('the sixteen ALTER statements, run by hand before Batch A and S0-M4: ok')
-    for rel in BATCH_A + [S0_M4]:
+    print('the sixteen ALTER statements, run by hand before Batch A: ok')
+    for rel in BATCH_A:
         try:
             for st in statements(rel, transaction=True): c.run(st)
             print('%s: applies' % rel)
@@ -923,7 +921,7 @@ def main():
     refused('Batch A file 03 is not applied', ['alter table public.student_card rename to m5_renamed'], 'Batch A is not all applied')
     refused('Batch A file 04 is not applied', ['alter table student_submit.device_session rename to m5_renamed'], 'Batch A is not all applied')
     without_m4 = bundle.replace(",\n                       'created_at', asm.created_at", '')
-    refused('S0-M4 is not applied (get_class_bundle as it is live today)', [without_m4], 'S0-M4 is not applied')
+    refused('S0-M4 is not applied (get_class_bundle as it was before S0-M4)', [without_m4], 'S0-M4 is not applied')
     refused('get_class_bundle is neither the definition S0-M4 leaves nor that with this setting',
             [bundle.replace('\ndeclare\n', '\ndeclare\n    -- another change\n', 1)],
             'public.get_class_bundle(uuid,bigint) is not the definition this file was written against')
@@ -933,8 +931,63 @@ def main():
         refused('another SECURITY DEFINER function in %s lacks pg_temp last (the last check, after the sixteen ALTERs)' % where, [make],
                 'SECURITY DEFINER without pg_temp last in its search_path: %s.m5_seventeenth()' % where)
 
-    # What the wrong order would do: this file's change to get_class_bundle,
-    # made by hand before S0-M4, stops S0-M4 at its first check.
+    # ── The applying role must own all sixteen ──────────────────────────────
+    # ALTER FUNCTION needs the function's owner. Two roles made here and
+    # rolled back with the transaction: one owns fifteen and applies the
+    # file, the other owns rls_auto_enable (the one the repo did not make).
+    s = Session(seeded=False)
+    s.run('create role m5b_applier nologin'); s.run('create role m5b_other nologin')
+    s.run('grant usage on schema public, student_submit, fv_private, auth to m5b_applier')
+    for fn, _was, _becomes in SIXTEEN: s.run('alter function %s owner to m5b_applier' % fn)
+    ok('the header\'s "before the apply" query still finds nothing when another role owns all sixteen', s.rows(header_query('precheck')) == [])
+    s.run('alter function public.rls_auto_enable() owner to m5b_other')
+    listed = s.rows(header_query('precheck'))
+    ok('... and lists a function of the sixteen that the role owning fv_owns_course does not own, with both owners',
+       len(listed) == 1 and listed[0][0] == 'public.rls_auto_enable()' and listed[0][6:8] == ['m5b_applier', 'm5b_other'], [r[:8] for r in listed])
+    before = settings(s)
+    def as_applier():
+        s.c.run('savepoint owned'); s.c.run('set local role m5b_applier')
+        try:
+            for st in statements(): s.c.run(st)
+            s.c.run('reset role'); return 'applied'
+        except pg.DatabaseError as e:
+            s.c.run('rollback to savepoint owned'); s.c.run('reset role')
+            return '%s %s' % (e.args[0].get('C'), e.args[0].get('M'))
+    got = as_applier()
+    ok('applied by a role that does not own one of the sixteen, the file stops at that ALTER (42501, must be owner)',
+       got.startswith('42501 must be owner of function') and got.endswith('rls_auto_enable'), got)
+    ok('... and none of the sixteen was changed', settings(s) == before)
+    s.run('alter function public.rls_auto_enable() owner to m5b_applier')
+    got = as_applier()
+    ok('applied by a role that owns all sixteen and is not a superuser, it applies', got == 'applied' and s.rows(WITHOUT_PG_TEMP) == [], got)
+    s.close()
+
+    # ── S0-M4b (PR 989) before this file, or after it ───────────────────────
+    # This file neither checks for it nor needs it.
+    ends = {}
+    for label, order in (('S0-M4b, then this file', (S0_M4B, MIGRATION)), ('this file, then S0-M4b', (MIGRATION, S0_M4B))):
+        s = Session(seeded=False); got = 'applied'
+        try:
+            for rel in order: s.apply(rel)
+        except pg.DatabaseError as e:
+            got = e.args[0].get('M')
+        ok('%s: both apply, the sixteen have the new setting, and no SECURITY DEFINER function is left without pg_temp last' % label,
+           got == 'applied' and settings(s) == {fn: 'search_path=' + becomes for fn, _was, becomes in SIXTEEN} and s.rows(WITHOUT_PG_TEMP) == [], got)
+        s.c.run('savepoint again'); again = 'applied'
+        try:
+            for rel in order: s.apply(rel)
+        except pg.DatabaseError as e:
+            again = e.args[0].get('M'); s.c.run('rollback to savepoint again')
+        ok('%s: and both can be run again' % label, again == 'applied', again)
+        ends[label] = s.rows("""select n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')', md5(pg_get_functiondef(p.oid))
+                                  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                                 where n.nspname in ('public', 'student_submit', 'fv_private') and p.prokind in ('f', 'p') order by 1""")
+        s.close()
+    ok('either order leaves every function in the three schemas the same (%d compared)' % len(ends['S0-M4b, then this file']),
+       ends['S0-M4b, then this file'] == ends['this file, then S0-M4b'] and len(ends['S0-M4b, then this file']) > 100)
+
+    # What the wrong order would have done: this file's change to
+    # get_class_bundle, made by hand before S0-M4, stops S0-M4 at its first check.
     s = Session(seeded=False)
     s.run(without_m4)
     ok('(get_class_bundle put back to the live definition: md5 %s)' % live['get_class_bundle'],

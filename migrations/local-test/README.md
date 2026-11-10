@@ -247,14 +247,14 @@ the `search_path` of sixteen SECURITY DEFINER functions, so a caller's
 temporary table can never stand in for a real one. It replaces no body.
 Tested here only (no Supabase branch, never `gradebook-prod`).
 
-It must be applied after Batch A (PR 966) and S0-M4 (PR 985, applied and
-merged on Nov 10) and refuses to run before them, so `search_path.py build`
-loads the database in that order: Batch A's list, `bundle-prelude.sql` and
-`bundle-tables.sql`, then `search-path-prelude.sql`, Batch A's four files
-and S0-M4's file. Until Batch A is merged it reads Batch A's files from its
-branch with `git show` and says so; `bundle-tables.sql` and
-`batch-a-tables.sql` share five tables, and a statement that has already run
-word for word is not run again.
+It must be applied after S0-M4 (PR 985, applied and merged on Nov 10) and
+Batch A (PR 966) and refuses to run before them, so `search_path.py build`
+loads the database in that order: Batch A's own list (the harness with
+S0-M4's file applied, as live is), then `search-path-prelude.sql`, then
+Batch A's four files. S0-M4b (PR 989) may be applied before this file or
+after it: the file neither checks for it nor needs it. Until those two PRs
+are merged it reads their files from their branches with `git show` and says
+so.
 
 Where each of the sixteen comes from:
 
@@ -357,11 +357,21 @@ in a transaction that is rolled back.
   with any fingerprint but the one S0-M4 leaves; a seventeenth SECURITY
   DEFINER function without `pg_temp` last in any of the three schemas (the
   last check, after the ALTERs). The wrong order, made by hand: S0-M4 stops
-  at its fingerprint check (`python3 search_path.py wrong-order`, on an empty
-  database, shows the whole of it: Batch A's four files still apply, S0-M4
-  stops). A lock it cannot get: gives up at five seconds, nothing changed.
-  It takes no table lock: it runs at once with six tables locked whole by
-  another session. A second run changes nothing.
+  at its fingerprint check; `python3 search_path.py wrong-order`, on an empty
+  database, makes the ALTERs before Batch A, whose four files still apply. A
+  lock it cannot get: gives up at five seconds, nothing changed. It takes no
+  table lock: it runs at once with six tables locked whole by another
+  session. A second run changes nothing.
+- **Who applies it.** ALTER FUNCTION needs the function's owner. Applied by a
+  role that owns fifteen of the sixteen and not `rls_auto_enable`, the file
+  stops at that ALTER ("must be owner of function") with nothing changed;
+  the header's "Before the apply" query lists such a function with both
+  owners. Applied by a role that owns all sixteen and is not a superuser, it
+  applies. (The two roles are made and rolled back inside the check.)
+- **S0-M4b (PR 989) on either side.** S0-M4b then this file, and this file
+  then S0-M4b: both apply and can be run again, no SECURITY DEFINER function
+  is left without `pg_temp` last, and the 144 functions in the three schemas
+  end up the same either way.
 - **Taking it back out.** `s0-m5-undo.sql` (not a migration) sets each
   `search_path` back. After it all sixteen rows of `pg_proc` are what they
   were, column for column, so all sixteen fingerprints are too, and nothing
@@ -377,7 +387,7 @@ in a transaction that is rolled back.
   three schemas went back to `m5_pre`'s and forward again.
 
 Result on 2026-11-10, PostgreSQL 17.11 (production's version) and 18.6:
-**339 of 339 on each**, the two outputs identical line for line, fingerprints
+**349 of 349 on each**, the two outputs identical line for line, fingerprints
 included.
 
 The other suites, on `m5_pre` and on `m5_post`, checks compared line by line
@@ -386,7 +396,7 @@ with `live-function-md5.txt` as it will be after each apply:
 
 | Suite                       | Without the migration | With it    |
 | --------------------------- | --------------------- | ---------- |
-| `score_rpcs.py`             | 235 of 235            | 235 of 235 |
+| `score_rpcs.py`             | 236 of 236            | 236 of 236 |
 | `student_submit.py`         | 79 of 79              | 79 of 79   |
 | `questionnaire_identity.py` | 47 of 47              | 47 of 47   |
 | `phone_reports.py`          | 37 of 37              | 37 of 37   |
@@ -394,8 +404,8 @@ with `live-function-md5.txt` as it will be after each apply:
 | `grade_return.py`           | 280 of 280            | 280 of 280 |
 | `student_page.py`           | 216 of 216            | 216 of 216 |
 
-`score_rpcs.py` has one check more than Batch A's 234 because this database
-loads `get_class_bundle`; every other count is Batch A's own.
+Every count is Batch A's own, from its branch as of Nov 10 (file 01 in plpgsql,
+the harness with S0-M4 applied).
 (`grade_return.py` counts every function named `_fv_` that a signed-in
 teacher may run, so `search-path-prelude.sql` does not grant
 `_fv_release_orphan_teacher_email` to `authenticated`; `search_path.py`
