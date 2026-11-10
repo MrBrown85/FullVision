@@ -2,13 +2,14 @@
  *
  * The one module a screen writes a grade through
  * (docs/plans/student-page-build-plan.md, 1.4). Each action is named for
- * what the teacher does. Today each is a pass-through: it calls the
+ * what the teacher does. Each is a pass-through: it calls the
  * shared/data.js writer the screen called before, with the same arguments,
- * returns what the writer returns, and tells GradeState a grade was saved
- * (which changes nothing yet). No rule lives here. The rules that go with
- * the actions (locks, the points limit, the state of a piece, the To Grade
- * and To Return counts) move in behind them in later PRs, with Return,
- * Return for Revision and Return N Graded.
+ * and returns what the writer returns. data.js runs the Draft and Returned
+ * rule on the write (shared/grade-state.js); the action then asks GradeState
+ * what state the piece is in and keeps the answer for the screen
+ * (lastState). The other rules that go with the actions (locks, the points
+ * limit, the To Grade and To Return counts) move in behind them in later
+ * PRs, with Return for Revision and Return N Graded.
  *
  * Clearing is the same action with nothing in it: level 0, points null, a
  * null mark, a null status.
@@ -26,11 +27,20 @@
 window.Grader = (function () {
   'use strict';
 
-  /* Every action ends here: GradeState hears of the save, and the writer's
-     answer goes back to the screen. */
+  var _last = null;
+
+  /* Every action ends here: GradeState says what state the piece is in
+     after the save, and the writer's answer goes back to the screen. */
   function _saved(cid, sid, aid, what, out) {
-    GradeState.afterSave(cid, sid, aid, what);
+    _last = { cid: cid, sid: sid, aid: aid, what: what, state: GradeState.afterSave(cid, sid, aid, what) };
     return out;
+  }
+
+  /* What the last action left: { cid, sid, aid, what, state }, where state
+     is 'draft', 'returned', or null for a piece with no grade returned and
+     none waiting. null before any action. */
+  function lastState() {
+    return _last;
   }
 
   /* A level under one score key (a competency, a rubric criterion or
@@ -113,6 +123,14 @@ window.Grader = (function () {
     return _saved(cid, null, null, 'undo', restoreScoreCells(cid, before, after));
   }
 
+  /* Return: the students in `studentIds` (one id or a list) are given
+     their grade on `aid`. Only drafts are returned. Answers
+     { returned, enrollment_ids, returned_at }. */
+  function returnTo(cid, aid, studentIds) {
+    var ids = Array.isArray(studentIds) ? studentIds : [studentIds];
+    return _saved(cid, ids.length === 1 ? ids[0] : null, aid, 'return', returnGrades(cid, aid, ids));
+  }
+
   return {
     setLevel: setLevel,
     setPlusMinus: setPlusMinus,
@@ -128,5 +146,7 @@ window.Grader = (function () {
     gradeSeparately: gradeSeparately,
     backToGroupGrade: backToGroupGrade,
     undo: undo,
+    returnGrades: returnTo,
+    lastState: lastState,
   };
 })();

@@ -11886,6 +11886,7 @@ window.PageAssignments = (function () {
       var what = btn.dataset.grader;
       if (what === 'close') closeGrader();
       else if (what === 'next' || what === 'prev') stepFocusStudent(what === 'next' ? 1 : -1);
+      else if (what === 'return') _graderReturn();
       else _graderGroupAction(what, btn.dataset.sid);
     });
     // A click anywhere but the open ⋯ menu closes it.
@@ -12554,6 +12555,7 @@ window.PageAssignments = (function () {
       ? returnStep + '\u2190 \u2192 change group \u00B7 Esc closes'
       : returnStep + '\u2190 \u2192 change student \u00B7 Esc closes';
     _refreshReportNote(dialog, cid, a, sid);
+    _refreshGraderReturn(dialog, cid, a, sid, view);
     // Printed / Changed Since Printed beside the name (teacher/rubric-print.js).
     var markHtml = view ? '' : _printMarkHtml(cid, a.id, sid);
     var markBox = dialog.querySelector('.grader-print-mark');
@@ -12581,6 +12583,98 @@ window.PageAssignments = (function () {
       }
       levels.innerHTML = _dibelsLevelPillsHtml(cid, a, sid);
     } else if (levels) levels.remove();
+  }
+
+  /* ── Draft and Returned (S0-F2) ───────────────────────────
+     In a class whose student page is on (the build switch) and that returns
+     grades When I Return Them, a row under the grading says where the
+     grade stands: Return with the Draft mark and "Saved. Not returned
+     yet." while it waits, "Returned Nov 3" once it is given. A change to
+     a returned grade adds the one line about what the student still sees.
+     A status alone is not a grade, so Missing, Excused and Late show no
+     draft. With the switch off the row is never made and the dialog is as
+     it was. Group work is returned to every member still graded with the
+     group. */
+  function _graderReturnIds(sid, view) {
+    return view && view.linked ? view.linked.slice() : [sid];
+  }
+
+  // html-safe: fixed labels; the name and the date go through esc
+  function _graderReturnHtml(cid, a, sid, view) {
+    var klass = getReturnSettings(cid);
+    if (!klass.student_page) return '';
+    var waiting = _graderReturnIds(sid, view)
+      .map(function (id) {
+        return getGradeReturn(cid, id, a.id);
+      })
+      .filter(function (row) {
+        return row && row.is_draft;
+      });
+    // As Soon As I Save: nothing waits, so there is nothing to return.
+    if (!waiting.length && !GradeState.holds(klass)) return '';
+    var row = getGradeReturn(cid, sid, a.id);
+    if (!waiting.length) {
+      if (GradeState.stateOf(cid, sid, a.id) !== GradeState.RETURNED)
+        return '<button type="button" class="grader-return-btn" data-grader="return" disabled>Return</button>';
+      var on = row && row.returned_at ? formatShortDate(row.returned_at) : '';
+      return '<span class="grader-returned">' + esc(on ? 'Returned ' + on : 'Returned') + '</span>';
+    }
+    // The grade the student was given before this change, if there was one.
+    var given = waiting.find(function (r) {
+      return r.returned_copy;
+    });
+    var still = '';
+    if (given) {
+      var st = getStudents(cid).find(function (x) {
+        return x.id === sid;
+      });
+      var who = view ? view.label : st ? displayNameFirst(st) : 'The student';
+      var when = given.returned_at ? ' ' + formatShortDate(given.returned_at) : '';
+      still = '<p class="grader-draft-still">' + esc(who + ' still sees the grade you returned' + when + '.') + '</p>';
+    }
+    return (
+      '<button type="button" class="grader-return-btn" data-grader="return">Return</button>' +
+      '<div class="grader-draft"><p class="grader-draft-line">' +
+      '<span class="grader-draft-mark">Draft</span><span class="grader-draft-text">Saved. Not returned yet.</span>' +
+      '</p>' +
+      still +
+      '</div>'
+    );
+  }
+
+  /* The row is made only when there is something to say, under the
+     grading and the Note for the Report, and redrawn only when it changes:
+     a button swapped out under the mouse loses its click. */
+  function _refreshGraderReturn(dialog, cid, a, sid, view) {
+    var html = _graderReturnHtml(cid, a, sid, view);
+    var box = dialog.querySelector('.grader-return');
+    if (!html) {
+      if (box) box.remove();
+      return;
+    }
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'grader-return';
+      dialog.querySelector('.grader-report-note').insertAdjacentElement('afterend', box);
+    }
+    if (box.dataset.html === html) return;
+    box.dataset.html = html;
+    // html-safe: built by _graderReturnHtml
+    box.innerHTML = html;
+  }
+
+  function _graderReturn() {
+    if (!_grader || !focusStudentId) return;
+    var cid = activeCourse;
+    var a = getAssessments(cid).find(function (x) {
+      return x.id === _grader.aid;
+    });
+    if (!a) return;
+    Grader.returnGrades(cid, a.id, _graderReturnIds(focusStudentId, _graderGroupView(cid, a, focusStudentId)));
+    _refreshGraderChrome();
+    // The button is gone: the dialog keeps the keys.
+    var dialog = _grader.overlay.querySelector('.grader-dialog');
+    if (dialog && !_grader.overlay.contains(document.activeElement)) dialog.focus({ preventScroll: true });
   }
 
   /* ── Note for the Report ──────────────────────────────────
