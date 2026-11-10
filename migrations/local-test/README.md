@@ -429,22 +429,70 @@ of the table is for live functions. Nothing changed: `delete_rubric` still
 deadlocks with saves, the other four are still clean, and the count of RPCs
 that are not clean is still nine.
 
-Timing, measured by the reviewer of the last verify pass on a
-production-sized class (32 students, 70 pieces), one quiet call each:
+Timing on Postgres 17.11, which is what production runs, measured with
+`batch_a_cost.py` on a production-sized class (32 students, 70 pieces), one
+quiet call each as a signed-in teacher, the best of up to three runs (the
+machine is shared, and a run now and then comes out two or three times
+slower). The script commits the class it makes, so it wants a database of
+its own:
 
-| One quiet call                      | without Batch A | with           |
-| ----------------------------------- | --------------- | -------------- |
-| `upsert_score`                      | 0.45 ms         | 0.65 to 0.8 ms |
-| `clear_score` on one rubric grade   | 0.5 ms          | 0.9 ms         |
-| `fill_rubric`, 5 criteria           | 0.6 ms          | 1.5 ms         |
-| `clear_row_scores`, one student     | 4.1 ms          | 9.2 ms         |
-| `clear_column_scores`, 32 students  | 3.0 ms          | 5.4 ms         |
-| deleting a section                  | 12.6 ms         | 59.5 ms        |
-| deleting a rubric used by 24 pieces | 178 ms          | 265 ms         |
+```bash
+PGPORT=54331 PGDATABASE=fv_cost_pre python3 run.py $BASE          # without Batch A
+PGPORT=54331 PGDATABASE=fv_cost python3 run.py $BASE $MIGRATIONS  # with the four files
+PGPORT=54331 PGDATABASE=fv_cost_pre python3 batch_a_cost.py
+PGPORT=54331 PGDATABASE=fv_cost python3 batch_a_cost.py
+```
 
-Every save does a little more work; bulk clears and deletes take 1.5 to 5
-times as long, all still well under a second. A restore of a 30 by 40 class
-(4,800 score rows) took between 0.3 and 0.7 s here; the triggers stand aside
+| One quiet call                                | without Batch A | with, helpers as SQL (as first verified) | with, helpers as plpgsql (now) | Postgres 18.6: without, with |
+| --------------------------------------------- | --------------- | ---------------------------------------- | ------------------------------ | ---------------------------- |
+| `upsert_score`                                | 0.46 ms         | 0.88 ms                                  | 0.68 ms                        | 0.28, 0.42 ms                |
+| `upsert_tag_score`                            | 0.37 ms         | 1.13 ms                                  | 0.71 ms                        | 0.25, 0.42 ms                |
+| `upsert_rubric_score`                         | 0.33 ms         | 1.12 ms                                  | 0.70 ms                        | 0.27, 0.45 ms                |
+| `clear_score` on one rubric grade             | 0.31 ms         | 0.70 ms                                  | 0.70 ms                        | 0.33, 0.47 ms                |
+| `fill_rubric`, 5 criteria                     | 0.84 ms         | 3.85 ms                                  | 1.74 ms                        | 0.47, 1.44 ms                |
+| `clear_row_scores`, one student               | 5.2 ms          | 11.4 ms                                  | 11.6 ms                        | 4.9, 9.7 ms                  |
+| `clear_column_scores`, 32 students            | 2.7 ms          | 5.6 ms                                   | 5.7 ms                         | 2.7, 5.4 ms                  |
+| deleting a section                            | 4.2 ms          | 15.3 ms                                  | 15.1 ms                        | 4.5, 11.8 ms                 |
+| deleting a rubric used by 24 pieces           | 503 ms          | 717 ms                                   | 720 ms                         | 519, 699 ms                  |
+| a fill for 30 students, 5 criteria (30 calls) | 28 ms           | 117 ms                                   | 56 ms                          | 19, 44 ms                    |
+
+Every save does a little more work: a quarter to a third of a millisecond on a
+single score, and a rubric fill takes about twice as long. Bulk clears and
+deletes take 1.4 to 3.6 times as long, all still under a second.
+
+**The figures this README and the PR gave before were measured on Postgres
+18 only.** File 01's four helpers were SQL-language functions, and Postgres
+17 plans an SQL-language function again in every statement that calls it,
+where 18 keeps the plan. On 17 that made a 30-student fill take 81 ms with
+file 01 alone, against 28 ms without it. The helpers are plpgsql now (the
+owner's ruling: rewrite before applying), which keeps its plan for the life
+of the connection on both versions:
+
+| File 01 alone, Postgres 17.11      | without | helpers as SQL | helpers as plpgsql |
+| ---------------------------------- | ------- | -------------- | ------------------ |
+| `upsert_score`                     | 0.46 ms | 0.53 ms        | 0.33 ms            |
+| `upsert_tag_score`                 | 0.37 ms | 0.85 ms        | 0.30 ms            |
+| `upsert_rubric_score`              | 0.33 ms | 0.82 ms        | 0.28 ms            |
+| `fill_rubric`, 5 criteria          | 0.84 ms | 2.75 ms        | 0.66 ms            |
+| a fill for 30 students, 5 criteria | 28 ms   | 81 ms          | 23 ms              |
+
+With the helpers in plpgsql, file 01 costs nothing that can be measured on
+either version, and reads through row security cost the same as before
+(3,840 rubric rows read as a teacher: 35 ms with the SQL form, 32 ms with
+plpgsql; the plan is the same, the helper called once a row in the filter:
+the SQL form was never inlined, being SECURITY DEFINER with a search_path
+of its own).
+
+File 02's own SQL-language helpers (`_grade_copy`, `_grade_copy_of`,
+`_grade_copy_entry`, `_grade_return_holds`, `_grade_copy_in_use`) and file
+04's `_returned_grade` are slower on 17 than on 18 for the same reason
+(`_grade_copy` of a rubric grade: 0.36 ms a call on 17 against 0.24 on 18,
+both with a 0.2 ms round trip in them). Each was tried as plpgsql on 17 and
+none got reliably faster (the copy is built by nested calls, and the gain
+on one is lost on the next), so they are left as they were verified.
+
+A restore of a 30 by 40 class
+(4,800 score rows) took between 0.3 and 0.7 s on 18.6; the triggers stand aside
 during a restore and it sets the state in a few statements. `grade_return`
 holds a second copy of every grade: 851 kB at 2,240 graded cells, 389 bytes
 a cell on average, beside 2.0 MB for the four score tables together.
