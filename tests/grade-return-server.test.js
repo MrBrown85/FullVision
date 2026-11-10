@@ -749,6 +749,98 @@ describe('Return goes to the server', () => {
   });
 });
 
+describe('the page is redrawn only when the server’s rows would look different', () => {
+  let redraws;
+  let realRedraw;
+  beforeEach(() => {
+    redraws = 0;
+    realRedraw = globalThis._invalidateAndRerender;
+    globalThis._invalidateAndRerender = () => redraws++;
+    fake.on('return_grades', p => ({
+      data: { returned: 1, enrollment_ids: p.p_enrollment_ids, returned_at: new Date().toISOString() },
+      error: null,
+    }));
+  });
+  afterEach(() => {
+    globalThis._invalidateAndRerender = realRedraw;
+  });
+
+  it('the same rows with the server’s own time on a Return, in another order: no redraw', async () => {
+    await openClass();
+    rows = null;
+    level(NOOR, CAUSES, SIGNIFICANCE, 2);
+    level(PRIYA, WEEK1, CHANGE, 4);
+    await quiet();
+    Grader.returnGrades(CID, CAUSES, [NOOR]);
+    const mine = getGradeReturns(CID);
+    // The server's copy: its own clock a moment later, the work listed the other way round.
+    const later = new Date(Date.parse(mine[CAUSES][NOOR].returned_at) + 900).toISOString();
+    rows = {
+      [WEEK1]: structuredClone(mine[WEEK1]),
+      [CAUSES]: { [NOOR]: { ...structuredClone(mine[CAUSES][NOOR]), returned_at: later } },
+    };
+    redraws = 0;
+    await quiet();
+    expect(callsTo('return_grades').length).toBe(1);
+    expect(getGradeReturn(CID, NOOR, CAUSES).returned_at).toBe(later);
+    expect(redraws).toBe(0);
+  });
+
+  it('a row the server holds differently: one redraw', async () => {
+    await openClass();
+    rows = null;
+    level(NOOR, CAUSES, SIGNIFICANCE, 2);
+    await quiet();
+    redraws = 0;
+    // Another writer returned it (the grade-scans skill's class setting, say).
+    rows = { [CAUSES]: { [NOOR]: { is_draft: false, returned_at: '2026-11-10T19:00:00+00:00' } } };
+    await _refreshGradeReturnsSoon(CID);
+    expect(state(NOOR, CAUSES)).toBe('returned');
+    expect(redraws).toBe(1);
+  });
+
+  it('_gradeRowsLook ignores order, the time of day and when a student opened a piece; it sees a state or a copy change', () => {
+    const copy = {
+      v: 1,
+      value: null,
+      modifier: 0,
+      comment: null,
+      tags: { t: { value: 3, modifier: 0, comment: null } },
+      criteria: {},
+      checks: [],
+    };
+    const a = {
+      a1: {
+        s1: { is_draft: true, returned_at: '2026-11-03T17:00:00.000Z', returned_copy: copy },
+        s2: { is_draft: false },
+      },
+      a2: { s1: { is_draft: false, returned_at: '2026-11-03T17:00:00.000Z' } },
+    };
+    const b = {
+      a2: { s1: { returned_at: '2026-11-03T17:00:09.500Z', is_draft: false, seen_at: '2026-11-04T17:00:00.000Z' } },
+      a1: {
+        s2: { is_draft: false },
+        s1: {
+          returned_copy: { ...copy, tags: { t: { modifier: 0, value: 3 } } },
+          is_draft: true,
+          returned_at: '2026-11-03T17:00:01.000Z',
+        },
+      },
+    };
+    expect(_gradeRowsLook(b)).toBe(_gradeRowsLook(a));
+    const draft = structuredClone(a);
+    draft.a2.s1.is_draft = true;
+    expect(_gradeRowsLook(draft)).not.toBe(_gradeRowsLook(a));
+    const changed = structuredClone(a);
+    changed.a1.s1.returned_copy.tags.t.value = 4;
+    expect(_gradeRowsLook(changed)).not.toBe(_gradeRowsLook(a));
+    const nextDay = structuredClone(a);
+    nextDay.a2.s1.returned_at = '2026-11-05T17:00:00.000Z';
+    expect(_gradeRowsLook(nextDay)).not.toBe(_gradeRowsLook(a));
+    expect(_gradeRowsLook(null)).toBe(_gradeRowsLook({}));
+  });
+});
+
 describe('what the client names', () => {
   const src = readFileSync(resolve(root, 'shared/data.js'), 'utf-8');
 
