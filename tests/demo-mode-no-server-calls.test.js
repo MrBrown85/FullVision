@@ -134,15 +134,34 @@ describe('Demo Mode sends nothing to Supabase', () => {
 /* The student page's card path (s/app.js, s/assignments.js,
    s/student-data.js; docs/plans/student-page-build-plan.md, 1.10). Demo Mode
    builds the card, the identity check and the page for one class on the
-   device. The edge function is never asked, and until its routes exist the
-   three files hold no way to ask it. */
+   device, and the edge function is never asked.
+   Since S0-W1 a real card does ask it, from one place: `ask` in s/app.js,
+   which answers on the device and returns before the call whenever the
+   page is in Demo Mode. The other two files still hold no way to ask. */
 describe('Demo Mode sends nothing from the student page', () => {
   const CARD_FILES = ['s/app.js', 's/assignments.js', 's/student-data.js'];
+  const source = file => readFileSync(new URL('../' + file, import.meta.url), 'utf-8');
 
-  it.each(CARD_FILES)('%s has no way to reach a server', file => {
-    const src = readFileSync(new URL('../' + file, import.meta.url), 'utf-8');
+  it.each(CARD_FILES)('%s has no way of its own to reach a server', file => {
+    const src = source(file);
     expect(src).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|sendBeacon|WebSocket|EventSource/);
-    expect(src).not.toMatch(/StudentPage\.call\b|functions\/v1|supabase/i);
+    expect(src).not.toMatch(/functions\/v1|supabase\.co|__ENV/i);
+    if (file !== 's/app.js') expect(src).not.toMatch(/StudentPage\.call\b|supabase/i);
+  });
+
+  it('s/app.js asks the function from one place, and never from Demo Mode', () => {
+    const src = source('s/app.js');
+    // One call, and no other name for it.
+    expect(src.match(/StudentPage\.call\b/g)).toHaveLength(1);
+    expect(src).not.toMatch(/=\s*StudentPage\.call\b|StudentPage\[/);
+    // It is the last line of `fromFunction` (all `ask` calls), after Demo Mode has returned its own answer.
+    expect(src.match(/\bfromFunction\(/g)).toHaveLength(2);
+    const ask = /\n {2}function fromFunction\(route, body\) \{\n([\s\S]*?)\n {2}\}\n/.exec(src)[1];
+    expect(ask.replace(/\s+/g, ' ').trim()).toBe(
+      'if (S.demo) { var answer = demo ? DEMO_ANSWERS[route] : null; ' +
+        "return Promise.resolve(answer ? answer(body || {}) : { ok: false, error: 'not_found' }); } " +
+        'return StudentPage.call(Object.assign({ route: route }, body));',
+    );
   });
 
   it.each(['#demo-card', '#demo-card-password', '#demo-card-letter', '#demo-card-both'])(

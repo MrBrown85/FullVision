@@ -13,7 +13,7 @@
  * formats every result here from s/student-data.js alone.
  */
 import { describe, expect, it } from 'vitest';
-import { openStudentPage, studentPageScripts } from './helpers/student-page-context.js';
+import { asServerSends, openStudentPage, studentPageScripts } from './helpers/student-page-context.js';
 
 const CID = 'demo-science-8';
 const SID = 'demo-cece';
@@ -468,7 +468,9 @@ describe('student card: a draft is nowhere on the page', () => {
 });
 
 describe('student-data.js: the one adapter', () => {
-  const REPLY = {
+  // Each grade below is written as the score tables' rows and reaches the
+  // adapter as the copy the server sends (asServerSends; S0-W1).
+  const REPLY = asServerSends({
     ok: true,
     v: 1,
     student: { enrollment_id: 'e1', first_name: 'Sam' },
@@ -527,7 +529,7 @@ describe('student-data.js: the one adapter', () => {
         grade: null,
       },
     ],
-  };
+  });
 
   it('keeps a grade only where it was returned, and copies named fields only', () => {
     const page = openStudentPage();
@@ -623,7 +625,9 @@ describe('calc.js on the student page reads only what student-data.js gives it',
   const at = '2026-11-03T20:00:00Z';
   const level = (tag_id, value, modifier) => ({ tag_id, value, modifier: modifier || 0, comment: null });
   // Every kind of piece the list can show, in a class of the given style.
-  const everyKind = (system, scale) => ({
+  // Grades are written as rows and sent as the server's copies (asServerSends).
+  const everyKind = (system, scale) => asServerSends(everyKindRows(system, scale));
+  const everyKindRows = (system, scale) => ({
     ok: true,
     v: 1,
     student: { enrollment_id: 'e1', first_name: 'Sam' },
