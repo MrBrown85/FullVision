@@ -690,7 +690,8 @@
       endOnServer(token);
       return;
     }
-    locks.request('fv-s-done-' + token, { ifAvailable: true }, function (lock) {
+    // Named by a part of the token, not the token: a lock's name can be read by this site's pages.
+    locks.request('fv-s-done-' + token.slice(0, 16), { ifAvailable: true }, function (lock) {
       if (!lock) return undefined;
       endOnServer(token);
       // Kept for as long as this tab lives.
