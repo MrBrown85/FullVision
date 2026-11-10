@@ -37,7 +37,8 @@
  * closing a lid does. advance(ms) moves the page's clock (Date.now) on
  * without running its timers, as a closed lid does; a timer the page set
  * for longer than a second never fires here, so a test moves the clock and
- * then sends the event that would wake the page.
+ * then sends the event that would wake the page, or runTicks(), which
+ * fires each repeating timer the page has set, once.
  *
  * What is on screen. There is no layout here, so the page's
  * IntersectionObserver is a stand-in a test drives: onScreen(el => true or
@@ -100,6 +101,7 @@ export function openStudentPage(opts = {}) {
     setItem: (k, v) => (kept[k] = String(v)),
     removeItem: k => delete kept[k],
   });
+  const ticking = [];
   const win = new EventTarget();
   const observers = [];
   class FakeIntersectionObserver {
@@ -136,9 +138,17 @@ export function openStudentPage(opts = {}) {
     addEventListener: win.addEventListener.bind(win),
     removeEventListener: win.removeEventListener.bind(win),
     IntersectionObserver: opts.noObserver ? undefined : FakeIntersectionObserver,
-    // The loading screen turns its lines on a timer; nothing here waits on it.
-    setInterval: () => 0,
-    clearInterval() {},
+    /* A repeating timer never fires by itself here (the loading screen
+       turns its lines on one, and nothing waits on that). A test fires them:
+       runTicks() runs each repeating timer the page has set, once, as the
+       passing of that much time does. */
+    setInterval: fn => {
+      ticking.push(fn);
+      return ticking.length;
+    },
+    clearInterval: n => {
+      if (n > 0) ticking[n - 1] = null;
+    },
     __ENV: { SUPABASE_URL: 'https://x.supabase.co' },
     scrollTo() {},
     history: { replaceState: (state, title, address) => addresses.push(address) },
@@ -242,6 +252,15 @@ export function openStudentPage(opts = {}) {
     show: () => {
       visibility = 'visible';
       document.dispatchEvent(new window.Event('visibilitychange'));
+    },
+    runTicks: () => {
+      ticking.slice().forEach(fn => {
+        try {
+          if (fn) fn();
+        } catch (e) {
+          /* the loading screen's own timer, after its screen has gone */
+        }
+      });
     },
     advance: ms =>
       run('Date.now = (function (now, by) { return function () { return now() + by; }; })(Date.now, ' + ms + ')'),

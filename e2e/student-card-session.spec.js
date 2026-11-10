@@ -188,7 +188,8 @@ test.describe('before the page knows whether a code is a card or a slip', () => 
     expect(await page.locator('#app').innerText()).not.toMatch(/slip|card|answers|Student Questions|Student Page/i);
     await expect(page.getByRole('button', { name: 'Try Again' })).toBeFocused();
     await expect(page.locator('#sp-code')).toHaveCount(0);
-    expect(routes(posts)).toEqual(['card']);
+    // The card route did not answer, so the slip route was asked too.
+    expect(routes(posts)).toEqual(['card', 'open']);
     await fits(page);
     await named(page);
     await contrast(page);
@@ -196,7 +197,7 @@ test.describe('before the page knows whether a code is a card or a slip', () => 
     down = false;
     await page.getByRole('button', { name: 'Try Again' }).tap();
     await expect(page.getByRole('heading', { name: 'Is this you, Cece?' })).toBeVisible();
-    expect(routes(posts)).toEqual(['card', 'card']);
+    expect(routes(posts)).toEqual(['card', 'open', 'card']);
   });
 
   test('a server error on a real card is not "That code didn’t work"', async ({ page }) => {
@@ -207,10 +208,45 @@ test.describe('before the page knows whether a code is a card or a slip', () => 
     });
     await page.goto('/s/#P3R-8WD');
     await expect(page.getByRole('alert')).toHaveText(UNREACHED);
-    expect(routes(posts)).toEqual(['card']);
+    expect(await page.locator('#app').innerText()).not.toMatch(/didn't work|slip/i);
+    expect(routes(posts)).toEqual(['card', 'open']);
     broken = false;
     await page.getByRole('button', { name: 'Try Again' }).tap();
     await expect(page.getByRole('heading', { name: 'Is this you, Cece?' })).toBeVisible();
+  });
+
+  /* A slip opens whenever the slip route is healthy, whatever the card
+     route does. This is the function after it is deployed with the card
+     route failing. */
+  test('the card route answers a server error and the slip route is healthy: a slip opens, scanned and typed', async ({
+    page,
+  }) => {
+    const fn = school(null, { slips: { K7M4QX: SLIP } });
+    const posts = await serve(page, fn, {
+      answer: body => (body.route === 'card' ? { status: 500, json: { ok: false, error: 'server' } } : null),
+    });
+    await page.goto('/s/#K7M-4QX');
+    await expect(page.getByRole('heading', { name: 'Hi Cece!' })).toBeVisible();
+    await page.getByLabel('Student Number').fill('0123456');
+    await page.getByRole('button', { name: 'Yes, Start' }).tap();
+    await expect(page.getByText('How did it go?')).toBeVisible();
+    expect(routes(posts)).toEqual(['card', 'open', 'verify']);
+    // Typed on the slip's first screen.
+    posts.length = 0;
+    await page.goto('/login.html');
+    await page.goto('/s/');
+    await page.getByLabel('Type the code on your slip').fill('K7M-4QX');
+    await page.getByRole('button', { name: 'Open' }).tap();
+    await expect(page.getByRole('heading', { name: 'Hi Cece!' })).toBeVisible();
+    expect(routes(posts)).toEqual(['card', 'open']);
+  });
+
+  test('the card route times out and the slip route is healthy: a slip still opens', async ({ page }) => {
+    const fn = school(null, { slips: { K7M4QX: SLIP } });
+    const posts = await serve(page, fn, { fail: body => body.route === 'card' });
+    await page.goto('/s/#K7M-4QX');
+    await expect(page.getByRole('heading', { name: 'Hi Cece!' })).toBeVisible();
+    expect(routes(posts)).toEqual(['card', 'open']);
   });
 
   test('Is This You? opens with the first field in focus, and a wrong answer is read out from it', async ({ page }) => {
@@ -226,15 +262,42 @@ test.describe('before the page knows whether a code is a card or a slip', () => 
       "That doesn't match. Check your birthday or student number. 4 tries left.",
     );
     await expect(page.getByLabel('Student Number')).toHaveAttribute('aria-invalid', 'true');
+    // The old answer is selected: typing the right one replaces it, and does not make "9990123456".
+    expect(await page.evaluate(() => String(window.getSelection()))).toBe('999');
+    await page.keyboard.type('0000000');
+    await expect(page.getByLabel('Student Number')).toHaveValue('0000000');
+    await page.getByRole('button', { name: 'Yes, That’s Me' }).tap();
+    await expect(page.getByRole('alert')).toContainText('3 tries left.');
     // A birthday that is wrong: the focus goes to the first picker.
     await page.getByLabel('Student Number').fill('');
     await page.getByLabel('Month').selectOption('1');
     await page.getByLabel('Day').selectOption('1');
     await page.getByLabel('Year').selectOption('2012');
     await page.getByRole('button', { name: 'Yes, That’s Me' }).tap();
-    await expect(page.getByRole('alert')).toContainText('3 tries left.');
+    await expect(page.getByRole('alert')).toContainText('2 tries left.');
     await expect(page.getByLabel('Month')).toBeFocused();
+    // A picker holds one choice: choosing again replaces it.
+    await page.getByLabel('Month').selectOption('5');
+    await page.getByLabel('Day').selectOption('15');
+    await page.getByRole('button', { name: 'Yes, That’s Me' }).tap();
+    await expect(page.getByRole('heading', { name: 'Assignments' })).toBeVisible();
     await named(page);
+  });
+
+  test('after a wrong student number, the right one typed straight in opens the page', async ({ page }) => {
+    const fn = school();
+    await serve(page, fn);
+    await page.goto('/s/#P3R-8WD');
+    await page.getByLabel('Student Number').fill('999');
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('alert')).toContainText('4 tries left.');
+    await expect(page.getByLabel('Student Number')).toBeFocused();
+    await page.keyboard.type('0123456');
+    await expect(page.getByLabel('Student Number')).toHaveValue('0123456');
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('heading', { name: 'Assignments' })).toBeVisible();
+    // One wrong try was counted, not two.
+    expect(fn.logs.map(l => l.outcome)).toEqual(['ok', 'wrong_identity', 'ok', 'ok']);
   });
 
   test('a card that asks for its password opens with the password box in focus', async ({ page }) => {
@@ -246,6 +309,11 @@ test.describe('before the page knows whether a code is a card or a slip', () => 
     await page.keyboard.press('Enter');
     await expect(page.getByRole('alert')).toContainText('4 tries left.');
     await expect(page.getByLabel('Password')).toBeFocused();
+    // The wrong password is selected: the right one replaces it.
+    await page.keyboard.type('4821');
+    await expect(page.getByLabel('Password')).toHaveValue('4821');
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('heading', { name: 'Assignments' })).toBeVisible();
   });
 });
 
@@ -298,6 +366,29 @@ test.describe('the session’s end is checked before the list can be seen again'
     await expect(page.locator('.sp-row')).toHaveCount(0);
     expect((await stored(page)).local).toEqual({});
   });
+
+  /* A Chromebook that slept with the list open. The clock is four hours on;
+     no timer ran, the tab was never hidden, and nobody touches it. */
+  for (const [name, lasts] of [
+    ['past its midnight', 2 * 60 * MIN],
+    ['past fifteen idle minutes', 12 * 60 * MIN],
+  ]) {
+    test(`woken four hours later, ${name}, with no event: the list comes down by itself`, async ({ page }) => {
+      await page.clock.install();
+      const fn = school(null, { lasts });
+      const posts = await serve(page, fn);
+      await signIn(page);
+      await page.mouse.move(600, 500);
+      await page.clock.setSystemTime(Date.now() + 4 * 60 * MIN);
+      await expect(page.getByRole('status')).toHaveText(SIGNED_OUT, { timeout: 4000 });
+      await expect(page.locator('.sp-row')).toHaveCount(0);
+      expect(await page.locator('body').innerText()).not.toMatch(/Cece|Extending|8 \/ 10/);
+      expect((await stored(page)).local).toEqual({});
+      // Idle ends it as Done does; a session past its midnight is already over on the server.
+      await page.waitForTimeout(300);
+      expect(posts.filter(p => p.body.route === 'done')).toHaveLength(name === 'past its midnight' ? 0 : 1);
+    });
+  }
 
   test('a hidden tab is covered; shown again after its midnight, the list is never on screen', async ({ page }) => {
     await page.clock.install();
@@ -552,6 +643,56 @@ test.describe('"opened" means the row was on screen', () => {
     expect(new Set(done).size).toBe(done.length);
     // Done stays in reach all the way down.
     await expect(page.getByRole('button', { name: 'Done' })).toBeInViewport();
+  });
+
+  test('a flick to the bottom: the rows that flew past are not sent, the ones it rests on are', async ({ page }) => {
+    const fn = school({ page: longPage() });
+    const posts = await serve(page, fn);
+    await signIn(page);
+    await expect(page.locator('.sp-row')).toHaveCount(39);
+    const top = await onScreen(page);
+    await expect.poll(() => sent(fn, posts)).toEqual([top]);
+    // The whole list in about half a second.
+    const height = await page.evaluate(() => document.documentElement.scrollHeight);
+    await page.mouse.move(180, 400);
+    for (let i = 0; i < 25; i++) {
+      await page.mouse.wheel(0, Math.ceil(height / 25));
+      await page.waitForTimeout(16);
+    }
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    const bottom = await onScreen(page);
+    expect(bottom).toContain('Piece 39');
+    await expect.poll(() => sent(fn, posts).length).toBe(2);
+    await page.waitForTimeout(1200);
+    const all = sent(fn, posts).flat();
+    expect(new Set(all).size).toBe(all.length);
+    // Only what was read at the top and what the flick came to rest on.
+    all.forEach(title => expect(top.concat(bottom)).toContain(title));
+    expect(all).not.toContain('Piece 20');
+    expect(all.length).toBeLessThan(30);
+    await expect(row(page, 'Piece 39').locator('.sp-row-sub')).toHaveText(/· Updated$/);
+
+    // A row that flew past can still count on a later look: scroll back to it and stay.
+    await row(page, 'Piece 20').scrollIntoViewIfNeeded();
+    await expect.poll(() => sent(fn, posts).flat()).toContain('Piece 20');
+  });
+
+  test('a flick past the changed grade and away again: it is not marked opened, and Updated is still there next time', async ({
+    page,
+  }) => {
+    const fn = school({ page: longPage() });
+    const posts = await serve(page, fn);
+    await signIn(page);
+    await expect.poll(() => sent(fn, posts).length).toBe(1);
+    // To the bottom and straight back to the top, inside half a second.
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(250);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(1500);
+    expect(sent(fn, posts).flat()).not.toContain('Piece 39');
+    await page.reload();
+    await expect(page.locator('.sp-row')).toHaveCount(39);
+    await expect(row(page, 'Piece 39').locator('.sp-row-sub')).toHaveText(/· Updated$/);
   });
 
   test('Updated stays on a changed grade never scrolled to, and goes once it has been on screen', async ({ page }) => {

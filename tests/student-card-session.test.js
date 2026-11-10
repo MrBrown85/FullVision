@@ -19,6 +19,7 @@
  * database, as in tests/student-card-wired.test.js.
  */
 import { describe, expect, it } from 'vitest';
+import { makeHandler as functionDeployedToday } from './fixtures/student-submit-handler-2026-11-03.ts';
 import { openStudentPage } from './helpers/student-page-context.js';
 import { CECE, OMAR, WORK, fakeStudentSubmit, id, sampleCard, samplePage } from './helpers/fake-student-submit.js';
 
@@ -88,9 +89,14 @@ async function signIn(dev, server) {
   return page;
 }
 
-// Every row the page is watching is on screen, and the page has told the server.
+// Every row the page is watching comes on screen and stays there, and the page has told the server.
 async function scrollThroughAll(page) {
   page.onScreen(() => true);
+  await readFor(page, 700);
+}
+// The student looks at what is on screen for this long; then whatever is due is sent.
+async function readFor(page, ms) {
+  page.advance(ms);
   await page.T.tellSeen();
   await page.settle();
 }
@@ -239,15 +245,16 @@ describe('before the page knows whether a code is a card or a slip, it speaks as
     expect(page.root().querySelector('[data-act="code-retry"]').textContent).toBe('Try Again');
   }
 
-  it('a scanned card with no internet: one neutral line and Try Again, and the slip route is not asked', async () => {
+  it('a scanned card with no internet: one neutral line and Try Again', async () => {
     const dev = school();
     let down = true;
     const page = await dev.open('#P3R-8WD', body => (down ? offline() : dev.fn.handle(body)));
-    expect(routes(page)).toEqual(['card']);
+    // The card route did not answer, so the slip route was tried too. Neither did.
+    expect(routes(page)).toEqual(['card', 'open']);
     neither(page);
     // Still nothing: the same screen.
     await page.click('[data-act="code-retry"]');
-    expect(routes(page)).toEqual(['card', 'card']);
+    expect(routes(page)).toEqual(['card', 'open', 'card', 'open']);
     neither(page);
     // The internet is back: the card opens.
     down = false;
@@ -263,7 +270,7 @@ describe('before the page knows whether a code is a card or a slip, it speaks as
     down = false;
     await page.click('[data-act="code-retry"]');
     expect(text(page)).toContain('Hi Cece!');
-    expect(routes(page)).toEqual(['card', 'card', 'open']);
+    expect(routes(page)).toEqual(['card', 'open', 'card', 'open']);
   });
 
   it('while a scanned code is being looked up, the loading screen is neither’s', async () => {
@@ -279,23 +286,157 @@ describe('before the page knows whether a code is a card or a slip, it speaks as
     expect(page.root().querySelector('.sp-big').textContent).toBe('Is this you, Cece?');
   });
 
-  /* Only a clear "this is no card" sends a code on to the slip route: the
-     function's not_found, and the bad_request the function deployed today
-     gives a route it does not know. */
-  it.each([
+  /* When the card route gives no answer the page can use, the slip route
+     is still asked: a slip must open whenever the slip route is healthy.
+     But "not found" from the slip route then proves nothing about a card,
+     so it is never "That code didn't work… new slip." */
+  const UNWELL = [
     ['a server error (500)', () => ({ ok: false, error: 'server' })],
     ['a reply that says neither', () => ({ ok: true })],
     ['an error this page has no name for', () => ({ ok: false, error: 'teapot' })],
     ['nothing at all', () => undefined],
-  ])('card answers %s for a real card: the neutral line, never "That code didn’t work"', async (name, says) => {
+    ['no answer (a timeout)', offline],
+  ];
+
+  it.each(UNWELL)(
+    'card answers %s for a real card: the neutral line, never "That code didn’t work"',
+    async (name, says) => {
+      const dev = school();
+      let broken = true;
+      const page = await dev.open('#P3R-8WD', body => (broken && body.route === 'card' ? says() : dev.fn.handle(body)));
+      expect(routes(page)).toEqual(['card', 'open']);
+      neither(page);
+      expect(text(page)).not.toContain("didn't work");
+      broken = false;
+      await page.click('[data-act="code-retry"]');
+      expect(page.root().querySelector('.sp-big').textContent).toBe('Is this you, Cece?');
+    },
+  );
+
+  it.each(UNWELL)('card answers %s and the slip route is healthy: a scanned slip opens', async (name, says) => {
     const dev = school();
-    let broken = true;
-    const page = await dev.open('#P3R-8WD', body => (broken && body.route === 'card' ? says() : dev.fn.handle(body)));
-    expect(routes(page)).toEqual(['card']);
-    neither(page);
-    broken = false;
-    await page.click('[data-act="code-retry"]');
-    expect(page.root().querySelector('.sp-big').textContent).toBe('Is this you, Cece?');
+    const page = await dev.open('#K7M-4QX', body => (body.route === 'card' ? says() : dev.fn.handle(body)));
+    expect(routes(page)).toEqual(['card', 'open']);
+    expect(text(page)).toContain('Hi Cece!');
+    expect(page.root().querySelector('.sp-head-sub').textContent).toBe('Student Questions');
+    // And the student carries on: the check, then the questions.
+    page.type('#sp-ident', '0123456');
+    await page.click('[data-act="start"]');
+    expect(text(page)).toContain('How did it go?');
+    expect(routes(page)).toEqual(['card', 'open', 'verify']);
+  });
+
+  it.each(UNWELL)(
+    'card answers %s and the slip route is healthy: a slip typed on the slip’s screen opens',
+    async (name, says) => {
+      const dev = school();
+      const page = await dev.open('', body => (body.route === 'card' ? says() : dev.fn.handle(body)));
+      page.type('#sp-code', 'K7M-4QX');
+      await page.submit('form[data-form="code"]');
+      expect(routes(page)).toEqual(['card', 'open']);
+      expect(text(page)).toContain('Hi Cece!');
+    },
+  );
+
+  it('the card route is unwell and the slip says it was used, is closed or is not open yet: it is a slip, in the slip’s words', async () => {
+    for (const [reply, shows] of [
+      [{ ok: false, error: 'used' }, 'This slip has already been used.'],
+      [{ ok: false, error: 'closed' }, 'These questions are closed now.'],
+      [{ ok: false, error: 'not_open_yet' }, 'These questions are not open yet.'],
+    ]) {
+      const dev = school({ slips: { K7M4QX: reply } });
+      const page = await dev.open('#K7M-4QX', body =>
+        body.route === 'card' ? { ok: false, error: 'server' } : dev.fn.handle(body),
+      );
+      expect(alertText(page), reply.error).toContain(shows);
+    }
+  });
+
+  it('the card route is unwell and the slip route says too many tries, or busy: said as it is, as neither’s', async () => {
+    for (const [error, line] of [
+      ['locked', 'Too many tries. Wait 15 minutes and try again.'],
+      ['busy', 'FullVision is busy right now. Wait a minute and try again.'],
+    ]) {
+      const dev = school();
+      const page = await dev.open('#P3R-8WD', body => ({ ok: false, error: body.route === 'card' ? 'server' : error }));
+      expect(alertText(page), error).toBe(line);
+      expect(page.root().querySelector('.sp-head-title').textContent).toBe('FullVision');
+      expect(text(page)).not.toMatch(/slip|card|Student Questions/i);
+      expect(page.root().querySelector('[data-act="code-retry"]')).toBeTruthy();
+    }
+  });
+
+  it('the card route is unwell and a code is typed on the card’s screen: the neutral line there, not "didn’t work"', async () => {
+    const dev = school();
+    const first = await signIn(dev);
+    await first.click('[data-act="card-done"]');
+    first.server = body => (body.route === 'card' ? { ok: false, error: 'server' } : dev.fn.handle(body));
+    first.type('#sp-code', 'P3R-8WD');
+    await first.submit('form[data-form="card"]');
+    expect(alertText(first)).toBe(UNREACHED);
+    expect(first.root().querySelector('form[data-form="card"]')).toBeTruthy();
+    // A slip typed there still opens.
+    first.type('#sp-code', 'K7M-4QX');
+    await first.submit('form[data-form="card"]');
+    expect(text(first)).toContain('Hi Cece!');
+  });
+
+  /* The page released before the function is deployed. This is the
+     function's handler as it stood on Nov 3, itself, with a stand-in
+     database: it knows no card route. */
+  it('against the function as deployed today, a slip opens and is answered, and nothing is counted for the card question', async () => {
+    const asked = [];
+    const old = functionDeployedToday({
+      region: 'ca-central-1',
+      ipKey: 'k',
+      log: () => {},
+      db: {
+        open: async code => (asked.push(['open', code]), SLIP),
+        verify: async token => (
+          asked.push(['verify', token]),
+          {
+            ok: true,
+            parts: [
+              {
+                id: 'p1',
+                kind: 'core_reflection',
+                title: 'November Reflection',
+                questions: [{ id: 'q1', kind: 'text', prompt: 'How did it go?', options: {}, core_ids: [] }],
+              },
+            ],
+            context: {},
+          }
+        ),
+      },
+    });
+    const statuses = [];
+    const server = async body => {
+      const res = await old(
+        new Request('https://x.supabase.co/functions/v1/student-submit', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            origin: 'https://fullvision.ca',
+            'cf-connecting-ip': '203.0.113.7',
+          },
+          body: JSON.stringify(body),
+        }),
+      );
+      statuses.push(body.route + ' ' + res.status);
+      return res.json();
+    };
+    const dev = school();
+    const page = await dev.open('#K7M-4QX', server);
+    expect(text(page)).toContain('Hi Cece!');
+    page.type('#sp-ident', '0123456');
+    await page.click('[data-act="start"]');
+    expect(text(page)).toContain('How did it go?');
+    expect(statuses).toEqual(['card 400', 'open 200', 'verify 200']);
+    // The card question never reached the database: nothing to count.
+    expect(asked).toEqual([
+      ['open', 'K7M4QX'],
+      ['verify', 'a'.repeat(64)],
+    ]);
   });
 
   it.each([
@@ -322,6 +463,15 @@ describe('before the page knows whether a code is a card or a slip, it speaks as
     const page = await dev.open('#P3R-8WD', body => (body.route === 'open' ? offline() : dev.fn.handle(body)));
     expect(routes(page)).toEqual(['card', 'open']);
     neither(page);
+  });
+
+  it('the address is locked for cards and the code opens no slip: Too many tries, as neither’s', async () => {
+    const dev = school();
+    dev.fn.state.addressLocked = true;
+    const page = await dev.open('#P3R-8WD');
+    expect(alertText(page)).toBe('Too many tries. Wait 15 minutes and try again.');
+    expect(page.root().querySelector('.sp-head-title').textContent).toBe('FullVision');
+    expect(text(page)).not.toMatch(/slip|Student Questions/i);
   });
 });
 
@@ -445,6 +595,72 @@ describe('a session’s end is checked before the list can be drawn again', () =
     const dev = school({ lasts: 150 });
     const page = await signIn(dev);
     await sleep(260);
+    expect(page.root().querySelector('.sp-row')).toBeNull();
+    expect(page.root().querySelector('.sp-msg').textContent).toBe(SIGNED_OUT);
+    expect(dev.store).toEqual({});
+  });
+
+  /* A device that slept with the list open: the clock has moved and no
+     timer ran, no tab was hidden or shown, and nobody has touched it. The
+     page looks at the clock every second while a list is up. */
+  it('the clock jumps past the session’s end with no event at all: the next tick takes the list down', async () => {
+    const dev = school({ lasts: 3 * 60 * MIN });
+    const page = await signIn(dev);
+    page.advance(10 * MIN);
+    page.fire('pointerdown'); // still in use
+    page.runTicks();
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    page.advance(4 * 60 * MIN); // asleep four hours
+    page.runTicks();
+    await page.settle();
+    expect(page.root().querySelector('.sp-row')).toBeNull();
+    expect(page.root().querySelector('.sp-msg').textContent).toBe(SIGNED_OUT);
+    expect(text(page)).not.toMatch(/Cece|Energy Transfer/);
+    expect(dev.store).toEqual({});
+  });
+
+  it('the clock jumps sixteen idle minutes with no event: the next tick signs out as Done does, once', async () => {
+    const dev = school();
+    const page = await signIn(dev);
+    const token = JSON.parse(dev.store[KEY]).t;
+    page.advance(14 * MIN);
+    page.runTicks();
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    page.advance(2 * MIN);
+    page.runTicks();
+    page.runTicks();
+    await page.settle();
+    expect(page.root().querySelector('.sp-row')).toBeNull();
+    expect(page.root().querySelector('.sp-msg').textContent).toBe(SIGNED_OUT);
+    expect(page.calls.filter(c => c.body.route === 'done').map(c => c.body)).toEqual([
+      { route: 'done', session: token },
+    ]);
+    expect(dev.store).toEqual({});
+  });
+
+  it('the tick stops with the session, and never touches a slip', async () => {
+    const dev = school();
+    const page = await signIn(dev);
+    await page.click('[data-act="card-done"]');
+    page.advance(60 * MIN);
+    page.runTicks();
+    expect(page.root().querySelector('form[data-form="card"]')).toBeTruthy();
+    expect(page.root().querySelector('.sp-msg')).toBeNull();
+    // A slip in a tab that was signed in.
+    const tab = await signIn(dev);
+    tab.T.start(tab.root(), '#K7M-4QX');
+    await tab.settle();
+    tab.advance(60 * MIN);
+    tab.runTicks();
+    expect(text(tab)).toContain('Hi Cece!');
+  });
+
+  it('a last-activity time in the future (the clock was set back) does not keep a session alive', async () => {
+    const dev = school();
+    await signIn(dev);
+    const kept = JSON.parse(dev.store[KEY]);
+    dev.store[KEY] = JSON.stringify(Object.assign(kept, { a: Date.now() + 5 * 60 * MIN }));
+    const page = await dev.open('');
     expect(page.root().querySelector('.sp-row')).toBeNull();
     expect(page.root().querySelector('.sp-msg').textContent).toBe(SIGNED_OUT);
     expect(dev.store).toEqual({});
@@ -703,6 +919,82 @@ describe('"opened" means the row was on screen in a visible tab', () => {
     [...page.root().querySelectorAll('[data-unseen]')].map(el => el.getAttribute('data-unseen'));
   const seenCalls = page => page.calls.filter(c => c.body.route === 'seen').map(c => c.body.assessment_ids);
 
+  /* A row counts only if it is still on screen, in a visible tab, when
+     0.6 s is up. A false "opened" would lose Updated for good. */
+  it('a flick: rows that pass through and are gone inside 0.6 s are not sent', async () => {
+    const dev = school();
+    const page = await signIn(dev);
+    // Down the whole list and off the end in under half a second.
+    page.onScreen(el => [WORK.energy, WORK.quiz].includes(el.getAttribute('data-unseen')));
+    page.advance(150);
+    page.onScreen(el => [WORK.lab, WORK.essay].includes(el.getAttribute('data-unseen')));
+    page.advance(150);
+    page.onScreen(el => [WORK.kmt, WORK.contract].includes(el.getAttribute('data-unseen')));
+    page.advance(150);
+    page.onScreen(() => false);
+    await readFor(page, 2000);
+    expect(seenCalls(page)).toEqual([]);
+    expect(rowSubs(page)['Lab Safety Contract']).toMatch(/· Updated$/);
+    // The list loaded again: every one of them can still be opened, and the mark is still there.
+    const next = await dev.open('');
+    expect(next.root().querySelectorAll('[data-unseen]')).toHaveLength(6);
+    expect(rowSubs(next)['Lab Safety Contract']).toMatch(/· Updated$/);
+  });
+
+  it('a flick that stops: only the rows it comes to rest on are sent', async () => {
+    const dev = school();
+    const page = await signIn(dev);
+    page.onScreen(el => [WORK.energy, WORK.quiz].includes(el.getAttribute('data-unseen')));
+    page.advance(200);
+    page.onScreen(el => [WORK.kmt, WORK.contract].includes(el.getAttribute('data-unseen')));
+    await readFor(page, 500); // 0.7 s since the top rows came on, 0.5 s since the bottom ones did
+    expect(seenCalls(page)).toEqual([]);
+    await readFor(page, 200);
+    expect(seenCalls(page)).toEqual([[WORK.kmt, WORK.contract]]);
+  });
+
+  it('a row read for a second is sent', async () => {
+    const dev = school();
+    const page = await signIn(dev);
+    page.onScreen(el => el.getAttribute('data-unseen') === WORK.quiz);
+    await readFor(page, 500);
+    expect(seenCalls(page)).toEqual([]);
+    await readFor(page, 500);
+    expect(seenCalls(page)).toEqual([[WORK.quiz]]);
+  });
+
+  it('a row that leaves and comes back starts again, and counts on the later look', async () => {
+    const dev = school();
+    const page = await signIn(dev);
+    const only = id_ => el => el.getAttribute('data-unseen') === id_;
+    page.onScreen(only(WORK.quiz));
+    page.advance(400);
+    page.onScreen(() => false);
+    await readFor(page, 1000);
+    expect(seenCalls(page)).toEqual([]);
+    // Back on screen: 0.4 s earlier does not count toward this look.
+    page.onScreen(only(WORK.quiz));
+    await readFor(page, 300);
+    expect(seenCalls(page)).toEqual([]);
+    await readFor(page, 400);
+    expect(seenCalls(page)).toEqual([[WORK.quiz]]);
+  });
+
+  it('time in a hidden tab does not count: the 0.6 s starts when the tab is shown', async () => {
+    const dev = school();
+    const page = await signIn(dev);
+    page.onScreen(el => el.getAttribute('data-unseen') === WORK.quiz);
+    page.advance(300);
+    page.hide();
+    await readFor(page, 5000);
+    expect(seenCalls(page)).toEqual([]);
+    page.show();
+    await readFor(page, 300);
+    expect(seenCalls(page)).toEqual([]);
+    await readFor(page, 400);
+    expect(seenCalls(page)).toEqual([[WORK.quiz]]);
+  });
+
   it('drawing the list tells the server nothing; a row that comes on screen is told, once', async () => {
     const dev = school();
     const page = await signIn(dev);
@@ -712,8 +1004,7 @@ describe('"opened" means the row was on screen in a visible tab', () => {
 
     // Only the first two are in view.
     page.onScreen(el => [WORK.energy, WORK.quiz].includes(el.getAttribute('data-unseen')));
-    await page.T.tellSeen();
-    await page.settle();
+    await readFor(page, 700);
     expect(seenCalls(page)).toEqual([[WORK.energy, WORK.quiz]]);
     expect(page.calls[page.calls.length - 1].body).toEqual({
       route: 'seen',
@@ -724,16 +1015,14 @@ describe('"opened" means the row was on screen in a visible tab', () => {
 
     // The page scrolls: the same two and two more.
     page.onScreen(el => [WORK.energy, WORK.quiz, WORK.lab, WORK.essay].includes(el.getAttribute('data-unseen')));
-    await page.T.tellSeen();
-    await page.settle();
+    await readFor(page, 700);
     expect(seenCalls(page)).toEqual([
       [WORK.energy, WORK.quiz],
       [WORK.lab, WORK.essay],
     ]);
     // Nothing new on screen: nothing more is sent.
     page.onScreen(el => [WORK.lab].includes(el.getAttribute('data-unseen')));
-    await page.T.tellSeen();
-    await page.settle();
+    await readFor(page, 700);
     expect(seenCalls(page)).toHaveLength(2);
   });
 
@@ -758,12 +1047,10 @@ describe('"opened" means the row was on screen in a visible tab', () => {
     expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
     // The browser reports the rows in view, but nobody is looking.
     page.onScreen(() => true);
-    await page.T.tellSeen();
-    await page.settle();
+    await readFor(page, 2000);
     expect(routes(page)).toEqual(['page']);
     page.show();
-    await page.T.tellSeen();
-    await page.settle();
+    await readFor(page, 700);
     expect(seenCalls(page)).toEqual([[WORK.energy, WORK.quiz, WORK.lab, WORK.essay, WORK.kmt, WORK.contract]]);
   });
 
@@ -776,8 +1063,7 @@ describe('"opened" means the row was on screen in a visible tab', () => {
     page.onScreen(() => true);
     page.onScreen(el => el.getAttribute('data-unseen') === WORK.quiz);
     page.show();
-    await page.T.tellSeen();
-    await page.settle();
+    await readFor(page, 700);
     expect(seenCalls(page)).toEqual([[WORK.quiz]]);
   });
 
@@ -787,8 +1073,7 @@ describe('"opened" means the row was on screen in a visible tab', () => {
     expect(rowSubs(page)['Lab Safety Contract']).toMatch(/· Updated$/);
     // Everything but the contract, at the bottom, is looked at.
     page.onScreen(el => el.getAttribute('data-unseen') !== WORK.contract);
-    await page.T.tellSeen();
-    await page.settle();
+    await readFor(page, 700);
     const second = await dev.open('');
     expect(rowSubs(second)['Lab Safety Contract']).toMatch(/· Updated$/);
     expect(second.root().querySelectorAll('[data-unseen]')).toHaveLength(1);
@@ -813,8 +1098,7 @@ describe('"opened" means the row was on screen in a visible tab', () => {
     await scrollThroughAll(page);
     page.hide();
     page.show();
-    await page.T.tellSeen();
-    await page.settle();
+    await readFor(page, 700);
     expect(seenCalls(page)).toHaveLength(1);
   });
 
@@ -895,8 +1179,7 @@ describe('"opened" means the row was on screen in a visible tab', () => {
     await page.start('#P3R-8WD');
     page.type('#sp-ident', '0123456');
     await page.click('[data-act="card-yes"]');
-    await page.T.tellSeen();
-    await page.settle();
+    await readFor(page, 2000);
     expect(routes(page)).toEqual(['card', 'verify', 'page']);
     expect(rowSubs(page)['Lab Safety Contract']).toMatch(/· Updated$/);
   });
@@ -920,8 +1203,7 @@ describe('"opened" means the row was on screen in a visible tab', () => {
     page.onScreen(() => true);
     await page.click('[data-act="card-done"]');
     await sleep(800);
-    await page.T.tellSeen();
-    await page.settle();
+    await readFor(page, 2000);
     expect(routes(page)).toEqual(['card', 'verify', 'page', 'done']);
     expect(page.observers).toEqual([]);
   });

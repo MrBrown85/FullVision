@@ -599,6 +599,14 @@
   // The last student's token: sent with the next check, so the server ends it.
   var ending = '';
   var timer = 0;
+  /* A timer counts time the device was awake. A Chromebook that slept with
+     the list open wakes with its timer still far from done, and nothing
+     tells the page it slept. So beside the timer there is a tick: once a
+     second, while a card's page is up, the real time is compared with the
+     session's end and with the last activity, and the list comes down the
+     moment either has passed, with nobody touching anything. */
+  var TICK_MS = 1000;
+  var tick = 0;
   // When this tab last wrote the time of the last activity.
   var wrote = 0;
 
@@ -625,9 +633,14 @@
 
   /* When the student last touched the page: in this tab, or in another tab
      on this device showing the same session. */
-  function lastActive(s) {
+  function lastActive(s, now) {
     var stored = s.kept ? readStored() : null;
-    return Math.max(s.active || 0, stored && stored.token === s.token ? stored.active : 0);
+    // A time ahead of the clock (the clock was set back, or the entry was
+    // edited) is not believed: it counts as no activity at all.
+    function believed(t) {
+      return t > clock(now) + 60 * 1000 ? 0 : t || 0;
+    }
+    return Math.max(believed(s.active), stored && stored.token === s.token ? believed(stored.active) : 0);
   }
 
   /* Why a session is over at `now`: 'ended' (its midnight has come), 'idle'
@@ -637,7 +650,7 @@
   function over(s, now) {
     var end = endsAt(s);
     if (end != null && end <= clock(now)) return 'ended';
-    return clock(now) - lastActive(s) >= IDLE_MS ? 'idle' : '';
+    return clock(now) - lastActive(s, now) >= IDLE_MS ? 'idle' : '';
   }
 
   // Kept only with an end this page can read, so nothing stays past its midnight.
@@ -662,8 +675,7 @@
   // `stored` false leaves another student's session, kept by another tab, where it is.
   function forget(stored) {
     session = null;
-    if (timer) clearTimeout(timer);
-    timer = 0;
+    stopClocks();
     stopWatchingRows();
     if (stored === false) return;
     try {
@@ -780,13 +792,26 @@
     return arm(now);
   }
 
-  // One timer, set for whichever comes first: the session's end or the idle limit.
+  function stopClocks() {
+    if (timer) clearTimeout(timer);
+    timer = 0;
+    if (tick && typeof clearInterval === 'function') clearInterval(tick);
+    tick = 0;
+  }
+
+  /* One timer, set for whichever comes first: the session's end or the idle
+     limit. And the tick, for a device whose timers stood still. */
   function arm(now) {
     if (timer) clearTimeout(timer);
     timer = 0;
     if (!session || S.demo) return;
+    if (!tick && typeof setInterval === 'function') {
+      tick = setInterval(function () {
+        checkSession();
+      }, TICK_MS);
+    }
     var end = endsAt(session);
-    var due = Math.min(end == null ? Infinity : end, lastActive(session) + IDLE_MS) - clock(now);
+    var due = Math.min(end == null ? Infinity : end, lastActive(session, now) + IDLE_MS) - clock(now);
     timer = setTimeout(
       function () {
         timer = 0;
@@ -842,16 +867,23 @@
   /* ── What the student has opened ───────────────────────────── */
 
   /* A returned piece counts as opened once its row has been on screen in a
-     visible tab (Colin, Nov 10). assignments.js marks the rows that could
-     be (data-unseen: returned, a result drawn, not opened since it came
-     back). They are watched here; the ones seen are told to the server in
-     one call a moment later, once each. Nothing is watched while the
-     results have not loaded, and nothing counts in a tab nobody is looking
-     at. A browser that cannot say what is on screen sends nothing.
+     visible tab (Colin, Nov 10), and stayed there: a row counts only if it
+     is still in view when SEEN_AFTER_MS is up. A flick down the list
+     passes every row and reads none, and a piece wrongly told as opened
+     would lose its Updated mark for good. A row that leaves before then is
+     not sent, and starts again the next time it comes into view. Time in a
+     tab nobody is looking at does not count.
+     assignments.js marks the rows that could be opened (data-unseen:
+     returned, a result drawn, not opened since it came back). They are
+     watched here; the ones read are told to the server in one call, once
+     each. Nothing is watched while the results have not loaded. A browser
+     that cannot say what is on screen sends nothing.
      The feedback screen (S4) will tighten this to a piece actually opened:
      it changes `watchRows` and `shown`, and nothing else. */
   var SEEN_AFTER_MS = 600;
-  var watching = null; // { page, observer, inView: { id: true }, pending: { id: true }, timer }
+  // Rows that came into view in the same moment go in the same call.
+  var SEEN_SLACK_MS = 150;
+  var watching = null; // { page, observer, since: { id: when it came into view }, timer }
 
   function stopWatchingRows() {
     if (!watching) return;
@@ -860,13 +892,17 @@
     watching = null;
   }
 
+  function tabHidden() {
+    return typeof document !== 'undefined' && document.visibilityState === 'hidden';
+  }
+
   function watchRows() {
     stopWatchingRows();
     if (!S.page || !session || S.screen !== 'assignments') return;
     if (typeof IntersectionObserver !== 'function' || typeof document === 'undefined') return;
     var rows = document.querySelectorAll('.sp-row[data-unseen]');
     if (!rows.length) return;
-    var w = { page: S.page, observer: null, inView: {}, pending: {}, timer: 0 };
+    var w = { page: S.page, observer: null, since: {}, timer: 0 };
     // The header stays over the top of the list: a row under it is not on screen.
     var head = document.querySelector('.sp-head');
     var under = (head && head.offsetHeight) || 0;
@@ -874,8 +910,8 @@
       function (entries) {
         entries.forEach(function (entry) {
           var id = entry.target.getAttribute('data-unseen');
-          if (entry.isIntersecting) w.inView[id] = true;
-          else delete w.inView[id];
+          if (!entry.isIntersecting) delete w.since[id];
+          else if (!(id in w.since)) w.since[id] = Date.now();
         });
         if (watching === w) shown();
       },
@@ -887,41 +923,59 @@
     watching = w;
   }
 
-  // The rows in view are counted, if the tab is one somebody can see.
+  // The tab has been hidden or shown: a row's time on screen starts over.
+  function lookAgain() {
+    if (!watching) return;
+    var now = Date.now();
+    Object.keys(watching.since).forEach(function (id) {
+      watching.since[id] = now;
+    });
+    shown();
+  }
+
+  /* Rows are in view. When the first of them has been there long enough,
+     the ones that have are told to the server. */
   function shown() {
     var w = watching;
     if (!w || S.page !== w.page || S.screen !== 'assignments') return;
-    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-    Object.keys(w.inView).forEach(function (id) {
-      w.pending[id] = true;
+    if (w.timer) clearTimeout(w.timer);
+    w.timer = 0;
+    if (tabHidden()) return;
+    var first = Infinity;
+    w.page.assessments.forEach(function (a) {
+      if (a.unseen && a.id in w.since) first = Math.min(first, w.since[a.id]);
     });
-    if (!w.timer && Object.keys(w.pending).length) w.timer = setTimeout(tellSeen, SEEN_AFTER_MS);
+    if (first === Infinity) return;
+    w.timer = setTimeout(tellSeen, Math.max(first + SEEN_AFTER_MS + SEEN_SLACK_MS - Date.now(), 0));
   }
 
-  /* Tells the server which pieces were opened: one call for all that are
-     waiting. A piece is marked as told when it is sent, so it is sent once
-     in a session whatever the answer; the server's own record decides what
-     the next visit shows. A session that has ended signs this tab out. */
+  /* Tells the server which pieces were opened: one call for every row that
+     is still in view and has been for long enough. A piece is marked as
+     told when it is sent, so it is sent once in a session whatever the
+     answer; the server's own record decides what the next visit shows. A
+     session that has ended signs this tab out. */
   function tellSeen() {
     var w = watching;
     if (!w) return Promise.resolve();
     if (w.timer) clearTimeout(w.timer);
     w.timer = 0;
     var page = w.page;
-    if (S.page !== page || !session) return Promise.resolve();
+    if (S.page !== page || !session || tabHidden()) return Promise.resolve();
+    var now = Date.now();
     var ids = page.assessments
       .filter(function (a) {
-        return a.unseen && w.pending[a.id];
+        return a.unseen && a.id in w.since && now - w.since[a.id] >= SEEN_AFTER_MS;
       })
       .map(function (a) {
         return a.id;
       })
       .slice(0, 500);
-    w.pending = {};
-    if (!ids.length) return Promise.resolve();
     page.assessments.forEach(function (a) {
       if (ids.indexOf(a.id) >= 0) a.unseen = false;
     });
+    // Rows still in view that have not been there long enough yet.
+    shown();
+    if (!ids.length) return Promise.resolve();
     return ask('seen', { session: session.token, enrollment_id: session.enrollment, assessment_ids: ids }).then(
       function (res) {
         if (res && res.error === 'signed_out' && S.page === page) leave(MESSAGES.signed_out);
@@ -1283,10 +1337,11 @@
     document.addEventListener('visibilitychange', function () {
       if (document.visibilityState === 'hidden') {
         cover();
+        lookAgain();
         return;
       }
       uncover();
-      shown();
+      lookAgain();
     });
   }
   if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
@@ -1327,8 +1382,7 @@
          showing the session now: the device's copy stays where it is, for a
          card to end or the page to open again. */
       session = null;
-      if (timer) clearTimeout(timer);
-      timer = 0;
+      stopClocks();
       stopWatchingRows();
       if (typeof document !== 'undefined') document.documentElement.classList.remove('sp-away');
       if (startDemo(hash)) return true;

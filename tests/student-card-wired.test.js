@@ -46,6 +46,7 @@ const alertText = page => (page.root().querySelector('[role="alert"]') || {}).te
    screen (tests/student-card-session.test.js has that rule's own tests). */
 async function scrollThroughAll(page) {
   page.onScreen(() => true);
+  page.advance(700); // on screen long enough to count
   await page.T.tellSeen();
   await page.settle();
 }
@@ -287,7 +288,7 @@ describe('a slip still opens: the card is asked first, then open', () => {
         throw new Error('offline');
       },
     });
-    expect(routes(page)).toEqual(['card']);
+    expect(routes(page)).toEqual(['card', 'open']);
     expect(alertText(page)).toBe("Couldn't reach FullVision. Check your internet and try again.");
     expect(text(page)).not.toMatch(/slip|answers|Student Questions/i);
     expect(page.root().querySelector('[data-act="code-retry"]').textContent).toBe('Try Again');

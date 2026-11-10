@@ -202,7 +202,7 @@ var StudentPage = (function () {
       header(NEITHER, '') +
       '<main class="sp-main sp-main-center">' +
       '<section class="sp-card sp-hello"><p class="sp-lead" role="alert">' +
-      esc(MESSAGES.card_network) +
+      esc(state.message || MESSAGES.card_network) +
       '</p></section>' +
       '<button type="button" class="sp-btn sp-btn-primary" data-act="code-retry"' +
       (state.sending ? ' disabled' : '') +
@@ -623,19 +623,23 @@ var StudentPage = (function () {
   }
 
   /* A typed or scanned code. It is put to the card's screens first
-     (app.js's `card`, which asks the function's `card` route) and, when
-     they say it is no card, opened as a slip, as it always was.
+     (app.js's `card`, which asks the function's `card` route), and then,
+     unless that said it is a card, to the slip route, as it always was.
      `card(code)` gives a promise of
        true         a card: its screen is drawn;
        false        not a card: the function said so (or is the one deployed
                     before cards, which does not know the question);
-       'locked'     this address has made too many wrong tries on cards; a
-                    slip may still open;
+       'locked'     this address has made too many wrong tries on cards;
        'unreached'  no answer the page can use (no internet, a server
-                    error): it is not known what the code is.
+                    error, a timeout).
+     A slip opens whenever the slip route is healthy, whatever the card
+     route does: after 'locked' and 'unreached' the slip route is still
+     asked. What differs is what "nothing opened" then means. After false,
+     the code is no card and no slip: "That code didn't work." After the
+     other two it is not known what the code is, so the page speaks as
+     neither (`unreached`).
      `from` is 'card' when the code was typed on one of the card's screens:
-     a code that opens nothing is then answered there, in the card's words
-     (app.js's `refused`). */
+     a code that opens nothing is then answered there (app.js's `refused`). */
   function openCode(code, from) {
     var c = cleanCode(code);
     S.typed = prettyCode(c);
@@ -660,31 +664,37 @@ var StudentPage = (function () {
     var onCard = from === 'card' ? cards : null;
     return (cards ? cards.card(c) : Promise.resolve(false)).then(function (said) {
       if (said === true) return undefined;
-      if (said === 'unreached') return unreached(onCard);
-      return openSlip(c, said === 'locked', onCard);
+      return openSlip(c, said, onCard);
     });
   }
 
-  /* The code could not be looked up. Typed on a card's screen, that screen
-     says so; scanned, or typed anywhere else, the neutral screen does. */
-  function unreached(cards) {
-    if (cards && cards.refused({ ok: false, error: 'network' })) return undefined;
+  /* Nothing opened, and it is not known whether the code is a card's or a
+     slip's. Typed on a card's screen, that screen says so; scanned, or
+     typed anywhere else, the neutral screen does, with Try Again. `why` is
+     'locked' or 'busy' when the function said so, else the code could not
+     be looked up. */
+  function unreached(cards, why) {
+    var e = why === 'locked' || why === 'busy' ? why : 'network';
+    if (cards && cards.refused({ ok: false, error: e })) return;
+    S.message = e === 'network' ? '' : MESSAGES[e];
     S.screen = 'unreached';
     paint('[data-act="code-retry"]');
-    return undefined;
   }
 
-  function openSlip(c, cardsLocked, cards) {
+  // What the slip route says only of a slip: it is one, whatever the card route said.
+  var A_SLIP = { used: 1, closed: 1, not_open_yet: 1 };
+
+  /* `cardSaid` is false, 'locked' or 'unreached' (openCode). */
+  function openSlip(c, cardSaid, cards) {
     return call({ route: 'open', code: c }).then(function (res) {
-      // No card and no slip, from an address the card route has locked.
-      if (cardsLocked && res && !res.ok && res.error === 'not_found') res = { ok: false, error: 'locked' };
-      // Typed on a card's screen and it opened nothing: that screen answers.
-      if (cards && !(res && res.ok) && cards.refused(res)) return;
-      // The card route would not say (locked) and the slip route can't be reached: still not known.
-      if (cardsLocked && !(res && res.ok) && (res.error === 'network' || !MESSAGES[res.error])) {
-        unreached(null);
+      var e = res && res.ok ? '' : (res && res.error) || 'network';
+      if (cardSaid !== false && e && !Object.prototype.hasOwnProperty.call(A_SLIP, e)) {
+        // The card route did not say what the code is and the slip route has not opened it.
+        unreached(cards, cardSaid === 'locked' && e === 'not_found' ? 'locked' : e);
         return;
       }
+      // Typed on a card's screen and it opened nothing: that screen answers.
+      if (cards && e && cards.refused(res)) return;
       // A slip typed on a card's screen: the tab is named for the slip's page again.
       if (cards && typeof document !== 'undefined') document.title = 'Student Questions — FullVision';
       if (res && res.ok && res.kind === 'report') {
@@ -711,6 +721,15 @@ var StudentPage = (function () {
         paint();
       }
     });
+  }
+
+  /* The focus has gone back to a box that holds the answer that was wrong.
+     Its text is selected, so typing the right one replaces it: typed after
+     it, "0123456" on "999" would be a second wrong try, and five lock the
+     card. A birthday picker needs nothing: choosing replaces its choice. */
+  function selectAnswer(sel) {
+    var el = sel && root ? root.querySelector(sel) : null;
+    if (el && el.tagName === 'INPUT' && typeof el.select === 'function') el.select();
   }
 
   /* A questionnaire slip: the birthday, student number or slip password
@@ -792,6 +811,7 @@ var StudentPage = (function () {
         if (e !== 'network' && e !== 'busy') S.screen = card ? card.messageScreen : 'message';
       }
       paint(back);
+      selectAnswer(back);
     };
     if (card) {
       S.sending = true;
