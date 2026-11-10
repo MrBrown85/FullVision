@@ -583,6 +583,31 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them: the As
     if (typeof dismissUndoToast === 'function') dismissUndoToast();
   });
 
+  it('a button is not swapped out by an event that changed nothing', async () => {
+    openGraded({ open: ESSAY });
+    await settled();
+    const button = cardReturn(ESSAY);
+    const chip = inCard(ESSAY, '.assess-to-return');
+    const row = inCard(ESSAY, '.ret-mark[data-ret-sids="' + BEN + '"] .ret-draft');
+    const count = pill();
+    // A click and a key that save nothing, and a status that is no part of a grade.
+    click(inCard(ESSAY, '.rsg-student-name'));
+    fire(document.querySelector('.assess-search-input'), 'focusout');
+    click(statusButton(ESSAY, BEN, 'LATE'));
+    await settled();
+    expect(cardReturn(ESSAY)).toBe(button);
+    expect(inCard(ESSAY, '.assess-to-return')).toBe(chip);
+    expect(inCard(ESSAY, '.ret-mark[data-ret-sids="' + BEN + '"] .ret-draft')).toBe(row);
+    expect(pill()).toBe(count);
+    // A save that changes the count does swap it.
+    click(levelOf(tagRow(ESSAY, BEN, QUESTION), 2));
+    await settled();
+    if (typeof dismissUndoToast === 'function') dismissUndoToast();
+    expect(drafts(ESSAY).length).toBe(4);
+    expect(cardReturn(ESSAY)).not.toBe(button);
+    expect(text(cardReturn(ESSAY))).toBe('Return 4 Graded');
+  });
+
   it('points typed in a ledger and a comment saved off its timer are drafts too', async () => {
     openCard(QUIZ);
     await settled();
@@ -829,6 +854,27 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them: the As
       expect(GradeState.stateOf(CID, BEN, ESSAY)).toBe('draft');
       expect(text(pill())).toBe('2 to return');
       returns.mockRestore();
+    });
+
+    it('the row is about the student on screen: a partner’s draft alone shows no Draft here', async () => {
+      openGraded({ student: BEN });
+      await settled();
+      // Ben's piece of the pair's work is returned; Ava's still waits.
+      Grader.returnGrades(CID, TALK, [BEN]);
+      window.PageAssignments.render();
+      await settled();
+      expect(text(inlineRow(TALK))).toBe('Returned ' + today());
+      expect(inlineReturn(TALK)).toBe(null);
+      expect(toReturnChip(TALK)).toBe(null);
+      // Changed again, the line names Ben, not the pair.
+      Grader.gradeSeparately(CID, TALK, BEN);
+      window.PageAssignments.render();
+      await settled();
+      click(graderTagLevel(card(TALK), QUESTION, 1));
+      await settled();
+      expect(text(inlineRow(TALK).querySelector('.grader-draft-still'))).toBe(
+        'Ben still sees the grade you returned ' + today() + '.',
+      );
     });
 
     it('a partner already returned is not asked about: one click', async () => {

@@ -2569,6 +2569,8 @@ window.PageAssignments = (function () {
     }
     document.querySelectorAll('#main .ldg-grid').forEach(refreshLedgerSummary);
     _refreshClassResultsSoon();
+    // The marks and counts to return, as just drawn (S1-F2).
+    _refreshReturns(true);
 
     // Show/hide descriptor bar
     var hasActiveRubricView = false;
@@ -12910,14 +12912,17 @@ window.PageAssignments = (function () {
   }
 
   /* With one student open: the dialog's row under their grader, Return
-     with the Draft mark and its line, or Returned. */
+     with the Draft mark and its line, or Returned. The row is about the
+     student on screen, on pair and group work too (the dialog shows the
+     group there; the page shows the student), so it agrees with the count
+     on the toolbar and with what Return does (_returnOne). */
   // html-safe: ids are ours; the title goes through esc; the row is _graderReturnHtml's
   function _inlineReturnInner(cid, a, sid) {
     return _graderReturnHtml(
       cid,
       a,
       sid,
-      _graderGroupView(cid, a, sid),
+      null,
       'data-action="returnOne" data-aid="' +
         a.id +
         '" data-sid="' +
@@ -12947,15 +12952,25 @@ window.PageAssignments = (function () {
   /* Brings the page's marks, counts and buttons up to date without a
      redraw, after an event that may have saved a grade. Each piece is
      written only when it changes: a button swapped out under the mouse
-     loses its click. */
-  function _refreshReturns() {
+     loses its click. What a piece holds is remembered on its element, as
+     the string its builder made: the browser's own copy of the HTML can
+     differ from it (an apostrophe in a title), and would look changed.
+     render() calls this with `drawn` set once it has drawn the page, to
+     remember what it drew and write nothing. */
+  function _refreshReturns(drawn) {
     if (_grader) return;
     var cid = activeCourse;
     if (!_holdsGrades(cid) || !document.getElementById('main')) return;
     var shownIds = _returnShownIds(cid);
-    // html-safe: every string set here is built by a reviewed builder above
     var set = function (el, html) {
-      if (el.innerHTML !== html) el.innerHTML = html;
+      if (drawn === true || el._returnsHtml === html) {
+        el._returnsHtml = html;
+        return false;
+      }
+      el._returnsHtml = html;
+      // html-safe: every string set here is built by a reviewed builder above
+      el.innerHTML = html;
+      return true;
     };
     var total = 0;
     document.querySelectorAll('#main [data-returns-aid]').forEach(function (el) {
@@ -12975,15 +12990,15 @@ window.PageAssignments = (function () {
       var a = _assessmentById(cid, el.dataset.returnRowAid);
       if (!a) return;
       var html = _inlineReturnInner(cid, a, el.dataset.returnRowSid);
-      el.hidden = !html;
-      set(el, html);
+      if (set(el, html)) el.hidden = !html;
     });
-    if (total === _toReturnTotal) return;
+    if (drawn === true || total === _toReturnTotal) return;
     _toReturnTotal = total;
     // The last draft is returned: the filter turns off and the list is whole again.
     if (!total && _toReturnOnly) return render();
     var slot = document.querySelector('.assess-to-return-slot');
-    if (slot) set(slot, _toReturnPillHtml());
+    // html-safe: built by _toReturnPillHtml
+    if (slot) slot.innerHTML = _toReturnPillHtml();
   }
   function _returnsAfterEvent() {
     if (_grader || !_holdsGrades(activeCourse)) return;

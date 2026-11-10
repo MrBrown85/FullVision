@@ -6569,9 +6569,26 @@ button.grader-member-name {
   white-space: nowrap;
   cursor: pointer;
 }
-.assess-return-btn:hover,
-.grader-return-all:hover {
+.assess-return-btn:hover {
   background: var(--btn-hover-blue);
+}
+/* In the dialog it is tinted, as the board draws it and as Print is: Done
+   and Return stay the dialog's solid blue buttons. */
+.grader-return-all {
+  background: rgba(0, 122, 255, 0.1);
+  color: #0062cc;
+}
+.grader-return-all:hover {
+  background: rgba(0, 122, 255, 0.16);
+}
+@media (prefers-color-scheme: dark) {
+  .grader-return-all {
+    background: rgba(10, 132, 255, 0.2);
+    color: var(--active);
+  }
+  .grader-return-all:hover {
+    background: rgba(10, 132, 255, 0.28);
+  }
 }
 /* A row's mark beside the student's name. */
 .ret-mark {
