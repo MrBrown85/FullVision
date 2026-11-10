@@ -2,7 +2,7 @@
 
 This plans the build of everything on the "Photo Submissions" artboard (https://claude.ai/artifact/GhXQnhDhoxsdfbvVq8QfjF) and the backend behind it. Nothing here is built yet. It is a plan only: no app code changes with it.
 
-Sources: `CLAUDE.md`, `docs/DECISIONS.md` (to the Nov 8 entry), `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, `docs/STUDENT-VOICE-PLAN.md`, `docs/write-path-plan.md`, the artboard's 118 boards and its canvas notes, the kanban (cleanup card cp1), and a read of the code on `main` at `8dd4437f`. Where one of those does not say something, this plan does not make it up: it is a question in section 6.
+Sources: `CLAUDE.md`, `docs/DECISIONS.md` (to the Nov 8 entry), `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, `docs/STUDENT-VOICE-PLAN.md`, `docs/write-path-plan.md`, the artboard's 118 boards and its canvas notes, the kanban (cleanup card cp1), and a read of the code on `main` at `8dd4437f`. Where one of those did not say something, it was put to Colin as a question; his answers of Nov 9 are in section 6 and are written into the plan.
 
 ## How to read this
 
@@ -11,7 +11,7 @@ Sources: `CLAUDE.md`, `docs/DECISIONS.md` (to the Nov 8 entry), `docs/ARCHITECTU
 - Section 3 says which slices can run at the same time.
 - Section 4 lists every point where work stops for Colin.
 - Section 5 lists what could go wrong and the test or rule that stops it.
-- Section 6 is the questions.
+- Section 6 records Colin's answers to the plan's questions (Nov 9).
 
 Words used here:
 
@@ -38,7 +38,9 @@ Two facts about CI shape the whole order of work (`scripts/check-db-drift.mjs`, 
 - Code in `shared/`, `teacher/` or `teacher-mobile/` that names an RPC the live database lacks fails CI. So a PR that calls a new RPC cannot merge before that migration is applied.
 - Applying a migration changes the live schema, so every open PR fails the schema snapshot check until `docs/schema.generated.sql` is refreshed on `main`. Apply migrations in batches, at a quiet moment, and merge the snapshot at once.
 
-Because of this, each feature is built in two steps where it touches the server: the screen first, working in Demo Mode with no RPC call, then a small "wire it up" PR once the batch is applied. Agents are never idle waiting for an approval.
+Migrations are tested locally only (Q18): on the throwaway Postgres harness in `migrations/local-test/`, never on a Supabase branch and never on `gradebook-prod`. Storage policies are tested there against a stand-in `storage.objects` table, and the edge function's handler with a fake database, as `tests/student-submit-handler.test.js` does today. The first real upload and the first real card scan happen on `gradebook-prod` after Colin's OK, in his own test class, with the build switch on for that class only.
+
+Because of these, each feature is built in two steps where it touches the server: the screen first, working in Demo Mode with no RPC call, then a small "wire it up" PR once the batch is applied. Agents are never idle waiting for an approval.
 
 ---
 
@@ -71,12 +73,14 @@ Because of this, each feature is built in two steps where it touches the server:
 | `updated_at`    | When a returned grade was last changed and returned again.                                                                                     |
 | `seen_at`       | When the student last opened this piece. It feeds "3 Things Since You Last Looked".                                                            |
 
-**New columns on `course`:** `student_page_enabled` (the build switch, default false) and `return_grades` (`on_return` or `on_save`, default `on_return`: "When I Return Them" and "As Soon As I Save").
+**New columns on `course`:** `student_page_enabled` (the build switch, default false) and `return_grades` (`on_return` or `on_save`: "When I Return Them" and "As Soon As I Save"). A new class starts on `on_return`. An existing class starts with no choice made, which works as `on_save`, until its teacher first opens Class Settings › Student Page, where When I Return Them is the choice shown first (Q8).
 
 **How the state is kept.** Database triggers on `score`, `tag_score`, `rubric_score` and `rubric_check_score` keep `grade_return` right. A trigger cannot be forgotten by a new RPC, an old cached client, or the grade-scans skill.
 
 - Build switch off, or Return Grades set to As Soon As I Save: every save is returned at once. Nothing changes for the teacher.
 - Build switch on and When I Return Them: a save marks the grade Draft. If the grade was returned before, the trigger first keeps the returned values in `returned_copy`, so the student still has them.
+- Missing, Excused and Late are never drafts. They show and count as soon as they are set (Q7).
+- Grades written by the grade-scans skill go through the same triggers, so in a When I Return Them class they arrive as drafts for the teacher to check and return (Q9).
 - `return_grades(p_assessment_id, p_enrollment_ids, p_idempotency_key)` returns one grade or many (Return, Return and Next, Return N Graded). It clears `returned_copy`, sets `returned_at`, and moves the old copy to `previous_copy`.
 - Bulk paths have a named rule each, with a test: a restore keeps the state in the backup (an older backup restores as Returned); changing an assessment's rubric (`move_rubric_scores`) keeps the state; Duplicate Class and Copy Assessment copy no grades and no work.
 
@@ -100,16 +104,16 @@ Because of this, each feature is built in two steps where it touches the server:
 
 **Which grades each screen uses.** The artboard's table, with the screens it does not list marked as questions:
 
-| Screen                                                              | Uses          | Source        |
-| ------------------------------------------------------------------- | ------------- | ------------- |
-| Gradebook; both graders; phone student card; phone Grade tab        | All work      | Artboard      |
-| Print Grades and Export                                             | All work      | Artboard      |
-| Progress Reports                                                    | Returned only | Artboard      |
-| Student page: Your Result, Back, My Learning                        | Returned only | Artboard      |
-| Preview as Student                                                  | Returned only | Artboard      |
-| MyEdBC Input and the MyEd extension                                 | Returned only | Artboard      |
-| Dashboard, Class Results, the teacher's student page, class backups | All work      | Proposed (Q6) |
-| Term Questionnaire and Generate; Sent to Phones                     | Returned only | Proposed (Q6) |
+| Screen                                                              | Uses          | Source    |
+| ------------------------------------------------------------------- | ------------- | --------- |
+| Gradebook; both graders; phone student card; phone Grade tab        | All work      | Artboard  |
+| Print Grades and Export                                             | All work      | Artboard  |
+| Progress Reports                                                    | Returned only | Artboard  |
+| Student page: Your Result, Back, My Learning                        | Returned only | Artboard  |
+| Preview as Student                                                  | Returned only | Artboard  |
+| MyEdBC Input                                                        | Returned only | Artboard  |
+| Dashboard, Class Results, the teacher's student page, class backups | All work      | Colin, Q6 |
+| Term Questionnaire and Generate; Sent to Phones                     | Returned only | Colin, Q6 |
 
 Every new screen gets a row here before it is built.
 
@@ -126,7 +130,10 @@ A guard test fails if any file but `shared/grader.js` calls the score writers in
 - **Sessions** (`student_submit` schema, no API access): a session belongs to a device, not to a card. A second table lists the enrollments that session has opened, one per card added. That is what makes Switching Classes work now and lets a passkey or another sign-in attach to the same session later with no rework (Nov 8, decision 13).
 - **Questionnaire slips and phone-report slips keep working** as they do today, for one-offs.
 
-Whether the teacher can see a card's code again after it is made is Q10.
+The class's teacher can see a card's code again (Q10), so Print All and Show Card Code never stop a card the student holds: the code is stored for the teacher, readable only through `fv_owns_enrollment`, beside the hash the student path checks.
+
+- **A device stays signed in until midnight (Pacific time) or until the student taps Done**, whichever comes first (Q11). A shared Chromebook still signs out on Done.
+- **Today Only codes are not built** (Q12); they wait with Family Codes.
 
 ### 1.6 Submissions, Mark Up, reflections, revisions
 
@@ -135,21 +142,23 @@ New tables, all owned through `fv_owns_enrollment` or `fv_owns_assessment`:
 | Table                 | Holds                                                                                                                                                                          |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `submission`          | One per student (or group) per assessment per version: when it was sent, who sent it (student or teacher), on paper or not, the student's note, late or not, "Did You Do It?". |
-| `submission_file`     | One per page or file: photo or PDF, its place in order, storage path, thumbnail path, size, a hash for the exact-duplicate check, rotation.                                    |
+| `submission_file`     | One per page: always a JPEG (a PDF arrives as one JPEG per page), its place in order, storage path, thumbnail path, size, a hash for the exact-duplicate check, rotation.      |
 | `markup`              | Drawing data per page: the teacher's working copy and the copy the student was given. The photo itself is never changed.                                                       |
 | `revision_request`    | What to Fix, Revise By, which criteria, and whether the grade is kept or hidden until the new version is graded.                                                               |
 | `feedback_reflection` | Does the feedback make sense, the question, the plan, what went well, the teacher's answer, and "Does It Make Sense Now?".                                                     |
 
-New columns on `assessment` (the form's Student Work card): Students Send (Nothing, Photos, Photos and Files), After the Due Date (Keep Accepting, Until a date, Stop), Group Work (Each Student, One per Group), Students See Your Mark Up. New columns on `course`: Send Work, Keep Photos Until, Reflect on Feedback, Show My Learning, each off or at its decided default.
+New columns on `assessment` (the form's Student Work card): Students Send (Nothing, Photos, Photos and Files), After the Due Date (Keep Accepting, Until a date, Stop), Group Work (Each Student, One per Group), Students See Your Mark Up. Keep Photos Until is per class only and is not on the assessment form (Q15). New columns on `course`: Send Work, Keep Photos Until, Reflect on Feedback, Show My Learning, each off or at its decided default.
 
 A revision is version 2 of a submission. When its grade is returned it replaces the old one; version 1 keeps its returned grade as history for Before and After (Nov 8, decision 10).
 
 ### 1.7 Storage
 
-- **Two private buckets in the project's region (ca-central-1):** `student-photos` (JPEG only, 2 MB limit) and `student-files` (PDF only, 20 MB limit). The bucket limits are the server's refusal of an oversized photo.
+- **One private bucket in the project's region (ca-central-1):** `student-photos`, JPEG only, 2 MB limit. The bucket limit is the server's refusal of an oversized photo.
+- **PDFs become pages** (Q13, superseding the PDF part of Nov 8 decision 8). The browser reads a PDF up to 20 MB with Mozilla's pdf.js (in `vendor/`, loaded only for this step), turns each page into a shrunk JPEG like a photo, and uploads the pages. The PDF itself is not kept. Every page can then be marked up the same way.
+- **HEIC on a Chromebook is converted in the browser** (Q14) by a HEIC decoder in `vendor/`, loaded only when such a file is chosen. It is likely to need the CSP to allow WebAssembly on the pages that upload; that change is shown to Colin in its PR, limited to those pages, and pinned by `tests/csp-directives.test.js`.
 - **Layout:** `<course id>/<assessment id>/<enrollment id>/<submission id>/<file id>.jpg`, with the thumbnail beside it. One folder per class.
 - **Policies:** a teacher reads, writes and deletes only under a class they own, by the same `fv_owns_course` check as every table. Students have no storage role at all.
-- **Students upload** through a one-time upload link the edge function makes for one file in that student's folder. Supabase fixes that link's life at two hours, not minutes (Q4).
+- **Students upload** through a one-time upload link the edge function makes for one file in that student's folder. Supabase fixes that link's life at two hours; Colin accepted that (Q4), and the nightly check clears any file never committed.
 - **Students view** their own pages through short-lived links the edge function makes. The page fetches the image and shows it from a `blob:` address, so the CSP does not change.
 - **Location data.** The browser redraws every photo before upload, which drops GPS and camera details. When a submission is committed, the edge function checks each photo and strips any that remain.
 - **Deletes follow the rows.** Unsend, Replace, Keep Photos Until, the 30-day class purge and deleting a withdrawn student all delete the files, not only the rows. A nightly check finds files with no row and rows with no file.
@@ -176,20 +185,20 @@ The one function, `student-submit`, keeps its four routes and gains these. Each 
 
 ### 1.9 Client modules
 
-| File                                                                                                                                                         | New or changed | What it is                                                                                                                                      |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `shared/grade-state.js`                                                                                                                                      | New            | The Draft and Returned rule and the state of a piece, as plain functions.                                                                       |
-| `shared/grader.js`                                                                                                                                           | New            | The one grader (1.4).                                                                                                                           |
-| `shared/calc.js`                                                                                                                                             | Changed        | One reader for scores; `withReturnedOnly`.                                                                                                      |
-| `shared/data.js`                                                                                                                                             | Changed        | The `gradeReturns` cache field, the returned score set, and writers for cards, submissions, Mark Up, reflections and revisions.                 |
-| `shared/photo-shrink.js`                                                                                                                                     | New            | File type check, shrink to about 2000 px JPEG, thumbnail, exact-match hash, the blurry check. Used on every upload path.                        |
-| `shared/photo-queue.js`                                                                                                                                      | New            | Photos waiting to send, in IndexedDB. Used by the student page and both teacher apps.                                                           |
-| `shared/student-view.js`                                                                                                                                     | New            | Builds what one student sees, from returned grades only. Used by the student page and by Preview as Student, so the two are the same by design. |
-| `s/student-data.js`                                                                                                                                          | New            | Gives `calc.js` the few readers it needs from the student's own page data, the way the tests already swap those readers.                        |
-| `s/app.js`, `s/assignments.js`, `s/send.js`, `s/feedback.js`, `s/reflect.js`, `s/learning.js`                                                                | New            | The student page's screens.                                                                                                                     |
-| `s/questionnaire.js`, `s/report.js`                                                                                                                          | Split out      | Today's questionnaire and phone-report screens, moved out of `s/student.js` unchanged.                                                          |
-| `teacher/cm-student-page.js`, `teacher/student-cards.js`, `teacher/preview-student.js`, `teacher/markup.js`, `teacher/work-wall.js`, `teacher/myed-input.js` | New            | Teacher screens.                                                                                                                                |
-| `teacher-mobile/grade-photos.js`, `teacher-mobile/add-work.js`                                                                                               | New            | Phone photo strip, Mark Up host and camera capture.                                                                                             |
+| File                                                                                                                                                         | New or changed | What it is                                                                                                                                                 |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `shared/grade-state.js`                                                                                                                                      | New            | The Draft and Returned rule and the state of a piece, as plain functions.                                                                                  |
+| `shared/grader.js`                                                                                                                                           | New            | The one grader (1.4).                                                                                                                                      |
+| `shared/calc.js`                                                                                                                                             | Changed        | One reader for scores; `withReturnedOnly`.                                                                                                                 |
+| `shared/data.js`                                                                                                                                             | Changed        | The `gradeReturns` cache field, the returned score set, and writers for cards, submissions, Mark Up, reflections and revisions.                            |
+| `shared/photo-shrink.js`                                                                                                                                     | New            | File type check, shrink to about 2000 px JPEG, thumbnail, exact-match hash, the blurry check, PDF pages to JPEGs, HEIC to JPEG. Used on every upload path. |
+| `shared/photo-queue.js`                                                                                                                                      | New            | Photos waiting to send, in IndexedDB. Used by the student page and both teacher apps.                                                                      |
+| `shared/student-view.js`                                                                                                                                     | New            | Builds what one student sees, from returned grades only. Used by the student page and by Preview as Student, so the two are the same by design.            |
+| `s/student-data.js`                                                                                                                                          | New            | Gives `calc.js` the few readers it needs from the student's own page data, the way the tests already swap those readers.                                   |
+| `s/app.js`, `s/assignments.js`, `s/send.js`, `s/feedback.js`, `s/reflect.js`, `s/learning.js`                                                                | New            | The student page's screens.                                                                                                                                |
+| `s/questionnaire.js`, `s/report.js`                                                                                                                          | Split out      | Today's questionnaire and phone-report screens, moved out of `s/student.js` unchanged.                                                                     |
+| `teacher/cm-student-page.js`, `teacher/student-cards.js`, `teacher/preview-student.js`, `teacher/markup.js`, `teacher/work-wall.js`, `teacher/myed-input.js` | New            | Teacher screens.                                                                                                                                           |
+| `teacher-mobile/grade-photos.js`, `teacher-mobile/add-work.js`                                                                                               | New            | Phone photo strip, Mark Up host and camera capture.                                                                                                        |
 
 `s/` starts loading `shared/constants.js` and `shared/calc.js`. It still loads no Supabase client, no key and no Sentry.
 
@@ -206,7 +215,7 @@ The one function, `student-submit`, keeps its four routes and gains these. Each 
 | Sending and adding work                      | Photos are shrunk and kept in IndexedDB on the device. Nothing uploads.                                                                                |
 | Mark Up, reflections, revisions, My Learning | Saved on the device like any Demo Mode change.                                                                                                         |
 | Passkeys                                     | A stand-in that walks the same screens without saving a key.                                                                                           |
-| MyEdBC Input                                 | Works on the Demo class. The extension has a demo page that stands in for MyEd.                                                                        |
+| MyEdBC Input                                 | Works on the Demo class.                                                                                                                               |
 
 `tests/demo-mode-no-server-calls.test.js` is extended to cover each new module, `s/` included.
 
@@ -246,7 +255,7 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 
 **Switch.** `course.student_page_enabled`, off. With it off, every screen and every number is as today.
 
-**Done when.** On a Supabase branch, a real card opens a real page that shows a returned grade and never a draft; with the switch off, the golden file and every existing test pass unchanged.
+**Done when.** In the local harness and then in Colin's own test class, a real card opens a real page that shows a returned grade and never a draft; with the switch off, the golden file and every existing test pass unchanged.
 
 ### S1. Draft and Returned on every grading screen
 
@@ -264,7 +273,7 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 - `S1-F2` Desktop grader and Assignments page: the To Return and Returned counts, Return N Graded, Draft beside Return.
 - `S1-F3` Phone: Return and Next, the To Return tab with Return N, the student card's To Return list.
 - `S1-F4` Class Settings › Student Page: Return Grades (When I Return Them, As Soon As I Save), with the line about changed grades.
-- `S1-F5` A change to a returned grade: it waits as a draft under When I Return Them and shows at once under As Soon As I Save; the student page marks it Updated. The teacher-side words wait on Q2.
+- `S1-F5` A change to a returned grade: it waits as a draft under When I Return Them and shows at once under As Soon As I Save; the student page marks it Updated. While it waits, the student and reports keep the grade returned, and the teacher sees the Draft mark, "Draft Saved. Not returned yet." and one line, "Jordan still sees the grade you returned Nov 3." (Q2).
 
 **Files.** `shared/grader.js`, `teacher/page-gradebook.js`, `teacher/class-results.js`, `teacher/page-assignments.js`, `teacher-mobile/tab-grade.js`, `teacher-mobile/card-widgets.js`, `teacher/dash-class-manager.js`, `teacher/cm-student-page.js`, the CSS beside each.
 
@@ -288,7 +297,7 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 
 - `S2-T1` Report surfaces read grades through one entry in `teacher/page-reports.js` so the score set is chosen in one place.
 - `S2-F1` Progress Reports use returned grades only. Print Reports with drafts names them and offers Return Them, Then Print; Print Without Them; Cancel.
-- `S2-F2` The other family-facing surfaces follow Q6's answer.
+- `S2-F2` The Term Questionnaire's facts, Generate and Sent to Phones use returned grades only (Q6).
 
 **Files.** `teacher/page-reports.js`, `teacher/report-blocks.js`, `teacher/report-studio.js`, `teacher/report-questionnaire.js`, `teacher/comment-bank.js`, `teacher/phone-reports.js`, `teacher/grades-print.js` and `teacher/export-all.js` (to confirm they stay on all work).
 
@@ -318,7 +327,7 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 
 **Demo Mode.** Cards on the device; the demo student page opens from them. **Switch.** The build switch.
 
-**Done when.** Colin prints cards for a test class on a branch, signs in as two students in two classes on one phone, and a reissued card's old code no longer opens.
+**Done when.** Colin prints cards for his test class, signs in as two students in two classes on one phone, and a reissued card's old code no longer opens.
 
 ### S4. The student page: assignments, feedback, Questionnaires, Reports, Preview as Student
 
@@ -347,7 +356,7 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 
 **Done when.** Preview as Student and the real page show the same thing for the same student, and a draft appears on neither.
 
-### S5. Sending work: photos and PDFs
+### S5. Sending work: photos, and PDFs as pages
 
 **Goal.** A student sends photos or a PDF for an assessment the teacher set to take work.
 
@@ -358,7 +367,7 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 - `S5-T1` `shared/photo-shrink.js` and `shared/photo-queue.js`, with tests, used by nothing yet.
 - `S5-M1` (Batch B) `submission`, `submission_file`, the assessment and course columns, the teacher RPCs and the student functions.
 - `S5-M2` (Batch B) The two buckets and their policies.
-- `S5-F1` Assessment form: the Student Work card. Class Settings: Send Work and Keep Photos Until.
+- `S5-F1` Assessment form: the Student Work card, without Keep Photos Until. Class Settings: Send Work and Keep Photos Until.
 - `S5-F2` Student: camera and file choice, Check and Send with the note, Sent, Sending Late, Closed.
 - `S5-F3` Student: Not Sent Yet, One Page Didn't Send, the blurry check, Unsend and Replace.
 - `S5-F4` Edge routes `send-start`, `send-finish`, `unsend`, `replace`, `file-links`, with the server's location check.
@@ -367,11 +376,11 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 
 **Files.** `shared/photo-shrink.js`, `shared/photo-queue.js`, `shared/data.js`, `shared/seed-data.js`, `shared/constants.js`, `shared/supabase.js` (sign-out wipe), `teacher/page-assignments.js` (the form), `teacher/cm-student-page.js`, `s/send.js`, the edge function, `assets/` (sample pages), `privacy.html`.
 
-**Tests.** Unit: a 12-megapixel photo comes out near 2000 px and under the size limit with no location data; a Word file is refused with "Save it as a PDF first"; the queue survives a reload and sends in order; Sign Out empties it. SQL and storage, on a branch: a teacher cannot read another teacher's folder; a student link writes one file in one folder; a photo over 2 MB is refused; Unsend deletes the files; Unsend is refused once grading has started. Browser: send on phone and Chromebook, offline then online, a failed page.
+**Tests.** Unit: a 12-megapixel photo comes out near 2000 px and under the size limit with no location data; a Word file is refused with "Save it as a PDF first"; a two-page PDF becomes two JPEG pages; a HEIC file becomes a JPEG; the queue survives a reload and sends in order; Sign Out empties it. SQL and storage, in the local harness: a teacher cannot read another teacher's folder; a student link writes one file in one folder; a photo over 2 MB is refused; Unsend deletes the files; Unsend is refused once grading has started. Browser: send on phone and Chromebook, offline then online, a failed page.
 
 **Demo Mode.** Photos stay on the device. **Switch.** The build switch, then Send Work (off), then Students Send on the assessment (Nothing).
 
-**Done when.** On a branch, a student sends two photos from a phone and a PDF from a Chromebook, offline included, and Unsend leaves no file behind.
+**Done when.** In Colin's test class, a student sends two photos from a phone and a PDF from a Chromebook, offline included, and Unsend leaves no file behind.
 
 ### S6. Desktop: grading a submission
 
@@ -424,21 +433,21 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 
 **Goal.** Photos leave when they should, and nothing is left behind. This slice must merge before any release that lets a real class turn Send Work on.
 
-**Boards.** None drawn. From the canvas note "Not drawn, still needed" and the Behind the Boards plan. The reminder and the warnings need words (Q22).
+**Boards.** None drawn. From the canvas note "Not drawn, still needed" and the Behind the Boards plan. The reminder and the warnings are drafted on the artboard by the slice's agent and approved by Colin before they are built (Q22).
 
 **PRs.**
 
 - `S8-M1` (Batch D) Deletes that follow the rows: the 30-day class purge and `delete_withdrawn_student` remove the files too; the Keep Photos Until job and its one-week reminder; the nightly check for strays.
 - `S8-F1` The reminder and the plain "photos go for good" lines on Keep Photos Until, Unsend, Delete Class and Delete Student.
-- `S8-F2` Class backup and Download All My Data say whether photos are included (Q22). Sentry never receives an image (a test on `shared/sentry-init.js`).
+- `S8-F2` Class backup and Download All My Data leave photos out and say so: "Photos of student work are not in this file." (Q22). Sentry never receives an image (a test on `shared/sentry-init.js`).
 
 **Files.** `migrations/`, `teacher/dash-class-manager.js`, `teacher/cm-student-page.js`, `shared/backup-restore.js`, `teacher/export-all.js`, `shared/sentry-init.js`, `privacy.html`.
 
-**Tests.** On a branch: purge a class and count zero files; delete a student and count zero files; run the date job past the date; plant a stray file and a row with no file and see both reported. Grades, comments and Mark Up survive each.
+**Tests.** In the local harness: purge a class and count zero files; delete a student and count zero files; run the date job past the date; plant a stray file and a row with no file and see both reported. Grades, comments and Mark Up survive each.
 
 **Demo Mode.** The reminder and warnings show; nothing is stored to delete. **Switch.** Send Work.
 
-**Done when.** Every way a row can go takes its files with it, proven on a branch. Deletes data: Colin's review.
+**Done when.** Every way a row can go takes its files with it, proven in the local harness and checked once in Colin's test class. Deletes data: Colin's review.
 
 ### S9. Mark Up
 
@@ -502,7 +511,7 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 - `S11-F3` Grading both versions, with "Was Developing + on the Oct 30 version".
 - `S11-W1` Wire.
 
-**Files.** `shared/grader.js`, `shared/grade-state.js`, `shared/calc.js` (only if Q5's answer needs it), `teacher/page-assignments.js`, `teacher-mobile/tab-grade.js`, `s/assignments.js`, `s/feedback.js`.
+**Files.** `shared/grader.js`, `shared/grade-state.js`, `shared/calc.js` (a hidden grade is a draft, Q5, so likely no change), `teacher/page-assignments.js`, `teacher-mobile/tab-grade.js`, `s/assignments.js`, `s/feedback.js`.
 
 **Tests.** Unit: the old grade counts until the new one is returned, then only the new one counts, in all-work and returned-only; version 1 and its grade are still readable. Browser: the loop on both sizes.
 
@@ -534,7 +543,7 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 
 **PRs.** `S13-T1` `student-view.js` gains a learning section built from existing `calc.js` functions. `S13-F1` the switch and See What They'd See. `S13-F2` the My Learning screens for each grading style. `S13-F3` One Skill with How It's Going and Your Work.
 
-**Files.** `shared/student-view.js`, `shared/calc.js` (only for what does not exist yet: "Up from Developing a month ago", Q16), `s/learning.js`, `teacher/cm-student-page.js`, `teacher/comment-bank.js` and `shared/bank-comment.js` (read only, for Next Step).
+**Files.** `shared/student-view.js`, `shared/calc.js` (only for what does not exist yet: "Up from Developing a month ago": returned work dated on or before 30 days ago, Q16), `s/learning.js`, `teacher/cm-student-page.js`, `teacher/comment-bank.js` and `shared/bank-comment.js` (read only, for Next Step).
 
 **Migrations.** The `show_my_learning` column (Batch C).
 
@@ -550,7 +559,7 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 
 **Boards.** Teacher: Work Wall for One Assessment; Teacher: Student Page, Work Tab.
 
-**PRs.** `S14-T1` thumbnails load through one helper. `S14-F1` Work Wall. `S14-F2` the Work tab. Evidence Picks wait on Q19.
+**PRs.** `S14-T1` thumbnails load through one helper. `S14-F1` Work Wall. `S14-F2` the Work tab. Evidence Picks are not built until drawn (Q19).
 
 **Files.** `teacher/work-wall.js`, `teacher/page-student.js`, `teacher-mobile/tab-grade.js` (the row menu's Work Wall).
 
@@ -564,7 +573,7 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 
 **Goal.** "Cards enrol, passkeys return." After the first card scan, a student can come back with Face ID, a fingerprint or the phone's PIN.
 
-**Boards.** None drawn. From the Behind the Boards row (Q22).
+**Boards.** None drawn. From the Behind the Boards row. The slice's agent drafts the screens on the artboard for Colin's approval first (Q22).
 
 **PRs.** `S15-M1` (Batch E) a keys table and the SQL behind two routes. `S15-F1` the offer after the first card check, and coming back with it. `S15-F2` a shared Chromebook signs in from the student's own phone. `S15-F3` the teacher removes a device's key.
 
@@ -592,21 +601,9 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 
 **Done when.** The export for a test class matches MyEd's row order by hand.
 
-### S17. The MyEd extension
+### S17. The MyEd extension: not in this build
 
-**Goal.** A Chrome extension fills MyEd's Post Columns after a review, checks them, and never posts.
-
-**Boards.** MyEdBC Plugin: Extension: Review Before Fill; Filling; Checked, Ready to Post.
-
-**PRs.** `S17-M1` (Batch F) the fill log. `S17-F1` the extension in its own folder, `extension/`, with a demo page that stands in for MyEd. `S17-F2` Fill in MyEd hands the run to it; the run is saved in FullVision.
-
-**Files.** `extension/` (new, outside the app's build), `teacher/myed-input.js`.
-
-**Tests.** Against the stand-in page: it refuses when the page does not match; typing stops the run; it reads back what it wrote; it has no code path that presses Post Grades.
-
-**Demo Mode.** The stand-in page. **Switch.** It only works from the hidden tab.
-
-**Done when.** It fills and checks the stand-in page. Running it on real MyEd is Colin's step.
+Colin, Nov 9 (Q25): not now. MyEdBC Input and the Export Sheet (S16) still ship. The three extension boards stay on the artboard for later.
 
 ### S18. Term Questionnaire: In Their Words
 
@@ -659,9 +656,8 @@ The rest of cleanup card cp1, after the build: what is still in `data.js` and th
 | G. Uploads        | `shared/photo-shrink.js`, `shared/photo-queue.js`                               | S5-T1                                                     |
 | H. Class Settings | `teacher/cm-student-page.js`, `teacher/student-cards.js`, `teacher/qr-slips.js` | S1-T4, S1-F4, S3, S5-F1, S8-F1                            |
 | I. Reports        | `teacher/page-reports.js`, `teacher/report-*.js`, `teacher/myed-input.js`       | S2, S16, S18                                              |
-| J. Extension      | `extension/`                                                                    | S17                                                       |
 
-Tracks A, B, F, G, I and J share no files with each other or with C, D and E. They can all run from the first night.
+Tracks A, B, F, G and I share no files with each other or with C, D and E. They can all run from the first night.
 
 ### Files only one agent may change at a time
 
@@ -676,14 +672,14 @@ The session that hands out the work keeps one list of who holds each of these fi
 ### What waits for what
 
 - `S0-P1` and `S0-P2` come first. Nothing reshapes `calc.js` or a save path before its pin is on `main`.
-- **The branch `grader/comment-beside-checklist` must land before `S0-T2`.** Its uncommitted work is in `page-assignments.js` and `tab-grade.js`, the two files the grader tidying reshapes (Q23).
+- **PR 955 must merge before `S0-T2`.** It carries the Nov 6 grader work that sat uncommitted on `grader/comment-beside-checklist`, in `page-assignments.js` and `tab-grade.js`, the two files the grader tidying reshapes. Colin approved merging it (Q23).
 - `S0-T2` before `S1-T1`, `S1-T2` and `S1-T3`. Those three are in different files and run side by side.
 - `S0-T1` before `S0-F1`. `S0-F1` before S2, S4 and S16-F3.
 - Batch A applied before any `W` PR in S0 to S4. Batch B before S5 to S7 wiring. Batch C before S9 to S13 wiring. Batch D before a real class turns on Send Work.
 - S3 before real students use S4. S4 before S5's student screens. S5 before S6 and S7. S6 before S9, S11, S12 and S14.
 - S8 before the release that opens Send Work.
 - S15 after S4 works.
-- S16 and S18 need only `S0-F1`. S17 needs S16.
+- S16 and S18 need only `S0-F1`.
 
 ### A first night, as an example
 
@@ -697,7 +693,7 @@ Each row stops only the work listed. Everything else keeps moving.
 
 | #   | What Colin is asked                                                                                                                                                                                                  | When                         | It unblocks           |
 | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | --------------------- |
-| 1   | This plan, and the answers in section 6. Q2, Q5, Q7, Q8 and Q10 shape Batch A.                                                                                                                                       | Now                          | Batch A's final SQL   |
+| 1   | This plan, and the answers in section 6. Answered Nov 9.                                                                                                                                                             | Now                          | Batch A's final SQL   |
 | 2   | **Batch A.** One read of three migrations: `grade_return` with its backfill (existing scores become Returned; no score or number changes), cards, sessions and the page reader. Plus the first edge function deploy. | Once it passes on a branch   | S0 to S4 wiring       |
 | 3   | **Math review 1.** `S0-F1`, the returned-only option. The proof offered: with no drafts, every number in the golden file is unchanged.                                                                               | With Batch A                 | S2, S4, S16-F3        |
 | 4   | **Batch B.** Submissions, the two buckets and their policies, the second edge deploy. Unsend and Replace delete files. Also Colin's own step: spend cap off and usage alerts at about 70% (Nov 8, decision 7).       | When S1 is in review         | S5 to S7 wiring       |
@@ -706,85 +702,77 @@ Each row stops only the work listed. Everything else keeps moving.
 | 7   | **Math review 3.** `S13`: anything new in `calc.js` for My Learning.                                                                                                                                                 | With S13                     | S13 merge             |
 | 8   | **Batch D. Deletes data.** Photo deletion on class purge, student delete and Keep Photos Until; the nightly check.                                                                                                   | Before Send Work is released | The Send Work release |
 | 9   | **Batch E.** Passkeys, with the privacy page change.                                                                                                                                                                 | After S4 is live             | S15                   |
-| 10  | **Batch F.** MyEd tables.                                                                                                                                                                                            | Any time                     | S16 and S17 wiring    |
+| 10  | **Batch F.** MyEd tables.                                                                                                                                                                                            | Any time                     | S16 wiring            |
 | 11  | **Releases.** Suggested points, each on Colin's word: after S2 (nothing visible, switch off); after S4 (cards and the read-only page, for Colin's own classes); after S8 (photo submissions); then as he likes.      | His call                     | Teachers seeing it    |
 
-How a batch is tested before Colin sees it: every migration runs on the throwaway Postgres harness with its tests, then the whole batch runs on one Supabase branch with the edge function, never on `gradebook-prod`. The PR shows the SQL, the test results, and what the batch does to existing rows in one paragraph. A Supabase branch costs money; that is Q18.
+How a batch is tested before Colin sees it: every migration runs on the throwaway Postgres harness with its tests, storage policies against the harness's stand-in storage table, and the edge function's handler with a fake database. No Supabase branch is used (Q18). The PR shows the SQL, the test results, and what the batch does to existing rows in one paragraph. After it is applied, the first real check is in Colin's own test class.
 
 ---
 
 ## 5. Risks
 
-| Risk                                                                                     | What stops it                                                                                                                                                                                                                                                        |
-| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The graders drift apart again                                                            | One module, `shared/grader.js`. The guard test fails if any other file calls a score writer. One browser test walks the Grader Parts board row by row on desktop and phone.                                                                                          |
-| A draft leaks to a student                                                               | Students read grades through one SQL function. SQL tests: for a run of saves and returns, `page` always equals the grade at the last return. A test greps `student_submit` for any other read of the score tables. The page is checked on a branch with a real card. |
-| A draft leaks to a family                                                                | Reports choose their score set in one place (S2-T1). A test prints a class with a draft and looks for the draft's value in the output.                                                                                                                               |
-| Returned-only and all-work disagree when they should not                                 | The invariant test: no drafts means the same numbers, for every student in two fixtures.                                                                                                                                                                             |
-| The browser's rule and the server's rule differ                                          | One file of worked cases runs through `shared/grade-state.js` and through the SQL triggers.                                                                                                                                                                          |
-| Preview as Student differs from the real page                                            | Both are built by `shared/student-view.js`. A test compares its output with the server's `page` output for one fixture.                                                                                                                                              |
-| A write path skips the state (restore, rubric change, grade-scans, an old cached client) | The state is kept by triggers on the tables, not by each RPC. Each bulk path has its own named test.                                                                                                                                                                 |
-| A return is sent before the last score                                                   | The return shares the cell's outbox key, so it goes after that cell's writes. A test queues a score then a return offline and checks the order sent.                                                                                                                 |
-| A local id reaches the database or a storage path                                        | A photo uploads only after its record has server ids. The path is built from those ids. A test fails on any upload whose path holds a local-shaped id. Kanban f2 is fixed in S7.                                                                                     |
-| Photos orphaned in storage                                                               | Every delete of a row deletes its files in the same step. The nightly check reports strays both ways. Tests on a branch purge a class and delete a student and count zero files.                                                                                     |
-| A photo is lost offline                                                                  | The photo stays in IndexedDB until the server confirms it. Tests: reload mid-send, go offline mid-send, fill the device.                                                                                                                                             |
-| Two tabs send the same photo                                                             | The photo queue takes a lock before it sends. The server ignores a second commit of the same file.                                                                                                                                                                   |
-| The CSP blocks a photo or a PDF, or gets loosened to fix it                              | Photos are fetched and shown from `blob:`, which the policy allows today. `tests/csp-directives.test.js` gains a line pinning `img-src`, `connect-src`, `frame-src` and `object-src` as they are. The PDF viewer is Q13.                                             |
-| A student's location is stored                                                           | The browser redraws every photo. The server checks again on commit. A test uploads a photo with GPS data and reads the stored file.                                                                                                                                  |
-| A huge file fills storage                                                                | Bucket limits: 2 MB for photos, 20 MB for PDFs. The shrink step runs on every upload path, tested for each.                                                                                                                                                          |
-| A card code is guessed                                                                   | The identity check, the lock after five wrong tries, today's rate limits, and a limit on how often a card can send (Q20).                                                                                                                                            |
-| Student data leaves Canada                                                               | Storage is in the project's region. The edge function already refuses to run outside `ca-central-1`; the new routes go through the same check. `s/` loads no Sentry.                                                                                                 |
-| The grade math changes by accident                                                       | The golden file from `S0-P2` must pass unchanged in every PR that does not say "math" in its title.                                                                                                                                                                  |
-| A migration turns every open PR red                                                      | Batches are applied at a quiet moment and the snapshot merges at once (see the rules above).                                                                                                                                                                         |
-| The switch is off but something still changed                                            | A browser test runs the regression smoke suite with the build switch off after every slice.                                                                                                                                                                          |
-| Demo Mode calls the server                                                               | `tests/demo-mode-no-server-calls.test.js` covers each new module and `s/`.                                                                                                                                                                                           |
-| The student page gets too slow on a school Chromebook                                    | `s/` loads `calc.js` only on tabs that show a grade. Page weight is measured in S4 and again in S13.                                                                                                                                                                 |
+| Risk                                                                                        | What stops it                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The graders drift apart again                                                               | One module, `shared/grader.js`. The guard test fails if any other file calls a score writer. One browser test walks the Grader Parts board row by row on desktop and phone.                                                                                                                                                               |
+| A draft leaks to a student                                                                  | Students read grades through one SQL function. SQL tests: for a run of saves and returns, `page` always equals the grade at the last return. A test greps `student_submit` for any other read of the score tables. The page is checked in Colin's test class with a real card.                                                            |
+| A draft leaks to a family                                                                   | Reports choose their score set in one place (S2-T1). A test prints a class with a draft and looks for the draft's value in the output.                                                                                                                                                                                                    |
+| Returned-only and all-work disagree when they should not                                    | The invariant test: no drafts means the same numbers, for every student in two fixtures.                                                                                                                                                                                                                                                  |
+| The browser's rule and the server's rule differ                                             | One file of worked cases runs through `shared/grade-state.js` and through the SQL triggers.                                                                                                                                                                                                                                               |
+| Preview as Student differs from the real page                                               | Both are built by `shared/student-view.js`. A test compares its output with the server's `page` output for one fixture.                                                                                                                                                                                                                   |
+| A write path skips the state (restore, rubric change, grade-scans, an old cached client)    | The state is kept by triggers on the tables, not by each RPC. Each bulk path has its own named test.                                                                                                                                                                                                                                      |
+| A return is sent before the last score                                                      | The return shares the cell's outbox key, so it goes after that cell's writes. A test queues a score then a return offline and checks the order sent.                                                                                                                                                                                      |
+| A local id reaches the database or a storage path                                           | A photo uploads only after its record has server ids. The path is built from those ids. A test fails on any upload whose path holds a local-shaped id. Kanban f2 is fixed in S7.                                                                                                                                                          |
+| Photos orphaned in storage                                                                  | Every delete of a row deletes its files in the same step. The nightly check reports strays both ways. Tests in the local harness purge a class and delete a student and count zero files.                                                                                                                                                 |
+| A photo is lost offline                                                                     | The photo stays in IndexedDB until the server confirms it. Tests: reload mid-send, go offline mid-send, fill the device.                                                                                                                                                                                                                  |
+| Two tabs send the same photo                                                                | The photo queue takes a lock before it sends. The server ignores a second commit of the same file.                                                                                                                                                                                                                                        |
+| The CSP blocks a photo or a PDF, or gets loosened to fix it                                 | Photos are fetched and shown from `blob:`, which the policy allows today. `tests/csp-directives.test.js` gains a line pinning `img-src`, `connect-src`, `frame-src` and `object-src` as they are. PDFs become JPEG pages in the browser (Q13). The HEIC decoder's CSP change is reviewed in its PR and limited to the upload pages (Q14). |
+| A student's location is stored                                                              | The browser redraws every photo. The server checks again on commit. A test uploads a photo with GPS data and reads the stored file.                                                                                                                                                                                                       |
+| A huge file fills storage                                                                   | The bucket limit: 2 MB a page. A PDF over 20 MB is refused in the browser. The shrink step runs on every upload path, tested for each.                                                                                                                                                                                                    |
+| A card code is guessed                                                                      | The identity check, the lock after five wrong tries, today's rate limits, and a limit of 20 sends per card per hour (Q20).                                                                                                                                                                                                                |
+| Student data leaves Canada                                                                  | Storage is in the project's region. The edge function already refuses to run outside `ca-central-1`; the new routes go through the same check. `s/` loads no Sentry.                                                                                                                                                                      |
+| The grade math changes by accident                                                          | The golden file from `S0-P2` must pass unchanged in every PR that does not say "math" in its title.                                                                                                                                                                                                                                       |
+| A migration turns every open PR red                                                         | Batches are applied at a quiet moment and the snapshot merges at once (see the rules above).                                                                                                                                                                                                                                              |
+| Storage policies or the edge function fail on first real use, with no branch to try them on | They are tested against stand-ins in the local harness and the handler tests. After a batch is applied, the first real card scan and upload are in Colin's test class alone, with the build switch on for it only. A failed check there stops the next batch.                                                                             |
+| The switch is off but something still changed                                               | A browser test runs the regression smoke suite with the build switch off after every slice.                                                                                                                                                                                                                                               |
+| Demo Mode calls the server                                                                  | `tests/demo-mode-no-server-calls.test.js` covers each new module and `s/`.                                                                                                                                                                                                                                                                |
+| The student page gets too slow on a school Chromebook                                       | `s/` loads `calc.js` only on tabs that show a grade. Page weight is measured in S4 and again in S13.                                                                                                                                                                                                                                      |
 
 ---
 
-## 6. Questions for Colin
+## 6. Colin's answers (2026-11-09)
 
-Short answers are enough. Each has a recommendation.
+Colin answered the 25 questions one at a time on Nov 9. Each answer is written into the plan above. The ones that change a recorded decision or a project rule are also in `docs/DECISIONS.md`, "Student page build answers (2026-11-09)".
 
-**Conflicts with a fixed decision or a rule**
+| #   | Question                                                    | Answer                                                                                                                                                                                                |
+| --- | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Product shape's "No LMS features: no assignment submission" | Replaced by a new DECISIONS entry: students can send photos and PDFs of their work; still no content pages, discussions or quizzes. `CLAUDE.md`'s opening line follows.                               |
+| 2   | Editing a returned grade under When I Return Them           | The student and reports keep the returned grade until it is returned again. The teacher sees the Draft mark and one line: "Jordan still sees the grade you returned Nov 3."                           |
+| 3   | Idempotency keys on today's score RPCs                      | Leave them; every new RPC takes a key. `CLAUDE.md` rule 7 names the old ones as overwrite-only exceptions.                                                                                            |
+| 4   | Upload links live two hours                                 | Accepted. The nightly check clears files never committed.                                                                                                                                             |
+| 5   | A grade hidden during a revision                            | It counts only in the teacher's views, like any draft.                                                                                                                                                |
+| 6   | Screens the Which Grades board leaves out                   | Returned only for anything a family reads (Term Questionnaire facts, Generate, Sent to Phones); all work for the teacher's own views (Dashboard, Class Results, the teacher's student page, backups). |
+| 7   | Missing, Excused and Late                                   | Never drafts: they show and count at once.                                                                                                                                                            |
+| 8   | Where existing classes start                                | As Soon As I Save, until the teacher first opens Class Settings › Student Page. New classes start on When I Return Them.                                                                              |
+| 9   | Grades from the grade-scans skill                           | Drafts, in a When I Return Them class.                                                                                                                                                                |
+| 10  | Seeing a card's code again                                  | Yes. Stored for the class's teacher only.                                                                                                                                                             |
+| 11  | How long a device stays signed in                           | Until midnight, or until Done.                                                                                                                                                                        |
+| 12  | Today Only codes                                            | Not built; they wait with Family Codes.                                                                                                                                                               |
+| 13  | PDFs                                                        | Each page becomes a JPEG in the browser, using pdf.js for that step; the PDF is not kept. This changes the PDF part of Nov 8 decision 8.                                                              |
+| 14  | HEIC files on a Chromebook                                  | Converted in the browser. The CSP change it needs is shown to Colin in its PR.                                                                                                                        |
+| 15  | Keep Photos Until                                           | Per class only; off the assessment form.                                                                                                                                                              |
+| 16  | "Up from Developing a month ago"                            | Returned work dated on or before 30 days ago, compared with now.                                                                                                                                      |
+| 17  | Handed In Paper                                             | The piece moves to Sent, marked "Handed in on paper", with no photos.                                                                                                                                 |
+| 18  | Supabase branches for testing                               | No. Local tests only; the first real check is in Colin's test class after he applies a batch.                                                                                                         |
+| 19  | Evidence Picks                                              | Not built until drawn.                                                                                                                                                                                |
+| 20  | Sends per card                                              | 20 an hour.                                                                                                                                                                                           |
+| 21  | Undrawn items that follow from decided rules                | Built without boards.                                                                                                                                                                                 |
+| 22  | Photos in backups; undrawn items that need words            | Backups and Download All My Data leave photos out and say so. Agents draft the rest on the artboard for Colin to approve first.                                                                       |
+| 23  | The uncommitted grader branch                               | Merge it (PR 955) once its checks pass.                                                                                                                                                               |
+| 24  | When a real class can turn on Send Work                     | After the privacy page ships with S5; Colin decides at release time.                                                                                                                                  |
+| 25  | The MyEd extension                                          | Not now. S17 is out of this build; S16 still ships.                                                                                                                                                   |
 
-1. **Product shape still says "No LMS features: no assignment submission".** Photo submissions contradict it. Recommend a new dated entry in DECISIONS that replaces that line: students can send photos and PDFs of their work for an assessment; still no content pages, discussions or quizzes. `CLAUDE.md`'s opening line gets the same touch. The ROADMAP's opening already says it.
-2. **Editing after return.** Decided: under When I Return Them a change waits as a draft, then the student sees Updated. Not said: what the student sees while it waits, and what the teacher's screen calls it. Recommend: the student keeps the grade you returned until you return again; reports keep it too; the teacher sees the same Draft mark and "Draft Saved. Not returned yet.", with one added line, "Jordan still sees the grade you returned Nov 3." The exact words are yours.
-3. **CLAUDE.md rule 7 says every write RPC is idempotent.** The score RPCs take no key today; their migration calls them safe to retry because they overwrite by student and assessment. Recommend leaving them and giving every new RPC a key. Say if you want the old ones changed.
-4. **The upload link's life.** The board says it "expires in minutes". Supabase fixes it at two hours. Recommend accepting two hours: the link writes one file, once, in one student's folder, and the nightly check clears anything never committed. The other choice is to pass every upload through the edge function, which is slower and costs more.
+### Left open by the answers
 
-**Draft and Returned**
-
-5. **Return for Revision with "Hide the grade until then".** Does the hidden grade count on that student's My Learning and on a report printed meanwhile? Recommend no: hidden means not returned, so it counts only in your own views.
-6. **Screens the Which Grades board does not list.** Recommend returned only for anything a family reads (Term Questionnaire facts and Generate, Sent to Phones), and all work for your own views (Dashboard, Class Results, your student page, backups).
-7. **Missing, Excused and Late.** Are they drafts too? Recommend no: they show and count at once, as the board's "Alongside Any State" suggests. Otherwise a Missing mark would need a Return.
-8. **When this ships to everyone, where do existing classes start?** Return Grades defaults to When I Return Them. For a teacher who never uses the student page, that means every new grade is a draft and every report asks first. Recommend: a class starts on As Soon As I Save until its teacher first opens Class Settings › Student Page, and new choices default to When I Return Them from there.
-9. **Grades from the grade-scans skill.** They will arrive as drafts in a When I Return Them class. Recommend yes: you check them, then Return N Graded.
-
-**Cards and sign-in**
-
-10. **Can a teacher see a card's code again?** The boards show Print All 28, cards made but not yet printed, and Show Card Code. Slip codes today are stored only as a hash, so they cannot be shown twice. Recommend storing card codes where only the class's teacher can read them. Otherwise every reprint is a reissue and stops the card a student is holding.
-11. **How long does a phone stay signed in?** Recommend today's rule: one class block (80 minutes) or until Done, and gone when the tab closes. Passkeys later remove the repeat scan.
-12. **Today Only codes** (Phone: Show a Student's Code). The canvas note says brainstormed, not decided, but the passkey plan mentions them. Recommend leaving them out with Family Codes until you decide.
-
-**Photos and files**
-
-13. **PDFs need a viewer that Mark Up can draw on.** Recommend adding Mozilla's pdf.js to `vendor/`, loaded only when a PDF is opened. It needs no CSP change.
-14. **An iPhone photo (HEIC) chosen on a Chromebook.** An iPhone converts its own photos, so decision 8 holds there. Chrome cannot open HEIC. Recommend a plain message, "Save it as a JPEG or a PDF first", not a converter, which would need a looser CSP.
-15. **Keep Photos Until appears twice:** per class in Class Settings (the decision) and per assessment on the assessment form board. Recommend per class only, and drop it from the form.
-16. **"Up from Developing a month ago".** Which work counts as a month ago? Recommend the rule reports already use: work dated on or before that day.
-17. **Handed In Paper** on the student's card. What does it do? Recommend: the piece moves to Sent marked "Handed in on paper", with no photos, and you grade it from paper.
-18. **Supabase branches** cost a little each. Recommend one branch per migration batch, deleted after the review. OK to spend?
-19. **Evidence Picks** on the Work tab. The board shows three picks; nothing says who picks them or where. Recommend leaving them out until drawn.
-20. **"Limit how often a code can send."** No number is given. Recommend 20 sends per card per hour, matching today's 20 opens per code.
-
-**Not drawn, still needed** (from the canvas note)
-
-21. These can be built from rules already decided, with no board: stripping location on the server; deleting photos with a student, a class and at the date; Duplicate Class and Copy Assessment never copying work; Sign Out clearing photos and Sentry never getting one; photos waiting offline; the exact-match duplicate check; a limit on sends; Demo Mode samples; reissuing a card.
-22. These need words or a drawing first: the Keep Photos Until reminder and the "gone for good" warnings; what class backups and Download All My Data say about photos (recommend: photos are not in them, and say so); sideways photos and the Rotate control; the 1024 px laptop layout; dark mode on the student page; the passkey screens; the "ask first" dialog on MyEdBC Input.
-23. **The branch `grader/comment-beside-checklist`.** It has to merge before the grader tidying starts. When will it land?
-
-**Outside the code**
-
-24. **Privacy.** Students sending photos changes `privacy.html`, and the kanban's privacy assessment (s04) is not started. Recommend the privacy page ships with S5, and that you decide whether a real class can turn on Send Work before the assessment is done.
-25. **The MyEd extension** needs a Chrome Web Store account to reach teachers. Recommend building and testing against the stand-in page now, and you choose when and how it is published.
+- **Midnight in which time zone.** The plan uses Pacific time, the class's default `course.timezone`. Say if it should be the student's device clock instead.
+- **Without a Supabase branch,** storage policies and the edge function are first tried together on `gradebook-prod`. The plan limits that to Colin's own test class with the build switch on for it alone, and adds a risk row for it.
+- **The artboard** still says the upload link expires in minutes, shows Keep Photos Until on the assessment form, and shows PDFs kept as files. The boards are not changed by this PR.

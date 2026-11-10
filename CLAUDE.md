@@ -1,6 +1,6 @@
 # FullVision
 
-A gradebook and report writer for BC classroom teachers. Proficiency scale (Emerging, Developing, Proficient, Extending, with + and −) and letter/percent for grades 10–12, a learning map built from the BC curriculum, an observation log, student goals and reflections, a term questionnaire, and printed reports. Teacher-only: no student or parent logins.
+A gradebook and report writer for BC classroom teachers. Proficiency scale (Emerging, Developing, Proficient, Extending, with + and −) and letter/percent for grades 10–12, a learning map built from the BC curriculum, an observation log, student goals and reflections, a term questionnaire, and printed reports. Teacher-only: no student or parent logins. Students open their own page with a printed card to answer questionnaires and, once built, to send work and read returned feedback (`docs/plans/student-page-build-plan.md`).
 
 Live at fullvision.ca. Owner: Colin Brown, a Surrey (SD36) teacher. Read `docs/ROADMAP.md` for where the product is going and `docs/DECISIONS.md` before changing grading or student-facing behaviour.
 
@@ -51,7 +51,7 @@ Demo Mode (`login.html` → Try Demo Mode, or `/login.html?demo=1`) runs local-o
 4. **Demo Mode is the only sample data.** No Welcome Class, no seeded rows for signed-in teachers.
 5. **Sync failures show only on the sync dot.** No banners, toasts or failed-item lists for sync problems.
 6. **Client ids:** `createCourse` and friends return a local id (`c` + base36 timestamp) and re-key to the server UUID when the RPC resolves. A local-shaped id reaching the database is a bug.
-7. **Every write RPC is idempotent** through `p_idempotency_key` (`fv_idem_check`). Keep that when adding one.
+7. **Every write RPC is idempotent** through `p_idempotency_key` (`fv_idem_check`). Keep that when adding one. The old one-cell score writes (`upsert_score`, `upsert_tag_score`, `upsert_rubric_score`, `save_score_comment`, `set_score_status`, `clear_score`, `set_rubric_check`) overwrite by student and assessment and take no key (DECISIONS, "Student page build answers" 11).
 8. **One PR per change; a release is a separate step.** `test-and-format` (vitest, the innerHTML audit, the database drift check, Prettier) must pass before merge; it is the only required check. Playwright runs on every PR and again on main after each merge (about five minutes); it is not required, so wait for every check, the browser tests included, before merging, and after merging check main's e2e run: if it's red, fixing it is the next PR. Merging to `main` costs nothing and deploys nothing. Netlify deploys the `production` branch only: a release is one pull request from `main` into `production` (`gh pr create --base production --head main`), one deploy, carrying every merge since the last release. Release only when Colin says to; each release spends a Netlify credit. End commit messages with the attribution line the session gives you.
 9. **Plain language in the UI:** Title Case for labels, headings, buttons and tabs; plain sentences for hints and messages. No jargon without a legend, no all-caps prompts.
 10. **Don't touch** `fullvision-user-inputs.xlsx`, `fullvision-documentation-inventory.xlsx`, or the gradebook site's CSS from classroom-content work.
