@@ -303,6 +303,29 @@ Context: the second day of the build. The math and screen reviews, and the first
 9. **A card's code and password stay readable by the class's teacher.** The privacy page must say so, and Colin puts it to his district's privacy officer.
 10. **When a student opens a returned piece is recorded for the student's own page only.** It is what marks a grade Updated (evening rulings 9). It is not shown to teachers, is kept as long as the grade, and goes on the privacy page.
 
+## Student page build rulings (2026-11-10, later)
+
+Context: the same day, after the first migration batch was applied. The screens that return grades went through review one by one, the student's page was wired to the server, and Colin tested a real card in his own class. He ruled on each point below, one at a time.
+
+**Returning grades**
+
+1. **A Return that reaches past the student on screen asks first.** "Return 3 Grades Now?", a line naming who is waiting, Cancel and Return 3 Graded. It applies to the gradebook's Competencies header button, an Assignments card's Return N Graded, and every Return N on the phone's To Return tab, Return 1 included: a return cannot be undone, and a thumb in a scrolling list or a stray click on a header should return nothing. One exception: the gradebook's Scores column menu stays one click, because the line directly above the item names who gets their grade. Returning the one student whose grade is on screen is one tap (the grader's Return, the phone's Return and Next, the student card's Return), unless a pair or group partner's draft goes with it; then it asks and names everyone.
+2. **Counts are students, and they match who is returned.** On pair and group work To Return and Return N Graded count students, not groups, on every screen. A count and its line of names always equal the grades that will be returned, a partner hidden by a search included.
+3. **On the phone, Return and Next goes to the next student in the strip,** graded or not. The To Return tab is where a teacher returns what is left in bulk.
+
+**The student's page**
+
+4. **The page signs itself out after 15 minutes with no activity,** on top of midnight and Done. A page forgotten on a shared Chromebook closes before the next block. Adds to Student page build answers 7.
+5. **"Opened" means the row was on screen.** A returned piece counts as opened once its row has been at least 60% in view, in a visible tab, for 0.6 seconds. So Updated stays on a changed grade the student never scrolled to. The feedback screen, when it is built, tightens this to a real open. Adds to 10 above.
+6. **Any card that is recognised signs the last student out,** also when it will not open (locked, past its date, the class's page off, needs reprinting). A code that is no card (a slip, a typo) signs nobody out. Applies the evening rulings' 2.
+7. **A piece switched to DIBELS and back keeps its returned grades.** While it is DIBELS its Draft and Returned records are dormant: nothing counts, lists, returns or shows them. Changed back, each is as it was (PR 989).
+
+**What was applied and released that day**
+
+Each on Colin's word, after its independent review: the first migration batch (PR 966), the search-path change (PR 991) and the follow-up to the batch (PR 989) were applied to the database; the `student-submit` edge function was deployed with its card routes; and `main` was released (PR 1001). Colin then turned Student Page on for one of his own classes, made cards, scanned one, and saw a returned grade and no draft. That closed the build plan's first slice.
+
+Still open: the privacy page's wording, which must change before cards go to another class.
+
 ## Phone-report birthday tries (2026-11-03)
 
 The Nov 3 bug sweep found that a phone-report slip has no lifetime limit on wrong birthdays: five in a session or ten on one code in 15 minutes lock it for now (`student_submit.check`, `migrations/20261025_phone_reports.sql`), and scanning the code again starts a new session. Questionnaire slips lock for good after five wrong tries (Student voice 2).
