@@ -1577,6 +1577,198 @@ describe('categories: the server’s list is read before the whole list is saved
     expect(kept()).toBe(null);
   });
 
+  /* The server takes the first write of `which` and its answer is lost on
+     the way back. */
+  function loseFirstAnswer(which) {
+    const send = server.fake.rpc;
+    let lose = true;
+    server.fake.rpc = function (name, params) {
+      const res = send(name, params);
+      if (name !== which || !lose) return res;
+      lose = false;
+      return Promise.resolve(res).then(() => ({ data: null, error: { message: 'network: failed to fetch' } }));
+    };
+    return () => (server.fake.rpc = send);
+  }
+
+  it('the save lands, its answer is lost, more is typed and the tab closed: the next time, the typing is kept and nothing says another device', async () => {
+    await openApp();
+    const restore = loseFirstAnswer('save_categories');
+    act('cmCatAdd');
+    input('cmCatNameLive', { idx: '2' }, 'Projects');
+    input('cmCatWeightLive', { idx: '0' }, 50);
+    input('cmCatWeightLive', { idx: '1' }, 30);
+    input('cmCatWeightLive', { idx: '2' }, 20);
+    act('cmCatSave');
+    await quiet();
+    restore();
+    expect(server.categories.map(c => [c.name, c.weight])).toEqual([
+      ['Assignments', 50],
+      ['Tests', 30],
+      ['Projects', 20],
+    ]);
+    const projects = server.categories[2].id;
+    // More typing, then the tab is closed.
+    input('cmCatWeightLive', { idx: '0' }, 40);
+    input('cmCatWeightLive', { idx: '2' }, 30);
+    await settle();
+    await openApp();
+    // Both halves of "changed on another device, nothing was saved" were
+    // false: the save was this computer's own. What is unsaved is the typing.
+    expect(draft().notice).toBe(KEPT);
+    expect(draft().typed).toBe(null);
+    expect(draft().rows.map(r => [r.name, r.weight])).toEqual([
+      ['Assignments', 40],
+      ['Tests', 30],
+      ['Projects', 30],
+    ]);
+    server.sent.length = 0;
+    act('cmCatSave');
+    await quiet();
+    expect(sentNames()).toEqual(['save_categories']);
+    expect(draft().notice).toBe(null);
+    expect(server.categories.map(c => [c.name, c.weight])).toEqual([
+      ['Assignments', 40],
+      ['Tests', 30],
+      ['Projects', 30],
+    ]);
+    // The row the first save made is the same row: not deleted and made again.
+    expect(server.categories[2].id).toBe(projects);
+    expect(kept()).toBe(null);
+  });
+
+  it('the save lands, its answer is lost, the tab is closed with nothing more typed: the next time, nothing is unsaved', async () => {
+    await openApp();
+    const restore = loseFirstAnswer('save_categories');
+    input('cmCatWeightLive', { idx: '0' }, 70);
+    input('cmCatWeightLive', { idx: '1' }, 30);
+    act('cmCatSave');
+    await quiet();
+    restore();
+    await openApp();
+    expect(draft().notice).toBe(null);
+    expect(draft().dirty).toBe(false);
+    expect(kept()).toBe(null);
+  });
+
+  it('a drag lands and its answer is lost: the row stays where it was put, nothing untrue is said, and the next Save goes once', async () => {
+    await openApp();
+    const restore = loseFirstAnswer('reorder_categories');
+    await DashClassManager.reorderCategory(1, 0);
+    await quiet();
+    restore();
+    expect(server.categories.map(c => c.name)).toEqual(['Tests', 'Assignments']);
+    // Not "Nothing was saved", and the row does not go back: this computer
+    // cannot tell whether the order arrived, so it keeps it as unsaved.
+    expect(draft().notice).toBe(OFFLINE);
+    expect(draft().rows.map(r => r.name)).toEqual(['Tests', 'Assignments']);
+    input('cmCatWeightLive', { idx: '0' }, 30);
+    input('cmCatWeightLive', { idx: '1' }, 70);
+    server.sent.length = 0;
+    act('cmCatSave');
+    await quiet();
+    // Not refused as "changed on another device": the order it found was its own.
+    expect(draft().notice).toBe(null);
+    expect(draft().typed).toBe(null);
+    expect(sentNames()).toEqual(['save_categories']);
+    expect(server.categories.map(c => [c.name, c.weight])).toEqual([
+      ['Tests', 30],
+      ['Assignments', 70],
+    ]);
+  });
+
+  it('a drag lands and its answer is lost, then the tab is closed: the next time, nothing is unsaved', async () => {
+    await openApp();
+    const restore = loseFirstAnswer('reorder_categories');
+    await DashClassManager.reorderCategory(1, 0);
+    await quiet();
+    restore();
+    await openApp();
+    expect(draft().notice).toBe(null);
+    expect(draft().rows.map(r => r.name)).toEqual(['Tests', 'Assignments']);
+    expect(kept()).toBe(null);
+  });
+
+  it('a drag sent with no answer that never arrived: the next Save sends the order on screen', async () => {
+    await openApp();
+    const send = server.fake.rpc;
+    let drop = true;
+    server.fake.rpc = function (name, params) {
+      if (name === 'reorder_categories' && drop) {
+        drop = false;
+        return Promise.resolve({ data: null, error: { message: 'network: failed to fetch' } });
+      }
+      return send(name, params);
+    };
+    await DashClassManager.reorderCategory(1, 0);
+    await quiet();
+    server.fake.rpc = send;
+    expect(server.categories.map(c => c.name)).toEqual(['Assignments', 'Tests']);
+    expect(draft().notice).toBe(OFFLINE);
+    act('cmCatSave');
+    await quiet();
+    expect(draft().notice).toBe(null);
+    expect(server.categories.map(c => c.name)).toEqual(['Tests', 'Assignments']);
+  });
+
+  /* Another write from this computer is still waiting to go (the server
+     answers it with a dropped connection), while the category reads work. */
+  async function anotherWriteWaits() {
+    const send = server.fake.rpc;
+    server.fake.rpc = function (name, params) {
+      if (name === 'update_course')
+        return Promise.resolve({ data: null, error: { message: 'network: failed to fetch' } });
+      return send(name, params);
+    };
+    act('cmSetRoundPercent', { value: 'whole' });
+    await settle();
+    const wait = CATEGORY_WRITE_WAIT_MS;
+    CATEGORY_WRITE_WAIT_MS = 200;
+    return async () => {
+      CATEGORY_WRITE_WAIT_MS = wait;
+      server.fake.rpc = send;
+      await goOnline();
+    };
+  }
+  const WAITING =
+    'Other changes from this computer are still being sent, so nothing was saved. Your changes are kept on this computer. Save again in a moment.';
+  const WAITING_ORDER =
+    'Other changes from this computer are still being sent, so nothing was saved. Try again in a moment.';
+
+  it('Save Categories while another write from this computer waits: it does not blame the connection', async () => {
+    await openApp();
+    const done = await anotherWriteWaits();
+    input('cmCatWeightLive', { idx: '0' }, 70);
+    input('cmCatWeightLive', { idx: '1' }, 30);
+    act('cmCatSave');
+    await new Promise(r => setTimeout(r, 700));
+    await settle();
+    expect(navigator.onLine).toBe(true);
+    expect(draft().notice).toBe(WAITING);
+    expect(draft().action).toBe('Discard My Changes');
+    expect(draft().rows.map(r => r.weight)).toEqual([70, 30]);
+    expect(server.categories.map(c => c.weight)).toEqual([60, 40]);
+    await done();
+    act('cmCatSave');
+    await quiet();
+    expect(draft().notice).toBe(null);
+    expect(server.categories.map(c => c.weight)).toEqual([70, 30]);
+  });
+
+  it('a drag while another write from this computer waits: the row goes back, and it does not blame the connection', async () => {
+    await openApp();
+    const done = await anotherWriteWaits();
+    const moved = DashClassManager.reorderCategory(1, 0);
+    await new Promise(r => setTimeout(r, 700));
+    await moved;
+    await settle();
+    expect(draft().notice).toBe(WAITING_ORDER);
+    expect(draft().action).toBe(null);
+    expect(draft().rows.map(r => r.name)).toEqual(['Assignments', 'Tests']);
+    expect(server.categories.map(c => c.name)).toEqual(['Assignments', 'Tests']);
+    await done();
+  });
+
   it('a connection that answers with an error is no check: nothing is saved', async () => {
     await openApp();
     server.fake.on('list_categories', () => ({ data: null, error: { message: 'permission denied', code: '42501' } }));

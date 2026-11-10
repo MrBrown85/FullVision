@@ -5949,13 +5949,17 @@ window.DashClassManager = (function () {
      the display order the server gave it (two rows can share one). */
   function _cmCatSnapshot(rows, inOrder) {
     return (rows || []).map(function (r, i) {
-      return {
+      var row = {
         id: r.id || null,
         name: r.name || '',
         weight: Number(r.weight) || 0,
         display_order: inOrder || r.display_order == null ? i : Number(r.display_order) || 0,
         calc_mode: categoryCalcMode(r),
       };
+      // A new row in a list sent with no answer: which row it is, so the id
+      // the server gave it can be found again after the tab is closed.
+      if (!row.id && r.key) row.key = r.key;
+      return row;
     });
   }
   function _cmCatRemember(st, rows, inOrder) {
@@ -5986,6 +5990,10 @@ window.DashClassManager = (function () {
       'Categories need a connection to save. Your changes are kept on this computer. Save again when you are online.',
     offlineOrder: 'Categories need a connection to save. Nothing was saved. Try again when you are online.',
     kept: 'Your unsaved category changes were kept on this computer. Save Categories to send them.',
+    // Online, but other changes from this computer had not gone yet.
+    waiting:
+      'Other changes from this computer are still being sent, so nothing was saved. Your changes are kept on this computer. Save again in a moment.',
+    waitingOrder: 'Other changes from this computer are still being sent, so nothing was saved. Try again in a moment.',
   };
   var CM_CAT_REST = ' Everything else was copied.';
   function _cmCatNoticeText(st) {
@@ -6014,8 +6022,8 @@ window.DashClassManager = (function () {
   function _cmCatNoticeAction(st) {
     var n = st.notice;
     if (!n) return null;
-    if (n.kind === 'offline' || n.kind === 'kept') return 'Discard My Changes';
-    if (n.kind === 'offlineOrder') return null;
+    if (n.kind === 'offline' || n.kind === 'kept' || n.kind === 'waiting') return 'Discard My Changes';
+    if (n.kind === 'offlineOrder' || n.kind === 'waitingOrder') return null;
     return 'Dismiss';
   }
   var CM_CAT_MODE_LABELS = { points: 'Total Points', percent: 'Average of Percentages' };
@@ -6059,6 +6067,7 @@ window.DashClassManager = (function () {
     if (st.keeping) {
       draft.rows = _cmCatSnapshot(st.rows, true);
       draft.opened = st.opened || [];
+      if (st.tried) draft.tried = st.tried.snap;
     }
     if (st.typed && st.typed.length) draft.typed = st.typed;
     if (st.notice && (st.notice.kind === 'copyChanged' || st.notice.kind === 'copyOffline')) {
@@ -6101,6 +6110,22 @@ window.DashClassManager = (function () {
       saveCategoryDraft(cid, draft.note ? { note: draft.note } : null);
       return;
     }
+    if (Array.isArray(draft.tried) && same(st.opened, draft.tried) && !same(st.opened, draft.opened || [])) {
+      // The server holds the list this computer sent and never heard back
+      // about: its own save landed, not a change made on another device.
+      // What was typed after it is unsaved, made over that list.
+      var rows = _cmCatWithLandedIds(draft.rows, draft.tried, st.opened);
+      if (same(st.opened, rows)) {
+        saveCategoryDraft(cid, draft.note ? { note: draft.note } : null);
+        return;
+      }
+      st.rows = _cmCatRowsFrom(rows);
+      st.dirty = true;
+      st.keeping = true;
+      st.notice = { kind: 'kept' };
+      _cmCatKeep(cid);
+      return;
+    }
     if (same(st.opened, draft.opened || [])) {
       st.rows = _cmCatRowsFrom(draft.rows);
       st.dirty = true;
@@ -6114,13 +6139,43 @@ window.DashClassManager = (function () {
     st.notice = { kind: 'changed' };
     _cmCatKeep(cid);
   }
+  /* Kept rows typed over a list that was sent with no answer and then
+     found on the server (`landed`, in its order): a new row of that list
+     takes the id the server gave it, found by its key. */
+  function _cmCatWithLandedIds(rows, tried, landed) {
+    var byOrder = function (list) {
+      return (list || [])
+        .map(function (r, i) {
+          return { r: r, i: i };
+        })
+        .sort(function (a, b) {
+          return (Number(a.r.display_order) || 0) - (Number(b.r.display_order) || 0) || a.i - b.i;
+        })
+        .map(function (x) {
+          return x.r;
+        });
+    };
+    var sent = byOrder(tried);
+    var there = byOrder(landed);
+    var idOf = {};
+    sent.forEach(function (r, i) {
+      if (!r.id && r.key && there[i] && there[i].id) idOf[r.key] = there[i].id;
+    });
+    return (rows || []).map(function (r) {
+      if (r.id || !r.key || !idOf[r.key]) return r;
+      var row = Object.assign({}, r, { id: idOf[r.key] });
+      delete row.key;
+      return row;
+    });
+  }
   /* The button beside the line. Discard My Changes puts the form back to
      the class's list as the server has it; Dismiss takes the line away. */
   function cmCatNoticeDone() {
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
     var st = _cmCatState(cid);
-    var discard = st.notice && (st.notice.kind === 'offline' || st.notice.kind === 'kept');
+    var discard =
+      st.notice && (st.notice.kind === 'offline' || st.notice.kind === 'kept' || st.notice.kind === 'waiting');
     if (typeof saveCategoryDraft === 'function') saveCategoryDraft(cid, null);
     if (discard) {
       // Back to the list the changes were made over: the server's, as this
@@ -6131,7 +6186,8 @@ window.DashClassManager = (function () {
       st.dirty = false;
       st.keeping = false;
       st.moving = null;
-      st.tried = null;
+      // st.tried stays: a list sent with no answer may still be what the
+      // server holds, and the next save must know it for this computer's own.
     }
     st.notice = null;
     st.typed = null;
@@ -6685,14 +6741,25 @@ window.DashClassManager = (function () {
           showSyncToast('Categories not saved: ' + ((res.error && res.error.message) || 'server error'), 'error');
         return;
       }
-      // No connection: nothing was saved, and what was typed stays, on
-      // screen and on this device.
-      if (res.unknown) st.tried = { rows: rows.slice(), snap: _cmCatSnapshot(rows, true) };
+      // No connection, or this computer's other changes had not gone:
+      // nothing was saved, and what was typed stays, on screen and on this
+      // device. Sent with no answer: it may have landed, and the next check
+      // knows it for this computer's own if it did.
+      if (res.unknown) _cmCatTried(st, rows);
       st.keeping = true;
-      st.notice = { kind: 'offline' };
+      st.notice = { kind: res.why === 'waiting' ? 'waiting' : 'offline' };
       _cmCatKeep(cid);
       renderClassManager();
     });
+  }
+  /* A list sent whose answer never came. Its new rows get a key, kept with
+     them on this device, so the ids the server gave them can be found again
+     after the tab is closed (_cmCatWithLandedIds). */
+  function _cmCatTried(st, rows) {
+    rows.forEach(function (r) {
+      if (!r.id && !r.key) r.key = uid();
+    });
+    st.tried = { rows: rows.slice(), snap: _cmCatSnapshot(rows, true) };
   }
 
   // Grading setup copied to or from another class (teacher/grading-setup-copy.js).
@@ -6725,7 +6792,8 @@ window.DashClassManager = (function () {
   /* A row dragged to a new place. It moves on screen at once. With nothing
      else unsaved, the new order is checked and sent in one online moment
      (reorderCategoriesNow in shared/data.js): the list changed elsewhere,
-     the current one shows; no connection, the row goes back where it was. */
+     the current one shows; no connection, the row goes back where it was;
+     sent with no answer, it stays, as a change not yet saved. */
   function _cmCatReorder(cid, fromIdx, toIdx) {
     var st = _cmCatState(cid);
     var before = st.rows.slice();
@@ -6777,10 +6845,19 @@ window.DashClassManager = (function () {
           _cmMirrorCategoriesToCache(cid);
         } else if (res.why === 'refused') {
           undo();
+        } else if (res.unknown) {
+          // Sent, and no answer came: the new order may be on the server or
+          // not. The row stays where it was put, as a change not yet saved,
+          // kept like any other; the next Save sends it, or finds it landed.
+          _cmCatTried(st, st.rows);
+          st.dirty = true;
+          st.keeping = true;
+          st.notice = { kind: 'offline' };
+          _cmCatKeep(cid);
         } else {
           // Not sent: the row goes back where it was.
           undo();
-          st.notice = { kind: 'offlineOrder' };
+          st.notice = { kind: res.why === 'waiting' ? 'waitingOrder' : 'offlineOrder' };
         }
         renderClassManager();
       });

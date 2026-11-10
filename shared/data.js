@@ -10055,10 +10055,12 @@ var CATEGORY_SAME_MOMENT_MS = 10000; // a queued list sent within this of being 
      { ok: false, why: 'changed', rows }   changed on another device; rows
                                            is the server's list (the cache
                                            has taken it)
-     { ok: false, why: 'offline' }         not saved: no connection, or
-                                           this device's other changes did
-                                           not go first. `unknown`: it was
-                                           sent and no answer came.
+     { ok: false, why: 'offline' }         not saved: no connection.
+                                           `unknown`: it was sent and no
+                                           answer came.
+     { ok: false, why: 'waiting' }         not saved: online, but this
+                                           device's other changes did not go
+                                           first
      { ok: false, why: 'refused', error }  the server said no
    A class no server holds (Demo Mode, one not created yet) saves as it
    always did. Never throws. */
@@ -10087,7 +10089,10 @@ async function _categoryWriteNow(cid, name, params, opened, tried) {
     // Work moved out of a category must reach the server before the list
     // that deletes it, and nothing this device still has to send may land
     // after the list it was made over.
-    if (!(await _unsentWritesGone(CATEGORY_WRITE_WAIT_MS)) || _isOffline()) return noAnswer;
+    var gone = await _unsentWritesGone(CATEGORY_WRITE_WAIT_MS);
+    if (_isOffline()) return noAnswer;
+    // Online, and this device's other writes are still waiting to go.
+    if (!gone) return { ok: false, why: 'waiting' };
   } catch (e) {
     return noAnswer;
   }
@@ -10186,6 +10191,9 @@ function _guardCategorySave(params, options) {
      typed          what the teacher had typed when the list turned out to
                     have changed on another device: shown beside the
                     current list to copy from
+     tried          a list this computer sent whose answer never came: if
+                    the server holds it, it was this computer's own save
+                    that landed, not a change made on another device
      note           { why, from, rest }: Copy Grading Setup left this
                     class's categories alone, and why
    Not class data: never sent, not in a backup, gone with the class. */
@@ -10197,7 +10205,7 @@ function saveCategoryDraft(cid, draft) {
   if (!cid) return;
   var keep = {};
   if (_plainObject(draft)) {
-    ['rows', 'opened', 'typed'].forEach(function (k) {
+    ['rows', 'opened', 'typed', 'tried'].forEach(function (k) {
       if (Array.isArray(draft[k])) keep[k] = draft[k];
     });
     if (_plainObject(draft.note)) keep.note = draft.note;
