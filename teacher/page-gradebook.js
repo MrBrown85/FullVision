@@ -953,6 +953,41 @@ window.PageGradebook = (function () {
     return true;
   }
 
+  /* A Competencies header's Return N Graded asks first (Colin, 2026-11-10):
+     the button shows no names, so the app's confirm dialog says who gets
+     their grade, the line the Scores column's menu shows above its own
+     Return N Graded, which stays one click. Cancel returns nothing and
+     gives the button the focus back. Return counts the drafts again from
+     the rows on screen (_returnDrafts) and does nothing if none is left;
+     the button goes with the drafts, so the assessment's title takes the
+     focus. */
+  function _askReturnDrafts(button) {
+    var cid = activeCourse;
+    var aid = button.dataset.aid;
+    var waiting = _drafts ? GradeState.draftsIn(cid, aid, _rowIds()) : [];
+    var n = waiting.length;
+    if (!n) return;
+    // The dialog gives the focus back to what had it when it opened. Safari
+    // does not focus a button it clicks, so the button takes it first.
+    button.focus({ preventScroll: true });
+    showConfirm(
+      'Return ' + n + (n === 1 ? ' Grade' : ' Grades') + ' Now?',
+      _draftsSentence(cid, waiting),
+      'Return ' + n + ' Graded',
+      'primary',
+      function () {
+        if (!_mounted || activeCourse !== cid || !_returnDrafts(aid)) return;
+        var title = Array.prototype.find.call(
+          document.querySelectorAll('.gb-grid-assess-group .gb-assess-title'),
+          function (t) {
+            return (t.dataset.href || '').split('&open=')[1] === aid;
+          },
+        );
+        if (title) title.focus({ preventScroll: true });
+      },
+    );
+  }
+
   /* Return N Graded under a Competencies header, where the column has no
      menu: drawn only while the assessment has drafts on screen. The Scores
      view has it at the top of the column's menu (showHeaderContextMenu). */
@@ -4407,18 +4442,9 @@ window.PageGradebook = (function () {
         var again = document.querySelector('.gb-to-return');
         if (again) again.focus({ preventScroll: true });
       },
-      // A Competencies header's Return N Graded: the button goes with the
-      // drafts, so the assessment's title takes the focus.
+      // A Competencies header's Return N Graded.
       returnDrafts: function () {
-        var aid = el.dataset.aid;
-        if (!_returnDrafts(aid)) return;
-        var title = Array.prototype.find.call(
-          document.querySelectorAll('.gb-grid-assess-group .gb-assess-title'),
-          function (t) {
-            return (t.dataset.href || '').split('&open=')[1] === aid;
-          },
-        );
-        if (title) title.focus({ preventScroll: true });
+        _askReturnDrafts(el);
       },
       toggleSort: function () {
         toggleSort(el.dataset.sortkey);

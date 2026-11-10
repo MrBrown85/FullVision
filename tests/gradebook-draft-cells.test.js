@@ -29,7 +29,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount, showCompetencies } from './helpers/gradebook-dom.js';
-import { U, signIn, seedClass, clearClass, click, fire, key } from './helpers/pin-save-paths.js';
+import { U, signIn, seedClass, clearClass, click, fire, key, confirmOk } from './helpers/pin-save-paths.js';
 
 const SNAPSHOT = join(new URL('.', import.meta.url).pathname, 'fixtures', 'gradebook-switch-off.json');
 const UPDATE = process.env.UPDATE_GRADEBOOK_SNAPSHOT === '1';
@@ -317,6 +317,9 @@ const headerButtons = () => Array.from(document.querySelectorAll('.gb-return-dra
 const headerButton = aid => headerButtons().find(b => b.getAttribute('data-aid') === aid);
 const returnItem = () => document.querySelector('.gb-ctx-menu [data-ctx="returnDrafts"]');
 const closeMenu = () => key(document.querySelector('.gb-ctx-menu'), 'Escape');
+// The app's confirm dialog (teacher/ui.js showConfirm), or null.
+const confirmDialog = () => document.querySelector('.confirm-overlay');
+const cancelConfirm = () => document.getElementById('confirm-cancel-btn').onclick();
 // What a Scores column's menu offers to return: its N, or 0 with no item.
 function menuCount(aid) {
   openColumnMenu(aid);
@@ -557,6 +560,8 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them', () =>
     openColumnMenu(LAB);
     expect(returnItem().textContent).toBe('Return 3 Graded');
     click(returnItem());
+    // One click: the line above the item has named who, so nothing asks.
+    expect(confirmDialog()).toBe(null);
     expect(returned.mock.calls).toEqual([[CID, LAB, [BEN, CARA, DEV]]]);
     returned.mockRestore();
     expect(document.querySelector('.gb-ctx-menu')).toBe(null);
@@ -575,7 +580,7 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them', () =>
     expect(document.activeElement.closest('.gb-grid-colhead').getAttribute('data-aid')).toBe(LAB);
   });
 
-  it('Return N Graded under a Competencies header does the same, and the title takes the focus', () => {
+  it('Return N Graded under a Competencies header asks first, naming who gets their grade', () => {
     open();
     [CARA, DEV].forEach(sid => Grader.setPoints(CID, sid, EXIT, 1));
     showCompetencies();
@@ -587,6 +592,67 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them', () =>
     expect(button.parentNode.querySelector('.gb-assess-title').textContent).toBe('Exit Ticket');
     const returned = vi.spyOn(Grader, 'returnGrades');
     click(button);
+    // The app's confirm dialog, and nothing returned yet.
+    const dialog = confirmDialog();
+    expect(dialog.getAttribute('role')).toBe('dialog');
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    expect(dialog.querySelector('.confirm-title').textContent).toBe('Return 2 Grades Now?');
+    expect(dialog.querySelector('.confirm-message').textContent).toBe(
+      '2 drafts: Cara and Dev can\u2019t see them yet.',
+    );
+    const buttons = Array.from(dialog.querySelectorAll('.confirm-actions button'));
+    expect(buttons.map(b => b.textContent)).toEqual(['Cancel', 'Return 2 Graded']);
+    expect(buttons[1].className).toBe('confirm-ok primary');
+    expect(returned.mock.calls).toEqual([]);
+    expect(dialogDrafts(EXIT)).toEqual([CARA, DEV]);
+    returned.mockRestore();
+  });
+
+  it('for one draft the dialog says Grade, not Grades', () => {
+    open();
+    Grader.setPoints(CID, DEV, EXIT, 1);
+    showCompetencies();
+    expect(headerButton(EXIT).textContent).toBe('Return 1 Graded');
+    click(headerButton(EXIT));
+    const dialog = confirmDialog();
+    expect(dialog.querySelector('.confirm-title').textContent).toBe('Return 1 Grade Now?');
+    expect(dialog.querySelector('.confirm-message').textContent).toBe('1 draft: Dev can\u2019t see it yet.');
+    expect(dialog.querySelector('#confirm-ok-btn').textContent).toBe('Return 1 Graded');
+    cancelConfirm();
+  });
+
+  it('Cancel returns nothing and gives the header button the focus back', () => {
+    open();
+    [CARA, DEV].forEach(sid => Grader.setPoints(CID, sid, EXIT, 1));
+    showCompetencies();
+    const before = main();
+    const returned = vi.spyOn(Grader, 'returnGrades');
+    click(headerButton(EXIT));
+    expect(confirmDialog()).not.toBe(null);
+    cancelConfirm();
+    expect(confirmDialog()).toBe(null);
+    expect(returned.mock.calls).toEqual([]);
+    returned.mockRestore();
+    expect(dialogDrafts(EXIT)).toEqual([CARA, DEV]);
+    expect(main()).toBe(before);
+    expect(pill().textContent).toBe('2 to return');
+    expect(document.activeElement).toBe(headerButton(EXIT));
+    // Escape is Cancel too.
+    click(headerButton(EXIT));
+    key(document, 'Escape');
+    expect(confirmDialog()).toBe(null);
+    expect(dialogDrafts(EXIT)).toEqual([CARA, DEV]);
+    expect(document.activeElement).toBe(headerButton(EXIT));
+  });
+
+  it('confirming returns the column’s drafts through the one grader, and the title takes the focus', () => {
+    open();
+    [CARA, DEV].forEach(sid => Grader.setPoints(CID, sid, EXIT, 1));
+    showCompetencies();
+    const returned = vi.spyOn(Grader, 'returnGrades');
+    click(headerButton(EXIT));
+    confirmOk();
+    expect(confirmDialog()).toBe(null);
     expect(returned.mock.calls).toEqual([[CID, EXIT, [CARA, DEV]]]);
     returned.mockRestore();
     expect(headerButtons()).toEqual([]);
@@ -594,6 +660,31 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them', () =>
     expect(isDashed(compCell(EXIT, CARA))).toBe(false);
     expect(document.activeElement.className).toBe('gb-assess-title');
     expect(document.activeElement.textContent).toBe('Exit Ticket');
+  });
+
+  it('the drafts are counted again at the moment of confirming', () => {
+    open();
+    [CARA, DEV].forEach(sid => Grader.setPoints(CID, sid, EXIT, 1));
+    showCompetencies();
+    click(headerButton(EXIT));
+    expect(confirmDialog().querySelector('.confirm-title').textContent).toBe('Return 2 Grades Now?');
+    // One of the two is returned somewhere else while the dialog is up.
+    Grader.returnGrades(CID, EXIT, [CARA]);
+    const returned = vi.spyOn(Grader, 'returnGrades');
+    confirmOk();
+    expect(returned.mock.calls).toEqual([[CID, EXIT, [DEV]]]);
+    expect(dialogDrafts(EXIT)).toEqual([]);
+    // With none left, confirming does nothing.
+    Grader.setPoints(CID, BEN, EXIT, 1);
+    redraw();
+    click(headerButton(EXIT));
+    Grader.returnGrades(CID, EXIT, [BEN]);
+    returned.mockClear();
+    const drawn = main();
+    confirmOk();
+    expect(returned.mock.calls).toEqual([]);
+    expect(main()).toBe(drawn);
+    returned.mockRestore();
   });
 
   it('pair work is returned together, as the grader dialog returns it', () => {
@@ -614,6 +705,19 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them', () =>
     search('');
     expect(pill()).toBe(null);
     expect(isDashed(scoresCell(TALK, AVA))).toBe(false);
+    // The header's dialog counts and names the students on screen too: with
+    // only Ben shown it says one grade, and the pair is returned together.
+    Grader.setLevel(CID, BEN, TALK, QUESTION, 1, 0);
+    search('ben');
+    showCompetencies();
+    click(headerButton(TALK));
+    expect(confirmDialog().querySelector('.confirm-title').textContent).toBe('Return 1 Grade Now?');
+    expect(confirmDialog().querySelector('.confirm-message').textContent).toBe('1 draft: Ben can\u2019t see it yet.');
+    confirmOk();
+    expect(GradeState.stateOf(CID, BEN, TALK)).toBe('returned');
+    expect(GradeState.stateOf(CID, AVA, TALK)).toBe('returned');
+    showScores();
+    search('');
     // A member graded separately is not returned with the pair.
     Grader.gradeSeparately(CID, TALK, AVA);
     Grader.setLevel(CID, AVA, TALK, QUESTION, 2, 0);
