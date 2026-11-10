@@ -53,7 +53,7 @@ BUILD = ['harness.sql', 'score-prelude.sql', 'score-tables.sql', 'bundle-prelude
          '../20261101_questionnaire_identity_check.sql', '../20261101_questionnaire_slip_fixes.sql',
          '../20261103_slip_password_kept_for_live_slips.sql', 'batch-a-tables.sql', 'batch-a-prelude.sql',
          'class-writers-prelude.sql', 'search-path-prelude.sql', *BATCH_A]
-LIVE_BUNDLE_MD5 = '119165287207814181c5875d81451147'   # live-function-md5.txt, before S0-M4
+LIVE_BUNDLE_MD5 = '119165287207814181c5875d81451147'   # get_class_bundle before S0-M4 (live-function-md5.txt's plain line is the one after it)
 LIVE_RLS_MD5 = '846ec2fbff751d24b890656d63c3a9bf'      # rls_auto_enable, read from gradebook-prod on 2026-11-10
 
 def source(rel):
@@ -682,8 +682,8 @@ def main():
         ok('%s is the live function, byte for byte (live-function-md5.txt)' % name,
            s.one("select md5(pg_get_functiondef(p.oid)) from pg_proc p where p.oid = to_regprocedure(:f)", f='public.%s(uuid)' % name) == live[name])
     bundle = s.one("select pg_get_functiondef('public.get_class_bundle(uuid,bigint)'::regprocedure)")
-    ok('get_class_bundle is the live function with S0-M4\'s one key added, and nothing else',
-       md5(bundle.replace(",\n                       'created_at', asm.created_at", '')) == live['get_class_bundle'])
+    ok('get_class_bundle is the function that was live before S0-M4 with S0-M4\'s one key added, and nothing else',
+       md5(bundle.replace(",\n                       'created_at', asm.created_at", '')) == LIVE_BUNDLE_MD5)
     ok('rls_auto_enable is the live function, byte for byte (md5 %s, read from gradebook-prod on 2026-11-10)' % LIVE_RLS_MD5,
        s.one("select md5(pg_get_functiondef('public.rls_auto_enable()'::regprocedure))") == LIVE_RLS_MD5)
     ok('the header\'s "before the apply" query finds nothing: every one of the sixteen is as it was tested', s.rows(header_query('precheck')) == [],
@@ -808,7 +808,7 @@ def main():
     ok('the header\'s "before the apply" query finds nothing again', s.rows(header_query('precheck')) == [])
     s.apply(UNDO)
     ok('a second run of the undo changes nothing', catalog(s) == cat0)
-    ok('after it, the undo script of S0-M4 runs, and get_class_bundle is the live function again', m4_undo() == live['get_class_bundle'], m4_undo())
+    ok('after it, the undo script of S0-M4 runs, and get_class_bundle is the function from before S0-M4 again', m4_undo() == LIVE_BUNDLE_MD5, m4_undo())
     s.apply()
     ok('S0-M5 applies again after its undo, to the same result', catalog(s) == cat1)
     s.close()
@@ -989,8 +989,8 @@ def main():
     # get_class_bundle, made by hand before S0-M4, stops S0-M4 at its first check.
     s = Session(seeded=False)
     s.run(without_m4)
-    ok('(get_class_bundle put back to the live definition: md5 %s)' % live['get_class_bundle'],
-       s.one("select md5(pg_get_functiondef('public.get_class_bundle(uuid,bigint)'::regprocedure))") == live['get_class_bundle'])
+    ok('(get_class_bundle put back to the definition from before S0-M4: md5 %s)' % LIVE_BUNDLE_MD5,
+       s.one("select md5(pg_get_functiondef('public.get_class_bundle(uuid,bigint)'::regprocedure))") == LIVE_BUNDLE_MD5)
     s.run('alter function public.get_class_bundle(uuid, bigint) set search_path = pg_catalog, pg_temp')
     try:
         s.apply(S0_M4); got = 'no error'
