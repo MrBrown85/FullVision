@@ -3370,6 +3370,8 @@ window.PageGradebook = (function () {
       });
       if (colAvg) avgHint = 'Avg ' + classColumnAverageText(activeCourse, assess, colAvg);
     }
+    // Print Rubrics (or Print Scores), as on Class Results and the grader.
+    var printLabel = window.RubricPrint ? RubricPrint.printLabel(activeCourse, assess) : '';
     // Return N Graded and who is waiting, when the column has drafts (S1-F1).
     var waiting = _drafts ? GradeState.draftsReturned(activeCourse, aid, _rowIds()) : [];
     // html-safe: the hint is a figure from calc.js, escaped; the drafts line's names go through esc
@@ -3388,6 +3390,7 @@ window.PageGradebook = (function () {
       (avgHint ? '<span class="gb-ctx-hint">' + esc(avgHint) + '</span>' : '') +
       '</div>' +
       '<div class="gb-ctx-item" data-ctx="editAssess">Edit Assessment Details</div>' +
+      (printLabel ? '<div class="gb-ctx-item" data-ctx="printRubrics">' + esc(printLabel) + '</div>' : '') +
       '<div class="gb-ctx-divider"></div>' +
       '<div class="gb-ctx-item" data-ctx="markUngradedNS">Mark Blank Cells Missing</div>' +
       '<div class="gb-ctx-item" data-ctx="markUngradedEXC">Mark Blank Cells Excused</div>' +
@@ -3418,7 +3421,9 @@ window.PageGradebook = (function () {
         if (window.ClassResults)
           ClassResults.open(activeCourse, aid, { from: header.querySelector('.gb-grid-colhead-label') || header });
       } else if (action === 'editAssess') Router.navigate('/assignments?course=' + activeCourse + '&edit=' + aid);
-      else if (action === 'markUngradedNS' || action === 'markUngradedEXC') {
+      else if (action === 'printRubrics') {
+        if (window.RubricPrint) RubricPrint.open(activeCourse, aid);
+      } else if (action === 'markUngradedNS' || action === 'markUngradedEXC') {
         // Every student row on screen with nothing in this column.
         _markBlankCells(
           aid,
