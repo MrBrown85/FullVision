@@ -1777,7 +1777,18 @@
     if (root && root.remove) root.remove();
   }
 
+  /* What a print button for this assessment says: Print Rubrics on rubric
+     and competency-level work (a graded rubric), Print Scores on points and
+     Complete/Incomplete work with no rubric, '' on DIBELS (its class sheet
+     prints from the Assignments page). */
+  function printLabel(cid, a) {
+    if (!a || isDibelsScored(a)) return '';
+    var hasRubric = a.rubricId && getRubricById(cid, a.rubricId);
+    return !hasRubric && isPointsScored(a) ? 'Print Scores' : 'Print Rubrics';
+  }
+
   window.RubricPrint = {
+    printLabel: printLabel,
     LAYOUTS: LAYOUTS,
     LAYOUT_ORDER: LAYOUT_ORDER,
     DEFAULT_OPTIONS: DEFAULT_OPTIONS,
