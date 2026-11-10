@@ -34,10 +34,22 @@
 
   /* Every score, comment, tick and status a sheet shows is read through
      ReportScores (teacher/report-scores.js), never from the data layer
-     here. A sheet drawn for a Feedback Page follows that report's set of
-     scores. A handout printed from the grader is drawn on the teacher's
-     working copy (all work), as it always was: it is not one of the
-     report surfaces in ReportScores' table. */
+     here. The handout is a report surface of its own ('handout'): it is
+     handed to students, so in a class that holds grades it shows returned
+     grades only (DECISIONS, "Student page build rulings (2026-11-10)" 6),
+     and Print asks first when a student in the print has a draft on the
+     piece (_askAboutDrafts). Each function below that reads a grade runs
+     inside ReportScores.withReportScores every time it is called, from
+     whichever door: the grader, Class Results, the gradebook's column
+     menu, the rubric bank. A sheet drawn for a Feedback Page follows that
+     report's set of scores. */
+  var _inReportScores = function (fn) {
+    return ReportScores.scoped('handout', fn);
+  };
+  sheetData = _inReportScores(sheetData);
+  scoreSheetData = _inReportScores(scoreSheetData);
+  feedbackItems = _inReportScores(feedbackItems);
+  isStudentScored = _inReportScores(isStudentScored);
 
   var ROOT_ID = 'rubric-print-root';
   var STYLE_ID = 'rubric-print-page';

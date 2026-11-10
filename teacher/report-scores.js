@@ -9,7 +9,13 @@
    - 'all': the teacher's working copy, drafts included;
    - 'returned': only what students have been given (shared/calc.js,
      withReturnedOnly).
-   Today every surface is 'all'. Nothing else in the app decides this.
+   Nothing else in the app decides this.
+
+   'returned' changes something only in a class that holds grades (its
+   student page on and Return Grades set to When I Return Them). In any
+   other class the data layer's returned set is the working copy itself
+   (getReturnedScores, getReturnedRubricCheckIds), so such a class prints
+   exactly what it printed before (tests/report-surfaces-other-classes.test.js).
 
    Three things go through here, and tests/report-score-seam.test.js fails
    when a report file goes around any of them:
@@ -30,14 +36,16 @@ window.ReportScores = (function () {
 
   /* Which grades each surface uses (plan 1.3, "Which grades each screen
      uses"; DECISIONS, "Student page build answers" 6). To put a surface on
-     returned grades, change its row to 'returned'.
-     The rubric handout printed from the grader (teacher/rubric-print.js)
-     is not a surface: the plan's table has no row for it. Its sheet reads
-     through the readers below, and is drawn on all work unless a report
-     surface draws it (a Feedback Page). */
+     returned grades, change its row to 'returned'. */
   var SURFACES = {
-    // Progress Reports on Page Studio, and the Quick Report with its Feedback Pages. S2-F1 makes it 'returned'.
-    progress: 'all',
+    // Progress Reports on Page Studio, and the Quick Report with its Feedback Pages (S2-F1).
+    progress: 'returned',
+    /* The rubric handout (teacher/rubric-print.js), from each door that
+       prints it: the grader, Class Results and the gradebook's column menu.
+       It is handed to students (DECISIONS, "Student page build rulings
+       (2026-11-10)" 6; S2-F1). Drawn inside a Feedback Page it takes that
+       report's set, as any report drawn inside another does. */
+    handout: 'returned',
     // The Term Questionnaire's facts, At a Glance and Generate. S2-F2 makes it 'returned'.
     questionnaire: 'all',
     // Sent to Phones: each student's phone copy. S2-F2 makes it 'returned'.

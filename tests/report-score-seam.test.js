@@ -16,9 +16,11 @@
  *    to 'returned' and drafts in the class, the report is exactly the
  *    report of a class that has only the returned grades, a draft's
  *    comment, note and tick are nowhere in it, and Print Grades and Export
- *    still give all work. Today every row is 'all'; the test changes the
- *    rows the way S2-F1 will (it loads the seam's source with the row
- *    edited), so that PR turns the row and this file needs no change.
+ *    still give all work. The tests below start from every report row on
+ *    'all' and turn the rows themselves (they load the seam's source with
+ *    the rows edited, loadSeam), so they test the mechanism whatever the
+ *    table says. What the table says is pinned on its own (S2-F1 turned
+ *    Progress Reports and the rubric handout to 'returned').
  *
  * tests/report-surfaces-output.test.js holds what each surface prints today.
  */
@@ -286,6 +288,11 @@ const DOORS = {
   'teacher/phone-reports.js': { surface: 'phones', names: ['snapshot'] },
   'teacher/grades-print.js': { surface: 'printGrades', names: ['buildModel', 'cellText', 'columnAverageText'] },
   'teacher/export-all.js': { surface: 'exportData', names: ['rows'] },
+  // The rubric handout, from every door that prints it (S2-F1).
+  'teacher/rubric-print.js': {
+    surface: 'handout',
+    names: ['sheetData', 'scoreSheetData', 'feedbackItems', 'isStudentScored'],
+  },
 };
 
 describe('report files read scores only through ReportScores', () => {
@@ -483,22 +490,36 @@ describe('report files read scores only through ReportScores', () => {
 
 /* ── Loading the seam with a row changed, as S2-F1 will change it ── */
 
-/* The seam's source with these surfaces' rows set ({ progress: 'returned' }),
-   run in place of the one loaded. With no rows, the seam as it is written. */
-function loadSeam(rows) {
+/* The report rows the tests below start from: every one on all work, so
+   they test the mechanism, not the table (which is pinned on its own). */
+const REPORT_ROWS = ['progress', 'handout', 'questionnaire', 'phones'];
+const ALL_WORK = Object.fromEntries(REPORT_ROWS.map(surface => [surface, 'all']));
+
+/* The seam's source with every report row on all work and then these
+   surfaces' rows set ({ progress: 'returned' }), run in place of the one
+   loaded. With no rows, every row on all work. loadSeam(null, true) runs
+   the seam as it is written. */
+function loadSeam(rows, asWritten) {
   let source = SEAM_SOURCE;
-  Object.keys(rows || {}).forEach(surface => {
+  Object.keys(Object.assign({}, asWritten ? {} : ALL_WORK, rows || {})).forEach(surface => {
     const row = new RegExp('(\\n\\s*' + surface + ": )'(all|returned)',");
     expect(row.test(source), surface + ' has a row in the table').toBe(true);
-    source = source.replace(row, "$1'" + rows[surface] + "',");
+    source = source.replace(row, "$1'" + Object.assign({}, asWritten ? {} : ALL_WORK, rows)[surface] + "',");
   });
   runInThisContext(source, { filename: SEAM });
 }
-const REPORTS_ON_RETURNED = { progress: 'returned', questionnaire: 'returned', phones: 'returned' };
+const REPORTS_ON_RETURNED = {
+  progress: 'returned',
+  handout: 'returned',
+  questionnaire: 'returned',
+  phones: 'returned',
+};
 
 /* ── 2. The seam itself ──────────────────────────────────────── */
 
 describe('ReportScores', () => {
+  beforeAll(() => loadSeam());
+  afterAll(() => loadSeam(null, true));
   afterEach(() => {
     loadSeam();
     delete globalThis.getReturnedScores;
@@ -506,9 +527,30 @@ describe('ReportScores', () => {
     _scoreSet = 'all';
   });
 
-  it('puts every surface on all work today', () => {
-    expect(ReportScores.surfaces()).toEqual(['progress', 'questionnaire', 'phones', 'printGrades', 'exportData']);
+  it('puts every surface on all work when every report row is on all work', () => {
+    expect(ReportScores.surfaces()).toEqual([
+      'progress',
+      'handout',
+      'questionnaire',
+      'phones',
+      'printGrades',
+      'exportData',
+    ]);
     ReportScores.surfaces().forEach(surface => expect(ReportScores.reportScoreSet(surface), surface).toBe('all'));
+  });
+
+  it('the table as written: Progress Reports and the rubric handout on returned grades (S2-F1), the rest on all work', () => {
+    loadSeam(null, true);
+    expect(
+      Object.fromEntries(ReportScores.surfaces().map(surface => [surface, ReportScores.reportScoreSet(surface)])),
+    ).toEqual({
+      progress: 'returned',
+      handout: 'returned',
+      questionnaire: 'all',
+      phones: 'all',
+      printGrades: 'all',
+      exportData: 'all',
+    });
   });
 
   it('refuses a surface that is not in the table, when it is named and when it is run', () => {
@@ -686,6 +728,7 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
     wasDemo = window.isDemoMode;
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(FROZEN_AT));
+    loadSeam();
     cid = loadDemoClass();
     setActiveTerm(cid, null);
     working = structuredClone(getScores(cid));
@@ -703,6 +746,7 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
   });
 
   afterAll(() => {
+    loadSeam(null, true);
     vi.useRealTimers();
     window.isDemoMode = wasDemo;
     CURRICULUM_INDEX = null;
@@ -775,10 +819,11 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
     expect(bare.outside.length).toBeGreaterThan(0);
     expect(inSeam.outside).toEqual([]);
     expect(inSeam.inside).toBeGreaterThan(0);
-    // A rubric handout asked for as Print Rubrics asks is not a report surface: it reads the working copy.
+    // A rubric handout asked for as Print Rubrics asks is a report surface of its own (S2-F1): its reads are inside.
     const lab = getAssessments(cid).find(a => a.rubricId);
     const handout = readsOutsideTheSeam(() => RubricPrint.sheetData(cid, lab.id, student.id));
-    expect(handout.outside.join(' ')).toContain('teacher/rubric-print.js');
+    expect(handout.outside).toEqual([]);
+    expect(handout.inside).toBeGreaterThan(0);
   });
 
   it('every score, status and tick read while a surface is drawn is made inside withReportScores', async () => {
@@ -799,11 +844,18 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
     expect(asked.outside).toEqual([]);
     expect(asked.inside).toBeGreaterThan(1000);
     expect(asked.watched).toBeGreaterThan(60);
-    // It sees one: the rubric sheet asked for as Print Rubrics asks, outside every report.
+    // The rubric sheet asked for as Print Rubrics asks is inside its own surface (S2-F1).
     const lab = getAssessments(cid).find(a => a.rubricId);
     const scored = getStudents(cid).find(s => getAssessmentOverallScore(cid, s.id, lab.id) > 0);
     const handout = gradesAskedOutsideTheSeam(() => RubricPrint.sheetData(cid, lab.id, scored.id));
-    expect(handout.outside.join(' ')).toContain('getAssessmentOverallScore from teacher/rubric-print.js');
+    expect(handout.outside).toEqual([]);
+    expect(handout.inside).toBeGreaterThan(0);
+    // And the watch still sees a grade a report file asks for outside every surface.
+    const unwrapped = runInThisContext('(function (c, a, s) { return getAssessmentOverallScore(c, s, a); })', {
+      filename: 'teacher/rubric-print.js',
+    });
+    const bare = gradesAskedOutsideTheSeam(() => unwrapped(cid, lab.id, scored.id));
+    expect(bare.outside.join(' ')).toContain('getAssessmentOverallScore from teacher/rubric-print.js');
   });
 
   it('no function run inside withReportScores leaves work for later (S2-F1 would refuse it)', async () => {
