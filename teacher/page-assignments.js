@@ -1185,7 +1185,7 @@ window.PageAssignments = (function () {
     var n = raw === '' ? null : Math.floor(Number(raw));
     values[el.dataset.field] = raw === '' || !isFinite(n) || n < 0 ? null : n;
     el.value = values[el.dataset.field] == null ? '' : values[el.dataset.field];
-    saveDibelsScore(cid, sid, aid, period, values);
+    Grader.setDibels(cid, sid, aid, period, values);
     var f = _dibelsFigures(cid, sid, aid, period);
     var scope = el.closest('.dbl-row') || el.closest('.dbl-card-wrap');
     if (!scope) return;
@@ -7091,7 +7091,7 @@ window.PageAssignments = (function () {
         formatPoints(saved) +
         '.',
       function () {
-        setPointsScore(cid, sid, aid, prev);
+        Grader.setPoints(cid, sid, aid, prev);
         render();
         refreshSidebarGrades(sid);
       },
@@ -7208,7 +7208,7 @@ window.PageAssignments = (function () {
     var current = getAssignmentStatus(cid, sid, aid);
     var newStatus = current === status ? null : status;
     if (!canSetAssignmentStatus(cid, sid, aid, newStatus)) return;
-    var clearedScores = applyAssignmentStatus(cid, sid, aid, newStatus);
+    var clearedScores = Grader.setStatus(cid, sid, aid, newStatus);
     var row =
       document.querySelector('.score-row[data-status-student="' + sid + '"][data-status-assess="' + aid + '"]') ||
       document.querySelector('.rsg-student[data-status-student="' + sid + '"][data-status-assess="' + aid + '"]');
@@ -7382,7 +7382,7 @@ window.PageAssignments = (function () {
   function _offerClearUndo(cid, before) {
     var after = structuredClone(getScores(cid));
     _showFillUndo('Score cleared', function () {
-      restoreScoreCells(cid, before, after);
+      Grader.undo(cid, before, after);
       render();
       refreshSidebarGrades();
     });
@@ -8101,7 +8101,7 @@ window.PageAssignments = (function () {
     var text = el.value.trim();
     el.classList.toggle('has-text', !!text);
     if (text === getScoreComment(activeCourse, el.dataset.sid, el.dataset.aid)) return;
-    saveScoreComment(activeCourse, el.dataset.sid, el.dataset.aid, text);
+    Grader.setOverallComment(activeCourse, el.dataset.sid, el.dataset.aid, text);
   }
   function _queueOverallComment(el) {
     el.classList.toggle('has-text', !!el.value.trim());
@@ -10935,7 +10935,7 @@ window.PageAssignments = (function () {
         var aid = _graderAid(el);
         if (!aid || !focusStudentId) return;
         var now = getCompletionMark(activeCourse, focusStudentId, aid);
-        setCompletionMark(activeCourse, focusStudentId, aid, now === el.dataset.mark ? null : el.dataset.mark);
+        Grader.setMark(activeCourse, focusStudentId, aid, now === el.dataset.mark ? null : el.dataset.mark);
         refreshSidebarGrades(focusStudentId);
         render();
       },
@@ -11213,7 +11213,7 @@ window.PageAssignments = (function () {
         text !==
         getRubricCriterionComment(activeCourse, focusStudentId, noteAid, _graderCriterion(noteAid, el.dataset.critid))
       )
-        saveRubricCriterionComment(activeCourse, focusStudentId, noteAid, el.dataset.critid, text);
+        Grader.setCriterionComment(activeCourse, focusStudentId, noteAid, el.dataset.critid, text);
       el.classList.toggle('has-text', !!text);
       return;
     }
@@ -11251,7 +11251,7 @@ window.PageAssignments = (function () {
           _graderCriterion(beyondAid, el.dataset.critid),
         )
       )
-        saveRubricCriterionBeyond(activeCourse, focusStudentId, beyondAid, el.dataset.critid, beyondText);
+        Grader.setWentBeyond(activeCourse, focusStudentId, beyondAid, el.dataset.critid, beyondText);
       el.classList.toggle('has-text', !!beyondText);
       return;
     }
@@ -11260,7 +11260,7 @@ window.PageAssignments = (function () {
       var tagText = el.value.trim();
       if (!tagAid || !focusStudentId) return;
       if (tagText !== getTagComment(activeCourse, focusStudentId, tagAid, el.dataset.tag))
-        saveTagComment(activeCourse, focusStudentId, tagAid, el.dataset.tag, tagText);
+        Grader.setCompetencyComment(activeCourse, focusStudentId, tagAid, el.dataset.tag, tagText);
       el.classList.toggle('has-text', !!tagText);
       return;
     }
@@ -12344,7 +12344,7 @@ window.PageAssignments = (function () {
       if (item) item.focus();
     } else if (what === 'separate') {
       _grader.menuSid = null;
-      setGradedSeparately(cid, aid, sid, true);
+      Grader.gradeSeparately(cid, aid, sid);
       // The group stays open; it draws from another member now if it drew
       // from this one.
       if (focusStudentId === sid) {
@@ -12372,7 +12372,7 @@ window.PageAssignments = (function () {
     var group = getCollabGroupOf(a, sid);
     if (!st || !group) return;
     var done = function () {
-      setGradedSeparately(cid, a.id, sid, false);
+      Grader.backToGroupGrade(cid, a.id, sid);
       refreshSidebarGrades();
       render();
     };
@@ -12709,7 +12709,7 @@ window.PageAssignments = (function () {
     var next = state.level === level && !state.mixed ? 0 : level;
     var before = next ? null : structuredClone(getScores(activeCourse));
     rubricCriterionScoreKeys(crit).forEach(function (tid) {
-      setScore(activeCourse, focusStudentId, aid, tid, next, 0);
+      Grader.setLevel(activeCourse, focusStudentId, aid, tid, next, 0);
     });
     refreshSidebarGrades(focusStudentId);
     render();
@@ -12725,7 +12725,7 @@ window.PageAssignments = (function () {
     var next = state.mod === mod ? 0 : mod;
     if (normalizeScoreMod(state.level, next) !== next) return;
     rubricCriterionScoreKeys(crit).forEach(function (tid) {
-      setScore(activeCourse, focusStudentId, aid, tid, state.level, next);
+      Grader.setPlusMinus(activeCourse, focusStudentId, aid, tid, state.level, next);
     });
     refreshSidebarGrades(focusStudentId);
     render();
@@ -12744,12 +12744,12 @@ window.PageAssignments = (function () {
       return;
     }
     var before = getRubricCheckIds(cid, focusStudentId, aid);
-    var after = setRubricCheck(cid, focusStudentId, aid, checkId, on);
+    var after = Grader.setTick(cid, focusStudentId, aid, checkId, on);
     var current = _criterionLevelNow(cid, aid, focusStudentId, crit);
     var next = RubricChecks.levelAfterTick(crit, current, before, after);
     if (next !== current)
       rubricCriterionScoreKeys(crit).forEach(function (tid) {
-        setScore(cid, focusStudentId, aid, tid, next);
+        Grader.setLevel(cid, focusStudentId, aid, tid, next);
       });
     refreshSidebarGrades(focusStudentId);
     render();
@@ -12762,7 +12762,9 @@ window.PageAssignments = (function () {
     var state = _tagState(activeCourse, focusStudentId, aid, tagId);
     var next = state.level === level && !state.mixed ? 0 : level;
     var before = next ? null : structuredClone(getScores(activeCourse));
-    _setTagScore(activeCourse, focusStudentId, aid, tagId, next, 0);
+    _tagScoreKeys(activeCourse, aid, tagId).forEach(function (key) {
+      Grader.setLevel(activeCourse, focusStudentId, aid, key, next, 0);
+    });
     refreshSidebarGrades(focusStudentId);
     render();
     _focusGraderCard(aid, '.grdl-card[data-tag="' + tagId + '"]');
@@ -12774,7 +12776,9 @@ window.PageAssignments = (function () {
     if (!state.level || state.mixed) return;
     var next = state.mod === mod ? 0 : mod;
     if (normalizeScoreMod(state.level, next) !== next) return;
-    _setTagScore(activeCourse, focusStudentId, aid, tagId, state.level, next);
+    _tagScoreKeys(activeCourse, aid, tagId).forEach(function (key) {
+      Grader.setPlusMinus(activeCourse, focusStudentId, aid, key, state.level, next);
+    });
     refreshSidebarGrades(focusStudentId);
     render();
     _focusGraderCard(aid, '.grdl-card[data-tag="' + tagId + '"]');

@@ -78,7 +78,9 @@ window.DashClassManager = (function () {
   var classManagerOpen = false;
   var cmSelectedCourse = null;
   var cmMode = 'edit';
-  var cmTab = 'details'; // details | students | questionnaires | grading | terms | competencies
+  // details | students | questionnaires | grading | terms | competencies,
+  // and student-page where that tab is shown (CM_TABS).
+  var cmTab = 'details';
 
   // Curriculum Wizard state
   var cwStep = 1;
@@ -2763,12 +2765,7 @@ window.DashClassManager = (function () {
     classManagerOpen = true;
     cmSelectedCourse = cid && COURSES[cid] ? cid : _activeCourse;
     cmMode = 'edit';
-    if (
-      CM_TABS.some(function (t) {
-        return t.id === tab;
-      })
-    )
-      cmTab = tab;
+    if (_cmTabShown(tab, cmSelectedCourse)) cmTab = tab;
     if (tab === 'new') {
       cmStartCreate();
       return;
@@ -2955,6 +2952,8 @@ window.DashClassManager = (function () {
       });
     }
     var html = '';
+    // A remembered tab this class doesn't show opens Details instead.
+    if (!_cmTabShown(cmTab, cmSelectedCourse)) cmTab = 'details';
     _cmSyncUrl();
 
     // Top bar
@@ -3303,6 +3302,9 @@ window.DashClassManager = (function () {
     // Questionnaires tab (teacher/cm-questionnaires.js)
     if (typeof CmQuestionnaires !== 'undefined') panels.questionnaires = CmQuestionnaires.render(cid);
 
+    // Student Page tab (teacher/cm-student-page.js), built only where shown
+    if (_cmTabShown('student-page', cid)) panels['student-page'] = CmStudentPage.render(cid);
+
     // Grading tab
     panels.grading = _cmRenderGradingTab(cid);
 
@@ -3623,14 +3625,44 @@ window.DashClassManager = (function () {
     );
   }
 
+  /* A tab marked `hidden` is not there: no button in the tab bar, no way in
+     by click, arrow key, address or remembered tab, and its panel is never
+     built. `hidden` is true, or a function of the class id for a tab some
+     classes show. Student Page (teacher/cm-student-page.js) decides its own
+     and is hidden for every class until S1-F4
+     (docs/plans/student-page-build-plan.md). */
   var CM_TABS = [
     { id: 'details', label: 'Details' },
     { id: 'students', label: 'Students' },
     { id: 'questionnaires', label: 'Questionnaires' },
+    {
+      id: 'student-page',
+      label: 'Student Page',
+      hidden: function (cid) {
+        return typeof CmStudentPage === 'undefined' || CmStudentPage.isShown(cid) !== true;
+      },
+    },
     { id: 'grading', label: 'Grading' },
     { id: 'terms', label: 'Reporting Terms' },
     { id: 'competencies', label: 'Competencies' },
   ];
+
+  function _cmTabHidden(t, cid) {
+    return !!(typeof t.hidden === 'function' ? t.hidden(cid) : t.hidden);
+  }
+
+  // The tabs a class shows, in order.
+  function _cmShownTabs(cid) {
+    return CM_TABS.filter(function (t) {
+      return !_cmTabHidden(t, cid);
+    });
+  }
+
+  function _cmTabShown(tab, cid) {
+    return _cmShownTabs(cid).some(function (t) {
+      return t.id === tab;
+    });
+  }
 
   function _cmRenderTabs(active, studentCount, tagCount) {
     var counts = { students: studentCount, competencies: tagCount };
@@ -3638,6 +3670,7 @@ window.DashClassManager = (function () {
     return (
       '<div class="cm-tabs" role="tablist" aria-label="Class settings">' +
       CM_TABS.map(function (t) {
+        if (_cmTabHidden(t, cmSelectedCourse)) return '';
         var on = t.id === active;
         return (
           '<button type="button" class="cm-tab' +
@@ -3661,12 +3694,7 @@ window.DashClassManager = (function () {
   }
 
   function cmSetTab(tab) {
-    if (
-      !CM_TABS.some(function (t) {
-        return t.id === tab;
-      })
-    )
-      return;
+    if (!_cmTabShown(tab, cmSelectedCourse)) return;
     cmTab = tab;
     // A school picked but not used goes back to the class's own.
     if (cmSelectedCourse) delete _cmTermSchool[cmSelectedCourse];
@@ -7745,6 +7773,9 @@ window.DashClassManager = (function () {
     // (DECISIONS, Reporting periods 6).
     var cc = structuredClone(getCourseConfig(sourceCid));
     delete cc.reportingTerms;
+    // The copy's Student Page starts off; its Return Grades choice
+    // (return_grades) comes along (DECISIONS, Student page build rulings 12).
+    delete cc.student_page_enabled;
     if (Object.keys(cc).length > 0) saveCourseConfig(newCourse.id, cc);
     // Categories and weights, as new rows. They go up through save_categories
     // once the class has its server id.
@@ -10053,6 +10084,8 @@ window.DashClassManager = (function () {
     if (action !== 'cmRosterDesigOpen') _cmCloseRosterPicker();
     if (/^sq[A-Z]/.test(action) && typeof CmQuestionnaires !== 'undefined')
       return CmQuestionnaires.handleAction(action, el);
+    if (/^sp[A-Z]/.test(action) && _cmTabShown('student-page', cmSelectedCourse))
+      return CmStudentPage.handleAction(action, el);
     var handlers = {
       openClassManager: function () {
         openClassManager();
@@ -10478,6 +10511,7 @@ window.DashClassManager = (function () {
 
   function _handleChange(el) {
     if (typeof CmQuestionnaires !== 'undefined' && CmQuestionnaires.handleChange(el)) return true;
+    if (_cmTabShown('student-page', cmSelectedCourse) && CmStudentPage.handleChange(el)) return true;
     if (el.dataset.actionChange === 'cmCSV') {
       cmHandleCSV(el);
       return true;
@@ -10615,7 +10649,7 @@ window.DashClassManager = (function () {
     }
     // Arrow keys move between the class tabs, as in any tab list.
     if (el && el.classList && el.classList.contains('cm-tab') && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
-      var ids = CM_TABS.map(function (t) {
+      var ids = _cmShownTabs(cmSelectedCourse).map(function (t) {
         return t.id;
       });
       var at = ids.indexOf(el.dataset.tab);
@@ -10649,6 +10683,7 @@ window.DashClassManager = (function () {
 
   function handleBlur(el) {
     if (typeof CmQuestionnaires !== 'undefined' && CmQuestionnaires.handleBlur(el)) return true;
+    if (_cmTabShown('student-page', cmSelectedCourse) && CmStudentPage.handleBlur(el)) return true;
     if (el.dataset.actionBlur === 'cmRosterField') {
       cmRosterField(el);
       return true;

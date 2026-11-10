@@ -711,7 +711,7 @@ window.MGrade = (function () {
   }
   function gradeSeparately(cid, aid, sid) {
     MC.dismissSheet();
-    setGradedSeparately(cid, aid, sid, true);
+    Grader.gradeSeparately(cid, aid, sid);
     MC.haptic();
     _redrawSwiper(cid, aid);
   }
@@ -750,7 +750,7 @@ window.MGrade = (function () {
   }
   function backToGroup(cid, aid, sid) {
     MC.dismissSheet();
-    setGradedSeparately(cid, aid, sid, false);
+    Grader.backToGroupGrade(cid, aid, sid);
     MC.haptic();
     _redrawSwiper(cid, aid);
   }
@@ -1435,7 +1435,7 @@ window.MGrade = (function () {
     if (!found) return;
     var text = el.value.trim();
     if (text === getRubricCriterionComment(cid, el.dataset.sid, el.dataset.aid, found.crit)) return;
-    saveRubricCriterionComment(cid, el.dataset.sid, el.dataset.aid, el.dataset.critid, text);
+    Grader.setCriterionComment(cid, el.dataset.sid, el.dataset.aid, el.dataset.critid, text);
   }
 
   /* Redraw one student's card in place after a criterion change. */
@@ -1462,12 +1462,13 @@ window.MGrade = (function () {
   }
 
   /* Write one level (and ±) under every key of a criterion, undoable as one. */
-  function _writeCriterion(cid, sid, found, level, mod) {
-    _writeKeys(cid, sid, found.assessment, rubricCriterionScoreKeys(found.crit), level, mod);
+  function _writeCriterion(cid, sid, found, level, mod, plusMinus) {
+    _writeKeys(cid, sid, found.assessment, rubricCriterionScoreKeys(found.crit), level, mod, plusMinus);
   }
 
-  /* Write one level (and ±) under several score keys, undoable as one. */
-  function _writeKeys(cid, sid, assessment, keys, level, mod) {
+  /* Write one level (and ±) under several score keys, undoable as one.
+     `plusMinus` says the tap was a + or −, not a level. */
+  function _writeKeys(cid, sid, assessment, keys, level, mod, plusMinus) {
     var aid = assessment.id;
     var prev = keys.map(function (tid) {
       var e = _currentEntry(cid, sid, aid, tid);
@@ -1476,17 +1477,8 @@ window.MGrade = (function () {
     _undoStack.push({ cid: cid, sid: sid, aid: aid, multi: prev });
     if (_undoStack.length > 20) _undoStack.shift();
     keys.forEach(function (tid) {
-      upsertScore(
-        cid,
-        sid,
-        aid,
-        tid,
-        level,
-        assessment.date || courseToday(cid),
-        scoreTypeFor(assessment),
-        '',
-        mod || 0,
-      );
+      if (plusMinus) Grader.setPlusMinusOnPhone(cid, sid, aid, tid, level, mod || 0, '');
+      else Grader.setLevelOnPhone(cid, sid, aid, tid, level, mod || 0);
     });
     clearProfCache();
   }
@@ -1517,7 +1509,7 @@ window.MGrade = (function () {
     if (!(state.level > 0) || state.mixed) return;
     var next = state.mod === mod ? 0 : mod;
     if (normalizeScoreMod(state.level, next) !== next) return;
-    _writeKeys(cid, sid, assessment, rubricRowScoreKeys(cid, assessment, tid), state.level, next);
+    _writeKeys(cid, sid, assessment, rubricRowScoreKeys(cid, assessment, tid), state.level, next, true);
     MC.haptic();
     _refreshCard(cid, sid, assessment.id);
   }
@@ -1542,7 +1534,7 @@ window.MGrade = (function () {
     if (!(state.level > 0) || state.mixed) return;
     var next = state.mod === mod ? 0 : mod;
     if (normalizeScoreMod(state.level, next) !== next) return;
-    _writeCriterion(cid, sid, found, state.level, next);
+    _writeCriterion(cid, sid, found, state.level, next, true);
     MC.haptic();
     _refreshCard(cid, sid, aid);
   }
@@ -1588,7 +1580,7 @@ window.MGrade = (function () {
     var found = _findCriterion(cid, aid, critId);
     if (!found) return;
     var before = getRubricCheckIds(cid, sid, aid);
-    var after = setRubricCheck(cid, sid, aid, checkId, on);
+    var after = Grader.setTick(cid, sid, aid, checkId, on);
     var state = _critState(cid, sid, aid, found.crit);
     var next = RubricChecks.levelAfterTick(found.crit, state.level, before, after);
     if (next !== state.level) _writeCriterion(cid, sid, found, next, 0);
@@ -1650,20 +1642,7 @@ window.MGrade = (function () {
     if (normalizeScoreMod(e.score, next) !== next) return;
     _undoStack.push({ cid: cid, sid: sid, aid: aid, tid: tid, prev: [JSON.parse(JSON.stringify(e))] });
     if (_undoStack.length > 20) _undoStack.shift();
-    var assessment = getAssessments(cid).find(function (a) {
-      return a.id === aid;
-    });
-    upsertScore(
-      cid,
-      sid,
-      aid,
-      tid,
-      e.score,
-      (assessment && assessment.date) || courseToday(cid),
-      scoreTypeFor(assessment),
-      e.note || '',
-      next,
-    );
+    Grader.setPlusMinusOnPhone(cid, sid, aid, tid, e.score, next, e.note || '');
     clearProfCache();
     MC.haptic();
     _syncModBtns(cid, sid, aid, tid);
@@ -1694,20 +1673,7 @@ window.MGrade = (function () {
     var cleared = existing && existing.score === score;
     if (cleared) score = 0;
 
-    // Find assessment for metadata
-    var assessment = getAssessments(cid).find(function (a) {
-      return a.id === aid;
-    });
-    upsertScore(
-      cid,
-      sid,
-      aid,
-      tid,
-      score,
-      (assessment && assessment.date) || courseToday(cid),
-      scoreTypeFor(assessment),
-      '',
-    );
+    Grader.setLevelOnPhone(cid, sid, aid, tid, score);
     clearProfCache();
     MC.haptic();
 
@@ -1736,7 +1702,7 @@ window.MGrade = (function () {
     if (!canSetAssignmentStatus(cid, sid, aid, newStatus)) return;
     // The desktop's rule (data.js applyAssignmentStatus): NS on proficiency
     // work zeroes every score under it; clearing NS restores nothing.
-    var clearsScores = applyAssignmentStatus(cid, sid, aid, newStatus);
+    var clearsScores = Grader.setStatus(cid, sid, aid, newStatus);
     if (clearsScores) clearProfCache();
     MC.haptic();
 
@@ -1804,8 +1770,7 @@ window.MGrade = (function () {
       stScores.push(p);
     });
     allScores[entry.sid] = stScores;
-    saveScores(entry.cid, allScores);
-    persistScoreDiffToCanonical(entry.cid, beforeScores, allScores);
+    Grader.undoOnPhone(entry.cid, entry.sid, entry.aid, beforeScores, allScores);
     clearProfCache();
 
     // Update UI
@@ -1839,8 +1804,7 @@ window.MGrade = (function () {
       });
     });
     allScores[entry.sid] = stScores;
-    saveScores(entry.cid, allScores);
-    persistScoreDiffToCanonical(entry.cid, beforeScores, allScores);
+    Grader.undoOnPhone(entry.cid, entry.sid, entry.aid, beforeScores, allScores);
     clearProfCache();
     _refreshCard(entry.cid, entry.sid, entry.aid);
     _updateThumbGraded(entry.cid, entry.aid);
@@ -2070,7 +2034,7 @@ window.MGrade = (function () {
     delete _commentTimers[key];
     var text = el.value.trim();
     if (text === getScoreComment(cid, el.dataset.sid, el.dataset.aid)) return;
-    saveScoreComment(cid, el.dataset.sid, el.dataset.aid, text);
+    Grader.setOverallComment(cid, el.dataset.sid, el.dataset.aid, text);
   }
 
   // `instant` lands on the student with no scroll animation.
@@ -2153,7 +2117,7 @@ window.MGrade = (function () {
   // Tapping the active mark again clears it.
   function setCompletion(cid, sid, aid, mark) {
     var next = getCompletionMark(cid, sid, aid) === mark ? null : mark;
-    setCompletionMark(cid, sid, aid, next);
+    Grader.setMark(cid, sid, aid, next);
     clearProfCache();
     MC.haptic();
     var group = document.querySelector('.m-cmp-group[data-sid="' + sid + '"][data-aid="' + aid + '"]');
@@ -2165,7 +2129,7 @@ window.MGrade = (function () {
   function adjustPointsScore(cid, sid, aid, delta, maxPts) {
     var current = getPointsScore(cid, sid, aid) || 0;
     var next = Math.max(0, Math.min(maxPts * POINTS_EXTRA_CREDIT_FACTOR, current + delta));
-    setPointsScore(cid, sid, aid, next);
+    Grader.setPoints(cid, sid, aid, next);
     clearProfCache();
     MC.haptic();
     // Update display
@@ -2197,7 +2161,7 @@ window.MGrade = (function () {
     inp.value = raw != null ? formatPoints(raw) : '';
     _updatePointsPct(sid, aid, raw, max);
     if (raw === prev) return;
-    setPointsScore(cid, sid, aid, raw);
+    Grader.setPoints(cid, sid, aid, raw);
     clearProfCache();
     _updateThumbGraded(cid, aid);
   }
