@@ -282,17 +282,31 @@ in a transaction that is rolled back.
 - **The apply path.** Each check stops the file with nothing changed: a
   function missing, with other arguments, not SECURITY DEFINER, with another
   `search_path` or a second setting; each of Batch A's four files missing;
-  S0-M4 missing; a seventeenth SECURITY DEFINER function without `pg_temp`
-  last in any of the three schemas (the last check, after the ALTERs). The
-  wrong order, made by hand: S0-M4 stops at its fingerprint check
-  (`python3 search_path.py wrong-order`, on an empty database, shows the
-  whole of it: Batch A's four files still apply, S0-M4 stops). A lock it
-  cannot get: gives up at five seconds, nothing changed. It takes no table
-  lock: it runs at once with six tables locked whole by another session. A
-  second run changes nothing.
+  S0-M4 missing (`get_class_bundle` with today's fingerprint) or the bundle
+  with any fingerprint but the one S0-M4 leaves; a seventeenth SECURITY
+  DEFINER function without `pg_temp` last in any of the three schemas (the
+  last check, after the ALTERs). The wrong order, made by hand: S0-M4 stops
+  at its fingerprint check (`python3 search_path.py wrong-order`, on an empty
+  database, shows the whole of it: Batch A's four files still apply, S0-M4
+  stops). A lock it cannot get: gives up at five seconds, nothing changed.
+  It takes no table lock: it runs at once with six tables locked whole by
+  another session. A second run changes nothing.
+- **Taking it back out.** `s0-m5-undo.sql` (not a migration) sets each
+  `search_path` back. After it all sixteen rows of `pg_proc` are what they
+  were, column for column, so all sixteen fingerprints are too, and nothing
+  else has changed; a second run, and a run where S0-M5 was never applied,
+  change nothing; it stops with nothing changed on a function that is
+  missing, not SECURITY DEFINER, has a third setting, or (for the four with
+  a fingerprint on file) has another body. It reopens the trick: Teacher B's
+  temporary `course` works again. S0-M4's undo (`s0-m4-undo.sql`) stops
+  while S0-M5 is applied and runs once it is undone, so the order out is
+  S0-M5's undo, then S0-M4's. S0-M5 applies again afterwards to the same
+  result. Both files were also run for real with `run.py` on `m5_post`
+  (undo, undo again, apply, apply again): every function fingerprint in the
+  three schemas went back to `m5_pre`'s and forward again.
 
 Result on 2026-11-10, PostgreSQL 17.11 (production's version) and 18.6:
-**309 of 309 on each**, the two outputs identical line for line, fingerprints
+**329 of 329 on each**, the two outputs identical line for line, fingerprints
 included.
 
 The other suites, on `m5_pre` and on `m5_post`, checks compared line by line

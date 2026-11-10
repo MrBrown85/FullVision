@@ -82,10 +82,20 @@
 --     longer be true.
 --
 -- So this file refuses to run, with nothing changed, until all four Batch A
--- files and S0-M4 are in: the one order that was tested. Its last step
--- checks that no SECURITY DEFINER function in public, student_submit or
--- fv_private is left without pg_temp last, Batch A's new ones included, and
--- undoes everything if one is.
+-- files and S0-M4 are in: the one order that was tested. For S0-M4 it goes
+-- by get_class_bundle's fingerprint: it must be the one S0-M4 leaves
+-- (845b42513d1f556dc941a1cc11cf9567, length 22591); today's
+-- (119165287207814181c5875d81451147) stops the file with a message naming
+-- S0-M4, and any other stops it too. Its last step checks that no SECURITY
+-- DEFINER function in public, student_submit or fv_private is left without
+-- pg_temp last, Batch A's new ones included, and undoes everything if one is.
+--
+-- ── Taking it back out ──────────────────────────────────────────────────────
+-- migrations/local-test/s0-m5-undo.sql puts each function's search_path back
+-- (not a migration; tested by search_path.py). It reopens what this file
+-- closes. S0-M4's undo script (local-test/s0-m4-undo.sql) checks
+-- get_class_bundle's fingerprint, so once this file is applied it stops:
+-- undo this one first, then S0-M4.
 --
 -- After the apply, four lines of migrations/local-test/live-function-md5.txt
 -- are out of date (fv_owns_assessment, fv_owns_course, fv_owns_enrollment,
@@ -109,8 +119,10 @@
 -- definition, which it prints), and any other SECURITY DEFINER function
 -- without pg_temp. No rows: everything is as tested. A row whose only
 -- difference is the md5 does not stop this file (it replaces no body); it
--- means that function was tested from a copy that is not the live one.
--- get_class_bundle has two md5s: today's, and with S0-M4 applied.
+-- means that function was tested from a copy that is not the live one. The
+-- exception is get_class_bundle, which the file does check. It has two md5s
+-- here, so the query can be run on either side of S0-M4: today's, and with
+-- S0-M4 applied.
 --
 -- precheck:
 --   with v(fn, setting, md5) as (values
@@ -197,6 +209,7 @@ do $guard$
 declare
     _f record;
     _p record;
+    _bundle text;
 begin
     -- Each function must exist with exactly these arguments, be SECURITY
     -- DEFINER, and have the search_path it had when this was written (read
@@ -241,8 +254,17 @@ begin
        or to_regclass('student_submit.device_session') is null then
         raise exception 'Batch A is not all applied (2026110901 to 2026110904): apply it, then S0-M4, then this file. Nothing was changed.';
     end if;
-    if position($s$'created_at', asm.created_at$s$ in pg_get_functiondef('public.get_class_bundle(uuid,bigint)'::regprocedure)) = 0 then
+    -- get_class_bundle must be the definition S0-M4 leaves (md5 of
+    -- pg_get_functiondef on PostgreSQL 17, confirmed by PR 985's reviewer),
+    -- or that one with this file's setting (a second run). The choice of
+    -- pg_catalog, pg_temp for it was made by reading that body.
+    _bundle := md5(pg_get_functiondef('public.get_class_bundle(uuid,bigint)'::regprocedure));
+    if _bundle = '119165287207814181c5875d81451147'
+       or position($s$'created_at', asm.created_at$s$ in pg_get_functiondef('public.get_class_bundle(uuid,bigint)'::regprocedure)) = 0 then
         raise exception 'S0-M4 is not applied (2026111001_assessment_created_at_in_bundle.sql): it checks get_class_bundle''s fingerprint, which this file changes. Apply it first. Nothing was changed.';
+    end if;
+    if _bundle not in ('845b42513d1f556dc941a1cc11cf9567', '116294a41f043458e3ddec694520cf0d') then
+        raise exception 'public.get_class_bundle(uuid,bigint) is not the definition this file was written against (md5 %, expected 845b42513d1f556dc941a1cc11cf9567, as S0-M4 leaves it). Nothing was changed.', _bundle;
     end if;
 end
 $guard$;

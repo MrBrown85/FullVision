@@ -609,20 +609,22 @@ def trick(title, scenario, expected):
         ok('%s: %s: without the migration %s, with it %s' % (title, what, json.dumps(was), json.dumps(now)),
            before.get(what) == was and after.get(what) == now, (before.get(what), after.get(what)))
 
-def refused(title, change, message, check_first=True):
-    """Make one thing differ from what the file expects, in a new session;
-    the file must stop with `message`, having changed none of the sixteen."""
-    s = Session(seeded=False)
+UNDO = 's0-m5-undo.sql'; S0_M4_UNDO = 's0-m4-undo.sql'
+
+def refused(title, change, message, rel=MIGRATION, applied=False):
+    """Make one thing differ from what a file expects, in a new session; the
+    file must stop with `message`, having changed none of the sixteen."""
+    s = Session(applied, seeded=False)
     try:
         s.owner()
         for st in change: s.run(st)
         before = settings(s)
         s.c.run('savepoint file')
         try:
-            s.apply(); got = 'no error'
+            s.apply(rel); got = 'no error'
         except pg.DatabaseError as e:
             got = e.args[0].get('M'); s.c.run('rollback to savepoint file')
-        ok('stops, saying so: ' + title, message in got and 'Nothing was changed' in got, got)
+        ok('%s, saying so: %s' % ('stops' if rel == MIGRATION else 'the undo stops', title), message in got and 'Nothing was changed' in got, got)
         ok('... and none of the sixteen was changed', settings(s) == before)
     finally:
         s.close()
@@ -759,7 +761,52 @@ def main():
     ok('the header\'s "before the apply" query now lists all sixteen as changed', len(s.rows(header_query('precheck'))) == 16)
     s.apply()
     ok('a second run changes nothing', catalog(s) == cat1)
+
+    # ── Taking it back out: s0-m5-undo.sql, in the same session ─────────────
+    undo = statements(UNDO, transaction=True)
+    ok('the undo script: one transaction, a five-second lock timeout, its checks before anything is changed',
+       last_line(undo[0]) == 'begin' and last_line(undo[-1]) == 'commit' and bare(undo[1]).lower() == "set local lock_timeout = '5s'"
+       and '$guard$' in undo[2] and len([u for u in undo if bare(u).lower().startswith('alter function')]) == 16)
+    def m4_undo():
+        s.c.run('savepoint m4')
+        try:
+            s.apply(S0_M4_UNDO)
+            return s.one("select md5(pg_get_functiondef('public.get_class_bundle(uuid,bigint)'::regprocedure))")
+        except pg.DatabaseError as e:
+            return e.args[0].get('M')
+        finally:
+            s.c.run('rollback to savepoint m4')
+    ok('with S0-M5 applied, the undo script of S0-M4 stops with nothing changed (so S0-M5 is undone first)',
+       m4_undo() == 'public.get_class_bundle(uuid,bigint) is neither the patched nor the original definition. Nothing was changed.', m4_undo())
+    s.apply(UNDO)
+    back = catalog(s)
+    differ = [fn for fn in cat0['sixteen'] if back['sixteen'][fn] != cat0['sixteen'][fn]]
+    ok('the undo puts all sixteen rows of pg_proc back as they were, column for column, and so all sixteen fingerprints', not differ, differ)
+    ok('... and changes no other function, trigger, policy or row', back == cat0)
+    ok('the header\'s "before the apply" query finds nothing again', s.rows(header_query('precheck')) == [])
+    s.apply(UNDO)
+    ok('a second run of the undo changes nothing', catalog(s) == cat0)
+    ok('after it, the undo script of S0-M4 runs, and get_class_bundle is the live function again', m4_undo() == live['get_class_bundle'], m4_undo())
+    s.apply()
+    ok('S0-M5 applies again after its undo, to the same result', catalog(s) == cat1)
     s.close()
+    s = Session(seeded=False)
+    first = catalog(s); s.apply(UNDO)
+    ok('the undo, run where S0-M5 was never applied, changes nothing', catalog(s) == first)
+    s.close()
+    s = Session(applied=True); s.apply(UNDO)
+    ok('the undo reopens it: Teacher B with a temporary course is told the class of Teacher A is theirs again',
+       trick_owns_course(s)["fv_owns_course says the class of Teacher A is B's"] is True)
+    s.close()
+    refused('a function is missing', ['drop function public.fv_retention_cleanup()'], 'public.fv_retention_cleanup() does not exist with these arguments', UNDO, True)
+    refused('a function is not SECURITY DEFINER', ['alter function public.fv_idem_check(uuid, text) security invoker'],
+            'public.fv_idem_check(uuid,text) is not SECURITY DEFINER', UNDO, True)
+    refused('a function has a third search_path', ['alter function public.rls_auto_enable() set search_path = pg_catalog, public, pg_temp'],
+            'public.rls_auto_enable() has the settings', UNDO, True)
+    refused('a function whose fingerprint is on file has another body',
+            ["""create or replace function public.fv_owns_course(cid uuid) returns boolean language sql stable security definer
+                set search_path to 'public', 'pg_temp' as 'select false'"""],
+            'public.fv_owns_course(uuid) is neither the S0-M5 definition nor the one before it', UNDO, True)
 
     # ── The temporary-table trick, without the migration and with it ────────
     trick('fv_owns_course, Teacher B with a temporary table called course', trick_owns_course, {
@@ -829,6 +876,9 @@ def main():
     refused('Batch A file 04 is not applied', ['alter table student_submit.device_session rename to m5_renamed'], 'Batch A is not all applied')
     without_m4 = bundle.replace(",\n                       'created_at', asm.created_at", '')
     refused('S0-M4 is not applied (get_class_bundle as it is live today)', [without_m4], 'S0-M4 is not applied')
+    refused('get_class_bundle is neither the definition S0-M4 leaves nor that with this setting',
+            [bundle.replace('\ndeclare\n', '\ndeclare\n    -- another change\n', 1)],
+            'public.get_class_bundle(uuid,bigint) is not the definition this file was written against')
     for where, make in (('public', "create function public.m5_seventeenth() returns int language sql security definer set search_path = public as 'select 1'"),
                         ('student_submit', "create function student_submit.m5_seventeenth() returns int language sql security definer as 'select 1'"),
                         ('fv_private', "create function fv_private.m5_seventeenth() returns int language sql security definer set search_path = pg_temp, public as 'select 1'")):
