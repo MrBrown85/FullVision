@@ -4,9 +4,10 @@ import { test, expect } from '@playwright/test';
 // that returns grades When I Return Them, the gradebook marks each draft
 // with a dashed outline, explains the mark in its key, counts the drafts on
 // "N to return" (which is also a filter), and returns a column's drafts with
-// Return N Graded: in the Scores column's menu and under a Competencies
-// header. Demo Mode only: no server knows the rule yet. With the switch off
-// the gradebook has none of it.
+// Return N Graded: in the Scores column's menu (one click, under the line
+// that names who) and under a Competencies header (which asks first, in the
+// app's confirm dialog). Demo Mode only: no server knows the rule yet. With
+// the switch off the gradebook has none of it.
 
 // A piece nobody is graded on yet, added to the Demo class. It is dated
 // today, so with Newest First it is the first column.
@@ -131,6 +132,8 @@ test('draft cells are dashed, counted and returned from their column; the filter
 
   // One press returns both: the cells are plain and the count is gone.
   await give.click();
+  // The menu's item is one click: the line above it named who, so no dialog.
+  await expect(page.locator('.confirm-overlay')).toHaveCount(0);
   await expect(page.locator('.gb-ctx-menu')).toHaveCount(0);
   await expect(page.locator('#gb-data .gb-draft')).toHaveCount(0);
   await expect(cell(page, first)).not.toHaveAttribute('aria-label', /Draft/);
@@ -222,10 +225,43 @@ test('draft cells are dashed, counted and returned from their column; the filter
     ),
   ).toEqual([3]);
 
-  // Returned from the Competencies header this time.
+  // Returned from the Competencies header this time. Its button shows no
+  // names, so it asks first, saying who gets their grade.
   await page.locator('[data-action="setView"][data-mode="detailed"]').click();
-  await page.locator('.gb-return-drafts[data-aid="e2e-draft"]').click();
+  const headerButton = page.locator('.gb-return-drafts[data-aid="e2e-draft"]');
+  const dialog = page.locator('.confirm-overlay');
+  await headerButton.click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('.confirm-title')).toHaveText('Return 2 Grades Now?');
+  const waiting = [at.names[0], at.names[2]].sort((a, b) => a.localeCompare(b));
+  await expect(dialog.locator('.confirm-message')).toHaveText(
+    '2 drafts: ' + waiting[0] + ' and ' + waiting[1] + ' can\u2019t see them yet.',
+  );
+  await expect(dialog.locator('.confirm-actions button')).toHaveText(['Cancel', 'Return 2 Graded']);
+  await expect(dialog.locator('#confirm-ok-btn')).toHaveClass(/primary/);
+  await expect(dialog.locator('.confirm-card')).toBeInViewport({ ratio: 1 });
+  // Cancel: nothing is returned, and the button has the focus again.
+  await dialog.locator('#confirm-cancel-btn').click();
+  await expect(dialog).toHaveCount(0);
+  await expect(pill).toHaveText('2 to return');
+  await expect(page.locator('#gb-data td.gb-score.gb-draft')).toHaveCount(2);
+  expect(await page.evaluate(a => a.sids.map(sid => GradeState.stateOf(a.cid, sid, 'e2e-draft')), at)).toEqual([
+    'draft',
+    'returned',
+    'draft',
+  ]);
+  await expect(headerButton).toBeFocused();
+  // Asked again and confirmed: both are returned.
+  await headerButton.click();
+  await dialog.locator('#confirm-ok-btn').click();
+  await expect(dialog).toHaveCount(0);
   await expect(page.locator('.gb-return-drafts')).toHaveCount(0);
+  expect(await page.evaluate(a => a.sids.map(sid => GradeState.stateOf(a.cid, sid, 'e2e-draft')), at)).toEqual([
+    'returned',
+    'returned',
+    'returned',
+  ]);
+  await expect(page.locator('.gb-grid-assess-group .gb-assess-title', { hasText: 'Tide Pool Notes' })).toBeFocused();
   await expect(pill).toHaveCount(0);
   await expect(page.locator('#gb-data .gb-draft')).toHaveCount(0);
   expect(errors).toEqual([]);
@@ -246,6 +282,17 @@ test('the marks follow the theme: dashed in dark mode too', async ({ page }) => 
     await draft.evaluate(el => getComputedStyle(el, '::before').borderTopColor === getComputedStyle(el).color),
   ).toBe(true);
   await expect(page.locator('.gb-to-return')).toHaveText('1 to return');
+
+  // One draft, from the Competencies header: the dialog says Grade, not Grades.
+  await page.locator('[data-action="setView"][data-mode="detailed"]').click();
+  await page.locator('.gb-return-drafts[data-aid="e2e-draft"]').click();
+  const dialog = page.locator('.confirm-overlay');
+  await expect(dialog.locator('.confirm-title')).toHaveText('Return 1 Grade Now?');
+  await expect(dialog.locator('.confirm-message')).toHaveText('1 draft: ' + at.names[0] + ' can\u2019t see it yet.');
+  await expect(dialog.locator('#confirm-ok-btn')).toHaveText('Return 1 Graded');
+  await dialog.locator('#confirm-ok-btn').click();
+  await expect(page.locator('.gb-to-return')).toHaveCount(0);
+  await expect(page.locator('#gb-data .gb-draft')).toHaveCount(0);
 });
 
 test('with the switch off, and on As Soon As I Save, the gradebook has no mark, count or Return', async ({ page }) => {
