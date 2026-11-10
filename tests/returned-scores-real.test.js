@@ -377,23 +377,61 @@ describe.each(CLASSES)('%s', (name, load) => {
       const real = getReturnedScores(cid);
       expect(read(real)).toEqual(read(referenceSet(cid, getScores(cid), rows)));
       expect(read(real)).not.toEqual(read(getScores(cid)));
-      // The cleared piece is back in its assessment's place, not at the end.
-      const mine = real[cleared.sid].map(e => e.assessmentId);
-      const order = getAssessments(cid).map(a => a.id);
-      expect(mine.indexOf(cleared.a.id)).toBeGreaterThanOrEqual(0);
-      expect(mine.slice().sort((x, y) => order.indexOf(x) - order.indexOf(y))).toEqual(mine);
+      // The cleared piece still counts.
+      expect(real[cleared.sid].some(e => e.assessmentId === cleared.a.id)).toBe(true);
       // With a returned row for every other grade, as the backfill leaves a class.
       const full = everyGradeReturned(cid);
       Object.keys(rows).forEach(aid => (full[aid] = Object.assign({}, full[aid], rows[aid])));
       setRows(cid, full);
       expect(read(getReturnedScores(cid))).toEqual(read(referenceSet(cid, getScores(cid), full)));
-      // Missing, then Excused, on the cleared piece: both leave it out.
+      // Missing, then Excused, on the cleared piece: neither builder decides
+      // that; calc.js does, and the piece counts the same in both sets.
       ['NS', 'EXC'].forEach(status => {
         getAssignmentStatuses(cid)[cleared.sid + ':' + cleared.a.id] = status;
         setRows(cid, full);
         expect(read(getReturnedScores(cid))).toEqual(read(referenceSet(cid, getScores(cid), full)));
-        expect(getReturnedScores(cid)[cleared.sid].filter(e => e.assessmentId === cleared.a.id)).toEqual([]);
+        const both = { all: allWork(cid)[cleared.sid], returned: returnedOnly(cid)[cleared.sid] };
+        expect(both.returned.levels.workLevel[cleared.a.id]).toEqual(both.all.levels.workLevel[cleared.a.id]);
       });
+    });
+
+    it('the order of the returned set’s entries does not matter: shuffled, every number is the same', () => {
+      const cid = ctx.cid;
+      hold();
+      // A few drafts: a changed grade, a cleared one, on different students.
+      const one = find(cid, isLevels);
+      lower(cid, one.sid, one.a);
+      const other = getStudents(cid).find(s => s.id !== one.sid && graded(cid, s.id, one.a));
+      clear(cid, other.id, one.a);
+      const real = globalThis.getReturnedScores;
+      const straight = withReturnedOnly(() => recordClass(cid)).record;
+      const allOf = recordClass(cid).record;
+      expect(differences(canonical(allOf, ''), canonical(straight, '')).length).toBeGreaterThan(0);
+      try {
+        [1, 2, 3, 4, 5].forEach(seed => {
+          // A small seeded generator, so a failure can be run again.
+          let state = seed * 2654435761;
+          const next = () => ((state = (state * 1664525 + 1013904223) >>> 0), state / 4294967296);
+          const shuffled = {};
+          const set = real(cid);
+          Object.keys(set).forEach(sid => {
+            const list = set[sid].slice();
+            for (let i = list.length - 1; i > 0; i--) {
+              const j = Math.floor(next() * (i + 1));
+              [list[i], list[j]] = [list[j], list[i]];
+            }
+            shuffled[sid] = list;
+          });
+          expect(shuffled).not.toEqual(set);
+          globalThis.getReturnedScores = () => shuffled;
+          clearProfCache();
+          const now = withReturnedOnly(() => recordClass(cid)).record;
+          expect(differences(canonical(straight, ''), canonical(now, '')), 'seed ' + seed).toEqual([]);
+        });
+      } finally {
+        globalThis.getReturnedScores = real;
+        clearProfCache();
+      }
     });
 
     it('entry for entry: every grade returned, then one changed, is the getScores of before the change', () => {

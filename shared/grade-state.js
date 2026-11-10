@@ -34,9 +34,6 @@
  *   previous_copy  the grade the student had before the newest return
  *   updated_at     when a returned grade last changed for the student
  *   seen_at        when the student last opened the piece
- * A device may keep `local` beside a returned copy it took itself: the
- * score entries the copy was made from and the entry they sat after
- * (shared/data.js). It is carried while the copy is, and never sent.
  * No row and no grade: nothing is returned and nothing waits. No row and a
  * grade: the grade was there before the rule was kept, so it is Returned
  * (existing scores become Returned).
@@ -56,11 +53,12 @@
  *   competency since deleted. Those drop off at once, with no Return.
  * - Missing and Excused win at once (Colin, 2026-11-09). While a piece is
  *   Missing or Excused the student is given no grade, even one returned
- *   before, and the returned set of scores holds nothing from its returned
- *   copy. Take the mark off before any Return and the returned grade is
+ *   before. Take the mark off before any Return and the returned grade is
  *   back. Late is only a label and hides nothing. The row itself does not
  *   change: a draft under Missing is still a draft there, though a screen
- *   shows the status, not Draft (stateOf).
+ *   shows the status, not Draft (stateOf). In grade math the same holds
+ *   for every set of scores, and calc.js is where: a Missing or Excused
+ *   piece counts no level, whatever entries a set holds for it.
  *
  * shared/data.js applies afterWrite on every score write and afterReturn on
  * Return, and keeps the rows beside the scores. What lands here later: the
@@ -157,8 +155,6 @@ window.GradeState = (function () {
     _FIELDS.forEach(function (f) {
       if (row[f] != null) out[f] = row[f];
     });
-    // What the device keeps beside a returned copy lasts as long as the copy.
-    if (out.returned_copy && row.local) out.local = row.local;
     return out.is_draft || Object.keys(out).length > 1 ? out : null;
   }
   function _time(iso) {
@@ -408,43 +404,24 @@ window.GradeState = (function () {
      the working scores, { studentId: [entry] }:
      - the working entries where nothing is a draft;
      - the returned grade where a draft sits on a returned grade;
-     - nothing where a grade was never returned;
-     - nothing for a piece that is Missing or Excused, draft or not: the
-       mark wins at once, and taking it off brings the grade back. (Entries
-       that hold nothing, a cleared level's 0, stay: they count for nothing
-       and a class with no draft keeps its own entries.)
-     Entries are read whole, as the working copy is: grade math hides what
-     a piece is no longer scored by the same way in both sets, so a draft
-     on one competency never moves another's level.
-
-     Where an entry sits matters: grade math breaks a tie between two
-     pieces of the same date by their order. A returned grade goes back
-     where its entries sat: after the entry the row says they followed
-     (row.local.after); failing that, where the working entries it stands
-     for are; failing that (a cleared grade from another device), by its
-     assessment's place in the class's list, `order`.
+     - nothing where a grade was never returned.
+     That is all it decides. calc.js reads both sets by the same rules:
+     what a piece measures now, a Missing or Excused piece counting no
+     level, and same-date pieces in the class's assignment-list order,
+     whatever order the entries sit in. So a returned grade goes where its
+     working entries are, or at the end when it has none left.
 
      The set is a plain object with a list for every student in the working
      copy or the rows: an empty list when nothing of theirs is returned.
 
      `rows` is { assessmentId: { studentId: row } }. `entriesOf(sid, aid,
-     copy, own, row)` turns a returned copy into score entries; `own` is the
-     student's working entries for that assessment. `statuses` is
-     { 'studentId:assessmentId': 'NS' | 'EXC' | 'LATE' }. `order` is the
-     class's assessment ids, in order. */
-  function returnedScores(working, rows, entriesOf, statuses, order) {
+     copy, own)` turns a returned copy into score entries; `own` is the
+     student's working entries for that assessment. */
+  function returnedScores(working, rows, entriesOf) {
     working = working || {};
     rows = rows || {};
-    statuses = statuses || {};
-    var rank = {};
-    (order || []).forEach(function (aid, i) {
-      rank[aid] = i;
-    });
     var rowOf = function (sid, aid) {
       return (rows[aid] || {})[sid] || null;
-    };
-    var holdsSomething = function (e) {
-      return (e.score != null && e.score !== '' && Number(e.score) !== 0) || !!e.note || !!e.critNote || !!e.critBeyond;
     };
     var sids = Object.keys(working);
     Object.keys(rows).forEach(function (aid) {
@@ -456,51 +433,28 @@ window.GradeState = (function () {
     sids.forEach(function (sid) {
       var own = Array.isArray(working[sid]) ? working[sid] : [];
       var list = [];
-      var slots = {}; // assessmentId → the place its working entries hold, for a draft
+      var placed = {};
+      var place = function (aid) {
+        if (placed[aid]) return;
+        placed[aid] = true;
+        var copy = rowOf(sid, aid).returned_copy;
+        if (!copy) return;
+        var mine = own.filter(function (e) {
+          return e && e.assessmentId === aid;
+        });
+        entriesOf(sid, aid, copy, mine).forEach(function (e) {
+          list.push(e);
+        });
+      };
       own.forEach(function (entry) {
-        var aid = entry ? entry.assessmentId : null;
-        var row = aid ? rowOf(sid, aid) : null;
-        if (row && row.is_draft) {
-          if (!slots[aid]) list.push((slots[aid] = { slot: aid }));
-        } else if (!entry || !_hidesGrade(statuses[sid + ':' + aid]) || !holdsSomething(entry)) list.push(entry);
+        var row = entry ? rowOf(sid, entry.assessmentId) : null;
+        if (row && row.is_draft) place(entry.assessmentId);
+        else list.push(entry);
       });
+      // A returned grade cleared since has no working entry; it still counts.
       Object.keys(rows).forEach(function (aid) {
         var row = rowOf(sid, aid);
-        if (!row || !row.is_draft) return;
-        var back = [];
-        if (row.returned_copy && !_hidesGrade(statuses[sid + ':' + aid])) {
-          back = entriesOf(
-            sid,
-            aid,
-            row.returned_copy,
-            own.filter(function (e) {
-              return e && e.assessmentId === aid;
-            }),
-            row,
-          );
-        }
-        var at = -1;
-        var after = row.local ? row.local.after : undefined;
-        if (after === null) at = 0;
-        else if (after) {
-          for (var i = list.length - 1; i >= 0 && at < 0; i--) {
-            var e = list[i];
-            if (e && e.assessmentId === after[0] && (e.tagId || '') === after[1]) at = i + 1;
-          }
-        }
-        var slot = slots[aid] ? list.indexOf(slots[aid]) : -1;
-        if (at < 0) at = slot;
-        if (at < 0 && rank[aid] !== undefined) {
-          for (var j = 0; j < list.length && at < 0; j++) {
-            if (list[j] && rank[list[j].assessmentId] > rank[aid]) at = j;
-          }
-        }
-        if (at < 0) at = list.length;
-        if (slot >= 0) {
-          list.splice(slot, 1);
-          if (slot < at) at--;
-        }
-        Array.prototype.splice.apply(list, [at, 0].concat(back));
+        if (row && row.is_draft) place(aid);
       });
       out[sid] = list;
     });

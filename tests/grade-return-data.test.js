@@ -433,9 +433,6 @@ describe('Return', () => {
       returned_at: '2026-11-09T18:00:00.000Z',
       returned_copy: three,
     });
-    // Beside the copy, the entries it was made from and where they sat (first).
-    expect(row('s1', 'essay').local.entries.map(e => [e.tagId, e.score])).toEqual([['t1', 3]]);
-    expect(row('s1', 'essay').local.after).toBe(null);
     give('essay', 's1');
     expect(row('s1', 'essay')).toEqual({
       is_draft: false,
@@ -515,8 +512,9 @@ describe('Missing wins at once', () => {
     expect(state('s1', 'essay')).toBe('draft');
     expect(applyAssignmentStatus(CID, 's1', 'essay', 'NS')).toBe(true);
     expect(state('s1', 'essay')).toBe(null);
-    // The returned set holds nothing for the piece while it is Missing.
-    expect(getReturnedScores(CID).s1.filter(e => e.assessmentId === 'essay')).toEqual([]);
+    // The returned set still holds what was returned: calc.js is where a
+    // Missing piece counts no level, in both sets ("with real grade math").
+    expect(getReturnedScores(CID).s1.filter(e => e.assessmentId === 'essay' && e.score > 0).length).toBe(1);
     applyAssignmentStatus(CID, 's1', 'essay', null);
     expect(state('s1', 'essay')).toBe('draft');
     expect(
@@ -878,9 +876,10 @@ describe('with real grade math', () => {
     // The 4 is cleared and the clear is not returned.
     saveScores(MATH, clearScoreEntries(MATH, getScores(MATH), 's1', FIRST, ['q']));
     expect(getScores(MATH).s1.map(e => e.assessmentId)).toEqual(['second']);
+    // The returned 4 is back in the set, after the 2: calc.js puts the tie in the class's order.
     expect(getReturnedScores(MATH).s1.map(e => [e.assessmentId, e.score])).toEqual([
-      ['first', 4],
       ['second', 2],
+      ['first', 4],
     ]);
     METHODS.forEach(name => {
       method(name);
@@ -1034,8 +1033,11 @@ describe('review: the returned set and real grade math', () => {
   const R = 'c-review';
   const ESSAY2 = { id: 'essay', title: 'Essay', date: '2026-10-10', type: 'summative', tagIds: ['ask', 'plan'] };
   const LAB2 = { id: 'lab', title: 'Lab', date: '2026-10-11', type: 'summative', tagIds: ['plan'] };
-  const QUIZ_A = { id: 'qa', title: 'Quiz A', date: '2026-10-12', scoreMode: 'points', maxPoints: 10, tagIds: ['ask'] };
-  const QUIZ_B = { id: 'qb', title: 'Quiz B', date: '2026-10-12', scoreMode: 'points', maxPoints: 10, tagIds: ['ask'] };
+  const quiz = (id, title) => ({ id, title, date: '2026-10-12', scoreMode: 'points', maxPoints: 10, tagIds: ['ask'] });
+  const QUIZ_A = quiz('qa', 'Quiz A');
+  const QUIZ_B = quiz('qb', 'Quiz B');
+  const QUIZ_C = quiz('qc', 'Quiz C');
+  const QUIZ_D = quiz('qd', 'Quiz D');
   const lvl = (sid, aid, tid, value) => upsertScore(R, sid, aid, tid, value, '', 'summative', '', 0);
   const all = (sid, tid) => (clearProfCache(), getTagProficiency(R, sid, tid));
   const returned = (sid, tid) => (clearProfCache(), withReturnedOnly(() => getTagProficiency(R, sid, tid)));
@@ -1045,7 +1047,7 @@ describe('review: the returned set and real grade math', () => {
     localStorage.clear();
     seedClass(R, {
       students: STUDENTS,
-      assessments: [ESSAY2, LAB2, QUIZ_A, QUIZ_B].map(a => structuredClone(a)),
+      assessments: [ESSAY2, LAB2, QUIZ_A, QUIZ_B, QUIZ_C, QUIZ_D].map(a => structuredClone(a)),
       learningMaps: {
         subjects: [],
         sections: [
@@ -1061,58 +1063,99 @@ describe('review: the returned set and real grade math', () => {
   });
   afterEach(() => clearClass(R));
 
-  it('1. a draft on one competency never moves another’s returned-only level', () => {
+  it('1. a draft on one competency never moves another’s level: the two sets agree at every step', () => {
     lvl('s1', 'essay', 'ask', 3);
     lvl('s1', 'essay', 'plan', 4);
     lvl('s1', 'lab', 'plan', 2);
     returnGrades(R, 'essay', ['s1']);
     returnGrades(R, 'lab', ['s1']);
-    // Plan is taken off the Essay; its old level stays in the scores.
+    expect([all('s1', 'plan'), returned('s1', 'plan')]).toEqual([3, 3]);
+    // Plan is taken off the Essay: only what a piece measures now counts, in both sets.
     saveAssessments(
       R,
       getAssessments(R).map(a => (a.id === 'essay' ? Object.assign({}, a, { tagIds: ['ask'] }) : a)),
     );
-    const plan = { all: all('s1', 'plan'), returned: returned('s1', 'plan') };
-    expect(plan.returned).toBe(plan.all);
+    expect([all('s1', 'plan'), returned('s1', 'plan')]).toEqual([2, 2]);
     lvl('s1', 'essay', 'ask', 2);
     expect(GradeState.stateOf(R, 's1', 'essay')).toBe('draft');
-    expect(returned('s1', 'plan')).toBe(plan.returned);
-    expect(all('s1', 'plan')).toBe(plan.all);
-    expect(returned('s1', 'ask')).toBe(3);
+    // The returned copy still holds Plan 4; it is read as the working copy is.
+    expect(getGradeReturn(R, 's1', 'essay').returned_copy.tags.plan.value).toBe(4);
+    expect([all('s1', 'plan'), returned('s1', 'plan')]).toEqual([2, 2]);
+    expect([all('s1', 'ask'), returned('s1', 'ask')]).toEqual([2, 3]);
     returnGrades(R, 'essay', ['s1']);
-    expect(returned('s1', 'plan')).toBe(plan.returned);
+    expect([all('s1', 'plan'), returned('s1', 'plan')]).toEqual([2, 2]);
     expect(returned('s1', 'ask')).toBe(2);
   });
 
-  it('2. a cleared points grade sits exactly where its entry sat, graded out of the class’s order', () => {
-    // Quiz B first (10/10), then Quiz A (2/10): the same date, the same competency.
-    setPointsScore(R, 's1', 'qb', 10);
-    setPointsScore(R, 's1', 'qa', 2);
-    returnGrades(R, 'qb', ['s1']);
-    returnGrades(R, 'qa', ['s1']);
-    const before = structuredClone(getScores(R).s1);
-    const numbers = {};
-    const METHODS = ['mostRecent', 'mode', 'decayingAvg', 'average', 'highest'];
-    METHODS.forEach(name => {
-      method(name);
-      numbers[name] = all('s1', 'ask');
+  /* Same-date pieces on one competency. calc.js counts them in the class's
+     assignment-list order, so where a returned grade's entries sit in the
+     set does not matter. Each sequence is run on the rows this device
+     keeps, and again on rows shaped as the server sends them. */
+  const METHODS = ['mostRecent', 'mode', 'decayingAvg', 'average', 'highest'];
+  const numbers = read => Object.fromEntries(METHODS.map(name => (method(name), [name, read('s1', 'ask')])));
+  const asServerSends = () => {
+    const rows = {};
+    Object.keys(getGradeReturns(R)).forEach(aid => {
+      rows[aid] = {};
+      Object.keys(getGradeReturns(R)[aid]).forEach(sid => {
+        const row = JSON.parse(JSON.stringify(getGradeReturns(R)[aid][sid]));
+        expect(
+          Object.keys(row).filter(k => !/^(is_draft|returned_at|returned_copy|previous_copy|updated_at)$/.test(k)),
+        ).toEqual([]);
+        rows[aid][sid] = row;
+      });
     });
-    setPointsScore(R, 's1', 'qa', null);
-    expect(getScores(R).s1.map(e => e.assessmentId)).toEqual(['qb']);
-    // Entry for entry, id and created too, in the order they were.
-    expect(getReturnedScores(R).s1).toEqual(before);
-    METHODS.forEach(name => {
-      method(name);
-      expect(returned('s1', 'ask'), name).toBe(numbers[name]);
-    });
-    // Cleared and typed again, the working entry moves to the end; the returned grade does not.
-    setPointsScore(R, 's1', 'qb', null);
-    setPointsScore(R, 's1', 'qb', 4);
-    expect(getScores(R).s1.map(e => e.assessmentId)).toEqual(['qb']);
-    expect(getReturnedScores(R).s1).toEqual(before);
+    _saveGradeReturns(R, rows);
+  };
+  const QUIZZES = ['qa', 'qb', 'qc', 'qd'];
+  const SEQUENCES = {
+    'a quiz graded out of the class’s order, then cleared': () => {
+      setPointsScore(R, 's1', 'qb', 10);
+      setPointsScore(R, 's1', 'qa', 2);
+      return () => setPointsScore(R, 's1', 'qa', null);
+    },
+    'a quiz cleared, then the next piece changed': () => {
+      [3, 10, 6, 8].forEach((points, i) => setPointsScore(R, 's1', QUIZZES[i], points));
+      return () => {
+        setPointsScore(R, 's1', 'qb', null);
+        setPointsScore(R, 's1', 'qc', 1);
+      };
+    },
+    'two quizzes cleared in a row': () => {
+      [3, 10, 6, 2].forEach((points, i) => setPointsScore(R, 's1', QUIZZES[i], points));
+      return () => {
+        setPointsScore(R, 's1', 'qc', null);
+        setPointsScore(R, 's1', 'qd', null);
+      };
+    },
+    'a quiz cleared and typed again, so its entry moves to the end': () => {
+      [10, 2, 6].forEach((points, i) => setPointsScore(R, 's1', QUIZZES[i], points));
+      return () => {
+        setPointsScore(R, 's1', 'qa', null);
+        setPointsScore(R, 's1', 'qa', 4);
+      };
+    },
+  };
+  describe.each(Object.keys(SEQUENCES))('2. %s', name => {
+    it.each(['the rows this device keeps', 'rows as the server sends them'])(
+      'returned-only is what it was, on %s',
+      rows => {
+        const change = SEQUENCES[name]();
+        QUIZZES.forEach(aid => returnGrades(R, aid, ['s1']));
+        const before = numbers(all);
+        expect(numbers(returned)).toEqual(before);
+        change();
+        if (rows !== 'the rows this device keeps') asServerSends();
+        expect(numbers(returned)).toEqual(before);
+        expect(numbers(all)).not.toEqual(before);
+        // Returned, both sets agree again.
+        QUIZZES.forEach(aid => returnGrades(R, aid, ['s1']));
+        expect(numbers(returned)).toEqual(numbers(all));
+      },
+    );
   });
 
-  it('3. Missing or Excused takes a piece out of the returned set with no draft on it; all-work is told apart', () => {
+  it('3. Missing or Excused on a scored piece with no draft: no level counts, in both sets', () => {
     lvl('s1', 'essay', 'ask', 4);
     lvl('s1', 'lab', 'plan', 2);
     lvl('s1', 'essay', 'plan', 4);
@@ -1120,26 +1163,33 @@ describe('review: the returned set and real grade math', () => {
     returnGrades(R, 'lab', ['s1']);
     ['NS', 'EXC'].forEach(status => {
       // Written past the app, which refuses Missing and Excused on scored work.
-      const statuses = Object.assign({}, getAssignmentStatuses(R));
-      statuses['s1:essay'] = status;
-      saveAssignmentStatuses(R, statuses);
+      saveAssignmentStatuses(R, { 's1:essay': status });
       expect(getGradeReturn(R, 's1', 'essay').is_draft).toBe(false);
-      expect(getReturnedScores(R).s1.map(e => e.assessmentId)).toEqual(['lab']);
-      expect(returned('s1', 'plan')).toBe(2);
-      expect(returned('s1', 'ask')).toBe(0);
-      // The mark taken off, the returned grade is back.
-      saveAssignmentStatuses(R, {});
+      // The set is the working copy; calc.js is where the mark wins.
       expect(getReturnedScores(R)).toBe(getScores(R));
-      expect(returned('s1', 'plan')).toBe(3);
+      expect([all('s1', 'plan'), returned('s1', 'plan')]).toEqual([2, 2]);
+      expect([all('s1', 'ask'), returned('s1', 'ask')]).toEqual([0, 0]);
+      // The mark taken off, the grade is back.
+      saveAssignmentStatuses(R, {});
+      expect([all('s1', 'plan'), returned('s1', 'plan')]).toEqual([3, 3]);
     });
-    // All-work, for the same data: Excused is out of every number; a Missing
-    // piece's stored levels still count in competency levels (calc.js skips
-    // a Missing piece there only when it has no levels).
-    saveAssignmentStatuses(R, { 's1:essay': 'EXC' });
-    expect(all('s1', 'plan')).toBe(2);
-    saveAssignmentStatuses(R, { 's1:essay': 'NS' });
-    expect(all('s1', 'plan')).toBe(3);
-    expect(returned('s1', 'plan')).toBe(2);
+  });
+
+  it('3. a returned grade under a draft, with the piece Missing or Excused: no level counts, in both sets', () => {
+    lvl('s1', 'essay', 'ask', 4);
+    lvl('s1', 'lab', 'plan', 2);
+    lvl('s1', 'essay', 'plan', 4);
+    returnGrades(R, 'essay', ['s1']);
+    returnGrades(R, 'lab', ['s1']);
+    lvl('s1', 'essay', 'plan', 1);
+    expect([all('s1', 'plan'), returned('s1', 'plan')]).toEqual([1.5, 3]);
+    ['NS', 'EXC'].forEach(status => {
+      saveAssignmentStatuses(R, { 's1:essay': status });
+      expect([all('s1', 'plan'), returned('s1', 'plan')]).toEqual([2, 2]);
+      expect([all('s1', 'ask'), returned('s1', 'ask')]).toEqual([0, 0]);
+      saveAssignmentStatuses(R, {});
+      expect([all('s1', 'plan'), returned('s1', 'plan')]).toEqual([1.5, 3]);
+    });
   });
 });
 

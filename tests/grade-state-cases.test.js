@@ -424,42 +424,34 @@ describe('Missing and Excused win at once', () => {
   it('Late hides nothing', () => {
     expect(GradeState.studentCopy(row, null, 'LATE')).toEqual(three);
   });
-
-  it('the returned set holds nothing from the returned copy of a Missing or Excused piece', () => {
-    const entriesOf = (sid, aid, copy) => [{ assessmentId: aid, tagId: 't1', score: copy.tags.t1.value }];
-    const rows = { essay: { s1: row } };
-    const set = status => GradeState.returnedScores({ s1: [] }, rows, entriesOf, status ? { 's1:essay': status } : {});
-    expect(set(null)).toEqual({ s1: [{ assessmentId: 'essay', tagId: 't1', score: 3 }] });
-    expect(set('NS')).toEqual({ s1: [] });
-    expect(set('EXC')).toEqual({ s1: [] });
-    expect(set('LATE')).toEqual(set(null));
-  });
 });
 
-describe('where a returned copy sits among a student’s entries', () => {
-  // Two pieces of the same date on one competency: their order breaks the tie.
+describe('the returned set of scores', () => {
   const a = score => ({ assessmentId: 'a', tagId: 't1', score });
   const b = score => ({ assessmentId: 'b', tagId: 't1', score });
-  const c = score => ({ assessmentId: 'c', tagId: 't1', score });
   const draftOn = level => ({ is_draft: true, returned_copy: GradeState.copyOf({ tags: { t1: { value: level } } }) });
   const entriesOf = (sid, aid, copy) => [{ assessmentId: aid, tagId: 't1', score: copy.tags.t1.value }];
-  const set = (working, rows) => GradeState.returnedScores({ s1: working }, rows, entriesOf, {}, ['a', 'b', 'c']).s1;
+  const set = (working, rows) => GradeState.returnedScores({ s1: working }, rows, entriesOf).s1;
 
-  it('a changed grade stays where its working entry is', () => {
-    expect(set([b(2), a(1), c(3)], { a: { s1: draftOn(4) } })).toEqual([b(2), a(4), c(3)]);
+  it('the working entries where nothing is a draft; the returned grade under a draft; nothing never returned', () => {
+    expect(set([a(1), b(2)], {})).toEqual([a(1), b(2)]);
+    expect(set([a(1), b(2)], { a: { s1: { is_draft: false, returned_at: 'x' } } })).toEqual([a(1), b(2)]);
+    expect(set([a(1), b(2)], { a: { s1: draftOn(4) } })).toEqual([a(4), b(2)]);
+    expect(set([a(1), b(2)], { a: { s1: { is_draft: true } } })).toEqual([b(2)]);
   });
 
-  it('a cleared grade goes back in its assessment’s place, not at the end', () => {
-    // a was 4, then cleared: Most Recent of the two is still b's 2.
-    expect(set([b(2)], { a: { s1: draftOn(4) } })).toEqual([a(4), b(2)]);
-    expect(set([a(1), c(3)], { b: { s1: draftOn(4) } })).toEqual([a(1), b(4), c(3)]);
-    expect(set([a(1), b(2)], { c: { s1: draftOn(4) } })).toEqual([a(1), b(2), c(4)]);
-    // Two cleared: each in its place.
-    expect(set([b(2)], { c: { s1: draftOn(3) }, a: { s1: draftOn(4) } })).toEqual([a(4), b(2), c(3)]);
+  it('a cleared returned grade still counts: it has no working entry, and goes at the end', () => {
+    // Where it goes does not matter: calc.js orders same-date pieces itself.
+    expect(set([b(2)], { a: { s1: draftOn(4) } })).toEqual([b(2), a(4)]);
+  });
+
+  it('Missing and Excused are not decided here: calc.js counts no level for such a piece in either set', () => {
+    expect(GradeState.returnedScores.length).toBe(3);
   });
 
   it('a student whose every grade is a draft never returned has an empty list, not a missing one', () => {
     const rows = { a: { s1: { is_draft: true } }, b: { s1: { is_draft: true } } };
-    expect(GradeState.returnedScores({ s1: [a(3), b(2)] }, rows, entriesOf, {}, ['a', 'b'])).toEqual({ s1: [] });
+    expect(GradeState.returnedScores({ s1: [a(3), b(2)] }, rows, entriesOf)).toEqual({ s1: [] });
+    expect(GradeState.returnedScores({}, rows, entriesOf)).toEqual({ s1: [] });
   });
 });

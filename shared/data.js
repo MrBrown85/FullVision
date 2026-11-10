@@ -10049,10 +10049,7 @@ function restoreScoreCells(cid, before, after) {
    (gradeReturns) and in localStorage under gb-grade-returns-<cid>. A row is
    the server's grade_return row with nulls left out: { is_draft,
    returned_at, returned_copy, previous_copy, updated_at, seen_at }, the
-   shape the server's list of a class's rows will come in. While a row
-   keeps a returned copy this device also keeps, in `local`, the score
-   entries that copy was made from and the entry they sat after, so the
-   returned grade can be given back exactly as getScores held it.
+   shape the server's list of a class's rows will come in.
 
    Rows are kept only while the class's student page is on (the build
    switch, courseConfig.student_page_enabled). With it off nothing is kept:
@@ -10283,9 +10280,8 @@ function _gradeRule(cid, was, next) {
   var klass = getReturnSettings(cid);
   var scores = was.scores ? next : getScores(cid);
   var checks = was.checks ? next : getRubricChecks(cid);
-  var scoresWas = was.scores || scores;
   var now = _gradeCells(scores, checks);
-  var before = _gradeCells(scoresWas, was.checks || checks);
+  var before = _gradeCells(was.scores || scores, was.checks || checks);
   var rows = getGradeReturns(cid);
   var out = Object.assign({}, rows);
   var at = new Date().toISOString();
@@ -10299,12 +10295,7 @@ function _gradeRule(cid, was, next) {
       var copyWas = b ? _gradeOf(a, b.entries, b.checks) : null;
       var copyNow = n ? _gradeOf(a, n.entries, n.checks) : null;
       if (GradeState.sameCopy(copyWas, copyNow)) return;
-      var row = (out[aid] || {})[sid] || null;
-      var kept = GradeState.afterWrite(klass, row, copyWas, copyNow, at);
-      // A returned copy was just taken: keep the entries it was made from.
-      if (kept && kept.returned_copy && !(row && row.returned_copy) && b && b.entries.length) {
-        kept = Object.assign({}, kept, { local: _returnedEntries(b.entries, scoresWas[sid]) });
-      }
+      var kept = GradeState.afterWrite(klass, (out[aid] || {})[sid] || null, copyWas, copyNow, at);
       out[aid] = Object.assign({}, out[aid]);
       if (kept) out[aid][sid] = kept;
       else delete out[aid][sid];
@@ -10314,18 +10305,6 @@ function _gradeRule(cid, was, next) {
   });
   if (changed) _saveGradeReturns(cid, out);
 }
-/* What this device keeps beside a returned copy: the student's entries for
-   the piece as they were returned, and the entry they sat after in the
-   student's list (null when they were first), as [assessmentId, tagId]. */
-function _returnedEntries(entries, list) {
-  var first = (list || []).indexOf(entries[0]);
-  var prev = first > 0 ? list[first - 1] : null;
-  return {
-    entries: _cloneValue(entries),
-    after: prev ? [prev.assessmentId, prev.tagId || ''] : first === 0 ? null : undefined,
-  };
-}
-
 /* Return: `studentIds` (one id or a list) are given their grade on `aid`.
    Only drafts are returned; the rest are skipped. A class that does not
    hold grades has none to return. Answers as the server's return will:
@@ -10377,20 +10356,17 @@ function _returnGrades(cid, aid, studentIds) {
   return { returned: done.length, enrollment_ids: done, returned_at: done.length ? at : null };
 }
 
-/* A row's returned grade as the score entries getScores held for it.
-   Where this device took the copy (row.local) they are those entries
-   themselves, ids, dates and all. A row from the server has only the copy:
-   it is read the way a grade loaded from the server is, then fitted to the
-   student's working entries (`own`): an entry the change did not touch is
-   the working entry itself, a changed one is the working entry with the
-   returned level, + or − and comments, in the working entries' order.
-   Points work keeps one score; a class carries it once per competency (a
-   score typed on this device) or once (a loaded class), and the returned
-   grade is carried the way the class's other entries are.
-   The copy is read whole, as the working copy is: grade math hides what
-   the work is no longer scored by the same way in both sets. */
-function _gradeCopyEntries(cid, sid, aid, copy, own, row, working) {
-  if (row && row.local && Array.isArray(row.local.entries)) return row.local.entries;
+/* A returned copy as the score entries this class would hold for it: read
+   the way a grade loaded from the server is, then fitted to the student's
+   working entries (`own`): an entry the change did not touch is the
+   working entry itself; a changed one is the working entry with the
+   returned level, + or − and comments, so it keeps its date. Points work
+   keeps one score; a class carries it once per competency (a score typed
+   on this device) or once (a loaded class), and the returned grade is
+   carried the way the class's other entries are.
+   The copy is read whole, as the working copy is: calc.js applies what a
+   piece measures now the same way in both sets. */
+function _gradeCopyEntries(cid, sid, aid, copy, own, working) {
   var a = _assessmentById(cid, aid);
   if (!a || !copy) return [];
   var cells = {};
@@ -10421,39 +10397,32 @@ function _gradeCopyEntries(cid, sid, aid, copy, own, row, working) {
     }) || {}
   ).note;
   var sameComment = (comment || '') === (copy.comment || '');
-  var scored = scoreTagIds(a, cid);
-  var place = function (e) {
-    var at = keys.indexOf(e.tagId);
-    if (at >= 0) return at;
-    at = scored.indexOf(e.tagId);
-    return keys.length + (at < 0 ? scored.length : at);
+  // In the working entries' order, so a changed grade reads back entry for entry.
+  var at = function (e) {
+    var i = keys.indexOf(e.tagId);
+    return i < 0 ? keys.length : i;
   };
-  return built
-    .map(function (e, i) {
-      return { e: e, i: i };
-    })
-    .sort(function (x, y) {
-      return place(x.e) - place(y.e) || x.i - y.i;
-    })
-    .map(function (x) {
-      var e = x.e;
-      var mine = own[keys.indexOf(e.tagId)];
-      if (!mine) return e;
-      var same =
-        sameComment &&
-        (mine.score == null || mine.score === '' ? null : Number(mine.score)) === e.score &&
-        (mine.mod || 0) === (e.mod || 0) &&
-        (mine.critNote || '') === (e.critNote || '') &&
-        (mine.critBeyond || '') === (e.critBeyond || '');
-      if (same) return mine;
-      var out = Object.assign({}, mine, { score: e.score });
-      if (!sameComment) out.note = e.note;
-      ['mod', 'critNote', 'critBeyond'].forEach(function (f) {
-        if (e[f]) out[f] = e[f];
-        else delete out[f];
-      });
-      return out;
+  built = built.slice().sort(function (x, y) {
+    return at(x) - at(y);
+  });
+  return built.map(function (e) {
+    var mine = own[keys.indexOf(e.tagId)];
+    if (!mine) return e;
+    var same =
+      sameComment &&
+      (mine.score == null || mine.score === '' ? null : Number(mine.score)) === e.score &&
+      (mine.mod || 0) === (e.mod || 0) &&
+      (mine.critNote || '') === (e.critNote || '') &&
+      (mine.critBeyond || '') === (e.critBeyond || '');
+    if (same) return mine;
+    var out = Object.assign({}, mine, { score: e.score });
+    if (!sameComment) out.note = e.note;
+    ['mod', 'critNote', 'critBeyond'].forEach(function (f) {
+      if (e[f]) out[f] = e[f];
+      else delete out[f];
     });
+    return out;
+  });
 }
 /* The keys a points score is carried under for this class: the student's
    own working entries', else another student's on the same work, else
@@ -10483,15 +10452,15 @@ function _pointsScoreKeys(a, own, working, loadedKey) {
 
 /* The class's scores as students have been given them, in the shape of
    getScores: the working entries where nothing is a draft, the returned
-   grade where a draft sits on a returned grade (in the place its entries
-   sat), nothing where a grade was never returned, and nothing for a piece
-   that is Missing or Excused, draft or not (GradeState.returnedScores).
-   Statuses themselves are not here: calc.js reads them the same in both
-   sets.
-   A class whose student page is off has no draft and hides nothing: this
-   is getScores' own object. So it is whenever nothing differs. A class
-   that holds grades whose rows are not loaded throws: "not loaded" must
-   never read as "every grade returned" (calc.js then works out no grade).
+   grade where a draft sits on a returned grade, nothing where a grade was
+   never returned (GradeState.returnedScores). That is all it decides:
+   calc.js reads both sets by one set of rules (what a piece measures now,
+   Missing and Excused, same-date order), and statuses are not here.
+   A class that does not hold grades (the student page off, or As Soon As I
+   Save) has no draft by rule: this is getScores' own object. So it is in a
+   class that holds grades with no draft waiting. A class that holds grades
+   whose rows are not loaded throws: "not loaded" must never read as "every
+   grade returned" (calc.js then works out no grade).
    Always a plain object with a list for every student in it, an empty one
    when nothing of theirs is returned: calc.js takes nothing else, and
    fails closed for the whole class on anything else.
@@ -10509,37 +10478,24 @@ window.getReturnedScores = function getReturnedScores(cid) {
   if (kept && kept.working === working && kept.slot === _cache.gradeReturns[cid]) return kept.set;
   var set = working;
   var klass = getReturnSettings(cid);
-  if (klass.student_page) {
-    var holds = GradeState.holds(klass);
-    if (holds && !_gradeReturnsLoaded(cid)) {
+  if (klass.student_page && GradeState.holds(klass)) {
+    if (!_gradeReturnsLoaded(cid)) {
       throw new Error(
         'This class holds grades until they are returned, and which of its grades are returned has not loaded. ' +
           'No returned grade was worked out, so no draft is shown.',
       );
     }
-    var built = GradeState.returnedScores(
-      working,
-      holds ? getGradeReturns(cid) : {},
-      function (sid, aid, copy, own, row) {
-        return _gradeCopyEntries(cid, sid, aid, copy, own, row, working);
-      },
-      getAssignmentStatuses(cid),
-      getAssessments(cid).map(function (a) {
-        return a && a.id;
-      }),
-    );
-    // Nothing differs: the working copy itself.
-    var same = Object.keys(built).every(function (sid) {
-      var mine = working[sid];
-      return (
-        Array.isArray(mine) &&
-        mine.length === built[sid].length &&
-        mine.every(function (e, i) {
-          return e === built[sid][i];
-        })
-      );
+    var rows = getGradeReturns(cid);
+    var anyDraft = Object.keys(rows).some(function (aid) {
+      return Object.keys(rows[aid] || {}).some(function (sid) {
+        return rows[aid][sid] && rows[aid][sid].is_draft;
+      });
     });
-    if (!same || Object.keys(built).length !== Object.keys(working).length) set = built;
+    if (anyDraft) {
+      set = GradeState.returnedScores(working, rows, function (sid, aid, copy, own) {
+        return _gradeCopyEntries(cid, sid, aid, copy, own, working);
+      });
+    }
   }
   // A working copy that is not a plain object of lists (a damaged saved
   // copy) is given as one: a student with no list has no grades.
@@ -10562,7 +10518,7 @@ window.getReturnedScores = function getReturnedScores(cid) {
 
 /* A local id became a server id (_rekey): the rows move with it, whether it
    named an assessment, a student, or a competency, criterion or checkbox
-   inside a kept copy or the entries kept beside it. */
+   inside a kept copy. */
 function _rekeyGradeReturns(cid, localId, serverId) {
   delete _returnedSets[cid];
   var map = {};
@@ -10572,7 +10528,7 @@ function _rekeyGradeReturns(cid, localId, serverId) {
     Object.keys(rows || {}).forEach(function (aid) {
       if (_rekeyObjectKey(rows[aid], localId, serverId)) changed = true;
       Object.keys(rows[aid] || {}).forEach(function (sid) {
-        var moved = _repointGradeRow(rows[aid][sid], map, map, map);
+        var moved = GradeState.afterMove(rows[aid][sid], map, map, map);
         if (moved === rows[aid][sid]) return;
         rows[aid][sid] = moved;
         changed = true;
@@ -10581,33 +10537,6 @@ function _rekeyGradeReturns(cid, localId, serverId) {
     return changed;
   });
 }
-// A row with ids re-pointed in its kept copies and in the entries kept beside them.
-function _repointGradeRow(row, criteria, checks, ids) {
-  var moved = GradeState.afterMove(row, criteria, checks, ids);
-  var local = row && row.local;
-  var all = Object.assign({}, criteria, ids);
-  var named = function (id) {
-    return all[id] !== undefined;
-  };
-  var touched =
-    local &&
-    ((local.entries || []).some(function (e) {
-      return named(e.assessmentId) || named(e.tagId);
-    }) ||
-      (local.after || []).some(named));
-  if (!touched) return moved;
-  var next = _cloneValue(local);
-  (next.entries || []).forEach(function (e) {
-    if (named(e.assessmentId)) e.assessmentId = all[e.assessmentId];
-    if (named(e.tagId)) e.tagId = all[e.tagId];
-  });
-  if (next.after)
-    next.after = next.after.map(function (id) {
-      return named(id) ? all[id] : id;
-    });
-  return Object.assign({}, moved, { local: next });
-}
-
 /* moveRubricScores: an assessment's scores followed it to a copy of its
    rubric. Each grade keeps its state; the criteria and checkboxes inside
    its kept copies take their new ids (GradeState.afterMove). */
@@ -10618,7 +10547,7 @@ function _repointGradeReturns(cid, aid, criteria, checks) {
   var of = (rows[aid] = Object.assign({}, rows[aid]));
   var changed = false;
   Object.keys(of).forEach(function (sid) {
-    var moved = _repointGradeRow(of[sid], criteria, checks, null);
+    var moved = GradeState.afterMove(of[sid], criteria, checks);
     if (moved === of[sid]) return;
     of[sid] = moved;
     changed = true;
