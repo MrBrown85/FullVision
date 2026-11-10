@@ -3,8 +3,9 @@
 Six connections save in a loop as Teacher A (points, a rubric fill, one
 rubric criterion, a comment, a clear, a change to the class itself: the
 reviewer's mix, which also takes the course table). PART 1 is run
-against them again and again; between runs the saves are paused and file 02
-puts the triggers back. Counted: saves that failed, by SQLSTATE (40P01 is a
+against them again and again, on a database with everything live has
+(Batch A, S0-M5, S0-M4b: the trigger function is S0-M4b's); between runs the
+saves are paused and file 02, then 2026110905, put everything back. Counted: saves that failed, by SQLSTATE (40P01 is a
 save Postgres killed to break a deadlock), the slowest save, and PART 1 runs
 that did not finish.
 
@@ -15,6 +16,8 @@ holding all seven tables until it commits) and as it is now (one table at a
 time, 200 ms lock timeout, retry). The first is only printed; the second is
 checked: no save fails and every run finishes. Then PART 2, a few times,
 printed: it is one transaction on purpose and is not for a busy moment.
+(S0-M4b's own undo, which PART 2 needs first, is run with the saves paused:
+how it does against saves is for its own tests.)
 
 Needs the template database batch_a_undo.py uses; works on a copy.
 
@@ -112,7 +115,7 @@ def measure(label, statements, runs, restore):
              ' | stopped: %s' % stopped if stopped else ''))
     return done, errs, calls
 
-restore_triggers = lambda: d.file(FILES[1])
+restore_triggers = lambda: d.back_on()
 def alone(speed, seconds=8):
     """The saves by themselves, nothing run against them: what they do to each other."""
     reset(); time.sleep(seconds); calls, errs, slowest, slow = totals()
@@ -127,8 +130,10 @@ for speed, p in (('a class at work', 0.25), ('flat out', 0.0)):
     ok('PART 1 against saves, %s: every one of %d runs finished and dropped all 18 triggers' % (speed, runs), done == runs, done)
     ok('PART 1 against saves, %s: no save failed' % speed, errs == {} and calls > 0, errs)
 def put_back():
+    """Everything applied again, as on live, and S0-M4b's undo run, so that PART 2 can."""
     d.run("delete from supabase_migrations.schema_migrations where name = any (cast(:n as text[]))", n=U.RECORD)
-    return d.apply()
+    return d.apply() == 'ok' and d.s0_m4b_out()
+assert quiet(d.s0_m4b_out) == 'ok'
 for speed, p in (('a class at work', 0.25), ('flat out', 0.0)):
     pause[0] = p; time.sleep(0.5)
     measure('PART 2 (one transaction), %s:' % speed, PARTS['PART 2'], 10, put_back)
