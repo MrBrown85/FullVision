@@ -21,6 +21,62 @@ var _assessmentOverallCache = {};
 var _categoryAvgCache = {};
 var _courseLetterCache = {};
 
+/* ── The score set and its reader ──────────────────────────────
+   Every score, status, points score, Complete/Incomplete mark, Overall
+   Comment and DIBELS number this file works with is read through _scoreRead,
+   and nowhere else in it (tests/calc-score-reader.test.js fails on a direct
+   read). No calculation asks the data layer for a score itself.
+
+   _scoreSet names the set of scores in use. Today there is one, 'all': the
+   teacher's working copy, every score the data layer holds. The student
+   page build adds the scores a student has been given back
+   (docs/plans/student-page-build-plan.md 1.3, S0-F1): that PR changes what
+   scores() and statuses() give for its set, and nothing below this block.
+   The set is part of every cache key (_ck), so two sets never share a
+   cached number. */
+var _scoreSet = 'all';
+
+var _scoreRead = {
+  // Every student's score entries in the class: { [studentId]: [entry] }.
+  scores: function (cid) {
+    return getScores(cid);
+  },
+  // Every status in the class: { 'studentId:assessmentId': 'NS' | 'EXC' | 'LATE' }.
+  statuses: function (cid) {
+    return getAssignmentStatuses(cid);
+  },
+  // One student's status on one assessment, or null.
+  status: function (cid, sid, aid) {
+    return _scoreRead.statuses(cid)[sid + ':' + aid] || null;
+  },
+  // A points score, or null when none is entered; 0 is a score.
+  pointsScore: function (cid, sid, aid) {
+    var entry = (_scoreRead.scores(cid)[sid] || []).find(function (e) {
+      return e.assessmentId === aid && e.score != null && e.score !== '';
+    });
+    return entry ? Number(entry.score) : null;
+  },
+  // A Complete/Incomplete mark: 'complete', 'incomplete', or null when unmarked.
+  completionMark: function (cid, sid, aid) {
+    var entry = (_scoreRead.scores(cid)[sid] || []).find(function (e) {
+      return e.assessmentId === aid;
+    });
+    if (!entry || entry.score == null) return null;
+    return Number(entry.score) > 0 ? 'complete' : 'incomplete';
+  },
+  // The Overall Comment on one piece of work, or ''.
+  comment: function (cid, sid, aid) {
+    var entry = (_scoreRead.scores(cid)[sid] || []).find(function (e) {
+      return e && e.assessmentId === aid && e.note;
+    });
+    return entry ? String(entry.note) : '';
+  },
+  // One window's DIBELS numbers, or null. A reading record, never a grade.
+  dibels: function (cid, sid, aid, period) {
+    return getDibelsScore(cid, sid, aid, period);
+  },
+};
+
 /* ── Reporting term scope ──────────────────────────────────────
    Teachers grade cumulatively; a reporting term is a checkpoint
    (docs/DECISIONS.md, "Reporting periods" 2; Colin, 2026-11-03). While a
@@ -68,9 +124,10 @@ function _termKey(cid) {
   return t ? '@' + t.ordinal : '';
 }
 
-/* Cache key prefix for a class: the class id plus the active term. */
+/* Cache key prefix for a class: the class id, the active term and the score
+   set in use ('c1#all', 'c1@2#all'). */
 function _ck(cid) {
-  return cid + _termKey(cid);
+  return cid + _termKey(cid) + '#' + _scoreSet;
 }
 
 function _assessmentDate(a) {
@@ -387,12 +444,12 @@ function getRubricAssessmentScore(cid, assessment, entries) {
    is null; not submitted is 0 out of every criterion's top value.
    Undefined when the assessment isn't rubric-scored. */
 function _rubricAssessmentPoints(cid, studentId, assessment) {
-  var entries = (getScores(cid)[studentId] || []).filter(function (entry) {
+  var entries = (_scoreRead.scores(cid)[studentId] || []).filter(function (entry) {
     return entry.assessmentId === assessment.id;
   });
   var scored = _rubricScoredCriteria(cid, assessment, entries, true);
   if (scored === undefined) return undefined;
-  var status = getAssignmentStatus(cid, studentId, assessment.id);
+  var status = _scoreRead.status(cid, studentId, assessment.id);
   if (status === 'EXC') return null;
   if (status === 'NS') {
     var full = _rubricFullPoints(cid, assessment).possible;
@@ -445,7 +502,7 @@ function getAssessmentOverallScore(cid, studentId, assessmentId) {
     return null;
   }
 
-  var status = getAssignmentStatus(cid, studentId, assessmentId);
+  var status = _scoreRead.status(cid, studentId, assessmentId);
   // Status enum matches the server CHECK constraint on set_score_status:
   // 'NS' | 'EXC' | 'LATE'. Long-form desktop-era values are rewritten by
   // _migrateAssignmentStatusFormat() on boot.
@@ -458,7 +515,7 @@ function getAssessmentOverallScore(cid, studentId, assessmentId) {
     return 0;
   }
 
-  var entries = (getScores(cid)[studentId] || []).filter(function (entry) {
+  var entries = (_scoreRead.scores(cid)[studentId] || []).filter(function (entry) {
     return entry.assessmentId === assessmentId;
   });
   var rubricResult = getRubricAssessmentScore(cid, assessment, entries);
@@ -517,7 +574,7 @@ function _factoredMeanLevel(cid, studentId, assessments) {
   var count = 0;
   var noEvidence = courseGradeMode(cid) !== 'letter';
   (assessments || []).forEach(function (assessment) {
-    if (noEvidence && getAssignmentStatus(cid, studentId, assessment.id) === 'NS') return;
+    if (noEvidence && _scoreRead.status(cid, studentId, assessment.id) === 'NS') return;
     var value = getAssessmentOverallScore(cid, studentId, assessment.id);
     if (value == null) return;
     var factor = getAssessmentWeight(assessment);
@@ -640,12 +697,12 @@ function courseHasEnded(cid) {
    doesn't count: excused, or not graded yet. Not submitted counts as 0.
    Points work can earn extra credit up to twice its maximum. */
 function _assessmentPoints(cid, studentId, assessment) {
-  var status = getAssignmentStatus(cid, studentId, assessment.id);
+  var status = _scoreRead.status(cid, studentId, assessment.id);
   if (status === 'EXC') return null;
   var possible = isCompletionScored(assessment) ? COMPLETE_MAX_POINTS : Number(assessment.maxPoints) || 0;
   if (!(possible > 0)) return null;
   if (status === 'NS') return { earned: 0, possible: possible };
-  var entry = (getScores(cid)[studentId] || []).find(function (e) {
+  var entry = (_scoreRead.scores(cid)[studentId] || []).find(function (e) {
     return e.assessmentId === assessment.id && e.score != null && e.score !== '';
   });
   if (!isScoreEntered(assessment, entry)) return null;
@@ -684,7 +741,7 @@ var COLUMN_STATUS_RULES = {
 function columnCountedValue(cid, sid, col) {
   var a = col.assessment;
   if (!a || isDibelsScored(a)) return null;
-  var status = getAssignmentStatus(cid, sid, a.id);
+  var status = _scoreRead.status(cid, sid, a.id);
   if (isPointsScored(a)) {
     var pointsRule = COLUMN_STATUS_RULES.points[status];
     if (pointsRule === 'out') return null;
@@ -700,7 +757,7 @@ function columnCountedValue(cid, sid, col) {
   if (profRule === 'out') return null;
   if (profRule === 'zero') return { value: 0 };
   if (col.tagIds && col.tagIds.length) {
-    var entries = getScores(cid)[sid] || [];
+    var entries = _scoreRead.scores(cid)[sid] || [];
     var vals = [];
     _columnScoreKeys(cid, a, col.tagIds).forEach(function (key) {
       var entry = entries.find(function (e) {
@@ -1178,10 +1235,10 @@ function categoryCourseShares(cid, studentId) {
    criterion has no score or the work is excused or not submitted. */
 function rubricCriterionLevel(cid, studentId, assessment, criterion) {
   if (!assessment || !criterion) return null;
-  var status = getAssignmentStatus(cid, studentId, assessment.id);
+  var status = _scoreRead.status(cid, studentId, assessment.id);
   if (status === 'EXC' || status === 'NS') return null;
   var keys = rubricCriterionScoreKeys(criterion);
-  var values = (getScores(cid)[studentId] || [])
+  var values = (_scoreRead.scores(cid)[studentId] || [])
     .filter(function (e) {
       return e.assessmentId === assessment.id && keys.indexOf(e.tagId) >= 0;
     })
@@ -1492,7 +1549,7 @@ function rubricScoredTagIds(rubric) {
    average }, or null when no criterion is scored. `entries` may hold the
    student's other scores too. */
 function wholeRubricLevel(cid, sid, assessment, entries) {
-  var average = getRubricAssessmentScore(cid, assessment, entries || getScores(cid)[sid] || []);
+  var average = getRubricAssessmentScore(cid, assessment, entries || _scoreRead.scores(cid)[sid] || []);
   if (average == null) return null;
   return {
     score: pointsToProf(average, 4, getGradingScale(cid)),
@@ -1533,7 +1590,7 @@ function competencyLevelFromCriteria(cid, sid, assessment, tagId, criteria) {
   if (rubricWholeTagIds(cid, assessment).indexOf(tagId) >= 0) return wholeRubricLevel(cid, sid, assessment);
   if (!criteria) criteria = rubricCriteriaForTag(cid, assessment, tagId);
   if (!criteria.length) return null;
-  var entries = getScores(cid)[sid] || [];
+  var entries = _scoreRead.scores(cid)[sid] || [];
   var levels = [];
   var mods = [];
   criteria.forEach(function (c) {
@@ -1617,9 +1674,9 @@ function getTagScores(cid, studentId, tagId) {
   var cacheKey = _ck(cid) + ':' + studentId + ':' + tagId;
   if (_tagScoresCache[cacheKey]) return _tagScoresCache[cacheKey];
 
-  const allScores = getScores(cid);
+  const allScores = _scoreRead.scores(cid);
   const studentScores = allScores[studentId] || [];
-  const statuses = getAssignmentStatuses(cid);
+  const statuses = _scoreRead.statuses(cid);
   // Use Map for O(1) lookup instead of O(n) find() per score entry
   const assessMap = _getAssessMap(cid);
   const criteria = _criterionIndex(cid);
@@ -2397,7 +2454,7 @@ function formatPointsPercent(points, maxPoints) {
    `late` is true when the cell is marked Late (it keeps its score). */
 function assessmentCellValue(cid, sid, assessment) {
   var a = assessment;
-  var entries = getScores(cid)[sid] || [];
+  var entries = _scoreRead.scores(cid)[sid] || [];
   var tagScores = scoreTagIds(a, cid)
     .map(function (tid) {
       var entry = entries.find(function (e) {
@@ -2420,9 +2477,9 @@ function assessmentCellValue(cid, sid, assessment) {
   var isPoints = isPointsScored(a);
   var isComplete = isCompletionScored(a);
   // A points 0 is a score; on proficiency work 0 is none.
-  var pointsVal = isPoints && !isComplete ? getPointsScore(cid, sid, a.id) : null;
+  var pointsVal = isPoints && !isComplete ? _scoreRead.pointsScore(cid, sid, a.id) : null;
   if (pointsVal != null) val = pointsVal;
-  var status = getAssignmentStatus(cid, sid, a.id);
+  var status = _scoreRead.status(cid, sid, a.id);
   var out = {
     kind: 'none',
     value: 0,
@@ -2446,7 +2503,7 @@ function assessmentCellValue(cid, sid, assessment) {
     out.kind = 'dibels';
     var latest = null;
     ['eoy', 'moy', 'boy'].some(function (p) {
-      var row = typeof getDibelsScore === 'function' ? getDibelsScore(cid, sid, a.id, p) : null;
+      var row = typeof getDibelsScore === 'function' ? _scoreRead.dibels(cid, sid, a.id, p) : null;
       if (row && row.orfWrc != null) latest = { period: p, level: dibelsLevel('orf', p, row.orfWrc) };
       return !!latest;
     });
@@ -2456,7 +2513,7 @@ function assessmentCellValue(cid, sid, assessment) {
     }
     return out;
   }
-  var mark = isComplete ? getCompletionMark(cid, sid, a.id) : null;
+  var mark = isComplete ? _scoreRead.completionMark(cid, sid, a.id) : null;
   if (mark) {
     out.kind = 'complete';
     out.mark = mark;
@@ -3272,7 +3329,7 @@ function classCompetencyGrid(cid, students, assessment) {
     if (c && c.id) critById[c.id] = c;
   });
   function out(sid) {
-    var st = getAssignmentStatus(cid, sid, assessment.id);
+    var st = _scoreRead.status(cid, sid, assessment.id);
     return st === 'NS' || st === 'EXC';
   }
   return {
@@ -3285,7 +3342,7 @@ function classCompetencyGrid(cid, students, assessment) {
           var m = competencyLevelFromCriteria(cid, sid, assessment, key);
           return m ? scoreModValue({ score: m.score, mod: m.mod }) : null;
         }
-        var entry = (getScores(cid)[sid] || []).find(function (e) {
+        var entry = (_scoreRead.scores(cid)[sid] || []).find(function (e) {
           return e.assessmentId === assessment.id && e.tagId === key;
         });
         return entry && entry.score > 0 ? scoreModValue(entry) : null;
@@ -3304,7 +3361,7 @@ function classCompetencyGrid(cid, students, assessment) {
 function classColumnStatusCounts(cid, students, assessment) {
   var res = { scored: 0, total: (students || []).length, missing: [], excused: [], late: [], unmarked: [] };
   (students || []).forEach(function (s) {
-    var status = getAssignmentStatus(cid, s.id, assessment.id);
+    var status = _scoreRead.status(cid, s.id, assessment.id);
     if (status === 'NS') return res.missing.push(s.id);
     if (status === 'EXC') return res.excused.push(s.id);
     if (status === 'LATE') res.late.push(s.id);
@@ -3321,13 +3378,13 @@ function classColumnStatusCounts(cid, students, assessment) {
 function classFeedbackCounts(cid, students, assessment) {
   var res = { withComment: [], without: [] };
   (students || []).forEach(function (s) {
-    var status = getAssignmentStatus(cid, s.id, assessment.id);
+    var status = _scoreRead.status(cid, s.id, assessment.id);
     if (status === 'NS' || status === 'EXC') return;
     var cell = assessmentCellValue(cid, s.id, assessment);
     if (cell.kind === 'none' || (cell.kind === 'dibels' && !cell.dibels)) return;
     var has =
-      !!String(getScoreComment(cid, s.id, assessment.id) || '').trim() ||
-      (getScores(cid)[s.id] || []).some(function (e) {
+      !!String(_scoreRead.comment(cid, s.id, assessment.id) || '').trim() ||
+      (_scoreRead.scores(cid)[s.id] || []).some(function (e) {
         return e && e.assessmentId === assessment.id && String(e.critNote || '').trim();
       });
     (has ? res.withComment : res.without).push(s.id);
@@ -3433,10 +3490,10 @@ function pointsBands(cid, students, assessment, bandSize) {
 function completionCounts(cid, students, assessment) {
   var res = { complete: [], incomplete: [], unmarked: [], missing: [], excused: [], pct: null };
   (students || []).forEach(function (s) {
-    var status = getAssignmentStatus(cid, s.id, assessment.id);
+    var status = _scoreRead.status(cid, s.id, assessment.id);
     if (status === 'NS') return res.missing.push(s.id);
     if (status === 'EXC') return res.excused.push(s.id);
-    var mark = getCompletionMark(cid, s.id, assessment.id);
+    var mark = _scoreRead.completionMark(cid, s.id, assessment.id);
     if (mark === 'complete') res.complete.push(s.id);
     else if (mark === 'incomplete') res.incomplete.push(s.id);
     else res.unmarked.push(s.id);
@@ -3471,10 +3528,10 @@ function dibelsClassResults(cid, students, assessment) {
   var wrcs = {};
   var accs = {};
   (students || []).forEach(function (s) {
-    var status = getAssignmentStatus(cid, s.id, assessment.id);
+    var status = _scoreRead.status(cid, s.id, assessment.id);
     if (status === 'NS' || status === 'EXC') return;
     DIBELS_PERIODS.forEach(function (p) {
-      var row = getDibelsScore(cid, s.id, assessment.id, p);
+      var row = _scoreRead.dibels(cid, s.id, assessment.id, p);
       if (!row || row.orfWrc == null) return;
       var level = dibelsLevel('orf', p, row.orfWrc);
       if (!level) return;

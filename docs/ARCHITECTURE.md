@@ -78,8 +78,10 @@ Shared runtime modules load before desktop or mobile page modules, in this order
 10. `shared/offline-queue.js`
 11. `shared/auto-update.js`
 12. `shared/calc.js`
-13. `shared/rubric-draft.js`
-14. `shared/rubric-checks.js`
+13. `shared/grade-state.js` (the Draft and Returned rule; today every save is returned at once)
+14. `shared/grader.js` (`Grader`, the one module a screen writes a grade through)
+15. `shared/rubric-draft.js`
+16. `shared/rubric-checks.js`
 
 The phone loads the same list without `link-nav.js`, `reporting-term-presets.js` and `rubric-draft.js`.
 
