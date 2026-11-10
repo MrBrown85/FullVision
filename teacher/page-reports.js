@@ -31,9 +31,10 @@ window.PageReports = (function () {
        teardown()         clears what it left behind when the page closes
      and, only where a tab needs one: address() (what it adds to the
      address), longForm() (its comment box, for a sign-in that expires
-     mid-sentence), print(), key(e), resize() and pickStudent(sid) (a click
-     on the roster). The first tab that isn't hidden is the one Reports
-     opens on. */
+     mid-sentence), printButton (true shows the toolbar's Print Reports)
+     with print() for what it does, key(e), resize() and pickStudent(sid)
+     (a click on the roster). The first tab that isn't hidden is the one Reports
+     opens on, and the one a hidden tab's id opens. */
   var TABS = [
     {
       id: 'questionnaire',
@@ -76,10 +77,9 @@ window.PageReports = (function () {
       show: _showProgressTab,
       render: _renderProgressTab,
       teardown: _teardownProgressTab,
-      // A chosen copy prints as it is; the live reports save a copy, then print.
+      printButton: true,
       print: function () {
-        if (viewingIssue) _printIssue();
-        else openIssueDialog();
+        openIssueDialog();
       },
       resize: function () {
         clearTimeout(_resizeTimer);
@@ -99,15 +99,38 @@ window.PageReports = (function () {
     });
   }
 
-  /* The tab an id opens: that tab when it is on the bar, else the first
-     tab on the bar. A hidden tab's id opens nothing of its own. */
+  /* An address that names a tab the list doesn't have (?tab=bogus). This
+     is what the page has always done with one, kept as it is and not
+     endorsed: Progress Reports' canvas is drawn with the first tab's button
+     still lit, Print Reports is the only tab control showing and prints
+     without the dialog, a roster click opens that student's questionnaire,
+     and the address keeps the stray name. It is not in TABS, so it has no
+     button. Fixing it (open the first tab instead) is its own change. */
+  var UNKNOWN_TAB = {
+    printButton: true,
+    render: _renderProgressTab,
+    pickStudent: function (sid) {
+      tqSelectStudent(sid);
+    },
+  };
+
+  /* The tab an id opens. A tab on the bar opens itself. A hidden tab's id,
+     or no id, opens the first tab on the bar: a hidden tab can't be opened.
+     An id the list doesn't have at all gets UNKNOWN_TAB. */
   function _tabFor(tabs, id) {
     var shown = _shownTabs(tabs);
-    return (
-      shown.find(function (t) {
-        return t.id === id;
-      }) || shown[0]
-    );
+    var named = tabs.find(function (t) {
+      return t.id === id;
+    });
+    if (named) return named.hidden ? shown[0] : named;
+    return id ? UNKNOWN_TAB : shown[0];
+  }
+
+  /* The name kept for the open tab, in activeTab and the address: the
+     tab's own id, or the stray name as it came for UNKNOWN_TAB. */
+  function _tabIdFor(tabs, id) {
+    var t = _tabFor(tabs, id);
+    return t === UNKNOWN_TAB ? id : t.id;
   }
 
   /* The bar's buttons, one for each tab that isn't hidden. The first is
@@ -134,7 +157,7 @@ window.PageReports = (function () {
   }
 
   var activeCourse;
-  var activeTab = _tabFor(TABS).id;
+  var activeTab = _tabIdFor(TABS);
   var phonesView = false; // Progress Reports › Sent to Phones (teacher/phone-reports.js)
 
   // The open tab's entry.
@@ -218,13 +241,16 @@ window.PageReports = (function () {
   function switchTab(tab) {
     // A comment typed in the last moment is saved before the page changes.
     RQ.tqSaveCurrentIfNeeded();
-    activeTab = _tabFor(TABS, tab).id;
+    activeTab = _tabIdFor(TABS, tab);
     viewingIssue = null;
     segSelect(document.querySelector('.report-seg-btn[data-tab="' + activeTab + '"]'));
     // Show/hide contextual toolbar elements
+    var open = _tab();
     TABS.forEach(function (t) {
-      if (t.show) t.show(t.id === activeTab);
+      if (t.show) t.show(t === open);
     });
+    const tbPrint = document.getElementById('tb-print-btn');
+    if (tbPrint) tbPrint.style.display = open.printButton ? '' : 'none';
     var layout = document.getElementById('page-layout');
     if (layout) layout.classList.toggle('sidebar-hidden', !_sidebarVisible);
     renderReports();
@@ -241,9 +267,6 @@ window.PageReports = (function () {
 
   function _showProgressTab(on) {
     document.getElementById('student-picker').style.display = on ? '' : 'none';
-    // Print Reports is this tab's button.
-    const tbPrint = document.getElementById('tb-print-btn');
-    if (tbPrint) tbPrint.style.display = on ? '' : 'none';
     const tbSave = document.getElementById('tb-save-template');
     if (tbSave) tbSave.style.display = on ? '' : 'none';
     const copySel = document.getElementById('report-copy');
@@ -503,7 +526,7 @@ window.PageReports = (function () {
     // and again once it is here.
     if (window.RubricPrint && RubricPrint.classUsesBankLevels && RubricPrint.classUsesBankLevels(cid)) {
       RubricPrint.loadBankLevels().then(function (ok) {
-        if (ok && activeTab === 'progress' && activeCourse === cid) renderReports();
+        if (ok && activeTab !== 'questionnaire' && activeCourse === cid) renderReports();
       });
     }
 
@@ -2113,10 +2136,10 @@ window.PageReports = (function () {
         tqNextStudent();
       },
       printReports: function () {
-        // The button shows only on Progress Reports; a tab with no print of
-        // its own prints the page as it stands, as it always has.
+        // A chosen copy prints as it is; the live reports save a copy, then print.
         var t = _tab();
-        if (t.print) t.print();
+        if (viewingIssue) _printIssue();
+        else if (t.print) t.print();
         else _printNow();
       },
       setPaper: function () {
@@ -2488,7 +2511,7 @@ window.PageReports = (function () {
   function init(params) {
     activeCourse = params.course || getActiveCourse();
     setActiveCourse(activeCourse);
-    activeTab = _tabFor(TABS, params.tab).id;
+    activeTab = _tabIdFor(TABS, params.tab);
     selectedStudentIds = null;
 
     reportConfig = _loadReportConfig(activeCourse);
@@ -2629,7 +2652,9 @@ window.PageReports = (function () {
     },
     _helpers: {
       tabs: TABS,
+      unknownTab: UNKNOWN_TAB,
       tabFor: _tabFor,
+      tabIdFor: _tabIdFor,
       tabBarHtml: _tabBarHtml,
     },
   };
