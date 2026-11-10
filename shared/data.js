@@ -8109,7 +8109,7 @@ function _categoryChanged(a, b, idx) {
 
 /* Categories go up as one list (save_categories): weights must total 100,
    which a row-at-a-time save can't keep while weights change. */
-function _persistCategoriesToCanonical(cid, prev, arr) {
+function _persistCategoriesToCanonical(cid, prev, arr, copy) {
   if (!window.v2 || !window.v2.saveCategories) return;
   var tail = _categorySaveQueue[cid] || Promise.resolve();
   var next = tail.then(function () {
@@ -8151,9 +8151,11 @@ function _persistCategoriesToCanonical(cid, prev, arr) {
     });
     // Kept with the queued save: the list it was made over. If it has to
     // wait, it is sent only over that list (_guardCategorySave).
+    var guard = { expected: _categoryListKept(before) };
+    if (_plainObject(copy)) guard.copy = { from: String(copy.from || ''), rest: !!copy.rest };
     var options = {
       entryId: entryId || undefined,
-      guard: { expected: _categoryListKept(before) },
+      guard: guard,
       categoriesMadeAt: Date.now(),
     };
     return window.v2.saveCategories(cid, arr, options).then(function (res) {
@@ -9893,12 +9895,16 @@ function getCategories(cid) {
     return [];
   }
 }
-function saveCategories(cid, arr) {
+/* `options.copy`: { from, rest } when the list is Copy Grading Setup's,
+   copied from the class named `from` (`rest`: other groups were copied
+   too). If the save has to wait and is then not sent, the class says so
+   when next opened (noteCategoriesNotCopied). */
+function saveCategories(cid, arr, options) {
   var prev = _loadPersistedCourseFieldSnapshot('categories', cid, (_cache.categories && _cache.categories[cid]) || []);
   var next = arr || [];
   _saveCourseField('categories', cid, next);
   if (!_writesEnabled() || !_isUuid(cid)) return;
-  _persistCategoriesToCanonical(cid, prev, next);
+  _persistCategoriesToCanonical(cid, prev, next, options && options.copy);
 }
 /* The class manager writes categories itself (save_categories,
    reorder_categories) and hands the resulting rows here.
@@ -10179,6 +10185,11 @@ function _guardCategorySave(params, options) {
     }
     if (guard && Array.isArray(guard.expected) && _categoryListsMatch(rows, guard.expected)) return null;
     adoptCategoriesFromServer(cid, rows);
+    // Copy Grading Setup's list: its message said "copied", so the class
+    // says it was not, above its categories, when next opened.
+    if (guard && _plainObject(guard.copy)) {
+      noteCategoriesNotCopied(cid, { why: 'changed', from: guard.copy.from, rest: guard.copy.rest });
+    }
     return { answer: _discardWrite(cid, guard ? WAITED_CATEGORY_SAVE_NOT_SENT : OLD_CATEGORY_SAVE_NOT_SENT) };
   })();
 }

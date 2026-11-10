@@ -1956,6 +1956,42 @@ describe('categories: the server’s list is read before the whole list is saved
     );
   });
 
+  it('Copy Grading Setup whose list had to wait and was then not sent: the class says so when next opened, as when it is not copied at once', async () => {
+    await openApp();
+    anotherClass();
+    _cache.courseConfigs[SRC] = { roundPercent: true };
+    const send = server.fake.rpc;
+    server.fake.rpc = function (name, params) {
+      const res = send(name, params);
+      if (name === 'list_categories') server.reachable = false; // the check is answered; then the connection goes
+      return res;
+    };
+    const plan = GradingSetupCopy.planSetup(SRC, CID, { categories: true, roundPercent: true });
+    const done = GradingSetupCopy.applySetup(plan, {});
+    for (let i = 0; i < 6; i++) await settle();
+    server.fake.rpc = send;
+    expect(window.v2Queue.queued('save_categories').length).toBe(1);
+    // The message after the copy has already said it was copied.
+    expect(GradingSetupCopy.copiedMessage([plan])).toBe('Copied the grading setup to History 12.');
+    schoolAddsProjects();
+    server.sent.length = 0;
+    await goOnline();
+    await done.catch(() => {});
+    await quiet();
+    expect(sentNames()).not.toContain('save_categories');
+    expect(server.categories.map(c => c.name)).toEqual(['Assignments', 'Tests', 'Projects']);
+    expect(getSyncDotState().status).toBe('error'); // as before
+    await openApp();
+    expect(draft().notice).toBe(
+      'The categories were not copied from History 11: they changed on another device first. These are the current ones. Everything else was copied.',
+    );
+    expect(draft().action).toBe('Dismiss');
+    expect(draft().rows.map(r => r.name)).toEqual(['Assignments', 'Tests', 'Projects']);
+    act('cmCatNoticeDone');
+    await openApp();
+    expect(draft().notice).toBe(null);
+  });
+
   it('every whole-list save of categories is one this file knows, and each is behind the check or is a new class', () => {
     const sources = [];
     ['shared', 'teacher', 'teacher-mobile'].forEach(dir =>

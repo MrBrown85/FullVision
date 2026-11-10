@@ -344,12 +344,15 @@ window.GradingSetupCopy = (function () {
     return typeof _assessmentSaveQueue !== 'undefined' ? _assessmentSaveQueue : null;
   }
 
-  function _saveCats(cid, rows) {
+  // `copy`: { from, rest }, kept with the save in case it has to wait
+  // (saveCategories in shared/data.js).
+  function _saveCats(cid, rows, copy) {
     saveCategories(
       cid,
       rows.map(function (r, i) {
         return { id: r.id, name: r.name, weight: r.weight, displayOrder: i, calcMode: categoryCalcMode(r) };
       }),
+      copy ? { copy: copy } : undefined,
     );
     return _wait(_categoryQueue(), cid);
   }
@@ -384,7 +387,7 @@ window.GradingSetupCopy = (function () {
      1. save the new list plus those categories at 0% (still totals 100),
      2. move the work and wait for it to land,
      3. save the final list, which deletes them. */
-  function _applyCategories(dstCid, cats, moves) {
+  function _applyCategories(dstCid, cats, moves, copy) {
     moves = moves || {};
     var rows = cats.rows.map(function (r) {
       return { id: r.id || uid(), name: r.name, weight: r.weight, calcMode: r.calcMode };
@@ -410,7 +413,7 @@ window.GradingSetupCopy = (function () {
         }),
     );
 
-    return _saveCats(dstCid, rows.concat(holding)).then(function () {
+    return _saveCats(dstCid, rows.concat(holding), copy).then(function () {
       if (!holding.length && !moveUncat) return;
       var ids = _landedIds(dstCid, rows);
       // Signed in, a category the server hasn't saved has no id to point
@@ -438,7 +441,7 @@ window.GradingSetupCopy = (function () {
         var finalRows = rows.map(function (r, i) {
           return { id: ids[i], name: r.name, weight: r.weight, calcMode: r.calcMode };
         });
-        return _saveCats(dstCid, finalRows);
+        return _saveCats(dstCid, finalRows, copy);
       });
     });
   }
@@ -489,16 +492,16 @@ window.GradingSetupCopy = (function () {
             // another device, or 'offline'), and the class says so itself
             // above its categories when it is next opened in Class
             // Settings: the message after the copy is gone in seconds.
-            if (!why) return _applyCategories(dstCid, plan.categories, moves);
+            var note = {
+              from: _className(srcCid),
+              rest: plan.changes.some(function (c) {
+                return c.key !== 'categories';
+              }),
+            };
+            if (!why) return _applyCategories(dstCid, plan.categories, moves, note);
             plan.categoriesNotCopied = why;
             if (typeof noteCategoriesNotCopied === 'function') {
-              noteCategoriesNotCopied(dstCid, {
-                why: why,
-                from: _className(srcCid),
-                rest: plan.changes.some(function (c) {
-                  return c.key !== 'categories';
-                }),
-              });
+              noteCategoriesNotCopied(dstCid, { why: why, from: note.from, rest: note.rest });
             }
           })
         : null;
