@@ -19,6 +19,7 @@ Without these, no feature set will be worth paying for.
    - Display choices kept on one device (`gb_newestFirst`, the roster's sort, the report's paper size and the like) move to the server, so they follow the teacher.
    - Teacher preferences (`save_teacher_preferences`) are still sent as one whole copy, so an old tab can put an old one back; send only what changed, as class settings now do.
    - The database checks a category save itself (the list's version goes up with it and an old one is refused), so the check does not rest on the browser reading the list first.
+   - Category edits kept on a computer when a save could not be made (`gb-category-draft-<class>`) go, without a word, with that class's saved copy: at the 14-day purge of saved copies, or when the browser clears its storage. Keep them, or say so, separately from the saved copy.
 
 ## 2. Make the core job far better than anyone else
 
