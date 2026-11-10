@@ -1242,13 +1242,13 @@ window.MGrade = (function () {
       ? 'Tick what you saw. A level is suggested when all of its boxes are ticked.'
       : state.level && state.level !== suggested
         ? 'You picked ' + PROF_LABELS[state.level] + '. Ticks keep your choice until you clear the level.'
-        : 'Every ' + PROF_LABELS[suggested] + ' box is ticked. Pick another level to override.';
+        : // The level already matches the ticks: nothing to explain.
+          '';
     var html =
       '<div class="m-checklist"><div class="m-checklist-head">' +
       MC.esc(head) +
-      '</div><div class="m-checklist-hint">' +
-      MC.esc(hint) +
-      '</div>';
+      '</div>' +
+      (hint ? '<div class="m-checklist-hint">' + MC.esc(hint) + '</div>' : '');
     levelOrderFor(cid).forEach(function (lv) {
       var boxes = RubricChecks.checksAt(crit, lv);
       if (!boxes.length) return;
@@ -1319,12 +1319,9 @@ window.MGrade = (function () {
         open +
         '" aria-label="Checklist, ' +
         count.ticked +
-        ' of ' +
-        count.total +
         ' ticked"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 12l3 3 5-6"/></svg>' +
-        count.ticked +
-        '/' +
-        count.total +
+        // Only the ticks, as on the desktop grader: no box total.
+        (count.ticked ? count.ticked : 'Checklist') +
         '</button>';
     }
     return (

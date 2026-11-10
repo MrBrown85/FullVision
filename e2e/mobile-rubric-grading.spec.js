@@ -138,7 +138,7 @@ test.describe('Phone grading by rubric criterion', () => {
     await group().getByLabel('Explains an odd result').check();
     await expect(group().locator('.m-score-btn.m-score-active')).toHaveText('4');
     await expect(group().locator('.m-checklist-head')).toHaveText('Suggested: Extending');
-    await expect(group().locator('.m-checks-btn')).toContainText('2/3');
+    await expect(group().locator('.m-checks-btn')).toHaveText('2');
 
     // A level picked by hand stays.
     await group().locator('.m-score-btn[data-score="2"]').click();

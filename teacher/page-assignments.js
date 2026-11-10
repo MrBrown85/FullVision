@@ -7785,15 +7785,14 @@ window.PageAssignments = (function () {
       .join('<span class="rsg-level-sep" aria-hidden="true"></span>');
   }
   /* The whole-class grid's top row: "Set Everyone To" and a capsule per
-     level (today's fill-all), and the hover hint for the rubric wording. */
-  function _setEveryoneHtml(cid, action, aid, withHint) {
+     level (today's fill-all). No hover hint: the wording bar shows itself. */
+  function _setEveryoneHtml(cid, action, aid) {
     return (
       '<div class="rsg-header">' +
       '<span class="rsg-header-label">Set Everyone To</span>' +
       '<div class="rsg-header-levels">' +
       _fillAllHeaderHtml(cid, action, aid) +
       '</div>' +
-      (withHint === false ? '' : '<span class="rsg-header-hint">Hover a level to see its wording</span>') +
       '</div>'
     );
   }
@@ -8292,12 +8291,10 @@ window.PageAssignments = (function () {
       esc(crit.name) +
       ', ' +
       count.ticked +
-      ' of ' +
-      count.total +
       ' ticked" title="Checklist (K)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 12l3 3 5-6"/></svg>' +
-      count.ticked +
-      '/' +
-      count.total +
+      // Only the ticks: teachers tick what the student showed at the level
+      // they reached, never every box, so a total reads as work left undone.
+      (count.ticked ? count.ticked : 'Checklist') +
       '</button>'
     );
   }
@@ -8315,7 +8312,8 @@ window.PageAssignments = (function () {
         ? 'Tick what you saw. A level is suggested when all of its boxes are ticked.'
         : current && current !== suggested
           ? 'You picked ' + PROF_LABELS[current] + '. Ticks keep your choice until you clear the level.'
-          : 'Every ' + PROF_LABELS[suggested] + ' box is ticked. Pick another level to override.',
+          : // The level already matches the ticks: nothing to explain.
+            '',
     };
   }
   function _checklistPanelHtml(cid, aid, sid, crit, currentLevel) {
@@ -8450,7 +8448,7 @@ window.PageAssignments = (function () {
     var single = rubricStyle(rubric) === 'single_point';
     var html = '<div class="rsg-grid' + (advanced ? ' is-advanced' : '') + (single ? ' is-single-point' : '') + '">';
     if (single) html += _singlePointStripHtml(rubric);
-    html += _setEveryoneHtml(cid, 'confirmFillRubricAll', a.id, !single);
+    html += _setEveryoneHtml(cid, 'confirmFillRubricAll', a.id);
 
     var statuses = getAssignmentStatuses(cid);
     students.forEach(function (st) {
@@ -8530,6 +8528,9 @@ window.PageAssignments = (function () {
         : displayScore;
     var open = advanced && RubricChecks.hasChecks(crit) && _isChecklistOpen(aid, sid, crit.id);
     var advice = open ? _checklistAdvice(crit, getRubricCheckIds(cid, sid, aid), displayScore) : null;
+    // A single-point criterion's comment is its Work On field.
+    var commentBtn = single ? '' : criterionCommentButtonHtml(aid, sid, crit);
+    var note = single ? '' : getRubricCriterionComment(cid, sid, aid, crit);
     return (
       '<div class="rsg-criterion-row' +
       (open ? ' has-checklist' : '') +
@@ -8546,19 +8547,20 @@ window.PageAssignments = (function () {
       '"><span class="rsg-criterion-name">' +
       esc(crit.name) +
       '</span></div>' +
-      (advanced
-        ? '<div class="rsg-crit-tools"><div class="rsg-checks-cell">' +
-          _checksButtonHtml(cid, aid, sid, crit) +
-          '</div></div>'
+      (advanced || commentBtn
+        ? '<div class="rsg-crit-tools">' +
+          (advanced ? '<div class="rsg-checks-cell">' + _checksButtonHtml(cid, aid, sid, crit) + '</div>' : '') +
+          commentBtn +
+          '</div>'
         : '') +
       (advice
         ? '<div class="rsg-checklist-advice' +
           (advice.suggested ? ' l' + advice.suggested : '') +
           '"><span class="rsg-checklist-head">' +
           esc(advice.head) +
-          '</span><span class="rsg-checklist-hint">' +
-          esc(advice.hint) +
-          '</span></div>'
+          '</span>' +
+          (advice.hint ? '<span class="rsg-checklist-hint">' + esc(advice.hint) + '</span>' : '') +
+          '</div>'
         : '') +
       '</div>' +
       '<div class="rsg-criterion-main">' +
@@ -8585,8 +8587,7 @@ window.PageAssignments = (function () {
         critMod,
       ) +
       '</div>' +
-      // A single-point criterion's comment is its Work On field.
-      (single ? '' : '<div class="rsg-comment-cell">' + criterionCommentButtonHtml(aid, sid, crit) + '</div>') +
+      (note ? '<div class="rsg-crit-note">' + esc(note) + '</div>' : '') +
       (open ? _checklistPanelHtml(cid, aid, sid, crit, displayScore) : '') +
       (single ? _rsgSinglePointNotesHtml(cid, aid, sid, crit) : '') +
       '</div></div>'
@@ -10045,8 +10046,9 @@ window.PageAssignments = (function () {
 
   /* ── Criterion comment ──────────────────────────────────── */
   // One short note per rubric criterion, printed under its row on the rubric
-  // handout. Its labelled button sits at the end of the criterion's levels,
-  // solid once the criterion has a comment.
+  // handout. Its labelled button sits under the criterion's name, beside the
+  // checklist button, solid once the criterion has a comment; the comment's
+  // text shows under the levels.
   function criterionCommentButtonHtml(aid, sid, crit) {
     var note = getRubricCriterionComment(activeCourse, sid, aid, crit);
     return (
@@ -10198,6 +10200,20 @@ window.PageAssignments = (function () {
       btn.classList.toggle('has-comment', !!text);
       btn.title = text || 'Comment on this criterion (C)';
     }
+    var row = btn && btn.closest('.rsg-criterion-row');
+    var levels = row && row.querySelector('.rsg-levels');
+    if (!levels) return;
+    var noteEl = row.querySelector('.rsg-crit-note');
+    if (!text) {
+      if (noteEl) noteEl.remove();
+      return;
+    }
+    if (!noteEl) {
+      noteEl = document.createElement('div');
+      noteEl.className = 'rsg-crit-note';
+      levels.insertAdjacentElement('afterend', noteEl);
+    }
+    noteEl.textContent = text;
   }
   function saveCriterionComment() {
     if (!_critCommentState) return;

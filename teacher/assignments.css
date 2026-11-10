@@ -4136,11 +4136,6 @@ body:has(.af-comp-overlay:not([hidden])) #gb-tooltip {
 .rsg-header-level.hl4::before {
   background: var(--score-4);
 }
-.rsg-header-hint {
-  margin-left: auto;
-  font-size: var(--text-xs);
-  color: var(--text);
-}
 
 /* A student: the name at 21px with status and Comment beside it, and the
    criteria indented under it. */
@@ -5393,32 +5388,41 @@ body:has(#page-layout.sidebar-hidden) .rsg-descriptor-bar {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* The criterion comment: a labelled blue pill at the end of the levels,
-   solid blue once the criterion has a comment. C opens it on the focused
-   row. */
-.rsg-comment-cell {
-  display: flex;
-  margin-top: 4px;
-}
+/* The criterion comment: a labelled blue button under the criterion's name,
+   beside the checklist button and the same size, solid blue once the
+   criterion has a comment. C opens it on the focused row. */
 .rsg-crit-comment {
-  height: 32px;
-  padding: 0 14px 0 12px;
+  height: 26px;
+  padding: 0 9px;
   border: none;
-  border-radius: 16px;
+  border-radius: 7px;
   background: rgba(0, 122, 255, 0.12);
   color: #0058d0;
   font-family: inherit;
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 .rsg-crit-comment svg {
-  width: 15px;
-  height: 15px;
+  width: 13px;
+  height: 13px;
+}
+/* The saved comment, read in place under the levels. */
+.rsg-crit-note {
+  padding: 0 4px;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 .rsg-crit-comment:hover,
 .rsg-crit-comment:focus-visible {
@@ -5719,8 +5723,10 @@ body:has(#page-layout.sidebar-hidden) .rsg-descriptor-bar {
 }
 
 /* ── Advanced Rubric checklists (scoring) ─────────────────── */
-/* A Checks column between the levels and −/+; the checklist opens under
-   its row with one column under each level button. */
+/* The checklist button under the criterion's name, beside Comment, showing
+   how many boxes are ticked (never a total: teachers tick only what the
+   student showed). The checklist opens under its row with one column under
+   each level button. */
 .rsg-checks-cell {
   display: flex;
 }
@@ -5763,20 +5769,9 @@ body:has(#page-layout.sidebar-hidden) .rsg-descriptor-bar {
 }
 .rsg-criterion-main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  column-gap: 10px;
+  grid-template-columns: minmax(0, 1fr);
   row-gap: 6px;
   min-width: 0;
-}
-.rsg-criterion-main:not(:has(> .rsg-comment-cell)) {
-  grid-template-columns: minmax(0, 1fr);
-}
-.rsg-criterion-main > * {
-  grid-column: 1;
-}
-.rsg-criterion-main > .rsg-comment-cell {
-  grid-column: 2;
-  grid-row: 1;
 }
 .rsg-checklist-advice {
   display: flex;
@@ -8505,14 +8500,6 @@ button.grader-member-name {
   .rsg-criterion-row {
     grid-template-columns: minmax(0, 1fr);
     gap: 4px;
-  }
-  .rsg-criterion-main {
-    grid-template-columns: minmax(0, 1fr) !important;
-  }
-  .rsg-criterion-main > .rsg-comment-cell {
-    grid-column: 1;
-    grid-row: auto;
-    justify-self: start;
   }
   .rsg-level {
     overflow: hidden;
