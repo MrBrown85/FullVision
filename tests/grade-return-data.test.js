@@ -710,3 +710,201 @@ describe('the build switch', () => {
     });
   });
 });
+
+/* ── From the S0-F1 review ───────────────────────────────────── */
+
+describe('"not loaded" is not "none"', () => {
+  const LIVE = U(1);
+  const HELD = { student_page: true, return_grades: 'on_return' };
+  let session;
+  let realSettings;
+
+  beforeEach(() => {
+    seedClass(LIVE, {
+      students: [{ id: U(11), firstName: 'Jordan', lastName: 'Test' }],
+      assessments: [{ id: U(31), title: 'Essay', date: '2026-10-10', type: 'summative', tagIds: [U(51)] }],
+      scores: {
+        [U(11)]: [
+          { id: 'e1', assessmentId: U(31), tagId: U(51), score: 3, date: '2026-10-10', type: 'summative', note: '' },
+        ],
+      },
+    });
+    session = signIn();
+    realSettings = globalThis.getReturnSettings;
+  });
+  afterEach(() => {
+    globalThis.getReturnSettings = realSettings;
+    session.signOut();
+    clearClass(LIVE);
+  });
+
+  it('a signed-in class that holds grades throws until its rows have loaded, then reads them', () => {
+    // As S0-W1 will have it: the class's settings read as the server has them.
+    globalThis.getReturnSettings = () => HELD;
+    expect(_cache.gradeReturns[LIVE]).toBeUndefined();
+    expect(() => getReturnedScores(LIVE)).toThrow(/has not loaded.*no draft is shown/);
+    // And again: the failure is not remembered as an answer.
+    expect(() => getReturnedScores(LIVE)).toThrow(/has not loaded/);
+    // calc.js works out no grade.
+    expect(() => withReturnedOnly(() => getScoreComment(LIVE, U(11), U(31)) + _scoreRead.scores(LIVE))).toThrow(
+      /has not loaded/,
+    );
+    // Loaded, and the class has none: every grade is returned.
+    _cache.gradeReturns[LIVE] = {};
+    expect(getReturnedScores(LIVE)).toBe(getScores(LIVE));
+    // Loaded, with a draft never returned: it is not there.
+    _cache.gradeReturns[LIVE] = { [U(31)]: { [U(11)]: { is_draft: true } } };
+    delete _returnedSets[LIVE];
+    expect(getReturnedScores(LIVE)).toEqual({ [U(11)]: [] });
+  });
+
+  it('a class that holds no grades has no draft by rule: the working copy, loaded or not', () => {
+    [
+      { student_page: false, return_grades: 'on_return' },
+      { student_page: true, return_grades: 'on_save' },
+      { student_page: true, return_grades: null },
+    ].forEach(settings => {
+      globalThis.getReturnSettings = () => settings;
+      delete _returnedSets[LIVE];
+      expect(getReturnedScores(LIVE)).toBe(getScores(LIVE));
+    });
+  });
+
+  it('a class kept on this device always knows its rows: none saved is none', () => {
+    session.signOut();
+    try {
+      held();
+      expect(_cache.gradeReturns[CID]).toBeUndefined();
+      expect(getReturnedScores(CID)).toBe(getScores(CID));
+      level('s1', 'essay', 't1', 3);
+      expect(getReturnedScores(CID).s1).toEqual([]);
+    } finally {
+      session = signIn();
+    }
+  });
+});
+
+describe('with real grade math', () => {
+  const MATH = 'c-math';
+  // Two pieces of the same date on one competency, and pair and group work.
+  const FIRST = { id: 'first', title: 'First', date: '2026-10-10', type: 'summative', tagIds: ['q'] };
+  const SECOND = { id: 'second', title: 'Second', date: '2026-10-10', type: 'summative', tagIds: ['q'] };
+  const PAIR = {
+    id: 'pair',
+    title: 'Pair Talk',
+    date: '2026-10-12',
+    type: 'summative',
+    tagIds: ['q'],
+    collaboration: 'pair',
+    pairs: [['s1', 's2']],
+  };
+  const GROUP = {
+    id: 'group',
+    title: 'Group Poster',
+    date: '2026-10-13',
+    type: 'summative',
+    tagIds: ['q'],
+    collaboration: 'group',
+    groups: [['s1', 's2', 's3']],
+  };
+  const lvl = (sid, aid, value) => upsertScore(MATH, sid, aid, 'q', value, '', 'summative', '', 0);
+  const all = sid => (clearProfCache(), getTagProficiency(MATH, sid, 'q'));
+  const returned = sid => (clearProfCache(), withReturnedOnly(() => getTagProficiency(MATH, sid, 'q')));
+  const method = name => saveCourseConfig(MATH, Object.assign({}, getCourseConfig(MATH), { calcMethod: name }));
+
+  beforeEach(() => {
+    localStorage.clear();
+    seedClass(MATH, {
+      students: STUDENTS,
+      assessments: [FIRST, SECOND, PAIR, GROUP].map(a => structuredClone(a)),
+      learningMaps: {
+        subjects: [],
+        sections: [{ id: 'sec', name: 'Question', tags: [{ id: 'q', label: 'Question', text: 'Ask questions' }] }],
+        _customized: true,
+        _version: 1,
+        _flatVersion: 2,
+      },
+      courseConfigs: { student_page_enabled: true, return_grades: 'on_return' },
+    });
+  });
+  afterEach(() => clearClass(MATH));
+
+  it('a cleared returned grade keeps its place: a tie between two pieces of one date goes the way it did', () => {
+    // 4 then 2, the same day, both returned.
+    lvl('s1', 'first', 4);
+    lvl('s1', 'second', 2);
+    returnGrades(MATH, 'first', ['s1']);
+    returnGrades(MATH, 'second', ['s1']);
+    const before = {};
+    const METHODS = ['mostRecent', 'decayingAvg', 'mode', 'average', 'highest'];
+    METHODS.forEach(name => {
+      method(name);
+      before[name] = all('s1');
+    });
+    expect(before.mostRecent).toBe(2);
+    // The 4 is cleared and the clear is not returned.
+    saveScores(MATH, clearScoreEntries(MATH, getScores(MATH), 's1', FIRST, ['q']));
+    expect(getScores(MATH).s1.map(e => e.assessmentId)).toEqual(['second']);
+    expect(getReturnedScores(MATH).s1.map(e => [e.assessmentId, e.score])).toEqual([
+      ['first', 4],
+      ['second', 2],
+    ]);
+    METHODS.forEach(name => {
+      method(name);
+      expect(returned('s1'), name).toBe(before[name]);
+    });
+    method('mostRecent');
+    expect(returned('s1')).toBe(2);
+    expect(all('s1')).toBe(2);
+  });
+
+  it.each([
+    ['pair', PAIR, ['s1', 's2']],
+    ['group', GROUP, ['s1', 's2', 's3']],
+  ])(
+    'Missing wins at once on %s work: one click, and the returned grade stops counting for that member',
+    (_, work, members) => {
+      // s1 has a 1 of their own; the group is graded 3 and it is returned.
+      lvl('s1', 'first', 1);
+      returnGrades(MATH, 'first', ['s1']);
+      lvl('s1', work.id, 3);
+      expect(members.map(sid => GradeState.stateOf(MATH, sid, work.id))).toEqual(members.map(() => 'draft'));
+      returnGrades(MATH, work.id, members);
+      const before = { all: members.map(all), returned: members.map(returned) };
+      expect(before.returned).toEqual(before.all);
+      expect(before.all[0]).toBe(2);
+
+      // Missing on one member clears their copy of the group's grade.
+      expect(setAssignmentStatus(MATH, 's1', work.id, 'NS')).toBe(true);
+      expect(getScores(MATH).s1.filter(e => e.assessmentId === work.id)).toEqual([]);
+      expect(getGradeReturn(MATH, 's1', work.id)).toMatchObject({ is_draft: true });
+      // The teacher's number and the returned-only number agree at once.
+      expect(all('s1')).toBe(1);
+      expect(returned('s1')).toBe(1);
+      expect(GradeState.stateOf(MATH, 's1', work.id)).toBe(null);
+      // The others keep the group's returned grade.
+      members.slice(1).forEach(sid => {
+        expect(returned(sid)).toBe(3);
+        expect(GradeState.stateOf(MATH, sid, work.id)).toBe('returned');
+      });
+      // Missing taken off: the group's grade is copied back, as it was returned.
+      expect(setAssignmentStatus(MATH, 's1', work.id, null)).toBe(true);
+      expect(members.map(all)).toEqual(before.all);
+      expect(members.map(returned)).toEqual(before.returned);
+      expect(GradeState.stateOf(MATH, 's1', work.id)).toBe('returned');
+    },
+  );
+
+  it('Excused on a member of a pair: left out of both sets at once, and back when it is taken off', () => {
+    lvl('s1', 'first', 1);
+    returnGrades(MATH, 'first', ['s1']);
+    lvl('s1', 'pair', 3);
+    returnGrades(MATH, 'pair', ['s1', 's2']);
+    expect(setAssignmentStatus(MATH, 's1', 'pair', 'EXC')).toBe(true);
+    expect(all('s1')).toBe(1);
+    expect(returned('s1')).toBe(1);
+    expect(setAssignmentStatus(MATH, 's1', 'pair', null)).toBe(true);
+    expect(returned('s1')).toBe(2);
+    expect(all('s1')).toBe(2);
+  });
+});
