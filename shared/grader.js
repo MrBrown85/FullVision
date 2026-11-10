@@ -112,10 +112,9 @@ window.Grader = (function () {
      actions go through the actions above. Its levels and its Undo pass
      data.js something different from the desktop's, so they have actions
      of their own here, kept as the phone had them: the move changed
-     nothing that is saved or sent (tests/pin-phone-grade-writes.test.js),
-     and since then only how often Undo sends a cell. Each says how it
-     differs. Making them the same changes what a teacher's tap saves, so
-     that is a decision, not tidying. */
+     nothing that is saved or sent (tests/pin-phone-grade-writes.test.js).
+     Each says how it differs. Making them the same changes what a
+     teacher's tap saves, so that is a decision, not tidying. */
 
   /* A level under one score key, as the phone dates and notes it. Work
      with no date of its own is dated today, on every change of the level;
@@ -152,14 +151,14 @@ window.Grader = (function () {
   }
 
   /* The phone's Undo. The phone works out the class's scores with the
-     undone cells as they were (`scores`) and saves that list: saveScores
-     sends each cell that changed, once. (Until S1-T2 the phone then sent
-     the same cells a second time.) undo, below, hands data.js a copy from
-     before and one from after, and data.js puts back only the cells that
-     still hold what was undone: an unscored cell keeps a 0 there, where
-     the phone takes the entry away, so the two are not yet one action. */
-  function undoOnPhone(cid, sid, aid, scores) {
-    return _saved(cid, sid, aid, 'undo', saveScores(cid, scores));
+     undone cells as they were (`after`; `before` is a copy from before it
+     did) and saves that list, then sends what changed between the two.
+     undo, below, hands both copies to data.js, which puts back only the
+     cells that still hold what was undone. */
+  function undoOnPhone(cid, sid, aid, before, after) {
+    var out = saveScores(cid, after);
+    persistScoreDiffToCanonical(cid, before, after);
+    return _saved(cid, sid, aid, 'undo', out);
   }
 
   /* Undo: put back the cells that changed between `before` and `after`

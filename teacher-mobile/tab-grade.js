@@ -1761,6 +1761,7 @@ window.MGrade = (function () {
     if (entry.multi) return _undoCriterion(entry);
     var prev = _undoEntries(entry, entry.prev);
     var allScores = getScores(entry.cid);
+    var beforeScores = structuredClone(allScores);
     var stScores = (allScores[entry.sid] || []).filter(function (s) {
       return !(s.assessmentId === entry.aid && s.tagId === entry.tid);
     });
@@ -1769,7 +1770,7 @@ window.MGrade = (function () {
       stScores.push(p);
     });
     allScores[entry.sid] = stScores;
-    Grader.undoOnPhone(entry.cid, entry.sid, entry.aid, allScores);
+    Grader.undoOnPhone(entry.cid, entry.sid, entry.aid, beforeScores, allScores);
     clearProfCache();
 
     // Update UI
@@ -1790,6 +1791,7 @@ window.MGrade = (function () {
   /* A criterion's change, put back on every key it wrote. */
   function _undoCriterion(entry) {
     var allScores = getScores(entry.cid);
+    var beforeScores = structuredClone(allScores);
     var tids = entry.multi.map(function (m) {
       return m.tid;
     });
@@ -1802,7 +1804,7 @@ window.MGrade = (function () {
       });
     });
     allScores[entry.sid] = stScores;
-    Grader.undoOnPhone(entry.cid, entry.sid, entry.aid, allScores);
+    Grader.undoOnPhone(entry.cid, entry.sid, entry.aid, beforeScores, allScores);
     clearProfCache();
     _refreshCard(entry.cid, entry.sid, entry.aid);
     _updateThumbGraded(entry.cid, entry.aid);

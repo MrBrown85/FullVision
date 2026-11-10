@@ -984,21 +984,17 @@ describe('pin: the phone Grade tab’s writes', () => {
      The tab keeps a list of the last 20 level changes (a level, a + or −,
      a clear, a level a tick set) and Undo puts the newest one back: the
      score entries under the keys it wrote, as they were. Points, marks,
-     statuses, ticks and comments are not on the list.
+     statuses, ticks and comments are not on the list. */
 
-     These were pinned before Undo changed (S1-T2, the second commit). That
-     change touched two lines here, UNDO_CALLS and undoSends, and no other
-     expectation. */
-
-  // What Undo calls: it saves the class's score list, and saveScores
-  // sends what changed in it. Until S1-T2 the tab then called
-  // persistScoreDiffToCanonical with the list before and the list after.
-  const UNDO_CALLS = [['saveScores', CID, '<scores>']];
-  // So each cell Undo puts back is sent once. Until S1-T2 it was sent
-  // twice (cells.concat(cells)): by saveScores, then by the tab itself.
-  // Nothing else in these pins changed with it: every entry, status, tick
-  // and comment below is as it was.
-  const undoSends = cells => cells;
+  // What Undo calls: it saves the class's score list, then sends what
+  // changed between the list before and the list after.
+  const UNDO_CALLS = [
+    ['saveScores', CID, '<scores>'],
+    ['persistScoreDiffToCanonical', CID, '<scores>', '<scores>'],
+  ];
+  // So each cell Undo puts back is sent twice: saveScores sends what
+  // changed in the list, and then the tab sends the same change itself.
+  const undoSends = cells => cells.concat(cells);
 
   describe('Undo', () => {
     const undo = () => MGrade.undoLastScore();
