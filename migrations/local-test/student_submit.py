@@ -248,14 +248,17 @@ back()
 
 # ── Rate limits ────────────────────────────────────────────────────────
 sp()
-# A school shares one address: 59 misses still let a good code through,
-# the 60th locks the address out (20261025_phone_reports.sql).
-for i in range(59): open_('ZZZ-ZZZ', ip='ip-guess')
+# A school shares one address: the limit is 60 unknown codes in 15 minutes
+# (20261025_phone_reports.sql), and 300 once Batch A is loaded
+# (2026110904_student_sessions_page.sql, as for cards). One short of it
+# still lets a good code through; the next miss locks the address out.
+LIMIT = 300 if one("select pg_get_functiondef('student_submit.open(text,text)'::regprocedure) like '%''15 minutes'') >= 300 then%'") else 60
+for i in range(LIMIT - 1): open_('ZZZ-ZZZ', ip='ip-guess')
 r = open_(new1, ip='ip-guess')
-ok('59 misses from one address still let a good code open', r.get('ok') is True, r)
+ok('%d misses from one address still let a good code open' % (LIMIT - 1), r.get('ok') is True, r)
 open_('ZZZ-ZZZ', ip='ip-guess')
 r = open_(new1, ip='ip-guess')
-ok('the 60th miss from one address locks it out, even with a good code', r == {'ok': False, 'error': 'locked'}, r)
+ok('miss number %d from one address locks it out: the next request is refused, even with a good code' % LIMIT, r == {'ok': False, 'error': 'locked'}, r)
 r = open_(new1, ip='ip-other')
 ok('another IP is unaffected', r.get('ok') is True, r)
 back(); sp(); as_owner()

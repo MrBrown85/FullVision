@@ -7,11 +7,18 @@ then as Teacher B, with no JWT and as anon. Rows are read back as the
 database owner. One transaction, rolled back at the end.
 
 "today:" in a check's name marks a gap this pins as it is, not as it should
-be. Batch A closes two of them (a criterion not on the assessment's rubric;
-Missing on scored work) and flips those checks to "refused".
+be. Batch A closes one of them: a score row that names another class's
+records (migrations/2026110901_score_rows_same_class.sql). Missing on
+scored work and a criterion that is not on the assessment's rubric stay
+accepted: Batch A changes no score RPC but move_rubric_scores.
+
+The script runs against either database and says which it found: before
+Batch A the cross-class rows are pinned as "today: accepted"; with Batch A
+loaded they are "refused", and a section at the end tries every way in.
 
 PGPORT=54329 PGDATABASE=fv_score python3 run.py harness.sql score-prelude.sql score-tables.sql
-PGPORT=54329 PGDATABASE=fv_score python3 score_rpcs.py
+PGPORT=54329 PGDATABASE=fv_score python3 score_rpcs.py      # today
+PGPORT=54329 PGDATABASE=fv_a python3 score_rpcs.py          # with Batch A (README.md, "Batch A")
 """
 import os, re, sys, uuid
 if os.environ.get('PG8000_PATH'): sys.path.insert(0, os.environ['PG8000_PATH'])
@@ -45,7 +52,15 @@ def snapshot_blocks(text):
 # Postgres 18 lists NOT NULL as constraints and prints one nested AND flat;
 # 17 (production) does neither. Neither changes what a table accepts.
 def same_shape(lines):
+    if BATCH_A:
+        # Batch A replaces the score tables' policies and adds its triggers;
+        # the snapshot changes when it is applied. Compare the rest.
+        cut = next((n for n, l in enumerate(lines) if l.startswith('  policy ')), len(lines))
+        lines = [l for l in lines[:cut] if 'grade_return_' not in l]
     return [re.sub(r'[()]', '', l) for l in lines if not re.match(r'  constraint \S+ NOT NULL ', l)]
+BATCH_A = c.run("select to_regclass('public.grade_return') is not null")[0][0]
+PATCHED = ['move_rubric_scores'] if BATCH_A else []
+ok('running against a database %s Batch A' % ('with' if BATCH_A else 'without'), True)
 c.run("set search_path = ''")
 local = snapshot_blocks(c.run(open(os.path.join(HERE, '..', '..', 'scripts', 'schema-snapshot.sql')).read())[0][0])
 c.run('reset search_path')
@@ -55,7 +70,8 @@ SCORE_TABLES = ['course_sync_cursor', 'subject', 'competency_group', 'section', 
                 'assessment_tag', 'score', 'score_audit', 'tag_score', 'rubric_score', 'rubric_check_score']
 differ = [t for t in SCORE_TABLES if same_shape(local.get('public.' + t, [])) != same_shape(live['public.' + t])]
 ok('every score table matches the live snapshot: columns, constraints, indexes, triggers, policies', not differ, differ)
-strangers = [f for f in local['functions'] if f not in set(live['functions'])]
+live_names = {f.split('(')[0] for f in live['functions']}
+strangers = [f for f in local['functions'] if f not in set(live['functions']) and (not BATCH_A or f.split('(')[0] in live_names)]
 ok('every function loaded has the live signature and security', not strangers, strangers)
 RPCS = ['upsert_score', 'upsert_tag_score', 'upsert_rubric_score', 'fill_rubric', 'set_rubric_check',
         'save_score_comment', 'save_score_report_note', 'set_score_status', 'clear_score',
@@ -71,12 +87,15 @@ ok('none of them is SECURITY DEFINER: row security is their ownership check',
 # compared, not only the body.
 want = {}
 for line in open(os.path.join(HERE, 'live-function-md5.txt')):
-    if line.strip() and not line.startswith('#'):
+    if line.strip() and not line.startswith('#') and len(line.split()) == 3:   # a fourth word: grade_return_race.py's
         name, md5, _length = line.split(); want[name] = md5
 got = {r[0]: r[1] for r in c.run("""select p.proname, md5(pg_get_functiondef(p.oid)) from pg_proc p
                                      join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public'""")}
-for name in sorted(n for n in want if n in got):
+for name in sorted(n for n in want if n in got and n not in PATCHED
+                   and not (BATCH_A and n in ('update_course', 'import_json_restore', 'duplicate_course'))):
     ok('%s is the live function, byte for byte' % name, got[name] == want[name], got[name])
+for name in PATCHED:
+    ok('%s carries Batch A\'s patch (batch_a_apply.py shows it started as the live body)' % name, got[name] != want[name])
 ok('all twelve score RPCs and the three ownership helpers were compared',
    all(n in want and n in got for n in RPCS + ['fv_owns_course', 'fv_owns_enrollment', 'fv_owns_assessment']))
 
@@ -188,10 +207,14 @@ rpc(A, 'upsert_score(:e, :a, null)', e=ENR1, a=PLAIN)
 ok('upsert_score with a null value leaves the row with no value', score_row(ENR1, PLAIN) == [None, 0, None, None, None], score_row(ENR1, PLAIN))
 rpc(A, 'upsert_score(:e, :a, 250)', e=ENR2, a=PTS)
 ok('today: points over the assessment\'s maximum are accepted', score_row(ENR2, PTS)[0] == 250.0, score_row(ENR2, PTS))
-rpc(A, 'upsert_score(:e, :a, 4)', e=ENR2, a=ids['b_asm'])
-ok("today: a score for Teacher A's student on Teacher B's assessment is accepted (row security checks the enrollment only)",
-   score_row(ENR2, ids['b_asm']) == [4.0, 0, None, None, None], score_row(ENR2, ids['b_asm']))
-as_owner(); c.run('delete from score where assessment_id = :a', a=ids['b_asm'])
+if BATCH_A:
+    expect_error("refused: a score for Teacher A's student on Teacher B's assessment",
+                 lambda: rpc(A, 'upsert_score(:e, :a, 4)', e=ENR2, a=ids['b_asm']), 'row-level security')
+else:
+    rpc(A, 'upsert_score(:e, :a, 4)', e=ENR2, a=ids['b_asm'])
+    ok("today: a score for Teacher A's student on Teacher B's assessment is accepted (row security checks the enrollment only)",
+       score_row(ENR2, ids['b_asm']) == [4.0, 0, None, None, None], score_row(ENR2, ids['b_asm']))
+    as_owner(); c.run('delete from score where assessment_id = :a', a=ids['b_asm'])
 
 # ── upsert_tag_score ───────────────────────────────────────────────────
 tid = rpc(A, "upsert_tag_score(:e, :a, :t, 3, 1::smallint, 'Clear question')", e=ENR1, a=PROF, t=T1)
@@ -220,8 +243,12 @@ rpc(A, 'upsert_tag_score(:e, :a, :t, 0)', e=ENR1, a=DONE, t=T1)
 ok('Incomplete is a stored 0, not a cleared score', score_row(ENR1, DONE)[0] == 0.0, score_row(ENR1, DONE))
 rpc(A, 'upsert_tag_score(:e, :a, :t, 3)', e=ENR2, a=PLAIN, t=T1)
 ok('today: a competency the assessment is not linked to is accepted', tag_row(ENR2, PLAIN, T1) == [3, 0, None], tag_row(ENR2, PLAIN, T1))
-rpc(A, 'upsert_tag_score(:e, :a, :t, 3)', e=ENR2, a=PLAIN, t=ids['b_tag'])
-ok("today: Teacher B's competency on Teacher A's student is accepted", tag_row(ENR2, PLAIN, ids['b_tag']) == [3, 0, None], tag_row(ENR2, PLAIN, ids['b_tag']))
+if BATCH_A:
+    expect_error("refused: Teacher B's competency on Teacher A's student",
+                 lambda: rpc(A, 'upsert_tag_score(:e, :a, :t, 3)', e=ENR2, a=PLAIN, t=ids['b_tag']), 'row-level security')
+else:
+    rpc(A, 'upsert_tag_score(:e, :a, :t, 3)', e=ENR2, a=PLAIN, t=ids['b_tag'])
+    ok("today: Teacher B's competency on Teacher A's student is accepted", tag_row(ENR2, PLAIN, ids['b_tag']) == [3, 0, None], tag_row(ENR2, PLAIN, ids['b_tag']))
 as_owner(); c.run('delete from tag_score where enrollment_id = :e and assessment_id = :a', e=ENR2, a=PLAIN)
 
 # ── upsert_rubric_score ────────────────────────────────────────────────
@@ -239,13 +266,20 @@ ok('no level keeps the row while a note remains', r == rid and crit_row(ENR1, RU
 r = rpc(A, "upsert_rubric_score(:e, :a, :x, 0, 0::smallint, null, '')", e=ENR1, a=RUB, x=C1)
 ok('no level and no notes deletes the row and returns null', r is None and crit_row(ENR1, RUB, C1) is None, (r, crit_row(ENR1, RUB, C1)))
 expect_error('a criterion level above 4 is refused by the table', lambda: rpc(A, 'upsert_rubric_score(:e, :a, :x, 5)', e=ENR1, a=RUB, x=C1), '23514')
-# GAP 1 (Batch A closes it): the criterion is not checked against the rubric.
+# GAP 1, still open with Batch A: the criterion is not checked against the
+# work's rubric. upsert_rubric_score is left exactly as live, because the
+# outbox can send a score ahead of the update_assessment that changes the
+# rubric; the check waits for the client to send the rubric change first.
 rpc(A, 'upsert_rubric_score(:e, :a, :x, 3)', e=ENR2, a=RUB, x=CX)
 ok("today: accepted: a criterion that is not on the assessment's rubric", crit_row(ENR2, RUB, CX) == [3, 0, None, None], crit_row(ENR2, RUB, CX))
 rpc(A, 'upsert_rubric_score(:e, :a, :x, 2)', e=ENR2, a=PLAIN, x=C1)
 ok('today: accepted: a criterion on an assessment with no rubric', crit_row(ENR2, PLAIN, C1) == [2, 0, None, None], crit_row(ENR2, PLAIN, C1))
-rpc(A, 'upsert_rubric_score(:e, :a, :x, 2)', e=ENR2, a=RUB, x=ids['b_crit'])
-ok("today: accepted: Teacher B's criterion on Teacher A's student", crit_row(ENR2, RUB, ids['b_crit']) == [2, 0, None, None], crit_row(ENR2, RUB, ids['b_crit']))
+if BATCH_A:
+    expect_error("refused: Teacher B's criterion on Teacher A's student (a score row belongs to one class)",
+                 lambda: rpc(A, 'upsert_rubric_score(:e, :a, :x, 2)', e=ENR2, a=RUB, x=ids['b_crit']), 'row-level security')
+else:
+    rpc(A, 'upsert_rubric_score(:e, :a, :x, 2)', e=ENR2, a=RUB, x=ids['b_crit'])
+    ok("today: accepted: Teacher B's criterion on Teacher A's student", crit_row(ENR2, RUB, ids['b_crit']) == [2, 0, None, None], crit_row(ENR2, RUB, ids['b_crit']))
 as_owner(); c.run('delete from rubric_score where enrollment_id = :e', e=ENR2)
 
 # ── fill_rubric ────────────────────────────────────────────────────────
@@ -304,7 +338,8 @@ ok('Late on scored work keeps the score', score_row(ENR1, PTS)[:3] == [6.0, 0, '
 rpc(A, 'set_score_status(:e, :a, null)', e=ENR2, a=PLAIN)
 ok('a null status clears it; today the empty row stays behind', score_row(ENR2, PLAIN) == [None, 0, None, None, None], score_row(ENR2, PLAIN))
 expect_error('a status that is not NS, EXC or LATE is refused', lambda: rpc(A, "set_score_status(:e, :a, 'missing')", e=ENR2, a=PLAIN), 'invalid status')
-# GAP 2 (Batch A closes it): Missing on work that has a score.
+# GAP 2, still open with Batch A: Missing on work that has a score. The
+# shipped app sends it on cells the server still holds a score for.
 rpc(A, "set_score_status(:e, :a, 'NS')", e=ENR2, a=PTS)
 ok('today: accepted: Missing on work that has points', score_row(ENR2, PTS)[:3] == [250.0, 0, 'NS'], score_row(ENR2, PTS))
 rpc(A, 'upsert_tag_score(:e, :a, :t, 3)', e=ENR2, a=PROF, t=T2)
@@ -460,6 +495,94 @@ def audit_write():
 expect_error('a teacher cannot write the change history directly', audit_write, 'row-level security')
 as_teacher(B); c.run('select _score_audit_diff(:s, 1, 2, null, null)', s=sid)
 ok("Teacher B's call to the audit helper for Teacher A's score writes nothing", everything() == fingerprint)
+
+# ── With Batch A: a score row belongs to one class ─────────────────────
+if BATCH_A:
+    as_owner()
+    c2 = {k: str(uuid.uuid4()) for k in ('course', 'enr', 'subj', 'sect', 'tag', 'rub', 'crit', 'chk', 'asm')}
+    c.run("insert into course (id, teacher_id, name) values (:c, :t, 'Socials 8')", c=c2['course'], t=A)
+    c.run("insert into enrollment (id, student_id, course_id) values (:e, 'aaaaaaaa-1111-0000-0000-000000000001', :c)", e=c2['enr'], c=c2['course'])
+    c.run("insert into subject (id, course_id, name) values (:s, :c, 'Socials')", s=c2['subj'], c=c2['course'])
+    c.run("insert into section (id, course_id, subject_id, name) values (:x, :c, :s, 'Evidence')", x=c2['sect'], c=c2['course'], s=c2['subj'])
+    c.run("insert into tag (id, section_id, label) values (:t, :x, 'Use sources')", t=c2['tag'], x=c2['sect'])
+    c.run("insert into rubric (id, course_id, name, style) values (:r, :c, 'Essay', 'advanced')", r=c2['rub'], c=c2['course'])
+    c.run("insert into criterion (id, rubric_id, name) values (:x, :r, 'Thesis')", x=c2['crit'], r=c2['rub'])
+    c.run("insert into criterion_check (id, criterion_id, level, label) values (:k, :x, 3, 'States a claim')", k=c2['chk'], x=c2['crit'])
+    c.run("insert into assessment (id, course_id, title, rubric_id) values (:a, :c, 'Essay', :r)", a=c2['asm'], c=c2['course'], r=c2['rub'])
+    c.run("insert into criterion_check (id, criterion_id, level, label) values (:k, :x, 3, 'Has a thesis')", k=ids['b_subj'], x=ids['b_crit'])
+    b_check = ids['b_subj']   # a checkbox on Teacher B's criterion (the id is only an id)
+    c.run('update assessment set rubric_id = :r where id = :a', r=ids['b_rub'], a=ids['b_asm'])
+    rpc(A, 'upsert_tag_score(:e, :a, :t, 3)', e=ENR1, a=PROF, t=T1)
+    rpc(A, 'upsert_rubric_score(:e, :a, :x, 3)', e=ENR1, a=RUB, x=C1)
+    rpc(A, 'set_rubric_check(:e, :a, :k, true)', e=ENR1, a=RUB, k=K1)
+    rpc(A, 'upsert_score(:e, :a, 5)', e=ENR1, a=DONE)
+    fingerprint = everything()
+    for whose, asm, tag, crit, chk in (("Teacher B's", ids['b_asm'], ids['b_tag'], ids['b_crit'], b_check),
+                                       ("another of Teacher A's classes'", c2['asm'], c2['tag'], c2['crit'], c2['chk'])):
+        THROUGH = [
+            ('upsert_score', 'upsert_score(:e, :a, 3)', dict(e=ENR1, a=asm)),
+            ('set_score_status', "set_score_status(:e, :a, 'LATE')", dict(e=ENR1, a=asm)),
+            ('save_score_comment', "save_score_comment(:e, :a, 'x')", dict(e=ENR1, a=asm)),
+            ('save_score_report_note', "save_score_report_note(:e, :a, 'x', :k)", dict(e=ENR1, a=asm, k=key())),
+            ('upsert_tag_score (the assessment)', 'upsert_tag_score(:e, :a, :t, 3)', dict(e=ENR1, a=asm, t=T1)),
+            ('upsert_tag_score (the competency)', 'upsert_tag_score(:e, :a, :t, 3)', dict(e=ENR1, a=PROF, t=tag)),
+            ('upsert_rubric_score (the assessment)', 'upsert_rubric_score(:e, :a, :x, 3)', dict(e=ENR1, a=asm, x=crit)),
+            ('upsert_rubric_score (the criterion)', 'upsert_rubric_score(:e, :a, :x, 3)', dict(e=ENR1, a=RUB, x=crit)),
+            ('fill_rubric', 'fill_rubric(:e, :a, 3)', dict(e=ENR1, a=asm)),
+            ('set_rubric_check (the assessment)', 'set_rubric_check(:e, :a, :k, true)', dict(e=ENR1, a=asm, k=chk)),
+            ('set_rubric_check (the checkbox)', 'set_rubric_check(:e, :a, :k, true)', dict(e=ENR1, a=RUB, k=chk)),
+        ]
+        for name, sql, kw in THROUGH:
+            expect_error("%s is refused for Teacher A's student against %s record" % (name, whose), lambda: rpc(A, sql, **kw))
+        rpc(A, 'clear_score(:e, :a)', e=ENR1, a=asm)
+        DIRECT = [
+            ('score', 'insert into score (enrollment_id, assessment_id, value) values (:e, :a, 3)', dict(e=ENR1, a=asm)),
+            ('dibels_score', "insert into dibels_score (enrollment_id, assessment_id, period) values (:e, :a, 'boy')", dict(e=ENR1, a=asm)),
+            ('tag_score (the assessment)', 'insert into tag_score (enrollment_id, assessment_id, tag_id, value) values (:e, :a, :t, 3)', dict(e=ENR1, a=asm, t=T1)),
+            ('tag_score (the competency)', 'insert into tag_score (enrollment_id, assessment_id, tag_id, value) values (:e, :a, :t, 3)', dict(e=ENR1, a=PROF, t=tag)),
+            ('rubric_score (the assessment)', 'insert into rubric_score (enrollment_id, assessment_id, criterion_id, value) values (:e, :a, :x, 3)', dict(e=ENR1, a=asm, x=C1)),
+            ('rubric_score (the criterion)', 'insert into rubric_score (enrollment_id, assessment_id, criterion_id, value) values (:e, :a, :x, 3)', dict(e=ENR1, a=RUB, x=crit)),
+            ('rubric_check_score (the assessment)', 'insert into rubric_check_score (enrollment_id, assessment_id, check_id) values (:e, :a, :k)', dict(e=ENR1, a=asm, k=K1)),
+            ('rubric_check_score (the checkbox)', 'insert into rubric_check_score (enrollment_id, assessment_id, check_id) values (:e, :a, :k)', dict(e=ENR1, a=RUB, k=chk)),
+        ]
+        for name, sql, kw in DIRECT:
+            def go():
+                as_teacher(A); c.run(sql, **kw)
+            expect_error("a direct insert into %s is refused against %s record" % (name, whose), go, 'row-level security')
+        MOVES = [
+            ('score to the assessment', 'update score set assessment_id = :a where enrollment_id = :e and assessment_id = :own', dict(a=asm, e=ENR1, own=DONE)),
+            ('tag_score to the assessment', 'update tag_score set assessment_id = :a where enrollment_id = :e', dict(a=asm, e=ENR1)),
+            ('tag_score to the competency', 'update tag_score set tag_id = :t where enrollment_id = :e', dict(t=tag, e=ENR1)),
+            ('rubric_score to the criterion', 'update rubric_score set criterion_id = :x where enrollment_id = :e and assessment_id = :own', dict(x=crit, e=ENR1, own=RUB)),
+            ('rubric_check_score to the checkbox', 'update rubric_check_score set check_id = :k where enrollment_id = :e and assessment_id = :own', dict(k=chk, e=ENR1, own=RUB)),
+        ]
+        for name, sql, kw in MOVES:
+            def go():
+                as_teacher(A); c.run(sql, **kw)
+            expect_error("a direct update of %s is refused against %s record" % (name, whose), go, 'row-level security')
+        ok("after all of that against %s records, no score row changed" % whose, everything() == fingerprint)
+    rpc(A, 'upsert_score(:e, :a, 4)', e=c2['enr'], a=c2['asm'])
+    rpc(A, 'upsert_rubric_score(:e, :a, :x, 3)', e=c2['enr'], a=c2['asm'], x=c2['crit'])
+    rpc(A, 'set_rubric_check(:e, :a, :k, true)', e=c2['enr'], a=c2['asm'], k=c2['chk'])
+    ok("in Teacher A's second class, that class's own student, assessment, criterion and checkbox are taken as usual",
+       score_row(c2['enr'], c2['asm'])[0] == 4.0 and crit_row(c2['enr'], c2['asm'], c2['crit'])[0] == 3 and ticks(c2['enr'], c2['asm']) == [c2['chk']])
+    # A row from before the policies that names another class's records.
+    as_owner()
+    c.run('insert into score (enrollment_id, assessment_id, value) values (:e, :a, 2)', e=ENR2, a=ids['b_asm'])
+    c.run('insert into tag_score (enrollment_id, assessment_id, tag_id, value) values (:e, :a, :t, 2)', e=ENR2, a=PLAIN, t=ids['b_tag'])
+    as_teacher(A)
+    ok("a row left on another teacher's assessment is no longer read by either teacher",
+       c.run('select count(*) from score where assessment_id = :a', a=ids['b_asm'])[0][0] == 0)
+    as_teacher(B)
+    ok('(Teacher B never could read it: the enrollment is not theirs)', c.run('select count(*) from score where enrollment_id = :e', e=ENR2)[0][0] == 0)
+    as_teacher(A)
+    ok("a row in the right class that names another class's competency can still be read",
+       c.run('select count(*) from tag_score where enrollment_id = :e and assessment_id = :a', e=ENR2, a=PLAIN)[0][0] == 1)
+    def relevel():
+        as_teacher(A); c.run('update tag_score set value = 4 where enrollment_id = :e and assessment_id = :a', e=ENR2, a=PLAIN)
+    expect_error('its level cannot be changed', relevel, 'row-level security')
+    rpc(A, 'upsert_tag_score(:e, :a, :t, 0)', e=ENR2, a=PLAIN, t=ids['b_tag'])
+    ok('and it can be cleared', tag_row(ENR2, PLAIN, ids['b_tag']) is None)
 
 c.run('rollback')
 print('\n'.join('PASS ' + p for p in passed))
