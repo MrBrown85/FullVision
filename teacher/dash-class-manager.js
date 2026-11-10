@@ -7773,6 +7773,9 @@ window.DashClassManager = (function () {
     // (DECISIONS, Reporting periods 6).
     var cc = structuredClone(getCourseConfig(sourceCid));
     delete cc.reportingTerms;
+    // The copy's Student Page starts off; its Return Grades choice
+    // (return_grades) comes along (DECISIONS, Student page build rulings 12).
+    delete cc.student_page_enabled;
     if (Object.keys(cc).length > 0) saveCourseConfig(newCourse.id, cc);
     // Categories and weights, as new rows. They go up through save_categories
     // once the class has its server id.
