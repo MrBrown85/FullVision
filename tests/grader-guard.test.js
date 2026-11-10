@@ -59,9 +59,9 @@ const CAPS = {
   // tests/score-save-parity.test.js and tests/report-note.test.js look for
   // those two calls in this file's text, so they move with those tests.
   'teacher/page-assignments.js': 25,
-  // S1-T1 (gradebook and Class Results).
-  'teacher/page-gradebook.js': 21,
-  'teacher/class-results.js': 2,
+  // S1-T1 (gradebook and Class Results): moved.
+  'teacher/page-gradebook.js': 0,
+  'teacher/class-results.js': 0,
   // S1-T2 (phone Grade tab).
   'teacher-mobile/tab-grade.js': 16,
 };

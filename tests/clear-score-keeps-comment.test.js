@@ -55,8 +55,11 @@ describe('clearScoreEntries', () => {
 
 describe('the gradebook and the server agree', () => {
   it('Clear Score in the gradebook goes through clearScoreEntries', () => {
+    // Through the grader's Clear Score since S1-T1 (shared/grader.js).
     const src = readFileSync('teacher/page-gradebook.js', 'utf-8');
-    expect(src).toContain('clearScoreEntries(cid, scores, sid, assess, clearIds);');
+    expect(src).toContain('Grader.clearScore(cid, scores, sid, assess, clearIds);');
+    const grader = readFileSync('shared/grader.js', 'utf-8');
+    expect(grader).toContain('clearScoreEntries(cid, scores, sid, assessment, keys);');
   });
 
   const sql = readFileSync('migrations/20261103_clear_score_keeps_comment.sql', 'utf-8');
