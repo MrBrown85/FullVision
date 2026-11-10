@@ -8,6 +8,7 @@
 #   select p.proname, md5(pg_get_functiondef(p.oid)), length(pg_get_functiondef(p.oid))
 #     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
 #    where n.nspname = 'public' and p.proname in (...) order by 1;
+# get_gradebook was read the same way on 2026-11-10 (22 functions now).
 # function md5 length
 clear_column_scores 2eef90e77ca6c84c36832bdd18bb53e5 746
 clear_row_scores 326e27cf74efda1aba93850f4b64baed 1136
@@ -20,6 +21,7 @@ fv_owns_assessment 852322ca22024d49dcc4f88a6863a4cf 378
 fv_owns_course 61fa41c6c4e94a1e27b606e454262baf 334
 fv_owns_enrollment 9c1d01d07ad0e2402784a2257e13aecb 378
 get_class_bundle 119165287207814181c5875d81451147 22538
+get_gradebook 2876cd40c373b8a59bff4464008c8601 6816
 import_json_restore 58e48ae4f7ebcc05489b489a4f8906df 36519
 move_rubric_scores 92f7ff4b840c1dd9fe473f8ecdee29b5 3216
 save_score_comment 26a6f288a2594c54c7e94f4a8b5b5c21 753

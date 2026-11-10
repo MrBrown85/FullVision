@@ -101,15 +101,10 @@ declare
     _def text;
 begin
     -- Each function must be the one this file was written against (md5 of
-    -- pg_get_functiondef), or already carry the patch (a second run).
-    --   get_class_bundle  read from gradebook-prod on 2026-11-09
-    --                     (migrations/local-test/live-function-md5.txt).
-    --   get_gradebook     the repo's chain: 20260430_get_gradebook_include_modules
-    --                     and the three in-place patches after it. To check it
-    --                     against the live database before applying:
-    --                       select md5(pg_get_functiondef('public.get_gradebook(uuid)'::regprocedure)),
-    --                              length(pg_get_functiondef('public.get_gradebook(uuid)'::regprocedure));
-    --                       -- expected: 2876cd40c373b8a59bff4464008c8601, 6816
+    -- pg_get_functiondef, both read from gradebook-prod: get_class_bundle on
+    -- 2026-11-09, get_gradebook on 2026-11-10;
+    -- migrations/local-test/live-function-md5.txt), or already carry the
+    -- patch (a second run).
     for _f in
         select * from (values
             ('public.get_class_bundle(uuid,bigint)', '119165287207814181c5875d81451147', $s$'created_at', asm.created_at$s$),

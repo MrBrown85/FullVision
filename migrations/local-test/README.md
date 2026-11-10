@@ -151,7 +151,7 @@ Two files build the score paths on top of `harness.sql`:
   `save_score_comment`, `clear_row_scores` and `clear_column_scores` have no
   migration; theirs are the live bodies, read from `gradebook-prod` on
   2026-11-09.
-- `live-function-md5.txt`: `md5(pg_get_functiondef)` of 21 live functions.
+- `live-function-md5.txt`: `md5(pg_get_functiondef)` of 22 live functions.
   `score_rpcs.py` compares every function it loads that is in the table (the
   twelve RPCs and `fv_owns_course`, `fv_owns_enrollment`,
   `fv_owns_assessment`), so each is the live one byte for byte. The check
@@ -209,7 +209,8 @@ Two more files build what it needs on top of the score paths:
   them: 17 patches for the bundle, 3 for `get_gradebook`). The bundle comes
   out as the live function, byte for byte (`live-function-md5.txt`).
   `get_gradebook` comes out as md5 `2876cd40c373b8a59bff4464008c8601`, length
-  6816: **not yet checked against `gradebook-prod`.** Also
+  6816, which the orchestrator confirmed against `gradebook-prod` on Nov 10;
+  it is in `live-function-md5.txt` too. Also
   `fv_owns_term_rating`, and four stand-ins for the server's old grade
   calculation that `get_gradebook` calls for its cells (`fv_assessment_overall`
   and three more): they have the live signatures and return nothing, because
@@ -235,6 +236,6 @@ sending the version it holds is still told `not_modified`; a second run
 changes nothing; and a body that is not the expected one stops the file at
 its first check with nothing changed.
 
-Result on 2026-11-10 (Postgres 18.6, local; production is 17): 39 of 39.
+Result on 2026-11-10 (Postgres 18.6, local; production is 17): 40 of 40.
 `score_rpcs.py` is unchanged at 175 of 175, and `make-score-tables.py` still
 writes `score-tables.sql` byte for byte.

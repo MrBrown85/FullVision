@@ -22,8 +22,8 @@
 --   get_gradebook     20260430_get_gradebook_include_modules.sql, then the
 --                     patches in 20261013_proficiency_plus_minus,
 --                     20261027_assessment_core_competencies and
---                     20261029_category_calc_mode. live-function-md5.txt says
---                     whether that is the live function.
+--                     20261029_category_calc_mode. Also the live function,
+--                     byte for byte: 2876cd40c373b8a59bff4464008c8601.
 
 -- Bodies are stored as written; the tables some of them name come later.
 set check_function_bodies = off;
