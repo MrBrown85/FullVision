@@ -405,10 +405,11 @@ adds no lock they could meet in a new order: no dead call was waiting on a
 `grade_return` row in any run, and every one of the 3,382 deadlocks the
 server logged in the three full runs was between live RPCs (a Return or a card call appears in a
 few only as a third call waiting in line). It does make them collide more
-often under this load, about twice as often here: a save holds the cursor
-row about a third longer (an `upsert_score` call took 0.30 ms before and
-0.41 ms after), and a delete's own trigger work adds to what waits behind
-it. Ending them means the cursor triggers firing at
+often under this load, about twice as often here: every call now does the
+triggers' work while holding the cursor row (the table under Timing, below),
+so more saves are waiting in line when one of the nine arrives. A reviewer
+checked that time alone explains it: a trigger that only burns about 0.6 ms
+and takes no lock reproduces the doubling. Ending them means the cursor triggers firing at
 commit instead of after each statement, on all 38 tables that have one;
 that is a change to the live schema outside this batch.
 
@@ -428,9 +429,35 @@ of the table is for live functions. Nothing changed: `delete_rubric` still
 deadlocks with saves, the other four are still clean, and the count of RPCs
 that are not clean is still nine.
 
-Timing: a rubric fill for 30 students with 5 criteria (30 `fill_rubric`
-calls, 150 rows) took about 15 ms before the batch, 20 ms with the
-same-class policies and 40 to 45 ms with the Draft and Returned triggers
-too. A restore of a 30 by 40 class (4,800 score rows) took between 0.3 and
-0.7 s; the triggers stand aside during a restore and it sets the state in a
-few statements.
+Timing, measured by the reviewer of the last verify pass on a
+production-sized class (32 students, 70 pieces), one quiet call each:
+
+| One quiet call                      | without Batch A | with           |
+| ----------------------------------- | --------------- | -------------- |
+| `upsert_score`                      | 0.45 ms         | 0.65 to 0.8 ms |
+| `clear_score` on one rubric grade   | 0.5 ms          | 0.9 ms         |
+| `fill_rubric`, 5 criteria           | 0.6 ms          | 1.5 ms         |
+| `clear_row_scores`, one student     | 4.1 ms          | 9.2 ms         |
+| `clear_column_scores`, 32 students  | 3.0 ms          | 5.4 ms         |
+| deleting a section                  | 12.6 ms         | 59.5 ms        |
+| deleting a rubric used by 24 pieces | 178 ms          | 265 ms         |
+
+Every save does a little more work; bulk clears and deletes take 1.5 to 5
+times as long, all still well under a second. A restore of a 30 by 40 class
+(4,800 score rows) took between 0.3 and 0.7 s here; the triggers stand aside
+during a restore and it sets the state in a few statements. `grade_return`
+holds a second copy of every grade: 851 kB at 2,240 graded cells, 389 bytes
+a cell on average, beside 2.0 MB for the four score tables together.
+
+What the last verify pass found and the SQL does not fix: the repair
+statements at the end of file 02 do not add a `grade_return` row that is
+missing (running the whole file again does, through its backfill); a
+hand-made restore with `grade_returns` and no `courses` row, into an As Soon
+As I Save class, can leave a draft; orphan rows left by a delete with
+triggers off are skipped by the two read RPCs but visible to a direct
+select; and after five caught deadlocks `_grade_return_lock_first` lets the
+sixth fail, with nothing in the server log for the five.
+
+Not verified: Postgres 17 (everything here ran on 18.6), cascades from the
+tables this harness does not carry, and how often a collision happens in
+real use.
