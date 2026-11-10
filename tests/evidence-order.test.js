@@ -264,6 +264,72 @@ describe('what "the assignment list" is', () => {
   });
 });
 
+describe('ties the list cannot settle are still fixed', () => {
+  afterEach(drop);
+
+  it('two same-date scores whose pieces are both gone from the class: by the pieces’ ids', () => {
+    seed([piece('A')], 'mostRecent');
+    orders([score('gone-b', 4), score('gone-a', 1), score('A', 2)]).forEach(order => {
+      graded(order);
+      expect(getTagScores(CID, 'sam', 'T1').map(e => e.assessmentId)).toEqual(['A', 'gone-a', 'gone-b']);
+      expect(level()).toBe(4);
+    });
+  });
+
+  it('two scores of one piece under keys the piece does not list: by the keys', () => {
+    // A rubric piece with two entries left under criteria of another rubric,
+    // both feeding T1. Neither is evidence; their order is fixed all the same.
+    seed([piece('A')], 'mostRecent');
+    const x = { assessmentId: 'A', tagId: 'zz-old', score: 1, date: DAY };
+    const y = { assessmentId: 'A', tagId: 'aa-old', score: 4, date: DAY };
+    orders([x, y, score('A', 3)]).forEach(order => {
+      graded(order);
+      expect(_orderedEntries(CID, 'sam').map(e => e.tagId)).toEqual(['T1', 'aa-old', 'zz-old']);
+      expect(level()).toBe(3);
+    });
+  });
+});
+
+describe('the one place the order of same-date pieces is decided', () => {
+  afterEach(drop);
+
+  it('_pieceOrderFacts names what is known about each piece', () => {
+    seed(
+      [piece('A', { display_order: 2, moduleId: 'm2' }), piece('B', { created: '2026-10-05T17:00:00.000Z' })],
+      'mostRecent',
+    );
+    _cache.modules[CID] = [
+      { id: 'm1', name: 'Unit 1' },
+      { id: 'm2', name: 'Unit 2' },
+    ];
+    expect(_pieceOrderFacts(CID)).toEqual([
+      { id: 'A', placed: 2, stored: 0, made: '', folder: 'm2', folderPlace: 1 },
+      { id: 'B', placed: 0, stored: 1, made: '2026-10-05T17:00:00.000Z', folder: '', folderPlace: Infinity },
+    ]);
+    delete _cache.modules[CID];
+  });
+
+  it('changing _sameDatePieceOrder alone changes every reading of same-date work', () => {
+    seed([piece('A'), piece('B'), piece('C')], 'mostRecent');
+    graded([score('A', 1), score('B', 4), score('C', 2)]);
+    expect(level()).toBe(2);
+    expect(getSectionTrend(CID, 'sam', 'S1')).toBe('down');
+    const asBuilt = _sameDatePieceOrder;
+    try {
+      // Read the other way round.
+      _sameDatePieceOrder = (x, y) => asBuilt(y, x);
+      clearProfCache();
+      expect(level()).toBe(1);
+      expect(getTagScores(CID, 'sam', 'T1').map(e => e.assessmentId)).toEqual(['C', 'B', 'A']);
+      expect(getSectionTrend(CID, 'sam', 'S1')).toBe('down'); // B 4 then A 1
+      expect(sectionCountedEvidence(CID, 'sam', 'S1').map(e => e.assessmentId)).toEqual(['C', 'B', 'A']);
+    } finally {
+      _sameDatePieceOrder = asBuilt;
+      clearProfCache();
+    }
+  });
+});
+
 describe('the scores of one piece count in the order the piece lists them', () => {
   afterEach(drop);
 
@@ -285,6 +351,9 @@ describe('the scores of one piece count in the order the piece lists them', () =
       graded(order);
       expect(level()).toBe(4); // Data is the second criterion
       expect(getTagScores(CID, 'sam', 'T1').map(e => e.criterionId)).toEqual(['c-method', 'c-data']);
+      // The section's evidence and its trend read the criteria in the same order: Method's 2, then Data's 4.
+      expect(sectionCountedEvidence(CID, 'sam', 'S1').map(e => e.criterionId)).toEqual(['c-method', 'c-data']);
+      expect(getSectionTrend(CID, 'sam', 'S1')).toBe('up');
       setMethod('decayingAvg');
       expect(level()).toBeCloseTo(2 * 0.35 + 4 * 0.65, 12);
       setMethod('mostRecent');
