@@ -14,16 +14,14 @@
  * Clearing is the same action with nothing in it: level 0, points null, a
  * null mark, a null status.
  *
- * Who writes through it: the desktop grader dialog
- * (teacher/page-assignments.js), but for its points box and its Note for
- * the Report, which still call data.js (two older tests look for those
- * calls in the page's text); the gradebook (teacher/page-gradebook.js)
- * and Class Results (teacher/class-results.js), whose own actions are
- * together below (S1-T1). The phone's Grade tab follows in S1-T2 and the
- * rest of the Assignments page (its grids, ledgers, fills and Set Everyone
- * To) in S1-T3; the fills and their Undo get their actions there.
- * tests/grader-guard.test.js counts the calls each file still makes to the
- * score writers in data.js and fails when one is added.
+ * Who writes through it: every screen that writes a grade. The desktop
+ * grader dialog and the Assignments page (teacher/page-assignments.js: its
+ * grids, ledgers, fills and Set Everyone To; S0-T2 and S1-T3); the
+ * gradebook (teacher/page-gradebook.js) and Class Results
+ * (teacher/class-results.js; S1-T1); the phone's Grade tab
+ * (teacher-mobile/tab-grade.js; S1-T2). The actions a screen brought of its
+ * own are together under its name below. tests/grader-guard.test.js fails
+ * when any other file calls one of the score writers in data.js.
  */
 window.Grader = (function () {
   'use strict';
