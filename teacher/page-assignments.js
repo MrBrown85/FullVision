@@ -1332,7 +1332,7 @@ window.PageAssignments = (function () {
   }
   function _setTagScore(cid, sid, aid, tagId, value, mod) {
     _tagScoreKeys(cid, aid, tagId).forEach(function (key) {
-      setScore(cid, sid, aid, key, value, mod);
+      Grader.setLevel(cid, sid, aid, key, value, mod);
     });
   }
   function _tagState(cid, sid, aid, tagId) {
@@ -7356,7 +7356,7 @@ window.PageAssignments = (function () {
     var next = st.mod === mod ? 0 : mod;
     if (normalizeScoreMod(st.level, next) !== next) return;
     st.tagIds.forEach(function (tid) {
-      setScore(activeCourse, row.dataset.student, row.dataset.assess, tid, st.level, next);
+      Grader.setPlusMinus(activeCourse, row.dataset.student, row.dataset.assess, tid, st.level, next);
     });
     if (row.dataset.tag) _syncTagRows(row.dataset.assess, row.dataset.student);
     else syncModRow(row);
@@ -7407,12 +7407,9 @@ window.PageAssignments = (function () {
     var sid = group.dataset.student;
     var aid = group.dataset.assess;
     var tagId = group.dataset.tag;
-    var assess = getAssessments(cid).find(function (a) {
-      return a.id === aid;
-    });
     var wasActive = el.classList.contains('active');
     var next = wasActive ? 0 : value;
-    upsertScore(cid, sid, aid, tagId, next, assess ? assess.date : '', scoreTypeFor(assess), '');
+    Grader.setLevel(cid, sid, aid, tagId, next);
     group.querySelectorAll('.score-opt').forEach(function (o) {
       o.classList.remove('active');
     });
@@ -7568,7 +7565,7 @@ window.PageAssignments = (function () {
     if (next && isScoreLocked(activeCourse, sid, aid)) return;
     var before = wasActive ? structuredClone(getScores(activeCourse)) : null;
     rubricCriterionScoreKeys(crit).forEach(function (tagId) {
-      setScore(activeCourse, sid, aid, tagId, next);
+      Grader.setLevel(activeCourse, sid, aid, tagId, next);
     });
     el.parentElement.querySelectorAll('.rsg-level').forEach(function (o) {
       o.classList.remove('active', 'mixed');
@@ -8409,12 +8406,12 @@ window.PageAssignments = (function () {
       return;
     }
     var before = getRubricCheckIds(cid, sid, aid);
-    var after = setRubricCheck(cid, sid, aid, checkId, el.checked);
+    var after = Grader.setTick(cid, sid, aid, checkId, el.checked);
     var current = _criterionLevelNow(cid, aid, sid, crit);
     var next = RubricChecks.levelAfterTick(crit, current, before, after);
     if (next !== current) {
       rubricCriterionScoreKeys(crit).forEach(function (tagId) {
-        setScore(cid, sid, aid, tagId, next);
+        Grader.setLevel(cid, sid, aid, tagId, next);
       });
       var row = _criterionRow(aid, sid, critId);
       if (row) {
