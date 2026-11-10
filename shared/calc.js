@@ -64,6 +64,21 @@ function withReturnedOnly(fn) {
   return result;
 }
 
+/* Whether a value is a set of scores as the reader's scores() gives it: a
+   plain object of { studentId: [entries] }. A list, a Map, a promise or a
+   student whose scores are not a list would not throw further down. Each
+   would read as "this student has no scores", and every grade would come
+   out blank with no error. */
+function _isScoreMap(value) {
+  if (!value || typeof value !== 'object') return false;
+  // A plain object only: a list, a Map, a promise each has its own prototype.
+  var proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) return false;
+  return Object.keys(value).every(function (sid) {
+    return Array.isArray(value[sid]);
+  });
+}
+
 var _scoreRead = {
   // Every student's score entries in the class: { [studentId]: [entry] }.
   scores: function (cid) {
@@ -72,8 +87,10 @@ var _scoreRead = {
        the shape above, from the working copy and each grade's returned
        copy; this file works no draft rule out itself. When the set cannot
        be had (an unknown set, no builder loaded, a builder that gives
-       nothing) this stops with an error. It never falls back to every
-       score: that would show a draft to a family. */
+       nothing, or gives anything but that shape) this stops with an error.
+       It never falls back to every score: that would show a draft to a
+       family. A student who is not in the set, or whose list is empty, has
+       no returned grade, and is given none. */
     if (_scoreSet !== 'returned') {
       throw new Error('calc.js has no set of scores called "' + _scoreSet + '". No grade was worked out.');
     }
@@ -88,6 +105,12 @@ var _scoreRead = {
       throw new Error(
         'Returned grades were asked for, but none came back for this class. ' +
           'No grade was worked out, so no draft is shown.',
+      );
+    }
+    if (!_isScoreMap(returned)) {
+      throw new Error(
+        'Returned grades were asked for, but what came back for this class is not a set of scores ' +
+          '(each student with a list). No grade was worked out, so no draft is shown.',
       );
     }
     return returned;
