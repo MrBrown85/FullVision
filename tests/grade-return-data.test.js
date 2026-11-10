@@ -1603,9 +1603,22 @@ const GRADER_SCENARIOS = {
     Grader.undoOnPhone(CID, 's2', 'essay', structuredClone(getScores(CID)), empty);
     if (on) expect(row('s2', 'essay')).toBe(null);
   },
+  // The Assignments page (S1-T3).
+  undoMissing(on) {
+    level('s1', 'essay', 't1', 3);
+    give('essay', 's1');
+    level('s2', 'essay', 't1', 2);
+    setAssignmentStatus(CID, 's3', 'essay', 'NS');
+    const before = storedRows();
+    Grader.undoMissing(CID, 's3', 'essay');
+    // A status is never a draft, and nobody's grade moved.
+    expect(getAssignmentStatus(CID, 's3', 'essay')).toBe(null);
+    expect(storedRows()).toBe(before);
+    if (on) expect(['s1', 's2', 's3'].map(sid => state(sid, 'essay'))).toEqual(['returned', 'draft', null]);
+  },
 };
 
-describe('the grader’s gradebook and phone actions follow the rule through the writers they call', () => {
+describe('the grader’s gradebook, phone and Assignments page actions follow the rule through the writers they call', () => {
   it('every action here is one Grader has, and with the dialog’s it is all of them', () => {
     const names = Object.keys(GRADER_SCENARIOS);
     expect(names.filter(name => typeof Grader[name] !== 'function')).toEqual([]);

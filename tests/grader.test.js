@@ -284,6 +284,14 @@ describe('Grader: each action passes through to one data.js writer', () => {
       [CID, 'talk', 's1', false],
       [CID, 's1', 'talk', 'backToGroupGrade'],
     ],
+    // The Assignments page (S1-T3).
+    [
+      'undoMissing',
+      [CID, 's1', 'essay'],
+      'setAssignmentStatus',
+      [CID, 's1', 'essay', null],
+      [CID, 's1', 'essay', 'undo'],
+    ],
     // The phone's Grade tab (S1-T2). More on these three below.
     [
       'setLevelOnPhone',

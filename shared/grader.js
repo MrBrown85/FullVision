@@ -186,6 +186,22 @@ window.Grader = (function () {
     return _saved(cid, null, aid, 'delete', saveAssignmentStatuses(cid, statuses));
   }
 
+  /* ── The Assignments page (S1-T3) ───────────────────────────────────
+     The page's grids and ledgers write through the actions at the top: a
+     level, a + or −, points, a mark, a status, a tick and the comments
+     pass data.js what the dialog's do. So do its fills (Set Everyone To,
+     a row's fill and Clear, Set Unmarked to …), a cell at a time: the page
+     looks at each cell just before it writes it, because on pair work the
+     first member's mark reaches the partner, who is then passed over. A
+     score fill's Undo is undo, below. The actions here are the rest. */
+
+  /* Undo for Set Unmarked to Missing: the status comes off one student.
+     setStatus with null does the same and answers false; this answers
+     what saving the status list does. */
+  function undoMissing(cid, sid, aid) {
+    return _saved(cid, sid, aid, 'undo', setAssignmentStatus(cid, sid, aid, null));
+  }
+
   /* ── The phone's Grade tab (S1-T2) ──────────────────────────────────
      The phone's points, marks, statuses, ticks, comments and group
      actions go through the actions above. Its levels and its Undo pass
@@ -278,6 +294,8 @@ window.Grader = (function () {
     undoMarkBlankCells: undoMarkBlankCells,
     deleteAssessmentScores: deleteAssessmentScores,
     deleteAssessmentStatuses: deleteAssessmentStatuses,
+    // The Assignments page (S1-T3)
+    undoMissing: undoMissing,
     // The phone's Grade tab (S1-T2)
     setLevelOnPhone: setLevelOnPhone,
     setPlusMinusOnPhone: setPlusMinusOnPhone,

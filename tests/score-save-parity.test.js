@@ -106,7 +106,7 @@ describe('No score writer works out the type on its own', () => {
     expect(grader).toContain('setPointsScore(cid, focusStudentId, aid, raw)');
     expect(grader).not.toMatch(/\bsetScore\(/);
     const fill = src.slice(src.indexOf('function confirmFillPoints('), src.indexOf('function livePointsUpdate('));
-    expect(fill).toContain('setPointsScore(cid, st.id, aid, max)');
+    expect(fill).toContain('Grader.setPoints(cid, st.id, aid, max)');
     expect(fill).not.toMatch(/\bsetScore\(/);
     // No points writer anywhere keys a score by the assessment's own id.
     expect(src).not.toMatch(/setScore\([^)]*\baid, aid\b/);
