@@ -399,13 +399,25 @@ function _pieceMeasures(cid, assessmentId, key) {
 
    It is decided in one place, _sameDatePieceOrder(x, y), given two pieces
    as _pieceOrderFacts describes them. It returns < 0 when x counts first:
-     id    the piece's id
-     made  when the piece was made, in milliseconds (_pieceMadeAt), or null
-           when that is not known
+     id      the piece's id
+     made    when the piece was made, in milliseconds (_pieceMadeAt), or null
+             when that is not known
+     here    true when that time is this device's: the piece was made here
+             and the class has not been loaded since
+     stored  the piece's place in the class's stored list of work
+   A piece whose time is not known counts before one whose time is.
+
    Pieces made in the same millisecond, and pieces whose time is not known,
-   fall to a fixed order by id: the same on every device and after every
-   reload, though not the order they were made in. A piece whose time is
-   not known counts before one whose time is.
+   are a tie, and a tie never falls to anything that changes while nothing
+   is graded:
+   - two loaded pieces: by id. The same on every device and after every
+     reload, though not the order they were made in.
+   - two pieces made here: by their place in the stored list. A new piece
+     goes on the end of that list, so this is the order they were made in,
+     and neither a drag nor a save moves it. Not by id: a piece made here
+     has a local id until its save lands and the server's id after, and the
+     order must not change at that moment.
+   - one of each: the loaded piece first.
 
    Where `made` comes from:
    - a piece loaded from the server: its created_at, the server's clock,
@@ -419,6 +431,8 @@ function _sameDatePieceOrder(x, y) {
   var a = x.made == null ? -Infinity : x.made;
   var b = y.made == null ? -Infinity : y.made;
   if (a !== b) return a < b ? -1 : 1;
+  if (!x.here !== !y.here) return x.here ? 1 : -1;
+  if (x.here) return x.stored - y.stored;
   return _cmpText(x.id, y.id);
 }
 
@@ -451,9 +465,11 @@ function _pieceMadeAt(assessment) {
 
 /* What _sameDatePieceOrder is told about each piece of work in the class. */
 function _pieceOrderFacts(cid) {
-  return (getAssessments(cid) || []).filter(Boolean).map(function (a) {
-    return { id: a.id, made: _pieceMadeAt(a) };
+  var facts = [];
+  (getAssessments(cid) || []).forEach(function (a, stored) {
+    if (a) facts.push({ id: a.id, made: _pieceMadeAt(a), here: _pieceMadeHereAt(a) != null, stored: stored });
   });
+  return facts;
 }
 
 /* Each piece's place among the class's pieces by _sameDatePieceOrder,
@@ -514,8 +530,11 @@ function _evidenceCompare(cid) {
    other entry stays where it is stored. So anything that reads entries
    and then orders them by date (as the calculations here do, and the
    screens that list evidence) gets same-date work in counting order,
-   whatever order it was graded or stored in, and a class with no two
-   pieces on one date reads exactly as it did. */
+   whatever order it was graded or stored in. A class with no two pieces
+   on one date keeps every level and every order across pieces; the one
+   thing that can change places there is the entries of a single piece (its
+   levels share its date), when they are stored apart and not in the order
+   the piece lists them. */
 function _orderedEntries(cid, studentId) {
   var key = _ck(cid) + ':' + studentId;
   if (_orderedEntriesCache[key]) return _orderedEntriesCache[key];

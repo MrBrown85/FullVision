@@ -259,13 +259,18 @@ describe('what decides the order of same-date pieces', () => {
     expect(mostRecent([made()[2], made()[0], made()[1]])).toBe(4);
   });
 
-  it('made in the same instant: a fixed order by id, in any stored order', () => {
-    const batch = () => ['B', 'C', 'A'].map(id => piece(id, { created: at(5) }));
+  it('loaded pieces made in the same instant: a fixed order by id, in any stored order', () => {
+    // (Two pieces made on this device in one instant are further down.)
+    const batch = () => ['B', 'C', 'A'].map(id => piece(id, { created_at: at(5) }));
     expect(mostRecent(batch())).toBe(2); // A, B, C by id: C is last
     expect(mostRecent(batch().reverse())).toBe(2);
     // Two in the same instant, one made after them: the later one is last.
     expect(
-      mostRecent([piece('C', { created: at(5) }), piece('B', { created: at(5) }), piece('A', { created: at(6) })]),
+      mostRecent([
+        piece('C', { created_at: at(5) }),
+        piece('B', { created_at: at(5) }),
+        piece('A', { created_at: at(6) }),
+      ]),
     ).toBe(1);
   });
 
@@ -447,6 +452,93 @@ describe('a piece made on this device and not loaded since', () => {
       );
     });
   });
+
+  describe('two pieces made here in the same instant', () => {
+    /* First is scored 4, Second 1. They are stored in the order made: a new
+       piece goes on the end of the class's list, and a drag or a save does
+       not move it. */
+    const pair = (firstId, secondId) => [
+      piece(firstId, { title: 'First', created: at(5) }),
+      piece(secondId, { title: 'Second', created: at(5) }),
+    ];
+    const reading = (firstId, secondId) => {
+      seed(pair(firstId, secondId), 'mostRecent');
+      const got = orders([score(firstId, 4), score(secondId, 1)]).map(order => {
+        graded(order);
+        return [level(), counted().join(' > '), getSectionTrend(CID, 'sam', 'S1')].join(' | ');
+      });
+      expect(new Set(got).size).toBe(1);
+      return got[0];
+    };
+
+    it('count in the order they are stored, whatever their ids: a save landing moves no value', () => {
+      // Second (1) is the most recent, after First (4): down.
+      const same = (firstId, secondId) =>
+        expect(reading(firstId, secondId)).toBe('1 | ' + firstId + ' > ' + secondId + ' | down');
+      same(LOCAL_1, LOCAL_2);
+      // The local ids the other way round.
+      same(LOCAL_2, LOCAL_1);
+      // The first piece's save lands: its id now sorts before the second's (it did already).
+      same(UUID_MID, LOCAL_2);
+      // The second's lands first: its id now sorts before the first's.
+      same(LOCAL_1, UUID_MID);
+      // Both have landed, the server's ids either way round.
+      same(UUID_LOW, UUID_HIGH);
+      same(UUID_HIGH, UUID_LOW);
+    });
+
+    it('stored the other way round, the other one is later', () => {
+      seed(pair(LOCAL_1, LOCAL_2).reverse(), 'mostRecent');
+      graded([score(LOCAL_1, 4), score(LOCAL_2, 1)]);
+      expect(level()).toBe(4);
+      expect(counted()).toEqual([LOCAL_2, LOCAL_1]);
+    });
+
+    it('a drag does not move them', () => {
+      const dragged = pair(UUID_HIGH, UUID_LOW);
+      dragged[0].display_order = 2;
+      dragged[1].display_order = 1;
+      seed(dragged, 'mostRecent');
+      graded([score(UUID_LOW, 1), score(UUID_HIGH, 4)]);
+      expect(level()).toBe(1);
+    });
+  });
+
+  describe('a loaded piece and a piece made here in the same millisecond', () => {
+    // The loaded piece is scored 4, the one made here 1.
+    const loaded = id => piece(id, { title: 'Loaded', created_at: at(5) });
+    const here = id => piece(id, { title: 'Made Here', created: at(5) });
+
+    it('the loaded one counts first, whatever the ids and wherever each is stored', () => {
+      [
+        [UUID_MID, LOCAL_1],
+        [UUID_MID, UUID_LOW],
+        [UUID_MID, UUID_HIGH],
+      ].forEach(([loadedId, hereId]) => {
+        [
+          [loaded(loadedId), here(hereId)],
+          [here(hereId), loaded(loadedId)],
+        ].forEach(list => {
+          seed(list, 'mostRecent');
+          orders([score(loadedId, 4), score(hereId, 1)]).forEach(order => {
+            graded(order);
+            expect(level()).toBe(1);
+            expect(counted()).toEqual([loadedId, hereId]);
+          });
+        });
+      });
+    });
+
+    it('with two loaded pieces in that millisecond too, there is still one order', () => {
+      // By id among the loaded, then the one made here: in every stored order.
+      orders([loaded(UUID_HIGH), loaded(UUID_MID), here(UUID_LOW)]).forEach(list => {
+        seed(list, 'mostRecent');
+        graded([score(UUID_LOW, 1), score(UUID_MID, 3), score(UUID_HIGH, 4)]);
+        expect(counted()).toEqual([UUID_MID, UUID_HIGH, UUID_LOW]);
+        expect(level()).toBe(1);
+      });
+    });
+  });
 });
 
 describe('ties the list cannot settle are still fixed', () => {
@@ -482,7 +574,7 @@ describe('ties the list cannot settle are still fixed', () => {
 describe('the one place the order of same-date pieces is decided', () => {
   afterEach(drop);
 
-  it('_pieceOrderFacts names what is known about each piece: its id and when it was made', () => {
+  it('_pieceOrderFacts names what is known about each piece: its id, when it was made, whether here, and its place', () => {
     seed(
       [
         piece('A', { display_order: 2, moduleId: 'm2', noTime: true }),
@@ -492,9 +584,10 @@ describe('the one place the order of same-date pieces is decided', () => {
       'mostRecent',
     );
     expect(_pieceOrderFacts(CID)).toEqual([
-      { id: 'A', made: null },
-      { id: 'B', made: Date.UTC(2026, 9, 5, 17, 0, 0) },
-      { id: 'C', made: Date.UTC(2026, 9, 5, 17, 30, 0) }, // this device's time, not the server's 16:00
+      { id: 'A', made: null, here: false, stored: 0 },
+      { id: 'B', made: Date.UTC(2026, 9, 5, 17, 0, 0), here: true, stored: 1 },
+      // This device's time, not the server's 16:00.
+      { id: 'C', made: Date.UTC(2026, 9, 5, 17, 30, 0), here: true, stored: 2 },
     ]);
   });
 
