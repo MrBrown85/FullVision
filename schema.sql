@@ -333,14 +333,17 @@ create table rubric_check_score (
 
 -- Draft or Returned, per student per assessment: what the student has been
 -- given (2026110902_grade_return; plan 1.2). The teacher's working copy stays
--- in score, tag_score, rubric_score and rubric_check_score. Statement triggers
--- on those four (grade_return_insert / _update / _delete ->
--- _grade_return_on_change) keep this table right for any writer; return_grades
--- returns drafts; the restore sets the backup's state. Teachers read their own
--- rows; nobody writes it directly. A copy is { v, value, modifier, comment,
--- tags {tag id: {value, modifier, comment}}, criteria {criterion id: {value,
--- modifier, comment, beyond}}, checks [check ids] }; status and report_note
--- are never in one.
+-- in score, tag_score, rubric_score and rubric_check_score. Triggers on those
+-- four keep this table right for any writer: a row trigger before each change
+-- keeps the grade as it was (grade_return_before), a statement trigger after
+-- compares it with the grade now. return_grades returns drafts; a class
+-- leaving When I Return Them returns what was waiting (a trigger on course);
+-- the restore sets the backup's state. Teachers read their own rows; nobody
+-- writes it directly. A copy is { v, value, modifier, comment, tags {tag id:
+-- {value, modifier, comment}}, criteria {criterion id: {value, modifier,
+-- comment, beyond}}, checks [check ids] }; status and report_note are never
+-- in one. Students are sent only the part of a copy the work's scoring uses
+-- now (_grade_copy_in_use), and nothing while the piece is Missing or Excused.
 create table grade_return (
   enrollment_id uuid        not null references enrollment(id) on delete cascade,
   assessment_id uuid        not null references assessment(id) on delete cascade,
@@ -354,6 +357,22 @@ create table grade_return (
   check ((returned_copy is not null) = (is_draft and returned_at is not null))
 );
 -- RLS: select only, fv_owns_enrollment(enrollment_id).
+
+-- Scratch for the triggers: the copy a cell had before a transaction first
+-- changed it. A row is deleted when it is used. No access for any API role.
+create table grade_return_before (
+  enrollment_id uuid   not null references enrollment(id) on delete cascade,
+  assessment_id uuid   not null references assessment(id) on delete cascade,
+  txid          bigint not null,
+  copy          jsonb,
+  primary key (enrollment_id, assessment_id)
+);
+
+-- Schema fv_private (2026110902_grade_return): helpers that SECURITY INVOKER
+-- RPCs call, so signed-in teachers can run them, kept out of the API (the API
+-- serves schema public only): restore_grade_returns (import_json_restore),
+-- grade_return_remap (move_rubric_scores), work_is_scored (set_score_status).
+-- docs/schema.generated.sql does not list this schema.
 
 -- Row security on score, tag_score, rubric_score, rubric_check_score and
 -- dibels_score (2026110901_score_rows_same_class): the caller owns the
@@ -741,35 +760,38 @@ create table student_submit.attempt (                                 -- rate li
 -- and keeps its row. The code is kept readable for the class's teacher
 -- (select only, fv_owns_enrollment) beside the salted hash the student path
 -- checks. Written only by issue_student_cards, mark_student_cards_printed,
--- unlock_student_card, reissue_student_card, set_cards_work_until and the
--- student path.
+-- unlock_student_card, unlock_all_student_cards, reissue_student_card,
+-- set_cards_work_until and the student path. A new slip never draws a live
+-- card's code, nor a new card a live slip's.
 create table student_card (
   id             uuid        primary key default gen_random_uuid(),
   enrollment_id  uuid        not null references enrollment(id) on delete cascade,
-  code           text        not null,                              -- as printed, K7M-4QX
+  code           text        not null,                              -- as printed, K7M-4QX; unique among live cards
   code_hash      text        not null unique,                       -- _access_code_hash(code, salt), as a slip's
   salt           text        not null,
   created_at     timestamptz not null default now(),
   printed_at     timestamptz,
   last_opened_at timestamptz,
-  wrong_tries    integer     not null default 0,                    -- wrong answers to "Is This You?"; the fifth locks the card
+  wrong_tries    integer     not null default 0,                    -- wrong answers to "Is This You?" in a row; a right one resets it; the fifth locks the card
   locked_at      timestamptz,                                       -- Unlock clears it and the count
   stopped_at     timestamptz,                                       -- reissued; never opens again
-  works_until    date                                               -- this card's last day; null: the class's (course.cards_work_until, else the last reporting date)
+  works_until    date        not null,                              -- the card's last day, written when it is made: the class's Cards Work Until, else its last reporting date, else the next June 30
+  password       text                                               -- the card password printed on it, for a student with no birthday or number then; the card's own
 );
 
 -- A signed-in student device (2026110904_student_sessions_page). A session
 -- belongs to the device, not to a card; device_session_enrollment lists the
--- classes it has opened, one per card added. It ends at the next midnight in
--- the class's time zone, or on Done. card, verify_card, page, seen and done
--- are the edge function's; _returned_grade is the only function in the schema
--- that reads a grade.
+-- classes it has opened, one per card added. A card checked from the start
+-- screen starts a fresh session; only Add Another Card joins one. It ends at
+-- the next midnight in the class's time zone, or on Done (the row is
+-- deleted; any card scan deletes rows past their midnight). card,
+-- verify_card, page, seen and done are the edge function's; _returned_grade
+-- is the only function in the schema that reads a grade.
 create table student_submit.device_session (
   id uuid primary key default gen_random_uuid(),
   token_hash text not null unique,                                    -- the phone holds the token
   created_at timestamptz not null default now(),
-  expires_at timestamptz not null,
-  ended_at timestamptz
+  expires_at timestamptz not null
 );
 create table student_submit.device_session_enrollment (
   session_id uuid not null references student_submit.device_session(id) on delete cascade,
@@ -850,8 +872,10 @@ create table support_report (
 -- `category_weight_sum_check(_update)` deferred constraint triggers on category → fv_check_category_weight_sum()
 -- `score_audit_trigger`         after  update on score          → _score_audit_diff(...)
 -- `term_rating_audit_trigger`   after  update on term_rating    → _term_rating_audit_field(...)
--- `grade_return_insert|update|delete` after each statement on score, tag_score, rubric_score, rubric_check_score → _grade_return_on_change(part, id column)
--- `grade_return_repoint`        after  update (row) on tag_score, rubric_score, rubric_check_score when its tag, criterion or check id changes → _grade_return_repoint(part, id column)
+-- `grade_return_before`        before insert, update or delete (row) on score, tag_score, rubric_score, rubric_check_score → _grade_return_before(part)
+-- `grade_return_insert|update|delete` after each statement on those four → _grade_return_on_change()
+-- `grade_return_repoint`        after  update (row) on tag_score, rubric_score, rubric_check_score when its tag, criterion or check id changes → _grade_return_repoint(part, id column); acts only inside move_rubric_scores
+-- `grade_return_release`        after  update of student_page_enabled, return_grades on course, when the class stops holding grades → _grade_return_release()
 -- `fv_teacher_sign_in_deleted`  after  delete on auth.users     → _fv_teacher_sign_in_deleted() (soft-deletes the teacher)
 
 -- ─── Publications ───────────────────────────────────────────────────────────

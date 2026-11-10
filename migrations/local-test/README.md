@@ -171,7 +171,7 @@ PGPORT=54329 PGDATABASE=fv_score python3 score_rpcs.py
 
 Result on 2026-11-09 (Postgres 18.6, local; production is 17): 176 of 176.
 Against a database with Batch A loaded (below) the same script finds it and
-expects the three gaps Batch A closes to be refused: 236 of 236.
+expects the three gaps Batch A closes to be refused: 235 of 235.
 
 Checks named "today:" pin a gap as it is. Batch A closes three and its
 database flips their checks to "refused": `upsert_rubric_score` takes a
@@ -230,47 +230,61 @@ PGPORT=54329 PGDATABASE=fv_a_pre python3 batch_a_apply.py
 PGPORT=54329 PGDATABASE=fv_a python3 grade_return.py
 PGPORT=54329 PGDATABASE=fv_a python3 student_page.py
 PGPORT=54329 PGDATABASE=fv_a python3 score_rpcs.py
+PGPORT=54329 PGDATABASE=fv_a python3 grade_return_race.py
 ```
 
 What each covers:
 
 - `batch_a_apply.py` meets the migrations the way production will: scores
-  first, then the four files. Every function the batch patches or copies
-  starts as the live one (20 fingerprints); the patch refuses any other
-  body; the backfill makes every existing grade Returned and changes no
-  score row (a checksum of the four score tables before and after); every
-  class has the student page off and no Return Grades choice; a second run
-  of all four files changes nothing.
+  first, then the four files. Each file is one transaction that sets a lock
+  timeout and runs its checks first; a function that is not the live one, a
+  score row in another class or files out of order stop it there with
+  nothing created. Every function the batch patches or copies starts as the
+  live one (20 fingerprints); the backfill makes every existing grade
+  Returned and changes no score row (a checksum of the four score tables
+  before and after); every class has the student page off and no Return
+  Grades choice; a second run of all four files changes nothing.
 - `grade_return.py` runs every case in `tests/fixtures/grade-state-cases.json`
   through the score RPCs, the triggers and `student_submit._returned_grade`
-  (the same file runs through `shared/grade-state.js`), then the two server
-  checks, `return_grades`, the class settings, and each bulk path by name:
-  the restore (a new backup and an old one, and a 30 by 40 class),
-  `move_rubric_scores`, Duplicate Class, Copy Assessment, the two bulk
-  clears, deleting an assessment, a criterion and a student; then who can
-  reach what.
+  (the same file runs through `shared/grade-state.js`). Then: the two server
+  checks, each against what shipped clients send; `return_grades`; the class
+  settings, and a class leaving When I Return Them returning what was
+  waiting; each bulk path by name (the restore from a new backup, an old one
+  and a 30 by 40 class, `move_rubric_scores`, Duplicate Class, Copy
+  Assessment, the two bulk clears); deleting a criterion that has a ticked
+  box in each order the cascades can run, a checkbox, a competency, a rubric
+  and a student; a statement that adds and changes rows of one grade; an id
+  re-pointed by hand; what a student is sent when the work's scoring has
+  changed; then who can reach what.
 - `student_page.py` runs the card RPCs and `card`, `verify_card`, `page`,
-  `seen` and `done` as the edge function calls them: five wrong tries,
-  Unlock, Reissue, Cards Work Until, one session holding two classes,
-  midnight in the class's time zone, Done, the rate limits, the log. A draft
-  never comes back from `page`: by hand, then for 300 seeded random saves,
-  edits, clears, returns and setting changes. Last, no function in
-  `student_submit` but `_returned_grade` names a score table.
+  `seen` and `done` as the edge function calls them: five wrong tries in a
+  row, Unlock and Unlock All, Reissue, Cards Work Until, a fresh session
+  from the start screen and Add Another Card joining one, midnight in the
+  class's time zone, Done, the per-address limit, a slip's code not
+  counting toward it, housekeeping, the log. A draft never comes back from
+  `page`: by hand, then for 300 seeded random saves, edits, clears, returns
+  and setting changes. Missing and Excused show no result. Last, no function
+  in `student_submit` but `_returned_grade` names a score table.
 - `score_rpcs.py` with Batch A loaded: everything it pinned still holds for
   a teacher's own class, and every way in against another class's
   assessment, competency, criterion or checkbox is refused (each RPC, then a
   direct insert and update on each table), for Teacher B's records and for
   another class of Teacher A's own.
+- `grade_return_race.py` uses several connections and commits (it cleans up
+  after itself). Two saves on one grade: the second waits and the draft
+  stays a draft. 150 saves on each of two students against 150 returns: no
+  call fails; with the class lock made a no-op, as a control, the same run
+  deadlocks.
 
 Result on 2026-11-09 (Postgres 18.6, local; production is 17):
-`batch_a_apply.py` 68 of 68, `grade_return.py` 158 of 158, `student_page.py`
-141 of 141, `score_rpcs.py` 236 of 236. With Batch A loaded the earlier
-suites pass as before: `student_submit.py` 79 of 79,
-`questionnaire_identity.py` 47 of 47, `phone_reports.py` 37 of 37,
-`questionnaires.py` 42 of 42.
+`batch_a_apply.py` 80 of 80, `grade_return.py` 273 of 273, `student_page.py`
+197 of 197, `score_rpcs.py` 235 of 235 (176 of 176 without Batch A),
+`grade_return_race.py` 6 of 6. With Batch A loaded the earlier suites pass
+as before: `student_submit.py` 79 of 79, `questionnaire_identity.py` 47 of
+47, `phone_reports.py` 37 of 37, `questionnaires.py` 42 of 42.
 
 Timing, same run: a rubric fill for 30 students with 5 criteria (30
-`fill_rubric` calls, 150 rows) took about 15 ms before the batch, 21 ms with
-the same-class policies and 51 ms with the Draft and Returned triggers too.
-A restore of a 30 by 40 class (4,800 score rows) took 0.28 s; the triggers
-stand aside during a restore and it sets the state in two statements.
+`fill_rubric` calls, 150 rows) took about 17 ms before the batch, 21 ms with
+the same-class policies and 45 ms with the Draft and Returned triggers too.
+A restore of a 30 by 40 class (4,800 score rows) took 0.30 s; the triggers
+stand aside during a restore and it sets the state in a few statements.
