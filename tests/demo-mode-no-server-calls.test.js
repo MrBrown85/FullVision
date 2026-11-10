@@ -185,3 +185,81 @@ describe('Demo Mode sends nothing from the student page', () => {
     }
   });
 });
+
+/* Draft and Returned (S0-F2): the rule runs on the device. Grading in a
+   class that holds grades, Return, and leaving When I Return Them send
+   nothing, and the modules that hold the rule have no way to reach a
+   server or to name a server function. */
+describe('Demo Mode sends nothing for Draft and Returned', () => {
+  const CID = 'c-demo-held';
+  let calls;
+  let originals;
+
+  beforeEach(() => {
+    localStorage.clear();
+    localStorage.setItem('gb-demo-mode', '1');
+    calls = [];
+    originals = { getSupabase: globalThis.getSupabase, isDemoMode: globalThis.isDemoMode, useSupabase: _useSupabase };
+    globalThis.getSupabase = () => ({
+      rpc(name) {
+        calls.push(name);
+        return Promise.resolve({ data: null, error: { message: 'permission denied', status: 401 } });
+      },
+      from(table) {
+        calls.push('from:' + table);
+        return { select: () => Promise.resolve({ data: [], error: null }) };
+      },
+      auth: { getSession: () => Promise.resolve({ data: { session: null } }) },
+    });
+    globalThis.isDemoMode = () => true;
+    COURSES[CID] = { id: CID, name: 'Science 8', gradingSystem: 'proficiency', gradeLevel: '8' };
+    saveStudents(CID, [{ id: 's1', firstName: 'Jordan', lastName: 'Test' }]);
+    saveAssessments(CID, [{ id: 'essay', title: 'Essay', date: '2026-10-10', type: 'summative', tagIds: ['t1'] }]);
+    saveScores(CID, {});
+  });
+
+  afterEach(() => {
+    globalThis.getSupabase = originals.getSupabase;
+    globalThis.isDemoMode = originals.isDemoMode;
+    _useSupabase = originals.useSupabase;
+    Object.keys(_cache).forEach(field => {
+      if (_cache[field] && typeof _cache[field] === 'object') delete _cache[field][CID];
+    });
+    delete COURSES[CID];
+    localStorage.clear();
+  });
+
+  // A Demo Mode page can also be one a signed-in teacher opened.
+  it.each([false, true])('a draft, Return and a change of Return Grades (signed in behind it: %s)', async signedIn => {
+    _useSupabase = signedIn;
+    expect(setStudentPageSwitch(CID, true)).toBe(true);
+    Grader.setLevel(CID, 's1', 'essay', 't1', 3, 0);
+    expect(GradeState.stateOf(CID, 's1', 'essay')).toBe('draft');
+    expect(getReturnedScores(CID).s1).toEqual([]);
+    expect(Grader.returnGrades(CID, 'essay', ['s1']).returned).toBe(1);
+    Grader.setLevel(CID, 's1', 'essay', 't1', 4, 0);
+    Grader.setOverallComment(CID, 's1', 'essay', 'Recounted.');
+    expect(getReturnedScores(CID).s1.map(e => e.score)).toEqual([3]);
+    // Leaving When I Return Them returns what was waiting.
+    setStudentPageSwitch(CID, true, 'on_save');
+    expect(GradeState.stateOf(CID, 's1', 'essay')).toBe('returned');
+    setStudentPageSwitch(CID, false);
+    await tick();
+    expect(calls).toEqual([]);
+    expect(JSON.parse(localStorage.getItem('gb-grade-returns-' + CID)).essay.s1.is_draft).toBe(false);
+  });
+
+  it('the rule and the grader name no server function', () => {
+    ['shared/grade-state.js', 'shared/grader.js'].forEach(file => {
+      const src = readFileSync(new URL('../' + file, import.meta.url), 'utf-8');
+      expect(src, file).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|sendBeacon|_writeRpc|\.rpc\(|getSupabase/);
+    });
+    // Nothing the client sends names the server's return or its list of rows
+    // until S0-W1: the live database has neither yet.
+    ['shared/data.js', 'shared/grade-state.js', 'shared/grader.js', 'teacher/page-assignments.js'].forEach(file => {
+      const src = readFileSync(new URL('../' + file, import.meta.url), 'utf-8');
+      expect(src, file).not.toMatch(/['"`](return_grades|list_course_grade_returns|course_draft_count)['"`]\s*,/);
+      expect(src, file).not.toMatch(/rpc:\s*['"`](return_grades|list_course_grade_returns|course_draft_count)/);
+    });
+  });
+});

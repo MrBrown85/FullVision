@@ -313,6 +313,15 @@ describe('Grader: each action passes through to one data.js writer', () => {
       [CID, { s1: [] }, { s1: [{ score: 3 }] }],
       [CID, null, null, 'undo'],
     ],
+    // Return (S0-F2): one student, then several.
+    ['returnGrades', [CID, 'essay', 's1'], 'returnGrades', [CID, 'essay', ['s1']], [CID, 's1', 'essay', 'return']],
+    [
+      'returnGrades',
+      [CID, 'essay', ['s1', 's2']],
+      'returnGrades',
+      [CID, 'essay', ['s1', 's2']],
+      [CID, null, 'essay', 'return'],
+    ],
   ];
 
   it.each(cases)('%s%j', (action, args, writer, writerArgs, heardArgs) => {

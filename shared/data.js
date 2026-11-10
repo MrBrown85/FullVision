@@ -73,6 +73,11 @@ const _cache = {
   rubrics: {}, // keyed by cid
   rubricChecks: {}, // keyed by cid — ticked Advanced Rubric checkboxes { 'sid:aid': [checkId, …] }
   rubricPrints: {}, // keyed by cid — printed rubric handouts { 'sid:aid': { at: ISO, hash } }
+  // keyed by cid — Draft and Returned rows { aid: { sid: row } } (getGradeReturns).
+  // Never assign a class's rows here: _saveGradeReturns (a change on this
+  // device) and _loadGradeReturns (rows from the server) are the only ways
+  // in. Both drop the returned set and calc.js's cached numbers.
+  gradeReturns: {},
   dibels: {}, // keyed by cid — DIBELS raw scores { 'sid:aid': { boy|moy|eoy: { orfWrc, orfErrors, mazeCorrect, mazeIncorrect } } }
   flags: {}, // keyed by cid
   goals: {}, // keyed by cid
@@ -104,6 +109,7 @@ const _DATA_KEYS = {
   rubrics: 'rubrics',
   rubricChecks: 'rubric-checks',
   rubricPrints: 'rubric-prints',
+  gradeReturns: 'grade-returns',
   dibels: 'dibels',
   flags: 'flags',
   goals: 'goals',
@@ -647,15 +653,23 @@ function _migrateCourseDataLocalToCanonical(localId, canonicalId) {
   // anything written via the bulk save during the pending window stays local
   // until P6.6 wires those bulk fallbacks. Migrate cache+LS for parity even
   // though no canonical dispatch fires today.
-  ['goals', 'reflections', 'observations', 'flags', 'overrides', 'termRatings', 'reportConfig', 'withdrawn'].forEach(
-    function (field) {
-      if (userEdits[field] !== undefined && _cache[field]) {
-        _cache[field][canonicalId] = userEdits[field];
-        var dataKey = _DATA_KEYS[field];
-        if (dataKey) _safeLSSet('gb-' + dataKey + '-' + canonicalId, JSON.stringify(userEdits[field]));
-      }
-    },
-  );
+  [
+    'goals',
+    'reflections',
+    'observations',
+    'flags',
+    'overrides',
+    'termRatings',
+    'reportConfig',
+    'withdrawn',
+    'gradeReturns',
+  ].forEach(function (field) {
+    if (userEdits[field] !== undefined && _cache[field]) {
+      _cache[field][canonicalId] = userEdits[field];
+      var dataKey = _DATA_KEYS[field];
+      if (dataKey) _safeLSSet('gb-' + dataKey + '-' + canonicalId, JSON.stringify(userEdits[field]));
+    }
+  });
   // 4. gb-config's active-course pointer is keyed by course id as well. If it
   //    still holds the placeholder, move it across — otherwise it survives the
   //    re-key permanently and every later saveConfig re-sends a non-uuid to
@@ -681,7 +695,7 @@ let _courseSyncCourseId = null;
 let _courseSyncState = {};
 
 function _isGradebookField(field) {
-  return ['students', 'categories', 'assessments', 'scores', 'withdrawn'].indexOf(field) >= 0;
+  return ['students', 'categories', 'assessments', 'scores', 'withdrawn', 'gradeReturns'].indexOf(field) >= 0;
 }
 
 function _isStudentRecordField(field) {
@@ -1666,6 +1680,7 @@ function _keepOrDefaultField(cid, field, fallback) {
 function _persistLoadedField(cid, field, value) {
   if (_refreshMustSkip(cid, field)) return;
   _cache[field][cid] = value;
+  if (field === 'scores') _gradeScoresLoaded(cid); // Draft and Returned: the rows are from before this load
   if (field === 'rubrics') _noteRubricsSet(cid);
   var key = _DATA_KEYS[field];
   if (key) {
@@ -2660,6 +2675,7 @@ function _rekey(cid, kind, localId, serverId, extra) {
       return _rekeyRowId(rows, localId, serverId);
     });
   }
+  _rekeyGradeReturns(cid, localId, serverId);
   if (typeof clearProfCache === 'function') clearProfCache();
 
   _rewriteQueuedIds(kind, localId, serverId);
@@ -4880,6 +4896,7 @@ function _loadCourseFromLS(cid) {
   _noteRubricsSet(cid);
   _cache.rubricChecks[cid] = _safeParseLS('gb-rubric-checks-' + cid, {});
   _cache.rubricPrints[cid] = _safeParseLS('gb-rubric-prints-' + cid, {});
+  delete _cache.gradeReturns[cid]; // read again when asked for (getGradeReturns)
 
   // Learning map: check localStorage first, then fall back to LEARNING_MAP constant
   const lmRaw = _safeParseLS('gb-learningmap-' + cid, null);
@@ -5034,6 +5051,7 @@ function _saveCourseField(field, cid, value) {
   _cache[field][cid] = value;
   if (field === 'rubrics') _noteRubricsSet(cid);
   if (_PROF_FIELDS.includes(field) && typeof clearProfCache === 'function') clearProfCache();
+  delete _returnedSets[cid]; // Draft and Returned: the returned set is built again
   _markLocalWrite(field, cid);
   // Persist to localStorage (primary store in v2; remote writes happen through
   // the dispatcher functions at each save site, not via this field-save path).
@@ -5364,7 +5382,9 @@ function _upsertScoreOne(cid, sid, aid, tid, scoreVal, date, type, note, mod) {
   }
   _cache.scores[cid] = scores;
   if (typeof clearProfCache === 'function') clearProfCache();
+  var gradesWere = _gradeBefore(cid, 'scores');
   var lsOk = _safeLSSet('gb-scores-' + cid, JSON.stringify(scores));
+  _gradeAfter(cid, gradesWere, scores);
   // A realtime refresh that started before this edit must not overwrite it.
   _markLocalWrite('scores', cid);
 
@@ -5597,7 +5617,9 @@ function _saveRubricCriterionNote(cid, sid, aid, criterionId, text, field) {
   });
   if (!changed) return true;
   _cache.scores[cid] = scores;
+  var gradesWere = _gradeBefore(cid, 'scores');
   var lsOk = _safeLSSet('gb-scores-' + cid, JSON.stringify(scores));
+  _gradeAfter(cid, gradesWere, scores);
   _markLocalWrite('scores', cid);
   if (_writesEnabled() && _isSendableId(sid) && _isSendableId(aid) && _isSendableId(criterionId)) {
     var params = {
@@ -5666,7 +5688,9 @@ function _saveTagCommentOne(cid, sid, aid, tagId, text) {
   else delete entry.critNote;
   var level = Number(entry.score) > 0 ? Number(entry.score) : 0;
   _cache.scores[cid] = scores;
+  var gradesWere = _gradeBefore(cid, 'scores');
   var lsOk = _safeLSSet('gb-scores-' + cid, JSON.stringify(scores));
+  _gradeAfter(cid, gradesWere, scores);
   _markLocalWrite('scores', cid);
   if (_writesEnabled() && _isSendableId(sid) && _isSendableId(aid) && _isSendableId(tagId)) {
     _trackPendingSync(
@@ -5734,7 +5758,9 @@ function _saveScoreCommentOne(cid, sid, aid, text) {
     e.note = note;
   });
   _cache.scores[cid] = scores;
+  var gradesWere = _gradeBefore(cid, 'scores');
   var lsOk = _safeLSSet('gb-scores-' + cid, JSON.stringify(scores));
+  _gradeAfter(cid, gradesWere, scores);
   _markLocalWrite('scores', cid);
   if (_writesEnabled() && _isSendableId(sid) && _isSendableId(aid)) {
     _trackPendingSync(
@@ -5784,6 +5810,7 @@ function saveScoreReportNote(cid, sid, aid, text) {
     else delete e.reportNote;
   });
   _cache.scores[cid] = scores;
+  delete _returnedSets[cid];
   var lsOk = _safeLSSet('gb-scores-' + cid, JSON.stringify(scores));
   _markLocalWrite('scores', cid);
   if (_writesEnabled() && _isSendableId(sid) && _isSendableId(aid)) {
@@ -6560,6 +6587,7 @@ function _clearCourseLocalState(id) {
     'rubrics',
     'rubric-checks',
     'rubric-prints',
+    'grade-returns',
     'statuses',
     'quick-obs',
     'term-ratings',
@@ -8430,7 +8458,10 @@ function getRubricChecks(cid) {
 /* Replace every tick in a class at once, cache and localStorage only.
    Demo Mode's seed uses it; nothing is sent to the server. */
 function saveRubricChecks(cid, checks) {
-  _saveCourseField('rubricChecks', cid, checks && typeof checks === 'object' && !Array.isArray(checks) ? checks : {});
+  checks = checks && typeof checks === 'object' && !Array.isArray(checks) ? checks : {};
+  var gradesWere = _gradeBefore(cid, 'rubricChecks');
+  _saveCourseField('rubricChecks', cid, checks);
+  _gradeAfter(cid, gradesWere, checks);
 }
 /* Edit a Copy on scored work (assessment form redesign PR 10): the copy's
    criteria and checkboxes have new ids, so this assessment's rubric scores
@@ -8465,6 +8496,7 @@ function moveRubricScores(cid, aid, maps) {
     });
   });
   _saveCourseField('rubricChecks', cid, checks);
+  _repointGradeReturns(cid, aid, crit, chk);
   if (typeof clearProfCache === 'function') clearProfCache();
   return _writeRpc('move_rubric_scores', {
     p_assessment_id: aid,
@@ -8500,7 +8532,9 @@ function _setRubricCheckOne(cid, sid, aid, checkId, on) {
   if (!changed) return list;
   if (list.length) checks[key] = list;
   else delete checks[key];
+  var gradesWere = _gradeBefore(cid, 'rubricChecks');
   _saveCourseField('rubricChecks', cid, checks);
+  _gradeAfter(cid, gradesWere, checks);
   if (_writesEnabled() && _isSendableId(sid) && _isSendableId(aid) && _isSendableId(checkId)) {
     _trackPendingSync(
       _writeRpc('set_rubric_check', {
@@ -8911,6 +8945,7 @@ function getCourseConfig(cid) {
   }
 }
 function saveCourseConfig(cid, obj) {
+  var held = _returnSettingsBefore(cid); // Draft and Returned: did the class hold grades before this save
   _saveCourseField('courseConfigs', cid, obj);
   if (_writesEnabled() && _isUuid(cid)) {
     // v2: policy fields live on the course row. save_course_policy is gone;
@@ -8941,6 +8976,7 @@ function saveCourseConfig(cid, obj) {
       }
     }
   }
+  _returnSettingsSaved(cid, held);
 }
 function getStudents(cid) {
   if (_cache.students[cid] !== undefined) return _cache.students[cid];
@@ -9670,6 +9706,7 @@ function _cleanOrphanedScores(cid, validArr) {
   if (dropStatuses(prints)) _saveCourseField('rubricPrints', cid, prints);
   var dibels = getDibelsScores(cid);
   if (dropStatuses(dibels)) _saveCourseField('dibels', cid, dibels);
+  _dropGradeReturnsNotIn(cid, validIds);
   if (_hasServerState('scores', cid)) dropScores(_serverState.scores[cid]);
   if (_hasServerState('statuses', cid)) dropStatuses(_serverState.statuses[cid]);
 }
@@ -9940,7 +9977,9 @@ function saveScores(cid, obj, fillUndone) {
     if (typeof showSyncToast === 'function') showSyncToast('Score save blocked — data loss prevented', 'error');
     return false;
   }
+  var gradesWere = _gradeBefore(cid, 'scores');
   var lsOk = _saveCourseField('scores', cid, obj);
+  _gradeAfter(cid, gradesWere, obj);
   var refused = false;
   if (_writesEnabled()) {
     var refusals = _writeRefusals;
@@ -10002,6 +10041,569 @@ function restoreScoreCells(cid, before, after) {
   saveScores(cid, next, removed);
   if (getScores(cid) === next) persistScoreDiffToCanonical(cid, now, next);
 }
+
+/* ── Draft and Returned (S0-F2) ──────────────────────────────────────────
+   Every grade is Draft or Returned (docs/plans/student-page-build-plan.md
+   1.2). The rule is shared/grade-state.js; this block keeps its rows beside
+   the scores and runs it on every score write, so any screen's save follows
+   it, in Demo Mode and offline too.
+
+   The rows: { assessmentId: { studentId: row } } in the cache
+   (gradeReturns) and in localStorage under gb-grade-returns-<cid>. A row is
+   the server's grade_return row with nulls left out: { is_draft,
+   returned_at, returned_copy, previous_copy, updated_at, seen_at }, the
+   shape the server's list of a class's rows will come in.
+
+   Rows are kept only while the class's student page is on (the build
+   switch, courseConfig.student_page_enabled). With it off nothing is kept:
+   a grade is Returned as soon as it is saved, as it always was.
+
+   Every score writer calls _gradeBefore before it saves and _gradeAfter
+   once the save is done: the one-cell writers that save the scores
+   themselves (_upsertScoreOne, _saveRubricCriterionNote,
+   _saveTagCommentOne, _saveScoreCommentOne), saveScores (fills, clears,
+   undo, group copies), and the two tick writers. _gradeBefore reads the
+   grades as they were from the saved copy; _gradeAfter compares cell by
+   cell and runs the rule on each cell that changed. Neither can stop or
+   reorder a save: both read the switch from the class's settings before
+   anything else, touch GradeState only when it is on, and catch and report
+   a failure (_gradeStateFailed). Loads, re-keys, withdrawing a student and
+   moveRubricScores do not grade, and do not run the rule.
+
+   NOT WIRED TO THE SERVER (S0-W1, once Batch A is applied). Three seams:
+   1. getReturnSettings and _gradesKept: a signed-in teacher's switch reads
+      off, because the live update_course does not know the two settings
+      and the rows have nowhere to go. saveCourseConfig sends neither.
+   2. returnGrades and _returnSettingsSaved: the server's return is queued
+      where the comments say.
+   3. Loading the class: _loadGradeReturns(cid, rows) is the one way rows
+      from the server get in. Until it has run for a class, a signed-in
+      class that holds grades has rows that are NOT LOADED, which is not
+      the same as none: getReturnedScores throws, so no draft is ever
+      counted as returned. And the class move
+      (_migrateCourseDataLocalToCanonical) must not run the rule while it
+      replays saveScores. */
+var _returnedSets = {}; // cid → { working, slot, set }: the returned set for one working copy and one set of rows
+var _gradeReturnsLoadedFor = {}; // cid → true once _loadGradeReturns has run for the class
+
+/* The class's two settings, as the rule reads them: { student_page,
+   return_grades }. return_grades is 'on_return' (When I Return Them),
+   'on_save' (As Soon As I Save) or null for no choice made, which works as
+   on_save. `saved` reads them from a copy of the class's settings in place
+   of the ones in the cache. */
+function getReturnSettings(cid, saved) {
+  var cfg = saved || getCourseConfig(cid) || {};
+  var choice = cfg.return_grades;
+  return {
+    // Seam 1 (S0-W1): take `&& !_writesEnabled()` away, here and in _gradesKept.
+    student_page: cfg.student_page_enabled === true && !_writesEnabled(),
+    return_grades: choice === 'on_return' || choice === 'on_save' ? choice : null,
+  };
+}
+// True when rows are kept for the class: the switch alone, nothing else read.
+function _gradesKept(cid) {
+  return (getCourseConfig(cid) || {}).student_page_enabled === true && !_writesEnabled();
+}
+/* The rule failed. The save it followed is done; the failure goes to the
+   error channel, never to the teacher (no banner, no toast). */
+function _gradeStateFailed(doing, e) {
+  console.error('Draft and Returned: ' + doing + ' failed.', e);
+  try {
+    if (window.Sentry && typeof window.Sentry.captureException === 'function') window.Sentry.captureException(e);
+  } catch (ignored) {
+    /* reporting is best effort */
+  }
+}
+
+/* The build switch, by hand, until Class Settings has it (S1-F4). Demo Mode
+   and classes kept on this device only: for a signed-in teacher it does
+   nothing and answers false. From the console:
+     setStudentPageSwitch(getActiveCourse(), true)             When I Return Them
+     setStudentPageSwitch(getActiveCourse(), true, 'on_save')  As Soon As I Save
+     setStudentPageSwitch(getActiveCourse(), false)            off again
+   Turning it on with no choice given keeps the class's choice, or starts it
+   on When I Return Them. Rows already kept stay. */
+function setStudentPageSwitch(cid, on, returnGrades) {
+  if (!cid || _writesEnabled()) return false;
+  var cfg = Object.assign({}, getCourseConfig(cid));
+  if (on) {
+    cfg.student_page_enabled = true;
+    if (returnGrades === 'on_return' || returnGrades === 'on_save') cfg.return_grades = returnGrades;
+    else if (cfg.return_grades !== 'on_save') cfg.return_grades = 'on_return';
+  } else delete cfg.student_page_enabled;
+  saveCourseConfig(cid, cfg);
+  return true;
+}
+
+/* saveCourseConfig, before it saves: how the class returned grades, from
+   the saved copy (a caller may have changed the cached settings in place).
+   null unless it held them. Never throws. */
+function _returnSettingsBefore(cid) {
+  try {
+    var was = getReturnSettings(cid, _safeParseLS('gb-courseconfig-' + cid, null));
+    return was.student_page && was.return_grades === 'on_return' ? was : null;
+  } catch (e) {
+    _gradeStateFailed('reading the class settings', e);
+    return null;
+  }
+}
+/* saveCourseConfig, once the settings are saved and sent. A class that
+   stops holding grades (As Soon As I Save is chosen, or the student page
+   is turned off) returns every waiting draft as part of the change. */
+function _returnSettingsSaved(cid, was) {
+  if (!was) return;
+  try {
+    var rows = getGradeReturns(cid);
+    var cells = _gradeCells(getScores(cid), getRubricChecks(cid));
+    var out = GradeState.afterSettingChange(
+      was,
+      getReturnSettings(cid),
+      rows,
+      function (sid, aid) {
+        var a = _assessmentById(cid, aid);
+        var cell = (cells[aid] || {})[sid];
+        return a && cell ? _gradeOf(a, cell.entries, cell.checks) : null;
+      },
+      new Date().toISOString(),
+    );
+    // Seam 2 (S0-W1): these returns go to the server with the setting.
+    if (out !== rows) _saveGradeReturns(cid, out);
+  } catch (e) {
+    _gradeStateFailed('returning the waiting drafts', e);
+  }
+}
+
+/* A class's rows. A class with none saved has none: nothing is put in the
+   cache or in localStorage for it. */
+function getGradeReturns(cid) {
+  if (_cache.gradeReturns[cid] !== undefined) return _cache.gradeReturns[cid];
+  var stored = _safeParseLS('gb-grade-returns-' + cid, null);
+  if (!_plainObject(stored)) return {};
+  _cache.gradeReturns[cid] = stored;
+  return stored;
+}
+// One student's row on one assessment, or null.
+function getGradeReturn(cid, sid, aid) {
+  return (getGradeReturns(cid)[aid] || {})[sid] || null;
+}
+function _saveGradeReturns(cid, rows) {
+  _saveCourseField('gradeReturns', cid, rows);
+  // Returned-only numbers follow the rows.
+  if (typeof clearProfCache === 'function') clearProfCache();
+}
+/* Seam 3 (S0-W1): a signed-in class's rows, as loaded from the server.
+   The only way they get in: it marks the class loaded, drops the returned
+   set built from the rows before, and has returned-only numbers worked out
+   again. */
+function _loadGradeReturns(cid, rows) {
+  _cache.gradeReturns[cid] = _plainObject(rows) ? rows : {};
+  _gradeReturnsLoadedFor[cid] = true;
+  _safeLSSet('gb-grade-returns-' + cid, JSON.stringify(_cache.gradeReturns[cid]));
+  delete _returnedSets[cid];
+  if (typeof clearProfCache === 'function') clearProfCache();
+}
+/* The class's scores were just replaced by a load from the server (a
+   refresh, or a full download after a saved copy was refused as an older
+   shape). The rows this device holds are from before that load, so they
+   are not "loaded" again until _loadGradeReturns runs for it: a class that
+   holds grades fails closed in between rather than read old rows against
+   new scores. The rows themselves are left where they are. A class kept on
+   this device only is never loaded from a server, and keeps its rows. */
+function _gradeScoresLoaded(cid) {
+  delete _gradeReturnsLoadedFor[cid];
+  delete _returnedSets[cid];
+}
+/* True when the class's rows are known. A class kept on this device only
+   (Demo Mode) keeps them in localStorage, which is always there to read:
+   no key means no rows. A signed-in class's rows are known only once
+   _loadGradeReturns has run for it: a row saved or read on this device
+   before that says nothing about the drafts it has not heard of. */
+function _gradeReturnsLoaded(cid) {
+  return !_writesEnabled() || _gradeReturnsLoadedFor[cid] === true;
+}
+
+/* One student's grade on one assessment, from their score entries and
+   ticks, in the parts of a copy (GradeState.copyOf tidies it). Points and
+   Complete/Incomplete work keeps one score however many entries carry it. */
+function _gradeOf(a, entries, checks) {
+  var grade = { value: null, modifier: 0, comment: null, tags: {}, criteria: {}, checks: checks || [] };
+  var points = isPointsScored(a);
+  var onRubric = !points && !!(a.rubricId || a.rubric_id);
+  (entries || []).forEach(function (e) {
+    if (e.note && !grade.comment) grade.comment = String(e.note);
+    var level = Number(e.score) > 0 ? Number(e.score) : null;
+    var part = { value: level, modifier: level ? e.mod || 0 : 0, comment: e.critNote || null };
+    if (points) {
+      if (grade.value == null && e.score != null && e.score !== '') grade.value = Number(e.score);
+    } else if (isUnlinkedTag(e.tagId)) {
+      grade.value = part.value;
+      grade.modifier = part.modifier;
+    } else if (onRubric) {
+      part.beyond = e.critBeyond || null;
+      grade.criteria[e.tagId] = part;
+    } else grade.tags[e.tagId] = part;
+  });
+  return grade;
+}
+
+// Every cell of a class: { aid: { sid: { entries, checks } } }.
+function _gradeCells(scores, checks) {
+  var cells = {};
+  var cell = function (aid, sid) {
+    var of = cells[aid] || (cells[aid] = {});
+    return of[sid] || (of[sid] = { entries: [], checks: [] });
+  };
+  Object.keys(scores || {}).forEach(function (sid) {
+    (Array.isArray(scores[sid]) ? scores[sid] : []).forEach(function (e) {
+      if (e && e.assessmentId) cell(e.assessmentId, sid).entries.push(e);
+    });
+  });
+  Object.keys(checks || {}).forEach(function (key) {
+    var i = key.indexOf(':');
+    if (i > 0 && Array.isArray(checks[key])) cell(key.slice(i + 1), key.slice(0, i)).checks = checks[key];
+  });
+  return cells;
+}
+
+/* A score writer, before it saves the class's scores or ticks (`field`):
+   the grades as they were, from the saved copy. null when no rows are kept
+   for the class, which is all the switch-off path does. Never throws. */
+function _gradeBefore(cid, field) {
+  try {
+    if (!_gradesKept(cid)) return null;
+    return field === 'scores'
+      ? { scores: _migrateRubricScoreKeys(cid, _safeParseLS('gb-scores-' + cid, {})) }
+      : { checks: _safeParseLS('gb-rubric-checks-' + cid, {}) };
+  } catch (e) {
+    _gradeStateFailed('reading the grades before a save', e);
+    return null;
+  }
+}
+/* The same writer, once its save is done: `was` is what _gradeBefore gave,
+   `next` the scores or ticks just saved. Never throws. */
+function _gradeAfter(cid, was, next) {
+  delete _returnedSets[cid];
+  if (!was) return;
+  try {
+    _gradeRule(cid, was, next || {});
+  } catch (e) {
+    _gradeStateFailed('keeping which grades are returned', e);
+  }
+}
+function _gradeRule(cid, was, next) {
+  var klass = getReturnSettings(cid);
+  var scores = was.scores ? next : getScores(cid);
+  var checks = was.checks ? next : getRubricChecks(cid);
+  var now = _gradeCells(scores, checks);
+  var before = _gradeCells(was.scores || scores, was.checks || checks);
+  var rows = getGradeReturns(cid);
+  var out = Object.assign({}, rows);
+  var at = new Date().toISOString();
+  var changed = false;
+  Object.keys(Object.assign({}, before, now)).forEach(function (aid) {
+    var a = _assessmentById(cid, aid);
+    // A DIBELS benchmark is a reading record, not a grade that is returned:
+    // nothing saved on it, its Overall Comment included, makes or changes a row.
+    if (!a || isDibelsScored(a)) return;
+    Object.keys(Object.assign({}, before[aid], now[aid])).forEach(function (sid) {
+      var b = (before[aid] || {})[sid];
+      var n = (now[aid] || {})[sid];
+      var copyWas = b ? _gradeOf(a, b.entries, b.checks) : null;
+      var copyNow = n ? _gradeOf(a, n.entries, n.checks) : null;
+      if (GradeState.sameCopy(copyWas, copyNow)) return;
+      var kept = GradeState.afterWrite(klass, (out[aid] || {})[sid] || null, copyWas, copyNow, at);
+      out[aid] = Object.assign({}, out[aid]);
+      if (kept) out[aid][sid] = kept;
+      else delete out[aid][sid];
+      if (!Object.keys(out[aid]).length) delete out[aid];
+      changed = true;
+    });
+  });
+  if (changed) _saveGradeReturns(cid, out);
+}
+/* Return: `studentIds` (one id or a list) are given their grade on `aid`.
+   Only drafts are returned; the rest are skipped. A class that does not
+   hold grades has none to return. Answers as the server's return will:
+   { returned, enrollment_ids, returned_at }. If the rule fails, the failure
+   is reported and the answer is that nothing was returned. */
+function returnGrades(cid, aid, studentIds) {
+  var nothing = { returned: 0, enrollment_ids: [], returned_at: null };
+  try {
+    return _returnGrades(cid, aid, studentIds) || nothing;
+  } catch (e) {
+    // Like the other hooks: reported, never thrown at a screen. Nothing was returned.
+    _gradeStateFailed('returning grades', e);
+    return nothing;
+  }
+}
+function _returnGrades(cid, aid, studentIds) {
+  var ids = Array.isArray(studentIds) ? studentIds : studentIds ? [studentIds] : [];
+  var done = [];
+  var at = new Date().toISOString();
+  var a = _assessmentById(cid, aid);
+  var klass = getReturnSettings(cid);
+  if (a && !isDibelsScored(a) && klass.student_page && GradeState.holds(klass)) {
+    var rows = getGradeReturns(cid);
+    var of = Object.assign({}, rows[aid]);
+    var cells = _gradeCells(getScores(cid), getRubricChecks(cid))[aid] || {};
+    ids.forEach(function (sid) {
+      var row = of[sid];
+      if (!row || !row.is_draft || done.indexOf(sid) >= 0) return;
+      var kept = GradeState.afterReturn(
+        row,
+        cells[sid] ? _gradeOf(a, cells[sid].entries, cells[sid].checks) : null,
+        at,
+      );
+      if (kept) of[sid] = kept;
+      else delete of[sid];
+      done.push(sid);
+    });
+    if (done.length) {
+      var out = Object.assign({}, rows);
+      if (Object.keys(of).length) out[aid] = of;
+      else delete out[aid];
+      _saveGradeReturns(cid, out);
+      // Seam 2 (S0-W1): queue the server's return of `done` on `aid` here,
+      // with an idempotency key, under each cell's outbox key
+      // (cell:<student>:<assessment>) so it is sent after that cell's score
+      // writes and is never merged away with one.
+    }
+  }
+  return { returned: done.length, enrollment_ids: done, returned_at: done.length ? at : null };
+}
+
+/* A returned copy as the score entries this class would hold for it: read
+   the way a grade loaded from the server is, then fitted to the student's
+   working entries (`own`): an entry the change did not touch is the
+   working entry itself; a changed one is the working entry with the
+   returned level, + or − and comments, so it keeps its date. Points work
+   keeps one score; a class carries it once per competency (a score typed
+   on this device) or once (a loaded class), and the returned grade is
+   carried the way the class's other entries are.
+   The copy is read whole, as the working copy is: calc.js applies what a
+   piece measures now the same way in both sets. */
+function _gradeCopyEntries(cid, sid, aid, copy, own, working) {
+  var a = _assessmentById(cid, aid);
+  if (!a || !copy) return [];
+  var cells = {};
+  cells[sid] = {};
+  cells[sid][aid] = {
+    score: { value: copy.value, modifier: copy.modifier, comment: copy.comment },
+    tag_scores: Object.keys(copy.tags || {}).map(function (id) {
+      return Object.assign({ tag_id: id }, copy.tags[id]);
+    }),
+    rubric_scores: Object.keys(copy.criteria || {}).map(function (id) {
+      return Object.assign({ criterion_id: id }, copy.criteria[id]);
+    }),
+  };
+  var built = _gradebookCellsToScoreCache(cid, getAssessments(cid), cells).scores[sid] || [];
+  own = own || [];
+  var keys = own.map(function (e) {
+    return e.tagId;
+  });
+  if (isPointsScored(a) && built.length === 1) {
+    var carried = _pointsScoreKeys(a, keys, working, built[0].tagId);
+    built = carried.map(function (tid) {
+      return Object.assign({}, built[0], { tagId: tid, id: aid + ':' + (tid || 'overall') });
+    });
+  }
+  var comment = (
+    own.find(function (e) {
+      return e.note;
+    }) || {}
+  ).note;
+  var sameComment = (comment || '') === (copy.comment || '');
+  // In the working entries' order, so a changed grade reads back entry for entry.
+  var at = function (e) {
+    var i = keys.indexOf(e.tagId);
+    return i < 0 ? keys.length : i;
+  };
+  built = built.slice().sort(function (x, y) {
+    return at(x) - at(y);
+  });
+  return built.map(function (e) {
+    var mine = own[keys.indexOf(e.tagId)];
+    if (!mine) return e;
+    var same =
+      sameComment &&
+      (mine.score == null || mine.score === '' ? null : Number(mine.score)) === e.score &&
+      (mine.mod || 0) === (e.mod || 0) &&
+      (mine.critNote || '') === (e.critNote || '') &&
+      (mine.critBeyond || '') === (e.critBeyond || '');
+    if (same) return mine;
+    var out = Object.assign({}, mine, { score: e.score });
+    if (!sameComment) out.note = e.note;
+    ['mod', 'critNote', 'critBeyond'].forEach(function (f) {
+      if (e[f]) out[f] = e[f];
+      else delete out[f];
+    });
+    return out;
+  });
+}
+/* The keys a points score is carried under for this class: the student's
+   own working entries', else another student's on the same work, else
+   every competency for a class kept on this device (as _setPointsScoreOne
+   writes it) and the one key a loaded class has. */
+function _pointsScoreKeys(a, own, working, loadedKey) {
+  var distinct = function (ids) {
+    return ids.filter(function (id, i) {
+      return ids.indexOf(id) === i;
+    });
+  };
+  if (own.length) return distinct(own);
+  var sids = Object.keys(working || {});
+  for (var i = 0; i < sids.length; i++) {
+    var theirs = (Array.isArray(working[sids[i]]) ? working[sids[i]] : [])
+      .filter(function (e) {
+        return e && e.assessmentId === a.id;
+      })
+      .map(function (e) {
+        return e.tagId;
+      });
+    if (theirs.length) return distinct(theirs);
+  }
+  var all = scoreTagIds(a);
+  return !_writesEnabled() && all.length ? all : [loadedKey];
+}
+
+/* The class's scores as students have been given them, in the shape of
+   getScores: the working entries where nothing is a draft, the returned
+   grade where a draft sits on a returned grade, nothing where a grade was
+   never returned (GradeState.returnedScores). That is all it decides:
+   calc.js reads both sets by one set of rules (what a piece measures now,
+   Missing and Excused, same-date order), and statuses are not here.
+   A class that does not hold grades (the student page off, or As Soon As I
+   Save) has no draft by rule: this is getScores' own object. So it is in a
+   class that holds grades with no draft waiting. A class that holds grades
+   whose rows are not loaded throws: "not loaded" must never read as "every
+   grade returned" (calc.js then works out no grade).
+   Always a plain object with a list for every student in it, an empty one
+   when nothing of theirs is returned: calc.js takes nothing else, and
+   fails closed for the whole class on anything else.
+   Built once for each working copy and each set of rows; any save of the
+   class's data has it built again. Checklist ticks are not in it
+   (getScores holds none); the returned ticks are kept in each row's
+   returned_copy for a reader to come (S2).
+   It is set on window, not declared: calc.js looks for it by name and
+   fails closed when it is not there, and its tests take it away (and put
+   their own in its place) to prove that. A declared function could be
+   neither removed nor told from one that never loaded. */
+window.getReturnedScores = function getReturnedScores(cid) {
+  var working = getScores(cid) || {};
+  var kept = _returnedSets[cid];
+  if (kept && kept.working === working && kept.slot === _cache.gradeReturns[cid]) return kept.set;
+  var set = working;
+  var klass = getReturnSettings(cid);
+  if (klass.student_page && GradeState.holds(klass)) {
+    if (!_gradeReturnsLoaded(cid)) {
+      throw new Error(
+        'This class holds grades until they are returned, and which of its grades are returned has not loaded. ' +
+          'No returned grade was worked out, so no draft is shown.',
+      );
+    }
+    // A DIBELS benchmark has no returned grade: any row for one is passed
+    // over, so its entries are the working copy's.
+    var rows = {};
+    var every = getGradeReturns(cid);
+    Object.keys(every).forEach(function (aid) {
+      if (!isDibelsScored(_assessmentById(cid, aid))) rows[aid] = every[aid];
+    });
+    var anyDraft = Object.keys(rows).some(function (aid) {
+      return Object.keys(rows[aid] || {}).some(function (sid) {
+        return rows[aid][sid] && rows[aid][sid].is_draft;
+      });
+    });
+    if (anyDraft) {
+      set = GradeState.returnedScores(working, rows, function (sid, aid, copy, own) {
+        return _gradeCopyEntries(cid, sid, aid, copy, own, working);
+      });
+    }
+  }
+  // A working copy that is not a plain object of lists (a damaged saved
+  // copy) is given as one: a student with no list has no grades.
+  var plain = _plainObject(set) && Object.getPrototypeOf(set) === Object.prototype;
+  var lists =
+    plain &&
+    Object.keys(set).every(function (sid) {
+      return Array.isArray(set[sid]);
+    });
+  if (!lists) {
+    var tidy = {};
+    Object.keys(_plainObject(set) ? set : {}).forEach(function (sid) {
+      tidy[sid] = Array.isArray(set[sid]) ? set[sid] : [];
+    });
+    set = tidy;
+  }
+  _returnedSets[cid] = { working: working, slot: _cache.gradeReturns[cid], set: set };
+  return set;
+};
+
+/* A local id became a server id (_rekey): the rows move with it, whether it
+   named an assessment, a student, or a competency, criterion or checkbox
+   inside a kept copy. */
+function _rekeyGradeReturns(cid, localId, serverId) {
+  delete _returnedSets[cid];
+  var map = {};
+  map[localId] = serverId;
+  _rekeyField('gradeReturns', cid, function (rows) {
+    var changed = _rekeyObjectKey(rows, localId, serverId);
+    Object.keys(rows || {}).forEach(function (aid) {
+      if (_rekeyObjectKey(rows[aid], localId, serverId)) changed = true;
+      Object.keys(rows[aid] || {}).forEach(function (sid) {
+        var moved = GradeState.afterMove(rows[aid][sid], map, map, map);
+        if (moved === rows[aid][sid]) return;
+        rows[aid][sid] = moved;
+        changed = true;
+      });
+    });
+    return changed;
+  });
+}
+/* moveRubricScores: an assessment's scores followed it to a copy of its
+   rubric. Each grade keeps its state; the criteria and checkboxes inside
+   its kept copies take their new ids (GradeState.afterMove). */
+function _repointGradeReturns(cid, aid, criteria, checks) {
+  delete _returnedSets[cid];
+  if (!getGradeReturns(cid)[aid]) return;
+  var rows = Object.assign({}, getGradeReturns(cid));
+  var of = (rows[aid] = Object.assign({}, rows[aid]));
+  var changed = false;
+  Object.keys(of).forEach(function (sid) {
+    var moved = GradeState.afterMove(of[sid], criteria, checks);
+    if (moved === of[sid]) return;
+    of[sid] = moved;
+    changed = true;
+  });
+  if (changed) _saveGradeReturns(cid, rows);
+}
+
+// Assessments were deleted: their rows go with their scores.
+function _dropGradeReturnsNotIn(cid, validIds) {
+  var rows = getGradeReturns(cid);
+  var gone = Object.keys(rows).filter(function (aid) {
+    return !validIds.has(aid);
+  });
+  if (!gone.length) return;
+  var out = Object.assign({}, rows);
+  gone.forEach(function (aid) {
+    delete out[aid];
+  });
+  _saveGradeReturns(cid, out);
+}
+// A withdrawn student was deleted for good: their rows go too.
+function _dropGradeReturnsOf(cid, sid) {
+  var rows = getGradeReturns(cid);
+  var out = null;
+  Object.keys(rows).forEach(function (aid) {
+    if (!rows[aid] || rows[aid][sid] === undefined) return;
+    out = out || Object.assign({}, rows);
+    out[aid] = Object.assign({}, rows[aid]);
+    delete out[aid][sid];
+    if (!Object.keys(out[aid]).length) delete out[aid];
+  });
+  if (out) _saveGradeReturns(cid, out);
+}
+/* ── end Draft and Returned (S0-F2) ── */
 
 /* ── Points-mode helpers: one score → all tags ──────────────── */
 // A cell's points, or null when it has no score. A 0 is a score.
@@ -12709,6 +13311,7 @@ function deleteWithdrawnStudent(cid, sid) {
     }
   });
   if (changed) saveAssessments(cid, assessments);
+  _dropGradeReturnsOf(cid, sid);
 
   if (!_writesEnabled() || !_isUuid(cid)) return true;
   // An enrol still queued is simply not sent (with the withdraw behind it).
@@ -13562,6 +14165,12 @@ window.GB = {
   saveNotes,
   getScores,
   saveScores,
+  getReturnSettings,
+  setStudentPageSwitch,
+  getGradeReturns,
+  getGradeReturn,
+  getReturnedScores,
+  returnGrades,
   upsertScore,
   persistScoreDiffToCanonical,
   getPointsScore,
