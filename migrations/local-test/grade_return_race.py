@@ -46,7 +46,8 @@ With Batch A loaded:
 First, every function in class-writers-prelude.sql is compared with its live
 fingerprint (live-function-md5.txt, the lines marked class-writer). One that
 differs is named in NOT_LIVE until its live body is loaded: its row of the
-matrix is then for the body the repo has, not the live one.
+matrix is then for the body the repo has, not the live one. RACE_ONLY runs
+the named rows alone, without the all-at-once runs.
 
 Without Batch A (the same database before the four migrations) only the
 matrix runs, against saves alone, and nothing is asserted: it is the
@@ -106,16 +107,17 @@ LIVE = {}
 for line in open(os.path.join(HERE, 'live-function-md5.txt')):
     parts = line.split()
     if len(parts) == 4 and not line.startswith('#'): LIVE[parts[0]] = parts[1]
-# Loaded from the April design file (docs/backend-design/write-paths.sql),
-# which is not what the live database runs. Take a name out when its live
-# body is in class-writers-prelude.sql.
-NOT_LIVE = ('delete_rubric', 'save_assessment_tags', 'update_enrollment')
+# Loaded from the last migration that defines them
+# (20260423_write_path_idempotency_phase2.sql), which is not what the live
+# database runs. Take a name out when its live body is in
+# class-writers-prelude.sql.
+NOT_LIVE = ('upsert_section', 'upsert_subject')
 LOADED = {r[0]: r[1] for r in o.run("""select p.proname, md5(pg_get_functiondef(p.oid)) from pg_proc p
                                          where p.pronamespace = 'public'::regnamespace and p.proname = any (:n)""", n=WRITERS)}
 def writers():
     for name in sorted(LIVE):
         if name in NOT_LIVE:
-            ok('today: %s is NOT the live function (the April design file\'s body is loaded; the live one has been asked for)' % name,
+            ok('today: %s is NOT the live function (the repo\'s last migration for it is loaded; the live one has been asked for)' % name,
                LOADED.get(name) is not None and LOADED[name] != LIVE[name], LOADED.get(name))
         else:
             ok('%s is the live function, byte for byte' % name, LOADED.get(name) == LIVE[name], LOADED.get(name))
@@ -625,7 +627,7 @@ try:
     # both rewrite one assessment's links), so neither run can be asked for
     # no deadlock: both are counted, beside the baseline's.
     for label, group in (('all that are clean against saves, at once', [n for n in names if n not in TODAY]), ('all at once', names)):
-        if ONLY and len(ONLY) < 2: break
+        if ONLY: break
         try:
             W.reset()
             mixed = [(n, S[n], S[n][0]() if S[n][0] else {}) for n in group]

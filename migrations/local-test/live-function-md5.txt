@@ -34,8 +34,8 @@ upsert_tag_score 3a878c46479fef1f84c18ffc0802e0cf 2448
 # The class writers grade_return_race.py loads from class-writers-prelude.sql,
 # read from gradebook-prod the same way on 2026-11-09 by the orchestrator. A
 # fourth word marks these lines: score_rpcs.py and batch_a_apply.py compare
-# the lines above, grade_return_race.py compares these. The other ten
-# functions in that prelude have no line here yet.
+# the lines above, grade_return_race.py compares these. All 21 functions in
+# that prelude have a line.
 create_assessment b3f6055028ea0ea1bdcb2f481959d9cf 2237 class-writer
 delete_assessment b0557c759c662175194a75bff27c7001 407 class-writer
 delete_competency_group 01ac8ad9471a683ea1aa0dbb48296065 424 class-writer
@@ -47,3 +47,13 @@ save_assessment_tags feafcae04a90f26cd44707e26f911a45 747 class-writer
 update_assessment 523f9491dc3b689dc3d6473e411e4876 2939 class-writer
 update_enrollment 3cfcb3dd88253a54a5fc5b65a749ac82 1249 class-writer
 upsert_rubric 09bf9d14cf82a5b2c29abe3822227c2c 7572 class-writer
+create_student_and_enroll d63bd1f5393fdfb3ff26e9439f906dce 1931 class-writer
+delete_withdrawn_student ad4c98f316f4f41f7ac7eec80f1c0093 2120 class-writer
+reenrol_student 20034fbb80d524258b88a19a6bd0c138 1043 class-writer
+remove_section 7d36db01b87668b76fd5894fdd2031c9 909 class-writer
+restore_section 8cc2f6acd6ff061eaefad65be417a348 835 class-writer
+upsert_competency_group 18b590375a3b599c944e843116ca60eb 1609 class-writer
+upsert_section 07e3bfc041047a08b6c34dd431d86da1 1808 class-writer
+upsert_subject 3fa8209ed1f82365ac49d745c1b7b301 1365 class-writer
+upsert_tag 3a527f37023f8290a9bfe63c91320aca 1903 class-writer
+withdraw_student c4fc1f0e7c9ecee57726e975c0b89847 1153 class-writer

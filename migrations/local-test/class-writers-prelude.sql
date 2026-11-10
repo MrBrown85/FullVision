@@ -1,10 +1,12 @@
 -- GENERATED: the other RPCs that write a class's tables, for grade_return_race.py.
 -- Each is copied whole and unchanged from the migration that last defined it.
 -- Four have no migration (they date from the April design and were applied by
--- hand): those are copied from docs/backend-design/write-paths.sql.
--- grade_return_race.py compares each with live-function-md5.txt (the lines
--- marked class-writer) and names the ones that are not the live body; README.md,
--- "Batch A", says which are confirmed.
+-- hand). delete_assessment is copied from docs/backend-design/write-paths.sql,
+-- which matches the live database. The other three are the live definitions
+-- themselves, as pg_get_functiondef printed them on 2026-11-09 (read by the
+-- orchestrator): the design file differs from them in a comment and spacing.
+-- grade_return_race.py compares every function here with live-function-md5.txt
+-- (the lines marked class-writer) and names the ones that are not the live body.
 -- Load after batch-a-prelude.sql.
 
 -- create_assessment: migrations/20261027_assessment_core_competencies.sql
@@ -127,22 +129,27 @@ begin
     if not found then raise exception 'assessment not found' using errcode = 'P0002'; end if;
 end; $$;
 
--- save_assessment_tags: docs/backend-design/write-paths.sql
-create or replace function save_assessment_tags(p_id uuid, p_tag_ids uuid[]) returns void
-language plpgsql security invoker set search_path = public as $$
+-- save_assessment_tags: gradebook-prod
+CREATE OR REPLACE FUNCTION public.save_assessment_tags(p_id uuid, p_tag_ids uuid[])
+ RETURNS void
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
 declare _tag uuid;
 begin
     if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
     if not exists (select 1 from assessment where id = p_id) then
         raise exception 'assessment not found' using errcode = 'P0002';
     end if;
+
     delete from assessment_tag where assessment_id = p_id;
     if p_tag_ids is not null then
         foreach _tag in array p_tag_ids loop
-            insert into assessment_tag (assessment_id, tag_id) values (p_id, _tag) on conflict do nothing;
+            insert into assessment_tag (assessment_id, tag_id) values (p_id, _tag)
+            on conflict do nothing;
         end loop;
     end if;
-end; $$;
+end; $function$;
 
 -- upsert_rubric: migrations/20261103_rubric_whole_competencies.sql
 create or replace function public.upsert_rubric(
@@ -324,23 +331,24 @@ begin
 end;
 $function$;
 
--- delete_rubric: docs/backend-design/write-paths.sql
-create or replace function delete_rubric(p_id uuid) returns void
-language plpgsql
-security invoker
-set search_path = public
-as $$
+-- delete_rubric: gradebook-prod
+CREATE OR REPLACE FUNCTION public.delete_rubric(p_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
 begin
     if (select auth.uid()) is null then
         raise exception 'not authenticated' using errcode = 'PT401';
     end if;
 
+    -- assessment.rubric_id is ON DELETE SET NULL; criterion/criterion_tag/rubric_score cascade.
     delete from rubric where id = p_id;
     if not found then
         raise exception 'rubric not found' using errcode = 'P0002';
     end if;
 end;
-$$;
+$function$;
 
 -- upsert_subject: migrations/20260423_write_path_idempotency_phase2.sql
 create or replace function upsert_subject(
@@ -680,26 +688,32 @@ begin
     return _result;
 end; $$;
 
--- update_enrollment: docs/backend-design/write-paths.sql
-create or replace function update_enrollment(p_id uuid, p_patch jsonb) returns void
-language plpgsql security invoker set search_path = public as $$
+-- update_enrollment: gradebook-prod
+CREATE OR REPLACE FUNCTION public.update_enrollment(p_id uuid, p_patch jsonb)
+ RETURNS void
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
 declare _desig text[];
 begin
     if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+
     if p_patch ? 'designations' and jsonb_typeof(p_patch->'designations') = 'array' then
         select array_agg(v #>> '{}') into _desig from jsonb_array_elements(p_patch->'designations') v;
     end if;
+
     update enrollment set
-        designations    = case when p_patch ? 'designations'    then coalesce(_desig, '{}') else designations end,
-        is_flagged      = case when p_patch ? 'is_flagged'      then (p_patch->>'is_flagged')::boolean else is_flagged end,
+        designations    = case when p_patch ? 'designations' then coalesce(_desig, '{}') else designations end,
+        is_flagged      = case when p_patch ? 'is_flagged' then (p_patch->>'is_flagged')::boolean else is_flagged end,
         roster_position = case when p_patch ? 'roster_position' then (p_patch->>'roster_position')::int else roster_position end,
         withdrawn_at    = case when p_patch ? 'withdrawn_at'
                                then nullif(p_patch->>'withdrawn_at', '')::timestamptz
                                else withdrawn_at end,
         updated_at      = now()
     where id = p_id;
+
     if not found then raise exception 'enrollment not found' using errcode = 'P0002'; end if;
-end; $$;
+end; $function$;
 
 -- withdraw_student: migrations/20261019_withdraw_students.sql
 create or replace function public.withdraw_student(p_enrollment_id uuid, p_idempotency_key uuid default null)

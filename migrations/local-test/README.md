@@ -223,19 +223,19 @@ Three more files build what they need on top of the score paths:
   `upsert_` and a `delete_` each, `remove_section`, `restore_section`) and
   students (`create_student_and_enroll`, `update_enrollment`,
   `withdraw_student`, `reenrol_student`, `delete_withdrawn_student`). Each is
-  copied whole and unchanged from the migration that last defined it.
-  Four have no migration (`delete_assessment`, `save_assessment_tags`,
-  `delete_rubric`, `update_enrollment`): those are from
-  `docs/backend-design/write-paths.sql`, the April design.
-  `grade_return_race.py` compares each with `live-function-md5.txt` (the
-  lines marked `class-writer`, eleven so far). **Eight are the live
-  functions**: `create_assessment`, `update_assessment`, `delete_assessment`,
-  `upsert_rubric`, `delete_tag`, `delete_section`, `delete_subject`,
-  `delete_competency_group`. **Three are not**, all from the April file:
-  `delete_rubric`, `save_assessment_tags`, `update_enrollment`; the script
-  names them (`NOT_LIVE`) until their live bodies are loaded. **Ten have no
-  live fingerprint yet**: the four upserts, `remove_section`,
-  `restore_section` and the five student RPCs.
+  copied whole and unchanged from the migration that last defined it. Four
+  have no migration: `delete_assessment` is from
+  `docs/backend-design/write-paths.sql`, the April design, which matches the
+  live database; `delete_rubric`, `save_assessment_tags` and
+  `update_enrollment` are the live definitions themselves, as
+  `pg_get_functiondef` printed them on 2026-11-09 (the April file differs
+  from them only in a comment and white space).
+  `grade_return_race.py` compares all 21 with `live-function-md5.txt` (the
+  lines marked `class-writer`) on every run. **Nineteen are the live
+  functions. Two are not**: `upsert_section` and `upsert_subject`, loaded
+  from `20260423_write_path_idempotency_phase2.sql`, the only migration that
+  defines them; the script names them (`NOT_LIVE`) until their live bodies
+  are loaded.
 
 Two databases, one without the four migrations (for `batch_a_apply.py`,
 which applies them itself) and one with:
@@ -322,7 +322,7 @@ What each covers:
 Result on 2026-11-09 (Postgres 18.6, local; production is 17):
 `batch_a_apply.py` 82 of 82, `grade_return.py` 280 of 280, `student_page.py`
 216 of 216, `score_rpcs.py` 234 of 234 (176 of 176 without Batch A),
-`grade_return_race.py` 414 of 414; each three times (425 of 425 since the eleven fingerprint checks were added, run once). With Batch A loaded the earlier suites pass
+`grade_return_race.py` 414 of 414; each three times (435 of 435 since the 21 fingerprint checks were added, run once). With Batch A loaded the earlier suites pass
 as before: `student_submit.py` 79 of 79, `questionnaire_identity.py` 47 of
 47, `phone_reports.py` 37 of 37, `questionnaires.py` 42 of 42.
 
@@ -358,12 +358,12 @@ last column is the same calls on the database without the four migrations.
 | `update_course`                               | 0 of 2,555     | 0 of 2,739      | 0 of 3,667      | 0 of 2,433                |
 | `create_assessment`                           | 0 of 3,845     | 0 of 4,978      | 0 of 4,966      | 0 of 4,878                |
 | `update_assessment`                           | 0 of 2,436     | 0 of 2,735      | 0 of 3,748      | 0 of 2,669                |
-| `save_assessment_tags`                        | 0 of 2,346     | 0 of 2,745      | 0 of 3,839      | 0 of 2,674                |
+| `save_assessment_tags`                        | 0 of 2,387     | 0 of 2,756      | 0 of 3,692      | 0 of 2,746                |
 | `duplicate_assessment`                        | 0 of 3,736     | 0 of 4,735      | 0 of 4,893      | 0 of 4,923                |
 | `delete_assessment`                           | 0 of 2,988     | 0 of 2,855      | 0 of 4,542      | 0 of 2,803                |
 | `upsert_rubric (nothing removed)`             | 0 of 2,777     | 0 of 2,701      | 0 of 3,037      | 0 of 2,932                |
 | `upsert_rubric (criteria and boxes removed)`  | 73 of 3,706    | 0 of 4,189      | 78 of 4,929     | 57 of 4,680               |
-| `delete_rubric`                               | 157 of 2,851   | 0 of 2,750      | 305 of 3,805    | 86 of 2,761               |
+| `delete_rubric`                               | 136 of 3,015   | 0 of 2,526      | 345 of 4,411    | 134 of 3,375              |
 | `update_assessment + move_rubric_scores`      | 60 of 4,073    | 0 of 4,989      | 63 of 5,119     | 28 of 3,741               |
 | `upsert_subject`                              | 0 of 2,622     | 0 of 3,121      | 0 of 3,810      | 0 of 2,921                |
 | `upsert_competency_group`                     | 0 of 2,686     | 0 of 3,225      | 0 of 4,116      | 0 of 2,923                |
@@ -375,7 +375,7 @@ last column is the same calls on the database without the four migrations.
 | `delete_subject`                              | 278 of 3,100   | 0 of 2,985      | 363 of 3,723    | 100 of 2,886              |
 | `delete_competency_group`                     | 0 of 2,254     | 0 of 2,682      | 0 of 3,503      | 0 of 2,546                |
 | `create_student_and_enroll`                   | 0 of 2,216     | 0 of 2,974      | 0 of 3,536      | 0 of 2,743                |
-| `update_enrollment`                           | 0 of 2,424     | 0 of 2,714      | 0 of 3,618      | 0 of 2,371                |
+| `update_enrollment`                           | 0 of 2,233     | 0 of 2,517      | 0 of 3,618      | 0 of 2,539                |
 | `withdraw_student`                            | 0 of 2,387     | 0 of 2,720      | 0 of 3,797      | 0 of 2,545                |
 | `delete_withdrawn_student`                    | 0 of 3,223     | 0 of 2,670      | 0 of 4,878      | 0 of 3,281                |
 | `import_json_restore`                         | 0 of 3,961     | 0 of 4,091      | 0 of 4,938      | 0 of 4,329                |
@@ -390,10 +390,10 @@ last column is the same calls on the database without the four migrations.
 | `student: card and verify_card`               | 0 of 1,719     | 0 of 2,482      | 0 of 1,730      | -                         |
 | **all that are clean against saves, at once** |                |                 | 273 of 128,843  | 260 of 54,721             |
 | **all at once**                               |                |                 | 1032 of 138,056 | 843 of 97,374             |
-| **total**                                     | 865 of 121,697 | 0 of 139,439    | 2517 of 429,562 | 1488 of 257,209           |
+| **total**                                     | 844 of 121,711 | 0 of 139,029    | 2557 of 430,021 | 1536 of 258,063           |
 
-After every one of the 411 runs, deadlocks included, every `grade_return`
-row was right: 0 rows wrong.
+After every run, deadlocks included, every `grade_return` row was right: 0
+rows wrong.
 
 Every RPC is clean against returns alone. Thirty-six of the 45 are clean
 against saves. **Nine are not, with or without Batch A**: the three clears,
@@ -405,7 +405,7 @@ row a save has, because the cursor triggers fire after every statement and
 after the first level of a cascade. Batch A changes none of the nine and
 adds no lock they could meet in a new order: no dead call was waiting on a
 `grade_return` row in any run, and every one of the 3,382 deadlocks the
-server logged was between live RPCs (a Return or a card call appears in a
+server logged in the three full runs was between live RPCs (a Return or a card call appears in a
 few only as a third call waiting in line). It does make them collide more
 often under this load, about twice as often here: a save holds the cursor
 row about a third longer (an `upsert_score` call took 0.30 ms before and
@@ -423,10 +423,13 @@ A Return or a student's `seen()` waiting in line when two such calls collide
 could be the one Postgres stops; it holds nothing they want, so it waits
 again (`_grade_return_lock_first`). In these runs no Return died.
 
-`delete_rubric`'s row is for the April design file's body, which is not the
-live one (above); it is to be run again once the live body is loaded.
-`save_assessment_tags` and `update_enrollment`, also not the live bodies,
-are among the clean ones.
+The rows for `delete_rubric`, `save_assessment_tags` and `update_enrollment`
+were run again, three times each way, once their live bodies were loaded;
+the table has those runs. Nothing changed: `delete_rubric` still deadlocks
+with saves, the other two are still clean, and the count of RPCs that are
+not clean is still nine. The two all-at-once rows are from before that. The
+rows for `upsert_section` and `upsert_subject`, both clean, are for the
+repo's bodies, which are not the live ones.
 
 Timing: a rubric fill for 30 students with 5 criteria (30 `fill_rubric`
 calls, 150 rows) took about 15 ms before the batch, 20 ms with the
