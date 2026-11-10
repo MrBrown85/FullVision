@@ -2143,7 +2143,8 @@ th.gb-group-alt {
   max-width: 100%;
   margin: 4px auto 0;
   height: 22px;
-  padding: 0 10px;
+  /* "Return 3 Graded" fits the narrowest header (120px) whole. */
+  padding: 0 6px;
   border: none;
   border-radius: 11px;
   background: var(--active);
