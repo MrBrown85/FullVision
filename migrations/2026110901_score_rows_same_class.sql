@@ -50,10 +50,12 @@
 -- prints it). Class loads do not run these policies: get_class_bundle is
 -- SECURITY DEFINER.
 --
--- Existing rows: none change. RUN THIS FIRST; IT MUST RETURN 0. A row it
--- counts would disappear from its teacher's view when the policies change
--- (counted 0 on gradebook-prod on 2026-11-09: score 1,872 rows, tag_score
--- 697, rubric_score 3,964, rubric_check_score 500, dibels_score 0).
+-- Existing rows: none change. The file's first step counts the rows below
+-- and stops, with nothing changed, unless the answer is 0: a row it counts
+-- would disappear from its teacher's view when the policies change. To look
+-- before applying, run it by hand (counted 0 on gradebook-prod on
+-- 2026-11-09: score 1,872 rows, tag_score 697, rubric_score 3,964,
+-- rubric_check_score 500, dibels_score 0).
 --
 --   select (select count(*) from score x join enrollment e on e.id = x.enrollment_id
 --             join assessment a on a.id = x.assessment_id where a.course_id <> e.course_id)
@@ -81,8 +83,40 @@
 --             join rubric r on r.id = c.rubric_id
 --            where r.course_id <> e.course_id) as checkboxes_from_another_class;
 --
--- Can be run again: every statement replaces what it made. Apply in one
--- transaction.
+-- Can be run again: every statement replaces what it made.
+--
+-- One transaction: the file opens with begin and ends with commit, as
+-- 20261027_score_comments.sql and 20261031_score_report_note.sql do, so it
+-- is all or nothing whether it is pasted into the SQL editor or sent through
+-- apply_migration. Every check that can stop it runs first, before anything
+-- is created or changed.
+begin;
+
+-- Give up after five seconds rather than queue behind a long transaction and
+-- hold every teacher's saves up behind this one. If it gives up, nothing is
+-- applied: run the file again.
+set local lock_timeout = '5s';
+
+do $guard$
+declare
+    _n bigint;
+begin
+    select (select count(*) from public.score x join public.enrollment e on e.id = x.enrollment_id
+              join public.assessment a on a.id = x.assessment_id where a.course_id <> e.course_id)
+         + (select count(*) from public.tag_score x join public.enrollment e on e.id = x.enrollment_id
+              join public.assessment a on a.id = x.assessment_id where a.course_id <> e.course_id)
+         + (select count(*) from public.rubric_score x join public.enrollment e on e.id = x.enrollment_id
+              join public.assessment a on a.id = x.assessment_id where a.course_id <> e.course_id)
+         + (select count(*) from public.rubric_check_score x join public.enrollment e on e.id = x.enrollment_id
+              join public.assessment a on a.id = x.assessment_id where a.course_id <> e.course_id)
+         + (select count(*) from public.dibels_score x join public.enrollment e on e.id = x.enrollment_id
+              join public.assessment a on a.id = x.assessment_id where a.course_id <> e.course_id)
+      into _n;
+    if _n > 0 then
+        raise exception '% score rows name an assessment in another class than their student''s; the new policies would hide them from their teacher. Nothing was changed.', _n;
+    end if;
+end
+$guard$;
 
 -- ── The helpers, in the style of fv_owns_enrollment ─────────────────────────
 -- pg_temp is named last in each search_path, so a temporary table called
@@ -198,3 +232,5 @@ create policy rubric_check_score_same_class on public.rubric_check_score
     with check (public.fv_owns_rubric_check_cell(enrollment_id, assessment_id, check_id));
 
 notify pgrst, 'reload schema';
+
+commit;

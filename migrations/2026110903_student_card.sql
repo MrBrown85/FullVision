@@ -81,8 +81,63 @@
 --    Errors: PT401 not signed in; P0002 class or card not found (or not the
 --    caller's); 22023 a card already stopped.
 --
+-- 4. A new slip avoids every live card's code (Colin, Nov 9: "check slips
+--    too"), as a new card avoids every live slip's. _issue_access_code and
+--    _issue_report_code are patched in place, one line each: the draw also
+--    goes again when the code is a live card's. The file stops, with nothing
+--    changed, if either is not the body in the repo
+--    (20261025_student_submit.sql, 20261025_phone_reports.sql).
+--
+-- Who else changes an enrollment: clear_data deletes the caller's classes and
+-- students, and relink_student deletes a duplicate enrollment; the cards of
+-- a deleted enrollment go with it. When relink_student moves an enrollment
+-- to the real student record the enrollment keeps its id and its card, and
+-- "Is This You?" then asks for that record's birthday or student number;
+-- the card's own password still works.
+--
+-- Functions this file leaves callable by signed-in teachers through the API:
+-- issue_student_cards, list_student_cards, mark_student_cards_printed,
+-- unlock_student_card, unlock_all_student_cards, reissue_student_card and
+-- set_cards_work_until.
+--
 -- No existing row changes. Every class gets cards_work_until = null. The
--- file can be run again. Apply in one transaction.
+-- file can be run again.
+--
+-- One transaction: the file opens with begin and ends with commit, as
+-- 20261027_score_comments.sql and 20261031_score_report_note.sql do, so it
+-- is all or nothing whether it is pasted into the SQL editor or sent through
+-- apply_migration. Every check that can stop it runs first, before anything
+-- is created or changed.
+begin;
+
+-- Give up after five seconds rather than queue behind a long transaction and
+-- hold every teacher's saves up behind this one. If it gives up, nothing is
+-- applied: run the file again.
+set local lock_timeout = '5s';
+
+do $guard$
+declare
+    _f   record;
+    _def text;
+begin
+    -- The two functions that draw slip codes must be the bodies in the repo
+    -- (md5 of pg_get_functiondef), or already carry the patch (a second run).
+    for _f in
+        select * from (values
+            ('public._issue_access_code(uuid,uuid,timestamptz)', '1c4eab088284f90c919d07ba35ffc14d'),
+            ('public._issue_report_code(uuid,uuid,timestamptz)', '020cb811d2214dd5866cc2cf4ab705eb')
+        ) as v(fn, was)
+    loop
+        _def := pg_get_functiondef(_f.fn::regprocedure);
+        if position('live student card' in _def) = 0 and md5(_def) <> _f.was then
+            raise exception '% is not the definition this migration was written against (md5 %, expected %). Nothing was changed.',
+                _f.fn, md5(_def), _f.was;
+        end if;
+    end loop;
+    perform 'public._new_access_code()'::regprocedure, 'public._access_code_hash(text,text)'::regprocedure,
+            'public._slip_password(uuid)'::regprocedure, 'public.fv_owns_course(uuid)'::regprocedure;
+end
+$guard$;
 
 alter table public.course add column if not exists cards_work_until date;
 comment on column public.course.cards_work_until is
@@ -247,6 +302,38 @@ begin
 end;
 $function$;
 revoke all on function public._issue_student_card(uuid) from public, anon, authenticated;
+
+-- ── A new slip avoids live card codes ───────────────────────────────────────
+do $patch$
+declare
+    _f   record;
+    _def text;
+    _old constant text := $s$        continue when exists (
+            select 1 from student_access_code
+             where revoked_at is null and expires_at > now()
+               and code_hash = _access_code_hash(_code, salt));$s$;
+    _new constant text := $s$        continue when exists (
+            select 1 from student_access_code
+             where revoked_at is null and expires_at > now()
+               and code_hash = _access_code_hash(_code, salt))
+            -- nor the code of a live student card (2026110903_student_card)
+            or exists (select 1 from student_card where stopped_at is null and code = _code);$s$;
+begin
+    for _f in
+        select * from (values
+            ('public._issue_access_code(uuid,uuid,timestamptz)'),
+            ('public._issue_report_code(uuid,uuid,timestamptz)')
+        ) as v(fn)
+    loop
+        _def := pg_get_functiondef(_f.fn::regprocedure);
+        continue when position('live student card' in _def) > 0;  -- a second run
+        if (length(_def) - length(replace(_def, _old, ''))) / length(_old) <> 1 then
+            raise exception '% does not hold the draw this migration patches', _f.fn;
+        end if;
+        execute replace(_def, _old, _new);
+    end loop;
+end
+$patch$;
 
 -- ── The teacher's RPCs ──────────────────────────────────────────────────────
 create or replace function public.list_student_cards(p_course_id uuid)
@@ -452,3 +539,5 @@ grant execute on function public.reissue_student_card(uuid, uuid) to authenticat
 grant execute on function public.set_cards_work_until(uuid, date, uuid) to authenticated, service_role;
 
 notify pgrst, 'reload schema';
+
+commit;

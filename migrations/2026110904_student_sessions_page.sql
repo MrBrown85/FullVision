@@ -123,14 +123,22 @@
 --   rubric_check_score or grade_return's copies
 --   (migrations/local-test/student_page.py fails if one does).
 --   -> { status, returned_at, updated_at, seen_at, grade, previous }
---   A competency that is no longer on the class (its section was removed)
---   is left out of grade and previous, as page leaves it out of tag_ids:
---   the student is not shown a level for a competency the class no longer
---   has. If that leaves nothing, grade is null and returned_at still says
---   the piece came back.
+--   grade and previous hold only the part of the copy the work's scoring
+--   uses now (public._grade_copy_in_use, 2026110902 3b): the criteria and
+--   ticks of the rubric it has, or its points or mark, or the levels of the
+--   competencies it is linked to that are still on the class, or its
+--   Overall level; and always the Overall Comment. A level for a competency
+--   since removed from the class, or left from a rubric the work no longer
+--   uses, is not sent. If that leaves nothing, grade is null and
+--   returned_at still says the piece came back.
 --   grade is null for a grade never returned, grade_return.returned_copy
 --   while a draft sits on a returned grade, and the working copy otherwise.
---   status comes straight from score.status. The Note for the Report
+--   status comes straight from score.status. Missing and Excused win at
+--   once (Colin, Nov 9: "Missing wins at once"): while a piece is marked
+--   Missing or Excused, grade and previous are null, though returned_copy
+--   may still hold an old grade and returned_at still says when it came
+--   back. Take the mark off before any Return and the returned grade is
+--   sent again. Late hides nothing. The Note for the Report
 --   (score.report_note) is never in it.
 --
 -- `add-card` and `done` belong to slice S3 and `seen` to S4; the session
@@ -138,8 +146,34 @@
 -- no migration for them. Opening a questionnaire or a phone report from the
 -- card's session (S4-F4) is NOT here.
 --
--- No existing row changes. The file can be run again. Apply in one
--- transaction, after 2026110902 and 2026110903.
+-- Functions this file leaves callable through the API: none. Every function
+-- here is for service_role, over the edge function's own connection.
+--
+-- No existing row changes. The file can be run again. Apply after 2026110902
+-- and 2026110903; its first step stops it otherwise.
+--
+-- One transaction: the file opens with begin and ends with commit, as
+-- 20261027_score_comments.sql and 20261031_score_report_note.sql do, so it
+-- is all or nothing whether it is pasted into the SQL editor or sent through
+-- apply_migration. Every check that can stop it runs first, before anything
+-- is created or changed.
+begin;
+
+-- Give up after five seconds rather than queue behind a long transaction and
+-- hold every teacher's saves up behind this one. If it gives up, nothing is
+-- applied: run the file again.
+set local lock_timeout = '5s';
+
+do $guard$
+begin
+    if to_regclass('public.grade_return') is null or to_regclass('public.student_card') is null
+       or to_regclass('student_submit.attempt') is null then
+        raise exception 'apply 2026110902_grade_return.sql and 2026110903_student_card.sql first. Nothing was changed.';
+    end if;
+    perform 'public._grade_copy_in_use(jsonb,uuid)'::regprocedure, 'public._fv_timezone(text)'::regprocedure,
+            'student_submit._log(text,text,text,uuid,uuid)'::regprocedure, 'student_submit._norm(text)'::regprocedure;
+end
+$guard$;
 
 -- ── Tables ──────────────────────────────────────────────────────────────────
 create table if not exists student_submit.device_session (
@@ -169,26 +203,6 @@ alter table student_submit.attempt add constraint attempt_route_check
     check (route = any (array['open'::text, 'submit'::text, 'card'::text]));
 
 -- ── The one reader ──────────────────────────────────────────────────────────
--- A copy without the competencies that are no longer on the assessment's
--- class: a removed section's, or one from another class.
-create or replace function student_submit._on_class(p_copy jsonb, p_assessment_id uuid)
- returns jsonb
- language sql
- stable
- security definer
- set search_path to 'public', 'student_submit', 'pg_temp'
-as $function$
-    select case when p_copy is null then null else public._grade_copy_of(
-        (p_copy->>'value')::numeric, (p_copy->>'modifier')::int, p_copy->>'comment',
-        (select coalesce(jsonb_object_agg(e.key, e.value), '{}'::jsonb)
-           from jsonb_each(coalesce(p_copy->'tags', '{}'::jsonb)) e
-          where exists (select 1 from tag t
-                          join section s on s.id = t.section_id
-                          join assessment a on a.course_id = s.course_id
-                         where t.id::text = e.key and a.id = p_assessment_id and s.removed_at is null)),
-        p_copy->'criteria', p_copy->'checks') end;
-$function$;
-
 create or replace function student_submit._returned_grade(p_enrollment_id uuid, p_assessment_id uuid)
  returns jsonb
  language sql
@@ -197,16 +211,22 @@ create or replace function student_submit._returned_grade(p_enrollment_id uuid, 
  set search_path to 'public', 'student_submit', 'pg_temp'
 as $function$
     select jsonb_build_object(
-               'status', (select s.status from score s
-                           where s.enrollment_id = p_enrollment_id and s.assessment_id = p_assessment_id),
+               'status', s.status,
                'returned_at', g.returned_at,
                'updated_at', g.updated_at,
                'seen_at', g.seen_at,
-               'grade', _on_class(case when g.returned_at is null then null
-                                       when g.is_draft then g.returned_copy
-                                       else public._grade_copy(p_enrollment_id, p_assessment_id) end, p_assessment_id),
-               'previous', _on_class(case when g.returned_at is not null then g.previous_copy end, p_assessment_id))
+               -- Missing and Excused win at once: no result is sent while
+               -- either is on the piece, whatever was returned before.
+               -- Otherwise only the part the work's scoring uses now, so the
+               -- student page never sees a row the teacher's screens hide.
+               'grade', case when s.status in ('NS', 'EXC') then null else public._grade_copy_in_use(
+                            case when g.returned_at is null then null
+                                 when g.is_draft then g.returned_copy
+                                 else public._grade_copy(p_enrollment_id, p_assessment_id) end, p_assessment_id) end,
+               'previous', case when s.status in ('NS', 'EXC') then null else public._grade_copy_in_use(
+                            case when g.returned_at is not null then g.previous_copy end, p_assessment_id) end)
       from (select 1) one
+      left join score s on s.enrollment_id = p_enrollment_id and s.assessment_id = p_assessment_id
       left join grade_return g on g.enrollment_id = p_enrollment_id and g.assessment_id = p_assessment_id;
 $function$;
 
@@ -630,7 +650,6 @@ end;
 $function$;
 
 -- Service role only, as open and submit are.
-revoke all on function student_submit._on_class(jsonb, uuid) from public, anon, authenticated;
 revoke all on function student_submit._returned_grade(uuid, uuid) from public, anon, authenticated;
 revoke all on function student_submit._midnight(text) from public, anon, authenticated;
 revoke all on function student_submit._device_session(text) from public, anon, authenticated;
@@ -648,3 +667,5 @@ grant execute on function student_submit.verify_card(text, text, text, text, tex
 grant execute on function student_submit.page(text, uuid, text) to service_role;
 grant execute on function student_submit.seen(text, uuid, uuid[], text) to service_role;
 grant execute on function student_submit.done(text, text) to service_role;
+
+commit;
