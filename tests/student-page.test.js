@@ -13,7 +13,9 @@ import { parseHTML } from 'linkedom';
 
 const ROOT = resolve(__dirname, '..');
 // tests/setup.js (the global setup file) has loaded shared/questionnaire-templates.js.
-runInThisContext(readFileSync(resolve(ROOT, 's/student.js'), 'utf8'));
+['s/student.js', 's/questionnaire.js', 's/report.js'].forEach(f =>
+  runInThisContext(readFileSync(resolve(ROOT, f), 'utf8')),
+);
 // shared/phone-report-view.js is loaded by tests/setup.js too.
 const T = globalThis.StudentPage._test;
 
