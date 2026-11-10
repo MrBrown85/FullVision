@@ -6122,11 +6122,19 @@ window.DashClassManager = (function () {
     var st = _cmCatState(cid);
     var discard = st.notice && (st.notice.kind === 'offline' || st.notice.kind === 'kept');
     if (typeof saveCategoryDraft === 'function') saveCategoryDraft(cid, null);
-    if (discard) delete _cmCategoryState[cid];
-    else {
-      st.notice = null;
-      st.typed = null;
+    if (discard) {
+      // Back to the list the changes were made over: the server's, as this
+      // form last had it. The next save checks it again in any case.
+      st.rows = _cmCatRowsFrom(st.opened || []).sort(function (a, b) {
+        return a.display_order - b.display_order;
+      });
+      st.dirty = false;
+      st.keeping = false;
+      st.moving = null;
+      st.tried = null;
     }
+    st.notice = null;
+    st.typed = null;
     renderClassManager();
   }
 
