@@ -17,6 +17,7 @@ import { makeHandler } from '../supabase/functions/student-submit/handler.ts';
 import { CARD_ROUTES } from '../supabase/functions/student-submit/card-routes.ts';
 
 const CODE = 'P3R-8WD';
+const SLIP = 'K7M-4QX'; // a live questionnaire slip's code, typed where a card goes
 const SESSION = 'a'.repeat(64); // this phone, signed in to Cece's Science 8
 const OTHER_DEVICE = 'b'.repeat(64); // another phone, signed in to another student
 const ENDED = 'c'.repeat(64); // a session that ended on Done or at midnight
@@ -174,14 +175,20 @@ function setup(answers, overrides) {
   const sql = Object.assign(
     {
       card: code => (code === CODE ? clone(CARD_OK) : { ok: false, error: 'not_found' }),
-      verify_card(code, birthday, number, password, session) {
+      // `add` is p_add, read from the statement: it is not a parameter.
+      verify_card(code, birthday, number, password, session, hash, add) {
         if (code !== CODE) return { ok: false, error: 'not_found' };
         if (birthday !== '2012-05-15' && number !== '0123456' && password !== '4821') {
           return { ok: false, error: 'wrong_identity', tries_left: 4 };
         }
+        // From the start screen: whoever was signed in on the device is signed out.
+        if (sessions[session] && !add) delete sessions[session];
+        const joined = !!sessions[session];
+        const token = joined ? session : NEW_SESSION;
+        sessions[token] = [...new Set([...(sessions[token] || []), CECE])];
         return {
           ok: true,
-          session_token: sessions[session] ? null : NEW_SESSION,
+          session_token: joined ? null : NEW_SESSION,
           expires_at: EXPIRES,
           enrollment_id: CECE,
           classes: clone(CLASSES),
@@ -217,7 +224,8 @@ function setup(answers, overrides) {
           async call(text, params) {
             calls.push({ sql: text, params });
             const fn = /^select student_submit\.(\w+)\(/.exec(text)[1];
-            return sql[fn](...params);
+            const add = /, p_add => (true|false)\) as r$/.exec(text);
+            return sql[fn](...params, add ? add[1] === 'true' : undefined);
           },
         },
       },
@@ -247,6 +255,9 @@ const GOOD = {
   seen: { route: 'seen', session: SESSION, enrollment_id: CECE, assessment_ids: [QUIZ, LAB] },
   done: { route: 'done', session: SESSION },
 };
+// The card's identity check: one statement for the start screen, one for Add Another Card.
+const VERIFY = CARD_ROUTES.verify.sql;
+const ADD_CARD = CARD_ROUTES['add-card'].sql;
 // The one student_submit function each route calls.
 const FUNCTION = {
   card: 'card',
@@ -292,7 +303,24 @@ describe('student-submit: the card route', () => {
     expect(await res.json()).toEqual(CARD_OK);
   });
 
-  it.each(['not_found', 'closed', 'card_locked', 'card_expired', 'reprint', 'locked', 'busy'])(
+  it("answers a slip's code as not_found, like any guess, and says nothing about slips", async () => {
+    const { handle, calls, logs, slip } = setup();
+    const guess = await (await handle(post({ route: 'card', code: 'ZZZ-ZZZ' }))).json();
+    const res = await handle(post({ route: 'card', code: SLIP }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(guess);
+    expect(guess).toEqual({ ok: false, error: 'not_found' });
+    expect(logs.map(l => l.outcome)).toEqual(['not_found', 'not_found']);
+    // The function does not try open itself: one statement each, and open is the page's next request.
+    expect(calls).toHaveLength(2);
+    expect(slip).toEqual([]);
+
+    // Whatever else the database put beside the refusal stays behind.
+    const dirty = setup({ card: () => ({ ok: false, error: 'not_found', kind: 'slip', questionnaire_id: QUIZ }) });
+    expect(await (await dirty.handle(post({ route: 'card', code: SLIP }))).json()).toEqual(guess);
+  });
+
+  it.each(['not_found', 'closed', 'card_locked', 'card_expired', 'reprint', 'locked'])(
     'answers %s as the database said it, with nothing else',
     async error => {
       const { handle, logs } = setup({ card: () => ({ ok: false, error, card_id: CHECK, course_id: RUBRIC }) });
@@ -318,7 +346,14 @@ describe('student-submit: the card route', () => {
   });
 
   it('answers a code it does not know as not_found, and logs it as that', async () => {
-    for (const error of ['card_stopped', 'no_identity', 'ambiguous', 'relation "student_card" does not exist']) {
+    // busy is a slip's: there is no everyone-is-busy stop on a card's routes.
+    for (const error of [
+      'busy',
+      'card_stopped',
+      'no_identity',
+      'ambiguous',
+      'relation "student_card" does not exist',
+    ]) {
       const { handle, logs } = setup({ card: () => ({ ok: false, error }) });
       const res = await handle(post(GOOD.card));
       expect(res.status, error).toBe(200);
@@ -355,11 +390,7 @@ describe('student-submit: verify for a card', () => {
     res = await handle(post({ route: 'verify', code: CODE, password: '4821', session: null }));
     expect(await res.json()).toEqual(ok);
 
-    for (const c of calls) {
-      expect(c.sql).toBe(
-        'select student_submit.verify_card($1::text, $2::text, $3::text, $4::text, $5::text, $6::text) as r',
-      );
-    }
+    for (const c of calls) expect(c.sql).toBe(VERIFY);
     expect(calls.map(c => c.params)).toEqual([
       [CODE, '2012-05-15', null, null, null, hash],
       [CODE, null, '0123456', null, null, hash],
@@ -369,17 +400,50 @@ describe('student-submit: verify for a card', () => {
     expect(slip).toEqual([]);
   });
 
-  it('sends the session the device already has, and passes on that it is still good', async () => {
+  it('from the start screen always starts a new session, and ends the one the device sent', async () => {
     const { handle, calls } = setup();
-    const res = await handle(post({ route: 'verify', code: CODE, birthday: '2012-05-15', session: SESSION }));
+    // A shared Chromebook: Omar is still signed in when Cece scans her card.
+    const res = await handle(post({ route: 'verify', code: CODE, birthday: '2012-05-15', session: OTHER_DEVICE }));
     expect(await res.json()).toEqual({
       ok: true,
-      session_token: null,
+      session_token: NEW_SESSION,
       expires_at: EXPIRES,
       enrollment_id: CECE,
       classes: CLASSES,
     });
-    expect(calls[0].params[4]).toBe(SESSION);
+    expect(calls[0].sql).toBe(VERIFY);
+    // The token is sent, so the database can end that session.
+    expect(calls[0].params[4]).toBe(OTHER_DEVICE);
+    const old = await handle(post({ route: 'page', session: OTHER_DEVICE, enrollment_id: OMAR }));
+    expect(await old.json()).toEqual({ ok: false, error: 'signed_out' });
+    const fresh = await handle(post({ route: 'page', session: NEW_SESSION, enrollment_id: CECE }));
+    expect((await fresh.json()).ok).toBe(true);
+    // Omar's class did not come along.
+    const omar = await handle(post({ route: 'page', session: NEW_SESSION, enrollment_id: OMAR }));
+    expect(await omar.json()).toEqual({ ok: false, error: 'not_found' });
+  });
+
+  it('cannot be turned into an add by anything in the request', async () => {
+    for (const extra of [
+      { add: true },
+      { p_add: true },
+      { p_add: 'true', add: 'true', join: true },
+      { route: 'verify', mode: 'add-card' },
+      { session: SESSION, student_number: 'p_add => true' },
+      { session: SESSION, password: 'true) as r' },
+    ]) {
+      const { handle, calls } = setup();
+      const body = { route: 'verify', code: CODE, birthday: '2012-05-15', session: SESSION, ...extra };
+      const res = await handle(post(body));
+      // A new session, never the one sent.
+      expect((await res.json()).session_token, JSON.stringify(extra)).toBe(NEW_SESSION);
+      expect(calls).toHaveLength(1);
+      expect(calls[0].sql).toBe(VERIFY);
+      expect(calls[0].sql).toMatch(/, p_add => false\) as r$/);
+      // Six parameters: the code, what was typed, the token and the hashed address. p_add is not one.
+      expect(calls[0].params).toHaveLength(6);
+      expect(calls[0].params).not.toContain(true);
+    }
   });
 
   it('gives the phone the named fields only', async () => {
@@ -435,7 +499,19 @@ describe('student-submit: verify for a card', () => {
     ]);
   });
 
-  it.each(['not_found', 'closed', 'card_locked', 'card_expired', 'reprint', 'locked', 'busy'])(
+  it('passes on the tries left as the database counts them, by whichever lock is nearer', async () => {
+    // Fourteen wrong tries this week already: the slow lock is one try away, on a card with none in a row.
+    const replies = [
+      { ok: false, error: 'wrong_identity', tries_left: 1, wrong_tries: 1, wrong_tries_7d: 14 },
+      { ok: false, error: 'card_locked', wrong_tries_7d: 15 },
+    ];
+    const { handle } = setup({ verify_card: () => replies.shift() });
+    const wrong = { route: 'verify', code: CODE, birthday: '2012-05-16' };
+    expect(await (await handle(post(wrong))).json()).toEqual({ ok: false, error: 'wrong_identity', tries_left: 1 });
+    expect(await (await handle(post(wrong))).json()).toEqual({ ok: false, error: 'card_locked' });
+  });
+
+  it.each(['not_found', 'closed', 'card_locked', 'card_expired', 'reprint', 'locked'])(
     'answers %s as the database said it, with nothing else',
     async error => {
       const { handle } = setup({ verify_card: () => ({ ok: false, error, tries_left: 2, card_id: CHECK }) });
@@ -446,8 +522,23 @@ describe('student-submit: verify for a card', () => {
   );
 
   it('answers a code it does not know as not_found', async () => {
-    const { handle } = setup({ verify_card: () => ({ ok: false, error: 'card_stopped' }) });
-    expect(await (await handle(post(GOOD.verify))).json()).toEqual({ ok: false, error: 'not_found' });
+    for (const error of ['card_stopped', 'busy', 'slip']) {
+      const { handle } = setup({ verify_card: () => ({ ok: false, error }) });
+      expect(await (await handle(post(GOOD.verify))).json(), error).toEqual({ ok: false, error: 'not_found' });
+    }
+  });
+
+  it("answers a slip's code as not_found: only a card is verified here", async () => {
+    const { handle } = setup();
+    const res = await handle(post({ route: 'verify', code: SLIP, birthday: '2012-05-15' }));
+    expect(await res.json()).toEqual({ ok: false, error: 'not_found' });
+  });
+
+  it("still passes busy on from a slip's open", async () => {
+    const { handle } = setup(null, { db: { open: async () => ({ ok: false, error: 'busy' }) } });
+    const res = await handle(post({ route: 'open', code: SLIP }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: false, error: 'busy' });
   });
 
   it('refuses a verify with nothing to check, or a field of the wrong shape', async () => {
@@ -491,9 +582,10 @@ describe('student-submit: verify for a card', () => {
 });
 
 describe('student-submit: add-card', () => {
-  it('runs the same check for a device that is signed in', async () => {
+  it('runs the same check and joins the session the device has', async () => {
     const { handle, calls } = setup();
-    const res = await handle(post(GOOD['add-card']));
+    // Omar's phone adds Cece's card: both classes are then in his session.
+    const res = await handle(post({ ...GOOD['add-card'], session: OTHER_DEVICE }));
     expect(await res.json()).toEqual({
       ok: true,
       session_token: null,
@@ -501,8 +593,35 @@ describe('student-submit: add-card', () => {
       enrollment_id: CECE,
       classes: CLASSES,
     });
-    expect(calls[0].sql).toMatch(/^select student_submit\.verify_card\(/);
-    expect(calls[0].params.slice(0, 5)).toEqual([CODE, null, '0123456', null, SESSION]);
+    expect(calls[0].sql).toBe(ADD_CARD);
+    expect(calls[0].sql).toMatch(/, p_add => true\) as r$/);
+    expect(calls[0].params).toEqual([
+      CODE,
+      null,
+      '0123456',
+      null,
+      OTHER_DEVICE,
+      expect.stringMatching(/^[0-9a-f]{64}$/),
+    ]);
+    for (const enrollment_id of [OMAR, CECE]) {
+      const page = await handle(post({ route: 'page', session: OTHER_DEVICE, enrollment_id }));
+      expect((await page.json()).ok, enrollment_id).toBe(true);
+    }
+  });
+
+  it('differs from verify only in p_add, which neither takes from the request', () => {
+    expect(VERIFY).toBe(
+      'select student_submit.verify_card($1::text, $2::text, $3::text, $4::text, $5::text, $6::text, p_add => false) as r',
+    );
+    expect(ADD_CARD).toBe(VERIFY.replace('p_add => false', 'p_add => true'));
+    expect(CARD_ROUTES.verify.sql).toBe(VERIFY);
+    expect(CARD_ROUTES['add-card'].sql).toBe(ADD_CARD);
+  });
+
+  it('starts a new session when the one sent is no longer live, as the database says', async () => {
+    const { handle } = setup();
+    const res = await handle(post({ ...GOOD['add-card'], session: ENDED }));
+    expect((await res.json()).session_token).toBe(NEW_SESSION);
   });
 
   it('needs the session', async () => {
@@ -653,6 +772,36 @@ describe('student-submit: the page route', () => {
     expect(page.assessments[2]).toMatchObject({ returned_at: null, grade: null, previous: null, status: 'NS' });
   });
 
+  it('hands on a Missing or Excused piece with no grade, though it was returned', async () => {
+    const sent = clone(PAGE_OK);
+    // Missing wins at once: the database sends no grade while the mark is on, and still says when it came back.
+    Object.assign(sent.assessments[0], { status: 'NS', grade: null, previous: null });
+    Object.assign(sent.assessments[1], { status: 'EXC', grade: null, previous: null });
+    const { handle } = setup({ page: () => clone(sent) });
+    const page = await (await handle(post(GOOD.page))).json();
+    expect(page).toEqual(sent);
+    expect(page.assessments[0]).toMatchObject({ status: 'NS', returned_at: '2026-11-03T20:15:00+00:00', grade: null });
+    expect(page.assessments[1]).toMatchObject({ status: 'EXC', returned_at: '2026-11-05T18:00:00+00:00', grade: null });
+  });
+
+  it('hands on only the competencies and criteria the database sent, and adds none back', async () => {
+    const OLD_TAG = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'; // removed from the class since the return
+    const sent = clone(PAGE_OK);
+    const lab = sent.assessments[1];
+    // The database left the removed competency out of tags, tag_ids and the copies.
+    lab.grade.criteria = {};
+    lab.grade.checks = [];
+    lab.previous.tags = {};
+    // A returned piece with nothing left in use: no grade, and the return date stays.
+    Object.assign(sent.assessments[0], { grade: null });
+    const { handle } = setup({ page: () => clone(sent) });
+    const page = await (await handle(post(GOOD.page))).json();
+    expect(page).toEqual(sent);
+    expect(JSON.stringify(page)).not.toContain(OLD_TAG);
+    expect(page.assessments[0]).toMatchObject({ returned_at: '2026-11-03T20:15:00+00:00', grade: null });
+    expect(page.assessments[1].grade).toEqual({ ...LAB_GRADE, criteria: {}, checks: [] });
+  });
+
   it('answers an empty class with an empty page', async () => {
     const { handle } = setup({ page: () => ({ ok: true, v: 1, expires_at: EXPIRES, tags: {}, rubrics: [] }) });
     const page = await (await handle(post(GOOD.page))).json();
@@ -744,7 +893,9 @@ describe('student-submit: every card route', () => {
     expect(text).toBe(CARD_ROUTES[route].sql);
     // One statement, one function, and only placeholders inside it.
     expect(text).toMatch(
-      new RegExp(`^select student_submit\\.${FUNCTION[route]}\\((\\$\\d::(text|uuid|uuid\\[\\])(, )?)+\\) as r$`),
+      new RegExp(
+        `^select student_submit\\.${FUNCTION[route]}\\((\\$\\d::(text|uuid|uuid\\[\\])(, )?)+(p_add => (true|false))?\\) as r$`,
+      ),
     );
     expect(text.match(/student_submit\./g)).toHaveLength(1);
     expect(text).not.toMatch(/;|--|\bfrom\b|\bpublic\b/i);

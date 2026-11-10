@@ -251,9 +251,9 @@ Context: the first night of the build ([`plans/student-page-build-plan.md`](plan
 
 **Cards and sign-in**
 
-1. **Five wrong tries in a row lock a card; a right answer resets the count.** A student does the identity check every morning, so a lifetime count would lock cards over a semester of typos. Class Settings gets Unlock All. Changes Student cards 2's "same wrong-try locks" for cards; slips keep theirs.
+1. **Five wrong tries in a row lock a card; a right answer resets the count.** A student does the identity check every morning, so a lifetime count would lock cards over a semester of typos. A card also locks after 15 wrong tries in any 7 days, whatever right answers come between, so someone holding a real code cannot guess four birthdays a day unseen. Class Settings gets Unlock All. Changes Student cards 2's "same wrong-try locks" for cards; slips keep theirs.
 2. **A card scanned from the start screen starts fresh.** It signs the last student out and starts a new session. A card joins a session only through Add Another Card (Switching Classes), so two students on one Chromebook never share a session.
-3. **Cards have a per-address guessing limit only.** The everyone-is-busy stop (500 wrong codes in ten minutes) is not used for cards: one person could shut sign-in for every class. Slips keep their rule.
+3. **Cards have a per-address guessing limit only: 300 wrong codes in 15 minutes.** A school shares one public address, and one class's typos could reach the old 60. The everyone-is-busy stop (500 wrong codes in ten minutes) is not used for cards: one person could shut sign-in for every class. Slips keep that stop, and their per-address limit also becomes 300, because a mistyped card code is tried as a slip and counts there too.
 4. **A card that won't open says why** (locked, past its date, the class's Student Page is off, needs reprinting), as slips do.
 5. **A new slip avoids every live card code,** as a new card avoids every live slip code.
 6. **With no reporting dates, a card lasts until June 30** of the school year it was made in, fixed on the card at printing. Cards Work Until still overrides. Adds to Grades, photos and sign-in 9.
@@ -267,7 +267,7 @@ Context: the first night of the build ([`plans/student-page-build-plan.md`](plan
 11. **A Note for the Report prints only once that piece's grade has been returned.** A note alone never makes a draft.
 12. **Duplicate Class copies the original's Return Grades choice;** the copy's Student Page starts off.
 13. **Missing wins at once.** Once a piece is marked Missing, a grade returned earlier for it stops counting and stops showing everywhere straight away, with no Return: the course grade and the competency levels agree, and the student sees Missing with no result. Adds to Student page build answers 4. This changes what `calc.js` counts from returned grades and gets Colin's review in the PR that builds it.
-14. **Section overrides count at once** on every screen, as today. A hand-set section level has no Draft or Returned state.
+14. **Section overrides count at once** on every screen. A hand-set section level has no Draft or Returned state, and it applies whether or not the section has scored work under it: a report shows it even when every piece in the section is still a draft. Before this a hand-set level on a section with no scored work was stored and showed a dash. It counts in the folder and the overall proficiency; the course %, letter and category grades come from the work and do not move (PR 974).
 15. **DIBELS numbers show at once.** A benchmark is a reading record, not a grade that is returned.
 16. **An assessment with no assigned date shows on the student's list as soon as it exists.**
 
@@ -275,6 +275,8 @@ Context: the first night of the build ([`plans/student-page-build-plan.md`](plan
 
 17. **Nothing is handed in until every page is up.** One Page Didn't Send offers Try Again or Remove the Page; the teacher never opens a submission with a page missing.
 18. **A PDF can have 20 pages at most.** A longer one is refused with a plain line. Adds to Student page build answers 2.
+
+**The server checks wait for the client.** The plan had the first migration batch make two client-only rules server rules: refuse a rubric level for a criterion that is not on the work's rubric, and refuse Missing on scored work. The reviews found cases where the app teachers already have sends exactly those writes (a level that arrives before its rubric change; Missing on a cell whose score the screen hides), and a refused write becomes a dead letter. Both checks are out of the batch until the client is changed first. The batch changes no existing score function.
 
 Still open: the blurry-photo threshold, which needs real classroom photos; and the privacy page's wording, which must change before cards go live (codes are no longer stored only as hashes or used once; students can read returned grades; FullVision records when a student opened a piece of feedback).
 

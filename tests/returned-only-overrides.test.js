@@ -1,27 +1,25 @@
 /**
- * Section overrides in returned-only grades (S0-F1b).
+ * Section overrides in returned-only grades (S0-F1b, changed by S0-F1c).
  *
- * Colin's ruling (DECISIONS, "Student page build rulings" 14): a section
- * level set by hand counts at once on every screen, as today; it has no
- * Draft or Returned state.
+ * Colin's rulings: a section level set by hand counts at once on every
+ * screen and has no Draft or Returned state (DECISIONS, "Student page build
+ * rulings" 14); and it shows even when no piece under it has a score
+ * ("Show the hand-set level now", his answer to S0-F1b's question,
+ * 2026-11-09).
  *
- * "As today" has one edge, and this file pins it. In shared/calc.js an
- * override replaces a section's calculated level; it is only looked at once
- * the section has a calculated level to replace (getSectionProficiency
- * returns 0 before it reads the override when no competency in the section
- * has scored evidence). That is true in all work today: a section with no
- * scored work shows nothing, whatever was set by hand. Returned-only follows
- * the same rule on the evidence it has, so when every piece in a section is
- * a draft never returned, the override does not show there, while the
- * teacher's view (which has the drafts as evidence) shows it.
- *
- * QUESTION FOR COLIN (S0-F1b's PR): Jordan's section has two pieces, both
- * drafts, and you set the section to Extending by hand. Should a report show
- * Extending now, or nothing until one piece is returned? As built: nothing
- * until one is returned. If the answer is "Extending now", the change is in
- * getSectionProficiency (read the override first), it also changes all work
- * for a section with no scored evidence, and the two tests marked PINNED
- * below change with it.
+ * S0-F1b pinned the behaviour before that answer: an override was only read
+ * once its section had a calculated level to replace, so when every piece
+ * in a section was a draft never returned, returned-only showed nothing
+ * while the teacher's view showed the override. S0-F1c changed
+ * getSectionProficiency to read the override first. The two tests marked
+ * CHANGED below are the ones that pinned the old answer:
+ *   - both pieces drafts: returned-only showed a dash and an overall of 3.0;
+ *     it now shows Extending and 3.1, as the teacher's view does;
+ *   - both scores cleared, all work: the section showed a dash and the
+ *     overall was 3.0 (rounded from 3.0203); it now shows Extending and the
+ *     overall counts it.
+ * The rule itself, in all work, is tested in
+ * tests/section-override-without-evidence.test.js.
  *
  * On the Demo class (Science 8). Jordan Kim's Sustained Inquiry competency
  * (section QP1) has two pieces of evidence: the Plate Tectonics Quiz and
@@ -81,6 +79,7 @@ describe('a section level set by hand, in returned-only grades', () => {
 
   const section = () => getSectionProficiency(cid, jordan, SECTION);
   const overall = () => getOverallProficiency(cid, jordan);
+  const summary = () => studentGradeSummary(cid, jordan).text;
   const setByHand = () => {
     setSectionOverride(cid, jordan, SECTION, EXTENDING, 'Conference on Nov 6');
     clearProfCache();
@@ -94,7 +93,7 @@ describe('a section level set by hand, in returned-only grades', () => {
     expect(section()).toBe(3);
     expect(withReturnedOnly(section)).toBe(3);
     expect(overall()).toBeCloseTo(3.0236, 4);
-    expect(studentGradeSummary(cid, jordan).text).toBe('3.0');
+    expect(summary()).toBe('3.0');
   });
 
   it('all work: the override replaces the calculated level at once', () => {
@@ -102,7 +101,7 @@ describe('a section level set by hand, in returned-only grades', () => {
     expect(section()).toBe(EXTENDING);
     expect(getSectionProficiencyRaw(cid, jordan, SECTION)).toBe(3);
     expect(overall()).toBeCloseTo(3.0569, 4);
-    expect(studentGradeSummary(cid, jordan).text).toBe('3.1');
+    expect(summary()).toBe('3.1');
   });
 
   it('returned only, nothing a draft: the override counts at once, the same number', () => {
@@ -120,26 +119,31 @@ describe('a section level set by hand, in returned-only grades', () => {
     expect(section()).toBe(EXTENDING);
   });
 
-  it('PINNED: returned only, both pieces drafts: the override does not show; the teacher sees it', () => {
+  it('CHANGED: returned only, both pieces drafts: the override shows, as the teacher sees it', () => {
     setByHand();
     drafts = new Set([quiz, exam]);
     clearProfCache();
-    // The teacher's view has the drafts as evidence, so the override applies.
+    // The teacher's view, drafts and all.
     expect(section()).toBe(EXTENDING);
     expect(overall()).toBeCloseTo(3.0569, 4);
-    expect(studentGradeSummary(cid, jordan).text).toBe('3.1');
-    // Returned-only has no evidence in the section: nothing to replace.
-    expect(withReturnedOnly(section)).toBe(0);
-    expect(withReturnedOnly(() => formatLevel(cid, section()))).toBe('—');
-    // The section is left out of the overall, as any section with no evidence is.
-    expect(withReturnedOnly(overall)).toBeCloseTo(3.0203, 4);
-    expect(withReturnedOnly(() => studentGradeSummary(cid, jordan).text)).toBe('3.0');
+    expect(summary()).toBe('3.1');
+    // Returned-only has no evidence in the section. Before S0-F1c that hid
+    // the override (section 0, a dash, overall 3.0203, "3.0"). Now the
+    // hand-set level stands on its own.
+    expect(withReturnedOnly(section)).toBe(EXTENDING);
+    expect(withReturnedOnly(() => formatLevel(cid, section()))).toBe('4.0');
+    expect(withReturnedOnly(overall)).toBeCloseTo(3.0523, 4);
+    expect(withReturnedOnly(summary)).toBe('3.1');
+    // It is still not evidence: the calculated level and the count say none.
+    expect(withReturnedOnly(() => getSectionProficiencyRaw(cid, jordan, SECTION))).toBe(0);
+    expect(withReturnedOnly(() => getSectionEvidenceCount(cid, jordan, SECTION))).toBe(0);
+    expect(getSectionEvidenceCount(cid, jordan, SECTION)).toBe(2);
     // The override itself is on file in both sets; it is not a draft.
     expect(withReturnedOnly(() => sectionOverrideInView(cid, jordan, SECTION))).toMatchObject({ level: EXTENDING });
     expect(sectionOverrideInView(cid, jordan, SECTION)).toMatchObject({ level: EXTENDING });
   });
 
-  it('PINNED: all work behaves the same way today: an override on a section with no scored work does not show', () => {
+  it('CHANGED: all work, both scores cleared: the override shows there too, and both sets agree', () => {
     setByHand();
     // The two pieces have no score at all (cleared), for the teacher too.
     _cache.scores[cid][jordan] = _cache.scores[cid][jordan].filter(
@@ -147,27 +151,28 @@ describe('a section level set by hand, in returned-only grades', () => {
     );
     clearProfCache();
     expect(sectionOverrideInView(cid, jordan, SECTION)).toMatchObject({ level: EXTENDING });
-    expect(section()).toBe(0);
-    expect(formatLevel(cid, section())).toBe('—');
+    // Before S0-F1c: section 0, a dash, overall 3.0203.
+    expect(section()).toBe(EXTENDING);
+    expect(formatLevel(cid, section())).toBe('4.0');
+    expect(overall()).toBeCloseTo(3.0523, 4);
     // And returned-only with both pieces drafts gives exactly this class's numbers.
-    const cleared = { section: section(), overall: overall(), summary: studentGradeSummary(cid, jordan).text };
+    const cleared = { section: section(), overall: overall(), summary: summary() };
     _cache.scores[cid] = structuredClone(scores);
     drafts = new Set([quiz, exam]);
     clearProfCache();
-    expect(
-      withReturnedOnly(() => ({
-        section: section(),
-        overall: overall(),
-        summary: studentGradeSummary(cid, jordan).text,
-      })),
-    ).toEqual(cleared);
+    expect(withReturnedOnly(() => ({ section: section(), overall: overall(), summary: summary() }))).toEqual(cleared);
   });
 
-  it('once one piece is returned, the override shows in returned-only too', () => {
+  it('the override shows in returned-only before and after a piece is returned', () => {
     setByHand();
     drafts = new Set([quiz, exam]);
-    expect(fresh(() => withReturnedOnly(section))).toBe(0);
+    expect(fresh(() => withReturnedOnly(section))).toBe(EXTENDING);
     drafts = new Set([exam]);
     expect(fresh(() => withReturnedOnly(section))).toBe(EXTENDING);
+    // Taking the override off leaves returned-only with what was returned.
+    setSectionOverride(cid, jordan, SECTION, 0, '');
+    expect(fresh(() => withReturnedOnly(section))).toBe(3);
+    drafts = new Set([quiz, exam]);
+    expect(fresh(() => withReturnedOnly(section))).toBe(0);
   });
 });

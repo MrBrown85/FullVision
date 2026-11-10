@@ -5,9 +5,9 @@
 // (migrations/2026110904_student_sessions_page.sql) and nothing else:
 //   {route: 'card', code}                          -> student_submit.card
 //   {route: 'verify', code, birthday | student_number | password, session?}
-//                                                  -> student_submit.verify_card
+//                                    -> student_submit.verify_card, p_add false
 //   {route: 'add-card', code, birthday | …, session}
-//                                                  -> student_submit.verify_card
+//                                    -> student_submit.verify_card, p_add true
 //   {route: 'page', session, enrollment_id}        -> student_submit.page
 //   {route: 'seen', session, enrollment_id, assessment_ids}
 //                                                  -> student_submit.seen
@@ -180,7 +180,7 @@ function page(r: Json): Json {
   };
 }
 
-// session_token is a new token, or null when the one sent is still good.
+// session_token is the new session's token, or null when add-card joined the session sent.
 function verified(r: Json): Json {
   return {
     ok: true,
@@ -191,12 +191,20 @@ function verified(r: Json): Json {
 
 // ── The routes ──────────────────────────────────────────────────────────────
 // What card() can say about a code that will not open. A guessed code is
-// not_found; so is a reissued card, a withdrawn student and a deleted class.
-const CARD_ERRORS = ['not_found', 'closed', 'card_locked', 'card_expired', 'reprint', 'locked', 'busy'];
+// not_found; so is a slip's code, a reissued card, a withdrawn student and
+// a deleted class. card_locked is five wrong tries in a row or fifteen in 7
+// days. locked is the per-address limit. There is no everyone-is-busy stop
+// on a card's routes (Colin, Nov 9); a slip's open keeps its own.
+const CARD_ERRORS = ['not_found', 'closed', 'card_locked', 'card_expired', 'reprint', 'locked'];
 const SESSION_ERRORS = ['signed_out', 'not_found', 'card_stopped', 'card_expired', 'closed'];
 
-const VERIFY_CARD =
-  'select student_submit.verify_card($1::text, $2::text, $3::text, $4::text, $5::text, $6::text) as r';
+/* The card's identity check, for the start screen (p_add false) or for Add
+   Another Card (p_add true). Which one is written into the route's
+   statement, never taken from the request: sending a session token, or
+   anything else, cannot turn a plain verify into an add. */
+const verifyCard = (add: boolean) =>
+  'select student_submit.verify_card($1::text, $2::text, $3::text, $4::text, $5::text, $6::text, ' +
+  `p_add => ${add ? 'true' : 'false'}) as r`;
 
 function verifyParams(body: Json, who: Identity | null, needsSession: boolean): Param[] | null {
   const c = code(body);
@@ -206,7 +214,9 @@ function verifyParams(body: Json, who: Identity | null, needsSession: boolean): 
 }
 
 export const CARD_ROUTES: Record<string, CardRoute> = {
-  // Code in; first name, class and which identity check out. Nothing opens yet.
+  /* Code in; first name, class and which identity check out. Nothing opens
+     yet. A slip's code is not_found here, as any unknown code is, so this
+     route says nothing about slips; the page then sends the code to open. */
   card: {
     sql: 'select student_submit.card($1::text, $2::text) as r',
     params: body => {
@@ -223,20 +233,23 @@ export const CARD_ROUTES: Record<string, CardRoute> = {
     }),
   },
 
-  /* The card's identity check. The phone sends the code again with what the
-     student typed. A match starts the device's session, or adds this class
-     to the session it sent. A session ends at midnight where the class is,
-     or on Done. */
+  /* The card's identity check from the start screen. The phone sends the
+     code again with what the student typed. A match always starts a new
+     session for the device and ends the one it sent, if that was live: on a
+     shared Chromebook the last student is signed out (Colin, Nov 9: "start
+     fresh"). A session ends at midnight where the class is, or on Done. */
   verify: {
-    sql: VERIFY_CARD,
+    sql: verifyCard(false),
     params: (body, who) => verifyParams(body, who, false),
     errors: [...CARD_ERRORS, 'wrong_identity'],
     reply: verified,
   },
 
-  // Add Another Card: the same check, from a device that is signed in.
+  /* Add Another Card: the same check, from a device that is signed in. The
+     class joins the session sent, and session_token comes back null (keep
+     using the one sent); if that session is no longer live, a new one starts. */
   'add-card': {
-    sql: VERIFY_CARD,
+    sql: verifyCard(true),
     params: (body, who) => verifyParams(body, who, true),
     errors: [...CARD_ERRORS, 'wrong_identity'],
     reply: verified,
