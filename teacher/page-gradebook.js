@@ -833,8 +833,8 @@ window.PageGradebook = (function () {
   /* The drafts among `students` in each of `assessments`:
      { byAid: { aid: [sid] }, bySid: { sid: true }, total, returns }, or
      null in a class that doesn't hold grades. `returns` is who each
-     column's Return N Graded returns (_draftsReturned): the same students,
-     and any partner of theirs a search has hidden. */
+     column's Return N Graded returns (GradeState.draftsReturned): the same
+     students, and any partner of theirs a search has hidden. */
   function _countDrafts(cid, students, assessments) {
     var klass = getReturnSettings(cid);
     if (!klass.student_page || !GradeState.holds(klass)) return null;
@@ -846,7 +846,7 @@ window.PageGradebook = (function () {
       var waiting = GradeState.draftsIn(cid, a.id, ids);
       if (!waiting.length) return;
       out.byAid[a.id] = waiting;
-      out.returns[a.id] = _draftsReturned(cid, a.id, ids);
+      out.returns[a.id] = GradeState.draftsReturned(cid, a.id, ids);
       waiting.forEach(function (sid) {
         out.bySid[sid] = true;
       });
@@ -881,35 +881,6 @@ window.PageGradebook = (function () {
     );
   }
 
-  /* "3 drafts: Avery, Mia and Sam can\u2019t see them yet." for the students in
-     `sids`, by first name; past three, "Avery, Mia, Sam and 2 others". */
-  function _draftsSentence(cid, sids) {
-    var roster = getStudents(cid);
-    var names = sids
-      .map(function (sid) {
-        var st = roster.find(function (s) {
-          return s.id === sid;
-        });
-        return st ? displayNameFirst(st) : '';
-      })
-      .filter(Boolean)
-      .sort(function (a, b) {
-        return a.localeCompare(b);
-      });
-    var n = sids.length;
-    var extra = n - 3;
-    var who =
-      names.length !== n
-        ? ''
-        : n === 1
-          ? names[0]
-          : n <= 3
-            ? names.slice(0, -1).join(', ') + ' and ' + names[n - 1]
-            : names.slice(0, 3).join(', ') + ' and ' + extra + (extra === 1 ? ' other' : ' others');
-    var cant = n === 1 ? ' can\u2019t see it yet.' : ' can\u2019t see them yet.';
-    return n + (n === 1 ? ' draft' : ' drafts') + ': ' + (who || (n === 1 ? 'the student' : 'the students')) + cant;
-  }
-
   // The student ids of the rows on screen, top to bottom.
   function _rowIds() {
     return Array.prototype.map.call(document.querySelectorAll('#gb-data tr[data-sid]'), function (row) {
@@ -917,48 +888,8 @@ window.PageGradebook = (function () {
     });
   }
 
-  /* Who a column's Return N Graded returns: each of `sids`, and with a
-     member of a pair or group the members still graded with them, as the
-     grader dialog's Return does (groupGradingUnits). */
-  function _returnTogether(cid, aid, sids) {
-    var a = getAssessments(cid).find(function (x) {
-      return x.id === aid;
-    });
-    var units = groupGradingUnits(
-      cid,
-      a,
-      sortStudents(getStudents(cid), 'lastName').map(function (s) {
-        return s.id;
-      }),
-    );
-    if (!units) return sids;
-    var out = sids.slice();
-    sids.forEach(function (sid) {
-      var unit = units.find(function (u) {
-        return u.linked && u.linked.indexOf(sid) >= 0;
-      });
-      (unit ? unit.linked : []).forEach(function (m) {
-        if (out.indexOf(m) < 0) out.push(m);
-      });
-    });
-    return out;
-  }
-
-  /* The drafts a column's Return N Graded returns: the one answer its N,
-     the names in its line, the dialog and the action all read. They are
-     the drafts among `shownIds` (the students on screen) and the drafts of
-     the pair or group members still graded with one of them, on screen or
-     not. So a column's N can be more than its dashed cells when a search
-     hides a partner: the pair is returned together, and the count and the
-     names say so. A partner whose piece is already returned is not in it.
-     Empty when no draft is on screen. */
-  function _draftsReturned(cid, aid, shownIds) {
-    var onScreen = GradeState.draftsIn(cid, aid, shownIds);
-    return onScreen.length ? GradeState.draftsIn(cid, aid, _returnTogether(cid, aid, onScreen)) : [];
-  }
-
   /* Return N Graded: every draft in the column, among the rows on screen
-     and the partners graded with them (_draftsReturned), is returned in one
+     and the partners graded with them (GradeState.draftsReturned), is returned in one
      action through the one grader. True when any was. The grader is handed
      each of those students' whole pair or group, as the dialog's Return
      hands it, and returns the drafts among them. */
@@ -968,7 +899,7 @@ window.PageGradebook = (function () {
     if (!klass.student_page || !GradeState.holds(klass)) return false;
     var waiting = GradeState.draftsIn(cid, aid, _rowIds());
     if (!waiting.length) return false;
-    Grader.returnGrades(cid, aid, _returnTogether(cid, aid, waiting));
+    Grader.returnGrades(cid, aid, GradeState.returnTogether(cid, aid, waiting));
     clearProfCache();
     render();
     return true;
@@ -985,16 +916,16 @@ window.PageGradebook = (function () {
   function _askReturnDrafts(button) {
     var cid = activeCourse;
     var aid = button.dataset.aid;
-    var waiting = _drafts ? _draftsReturned(cid, aid, _rowIds()) : [];
+    var waiting = _drafts ? GradeState.draftsReturned(cid, aid, _rowIds()) : [];
     var n = waiting.length;
     if (!n) return;
     // The dialog gives the focus back to what had it when it opened. Safari
     // does not focus a button it clicks, so the button takes it first.
     button.focus({ preventScroll: true });
     showConfirm(
-      'Return ' + n + (n === 1 ? ' Grade' : ' Grades') + ' Now?',
-      _draftsSentence(cid, waiting),
-      'Return ' + n + ' Graded',
+      GradeState.returnQuestion(n),
+      GradeState.draftsSentence(cid, waiting),
+      GradeState.returnNGraded(n),
       'primary',
       function () {
         if (!_mounted || activeCourse !== cid || !_returnDrafts(aid)) return;
@@ -1020,10 +951,10 @@ window.PageGradebook = (function () {
       '<button type="button" class="gb-return-drafts" data-action="returnDrafts" data-aid="' +
       a.id +
       '" title="' +
-      esc(_draftsSentence(cid, waiting)) +
-      '">Return ' +
-      waiting.length +
-      ' Graded</button>'
+      esc(GradeState.draftsSentence(cid, waiting)) +
+      '">' +
+      esc(GradeState.returnNGraded(waiting.length)) +
+      '</button>'
     );
   }
 
@@ -3442,16 +3373,16 @@ window.PageGradebook = (function () {
     // Print Rubrics (or Print Scores), as on Class Results and the grader.
     var printLabel = window.RubricPrint ? RubricPrint.printLabel(activeCourse, assess) : '';
     // Return N Graded and who is waiting, when the column has drafts (S1-F1).
-    var waiting = _drafts ? _draftsReturned(activeCourse, aid, _rowIds()) : [];
+    var waiting = _drafts ? GradeState.draftsReturned(activeCourse, aid, _rowIds()) : [];
     // html-safe: the hint is a figure from calc.js, escaped; the drafts line's names go through esc
     menu.innerHTML =
       (waiting.length
         ? '<div class="gb-ctx-note">' +
-          esc(_draftsSentence(activeCourse, waiting)) +
+          esc(GradeState.draftsSentence(activeCourse, waiting)) +
           '</div>' +
-          '<div class="gb-ctx-item gb-ctx-return" data-ctx="returnDrafts">Return ' +
-          waiting.length +
-          ' Graded</div>' +
+          '<div class="gb-ctx-item gb-ctx-return" data-ctx="returnDrafts">' +
+          esc(GradeState.returnNGraded(waiting.length)) +
+          '</div>' +
           '<div class="gb-ctx-divider"></div>'
         : '') +
       '<div class="gb-ctx-item" data-ctx="scoreMode">Grade This Assessment</div>' +

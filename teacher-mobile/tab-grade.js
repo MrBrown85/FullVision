@@ -137,9 +137,9 @@ window.MGrade = (function () {
      the To Return list's rows add up to GradeState.draftsWaiting. Every
      return goes through Grader.returnGrades.
 
-     _returnTogether, _draftsReturned and _draftsSentence are the
-     gradebook's own (teacher/page-gradebook.js), copied here because the
-     gradebook keeps them to itself; they belong in a shared file. */
+     Who a Return returns (pair and group partners included), the line of
+     names and the question's words are shared/grade-state.js's, as they
+     are the gradebook's (S1-T5). */
   function _holdsGrades(cid) {
     if (!cid || typeof getReturnSettings !== 'function' || !window.GradeState) return false;
     var klass = getReturnSettings(cid);
@@ -161,67 +161,6 @@ window.MGrade = (function () {
     });
   }
 
-  /* Who a Return returns: each of `sids`, and with a member of a pair or
-     group the members still graded with them, as the desktop's grader and
-     gradebook do (groupGradingUnits). */
-  function _returnTogether(cid, aid, sids) {
-    var units = groupGradingUnits(cid, _assessmentById(cid, aid), _rosterIds(cid));
-    if (!units) return sids;
-    var out = sids.slice();
-    sids.forEach(function (sid) {
-      var unit = units.find(function (u) {
-        return u.linked && u.linked.indexOf(sid) >= 0;
-      });
-      (unit ? unit.linked : []).forEach(function (m) {
-        if (out.indexOf(m) < 0) out.push(m);
-      });
-    });
-    return out;
-  }
-
-  /* The drafts a Return of `sids` returns: their own, and the drafts of the
-     pair or group members still graded with one of them. It is the one
-     answer a button's N, the names beside it, the question and the action
-     all read. Empty when none of `sids` has a draft. */
-  function _draftsReturned(cid, aid, sids) {
-    var own = GradeState.draftsIn(cid, aid, sids);
-    return own.length ? GradeState.draftsIn(cid, aid, _returnTogether(cid, aid, own)) : [];
-  }
-
-  // The first names of `sids`, A to Z.
-  function _draftNames(cid, sids) {
-    var roster = getStudents(cid);
-    return sids
-      .map(function (sid) {
-        var st = roster.find(function (s) {
-          return s.id === sid;
-        });
-        return st ? displayNameFirst(st) : '';
-      })
-      .filter(Boolean)
-      .sort(function (a, b) {
-        return a.localeCompare(b);
-      });
-  }
-
-  /* "3 drafts: Avery, Mia and Sam can’t see them yet." for the students in
-     `sids`, by first name; past three, "Avery, Mia, Sam and 2 others". */
-  function _draftsSentence(cid, sids) {
-    var names = _draftNames(cid, sids);
-    var n = sids.length;
-    var extra = n - 3;
-    var who =
-      names.length !== n
-        ? ''
-        : n === 1
-          ? names[0]
-          : n <= 3
-            ? names.slice(0, -1).join(', ') + ' and ' + names[n - 1]
-            : names.slice(0, 3).join(', ') + ' and ' + extra + (extra === 1 ? ' other' : ' others');
-    var cant = n === 1 ? ' can’t see it yet.' : ' can’t see them yet.';
-    return n + (n === 1 ? ' draft' : ' drafts') + ': ' + (who || (n === 1 ? 'the student' : 'the students')) + cant;
-  }
-
   /* Return the drafts `sids` hold on `aid`, and their partners': the
      grader is handed each one's whole pair or group, as the desktop's
      Return hands it, and returns the drafts among them. The drafts are
@@ -231,7 +170,7 @@ window.MGrade = (function () {
     if (!_holdsGrades(cid)) return false;
     var waiting = GradeState.draftsIn(cid, aid, sids);
     if (!waiting.length) return false;
-    Grader.returnGrades(cid, aid, _returnTogether(cid, aid, waiting));
+    Grader.returnGrades(cid, aid, GradeState.returnTogether(cid, aid, waiting));
     clearProfCache();
     return true;
   }
@@ -243,9 +182,9 @@ window.MGrade = (function () {
   function _askReturn(cid, aid, waiting, sids, from, then) {
     var n = waiting.length;
     MC.confirmSheet(
-      'Return ' + n + (n === 1 ? ' Grade' : ' Grades') + ' Now?',
-      _draftsSentence(cid, waiting),
-      'Return ' + n + ' Graded',
+      GradeState.returnQuestion(n),
+      GradeState.draftsSentence(cid, waiting),
+      GradeState.returnNGraded(n),
       function () {
         if (_returnDrafts(cid, aid, sids)) MC.haptic();
         then();
@@ -265,7 +204,7 @@ window.MGrade = (function () {
         return (b.date || '').localeCompare(a.date || '');
       })
       .map(function (a) {
-        return { a: a, waiting: _draftsReturned(cid, a.id, ids) };
+        return { a: a, waiting: GradeState.draftsReturned(cid, a.id, ids) };
       })
       .filter(function (row) {
         return row.waiting.length > 0;
@@ -320,7 +259,7 @@ window.MGrade = (function () {
             n +
             (n === 1 ? ' draft' : ' drafts') +
             '</span><span class="m-to-return-names">' +
-            MC.esc(_draftNames(cid, row.waiting).join(', ')) +
+            MC.esc(GradeState.draftNames(cid, row.waiting).join(', ')) +
             '</span></span>' +
             '<span class="m-to-return-meta">' +
             MC.esc(meta.join(' · ')) +
@@ -329,7 +268,7 @@ window.MGrade = (function () {
             '<button type="button" class="m-return-btn" data-action="m-grade-return-all" data-aid="' +
             a.id +
             '" aria-label="' +
-            MC.esc('Return ' + n + ' Graded, ' + a.title) +
+            MC.esc(GradeState.returnNGraded(n) + ', ' + a.title) +
             '"><span>Return ' +
             n +
             '</span></button>' +
@@ -370,7 +309,7 @@ window.MGrade = (function () {
   function askReturnAll(cid, aid, button) {
     if (!_holdsGrades(cid)) return;
     var ids = _rosterIds(cid);
-    var waiting = _draftsReturned(cid, aid, ids);
+    var waiting = GradeState.draftsReturned(cid, aid, ids);
     if (!waiting.length) return refreshToReturn(cid);
     _askReturn(cid, aid, waiting, ids, button, function () {
       var rows = Array.prototype.slice.call(document.querySelectorAll('#m-grade-to-return .m-to-return-row'));
@@ -408,7 +347,7 @@ window.MGrade = (function () {
      asks first and names everyone. `then` runs once the return is done. */
   function returnFromCard(cid, aid, sid, button, then) {
     if (!_holdsGrades(cid)) return;
-    var waiting = _draftsReturned(cid, aid, [sid]);
+    var waiting = GradeState.draftsReturned(cid, aid, [sid]);
     if (!waiting.length) return then();
     if (waiting.length > 1) return _askReturn(cid, aid, waiting, [sid], button, then);
     if (_returnDrafts(cid, aid, [sid])) MC.haptic();
@@ -2884,7 +2823,9 @@ window.MGrade = (function () {
     backToGroup: backToGroup,
     // Draft and Returned (S1-F3)
     holdsGrades: _holdsGrades,
-    draftsSentence: _draftsSentence,
+    draftsSentence: function (cid, sids) {
+      return GradeState.draftsSentence(cid, sids);
+    },
     refreshToReturn: refreshToReturn,
     askReturnAll: askReturnAll,
     returnAndNext: returnAndNext,
