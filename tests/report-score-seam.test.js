@@ -1006,18 +1006,30 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
   it('levels a render keeps are kept for one set: a block drawn on all work, then on returned grades in the same task', async () => {
     const c = classWithDrafts();
     _cache.scores[cid] = structuredClone(c.scores);
-    globalThis.getReturnedScores = () => c.returned;
-    const term = getReportingTerms(cid)[1];
-    const ctx = { termId: 'term-' + term.ordinal, termLabel: term.label };
+    /* One student's first-term work was never returned: on all work they
+       have a level at the last report, on returned grades they have none,
+       and the blocks print the change since then. */
+    const [first, second] = getReportingTerms(cid);
+    const since = new Set(
+      getAssessments(cid)
+        .filter(a => a.date > first.ends_on)
+        .map(a => a.id),
+    );
+    const student = c.other;
+    const returned = Object.assign({}, c.returned, {
+      [student.id]: c.returned[student.id].filter(e => since.has(e.assessmentId)),
+    });
+    expect(returned[student.id].length).toBeGreaterThan(0);
+    expect(returned[student.id].length).toBeLessThan(c.returned[student.id].length);
+    globalThis.getReturnedScores = () => returned;
+    const ctx = { termId: 'term-' + second.ordinal, termLabel: second.label };
     const autos = ReportBlocks.showDefaults(cid);
     // The blocks that read the start of the term and the last report's levels (report-blocks.js _pass).
     const blocks = () =>
-      ['proficiency', 'progress', 'next-steps', 'competency-table']
-        .map(id =>
-          ReportBlocks.renderReportBlock(id, cid, c.student, ctx, ReportSheets.optionsFor({ block: id }, autos)),
-        )
+      ['proficiency', 'progress', 'next-steps', 'academic-summary', 'support-home']
+        .map(id => ReportBlocks.renderReportBlock(id, cid, student, ctx, ReportSheets.optionsFor({ block: id }, autos)))
         .join('\n');
-    setActiveTerm(cid, term.ordinal);
+    setActiveTerm(cid, second.ordinal);
     try {
       await settle();
       clearProfCache();
@@ -1029,6 +1041,11 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
       const fromClean = withReturnedOnly(blocks);
       expect(straightAfter).toBe(fromClean);
       expect(fromClean).not.toBe(allWork);
+      // And the other way round.
+      await settle();
+      clearProfCache();
+      withReturnedOnly(blocks);
+      expect(blocks()).toBe(allWork);
     } finally {
       setActiveTerm(cid, null);
     }
