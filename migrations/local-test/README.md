@@ -490,12 +490,37 @@ of the connection on both versions:
 | `fill_rubric`, 5 criteria          | 0.84 ms | 2.75 ms        | 0.66 ms            |
 | a fill for 30 students, 5 criteria | 28 ms   | 81 ms          | 23 ms              |
 
-With the helpers in plpgsql, file 01 costs nothing that can be measured on
-either version, and reads through row security cost the same as before
-(3,840 rubric rows read as a teacher: 35 ms with the SQL form, 32 ms with
-plpgsql; the plan is the same, the helper called once a row in the filter:
-the SQL form was never inlined, being SECURITY DEFINER with a search_path
-of its own).
+With the helpers in plpgsql, a save with file 01 costs what it costs today,
+on either version.
+
+**A read through row security does not.** The new policies make a longer
+check for every row read. The same class, read as its teacher, the best of
+three rounds of 20:
+
+| A read as the class's teacher, 17.11      | today   | Batch A, helpers as SQL | Batch A now (plpgsql) |
+| ----------------------------------------- | ------- | ----------------------- | --------------------- |
+| every `score` row of the class (736)      | 2.3 ms  | 4.2 ms                  | 4.0 ms                |
+| every `tag_score` row (2,496)             | 7.2 ms  | 11.7 ms                 | 13.1 ms               |
+| every `rubric_score` row (3,840)          | 10.5 ms | 18.1 ms                 | 20.4 ms               |
+| every tick (3,840)                        | 10.6 ms | 18.0 ms                 | 20.4 ms               |
+| `get_gradebook`, the fallback class load  | 49.4 ms | 63.9 ms                 | 68.1 ms               |
+| `get_class_bundle`, the normal class load | 11.4 ms | 11.6 ms                 | 11.6 ms               |
+
+A read through the policies costs about twice what it costs today, with
+either form of the helpers, and plpgsql about a tenth more than SQL on
+reads (the reverse of saves, where SQL was three times slower). The normal
+class load is unaffected: `get_class_bundle` is SECURITY DEFINER and does
+not run the policies. The fallback load (`get_gradebook`) and anything else
+that reads a class-sized score table as the teacher pays about 10 ms for
+each such table; the bulk clears' share of that is already in the table of
+calls above. The plan of the read is the same with either form (the helper
+called once a row, in the filter; the SQL form was never inlined, being
+SECURITY DEFINER with a search_path of its own).
+
+This paragraph used to say that reads "cost the same as before". That
+compared the two forms of the helpers with each other, not with today, and
+its figures do not reproduce. The reviewer of the helper rewrite measured
+the numbers above first; they came out the same here.
 
 File 02's own SQL-language helpers (`_grade_copy`, `_grade_copy_of`,
 `_grade_copy_entry`, `_grade_return_holds`, `_grade_copy_in_use`) and file
@@ -520,7 +545,9 @@ triggers off are skipped by the two read RPCs but visible to a direct
 select; and after five caught deadlocks `_grade_return_lock_first` lets the
 sixth fail, with nothing in the server log for the five.
 
-Not verified: Postgres 17 (everything here ran on 18.6), cascades from the
+Not verified: the live server itself (everything here ran on a local
+Postgres 17.11, the version production runs, and on 18.6; the live
+server's settings and hardware are not this machine's), cascades from the
 tables this harness does not carry, and how often a collision happens in
 real use.
 

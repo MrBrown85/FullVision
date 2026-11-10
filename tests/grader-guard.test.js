@@ -1,12 +1,13 @@
 /**
  * A screen writes a grade only through shared/grader.js
  * (docs/plans/student-page-build-plan.md, 1.4). This guard fails when any
- * other file calls one of the score writers in shared/data.js more often
- * than it does today.
+ * other file calls one of the score writers in shared/data.js.
  *
- * The caps only go down. Each is today's count, and each names the PR that
- * takes it to zero. A count above its cap fails; so does a count below it,
- * until the cap is lowered to match. When every cap is zero, delete CAPS.
+ * It began with a cap for each screen that still called them, lowered as
+ * the screen moved onto the grader: the desktop grader dialog (S0-T2), the
+ * gradebook and Class Results (S1-T1), the phone's Grade tab (S1-T2) and
+ * the Assignments page (S1-T3). The last cap reached zero with S1-T3, so
+ * the caps are gone: no call is allowed.
  *
  * A call is counted wherever its name is followed by "(" in the file's
  * text, a comment included.
@@ -46,25 +47,12 @@ const WRITERS = [
   'saveAssignmentStatuses', // the class's whole status list
   'saveRubricChecks', // the class's whole tick list
   'moveRubricScores', // scores follow an assessment to another rubric
+  'returnGrades', // Return: the students are given their grade (S0-F2)
 ];
 
 // data.js holds the writers; grader.js is the one caller; seed-data.js
 // builds the Demo class by saving whole lists, before any screen is open.
 const EXEMPT = new Set(['shared/data.js', 'shared/grader.js', 'shared/seed-data.js']);
-
-const CAPS = {
-  // S1-T3 (Assignments page: list, rubric grid, ledgers, fills, Set
-  // Everyone To). Two of these are the grader dialog's own: its points box
-  // (_graderCommitPoints) and its Note for the Report (_saveReportNote).
-  // tests/score-save-parity.test.js and tests/report-note.test.js look for
-  // those two calls in this file's text, so they move with those tests.
-  'teacher/page-assignments.js': 25,
-  // S1-T1 (gradebook and Class Results): moved.
-  'teacher/page-gradebook.js': 0,
-  'teacher/class-results.js': 0,
-  // S1-T2 (phone Grade tab).
-  'teacher-mobile/tab-grade.js': 0,
-};
 
 function sources() {
   const out = [];
@@ -79,39 +67,35 @@ function sources() {
   return out;
 }
 
-const CALL = new RegExp('(?<![\\w$])(?:' + WRITERS.join('|') + ')\\(', 'g');
+// Grader.returnGrades is the grader's own action, named as the writer it calls.
+const CALL = new RegExp('(?<![\\w$])(?<!Grader\\.)(?:' + WRITERS.join('|') + ')\\(', 'g');
 
 function count(src) {
   return (src.match(CALL) || []).length;
 }
 
 describe('grades are written only through shared/grader.js', () => {
-  const counts = sources()
-    .map(f => [f.rel, count(f.src)])
-    .filter(([rel, n]) => n > 0 || CAPS[rel] !== undefined);
-
   it('every writer in the list is a function in shared/data.js', () => {
     const data = readFileSync(join(ROOT, 'shared/data.js'), 'utf-8');
     const missing = WRITERS.filter(name => !new RegExp('^function ' + name + '\\(', 'm').test(data));
     expect(missing).toEqual([]);
   });
 
-  it('no file calls a score writer in data.js more than before', () => {
-    const over = counts
-      .filter(([rel, n]) => n > (CAPS[rel] || 0))
-      .map(([rel, n]) => rel + ': ' + n + ' > ' + (CAPS[rel] || 0) + ' (write through shared/grader.js)');
-    expect(over).toEqual([]);
+  it('no file but shared/grader.js calls a score writer in data.js', () => {
+    const files = sources();
+    // The screens are among the files read.
+    ['teacher/page-assignments.js', 'teacher/page-gradebook.js', 'teacher-mobile/tab-grade.js'].forEach(rel => {
+      expect(files.some(f => f.rel === rel)).toBe(true);
+    });
+    const calls = files
+      .map(f => [f.rel, count(f.src)])
+      .filter(([, n]) => n > 0)
+      .map(([rel, n]) => rel + ': ' + n + ' (write through shared/grader.js)');
+    expect(calls).toEqual([]);
   });
 
-  it('a cap is lowered as its calls move to shared/grader.js', () => {
-    const under = counts
-      .filter(([rel, n]) => n < (CAPS[rel] || 0))
-      .map(([rel, n]) => rel + ': ' + n + ' < ' + CAPS[rel] + ' (lower the cap)');
-    expect(under).toEqual([]);
-  });
-
-  it('names only files that exist', () => {
-    const known = new Set(sources().map(f => f.rel));
-    expect(Object.keys(CAPS).filter(rel => !known.has(rel))).toEqual([]);
+  it('counts a writer’s call, and not a grader action or a longer name', () => {
+    expect(count('upsertScore(cid);\n  saveScores(cid, scores);\n// setPointsScore(')).toBe(3);
+    expect(count('Grader.returnGrades(cid, aid, ids); _upsertScoreOne(cid); mySaveScores(cid); upsertScore;')).toBe(0);
   });
 });

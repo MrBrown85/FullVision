@@ -59,6 +59,9 @@ const READERS = [
   '_holdsGroupCopy',
   // The returned set's builder (S0-F1): _scoreRead.scores alone may name it.
   'getReturnedScores',
+  // Which grades are drafts (S0-F2): calc.js works no draft rule out itself.
+  'getGradeReturns',
+  'getGradeReturn',
 ];
 // The three _scoreRead is built on, once each.
 const INSIDE_READER = { getScores: 1, getAssignmentStatuses: 1, getDibelsScore: 1 };
