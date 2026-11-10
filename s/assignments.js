@@ -11,7 +11,10 @@
    The result is worked out and worded by shared/calc.js and
    shared/constants.js (assessmentCellValue, levelWord, formatPoints), fed by
    student-data.js, so it follows the class's grading style and reads as the
-   teacher's gradebook cell does. Nothing here formats a grade.
+   teacher's gradebook cell does. Nothing here formats a grade, and nothing
+   here holds a grade's value: with calc.js not in (app.js fetches it before
+   this screen opens; the fetch can fail) a returned piece shows when it
+   came back and no result, and the list says the results didn't load.
 
    app.js opens this screen after Is This You? and draws the frame around
    it. This file adds its screen with StudentPage.addScreens. */
@@ -22,6 +25,12 @@
 
   var fmtDate = StudentPage.fmtDate;
 
+  var NO_RESULTS = 'Your results didn’t load. Check your internet and try again.';
+
+  function gradesAreIn() {
+    return typeof assessmentCellValue === 'function';
+  }
+
   var SEP = ' · ';
   var DAY = { month: 'short', day: 'numeric' };
   var DUE_DAY = { weekday: 'short', month: 'short', day: 'numeric' };
@@ -30,7 +39,8 @@
      its assessments: { kind, title, sub, result }.
      kind: 'back' (returned), 'missing', 'excused', or 'due' (anything else:
      not graded, or graded and not returned, which look the same).
-     result is '' unless the piece was returned with a score. */
+     result is '' unless the piece was returned with a score and calc.js is
+     in to word it. */
   function rowView(page, a) {
     var due = a.dueDate ? 'Due ' + fmtDate(a.dueDate, DUE_DAY) : a.date ? fmtDate(a.date, DAY) : '';
     var view = { kind: 'due', title: a.title, sub: due, result: '' };
@@ -47,7 +57,7 @@
       return view;
     }
     var cid = page.course.id;
-    var cell = assessmentCellValue(cid, page.student.id, a);
+    var cell = gradesAreIn() ? assessmentCellValue(cid, page.student.id, a) : { kind: 'none' };
     var bits = ['Back ' + fmtDate(a.returnedAt, DAY)];
     view.kind = 'back';
     if (cell.kind === 'level') {
@@ -102,8 +112,32 @@
     );
   }
 
+  /* The line over the list when calc.js didn't arrive and a piece has come
+     back: the results are missing, not empty. */
+  function noResultsHtml(state) {
+    var page = state.page;
+    var any =
+      page &&
+      page.assessments.some(function (a) {
+        return !!a.returnedAt;
+      });
+    if (gradesAreIn() || !any) return '';
+    return (
+      '<div class="sp-no-results"><p class="sp-msg sp-msg-calm" role="status">' +
+      esc(NO_RESULTS) +
+      '</p><button type="button" class="sp-btn sp-btn-quiet sp-btn-small" data-act="grades-retry"' +
+      (state.sending ? ' disabled' : '') +
+      '>' +
+      (state.sending ? 'Loading…' : 'Try Again') +
+      '</button></div>'
+    );
+  }
+
   function renderAssignments(state) {
-    return StudentPage.pageFrame(state, '<h1 class="sp-page-title">Assignments</h1>' + listHtml(state.page));
+    return StudentPage.pageFrame(
+      state,
+      '<h1 class="sp-page-title">Assignments</h1>' + noResultsHtml(state) + listHtml(state.page),
+    );
   }
 
   StudentPage.addScreens({

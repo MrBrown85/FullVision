@@ -632,10 +632,7 @@ var StudentPage = (function () {
     S.message = '';
     var done = function (res) {
       S.sending = false;
-      if (res && res.ok && card) {
-        S.data.check = null;
-        return card.ok(res);
-      }
+      if (res && res.ok && card) return card.ok(res);
       if (res && res.ok) {
         S.ident = ident;
         S.data.parts = res.parts || [];

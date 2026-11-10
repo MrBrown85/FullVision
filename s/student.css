@@ -734,6 +734,23 @@ button {
 .sp-page .sp-demo-note {
   margin-top: 8px;
 }
+/* The results didn't load (calc.js could not be fetched). */
+.sp-no-results {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--sp-card);
+  border: 1px solid var(--sp-line);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.sp-no-results .sp-msg {
+  flex: 1;
+  color: var(--sp-text);
+}
+.sp-no-results .sp-btn {
+  flex: none;
+}
 
 @media (min-width: 900px) {
   .sp-narrow {

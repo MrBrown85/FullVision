@@ -27,7 +27,7 @@ The app persists teacher data through Supabase Auth plus a public RPC surface. I
 
 - `login.html` and `login-auth.js` handle sign-in, sign-up, password reset, and Demo Mode entry.
 - Authenticated users are routed into the teacher experience.
-- Teachers are the only accounts. Students answer questionnaires and read phone reports on the student page (`s/index.html`; `s/student.js`, the shell, then its screens in `s/questionnaire.js` and `s/report.js`; `shared/phone-report-view.js`) with a code from their slip, through the `student-submit` Supabase edge function. A student card's screens are `s/app.js` (the card, Is This You?) and `s/assignments.js` (the Assignments list), with `s/student-data.js` feeding `shared/calc.js` from the student's own page; they run in Demo Mode only (`/s/#demo-card`) until the card routes exist. There is no parent portal.
+- Teachers are the only accounts. Students answer questionnaires and read phone reports on the student page (`s/index.html`; `s/student.js`, the shell, then its screens in `s/questionnaire.js` and `s/report.js`; `shared/phone-report-view.js`) with a code from their slip, through the `student-submit` Supabase edge function. A student card's screens are `s/app.js` (the card, Is This You?) and `s/assignments.js` (the Assignments list), with `s/student-data.js` feeding `shared/calc.js` from the student's own page (`calc.js` and `constants.js` are fetched only when the list is about to open, so a slip never loads them); they run in Demo Mode only (`/s/#demo-card`) until the card routes exist. There is no parent portal.
 
 ### Desktop SPA
 

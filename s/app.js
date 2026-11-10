@@ -446,56 +446,92 @@
     });
   }
 
-  /* calc.js and what it reads, for a copy of index.html from before student
-     cards, which names none of them. */
+  /* shared/constants.js and shared/calc.js work out and word a result. They
+     are fetched here, when a screen that shows a grade is about to open, so
+     a questionnaire or report slip never loads them (plan, section 5: the
+     page stays light on a school Chromebook). A file already in is not
+     fetched again; one that failed is tried again on the next call.
+     student-data.js comes with the page; it is fetched here only for a copy
+     of index.html from before student cards. */
+  var GRADE_FILES = [
+    [
+      'student-data.js',
+      function () {
+        return typeof StudentData !== 'undefined';
+      },
+    ],
+    [
+      '../shared/constants.js',
+      function () {
+        return typeof PROF_LABELS !== 'undefined';
+      },
+    ],
+    [
+      '../shared/calc.js',
+      function () {
+        return typeof assessmentCellValue === 'function';
+      },
+    ],
+  ];
+  var fetching = null;
+
   function whenGradesAreIn() {
-    var need = [];
-    if (typeof PROF_LABELS === 'undefined') need.push('../shared/constants.js');
-    if (typeof assessmentCellValue !== 'function') need.push('../shared/calc.js');
-    if (typeof StudentData === 'undefined') need.push('student-data.js');
+    if (fetching) return fetching;
+    var need = GRADE_FILES.filter(function (f) {
+      return !f[1]();
+    });
     if (!need.length || typeof document === 'undefined') return Promise.resolve();
-    return new Promise(function (done) {
+    fetching = new Promise(function (done) {
       var left = need.length;
-      need.forEach(function (src) {
+      need.forEach(function (f) {
         var s = document.createElement('script');
-        s.src = src;
-        s.async = false; // in this order
+        s.src = f[0];
+        s.async = false; // run in this order
         s.onload = s.onerror = function () {
           left -= 1;
-          if (!left) done();
+          if (left) return;
+          fetching = null;
+          done();
         };
         document.head.appendChild(s);
       });
     });
+    return fetching;
   }
 
-  function gradesAreIn() {
-    return typeof assessmentCellValue === 'function' && typeof StudentData !== 'undefined';
-  }
-
-  /* After the check: the student's page for the card's class. */
+  /* After the check: the student's page for the card's class. Is This You?
+     stays up, its button reading Checking, until the page's data and
+     calc.js are both in, so the list is drawn once, with its results. If
+     calc.js can't be fetched the list still opens, without results
+     (assignments.js says so and offers Try Again). */
   function openPage() {
-    if (!S.demo) {
-      S.screen = 'loading';
+    S.sending = true;
+    S.message = '';
+    paint();
+    return Promise.all([whenGradesAreIn(), ask('page', {})]).then(function (both) {
+      var res = both[1];
+      S.sending = false;
+      if (res && res.ok && typeof StudentData !== 'undefined') {
+        S.page = StudentData.fromServer(res);
+        StudentData.use(S.page);
+        S.screen = 'assignments';
+      } else {
+        S.message = cardMessage(res && res.ok ? { ok: false, error: 'network' } : res);
+        S.screen = 'cardmessage';
+      }
       paint();
-    }
-    return whenGradesAreIn()
-      .then(function () {
-        return gradesAreIn() ? ask('page', {}) : { ok: false, error: 'network' };
-      })
-      .then(function (res) {
-        if (res && res.ok) {
-          S.page = StudentData.fromServer(res);
-          StudentData.use(S.page);
-          S.message = '';
-          S.screen = 'assignments';
-        } else {
-          S.message = cardMessage(res);
-          S.screen = 'cardmessage';
-        }
-        paint();
-        window.scrollTo(0, 0);
-      });
+      window.scrollTo(0, 0);
+    });
+  }
+
+  // Try Again on a list whose results didn't load.
+  function fetchGradesAgain() {
+    S.sending = true;
+    paint();
+    return whenGradesAreIn().then(function () {
+      S.sending = false;
+      paint();
+    });
   }
 
   function checkCard() {
@@ -546,6 +582,8 @@
       paint();
     } else if (act === 'card-restart') {
       restartCard();
+    } else if (act === 'grades-retry') {
+      fetchGradesAgain();
     }
   }
 
@@ -579,6 +617,7 @@
       demoPage: demoPage,
       demoBirthday: demoBirthday,
       returnedGrade: returnedGrade,
+      whenGradesAreIn: whenGradesAreIn,
       openCard: openCard,
       checkCard: checkCard,
       DEMO: DEMO,

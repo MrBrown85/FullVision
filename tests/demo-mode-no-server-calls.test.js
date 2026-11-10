@@ -170,8 +170,8 @@ describe('Demo Mode sends nothing from the student page', () => {
       expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
       expect(page.root().querySelectorAll('.sp-row').length).toBeGreaterThan(0);
       expect(page.calls).toEqual([]);
-      // Every script the page needs came with it: nothing was fetched late.
-      expect(page.ctx.document.querySelectorAll('script')).toHaveLength(0);
+      // The only files fetched late are the site's own calc.js and constants.js.
+      expect(page.fetched).toEqual(['../shared/constants.js', '../shared/calc.js']);
     },
   );
 
@@ -179,8 +179,9 @@ describe('Demo Mode sends nothing from the student page', () => {
     for (const hash of ['#demo', '#demo-about', '#demo-report']) {
       const page = openStudentPage();
       await page.start(hash);
-      await page.tick();
       expect(page.calls, hash).toEqual([]);
+      // Demo Mode's questions come from the site's own templates file.
+      expect(page.fetched, hash).toEqual(hash === '#demo-report' ? [] : ['../shared/questionnaire-templates.js']);
     }
   });
 });

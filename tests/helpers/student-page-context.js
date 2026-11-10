@@ -5,9 +5,14 @@
  * so shared/calc.js runs here on s/student-data.js alone, as it does on a
  * student's phone.
  *
- * openStudentPage() returns { ctx, T, root(), calls, replies, start, click,
- * type, choose, submit, tick, run }. fetch is a stand-in that records every
- * call and answers from `replies`.
+ * A script the page adds later (a <script src> appended to <head>) is
+ * fetched as a browser would: its name goes on `fetched`, and it runs in
+ * the context a moment later, in the order added. `net.fail(src)` returning
+ * true makes that fetch fail instead.
+ *
+ * openStudentPage() returns { ctx, T, root(), calls, replies, fetched, net,
+ * start, click, type, choose, submit, tick, settle, run }. fetch is a
+ * stand-in that records every call and answers from `replies`.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -28,6 +33,9 @@ export function openStudentPage() {
   const { document, window } = parseHTML('<!doctype html><html><head></head><body></body></html>');
   const calls = [];
   const replies = [];
+  const fetched = [];
+  const net = { fail: () => false };
+  let pending = 0;
   const store = {};
   const storage = () => ({
     getItem: k => (k in store ? store[k] : null),
@@ -57,6 +65,20 @@ export function openStudentPage() {
   };
   sandbox.window = sandbox;
   const ctx = vm.createContext(sandbox);
+  const append = document.head.appendChild.bind(document.head);
+  document.head.appendChild = el => {
+    const src = el && el.tagName === 'SCRIPT' ? el.getAttribute('src') : null;
+    if (!src) return append(el);
+    fetched.push(src);
+    pending += 1;
+    setTimeout(() => {
+      pending -= 1;
+      if (net.fail(src)) return el.onerror && el.onerror();
+      vm.runInContext(readFileSync(resolve(ROOT, 's', src), 'utf8'), ctx, { filename: src });
+      return el.onload && el.onload();
+    }, 0);
+    return append(el);
+  };
   studentPageScripts().forEach(f => vm.runInContext(readFileSync(resolve(ROOT, f), 'utf8'), ctx, { filename: f }));
 
   const app = document.createElement('div');
@@ -71,6 +93,13 @@ export function openStudentPage() {
     return el;
   };
   const tick = () => new Promise(r => setTimeout(r, 0));
+  // Until the page has nothing left to fetch and has drawn what came.
+  const settle = async () => {
+    do {
+      await tick();
+    } while (pending > 0);
+    await tick();
+  };
   return {
     ctx,
     T,
@@ -78,14 +107,17 @@ export function openStudentPage() {
     root,
     calls,
     replies,
+    fetched,
+    net,
     tick,
+    settle,
     start: async hash => {
       T.start(root(), hash);
-      await tick();
+      await settle();
     },
     click: async sel => {
       find(sel).dispatchEvent(new window.Event('click', { bubbles: true }));
-      await tick();
+      await settle();
     },
     type: (sel, value) => {
       const el = find(sel);
@@ -100,7 +132,7 @@ export function openStudentPage() {
     },
     submit: async sel => {
       find(sel).dispatchEvent(new window.Event('submit', { bubbles: true }));
-      await tick();
+      await settle();
     },
   };
 }

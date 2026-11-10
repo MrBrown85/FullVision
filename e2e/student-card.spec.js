@@ -7,6 +7,17 @@ import { test, expect } from '@playwright/test';
    request goes to the student-submit function, and a grade the teacher has
    not returned is nowhere on the page. */
 
+/* The scripts that work out a grade, as the page asked for them. The page
+   fetches them only when a screen that shows a grade is about to open. */
+function gradeScripts(page) {
+  const asked = [];
+  page.on('request', req => {
+    const m = /\/shared\/(calc|constants)\.js(\?|$)/.exec(req.url());
+    if (m) asked.push(m[1]);
+  });
+  return asked;
+}
+
 const SIZES = [
   { name: 'a phone', use: { viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true } },
   { name: 'a Chromebook', use: { viewport: { width: 1366, height: 768 } } },
@@ -28,6 +39,7 @@ for (const size of SIZES) {
         if (msg.type() === 'error') errors.push(msg.text());
       });
       page.on('pageerror', err => errors.push(String(err)));
+      const asked = gradeScripts(page);
       const press = name =>
         wide ? page.getByRole('button', { name }).click() : page.getByRole('button', { name }).tap();
       const fits = async () => {
@@ -60,9 +72,11 @@ for (const size of SIZES) {
       await page.getByLabel('Month').selectOption('3');
       await page.getByLabel('Day').selectOption('14');
       await page.getByLabel('Year').selectOption(String(new Date().getFullYear() - 13));
+      // Neither calc.js nor constants.js has been asked for yet.
+      expect(asked).toEqual([]);
       await press('Yes, That’s Me');
 
-      // Assignments
+      // Assignments: both arrive, once, before the list is drawn.
       await expect(page.getByRole('heading', { name: 'Assignments' })).toBeVisible();
       const row = title => page.locator('.sp-row', { hasText: title });
       await expect(row('Energy Transfer Investigation').locator('.sp-row-result')).toHaveText('4.0 · 100%');
@@ -88,6 +102,7 @@ for (const size of SIZES) {
       expect(html).not.toContain('3.3 · 83%');
       await fits();
 
+      expect(asked.sort()).toEqual(['calc', 'constants']);
       expect(posts).toEqual([]);
       expect(errors).toEqual([]);
     });
@@ -146,5 +161,44 @@ test.describe('student card: the card’s password and the lock', () => {
       "That code didn't work. Check the letters and numbers on your slip.",
     );
     expect(posts).toEqual([{ route: 'open', code: 'P3R8WD' }]);
+  });
+
+  test('a slip page asks for neither calc.js nor constants.js', async ({ page }) => {
+    const asked = gradeScripts(page);
+    await page.goto('/s/#demo');
+    await expect(page.getByRole('heading', { name: 'Hi Cece!' })).toBeVisible();
+    await page.getByLabel('Student Number').fill('1');
+    await page.getByRole('button', { name: 'Yes, Start' }).tap();
+    await expect(page.locator('#sp-count')).toBeVisible();
+    expect(asked).toEqual([]);
+    expect(await page.evaluate(() => typeof window.formatLevel + ' ' + typeof window.Calc)).toBe('undefined undefined');
+  });
+
+  test('when calc.js can’t be fetched the list opens without results and says so', async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', err => errors.push(String(err)));
+    await page.route('**/shared/calc.js', route => route.abort());
+    await page.goto('/s/#demo-card');
+    await page.getByRole('button', { name: 'Continue' }).tap();
+    await page.getByLabel('Student Number').fill('1234567');
+    await page.getByRole('button', { name: 'Yes, That’s Me' }).tap();
+    await expect(page.getByRole('heading', { name: 'Assignments' })).toBeVisible();
+    await expect(page.getByRole('status')).toHaveText('Your results didn’t load. Check your internet and try again.');
+    await expect(page.locator('.sp-row')).toHaveCount(9);
+    await expect(page.locator('.sp-row-result')).toHaveCount(0);
+    await expect(
+      page.locator('.sp-row', { hasText: 'Energy Transfer Investigation' }).locator('.sp-row-sub'),
+    ).toHaveText(/^Back \S+ \d+$/);
+    await expect(page.locator('.sp-row', { hasText: 'Immune System Quick Check' }).locator('.sp-row-sub')).toHaveText(
+      /^Missing · Due /,
+    );
+    // The connection comes back.
+    await page.unroute('**/shared/calc.js');
+    await page.getByRole('button', { name: 'Try Again' }).tap();
+    await expect(
+      page.locator('.sp-row', { hasText: 'Energy Transfer Investigation' }).locator('.sp-row-result'),
+    ).toHaveText('4.0');
+    await expect(page.getByRole('status')).toHaveCount(0);
+    expect(errors).toEqual([]);
   });
 });

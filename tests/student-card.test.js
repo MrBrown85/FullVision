@@ -37,15 +37,16 @@ async function walk(hash) {
   return page;
 }
 
-describe('the student page loads calc.js without a data layer', () => {
-  it('loads constants.js, calc.js and student-data.js, and no Supabase client, key or Sentry', () => {
-    const scripts = studentPageScripts();
-    expect(scripts).toEqual([
+const GRADES_IN = 'typeof PROF_LABELS + " " + typeof formatLevel + " " + typeof assessmentCellValue';
+const CALC = ['../shared/constants.js', '../shared/calc.js'];
+
+describe('the student page fetches calc.js only when a grade is about to show', () => {
+  it('the page itself names no calc.js, constants.js, Supabase client, key or Sentry', () => {
+    // What main loads for a slip, then the card's three small files.
+    expect(studentPageScripts()).toEqual([
       'shared/html.js',
       'shared/phone-report-view.js',
       'shared/loading-screen.js',
-      'shared/constants.js',
-      'shared/calc.js',
       's/student-data.js',
       's/student.js',
       's/questionnaire.js',
@@ -54,10 +55,133 @@ describe('the student page loads calc.js without a data layer', () => {
       's/assignments.js',
     ]);
     const page = openStudentPage();
-    expect(page.run('typeof formatLevel + " " + typeof assessmentCellValue')).toBe('function function');
+    expect(page.run(GRADES_IN)).toBe('undefined undefined undefined');
     expect(page.run('typeof getSupabase + " " + typeof _cache + " " + typeof Sentry')).toBe(
       'undefined undefined undefined',
     );
+  });
+
+  it.each(['', '#demo', '#demo-about', '#demo-report'])('a slip page (%s) fetches neither', async hash => {
+    const page = openStudentPage();
+    await page.start(hash);
+    expect(page.fetched.filter(src => /calc|constants|student-data/.test(src))).toEqual([]);
+    expect(page.run(GRADES_IN)).toBe('undefined undefined undefined');
+  });
+
+  it('a real slip, opened and answered to the identity check, fetches nothing', async () => {
+    const page = openStudentPage();
+    page.replies.push({
+      ok: true,
+      token: 'a'.repeat(64),
+      student: { first_name: 'Cece' },
+      course: { name: 'Science 8', block: 'B' },
+      preview: [{ title: 'November Reflection', count: 1 }],
+      check: 'identity',
+    });
+    await page.start('#k7m-4qx');
+    page.replies.push({
+      ok: true,
+      parts: [
+        {
+          id: 'p1',
+          kind: 'core_reflection',
+          title: 'November Reflection',
+          questions: [{ id: 'q1', kind: 'text', prompt: 'How did it go?', options: {}, core_ids: [] }],
+        },
+      ],
+      context: {},
+    });
+    page.type('#sp-ident', '1234567');
+    await page.click('[data-act="start"]');
+    expect(page.calls.map(c => c.body.route)).toEqual(['open', 'verify']);
+    expect(page.root().textContent).toContain('How did it go?');
+    expect(page.fetched).toEqual([]);
+  });
+
+  it('the card and Is This You? fetch neither; reaching Assignments fetches both, once', async () => {
+    const page = openStudentPage();
+    await page.start('#demo-card');
+    await page.submit('form[data-form="card"]');
+    page.type('#sp-ident', '999');
+    await page.click('[data-act="card-yes"]');
+    expect(page.fetched).toEqual([]);
+    page.type('#sp-ident', page.T.DEMO.number);
+    await page.click('[data-act="card-yes"]');
+    expect(page.fetched).toEqual(CALC);
+    expect(page.run(GRADES_IN)).toBe('object function function');
+    expect(row(page, 'Energy Transfer Investigation').result).toBe('4.0');
+    // The card opened again on this device: nothing is fetched a second time.
+    page.T.openCard('P3R-8WD');
+    await page.settle();
+    page.type('#sp-ident', page.T.DEMO.number);
+    await page.click('[data-act="card-yes"]');
+    expect(row(page, 'Energy Transfer Investigation').result).toBe('4.0');
+    expect(page.fetched).toEqual(CALC);
+  });
+
+  it('draws nothing of the list until calc.js is in: Is This You? waits on Checking', async () => {
+    const page = openStudentPage();
+    await page.start('#demo-card');
+    await page.submit('form[data-form="card"]');
+    page.type('#sp-ident', page.T.DEMO.number);
+    page.T.checkCard();
+    // The check has passed and the page's data is here; calc.js is on its way.
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    expect(page.fetched).toEqual(CALC);
+    expect(page.run('typeof assessmentCellValue')).toBe('undefined');
+    expect(page.root().querySelector('.sp-row')).toBeNull();
+    expect(page.root().querySelector('.sp-row-result')).toBeNull();
+    const yes = page.root().querySelector('[data-act="card-yes"]');
+    expect(yes.textContent).toBe('Checking…');
+    expect(yes.hasAttribute('disabled')).toBe(true);
+    expect(page.root().querySelector('#sp-ident').getAttribute('value')).toBe(page.T.DEMO.number);
+    await page.settle();
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(row(page, 'Cell Microscope Lab').result).toBe('2.7');
+  });
+
+  it('with calc.js out of reach the list opens without results and says so; Try Again brings them', async () => {
+    const page = openStudentPage();
+    page.net.fail = src => /calc\.js$/.test(src);
+    await page.start('#demo-card-both');
+    await page.submit('form[data-form="card"]');
+    page.type('#sp-ident', page.T.DEMO.number);
+    await page.click('[data-act="card-yes"]');
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(page.root().querySelector('.sp-no-results .sp-msg').textContent).toBe(
+      'Your results didn’t load. Check your internet and try again.',
+    );
+    expect(page.root().querySelector('[data-act="grades-retry"]').textContent).toBe('Try Again');
+    // Every piece is listed, with its date; none has a result or a level.
+    expect(rows(page)).toHaveLength(9);
+    expect(rows(page).map(r => r.result)).toEqual(Array(9).fill(''));
+    expect(row(page, 'Energy Transfer Investigation').sub).toMatch(/^Back \S+ \d+$/);
+    expect(row(page, 'KMT & States of Matter Lab').sub).toMatch(/^Back \S+ \d+ · Late$/);
+    expect(row(page, 'Immune System Quick Check').sub).toMatch(/^Missing · Due /);
+    // No raw value stands in for a result.
+    const cells = page.root().querySelector('.sp-list').textContent;
+    expect(cells).not.toMatch(/Extending|Proficient|Developing|%|\d\.\d| \/ |Complete/);
+
+    page.net.fail = () => false;
+    await page.click('[data-act="grades-retry"]');
+    expect(page.fetched).toEqual([...CALC, '../shared/calc.js']);
+    expect(page.root().querySelector('.sp-no-results')).toBeNull();
+    expect(row(page, 'Energy Transfer Investigation').result).toBe('4.0 · 100%');
+    expect(row(page, 'Cell Structure Quiz').result).toBe('8 / 10');
+    expect(page.calls).toHaveLength(0);
+  });
+
+  it('a class with nothing returned says nothing about results', () => {
+    const page = openStudentPage();
+    const read = page.run('StudentData.fromServer')({
+      student: { enrollment_id: 'e1', first_name: 'Sam' },
+      course: { id: 'c1', name: 'Socials 10', block: 'C' },
+      assessments: [{ id: 'a1', title: 'Map Quiz', date: '2026-10-20', due_date: '2026-10-22' }],
+    });
+    page.run('StudentData.use')(read);
+    const html = page.T.render({ screen: 'assignments', page: read, demo: false });
+    expect(html).toContain('Map Quiz');
+    expect(html).not.toContain('sp-no-results');
   });
 });
 
@@ -316,9 +440,11 @@ describe('student card: a draft is nowhere on the page', () => {
     const poster = JSON.parse(reply).assessments.find(a => a.id === 'demo-poster');
     expect(poster.grade).toBeNull();
     expect(poster.returned_at).toBeNull();
-    expect(page.T.state().page.scores.filter(s => s.assessmentId === 'demo-poster')).toEqual([]);
+    expect(page.T.state().page.grades['demo-poster']).toBeUndefined();
+    const scores = page.run('getScores(' + JSON.stringify(CID) + ')')[SID];
+    expect(scores.filter(s => s.assessmentId === 'demo-poster')).toEqual([]);
     // The essay's only score is the one that was returned.
-    expect(page.T.state().page.scores.filter(s => s.assessmentId === 'demo-essay')).toEqual([
+    expect(scores.filter(s => s.assessmentId === 'demo-essay')).toEqual([
       { assessmentId: 'demo-essay', tagId: 'demo-com', score: 2, note: expect.any(String) },
     ]);
   });
@@ -417,14 +543,21 @@ describe('student-data.js: the one adapter', () => {
     expect(read.assessments.map(a => a.id)).toEqual(['a1', 'a2', 'a3', 'a5', 'a6', 'a7']);
     expect(JSON.stringify(read)).not.toContain('SECRET NOTE');
     expect(JSON.stringify(read)).not.toMatch(/draft/i);
-    expect(read.scores.map(s => s.assessmentId)).toEqual(['a1', 'a5', 'a6']);
-    expect(read.scores[0]).toEqual({ assessmentId: 'a1', tagId: 't1', score: 3, note: 'Good.', mod: 1 });
+    expect(Object.keys(read.grades)).toEqual(['a1', 'a5', 'a6']);
+    expect(read.grades.a1).toEqual({
+      value: null,
+      comment: 'Good.',
+      tagScores: [{ id: 't1', value: 3, modifier: 1 }],
+      rubricScores: [],
+    });
   });
 
-  it('the list reads each kind of piece from it', () => {
+  it('the list reads each kind of piece from it', async () => {
     const page = openStudentPage();
     const read = page.run('StudentData.fromServer')(REPLY);
     page.run('StudentData.use')(read);
+    page.T.whenGradesAreIn();
+    await page.settle();
     const view = id =>
       page.T.rowView(
         read,
@@ -442,12 +575,21 @@ describe('student-data.js: the one adapter', () => {
     expect(page.T.listHtml(Object.assign({}, read, { assessments: [] }))).toContain('No assignments yet.');
   });
 
-  it('answers calc.js for this student and this class only', () => {
+  it('answers calc.js for this student and this class only', async () => {
     const page = openStudentPage();
     const read = page.run('StudentData.fromServer')(REPLY);
     page.run('StudentData.use')(read);
+    page.T.whenGradesAreIn();
+    await page.settle();
     expect(page.run('courseGradeMode("c1")')).toBe('both');
     expect(page.run('getScores("c1").e1.length')).toBe(3);
+    expect(page.run('getScores("c1").e1[0]')).toEqual({
+      assessmentId: 'a1',
+      tagId: 't1',
+      score: 3,
+      note: 'Good.',
+      mod: 1,
+    });
     expect(page.run('JSON.stringify(getScores("other"))')).toBe('{}');
     expect(page.run('getAssignmentStatus("c1", "e1", "a3")')).toBe('EXC');
     expect(page.run('getAssignmentStatus("c1", "someone-else", "a3")')).toBeNull();
