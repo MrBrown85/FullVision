@@ -10,8 +10,9 @@
  * - a draft never returned: nothing.
  * Statuses are not here. Missing, Excused and Late are never drafts.
  * Missing and Excused win at once (Colin, 2026-11-09): while a piece is
- * either, a returned grade under a draft is left out, so its old level stops
- * counting everywhere without a Return.
+ * either, nothing of its grade is in the set, draft or not, so a returned
+ * level stops counting everywhere without a Return. (Entries that hold
+ * nothing, a cleared level's 0, stay.)
  * Where an entry sits matters (grade math breaks a tie between two pieces
  * of the same date by their order): a returned copy sits where its working
  * entries sit, and one with no working entry left (a returned grade,
@@ -59,9 +60,13 @@ export function returnedScores(cid, working, gradeReturns) {
     };
     ((working || {})[sid] || []).forEach(entry => {
       const row = entry ? rowOf(sid, entry.assessmentId) : null;
-      // Nothing is a draft: the working copy.
-      if (!row || !row.is_draft) list.push(entry);
-      else if (!placed[entry.assessmentId]) list.push(...returnedOf(entry.assessmentId));
+      // Nothing is a draft: the working copy, unless the piece is Missing or Excused.
+      const status = entry ? getAssignmentStatus(cid, sid, entry.assessmentId) : null;
+      const holds = e =>
+        (e.score != null && e.score !== '' && Number(e.score) !== 0) || e.note || e.critNote || e.critBeyond;
+      if (!row || !row.is_draft) {
+        if (!entry || (status !== 'NS' && status !== 'EXC') || !holds(entry)) list.push(entry);
+      } else if (!placed[entry.assessmentId]) list.push(...returnedOf(entry.assessmentId));
     });
     // A returned grade cleared since has no working entry; it still counts,
     // in its assessment's place: before the first entry of a later one.

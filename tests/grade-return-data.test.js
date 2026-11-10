@@ -307,6 +307,13 @@ const WRITER_SCENARIOS = {
     saveRubricChecks(CID, { 's1:lab': ['k1'], 's2:lab': ['k2'] });
     if (on) expect([state('s1', 'lab'), state('s2', 'lab')]).toEqual(['draft', 'draft']);
   },
+  returnGrades(on) {
+    level('s1', 'essay', 't1', 3);
+    level('s2', 'essay', 't1', 2);
+    const out = returnGrades(CID, 'essay', ['s1']);
+    expect(out.returned).toBe(on ? 1 : 0);
+    if (on) expect([state('s1', 'essay'), state('s2', 'essay')]).toEqual(['returned', 'draft']);
+  },
   moveRubricScores(on) {
     // Edit a Copy on scored work: each grade keeps its state.
     level('s1', 'lab', 'c1', 3);
@@ -347,6 +354,8 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   clearClass(CID);
+  // The re-key tests leave their ids mapped for the class.
+  delete _idRekeys[CID];
   localStorage.clear();
 });
 
@@ -419,11 +428,14 @@ describe('Return', () => {
     give('essay', 's1');
     vi.setSystemTime(new Date('2026-11-12T18:00:00.000Z'));
     level('s1', 'essay', 't1', 4);
-    expect(row('s1', 'essay')).toEqual({
+    expect(row('s1', 'essay')).toMatchObject({
       is_draft: true,
       returned_at: '2026-11-09T18:00:00.000Z',
       returned_copy: three,
     });
+    // Beside the copy, the entries it was made from and where they sat (first).
+    expect(row('s1', 'essay').local.entries.map(e => [e.tagId, e.score])).toEqual([['t1', 3]]);
+    expect(row('s1', 'essay').local.after).toBe(null);
     give('essay', 's1');
     expect(row('s1', 'essay')).toEqual({
       is_draft: false,
@@ -440,7 +452,7 @@ describe('Return', () => {
     expect(state('s1', 'essay')).toBe('returned');
     expect(row('s1', 'essay')).toBe(null);
     level('s1', 'essay', 't1', 4);
-    expect(row('s1', 'essay')).toEqual({ is_draft: true, returned_copy: three });
+    expect(row('s1', 'essay')).toMatchObject({ is_draft: true, returned_copy: three });
   });
 
   it('Grader.returnGrades returns them and reports the state', () => {
@@ -741,21 +753,19 @@ describe('"not loaded" is not "none"', () => {
   it('a signed-in class that holds grades throws until its rows have loaded, then reads them', () => {
     // As S0-W1 will have it: the class's settings read as the server has them.
     globalThis.getReturnSettings = () => HELD;
-    expect(_cache.gradeReturns[LIVE]).toBeUndefined();
+    delete _gradeReturnsLoadedFor[LIVE];
     expect(() => getReturnedScores(LIVE)).toThrow(/has not loaded.*no draft is shown/);
     // And again: the failure is not remembered as an answer.
     expect(() => getReturnedScores(LIVE)).toThrow(/has not loaded/);
     // calc.js works out no grade.
-    expect(() => withReturnedOnly(() => getScoreComment(LIVE, U(11), U(31)) + _scoreRead.scores(LIVE))).toThrow(
-      /has not loaded/,
-    );
+    expect(() => withReturnedOnly(() => _scoreRead.scores(LIVE))).toThrow(/has not loaded/);
     // Loaded, and the class has none: every grade is returned.
-    _cache.gradeReturns[LIVE] = {};
+    _loadGradeReturns(LIVE, {});
     expect(getReturnedScores(LIVE)).toBe(getScores(LIVE));
     // Loaded, with a draft never returned: it is not there.
-    _cache.gradeReturns[LIVE] = { [U(31)]: { [U(11)]: { is_draft: true } } };
-    delete _returnedSets[LIVE];
+    _loadGradeReturns(LIVE, { [U(31)]: { [U(11)]: { is_draft: true } } });
     expect(getReturnedScores(LIVE)).toEqual({ [U(11)]: [] });
+    delete _gradeReturnsLoadedFor[LIVE];
   });
 
   it('a class that holds no grades has no draft by rule: the working copy, loaded or not', () => {
@@ -988,8 +998,348 @@ describe('an Overall level on competency work, in a returned copy', () => {
     expect(back()).toEqual([['essay', 't2', 2, 0]]);
   });
 
-  it('beside a row the work no longer uses, nothing is', () => {
+  it('beside a row the work no longer uses, that row is read as the working copy would hold it', () => {
+    // Grade math hides what a piece is no longer scored by the same way in both sets.
     returnedAs({ value: 3, tags: { gone: { value: 2 } } });
-    expect(back()).toEqual([]);
+    expect(back()).toEqual([['essay', 'gone', 2, 0]]);
+  });
+});
+
+/* ── From the independent review of this PR ──────────────────── */
+
+describe('review: the returned set and real grade math', () => {
+  const R = 'c-review';
+  const ESSAY2 = { id: 'essay', title: 'Essay', date: '2026-10-10', type: 'summative', tagIds: ['ask', 'plan'] };
+  const LAB2 = { id: 'lab', title: 'Lab', date: '2026-10-11', type: 'summative', tagIds: ['plan'] };
+  const QUIZ_A = { id: 'qa', title: 'Quiz A', date: '2026-10-12', scoreMode: 'points', maxPoints: 10, tagIds: ['ask'] };
+  const QUIZ_B = { id: 'qb', title: 'Quiz B', date: '2026-10-12', scoreMode: 'points', maxPoints: 10, tagIds: ['ask'] };
+  const lvl = (sid, aid, tid, value) => upsertScore(R, sid, aid, tid, value, '', 'summative', '', 0);
+  const all = (sid, tid) => (clearProfCache(), getTagProficiency(R, sid, tid));
+  const returned = (sid, tid) => (clearProfCache(), withReturnedOnly(() => getTagProficiency(R, sid, tid)));
+  const method = name => saveCourseConfig(R, Object.assign({}, getCourseConfig(R), { calcMethod: name }));
+
+  beforeEach(() => {
+    localStorage.clear();
+    seedClass(R, {
+      students: STUDENTS,
+      assessments: [ESSAY2, LAB2, QUIZ_A, QUIZ_B].map(a => structuredClone(a)),
+      learningMaps: {
+        subjects: [],
+        sections: [
+          { id: 'sec1', name: 'Ask', tags: [{ id: 'ask', label: 'Ask', text: 'Ask questions' }] },
+          { id: 'sec2', name: 'Plan', tags: [{ id: 'plan', label: 'Plan', text: 'Plan a test' }] },
+        ],
+        _customized: true,
+        _version: 1,
+        _flatVersion: 2,
+      },
+      courseConfigs: { student_page_enabled: true, return_grades: 'on_return' },
+    });
+  });
+  afterEach(() => clearClass(R));
+
+  it('1. a draft on one competency never moves another’s returned-only level', () => {
+    lvl('s1', 'essay', 'ask', 3);
+    lvl('s1', 'essay', 'plan', 4);
+    lvl('s1', 'lab', 'plan', 2);
+    returnGrades(R, 'essay', ['s1']);
+    returnGrades(R, 'lab', ['s1']);
+    // Plan is taken off the Essay; its old level stays in the scores.
+    saveAssessments(
+      R,
+      getAssessments(R).map(a => (a.id === 'essay' ? Object.assign({}, a, { tagIds: ['ask'] }) : a)),
+    );
+    const plan = { all: all('s1', 'plan'), returned: returned('s1', 'plan') };
+    expect(plan.returned).toBe(plan.all);
+    lvl('s1', 'essay', 'ask', 2);
+    expect(GradeState.stateOf(R, 's1', 'essay')).toBe('draft');
+    expect(returned('s1', 'plan')).toBe(plan.returned);
+    expect(all('s1', 'plan')).toBe(plan.all);
+    expect(returned('s1', 'ask')).toBe(3);
+    returnGrades(R, 'essay', ['s1']);
+    expect(returned('s1', 'plan')).toBe(plan.returned);
+    expect(returned('s1', 'ask')).toBe(2);
+  });
+
+  it('2. a cleared points grade sits exactly where its entry sat, graded out of the class’s order', () => {
+    // Quiz B first (10/10), then Quiz A (2/10): the same date, the same competency.
+    setPointsScore(R, 's1', 'qb', 10);
+    setPointsScore(R, 's1', 'qa', 2);
+    returnGrades(R, 'qb', ['s1']);
+    returnGrades(R, 'qa', ['s1']);
+    const before = structuredClone(getScores(R).s1);
+    const numbers = {};
+    const METHODS = ['mostRecent', 'mode', 'decayingAvg', 'average', 'highest'];
+    METHODS.forEach(name => {
+      method(name);
+      numbers[name] = all('s1', 'ask');
+    });
+    setPointsScore(R, 's1', 'qa', null);
+    expect(getScores(R).s1.map(e => e.assessmentId)).toEqual(['qb']);
+    // Entry for entry, id and created too, in the order they were.
+    expect(getReturnedScores(R).s1).toEqual(before);
+    METHODS.forEach(name => {
+      method(name);
+      expect(returned('s1', 'ask'), name).toBe(numbers[name]);
+    });
+    // Cleared and typed again, the working entry moves to the end; the returned grade does not.
+    setPointsScore(R, 's1', 'qb', null);
+    setPointsScore(R, 's1', 'qb', 4);
+    expect(getScores(R).s1.map(e => e.assessmentId)).toEqual(['qb']);
+    expect(getReturnedScores(R).s1).toEqual(before);
+  });
+
+  it('3. Missing or Excused takes a piece out of the returned set with no draft on it; all-work is told apart', () => {
+    lvl('s1', 'essay', 'ask', 4);
+    lvl('s1', 'lab', 'plan', 2);
+    lvl('s1', 'essay', 'plan', 4);
+    returnGrades(R, 'essay', ['s1']);
+    returnGrades(R, 'lab', ['s1']);
+    ['NS', 'EXC'].forEach(status => {
+      // Written past the app, which refuses Missing and Excused on scored work.
+      const statuses = Object.assign({}, getAssignmentStatuses(R));
+      statuses['s1:essay'] = status;
+      saveAssignmentStatuses(R, statuses);
+      expect(getGradeReturn(R, 's1', 'essay').is_draft).toBe(false);
+      expect(getReturnedScores(R).s1.map(e => e.assessmentId)).toEqual(['lab']);
+      expect(returned('s1', 'plan')).toBe(2);
+      expect(returned('s1', 'ask')).toBe(0);
+      // The mark taken off, the returned grade is back.
+      saveAssignmentStatuses(R, {});
+      expect(getReturnedScores(R)).toBe(getScores(R));
+      expect(returned('s1', 'plan')).toBe(3);
+    });
+    // All-work, for the same data: Excused is out of every number; a Missing
+    // piece's stored levels still count in competency levels (calc.js skips
+    // a Missing piece there only when it has no levels).
+    saveAssignmentStatuses(R, { 's1:essay': 'EXC' });
+    expect(all('s1', 'plan')).toBe(2);
+    saveAssignmentStatuses(R, { 's1:essay': 'NS' });
+    expect(all('s1', 'plan')).toBe(3);
+    expect(returned('s1', 'plan')).toBe(2);
+  });
+});
+
+describe('review: a save is never broken or reordered by the rule', () => {
+  let real;
+  let reported;
+  let sentry;
+  beforeEach(() => {
+    real = {};
+    reported = [];
+    sentry = window.Sentry;
+    window.Sentry = { captureException: e => reported.push(e) };
+  });
+  afterEach(() => {
+    Object.keys(real).forEach(name => (GradeState[name] = real[name]));
+    window.Sentry = sentry;
+  });
+  const breakRule = names =>
+    names.forEach(name => {
+      real[name] = GradeState[name];
+      GradeState[name] = () => {
+        throw new Error('the rule broke: ' + name);
+      };
+    });
+  const everything = () => Object.keys(GradeState).filter(name => typeof GradeState[name] === 'function');
+
+  it('with the rule throwing, every save still lands in the cache and the saved copy, and the failure is reported', () => {
+    held();
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      breakRule(everything());
+      expect(level('s1', 'essay', 't1', 3)).toBe(true);
+      saveScoreComment(CID, 's1', 'essay', 'Careful work.');
+      saveTagComment(CID, 's1', 'essay', 't1', 'Say why');
+      saveRubricCriterionComment(CID, 's1', 'lab', 'c1', 'Number the steps');
+      setRubricCheck(CID, 's1', 'lab', 'k1', true);
+      setPointsScore(CID, 's1', 'quiz', 7);
+    } finally {
+      quiet.mockRestore();
+    }
+    const saved = JSON.parse(localStorage.getItem('gb-scores-' + CID));
+    expect(saved).toEqual(getScores(CID));
+    expect(saved.s1.map(e => [e.assessmentId, e.tagId, e.score])).toEqual(
+      expect.arrayContaining([
+        ['essay', 't1', 3],
+        ['quiz', 't1', 7],
+      ]),
+    );
+    expect(JSON.parse(localStorage.getItem('gb-rubric-checks-' + CID))).toEqual({ 's1:lab': ['k1'] });
+    expect(reported.length).toBeGreaterThanOrEqual(6);
+    expect(String(reported[0])).toMatch(/the rule broke/);
+  });
+
+  it('with the switch off no save touches GradeState at all, class settings included', async () => {
+    const LIVE = U(1);
+    seedClass(LIVE, {
+      students: [{ id: U(11), firstName: 'Jordan', lastName: 'Test' }],
+      assessments: [{ id: U(31), title: 'Essay', date: '2026-10-10', type: 'summative', tagIds: [U(51)] }],
+    });
+    const session = signIn();
+    try {
+      // As a stale cached grade-state.js beside a new data.js would be.
+      breakRule(everything());
+      upsertScore(LIVE, U(11), U(31), U(51), 3, '2026-10-10', 'summative', '', 0);
+      saveScores(LIVE, getScores(LIVE));
+      saveCourseConfig(LIVE, Object.assign({}, getCourseConfig(LIVE), { calcMethod: 'mostRecent' }));
+      await settle();
+      expect(session.sent().map(c => c[0])).toEqual(['upsert_tag_score', 'update_course']);
+      expect(JSON.parse(localStorage.getItem('gb-courseconfig-' + LIVE)).calcMethod).toBe('mostRecent');
+      expect(reported).toEqual([]);
+    } finally {
+      session.signOut();
+      clearClass(LIVE);
+    }
+    // And on this device, with the switch off.
+    seed();
+    level('s1', 'essay', 't1', 3);
+    saveCourseConfig(CID, Object.assign({}, getCourseConfig(CID), { calcMethod: 'mostRecent' }));
+    expect(reported).toEqual([]);
+  });
+
+  it('a class leaving When I Return Them with the rule throwing still saves its settings', () => {
+    held();
+    level('s1', 'essay', 't1', 3);
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      breakRule(['afterSettingChange']);
+      setStudentPageSwitch(CID, true, 'on_save');
+    } finally {
+      quiet.mockRestore();
+    }
+    expect(getCourseConfig(CID).return_grades).toBe('on_save');
+    expect(JSON.parse(localStorage.getItem('gb-courseconfig-' + CID)).return_grades).toBe('on_save');
+    expect(reported.length).toBe(1);
+  });
+});
+
+describe('review: rows from the server, and leftovers', () => {
+  const LIVE = U(1);
+  const HELD = { student_page: true, return_grades: 'on_return' };
+  let session;
+  let realSettings;
+  beforeEach(() => {
+    seedClass(LIVE, {
+      students: [{ id: U(11), firstName: 'Jordan', lastName: 'Test' }],
+      assessments: [{ id: U(31), title: 'Essay', date: '2026-10-10', type: 'summative', tagIds: [U(51)] }],
+      scores: {
+        [U(11)]: [
+          { id: 'e1', assessmentId: U(31), tagId: U(51), score: 3, date: '2026-10-10', type: 'summative', note: '' },
+        ],
+      },
+    });
+    session = signIn();
+    realSettings = globalThis.getReturnSettings;
+    delete _gradeReturnsLoadedFor[LIVE];
+  });
+  afterEach(() => {
+    globalThis.getReturnSettings = realSettings;
+    session.signOut();
+    clearClass(LIVE);
+    delete _gradeReturnsLoadedFor[LIVE];
+  });
+
+  it('5. only a real load makes a signed-in class’s rows loaded: a row saved or read on the device does not', () => {
+    globalThis.getReturnSettings = () => HELD;
+    // A row read from a saved copy.
+    localStorage.setItem('gb-grade-returns-' + LIVE, JSON.stringify({ [U(31)]: { [U(11)]: { is_draft: false } } }));
+    expect(getGradeReturn(LIVE, U(11), U(31))).toEqual({ is_draft: false });
+    expect(() => getReturnedScores(LIVE)).toThrow(/has not loaded/);
+    // A row saved on the device.
+    _saveGradeReturns(LIVE, { [U(31)]: { [U(11)]: { is_draft: false, returned_at: '2026-11-03T17:00:00.000Z' } } });
+    expect(() => getReturnedScores(LIVE)).toThrow(/has not loaded/);
+    // The load: the one way in. It drops what was built and the cached numbers.
+    const realClear = globalThis.clearProfCache;
+    let cleared = 0;
+    globalThis.clearProfCache = () => (cleared++, realClear());
+    try {
+      _loadGradeReturns(LIVE, {});
+      expect(cleared).toBe(1);
+      expect(getReturnedScores(LIVE)).toBe(getScores(LIVE));
+      _loadGradeReturns(LIVE, { [U(31)]: { [U(11)]: { is_draft: true } } });
+      expect(cleared).toBe(2);
+      expect(getReturnedScores(LIVE)).toEqual({ [U(11)]: [] });
+      expect(JSON.parse(localStorage.getItem('gb-grade-returns-' + LIVE))[U(31)][U(11)].is_draft).toBe(true);
+      // Something not a set of rows is none.
+      _loadGradeReturns(LIVE, null);
+      expect(getGradeReturns(LIVE)).toEqual({});
+    } finally {
+      globalThis.clearProfCache = realClear;
+    }
+  });
+
+  it('5. the returned set is built again when the rows change under it', () => {
+    globalThis.getReturnSettings = () => HELD;
+    _loadGradeReturns(LIVE, {});
+    const first = getReturnedScores(LIVE);
+    expect(first).toBe(getScores(LIVE));
+    // Rows put straight into the cache, with no setter and no save.
+    _cache.gradeReturns[LIVE] = { [U(31)]: { [U(11)]: { is_draft: true } } };
+    expect(getReturnedScores(LIVE)).toEqual({ [U(11)]: [] });
+    _cache.gradeReturns[LIVE] = {};
+    expect(getReturnedScores(LIVE)).toBe(getScores(LIVE));
+  });
+
+  it('8. Return is refused in a class that does not hold grades, whatever rows are on the device', () => {
+    localStorage.setItem('gb-grade-returns-' + LIVE, JSON.stringify({ [U(31)]: { [U(11)]: { is_draft: true } } }));
+    const before = localStorage.getItem('gb-grade-returns-' + LIVE);
+    expect(returnGrades(LIVE, U(31), [U(11)])).toEqual({ returned: 0, enrollment_ids: [], returned_at: null });
+    expect(localStorage.getItem('gb-grade-returns-' + LIVE)).toBe(before);
+    // As Soon As I Save, on this device: the same.
+    session.signOut();
+    try {
+      seed({ student_page_enabled: true, return_grades: 'on_save' });
+      level('s1', 'essay', 't1', 3);
+      expect(returnGrades(CID, 'essay', ['s1']).returned).toBe(0);
+    } finally {
+      session = signIn();
+    }
+  });
+
+  it('8. a withdrawn student deleted for good takes their rows; a Note for the Report reaches the returned set', () => {
+    session.signOut();
+    try {
+      held();
+      level('s1', 'essay', 't1', 3);
+      level('s2', 'essay', 't1', 3);
+      give('essay', 's1');
+      level('s1', 'essay', 't1', 4);
+      expect(getReturnedScores(CID).s1[0].reportNote).toBeUndefined();
+      saveScoreReportNote(CID, 's2', 'essay', 'explained her method');
+      saveScoreReportNote(CID, 's1', 'essay', 'linked two sources');
+      // s2's draft is not there; s1's returned grade is, and the set was built again.
+      expect(getReturnedScores(CID).s2).toEqual([]);
+      expect(getReturnedScores(CID).s1.map(e => e.score)).toEqual([3]);
+      expect(withdrawStudent(CID, 's1')).toBeTruthy();
+      expect(getGradeReturn(CID, 's1', 'essay')).not.toBe(null);
+      expect(deleteWithdrawnStudent(CID, 's1')).toBe(true);
+      expect(getGradeReturn(CID, 's1', 'essay')).toBe(null);
+      expect(JSON.parse(storedRows()).essay.s1).toBeUndefined();
+      expect(getGradeReturn(CID, 's2', 'essay')).toEqual({ is_draft: true });
+    } finally {
+      session = signIn();
+    }
+  });
+
+  it('8. another tab’s Return makes this one read the class again', () => {
+    expect(_isGradebookField('gradeReturns')).toBe(true);
+  });
+});
+
+describe('review: a tick is part of a grade for the state a screen shows', () => {
+  it('work with only ticks, and a cleared grade whose ticks remain, are Returned once returned', () => {
+    held();
+    setRubricCheck(CID, 's1', 'lab', 'k1', true);
+    expect(state('s1', 'lab')).toBe('draft');
+    give('lab', 's1');
+    expect(state('s1', 'lab')).toBe('returned');
+    level('s2', 'lab', 'c1', 3);
+    setRubricCheck(CID, 's2', 'lab', 'k1', true);
+    give('lab', 's2');
+    saveScores(CID, clearScoreEntries(CID, getScores(CID), 's2', LAB, ['c1', 'c2']));
+    give('lab', 's2');
+    expect(row('s2', 'lab')).toMatchObject({ is_draft: false });
+    expect(state('s2', 'lab')).toBe('returned');
   });
 });

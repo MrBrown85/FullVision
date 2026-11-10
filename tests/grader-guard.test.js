@@ -46,6 +46,7 @@ const WRITERS = [
   'saveAssignmentStatuses', // the class's whole status list
   'saveRubricChecks', // the class's whole tick list
   'moveRubricScores', // scores follow an assessment to another rubric
+  'returnGrades', // Return: the students are given their grade (S0-F2)
 ];
 
 // data.js holds the writers; grader.js is the one caller; seed-data.js
@@ -79,7 +80,8 @@ function sources() {
   return out;
 }
 
-const CALL = new RegExp('(?<![\\w$])(?:' + WRITERS.join('|') + ')\\(', 'g');
+// Grader.returnGrades is the grader's own action, named as the writer it calls.
+const CALL = new RegExp('(?<![\\w$])(?<!Grader\\.)(?:' + WRITERS.join('|') + ')\\(', 'g');
 
 function count(src) {
   return (src.match(CALL) || []).length;
