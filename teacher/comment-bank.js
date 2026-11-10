@@ -2546,7 +2546,7 @@ window.CommentBank = (function () {
       .map(function (a) {
         var v = getAssessmentOverallScore(cid, sid, a.id);
         // The teacher's Note for the Report on the piece, for the best-piece sentence.
-        var note = ReportScores.reportNote(cid, sid, a.id);
+        var note = ReportScores.getScoreReportNote(cid, sid, a.id);
         // Points work's own % (points earned out of possible, calc.js), the
         // mark a Letter class prints for it (workMark): its level is only a
         // band of that %. Rubric work's own % is its criteria's percents, as

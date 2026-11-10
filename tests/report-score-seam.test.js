@@ -91,15 +91,36 @@ const STORED = /gb-(scores|statuses|rubric-checks)-/;
 // Sorting the roster by name reads no score; by Missing or by grade it does.
 const NAME_SORTS = ['lastName', 'firstName'];
 
-function eachNode(node, visit, parent) {
+function eachNode(node, visit, parent, grandparent) {
   if (!node || typeof node.type !== 'string') return;
-  visit(node, parent);
+  visit(node, parent, grandparent);
   Object.keys(node).forEach(key => {
     const value = node[key];
-    if (Array.isArray(value)) value.forEach(child => eachNode(child, visit, node));
-    else if (value && typeof value.type === 'string') eachNode(value, visit, node);
+    if (Array.isArray(value)) value.forEach(child => eachNode(child, visit, node, parent));
+    else if (value && typeof value.type === 'string') eachNode(value, visit, node, parent);
   });
 }
+
+/* ReportScores' readers have the data layer's names, so that
+   `ReportScores.getScoreComment(…)` is how a report file reads a comment.
+   A name written that way is the seam's reader, not the data layer's. */
+const isSeamReader = (node, parent) =>
+  !!parent &&
+  parent.type === 'MemberExpression' &&
+  !parent.computed &&
+  parent.property === node &&
+  parent.object.type === 'Identifier' &&
+  parent.object.name === 'ReportScores';
+
+// A key in an object being made ({ getScores: … }) names nothing that is read.
+const isKeyBeingMade = (node, parent, grandparent) =>
+  !!parent &&
+  parent.type === 'Property' &&
+  !parent.computed &&
+  parent.key === node &&
+  parent.value !== node &&
+  !!grandparent &&
+  grandparent.type === 'ObjectExpression';
 
 const isNameSort = arg =>
   !!arg &&
@@ -107,9 +128,9 @@ const isNameSort = arg =>
     (arg.type === 'ConditionalExpression' && isNameSort(arg.consequent) && isNameSort(arg.alternate)));
 
 /* Every way a piece of source goes around the seam, counted by name:
-   a forbidden name as an identifier, a property or a string (comments are
-   not code and do not count), a stored-scores key, and a roster sort that
-   is not by name. */
+   a forbidden name as an identifier, a property of anything but
+   ReportScores, or a string (comments are not code and do not count), a
+   stored-scores key, and a roster sort that is not by name. */
 function aroundTheSeam(source) {
   const found = {};
   const add = what => (found[what] = (found[what] || 0) + 1);
@@ -126,9 +147,10 @@ function aroundTheSeam(source) {
       }
     }
   });
-  eachNode(ast, node => {
+  eachNode(ast, (node, parent, grandparent) => {
     if (node.type === 'Identifier') {
-      if (FORBIDDEN.has(node.name)) add(node.name);
+      if (FORBIDDEN.has(node.name) && !isSeamReader(node, parent) && !isKeyBeingMade(node, parent, grandparent))
+        add(node.name);
       // sortStudents kept under another name, or handed on, could sort by anything.
       if (node.name === 'sortStudents' && !sortCalls.has(node)) add('sortStudents (not called)');
     }
@@ -144,26 +166,12 @@ function aroundTheSeam(source) {
 /* The reads left outside the seam, each with its reason. Anything else,
    or one more of these, fails.
 
-   teacher/export-all.js: Export is the teacher's own record and stays on
-   all work (plan 1.3, the artboard). tests/export-all.test.js checks that
-   it names each of the data layer's readers, so it keeps the data layer's
-   own. They are allowed only while the 'exportData' row says 'all' (a test
-   below holds the row there).
-
    teacher/report-preview.js: asks whether the class has any score at all,
    to choose between the reports and "No report data yet". It prints no
    grade. The file was outside S2-T1's files; it is drawn inside
    withReportScores by page-reports.js, and moving this one read to
-   ReportScores.scores is a one-line change for S2-F1. */
+   ReportScores.getScores is a one-line change for S2-F1. */
 const LEFT_OUTSIDE = {
-  'teacher/export-all.js': {
-    getAssignmentStatuses: 1,
-    getRubricCriterionComment: 1,
-    getRubricCriterionBeyond: 1,
-    getScoreComment: 1,
-    getScoreReportNote: 1,
-    getTagComment: 1,
-  },
   'teacher/report-preview.js': { getScores: 1 },
 };
 
@@ -292,9 +300,9 @@ describe('report files read scores only through ReportScores', () => {
     expect(aroundTheSeam(read(file))).toEqual(LEFT_OUTSIDE[file] || {});
   });
 
-  it('allows Export its own reads only while Export stays on all work', () => {
-    // Plan 1.3: Print Grades and Export use all work (the artboard). Before
-    // either row changes, that file's reads move to ReportScores first.
+  it('keeps Print Grades and Export on all work', () => {
+    // Plan 1.3: Print Grades and Export use all work (the artboard). A PR
+    // that changes either row changes this test, and says why.
     expect(ReportScores.reportScoreSet('exportData')).toBe('all');
     expect(ReportScores.reportScoreSet('printGrades')).toBe('all');
     expect(SEAM_SOURCE).toMatch(/\n\s*printGrades: 'all',/);
@@ -307,6 +315,10 @@ describe('report files read scores only through ReportScores', () => {
     expect(caught('var s = getAssignmentStatus(cid, sid, aid);')).toEqual(['getAssignmentStatus']);
     expect(caught('var s = typeof getScoreReportNote === "function" ? 1 : 0;')).toEqual(['getScoreReportNote']);
     expect(caught('var read = window.getScoreComment;')).toEqual(['getScoreComment']);
+    expect(caught('var c = dataLayer.getScoreComment(cid, sid, aid);')).toEqual(['getScoreComment']);
+    expect(caught('var c = ReportScores["getScoreComment"](cid, sid, aid);')).toEqual(['getScoreComment']);
+    expect(caught('var readers = { note: getScoreReportNote };')).toEqual(['getScoreReportNote']);
+    expect(caught('var { getTagComment } = window;')).toEqual(['getTagComment']);
     expect(caught('var read = window["getRubricCheckIds"];')).toEqual(['getRubricCheckIds']);
     expect(caught('var { getPointsScore: read } = window;')).toEqual(['getPointsScore']);
     expect(caught('var x = _cache.scores[cid];')).toEqual(['_cache']);
@@ -326,7 +338,13 @@ describe('report files read scores only through ReportScores', () => {
     // What a report file may write.
     expect(caught('var list = sortStudents(getStudents(cid), "lastName");')).toEqual([]);
     expect(caught('var list = sortStudents(getStudents(cid), first ? "firstName" : "lastName");')).toEqual([]);
-    expect(caught('var all = ReportScores.entries(cid, sid); var s = ReportScores.status(cid, sid, aid);')).toEqual([]);
+    expect(
+      caught('var all = ReportScores.entries(cid, sid); var s = ReportScores.getAssignmentStatus(cid, sid, aid);'),
+    ).toEqual([]);
+    expect(caught('var c = ReportScores.getScoreComment(cid, sid, aid) || ReportScores.getScores(cid)[sid];')).toEqual(
+      [],
+    );
+    expect(caught('var api = { getScores: scores, getScoreComment: comment };')).toEqual([]);
     expect(caught('/* getScores(cid) is read through ReportScores */ var x = 1; // getAssignmentStatus')).toEqual([]);
   });
 
@@ -507,7 +525,7 @@ describe('ReportScores', () => {
       surface: ReportScores.reportScoreSet('printGrades'),
       nested: ReportScores.withReportScores('printGrades', () => _scoreSet),
       entries: ReportScores.entries('c', 's1'),
-      comment: ReportScores.comment('c', 's1', 'a1'),
+      comment: ReportScores.getScoreComment('c', 's1', 'a1'),
     }));
     expect(inside.set).toBe('returned');
     expect(inside.surface).toBe('returned');
@@ -580,7 +598,8 @@ describe('ReportScores', () => {
     it('checklist ticks have no returned reader yet: on returned grades they stop with an error, never the draft ticks', () => {
       loadSeam({ progress: 'returned' });
       globalThis.getReturnedScores = () => ({});
-      const ticks = () => ReportScores.withReportScores('progress', () => ReportScores.checkIds('c', 's1', 'a1'));
+      const ticks = () =>
+        ReportScores.withReportScores('progress', () => ReportScores.getRubricCheckIds('c', 's1', 'a1'));
       expect(ticks).toThrow(/returned checklist ticks/);
       globalThis.getReturnedRubricCheckIds = (cid, sid, aid) => [cid, sid, aid];
       expect(ticks()).toEqual(['c', 's1', 'a1']);
@@ -589,6 +608,24 @@ describe('ReportScores', () => {
 });
 
 /* ── 3 and 4. Behaviour, on the Demo class ───────────────────── */
+
+/* The calc.js functions that read no score: they format a number they are
+   given, read a setting or the report's term, or do arithmetic on what is
+   passed in. A report file may call them anywhere. Every other function
+   calc.js gives out is taken to read grades, and a report file calls it
+   only inside withReportScores; a new one is watched until it is listed
+   here. */
+const NO_SCORE = new Set([
+  // The class's grading style: Proficiency, Letter or Both (a setting).
+  'courseGradeMode',
+  // A level it is given, as the class shows it.
+  'formatLevel',
+  // A level it is given, as its proficiency word.
+  'levelWord',
+  // The report's term: which one is in view, and putting one in view (the Reports page).
+  'getActiveTerm',
+  'setActiveTerm',
+]);
 
 // Each drawing of the class takes a few seconds; a slow runner gets a minute.
 describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
@@ -663,6 +700,36 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
     return { outside: Array.from(outside).sort(), inside };
   }
 
+  /* calc.js keeps what it has worked out, so a grade asked for twice is read
+     once: a read outside the seam can hide behind an earlier one. This
+     watches the asking instead. Runs `fn` and gives back every call a
+     report file made to calc.js for a grade while no report surface was
+     running: "function from file:line". */
+  function gradesAskedOutsideTheSeam(fn) {
+    const names = Object.keys(Calc).filter(name => typeof globalThis[name] === 'function' && !NO_SCORE.has(name));
+    const kept = {};
+    const outside = new Set();
+    let inside = 0;
+    names.forEach(name => {
+      kept[name] = globalThis[name];
+      globalThis[name] = function () {
+        if (ReportScores.running() !== null) inside++;
+        else {
+          // The line that called calc.js: the frame above this one.
+          const caller = ((new Error().stack || '').split('\n')[2] || '').match(/(teacher|shared)\/[a-z-]+\.js:\d+/);
+          if (caller && REPORT_FILES.indexOf(caller[0].split(':')[0]) >= 0) outside.add(name + ' from ' + caller[0]);
+        }
+        return kept[name].apply(this, arguments);
+      };
+    });
+    try {
+      fn();
+    } finally {
+      names.forEach(name => (globalThis[name] = kept[name]));
+    }
+    return { outside: Array.from(outside).sort(), inside, watched: names.length };
+  }
+
   it('the spy sees a read made outside the seam', () => {
     const student = getStudents(cid)[0];
     const bare = readsOutsideTheSeam(() => getOverallProficiency(cid, student.id));
@@ -689,6 +756,21 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
     expect(reads.inside).toBeGreaterThan(1000);
   });
 
+  it('every grade a report file asks calc.js for while a surface is drawn is asked for inside withReportScores', async () => {
+    await settle();
+    freshGenerate();
+    // No clearProfCache: a grade calc.js already holds is still a grade asked for.
+    const asked = gradesAskedOutsideTheSeam(() => surfaces(cid, null, { handout: false }));
+    expect(asked.outside).toEqual([]);
+    expect(asked.inside).toBeGreaterThan(1000);
+    expect(asked.watched).toBeGreaterThan(60);
+    // It sees one: the rubric sheet asked for as Print Rubrics asks, outside every report.
+    const lab = getAssessments(cid).find(a => a.rubricId);
+    const scored = getStudents(cid).find(s => getAssessmentOverallScore(cid, s.id, lab.id) > 0);
+    const handout = gradesAskedOutsideTheSeam(() => RubricPrint.sheetData(cid, lab.id, scored.id));
+    expect(handout.outside.join(' ')).toContain('getAssessmentOverallScore from teacher/rubric-print.js');
+  });
+
   it('no function run inside withReportScores leaves work for later (S2-F1 would refuse it)', async () => {
     await settle();
     clearProfCache();
@@ -710,10 +792,15 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
     expect(runs).toBeGreaterThan(1000);
   });
 
-  /* The class with drafts: for every second student everything dated
-     after July is a draft never returned, and for every student the last
-     two pieces of the year are. One student's lab also has a draft Overall
-     Comment, criterion comment, Note for the Report and ticks. */
+  /* The class with drafts.
+     Never returned: for every second student everything dated after July,
+     and for every student the last two pieces of the year. One of those
+     students' labs (an Advanced Rubric) also has a draft Overall Comment,
+     criterion comment, Note for the Report and tick.
+     Changed since they were returned: another student's quiz, their
+     Complete/Incomplete piece and their lab. The working copy holds the
+     new score, comment and ticks; the returned set holds what the student
+     was given. */
   function classWithDrafts() {
     const assessments = getAssessments(cid);
     const late = new Set(assessments.filter(a => a.date > '2026-10-28').map(a => a.id));
@@ -726,13 +813,14 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
     const student = getStudents(cid).find(
       (s, i) => i % 2 && (working[s.id] || []).some(e => afterJuly.has(e.assessmentId)),
     );
+    const advanced = a => !!a.rubricId && rubricStyle(getRubricById(cid, a.rubricId)) === 'advanced';
     const lab = assessments.find(
       a =>
-        a.rubricId &&
+        advanced(a) &&
         afterJuly.has(a.id) &&
         (working[student.id] || []).some(e => e.assessmentId === a.id && e.score > 0),
     );
-    expect(lab, 'a scored rubric piece among the drafts').toBeTruthy();
+    expect(lab, 'a scored Advanced Rubric piece among the drafts').toBeTruthy();
     const scores = structuredClone(working);
     scores[student.id].forEach(e => {
       if (e.assessmentId !== lab.id) return;
@@ -743,7 +831,8 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
     const rubric = getRubricById(cid, lab.rubricId);
     const checks = structuredClone(ticks);
     const someCheck = (rubric.criteria || []).flatMap(c => c.checks || [])[0];
-    if (someCheck) checks[student.id + ':' + lab.id] = [someCheck.id];
+    expect(someCheck, 'the lab has checkboxes').toBeTruthy();
+    checks[student.id + ':' + lab.id] = [someCheck.id];
     // What students have been given: the working copy without the drafts.
     const returned = {};
     Object.keys(scores).forEach(sid => {
@@ -754,7 +843,42 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
       const [sid, aid] = key.split(':');
       if (!(drafts[sid] && drafts[sid].has(aid))) returnedTicks[key] = checks[key];
     });
-    return { scores, checks, returned, returnedTicks, student, lab, tick: someCheck || null };
+    // Changed since they were returned.
+    const other = getStudents(cid).find((s, i) => !(i % 2));
+    const given = a =>
+      !late.has(a.id) &&
+      (returned[other.id] || []).some(e => e.assessmentId === a.id && e.score != null && e.score !== '');
+    const quiz = assessments.find(a => isPointsScored(a) && !isCompletionScored(a) && given(a));
+    const check = assessments.find(a => isCompletionScored(a) && given(a));
+    const lab2 = assessments.find(a => advanced(a) && given(a));
+    expect(quiz && check && lab2, 'a returned quiz, Complete/Incomplete piece and lab').toBeTruthy();
+    const change = (a, now, was) => {
+      scores[other.id].filter(e => e.assessmentId === a.id).forEach(now);
+      returned[other.id].filter(e => e.assessmentId === a.id).forEach(was);
+    };
+    change(
+      quiz,
+      e => Object.assign(e, { score: Number(e.score) > 0 ? 0 : 1, note: 'ZZDRAFT changed quiz comment.' }),
+      e => Object.assign(e, { note: 'Returned quiz comment.' }),
+    );
+    change(
+      check,
+      e => Object.assign(e, { score: Number(e.score) > 0 ? 0 : 1, note: 'ZZDRAFT changed check comment.' }),
+      e => Object.assign(e, { note: 'Returned check comment.' }),
+    );
+    change(
+      lab2,
+      e => Object.assign(e, { score: e.score >= 4 ? 2 : 4, critNote: 'ZZDRAFT changed criterion comment.' }),
+      e => Object.assign(e, { critNote: 'Returned criterion comment.' }),
+    );
+    const key2 = other.id + ':' + lab2.id;
+    const was = (checks[key2] || []).slice();
+    const every = (getRubricById(cid, lab2.rubricId).criteria || []).flatMap(c => (c.checks || []).map(x => x.id));
+    returnedTicks[key2] = was;
+    // The draft ticks are the ones that were not ticked before.
+    checks[key2] = every.filter(id => was.indexOf(id) < 0);
+    expect(checks[key2].length && was.length, 'ticks before and after').toBeTruthy();
+    return { scores, checks, returned, returnedTicks, student, lab, tick: someCheck, other, quiz, check, lab2 };
   }
 
   it('with the reports’ rows on returned, each report is the report of a class that has only the returned grades', async () => {
@@ -808,13 +932,20 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
     expect(holding(allWork, ['quick'], 'ZZDRAFT overall comment.').length).toBeGreaterThan(0);
     expect(holding(allWork, ['quick'], 'ZZDRAFT criterion comment.').length).toBeGreaterThan(0);
     expect(holding(allWork, ['questionnaire'], 'ZZDRAFT note for the report').length).toBeGreaterThan(0);
-    if (c.tick) {
-      const card = k => JSON.parse(allWork[k]).feedback.find(item => item.id === c.lab.id);
-      const key = 'year › quick › ' + c.student.id;
-      const tickedOn = item =>
-        item.rubric.rows.some(row => Object.values(row.checks || {}).some(list => list.some(x => x.ticked)));
-      expect(tickedOn(card(key))).toBe(true);
-    }
+    expect(holding(allWork, ['quick'], 'ZZDRAFT changed quiz comment.').length).toBeGreaterThan(0);
+    expect(holding(allWork, ['quick'], 'ZZDRAFT changed check comment.').length).toBeGreaterThan(0);
+    expect(holding(allWork, ['quick'], 'ZZDRAFT changed criterion comment.').length).toBeGreaterThan(0);
+    // The ticks on a Feedback Page's card, as ids.
+    const ticksOn = (drawn, sid, aid) =>
+      JSON.parse(drawn['year › quick › ' + sid])
+        .feedback.filter(item => item.id === aid)
+        .flatMap(item => item.rubric.rows)
+        .flatMap(row => Object.values(row.checks || {}).flat())
+        .filter(x => x.ticked)
+        .map(x => x.id)
+        .sort();
+    expect(ticksOn(allWork, c.student.id, c.lab.id)).toEqual([c.tick.id]);
+    expect(ticksOn(allWork, c.other.id, c.lab2.id)).toEqual(c.checks[c.other.id + ':' + c.lab2.id].slice().sort());
 
     loadSeam(REPORTS_ON_RETURNED);
     globalThis.getReturnedScores = () => c.returned;
@@ -824,9 +955,17 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
     // The piece itself is not on the student's Feedback Pages: its grade was never returned.
     const feedback = JSON.parse(onReturned['year › quick › ' + c.student.id]).feedback;
     expect(feedback.find(item => item.id === c.lab.id)).toBeUndefined();
+    // What was changed since it was returned prints as it was returned: the comments and the ticks.
+    expect(holding(onReturned, ['quick'], 'Returned quiz comment.').length).toBeGreaterThan(0);
+    expect(holding(onReturned, ['quick'], 'Returned check comment.').length).toBeGreaterThan(0);
+    expect(holding(onReturned, ['quick'], 'Returned criterion comment.').length).toBeGreaterThan(0);
+    expect(ticksOn(onReturned, c.other.id, c.lab2.id)).toEqual(
+      c.returnedTicks[c.other.id + ':' + c.lab2.id].slice().sort(),
+    );
     // The teacher's own record keeps it.
     expect(holding(onReturned, ['export'], 'ZZDRAFT overall comment.').length).toBe(1);
     expect(holding(onReturned, ['export'], 'ZZDRAFT note for the report').length).toBe(1);
+    expect(holding(onReturned, ['export'], 'ZZDRAFT changed quiz comment.').length).toBe(1);
   });
 
   it('levels a render keeps are kept for one set: a block drawn on all work, then on returned grades in the same task', async () => {
@@ -870,8 +1009,8 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
     });
     globalThis.getReturnedScores = () => c.returned;
     const notes = () => [
-      ReportScores.reportNote(cid, c.student.id, c.lab.id),
-      ReportScores.reportNote(cid, c.student.id, returnedPiece.assessmentId),
+      ReportScores.getScoreReportNote(cid, c.student.id, c.lab.id),
+      ReportScores.getScoreReportNote(cid, c.student.id, returnedPiece.assessmentId),
     ];
     expect(notes()).toEqual(['ZZDRAFT note for the report', 'Linked the poster to the Act']);
     expect(withReturnedOnly(notes)).toEqual(['', 'Linked the poster to the Act']);
@@ -890,16 +1029,16 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
         getAssessments(cid).forEach(a => {
           const rubric = a.rubricId ? getRubricById(cid, a.rubricId) : null;
           out.push([
-            via.pointsScore(cid, s.id, a.id),
-            via.completionMark(cid, s.id, a.id),
-            via.comment(cid, s.id, a.id),
-            via.reportNote(cid, s.id, a.id),
-            via.checkIds(cid, s.id, a.id),
-            via.status(cid, s.id, a.id),
-            (a.tagIds || []).map(t => via.tagComment(cid, s.id, a.id, t)),
+            via.getPointsScore(cid, s.id, a.id),
+            via.getCompletionMark(cid, s.id, a.id),
+            via.getScoreComment(cid, s.id, a.id),
+            via.getScoreReportNote(cid, s.id, a.id),
+            via.getRubricCheckIds(cid, s.id, a.id),
+            via.getAssignmentStatus(cid, s.id, a.id),
+            (a.tagIds || []).map(t => via.getTagComment(cid, s.id, a.id, t)),
             ((rubric && rubric.criteria) || []).map(crit => [
-              via.criterionComment(cid, s.id, a.id, crit),
-              via.criterionBeyond(cid, s.id, a.id, crit),
+              via.getRubricCriterionComment(cid, s.id, a.id, crit),
+              via.getRubricCriterionBeyond(cid, s.id, a.id, crit),
             ]),
           ]);
         });
@@ -908,21 +1047,23 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
     };
     const dataLayer = readAll({
       entries: (id, sid) => getScores(id)[sid] || [],
-      pointsScore: getPointsScore,
-      completionMark: getCompletionMark,
-      comment: getScoreComment,
-      reportNote: getScoreReportNote,
-      checkIds: getRubricCheckIds,
-      status: getAssignmentStatus,
-      tagComment: getTagComment,
-      criterionComment: getRubricCriterionComment,
-      criterionBeyond: getRubricCriterionBeyond,
+      getPointsScore,
+      getCompletionMark,
+      getScoreComment,
+      getScoreReportNote,
+      getRubricCheckIds,
+      getAssignmentStatus,
+      getTagComment,
+      getRubricCriterionComment,
+      getRubricCriterionBeyond,
     });
+    expect(ReportScores.getScores(cid)).toBe(getScores(cid));
+    expect(withReturnedOnly(() => ReportScores.getScores(cid))).toBe(getScores(cid));
     // On all work the readers are the data layer's own.
     expect(readAll(ReportScores)).toBe(dataLayer);
     // On returned grades they work it out from the returned set: the same, with nothing in draft.
     expect(withReturnedOnly(() => readAll(ReportScores))).toBe(dataLayer);
     expect(dataLayer).toContain('ZZDRAFT criterion comment.');
-    expect(ReportScores.statuses(cid)).toBe(getAssignmentStatuses(cid));
+    expect(ReportScores.getAssignmentStatuses(cid)).toBe(getAssignmentStatuses(cid));
   });
 });

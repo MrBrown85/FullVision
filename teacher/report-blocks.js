@@ -1502,7 +1502,9 @@ window.ReportBlocks = (function () {
         .sort((a, b) => b.avg - a.avg);
       // Missing: assessments with tags in this section labelled Missing.
       const missingAssess = assessments.filter(
-        a => (a.tagIds || []).some(tid => secTagIds.has(tid)) && ReportScores.status(cid, student.id, a.id) === 'NS',
+        a =>
+          (a.tagIds || []).some(tid => secTagIds.has(tid)) &&
+          ReportScores.getAssignmentStatus(cid, student.id, a.id) === 'NS',
       );
 
       // 4-dot proficiency indicator
@@ -1649,7 +1651,7 @@ window.ReportBlocks = (function () {
       .slice(0, 3);
 
     // Missing assignments: work labelled Missing.
-    const missing = assessments.filter(a => ReportScores.status(cid, student.id, a.id) === 'NS');
+    const missing = assessments.filter(a => ReportScores.getAssignmentStatus(cid, student.id, a.id) === 'NS');
 
     // Proficient+ percentage for circle gauge
     const profPlus = counts[3] + counts[4];

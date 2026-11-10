@@ -124,7 +124,7 @@ window.ReportFeedback = (function () {
   /* The item for one assessment, or null when it has nothing to show. */
   function _item(cid, student, a, dateIso, cats) {
     var sid = student.id;
-    var status = ReportScores.status(cid, sid, a.id);
+    var status = ReportScores.getAssignmentStatus(cid, sid, a.id);
     var feedback = _feedback(cid, sid, a.id);
     var item = {
       id: a.id,
@@ -143,10 +143,10 @@ window.ReportFeedback = (function () {
       if (!feedback.length) return null;
       if (isCompletionScored(a)) {
         item.kind = 'complete';
-        item.mark = off ? null : ReportScores.completionMark(cid, sid, a.id);
+        item.mark = off ? null : ReportScores.getCompletionMark(cid, sid, a.id);
       } else {
         item.kind = 'points';
-        var points = off ? null : ReportScores.pointsScore(cid, sid, a.id);
+        var points = off ? null : ReportScores.getPointsScore(cid, sid, a.id);
         var max = Number(a.maxPoints) || 100;
         item.score = points == null ? '' : formatPoints(points);
         item.outOf = formatPoints(max);

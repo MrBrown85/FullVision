@@ -359,7 +359,7 @@
     var entries = ReportScores.entries(cid, sid).filter(function (e) {
       return e && e.assessmentId === aid;
     });
-    var status = ReportScores.status(cid, sid, aid);
+    var status = ReportScores.getAssignmentStatus(cid, sid, aid);
     var rows = (rubric.criteria || []).map(function (criterion) {
       var lv = criterionLevel(entries, aid, criterion);
       return {
@@ -370,12 +370,12 @@
         // Comments belong to a rubric of the teacher's own (on a criterion)
         // or a Tag Rubric (on a competency); a General Rubric has none.
         comment: !rubric.kind
-          ? ReportScores.criterionComment(cid, sid, aid, criterion)
+          ? ReportScores.getRubricCriterionComment(cid, sid, aid, criterion)
           : rubric.kind === 'tags'
-            ? ReportScores.tagComment(cid, sid, aid, criterion.id)
+            ? ReportScores.getTagComment(cid, sid, aid, criterion.id)
             : '',
         // A single-point rubric's Went Beyond; its Work On is the comment.
-        beyond: !rubric.kind ? ReportScores.criterionBeyond(cid, sid, aid, criterion) : '',
+        beyond: !rubric.kind ? ReportScores.getRubricCriterionBeyond(cid, sid, aid, criterion) : '',
         codes: _criterionCodes(cid, criterion, rubric.kind === 'tags'),
       };
     });
@@ -409,7 +409,7 @@
       overall: overall,
       feedback: _feedbackText(cid, sid, aid, entries),
       // An Advanced Rubric's ticked checkboxes for this student.
-      ticked: ReportScores.checkIds(cid, sid, aid),
+      ticked: ReportScores.getRubricCheckIds(cid, sid, aid),
     };
   }
 
@@ -417,11 +417,11 @@
      "90%", or "Complete" / "Incomplete". Null when there is no score. */
   function _scoreOverall(cid, sid, assessment) {
     if (isCompletionScored(assessment)) {
-      var mark = ReportScores.completionMark(cid, sid, assessment.id);
+      var mark = ReportScores.getCompletionMark(cid, sid, assessment.id);
       if (!mark) return null;
       return { value: mark === 'complete' ? 1 : 0, text: mark === 'complete' ? 'Complete' : 'Incomplete', word: '' };
     }
-    var points = ReportScores.pointsScore(cid, sid, assessment.id);
+    var points = ReportScores.getPointsScore(cid, sid, assessment.id);
     if (points == null) return null;
     var max = Number(assessment.maxPoints) || 0;
     return {
@@ -441,7 +441,7 @@
     var entries = ReportScores.entries(cid, sid).filter(function (e) {
       return e && e.assessmentId === aid;
     });
-    var status = ReportScores.status(cid, sid, aid);
+    var status = ReportScores.getAssignmentStatus(cid, sid, aid);
     var overall = _scoreOverall(cid, sid, assessment);
     return {
       cid: cid,

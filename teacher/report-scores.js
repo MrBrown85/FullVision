@@ -18,9 +18,11 @@
       function so it does that every time it is called, from a click, a
       timer or a promise alike.
    2. Scores, comments, notes, ticks and statuses read straight from the
-      data layer. A report file reads them with the readers below
-      (scores, entries, pointsScore, …), never with the data layer's own.
-      They give the set calc.js is using at that moment.
+      data layer. A report file reads them with the readers below, never
+      with the data layer's own. Each has the name of the data layer's
+      reader it stands in for: `getScoreComment(cid, sid, aid)` in a report
+      file is written `ReportScores.getScoreComment(cid, sid, aid)`. They
+      give the set calc.js is using at that moment.
    3. Anything a report keeps to draw faster. Its key holds
       reportScoreSet(surface), so the two sets never share a kept copy. */
 window.ReportScores = (function () {
@@ -256,18 +258,19 @@ window.ReportScores = (function () {
     surfaces: function () {
       return Object.keys(SURFACES);
     },
-    scores: scores,
+    // The readers, under the data layer's names. entries(cid, sid) is getScores(cid)[sid] || [].
+    getScores: scores,
     entries: entries,
-    pointsScore: pointsScore,
-    completionMark: completionMark,
-    comment: comment,
-    criterionComment: criterionComment,
-    criterionBeyond: criterionBeyond,
-    tagComment: tagComment,
-    reportNote: reportNote,
-    checkIds: checkIds,
-    statuses: statuses,
-    status: status,
+    getPointsScore: pointsScore,
+    getCompletionMark: completionMark,
+    getScoreComment: comment,
+    getRubricCriterionComment: criterionComment,
+    getRubricCriterionBeyond: criterionBeyond,
+    getTagComment: tagComment,
+    getScoreReportNote: reportNote,
+    getRubricCheckIds: checkIds,
+    getAssignmentStatuses: statuses,
+    getAssignmentStatus: status,
   };
   return api;
 })();
