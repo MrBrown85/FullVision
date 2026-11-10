@@ -7,9 +7,8 @@ search_path, and nothing else about them changes.
                                      Batch A's four files, S0-M4's file
     python3 search_path.py           the checks
 
-`build` reads each file from this checkout, or, while PR 966 (Batch A) and
-PR 985 (S0-M4) are not merged, from their branches with `git show` (it
-prints which). The checks:
+`build` reads each file from this checkout, or, while PR 966 (Batch A) is
+not merged, from its branch with `git show` (it prints which). The checks:
 
 - the file's shape, and where the sixteen start;
 - every caller gets what they got: Teacher A, Teacher B, no JWT and anon,
@@ -39,8 +38,8 @@ MIGRATION = '../2026111002_security_definer_search_path.sql'
 BATCH_A = ['../2026110901_score_rows_same_class.sql', '../2026110902_grade_return.sql',
            '../2026110903_student_card.sql', '../2026110904_student_sessions_page.sql']
 S0_M4 = '../2026111001_assessment_created_at_in_bundle.sql'
-# Until they are merged, their files are read from here.
-REFS = ['origin/batch-a-grade-return-cards-sessions', 'origin/s0-m4-bundle-sends-created-at']
+# Until Batch A is merged, its files are read from here. (S0-M4's are on main.)
+REFS = ['origin/batch-a-grade-return-cards-sessions']
 # Batch A's list (README.md, "Batch A"), then what get_class_bundle needs
 # (README.md, "The bundle sends created_at"), then the rest of the sixteen.
 BUILD = ['harness.sql', 'score-prelude.sql', 'score-tables.sql', 'student-submit-prelude.sql',

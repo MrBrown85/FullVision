@@ -151,7 +151,7 @@ Two files build the score paths on top of `harness.sql`:
   `save_score_comment`, `clear_row_scores` and `clear_column_scores` have no
   migration; theirs are the live bodies, read from `gradebook-prod` on
   2026-11-09.
-- `live-function-md5.txt`: `md5(pg_get_functiondef)` of 21 live functions.
+- `live-function-md5.txt`: `md5(pg_get_functiondef)` of 22 live functions.
   `score_rpcs.py` compares every function it loads that is in the table (the
   twelve RPCs and `fv_owns_course`, `fv_owns_enrollment`,
   `fv_owns_assessment`), so each is the live one byte for byte. The check
@@ -194,6 +194,52 @@ work. The others it found, left as they are:
 `import_json_restore`, `duplicate_course` and `duplicate_assessment` are not
 loaded: they need most of the schema. Batch A's tests load them.
 
+## The bundle sends created_at (S0-M4, 2026-11-10)
+
+`../2026111001_assessment_created_at_in_bundle.sql` patches `get_class_bundle`
+and `get_gradebook` in place so each assessment carries its `created_at`.
+Tested here only (no Supabase branch, never `gradebook-prod`).
+
+Two more files build what it needs on top of the score paths:
+
+- `bundle-prelude.sql`: `get_class_bundle` and `get_gradebook`. No one
+  migration holds either whole. Each is the migration that last wrote it in
+  full, then every later in-place patch run as its migration wrote it, in
+  file order, and printed with `pg_get_functiondef` (the file's header lists
+  them: 17 patches for the bundle, 3 for `get_gradebook`). The bundle comes
+  out as the live function, byte for byte (`live-function-md5.txt`).
+  `get_gradebook` comes out as md5 `2876cd40c373b8a59bff4464008c8601`, length
+  6816, which the orchestrator confirmed against `gradebook-prod` on Nov 10;
+  it is in `live-function-md5.txt` too. Also
+  `fv_owns_term_rating`, and four stand-ins for the server's old grade
+  calculation that `get_gradebook` calls for its cells (`fv_assessment_overall`
+  and three more): they have the live signatures and return nothing, because
+  the migration does not touch that part.
+- `bundle-tables.sql`: the 17 other tables `get_class_bundle` reads, from the
+  live snapshot (`python3 make-score-tables.py bundle`).
+
+```bash
+PGPORT=54329 PGDATABASE=fv_bundle python3 run.py harness.sql score-prelude.sql score-tables.sql \
+  bundle-prelude.sql bundle-tables.sql
+PGPORT=54329 PGDATABASE=fv_bundle python3 bundle_created_at.py
+```
+
+`bundle_created_at.py` makes a class with five pieces (two with one date and
+one display order, made a second apart), reads both payloads as Teacher A,
+Teacher B, with no JWT and as anon, applies the migration and reads them
+again. Every assessment then has `created_at`, equal to the table's to the
+microsecond; every other key of both payloads is the same, compared key by
+key; the other callers get what they got; owner, grants, SECURITY DEFINER,
+volatility and `search_path` are unchanged and each body is the old one plus
+the one key; no row changes and no class's sync version moves; a browser
+sending the version it holds is still told `not_modified`; a second run
+changes nothing; and a body that is not the expected one stops the file at
+its first check with nothing changed.
+
+Result on 2026-11-10 (Postgres 18.6, local; production is 17): 40 of 40.
+`score_rpcs.py` is unchanged at 175 of 175, and `make-score-tables.py` still
+writes `score-tables.sql` byte for byte.
+
 ## SECURITY DEFINER functions name pg_temp last (S0-M5, 2026-11-10)
 
 `../2026111002_security_definer_search_path.sql` adds `pg_temp` to the end of
@@ -201,13 +247,14 @@ the `search_path` of sixteen SECURITY DEFINER functions, so a caller's
 temporary table can never stand in for a real one. It replaces no body.
 Tested here only (no Supabase branch, never `gradebook-prod`).
 
-It must be applied after Batch A (PR 966) and S0-M4 (PR 985) and refuses to
-run before them, so `search_path.py build` loads the database in that order:
-Batch A's list, `bundle-prelude.sql` and `bundle-tables.sql`, then
-`search-path-prelude.sql`, Batch A's four files and S0-M4's file. Until those
-two PRs are merged it reads their files from their branches with `git show`
-and says so; `bundle-tables.sql` and `batch-a-tables.sql` share five tables,
-and a statement that has already run word for word is not run again.
+It must be applied after Batch A (PR 966) and S0-M4 (PR 985, applied and
+merged on Nov 10) and refuses to run before them, so `search_path.py build`
+loads the database in that order: Batch A's list, `bundle-prelude.sql` and
+`bundle-tables.sql`, then `search-path-prelude.sql`, Batch A's four files
+and S0-M4's file. Until Batch A is merged it reads Batch A's files from its
+branch with `git show` and says so; `bundle-tables.sql` and
+`batch-a-tables.sql` share five tables, and a statement that has already run
+word for word is not run again.
 
 Where each of the sixteen comes from:
 
