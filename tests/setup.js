@@ -221,6 +221,8 @@ load('shared/constants.js');
 load('shared/reporting-term-presets.js');
 load('shared/data.js');
 load('shared/calc.js');
+load('shared/grade-state.js');
+load('shared/grader.js');
 load('shared/rubric-draft.js');
 load('shared/rubric-checks.js');
 load('shared/core-self.js');
