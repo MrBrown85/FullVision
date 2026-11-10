@@ -38,8 +38,12 @@
 --      previous_copy  the grade the student had before the newest return
 --      updated_at     when a returned grade last changed for the student
 --      seen_at        when the student last opened this piece
+--      working_copy   the grade as the teacher's last save left it: what
+--                     the triggers compare the next save with (4). Never
+--                     sent to anyone.
 --    Teachers read their own rows (fv_owns_enrollment). Nobody writes the
---    table directly: only the triggers and functions below do.
+--    table directly: only the triggers and functions below do, and the
+--    student page's seen() (2026110904).
 --
 -- 3. A COPY of a grade is this JSON, the same in returned_copy, previous_copy
 --    and everything a student is sent. shared/grade-state.js and the edge
@@ -209,8 +213,10 @@
 --    through these triggers. A write made with them switched off (a
 --    superuser's session_replication_role = replica) leaves it behind, and
 --    the next save to that cell would be compared with an old copy; the
---    last statement of this file brings every row up to date and can be run
---    again at any time.
+--    last statement of this file brings every existing row up to date and
+--    can be run again at any time. It does not add a row for a cell that
+--    has none (a grade first given with the triggers off): running the
+--    whole file again does, through its backfill.
 --
 --    Two saves at once: the second waits on the class's cursor row and then
 --    reads the grade as the first left it. Without that a save could
@@ -275,9 +281,11 @@
 --    any score for that class; it reaches no other teacher's.
 --    move_rubric_scores keeps the state (4), and now also re-points the ids
 --    inside the stored copies for criteria and checkboxes the working copy
---    no longer has a row for (patched in place, one line).
---    duplicate_course and duplicate_assessment copy no grades, so no rows
---    appear. Not changed.
+--    no longer has a row for (patched in place: a flag set for a move to
+--    another rubric, and one call).
+--    duplicate_course and duplicate_assessment copy no grades, so no
+--    grade_return rows appear. duplicate_course is patched only to copy
+--    return_grades (1); duplicate_assessment is not changed.
 --
 -- ── What it does to existing rows ───────────────────────────────────────────
 -- No score, level, comment or tick changes. Every existing class gets
@@ -1334,7 +1342,9 @@ on conflict (enrollment_id, assessment_id) do nothing;
 
 -- The repair, for any later day (both do nothing on a first run): rows whose
 -- student or assessment is gone, and working copies that a write with the
--- triggers switched off left behind.
+-- triggers switched off left behind. A cell that has a grade and no row at
+-- all is not added here: the backfill above does that when the whole file
+-- is run again.
 delete from public.grade_return g
  where not exists (select 1 from public.enrollment e where e.id = g.enrollment_id)
     or not exists (select 1 from public.assessment a where a.id = g.assessment_id);

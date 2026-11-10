@@ -7,8 +7,9 @@
 -- reads their page for that class: the assignments and, for each, the grade
 -- that was returned. Never a draft. The student-submit edge function calls
 -- the functions below over its direct database connection, as it calls
--- open, verify, check and submit today. Those four, and every questionnaire
--- and phone-report slip, are untouched.
+-- open, verify, check and submit today. verify, check and submit, and every
+-- questionnaire and phone-report slip, are untouched; open has one number
+-- changed (below).
 --
 -- Nothing here is reachable through the API: the student_submit schema is
 -- not exposed, every function is granted to service_role only, and anon
@@ -116,6 +117,8 @@
 -- seen(p_session_token text, p_enrollment_id uuid, p_assessment_ids uuid[],
 --      p_ip_hash text)                                                route `seen`
 --   The student opened these pieces. -> { ok, seen: <how many> }
+--   It takes the class's lock first, as a Return does (2026110902, 4), so
+--   it waits for a save to the class that is under way.
 --   Errors: as page().
 --
 -- done(p_session_token text, p_ip_hash text)                          route `done`

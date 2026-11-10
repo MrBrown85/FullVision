@@ -37,10 +37,11 @@
 -- only; fv_retention_cleanup deletes whole classes.
 --
 -- Still open, on purpose (PR 958 lists them): a competency the assessment is
--- not linked to, a criterion from another rubric in the same class (the
--- grade_return migration makes upsert_rubric_score refuse that one), points
--- over the maximum, a score on Excused or Missing work, and ticked
--- checkboxes left behind by the three clear functions.
+-- not linked to, a criterion from another rubric in the same class (no
+-- migration in this batch refuses it: that waits until the client sends a
+-- rubric change before the scores that depend on it), points over the
+-- maximum, a score on Excused or Missing work, Missing on work that has a
+-- score, and ticked checkboxes left behind by the three clear functions.
 --
 -- Cost: one helper call per row, as today. fv_owns_enrollment joins two
 -- tables by primary key; these join three (five for a checkbox), all by

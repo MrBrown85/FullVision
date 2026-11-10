@@ -96,8 +96,9 @@
 --
 -- 4. A new slip avoids every live card's code (Colin, Nov 9: "check slips
 --    too"), as a new card avoids every live slip's. _issue_access_code and
---    _issue_report_code are patched in place, one line each: the draw also
---    goes again when the code is a live card's. The file stops, with nothing
+--    _issue_report_code are patched in place, two lines each (one of them a
+--    comment): the draw also goes again when the code is a live card's. The
+--    file stops, with nothing
 --    changed, if either is not the body in the repo
 --    (20261025_student_submit.sql, 20261025_phone_reports.sql).
 --
