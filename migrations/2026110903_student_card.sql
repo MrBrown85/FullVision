@@ -28,21 +28,31 @@
 --      wrong_tries     wrong answers to "Is This You?" in a row. A right
 --                      answer sets it back to 0; the fifth in a row locks
 --                      the card (Colin, Nov 9).
---      locked_at       when it locked. Unlock clears both.
+--      wrong_times     when each wrong answer of the last 7 days was given.
+--                      The fifteenth inside 7 days locks the card whatever
+--                      right answers came between (Colin, Nov 9: "add a
+--                      slow lock"), so four wrong and one right, over and
+--                      over, is not a way to keep guessing.
+--      locked_at       when it locked. Unlock clears all three.
 --      stopped_at      when it was reissued. A stopped card never opens
 --                      again; its row stays as history.
 --      works_until     the card's last day, written when it is made: the
 --                      class's Cards Work Until then (2). It does not move
---                      by itself afterwards.
+--                      by itself afterwards: a card keeps the day it was
+--                      printed with when reporting dates are added later.
 --    Teachers read their own rows (fv_owns_enrollment). Nobody writes the
 --    table directly: only the functions below and the student path do.
 --
 -- 2. course.cards_work_until date, null. The class's Cards Work Until. Null
 --    means the default: the class's last reporting date (the latest ends_on
 --    in course.reporting_terms), or the next June 30 when the class has no
---    terms. The date is worked out when a card is made, or when the teacher
---    sets it, and written on the card; a card works through that day in the
---    class's time zone. A class time zone or a term date that cannot be read
+--    terms or its last reporting date has already passed (a card is never
+--    made already expired by the default). The date is worked out when a
+--    card is made, or when the teacher sets it, and written on the card; a
+--    card works through that day in the class's time zone, so a card made
+--    on June 30 with no reporting dates lasts that day only.
+--    set_cards_work_until(c, null) rewrites every live card in the class to
+--    the default as it works out that day. A class time zone or a term date that cannot be read
 --    is treated as America/Vancouver, or left out: nothing a teacher saves
 --    can make the student's route fail.
 --
@@ -60,8 +70,9 @@
 --      list_student_cards(p_course_id)
 --        the class's live cards for the Student Cards page and the print
 --        sheet: [{ id, enrollment_id, code, created_at, printed_at,
---        last_opened_at, locked_at, wrong_tries, works_until, check,
---        password }]. check is 'identity' (birthday or student number on
+--        last_opened_at, locked_at, wrong_tries, wrong_tries_7d,
+--        works_until, check, password }]. wrong_tries_7d is how many wrong
+--        answers the card has had in the last 7 days. check is 'identity' (birthday or student number on
 --        file) or 'password'; password is the card password to print when
 --        check is 'password', else null.
 --      mark_student_cards_printed(p_card_ids, p_idempotency_key)
@@ -74,7 +85,9 @@
 --      reissue_student_card(p_card_id, p_idempotency_key)
 --        stops the card at once and makes a new one for the same student.
 --        Everything the student sent stays: nothing points at a card but
---        the device sessions it opened, and those end. Returns the new card.
+--        the device sessions it opened, and those end. A new card for a
+--        student with no birthday or number prints a NEW password, not the
+--        lost card's. Returns the new card.
 --      set_cards_work_until(p_course_id, p_date, p_idempotency_key)
 --        sets the class's date (null = the default, worked out now) and
 --        writes it on every live card in the class. Returns { works_until }.
@@ -153,6 +166,7 @@ create table if not exists public.student_card (
     printed_at     timestamptz,
     last_opened_at timestamptz,
     wrong_tries    integer     not null default 0 constraint student_card_wrong_tries_check check (wrong_tries >= 0),
+    wrong_times    timestamptz[] not null default '{}',
     locked_at      timestamptz,
     stopped_at     timestamptz,
     works_until    date        not null,
@@ -217,9 +231,11 @@ create or replace function public._cards_work_until(p_course_id uuid)
 as $function$
     select coalesce(
         c.cards_work_until,
+        -- the last reporting date, unless it has already passed
         (select max(_fv_date(t->>'ends_on')) from jsonb_array_elements(
-             case when jsonb_typeof(c.reporting_terms) = 'array' then c.reporting_terms else '[]'::jsonb end) t),
-        -- No reporting terms: the next June 30, today included.
+             case when jsonb_typeof(c.reporting_terms) = 'array' then c.reporting_terms else '[]'::jsonb end) t
+         having max(_fv_date(t->>'ends_on')) >= (now() at time zone _fv_timezone(c.timezone))::date),
+        -- No reporting date ahead: the next June 30, today included.
         (select make_date(extract(year from d.today)::int
                             + case when d.today > make_date(extract(year from d.today)::int, 6, 30) then 1 else 0 end, 6, 30)
            from (select (now() at time zone _fv_timezone(c.timezone))::date as today) d))
@@ -239,6 +255,7 @@ as $function$
                'id', k.id, 'enrollment_id', k.enrollment_id, 'code', k.code,
                'created_at', k.created_at, 'printed_at', k.printed_at, 'last_opened_at', k.last_opened_at,
                'locked_at', k.locked_at, 'wrong_tries', k.wrong_tries,
+               'wrong_tries_7d', (select count(*) from unnest(k.wrong_times) t where t > now() - interval '7 days'),
                'works_until', k.works_until,
                'check', case when s.date_of_birth is not null or nullif(btrim(s.student_number), '') is not null
                              then 'identity' else 'password' end,
@@ -253,7 +270,7 @@ revoke all on function public._student_card_json(uuid) from public, anon, authen
 
 -- A new live card for one enrollment. The code reads like no other live
 -- card and no live slip, so a typed code opens one thing.
-create or replace function public._issue_student_card(p_enrollment_id uuid)
+create or replace function public._issue_student_card(p_enrollment_id uuid, p_not_password text default null)
  returns uuid
  language plpgsql
  volatile
@@ -278,6 +295,11 @@ begin
                 where e.id = p_enrollment_id and s.date_of_birth is null
                   and nullif(btrim(s.student_number), '') is null) then
         _pw := _slip_password(p_enrollment_id);
+        -- A reissue: whoever holds the lost card knows its password, so the
+        -- new card gets one of its own.
+        while p_not_password is not null and _pw = p_not_password loop
+            _pw := lpad((('x' || substr(md5(gen_random_uuid()::text), 1, 7))::bit(28)::int % 10000)::text, 4, '0');
+        end loop;
     end if;
     select _cards_work_until(e.course_id) into _until from enrollment e where e.id = p_enrollment_id;
     loop
@@ -301,7 +323,7 @@ begin
     end loop;
 end;
 $function$;
-revoke all on function public._issue_student_card(uuid) from public, anon, authenticated;
+revoke all on function public._issue_student_card(uuid, text) from public, anon, authenticated;
 
 -- ── A new slip avoids live card codes ───────────────────────────────────────
 do $patch$
@@ -427,7 +449,7 @@ begin
     if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
     _cached := fv_idem_check(p_idempotency_key, 'unlock_student_card');
     if _cached is not null then return _cached; end if;
-    update student_card k set locked_at = null, wrong_tries = 0
+    update student_card k set locked_at = null, wrong_tries = 0, wrong_times = '{}'
      where k.id = p_card_id and fv_owns_enrollment(k.enrollment_id);
     if not found then
         raise exception 'card not found' using errcode = 'P0002';
@@ -454,7 +476,7 @@ begin
     end if;
     _cached := fv_idem_check(p_idempotency_key, 'unlock_all_student_cards');
     if _cached is not null then return _cached; end if;
-    update student_card k set locked_at = null, wrong_tries = 0
+    update student_card k set locked_at = null, wrong_tries = 0, wrong_times = '{}'
       from enrollment e
      where e.id = k.enrollment_id and e.course_id = p_course_id
        and k.stopped_at is null and k.locked_at is not null;
@@ -491,7 +513,7 @@ begin
     -- The old code stops here, before the new card exists.
     update student_card set stopped_at = now() where id = _k.id;
     -- Two statements: the card must exist before it is read back.
-    _new := _issue_student_card(_k.enrollment_id);
+    _new := _issue_student_card(_k.enrollment_id, coalesce(_k.password, ''));
     _cached := _student_card_json(_new);
     perform fv_idem_store(p_idempotency_key, 'reissue_student_card', _cached);
     return _cached;

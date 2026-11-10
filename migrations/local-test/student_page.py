@@ -356,6 +356,81 @@ ok('a replay of the reissue with the same key returns the same new card', rpc(A,
 expect_error('a card already reissued cannot be reissued again', lambda: rpc(A, 'reissue_student_card(:i, :k)', i=card1, k=key()), 'already reissued')
 code1, card1 = new['code'], new['id']
 
+# A reissued card for a student with no birthday or number prints a new password.
+old2 = cards()[ENR2]
+new2 = rpc(A, 'reissue_student_card(:i, :k)', i=old2['id'], k=key())
+ok('a reissued card prints a new card password, not the lost card\'s', re.fullmatch(r'\d{4}', new2['password'] or '') and new2['password'] != pw, (pw, new2['password']))
+ok("the lost card's password does not open the new card; the new one does",
+   verify(new2['code'], password=pw).get('error') == 'wrong_identity' and verify(new2['code'], password=new2['password']).get('ok') is True)
+code2, pw = new2['code'], new2['password']
+rpc(A, 'unlock_all_student_cards(:c, :k)', c=COURSE_A, k=key())
+
+# A card is never made already expired by the default.
+sp(); as_owner()
+c.run("""update course set cards_work_until = null, reporting_terms = '[{"ordinal":1,"label":"T1","starts_on":"2026-02-02","ends_on":"2026-06-25"}]'::jsonb where id = :c""", c=COURSE_A)
+late = rpc(A, 'reissue_student_card(:i, :k)', i=card1, k=key())
+ok("when the class's last reporting date has passed, a new card works until the next June 30, not until that past date",
+   late['works_until'] == june30 and card(late['code']).get('ok') is True, late)
+back()
+
+# ── The slow lock: fifteen wrong tries in 7 days ────────────────────────
+sp()
+left = []
+for round_ in range(3):
+    for n in range(4): left.append(verify(code1, birthday='2000-01-01').get('tries_left'))
+    ok('four wrong, then right (round %d): the card opens and the count in a row goes back to 0' % (round_ + 1),
+       verify(code1, birthday='2012-05-15').get('ok') is True and cards()[ENR1]['wrong_tries'] == 0)
+ok('tries left counts down inside each round of four', left == [4, 3, 2, 1] * 3, left)
+ok('twelve wrong tries in the week so far, shown on the card list', cards()[ENR1]['wrong_tries_7d'] == 12 and cards()[ENR1]['locked_at'] is None, cards()[ENR1])
+r13 = verify(code1, birthday='2000-01-01'); r14 = verify(code1, birthday='2000-01-01'); r15 = verify(code1, birthday='2000-01-01')
+ok('the thirteenth and fourteenth say how few are left: the slow lock is now the nearer one', [r13.get('tries_left'), r14.get('tries_left')] == [2, 1], (r13, r14))
+ok('the fifteenth wrong try inside 7 days locks the card, though no five were in a row', r15 == {'ok': False, 'error': 'card_locked'}
+   and cards()[ENR1]['locked_at'] is not None and cards()[ENR1]['wrong_tries'] == 3, (r15, cards()[ENR1]))
+ok('and the right answer is refused until the teacher unlocks it', verify(code1, birthday='2012-05-15') == {'ok': False, 'error': 'card_locked'})
+r = rpc(A, 'unlock_student_card(:i, :k)', i=card1, k=key())
+ok('Unlock clears the week\'s count too', r['wrong_tries_7d'] == 0 and verify(code1, birthday='2000-01-01').get('tries_left') == 4, r)
+back()
+sp(); as_owner()
+c.run("update student_card set wrong_times = array(select now() - interval '8 days' from generate_series(1, 14)) where id = :i", i=card1)
+r = verify(code1, birthday='2000-01-01')
+ok('wrong tries older than 7 days never count: after fourteen old ones, one more wrong try is the first of the week',
+   r == {'ok': False, 'error': 'wrong_identity', 'tries_left': 4} and cards()[ENR1]['wrong_tries_7d'] == 1
+   and one('select cardinality(wrong_times) from student_card where id = :i', i=card1) == 1, r)
+back()
+
+# ── A card is found by its code, then checked against its hash ──────────
+sp(); as_owner()
+c.run("update student_card set code_hash = 'not the hash of its code' where id = :i", i=card1)
+ok('a card whose stored hash does not match its code is not found', card(code1) == {'ok': False, 'error': 'not_found'})
+back()
+as_owner()
+c.run('set local enable_seqscan = off')
+plan = ' '.join(r[0] for r in c.run("explain select * from student_card where stopped_at is null and code = 'ABC-DEF'"))
+c.run('set local enable_seqscan = on')
+ok('the lookup reads the index on live codes, not every card', 'student_card_live_code' in plan, plan)
+ok('and that index exists, unique, on live cards only',
+   one("select indexdef from pg_indexes where indexname = 'student_card_live_code'") == 'CREATE UNIQUE INDEX student_card_live_code ON public.student_card USING btree (code) WHERE (stopped_at IS NULL)')
+
+# ── Changing how a piece is scored after it was returned ────────────────
+# Pinned as it is, not as it should be: the returned grade is read by the
+# work's scoring NOW, as the teacher's own screens read it today.
+sp()
+ov = new_assessment(K, 'competencies', title='Scored as a whole', date_assigned=today)
+as_owner(); c.run('delete from assessment_tag where assessment_id = :a', a=ov)
+rpc(A, 'upsert_score(:e, :a, 3, 1::smallint)', e=ENR1, a=ov)
+rpc(A, 'return_grades(:a, :ids::uuid[], :k)', a=ov, ids='{%s}' % ENR1, k=key())
+as_owner(); c.run("update assessment set score_mode = 'points', max_points = 10 where id = :a", a=ov)
+got = result(tok, ENR1, ov)
+ok('today: an Overall 3+ that was returned, on work then changed to points out of 10, is sent as 3 with a + and a maximum of 10',
+   got['grade']['value'] == 3 and got['grade']['modifier'] == 1 and float(got['max_points']) == 10 and got['score_mode'] == 'points', got)
+rpc(A, 'upsert_score(:e, :a, 7)', e=ENR1, a=a_future)
+as_owner(); c.run("update assessment set date_assigned = :d::date where id = :a", d=today, a=a_future)
+rpc(A, 'return_grades(:a, :ids::uuid[], :k)', a=a_future, ids='{%s}' % ENR1, k=key())
+as_owner(); c.run("update assessment set score_mode = 'proficiency', max_points = null where id = :a", a=a_future)
+got = result(tok, ENR1, a_future)
+ok('today: 7 points that were returned, on work then changed to levels, are sent as a level of 7', got['grade']['value'] == 7 and got['score_mode'] == 'proficiency', got)
+back()
+
 # ── Done ────────────────────────────────────────────────────────────────
 r = verify(code_a2, birthday='2012-05-15')
 t3 = r['session_token']
@@ -446,11 +521,17 @@ ok('and never left a returned copy off a draft, or a draft that equals what was 
 
 # ── Rate limits ─────────────────────────────────────────────────────────
 sp()
-for n in range(59): card('ZZZ-ZZZ', ip='ip-guess')
-ok('59 unknown codes from one address still let a good card through', card(code1, ip='ip-guess').get('ok') is True)
+as_owner()
+c.run("insert into student_submit.attempt (route, outcome, ip_hash) select 'card', 'not_found', 'ip-guess' from generate_series(1, 298)")
 card('ZZZ-ZZZ', ip='ip-guess')
-ok('the 60th locks that address out, even with a good code', card(code1, ip='ip-guess') == {'ok': False, 'error': 'locked'}
+ok('299 unknown codes from one address in 15 minutes still let a good card through (the limit is 300; Colin, Nov 9)',
+   card(code1, ip='ip-guess').get('ok') is True and verify(code1, birthday='2012-05-15', ip='ip-guess').get('ok') is True)
+card('not a code', ip='ip-guess')
+ok('the 300th, here a malformed one, locks that address out: a good card and a right answer from it are refused too',
+   card(code1, ip='ip-guess') == {'ok': False, 'error': 'locked'}
    and verify(code1, birthday='2012-05-15', ip='ip-guess') == {'ok': False, 'error': 'locked'})
+as_owner(); c.run("update student_submit.attempt set at = at - interval '16 minutes' where ip_hash = 'ip-guess'")
+ok('fifteen minutes later the address is open again', card(code1, ip='ip-guess').get('ok') is True)
 ok('another address is unaffected', card(code1, ip='ip-other').get('ok') is True)
 ok("a slip's open() from the locked address still answers: the two keep separate counts",
    svc("student_submit.open('ZZZ-ZZZ', 'ip-guess')") == {'ok': False, 'error': 'not_found'})
@@ -465,12 +546,14 @@ sp()
 q = rpc(A, "upsert_questionnaire(:c, 'core_reflection', 'November Reflection', 'core-8-1', p_report_period => 1, p_opens_on => (:d::date - 1), p_closes_on => (:d::date + 7), p_idempotency_key => :k)",
         c=COURSE_A, d=today, k=key())
 slip = rpc(A, 'issue_access_codes(:q, null, :k)', q=q['id'], k=key())[0]['code']
-ok("card() knows a live slip's code and says so, with nothing about whose it is", card(slip, ip='ip-school') == {'ok': True, 'kind': 'slip'})
+ok("card() answers a live slip's code as it answers any unknown code: it tells a guesser nothing about slips",
+   card(slip, ip='ip-school') == {'ok': False, 'error': 'not_found'} and card('ZZZ-ZZZ', ip='ip-other-school') == {'ok': False, 'error': 'not_found'})
+as_owner(); c.run("insert into student_submit.attempt (route, outcome, ip_hash) select 'card', 'slip', 'ip-school' from generate_series(1, 400)")
 for n in range(70): card(slip, ip='ip-school')
-ok('70 slip scans from one address do not count toward the card limit: a good card still opens',
+ok('470 slip scans from one address do not count toward the card limit: a good card still opens',
    card(code1, ip='ip-school').get('ok') is True and verify(code1, birthday='2012-05-15', ip='ip-school').get('ok') is True)
 ok('they are logged as slips, not as unknown codes',
-   one("select count(*) from student_submit.attempt where route = 'card' and ip_hash = 'ip-school' and outcome = 'slip'") == 71
+   one("select count(*) from student_submit.attempt where route = 'card' and ip_hash = 'ip-school' and outcome = 'slip'") == 471
    and one("select count(*) from student_submit.attempt where route = 'card' and ip_hash = 'ip-school' and outcome in ('not_found', 'bad_format', 'ambiguous')") == 0)
 ok("the slip still opens with open(), as before", svc("student_submit.open(:c, 'ip-school')", c=slip).get('kind') == 'questionnaire')
 ok("verify_card does not take a slip's code", verify(slip, birthday='2012-05-15', ip='ip-school') == {'ok': False, 'error': 'not_found'})

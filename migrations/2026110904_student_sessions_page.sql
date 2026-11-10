@@ -36,19 +36,22 @@
 --   Code in; who it says it is out. Nothing is opened yet.
 --   -> { ok, kind: "card", student: { first_name }, course: { name, block },
 --        check: "identity" | "password", also_password: bool }
---   or, for a code that is a live questionnaire or report slip's, not a
---   card's: { ok: true, kind: "slip" } and nothing else. The page then sends
---   the code to open(). A slip's code is not an unknown card code, so
---   scanning slips never counts toward the card limit below.
+--   A code that is a live questionnaire or report slip's, not a card's,
+--   answers not_found like any unknown code, so card() tells a guesser
+--   nothing about slips; the page then sends the code to open(). It is not
+--   counted as a failed card try, so scanning slips never uses up the card
+--   limit below.
 --   check says what "Is This You?" asks for: a birthday or student number,
 --   or the card password when the student has neither on file.
 --   also_password: a password printed before a birthday or number was added
 --   still works, so offer it too.
 --   Errors: not_found (no such live card, a reissued card, a withdrawn
 --   student, a deleted class), closed (the class's student page is off),
---   card_locked (five wrong tries in a row; the teacher unlocks it),
---   card_expired (past Cards Work Until), reprint (nothing on file to check
---   against), locked (60 unknown codes from one address in 15 minutes).
+--   card_locked (five wrong tries in a row, or fifteen in 7 days; the
+--   teacher unlocks it), card_expired (past Cards Work Until), reprint
+--   (nothing on file to check against), locked (300 unknown codes from one
+--   address in 15 minutes; Colin, Nov 9). While an address is locked every
+--   card call from it is refused, a valid card and a right answer included.
 --   There is no everyone-is-busy stop on the card routes (Colin, Nov 9:
 --   per-address only); a slip's open() keeps its own.
 --
@@ -73,8 +76,10 @@
 --   is 64 hex characters; only its SHA-256 is stored.
 --   Errors: the ones card() gives (reprint too: nothing is counted against
 --   a card that has nothing on file to check), and wrong_identity with
---   tries_left (4 down to 1). The fifth wrong try locks the card:
---   card_locked. A slip's code here is not_found.
+--   tries_left: how many more wrong tries before the card locks, by
+--   whichever lock is nearer. The fifth wrong try in a row locks the card,
+--   and so does the fifteenth inside 7 days whatever right answers came
+--   between (the slow lock): card_locked. A slip's code here is not_found.
 --
 -- page(p_session_token text, p_enrollment_id uuid, p_ip_hash text)   route `page`
 --   The student's whole page for one class in the session.
@@ -308,7 +313,6 @@ create or replace function student_submit._card_lookup(p_code text, p_ip_hash te
 as $function$
 declare
     _code text := upper(regexp_replace(coalesce(p_code, ''), '[^A-Za-z0-9]', '', 'g'));
-    _rows int;
     _k    student_card%rowtype;
     _why  text;
 begin
@@ -322,7 +326,7 @@ begin
     -- counts only codes that were not found (a guess).
     if (select count(*) from attempt
          where ip_hash = p_ip_hash and route = 'card' and outcome in ('not_found', 'bad_format', 'ambiguous')
-           and at > now() - interval '15 minutes') >= 60 then
+           and at > now() - interval '15 minutes') >= 300 then
         perform _log('card', 'locked', p_ip_hash);
         return jsonb_build_object('error', 'locked');
     end if;
@@ -331,23 +335,22 @@ begin
         return jsonb_build_object('error', 'not_found');
     end if;
 
-    -- Live cards only; each has its own salt. A reissued card is not live.
-    select count(*) into _rows
-      from student_card where stopped_at is null and code_hash = _access_code_hash(_code, salt);
-    if _rows = 0 and exists (select 1 from student_access_code
-                              where revoked_at is null and expires_at > now()
-                                and code_hash = _access_code_hash(_code, salt)) then
-        -- A live slip's code, typed or scanned where a card goes. Not a
-        -- guess: it is logged as what it is and counts toward no limit.
-        perform _log('card', 'slip', p_ip_hash);
-        return jsonb_build_object('error', 'not_found', 'kind', 'slip');
-    end if;
-    if _rows <> 1 then
-        perform _log('card', case when _rows = 0 then 'not_found' else 'ambiguous' end, p_ip_hash);
+    -- The live card with this code, found through the index on live codes
+    -- (one row read, however many cards there are), then checked against
+    -- its salted hash. A reissued card is not live.
+    select * into _k
+      from student_card
+     where stopped_at is null and code = substr(_code, 1, 3) || '-' || substr(_code, 4, 3);
+    if _k.id is null or _k.code_hash is distinct from _access_code_hash(_code, _k.salt) then
+        -- Not a card. A live slip's code, typed or scanned where a card
+        -- goes, is not a guess: it is logged as what it is and counts toward
+        -- no limit. The answer is the same either way.
+        perform _log('card', case when exists (select 1 from student_access_code
+                                                 where revoked_at is null and expires_at > now()
+                                                   and code_hash = _access_code_hash(_code, salt))
+                                  then 'slip' else 'not_found' end, p_ip_hash);
         return jsonb_build_object('error', 'not_found');
     end if;
-    select * into _k
-      from student_card where stopped_at is null and code_hash = _access_code_hash(_code, salt);
 
     _why := _card_refusal(_k.id);
     if _why is not null then
@@ -379,9 +382,6 @@ declare
     _by     text;
     _pw     boolean;
 begin
-    if _found->>'kind' = 'slip' then
-        return jsonb_build_object('ok', true, 'kind', 'slip');
-    end if;
     if _card is null then
         return jsonb_build_object('ok', false, 'error', _found->>'error');
     end if;
@@ -431,6 +431,8 @@ declare
     _session device_session%rowtype;
     _token   text;
     _ends    timestamptz;
+    _row     int;
+    _week    int;
 begin
     if _card is null then
         return jsonb_build_object('ok', false, 'error', _found->>'error');
@@ -462,17 +464,21 @@ begin
     if not coalesce((_dob is not null and _given is not null and _given = _dob)
                  or (_num is not null and _norm(p_student_number) = _num)
                  or (_pw is not null and _norm(p_password) = _pw), false) then
-        -- Five wrong tries in a row lock it; a right answer starts the count
-        -- again, so "tries left" is always true.
+        -- Five wrong tries in a row lock it (a right answer starts that
+        -- count again), and so do fifteen inside 7 days whatever came
+        -- between. "Tries left" is the nearer of the two, so it is always true.
         update student_card
            set wrong_tries = wrong_tries + 1,
-               locked_at = case when wrong_tries + 1 >= 5 then now() end
-         where id = _k.id;
+               wrong_times = array(select t from unnest(wrong_times) t where t > clock_timestamp() - interval '7 days')
+                             || clock_timestamp()
+         where id = _k.id
+        returning wrong_tries, cardinality(wrong_times) into _row, _week;
         perform _log('card', 'wrong_identity', p_ip_hash, _k.id, _course.id);
-        if _k.wrong_tries + 1 >= 5 then
+        if _row >= 5 or _week >= 15 then
+            update student_card set locked_at = now() where id = _k.id;
             return jsonb_build_object('ok', false, 'error', 'card_locked');
         end if;
-        return jsonb_build_object('ok', false, 'error', 'wrong_identity', 'tries_left', 4 - _k.wrong_tries);
+        return jsonb_build_object('ok', false, 'error', 'wrong_identity', 'tries_left', least(5 - _row, 15 - _week));
     end if;
 
     -- Matched. From the start screen that is a fresh session: whoever was

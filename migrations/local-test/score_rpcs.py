@@ -7,13 +7,14 @@ then as Teacher B, with no JWT and as anon. Rows are read back as the
 database owner. One transaction, rolled back at the end.
 
 "today:" in a check's name marks a gap this pins as it is, not as it should
-be. Batch A closes three of them: a criterion not on the assessment's rubric
-and Missing on scored work (migrations/2026110902_grade_return.sql), and a
-score row that names another class's records
-(migrations/2026110901_score_rows_same_class.sql).
+be. Batch A closes two of them: Missing on scored work
+(migrations/2026110902_grade_return.sql) and a score row that names another
+class's records (migrations/2026110901_score_rows_same_class.sql). A
+criterion that is not on the assessment's rubric stays accepted:
+upsert_rubric_score is not changed.
 
 The script runs against either database and says which it found: before
-Batch A those three are pinned as "today: accepted"; with Batch A loaded
+Batch A those two are pinned as "today: accepted"; with Batch A loaded
 they are "refused", and a section at the end tries every way in.
 
 PGPORT=54329 PGDATABASE=fv_score python3 run.py harness.sql score-prelude.sql score-tables.sql
@@ -59,7 +60,7 @@ def same_shape(lines):
         lines = [l for l in lines[:cut] if 'grade_return_' not in l]
     return [re.sub(r'[()]', '', l) for l in lines if not re.match(r'  constraint \S+ NOT NULL ', l)]
 BATCH_A = c.run("select to_regclass('public.grade_return') is not null")[0][0]
-PATCHED = ['upsert_rubric_score', 'set_score_status', 'move_rubric_scores'] if BATCH_A else []
+PATCHED = ['set_score_status', 'move_rubric_scores'] if BATCH_A else []
 ok('running against a database %s Batch A' % ('with' if BATCH_A else 'without'), True)
 c.run("set search_path = ''")
 local = snapshot_blocks(c.run(open(os.path.join(HERE, '..', '..', 'scripts', 'schema-snapshot.sql')).read())[0][0])
@@ -266,22 +267,18 @@ ok('no level keeps the row while a note remains', r == rid and crit_row(ENR1, RU
 r = rpc(A, "upsert_rubric_score(:e, :a, :x, 0, 0::smallint, null, '')", e=ENR1, a=RUB, x=C1)
 ok('no level and no notes deletes the row and returns null', r is None and crit_row(ENR1, RUB, C1) is None, (r, crit_row(ENR1, RUB, C1)))
 expect_error('a criterion level above 4 is refused by the table', lambda: rpc(A, 'upsert_rubric_score(:e, :a, :x, 5)', e=ENR1, a=RUB, x=C1), '23514')
-# GAP 1 (Batch A closes it): the criterion is not checked against the rubric.
+# GAP 1, still open with Batch A: the criterion is not checked against the
+# work's rubric. upsert_rubric_score is left exactly as live, because the
+# outbox can send a score ahead of the update_assessment that changes the
+# rubric; the check waits for the client to send the rubric change first.
+rpc(A, 'upsert_rubric_score(:e, :a, :x, 3)', e=ENR2, a=RUB, x=CX)
+ok("today: accepted: a criterion that is not on the assessment's rubric", crit_row(ENR2, RUB, CX) == [3, 0, None, None], crit_row(ENR2, RUB, CX))
+rpc(A, 'upsert_rubric_score(:e, :a, :x, 2)', e=ENR2, a=PLAIN, x=C1)
+ok('today: accepted: a criterion on an assessment with no rubric', crit_row(ENR2, PLAIN, C1) == [2, 0, None, None], crit_row(ENR2, PLAIN, C1))
 if BATCH_A:
-    expect_error("refused: a criterion that is not on the assessment's rubric",
-                 lambda: rpc(A, 'upsert_rubric_score(:e, :a, :x, 3)', e=ENR2, a=RUB, x=CX), 'is not in the rubric of assessment')
-    rpc(A, 'upsert_rubric_score(:e, :a, :x, 2)', e=ENR2, a=PLAIN, x=C1)
-    ok('still accepted: a criterion on an assessment with no rubric yet (the outbox can send a score ahead of its rubric)',
-       crit_row(ENR2, PLAIN, C1) == [2, 0, None, None], crit_row(ENR2, PLAIN, C1))
-    expect_error("refused: Teacher B's criterion on Teacher A's student",
-                 lambda: rpc(A, 'upsert_rubric_score(:e, :a, :x, 2)', e=ENR2, a=RUB, x=ids['b_crit']), 'is not in the rubric of assessment')
-    ok('a 0 for a criterion that is not on the rubric is still taken, and writes nothing',
-       rpc(A, 'upsert_rubric_score(:e, :a, :x, 0)', e=ENR2, a=RUB, x=CX) is None and crit_row(ENR2, RUB, CX) is None)
+    expect_error("refused: Teacher B's criterion on Teacher A's student (a score row belongs to one class)",
+                 lambda: rpc(A, 'upsert_rubric_score(:e, :a, :x, 2)', e=ENR2, a=RUB, x=ids['b_crit']), 'row-level security')
 else:
-    rpc(A, 'upsert_rubric_score(:e, :a, :x, 3)', e=ENR2, a=RUB, x=CX)
-    ok("today: accepted: a criterion that is not on the assessment's rubric", crit_row(ENR2, RUB, CX) == [3, 0, None, None], crit_row(ENR2, RUB, CX))
-    rpc(A, 'upsert_rubric_score(:e, :a, :x, 2)', e=ENR2, a=PLAIN, x=C1)
-    ok('today: accepted: a criterion on an assessment with no rubric', crit_row(ENR2, PLAIN, C1) == [2, 0, None, None], crit_row(ENR2, PLAIN, C1))
     rpc(A, 'upsert_rubric_score(:e, :a, :x, 2)', e=ENR2, a=RUB, x=ids['b_crit'])
     ok("today: accepted: Teacher B's criterion on Teacher A's student", crit_row(ENR2, RUB, ids['b_crit']) == [2, 0, None, None], crit_row(ENR2, RUB, ids['b_crit']))
 as_owner(); c.run('delete from rubric_score where enrollment_id = :e', e=ENR2)

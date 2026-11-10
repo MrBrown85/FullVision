@@ -163,8 +163,8 @@ ok('and no function: each patch went in once',
 # ── The patches start from the live bodies, and only from them ─────────
 got = {r[0]: r[1] for r in rows("""select p.proname, pg_get_functiondef(p.oid) from pg_proc p
                                     join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public'""")}
-ok('eight functions carry a patch', all(mark in got[fn] for fn, mark in (
-    ('upsert_rubric_score', 'is not in the rubric of assessment'), ('set_score_status', 'cannot be marked Missing'),
+ok('seven functions carry a patch', all(mark in got[fn] for fn, mark in (
+    ('set_score_status', 'cannot be marked Missing'),
     ('update_course', 'student_page_enabled'), ('move_rubric_scores', 'fv.moving_rubric'),
     ('import_json_restore', 'restore_grade_returns'), ('duplicate_course', 'courses_count_equally, return_grades'),
     ('_issue_access_code', 'live student card'), ('_issue_report_code', 'live student card'))))
@@ -175,10 +175,10 @@ ok('the two slip functions are their old bodies plus two lines',
    all(d.replace("""salt))
             -- nor the code of a live student card (2026110903_student_card)
             or exists (select 1 from student_card where stopped_at is null and code = _code);""", 'salt));') == slip_before[n] for n, d in PATCHES.items()))
-ok('create_course, duplicate_assessment and the other score RPCs are still the live bodies',
+ok('create_course, duplicate_assessment, upsert_rubric_score and the other score RPCs are still the live bodies',
    all(md5 == want[name] for name, md5 in rows("""select p.proname, md5(pg_get_functiondef(p.oid)) from pg_proc p
            join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public'""")
-       if name in want and name not in ('upsert_rubric_score', 'set_score_status', 'update_course', 'move_rubric_scores', 'import_json_restore', 'duplicate_course')))
+       if name in want and name not in ('set_score_status', 'update_course', 'move_rubric_scores', 'import_json_restore', 'duplicate_course')))
 c.run('rollback'); c.run('begin')
 as_owner()
 live_def = one("select pg_get_functiondef('public.set_score_status(uuid,uuid,text)'::regprocedure)")

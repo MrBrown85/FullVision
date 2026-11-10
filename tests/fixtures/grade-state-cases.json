@@ -23,7 +23,7 @@
     },
     "expect": {
       "state": "draft: the working copy holds something the student has not been given. returned: nothing is waiting and the student has a grade. none: no grade is returned and none is waiting.",
-      "student": "The grade the student is given, as a copy, or null for nothing. A draft is never in it; nothing is given while the piece is Missing or Excused; and only what the work is scored by now is in it (a deleted criterion, competency or checkbox is gone at once).",
+      "student": "The grade the student is given, as a copy, or null for nothing. A draft is never in it; nothing is given while the piece is Missing or Excused; and only what the work is scored by now is in it (a deleted criterion, competency or checkbox is gone at once; on competency work the score value is given only when the grade holds no competency level at all).",
       "status": "The status the student sees. It is never a draft.",
       "previous": "The grade the student had before the newest return, as a copy, or null.",
       "updated": "True when the student page marks the grade Updated.",
@@ -2804,6 +2804,94 @@
               "modifier": 0,
               "comment": null,
               "tags": {},
+              "criteria": {},
+              "checks": []
+            },
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Competency work that holds only an Overall level: the level is given (the app shows it under the first competency)",
+      "class": {
+        "student_page": true,
+        "return_grades": "on_return"
+      },
+      "work": "competencies",
+      "steps": [
+        {
+          "do": "score",
+          "value": 3
+        },
+        {
+          "expect": {
+            "state": "draft",
+            "student": null,
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        },
+        {
+          "do": "return"
+        },
+        {
+          "expect": {
+            "state": "returned",
+            "student": {
+              "v": 1,
+              "value": 3,
+              "modifier": 0,
+              "comment": null,
+              "tags": {},
+              "criteria": {},
+              "checks": []
+            },
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Competency work with a competency level and an Overall level: only the competency level is given",
+      "class": {
+        "student_page": true,
+        "return_grades": "on_return"
+      },
+      "work": "competencies",
+      "steps": [
+        {
+          "do": "score",
+          "value": 3
+        },
+        {
+          "do": "level",
+          "tag": "t1",
+          "value": 2
+        },
+        {
+          "do": "return"
+        },
+        {
+          "expect": {
+            "state": "returned",
+            "student": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {
+                "t1": {
+                  "value": 2,
+                  "modifier": 0,
+                  "comment": null
+                }
+              },
               "criteria": {},
               "checks": []
             },
