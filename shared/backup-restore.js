@@ -181,9 +181,27 @@
 
   /* The class row a restore makes, in COURSES shape. A backup from before
      Nov 2026 has no `courseInfo`: the class takes the given name and the
-     defaults, and the teacher sets its grade and grading style after. */
+     defaults, and the teacher sets its grade and grading style after.
+
+     The calculation method and decay weight are the ones the backup's
+     settings hold (`config`), when it holds them: those are what the class
+     was graded with on the computer that made the backup (shared/calc.js
+     reads the settings first), and what this device grades the restored
+     class with. The row took them from `courseInfo` alone, so a backup
+     with none sent the server Average 65% while the device showed the real
+     method; nothing sends it later, and the class's first load from the
+     server moved every grade. */
   function restoredCourse(backup, cid, name) {
     var info = obj(backup.courseInfo);
+    var config = obj(backup.config);
+    var method = str(config.calcMethod) || str(info.calcMethod) || 'average';
+    var decay = [config.decayWeight, info.decayWeight]
+      .map(function (v) {
+        return v == null || v === '' ? NaN : Number(v);
+      })
+      .filter(function (v) {
+        return isFinite(v);
+      })[0];
     return {
       id: cid,
       name: str(name).trim() || str(info.name).trim() || 'Restored Class',
@@ -194,8 +212,8 @@
       displayOrder: 0,
       gradingSystem:
         ['proficiency', 'letter', 'both'].indexOf(info.gradingSystem) >= 0 ? info.gradingSystem : 'proficiency',
-      calcMethod: info.calcMethod || 'average',
-      decayWeight: info.decayWeight != null ? info.decayWeight : 0.65,
+      calcMethod: method,
+      decayWeight: decay != null ? decay : 0.65,
       timezone: info.timezone || 'America/Vancouver',
       lateWorkPolicy: info.lateWorkPolicy || null,
       block: str(info.block).trim().slice(0, 24),

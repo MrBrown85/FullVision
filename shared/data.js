@@ -4854,6 +4854,18 @@ function _unsentCourseChangesByClass() {
   return byClass;
 }
 
+/* Has this class's row never been updated since it was made? True only
+   when the server says so itself: both times there, and the same. */
+function _courseRowNeverUpdated(row) {
+  return (
+    _plainObject(row) &&
+    typeof row.created_at === 'string' &&
+    !!row.created_at &&
+    typeof row.updated_at === 'string' &&
+    row.updated_at === row.created_at
+  );
+}
+
 // Does a settings save from an older build still wait in the outbox for this class?
 function _oldSettingsSaveWaits(cid) {
   var q = typeof window !== 'undefined' ? window.v2Queue : null;
@@ -4913,6 +4925,7 @@ function _applyBundleCourseConfig(cid, row, courseRow) {
   var missing = {};
   var hasCourseRow = !!courseRow && typeof courseRow === 'object';
   var unsent = _unsentCourseChanges(cid);
+  var serverRow = courseRow; // as the server sent it, before this device's unsent changes
   if (hasCourseRow) courseRow = Object.assign({}, courseRow, unsent);
   // A setting only this device has is sent up, unless a save of this
   // class's settings was discarded (or an older one still waits to be
@@ -4931,14 +4944,35 @@ function _applyBundleCourseConfig(cid, row, courseRow) {
   });
   // The calculation method and decay weight come on the course row. The
   // server never holds null for the method; a null weight is the default.
+  //
+  // One case keeps this device's instead and sends it up, once: the row
+  // has never been updated since it was made (updated_at is created_at).
+  // Then no computer has ever changed a setting of this class on the
+  // server, so a method this device holds that differs from the row's is
+  // not an old copy of something changed elsewhere: it is one the server
+  // never got. That is a class restored from a backup by the build before
+  // this fix, which sent the server Average 65% whatever the backup's
+  // settings said (shared/backup-restore.js restoredCourse) and counted on
+  // the next settings save to put it right. Any update of the row since
+  // (by any computer, of any setting) ends this: the server's then wins.
+  var neverUpdated = _courseRowNeverUpdated(serverRow) && sendUp;
   if (hasCourseRow && 'calc_method' in courseRow) {
-    if (typeof courseRow.calc_method === 'string' && courseRow.calc_method) config.calcMethod = courseRow.calc_method;
+    var rowMethod = typeof courseRow.calc_method === 'string' && courseRow.calc_method ? courseRow.calc_method : null;
+    if (neverUpdated && typeof config.calcMethod === 'string' && config.calcMethod && config.calcMethod !== rowMethod) {
+      missing.calc_method = config.calcMethod;
+    } else if (rowMethod) config.calcMethod = rowMethod;
     else delete config.calcMethod;
   }
   if (hasCourseRow && 'decay_weight' in courseRow) {
-    if (courseRow.decay_weight != null && isFinite(Number(courseRow.decay_weight))) {
-      config.decayWeight = Number(courseRow.decay_weight);
-    } else delete config.decayWeight;
+    var rowDecay =
+      courseRow.decay_weight != null && isFinite(Number(courseRow.decay_weight))
+        ? Number(courseRow.decay_weight)
+        : null;
+    var myDecay =
+      config.decayWeight != null && isFinite(Number(config.decayWeight)) ? Number(config.decayWeight) : null;
+    if (neverUpdated && myDecay != null && myDecay !== rowDecay) missing.decay_weight = myDecay;
+    else if (rowDecay != null) config.decayWeight = rowDecay;
+    else delete config.decayWeight;
   }
   // "Round to a whole %" comes on the course row. Null there means the class
   // never chose, so it follows its grade level.

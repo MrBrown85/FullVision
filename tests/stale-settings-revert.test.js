@@ -1569,6 +1569,237 @@ describe('categories: the server’s list is read before the whole list is saved
   });
 });
 
+/* ── A class this device makes ──────────────────────────────────────────── */
+
+describe('a class made on this device reaches the server with the settings this device shows', () => {
+  // A load now replaces every setting on the device with the server's, and
+  // a save sends only what changed. So whatever makes a class must send the
+  // server everything the device shows for it: nothing is put right later
+  // by the next settings save, as it used to be.
+  const everything = cid => {
+    const cc = getCourseConfig(cid) || {};
+    const c = COURSES[cid] || {};
+    return {
+      method: cc.calcMethod || c.calcMethod || 'average',
+      decay: Number(cc.decayWeight != null ? cc.decayWeight : c.decayWeight || 0.65),
+      recent: getRecentScoreLimit(cid) || null,
+      folders: getFoldersCountAsOne(cid),
+      coursesEqually: getCoursesCountEqually(cid),
+      scale: clone(getGradingScale(cid)),
+      round: getRoundWholePercent(cid),
+      terms: clone(getReportingTerms(cid)),
+      levels: levelOrderFor(cid)[0] === 1 ? 'asc' : 'desc',
+      style: courseGradeMode(cid),
+      timezone: c.timezone || null,
+      late: c.lateWorkPolicy || null,
+      name: c.name,
+      gradeLevel: c.gradeLevel || '',
+    };
+  };
+  // The class's first load from the server: the row the server was sent.
+  const firstLoad = (cid, row) => {
+    row = Object.assign({ teacher_id: TEACHER }, clone(row));
+    _applyBundleCourseConfig(cid, { grading_scale: row.grading_scale, category_weights: row.category_weights }, row);
+    _applyBundleCourseRow(cid, row);
+  };
+  const SETTINGS_IN_A_BACKUP = () => ({
+    calcMethod: 'decayingAvg',
+    decayWeight: 0.8,
+    recentScoreLimit: 4,
+    foldersCountAsOne: false,
+    coursesCountEqually: true,
+    gradingScale: BC_SCALE(),
+    roundPercent: true,
+    reportingTerms: clone(TERMS_A),
+    levelOrder: 'asc',
+  });
+  const backupOf = (courseInfo, config) => {
+    const backup = {
+      course: 'e0000000-0000-4000-8000-0000000000aa',
+      students: [],
+      categories: [],
+      assessments: [],
+      scores: {},
+      config: config || SETTINGS_IN_A_BACKUP(),
+    };
+    if (courseInfo) backup.courseInfo = courseInfo;
+    return backup;
+  };
+  async function restore(backup) {
+    const rows = [];
+    server.fake.on('import_json_restore', params => {
+      rows.push(clone(params.p_payload.courses[0]));
+      return { data: { student_ids: {} }, error: null };
+    });
+    const made = FVBackupRestore.restoreClassFromBackup(backup, { name: 'Restored' });
+    await made.sent;
+    await settle();
+    return { cid: made.cid, row: rows[0] };
+  }
+
+  const BACKUPS = [
+    ['a backup from before November 2026 (no class row in it)', undefined],
+    [
+      'a backup whose class row and settings disagree (made on a computer that had kept its own method)',
+      { name: 'Science 9', gradeLevel: '9', gradingSystem: 'letter', calcMethod: 'average', decayWeight: 0.65 },
+    ],
+    [
+      'a backup made on a computer in step with the server',
+      { name: 'Science 9', gradeLevel: '9', gradingSystem: 'letter', calcMethod: 'decayingAvg', decayWeight: 0.8 },
+    ],
+  ];
+  it.each(BACKUPS)('Restore Class from Backup, %s: the server is sent the method the device shows', async (_, info) => {
+    await openApp();
+    const { cid, row } = await restore(backupOf(info));
+    expect([everything(cid).method, everything(cid).decay]).toEqual(['decayingAvg', 0.8]);
+    expect([row.calc_method, row.decay_weight]).toEqual(['decayingAvg', 0.8]);
+  });
+
+  it.each(BACKUPS)(
+    'Restore Class from Backup, %s: nothing the device shows changes at the class’s first load',
+    async (_, info) => {
+      await openApp();
+      const { cid, row } = await restore(backupOf(info));
+      const shown = everything(cid);
+      server.sent.length = 0;
+      firstLoad(cid, row);
+      await settle();
+      expect(everything(cid)).toEqual(shown);
+      // And the load had nothing to send up or put right.
+      expect(server.fake.calls.filter(c => c.name === 'update_course' && c.params.p_course_id === cid)).toEqual([]);
+    },
+  );
+
+  it('Restore Class from Backup with no method in its settings: the class row’s method, on the device and on the server', async () => {
+    await openApp();
+    const config = SETTINGS_IN_A_BACKUP();
+    delete config.calcMethod;
+    delete config.decayWeight;
+    const info = { name: 'Science 9', gradeLevel: '9', gradingSystem: 'both', calcMethod: 'highest', decayWeight: 0.7 };
+    const { cid, row } = await restore(backupOf(info, config));
+    expect([everything(cid).method, row.calc_method, row.decay_weight]).toEqual(['highest', 'highest', 0.7]);
+    const shown = everything(cid);
+    firstLoad(cid, row);
+    expect(everything(cid)).toEqual(shown);
+  });
+
+  /* A class restored by the build before this fix: the device holds the
+     backup's method, the server was sent Average 65%, and nothing has sent
+     the real one since. As that build left it: this device's saved copy of
+     the class with its own method, and a row on the server that has never
+     been updated since it was made. */
+  async function restoredUnderTheOldBuild() {
+    await openApp();
+    closeApp();
+    const saved = JSON.parse(localStorage.getItem('gb-courseconfig-' + CID));
+    Object.assign(saved, { calcMethod: 'decayingAvg', decayWeight: 0.8 });
+    localStorage.setItem('gb-courseconfig-' + CID, JSON.stringify(saved));
+    const meta = JSON.parse(localStorage.getItem('gb-bundle-meta-' + CID));
+    delete meta.settings;
+    localStorage.setItem('gb-bundle-meta-' + CID, JSON.stringify(meta));
+    expect([server.course.calc_method, server.course.decay_weight]).toEqual(['average', 0.65]);
+    expect(server.course.updated_at).toBe(server.course.created_at);
+    server.sent.length = 0;
+  }
+
+  it('a class restored by the build before this fix keeps its method at the first load: it is sent up once, not overwritten', async () => {
+    await restoredUnderTheOldBuild();
+    await openApp();
+    expect([everything(CID).method, everything(CID).decay]).toEqual(['decayingAvg', 0.8]);
+    expect(server.patches()).toEqual([{ calc_method: 'decayingAvg', decay_weight: 0.8 }]);
+    expect([server.course.calc_method, server.course.decay_weight]).toEqual(['decayingAvg', 0.8]);
+    // Once: the row has been updated now, and the next load has nothing to say.
+    server.sent.length = 0;
+    await openApp();
+    await hearOfChange();
+    expect(server.sent).toEqual([]);
+    expect([everything(CID).method, everything(CID).decay]).toEqual(['decayingAvg', 0.8]);
+  });
+
+  it('but not once any computer has updated the class’s row since: then it cannot be told from an old copy, and the server’s stands', async () => {
+    await restoredUnderTheOldBuild();
+    // At school: a different setting. The row is no longer as it was made.
+    schoolSets(byName('Rubric Levels'));
+    await openApp();
+    expect(server.patches()).toEqual([]);
+    expect([everything(CID).method, everything(CID).decay]).toEqual(['average', 0.65]);
+    expect(server.course.calc_method).toBe('average');
+  });
+
+  it('Duplicate Class: the copy goes up with the method the device shows for the original', async () => {
+    // The original's class row says Average; this device's settings for it
+    // say Decaying Average 80% (it is what the device grades with).
+    await openApp();
+    act('cmSetCalcMethod', { value: 'decayingAvg' });
+    input('cmDecaySlider', {}, 80);
+    await quiet();
+    COURSES[CID].calcMethod = 'average';
+    COURSES[CID].decayWeight = 0.65;
+    const created = [];
+    server.fake.on('create_course', params => {
+      created.push(clone(params));
+      return { data: 'e0000000-0000-4000-8000-00000000c0de', error: null };
+    });
+    const sent = [];
+    const send = server.fake.rpc;
+    server.fake.rpc = function (name, params) {
+      if (name === 'update_course' && params.p_course_id !== CID) sent.push(clone(params.p_patch));
+      return send(name, params);
+    };
+    DashClassManager.duplicateCourse(CID, 'C');
+    for (let i = 0; i < 40; i++) await settle();
+    const copy = Object.keys(COURSES).find(cid => cid !== CID);
+    expect(copy).toBe('e0000000-0000-4000-8000-00000000c0de');
+    const row = Object.assign({}, ...sent);
+    expect([row.calc_method, row.decay_weight]).toEqual(['decayingAvg', 0.8]);
+    expect([everything(copy).method, everything(copy).decay]).toEqual(['decayingAvg', 0.8]);
+    delete COURSES[copy];
+  });
+
+  it('a class made with no connection: every setting chosen for it goes up when the class does', async () => {
+    await openApp();
+    await goOffline();
+    const made = createCourse({ name: 'Made offline', gradeLevel: '8', calcMethod: 'mostRecent', decayWeight: 0.8 });
+    const cc = getCourseConfig(made.id);
+    Object.assign(cc, {
+      calcMethod: 'mostRecent',
+      decayWeight: 0.8,
+      levelOrder: 'asc',
+      foldersCountAsOne: false,
+      recentScoreLimit: 3,
+      roundPercent: true,
+    });
+    saveCourseConfig(made.id, cc);
+    await settle();
+    const created = [];
+    server.fake.on('create_course', params => {
+      if (!server.reachable) return { data: null, error: { message: 'network: failed to fetch' } };
+      created.push(clone(params));
+      return { data: 'e0000000-0000-4000-8000-00000000c0df', error: null };
+    });
+    const sent = [];
+    const send = server.fake.rpc;
+    server.fake.rpc = function (name, params) {
+      if (name === 'update_course' && server.reachable && params.p_course_id !== CID) sent.push(clone(params.p_patch));
+      return send(name, params);
+    };
+    server.reachable = true;
+    setOnline(true);
+    await window.v2Queue.flush();
+    for (let i = 0; i < 40; i++) await settle();
+    expect(created.map(p => [p.p_calc_method, p.p_decay_weight])).toEqual([['mostRecent', 0.8]]);
+    expect(Object.assign({}, ...sent)).toEqual({
+      calc_method: 'mostRecent',
+      decay_weight: 0.8,
+      level_order: 'asc',
+      folders_count_as_one: false,
+      recent_score_limit: 3,
+      round_percent: true,
+    });
+    delete COURSES['e0000000-0000-4000-8000-00000000c0df'];
+  });
+});
+
 /* ── The phone and Demo Mode ────────────────────────────────────────────── */
 
 describe('the phone', () => {
