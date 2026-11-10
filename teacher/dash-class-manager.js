@@ -5940,6 +5940,324 @@ window.DashClassManager = (function () {
     return _cmCategoryState[cid];
   }
 
+  /* The list as the server gave it or last took it: what this form was
+     opened with. Before anything is saved over the class's whole list, the
+     server's list is read again and compared with this (saveCategoriesNow
+     in shared/data.js). A copy, since the rows on screen change as the
+     teacher types. `inOrder`: the rows were just saved in this order, so
+     their place in the list is their display order; otherwise each keeps
+     the display order the server gave it (two rows can share one). */
+  function _cmCatSnapshot(rows, inOrder) {
+    return (rows || []).map(function (r, i) {
+      var row = {
+        id: r.id || null,
+        name: r.name || '',
+        weight: Number(r.weight) || 0,
+        display_order: inOrder || r.display_order == null ? i : Number(r.display_order) || 0,
+        calc_mode: categoryCalcMode(r),
+      };
+      // A new row in a list sent with no answer: which row it is, so the id
+      // the server gave it can be found again after the tab is closed.
+      if (!row.id && r.key) row.key = r.key;
+      return row;
+    });
+  }
+  function _cmCatRemember(st, rows, inOrder) {
+    st.opened = _cmCatSnapshot(rows, inOrder);
+  }
+  // Rows for the form from a list in cache shape (the server's, as read).
+  function _cmCatRowsFrom(list) {
+    return (list || []).map(function (r, i) {
+      var order = r.displayOrder != null ? r.displayOrder : r.display_order;
+      return {
+        id: r.id || null,
+        name: r.name || '',
+        weight: Number(r.weight) || 0,
+        display_order: order != null ? Number(order) || 0 : i,
+        calc_mode: categoryCalcMode(r),
+      };
+    });
+  }
+
+  /* The one line shown above the categories when a save was not made, or
+     when something was kept for the teacher. With `typed`, what the teacher
+     had typed is listed under it to copy from. */
+  var CM_CAT_NOTICES = {
+    changed: 'The categories changed on another device, so nothing was saved. These are the current ones.',
+    changedTyped:
+      'The categories changed on another device, so nothing was saved. These are the current ones. What you typed is below.',
+    offline:
+      'Categories need a connection to save. Your changes are kept on this computer. Save again when you are online.',
+    offlineOrder: 'Categories need a connection to save. Nothing was saved. Try again when you are online.',
+    kept: 'Your unsaved category changes were kept on this computer. Save Categories to send them.',
+    // After Discard My Changes: a save whose answer never came had landed.
+    landed: 'Your earlier save went through after all. These are the saved categories.',
+    // Online, but other changes from this computer had not gone yet.
+    waiting:
+      'Other changes from this computer are still being sent, so nothing was saved. Your changes are kept on this computer. Save again in a moment.',
+    waitingOrder: 'Other changes from this computer are still being sent, so nothing was saved. Try again in a moment.',
+  };
+  var CM_CAT_REST = ' Everything else was copied.';
+  function _cmCatNoticeText(st) {
+    var n = st.notice;
+    if (!n) return null;
+    if (n.kind === 'copyChanged') {
+      return (
+        'The categories were not copied from ' +
+        (n.from || 'the other class') +
+        ': they changed on another device first. These are the current ones.' +
+        (n.rest ? CM_CAT_REST : '')
+      );
+    }
+    if (n.kind === 'copyOffline') {
+      return (
+        'The categories were not copied from ' +
+        (n.from || 'the other class') +
+        ': there was no connection.' +
+        (n.rest ? CM_CAT_REST : '')
+      );
+    }
+    if (n.kind === 'changed') return st.typed && st.typed.length ? CM_CAT_NOTICES.changedTyped : CM_CAT_NOTICES.changed;
+    return CM_CAT_NOTICES[n.kind] || null;
+  }
+  // The button beside the line: what it does, and its label.
+  function _cmCatNoticeAction(st) {
+    var n = st.notice;
+    if (!n) return null;
+    if (n.kind === 'offline' || n.kind === 'kept' || n.kind === 'waiting') return 'Discard My Changes';
+    if (n.kind === 'offlineOrder' || n.kind === 'waitingOrder') return null;
+    return 'Dismiss';
+  }
+  var CM_CAT_MODE_LABELS = { points: 'Total Points', percent: 'Average of Percentages' };
+  function _cmCatTypedLine(r) {
+    return (r.name || 'Unnamed') + ' · ' + (Number(r.weight) || 0) + '% · ' + CM_CAT_MODE_LABELS[categoryCalcMode(r)];
+  }
+  // html-safe: the line and each typed row through esc; the label is a constant
+  function _cmCatNoticeHtml(st) {
+    var text = _cmCatNoticeText(st);
+    if (!text) return '';
+    var action = _cmCatNoticeAction(st);
+    var typed = st.notice.kind === 'changed' && st.typed && st.typed.length ? st.typed : null;
+    return (
+      '<div class="cm-cat-notice" role="status">' +
+      '<div class="cm-cat-notice-text">' +
+      esc(text) +
+      '</div>' +
+      (typed
+        ? '<div class="cm-cat-typed"><div class="cm-cat-typed-label">What You Typed</div><ul>' +
+          typed
+            .map(function (r) {
+              return '<li>' + esc(_cmCatTypedLine(r)) + '</li>';
+            })
+            .join('') +
+          '</ul></div>'
+        : '') +
+      (action ? '<button class="cm-add-link" data-action="cmCatNoticeDone">' + action + '</button>' : '') +
+      '</div>'
+    );
+  }
+
+  /* What is kept on this device for the class's categories while a save
+     has not been made (shared/data.js getCategoryDraft): the edits that
+     could not be saved, or what was typed when the list turned out to have
+     changed. Written when a save is refused and after every edit from
+     then on; removed when a save is made or the teacher discards it. */
+  function _cmCatKeep(cid) {
+    var st = _cmCatState(cid);
+    if (typeof saveCategoryDraft !== 'function') return;
+    var draft = {};
+    if (st.keeping) {
+      draft.rows = _cmCatSnapshot(st.rows, true);
+      draft.opened = st.opened || [];
+      if (st.tried) draft.tried = st.tried.snap;
+    }
+    if (st.typed && st.typed.length) draft.typed = st.typed;
+    if (st.notice && (st.notice.kind === 'copyChanged' || st.notice.kind === 'copyOffline')) {
+      draft.note = {
+        why: st.notice.kind === 'copyChanged' ? 'changed' : 'offline',
+        from: st.notice.from,
+        rest: st.notice.rest,
+      };
+    }
+    saveCategoryDraft(cid, draft);
+  }
+  // After an edit: the kept copy follows what is on screen.
+  function _cmCatEdited(cid) {
+    var st = _cmCatState(cid);
+    st.dirty = true;
+    if (st.keeping) _cmCatKeep(cid);
+  }
+  /* The form has just been filled with the class's list (`opened` set).
+     Lay over it what this device kept from before. */
+  function _cmCatApplyKept(cid, st) {
+    var draft = typeof getCategoryDraft === 'function' ? getCategoryDraft(cid) : null;
+    if (!draft) return;
+    if (draft.note) {
+      st.notice = {
+        kind: draft.note.why === 'changed' ? 'copyChanged' : 'copyOffline',
+        from: draft.note.from,
+        rest: !!draft.note.rest,
+      };
+    }
+    if (Array.isArray(draft.typed) && draft.typed.length) {
+      st.typed = draft.typed;
+      st.notice = { kind: 'changed' };
+    }
+    if (!Array.isArray(draft.rows)) return;
+    var same = function (a, b) {
+      return typeof _categoryListsMatch === 'function' && _categoryListsMatch(a, b);
+    };
+    if (same(st.opened, draft.rows)) {
+      // The save had landed after all (its answer never came): nothing is unsaved.
+      saveCategoryDraft(cid, draft.note ? { note: draft.note } : null);
+      return;
+    }
+    if (Array.isArray(draft.tried) && same(st.opened, draft.tried) && !same(st.opened, draft.opened || [])) {
+      // The server holds the list this computer sent and never heard back
+      // about: its own save landed, not a change made on another device.
+      // What was typed after it is unsaved, made over that list.
+      var rows = _cmCatWithLandedIds(draft.rows, draft.tried, st.opened);
+      if (same(st.opened, rows)) {
+        saveCategoryDraft(cid, draft.note ? { note: draft.note } : null);
+        return;
+      }
+      st.rows = _cmCatRowsFrom(rows);
+      st.dirty = true;
+      st.keeping = true;
+      st.notice = { kind: 'kept' };
+      _cmCatKeep(cid);
+      return;
+    }
+    if (same(st.opened, draft.opened || [])) {
+      st.rows = _cmCatRowsFrom(draft.rows);
+      st.dirty = true;
+      st.keeping = true;
+      st.notice = { kind: 'kept' };
+      return;
+    }
+    // The list changed on another device while the edits waited here.
+    st.typed = draft.rows;
+    st.keeping = false;
+    st.notice = { kind: 'changed' };
+    _cmCatKeep(cid);
+  }
+  /* Kept rows typed over a list that was sent with no answer and then
+     found on the server (`landed`, in its order): a new row of that list
+     takes the id the server gave it, found by its key. */
+  function _cmCatWithLandedIds(rows, tried, landed) {
+    var byOrder = function (list) {
+      return (list || [])
+        .map(function (r, i) {
+          return { r: r, i: i };
+        })
+        .sort(function (a, b) {
+          return (Number(a.r.display_order) || 0) - (Number(b.r.display_order) || 0) || a.i - b.i;
+        })
+        .map(function (x) {
+          return x.r;
+        });
+    };
+    var sent = byOrder(tried);
+    var there = byOrder(landed);
+    var idOf = {};
+    sent.forEach(function (r, i) {
+      if (!r.id && r.key && there[i] && there[i].id) idOf[r.key] = there[i].id;
+    });
+    return (rows || []).map(function (r) {
+      if (r.id || !r.key || !idOf[r.key]) return r;
+      var row = Object.assign({}, r, { id: idOf[r.key] });
+      delete row.key;
+      return row;
+    });
+  }
+  /* The button beside the line. Discard My Changes puts the form back to
+     the class's list as the server has it; Dismiss takes the line away. */
+  function cmCatNoticeDone() {
+    if (!cmSelectedCourse) return;
+    var cid = cmSelectedCourse;
+    var st = _cmCatState(cid);
+    var discard =
+      st.notice && (st.notice.kind === 'offline' || st.notice.kind === 'kept' || st.notice.kind === 'waiting');
+    if (typeof saveCategoryDraft === 'function') saveCategoryDraft(cid, null);
+    if (discard) {
+      // Back to the list the changes were made over: the server's, as this
+      // form last had it. The next save checks it again in any case.
+      st.rows = _cmCatRowsFrom(st.opened || []).sort(function (a, b) {
+        return a.display_order - b.display_order;
+      });
+      st.dirty = false;
+      st.keeping = false;
+      st.moving = null;
+      // st.tried stays: a list sent with no answer may still be what the
+      // server holds, and the next save must know it for this computer's own.
+    }
+    st.notice = null;
+    st.typed = null;
+    renderClassManager();
+    // A save's answer never came: the opened list may not be the server's
+    // any more. The form shows what the server holds, read now, or once it
+    // can be read (_cmCatFollowServer).
+    if (discard && st.tried) _cmCatFollowServer(cid);
+  }
+
+  /* After Discard My Changes with a save whose answer never came: read the
+     server's list and show it. If it is the list that save sent, the save
+     had landed ('landed'); if it is neither that nor the opened list, it
+     changed on another device ('changed'). With no connection, or with new
+     edits typed meanwhile, it waits for the next time Class Settings draws
+     the categories (st.followServer). */
+  function _cmCatFollowServer(cid) {
+    var st = _cmCatState(cid);
+    st.followServer = false;
+    if (!st.tried || typeof _readServerCategories !== 'function') return Promise.resolve();
+    if (typeof _isOffline === 'function' && _isOffline()) {
+      st.followServer = true;
+      return Promise.resolve();
+    }
+    var same = function (a, b) {
+      return typeof _categoryListsMatch === 'function' && _categoryListsMatch(a, b);
+    };
+    return _cmCatInTurn(cid, function () {
+      if (!st.tried) return;
+      var tried = st.tried.snap;
+      return Promise.resolve(_readServerCategories(cid)).then(function (rows) {
+        if (!rows || st.dirty || !st.tried) {
+          if (st.tried) st.followServer = true;
+          return;
+        }
+        st.tried = null;
+        if (same(rows, st.opened || [])) return; // it never landed: the form is right
+        st.rows = _cmCatRowsFrom(rows);
+        _cmCatRemember(st, st.rows);
+        st.typed = null;
+        st.notice = { kind: same(rows, tried) ? 'landed' : 'changed' };
+        _cmMirrorCategoriesToCache(cid);
+        _cmCatRedraw(cid);
+      });
+    });
+  }
+
+  /* A redraw after something the category code waited for (a read, a
+     save's or a drag's answer, a copy). Only while Class Settings is still
+     open on that class: drawn after the teacher left, it would put Class
+     Settings back over the page they went to, or show this class's line on
+     another class. The state is updated either way, so the class shows the
+     right list and line when it is next opened. */
+  function _cmCatRedraw(cid) {
+    if (classManagerOpen && cmMode === 'edit' && cmSelectedCourse === cid) renderClassManager();
+  }
+
+  /* One save of the list at a time, in the order asked: each one's check
+     reads the list the one before it left. */
+  function _cmCatInTurn(cid, fn) {
+    var st = _cmCatState(cid);
+    var next = Promise.resolve(st.saving).then(fn, fn);
+    st.saving = next.catch(function (e) {
+      console.warn('Category save failed:', e);
+    });
+    return st.saving;
+  }
+
   // Push the class-manager's private category state into the shared
   // _cache.categories that getCategories / getCategoryById / page-assignments /
   // page-gradebook / shared/calc.js all read from. Without this, a category
@@ -5977,6 +6295,8 @@ window.DashClassManager = (function () {
         calc_mode: categoryCalcMode(c),
       };
     });
+    _cmCatRemember(st, st.rows);
+    _cmCatApplyKept(cid, st);
   }
 
   function _cmLoadCategories(cid) {
@@ -5985,7 +6305,7 @@ window.DashClassManager = (function () {
     if (st.loaded || st.loading) return;
     if (_cmCatsLocalOnly()) {
       _cmCatFillLocal(cid, st);
-      if (st.rows.length) renderClassManager();
+      if (st.rows.length) _cmCatRedraw(cid);
       return;
     }
     st.loading = window.v2
@@ -6007,8 +6327,10 @@ window.DashClassManager = (function () {
             .sort(function (a, b) {
               return a.display_order - b.display_order;
             });
+          _cmCatRemember(st, st.rows);
           _cmMirrorCategoriesToCache(cid);
-          renderClassManager();
+          _cmCatApplyKept(cid, st);
+          _cmCatRedraw(cid);
         }
       })
       .catch(function () {
@@ -6076,11 +6398,20 @@ window.DashClassManager = (function () {
       setTimeout(function () {
         _cmLoadCategories(cid);
       }, 0);
+    // Discarded with a save's answer outstanding and no connection then:
+    // the server's list is read now.
+    if (st.loaded && st.followServer && !st.dirty) {
+      st.followServer = false;
+      setTimeout(function () {
+        _cmCatFollowServer(cid);
+      }, 0);
+    }
 
     var rows = st.rows || [];
     var html =
       '<div class="cm-field cm-cat-field">' +
       '<label class="cm-label">Categories</label>' +
+      _cmCatNoticeHtml(st) +
       '<div class="cm-cat-list">';
     if (rows.length === 0) {
       html +=
@@ -6143,7 +6474,7 @@ window.DashClassManager = (function () {
     if (!cmSelectedCourse) return;
     var st = _cmCatState(cmSelectedCourse);
     st.rows.push({ id: null, name: '', weight: 0, display_order: st.rows.length });
-    st.dirty = true;
+    _cmCatEdited(cmSelectedCourse);
     renderClassManager();
   }
 
@@ -6153,7 +6484,7 @@ window.DashClassManager = (function () {
     var row = st.rows[idx];
     if (!row) return;
     row.name = value || '';
-    st.dirty = true;
+    _cmCatEdited(cmSelectedCourse);
     _cmCatRefreshFooter(cmSelectedCourse);
   }
 
@@ -6184,7 +6515,7 @@ window.DashClassManager = (function () {
     var row = st.rows[idx];
     if (!row) return;
     row.calc_mode = value === 'percent' ? 'percent' : 'points';
-    st.dirty = true;
+    _cmCatEdited(cmSelectedCourse);
     _cmCatRefreshFooter(cmSelectedCourse);
   }
 
@@ -6195,7 +6526,7 @@ window.DashClassManager = (function () {
     if (!row) return;
     var v = parseFloat(value);
     row.weight = isNaN(v) ? 0 : Math.max(0, v);
-    st.dirty = true;
+    _cmCatEdited(cmSelectedCourse);
     _cmCatRefreshFooter(cmSelectedCourse);
   }
 
@@ -6300,7 +6631,7 @@ window.DashClassManager = (function () {
     var st = _cmCatState(cid);
     var i = st.rows.indexOf(row);
     if (i >= 0) st.rows.splice(i, 1);
-    st.dirty = true;
+    _cmCatEdited(cid);
     renderClassManager();
   }
 
@@ -6403,27 +6734,93 @@ window.DashClassManager = (function () {
   }
 
   function _cmCatSaveRows(cid, rows) {
+    return _cmCatInTurn(cid, function () {
+      return _cmCatSaveNow(cid, rows, 0);
+    });
+  }
+  /* The server's list is read, compared with the one this form was opened
+     with, and the save sent, in one online moment or not at all
+     (saveCategoriesNow in shared/data.js). Nothing is left in the outbox
+     to go out later over a change made elsewhere. */
+  function _cmCatSaveNow(cid, rows, again) {
     var st = _cmCatState(cid);
-    var pending = typeof _assessmentSaveQueue !== 'undefined' && _assessmentSaveQueue[cid];
-    return Promise.resolve(pending)
-      .then(function () {
-        return window.v2.saveCategories(cid, rows);
-      })
-      .then(function (res) {
-        if (res && res.error) {
-          if (typeof showSyncToast === 'function')
-            showSyncToast('Categories not saved: ' + (res.error.message || 'server error'), 'error');
-          return;
-        }
-        var ids = (res && Array.isArray(res.data) && res.data) || [];
+    var tried = st.tried ? st.tried.snap : null;
+    return Promise.resolve(saveCategoriesNow(cid, rows, st.opened || [], tried)).then(function (res) {
+      res = res || { ok: false, why: 'offline' };
+      if (res.ok && res.landed) {
+        // An earlier try had reached the server; its answer never came.
+        var landed = _cmCatRowsFrom(res.rows);
+        (st.tried ? st.tried.rows : []).forEach(function (r, i) {
+          if (landed[i] && !r.id) r.id = landed[i].id;
+        });
+        _cmCatRemember(st, landed);
+        var same = typeof _categoryListsMatch === 'function' && _categoryListsMatch(landed, _cmCatSnapshot(rows, true));
+        st.tried = null;
+        if (!same && !again) return _cmCatSaveNow(cid, rows, 1);
+        res = {
+          ok: true,
+          ids: landed.map(function (r) {
+            return r.id;
+          }),
+        };
+      }
+      if (res.ok) {
+        var ids = res.ids || [];
         rows.forEach(function (r, i) {
           // Without a server (Demo Mode) a new row keeps a local id.
           r.id = ids[i] || r.id || uid();
         });
         st.dirty = false;
+        st.notice = null;
+        st.typed = null;
+        st.tried = null;
+        st.keeping = false;
+        _cmCatRemember(st, rows, true);
+        _cmCatKeep(cid);
         _cmMirrorCategoriesToCache(cid);
-        renderClassManager();
-      });
+        _cmCatRedraw(cid);
+        return;
+      }
+      if (res.why === 'changed') {
+        // Nothing was saved. The current list shows; what the teacher had
+        // typed is kept beside it, on this device too.
+        st.typed = _cmCatSnapshot(rows, true);
+        st.rows = _cmCatRowsFrom(res.rows);
+        _cmCatRemember(st, st.rows);
+        st.dirty = false;
+        st.moving = null;
+        st.tried = null;
+        st.keeping = false;
+        st.notice = { kind: 'changed' };
+        _cmCatKeep(cid);
+        _cmMirrorCategoriesToCache(cid);
+        _cmCatRedraw(cid);
+        return;
+      }
+      if (res.why === 'refused') {
+        if (typeof showSyncToast === 'function')
+          showSyncToast('Categories not saved: ' + ((res.error && res.error.message) || 'server error'), 'error');
+        return;
+      }
+      // No connection, or this computer's other changes had not gone:
+      // nothing was saved, and what was typed stays, on screen and on this
+      // device. Sent with no answer: it may have landed, and the next check
+      // knows it for this computer's own if it did.
+      if (res.unknown) _cmCatTried(st, rows);
+      st.keeping = true;
+      st.notice = { kind: res.why === 'waiting' ? 'waiting' : 'offline' };
+      _cmCatKeep(cid);
+      _cmCatRedraw(cid);
+    });
+  }
+  /* A list sent whose answer never came. Its new rows get a key, kept with
+     them on this device, so the ids the server gave them can be found again
+     after the tab is closed (_cmCatWithLandedIds). */
+  function _cmCatTried(st, rows) {
+    rows.forEach(function (r) {
+      if (!r.id && !r.key) r.key = uid();
+    });
+    st.tried = { rows: rows.slice(), snap: _cmCatSnapshot(rows, true) };
   }
 
   // Grading setup copied to or from another class (teacher/grading-setup-copy.js).
@@ -6441,14 +6838,91 @@ window.DashClassManager = (function () {
       cid,
       Object.assign({}, opts, {
         onDone: function (cids) {
+          // A class whose categories were left as they were says so above
+          // them when it is next shown here (noteCategoriesNotCopied).
           (cids || []).forEach(function (c) {
             delete _cmCategoryState[c];
             delete _cmTermState[c];
           });
-          renderClassManager();
+          _cmCatRedraw(cid);
         },
       }),
     );
+  }
+
+  /* A row dragged to a new place. It moves on screen at once. With nothing
+     else unsaved, the new order is checked and sent in one online moment
+     (reorderCategoriesNow in shared/data.js): the list changed elsewhere,
+     the current one shows; no connection, the row goes back where it was;
+     sent with no answer, it stays, as a change not yet saved. */
+  function _cmCatReorder(cid, fromIdx, toIdx) {
+    var st = _cmCatState(cid);
+    var before = st.rows.slice();
+    var moved = st.rows.splice(fromIdx, 1)[0];
+    st.rows.splice(toIdx, 0, moved);
+    st.rows.forEach(function (r, i) {
+      r.display_order = i;
+    });
+    // With other changes not yet saved (a row deleted or added here, a
+    // weight typed), the new order goes up with Save Categories, which
+    // numbers the whole list. reorder_categories numbers only the rows it
+    // is sent: sent without a row deleted on screen, it would leave that
+    // row tied with another on the server, in an order this form cannot
+    // know, and the next save would take it for a change made elsewhere.
+    var unsaved =
+      st.dirty ||
+      st.rows.some(function (r) {
+        return !r.id;
+      });
+    if (unsaved) _cmCatEdited(cid);
+    renderClassManager();
+    if (unsaved || !window.v2 || !window.v2.reorderCategories) return Promise.resolve();
+    var ids = st.rows.map(function (r) {
+      return r.id;
+    });
+    function undo() {
+      // Only if the list on screen is still the dragged one.
+      if (st.rows.length !== before.length || st.rows.some(r => before.indexOf(r) < 0)) return;
+      st.rows = before;
+      st.rows.forEach(function (r, i) {
+        r.display_order = i;
+      });
+    }
+    return _cmCatInTurn(cid, function () {
+      return Promise.resolve(reorderCategoriesNow(cid, ids, st.opened || [])).then(function (res) {
+        res = res || { ok: false, why: 'offline' };
+        if (res.ok) {
+          // Every row was sent, so the server holds them in this order.
+          if (!res.local) _cmCatRemember(st, st.rows, true);
+          return;
+        }
+        if (res.why === 'changed') {
+          st.rows = _cmCatRowsFrom(res.rows);
+          _cmCatRemember(st, st.rows);
+          st.dirty = false;
+          st.moving = null;
+          st.typed = null;
+          st.notice = { kind: 'changed' };
+          _cmMirrorCategoriesToCache(cid);
+        } else if (res.why === 'refused') {
+          undo();
+        } else if (res.unknown) {
+          // Sent, and no answer came: the new order may be on the server or
+          // not. The row stays where it was put, as a change not yet saved,
+          // kept like any other; the next Save sends it, or finds it landed.
+          _cmCatTried(st, st.rows);
+          st.dirty = true;
+          st.keeping = true;
+          st.notice = { kind: 'offline' };
+          _cmCatKeep(cid);
+        } else {
+          // Not sent: the row goes back where it was.
+          undo();
+          st.notice = { kind: res.why === 'waiting' ? 'waitingOrder' : 'offlineOrder' };
+        }
+        _cmCatRedraw(cid);
+      });
+    });
   }
 
   // Drag-reorder using delegated document listeners. Drop on another row → move.
@@ -6485,21 +6959,8 @@ window.DashClassManager = (function () {
         _cmCatDragId = null;
         return;
       }
-      var moved = st.rows.splice(fromIdx, 1)[0];
-      st.rows.splice(toIdx, 0, moved);
-      st.rows.forEach(function (r, i) {
-        r.display_order = i;
-      });
       _cmCatDragId = null;
-      renderClassManager();
-      if (window.v2 && window.v2.reorderCategories) {
-        var ids = st.rows
-          .map(function (r) {
-            return r.id;
-          })
-          .filter(Boolean);
-        window.v2.reorderCategories(ids);
-      }
+      _cmCatReorder(cmSelectedCourse, fromIdx, toIdx);
     });
     _addDocListener('dragend', function () {
       document.querySelectorAll('.cm-cat-row.dragging').forEach(function (el) {
@@ -10195,6 +10656,9 @@ window.DashClassManager = (function () {
       cmCatAdd: function () {
         cmCatAdd();
       },
+      cmCatNoticeDone: function () {
+        cmCatNoticeDone();
+      },
       cmCatCopyFrom: function () {
         cmOpenSetupCopy({ mode: 'from', only: 'categories' });
       },
@@ -10792,6 +11256,20 @@ window.DashClassManager = (function () {
     reportingTermsDraft: function (cid) {
       var st = _cmTermRows(cid || cmSelectedCourse);
       return { rows: st.rows.slice(), dirty: st.dirty, error: _cmTermError(cid || cmSelectedCourse) };
+    },
+    // The categories as Class Settings holds them, and a drag's move.
+    categoriesDraft: function (cid) {
+      var st = _cmCatState(cid || cmSelectedCourse);
+      return {
+        rows: st.rows.slice(),
+        dirty: !!st.dirty,
+        notice: _cmCatNoticeText(st),
+        action: _cmCatNoticeAction(st),
+        typed: st.notice && st.notice.kind === 'changed' && st.typed ? st.typed.map(_cmCatTypedLine) : null,
+      };
+    },
+    reorderCategory: function (fromIdx, toIdx) {
+      return cmSelectedCourse ? _cmCatReorder(cmSelectedCourse, fromIdx, toIdx) : Promise.resolve();
     },
     handleInput: handleInput,
     handleChange: handleChange,

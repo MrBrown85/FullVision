@@ -514,6 +514,7 @@ function _exitDegradedMode(bootstrapData) {
     COURSES = _cache.courses;
     _safeLSSet('gb-courses', JSON.stringify(_cache.courses));
     _safeLSSet('gb-config', JSON.stringify(_cache.config));
+    _releaseDiscardsByClassList(bootstrapData.courseRows);
   }
   var outbox = _outbox();
   if (outbox) outbox.flush();
@@ -1151,6 +1152,37 @@ function _purgeUnlistedCourseData(courses) {
   });
 }
 
+/* The server's class list has just been read (`rows`). A save discarded
+   for a class keeps the sync dot red until that class has been read again
+   (_discardWrite). Two classes never are: one gone from the server (deleted
+   on another device, or no longer this teacher's), and an archived one,
+   which is not preloaded. For those the list itself is the server's word:
+   a class gone from it ends the red dot now; an archived class's ends at
+   the next app open, so it lasts through the sitting the save was
+   discarded in. A live class waits to be read, as before. */
+function _releaseDiscardsByClassList(rows) {
+  var q = typeof window !== 'undefined' ? window.v2Queue : null;
+  if (!q || typeof q.deadLetter !== 'function' || typeof q.releaseDiscarded !== 'function') return;
+  try {
+    var listed = {};
+    (rows || []).forEach(function (r) {
+      if (r && r.id) listed[r.id] = r;
+    });
+    var seen = {};
+    var released = 0;
+    q.deadLetter().forEach(function (e) {
+      var cid = e && e.until_reload;
+      if (!cid || seen[cid]) return;
+      seen[cid] = true;
+      if (!listed[cid]) released += q.releaseDiscarded(cid);
+      else if (listed[cid].is_archived) released += q.releaseDiscarded(cid, { earlierPage: true });
+    });
+    if (released) _updateSyncIndicator();
+  } catch (e) {
+    /* the dot stays red; the next list read tries again */
+  }
+}
+
 function _removeLocalKeys(test) {
   try {
     var keys = [];
@@ -1242,6 +1274,7 @@ async function initAllCourses() {
       _safeLSSet('gb-config', JSON.stringify(_cache.config));
       _purgeUnlistedCourseData(_cache.courses);
       _purgeStaleSavedCopies();
+      _releaseDiscardsByClassList(data.courseRows);
       _syncStatus = 'idle';
       _updateSyncIndicator();
     } catch (e) {
@@ -1695,6 +1728,21 @@ function _keepOrDefaultField(cid, field, fallback) {
   if (_cache[field][cid] !== undefined) return;
   var key = _DATA_KEYS[field];
   _cache[field][cid] = key ? _safeParseLS('gb-' + key + '-' + cid, fallback) : fallback;
+  if (field === 'courseConfigs') _noteSettingsRead(cid);
+}
+
+/* The class's settings as this page read them from this device's storage:
+   { of: the cached object, copy: a clone of it then }. saveCourseConfig
+   sends what differs from the copy the page started from, and until the
+   class has loaded from the server (no connection, or sync paused) that is
+   this one. Not the storage as it is at the time of the save: another tab
+   writes its own changes there, and this page's older values would look
+   like changes. Good only while the cache still holds that same object. */
+var _settingsRead = {}; // cid → { of, copy }
+function _noteSettingsRead(cid) {
+  var value = _cache.courseConfigs[cid];
+  if (_plainObject(value)) _settingsRead[cid] = { of: value, copy: _cloneValue(value) };
+  else delete _settingsRead[cid];
 }
 
 function _persistLoadedField(cid, field, value) {
@@ -1744,6 +1792,8 @@ var _SERVER_STATE_FIELDS = {
   scores: true,
   statuses: true,
   rubrics: true,
+  // The class's settings: saveCourseConfig sends only what differs from it.
+  courseConfigs: true,
 };
 var _serverState = {}; // field → cid → value
 
@@ -4235,6 +4285,15 @@ async function _doInitData(cid) {
     }
     _clearLoadError(cid);
     _v2GradebookToCache(cid, gbRes.data || {});
+    // The class's settings too: get_gradebook's `course` is the whole course
+    // row, as the bundle's is. This load used to take none of them.
+    var olderRow = (_rpcObject(gbRes.data) || {}).course;
+    if (_plainObject(olderRow)) {
+      _applyBundleCourseConfig(cid, {}, olderRow);
+      _applyBundleCourseRow(cid, olderRow);
+      var olderLoad = _refreshState[cid];
+      if (!(olderLoad && olderLoad.skipped)) _classReadFromServer(cid);
+    }
     await _hydrateCanonicalDetails(cid);
     await loadStudentProfileSummaries(cid);
     if (_serverKeepsRows(cid)) await _loadServerGradeReturns(cid, true);
@@ -4432,6 +4491,7 @@ function _bundleToCache(cid, bundle) {
     );
   }
   _applyBundleCourseConfig(cid, bundle.course_config, bundle.gradebook && bundle.gradebook.course);
+  _applyBundleCourseRow(cid, bundle.gradebook && bundle.gradebook.course);
   _applyBundleCurriculumTags(cid, bundle.gradebook && bundle.gradebook.course);
   // After the class settings: it works out and caches levels, and on a first
   // load this device has none of the settings yet.
@@ -4452,7 +4512,9 @@ function _bundleToCache(cid, bundle) {
       owner: _teacherId,
       schema: _BUNDLE_SCHEMA,
       dirty: false,
+      settings: _SAVED_SETTINGS,
     });
+    _classReadFromServer(cid);
   }
 }
 
@@ -4474,6 +4536,14 @@ function _bundleToCache(cid, bundle) {
 // same-date work would sit in another order than on a device that fetched
 // the class fresh. Each class is downloaded in full once instead.
 var _BUNDLE_SCHEMA = 6;
+/* Whose settings a saved copy holds. 1 (2026-11-10): every class setting in
+   it was taken from the server when it was saved, the calculation method
+   and decay weight included. A copy saved before that kept this device's
+   own method and weight whatever the server held, and the server answers
+   "not modified" for a class that has not changed since, so such a copy
+   would go on grading with them. It is still shown at once, but not taken
+   as the server's: the class is downloaded in full once (_loadSavedCopy). */
+var _SAVED_SETTINGS = 1;
 var _SAVED_COPY_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 var _classFresh = {}; // cid → the server confirmed or replaced this copy since it was shown
 var _dirtyMarked = {}; // cid → the saved copy has been flagged as holding local edits
@@ -4537,7 +4607,7 @@ function _loadSavedCopy(cid) {
   var meta = _classMeta(cid) || {};
   _loadCourseFromLS(cid);
   _cache.categories[cid] = _safeParseLS('gb-categories-' + cid, []);
-  if (meta.dirty) return;
+  if (meta.dirty || meta.settings !== _SAVED_SETTINGS) return;
   Object.keys(_SERVER_STATE_FIELDS).forEach(function (field) {
     if (_cache[field][cid] !== undefined) _rememberServerState(field, cid, _cache[field][cid]);
   });
@@ -4783,23 +4853,168 @@ function _applyBundleCurriculumTags(cid, courseRow) {
   _safeLSSet('gb-courses', JSON.stringify(COURSES));
 }
 
+/* What this device has changed on a class's row and the server has not
+   yet taken: the patches of its queued update_course writes, later over
+   earlier. A load lays them back over the server's row, so a change made
+   here is never shown undone by a load that ran before it was sent. Only
+   writes that say they carry what the teacher changed and nothing else
+   (FV_SETTINGS_CHANGED_ONLY): not a whole copy an earlier build queued, and
+   not the student page's two settings, which have their own rules. */
+function _unsentCourseChanges(cid) {
+  return (cid && _unsentCourseChangesByClass()[cid]) || {};
+}
+// The same for every class at once: cid → patch.
+function _unsentCourseChangesByClass() {
+  var byClass = {};
+  var q = typeof window !== 'undefined' ? window.v2Queue : null;
+  if (!q || typeof q.queued !== 'function') return byClass;
+  var entries;
+  try {
+    entries = q.queued('update_course') || [];
+  } catch (e) {
+    return byClass;
+  }
+  entries.forEach(function (entry) {
+    var p = (entry && entry.payload) || {};
+    if (!p.p_course_id || !_plainObject(p.p_patch) || !p.p_patch[FV_SETTINGS_CHANGED_ONLY]) return;
+    var out = byClass[p.p_course_id] || (byClass[p.p_course_id] = {});
+    Object.keys(p.p_patch).forEach(function (col) {
+      // Only the server's word turns the student page on or sets Return Grades.
+      if (col === FV_SETTINGS_CHANGED_ONLY || col === 'student_page_enabled' || col === 'return_grades') return;
+      out[col] = p.p_patch[col];
+    });
+  });
+  return byClass;
+}
+
+/* Has this class's row never been updated since it was made? True only
+   when the server says so itself: both times there, and the same. */
+function _courseRowNeverUpdated(row) {
+  return (
+    _plainObject(row) &&
+    typeof row.created_at === 'string' &&
+    !!row.created_at &&
+    typeof row.updated_at === 'string' &&
+    row.updated_at === row.created_at
+  );
+}
+
+// Does a settings save from an older build still wait in the outbox for this class?
+function _oldSettingsSaveWaits(cid) {
+  var q = typeof window !== 'undefined' ? window.v2Queue : null;
+  if (!cid || !q || typeof q.queued !== 'function') return false;
+  try {
+    return (q.queued('update_course') || []).some(function (entry) {
+      var p = (entry && entry.payload) || {};
+      return p.p_course_id === cid && _isOldSettingsPatch(p.p_patch);
+    });
+  } catch (e) {
+    return false;
+  }
+}
+
+// What updateCourse counts its edits under (_localWrites): the class's own row.
+var _COURSE_ROW_FIELD = 'courseRow';
+/* The class's own row into the class list (COURSES), as list_teacher_courses
+   fills it when the app opens (_canonicalCoursesToBlob). A class load used
+   to leave these as they were, so a grading style, late work policy, name
+   or method changed on another device showed only after the app was closed
+   and opened again. */
+function _applyBundleCourseRow(cid, courseRow) {
+  if (!_plainObject(courseRow) || !COURSES || !COURSES[cid]) return;
+  // Changed here while this load was on its way (updateCourse): the row is
+  // from before that change, so it is left and the load runs again.
+  if (_refreshMustSkip(cid, _COURSE_ROW_FIELD)) return;
+  var row = Object.assign({}, courseRow, _unsentCourseChanges(cid));
+  var course = COURSES[cid];
+  var before = JSON.stringify(course);
+  if ('name' in row) course.name = row.name || 'Untitled Class';
+  if ('description' in row) course.description = row.description || '';
+  if ('grade_level' in row) course.gradeLevel = row.grade_level || '';
+  if ('color' in row) course.color = row.color || '';
+  if ('grading_system' in row) course.gradingSystem = row.grading_system || null;
+  if ('calc_method' in row) course.calcMethod = row.calc_method || null;
+  if ('decay_weight' in row) course.decayWeight = row.decay_weight;
+  if ('timezone' in row) course.timezone = row.timezone || null;
+  if ('late_work_policy' in row) course.lateWorkPolicy = row.late_work_policy || null;
+  if ('block' in row) course.block = row.block || '';
+  if (JSON.stringify(course) === before) return;
+  _safeLSSet('gb-courses', JSON.stringify(COURSES));
+  if (typeof clearProfCache === 'function') clearProfCache();
+}
+
+/* The class's settings from the server replace this device's copy: the
+   server's is the one true copy, and this one a working cache. Every
+   setting the course row carries is taken from it, the calculation method
+   and decay weight included: those two used to stay as this device last
+   had them, so it went on grading with its own (shared/calc.js reads the
+   settings copy first) and put them back on the server with its next save.
+   A change this device has queued and not yet sent is laid over the row
+   first (_unsentCourseChanges); one made while the load runs is kept by
+   _persistLoadedField, and the load runs again. */
 function _applyBundleCourseConfig(cid, row, courseRow) {
   if (!row || typeof row !== 'object') return;
   var config = Object.assign({}, getCourseConfig(cid) || {});
   var missing = {};
   var hasCourseRow = !!courseRow && typeof courseRow === 'object';
+  var unsent = _unsentCourseChanges(cid);
+  var serverRow = courseRow; // as the server sent it, before this device's unsent changes
+  if (hasCourseRow) courseRow = Object.assign({}, courseRow, unsent);
+  // A setting only this device has is sent up, unless a save of this
+  // class's settings was discarded (or an older one still waits to be
+  // weighed): then nothing of that save may reach the server, and the
+  // server's "never set" stands here too.
+  var sendUp = !(_classMeta(cid) || {}).noSendUp && !_oldSettingsSaveWaits(cid);
   Object.keys(_COURSE_CONFIG_COLUMNS).forEach(function (field) {
     var column = _COURSE_CONFIG_COLUMNS[field];
-    var onServer = row[column];
+    var onServer = column in unsent ? unsent[column] : row[column];
     if (onServer == null && hasCourseRow) onServer = courseRow[column];
     if (onServer && typeof onServer === 'object') config[field] = _cloneValue(onServer);
-    else if (config[field] != null) missing[column] = config[field];
+    else if (config[field] != null) {
+      if (sendUp) missing[column] = config[field];
+      else delete config[field];
+    }
   });
+  // The calculation method and decay weight come on the course row. The
+  // server never holds null for the method; a null weight is the default.
+  //
+  // One case keeps this device's instead and sends it up, once: the row
+  // has never been updated since it was made (updated_at is created_at).
+  // Then no computer has ever changed a setting of this class on the
+  // server, so a method this device holds that differs from the row's is
+  // not an old copy of something changed elsewhere: it is one the server
+  // never got. That is a class restored from a backup by the build before
+  // this fix, which sent the server Average 65% whatever the backup's
+  // settings said (shared/backup-restore.js restoredCourse) and counted on
+  // the next settings save to put it right. Any update of the row since
+  // (by any computer, of any setting) ends this: the server's then wins.
+  var neverUpdated = _courseRowNeverUpdated(serverRow) && sendUp;
+  if (hasCourseRow && 'calc_method' in courseRow) {
+    var rowMethod = typeof courseRow.calc_method === 'string' && courseRow.calc_method ? courseRow.calc_method : null;
+    if (neverUpdated && typeof config.calcMethod === 'string' && config.calcMethod && config.calcMethod !== rowMethod) {
+      missing.calc_method = config.calcMethod;
+    } else if (rowMethod) config.calcMethod = rowMethod;
+    else delete config.calcMethod;
+  }
+  if (hasCourseRow && 'decay_weight' in courseRow) {
+    var rowDecay =
+      courseRow.decay_weight != null && isFinite(Number(courseRow.decay_weight))
+        ? Number(courseRow.decay_weight)
+        : null;
+    var myDecay =
+      config.decayWeight != null && isFinite(Number(config.decayWeight)) ? Number(config.decayWeight) : null;
+    if (neverUpdated && myDecay != null && myDecay !== rowDecay) missing.decay_weight = myDecay;
+    else if (rowDecay != null) config.decayWeight = rowDecay;
+    else delete config.decayWeight;
+  }
   // "Round to a whole %" comes on the course row. Null there means the class
   // never chose, so it follows its grade level.
   if (courseRow && typeof courseRow === 'object' && 'round_percent' in courseRow) {
     if (typeof courseRow.round_percent === 'boolean') config.roundPercent = courseRow.round_percent;
-    else if (typeof config.roundPercent === 'boolean') missing.round_percent = config.roundPercent;
+    else if (typeof config.roundPercent === 'boolean') {
+      if (sendUp) missing.round_percent = config.roundPercent;
+      else delete config.roundPercent;
+    }
   }
   // "Count Only the Most Recent N" comes on the course row too. Null there is
   // All Scores, a choice, so the server's value always wins.
@@ -4848,8 +5063,14 @@ function _applyBundleCourseConfig(cid, row, courseRow) {
   if (hasSwitch && _cache.courseConfigs[cid] === config) {
     _setServerStudentPage(cid, courseRow.student_page_enabled === true);
   }
+  // The server's settings are this device's now: the lock a discarded save
+  // left comes off.
+  if (_cache.courseConfigs[cid] === config && (_classMeta(cid) || {}).noSendUp) {
+    _saveClassMeta(cid, { noSendUp: false });
+  }
 
   if (!Object.keys(missing).length || !_writesEnabled() || !_isUuid(cid)) return;
+  missing[FV_SETTINGS_CHANGED_ONLY] = true;
   _trackPendingSync(
     _writeRpc('update_course', { p_course_id: cid, p_patch: missing }).then(function (res) {
       if (res.error) console.warn('update_course (course config upload) failed:', res.error);
@@ -4957,6 +5178,7 @@ function _loadCourseFromLS(cid) {
   _cache.termRatings[cid] = _safeParseLS('gb-term-ratings-' + cid, {});
   _cache.customTags[cid] = _safeParseLS('gb-custom-tags-' + cid, []);
   _cache.courseConfigs[cid] = _safeParseLS('gb-courseconfig-' + cid, {});
+  _noteSettingsRead(cid);
   _cache.reportConfig[cid] = _safeParseLS('gb-report-config-' + cid, null);
   _cache.studentProfileSummaries[cid] = _safeParseLS('gb-student-profile-summaries-' + cid, {});
   _cache.withdrawn[cid] = _safeParseLS('gb-withdrawn-' + cid, []);
@@ -5168,9 +5390,13 @@ function _loadPersistedCourseFieldSnapshot(field, cid, fallbackValue) {
    kept from before (`prev`) stays, and _sendUpCurriculumTags saves it. */
 function _canonicalCoursesToBlob(rows, prev) {
   var out = {};
+  var unsent = _unsentCourseChangesByClass();
   (rows || []).forEach(function (r) {
     if (!r || !r.id) return;
     var mine = prev && prev[r.id] && Array.isArray(prev[r.id].curriculumTags) ? prev[r.id].curriculumTags : [];
+    // A change made on this device and not yet sent (a name or grading
+    // style changed offline) stays: the server's row is from before it.
+    r = Object.assign({}, r, unsent[r.id]);
     out[r.id] = {
       id: r.id,
       name: r.name || 'Untitled Class',
@@ -6590,6 +6816,11 @@ function updateCourse(id, updates) {
   if (!COURSES[id]) return;
   Object.assign(COURSES[id], updates);
   _safeLSSet('gb-courses', JSON.stringify(COURSES));
+  // A class load on its way must not put the older row back over this
+  // (_applyBundleCourseRow). The counter only: the class list is not part
+  // of the class's saved copy, so that copy is not marked as edited.
+  var edits = _localWrites[id] || (_localWrites[id] = { at: 0, fields: {} });
+  edits.fields[_COURSE_ROW_FIELD] = (edits.fields[_COURSE_ROW_FIELD] || 0) + 1;
   // The grade level sets the course %'s rounding (whole for 10–12), and the
   // method and grading style are read from the course too: no cached grade
   // may outlive them.
@@ -6616,7 +6847,7 @@ function updateCourse(id, updates) {
         patch.curriculum_tags = Array.isArray(updates.curriculumTags) ? updates.curriculumTags.slice() : null;
       if (Object.keys(patch).length > 0 && _isUuid(id)) {
         _trackPendingSync(
-          _writeRpc('update_course', { p_course_id: id, p_patch: patch }).then(function (res) {
+          _writeRpc('update_course', { p_course_id: id, p_patch: _changedOnly(patch) }).then(function (res) {
             if (res.error) console.warn('update_course RPC failed:', res.error);
           }),
         );
@@ -6657,6 +6888,7 @@ function _clearCourseLocalState(id) {
     'rubric-checks',
     'rubric-prints',
     'grade-returns',
+    'category-draft',
     'student-cards',
     'statuses',
     'quick-obs',
@@ -7877,7 +8109,7 @@ function _categoryChanged(a, b, idx) {
 
 /* Categories go up as one list (save_categories): weights must total 100,
    which a row-at-a-time save can't keep while weights change. */
-function _persistCategoriesToCanonical(cid, prev, arr) {
+function _persistCategoriesToCanonical(cid, prev, arr, copy) {
   if (!window.v2 || !window.v2.saveCategories) return;
   var tail = _categorySaveQueue[cid] || Promise.resolve();
   var next = tail.then(function () {
@@ -7917,7 +8149,16 @@ function _persistCategoriesToCanonical(cid, prev, arr) {
       });
       if (rec && !entryId) entryId = rec.entryId;
     });
-    return window.v2.saveCategories(cid, arr, { entryId: entryId || undefined }).then(function (res) {
+    // Kept with the queued save: the list it was made over. If it has to
+    // wait, it is sent only over that list (_guardCategorySave).
+    var guard = { expected: _categoryListKept(before) };
+    if (_plainObject(copy)) guard.copy = { from: String(copy.from || ''), rest: !!copy.rest };
+    var options = {
+      entryId: entryId || undefined,
+      guard: guard,
+      categoriesMadeAt: Date.now(),
+    };
+    return window.v2.saveCategories(cid, arr, options).then(function (res) {
       // Rejected or refused: the server still has the old list, so the
       // next save sends the whole list again.
       if (res && res.error && !res.error.cancelled) _rememberServerState('categories', cid, before);
@@ -7925,6 +8166,9 @@ function _persistCategoriesToCanonical(cid, prev, arr) {
       // Re-keys the rows and the assessments that point at them (already
       // done when the outbox reported success).
       if (entryId) _onCreateLanded(entryId, res && res.data);
+      // The server holds this list now: a "not copied" line for the class
+      // would no longer be true.
+      _clearCategoriesNotCopied(cid);
     });
   });
   _categorySaveQueue[cid] = _trackPendingSync(
@@ -9016,6 +9260,120 @@ function getCourseConfig(cid) {
     return {};
   }
 }
+/* A class's settings as update_course takes them: the patch a copy of the
+   settings would send. Never the student page's switch or Return Grades
+   (saveReturnSettings is their one writer). */
+function _courseSettingsPatch(obj) {
+  const patch = {};
+  if (!obj || typeof obj !== 'object') return patch;
+  if (obj.gradingSystem != null) patch.grading_system = obj.gradingSystem;
+  if (obj.calcMethod != null) patch.calc_method = obj.calcMethod;
+  if (obj.decayWeight != null) patch.decay_weight = obj.decayWeight;
+  if (obj.timezone != null) patch.timezone = obj.timezone;
+  if (obj.lateWorkPolicy != null) patch.late_work_policy = obj.lateWorkPolicy;
+  if (obj.gradingScale != null) patch.grading_scale = obj.gradingScale;
+  if (obj.categoryWeights != null) patch.category_weights = obj.categoryWeights;
+  if (typeof obj.roundPercent === 'boolean') patch.round_percent = obj.roundPercent;
+  // Null is a choice here (All Scores), so it is sent too.
+  if (obj.recentScoreLimit !== undefined) patch.recent_score_limit = obj.recentScoreLimit || null;
+  if (obj.levelOrder === 'asc' || obj.levelOrder === 'desc') patch.level_order = obj.levelOrder;
+  if (typeof obj.foldersCountAsOne === 'boolean') patch.folders_count_as_one = obj.foldersCountAsOne;
+  if (typeof obj.coursesCountEqually === 'boolean') patch.courses_count_equally = obj.coursesCountEqually;
+  if (Array.isArray(obj.reportingTerms)) patch.reporting_terms = obj.reportingTerms;
+  return patch;
+}
+/* Which setting each of those columns is in the settings copy. */
+var _COURSE_SETTING_FIELDS = {
+  grading_system: 'gradingSystem',
+  calc_method: 'calcMethod',
+  decay_weight: 'decayWeight',
+  timezone: 'timezone',
+  late_work_policy: 'lateWorkPolicy',
+  grading_scale: 'gradingScale',
+  category_weights: 'categoryWeights',
+  round_percent: 'roundPercent',
+  recent_score_limit: 'recentScoreLimit',
+  level_order: 'levelOrder',
+  folders_count_as_one: 'foldersCountAsOne',
+  courses_count_equally: 'coursesCountEqually',
+  reporting_terms: 'reportingTerms',
+};
+/* The columns only a whole copy of the settings ever carried: updateCourse
+   never sends them. An update_course naming one of them without
+   FV_SETTINGS_CHANGED_ONLY was queued by a build from before a save sent
+   only what changed (_oldSettingsWrite). */
+var _WHOLE_COPY_ONLY_COLUMNS = [
+  'grading_scale',
+  'category_weights',
+  'round_percent',
+  'recent_score_limit',
+  'level_order',
+  'folders_count_as_one',
+  'courses_count_equally',
+  'reporting_terms',
+];
+/* Set in the patch of every settings write this build queues: "these keys
+   are the ones the teacher changed, and nothing else". It stays with the
+   queued write, so it is known after a reload, and is taken out as the
+   write is sent (_sendableCoursePatch). The server reads only the columns
+   it knows, so one that slipped through would change nothing. */
+var FV_SETTINGS_CHANGED_ONLY = '_changed_only';
+function _changedOnly(patch) {
+  patch[FV_SETTINGS_CHANGED_ONLY] = true;
+  return patch;
+}
+
+/* What a setting is when this device's copy does not name it: how the app
+   reads it then (getFoldersCountAsOne and the rest), and what a class load
+   leaves out of the copy when the server holds it. A save that sets one of
+   these to the same thing has changed nothing. */
+var _SETTING_WHEN_ABSENT = {
+  folders_count_as_one: true,
+  courses_count_equally: false,
+  recent_score_limit: null,
+  level_order: 'desc',
+};
+
+// The same value, whatever order an object's keys are in (jsonb reorders
+// them), and whether a number came as a number or as text.
+function _sameSetting(a, b) {
+  var numberAndText =
+    (typeof a === 'number' && typeof b === 'string') || (typeof a === 'string' && typeof b === 'number');
+  if (numberAndText && a !== '' && b !== '' && isFinite(Number(a)) && isFinite(Number(b))) {
+    return Number(a) === Number(b);
+  }
+  return _settingText(a) === _settingText(b);
+}
+function _settingText(v) {
+  if (v === undefined) return 'undefined';
+  if (v === null || typeof v !== 'object') return JSON.stringify(v);
+  if (Array.isArray(v)) return '[' + v.map(_settingText).join(',') + ']';
+  return (
+    '{' +
+    Object.keys(v)
+      .filter(function (k) {
+        return v[k] !== undefined;
+      })
+      .sort()
+      .map(function (k) {
+        return JSON.stringify(k) + ':' + _settingText(v[k]);
+      })
+      .join(',') +
+    '}'
+  );
+}
+
+/* Save a class's settings. The server's copy is the one true copy; this
+   device's is a working cache that gives way to it on every load
+   (_applyBundleCourseConfig). So a save sends ONLY what this save changed:
+   the settings that differ from the copy this page loaded or last saved
+   (a clone, since callers change the cached object in place): the copy
+   read from this device's storage while the class has not loaded from the
+   server (_settingsRead), else the server-state baseline; for a class this
+   page has not touched at all, the copy saved in localStorage.
+   It used to send the device's whole copy, and a device that had loaded the
+   class before a change made elsewhere put the old values back. A save that
+   changes nothing sends nothing. */
 function saveCourseConfig(cid, obj) {
   // Draft and Returned: the student page's switch and Return Grades are not
   // this function's to change or send for a signed-in teacher
@@ -9023,38 +9381,204 @@ function saveCourseConfig(cid, obj) {
   // them, whatever copy of the settings the caller has.
   if (_writesEnabled()) obj = _keepReturnSettings(cid, obj);
   var held = _returnSettingsBefore(cid); // did the class hold grades before this save (Demo Mode)
+  var read = _settingsRead[cid];
+  var before =
+    read && read.of === _cache.courseConfigs[cid]
+      ? read.copy
+      : _hasServerState('courseConfigs', cid)
+        ? _serverState.courseConfigs[cid]
+        : _safeParseLS('gb-courseconfig-' + cid, null);
   _saveCourseField('courseConfigs', cid, obj);
   if (_writesEnabled() && _isUuid(cid)) {
     // v2: policy fields live on the course row. save_course_policy is gone;
     // remap the legacy courseConfig blob onto a update_course jsonb patch.
     const sb = getSupabase();
     if (sb && obj) {
+      const all = _courseSettingsPatch(obj);
+      const was = _courseSettingsPatch(before);
+      if (_plainObject(before)) {
+        Object.keys(_SETTING_WHEN_ABSENT).forEach(function (col) {
+          if (!(col in was)) was[col] = _SETTING_WHEN_ABSENT[col];
+        });
+      }
       const patch = {};
-      if (obj.gradingSystem != null) patch.grading_system = obj.gradingSystem;
-      if (obj.calcMethod != null) patch.calc_method = obj.calcMethod;
-      if (obj.decayWeight != null) patch.decay_weight = obj.decayWeight;
-      if (obj.timezone != null) patch.timezone = obj.timezone;
-      if (obj.lateWorkPolicy != null) patch.late_work_policy = obj.lateWorkPolicy;
-      if (obj.gradingScale != null) patch.grading_scale = obj.gradingScale;
-      if (obj.categoryWeights != null) patch.category_weights = obj.categoryWeights;
-      if (typeof obj.roundPercent === 'boolean') patch.round_percent = obj.roundPercent;
-      // Null is a choice here (All Scores), so it is sent too.
-      if (obj.recentScoreLimit !== undefined) patch.recent_score_limit = obj.recentScoreLimit || null;
-      if (obj.levelOrder === 'asc' || obj.levelOrder === 'desc') patch.level_order = obj.levelOrder;
-      if (typeof obj.foldersCountAsOne === 'boolean') patch.folders_count_as_one = obj.foldersCountAsOne;
-      if (typeof obj.coursesCountEqually === 'boolean') patch.courses_count_equally = obj.coursesCountEqually;
-      if (Array.isArray(obj.reportingTerms)) patch.reporting_terms = obj.reportingTerms;
-      // Never the student page's switch or Return Grades: see above.
-      if (Object.keys(patch).length > 0) {
+      Object.keys(all).forEach(function (col) {
+        if (!(col in was) || !_sameSetting(all[col], was[col])) patch[col] = all[col];
+      });
+      // From here this page takes the server to have what it was just sent.
+      _rememberServerState('courseConfigs', cid, obj);
+      delete _settingsRead[cid];
+      const sent = Object.keys(patch);
+      if (sent.length > 0) {
+        patch[FV_SETTINGS_CHANGED_ONLY] = true;
         _trackPendingSync(
           _writeRpc('update_course', { p_course_id: cid, p_patch: patch }).then(function (res) {
-            if (res.error) console.warn('update_course (saveCourseConfig) failed:', res.error);
+            if (!res.error) return;
+            console.warn('update_course (saveCourseConfig) failed:', res.error);
+            // Never queued (the outbox had no room): the server does not
+            // have these, so the next save of the class's settings sends
+            // them again. A write the server itself rejects is not sent
+            // again with every later save: the outbox tries it once more on
+            // the next page load, and the next class load shows what the
+            // server holds.
+            if (res.error.refused) _settingsNotSent(cid, sent, before);
           }),
         );
       }
     }
   }
   _returnSettingsSaved(cid, held);
+}
+/* An update_course on its way out. Answers { params } to send, or
+   { answer } when nothing is to be sent and the caller hears that instead.
+
+   A write this build queued carries FV_SETTINGS_CHANGED_ONLY: the mark is
+   taken out and the rest goes as it is.
+
+   One without the mark that names a whole-copy-only column was queued by a
+   build that sent a device's whole copy of the settings with every save.
+   Which of its keys the teacher meant to change was never recorded, so it
+   is compared with the class's row on the server now (_oldSettingsWrite). */
+function _sendableCoursePatch(params, options) {
+  var patch = params && params.p_patch;
+  if (!_plainObject(patch)) return { params: params };
+  if (patch[FV_SETTINGS_CHANGED_ONLY]) {
+    var clean = Object.assign({}, patch);
+    delete clean[FV_SETTINGS_CHANGED_ONLY];
+    return { params: Object.assign({}, params, { p_patch: clean }) };
+  }
+  return _isOldSettingsPatch(patch) ? _oldSettingsWrite(params, options || {}) : { params: params };
+}
+function _isOldSettingsPatch(patch) {
+  return (
+    _plainObject(patch) &&
+    !patch[FV_SETTINGS_CHANGED_ONLY] &&
+    _WHOLE_COPY_ONLY_COLUMNS.some(function (col) {
+      return col in patch;
+    })
+  );
+}
+
+/* A save that waited is not to be sent, and never will be: it was made by
+   an older build that could not say what the teacher changed, or for a
+   list that is no longer the server's. Sending it could put an old value
+   back over a change made on another computer, with no sign.
+
+   - Sentry is told (the kind of write only: never its content).
+   - The class is read again from the server, so the screen shows what the
+     server holds and the teacher can make the change again.
+   - Nothing of the save may reach the server by another route: a class
+     load sends up a setting only this device has, and until this class has
+     loaded once more it must not (noSendUp, _applyBundleCourseConfig).
+   - The answer is not a network error, so the outbox does not retry it: it
+     goes to the failed list, which turns the sync dot red (rule 5: the dot
+     only). noRetry: it gets no last try. untilReload: no later write and
+     no page load clears it until this class has been read again
+     (_classReadFromServer), so the dot is red for as long as the screen
+     may still show the change that was not saved. A class that is gone,
+     or archived, is ended by the class list (_releaseDiscardsByClassList). */
+var _WRITE_DISCARDED = 'FV409';
+function _discardWrite(cid, what) {
+  console.warn(what);
+  try {
+    if (window.Sentry && typeof window.Sentry.captureMessage === 'function') {
+      window.Sentry.captureMessage(what, 'warning');
+    }
+  } catch (e) {
+    /* reporting is best effort */
+  }
+  try {
+    if (_isUuid(cid)) _saveClassMeta(cid, { noSendUp: true });
+  } catch (e) {
+    /* the flag is a second lock: the class is read again either way */
+  }
+  _convergeOnServer(cid);
+  return {
+    data: null,
+    error: {
+      message: 'an older save that could not be checked was not sent',
+      code: _WRITE_DISCARDED,
+      noRetry: true,
+      untilReload: cid || undefined,
+    },
+  };
+}
+/* The class has been read from the server and what it sent is on screen:
+   the saves discarded for it may leave the failed list with the next page
+   load (the outbox's markReloaded). */
+function _classReadFromServer(cid) {
+  var q = typeof window !== 'undefined' ? window.v2Queue : null;
+  if (!cid || !q || typeof q.markReloaded !== 'function') return;
+  try {
+    if (q.markReloaded(cid)) _updateSyncIndicator();
+  } catch (e) {
+    /* the next load says it again */
+  }
+}
+
+// update_course leaves these columns alone when the patch gives them null.
+var _NULL_CHANGES_NOTHING = {
+  name: true,
+  grade_level: true,
+  grading_system: true,
+  calc_method: true,
+  timezone: true,
+  level_order: true,
+};
+var OLD_SETTINGS_NOT_SENT = 'An older settings save that could not be checked was not sent';
+/* A whole-copy settings write from an earlier build, weighed before it
+   goes (Colin, 2026-11-10: discard on any difference). Every key it names
+   is compared with the class's row on the server:
+   - nothing differs: there is nothing to send, and it is dropped;
+   - anything differs: it is never sent (_discardWrite). One key differing
+     could be the teacher's own change, or an old value this device kept
+     while another computer changed it: the two cannot be told apart, and
+     the second would revert that change with no sign. So a change made
+     offline on the older app and still waiting when this build opens is
+     lost; the setting shows as the server has it and the teacher sets it
+     again.
+   If the class cannot be read (offline), the write waits and is weighed
+   when it can be. */
+async function _oldSettingsWrite(params) {
+  var cid = params.p_course_id;
+  var patch = params.p_patch;
+  var res;
+  try {
+    res = await _callRpcWithAuthGuard(
+      'get_class_bundle',
+      { p_course_id: cid, p_if_version: null },
+      { suppressSessionExpiredModal: true },
+    );
+  } catch (e) {
+    res = { data: null, error: { message: 'network: the class could not be read' } };
+  }
+  if (!res || res.error) {
+    return { answer: { data: null, error: (res && res.error) || { message: 'network: the class could not be read' } } };
+  }
+  var bundle = _rpcObject(res.data) || {};
+  var row = bundle.gradebook && bundle.gradebook.course;
+  var differs =
+    !_plainObject(row) ||
+    Object.keys(patch).some(function (col) {
+      if (patch[col] == null && _NULL_CHANGES_NOTHING[col]) return false;
+      return !(col in row) || !_sameSetting(patch[col], row[col]);
+    });
+  if (!differs) return { answer: { data: null, error: null } };
+  return { answer: _discardWrite(cid, OLD_SETTINGS_NOT_SENT) };
+}
+
+/* These columns of a settings save never left this device: the baseline
+   says again what it said before the save, so they still count as changed. */
+function _settingsNotSent(cid, columns, before) {
+  if (!_hasServerState('courseConfigs', cid)) return;
+  var base = _serverState.courseConfigs[cid];
+  if (!_plainObject(base)) return;
+  columns.forEach(function (col) {
+    var field = _COURSE_SETTING_FIELDS[col];
+    if (!field) return;
+    if (_plainObject(before) && field in before) base[field] = _cloneValue(before[field]);
+    else delete base[field];
+  });
 }
 function getStudents(cid) {
   if (_cache.students[cid] !== undefined) return _cache.students[cid];
@@ -9374,12 +9898,16 @@ function getCategories(cid) {
     return [];
   }
 }
-function saveCategories(cid, arr) {
+/* `options.copy`: { from, rest } when the list is Copy Grading Setup's,
+   copied from the class named `from` (`rest`: other groups were copied
+   too). If the save has to wait and is then not sent, the class says so
+   when next opened (noteCategoriesNotCopied). */
+function saveCategories(cid, arr, options) {
   var prev = _loadPersistedCourseFieldSnapshot('categories', cid, (_cache.categories && _cache.categories[cid]) || []);
   var next = arr || [];
   _saveCourseField('categories', cid, next);
   if (!_writesEnabled() || !_isUuid(cid)) return;
-  _persistCategoriesToCanonical(cid, prev, next);
+  _persistCategoriesToCanonical(cid, prev, next, options && options.copy);
 }
 /* The class manager writes categories itself (save_categories,
    reorder_categories) and hands the resulting rows here.
@@ -9396,6 +9924,334 @@ function categoryCalcMode(category) {
 function adoptCategoriesFromServer(cid, rows) {
   _persistLoadedField(cid, 'categories', rows || []);
   if (typeof clearProfCache === 'function') clearProfCache();
+}
+/* A list of categories as rows to compare: id, name, weight and
+   Calculation, in the order a read returns them (display_order; rows that
+   tie there, by id, so the order does not hang on how the server breaks a
+   tie). Takes cache rows (displayOrder, calcMode) or server and Class
+   Settings rows (display_order, calc_mode). */
+function _categoryRowsInOrder(rows) {
+  var list = (rows || []).filter(Boolean).map(function (r, i) {
+    var order = r.displayOrder != null ? r.displayOrder : r.display_order;
+    return {
+      id: r.id || null,
+      name: String(r.name || '').trim(),
+      weight: Number(r.weight) || 0,
+      mode: categoryCalcMode(r),
+      at: i,
+      order: order != null && isFinite(Number(order)) ? Number(order) : i,
+    };
+  });
+  list.sort(function (a, b) {
+    if (a.order !== b.order) return a.order - b.order;
+    if (a.id && b.id && a.id !== b.id) return a.id < b.id ? -1 : 1;
+    return a.at - b.at;
+  });
+  return list;
+}
+/* Is the server's list the one wanted? A wanted row with no server id yet
+   (a new row in a list this device sent) matches whatever id it was given. */
+function _categoryListsMatch(serverRows, wanted) {
+  var a = _categoryRowsInOrder(serverRows);
+  var b = _categoryRowsInOrder(wanted);
+  if (a.length !== b.length) return false;
+  return b.every(function (w, i) {
+    return (
+      (!_isUuid(w.id) || w.id === a[i].id) && w.name === a[i].name && w.weight === a[i].weight && w.mode === a[i].mode
+    );
+  });
+}
+// A list as kept with a queued save: the least that _categoryListsMatch reads.
+function _categoryListKept(rows) {
+  return (rows || []).filter(Boolean).map(function (r, i) {
+    var order = r.displayOrder != null ? r.displayOrder : r.display_order;
+    return {
+      id: r.id || null,
+      name: String(r.name || '').trim(),
+      weight: Number(r.weight) || 0,
+      displayOrder: order != null && isFinite(Number(order)) ? Number(order) : i,
+      calcMode: categoryCalcMode(r),
+    };
+  });
+}
+/* The class's categories as the server holds them now, in cache shape and
+   read order; null when they could not be read. Never throws. */
+async function _readServerCategories(cid) {
+  try {
+    if (!window.v2 || typeof window.v2.listCategories !== 'function') return null;
+    var res = await window.v2.listCategories(cid);
+    if (!res || res.error || !Array.isArray(res.data)) return null;
+    return res.data
+      .map(function (r, i) {
+        return {
+          id: r.id,
+          name: r.name || '',
+          weight: Number(r.weight) || 0,
+          displayOrder: r.display_order != null ? Number(r.display_order) : i,
+          calcMode: categoryCalcMode(r),
+        };
+      })
+      .map(function (r, i) {
+        return { r: r, i: i };
+      })
+      .sort(function (a, b) {
+        return a.r.displayOrder - b.r.displayOrder || a.i - b.i;
+      })
+      .map(function (x) {
+        return x.r;
+      });
+  } catch (e) {
+    console.warn('The categories could not be read:', e);
+    return null;
+  }
+}
+
+/* Before a whole list of categories is saved over a class the server has:
+   is the server's list still the one this screen was opened with?
+   save_categories replaces the class's list, so a list opened before a
+   change made on another device would delete a category added there and
+   put old weights back. Copy Grading Setup asks this before it copies;
+   Class Settings asks and saves in one step (saveCategoriesNow).
+
+   `opened` is the list the screen was filled from. Answers a promise of
+     { ok: true }                          the same list: save
+     { ok: true, local: true }             no server holds this class (Demo
+                                           Mode, a class not created yet)
+     { ok: false, why: 'changed', rows }   it changed on another device;
+                                           rows is the server's list now
+     { ok: false, why: 'offline' }         it could not be read: do not save
+   On 'changed' the cache takes the server's list, so grades follow it at
+   once. Never throws. */
+function categoriesStillCurrent(cid, opened) {
+  if (!cid || !_writesEnabled() || !_isUuid(cid)) return Promise.resolve({ ok: true, local: true });
+  var check = (async function () {
+    try {
+      if (_isOffline()) return { ok: false, why: 'offline' };
+      // A list this device is still sending is part of what it opened with.
+      await _categorySaveQueue[cid];
+      if (_isOffline()) return { ok: false, why: 'offline' };
+      var rows = await _readServerCategories(cid);
+      if (!rows) return { ok: false, why: 'offline' };
+      if (_categoryListsMatch(rows, opened)) return { ok: true };
+      adoptCategoriesFromServer(cid, rows);
+      return { ok: false, why: 'changed', rows: rows };
+    } catch (e) {
+      console.warn('The categories could not be checked before saving:', e);
+      return { ok: false, why: 'offline' };
+    }
+  })();
+  // Part of a save: the sync dot and sign-out wait for it.
+  return _trackPendingSync(check);
+}
+
+var CATEGORY_WRITE_WAIT_MS = 8000; // how long a category save waits for this device's other writes to go first
+var CATEGORY_WRITE_ASK_MS = 15000; // how long it waits for the server's answer
+var CATEGORY_SAME_MOMENT_MS = 10000; // a queued list sent within this of being made is sent as made
+
+/* Class Settings' Save Categories and its drag to reorder: the server's
+   list is read, compared with the list the form was opened with, and the
+   save sent, in one online moment or not at all. The save is asked of the
+   server directly, never left in the outbox: a list that waited there
+   would go out later over whatever another device had done meanwhile.
+
+   `tried` is a list this form sent before and never heard back about (the
+   connection went as it left). If that is what the server holds now, it
+   landed: nothing is sent again.
+
+   Answers a promise of
+     { ok: true, ids }                     saved; the rows' ids, in order
+     { ok: true, landed: true, rows }      the earlier try had landed
+     { ok: false, why: 'changed', rows }   changed on another device; rows
+                                           is the server's list (the cache
+                                           has taken it)
+     { ok: false, why: 'offline' }         not saved: no connection.
+                                           `unknown`: it was sent and no
+                                           answer came.
+     { ok: false, why: 'waiting' }         not saved: online, but this
+                                           device's other changes did not go
+                                           first
+     { ok: false, why: 'refused', error }  the server said no
+   A class no server holds (Demo Mode, one not created yet) saves as it
+   always did. Never throws. */
+function saveCategoriesNow(cid, rows, opened, tried) {
+  if (!cid || !_writesEnabled() || !_isUuid(cid)) {
+    return Promise.resolve(window.v2.saveCategories(cid, rows)).then(function (res) {
+      if (res && res.error) return { ok: false, why: 'refused', error: res.error };
+      return { ok: true, local: true, ids: (res && Array.isArray(res.data) && res.data) || [] };
+    });
+  }
+  return _categoryWriteNow(cid, 'save_categories', _saveCategoriesParams(cid, rows), opened, tried);
+}
+function reorderCategoriesNow(cid, ids, opened) {
+  if (!cid || !_writesEnabled() || !_isUuid(cid)) {
+    return Promise.resolve(window.v2.reorderCategories(ids)).then(function (res) {
+      if (res && res.error) return { ok: false, why: 'refused', error: res.error };
+      return { ok: true, local: true };
+    });
+  }
+  return _categoryWriteNow(cid, 'reorder_categories', { p_ids: (ids || []).filter(_isUuid) }, opened, null);
+}
+async function _categoryWriteNow(cid, name, params, opened, tried) {
+  var noAnswer = { ok: false, why: 'offline' };
+  try {
+    if (_isOffline()) return noAnswer;
+    // Work moved out of a category must reach the server before the list
+    // that deletes it, and nothing this device still has to send may land
+    // after the list it was made over.
+    var gone = await _unsentWritesGone(CATEGORY_WRITE_WAIT_MS);
+    if (_isOffline()) return noAnswer;
+    // Online, and this device's other writes are still waiting to go.
+    if (!gone) return { ok: false, why: 'waiting' };
+  } catch (e) {
+    return noAnswer;
+  }
+  // From here it is a save: the sync dot and sign-out wait for it.
+  return _trackPendingSync(
+    (async function () {
+      try {
+        var rows = await _readServerCategories(cid);
+        if (!rows) return noAnswer;
+        if (!_categoryListsMatch(rows, opened)) {
+          adoptCategoriesFromServer(cid, rows);
+          if (tried && _categoryListsMatch(rows, tried)) return { ok: true, landed: true, rows: rows };
+          return { ok: false, why: 'changed', rows: rows };
+        }
+        // Not this page's own echo: the class is read when realtime says so.
+        _echoNeedsReload = true;
+        var res = await _withTimeout(
+          _callRpcWithAuthGuard(name, params, { suppressSessionExpiredModal: true }),
+          CATEGORY_WRITE_ASK_MS,
+          'the category save',
+        );
+        if (res && !res.error) {
+          if (name === 'save_categories') _clearCategoriesNotCopied(cid);
+          return { ok: true, ids: Array.isArray(res.data) ? res.data : [] };
+        }
+        if (_noAnswerFromServer(res)) return { ok: false, why: 'offline', unknown: true };
+        return { ok: false, why: 'refused', error: res.error };
+      } catch (e) {
+        console.warn('The category save failed:', e);
+        return { ok: false, why: 'offline', unknown: true };
+      }
+    })(),
+  );
+}
+// No answer, or none that says what the server did: a dropped connection, a
+// timeout, a server error, a session that ran out.
+function _noAnswerFromServer(res) {
+  if (!res || !res.error) return !res;
+  var err = res.error;
+  var status = Number(res.status || err.status || err.statusCode || 0);
+  if (status >= 500 || status === 401 || status === 408 || status === 429 || err.handledSessionExpired) return true;
+  var text = [err.code, err.message, err.name, typeof err === 'string' ? err : ''].join(' ');
+  return /network|fetch|failed to connect|ECONNREFUSED|timed? ?out|load failed|no_supabase|jwt expired|PGRST301/i.test(
+    text,
+  );
+}
+
+var OLD_CATEGORY_SAVE_NOT_SENT = 'An older category save that could not be checked was not sent';
+var WAITED_CATEGORY_SAVE_NOT_SENT = 'A category save that waited was not sent: the list had changed';
+/* A save_categories the outbox is about to send. Null to send it as it is;
+   else a promise of { answer }: what the outbox hears instead.
+
+   A list sent at once, in the page that made it, goes as made: its maker
+   had just checked (Copy Grading Setup) or the class is new. One that
+   waited (a retry, a later page, a connection that went) is never sent
+   blind. The server's list is read first:
+   - it is already this list: there is nothing to send;
+   - it is the list this save was made over (kept with the entry as its
+     guard): send;
+   - anything else: never sent (_discardWrite). That is also every save an
+     older build left waiting: it kept no word of what its device had
+     loaded, so it goes only when the server already holds its list. */
+function _guardCategorySave(params, options) {
+  if (!options.viaOutbox || !params || !_isUuid(params.p_course_id)) return null;
+  var guard = options.guard;
+  var made = Number(options.categoriesMadeAt) || 0;
+  var sameMoment = made > 0 && Date.now() - made < CATEGORY_SAME_MOMENT_MS && !options.attempts && !options.lastTry;
+  if (sameMoment) return null;
+  var cid = params.p_course_id;
+  return (async function () {
+    var rows = await _readServerCategories(cid);
+    if (!rows) {
+      return { answer: { data: null, error: { message: 'network: the categories could not be read' } } };
+    }
+    var mine = (Array.isArray(params.p_categories) ? params.p_categories : []).map(function (c, i) {
+      return Object.assign({}, c, { display_order: i });
+    });
+    if (_categoryListsMatch(rows, mine)) {
+      return {
+        answer: {
+          data: rows.map(function (r) {
+            return r.id;
+          }),
+          error: null,
+        },
+      };
+    }
+    if (guard && Array.isArray(guard.expected) && _categoryListsMatch(rows, guard.expected)) return null;
+    adoptCategoriesFromServer(cid, rows);
+    // Copy Grading Setup's list: its message said "copied", so the class
+    // says it was not, above its categories, when next opened.
+    if (guard && _plainObject(guard.copy)) {
+      noteCategoriesNotCopied(cid, { why: 'changed', from: guard.copy.from, rest: guard.copy.rest });
+    }
+    return { answer: _discardWrite(cid, guard ? WAITED_CATEGORY_SAVE_NOT_SENT : OLD_CATEGORY_SAVE_NOT_SENT) };
+  })();
+}
+
+/* What Class Settings keeps on this device for a class's categories when a
+   save was not made (gb-category-draft-<cid>), so nothing the teacher typed
+   is lost with the tab:
+     rows, opened   the edits that could not be saved (no connection), and
+                    the list they were made over
+     typed          what the teacher had typed when the list turned out to
+                    have changed on another device: shown beside the
+                    current list to copy from
+     tried          a list this computer sent whose answer never came: if
+                    the server holds it, it was this computer's own save
+                    that landed, not a change made on another device
+     note           { why, from, rest }: Copy Grading Setup left this
+                    class's categories alone, and why
+   Not class data: never sent, not in a backup, gone with the class. */
+function getCategoryDraft(cid) {
+  var draft = cid ? _safeParseLS('gb-category-draft-' + cid, null) : null;
+  return _plainObject(draft) ? draft : null;
+}
+function saveCategoryDraft(cid, draft) {
+  if (!cid) return;
+  var keep = {};
+  if (_plainObject(draft)) {
+    ['rows', 'opened', 'typed', 'tried'].forEach(function (k) {
+      if (Array.isArray(draft[k])) keep[k] = draft[k];
+    });
+    if (_plainObject(draft.note)) keep.note = draft.note;
+  }
+  try {
+    if (Object.keys(keep).length) _safeLSSet('gb-category-draft-' + cid, JSON.stringify(keep));
+    else localStorage.removeItem('gb-category-draft-' + cid);
+  } catch (e) {
+    /* storage full or closed: the form still holds it while it is open */
+  }
+}
+/* Copy Grading Setup did not copy this class's categories: say so when the
+   class is next opened in Class Settings. */
+/* A list of categories reached the server for this class: the note above
+   says nothing true any more. */
+function _clearCategoriesNotCopied(cid) {
+  var draft = getCategoryDraft(cid);
+  if (!draft || !draft.note) return;
+  delete draft.note;
+  saveCategoryDraft(cid, draft);
+}
+function noteCategoriesNotCopied(cid, note) {
+  var draft = getCategoryDraft(cid) || {};
+  draft.note = {
+    why: note && note.why === 'changed' ? 'changed' : 'offline',
+    from: (note && note.from) || '',
+    rest: !!(note && note.rest),
+  };
+  saveCategoryDraft(cid, draft);
 }
 function getCategoryById(cid, categoryId) {
   if (!categoryId) return null;
@@ -13044,6 +13900,27 @@ async function _callRpcWithAuthGuard(name, params, options) {
   // Draft and Returned: no update_course carries the student page's switch
   // or Return Grades beside another setting, whoever queued it.
   params = _onlyOwnReturnSettings(name, params);
+  // Class settings: a write from this build goes as it is; one a build from
+  // before it queued (a device's whole copy) is checked against the server
+  // first, and may be cut down or not sent at all.
+  // Only the check of an old write waits (it reads the class): a write from
+  // this build goes out in the same turn it always did.
+  if (name === 'update_course') {
+    var checked = _sendableCoursePatch(params, options);
+    if (checked && typeof checked.then === 'function') checked = await checked;
+    if (checked.answer) return checked.answer;
+    params = checked.params;
+  }
+
+  // A list of categories that waited in the outbox is sent only over the
+  // list it was made for, or not at all.
+  if (name === 'save_categories') {
+    var guarded = _guardCategorySave(params, options);
+    if (guarded) {
+      guarded = await guarded;
+      if (guarded && guarded.answer) return guarded.answer;
+    }
+  }
 
   // Before either retry below can fire, so every attempt at this write carries
   // the same key and the server returns the first result instead of inserting
@@ -13175,7 +14052,12 @@ function _writeRpc(name, params, options) {
   if (outbox) {
     var entryId = options.entryId || params.p_idempotency_key || _idempotencyKey() || uid();
     var undo = _snapshotBaselineRow(name, params);
-    var pushed = outbox.push(name, params, { id: entryId, blockedOn: blockedOn, sendOptions: options });
+    var pushed = outbox.push(name, params, {
+      id: entryId,
+      blockedOn: blockedOn,
+      sendOptions: options,
+      guard: options.guard,
+    });
     if (pushed && pushed.refused) {
       _onWriteRefused(name, params, undo, pushed.refused, options.entryId);
       return pushed;
@@ -13376,23 +14258,22 @@ window.v2.reorderCategories = function (ids) {
    created; the class's other categories are deleted. Resolves with the ids
    in the same order. */
 window.v2.saveCategories = function (courseId, rows, options) {
-  return _rpcOrNoop(
-    'save_categories',
-    {
-      p_course_id: courseId,
-      p_categories: (rows || []).map(function (r) {
-        var row = {
-          name: (r.name || '').trim(),
-          weight: r.weight != null ? Number(r.weight) : 0,
-          calc_mode: categoryCalcMode(r),
-        };
-        if (_isUuid(r.id)) row.id = r.id;
-        return row;
-      }),
-    },
-    options,
-  );
+  return _rpcOrNoop('save_categories', _saveCategoriesParams(courseId, rows), options);
 };
+function _saveCategoriesParams(courseId, rows) {
+  return {
+    p_course_id: courseId,
+    p_categories: (rows || []).map(function (r) {
+      var row = {
+        name: (r.name || '').trim(),
+        weight: r.weight != null ? Number(r.weight) : 0,
+        calc_mode: categoryCalcMode(r),
+      };
+      if (_isUuid(r.id)) row.id = r.id;
+      return row;
+    }),
+  };
+}
 
 /* Rubric — composite save: rubric row + criteria diff + criterion_tag replace
    + criterion_check replace, all in one transaction.  criteria payload:

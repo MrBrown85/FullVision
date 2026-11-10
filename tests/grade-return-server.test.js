@@ -378,6 +378,54 @@ describe('every caller of saveCourseConfig and update_course', () => {
       .forEach(file => expect(read(file), file).not.toMatch(/['"`]update_course['"`]/));
   });
 
+  /* Stale settings (tests/stale-settings-revert.test.js): a class-settings
+     write carries only what the teacher changed, and says so with a mark
+     kept with the queued write (FV_SETTINGS_CHANGED_ONLY), so an unmarked
+     one naming a whole-copy setting is known to be from an earlier build
+     and is weighed against the server first. A new sender of update_course
+     goes in this list with the answer to "does it mark its write?". */
+  it('each sender of class settings marks its write as only what changed; the two settings’ own writers do not', () => {
+    const src = read('shared/data.js');
+    const body = fn => {
+      const from = src.search(new RegExp('^(?:async )?function ' + fn + '\\(', 'm'));
+      expect(from, fn).toBeGreaterThan(-1);
+      const rest = src.slice(from + 1);
+      const to = rest.search(/^(?:async )?function \w+\(|^window\./m);
+      return rest.slice(0, to);
+    };
+    const marks = fn => /FV_SETTINGS_CHANGED_ONLY|_changedOnly\(/.test(body(fn));
+    expect({
+      _applyBundleCourseConfig: marks('_applyBundleCourseConfig'),
+      _sendUpCurriculumTags: marks('_sendUpCurriculumTags'),
+      updateCourse: marks('updateCourse'),
+      saveCourseConfig: marks('saveCourseConfig'),
+      saveReturnSettings: marks('saveReturnSettings'),
+      _startHolding: marks('_startHolding'),
+    }).toEqual({
+      _applyBundleCourseConfig: true,
+      _sendUpCurriculumTags: false, // one column, never part of a whole copy
+      updateCourse: true,
+      saveCourseConfig: true,
+      saveReturnSettings: false, // the two settings: their own rules
+      _startHolding: false,
+    });
+    // The mark comes out in the one place every update_course passes.
+    expect(body('_callRpcWithAuthGuard')).toMatch(/_sendableCoursePatch\(params, options\)/);
+  });
+
+  it('what each sender sends is what it changed, never the mark, and an unchanged copy sends nothing', async () => {
+    await openClass();
+    fake.calls.length = 0;
+    saveCourseConfig(CID, Object.assign({}, getCourseConfig(CID), { roundPercent: true }));
+    updateCourse(CID, { name: 'History 12 A' });
+    await quiet();
+    expect(patches()).toEqual([{ round_percent: true }, { name: 'History 12 A' }]);
+    fake.calls.length = 0;
+    saveCourseConfig(CID, Object.assign({}, getCourseConfig(CID)));
+    await quiet();
+    expect(patches()).toEqual([]);
+  });
+
   // What each of those sends of the two settings, for a class in every state.
   const CLASSES = [
     ['its student page on, When I Return Them', { student_page_enabled: true, return_grades: 'on_return' }],
@@ -460,11 +508,19 @@ describe('every caller of saveCourseConfig and update_course', () => {
   it('whoever asks, an update_course never leaves with either beside another setting', async () => {
     await openClass();
     fake.calls.length = 0;
+    // Writes of this build say they carry only what changed (_changed_only):
+    // since Nov 10 one that does not, naming a setting only a whole copy
+    // ever carried, is an older build's and is never sent when anything in
+    // it differs from the server (tests/stale-settings-revert.test.js). So
+    // the two here carry the mark; they carried none before.
     await _callRpcWithAuthGuard('update_course', {
       p_course_id: CID,
-      p_patch: { level_order: 'asc', return_grades: 'on_save', student_page_enabled: false },
+      p_patch: { level_order: 'asc', return_grades: 'on_save', student_page_enabled: false, _changed_only: true },
     });
-    await _writeRpc('update_course', { p_course_id: CID, p_patch: { round_percent: true, return_grades: null } });
+    await _writeRpc('update_course', {
+      p_course_id: CID,
+      p_patch: { round_percent: true, return_grades: null, _changed_only: true },
+    });
     expect(patches()).toEqual([{ level_order: 'asc' }, { round_percent: true }]);
   });
 
