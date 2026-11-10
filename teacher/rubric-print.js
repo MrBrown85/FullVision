@@ -32,6 +32,13 @@
 (function () {
   'use strict';
 
+  /* Every score, comment, tick and status a sheet shows is read through
+     ReportScores (teacher/report-scores.js), never from the data layer
+     here. A sheet drawn for a Feedback Page follows that report's set of
+     scores. A handout printed from the grader is drawn on the teacher's
+     working copy (all work), as it always was: it is not one of the
+     report surfaces in ReportScores' table. */
+
   var ROOT_ID = 'rubric-print-root';
   var STYLE_ID = 'rubric-print-page';
   var OVERLAY_ID = 'rubric-print-overlay';
@@ -312,7 +319,7 @@
      [{ text, date: '' }]. */
   function feedbackItems(cid, sid, aid, entries) {
     var note = '';
-    (entries || getScores(cid)[sid] || []).forEach(function (e) {
+    (entries || ReportScores.entries(cid, sid)).forEach(function (e) {
       if (e && e.assessmentId === aid && e.note && !note) note = String(e.note).trim();
     });
     return note
@@ -349,10 +356,10 @@
       return s && s.id === sid;
     });
     if (!assessment || !rubric || !student) return null;
-    var entries = (getScores(cid)[sid] || []).filter(function (e) {
+    var entries = ReportScores.entries(cid, sid).filter(function (e) {
       return e && e.assessmentId === aid;
     });
-    var status = typeof getAssignmentStatus === 'function' ? getAssignmentStatus(cid, sid, aid) : null;
+    var status = ReportScores.status(cid, sid, aid);
     var rows = (rubric.criteria || []).map(function (criterion) {
       var lv = criterionLevel(entries, aid, criterion);
       return {
@@ -362,17 +369,13 @@
         mixed: lv.mixed,
         // Comments belong to a rubric of the teacher's own (on a criterion)
         // or a Tag Rubric (on a competency); a General Rubric has none.
-        comment:
-          !rubric.kind && typeof getRubricCriterionComment === 'function'
-            ? getRubricCriterionComment(cid, sid, aid, criterion)
-            : rubric.kind === 'tags' && typeof getTagComment === 'function'
-              ? getTagComment(cid, sid, aid, criterion.id)
-              : '',
-        // A single-point rubric's Went Beyond; its Work On is the comment.
-        beyond:
-          !rubric.kind && typeof getRubricCriterionBeyond === 'function'
-            ? getRubricCriterionBeyond(cid, sid, aid, criterion)
+        comment: !rubric.kind
+          ? ReportScores.criterionComment(cid, sid, aid, criterion)
+          : rubric.kind === 'tags'
+            ? ReportScores.tagComment(cid, sid, aid, criterion.id)
             : '',
+        // A single-point rubric's Went Beyond; its Work On is the comment.
+        beyond: !rubric.kind ? ReportScores.criterionBeyond(cid, sid, aid, criterion) : '',
         codes: _criterionCodes(cid, criterion, rubric.kind === 'tags'),
       };
     });
@@ -406,7 +409,7 @@
       overall: overall,
       feedback: _feedbackText(cid, sid, aid, entries),
       // An Advanced Rubric's ticked checkboxes for this student.
-      ticked: typeof getRubricCheckIds === 'function' ? getRubricCheckIds(cid, sid, aid) : [],
+      ticked: ReportScores.checkIds(cid, sid, aid),
     };
   }
 
@@ -414,11 +417,11 @@
      "90%", or "Complete" / "Incomplete". Null when there is no score. */
   function _scoreOverall(cid, sid, assessment) {
     if (isCompletionScored(assessment)) {
-      var mark = getCompletionMark(cid, sid, assessment.id);
+      var mark = ReportScores.completionMark(cid, sid, assessment.id);
       if (!mark) return null;
       return { value: mark === 'complete' ? 1 : 0, text: mark === 'complete' ? 'Complete' : 'Incomplete', word: '' };
     }
-    var points = getPointsScore(cid, sid, assessment.id);
+    var points = ReportScores.pointsScore(cid, sid, assessment.id);
     if (points == null) return null;
     var max = Number(assessment.maxPoints) || 0;
     return {
@@ -435,10 +438,10 @@
       return s && s.id === sid;
     });
     if (!assessment || !student) return null;
-    var entries = (getScores(cid)[sid] || []).filter(function (e) {
+    var entries = ReportScores.entries(cid, sid).filter(function (e) {
       return e && e.assessmentId === aid;
     });
-    var status = typeof getAssignmentStatus === 'function' ? getAssignmentStatus(cid, sid, aid) : null;
+    var status = ReportScores.status(cid, sid, aid);
     var overall = _scoreOverall(cid, sid, assessment);
     return {
       cid: cid,
@@ -542,13 +545,13 @@
   function isStudentScored(cid, aid, sid) {
     var assessment = _assessment(cid, aid);
     if (assessment && isPointsScored(assessment)) {
-      return (getScores(cid)[sid] || []).some(function (e) {
+      return ReportScores.entries(cid, sid).some(function (e) {
         return e && e.assessmentId === aid && isScoreEntered(assessment, e);
       });
     }
     var rubric = _rubric(cid, assessment);
     if (!rubric) return false;
-    var entries = getScores(cid)[sid] || [];
+    var entries = ReportScores.entries(cid, sid);
     return (rubric.criteria || []).some(function (criterion) {
       return criterionLevel(entries, aid, criterion).level > 0;
     });
