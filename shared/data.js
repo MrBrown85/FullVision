@@ -4462,6 +4462,7 @@ function _bundleToCache(cid, bundle) {
       owner: _teacherId,
       schema: _BUNDLE_SCHEMA,
       dirty: false,
+      settings: _SAVED_SETTINGS,
     });
   }
 }
@@ -4484,6 +4485,14 @@ function _bundleToCache(cid, bundle) {
 // same-date work would sit in another order than on a device that fetched
 // the class fresh. Each class is downloaded in full once instead.
 var _BUNDLE_SCHEMA = 6;
+/* Whose settings a saved copy holds. 1 (2026-11-10): every class setting in
+   it was taken from the server when it was saved, the calculation method
+   and decay weight included. A copy saved before that kept this device's
+   own method and weight whatever the server held, and the server answers
+   "not modified" for a class that has not changed since, so such a copy
+   would go on grading with them. It is still shown at once, but not taken
+   as the server's: the class is downloaded in full once (_loadSavedCopy). */
+var _SAVED_SETTINGS = 1;
 var _SAVED_COPY_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 var _classFresh = {}; // cid → the server confirmed or replaced this copy since it was shown
 var _dirtyMarked = {}; // cid → the saved copy has been flagged as holding local edits
@@ -4547,7 +4556,7 @@ function _loadSavedCopy(cid) {
   var meta = _classMeta(cid) || {};
   _loadCourseFromLS(cid);
   _cache.categories[cid] = _safeParseLS('gb-categories-' + cid, []);
-  if (meta.dirty) return;
+  if (meta.dirty || meta.settings !== _SAVED_SETTINGS) return;
   Object.keys(_SERVER_STATE_FIELDS).forEach(function (field) {
     if (_cache[field][cid] !== undefined) _rememberServerState(field, cid, _cache[field][cid]);
   });

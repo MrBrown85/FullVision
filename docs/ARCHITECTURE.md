@@ -176,6 +176,8 @@ Remote persistence then happens through explicit v2 helpers and dispatchers, inc
 - report configuration and preferences
 - imports and restore flows
 
+Class settings (`saveCourseConfig`, `updateCourse` → `update_course(p_course_id, p_patch)`): the server's row is the one true copy and the device's `gb-courseconfig-<cid>` a working cache. A save sends only the keys that differ from the copy this page loaded or last saved (the `courseConfigs` server-state baseline; the localStorage copy when the class was never loaded this session), and nothing when none differ. Each queued patch carries the mark `_changed_only`, taken out as it is sent; an unmarked one naming a setting only a whole copy ever carried is from an older build and is compared with the server's row first (`_oldSettingsWrite`). A class load (`_applyBundleCourseConfig`, `_applyBundleCourseRow`) replaces every setting on the device, with this device's queued patches laid back over the row (`_unsentCourseChanges`). Whole-list category saves read `list_categories` first (`categoriesStillCurrent`). `docs/DECISIONS.md`, "Class settings on two computers".
+
 ### Offline and retry
 
 `shared/offline-queue.js` exposes `window.v2Queue`, which provides:

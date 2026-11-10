@@ -679,3 +679,13 @@ Context: a teacher could export one class's scores as a CSV and print reports, b
 4. **Read-only.** There is no import from this file. Restoring a class is Class Settings → Class Actions → Download Class Backup and Restore from Backup, which carry one class as data.
 5. **Withdrawn students** are on the Summary sheet, marked. Their records stay behind Download Records in Class Settings, which already exists for them.
 6. **ExcelJS** (`vendor/exceljs.min.js`, MIT) writes the styles; it loads only when the button is clicked. `tests/export-all.test.js` fails when a new per-class reader in `shared/data.js` is neither exported nor listed with a reason.
+
+## Class settings on two computers (2026-11-10)
+
+Context: saving any one class setting sent that device's copy of every other setting, so a computer that had loaded the class before a change made on another computer put the old values back, with no message. A class load never replaced the calculation method or decay weight on the device, so two computers could work out different grades for one class.
+
+1. **The server holds the one true copy of a class's settings** (Colin, 2026-11-10). Each device's copy is a working cache that gives way to the server's on every load. A save sends only what the teacher changed.
+2. **A load takes every setting from the server**, the calculation method and decay weight included. A change this device has made and not yet sent is kept over the server's until it is sent. A class a device saved before this fix is downloaded in full once, since the copy may hold that device's own old method beside an unchanged version number.
+3. **Two devices changing the same setting: the later save stays.** Nothing tells either teacher. A device shows old settings until it next loads the class.
+4. **Categories are checked in the browser before the whole list is saved** (Colin, 2026-11-10). Save Categories, a drag to reorder and Copy Grading Setup read the server's list first. If it is not the list the screen was opened with, nothing is saved, one line says the categories changed on another device, and the current ones are shown. With no connection nothing is saved and the line says a connection is needed. A check in the database is a later step (`docs/ROADMAP.md`).
+5. **A settings save left in the outbox by the older code** (a whole copy) is compared with the server's row before it is sent: nothing differs, nothing is sent; one setting differs, that one is sent; two or more differ, none is sent, the sync dot shows a change could not be saved, and the class is read again. Which of several differences was the teacher's own change cannot be known, and one old value put back could move every grade in a class.

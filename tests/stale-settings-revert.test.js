@@ -672,6 +672,43 @@ describe('two computers, one class: the grades each one works out', () => {
   });
 });
 
+describe('a class this device saved with the code before this fix', () => {
+  // That code never took the method from the server, so the copy it saved
+  // can hold this device's own old method beside the server's version
+  // number. The server answers "not modified" for that version: unless the
+  // copy is distrusted once, the laptop would go on grading with its own.
+  const asked = () => server.fake.calls.filter(c => c.name === 'get_class_bundle').map(c => c.params.p_if_version);
+
+  it('is downloaded in full once, so the method it kept gives way to the server’s though nothing has changed since', async () => {
+    const method = byName('Calculation Method');
+    await openApp();
+    await laptopHolds(method); // Most Recent
+    schoolSets(method); // Highest
+    await hearOfChange(); // the laptop has the class at the server's version
+    closeApp();
+    // As the earlier code left it: the same version, its own method kept.
+    const saved = JSON.parse(localStorage.getItem('gb-courseconfig-' + CID));
+    saved.calcMethod = 'mostRecent';
+    localStorage.setItem('gb-courseconfig-' + CID, JSON.stringify(saved));
+    const meta = JSON.parse(localStorage.getItem('gb-bundle-meta-' + CID));
+    expect(meta).toMatchObject({ version: server.version, dirty: false, settings: 1 });
+    delete meta.settings;
+    localStorage.setItem('gb-bundle-meta-' + CID, JSON.stringify(meta));
+
+    server.fake.calls.length = 0;
+    await openApp();
+    expect(asked()).toEqual([null]); // the whole class, not "anything new since my version?"
+    expect(method.held()).toBe('highest');
+    expect(STUDENTS.map(sid => getOverallProficiency(CID, sid))).toEqual([4, 2.75, 3, 3.5, 2]);
+
+    // Once: the copy it saved this time is trusted like any other.
+    server.fake.calls.length = 0;
+    await openApp();
+    expect(asked()).toEqual([server.version]);
+    expect(method.held()).toBe('highest');
+  });
+});
+
 describe('a change this device has made and not yet sent', () => {
   it('is not overwritten by the class loading: made offline, the app closed, opened again online', async () => {
     const round = byName('Round to a Whole %');
