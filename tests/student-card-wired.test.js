@@ -675,6 +675,52 @@ describe('the session: one token, kept until midnight or Done', () => {
     expect(first.root().querySelector('.sp-msg').textContent).toBe(SIGNED_OUT);
   });
 
+  it('in a private window nothing can be kept: the page still opens, for this tab, and Done still ends it', async () => {
+    const dev = school();
+    const page = openStudentPage({ noStorage: true });
+    page.server = body => dev.fn.handle(body);
+    await page.start('#P3R-8WD');
+    page.type('#sp-ident', '0123456');
+    await page.click('[data-act="card-yes"]');
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(row(page, 'Cell Structure Quiz').result).toBe('8 / 10');
+    // The session's check does not mistake "nothing kept" for "signed out elsewhere".
+    page.T.checkSession();
+    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    // Its midnight still takes the page down.
+    const token = Object.keys(dev.fn.state.sessions)[0];
+    page.T.checkSession(Date.parse(dev.fn.state.sessions[token].expires) + 1);
+    expect(page.root().querySelector('.sp-row')).toBeNull();
+    expect(page.root().querySelector('.sp-msg').textContent).toBe(SIGNED_OUT);
+
+    const again = openStudentPage({ noStorage: true });
+    again.server = body => dev.fn.handle(body);
+    await again.start('#P3R-8WD');
+    again.type('#sp-ident', '0123456');
+    await again.click('[data-act="card-yes"]');
+    await again.click('[data-act="card-done"]');
+    expect(again.calls[again.calls.length - 1].body.route).toBe('done');
+    expect(again.root().querySelector('form[data-form="card"]')).toBeTruthy();
+  });
+
+  it('the server’s times are read whatever their precision', async () => {
+    // To the microsecond with an offset, as Postgres writes them inside JSON.
+    const dev = school();
+    dev.card.page.assessments.forEach(a => {
+      if (a.returned_at) a.returned_at = a.returned_at.replace('+00:00', '.482913+00:00');
+      if (a.updated_at) a.updated_at = a.updated_at.replace('+00:00', '.482913+00:00');
+      if (a.seen_at) a.seen_at = a.seen_at.replace('+00:00', '.482912+00:00');
+    });
+    const page = await signIn(dev);
+    expect(row(page, 'Lab Safety Contract').sub).toMatch(/^Back \S+ \d+ · Updated$/);
+    expect(row(page, 'Energy Transfer Investigation').sub).toMatch(/^Back \S+ \d+ · Extending$/);
+    // A session's end written that way is kept and read.
+    const kept = JSON.parse(dev.store[KEY]);
+    dev.store[KEY] = JSON.stringify(Object.assign(kept, { x: '2099-06-30T07:00:00.123456+00:00' }));
+    const next = await dev.open('');
+    expect(next.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+  });
+
   it('what is kept is only ever a token: anything else found there is not used', async () => {
     for (const junk of [
       'not json',

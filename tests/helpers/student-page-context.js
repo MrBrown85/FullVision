@@ -28,6 +28,8 @@
  * kept in sessionStorage; openStudentPage({ store }) opens the page on a
  * device that already holds something (the same device, opened again).
  * `addresses` is each address the page has put in the bar (replaceState).
+ * openStudentPage({ noStorage: true }) is a private window, where every use
+ * of localStorage throws.
  *
  * watchGlobals(files) finds every global name those files read that the
  * page does not define (a reader the teacher's apps get from
@@ -98,7 +100,17 @@ export function openStudentPage(opts = {}) {
     scrollTo() {},
     history: { replaceState: (state, title, address) => addresses.push(address) },
     location: { pathname: '/s/', hash: '' },
-    localStorage: storage(store),
+    // A private window: every use of localStorage throws.
+    localStorage: opts.noStorage
+      ? new Proxy(
+          {},
+          {
+            get() {
+              throw new Error('SecurityError');
+            },
+          },
+        )
+      : storage(store),
     sessionStorage: storage(tab),
     fetch: async (url, init) => {
       const body = JSON.parse(init.body);

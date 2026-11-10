@@ -42,9 +42,11 @@ var StudentData = (function () {
     return isFinite(n) ? n : null;
   }
 
-  // A time as the server writes it, in milliseconds, or null.
+  /* A time as the server writes it, in milliseconds, or null. The server
+     writes to the microsecond; a browser is only sure to read three decimal
+     places, so the rest are dropped first. */
   function when(v) {
-    var t = v ? Date.parse(String(v)) : NaN;
+    var t = v ? Date.parse(String(v).replace(/(\.\d{3})\d+/, '$1')) : NaN;
     return isFinite(t) ? t : null;
   }
 

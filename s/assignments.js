@@ -89,7 +89,8 @@
   // When the teacher made a piece, in milliseconds, or null when the
   // server has not said.
   function madeAt(a) {
-    var t = a.created_at ? Date.parse(a.created_at) : NaN;
+    // To the millisecond, as calc.js reads it and as every browser can.
+    var t = a.created_at ? Date.parse(String(a.created_at).replace(/(\.\d{3})\d+/, '$1')) : NaN;
     return isFinite(t) ? t : null;
   }
 

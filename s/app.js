@@ -588,7 +588,7 @@
 
   // When a session ends (its midnight), in milliseconds, or null if unreadable.
   function endsAt(s) {
-    var t = Date.parse(s.expires);
+    var t = Date.parse(String(s.expires).replace(/(\.\d{3})\d+/, '$1'));
     return isFinite(t) ? t : null;
   }
 
