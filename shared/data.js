@@ -9402,6 +9402,11 @@ function saveAssessments(cid, arr) {
   if (!_writesEnabled() || !_isUuid(cid)) return;
   if (!cid || !arr) return;
   _persistAssessmentsToCanonical(cid, prev, arr);
+  // Draft and Returned: a change to a piece of work can change its rows on
+  // the server with no grade saved (its scoring moved to or from DIBELS,
+  // which has no Draft or Returned; the work deleted). Read them once the
+  // change has landed. Nothing for a class whose student page is off.
+  if (_serverKeepsRows(cid)) _refreshGradeReturnsSoon(cid);
 }
 
 /* Per-course save lock for assessments; see _studentSaveQueue for why the

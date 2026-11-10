@@ -1365,6 +1365,110 @@ describe('Return goes to the server', () => {
   });
 });
 
+describe('as the server is since S0-M4b (migrations/2026110905_grade_return_limits.sql)', () => {
+  // The server no longer sends when a student opened a piece.
+  it('under As Soon As I Save a changed grade is marked Updated by the server, not worked out here', async () => {
+    course = { student_page_enabled: true, return_grades: 'on_save' };
+    rows = { [CAUSES]: { [NOOR]: { is_draft: false, returned_at: '2026-11-03T17:00:00+00:00' } } };
+    await openClass();
+    expect('seen_at' in getGradeReturn(CID, NOOR, CAUSES)).toBe(false);
+    _REFRESH_QUIET_MS = 30;
+    level(NOOR, CAUSES, SIGNIFICANCE, 2);
+    // Here: returned again at once, and with no word of the student having
+    // looked, not marked Updated.
+    expect(state(NOOR, CAUSES)).toBe('returned');
+    expect(getGradeReturn(CID, NOOR, CAUSES).updated_at).toBeUndefined();
+    // The server knows she had opened it: its row says Updated, with what it was.
+    const was = { v: 1, modifier: 0, tags: { [SIGNIFICANCE]: { value: 4, modifier: 0 } }, criteria: {}, checks: [] };
+    rows = {
+      [CAUSES]: {
+        [NOOR]: {
+          is_draft: false,
+          returned_at: '2026-11-10T19:00:00+00:00',
+          updated_at: '2026-11-10T19:00:00+00:00',
+          previous_copy: was,
+        },
+      },
+    };
+    await quiet();
+    expect(getGradeReturn(CID, NOOR, CAUSES)).toMatchObject({
+      is_draft: false,
+      updated_at: '2026-11-10T19:00:00+00:00',
+      previous_copy: { tags: { [SIGNIFICANCE]: { value: 4, modifier: 0, comment: null } } },
+    });
+  });
+
+  describe('a DIBELS benchmark has no Draft and no Returned', () => {
+    const BENCH = id(306); // the class's seventh piece, scored as a benchmark here
+    const asBenchmark = () =>
+      fake.on('get_class_bundle', p => {
+        if (p.p_if_version === version) return { data: { not_modified: true, version }, error: null };
+        const bundle = serverClass();
+        bundle.gradebook.assessments[6].score_mode = 'dibels';
+        return { data: bundle, error: null };
+      });
+
+    it('a comment saved on one makes no row, nothing is returned for it, and no return is sent', async () => {
+      asBenchmark();
+      await openClass();
+      expect(isDibelsScored(getAssessments(CID).find(a => a.id === BENCH))).toBe(true);
+      rows = null;
+      fake.calls.length = 0;
+      Grader.setOverallComment(CID, NOOR, BENCH, 'Read with expression.');
+      expect(state(NOOR, BENCH)).toBe(null);
+      expect(getGradeReturn(CID, NOOR, BENCH)).toBe(null);
+      expect(GradeState.draftsWaiting(CID)).toBe(0);
+      expect(Grader.returnGrades(CID, BENCH, [NOOR]).returned).toBe(0);
+      await quiet();
+      expect(callsTo('return_grades')).toEqual([]);
+    });
+
+    it('a row the server no longer lists for one is dropped here with the next read', async () => {
+      asBenchmark();
+      // A row kept from before the piece was a benchmark.
+      localStorage.setItem('gb-grade-returns-' + CID, JSON.stringify({ [BENCH]: { [NOOR]: { is_draft: true } } }));
+      rows = {};
+      await openClass();
+      expect(getGradeReturn(CID, NOOR, BENCH)).toBe(null);
+      expect(state(NOOR, BENCH)).toBe(null);
+    });
+
+    it('its scoring changed back to levels: the server makes its grades drafts, and the rows are read once the change lands', async () => {
+      asBenchmark();
+      await openClass();
+      rows = {};
+      fake.calls.length = 0;
+      _REFRESH_QUIET_MS = 30;
+      // The teacher changes the piece's scoring; on the server every graded cell of it becomes a draft.
+      fake.on('update_assessment', () => {
+        rows = { [BENCH]: { [NOOR]: { is_draft: true }, [MATEO]: { is_draft: true } } };
+        return { data: null, error: null };
+      });
+      saveAssessments(
+        CID,
+        getAssessments(CID).map(a => (a.id === BENCH ? Object.assign({}, a, { scoreMode: 'proficiency' }) : a)),
+      );
+      await quiet();
+      expect(callsTo('update_assessment').length).toBe(1);
+      expect(callsTo('list_course_grade_returns').length).toBe(1);
+      expect(state(NOOR, BENCH)).toBe('draft');
+      expect(state(MATEO, BENCH)).toBe('draft');
+    });
+  });
+
+  it('a change to a piece of work in a class whose student page is off reads nothing', async () => {
+    course = { student_page_enabled: false, return_grades: 'on_return' };
+    await openClass();
+    fake.calls.length = 0;
+    saveAssessments(
+      CID,
+      getAssessments(CID).map(a => (a.id === CAUSES ? Object.assign({}, a, { title: 'Causes' }) : a)),
+    );
+    await quiet();
+    expect(names().filter(n => NEW_RPCS.test(n))).toEqual([]);
+  });
+});
+
 describe('the page is redrawn only when the server’s rows would look different', () => {
   let redraws;
   let realRedraw;
