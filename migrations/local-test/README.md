@@ -820,3 +820,110 @@ confirmed on `gradebook-prod` on 2026-11-10 (live is PostgreSQL 17.6).
 Not verified: which commands the live `ensure_rls` event trigger fires on
 (tested both ways, above); whether the API roles can make a table in public
 on `gradebook-prod` (here they cannot).
+
+## S0-M4b: three known limits of Batch A's grade_return, and DIBELS (2026-11-10)
+
+`../2026110905_grade_return_limits.sql` applies after Batch A. It closes the
+three limits the last verify pass on Batch A named, and makes three changes
+the owner ruled on:
+
+- (a) the repair (`_grade_return_repair_class`, one class) settles every cell
+  that has a grade or a row by the rule a save follows, so a grade written
+  with the triggers off is made a Draft or Returned as a save would have
+  left it, whether its cell had no row or an empty one;
+- (b) a restore with `grade_returns` and no `courses` row can no longer
+  leave a draft in a class that does not hold grades;
+- (c) `TRUNCATE` on `enrollment` or `assessment` takes the `grade_return`
+  rows with it, and `grade_return_repair_nightly()`, called once a day by a
+  pg_cron job where pg_cron is installed, repairs class by class, goes on
+  past a class it cannot do, and records it in
+  `public.grade_return_repair_log`;
+- (d) `student_submit.page` sends each assessment's `created_at`;
+- (e) `list_course_grade_returns` no longer sends `seen_at`;
+- (f) DIBELS work has no Draft and no Returned (ruling 15). A DIBELS piece's
+  `grade_return` rows are dormant: kept, and read or written by nothing
+  while the piece is DIBELS. Changed back, each cell is settled by the same
+  rule the repair uses.
+
+The file runs no repair and changes no row when it is applied. Eight of
+Batch A's functions are patched in place, each accepted only if its
+fingerprint is exactly Batch A's or exactly this file's.
+
+It is tested on the live database as it is since Nov 10: S0-M4, then Batch
+A (applied 15:28 to 15:33 UTC), then S0-M5 (15:37 UTC; PR 991's
+`2026111002_security_definer_search_path.sql`, with its
+`search-path-prelude.sql` loaded last in the base, as `search_path.py`
+loads it). "Batch A alone" below means that database, without this file.
+`live-function-md5.txt` holds the fingerprints after S0-M5; a database
+with the score paths alone, or from before Batch A, is no longer the live
+one, and `score_rpcs.py` on the score-only database now fails its
+comparison with the live snapshot, as it should.
+
+```bash
+LIVE="$BASE search-path-prelude.sql ../2026110901_score_rows_same_class.sql ../2026110902_grade_return.sql \
+  ../2026110903_student_card.sql ../2026110904_student_sessions_page.sql \
+  ../2026111002_security_definer_search_path.sql"                 # BASE as under "Batch A" above
+PGPORT=54331 PGDATABASE=fv_a python3 run.py $LIVE
+PGPORT=54331 PGDATABASE=fv_a4b python3 run.py $LIVE ../2026110905_grade_return_limits.sql
+PGPORT=54331 PGDATABASE=fv_a python3 grade_return_limits.py    # without the file: shows each limit, applies the file twice, shows it closed
+PGPORT=54331 PGDATABASE=fv_a4b python3 grade_return_limits.py  # with the file loaded: also the nightly procedure, which commits
+PGPORT=54331 PGDATABASE=fv_repair python3 run.py $LIVE ../2026110905_grade_return_limits.sql   # its own: the next script commits
+PGPORT=54331 PGDATABASE=fv_repair python3 grade_return_repair_race.py
+RACE_REPAIR=nightly PGPORT=54331 PGDATABASE=fv_a4b python3 grade_return_race.py   # or RACE_REPAIR=class
+PGPORT=54331 PGDATABASE=fv_undo4b python3 run.py $LIVE                            # without the file, for the undo's proof
+PGPORT=54331 PGDATABASE=fv_undo4b python3 grade_return_limits_undo.py
+```
+
+- `grade_return_limits.py`. On a database with Batch A alone it first shows
+  each limit as it is (checks named "today"), checks the guards (no Batch
+  A; four of the patched functions altered; a function that carries this
+  file's mark but not this file's patch), applies the file where pg_cron is
+  missing and where a stand-in for it exists, and checks that it changed no
+  row (a DIBELS piece's among them), left each patched function exactly as
+  its header says, took no lock on `enrollment` or `assessment` that stops
+  a read, and that a second run changes nothing and takes no lock the first
+  did not. Then, and on a database with the file loaded: the page's
+  `created_at`; `seen_at` kept from the teacher; the repair on a grade
+  written with triggers off into an opened cell, a cleared cell and a cell
+  with no row, in a class that holds grades and in one that does not, and
+  on a returned grade changed with triggers off; the restore; TRUNCATE and
+  orphans; a piece to DIBELS and back in both kinds of class, with a grade
+  unchanged, changed and first given while it was DIBELS; who can run what.
+  With the file loaded it also runs the nightly procedure as the job does,
+  on its own connections: a clean run; a run with the second of three
+  classes locked by someone else (the first and third are repaired, the
+  log names the second, the procedure ends with an error); and a class
+  deleted while the repair waits to lock it.
+- `grade_return_repair_race.py`: classes made, graded and deleted (two in
+  one statement; a student enrolled in two) while the nightly procedure
+  and the one-class repair loop. No deadlock, no error, nothing in the log,
+  no orphan, no row that does not hold its grade.
+- `grade_return_race.py` with the file loaded has one more RPC row (a
+  points piece flipping to DIBELS and back) and, with `RACE_REPAIR`, a
+  repair looping beside every run, which must never fail and never find
+  anything to do.
+- `s0-m4b-undo.sql` (not a migration) and its proof,
+  `grade_return_limits_undo.py`: PART 1 unschedules the job and drops the
+  three triggers; PART 2 puts Batch A's eight functions back by fingerprint
+  and drops everything the file made. After PART 2 the catalog of the three
+  schemas is identical to before the file, line by line (1,163 lines on
+  17.11 and 1,470 on 18.6), no
+  row of `grade_return` or a score table changed, Batch A's suites pass as
+  on Batch A alone, and the file applies again to the same catalog.
+- `tests/fixtures/grade-state-cases.json` has one case for (f), the last:
+  `"work": "dibels"`, named in the file's legend. `grade_return.py` runs it
+  where this file is loaded and pins what Batch A alone does where it is
+  not; `tests/grade-state-cases.test.js` runs it in the browser's rule.
+
+Result on 2026-11-10, on Postgres 17.11 (port 54331) and on 18.6 (port
+54329), the same on both: `grade_return_limits.py` 92 of 92 on Batch A
+alone and 74 of 74 with the file loaded; `grade_return_repair_race.py` 8 of
+8; `grade_return_limits_undo.py` 20 of 20. The Batch A suites on top of the
+file: `grade_return.py` 284 (281 on Batch A alone), `student_page.py` 216,
+`score_rpcs.py` 236, `student_submit.py` 79, `questionnaire_identity.py`
+47, `phone_reports.py` 37, `questionnaires.py` 42, `batch_a_apply.py` 84.
+`grade_return_race.py` 447 of 447, three runs on each version (the nightly
+procedure looping in two, the one-class repair in one): the same nine RPCs
+collide with saves and no other, the DIBELS flip never does, no
+`grade_return` row is wrong after any run, and the repair never failed and
+never found anything to do. `npm test`: " + sys.argv[2] + ".

@@ -3,7 +3,7 @@
   "about": "Worked cases for the Draft and Returned rule (docs/plans/student-page-build-plan.md 1.2). One file, run through the SQL triggers (migrations/local-test/grade_return.py) and through shared/grade-state.js, so the two cannot drift.",
   "how_to_read": {
     "class": "The class settings the case starts with: student_page (course.student_page_enabled) and return_grades (on_return, on_save or null for no choice made).",
-    "work": "What kind of assessment one student is graded on: competencies (levels on t1 and t2), rubric (criteria c1 and c2, with checkbox k1 on c1 and k2 on c2), or points (one score).",
+    "work": "What kind of assessment one student is graded on: competencies (levels on t1 and t2), rubric (criteria c1 and c2, with checkbox k1 on c1 and k2 on c2), points (one score), or dibels (a DIBELS benchmark: a reading record, not a grade that is returned, so whatever is saved on it the piece is never Draft or Returned and the student is given nothing for it).",
     "steps": "In order. A step with \"do\" is something that happens; a step with \"expect\" is what must be true at that point.",
     "do": {
       "level": "A competency level: tag, value (0 clears it), and optionally modifier and comment.",
@@ -2895,6 +2895,55 @@
               "criteria": {},
               "checks": []
             },
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "A DIBELS benchmark is a reading record, not a grade that is returned: a comment saved on it is never a draft, Return does nothing, and the student is given no grade for it",
+      "class": {
+        "student_page": true,
+        "return_grades": "on_return"
+      },
+      "work": "dibels",
+      "steps": [
+        {
+          "do": "comment",
+          "text": "Read with expression"
+        },
+        {
+          "expect": {
+            "state": "none",
+            "student": null,
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        },
+        {
+          "do": "return"
+        },
+        {
+          "expect": {
+            "state": "none",
+            "student": null,
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        },
+        {
+          "do": "class",
+          "student_page": true,
+          "return_grades": "on_save"
+        },
+        {
+          "expect": {
+            "state": "none",
+            "student": null,
             "status": null,
             "previous": null,
             "updated": false

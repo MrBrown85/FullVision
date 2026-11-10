@@ -24,6 +24,8 @@ const SCORING = {
   competencies: () => ({ kind: 'competencies', tags: ['t1', 't2'] }),
   rubric: () => ({ kind: 'rubric', criteria: ['c1', 'c2'], checks: ['k1', 'k2'], on: { k1: 'c1', k2: 'c2' } }),
   points: () => ({ kind: 'points' }),
+  // A DIBELS benchmark: a reading record, not a grade that is returned.
+  dibels: () => ({ kind: 'dibels' }),
 };
 // Edit a Copy: the copy's ids.
 const COPY_OF = { criteria: { c1: 'c3', c2: 'c4' }, checks: { k1: 'k3', k2: 'k4' } };
@@ -145,9 +147,45 @@ const CLASS_STEPS = {
 
 const KNOWN = Object.keys(WRITES).concat(Object.keys(CLASS_STEPS), ['return', 'seen']);
 
+/* A DIBELS benchmark has no Draft or Returned state, and shared/data.js
+   keeps no grade_return row for one. So a save on it (an Overall Comment,
+   say) changes the working copy and nothing else, and a Return, a change of
+   the class's settings and the student opening it do nothing. */
+function runDibels(world, step) {
+  if (WRITES[step.do]) return WRITES[step.do](cellOf(world, step.student || 's1'), step);
+  if (!KNOWN.includes(step.do)) throw new Error('A step this runner does not know: ' + JSON.stringify(step));
+  if (step.do === 'class') world.klass = { student_page: step.student_page, return_grades: step.return_grades };
+}
+
+/* What the file checks on a DIBELS piece. The state is the browser's own
+   answer: GradeState.stateOf asks whether the piece is a DIBELS benchmark
+   before it looks at anything saved on it. With no state there is nothing
+   to give the student (s/student-data.js leaves DIBELS pieces off the
+   student's page altogether). */
+function seenDibels(world, sid) {
+  const cell = cellOf(world, sid);
+  const was = globalThis.getAssessments;
+  globalThis.getAssessments = () => [{ id: 'the-benchmark', scoreMode: 'dibels' }];
+  let state;
+  try {
+    state = GradeState.stateOf('the-class', sid, 'the-benchmark');
+  } finally {
+    globalThis.getAssessments = was;
+  }
+  return {
+    state: state || 'none',
+    student: null,
+    status: cell.status,
+    previous: null,
+    updated: false,
+    returned_at: 'unchanged',
+  };
+}
+
 function run(world, step) {
   world.clock += 60000;
   const now = new Date(world.clock).toISOString();
+  if (world.scoring.kind === 'dibels') return runDibels(world, step);
   if (CLASS_STEPS[step.do]) return CLASS_STEPS[step.do](world, step, now);
   if (step.do === 'return') {
     (step.students || [step.student || 's1']).forEach(sid => {
@@ -173,6 +211,7 @@ function run(world, step) {
    piece is Missing or Excused), and whether the returned date moved since
    the check before. */
 function seen(world, sid) {
+  if (world.scoring.kind === 'dibels') return seenDibels(world, sid);
   const cell = cellOf(world, sid);
   const at = (cell.row && cell.row.returned_at) || null;
   const out = {
