@@ -1,0 +1,1306 @@
+{
+  "about": "What one sitting in Class Settings sent on the commit named in `ref`, before the stale-settings fix. Written by scripts/settings-session-main-log.mjs; read by tests/settings-session-requests.test.js. Not edited by hand.",
+  "ref": "d7e84209",
+  "start": {
+    "id": "e0000000-0000-4000-8000-000000000001",
+    "teacher_id": "f0000000-0000-4000-8000-00000000000a",
+    "name": "History 12",
+    "grade_level": "9",
+    "description": null,
+    "color": null,
+    "block": null,
+    "is_archived": false,
+    "display_order": 0,
+    "grading_system": "proficiency",
+    "calc_method": "average",
+    "decay_weight": 0.65,
+    "timezone": "America/Vancouver",
+    "late_work_policy": null,
+    "grading_scale": null,
+    "category_weights": null,
+    "round_percent": null,
+    "reporting_terms": null,
+    "recent_score_limit": null,
+    "level_order": "desc",
+    "folders_count_as_one": true,
+    "courses_count_equally": false,
+    "curriculum_tags": null,
+    "student_page_enabled": false,
+    "return_grades": null,
+    "created_at": "2026-09-01T16:00:00.000Z",
+    "updated_at": "2026-09-01T16:00:00.000Z",
+    "deleted_at": null
+  },
+  "final": {
+    "course": {
+      "id": "e0000000-0000-4000-8000-000000000001",
+      "teacher_id": "f0000000-0000-4000-8000-00000000000a",
+      "name": "History 12 (Block C)",
+      "grade_level": "9",
+      "description": null,
+      "color": null,
+      "block": null,
+      "is_archived": false,
+      "display_order": 0,
+      "grading_system": "letter",
+      "calc_method": "highest",
+      "decay_weight": 0.7,
+      "timezone": "America/Vancouver",
+      "late_work_policy": "No late work after the unit test.",
+      "grading_scale": {
+        "boundaries": [
+          {
+            "min": 86,
+            "proficiency": 4
+          },
+          {
+            "min": 73,
+            "proficiency": 3
+          },
+          {
+            "min": 50,
+            "proficiency": 2
+          },
+          {
+            "min": 0,
+            "proficiency": 1
+          }
+        ],
+        "percents": {
+          "1": 45,
+          "2": 63,
+          "3": 80,
+          "4": 100,
+          "4-": 92,
+          "3+": 86,
+          "3-": 73,
+          "2+": 67,
+          "2-": 55,
+          "1+": 50
+        },
+        "labels": null
+      },
+      "category_weights": null,
+      "round_percent": true,
+      "reporting_terms": [
+        {
+          "ordinal": 1,
+          "label": "Semester 1",
+          "starts_on": "2026-09-08",
+          "ends_on": "2027-01-22"
+        },
+        {
+          "ordinal": 2,
+          "label": "Semester 2",
+          "starts_on": "2027-01-25",
+          "ends_on": "2027-06-29"
+        }
+      ],
+      "recent_score_limit": null,
+      "level_order": "asc",
+      "folders_count_as_one": false,
+      "courses_count_equally": true,
+      "curriculum_tags": null,
+      "student_page_enabled": false,
+      "return_grades": null,
+      "created_at": "2026-09-01T16:00:00.000Z",
+      "deleted_at": null
+    },
+    "categories": [
+      {
+        "id": "e0000000-0000-4000-8000-000000000500",
+        "name": "Assignments",
+        "weight": 45,
+        "display_order": 0,
+        "calc_mode": "points"
+      },
+      {
+        "id": "e0000000-0000-4000-8000-000000000501",
+        "name": "Quizzes",
+        "weight": 35,
+        "display_order": 1,
+        "calc_mode": "points"
+      },
+      {
+        "id": "cccccccc-0000-4000-8000-000000000001",
+        "name": "Projects",
+        "weight": 20,
+        "display_order": 2,
+        "calc_mode": "points"
+      }
+    ]
+  },
+  "log": [
+    {
+      "step": "Open the app"
+    },
+    {
+      "name": "bootstrap_teacher",
+      "params": {
+        "p_email": "teacher@example.test",
+        "p_display_name": null
+      }
+    },
+    {
+      "name": "list_teacher_courses",
+      "params": {}
+    },
+    {
+      "name": "get_class_bundle",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_if_version": "none"
+      }
+    },
+    {
+      "name": "list_course_guardians",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "name": "list_questionnaire_templates",
+      "params": {}
+    },
+    {
+      "name": "list_course_questionnaires",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "name": "list_categories",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "step": "Calculation Method: Most Recent"
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "calc_method": "mostRecent",
+          "level_order": "desc"
+        }
+      }
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "calc_method": "mostRecent"
+        }
+      }
+    },
+    {
+      "step": "Calculation Method: Decaying Average"
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "calc_method": "decayingAvg",
+          "level_order": "desc"
+        }
+      }
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "calc_method": "decayingAvg"
+        }
+      }
+    },
+    {
+      "step": "Decay Weight: 70%"
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "calc_method": "decayingAvg",
+          "decay_weight": 0.7,
+          "level_order": "desc"
+        }
+      }
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "decay_weight": 0.7
+        }
+      }
+    },
+    {
+      "step": "Count Only the Most Recent: 3"
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "calc_method": "decayingAvg",
+          "decay_weight": 0.7,
+          "recent_score_limit": 3,
+          "level_order": "desc"
+        }
+      }
+    },
+    {
+      "step": "Folders Count as One: off"
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "calc_method": "decayingAvg",
+          "decay_weight": 0.7,
+          "recent_score_limit": 3,
+          "level_order": "desc",
+          "folders_count_as_one": false
+        }
+      }
+    },
+    {
+      "step": "Each Course Counts Equally: on"
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "calc_method": "decayingAvg",
+          "decay_weight": 0.7,
+          "recent_score_limit": 3,
+          "level_order": "desc",
+          "folders_count_as_one": false,
+          "courses_count_equally": true
+        }
+      }
+    },
+    {
+      "step": "Grading Scale: BC Letter Bands"
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "calc_method": "decayingAvg",
+          "decay_weight": 0.7,
+          "grading_scale": {
+            "boundaries": [
+              {
+                "min": 86,
+                "proficiency": 4
+              },
+              {
+                "min": 73,
+                "proficiency": 3
+              },
+              {
+                "min": 50,
+                "proficiency": 2
+              },
+              {
+                "min": 0,
+                "proficiency": 1
+              }
+            ],
+            "percents": {
+              "1": 45,
+              "2": 63,
+              "3": 80,
+              "4": 100,
+              "4-": 92,
+              "3+": 86,
+              "3-": 73,
+              "2+": 67,
+              "2-": 55,
+              "1+": 50
+            },
+            "labels": null
+          },
+          "recent_score_limit": 3,
+          "level_order": "desc",
+          "folders_count_as_one": false,
+          "courses_count_equally": true
+        }
+      }
+    },
+    {
+      "step": "Round to a Whole %: whole"
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "calc_method": "decayingAvg",
+          "decay_weight": 0.7,
+          "grading_scale": {
+            "boundaries": [
+              {
+                "min": 86,
+                "proficiency": 4
+              },
+              {
+                "min": 73,
+                "proficiency": 3
+              },
+              {
+                "min": 50,
+                "proficiency": 2
+              },
+              {
+                "min": 0,
+                "proficiency": 1
+              }
+            ],
+            "percents": {
+              "1": 45,
+              "2": 63,
+              "3": 80,
+              "4": 100,
+              "4-": 92,
+              "3+": 86,
+              "3-": 73,
+              "2+": 67,
+              "2-": 55,
+              "1+": 50
+            },
+            "labels": null
+          },
+          "round_percent": true,
+          "recent_score_limit": 3,
+          "level_order": "desc",
+          "folders_count_as_one": false,
+          "courses_count_equally": true
+        }
+      }
+    },
+    {
+      "step": "Grading Style: Letter"
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "grading_system": "letter"
+        }
+      }
+    },
+    {
+      "step": "Reporting Terms: two semesters"
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "calc_method": "decayingAvg",
+          "decay_weight": 0.7,
+          "grading_scale": {
+            "boundaries": [
+              {
+                "min": 86,
+                "proficiency": 4
+              },
+              {
+                "min": 73,
+                "proficiency": 3
+              },
+              {
+                "min": 50,
+                "proficiency": 2
+              },
+              {
+                "min": 0,
+                "proficiency": 1
+              }
+            ],
+            "percents": {
+              "1": 45,
+              "2": 63,
+              "3": 80,
+              "4": 100,
+              "4-": 92,
+              "3+": 86,
+              "3-": 73,
+              "2+": 67,
+              "2-": 55,
+              "1+": 50
+            },
+            "labels": null
+          },
+          "round_percent": true,
+          "recent_score_limit": 3,
+          "level_order": "desc",
+          "folders_count_as_one": false,
+          "courses_count_equally": true,
+          "reporting_terms": [
+            {
+              "ordinal": 1,
+              "label": "Semester 1",
+              "starts_on": "2026-09-08",
+              "ends_on": "2027-01-22"
+            },
+            {
+              "ordinal": 2,
+              "label": "Semester 2",
+              "starts_on": "2027-01-25",
+              "ends_on": "2027-06-29"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "step": "Rubric Levels: Emerging First"
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "calc_method": "decayingAvg",
+          "decay_weight": 0.7,
+          "grading_scale": {
+            "boundaries": [
+              {
+                "min": 86,
+                "proficiency": 4
+              },
+              {
+                "min": 73,
+                "proficiency": 3
+              },
+              {
+                "min": 50,
+                "proficiency": 2
+              },
+              {
+                "min": 0,
+                "proficiency": 1
+              }
+            ],
+            "percents": {
+              "1": 45,
+              "2": 63,
+              "3": 80,
+              "4": 100,
+              "4-": 92,
+              "3+": 86,
+              "3-": 73,
+              "2+": 67,
+              "2-": 55,
+              "1+": 50
+            },
+            "labels": null
+          },
+          "round_percent": true,
+          "recent_score_limit": 3,
+          "level_order": "asc",
+          "folders_count_as_one": false,
+          "courses_count_equally": true,
+          "reporting_terms": [
+            {
+              "ordinal": 1,
+              "label": "Semester 1",
+              "starts_on": "2026-09-08",
+              "ends_on": "2027-01-22"
+            },
+            {
+              "ordinal": 2,
+              "label": "Semester 2",
+              "starts_on": "2027-01-25",
+              "ends_on": "2027-06-29"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "step": "Late Work Policy"
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "late_work_policy": "Two days of grace."
+        }
+      }
+    },
+    {
+      "step": "Class Name"
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "name": "History 12 (Block C)"
+        }
+      }
+    },
+    {
+      "step": "Choose what is already chosen: Emerging First"
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "calc_method": "decayingAvg",
+          "decay_weight": 0.7,
+          "grading_scale": {
+            "boundaries": [
+              {
+                "min": 86,
+                "proficiency": 4
+              },
+              {
+                "min": 73,
+                "proficiency": 3
+              },
+              {
+                "min": 50,
+                "proficiency": 2
+              },
+              {
+                "min": 0,
+                "proficiency": 1
+              }
+            ],
+            "percents": {
+              "1": 45,
+              "2": 63,
+              "3": 80,
+              "4": 100,
+              "4-": 92,
+              "3+": 86,
+              "3-": 73,
+              "2+": 67,
+              "2-": 55,
+              "1+": 50
+            },
+            "labels": null
+          },
+          "round_percent": true,
+          "recent_score_limit": 3,
+          "level_order": "asc",
+          "folders_count_as_one": false,
+          "courses_count_equally": true,
+          "reporting_terms": [
+            {
+              "ordinal": 1,
+              "label": "Semester 1",
+              "starts_on": "2026-09-08",
+              "ends_on": "2027-01-22"
+            },
+            {
+              "ordinal": 2,
+              "label": "Semester 2",
+              "starts_on": "2027-01-25",
+              "ends_on": "2027-06-29"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "step": "Choose what is already chosen: whole %"
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "calc_method": "decayingAvg",
+          "decay_weight": 0.7,
+          "grading_scale": {
+            "boundaries": [
+              {
+                "min": 86,
+                "proficiency": 4
+              },
+              {
+                "min": 73,
+                "proficiency": 3
+              },
+              {
+                "min": 50,
+                "proficiency": 2
+              },
+              {
+                "min": 0,
+                "proficiency": 1
+              }
+            ],
+            "percents": {
+              "1": 45,
+              "2": 63,
+              "3": 80,
+              "4": 100,
+              "4-": 92,
+              "3+": 86,
+              "3-": 73,
+              "2+": 67,
+              "2-": 55,
+              "1+": 50
+            },
+            "labels": null
+          },
+          "round_percent": true,
+          "recent_score_limit": 3,
+          "level_order": "asc",
+          "folders_count_as_one": false,
+          "courses_count_equally": true,
+          "reporting_terms": [
+            {
+              "ordinal": 1,
+              "label": "Semester 1",
+              "starts_on": "2026-09-08",
+              "ends_on": "2027-01-22"
+            },
+            {
+              "ordinal": 2,
+              "label": "Semester 2",
+              "starts_on": "2027-01-25",
+              "ends_on": "2027-06-29"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "step": "Choose what is already chosen: BC Letter Bands"
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "calc_method": "decayingAvg",
+          "decay_weight": 0.7,
+          "grading_scale": {
+            "boundaries": [
+              {
+                "min": 86,
+                "proficiency": 4
+              },
+              {
+                "min": 73,
+                "proficiency": 3
+              },
+              {
+                "min": 50,
+                "proficiency": 2
+              },
+              {
+                "min": 0,
+                "proficiency": 1
+              }
+            ],
+            "percents": {
+              "1": 45,
+              "2": 63,
+              "3": 80,
+              "4": 100,
+              "4-": 92,
+              "3+": 86,
+              "3-": 73,
+              "2+": 67,
+              "2-": 55,
+              "1+": 50
+            },
+            "labels": null
+          },
+          "round_percent": true,
+          "recent_score_limit": 3,
+          "level_order": "asc",
+          "folders_count_as_one": false,
+          "courses_count_equally": true,
+          "reporting_terms": [
+            {
+              "ordinal": 1,
+              "label": "Semester 1",
+              "starts_on": "2026-09-08",
+              "ends_on": "2027-01-22"
+            },
+            {
+              "ordinal": 2,
+              "label": "Semester 2",
+              "starts_on": "2027-01-25",
+              "ends_on": "2027-06-29"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "step": "Save Categories: new weights"
+    },
+    {
+      "name": "save_categories",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_categories": [
+          {
+            "name": "Assignments",
+            "weight": 70,
+            "calc_mode": "points",
+            "id": "e0000000-0000-4000-8000-000000000500"
+          },
+          {
+            "name": "Tests",
+            "weight": 30,
+            "calc_mode": "points",
+            "id": "e0000000-0000-4000-8000-000000000501"
+          }
+        ]
+      }
+    },
+    {
+      "step": "Save Categories: a rename and a new category"
+    },
+    {
+      "name": "save_categories",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_categories": [
+          {
+            "name": "Assignments",
+            "weight": 50,
+            "calc_mode": "points",
+            "id": "e0000000-0000-4000-8000-000000000500"
+          },
+          {
+            "name": "Quizzes",
+            "weight": 30,
+            "calc_mode": "points",
+            "id": "e0000000-0000-4000-8000-000000000501"
+          },
+          {
+            "name": "Projects",
+            "weight": 20,
+            "calc_mode": "points"
+          }
+        ]
+      }
+    },
+    {
+      "step": "Copy Grading Setup from another class: Course %, Rubric Levels and categories"
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "calc_method": "decayingAvg",
+          "decay_weight": 0.7,
+          "grading_scale": {
+            "boundaries": [
+              {
+                "min": 86,
+                "proficiency": 4
+              },
+              {
+                "min": 73,
+                "proficiency": 3
+              },
+              {
+                "min": 50,
+                "proficiency": 2
+              },
+              {
+                "min": 0,
+                "proficiency": 1
+              }
+            ],
+            "percents": {
+              "1": 45,
+              "2": 63,
+              "3": 80,
+              "4": 100,
+              "4-": 92,
+              "3+": 86,
+              "3-": 73,
+              "2+": 67,
+              "2-": 55,
+              "1+": 50
+            },
+            "labels": null
+          },
+          "round_percent": false,
+          "recent_score_limit": 3,
+          "level_order": "desc",
+          "folders_count_as_one": false,
+          "courses_count_equally": true,
+          "reporting_terms": [
+            {
+              "ordinal": 1,
+              "label": "Semester 1",
+              "starts_on": "2026-09-08",
+              "ends_on": "2027-01-22"
+            },
+            {
+              "ordinal": 2,
+              "label": "Semester 2",
+              "starts_on": "2027-01-25",
+              "ends_on": "2027-06-29"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "save_categories",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_categories": [
+          {
+            "name": "Assignments",
+            "weight": 40,
+            "calc_mode": "points",
+            "id": "e0000000-0000-4000-8000-000000000500"
+          },
+          {
+            "name": "Quizzes",
+            "weight": 40,
+            "calc_mode": "points",
+            "id": "e0000000-0000-4000-8000-000000000501"
+          },
+          {
+            "name": "Projects",
+            "weight": 20,
+            "calc_mode": "points",
+            "id": "cccccccc-0000-4000-8000-000000000001"
+          }
+        ]
+      }
+    },
+    {
+      "step": "No connection: four settings changed, then the connection comes back"
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "calc_method": "decayingAvg",
+          "decay_weight": 0.7,
+          "grading_scale": {
+            "boundaries": [
+              {
+                "min": 86,
+                "proficiency": 4
+              },
+              {
+                "min": 73,
+                "proficiency": 3
+              },
+              {
+                "min": 50,
+                "proficiency": 2
+              },
+              {
+                "min": 0,
+                "proficiency": 1
+              }
+            ],
+            "percents": {
+              "1": 45,
+              "2": 63,
+              "3": 80,
+              "4": 100,
+              "4-": 92,
+              "3+": 86,
+              "3-": 73,
+              "2+": 67,
+              "2-": 55,
+              "1+": 50
+            },
+            "labels": null
+          },
+          "round_percent": true,
+          "recent_score_limit": 3,
+          "level_order": "desc",
+          "folders_count_as_one": false,
+          "courses_count_equally": true,
+          "reporting_terms": [
+            {
+              "ordinal": 1,
+              "label": "Semester 1",
+              "starts_on": "2026-09-08",
+              "ends_on": "2027-01-22"
+            },
+            {
+              "ordinal": 2,
+              "label": "Semester 2",
+              "starts_on": "2027-01-25",
+              "ends_on": "2027-06-29"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "calc_method": "decayingAvg",
+          "decay_weight": 0.7,
+          "grading_scale": {
+            "boundaries": [
+              {
+                "min": 86,
+                "proficiency": 4
+              },
+              {
+                "min": 73,
+                "proficiency": 3
+              },
+              {
+                "min": 50,
+                "proficiency": 2
+              },
+              {
+                "min": 0,
+                "proficiency": 1
+              }
+            ],
+            "percents": {
+              "1": 45,
+              "2": 63,
+              "3": 80,
+              "4": 100,
+              "4-": 92,
+              "3+": 86,
+              "3-": 73,
+              "2+": 67,
+              "2-": 55,
+              "1+": 50
+            },
+            "labels": null
+          },
+          "round_percent": true,
+          "recent_score_limit": 3,
+          "level_order": "asc",
+          "folders_count_as_one": false,
+          "courses_count_equally": true,
+          "reporting_terms": [
+            {
+              "ordinal": 1,
+              "label": "Semester 1",
+              "starts_on": "2026-09-08",
+              "ends_on": "2027-01-22"
+            },
+            {
+              "ordinal": 2,
+              "label": "Semester 2",
+              "starts_on": "2027-01-25",
+              "ends_on": "2027-06-29"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "calc_method": "highest",
+          "decay_weight": 0.7,
+          "grading_scale": {
+            "boundaries": [
+              {
+                "min": 86,
+                "proficiency": 4
+              },
+              {
+                "min": 73,
+                "proficiency": 3
+              },
+              {
+                "min": 50,
+                "proficiency": 2
+              },
+              {
+                "min": 0,
+                "proficiency": 1
+              }
+            ],
+            "percents": {
+              "1": 45,
+              "2": 63,
+              "3": 80,
+              "4": 100,
+              "4-": 92,
+              "3+": 86,
+              "3-": 73,
+              "2+": 67,
+              "2-": 55,
+              "1+": 50
+            },
+            "labels": null
+          },
+          "round_percent": true,
+          "recent_score_limit": 3,
+          "level_order": "asc",
+          "folders_count_as_one": false,
+          "courses_count_equally": true,
+          "reporting_terms": [
+            {
+              "ordinal": 1,
+              "label": "Semester 1",
+              "starts_on": "2026-09-08",
+              "ends_on": "2027-01-22"
+            },
+            {
+              "ordinal": 2,
+              "label": "Semester 2",
+              "starts_on": "2027-01-25",
+              "ends_on": "2027-06-29"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "calc_method": "highest"
+        }
+      }
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "late_work_policy": "No late work after the unit test."
+        }
+      }
+    },
+    {
+      "step": "The class is read again"
+    },
+    {
+      "name": "get_class_bundle",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_if_version": "older"
+      }
+    },
+    {
+      "step": "Close the app and open it again"
+    },
+    {
+      "name": "bootstrap_teacher",
+      "params": {
+        "p_email": "teacher@example.test",
+        "p_display_name": null
+      }
+    },
+    {
+      "name": "list_teacher_courses",
+      "params": {}
+    },
+    {
+      "name": "get_class_bundle",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_if_version": "current"
+      }
+    },
+    {
+      "name": "list_course_guardians",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "name": "list_categories",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "step": "After reopening, Count Only the Most Recent: All Scores"
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "calc_method": "highest",
+          "decay_weight": 0.7,
+          "grading_scale": {
+            "boundaries": [
+              {
+                "min": 86,
+                "proficiency": 4
+              },
+              {
+                "min": 73,
+                "proficiency": 3
+              },
+              {
+                "min": 50,
+                "proficiency": 2
+              },
+              {
+                "min": 0,
+                "proficiency": 1
+              }
+            ],
+            "percents": {
+              "1": 45,
+              "2": 63,
+              "3": 80,
+              "4": 100,
+              "4-": 92,
+              "3+": 86,
+              "3-": 73,
+              "2+": 67,
+              "2-": 55,
+              "1+": 50
+            },
+            "labels": null
+          },
+          "round_percent": true,
+          "recent_score_limit": null,
+          "level_order": "asc",
+          "folders_count_as_one": false,
+          "courses_count_equally": true,
+          "reporting_terms": [
+            {
+              "ordinal": 1,
+              "label": "Semester 1",
+              "starts_on": "2026-09-08",
+              "ends_on": "2027-01-22"
+            },
+            {
+              "ordinal": 2,
+              "label": "Semester 2",
+              "starts_on": "2027-01-25",
+              "ends_on": "2027-06-29"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "step": "After reopening, Save Categories: new weights"
+    },
+    {
+      "name": "save_categories",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_categories": [
+          {
+            "name": "Assignments",
+            "weight": 45,
+            "calc_mode": "points",
+            "id": "e0000000-0000-4000-8000-000000000500"
+          },
+          {
+            "name": "Quizzes",
+            "weight": 35,
+            "calc_mode": "points",
+            "id": "e0000000-0000-4000-8000-000000000501"
+          },
+          {
+            "name": "Projects",
+            "weight": 20,
+            "calc_mode": "points",
+            "id": "cccccccc-0000-4000-8000-000000000001"
+          }
+        ]
+      }
+    },
+    {
+      "step": "After reopening, choose what is already chosen: Emerging First"
+    },
+    {
+      "name": "update_course",
+      "params": {
+        "p_course_id": "e0000000-0000-4000-8000-000000000001",
+        "p_patch": {
+          "calc_method": "highest",
+          "decay_weight": 0.7,
+          "grading_scale": {
+            "boundaries": [
+              {
+                "min": 86,
+                "proficiency": 4
+              },
+              {
+                "min": 73,
+                "proficiency": 3
+              },
+              {
+                "min": 50,
+                "proficiency": 2
+              },
+              {
+                "min": 0,
+                "proficiency": 1
+              }
+            ],
+            "percents": {
+              "1": 45,
+              "2": 63,
+              "3": 80,
+              "4": 100,
+              "4-": 92,
+              "3+": 86,
+              "3-": 73,
+              "2+": 67,
+              "2-": 55,
+              "1+": 50
+            },
+            "labels": null
+          },
+          "round_percent": true,
+          "recent_score_limit": null,
+          "level_order": "asc",
+          "folders_count_as_one": false,
+          "courses_count_equally": true,
+          "reporting_terms": [
+            {
+              "ordinal": 1,
+              "label": "Semester 1",
+              "starts_on": "2026-09-08",
+              "ends_on": "2027-01-22"
+            },
+            {
+              "ordinal": 2,
+              "label": "Semester 2",
+              "starts_on": "2027-01-25",
+              "ends_on": "2027-06-29"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
