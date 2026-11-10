@@ -254,11 +254,19 @@ describe('Demo Mode sends nothing for Draft and Returned', () => {
       const src = readFileSync(new URL('../' + file, import.meta.url), 'utf-8');
       expect(src, file).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|sendBeacon|_writeRpc|\.rpc\(|getSupabase/);
     });
-    // Nothing the client sends names the server's return or its list of rows
-    // until S0-W1: the live database has neither yet.
-    ['shared/data.js', 'shared/grade-state.js', 'shared/grader.js', 'teacher/page-assignments.js'].forEach(file => {
+    // Until S0-W1 nothing the client sent named the server's return or its
+    // list of rows. Now shared/data.js sends both, for a signed-in teacher
+    // only (tests/grade-return-server.test.js); no other file names them, and
+    // nothing asks the server for a count of drafts: the screens count the
+    // rows the class holds.
+    ['shared/grade-state.js', 'shared/grader.js', 'teacher/page-assignments.js'].forEach(file => {
       const src = readFileSync(new URL('../' + file, import.meta.url), 'utf-8');
       expect(src, file).not.toMatch(/['"`](return_grades|list_course_grade_returns|course_draft_count)['"`]\s*,/);
+      expect(src, file).not.toMatch(/rpc:\s*['"`](return_grades|list_course_grade_returns|course_draft_count)/);
+    });
+    ['shared/data.js'].forEach(file => {
+      const src = readFileSync(new URL('../' + file, import.meta.url), 'utf-8');
+      expect(src, file).not.toMatch(/['"`]course_draft_count['"`]\s*,/);
       expect(src, file).not.toMatch(/rpc:\s*['"`](return_grades|list_course_grade_returns|course_draft_count)/);
     });
   });

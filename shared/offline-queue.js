@@ -148,6 +148,18 @@
     if (payload.p_enrollment_id && payload.p_assessment_id) {
       return 'cell:' + payload.p_enrollment_id + ':' + payload.p_assessment_id;
     }
+    // Return for one student (return_grades names its students as a list) is
+    // a write to that student's cell: it goes after the score writes queued
+    // for the cell and before any made after it. shared/data.js sends one
+    // student to a call for this.
+    if (
+      endpoint === 'return_grades' &&
+      payload.p_assessment_id &&
+      Array.isArray(payload.p_enrollment_ids) &&
+      payload.p_enrollment_ids.length === 1
+    ) {
+      return 'cell:' + payload.p_enrollment_ids[0] + ':' + payload.p_assessment_id;
+    }
     if (payload.p_id) return 'id:' + payload.p_id;
     if (payload.p_course_id) return 'course:' + payload.p_course_id;
     if (payload.p_enrollment_id) return 'enrollment:' + payload.p_enrollment_id;

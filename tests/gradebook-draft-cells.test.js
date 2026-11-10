@@ -279,12 +279,45 @@ describe('with the build switch off the gradebook is what it was', () => {
     Object.keys(before).forEach(name => expect(now[name] === before[name], name).toBe(true));
   });
 
-  it('byte for byte for a signed-in teacher, even with both settings on this device', () => {
+  // Until S0-W1 a signed-in teacher's switch read off whatever the device
+  // held, and this test said so with both settings on. The switch is the
+  // server's now (the class's own setting, loaded with it), so the proof is
+  // the one above, signed in: every class that does not hold grades.
+  it.each([
+    ['a class with neither setting', {}],
+    ['a class set to When I Return Them whose student page is off', { return_grades: 'on_return' }],
+    ['a class whose student page was turned off again', { student_page_enabled: false, return_grades: 'on_return' }],
+    [
+      'a class whose student page is on, set to As Soon As I Save',
+      { student_page_enabled: true, return_grades: 'on_save' },
+    ],
+    ['a class whose student page is on with no choice made', { student_page_enabled: true }],
+  ])('byte for byte for a signed-in teacher, in %s', (_, config) => {
+    const session = signIn();
+    try {
+      const now = walk(config);
+      expect(Object.keys(now)).toEqual(Object.keys(before));
+      Object.keys(before).forEach(name => expect(now[name] === before[name], name).toBe(true));
+      // With the student page off, nothing is asked of the server about
+      // Draft and Returned or cards.
+      if (config.student_page_enabled !== true) {
+        expect(session.sent().filter(c => /grade_return|return_grades|student_card|draft_count/.test(c[0]))).toEqual(
+          [],
+        );
+      }
+    } finally {
+      session.signOut();
+    }
+  });
+
+  it('and the check can tell: a signed-in class that holds grades is drawn its drafts (S0-W1)', () => {
     const session = signIn();
     try {
       const now = walk({ student_page_enabled: true, return_grades: 'on_return' });
       expect(Object.keys(now)).toEqual(Object.keys(before));
-      Object.keys(before).forEach(name => expect(now[name] === before[name], name).toBe(true));
+      const name = 'proficiency › Competencies, after a level';
+      expect(now[name]).not.toBe(before[name]);
+      expect(now[name]).toMatch(/gb-draft/);
     } finally {
       session.signOut();
     }

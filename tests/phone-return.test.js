@@ -289,12 +289,16 @@ afterEach(() => {
 const BOTH_SETTINGS = { student_page_enabled: true, return_grades: 'on_return' };
 const SIGNED_IN = 'signed in › ';
 
-// The walk as a signed-in teacher, who holds both settings on this device.
-function walkSignedIn() {
+/* The walk as a signed-in teacher. The snapshot's signed-in pictures were
+   taken on main with both settings on this device, where a signed-in
+   teacher's switch read off: so they are main's phone for a signed-in class
+   whose student page is off. `asked` is given every RPC the walk sent. */
+function walkSignedIn(config, asked) {
   const session = signIn();
   try {
-    return walk(BOTH_SETTINGS);
+    return walk(config || BOTH_SETTINGS);
   } finally {
+    if (asked) session.sent().forEach(c => asked.push(c[0]));
     session.signOut();
   }
 }
@@ -361,10 +365,35 @@ describe('with the build switch off the phone is what it was', () => {
     Object.keys(before).forEach(name => expect(now[name] === before[name], name).toBe(true));
   });
 
-  it('byte for byte for a signed-in teacher, even with both settings on this device', () => {
-    const now = walkSignedIn();
+  // Until S0-W1 a signed-in teacher's switch read off whatever the device
+  // held, and this test said so with both settings on. The switch is the
+  // server's now, so the proof is the one above, signed in: every class
+  // that does not hold grades.
+  it.each([
+    ['a class with neither setting', {}],
+    ['a class set to When I Return Them whose student page is off', { return_grades: 'on_return' }],
+    ['a class whose student page was turned off again', { student_page_enabled: false, return_grades: 'on_return' }],
+    [
+      'a class whose student page is on, set to As Soon As I Save',
+      { student_page_enabled: true, return_grades: 'on_save' },
+    ],
+    ['a class whose student page is on with no choice made', { student_page_enabled: true }],
+  ])('byte for byte for a signed-in teacher, in %s', (_, config) => {
+    const asked = [];
+    const now = walkSignedIn(config, asked);
     expect(Object.keys(now)).toEqual(Object.keys(before));
     Object.keys(before).forEach(name => expect(now[name] === beforeSignedIn[name], name).toBe(true));
+    // With the student page off, nothing is asked of the server about Draft
+    // and Returned or cards.
+    if (config.student_page_enabled !== true) {
+      expect(asked.filter(name => /grade_return|return_grades|student_card|draft_count/.test(name))).toEqual([]);
+    }
+  });
+
+  it('and the check can tell: a signed-in class that holds grades is not what main draws (S0-W1)', () => {
+    const now = walkSignedIn(BOTH_SETTINGS);
+    const changed = Object.keys(before).filter(name => now[name] !== beforeSignedIn[name]);
+    expect(changed.length).toBeGreaterThan(0);
   });
 });
 

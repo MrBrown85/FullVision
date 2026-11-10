@@ -254,11 +254,35 @@ describe('with the build switch off the dialog is what it was', () => {
     expect(Object.keys(localStorage._store).filter(k => k.indexOf('grade-returns') >= 0)).toEqual([]);
   });
 
-  it('byte for byte for a signed-in teacher, even with both settings on this device', async () => {
+  // Until S0-W1 a signed-in teacher's switch read off whatever the device
+  // held, and this test said so with both settings on. The switch is the
+  // server's now, so the proof is the one above, signed in: every class
+  // whose student page is off.
+  it.each([
+    ['a class with neither setting', {}],
+    ['a class set to When I Return Them whose student page is off', { return_grades: 'on_return' }],
+    ['a class whose student page was turned off again', { student_page_enabled: false, return_grades: 'on_return' }],
+  ])('byte for byte for a signed-in teacher, in %s', async (_, config) => {
+    const session = signIn();
+    try {
+      const now = await walk(config);
+      expect(Object.keys(now)).toEqual(Object.keys(before));
+      Object.keys(before).forEach(name => expect(now[name] === before[name], name).toBe(true));
+      expect(Object.keys(localStorage._store).filter(k => k.indexOf('grade-returns') >= 0)).toEqual([]);
+      // Nothing is asked of the server about Draft and Returned or cards.
+      expect(session.sent().filter(c => /grade_return|return_grades|student_card|draft_count/.test(c[0]))).toEqual([]);
+    } finally {
+      session.signOut();
+    }
+  });
+
+  it('and the check can tell: a signed-in class that holds grades is not what main draws (S0-W1)', async () => {
     const session = signIn();
     try {
       const now = await walk({ student_page_enabled: true, return_grades: 'on_return' });
-      Object.keys(before).forEach(name => expect(now[name] === before[name], name).toBe(true));
+      const changed = Object.keys(before).filter(name => now[name] !== before[name]);
+      expect(changed.length).toBeGreaterThan(0);
+      expect(changed.map(name => now[name]).join('')).toMatch(/grader-return|grader-draft-mark/);
     } finally {
       session.signOut();
     }
