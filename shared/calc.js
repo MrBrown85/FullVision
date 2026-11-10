@@ -391,47 +391,49 @@ function _pieceMeasures(cid, assessmentId, key) {
 }
 
 /* ── The order same-date work counts in ───────────────────────────
-   Colin, 2026-11-09, "Order in the assignment list": two pieces of work on
-   one competency with the same date count in a fixed order, whatever order
-   they were graded in. WHICH order is not settled (see below), so it is
-   decided in one place: _sameDatePieceOrder. Everything else here only
-   applies it.
+   Colin, 2026-11-10: "The one made later." Two pieces of work on one
+   competency with the same date count in the order they were made: the one
+   made earlier first, the one made later later, so it is the "most recent".
+   Never the order they were graded in, never the order the Assignments page
+   lists them in (a drag, a folder), never where they sit in a stored list.
 
-   _sameDatePieceOrder(x, y) is given two pieces as _pieceOrderFacts
-   describes them, and returns < 0 when x counts first (so y is the later,
-   "most recent" one):
-     id           the piece's id
-     placed       display_order: 1..n once the class's cards have been
-                  dragged; 0 for a card never placed (the Assignments page
-                  shows those first)
-     stored       its position in getAssessments(cid): the order the server
-                  sent (display_order, created_at, id), with pieces made on
-                  this device since then at the end
-     made         when it was made, as far as this device knows: its own
-                  clock for a piece made here and not yet reloaded
-                  (assessment.created), '' for a piece loaded from the
-                  server (the class bundle does not send created_at)
-     folder       the module folder it is filed in, or ''
-     folderPlace  that folder's place among the folders; Infinity when it is
-                  in none (the page lists unfiled cards after the folders)
+   It is decided in one place, _sameDatePieceOrder(x, y), given two pieces
+   as _pieceOrderFacts describes them. It returns < 0 when x counts first:
+     id      the piece's id
+     made    when the piece was made, in milliseconds (_pieceMadeAt), or null
+             when that is not known
+     here    true when that time is this device's: the piece was made here
+             and the class has not been loaded since
+     stored  the piece's place in the class's stored list of work
+   A piece whose time is not known counts before one whose time is.
 
-   AS BUILT: the class's cards read top to bottom as first to last, taking
-   no account of folders. The independent review found this is not what a
-   teacher sees once cards sit in folders, that a card made after a drag
-   (placed 0) counts first on its date, and that pieces made in one batch
-   can change order across a reload. The owner chooses between:
-     (1) the piece made later counts later:
-           return _cmpText(x.made, y.made) || _cmpText(x.id, y.id);
-         It needs `made` for every piece, which means the class bundle
-         sending created_at; nothing else here changes.
-     (2) exactly as the Assignments page shows them:
-           return x.folderPlace - y.folderPlace || x.placed - y.placed || x.stored - y.stored;
-         with new cards given a place so they do not jump ahead (a data
-         layer change).
-     (3) leave it to whichever was graded last, as on main: take
-         _orderedEntries' sort out. */
+   Pieces made in the same millisecond, and pieces whose time is not known,
+   are a tie, and a tie never falls to anything that changes while nothing
+   is graded:
+   - two loaded pieces: by id. The same on every device and after every
+     reload, though not the order they were made in.
+   - two pieces made here: by their place in the stored list. A new piece
+     goes on the end of that list, so this is the order they were made in,
+     and neither a drag nor a save moves it. Not by id: a piece made here
+     has a local id until its save lands and the server's id after, and the
+     order must not change at that moment.
+   - one of each: the loaded piece first.
+
+   Where `made` comes from:
+   - a piece loaded from the server: its created_at, the server's clock,
+     once the class bundle sends it (it is sent to the microsecond and read
+     here to the millisecond). A bundle that does not send it leaves a
+     loaded piece with no time known.
+   - a piece made on this device and not loaded since: assessment.created,
+     this device's clock, to the millisecond. At the next load the server's
+     copy, with the server's time and id, takes its place. */
 function _sameDatePieceOrder(x, y) {
-  return x.placed - y.placed || x.stored - y.stored;
+  var a = x.made == null ? -Infinity : x.made;
+  var b = y.made == null ? -Infinity : y.made;
+  if (a !== b) return a < b ? -1 : 1;
+  if (!x.here !== !y.here) return x.here ? 1 : -1;
+  if (x.here) return x.stored - y.stored;
+  return _cmpText(x.id, y.id);
 }
 
 function _cmpText(a, b) {
@@ -440,23 +442,34 @@ function _cmpText(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
+/* When this device made a piece of work, in milliseconds since 1970, or
+   null for a piece it did not make (or has loaded since): the loader gives
+   a loaded piece no `created`. */
+function _pieceMadeHereAt(assessment) {
+  var t = Date.parse((assessment && assessment.created) || '');
+  return isFinite(t) ? t : null;
+}
+
+/* When a piece of work was made, in milliseconds since 1970, or null: this
+   device's `created` when the piece was made here and not loaded since,
+   else the server's created_at. The device's time is read first because a
+   piece has both only when it was duplicated here from a loaded piece: the
+   copy carries its original's created_at, which is not when the copy was
+   made. */
+function _pieceMadeAt(assessment) {
+  var here = _pieceMadeHereAt(assessment);
+  if (here != null) return here;
+  var t = Date.parse((assessment && assessment.created_at) || '');
+  return isFinite(t) ? t : null;
+}
+
 /* What _sameDatePieceOrder is told about each piece of work in the class. */
 function _pieceOrderFacts(cid) {
-  var folders = {};
-  (typeof getModules === 'function' ? getModules(cid) || [] : []).forEach(function (m, i) {
-    if (m && m.id) folders[m.id] = i;
+  var facts = [];
+  (getAssessments(cid) || []).forEach(function (a, stored) {
+    if (a) facts.push({ id: a.id, made: _pieceMadeAt(a), here: _pieceMadeHereAt(a) != null, stored: stored });
   });
-  return (getAssessments(cid) || []).filter(Boolean).map(function (a, i) {
-    var folder = a.moduleId && folders[a.moduleId] != null ? a.moduleId : '';
-    return {
-      id: a.id,
-      placed: Number(a.display_order || 0) || 0,
-      stored: i,
-      made: a.created || '',
-      folder: folder,
-      folderPlace: folder ? folders[folder] : Infinity,
-    };
-  });
+  return facts;
 }
 
 /* Each piece's place among the class's pieces by _sameDatePieceOrder,
@@ -473,6 +486,20 @@ function _pieceRank(cid) {
   return rank;
 }
 
+/** Which of two pieces of work in the class counts first when they share a
+ * date (_sameDatePieceOrder): < 0 when `idA` does, > 0 when `idB` does. For
+ * a screen that lists or picks among same-date work, so it reads the same
+ * order the grades do. A piece that is not in the class comes last. */
+function samePieceDateOrder(cid, idA, idB) {
+  var rank = _pieceRank(cid);
+  var ra = rank.get(idA);
+  var rb = rank.get(idB);
+  if (ra == null && rb == null) return _cmpText(idA, idB);
+  if (ra == null) return 1;
+  if (rb == null) return -1;
+  return ra - rb;
+}
+
 /* The order evidence counts in: by date; work with the same date by
    _pieceRank; and the scores of one piece in the order the piece lists what
    it measures (its competencies, or its rubric's criteria). Never by where
@@ -481,7 +508,6 @@ function _pieceRank(cid) {
    must not move with it. Two entries under the same key of one piece are
    one score stored twice; they keep the order given. */
 function _evidenceCompare(cid) {
-  var rank = _pieceRank(cid);
   var pieces = _pieceIndex(cid);
   function place(entry) {
     var piece = pieces.get(entry.assessmentId);
@@ -492,26 +518,45 @@ function _evidenceCompare(cid) {
   return function (a, b) {
     var byDate = (a.date || '').localeCompare(b.date || '');
     if (byDate) return byDate;
-    if (a.assessmentId !== b.assessmentId) {
-      var ra = rank.get(a.assessmentId);
-      var rb = rank.get(b.assessmentId);
-      // A piece no longer in the class sorts after those that are, by its id.
-      if (ra == null && rb == null) return _cmpText(a.assessmentId, b.assessmentId);
-      if (ra == null) return 1;
-      if (rb == null) return -1;
-      return ra - rb;
-    }
+    // A piece no longer in the class sorts after those that are, by its id.
+    if (a.assessmentId !== b.assessmentId) return samePieceDateOrder(cid, a.assessmentId, b.assessmentId);
     return place(a) - place(b) || _cmpText(a.criterionId || a.tagId, b.criterionId || b.tagId);
   };
 }
 
-/* One student's score entries in counting order (_evidenceCompare), from
-   the set of scores in use. Everything that turns entries into evidence
-   reads them here, so no result depends on the order of the score list. */
+/* One student's score entries from the set of scores in use, with entries
+   that share a date put in the order they count in (_evidenceCompare).
+   Only same-date entries change places, and only among themselves: every
+   other entry stays where it is stored. So anything that reads entries
+   and then orders them by date (as the calculations here do, and the
+   screens that list evidence) gets same-date work in counting order,
+   whatever order it was graded or stored in. A class with no two pieces
+   on one date keeps every level and every order across pieces; the one
+   thing that can change places there is the entries of a single piece (its
+   levels share its date), when they are stored apart and not in the order
+   the piece lists them. */
 function _orderedEntries(cid, studentId) {
   var key = _ck(cid) + ':' + studentId;
   if (_orderedEntriesCache[key]) return _orderedEntriesCache[key];
-  var ordered = (_scoreRead.scores(cid)[studentId] || []).slice().sort(_evidenceCompare(cid));
+  var ordered = (_scoreRead.scores(cid)[studentId] || []).slice();
+  var placesByDate = {};
+  ordered.forEach(function (e, i) {
+    var d = e.date || '';
+    (placesByDate[d] = placesByDate[d] || []).push(i);
+  });
+  var compare = _evidenceCompare(cid);
+  Object.keys(placesByDate).forEach(function (d) {
+    var places = placesByDate[d];
+    if (places.length < 2) return;
+    var group = places
+      .map(function (i) {
+        return ordered[i];
+      })
+      .sort(compare);
+    places.forEach(function (i, n) {
+      ordered[i] = group[n];
+    });
+  });
   _orderedEntriesCache[key] = ordered;
   return ordered;
 }
@@ -2644,7 +2689,9 @@ function getSectionGrowthData(cid, studentId, sectionId) {
   // Sort allScores once by date, then use a running pointer — O(n) instead of O(n²).
   // For each date, advance the pointer to include all scores up to that date,
   // accumulating them into a per-tag Map so grouping is also O(1) per score.
-  allScores.sort(_evidenceCompare(cid));
+  // Same-date work on one competency is already in counting order here
+  // (getTagScores), and this sort keeps it.
+  allScores.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   const runningByTag = new Map(section.tags.map(t => [t.id, []]));
   let ri = 0;
 
@@ -3764,9 +3811,7 @@ function earlierInCategory(cid, assessment, n) {
     })
     .sort(function (x, y) {
       // Newest first; same-date pieces by the order they count in, later first.
-      return (
-        _assessmentDate(y).localeCompare(_assessmentDate(x)) || _pieceRank(cid).get(y.id) - _pieceRank(cid).get(x.id)
-      );
+      return _assessmentDate(y).localeCompare(_assessmentDate(x)) || samePieceDateOrder(cid, y.id, x.id);
     })
     .map(function (x) {
       var avg = classColumnAverage(cid, students, { assessment: x });
@@ -3988,6 +4033,7 @@ function classSpreadRangeText(cid, assessment, spread) {
 /* ── Namespace ──────────────────────────────────────────────── */
 window.Calc = {
   withReturnedOnly,
+  samePieceDateOrder,
   medianOf,
   classColumnSpread,
   classColumnLevelCounts,

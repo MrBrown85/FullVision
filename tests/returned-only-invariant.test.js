@@ -92,7 +92,7 @@ describe('with no grade a draft, returned-only gives what all-work gives', () =>
     CLASSES.forEach(([name]) => {
       expect(reads[name].allWork, name).toBe(0);
       // Hundreds of reads of the returned set for each class. (Over 1,000
-      // before S0-F1d, which reads a student's entries once and keeps them
+      // before S0-F1e, which reads a student's entries once and keeps them
       // in counting order.)
       expect(reads[name].noRows, name).toBeGreaterThan(300);
       expect(reads[name].everyRowReturned, name).toBeGreaterThan(300);

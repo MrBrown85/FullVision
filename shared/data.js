@@ -1680,6 +1680,7 @@ function _keepOrDefaultField(cid, field, fallback) {
 function _persistLoadedField(cid, field, value) {
   if (_refreshMustSkip(cid, field)) return;
   _cache[field][cid] = value;
+  if (field === 'scores') _gradeScoresLoaded(cid); // Draft and Returned: the rows are from before this load
   if (field === 'rubrics') _noteRubricsSet(cid);
   var key = _DATA_KEYS[field];
   if (key) {
@@ -4053,6 +4054,7 @@ function _v2GradebookToCache(cid, payload) {
       due_date: _dateOnly(a.due_date),
       assigned_at: _dateOnly(a.date_assigned),
       display_order: Number(a.display_order || 0),
+      created_at: a.created_at || undefined, // when the piece was made (calc.js _pieceMadeAt); sent once the bundle has it
     };
     var collabMode = a.collab_mode || a.collabMode;
     var collabConfig = a.collab_config || a.collabConfig || {};
@@ -4419,7 +4421,13 @@ function _bundleToCache(cid, bundle) {
 // (_savedCopyUsable), so only those classes are downloaded again in full.
 // 5 (2026-11-03): rubrics carry tagIds, the competencies the whole rubric
 // scores. A schema 4 copy is still used: none existed before.
-var _BUNDLE_SCHEMA = 5;
+// 6 (2026-11-10): assessments carry created_at, when the piece was made,
+// which orders same-date work (calc.js _sameDatePieceOrder). No older copy
+// is used as it is: the server answers "not modified" for a class that has
+// not changed, so an older copy would never get the times, and its
+// same-date work would sit in another order than on a device that fetched
+// the class fresh. Each class is downloaded in full once instead.
+var _BUNDLE_SCHEMA = 6;
 var _SAVED_COPY_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 var _classFresh = {}; // cid → the server confirmed or replaced this copy since it was shown
 var _dirtyMarked = {}; // cid → the saved copy has been flagged as holding local edits
@@ -4444,15 +4452,10 @@ function _saveClassMeta(cid, patch) {
 function _savedCopyUsable(cid) {
   var meta = _classMeta(cid);
   if (!meta || !meta.owner || meta.owner !== _teacherId) return false;
-  // A copy from schema 4 differs only in having no whole-rubric competencies,
-  // which none had. One from schema 3 differs only in keeping rubric scores
-  // under competencies; one with none of those is used as it is.
-  if (
-    meta.schema !== _BUNDLE_SCHEMA &&
-    meta.schema !== 4 &&
-    !(meta.schema === 3 && !_savedCopyHasLegacyRubricKeys(cid))
-  )
-    return false;
+  // Only a copy this code saved (see _BUNDLE_SCHEMA). An older one stays in
+  // the browser: it is what shows if the download fails, and what is kept
+  // while writes wait to be sent (_initClassData).
+  if (meta.schema !== _BUNDLE_SCHEMA) return false;
   if (Date.now() - (meta.lastOpenedAt || meta.savedAt || 0) > _SAVED_COPY_MAX_AGE_MS) return false;
   return _hasLocalCopy(cid);
 }
@@ -10199,6 +10202,17 @@ function _loadGradeReturns(cid, rows) {
   delete _returnedSets[cid];
   if (typeof clearProfCache === 'function') clearProfCache();
 }
+/* The class's scores were just replaced by a load from the server (a
+   refresh, or a full download after a saved copy was refused as an older
+   shape). The rows this device holds are from before that load, so they
+   are not "loaded" again until _loadGradeReturns runs for it: a class that
+   holds grades fails closed in between rather than read old rows against
+   new scores. The rows themselves are left where they are. A class kept on
+   this device only is never loaded from a server, and keeps its rows. */
+function _gradeScoresLoaded(cid) {
+  delete _gradeReturnsLoadedFor[cid];
+  delete _returnedSets[cid];
+}
 /* True when the class's rows are known. A class kept on this device only
    (Demo Mode) keeps them in localStorage, which is always there to read:
    no key means no rows. A signed-in class's rows are known only once
@@ -10288,7 +10302,9 @@ function _gradeRule(cid, was, next) {
   var changed = false;
   Object.keys(Object.assign({}, before, now)).forEach(function (aid) {
     var a = _assessmentById(cid, aid);
-    if (!a) return;
+    // A DIBELS benchmark is a reading record, not a grade that is returned:
+    // nothing saved on it, its Overall Comment included, makes or changes a row.
+    if (!a || isDibelsScored(a)) return;
     Object.keys(Object.assign({}, before[aid], now[aid])).forEach(function (sid) {
       var b = (before[aid] || {})[sid];
       var n = (now[aid] || {})[sid];
@@ -10326,7 +10342,7 @@ function _returnGrades(cid, aid, studentIds) {
   var at = new Date().toISOString();
   var a = _assessmentById(cid, aid);
   var klass = getReturnSettings(cid);
-  if (a && klass.student_page && GradeState.holds(klass)) {
+  if (a && !isDibelsScored(a) && klass.student_page && GradeState.holds(klass)) {
     var rows = getGradeReturns(cid);
     var of = Object.assign({}, rows[aid]);
     var cells = _gradeCells(getScores(cid), getRubricChecks(cid))[aid] || {};
@@ -10485,7 +10501,13 @@ window.getReturnedScores = function getReturnedScores(cid) {
           'No returned grade was worked out, so no draft is shown.',
       );
     }
-    var rows = getGradeReturns(cid);
+    // A DIBELS benchmark has no returned grade: any row for one is passed
+    // over, so its entries are the working copy's.
+    var rows = {};
+    var every = getGradeReturns(cid);
+    Object.keys(every).forEach(function (aid) {
+      if (!isDibelsScored(_assessmentById(cid, aid))) rows[aid] = every[aid];
+    });
     var anyDraft = Object.keys(rows).some(function (aid) {
       return Object.keys(rows[aid] || {}).some(function (sid) {
         return rows[aid][sid] && rows[aid][sid].is_draft;

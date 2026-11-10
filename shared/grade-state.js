@@ -466,11 +466,19 @@ window.GradeState = (function () {
 
   /* The state `sid`'s piece of work on `aid` is in: 'draft', 'returned', or
      null while it has no grade returned and none waiting. This is what a
-     screen shows: a status alone is not a grade, and a Missing or Excused
-     piece shows its status, never Draft. A piece with nothing waiting is
+     screen shows, and what a count of drafts asks: a status alone is not a
+     grade; a Missing or Excused piece shows its status, never Draft; and a
+     DIBELS benchmark has no Draft or Returned state at all, whatever is
+     saved on it (its numbers show at once; shared/data.js keeps no row for
+     one). A piece with nothing waiting is
      Returned once it has a score or feedback: every save that is not held
      is returned at once. */
   function stateOf(cid, sid, aid) {
+    // A DIBELS benchmark is a reading record, not a grade that is returned.
+    var piece = (getAssessments(cid) || []).find(function (a) {
+      return a && a.id === aid;
+    });
+    if (isDibelsScored(piece)) return null;
     var row = typeof getGradeReturn === 'function' ? getGradeReturn(cid, sid, aid) : null;
     if (row && row.is_draft) return _hidesGrade(getAssignmentStatus(cid, sid, aid)) ? null : DRAFT;
     // A tick is part of a grade: work with only ticks left has one.
