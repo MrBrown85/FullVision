@@ -27,6 +27,7 @@ import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { runInThisContext } from 'vm';
+import { expect } from 'vitest';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '../..');
@@ -185,6 +186,9 @@ function printGrades(cid, out, view, ordinal) {
   [{}, { scoresAs: 'proficiency' }, { scoresAs: 'percent' }, { scoresAs: 'both' }, { sortBy: 'first' }].forEach(o => {
     const opts = Object.assign(ordinal == null ? {} : { term: String(ordinal) }, o);
     const model = GP.buildModel(cid, opts);
+    // The time printed reads in the runner's own time zone; the rest is the class's.
+    expect(model.header.printed).toMatch(/\d/);
+    model.header.printed = '(the time printed)';
     out[view + ' › printGrades › ' + JSON.stringify(o)] = GP.renderPages(model) + '\n' + text(GP.keyLines(model));
   });
 }
