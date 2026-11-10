@@ -1,0 +1,894 @@
+/**
+ * A device with an old copy of a class's settings must not put them back.
+ *
+ * Saving one class setting sent this device's copy of every other setting
+ * (saveCourseConfig built its update_course patch from the whole copy). So a
+ * laptop that loaded the class before a change made at school put the old
+ * value back the next time it saved anything, with no word to the teacher.
+ * And a class load never replaced the calculation method or decay weight in
+ * the device's copy, so the laptop went on putting them back, and grading
+ * with them, even after it reloaded.
+ *
+ * Two devices here are "the laptop" (the device this file drives: the real
+ * data layer, outbox and Class Settings) and "the school computer". The
+ * school computer's change reaches the stand-in server as one request
+ * naming the one setting (server.fromAnotherDevice); the first describe
+ * checks that this is what a real device with a fresh copy sends, and the
+ * grades test near the end runs both devices for real, one after the other.
+ *
+ * The server is tests/helpers/class-settings-server.js: the live
+ * update_course and save_categories rules over one class.
+ *
+ * The phone has no screen that saves a class setting; the last describe
+ * holds that. Demo Mode has one device and no server, so nothing here
+ * applies to it (tests/demo-mode-no-server-calls.test.js holds that it
+ * sends nothing).
+ */
+import './setup.js';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { readFileSync, readdirSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { runInThisContext } from 'vm';
+import { settle } from './helpers/fake-supabase.js';
+import {
+  CAT_ASSIGNMENTS,
+  CAT_TESTS,
+  CID,
+  UPDATE_COURSE_COLUMNS,
+  classSettingsServer,
+} from './helpers/class-settings-server.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const read = file => readFileSync(resolve(root, file), 'utf-8');
+const QUEUE_SOURCE = read('shared/offline-queue.js');
+const clone = v => JSON.parse(JSON.stringify(v));
+const id = n => 'e0000000-0000-4000-8000-' + String(n).padStart(12, '0');
+const STUDENTS = [100, 101, 102, 103, 104].map(id); // the fixture's five, in roster order
+
+let server;
+let original;
+let tabs = [];
+
+const setOnline = on => Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => on });
+
+/* ── The laptop ─────────────────────────────────────────────────────────── */
+
+/* Everything a page holds in memory goes, as on a reload or when the tab is
+   closed. localStorage (the saved classes and the outbox) stays. */
+function forgetPage() {
+  Object.keys(_cache).forEach(function (field) {
+    _cache[field] = field === 'courses' || field === 'config' ? null : {};
+  });
+  COURSES = loadCourses();
+  _classVersion = {};
+  _classFresh = {};
+  _refreshState = {};
+  _loadError = {};
+  _localWrites = {};
+  _serverState = {};
+  _dirtyMarked = {};
+  _classLoads = {};
+  _initPromise = null;
+  _gradeReturnsLoadedFor = {};
+  _studentSaveQueue = {};
+  _assessmentSaveQueue = {};
+  _categorySaveQueue = {};
+  _learningMapSaveQueue = {};
+  _learningMapIdRemap = {};
+  _noteSaveQueue = {};
+  _idRekeys = {};
+  _pendingSyncs = 0;
+  _pendingLocalCids.clear();
+  _idmapRaw = null;
+  _idmapCache = null;
+  _echoNeedsReload = false;
+  _classBundleMissing = false;
+  _useSupabase = false;
+  _supabaseDegraded = false;
+  _teacherId = null;
+  // The next write configures whichever copy of the outbox is current.
+  _outboxConfigured = false;
+  if (_loadRetryTimer) clearTimeout(_loadRetryTimer);
+  _loadRetryTimer = null;
+  clearProfCache();
+  DashClassManager.resetState();
+}
+
+/* The outbox module loads again with the page. Offline while it loads, so
+   its start-up flush stays quiet (as tests/write-path-audit.test.js does). */
+function loadOutbox() {
+  setOnline(false);
+  runInThisContext(QUEUE_SOURCE, { filename: 'shared/offline-queue.js' });
+  tabs.push(window.v2Queue);
+  setOnline(true);
+}
+
+/* Until the laptop has nothing left to send or load. */
+async function quiet() {
+  for (let i = 0; i < 80; i++) {
+    await settle();
+    const refresh = _refreshState[CID];
+    if (!(refresh && refresh.running) && !_hasUnsentWrites()) return;
+    await new Promise(r => setTimeout(r, 25));
+  }
+  throw new Error('the laptop never went quiet');
+}
+
+/* The teacher opens the app: sign-in state, the class list, the class, and
+   Class Settings on that class. `connected: false` opens it with no
+   connection (the saved copy, the outbox holding its writes). */
+async function openApp(opts) {
+  const connected = !opts || opts.connected !== false;
+  forgetPage();
+  loadOutbox();
+  setOnline(connected);
+  server.reachable = connected;
+  await initAllCourses();
+  await initData(CID);
+  if (connected) await quiet();
+  else await settle();
+  DashClassManager.configure({ activeCourse: CID, onRender() {}, onCourseChange() {} });
+  DashClassManager.openClassManager();
+  DashClassManager.handleAction('cmTermCancel', { dataset: {} }); // no term edits left from another test
+  await settle();
+  if (connected) await quiet();
+}
+
+/* The class changed on the server and the laptop hears of it (its sync
+   cursor moves): the class is read again. */
+async function hearOfChange() {
+  await _handleExternalCourseUpdate(CID, 'gradebook');
+  await quiet();
+}
+
+async function goOffline() {
+  setOnline(false);
+  server.reachable = false;
+}
+async function goOnline() {
+  server.reachable = true;
+  setOnline(true);
+  await window.v2Queue.flush();
+  await quiet();
+}
+
+/* A device's saved state, so two devices can take turns in one test: what
+   is in its browser (localStorage). Its memory is gone when it comes back,
+   as after the app is closed. */
+function closeApp() {
+  const image = JSON.stringify(localStorage._store);
+  forgetPage();
+  return image;
+}
+function useDevice(image) {
+  forgetPage();
+  localStorage._store = image ? JSON.parse(image) : {};
+}
+
+/* ── Class Settings, as the teacher's clicks reach it ───────────────────── */
+const act = (action, dataset) => DashClassManager.handleAction(action, { dataset: dataset || {} });
+const input = (action, dataset, value) =>
+  DashClassManager.handleInput({ dataset: Object.assign({ actionInput: action }, dataset), value: String(value) });
+const change = (action, props) =>
+  DashClassManager.handleChange(Object.assign({ dataset: { actionChange: action } }, props));
+const blur = (action, value) => DashClassManager.handleBlur({ dataset: { actionBlur: action }, value: value });
+
+const BC_SCALE = () => ({
+  boundaries: clone(DEFAULT_GRADING_SCALE.boundaries),
+  percents: clone(BC_LETTER_BAND_PERCENTS),
+  labels: null,
+});
+const TERMS_A = [
+  { ordinal: 1, label: 'Term 1', starts_on: '2026-09-08', ends_on: '2027-01-29' },
+  { ordinal: 2, label: 'Term 2', starts_on: '2027-02-01', ends_on: '2027-06-25' },
+];
+const TERMS_B = [
+  { ordinal: 1, label: 'Semester 1', starts_on: '2026-09-08', ends_on: '2027-01-22' },
+  { ordinal: 2, label: 'Semester 2', starts_on: '2027-01-25', ends_on: '2027-06-29' },
+];
+
+/* Every class setting, each with: the server column that holds it; the
+   value the laptop has (`was`) and the one the school computer gives it
+   (`now`), as the column holds them; `set`, the teacher's own action in
+   Class Settings; and `held`, what this device works with, read the way the
+   app reads it. `harm` is the reviewer's list: these change grades or
+   report dates. */
+const SETTINGS = [
+  {
+    name: 'Calculation Method',
+    col: 'calc_method',
+    harm: true,
+    was: 'mostRecent',
+    now: 'highest',
+    set: v => act('cmSetCalcMethod', { value: v }),
+    // shared/calc.js: cc.calcMethod || course.calcMethod || 'average'
+    held: () => (getCourseConfig(CID) || {}).calcMethod || (COURSES[CID] || {}).calcMethod || 'average',
+  },
+  {
+    name: 'Decay Weight',
+    col: 'decay_weight',
+    harm: true,
+    was: 0.7,
+    now: 0.9,
+    set: v => input('cmDecaySlider', {}, Math.round(v * 100)),
+    // shared/calc.js: cc.decayWeight != null ? cc.decayWeight : course.decayWeight || 0.65
+    held: () => {
+      const cc = getCourseConfig(CID) || {};
+      return Number(cc.decayWeight != null ? cc.decayWeight : (COURSES[CID] || {}).decayWeight || 0.65);
+    },
+  },
+  {
+    name: 'Count Only the Most Recent',
+    col: 'recent_score_limit',
+    harm: true,
+    was: 3,
+    now: 5,
+    set: v => change('cmRecentLimit', { value: v ? String(v) : '' }),
+    held: () => getRecentScoreLimit(CID) || null,
+  },
+  {
+    name: 'Count Only the Most Recent, back to All Scores',
+    col: 'recent_score_limit',
+    harm: true,
+    was: 3,
+    now: null,
+    set: v => change('cmRecentLimit', { value: v ? String(v) : '' }),
+    held: () => getRecentScoreLimit(CID) || null,
+  },
+  {
+    name: 'Folders Count as One',
+    col: 'folders_count_as_one',
+    harm: true,
+    was: false,
+    now: true,
+    set: v => change('cmFoldersCountAsOne', { checked: v }),
+    held: () => getFoldersCountAsOne(CID),
+  },
+  {
+    name: 'Each Course Counts Equally',
+    col: 'courses_count_equally',
+    harm: true,
+    was: true,
+    now: false,
+    set: v => change('cmCoursesCountEqually', { checked: v }),
+    held: () => getCoursesCountEqually(CID),
+  },
+  {
+    name: 'Grading Scale',
+    col: 'grading_scale',
+    harm: true,
+    was: BC_SCALE(),
+    now: clone(DEFAULT_GRADING_SCALE),
+    // The two scales Class Settings has a button for.
+    set: v => act(v.percents['4-'] != null ? 'cmPointsScaleBc' : 'cmPointsScaleReset'),
+    held: () => clone(getGradingScale(CID)),
+  },
+  {
+    name: 'Category Weights (the course’s summative and formative split)',
+    col: 'category_weights',
+    harm: true,
+    was: { summative: 0.6, formative: 0.4 },
+    now: { summative: 0.8, formative: 0.2 },
+    // No screen sets it today; saved as any caller of the data layer would.
+    set: v => saveCourseConfig(CID, Object.assign({}, getCourseConfig(CID), { categoryWeights: clone(v) })),
+    held: () => clone(getCategoryWeights(CID)),
+  },
+  {
+    name: 'Round to a Whole %',
+    col: 'round_percent',
+    harm: true,
+    was: true,
+    now: false,
+    set: v => act('cmSetRoundPercent', { value: v ? 'whole' : 'decimal' }),
+    held: () => getRoundWholePercent(CID),
+    other: 'Rubric Levels',
+  },
+  {
+    name: 'Grading Style',
+    col: 'grading_system',
+    harm: true,
+    was: 'letter',
+    now: 'both',
+    set: v => act('cmSetGradingSystem', { value: v }),
+    held: () => courseGradeMode(CID),
+  },
+  {
+    name: 'Reporting Terms',
+    col: 'reporting_terms',
+    harm: true,
+    was: TERMS_A,
+    now: TERMS_B,
+    set: rows => {
+      act('cmTermPreset', { value: 'semesters' }); // two rows to type into
+      rows.forEach((r, i) =>
+        ['label', 'starts_on', 'ends_on'].forEach(f => input('cmTermLive', { idx: String(i), field: f }, r[f])),
+      );
+      act('cmTermSave');
+    },
+    held: () => clone(getReportingTerms(CID)),
+  },
+  {
+    name: 'Rubric Levels',
+    col: 'level_order',
+    was: 'asc',
+    now: 'desc',
+    set: v => act('cmSetLevelOrder', { value: v }),
+    held: () => (levelOrderFor(CID)[0] === 1 ? 'asc' : 'desc'),
+  },
+  {
+    name: 'Time Zone',
+    col: 'timezone',
+    was: 'America/Vancouver',
+    now: 'America/Edmonton',
+    set: null, // no screen changes it: create_course sets it, the server keeps it
+    held: () => (COURSES[CID] || {}).timezone,
+  },
+  {
+    name: 'Late Work Policy',
+    col: 'late_work_policy',
+    was: 'Two days of grace.',
+    now: 'No late work after the unit test.',
+    set: v => blur('cmLateWorkPolicy', v),
+    held: () => (COURSES[CID] || {}).lateWorkPolicy,
+  },
+];
+const byName = name => SETTINGS.find(s => s.name === name);
+
+/* The laptop came to hold `was`: it chose it itself, some time ago. (Time
+   Zone has no screen, so the server starts with it.) */
+async function laptopHolds(s) {
+  if (!s.set) {
+    expect(server.course[s.col]).toEqual(s.was);
+    return;
+  }
+  s.set(s.was);
+  await quiet();
+  expect(server.course[s.col], 'the laptop’s own earlier change reached the server').toEqual(s.was);
+}
+/* At school, later: one request naming the one setting. */
+function schoolSets(s) {
+  server.fromAnotherDevice('update_course', { p_course_id: CID, p_patch: { [s.col]: clone(s.now) } });
+  expect(server.course[s.col]).toEqual(s.now);
+}
+/* Tonight, on the laptop: a different setting, nothing else. */
+async function laptopSavesAnother(s) {
+  const other = byName(s.other || 'Round to a Whole %');
+  other.set(other.was);
+  await quiet();
+  expect(server.course[other.col], 'the setting the laptop did change was saved').toEqual(other.was);
+}
+
+beforeEach(() => {
+  original = {
+    getSupabase: globalThis.getSupabase,
+    useSupabase: _useSupabase,
+    teacher: _teacherId,
+    quiet: _REFRESH_QUIET_MS,
+    bundle: globalThis.__FV_CLASS_BUNDLE,
+    confirm: globalThis.showConfirm,
+    queue: window.v2Queue,
+    store: localStorage._store,
+  };
+  tabs = [];
+  _REFRESH_QUIET_MS = 0;
+  globalThis.__FV_CLASS_BUNDLE = true;
+  // Every "this changes grades for N students" question is answered Change.
+  globalThis.showConfirm = (title, message, ok, style, onConfirm) => onConfirm();
+  localStorage._store = {};
+  server = classSettingsServer();
+  globalThis.getSupabase = () => server.fake;
+  setOnline(true);
+});
+
+afterEach(() => {
+  tabs.forEach(tab => {
+    tab.clear();
+    tab.release();
+  });
+  forgetPage();
+  window.v2Queue = original.queue;
+  if (original.queue && typeof original.queue.claim === 'function') original.queue.claim();
+  globalThis.getSupabase = original.getSupabase;
+  globalThis.showConfirm = original.confirm;
+  globalThis.__FV_CLASS_BUNDLE = original.bundle;
+  _useSupabase = original.useSupabase;
+  _teacherId = original.teacher;
+  _REFRESH_QUIET_MS = original.quiet;
+  localStorage._store = original.store;
+  setOnline(true);
+});
+
+/* ── The stand-in server and the school computer are true to life ───────── */
+
+describe('the stand-in server', () => {
+  // The live function: the migration that last wrote it whole, with every
+  // later in-place patch (migrations/local-test/batch-a-prelude.sql), then
+  // Batch A's two columns (migrations/2026110902_grade_return.sql).
+  function liveUpdateCourse() {
+    const prelude = read('migrations/local-test/batch-a-prelude.sql');
+    const from = prelude.indexOf('create or replace function public.update_course(');
+    const body = prelude.slice(from, prelude.indexOf('$function$;', from));
+    const batchA = read('migrations/2026110902_grade_return.sql');
+    const patch = batchA.slice(batchA.indexOf("array['public.update_course(uuid,jsonb)'"));
+    return body + patch.slice(0, patch.indexOf("array['public.move_rubric_scores"));
+  }
+
+  it('reads every column of update_course the way the live function does: only from a key the patch has', () => {
+    const sql = liveUpdateCourse();
+    const found = {};
+    // name = coalesce(p_patch->>'name', name)   |   color = case when p_patch ? 'color' then … else color end
+    const assign = /^\s+(\w+)\s*=\s*(coalesce\(p_patch->>'(\w+)',\s*(\w+)\)|case when p_patch \? '(\w+)')/gm;
+    let m;
+    while ((m = assign.exec(sql))) {
+      const col = m[1];
+      if (m[3]) {
+        expect([m[3], m[4]], col).toEqual([col, col]);
+        found[col] = 'coalesce';
+      } else {
+        expect(m[5], col).toBe(col);
+        // …and the column keeps its value when the key is not there.
+        expect(sql, col).toMatch(
+          new RegExp(col + "\\s*=\\s*case when p_patch \\? '" + col + "'[\\s\\S]*?else " + col + ' end'),
+        );
+        found[col] = 'key';
+      }
+    }
+    expect(found).toEqual(UPDATE_COURSE_COLUMNS);
+    // Nothing else is assigned from the patch: updated_at is the one other column set.
+    const set = sql.slice(sql.indexOf('update course set'), sql.indexOf('where id = p_course_id'));
+    const assigned = (set.match(/^\s{8}(\w+)\s*=/gm) || []).map(l => l.trim().split(/\s/)[0]);
+    expect(assigned.filter(c => !UPDATE_COURSE_COLUMNS[c])).toEqual(['updated_at']);
+  });
+
+  it('leaves every other column alone when a patch names one', () => {
+    const before = clone(server.course);
+    server.fromAnotherDevice('update_course', { p_course_id: CID, p_patch: { round_percent: true } });
+    const after = clone(server.course);
+    expect(after.round_percent).toBe(true);
+    delete before.round_percent;
+    delete after.round_percent;
+    delete before.updated_at;
+    delete after.updated_at;
+    expect(after).toEqual(before);
+  });
+});
+
+describe('a device with a fresh copy of the class', () => {
+  it.each(SETTINGS.filter(s => s.set).map(s => [s.name, s]))('saves %s, and the server takes it', async (_, s) => {
+    await openApp();
+    s.set(s.now);
+    await quiet();
+    expect(server.course[s.col]).toEqual(s.now);
+    expect(s.held()).toEqual(s.now);
+  });
+});
+
+/* ── (a) A save sends only what the action changed ──────────────────────── */
+
+describe('the laptop holds an old copy and was never told of the change', () => {
+  it.each(SETTINGS.map(s => [s.name, s]))(
+    '%s changed at school stays changed when the laptop saves a different setting',
+    async (_, s) => {
+      await openApp();
+      await laptopHolds(s);
+      schoolSets(s);
+      await laptopSavesAnother(s);
+      expect(server.course[s.col]).toEqual(s.now);
+    },
+  );
+});
+
+describe('the laptop holds an old copy, then the class is read again from the server', () => {
+  it.each(SETTINGS.map(s => [s.name, s]))(
+    '%s changed at school stays changed when the laptop then saves a different setting',
+    async (_, s) => {
+      await openApp();
+      await laptopHolds(s);
+      schoolSets(s);
+      await hearOfChange();
+      await laptopSavesAnother(s);
+      expect(server.course[s.col]).toEqual(s.now);
+    },
+  );
+});
+
+describe('the laptop holds an old copy, then the app is closed and opened again', () => {
+  it.each(SETTINGS.map(s => [s.name, s]))(
+    '%s changed at school stays changed when the laptop then saves a different setting',
+    async (_, s) => {
+      await openApp();
+      await laptopHolds(s);
+      schoolSets(s);
+      await openApp(); // a new page: memory gone, the saved copy kept, the class list and the class read again
+      await laptopSavesAnother(s);
+      expect(server.course[s.col]).toEqual(s.now);
+    },
+  );
+});
+
+describe('what does not change', () => {
+  it('two devices change the SAME setting: the later save is the one that stays', async () => {
+    // Last write wins, for one setting. Nothing tells either teacher.
+    const method = byName('Calculation Method');
+    await openApp();
+    await laptopHolds(method); // Most Recent
+    schoolSets(method); // Highest
+    method.set('decayingAvg'); // the laptop, later, not told
+    await quiet();
+    expect(server.course.calc_method).toBe('decayingAvg');
+  });
+
+  it('a laptop that only ever loaded the method never sent it: a method changed at school already stayed', async () => {
+    // Why not every stale device did harm: the method and decay weight are
+    // in a device's settings copy only once that device has chosen them
+    // (or made the class). Every other setting is there from the first load.
+    server.course.calc_method = 'mostRecent';
+    const method = byName('Calculation Method');
+    await openApp();
+    expect(method.held()).toBe('mostRecent');
+    schoolSets(method);
+    await laptopSavesAnother(method);
+    expect(server.course.calc_method).toBe('highest');
+  });
+});
+
+describe('a second tab in the same browser', () => {
+  // Two tabs share localStorage. The copy to compare a save against is the
+  // one this tab loaded, not the one in localStorage: the other tab has
+  // already written its change there.
+  it('changed Rubric Levels: this tab, not told, saves a different setting and leaves it changed', async () => {
+    const levels = byName('Rubric Levels');
+    await openApp();
+    await laptopHolds(levels);
+    // The other tab's save: the server takes it, and the browser's saved copy has it.
+    schoolSets(levels);
+    const saved = JSON.parse(localStorage.getItem('gb-courseconfig-' + CID));
+    expect(saved.levelOrder).toBe('asc');
+    saved.levelOrder = 'desc';
+    localStorage.setItem('gb-courseconfig-' + CID, JSON.stringify(saved));
+    await laptopSavesAnother(levels);
+    expect(server.course.level_order).toBe('desc');
+  });
+});
+
+/* Every way the desktop saves a class setting, each against the Calculation
+   Method changed at school. */
+describe('every save of a class setting on the desktop leaves a method changed at school alone', () => {
+  const SRC = 'e0000000-0000-4000-8000-0000000000b2';
+  const SAVES = SETTINGS.filter(s => s.set && s.col !== 'calc_method').map(s => [s.name, () => s.set(s.was)]);
+  SAVES.push([
+    'Class Name',
+    () =>
+      DashClassManager.handleBlur({
+        dataset: { actionBlur: 'cmUpdateName' },
+        value: 'History 12 (Block C)',
+        style: {},
+      }),
+  ]);
+  SAVES.push([
+    'Copy Grading Setup into the class (Course % and Rubric Levels from another class)',
+    async () => {
+      // Another class on this device, set up differently.
+      COURSES[SRC] = { id: SRC, name: 'History 11', gradeLevel: '11', gradingSystem: 'proficiency' };
+      _cache.courseConfigs[SRC] = { roundPercent: true, levelOrder: 'asc' };
+      const plan = GradingSetupCopy.planSetup(SRC, CID, { roundPercent: true, levelOrder: true });
+      expect(plan.changes.map(c => c.key)).toEqual(['roundPercent', 'levelOrder']);
+      await GradingSetupCopy.applySetup(plan);
+    },
+  ]);
+  SAVES.push([
+    'Save Categories (a new weighting)',
+    async () => {
+      input('cmCatWeightLive', { idx: '0' }, 70);
+      input('cmCatWeightLive', { idx: '1' }, 30);
+      act('cmCatSave');
+      await quiet();
+      expect(server.categories.map(c => c.weight)).toEqual([70, 30]);
+    },
+  ]);
+
+  it.each(SAVES)('%s', async (_, save) => {
+    const method = byName('Calculation Method');
+    await openApp();
+    await laptopHolds(method);
+    schoolSets(method);
+    await save();
+    await quiet();
+    expect(server.course.calc_method).toBe('highest');
+  });
+});
+
+/* ── (b) A load replaces this device's settings with the server's ───────── */
+
+describe('a class load gives this device the server’s settings', () => {
+  const LOADS = [
+    ['the class read again after a change elsewhere (its sync cursor moved)', hearOfChange],
+    ['the app closed and opened again', () => openApp()],
+    [
+      'the older load, for a server with no get_class_bundle',
+      async () => {
+        globalThis.__FV_CLASS_BUNDLE = false;
+        await openApp();
+      },
+    ],
+  ];
+  LOADS.forEach(([how, load]) => {
+    it.each(SETTINGS.map(s => [s.name, s]))(how + ': %s', async (_, s) => {
+      await openApp();
+      await laptopHolds(s);
+      schoolSets(s);
+      await load();
+      expect(s.held()).toEqual(s.now);
+    });
+  });
+});
+
+describe('two computers, one class: the grades each one works out', () => {
+  // Second defect. shared/calc.js reads the method from the device's
+  // settings copy first, and a class load never replaced it there. So until
+  // the laptop's next settings save put the old method back on the server,
+  // the two computers showed different grades for the same marks.
+  const everyStudent = () => STUDENTS.map(sid => getOverallProficiency(CID, sid));
+  const MOST_RECENT = [3.5, 2.5, 3, 3, 1.5];
+  const HIGHEST = [4, 2.75, 3, 3.5, 2];
+
+  it('are the same once the laptop has opened the app again after the method changed at school', async () => {
+    const method = byName('Calculation Method');
+    // Last month, on the laptop.
+    await openApp();
+    method.set('mostRecent');
+    await quiet();
+    expect(everyStudent()).toEqual(MOST_RECENT);
+    const laptop = closeApp();
+
+    // Today, at school: a computer that has never opened the class.
+    useDevice(null);
+    await openApp();
+    expect(everyStudent()).toEqual(MOST_RECENT);
+    method.set('highest');
+    await quiet();
+    expect(server.course.calc_method).toBe('highest');
+    expect(everyStudent()).toEqual(HIGHEST);
+    closeApp();
+
+    // Tonight the laptop opens the app again: the class list and the class
+    // are read from the server.
+    useDevice(laptop);
+    await openApp();
+    expect(server.course.calc_method).toBe('highest');
+    expect(everyStudent()).toEqual(HIGHEST);
+  });
+
+  it('are the same once the laptop has heard of the change, without closing the app', async () => {
+    const method = byName('Calculation Method');
+    await openApp();
+    await laptopHolds(method);
+    expect(everyStudent()).toEqual(MOST_RECENT);
+    schoolSets(method);
+    await hearOfChange();
+    expect(everyStudent()).toEqual(HIGHEST);
+  });
+});
+
+describe('a change this device has made and not yet sent', () => {
+  it('is not overwritten by the class loading: made offline, the app closed, opened again online', async () => {
+    const round = byName('Round to a Whole %');
+    await openApp();
+    await goOffline();
+    round.set(true);
+    await settle();
+    expect(server.course.round_percent).toBe(null);
+    await openApp(); // online again: the class list and the class load while the change still waits
+    await goOnline();
+    expect(server.course.round_percent).toBe(true);
+    expect(getRoundWholePercent(CID)).toBe(true);
+  });
+
+  it('is not overwritten by a change heard of from elsewhere while it waits', async () => {
+    const levels = byName('Rubric Levels');
+    await openApp();
+    await goOffline();
+    levels.set('asc');
+    await settle();
+    schoolSets(byName('Count Only the Most Recent')); // something else changes at school
+    server.reachable = true;
+    setOnline(true);
+    await hearOfChange();
+    expect(server.course.level_order).toBe('asc');
+    expect(levels.held()).toBe('asc');
+    expect(server.course.recent_score_limit).toBe(5);
+    expect(getRecentScoreLimit(CID)).toBe(5);
+  });
+
+  it('a Grading Style change made offline shows on this device after the app is opened again', async () => {
+    const style = byName('Grading Style');
+    await openApp();
+    await goOffline();
+    style.set('letter');
+    await settle();
+    await openApp();
+    await goOnline();
+    expect(server.course.grading_system).toBe('letter');
+    expect(style.held()).toBe('letter');
+  });
+});
+
+/* ── The outbox ─────────────────────────────────────────────────────────── */
+
+describe('a save made offline with an old copy, sent later', () => {
+  it.each(SETTINGS.filter(s => s.harm).map(s => [s.name, s]))(
+    '%s changed at school stays changed when the laptop’s offline save of a different setting goes out',
+    async (_, s) => {
+      await openApp();
+      await laptopHolds(s);
+      await goOffline();
+      schoolSets(s);
+      const other = byName(s.other || 'Round to a Whole %');
+      other.set(other.was);
+      await settle();
+      expect(server.sent.filter(r => r.name === 'update_course').length, 'nothing sent while offline').toBe(
+        server.patches().length,
+      );
+      await goOnline();
+      expect(server.course[other.col]).toEqual(other.was);
+      expect(server.course[s.col]).toEqual(s.now);
+    },
+  );
+
+  it('still stays changed when the app was closed in between and the outbox is sent by the next page', async () => {
+    const method = byName('Calculation Method');
+    await openApp();
+    await laptopHolds(method);
+    await goOffline();
+    schoolSets(method);
+    act('cmSetRoundPercent', { value: 'whole' });
+    await settle();
+    await openApp(); // the next evening, online
+    await goOnline();
+    expect(server.course.round_percent).toBe(true);
+    expect(server.course.calc_method).toBe('highest');
+  });
+});
+
+describe('an update_course written to the outbox by the code before this fix', () => {
+  /* What main's saveCourseConfig queued for "Round to a Whole %": the
+     device's whole copy. The laptop had loaded the class and chosen Most
+     Recent a month earlier. */
+  const WHOLE_COPY = {
+    calc_method: 'mostRecent',
+    round_percent: true,
+    level_order: 'desc',
+  };
+
+  it('is what main queues (so the entry below is a true copy of one)', async () => {
+    await openApp();
+    await laptopHolds(byName('Calculation Method'));
+    server.sent.length = 0;
+    act('cmSetRoundPercent', { value: 'whole' });
+    await quiet();
+    // On main this is the whole copy. After the fix it is the one key, and
+    // this test says so: change the expectation then, and keep WHOLE_COPY.
+    expect(server.patches()).toEqual([WHOLE_COPY]);
+  });
+
+  it('does not put back a method changed at school since', async () => {
+    await openApp();
+    await laptopHolds(byName('Calculation Method'));
+    await goOffline();
+    // The old code's save: the copy saved on this device, the whole of it queued.
+    const cc = Object.assign({}, getCourseConfig(CID), { roundPercent: true });
+    _saveCourseField('courseConfigs', CID, cc);
+    _outbox();
+    window.v2Queue.push('update_course', { p_course_id: CID, p_patch: clone(WHOLE_COPY) });
+    await settle();
+    schoolSets(byName('Calculation Method'));
+    // The app updates; the next page sends what the old one left.
+    await openApp();
+    await goOnline();
+    expect(server.course.calc_method).toBe('highest');
+  });
+
+  it('still saves the one change it was made for when nothing else changed on the server', async () => {
+    await openApp();
+    await laptopHolds(byName('Calculation Method'));
+    await goOffline();
+    const cc = Object.assign({}, getCourseConfig(CID), { roundPercent: true });
+    _saveCourseField('courseConfigs', CID, cc);
+    _outbox();
+    window.v2Queue.push('update_course', { p_course_id: CID, p_patch: clone(WHOLE_COPY) });
+    await settle();
+    await openApp();
+    await goOnline();
+    expect(server.course.round_percent).toBe(true);
+    expect(server.course.calc_method).toBe('mostRecent');
+  });
+});
+
+/* ── Lists: categories and reporting terms ──────────────────────────────── */
+
+describe('lists saved whole', () => {
+  it('Save Categories from a list opened before a category was added at school does not delete it', async () => {
+    await openApp(); // Class Settings holds the two categories it read
+    server.fromAnotherDevice('save_categories', {
+      p_course_id: CID,
+      p_categories: [
+        { id: CAT_ASSIGNMENTS, name: 'Assignments', weight: 50 },
+        { id: CAT_TESTS, name: 'Tests', weight: 30 },
+        { name: 'Projects', weight: 20 },
+      ],
+    });
+    expect(server.categories.map(c => c.name)).toEqual(['Assignments', 'Tests', 'Projects']);
+    // On the laptop: rename one category, nothing else.
+    input('cmCatNameLive', { idx: '1' }, 'Quizzes');
+    act('cmCatSave');
+    await quiet();
+    expect(server.categories.map(c => c.name)).toContain('Projects');
+  });
+
+  it('Save Categories from an old list does not put back weights changed at school', async () => {
+    await openApp();
+    server.fromAnotherDevice('save_categories', {
+      p_course_id: CID,
+      p_categories: [
+        { id: CAT_ASSIGNMENTS, name: 'Assignments', weight: 30 },
+        { id: CAT_TESTS, name: 'Tests', weight: 70 },
+      ],
+    });
+    input('cmCatNameLive', { idx: '1' }, 'Quizzes');
+    act('cmCatSave');
+    await quiet();
+    expect(server.categories.map(c => c.weight)).toEqual([30, 70]);
+  });
+
+  it('Save Terms from dates opened before they changed at school is one setting: the later save wins, whole', async () => {
+    // Not a failure of this fix: two devices changing the SAME setting. The
+    // terms are one value on the course row; the last save is what stays.
+    const terms = byName('Reporting Terms');
+    await openApp();
+    await laptopHolds(terms);
+    schoolSets(terms);
+    input('cmTermLive', { idx: '0', field: 'label' }, 'First Half');
+    act('cmTermSave');
+    await quiet();
+    expect(server.course.reporting_terms.map(t => t.label)).toEqual(['First Half', 'Term 2']);
+    expect(server.course.reporting_terms[0].ends_on).toBe(TERMS_A[0].ends_on);
+  });
+});
+
+/* ── The phone and Demo Mode ────────────────────────────────────────────── */
+
+describe('the phone', () => {
+  const phoneScripts = () =>
+    readdirSync(resolve(root, 'teacher-mobile'))
+      .filter(f => f.endsWith('.js'))
+      .map(f => 'teacher-mobile/' + f);
+
+  it('has no screen that saves a class setting', () => {
+    // If the phone ever gets one, it must save through the same data-layer
+    // functions as the desktop, and this list is where to say so.
+    const savers =
+      /\b(saveCourseConfig|updateCourse|saveReportingTerms|saveCategories|saveReturnSettings|setStudentPageSwitch)\s*\(|['"`](update_course|save_categories|reorder_categories)['"`]|v2\.(saveCategories|reorderCategories|upsertCategory|deleteCategory)\b/;
+    expect(phoneScripts().length).toBeGreaterThan(5);
+    phoneScripts().forEach(file => expect(read(file), file).not.toMatch(savers));
+  });
+
+  it('loads the class with the same code as the desktop, so what a load replaces is the same there', () => {
+    const html = read('teacher-mobile/index.html');
+    expect(html).toMatch(/shared\/data\.js/);
+    expect(html).toMatch(/shared\/offline-queue\.js/);
+    expect(html).toMatch(/shared\/calc\.js/);
+  });
+});
+
+describe('Demo Mode', () => {
+  it('has one device and no server: a settings save stays on the device', async () => {
+    await openApp();
+    localStorage.setItem('gb-demo-mode', '1');
+    server.sent.length = 0;
+    act('cmSetRoundPercent', { value: 'whole' });
+    await settle();
+    expect(getRoundWholePercent(CID)).toBe(true);
+    expect(server.sent).toEqual([]);
+  });
+});
