@@ -118,7 +118,305 @@ window.MGrade = (function () {
     };
   }
 
+  /* ── Draft and Returned (S1-F3) ───────────────────────────────
+     In a class whose student page is on (the build switch) and that returns
+     grades When I Return Them, a grade is a draft until it is returned
+     (shared/grade-state.js). The phone then has three more things:
+     - the grading screen's bar above the tab bar: the Draft mark, "Saved.
+       Not returned yet." and Return and Next, or "Returned Nov 3";
+     - the Grade tab's To Return list: each assessment with drafts, who is
+       waiting, and Return N, which asks first;
+     - the student card's To Return list (teacher-mobile/card-widgets.js).
+     In any other class none of it is drawn and nothing here runs past
+     _holdsGrades: the phone's HTML is what it was
+     (tests/phone-return.test.js).
+
+     Every count is GradeState.draftsIn, which asks GradeState.stateOf, as
+     the desktop's grader, gradebook and Class Settings do: a Missing or
+     Excused piece is never a draft, a DIBELS benchmark has no state, and
+     the To Return list's rows add up to GradeState.draftsWaiting. Every
+     return goes through Grader.returnGrades.
+
+     _returnTogether, _draftsReturned and _draftsSentence are the
+     gradebook's own (teacher/page-gradebook.js), copied here because the
+     gradebook keeps them to itself; they belong in a shared file. */
+  function _holdsGrades(cid) {
+    if (!cid || typeof getReturnSettings !== 'function' || !window.GradeState) return false;
+    var klass = getReturnSettings(cid);
+    return !!klass.student_page && GradeState.holds(klass);
+  }
+
+  function _assessmentById(cid, aid) {
+    return (
+      (getAssessments(cid) || []).find(function (a) {
+        return a.id === aid;
+      }) || null
+    );
+  }
+
+  // Every student in the class: the phone's lists hide nobody.
+  function _rosterIds(cid) {
+    return sortStudents(getStudents(cid), 'lastName').map(function (s) {
+      return s.id;
+    });
+  }
+
+  /* Who a Return returns: each of `sids`, and with a member of a pair or
+     group the members still graded with them, as the desktop's grader and
+     gradebook do (groupGradingUnits). */
+  function _returnTogether(cid, aid, sids) {
+    var units = groupGradingUnits(cid, _assessmentById(cid, aid), _rosterIds(cid));
+    if (!units) return sids;
+    var out = sids.slice();
+    sids.forEach(function (sid) {
+      var unit = units.find(function (u) {
+        return u.linked && u.linked.indexOf(sid) >= 0;
+      });
+      (unit ? unit.linked : []).forEach(function (m) {
+        if (out.indexOf(m) < 0) out.push(m);
+      });
+    });
+    return out;
+  }
+
+  /* The drafts a Return of `sids` returns: their own, and the drafts of the
+     pair or group members still graded with one of them. It is the one
+     answer a button's N, the names beside it, the question and the action
+     all read. Empty when none of `sids` has a draft. */
+  function _draftsReturned(cid, aid, sids) {
+    var own = GradeState.draftsIn(cid, aid, sids);
+    return own.length ? GradeState.draftsIn(cid, aid, _returnTogether(cid, aid, own)) : [];
+  }
+
+  // The first names of `sids`, A to Z.
+  function _draftNames(cid, sids) {
+    var roster = getStudents(cid);
+    return sids
+      .map(function (sid) {
+        var st = roster.find(function (s) {
+          return s.id === sid;
+        });
+        return st ? displayNameFirst(st) : '';
+      })
+      .filter(Boolean)
+      .sort(function (a, b) {
+        return a.localeCompare(b);
+      });
+  }
+
+  /* "3 drafts: Avery, Mia and Sam can’t see them yet." for the students in
+     `sids`, by first name; past three, "Avery, Mia, Sam and 2 others". */
+  function _draftsSentence(cid, sids) {
+    var names = _draftNames(cid, sids);
+    var n = sids.length;
+    var extra = n - 3;
+    var who =
+      names.length !== n
+        ? ''
+        : n === 1
+          ? names[0]
+          : n <= 3
+            ? names.slice(0, -1).join(', ') + ' and ' + names[n - 1]
+            : names.slice(0, 3).join(', ') + ' and ' + extra + (extra === 1 ? ' other' : ' others');
+    var cant = n === 1 ? ' can’t see it yet.' : ' can’t see them yet.';
+    return n + (n === 1 ? ' draft' : ' drafts') + ': ' + (who || (n === 1 ? 'the student' : 'the students')) + cant;
+  }
+
+  /* Return the drafts `sids` hold on `aid`, and their partners': the
+     grader is handed each one's whole pair or group, as the desktop's
+     Return hands it, and returns the drafts among them. The drafts are
+     counted again here, so a question answered late returns what is
+     waiting now. True when any was returned. */
+  function _returnDrafts(cid, aid, sids) {
+    if (!_holdsGrades(cid)) return false;
+    var waiting = GradeState.draftsIn(cid, aid, sids);
+    if (!waiting.length) return false;
+    Grader.returnGrades(cid, aid, _returnTogether(cid, aid, waiting));
+    clearProfCache();
+    return true;
+  }
+
+  /* A Return that returns more than the one grade on screen, or names
+     nobody, asks first (Colin, 2026-11-10), in the desktop's words: "Return
+     3 Grades Now?", who is waiting, Return 3 Graded and Cancel. `then` runs
+     once the drafts are returned. */
+  function _askReturn(cid, aid, waiting, sids, from, then) {
+    var n = waiting.length;
+    MC.confirmSheet(
+      'Return ' + n + (n === 1 ? ' Grade' : ' Grades') + ' Now?',
+      _draftsSentence(cid, waiting),
+      'Return ' + n + ' Graded',
+      function () {
+        if (_returnDrafts(cid, aid, sids)) MC.haptic();
+        then();
+      },
+      from,
+    );
+  }
+
+  /* ── The Grade tab's To Return list ──────────────────────────── */
+
+  // The assessments with a draft, newest first, each with who is waiting.
+  function _toReturnRows(cid) {
+    var ids = _rosterIds(cid);
+    return getAssessments(cid)
+      .slice()
+      .sort(function (a, b) {
+        return (b.date || '').localeCompare(a.date || '');
+      })
+      .map(function (a) {
+        return { a: a, waiting: _draftsReturned(cid, a.id, ids) };
+      })
+      .filter(function (row) {
+        return row.waiting.length > 0;
+      });
+  }
+
+  // html-safe: n is a number
+  function _toReturnSegHtml(n) {
+    return 'To Return' + (n ? '<span class="m-seg-count" aria-hidden="true">' + n + '</span>' : '');
+  }
+
+  function _toReturnSegLabel(n) {
+    return n ? 'To Return, ' + n + (n === 1 ? ' draft' : ' drafts') : '';
+  }
+
+  // html-safe: titles, names, the category and the class name go through MC.esc; ids are ours; counts are numbers
+  function _toReturnHtml(cid, rows) {
+    if (!rows.length) {
+      var course = COURSES[cid];
+      return (
+        '<div class="m-empty m-to-return-empty"><div class="m-empty-title">Nothing to Return</div>' +
+        '<div class="m-empty-subtitle">' +
+        MC.esc('No grades are waiting as drafts in ' + ((course && course.name) || 'this class') + '.') +
+        '</div>' +
+        '<button type="button" class="m-btn-ghost" data-action="m-grade-seg" data-val="all">See All Assessments</button>' +
+        '</div>'
+      );
+    }
+    return (
+      '<div class="m-list m-to-return-list">' +
+      rows
+        .map(function (row) {
+          var a = row.a;
+          var n = row.waiting.length;
+          var meta = [];
+          if (showsCategoryBadge(cid, a)) meta.push(getAssessmentCategoryName(cid, a));
+          meta.push(
+            a.date ? parseLocalDate(a.date).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }) : 'No Date',
+          );
+          return (
+            '<div class="m-to-return-row" data-aid="' +
+            a.id +
+            '">' +
+            // Opens the grading screen on the first draft.
+            '<button type="button" class="m-to-return-open" data-action="m-grade-assess" data-open="draft" data-aid="' +
+            a.id +
+            '">' +
+            '<span class="m-to-return-title">' +
+            MC.esc(a.title) +
+            '</span>' +
+            '<span class="m-to-return-who"><span class="m-draft-mark">' +
+            n +
+            (n === 1 ? ' draft' : ' drafts') +
+            '</span><span class="m-to-return-names">' +
+            MC.esc(_draftNames(cid, row.waiting).join(', ')) +
+            '</span></span>' +
+            '<span class="m-to-return-meta">' +
+            MC.esc(meta.join(' · ')) +
+            '</span>' +
+            '</button>' +
+            '<button type="button" class="m-return-btn" data-action="m-grade-return-all" data-aid="' +
+            a.id +
+            '" aria-label="' +
+            MC.esc('Return ' + n + ' Graded, ' + a.title) +
+            '"><span>Return ' +
+            n +
+            '</span></button>' +
+            '</div>'
+          );
+        })
+        .join('') +
+      '</div>' +
+      '<p class="m-to-return-note">Graded but not returned. Students see these after you return them.</p>'
+    );
+  }
+
+  /* The To Return list and its count, drawn again from the class as it is
+     now: after a return, and when the Grade tab comes back from a grading
+     screen (shell.js). Nothing is drawn in a class that holds no grades. */
+  function refreshToReturn(cid) {
+    if (!_holdsGrades(cid)) return;
+    var panel = document.getElementById('m-grade-to-return');
+    if (!panel) return;
+    var rows = _toReturnRows(cid);
+    var n = rows.reduce(function (sum, row) {
+      return sum + row.waiting.length;
+    }, 0);
+    // html-safe: built by _toReturnHtml
+    panel.innerHTML = _toReturnHtml(cid, rows);
+    var seg = document.querySelector('.m-seg-btn[data-action="m-grade-seg"][data-val="toreturn"]');
+    if (!seg) return;
+    // html-safe: built by _toReturnSegHtml
+    seg.innerHTML = _toReturnSegHtml(n);
+    if (n) seg.setAttribute('aria-label', _toReturnSegLabel(n));
+    else seg.removeAttribute('aria-label');
+  }
+
+  /* Return N on a To Return row. The button shows a count and no names,
+     so it asks first, for one draft too. Afterwards the list is drawn
+     again; the row is gone, so the next row, or the To Return tab, takes
+     the focus. */
+  function askReturnAll(cid, aid, button) {
+    if (!_holdsGrades(cid)) return;
+    var ids = _rosterIds(cid);
+    var waiting = _draftsReturned(cid, aid, ids);
+    if (!waiting.length) return refreshToReturn(cid);
+    _askReturn(cid, aid, waiting, ids, button, function () {
+      var rows = Array.prototype.slice.call(document.querySelectorAll('#m-grade-to-return .m-to-return-row'));
+      var at = rows.findIndex(function (r) {
+        return r.getAttribute('data-aid') === aid;
+      });
+      refreshToReturn(cid);
+      var left = document.querySelectorAll('#m-grade-to-return .m-to-return-open');
+      var next =
+        left[Math.min(Math.max(at, 0), left.length - 1)] ||
+        document.querySelector('.m-seg-btn[data-action="m-grade-seg"][data-val="toreturn"]');
+      if (next) next.focus({ preventScroll: true });
+    });
+  }
+
+  /* ── The student card's To Return list ───────────────────────── */
+
+  /* The assessments on which `sid` has a draft, newest first: the rows of
+     the card's To Return list (teacher-mobile/card-widgets.js). Empty in a
+     class that holds no grades. */
+  function studentDrafts(cid, sid) {
+    if (!_holdsGrades(cid)) return [];
+    return getAssessments(cid)
+      .filter(function (a) {
+        return GradeState.draftsIn(cid, a.id, [sid]).length > 0;
+      })
+      .sort(function (a, b) {
+        return (b.date || '').localeCompare(a.date || '');
+      });
+  }
+
+  /* Return on a row of the card's To Return list. The row names the
+     student and shows the grade, so returning that one grade is one tap.
+     On pair or group work a partner's draft is returned with it, so it
+     asks first and names everyone. `then` runs once the return is done. */
+  function returnFromCard(cid, aid, sid, button, then) {
+    if (!_holdsGrades(cid)) return;
+    var waiting = _draftsReturned(cid, aid, [sid]);
+    if (!waiting.length) return then();
+    if (waiting.length > 1) return _askReturn(cid, aid, waiting, [sid], button, then);
+    if (_returnDrafts(cid, aid, [sid])) MC.haptic();
+    then();
+  }
+
   /* ── Assessment Picker Screen ───────────────────────────────── */
+  var _pickerCid = null;
   function renderPicker(cid) {
     var nav = MC.navBar({
       id: 'grade-picker',
@@ -139,8 +437,13 @@ window.MGrade = (function () {
     // Load persisted filters for this course. Cells that don't match are
     // drawn hidden, so the list never flashes unfiltered.
     _filters = _loadFilters(cid);
+    // To Return (S1-F3) is offered only in a class that holds grades. The
+    // list stays on it when the tab is drawn again for the same class.
+    var holds = _holdsGrades(cid);
+    var onToReturn = holds && _segmentMode === 'toreturn' && _pickerCid === cid;
+    _pickerCid = cid;
     // Saved filters cover the whole list; with none, the list opens on Recent.
-    _segmentMode = _activeFilterCount() > 0 ? 'all' : 'recent';
+    _segmentMode = onToReturn ? 'toreturn' : _activeFilterCount() > 0 ? 'all' : 'recent';
     var ctx = _filterCtx(cid);
 
     // Sort by date, newest first
@@ -152,15 +455,40 @@ window.MGrade = (function () {
     // the multi-dimension bottom sheet. Ungraded moved into the sheet as
     // gradedStatus='has-ungraded' (richer: also supports fully-graded).
     var activeN = _activeFilterCount();
+    var toReturnRows = holds ? _toReturnRows(cid) : [];
+    var toReturnN = toReturnRows.reduce(function (sum, row) {
+      return sum + row.waiting.length;
+    }, 0);
+    // In a class that holds grades each segment also says whether it is
+    // the one chosen (aria-pressed), and To Return sits between the two.
+    var pressed = function (mode) {
+      return holds ? ' aria-pressed="' + (_segmentMode === mode) + '"' : '';
+    };
     var segmented =
       '<div class="m-grade-filter-bar">' +
-      '<div class="m-segmented">' +
+      '<div class="m-segmented' +
+      (holds ? ' m-seg-three' : '') +
+      '">' +
       '<button class="m-seg-btn' +
       (_segmentMode === 'recent' ? ' m-seg-active' : '') +
-      '" data-action="m-grade-seg" data-val="recent">Recent</button>' +
+      '" data-action="m-grade-seg" data-val="recent"' +
+      pressed('recent') +
+      '>Recent</button>' +
+      (holds
+        ? '<button class="m-seg-btn' +
+          (onToReturn ? ' m-seg-active' : '') +
+          '" data-action="m-grade-seg" data-val="toreturn"' +
+          pressed('toreturn') +
+          (toReturnN ? ' aria-label="' + _toReturnSegLabel(toReturnN) + '"' : '') +
+          '>' +
+          _toReturnSegHtml(toReturnN) +
+          '</button>'
+        : '') +
       '<button class="m-seg-btn' +
       (_segmentMode === 'all' ? ' m-seg-active' : '') +
-      '" data-action="m-grade-seg" data-val="all">All</button>' +
+      '" data-action="m-grade-seg" data-val="all"' +
+      pressed('all') +
+      '>All</button>' +
       '</div>' +
       '<button class="m-grade-filter-btn" data-action="m-grade-filter-open" aria-label="Filter assessments">' +
       _FILTER_ICON_SVG +
@@ -236,6 +564,19 @@ window.MGrade = (function () {
       });
       cells += '</div>';
     }
+    // The To Return list has its own box beside the list of assessments;
+    // the segment shows one or the other (_showSegment).
+    if (holds)
+      cells =
+        '<div id="m-grade-main"' +
+        (onToReturn ? ' hidden' : '') +
+        '>' +
+        cells +
+        '</div><div id="m-grade-to-return"' +
+        (onToReturn ? '' : ' hidden') +
+        '>' +
+        _toReturnHtml(cid, toReturnRows) +
+        '</div>';
 
     return (
       '<div class="m-screen" id="m-screen-grade-picker">' +
@@ -245,6 +586,30 @@ window.MGrade = (function () {
       cells +
       '</div></div>'
     );
+  }
+
+  // The list of assessments or the To Return list, whichever the segment says.
+  function _showSegment(cid) {
+    if (!_holdsGrades(cid)) return;
+    var main = document.getElementById('m-grade-main');
+    var panel = document.getElementById('m-grade-to-return');
+    if (!main || !panel) return;
+    var onToReturn = _segmentMode === 'toreturn';
+    if (onToReturn) refreshToReturn(cid);
+    // See All Assessments is in the box it hides: the chosen segment takes
+    // the focus it had.
+    var hiding = onToReturn ? main : panel;
+    var held = !!document.activeElement && hiding.contains(document.activeElement);
+    _setHidden(main, onToReturn);
+    _setHidden(panel, !onToReturn);
+    if (!held) return;
+    var seg = document.querySelector('.m-seg-btn[data-action="m-grade-seg"][data-val="' + _segmentMode + '"]');
+    if (seg) seg.focus({ preventScroll: true });
+  }
+
+  function _setHidden(el, hidden) {
+    if (hidden) el.setAttribute('hidden', '');
+    else el.removeAttribute('hidden');
   }
 
   /* ── Filter evaluation ──────────────────────────────────────── */
@@ -322,6 +687,8 @@ window.MGrade = (function () {
   }
 
   function filterAssessments(cid, mode) {
+    // To Return is a segment only in a class that holds grades (S1-F3).
+    if (mode === 'toreturn' && !_holdsGrades(cid)) mode = null;
     if (mode) _segmentMode = mode;
     // Recent is itself a date range, so it replaces the sheet's.
     if (mode === 'recent' && _filters.dateRange !== 'all') {
@@ -335,7 +702,10 @@ window.MGrade = (function () {
     // Update segmented control active state
     document.querySelectorAll('.m-seg-btn[data-action="m-grade-seg"]').forEach(function (btn) {
       btn.classList.toggle('m-seg-active', btn.getAttribute('data-val') === _segmentMode);
+      if (btn.hasAttribute('aria-pressed'))
+        btn.setAttribute('aria-pressed', btn.getAttribute('data-val') === _segmentMode ? 'true' : 'false');
     });
+    _showSegment(cid);
 
     document.querySelectorAll('#m-grade-list .m-cell').forEach(function (cell) {
       var aid = cell.getAttribute('data-aid');
@@ -568,7 +938,7 @@ window.MGrade = (function () {
           st: byId[u.source],
           label: collabGroupLabel(u.group),
           thumb: (u.group.kind === 'pair' ? 'P' : 'G') + (u.group.index + 1),
-          view: { group: u.group, members: u.members },
+          view: { group: u.group, members: u.members, linked: u.linked },
         };
       return { st: byId[u.sid], label: displayNameWithLast(byId[u.sid]), separateFrom: u.separateFrom || null };
     });
@@ -757,6 +1127,7 @@ window.MGrade = (function () {
 
   function renderSwiper(cid, aid) {
     _swiperCid = cid;
+    _swiperAid = aid;
     var assessments = getAssessments(cid);
     var assessment = assessments.find(function (a) {
       return a.id === aid;
@@ -825,9 +1196,11 @@ window.MGrade = (function () {
     });
     thumbs += '</div>';
 
-    // Swiper cards
+    // Swiper cards. In a class that holds grades the Draft and Return bar
+    // sits under them, above the tab bar (S1-F3).
+    var holds = _holdsGrades(cid);
     var allStatuses = getAssignmentStatuses(cid);
-    var swiper = '<div class="m-swiper" id="m-swiper">';
+    var swiper = '<div class="m-swiper' + (holds ? ' m-has-return' : '') + '" id="m-swiper">';
     students.forEach(function (st, idx) {
       swiper += _renderStudentCard(cid, st, assessment, allScores, allStatuses, units[idx]);
     });
@@ -839,8 +1212,207 @@ window.MGrade = (function () {
       thumbs +
       _viewSwitchHtml(cid, assessment) +
       swiper +
+      (holds ? _returnBarHtml(cid, assessment, units, 0) : '') +
       '</div>'
     );
+  }
+
+  /* ── The grading screen's Draft and Return bar (S1-F3) ──────────
+     Under the cards, above the tab bar, for the card on screen: the Draft
+     mark, "Saved. Not returned yet." and Return and Next while its grade
+     waits; "Returned Nov 3" once it is given; Return and Next greyed out
+     with nothing in. It is the desktop grader's row (_graderReturnHtml,
+     teacher/page-assignments.js) and follows its rules: a change to a
+     returned grade adds what the student still sees; a status alone is not
+     a grade, so a piece with a status and nothing in shows nothing; a
+     DIBELS benchmark is not returned; a group's card returns every member
+     still graded with the group. It is drawn only in a class that holds
+     grades (renderSwiper), and again only when it changes. */
+  var _swiperAid = null;
+  // Set while the next card slides in after Return and Next.
+  var _returnSliding = null;
+  var RETURN_SLIDE_MS = 500;
+
+  // The students a card's Return returns: the group's linked members, or the one student.
+  function _cardReturnIds(unit) {
+    return unit.view ? (unit.view.linked || []).slice() : [unit.st.id];
+  }
+
+  // { state, act }: the line that says where the grade stands, and the button.
+  // html-safe: fixed labels; the name and the date go through MC.esc
+  function _returnBarParts(cid, a, unit, last) {
+    var none = { state: '', act: '' };
+    if (!unit || isDibelsScored(a)) return none;
+    var sid = unit.st.id;
+    var label = last ? 'Return' : 'Return and Next';
+    // A Missing or Excused piece is never a draft (GradeState.stateOf).
+    var waiting = GradeState.draftsIn(cid, a.id, _cardReturnIds(unit)).map(function (id) {
+      return getGradeReturn(cid, id, a.id);
+    });
+    if (!waiting.length) {
+      if (GradeState.stateOf(cid, sid, a.id) !== GradeState.RETURNED) {
+        // Missing, Excused or Late with nothing in: there is nothing to return.
+        if (getAssignmentStatus(cid, sid, a.id)) return none;
+        return {
+          state: '',
+          act:
+            '<button type="button" class="m-grade-return-btn" data-action="m-grade-return-next" disabled>' +
+            label +
+            '</button>',
+        };
+      }
+      var row = getGradeReturn(cid, sid, a.id);
+      var on = row && row.returned_at ? formatShortDate(row.returned_at) : '';
+      return {
+        state: '<span class="m-returned-mark">' + MC.esc(on ? 'Returned ' + on : 'Returned') + '</span>',
+        act: '',
+      };
+    }
+    // The grade the student was given before this change, if there was one.
+    var given = waiting.find(function (r) {
+      return r && r.returned_copy;
+    });
+    var still = '';
+    if (given) {
+      var who = unit.view ? collabGroupLabel(unit.view.group) : displayNameFirst(unit.st) || 'The student';
+      var when = given.returned_at ? ' ' + formatShortDate(given.returned_at) : '';
+      still =
+        '<span class="m-grade-return-still">' +
+        MC.esc(who + ' still sees the grade you returned' + when + '.') +
+        '</span>';
+    }
+    return {
+      state:
+        '<span class="m-draft-mark">Draft</span><span class="m-grade-return-text">Saved. Not returned yet.</span>' +
+        still,
+      act: '<button type="button" class="m-grade-return-btn" data-action="m-grade-return-next">' + label + '</button>',
+    };
+  }
+
+  // The card on screen's parts.
+  function _returnBarNow(cid, a) {
+    var units = _swiperUnits(cid, a);
+    return _returnBarParts(cid, a, units[_currentIdx], _currentIdx >= units.length - 1);
+  }
+
+  // html-safe: built by _returnBarParts
+  function _returnBarHtml(cid, a, units, idx) {
+    var parts = _returnBarParts(cid, a, units[idx], idx >= units.length - 1);
+    return (
+      '<div class="m-grade-return' +
+      (parts.state || parts.act ? '' : ' is-empty') +
+      (parts.act ? '' : ' is-alone') +
+      '" id="m-grade-return" tabindex="-1">' +
+      '<div class="m-grade-return-state" id="m-grade-return-state" role="status">' +
+      parts.state +
+      '</div>' +
+      '<div class="m-grade-return-act" id="m-grade-return-act">' +
+      parts.act +
+      '</div></div>'
+    );
+  }
+
+  /* The bar, for the card on screen now: after a save, and when the card
+     changes. Nothing happens in a class that holds no grades. When the
+     button under the focus goes or changes, the focus stays on the bar.
+     `scrolled` says the cards moved under a finger or a slide: while
+     Return and Next's own slide runs, the bar already shows the card it is
+     going to and stays on it. */
+  function _syncReturnBar(scrolled) {
+    var cid = _swiperCid;
+    if (!_holdsGrades(cid)) return;
+    if (scrolled && _returnSliding) return;
+    var bar = document.getElementById('m-grade-return');
+    var a = _assessmentById(cid, _swiperAid);
+    if (!bar || !a) return;
+    var parts = _returnBarNow(cid, a);
+    var shown = bar._fvShown || {};
+    if (shown.state === parts.state && shown.act === parts.act) return;
+    bar._fvShown = parts;
+    var state = document.getElementById('m-grade-return-state');
+    var act = document.getElementById('m-grade-return-act');
+    // Each part is drawn again only when it changes: the line is read out
+    // when it does, and a button swapped out under a finger loses its tap.
+    if (shown.state !== parts.state) {
+      // html-safe: built by _returnBarParts
+      state.innerHTML = parts.state;
+    }
+    if (shown.act !== parts.act) {
+      var held = !!document.activeElement && act.contains(document.activeElement);
+      // html-safe: built by _returnBarParts
+      act.innerHTML = parts.act;
+      if (held) (act.querySelector('button:not([disabled])') || bar).focus({ preventScroll: true });
+    }
+    bar.classList.toggle('is-empty', !parts.state && !parts.act);
+    // "Returned Nov 3" stands alone, with no button under it.
+    bar.classList.toggle('is-alone', !parts.act);
+  }
+
+  /* A grading screen just drawn (renderSwiper) shows its first card's bar:
+     the bar is told so, and is not drawn a second time. */
+  function _noteReturnBar(cid, aid) {
+    if (!_holdsGrades(cid)) return;
+    var bar = document.getElementById('m-grade-return');
+    var a = _assessmentById(cid, aid);
+    if (bar && a) bar._fvShown = _returnBarNow(cid, a);
+  }
+
+  /* What is typed on the card but not saved yet: a comment saves a moment
+     after the last key, and points when the field is left. A phone's button
+     does not take the focus from a field, so Return saves them first:
+     nothing typed is left behind as a new draft on a grade just returned. */
+  function _saveTyped(cid, sid) {
+    var card = document.querySelector('.m-swiper-card[data-sid="' + sid + '"]');
+    if (!card) return;
+    card.querySelectorAll('.m-pts-input').forEach(function (inp) {
+      commitPointsInput(cid, inp);
+    });
+    card.querySelectorAll('.m-crit-comment').forEach(function (el) {
+      _saveCritComment(cid, el);
+    });
+    card.querySelectorAll('.m-overall-comment').forEach(function (el) {
+      _saveOverallComment(cid, el);
+    });
+  }
+
+  /* Return and Next: the grade on screen is returned (a group's, to every
+     member still graded with it) and the next card comes up. One tap: the
+     card names who it is and shows the grade. On the last card it returns
+     and stays. */
+  function returnAndNext() {
+    var cid = _swiperCid;
+    if (!_holdsGrades(cid)) return;
+    // A second tap while the next card slides in returns nothing: a grade
+    // is returned only once its card is on screen.
+    if (_returnSliding) return;
+    var a = _assessmentById(cid, _swiperAid);
+    if (!a) return;
+    var units = _swiperUnits(cid, a);
+    var unit = units[_currentIdx];
+    if (!unit) return;
+    _saveTyped(cid, unit.st.id);
+    var ids = _cardReturnIds(unit);
+    if (!GradeState.draftsIn(cid, a.id, ids).length) return _syncReturnBar();
+    Grader.returnGrades(cid, a.id, ids);
+    clearProfCache();
+    MC.haptic();
+    if (_currentIdx >= units.length - 1) return _syncReturnBar();
+    jumpToStudent(_currentIdx + 1);
+    _returnSliding = setTimeout(function () {
+      _returnSliding = null;
+      _syncReturnBar();
+    }, RETURN_SLIDE_MS);
+  }
+
+  /* The card to open a To Return row on: the first with a draft. */
+  function jumpToFirstDraft(cid, aid) {
+    if (!_holdsGrades(cid)) return;
+    var a = _assessmentById(cid, aid);
+    if (!a) return;
+    var idx = _swiperUnits(cid, a).findIndex(function (unit) {
+      return GradeState.draftsIn(cid, aid, _cardReturnIds(unit)).length > 0;
+    });
+    if (idx > 0) jumpToStudent(idx, true);
   }
 
   // html-safe: names, labels and criterion text go through MC.esc; colours through cssColor or avatarColor's constants; ids, levels and points are ours or numbers; _criterionGroupHtml, _completionBtnsHtml, _modBtnsHtml and pointsPctHtml are checked.
@@ -1436,6 +2008,7 @@ window.MGrade = (function () {
     var text = el.value.trim();
     if (text === getRubricCriterionComment(cid, el.dataset.sid, el.dataset.aid, found.crit)) return;
     Grader.setCriterionComment(cid, el.dataset.sid, el.dataset.aid, el.dataset.critid, text);
+    _syncReturnBar();
   }
 
   /* Redraw one student's card in place after a criterion change. */
@@ -1502,6 +2075,7 @@ window.MGrade = (function () {
     MC.haptic();
     _refreshCard(cid, sid, assessment.id);
     _updateThumbGraded(cid, assessment.id);
+    _syncReturnBar();
   }
 
   // Tapping the active + or − again clears it.
@@ -1512,6 +2086,7 @@ window.MGrade = (function () {
     _writeKeys(cid, sid, assessment, rubricRowScoreKeys(cid, assessment, tid), state.level, next, true);
     MC.haptic();
     _refreshCard(cid, sid, assessment.id);
+    _syncReturnBar();
   }
 
   /* A level tapped on a criterion; tapping the active one clears it. */
@@ -1524,6 +2099,7 @@ window.MGrade = (function () {
     MC.haptic();
     _refreshCard(cid, sid, aid);
     _updateThumbGraded(cid, aid);
+    _syncReturnBar();
   }
 
   // Tapping the active + or − again clears it.
@@ -1537,6 +2113,7 @@ window.MGrade = (function () {
     _writeCriterion(cid, sid, found, state.level, next, true);
     MC.haptic();
     _refreshCard(cid, sid, aid);
+    _syncReturnBar();
   }
 
   function setGradeView(cid, aid, view) {
@@ -1587,6 +2164,7 @@ window.MGrade = (function () {
     MC.haptic();
     _refreshCard(cid, sid, aid);
     _updateThumbGraded(cid, aid);
+    _syncReturnBar();
   }
 
   /* ── + / − on a level ──────────────────────────────────────── */
@@ -1646,6 +2224,7 @@ window.MGrade = (function () {
     clearProfCache();
     MC.haptic();
     _syncModBtns(cid, sid, aid, tid);
+    _syncReturnBar();
   }
 
   /* ── Score a student (auto-save) ────────────────────────────── */
@@ -1690,6 +2269,7 @@ window.MGrade = (function () {
 
     // Update thumbnail graded state
     _updateThumbGraded(cid, aid);
+    _syncReturnBar();
 
     // Saves are silent, clearing included: the buttons show the result and
     // a toast over the card got in the way (Colin, 2026-11-05).
@@ -1741,6 +2321,7 @@ window.MGrade = (function () {
       return x.id === aid;
     });
     if (groupGradingUnits(cid, a, [])) _redrawSwiper(cid, aid);
+    _syncReturnBar();
   }
 
   /* The entries an undo puts back. Missing or Excused work takes no score
@@ -1825,6 +2406,7 @@ window.MGrade = (function () {
     });
     if (hasBank && window.CompetencyWording) CompetencyWording.loadBank();
     _fitCritComments(swiper);
+    _noteReturnBar(cid, aid);
 
     // Points field: tapping selects the number so typing replaces it; Done
     // or tapping away saves. The tap's mouseup would put the caret back, so
@@ -1929,6 +2511,7 @@ window.MGrade = (function () {
             _currentIdx = idx;
             _updateCurrentThumb(idx);
             _updateSubtitle(idx, total);
+            _syncReturnBar(true);
           }
         });
       },
@@ -2035,6 +2618,7 @@ window.MGrade = (function () {
     var text = el.value.trim();
     if (text === getScoreComment(cid, el.dataset.sid, el.dataset.aid)) return;
     Grader.setOverallComment(cid, el.dataset.sid, el.dataset.aid, text);
+    _syncReturnBar();
   }
 
   // `instant` lands on the student with no scroll animation.
@@ -2045,6 +2629,7 @@ window.MGrade = (function () {
     _currentIdx = idx;
     _updateCurrentThumb(idx);
     _updateSubtitle(idx, document.querySelectorAll('#m-thumb-strip .m-thumb').length);
+    _syncReturnBar();
   }
 
   function _updateCurrentThumb(idx) {
@@ -2123,6 +2708,7 @@ window.MGrade = (function () {
     var group = document.querySelector('.m-cmp-group[data-sid="' + sid + '"][data-aid="' + aid + '"]');
     if (group) group.innerHTML = _completionBtnsHtml(next);
     _updateThumbGraded(cid, aid);
+    _syncReturnBar();
   }
 
   // + and − step within the same limit as typing: 0 up to the bonus cap.
@@ -2137,6 +2723,7 @@ window.MGrade = (function () {
     if (el) el.value = formatPoints(next);
     _updatePointsPct(sid, aid, next, maxPts);
     _updateThumbGraded(cid, aid);
+    _syncReturnBar();
   }
 
   /* The % beside the points field, as the desktop shows it: "bonus" under
@@ -2164,6 +2751,7 @@ window.MGrade = (function () {
     Grader.setPoints(cid, sid, aid, raw);
     clearProfCache();
     _updateThumbGraded(cid, aid);
+    _syncReturnBar();
   }
 
   /* ── Press and hold a level (Nov 2 mockup, batch 2) ──────────────
@@ -2294,6 +2882,15 @@ window.MGrade = (function () {
     gradeSeparately: gradeSeparately,
     confirmBackToGroup: confirmBackToGroup,
     backToGroup: backToGroup,
+    // Draft and Returned (S1-F3)
+    holdsGrades: _holdsGrades,
+    draftsSentence: _draftsSentence,
+    refreshToReturn: refreshToReturn,
+    askReturnAll: askReturnAll,
+    returnAndNext: returnAndNext,
+    jumpToFirstDraft: jumpToFirstDraft,
+    studentDrafts: studentDrafts,
+    returnFromCard: returnFromCard,
     getCurrentIndex: function () {
       return _currentIdx;
     },
