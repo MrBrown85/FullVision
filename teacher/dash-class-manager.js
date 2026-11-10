@@ -6714,10 +6714,10 @@ window.DashClassManager = (function () {
     );
   }
 
-  /* A row dragged to a new place. It moves on screen at once; the new order
-     is sent once the server's list is known to be the one this form was
-     opened with (_cmCatStillCurrent). If it cannot be read, the row goes
-     back where it was. */
+  /* A row dragged to a new place. It moves on screen at once. With nothing
+     else unsaved, the new order is checked and sent in one online moment
+     (reorderCategoriesNow in shared/data.js): the list changed elsewhere,
+     the current one shows; no connection, the row goes back where it was. */
   function _cmCatReorder(cid, fromIdx, toIdx) {
     var st = _cmCatState(cid);
     var before = st.rows.slice();
