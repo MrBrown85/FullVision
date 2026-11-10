@@ -1695,6 +1695,21 @@ function _keepOrDefaultField(cid, field, fallback) {
   if (_cache[field][cid] !== undefined) return;
   var key = _DATA_KEYS[field];
   _cache[field][cid] = key ? _safeParseLS('gb-' + key + '-' + cid, fallback) : fallback;
+  if (field === 'courseConfigs') _noteSettingsRead(cid);
+}
+
+/* The class's settings as this page read them from this device's storage:
+   { of: the cached object, copy: a clone of it then }. saveCourseConfig
+   sends what differs from the copy the page started from, and until the
+   class has loaded from the server (no connection, or sync paused) that is
+   this one. Not the storage as it is at the time of the save: another tab
+   writes its own changes there, and this page's older values would look
+   like changes. Good only while the cache still holds that same object. */
+var _settingsRead = {}; // cid → { of, copy }
+function _noteSettingsRead(cid) {
+  var value = _cache.courseConfigs[cid];
+  if (_plainObject(value)) _settingsRead[cid] = { of: value, copy: _cloneValue(value) };
+  else delete _settingsRead[cid];
 }
 
 function _persistLoadedField(cid, field, value) {
@@ -5063,6 +5078,7 @@ function _loadCourseFromLS(cid) {
   _cache.termRatings[cid] = _safeParseLS('gb-term-ratings-' + cid, {});
   _cache.customTags[cid] = _safeParseLS('gb-custom-tags-' + cid, []);
   _cache.courseConfigs[cid] = _safeParseLS('gb-courseconfig-' + cid, {});
+  _noteSettingsRead(cid);
   _cache.reportConfig[cid] = _safeParseLS('gb-report-config-' + cid, null);
   _cache.studentProfileSummaries[cid] = _safeParseLS('gb-student-profile-summaries-' + cid, {});
   _cache.withdrawn[cid] = _safeParseLS('gb-withdrawn-' + cid, []);
@@ -9208,10 +9224,10 @@ var _SETTING_WHEN_ABSENT = {
 // The same value, whatever order an object's keys are in (jsonb reorders
 // them), and whether a number came as a number or as text.
 function _sameSetting(a, b) {
-  if (typeof a !== typeof b && a != null && b != null && isFinite(Number(a)) && isFinite(Number(b))) {
-    if (typeof a !== 'object' && typeof b !== 'object' && typeof a !== 'boolean' && typeof b !== 'boolean') {
-      return Number(a) === Number(b);
-    }
+  var numberAndText =
+    (typeof a === 'number' && typeof b === 'string') || (typeof a === 'string' && typeof b === 'number');
+  if (numberAndText && a !== '' && b !== '' && isFinite(Number(a)) && isFinite(Number(b))) {
+    return Number(a) === Number(b);
   }
   return _settingText(a) === _settingText(b);
 }
@@ -9238,8 +9254,10 @@ function _settingText(v) {
    device's is a working cache that gives way to it on every load
    (_applyBundleCourseConfig). So a save sends ONLY what this save changed:
    the settings that differ from the copy this page loaded or last saved
-   (the server-state baseline, a clone, since callers change the cached
-   object in place; before a first load, the copy saved in localStorage).
+   (a clone, since callers change the cached object in place): the copy
+   read from this device's storage while the class has not loaded from the
+   server (_settingsRead), else the server-state baseline; for a class this
+   page has not touched at all, the copy saved in localStorage.
    It used to send the device's whole copy, and a device that had loaded the
    class before a change made elsewhere put the old values back. A save that
    changes nothing sends nothing. */
@@ -9250,9 +9268,13 @@ function saveCourseConfig(cid, obj) {
   // them, whatever copy of the settings the caller has.
   if (_writesEnabled()) obj = _keepReturnSettings(cid, obj);
   var held = _returnSettingsBefore(cid); // did the class hold grades before this save (Demo Mode)
-  var before = _hasServerState('courseConfigs', cid)
-    ? _serverState.courseConfigs[cid]
-    : _safeParseLS('gb-courseconfig-' + cid, null);
+  var read = _settingsRead[cid];
+  var before =
+    read && read.of === _cache.courseConfigs[cid]
+      ? read.copy
+      : _hasServerState('courseConfigs', cid)
+        ? _serverState.courseConfigs[cid]
+        : _safeParseLS('gb-courseconfig-' + cid, null);
   _saveCourseField('courseConfigs', cid, obj);
   if (_writesEnabled() && _isUuid(cid)) {
     // v2: policy fields live on the course row. save_course_policy is gone;
@@ -9272,6 +9294,7 @@ function saveCourseConfig(cid, obj) {
       });
       // From here this page takes the server to have what it was just sent.
       _rememberServerState('courseConfigs', cid, obj);
+      delete _settingsRead[cid];
       const sent = Object.keys(patch);
       if (sent.length > 0) {
         patch[FV_SETTINGS_CHANGED_ONLY] = true;

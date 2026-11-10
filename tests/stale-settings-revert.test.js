@@ -553,6 +553,46 @@ describe('a second tab in the same browser', () => {
   });
 });
 
+describe('a second tab, with no connection in either', () => {
+  // The class cannot load from the server, so this tab works from the copy
+  // it read from the browser's storage when it opened. The other tab then
+  // writes its own change into that storage. What this tab saves must be
+  // compared with what it read, not with the storage as it is now.
+  it('changed Rubric Levels: this tab saves a different setting and queues that one key', async () => {
+    const levels = byName('Rubric Levels');
+    await openApp();
+    await laptopHolds(levels); // Emerging First
+    closeApp();
+
+    // This tab opens with no connection: sync is paused, the class comes
+    // from storage. (No retries of the first request: they only take time.)
+    const delays = _BOOTSTRAP_RETRY_DELAYS_MS.splice(0);
+    try {
+      await openApp({ connected: false });
+    } finally {
+      _BOOTSTRAP_RETRY_DELAYS_MS.push(...delays);
+    }
+    expect(levels.held()).toBe('asc');
+    expect(_hasServerState('courseConfigs', CID)).toBe(false);
+
+    // The other tab: Extending First. Its copy goes into the shared storage
+    // and its write into the shared outbox.
+    const saved = JSON.parse(localStorage.getItem('gb-courseconfig-' + CID));
+    saved.levelOrder = 'desc';
+    localStorage.setItem('gb-courseconfig-' + CID, JSON.stringify(saved));
+    window.v2Queue.push('update_course', { p_course_id: CID, p_patch: { level_order: 'desc', _changed_only: true } });
+
+    act('cmSetRoundPercent', { value: 'whole' });
+    await settle();
+    expect(window.v2Queue.queued('update_course').map(e => e.payload.p_patch)).toEqual([
+      { level_order: 'desc', _changed_only: true },
+      { round_percent: true, _changed_only: true },
+    ]);
+    if (_recoveryProbeTimer) clearTimeout(_recoveryProbeTimer);
+    _recoveryProbeTimer = null;
+  });
+});
+
 /* Every way the desktop saves a class setting, each against the Calculation
    Method changed at school. */
 describe('every save of a class setting on the desktop leaves a method changed at school alone', () => {
