@@ -132,3 +132,59 @@ column, a `report_reply` template insert failed the check, and an unknown
 token to `submit` still returned `expired`. A read afterwards showed nothing
 had changed. `phone_reports.py` and `questionnaires.py` test the Oct 25
 migrations as they were and still expect the reply.
+
+## Score RPCs (2026-11-09)
+
+`score_rpcs.py` pins what the twelve score RPCs do today, before Draft and
+Returned puts triggers under them (student page build plan, `S0-P1`):
+`upsert_score`, `upsert_tag_score`, `upsert_rubric_score`, `fill_rubric`,
+`set_rubric_check`, `save_score_comment`, `save_score_report_note`,
+`set_score_status`, `clear_score`, `clear_row_scores`, `clear_column_scores`
+and `move_rubric_scores`. For each: the rows that result as Teacher A (value,
+`modifier`, `status`, comments, the overwrite on a second call, clearing, the
+audit rows), then that Teacher B, no JWT and `anon` change nothing.
+
+Two files build the score paths on top of `harness.sql`:
+
+- `score-prelude.sql`: the functions, each copied from the migration that
+  last defined it (named above each one). `set_score_status`,
+  `save_score_comment`, `clear_row_scores` and `clear_column_scores` have no
+  migration; theirs are the April bodies in
+  `docs/backend-design/write-paths.sql`, so compare them with the live ones
+  before relying on a detail.
+- `score-tables.sql`: nineteen tables with their constraints, indexes,
+  triggers and policies, written by `make-score-tables.py` from
+  `docs/schema.generated.sql`. Run the script again when the snapshot
+  changes one of them; the first checks in `score_rpcs.py` fail until then.
+  They run `scripts/schema-snapshot.sql` here and compare each table, and
+  every loaded function's signature, with the live snapshot.
+
+```bash
+PGPORT=54329 PGDATABASE=fv_score python3 run.py harness.sql score-prelude.sql score-tables.sql
+PGPORT=54329 PGDATABASE=fv_score python3 score_rpcs.py
+```
+
+Result on 2026-11-09 (Postgres 18.6, local; production is 17): 159 of 159.
+
+Checks named "today:" pin a gap as it is. Batch A closes two and flips their
+checks to "refused": `upsert_rubric_score` takes a criterion that is not on
+the assessment's rubric, and `set_score_status` takes Missing on scored
+work. The others it found, left as they are:
+
+- Row security on the score tables checks the enrollment only. A teacher
+  can save a score for their own student against another teacher's
+  assessment, competency or criterion by id. Nothing reads such a row back
+  to the other teacher.
+- `upsert_tag_score` takes a competency the assessment is not linked to.
+- `upsert_score` takes points over the assessment's maximum, and a score on
+  Excused or Missing work.
+- `clear_score`, `clear_row_scores` and `clear_column_scores` leave ticked
+  Advanced Rubric checkboxes (`rubric_check_score`) behind.
+- `clear_row_scores` and `clear_column_scores` delete the whole score row,
+  so the Overall Comment, the Note for the Report and the status go too;
+  `clear_score` has kept them since Nov 3.
+- `save_score_comment` stores an empty comment as `''`, not null, and
+  `set_score_status(null)` leaves an empty score row.
+
+`import_json_restore`, `duplicate_course` and `duplicate_assessment` are not
+loaded: they need most of the schema. Batch A's tests load them.
