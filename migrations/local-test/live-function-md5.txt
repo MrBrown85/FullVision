@@ -20,6 +20,32 @@
 # from:
 #   get_class_bundle 119165287207814181c5875d81451147 22538
 #   get_gradebook    2876cd40c373b8a59bff4464008c8601 6816
+# All sixteen functions S0-M5 (2026111002_security_definer_search_path.sql)
+# changed, as they are on gradebook-prod AFTER it: its post-check, run
+# read-only right after the apply on 2026-11-10, found no difference. It
+# changed the SET search_path line of each, and so the fingerprint, and no
+# body. A migration written after S0-M5 guards on these. The fourth word
+# keeps the scripts that compare every function they load from reading
+# these lines: the harness's own copies of twelve of the sixteen are still
+# the definitions from before S0-M5. The other four (fv_owns_assessment,
+# fv_owns_course, fv_owns_enrollment, get_class_bundle) are also on plain
+# lines further down, with a note there on what they were before.
+_fv_release_orphan_teacher_email d1786f4b0205b700167758f4bb61e32e 762 after-s0-m5
+_fv_teacher_sign_in_deleted f81c14dec41dcf6d95377905e08ed58d 304 after-s0-m5
+_score_audit_diff 2f5d1bb44e726f189f029c3e955a84ea 805 after-s0-m5
+_term_rating_audit_field 23b66de03546627aa5583ca093946147 537 after-s0-m5
+_touch_course_sync_cursor b0b9eb6dbbe09e9edc5640cde262248d 1265 after-s0-m5
+_touch_course_sync_cursor_from_trigger 225aac90e5534c2826298d084e77991c 2572 after-s0-m5
+_touch_teacher_sync_cursor_from_trigger 01bc5ab445b01366dc915cd8ee57c1ec 537 after-s0-m5
+fv_idem_check 1c7b546434bee4b774557e0e6b16024f 727 after-s0-m5
+fv_idem_store 6d0b48c458d273a332db39e1a4b68626 499 after-s0-m5
+fv_owns_assessment 9f4c680c35f9f3ac32e8290824707673 389 after-s0-m5
+fv_owns_course e3afeca06043a6e907e6f4ae777c85da 345 after-s0-m5
+fv_owns_enrollment 728526648388367393162be706f7f9ea 389 after-s0-m5
+fv_owns_term_rating 000876617e013acb95c56932b42d1f02 459 after-s0-m5
+fv_retention_cleanup a8da46d6664ba5956f4215ba3b2ada39 2099 after-s0-m5
+get_class_bundle 116294a41f043458e3ddec694520cf0d 22612 after-s0-m5
+rls_auto_enable 37475132a56d7604318a225ce900ae7f 1234 after-s0-m5
 # function md5 length
 # 2026111002_security_definer_search_path.sql (S0-M5) was APPLIED to
 # gradebook-prod on 2026-11-10 at 15:37 UTC, after Batch A (15:28 to 15:33
