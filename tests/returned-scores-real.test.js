@@ -199,6 +199,28 @@ describe.each(CLASSES)('%s', (name, load) => {
       );
     });
 
+    it('is a plain object with a list for every student, with no draft and with some', () => {
+      const cid = ctx.cid;
+      const plainSet = set =>
+        Object.getPrototypeOf(set) === Object.prototype && Object.keys(set).every(sid => Array.isArray(set[sid]));
+      expect(plainSet(getReturnedScores(cid))).toBe(true);
+      expect(Object.keys(getReturnedScores(cid)).sort()).toEqual(Object.keys(getScores(cid)).sort());
+      hold();
+      const one = find(cid, isLevels);
+      lower(cid, one.sid, one.a);
+      // Another student: every grade they have is cleared and graded again, so none is returned.
+      const other = getStudents(cid).find(s => s.id !== one.sid && (getScores(cid)[s.id] || []).length);
+      const rows = structuredClone(getGradeReturns(cid));
+      getScores(cid)[other.id].forEach(
+        e => ((rows[e.assessmentId] = rows[e.assessmentId] || {})[other.id] = { is_draft: true }),
+      );
+      setRows(cid, rows);
+      const set = getReturnedScores(cid);
+      expect(plainSet(set)).toBe(true);
+      expect(set[other.id]).toEqual([]);
+      expect(Object.keys(set).sort()).toEqual(Object.keys(getScores(cid)).sort());
+    });
+
     it('never gives nothing back, whatever the class', () => {
       expect(getReturnedScores(ctx.cid)).toBe(getScores(ctx.cid));
       expect(getReturnedScores('no-such-class')).toEqual({});

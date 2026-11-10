@@ -407,6 +407,9 @@ window.GradeState = (function () {
      returned grade, cleared) sits by its assessment's place in the class's
      list, `order`: before the first entry of a later assessment.
 
+     The set is a plain object with a list for every student in the working
+     copy or the rows: an empty list when nothing of theirs is returned.
+
      `rows` is { assessmentId: { studentId: row } }. `entriesOf(sid, aid,
      copy, own)` turns a copy into score entries; `own` is the student's
      working entries for that assessment. `statuses` is
@@ -431,7 +434,7 @@ window.GradeState = (function () {
     });
     var out = {};
     sids.forEach(function (sid) {
-      var own = working[sid] || [];
+      var own = Array.isArray(working[sid]) ? working[sid] : [];
       var list = [];
       var placed = {};
       // The returned copy of a draft, as entries: none when it was never

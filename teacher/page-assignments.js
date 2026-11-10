@@ -12657,9 +12657,10 @@ window.PageAssignments = (function () {
       box = document.createElement('div');
       box.className = 'grader-return';
       dialog.querySelector('.grader-report-note').insertAdjacentElement('afterend', box);
+      _grader.returnHtml = null;
     }
-    if (box.dataset.html === html) return;
-    box.dataset.html = html;
+    if (_grader.returnHtml === html) return;
+    _grader.returnHtml = html;
     // html-safe: built by _graderReturnHtml
     box.innerHTML = html;
   }

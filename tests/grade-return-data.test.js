@@ -908,3 +908,53 @@ describe('with real grade math', () => {
     expect(all('s1')).toBe(2);
   });
 });
+
+/* calc.js takes from getReturnedScores only a plain object of
+   { studentId: [entries] }, checked on every read (S0-F1b). */
+describe('the returned set is always a plain object with a list for every student in it', () => {
+  const plainSet = set =>
+    Object.getPrototypeOf(set) === Object.prototype && Object.keys(set).every(sid => Array.isArray(set[sid]));
+
+  it('with no draft, with drafts, and for a student whose every grade is a draft never returned', () => {
+    held();
+    expect(plainSet(getReturnedScores(CID))).toBe(true);
+    level('s1', 'essay', 't1', 3);
+    level('s1', 'lab', 'c1', 2);
+    level('s2', 'essay', 't1', 3);
+    give('essay', 's2');
+    level('s2', 'essay', 't1', 4);
+    const set = getReturnedScores(CID);
+    expect(plainSet(set)).toBe(true);
+    expect(set.s1).toEqual([]);
+    expect(set.s2.map(e => e.score)).toEqual([3]);
+    // A student with a row and no working entries at all still has a list.
+    setPointsScore(CID, 's3', 'quiz', 7);
+    give('quiz', 's3');
+    setPointsScore(CID, 's3', 'quiz', null);
+    delete getScores(CID).s3;
+    delete _returnedSets[CID];
+    expect(plainSet(getReturnedScores(CID))).toBe(true);
+    expect(getReturnedScores(CID).s3.map(e => e.score)).toEqual([7, 7]);
+  });
+
+  it.each([
+    ['a student with no list', () => ({ s1: null, s2: 'x', s3: [] })],
+    ['a list where the class should be', () => []],
+  ])('a damaged working copy (%s) is given as one, in a class with drafts and in one without', (_, damaged) => {
+    [{}, { student_page_enabled: true, return_grades: 'on_return' }].forEach(config => {
+      seed(config);
+      level('s4', 'essay', 't1', 3);
+      const rows = getGradeReturns(CID);
+      _cache.scores[CID] = damaged();
+      _rubricKeyedScores.set(_cache.scores[CID], _rubricsRev[CID] || 0);
+      delete _returnedSets[CID];
+      const set = getReturnedScores(CID);
+      expect(plainSet(set)).toBe(true);
+      if (!Array.isArray(_cache.scores[CID]))
+        expect(Object.keys(set)).toEqual(expect.arrayContaining(['s1', 's2', 's3']));
+      // Nothing of a draft comes back with it.
+      expect(JSON.stringify(set)).not.toContain('"score":3');
+      expect(getGradeReturns(CID)).toEqual(rows);
+    });
+  });
+});

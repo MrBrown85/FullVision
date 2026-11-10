@@ -10411,6 +10411,9 @@ function _pointsScoreKeys(a, own, working, loadedKey) {
    class that holds grades with no draft waiting. A class that holds grades
    whose rows are not loaded throws: "not loaded" must never read as "every
    grade returned" (calc.js then works out no grade).
+   Always a plain object with a list for every student in it, an empty one
+   when nothing of theirs is returned: calc.js takes nothing else, and
+   fails closed for the whole class on anything else.
    Built once for each working copy; any save of the class's data has it
    built again. Checklist ticks are not in it (getScores holds none); the
    returned ticks are kept in each row's returned_copy for a reader to
@@ -10446,6 +10449,21 @@ function getReturnedScores(cid) {
         }),
       );
     }
+  }
+  // A working copy that is not a plain object of lists (a damaged saved
+  // copy) is given as one: a student with no list has no grades.
+  var plain = _plainObject(set) && Object.getPrototypeOf(set) === Object.prototype;
+  if (
+    !plain ||
+    Object.keys(set).some(function (sid) {
+      return !Array.isArray(set[sid]);
+    })
+  ) {
+    var lists = {};
+    Object.keys(_plainObject(set) ? set : {}).forEach(function (sid) {
+      lists[sid] = Array.isArray(set[sid]) ? set[sid] : [];
+    });
+    set = lists;
   }
   _returnedSets[cid] = { working: working, set: set };
   return set;
