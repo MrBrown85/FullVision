@@ -627,6 +627,53 @@ window.MCardWidgets = (function () {
     return '';
   };
 
+  /* ── To Return (S1-F3) ───────────────────────────────────────────
+     In a class that holds grades until they are returned, the card lists
+     the student's drafts under the name, above the widgets: the work, the
+     Draft mark, the grade and "Cece can’t see it yet", and Return. It is
+     not a widget: it shows whenever there is a draft, whatever Customize
+     Card has on. MGrade.studentDrafts is empty in any other class, so the
+     card is then what it was. The grade is the piece's cell
+     (assessmentCellValue), as the student screen's list shows it. */
+  function _draftGradeText(cid, sid, a) {
+    var cell = assessmentCellValue(cid, sid, a);
+    if (cell.kind === 'complete') return cell.mark === 'complete' ? 'Complete' : 'Incomplete';
+    if (cell.kind === 'points' || cell.kind === 'level') return window.MStudentDetail.cellText(cell, a);
+    return '';
+  }
+
+  // html-safe: the title, the grade and the name go through MC.esc; ids are ours
+  function _toReturnHtml(st, cid) {
+    var drafts = window.MGrade && MGrade.studentDrafts ? MGrade.studentDrafts(cid, st.id) : [];
+    if (!drafts.length) return '';
+    var cant = displayNameFirst(st) + ' can\u2019t see it yet';
+    return (
+      '<div class="m-scard-return"><div class="m-scard-return-head">To Return</div>' +
+      drafts
+        .map(function (a) {
+          var grade = _draftGradeText(cid, st.id, a);
+          return (
+            '<div class="m-scard-return-row"><div class="m-scard-return-body">' +
+            '<div class="m-scard-return-title">' +
+            MC.esc(a.title) +
+            '</div>' +
+            '<div class="m-scard-return-sub"><span class="m-draft-mark">Draft</span><span class="m-scard-return-text">' +
+            MC.esc((grade ? grade + ' \u00b7 ' : '') + cant) +
+            '</span></div></div>' +
+            '<button type="button" class="m-return-btn" data-action="m-card-return" data-sid="' +
+            st.id +
+            '" data-aid="' +
+            a.id +
+            '" aria-label="' +
+            MC.esc('Return, ' + a.title) +
+            '"><span>Return</span></button></div>'
+          );
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+
   /* ── assembleCard ────────────────────────────────────────────── */
   // html-safe: every widget renderer escapes its text with MC.esc and passes colours through cssColor or constants.
   function assembleCard(st, cid, data) {
@@ -677,6 +724,7 @@ window.MCardWidgets = (function () {
       '<div class="m-scard">' +
       heroHtml +
       '<div class="m-scard-widgets">' +
+      _toReturnHtml(st, cid) +
       middleHtml +
       '</div>' +
       actionsHtml +
