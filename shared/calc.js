@@ -530,8 +530,11 @@ function _evidenceCompare(cid) {
    other entry stays where it is stored. So anything that reads entries
    and then orders them by date (as the calculations here do, and the
    screens that list evidence) gets same-date work in counting order,
-   whatever order it was graded or stored in, and a class with no two
-   pieces on one date reads exactly as it did. */
+   whatever order it was graded or stored in. A class with no two pieces
+   on one date keeps every level and every order across pieces; the one
+   thing that can change places there is the entries of a single piece (its
+   levels share its date), when they are stored apart and not in the order
+   the piece lists them. */
 function _orderedEntries(cid, studentId) {
   var key = _ck(cid) + ':' + studentId;
   if (_orderedEntriesCache[key]) return _orderedEntriesCache[key];
