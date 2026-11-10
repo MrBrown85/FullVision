@@ -91,10 +91,12 @@ describe('No score writer works out the type on its own', () => {
     expect(fn).not.toContain('upsertScore(');
   });
 
+  // Through Grader.setPoints since S1-T3; tests/grader.test.js holds that
+  // setPoints calls setPointsScore with the same arguments.
   it('desktop points entry saves the score once, through setPointsScore', () => {
     const src = readFileSync(new URL('../teacher/page-assignments.js', import.meta.url), 'utf-8');
     const fn = src.slice(src.indexOf('function commitPointsScore('), src.indexOf('function focusPointsBox('));
-    expect(fn).toContain('setPointsScore(cid, sid, aid, raw)');
+    expect(fn).toContain('Grader.setPoints(cid, sid, aid, raw)');
     expect(fn).not.toContain('setScore(cid, sid, aid, aid');
   });
 

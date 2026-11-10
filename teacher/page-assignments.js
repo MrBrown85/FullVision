@@ -6888,7 +6888,7 @@ window.PageAssignments = (function () {
     var next = getCompletionMark(cid, sid, aid) === el.dataset.mark ? null : el.dataset.mark;
     // Missing and Excused work takes no mark (isScoreLocked); C and I reach here by key.
     if (next && isScoreLocked(cid, sid, aid)) return;
-    setCompletionMark(cid, sid, aid, next);
+    Grader.setMark(cid, sid, aid, next);
     var cell = el.closest('.cmp-cell');
     var grid = el.closest('.ldg-grid');
     if (cell) cell.innerHTML = completionButtonsHtml(aid, sid, next);
@@ -7061,10 +7061,10 @@ window.PageAssignments = (function () {
     // Leaving a field without changing it saves nothing; an untouched blank
     // field used to write a 0. A typed 0 is a score; blank clears.
     if (raw === prev) return;
-    // setPointsScore saves the one score, as the gradebook and phone do. A
+    // Grader.setPoints saves the one score, as the gradebook and phone do. A
     // second write under the assessment's own id left a stray entry and
     // sent the score twice.
-    setPointsScore(cid, sid, aid, raw);
+    Grader.setPoints(cid, sid, aid, raw);
     var pctSpan = inp.closest('.score-row').querySelector('.gb-pts-live-pct');
     if (pctSpan) pctSpan.innerHTML = pointsPctHtml(raw, max, 0);
     refreshLedgerSummary(inp.closest('.ldg-grid'));
