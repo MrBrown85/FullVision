@@ -59,7 +59,7 @@ const CAPS = {
   // (_graderCommitPoints) and its Note for the Report (_saveReportNote).
   // tests/score-save-parity.test.js and tests/report-note.test.js look for
   // those two calls in this file's text, so they move with those tests.
-  'teacher/page-assignments.js': 12,
+  'teacher/page-assignments.js': 7,
   // S1-T1 (gradebook and Class Results): moved.
   'teacher/page-gradebook.js': 0,
   'teacher/class-results.js': 0,

@@ -9994,7 +9994,7 @@ window.PageAssignments = (function () {
       return;
     }
     if (_commentEditId === OVERALL_COMMENT_ID) {
-      saveScoreComment(cid, sid, _commentPopoverState.aid, text);
+      Grader.setOverallComment(cid, sid, _commentPopoverState.aid, text);
     } else {
       // The comment may have been re-keyed to its server id since the list drew.
       updateQuickOb(cid, sid, resolveObservationId(cid, _commentEditId), { text: text });
@@ -10007,7 +10007,7 @@ window.PageAssignments = (function () {
       sid = _commentPopoverState.sid,
       aid = _commentPopoverState.aid;
     if (obId === _commentEditId) _commentEditId = null;
-    if (obId === OVERALL_COMMENT_ID) saveScoreComment(cid, sid, aid, '');
+    if (obId === OVERALL_COMMENT_ID) Grader.setOverallComment(cid, sid, aid, '');
     else deleteQuickOb(cid, sid, obId);
     renderCommentPopover();
     updateCommentBadge(sid, aid);
@@ -10182,7 +10182,7 @@ window.PageAssignments = (function () {
   function _commitCriterionComment(text) {
     var st = _critCommentState;
     if (!st) return;
-    if (text !== (st.original || '')) saveRubricCriterionComment(st.cid, st.sid, st.aid, st.critId, text);
+    if (text !== (st.original || '')) Grader.setCriterionComment(st.cid, st.sid, st.aid, st.critId, text);
     var btn = document.querySelector(
       '.rsg-crit-comment[data-aid="' + st.aid + '"][data-sid="' + st.sid + '"][data-critid="' + st.critId + '"]',
     );
@@ -11224,8 +11224,8 @@ window.PageAssignments = (function () {
         ? getRubricCriterionBeyond(activeCourse, el.dataset.sid, el.dataset.aid, spCrit)
         : getRubricCriterionComment(activeCourse, el.dataset.sid, el.dataset.aid, spCrit);
       if (spText === spSaved) return;
-      if (beyond) saveRubricCriterionBeyond(activeCourse, el.dataset.sid, el.dataset.aid, el.dataset.critid, spText);
-      else saveRubricCriterionComment(activeCourse, el.dataset.sid, el.dataset.aid, el.dataset.critid, spText);
+      if (beyond) Grader.setWentBeyond(activeCourse, el.dataset.sid, el.dataset.aid, el.dataset.critid, spText);
+      else Grader.setCriterionComment(activeCourse, el.dataset.sid, el.dataset.aid, el.dataset.critid, spText);
       return;
     }
     if (el.dataset.actionBlur === 'graderCritBeyond') {
