@@ -814,7 +814,9 @@ window.PageGradebook = (function () {
      (shared/grade-state.js). The gradebook marks each draft with a dashed
      outline and says so in the key; the toolbar's "N to return" counts the
      drafts on screen and, pressed, leaves only the students and assessments
-     that have one; each column's Return N Graded returns its drafts.
+     that have one; each column's Return N Graded returns its drafts, and
+     with a draft of pair or group work the partners' drafts, which its N
+     and names include even when a search hides a partner.
      In any other class none of it is drawn: the page's HTML is what it was
      (tests/gradebook-draft-cells.test.js).
 
@@ -829,19 +831,22 @@ window.PageGradebook = (function () {
   var DRAFT_CELL_WORDS = ', Draft, not returned yet';
 
   /* The drafts among `students` in each of `assessments`:
-     { byAid: { aid: [sid] }, bySid: { sid: true }, total }, or null in a
-     class that doesn't hold grades. */
+     { byAid: { aid: [sid] }, bySid: { sid: true }, total, returns }, or
+     null in a class that doesn't hold grades. `returns` is who each
+     column's Return N Graded returns (_draftsReturned): the same students,
+     and any partner of theirs a search has hidden. */
   function _countDrafts(cid, students, assessments) {
     var klass = getReturnSettings(cid);
     if (!klass.student_page || !GradeState.holds(klass)) return null;
     var ids = students.map(function (s) {
       return s.id;
     });
-    var out = { byAid: {}, bySid: {}, total: 0 };
+    var out = { byAid: {}, bySid: {}, total: 0, returns: {} };
     assessments.forEach(function (a) {
       var waiting = GradeState.draftsIn(cid, a.id, ids);
       if (!waiting.length) return;
       out.byAid[a.id] = waiting;
+      out.returns[a.id] = _draftsReturned(cid, a.id, ids);
       waiting.forEach(function (sid) {
         out.bySid[sid] = true;
       });
@@ -939,8 +944,24 @@ window.PageGradebook = (function () {
     return out;
   }
 
-  /* Return N Graded: every draft in the column, among the rows on screen,
-     is returned in one action through the one grader. True when any was. */
+  /* The drafts a column's Return N Graded returns: the one answer its N,
+     the names in its line, the dialog and the action all read. They are
+     the drafts among `shownIds` (the students on screen) and the drafts of
+     the pair or group members still graded with one of them, on screen or
+     not. So a column's N can be more than its dashed cells when a search
+     hides a partner: the pair is returned together, and the count and the
+     names say so. A partner whose piece is already returned is not in it.
+     Empty when no draft is on screen. */
+  function _draftsReturned(cid, aid, shownIds) {
+    var onScreen = GradeState.draftsIn(cid, aid, shownIds);
+    return onScreen.length ? GradeState.draftsIn(cid, aid, _returnTogether(cid, aid, onScreen)) : [];
+  }
+
+  /* Return N Graded: every draft in the column, among the rows on screen
+     and the partners graded with them (_draftsReturned), is returned in one
+     action through the one grader. True when any was. The grader is handed
+     each of those students' whole pair or group, as the dialog's Return
+     hands it, and returns the drafts among them. */
   function _returnDrafts(aid) {
     var cid = activeCourse;
     var klass = getReturnSettings(cid);
@@ -964,7 +985,7 @@ window.PageGradebook = (function () {
   function _askReturnDrafts(button) {
     var cid = activeCourse;
     var aid = button.dataset.aid;
-    var waiting = _drafts ? GradeState.draftsIn(cid, aid, _rowIds()) : [];
+    var waiting = _drafts ? _draftsReturned(cid, aid, _rowIds()) : [];
     var n = waiting.length;
     if (!n) return;
     // The dialog gives the focus back to what had it when it opened. Safari
@@ -993,7 +1014,7 @@ window.PageGradebook = (function () {
      view has it at the top of the column's menu (showHeaderContextMenu). */
   // html-safe: the id is ours; the names in the title go through esc
   function _returnDraftsButton(cid, a) {
-    var waiting = _drafts && _drafts.byAid[a.id];
+    var waiting = _drafts && _drafts.returns[a.id];
     if (!waiting) return '';
     return (
       '<button type="button" class="gb-return-drafts" data-action="returnDrafts" data-aid="' +
@@ -3419,7 +3440,7 @@ window.PageGradebook = (function () {
       if (colAvg) avgHint = 'Avg ' + classColumnAverageText(activeCourse, assess, colAvg);
     }
     // Return N Graded and who is waiting, when the column has drafts (S1-F1).
-    var waiting = _drafts ? GradeState.draftsIn(activeCourse, aid, _rowIds()) : [];
+    var waiting = _drafts ? _draftsReturned(activeCourse, aid, _rowIds()) : [];
     // html-safe: the hint is a figure from calc.js, escaped; the drafts line's names go through esc
     menu.innerHTML =
       (waiting.length

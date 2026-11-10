@@ -693,37 +693,76 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them', () =>
     redraw();
     expect(dialogDrafts(TALK)).toEqual([AVA, BEN]);
     expect(menuCount(TALK)).toBe(2);
-    // With only Ben on screen the count is his, and Return gives it to both.
+    // With only Ben on screen the pill counts the draft on screen, and the
+    // column's Return counts and names who it returns: the pair.
     search('ben');
     expect(rowIds()).toEqual([BEN]);
     expect(pill().textContent).toBe('1 to return');
-    openColumnMenu(TALK);
-    expect(returnItem().textContent).toBe('Return 1 Graded');
+    expect(document.querySelectorAll('#gb-data .gb-draft').length).toBe(1);
+    const returned = vi.spyOn(Grader, 'returnGrades');
+    let menu = openColumnMenu(TALK);
+    expect(menu.querySelector('.gb-ctx-note').textContent).toBe('2 drafts: Ava and Ben can\u2019t see them yet.');
+    expect(returnItem().textContent).toBe('Return 2 Graded');
     click(returnItem());
+    // The grader is handed the pair, as the dialog's Return hands it.
+    expect(returned.mock.calls).toEqual([[CID, TALK, [BEN, AVA]]]);
+    expect(returned.mock.results[0].value.enrollment_ids).toEqual([BEN, AVA]);
     expect(GradeState.stateOf(CID, BEN, TALK)).toBe('returned');
     expect(GradeState.stateOf(CID, AVA, TALK)).toBe('returned');
     search('');
     expect(pill()).toBe(null);
     expect(isDashed(scoresCell(TALK, AVA))).toBe(false);
-    // The header's dialog counts and names the students on screen too: with
-    // only Ben shown it says one grade, and the pair is returned together.
+
+    // The same under a Competencies header: the button, the dialog's title,
+    // its message and its button all say two, and both are returned.
     Grader.setLevel(CID, BEN, TALK, QUESTION, 1, 0);
     search('ben');
     showCompetencies();
+    expect(pill().textContent).toBe('1 to return');
+    expect(headerButton(TALK).textContent).toBe('Return 2 Graded');
+    expect(headerButton(TALK).getAttribute('title')).toBe('2 drafts: Ava and Ben can\u2019t see them yet.');
+    click(headerButton(TALK));
+    expect(confirmDialog().querySelector('.confirm-title').textContent).toBe('Return 2 Grades Now?');
+    expect(confirmDialog().querySelector('.confirm-message').textContent).toBe(
+      '2 drafts: Ava and Ben can\u2019t see them yet.',
+    );
+    expect(confirmDialog().querySelector('#confirm-ok-btn').textContent).toBe('Return 2 Graded');
+    returned.mockClear();
+    confirmOk();
+    expect(returned.mock.results[0].value.enrollment_ids).toEqual([BEN, AVA]);
+    expect(GradeState.stateOf(CID, BEN, TALK)).toBe('returned');
+    expect(GradeState.stateOf(CID, AVA, TALK)).toBe('returned');
+
+    // The hidden partner's piece is already returned: one draft, one name.
+    Grader.setLevel(CID, BEN, TALK, QUESTION, 3, 0);
+    Grader.returnGrades(CID, TALK, [AVA]);
+    expect(dialogDrafts(TALK)).toEqual([BEN]);
+    redraw();
+    expect(headerButton(TALK).textContent).toBe('Return 1 Graded');
     click(headerButton(TALK));
     expect(confirmDialog().querySelector('.confirm-title').textContent).toBe('Return 1 Grade Now?');
     expect(confirmDialog().querySelector('.confirm-message').textContent).toBe('1 draft: Ben can\u2019t see it yet.');
-    confirmOk();
-    expect(GradeState.stateOf(CID, BEN, TALK)).toBe('returned');
-    expect(GradeState.stateOf(CID, AVA, TALK)).toBe('returned');
+    cancelConfirm();
     showScores();
+    menu = openColumnMenu(TALK);
+    expect(menu.querySelector('.gb-ctx-note').textContent).toBe('1 draft: Ben can\u2019t see it yet.');
+    expect(returnItem().textContent).toBe('Return 1 Graded');
+    returned.mockClear();
+    click(returnItem());
+    expect(returned.mock.results[0].value.enrollment_ids).toEqual([BEN]);
+    expect(GradeState.stateOf(CID, BEN, TALK)).toBe('returned');
+    returned.mockRestore();
     search('');
+
     // A member graded separately is not returned with the pair.
     Grader.gradeSeparately(CID, TALK, AVA);
     Grader.setLevel(CID, AVA, TALK, QUESTION, 2, 0);
-    Grader.setLevel(CID, BEN, TALK, QUESTION, 3, 0);
+    Grader.setLevel(CID, BEN, TALK, QUESTION, 4, 0);
+    expect(dialogDrafts(TALK)).toEqual([AVA, BEN]);
     search('ben');
     openColumnMenu(TALK);
+    expect(returnItem().textContent).toBe('Return 1 Graded');
+    expect(document.querySelector('.gb-ctx-note').textContent).toBe('1 draft: Ben can\u2019t see it yet.');
     click(returnItem());
     expect(GradeState.stateOf(CID, BEN, TALK)).toBe('returned');
     expect(GradeState.stateOf(CID, AVA, TALK)).toBe('draft');
