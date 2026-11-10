@@ -20,23 +20,16 @@
 # from:
 #   get_class_bundle 119165287207814181c5875d81451147 22538
 #   get_gradebook    2876cd40c373b8a59bff4464008c8601 6816
-# 2026111002_security_definer_search_path.sql (S0-M5) was APPLIED to
-# gradebook-prod on 2026-11-10. It changed the SET search_path line of
-# sixteen functions, and so their fingerprints, and no body. The sixteen
-# lines below marked after-s0-m5 are the live definitions AFTER it (its
-# post-check, run read-only on gradebook-prod right after the apply, found
-# no difference). A migration written after S0-M5 guards on these.
-# They carry a fourth word so that the scripts which compare every function
-# they load skip them: the harness's own copies of these functions
-# (harness.sql, score-prelude.sql, bundle-prelude.sql, term-rating-prelude.sql,
-# search-path-prelude.sql) are still the definitions from BEFORE S0-M5,
-# which that migration's check expects and search_path.py starts from, and
-# S0-M5's file cannot be applied to the smaller harness databases. So the
-# unmarked lines further down for fv_owns_assessment, fv_owns_course,
-# fv_owns_enrollment and get_class_bundle are still the definitions before
-# S0-M5 (get_class_bundle: after S0-M4), which is what the harness builds.
-# batch_a_undo.py, whose databases do have S0-M5 applied, gives the suites
-# it runs a copy of this file with the marked lines in place of those four.
+# All sixteen functions S0-M5 (2026111002_security_definer_search_path.sql)
+# changed, as they are on gradebook-prod AFTER it: its post-check, run
+# read-only right after the apply on 2026-11-10, found no difference. It
+# changed the SET search_path line of each, and so the fingerprint, and no
+# body. A migration written after S0-M5 guards on these. The fourth word
+# keeps the scripts that compare every function they load from reading
+# these lines: the harness's own copies of twelve of the sixteen are still
+# the definitions from before S0-M5. The other four (fv_owns_assessment,
+# fv_owns_course, fv_owns_enrollment, get_class_bundle) are also on plain
+# lines further down, with a note there on what they were before.
 _fv_release_orphan_teacher_email d1786f4b0205b700167758f4bb61e32e 762 after-s0-m5
 _fv_teacher_sign_in_deleted f81c14dec41dcf6d95377905e08ed58d 304 after-s0-m5
 _score_audit_diff 2f5d1bb44e726f189f029c3e955a84ea 805 after-s0-m5
