@@ -55,11 +55,9 @@ const EXEMPT = new Set(['shared/data.js', 'shared/grader.js', 'shared/seed-data.
 
 const CAPS = {
   // S1-T3 (Assignments page: list, rubric grid, ledgers, fills, Set
-  // Everyone To). Two of these are the grader dialog's own: its points box
-  // (_graderCommitPoints) and its Note for the Report (_saveReportNote).
-  // tests/score-save-parity.test.js and tests/report-note.test.js look for
-  // those two calls in this file's text, so they move with those tests.
-  'teacher/page-assignments.js': 2,
+  // Everyone To, and the grader dialog's points box and Note for the
+  // Report): moved.
+  'teacher/page-assignments.js': 0,
   // S1-T1 (gradebook and Class Results): moved.
   'teacher/page-gradebook.js': 0,
   'teacher/class-results.js': 0,

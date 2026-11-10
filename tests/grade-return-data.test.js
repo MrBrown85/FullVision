@@ -1648,6 +1648,16 @@ const GRADER_SCENARIOS = {
     expect(Object.keys(row('s1', 'lab').returned_copy.criteria)).toEqual(['c1b']);
     expect(row('s1', 'lab').returned_copy.checks).toEqual(['k1b']);
   },
+  setReportNote(on) {
+    // A Note for the Report never makes a draft.
+    level('s1', 'essay', 't1', 3);
+    give('essay', 's1');
+    const before = JSON.stringify(row('s1', 'essay'));
+    Grader.setReportNote(CID, 's1', 'essay', 'explained her method');
+    expect(getScoreReportNote(CID, 's1', 'essay')).toBe('explained her method');
+    if (on) expect(state('s1', 'essay')).toBe('returned');
+    if (on) expect(JSON.stringify(row('s1', 'essay'))).toBe(before);
+  },
 };
 
 describe('the grader’s gradebook, phone and Assignments page actions follow the rule through the writers they call', () => {

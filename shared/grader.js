@@ -223,6 +223,13 @@ window.Grader = (function () {
     return _saved(cid, null, aid, 'move', moveRubricScores(cid, aid, maps));
   }
 
+  /* The Note for the Report, in the grader dialog: one line about what
+     the student did, for the term comment. It is no part of the grade, so
+     it never makes a draft. data.js tidies the text. */
+  function setReportNote(cid, sid, aid, text) {
+    return _saved(cid, sid, aid, 'reportNote', saveScoreReportNote(cid, sid, aid, text));
+  }
+
   /* ── The phone's Grade tab (S1-T2) ──────────────────────────────────
      The phone's points, marks, statuses, ticks, comments and group
      actions go through the actions above. Its levels and its Undo pass
@@ -319,6 +326,7 @@ window.Grader = (function () {
     undoMissing: undoMissing,
     carryOverall: carryOverall,
     moveToRubric: moveToRubric,
+    setReportNote: setReportNote,
     // The phone's Grade tab (S1-T2)
     setLevelOnPhone: setLevelOnPhone,
     setPlusMinusOnPhone: setPlusMinusOnPhone,

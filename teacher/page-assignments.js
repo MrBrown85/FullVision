@@ -12760,7 +12760,7 @@ window.PageAssignments = (function () {
     var sid = input.dataset.sid;
     var aid = input.dataset.aid;
     if (!cid || !sid || !aid || input.disabled) return;
-    saveScoreReportNote(cid, sid, aid, input.value);
+    Grader.setReportNote(cid, sid, aid, input.value);
     input.value = getScoreReportNote(cid, sid, aid);
     _reportNotePreview(input);
   }
@@ -12894,12 +12894,12 @@ window.PageAssignments = (function () {
       inp.value = raw != null ? formatPoints(raw) : '';
       return;
     }
-    // One save, through setPointsScore, as the ledger, gradebook and phone
+    // One save, through Grader.setPoints, as the ledger, gradebook and phone
     // do. A second write under the assessment's own id left an entry later
     // edits elsewhere never updated, so the cell and course % kept the old
     // points.
     var sid = focusStudentId;
-    setPointsScore(cid, focusStudentId, aid, raw);
+    Grader.setPoints(cid, focusStudentId, aid, raw);
     refreshSidebarGrades(sid);
     var nextId = next && _grader && _grader.overlay.contains(next) ? next.id : '';
     render();

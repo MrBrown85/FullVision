@@ -307,6 +307,13 @@ describe('Grader: each action passes through to one data.js writer', () => {
       [CID, 'lab', { rubricId: 'rub2', criteria: { c1: 'c1b' }, checks: { k1: 'k1b' } }],
       [CID, null, 'lab', 'move'],
     ],
+    [
+      'setReportNote',
+      [CID, 's1', 'essay', ' explained her   method '],
+      'saveScoreReportNote',
+      [CID, 's1', 'essay', ' explained her   method '],
+      [CID, 's1', 'essay', 'reportNote'],
+    ],
     // The phone's Grade tab (S1-T2). More on these three below.
     [
       'setLevelOnPhone',
