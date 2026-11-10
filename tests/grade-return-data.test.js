@@ -55,6 +55,7 @@ const RUBRIC = {
   ],
 };
 const NOTES = { id: 'notes', title: 'Field Notes', type: 'summative', tagIds: ['t1'] }; // no date
+const BENCH = { id: 'bench', title: 'Reading Benchmark', date: '2026-10-16', scoreMode: 'dibels', tagIds: [] };
 const STUDENTS = ['s1', 's2', 's3', 's4'].map((id, i) => ({
   id,
   firstName: ['Jordan', 'Avery', 'Noor', 'Lena'][i],
@@ -82,7 +83,7 @@ function seed(config) {
   clearClass(CID);
   seedClass(CID, {
     students: STUDENTS,
-    assessments: [ESSAY, QUIZ, DONE, LAB, TALK, NOTES].map(a => structuredClone(a)),
+    assessments: [ESSAY, QUIZ, DONE, LAB, TALK, NOTES, BENCH].map(a => structuredClone(a)),
     rubrics: [structuredClone(RUBRIC)],
     courseConfigs: config || {},
   });
@@ -1673,5 +1674,57 @@ describe('undated work changed on the phone after it was returned', () => {
     vi.setSystemTime(new Date('2026-11-12T18:00:00.000Z'));
     Grader.setLevel(CID, 's1', 'notes', 't1', 4, 0);
     expect(getReturnedScores(CID).s1.map(e => [e.score, e.date])).toEqual([[3, '2026-11-09']]);
+  });
+});
+
+/* DECISIONS, "Student page build rulings" 15: DIBELS numbers show at once.
+   A benchmark is a reading record, not a grade that is returned. So a
+   DIBELS piece has no Draft or Returned state at all, its Overall Comment
+   included. (The shared cases file has no DIBELS case yet; the server
+   track adds one.) */
+describe('a DIBELS benchmark is never a draft and is never returned', () => {
+  const WINDOW = { orfWrc: 90, orfErrors: 2, mazeCorrect: 12, mazeIncorrect: 1 };
+
+  it('a comment, numbers and a status in a class that holds grades make no row and no draft', () => {
+    held();
+    expect(isDibelsScored(getAssessments(CID).find(a => a.id === 'bench'))).toBe(true);
+    saveScoreComment(CID, 's1', 'bench', 'Read with expression.');
+    expect(getScoreComment(CID, 's1', 'bench')).toBe('Read with expression.');
+    saveDibelsScore(CID, 's1', 'bench', 'boy', WINDOW);
+    setAssignmentStatus(CID, 's2', 'bench', 'EXC');
+    saveScoreComment(CID, 's1', 'bench', 'Read with expression and care.');
+    expect(getGradeReturns(CID)).toEqual({});
+    expect(storedRows()).toBe(null);
+    // What a screen shows, and what a count of drafts asks.
+    expect(['s1', 's2', 's3'].map(sid => state(sid, 'bench'))).toEqual([null, null, null]);
+    expect(GradeState.afterSave(CID, 's1', 'bench', 'comment')).toBe(null);
+    // There is nothing to return, and the returned set is the working copy.
+    expect(returnGrades(CID, 'bench', ['s1', 's2'])).toEqual({ returned: 0, enrollment_ids: [], returned_at: null });
+    expect(getReturnedScores(CID)).toBe(getScores(CID));
+    // Other work in the class is still held.
+    level('s1', 'essay', 't1', 3);
+    expect(state('s1', 'essay')).toBe('draft');
+    expect(getReturnedScores(CID).s1.map(e => e.assessmentId)).toEqual(['bench']);
+  });
+
+  it('a row some other writer left on a benchmark changes nothing: no draft, nothing returned, the working copy counted', () => {
+    held();
+    saveScoreComment(CID, 's1', 'bench', 'Read with expression.');
+    _saveGradeReturns(CID, { bench: { s1: { is_draft: true }, s2: { is_draft: true, returned_copy: three } } });
+    expect([state('s1', 'bench'), state('s2', 'bench')]).toEqual([null, null]);
+    expect(getReturnedScores(CID)).toBe(getScores(CID));
+    expect(returnGrades(CID, 'bench', ['s1', 's2']).returned).toBe(0);
+    // A later save does not touch the row either.
+    const before = storedRows();
+    saveScoreComment(CID, 's1', 'bench', 'Read with care.');
+    expect(storedRows()).toBe(before);
+  });
+
+  it('with the switch off a benchmark has no state either, numbers or not', () => {
+    seed();
+    saveDibelsScore(CID, 's1', 'bench', 'boy', WINDOW);
+    saveScoreComment(CID, 's1', 'bench', 'Read with expression.');
+    expect(hasScoreOrFeedback(CID, 's1', 'bench')).toBe(true);
+    expect(state('s1', 'bench')).toBe(null);
   });
 });

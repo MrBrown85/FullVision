@@ -10289,7 +10289,9 @@ function _gradeRule(cid, was, next) {
   var changed = false;
   Object.keys(Object.assign({}, before, now)).forEach(function (aid) {
     var a = _assessmentById(cid, aid);
-    if (!a) return;
+    // A DIBELS benchmark is a reading record, not a grade that is returned:
+    // nothing saved on it, its Overall Comment included, makes or changes a row.
+    if (!a || isDibelsScored(a)) return;
     Object.keys(Object.assign({}, before[aid], now[aid])).forEach(function (sid) {
       var b = (before[aid] || {})[sid];
       var n = (now[aid] || {})[sid];
@@ -10327,7 +10329,7 @@ function _returnGrades(cid, aid, studentIds) {
   var at = new Date().toISOString();
   var a = _assessmentById(cid, aid);
   var klass = getReturnSettings(cid);
-  if (a && klass.student_page && GradeState.holds(klass)) {
+  if (a && !isDibelsScored(a) && klass.student_page && GradeState.holds(klass)) {
     var rows = getGradeReturns(cid);
     var of = Object.assign({}, rows[aid]);
     var cells = _gradeCells(getScores(cid), getRubricChecks(cid))[aid] || {};
@@ -10486,7 +10488,13 @@ window.getReturnedScores = function getReturnedScores(cid) {
           'No returned grade was worked out, so no draft is shown.',
       );
     }
-    var rows = getGradeReturns(cid);
+    // A DIBELS benchmark has no returned grade: any row for one is passed
+    // over, so its entries are the working copy's.
+    var rows = {};
+    var every = getGradeReturns(cid);
+    Object.keys(every).forEach(function (aid) {
+      if (!isDibelsScored(_assessmentById(cid, aid))) rows[aid] = every[aid];
+    });
     var anyDraft = Object.keys(rows).some(function (aid) {
       return Object.keys(rows[aid] || {}).some(function (sid) {
         return rows[aid][sid] && rows[aid][sid].is_draft;
