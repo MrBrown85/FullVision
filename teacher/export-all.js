@@ -16,6 +16,16 @@
 (function () {
   'use strict';
 
+  /* The export is the teacher's own record: all work, drafts included
+     (student page build plan 1.3). That is said in one place, ReportScores'
+     table (teacher/report-scores.js, 'exportData'), and rows() runs inside
+     ReportScores.withReportScores so nothing else can decide it. Because
+     that row stays on all work, rows() reads comments, notes and statuses
+     with the data layer's own readers, which tests/export-all.test.js
+     checks it names one by one; tests/report-score-seam.test.js allows
+     those reads here only while the row says 'all'. */
+  rows = ReportScores.scoped('exportData', rows);
+
   var LIB_URL = '/vendor/exceljs.min.js';
   var TEXT_WIDTH = 60;
 
