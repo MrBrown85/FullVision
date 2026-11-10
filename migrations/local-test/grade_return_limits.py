@@ -1,5 +1,6 @@
 """Exercise migrations/2026110905_grade_return_limits.sql (S0-M4b): the three
-known limits of Batch A's grade_return, and created_at on the student's page.
+known limits of Batch A's grade_return, created_at on the student's page,
+and seen_at kept from the teacher's list.
 
 Run it against a database with Batch A loaded. It shows each limit as it is
 with Batch A alone (checks named "today:"), applies the migration inside its
@@ -60,11 +61,15 @@ rpc(A, 'issue_student_cards(:c, null, :k)', c=COURSE_A, k=key())
 code = one('select code from student_card where enrollment_id = :e and stopped_at is null', e=ENR1)
 token = svc("student_submit.verify_card(:c, '2012-05-15', null, null, null, 'ip-1', false)", c=code)['session_token']
 def page(): return svc("student_submit.page(:t, :e, 'ip-1')", t=token, e=ENR1)
+svc("student_submit.seen(:t, :e, :ids::uuid[], 'ip-1')", t=token, e=ENR1, ids='{%s,%s}' % (p1, p2))   # opened: one returned piece, one with no grade
 page0 = page()
+list0 = rpc(A, 'list_course_grade_returns(:c)', c=COURSE_A)
 restore0, page_md5 = md5('fv_private.restore_grade_returns(jsonb)'), md5('student_submit.page(text,uuid,text)')
 
 # The limits as Batch A leaves them. Each block is undone before the migration.
 if not LOADED:
+    ok('today (e): the teacher\'s list sends seen_at, and lists a piece for no reason but that the student opened it',
+       'seen_at' in list0[p1][ENR1] and list0.get(p2, {}).get(ENR1) == {'is_draft': False, 'seen_at': list0[p2][ENR1]['seen_at']}, list0)
     ok('today: the page lists the two pieces and sends no created_at', page0.get('ok') and len(page0['assessments']) == 2
        and not any('created_at' in a for a in page0['assessments']), page0)
     # a. A grade first given with the triggers off has no row, and the repair does not make one.
@@ -136,10 +141,11 @@ if not LOADED:
        rows('select * from grade_return order by 1, 2') == before_rows and score_fingerprint() == before_scores)
     ok('the nightly job is scheduled once, at 10:47 UTC, to call the procedure',
        rows('select jobname, schedule, command from cron.job') == [['fv_grade_return_repair_daily', '47 10 * * *', 'call public.grade_return_repair_nightly()']])
-    snap = (md5('fv_private.restore_grade_returns(jsonb)'), md5('student_submit.page(text,uuid,text)'), md5('public.grade_return_repair()'))
+    FNS = ('fv_private.restore_grade_returns(jsonb)', 'student_submit.page(text,uuid,text)', 'public.grade_return_repair()', 'public.list_course_grade_returns(uuid)')
+    snap = [md5(f) for f in FNS]
     apply()
     ok('a second run changes nothing and schedules nothing more',
-       snap == (md5('fv_private.restore_grade_returns(jsonb)'), md5('student_submit.page(text,uuid,text)'), md5('public.grade_return_repair()'))
+       snap == [md5(f) for f in FNS]
        and one('select count(*) from cron.job') == 1
        and one("select count(*) from pg_trigger where tgname = 'grade_return_truncate'") == 2)
     as_owner(); c.run('drop schema cron cascade')
@@ -161,6 +167,22 @@ ok('page: v is still 1, and the returned grade still comes with the piece', page
    and [a['grade']['value'] if a['grade'] else None for a in page1['assessments']] == [7, None], page1['assessments'])
 ok('page: a draft is still not sent, nor any sign of one',
    not any(k in a for a in page1['assessments'] for k in ('is_draft', 'returned_copy', 'working_copy')))
+
+# ── e. seen_at is the student's own ────────────────────────────────────
+list1 = rpc(A, 'list_course_grade_returns(:c)', c=COURSE_A)
+ok("the teacher's list sends no seen_at for any student or piece", 'seen_at' not in json.dumps(list1), list1)
+ok('and no longer lists a piece only because the student opened it', p2 not in list1 and p1 in list1, sorted(list1))
+if not LOADED:
+    stripped = {a: {e: {k: v for k, v in row.items() if k != 'seen_at'} for e, row in rows_.items()} for a, rows_ in list0.items() if a != p2}
+    ok('everything else in the list is as it was: is_draft, returned_at, updated_at and the copies', list1 == stripped, (list1, stripped))
+ok('the server still has it, and the student is still sent their own', one('select seen_at is not null from grade_return where enrollment_id = :e and assessment_id = :a', e=ENR1, a=p1)
+   and [a['seen_at'] is not None for a in page1['assessments']] == [True, True], page1['assessments'])
+set_class(True, 'on_save')
+rpc(A, 'upsert_score(:e, :a, 6)', e=ENR1, a=p1)
+ok('and the server still uses it: a returned grade the student had opened is marked Updated when it changes under As Soon As I Save',
+   returned_grade(ENR1, p1)['previous']['value'] == 7 and returned_grade(ENR1, p1)['updated_at'] is not None, returned_grade(ENR1, p1))
+rpc(A, 'upsert_score(:e, :a, 7)', e=ENR1, a=p1)
+set_class(True, 'on_return')
 
 # ── a. The repair adds the missing row, as a save would have left it ───
 ok('before anything is broken the repair finds nothing to do',

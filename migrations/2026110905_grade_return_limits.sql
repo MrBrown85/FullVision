@@ -1,5 +1,5 @@
--- Closes three known limits of Batch A's grade_return, and sends created_at
--- on the student's page (2026-11-10). S0-M4b.
+-- Closes three known limits of Batch A's grade_return, sends created_at on
+-- the student's page, and keeps seen_at from the teacher (2026-11-10). S0-M4b.
 --
 -- Apply right after Batch A (2026110901 to 2026110904). The owner chose to
 -- apply Batch A exactly as it was verified and close these behind it. The
@@ -31,6 +31,11 @@
 --    works its numbers out from what student_submit.page sends, and page
 --    did not send when each piece was made, so a student's page and the
 --    teacher's report could order two same-date pieces differently.
+-- e. (New: the owner's ruling of Nov 10.) FullVision records when a student
+--    opens each returned piece (grade_return.seen_at) for the student's own
+--    page only: "3 Things Since You Last Looked" and the Updated mark. It is
+--    not shown to teachers, and it is kept only as long as the grade itself.
+--    Batch A's list_course_grade_returns sent it to the teacher's browser.
 --
 -- ── What it adds ────────────────────────────────────────────────────────────
 -- 1. _grade_return_repair_class(p_course_id) and grade_return_repair():
@@ -72,6 +77,20 @@
 --    jsonb prints a timestamptz ("2026-11-10T16:04:11.482913+00:00"), the
 --    same key and form get_class_bundle and get_gradebook send
 --    (2026111001). Nothing else in the reply changes; v stays 1.
+-- 6. list_course_grade_returns (Batch A's function), patched in place: it no
+--    longer sends seen_at, and a row that holds nothing but a seen_at is
+--    left out like any other row with nothing to say. Everything else it
+--    sends is unchanged. The server still has seen_at and still uses it:
+--    the triggers' "Updated only if the student had seen it" rule
+--    (2026110902, 4) reads the row, not the list, and student_submit.page
+--    still sends a student their own seen_at. Two things follow for the
+--    browser, neither of which this file can do: a backup made from the
+--    list no longer carries seen_at, so a restore starts "since you last
+--    looked" afresh; and the browser's own copy of the rule
+--    (shared/grade-state.js) can no longer tell whether a student had seen
+--    a grade, so after a save in an As Soon As I Save class it must take
+--    previous_copy and updated_at from the server instead of working them
+--    out.
 --
 -- No function this file adds can be called through the API: all are for the
 -- database owner and the nightly job.
@@ -83,11 +102,12 @@
 -- only as described in 1. No score, level, comment or tick ever changes.
 --
 -- ── Guards ──────────────────────────────────────────────────────────────────
--- The two functions patched in place are Batch A's own, so their expected
+-- The three functions patched in place are Batch A's own, so their expected
 -- fingerprints are what Batch A's files create (md5 of pg_get_functiondef),
 -- not something read from the live database:
 --   fv_private.restore_grade_returns(jsonb)   c43618c73751e036a2735ad246b35966
 --   student_submit.page(text,uuid,text)       7af33e2114372833d7ad7fb97b56ebae
+--   public.list_course_grade_returns(uuid)    6ccab9528aef0c2d6ec8bea1964edf81
 -- Anything else stops the file, unless the function already carries this
 -- file's patch (a second run).
 --
@@ -119,7 +139,8 @@ begin
     for _f in
         select * from (values
             ('fv_private.restore_grade_returns(jsonb)', 'c43618c73751e036a2735ad246b35966', '(2026110905)'),
-            ('student_submit.page(text,uuid,text)',     '7af33e2114372833d7ad7fb97b56ebae', $s$'created_at', a.created_at$s$)
+            ('student_submit.page(text,uuid,text)',     '7af33e2114372833d7ad7fb97b56ebae', $s$'created_at', a.created_at$s$),
+            ('public.list_course_grade_returns(uuid)',  '6ccab9528aef0c2d6ec8bea1964edf81', '(2026110905)')
         ) as v(fn, was, mark)
     loop
         _def := pg_get_functiondef(_f.fn::regprocedure);
@@ -300,7 +321,7 @@ begin
 end
 $cron$;
 
--- ── 4 and 5. The restore's helper and the student's page, patched in place ──
+-- ── 4, 5 and 6. The restore's helper, the student's page and the teacher's list, patched in place ──
 do $patch$
 declare
     _edits text[][] := array[
@@ -320,7 +341,18 @@ $s$      where g.is_draft and c.teacher_id = (select auth.uid())
       array['student_submit.page(text,uuid,text)',
             $s$'created_at', a.created_at$s$,
             $s$'rubric_id', a.rubric_id,$s$,
-            $s$'rubric_id', a.rubric_id, 'created_at', a.created_at,$s$]
+            $s$'rubric_id', a.rubric_id, 'created_at', a.created_at,$s$],
+      array['public.list_course_grade_returns(uuid)',
+            '(2026110905)',
+            $s$'seen_at', g.seen_at, 'returned_copy', g.returned_copy,$s$,
+            $s$'returned_copy', g.returned_copy,$s$],
+      array['public.list_course_grade_returns(uuid)',
+            '(2026110905)',
+$s$               -- a row with nothing to say (a grade cleared, a save in flight) is left out
+               and (g.is_draft or g.returned_at is not null or g.seen_at is not null)$s$,
+$s$               -- a row with nothing to say (a grade cleared, a save in flight) is left out.
+               -- seen_at is the student's own and is not sent to the teacher (2026110905).
+               and (g.is_draft or g.returned_at is not null)$s$]
     ];
     _def  text;
     _hits int;

@@ -461,3 +461,52 @@ sixth fail, with nothing in the server log for the five.
 Not verified: Postgres 17 (everything here ran on 18.6), cascades from the
 tables this harness does not carry, and how often a collision happens in
 real use.
+
+## S0-M4b: three known limits of Batch A's grade_return (2026-11-10)
+
+`../2026110905_grade_return_limits.sql` applies right after Batch A. It
+closes the three limits the last verify pass named, and makes two changes
+the owner ruled on Nov 10:
+
+- (a) the repair is a function now (`grade_return_repair()`), and adds a row
+  for a graded cell that has none, as a save through the triggers would have
+  left it;
+- (b) a restore with `grade_returns` and no `courses` row can no longer
+  leave a draft in a class that does not hold grades;
+- (c) `TRUNCATE` on `enrollment` or `assessment` takes the `grade_return`
+  rows with it, and `grade_return_repair_nightly()`, called once a day by a
+  pg_cron job where pg_cron is installed, removes the rows a delete with
+  triggers off leaves behind;
+- (d) `student_submit.page` sends each assessment's `created_at`;
+- (e) `list_course_grade_returns` no longer sends `seen_at`.
+
+```bash
+MIG4B="../2026110901_score_rows_same_class.sql ../2026110902_grade_return.sql ../2026110903_student_card.sql \
+  ../2026110904_student_sessions_page.sql ../2026110905_grade_return_limits.sql"
+PGPORT=54329 PGDATABASE=fv_a4b python3 run.py $BASE $MIG4B     # BASE as under "Batch A" above
+PGPORT=54329 PGDATABASE=fv_a python3 grade_return_limits.py    # Batch A alone: shows each limit, applies the file, shows it closed
+PGPORT=54329 PGDATABASE=fv_a4b python3 grade_return_limits.py  # with the file loaded: also the nightly procedure, which commits
+```
+
+On a database with Batch A alone, `grade_return_limits.py` first shows each
+limit as it is (checks named "today"): the repair statements leave a
+triggers-off grade without a row; the restore leaves a draft in an As Soon
+As I Save class; `truncate enrollment cascade`, `truncate assessment
+cascade` and `truncate course cascade` each leave orphan rows, and so does
+a delete with the trigger off; the teacher's list sends `seen_at`; the page
+sends no `created_at`. It checks the guards (no Batch A; a `page()` or a
+restore helper that is not Batch A's), applies the file where pg_cron is
+missing and where a stand-in for it exists (one job, scheduled once), and
+then shows each closed. On a database with the file loaded it runs the
+nightly procedure as the job does, on its own connection.
+
+Result on 2026-11-10, on Postgres 18.6 (port 54329) and on Postgres 17.11
+(port 54331), the same on both: `grade_return_limits.py` 51 of 51 on Batch A
+alone and 36 of 36 with the file loaded. Every Batch A suite on top of the
+file is unchanged: `grade_return.py` 280, `student_page.py` 216,
+`score_rpcs.py` 234, `student_submit.py` 79, `questionnaire_identity.py` 47,
+`phone_reports.py` 37, `questionnaires.py` 42, `batch_a_apply.py` 82,
+`grade_return_race.py` 435 (the same nine RPCs collide with saves, no
+other, and no `grade_return` row is wrong after any run). One check in
+`student_page.py` was edited: it asserted the exact keys of a page
+assessment and now allows `created_at`.
