@@ -3337,7 +3337,7 @@ body.offline-active #app-dock {
 }
 .drafts-print-without {
   background: var(--active-light);
-  color: var(--active);
+  color: var(--link);
 }
 .drafts-print-without:hover {
   filter: brightness(0.95);

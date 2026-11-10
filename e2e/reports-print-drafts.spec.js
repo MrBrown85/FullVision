@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { findLowContrastText } from './contrast-check.js';
 
 /* S2-F1: a family never sees a draft, and the teacher is asked, not
    surprised. In a class whose student page is on (the hidden build switch)
@@ -237,3 +238,33 @@ test.describe('Print Rubrics with a draft, from each door', () => {
     expect(await waiting(page)).toBe(2);
   });
 });
+
+for (const colorScheme of ['light', 'dark']) {
+  test.describe(`the question's text contrast, ${colorScheme} mode`, () => {
+    test.use({ colorScheme });
+
+    test('every word in the question can be read', async ({ page }) => {
+      await demoWithDrafts(page);
+      await openProgress(page);
+      await printReports(page);
+      await expect(drafts(page)).toBeVisible();
+      // Fades settle first, as in e2e/contrast.spec.js.
+      await page.evaluate(() =>
+        Promise.all(
+          document
+            .getAnimations()
+            .filter(a => a.effect?.getComputedTiming().iterations !== Infinity)
+            .map(a => a.finished.catch(() => {})),
+        ),
+      );
+      // Only the question: the page and the Print dialog under it are covered.
+      await page.evaluate(() => {
+        document.body.querySelectorAll(':scope > *:not(#drafts-print-overlay)').forEach(el => {
+          el.style.visibility = 'hidden';
+        });
+      });
+      const failures = await findLowContrastText(page, { fillTokens: ['--active'] });
+      expect(failures, JSON.stringify(failures, null, 1)).toEqual([]);
+    });
+  });
+}
