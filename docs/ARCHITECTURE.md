@@ -27,7 +27,7 @@ The app persists teacher data through Supabase Auth plus a public RPC surface. I
 
 - `login.html` and `login-auth.js` handle sign-in, sign-up, password reset, and Demo Mode entry.
 - Authenticated users are routed into the teacher experience.
-- Teachers are the only accounts. Students answer questionnaires and read phone reports on the student page (`s/index.html`, `s/student.js`, `shared/phone-report-view.js`) with a code from their slip, through the `student-submit` Supabase edge function. There is no parent portal.
+- Teachers are the only accounts. Students answer questionnaires and read phone reports on the student page (`s/index.html`; `s/student.js`, the shell, then its screens in `s/questionnaire.js` and `s/report.js`; `shared/phone-report-view.js`) with a code from their slip, through the `student-submit` Supabase edge function. There is no parent portal.
 
 ### Desktop SPA
 
