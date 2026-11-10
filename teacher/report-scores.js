@@ -30,7 +30,11 @@ window.ReportScores = (function () {
 
   /* Which grades each surface uses (plan 1.3, "Which grades each screen
      uses"; DECISIONS, "Student page build answers" 6). To put a surface on
-     returned grades, change its row to 'returned'. */
+     returned grades, change its row to 'returned'.
+     The rubric handout printed from the grader (teacher/rubric-print.js)
+     is not a surface: the plan's table has no row for it. Its sheet reads
+     through the readers below, and is drawn on all work unless a report
+     surface draws it (a Feedback Page). */
   var SURFACES = {
     // Progress Reports on Page Studio, and the Quick Report with its Feedback Pages. S2-F1 makes it 'returned'.
     progress: 'all',
