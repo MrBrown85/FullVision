@@ -164,8 +164,7 @@ ok('and no function: each patch went in once',
 # ── The patches start from the live bodies, and only from them ─────────
 got = {r[0]: r[1] for r in rows("""select p.proname, pg_get_functiondef(p.oid) from pg_proc p
                                     join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public'""")}
-ok('seven functions carry a patch', all(mark in got[fn] for fn, mark in (
-    ('set_score_status', 'cannot be marked Missing'),
+ok('six functions carry a patch, and a seventh below', all(mark in got[fn] for fn, mark in (
     ('update_course', 'student_page_enabled'), ('move_rubric_scores', 'fv.moving_rubric'),
     ('import_json_restore', 'restore_grade_returns'), ('duplicate_course', 'courses_count_equally, return_grades'),
     ('_issue_access_code', 'live student card'), ('_issue_report_code', 'live student card'))))
@@ -180,14 +179,16 @@ ok('the two slip functions are their old bodies plus two lines',
    all(d.replace("""salt))
             -- nor the code of a live student card (2026110903_student_card)
             or exists (select 1 from student_card where stopped_at is null and code = _code);""", 'salt));') == slip_before[n] for n, d in PATCHES.items()))
-ok('create_course, duplicate_assessment, upsert_rubric_score and the other score RPCs are still the live bodies',
+ok('create_course, duplicate_assessment, set_score_status, upsert_rubric_score and the other score RPCs are still the live bodies',
    all(md5 == want[name] for name, md5 in rows("""select p.proname, md5(pg_get_functiondef(p.oid)) from pg_proc p
            join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public'""")
-       if name in want and name not in ('set_score_status', 'update_course', 'move_rubric_scores', 'import_json_restore', 'duplicate_course')))
+       if name in want and name not in ('update_course', 'move_rubric_scores', 'import_json_restore', 'duplicate_course')))
 c.run('rollback'); c.run('begin')
 as_owner()
-live_def = one("select pg_get_functiondef('public.set_score_status(uuid,uuid,text)'::regprocedure)")
-c.run(live_def.replace("raise exception 'invalid status %', p_status", "raise exception 'not a status %', p_status"))
+live_def = one("select pg_get_functiondef(p.oid) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname = 'move_rubric_scores'")
+edited = live_def.replace('begin', 'begin ', 1)
+assert edited != live_def
+c.run(edited)
 def guarded():
     # Statement by statement, with no transaction to save it: the third
     # statement is the check, and it must be what stops the file.
@@ -195,7 +196,7 @@ def guarded():
     c.run(sts[1].split('\n')[-1]); c.run(sts[2])
 expect_error('the migration stops at its first check on a function that is not the one it was written against', guarded,
              'is not the definition this migration was written against')
-ok('and nothing of it exists: no table, no column, no trigger', one("select to_regclass('public.grade_return') is null and to_regclass('public.grade_return_before') is null")
+ok('and nothing of it exists: no table, no column, no trigger', one("select to_regclass('public.grade_return') is null")
    and one("select count(*) from information_schema.columns where table_name = 'course' and column_name in ('student_page_enabled', 'return_grades')") == 0
    and one("select count(*) from pg_trigger where tgname like 'grade_return%'") == 0)
 c.run('rollback'); c.run('begin'); as_owner()

@@ -493,8 +493,8 @@ for n in range(300):
             svc("student_submit.seen(:t, :e, :ids::uuid[], 'ip-1')", t=tok, e=ENR1, ids='{%s}' % a)
         c.run('release savepoint sp')
     except Exception as err:
-        back()   # a refused write (Missing on scored work) changes nothing
-        if 'cannot be marked Missing' not in str(err): raise
+        back()
+        raise
     after = working_copy(ENR1, a)
     # The model: what the student has is what the working copy was at the
     # last return; under As Soon As I Save every real change is a return.

@@ -66,20 +66,34 @@
 --    screens hide because the work is no longer scored that way (a level
 --    left on a rubric the work no longer uses, a competency level on work
 --    since changed to points). _grade_copy_in_use(copy, assessment) gives
---    the part the work's scoring uses now, by the rule under 6. Students are
---    sent only that (student_submit._returned_grade), so the student page
---    never has to know the hiding rules.
+--    the part the work's scoring uses now:
+--          a rubric attached        criterion levels and ticks on that rubric
+--          points or Complete       score.value; a 0 is a score
+--          competencies linked      their levels (competencies still on the
+--                                   class)
+--          no level row at all      the Overall level (score.value), which
+--                                   the app shows as Overall or under the
+--                                   work's first competency; a 0 is no score
+--          always                   the Overall Comment
+--    Students are sent only that (student_submit._returned_grade), so the
+--    student page never has to know the hiding rules. Where the app's own
+--    rule is not certain the SQL hides: on rubric work with no criterion
+--    level yet, an Overall level or a competency level from before the
+--    rubric was attached is not sent, though the teacher's screens show it
+--    under a competency or a linked criterion.
 --
 -- 4. Triggers on the four score tables keep grade_return right for any
---    writer: the RPCs, an old cached client, the grade-scans skill. A row
---    trigger BEFORE each change keeps the cell's copy as it was (in
---    grade_return_before, a scratch table) the first time a transaction
---    touches the cell; a statement trigger AFTER compares it with the copy
---    NOW. The copy before is taken before anything is deleted, so it does not
---    depend on the order cascades run in: deleting a criterion that has a
---    ticked box takes its levels and its ticks, and the student still keeps
---    both until the teacher returns the grade. Equal copies do nothing: a
---    save that changes nothing, or the same save sent twice, is not a draft.
+--    writer: the RPCs, an old cached client, the grade-scans skill. Each
+--    grade_return row keeps the working copy as the last save left it
+--    (working_copy). A statement trigger AFTER each change takes the class
+--    lock, reads that as the copy BEFORE, builds the copy NOW from the score
+--    tables, and writes it back. Both are read under the lock, so the copy
+--    before is what the last writer to the class left: it does not depend on
+--    the order cascades run in (deleting a criterion that has a ticked box
+--    takes its levels and its ticks, and the student still keeps both until
+--    the teacher returns the grade), nor on what another save or a Return
+--    did while this one waited. Equal copies do nothing: a save that changes
+--    nothing, or the same save sent twice, is not a draft.
 --    Otherwise, for that student and assessment:
 --
 --    The class holds grades (student_page_enabled and return_grades =
@@ -127,19 +141,66 @@
 --    screen asks first; course_draft_count(p_course_id) tells it how many.
 --    Turning the page back on leaves them returned.
 --
---    Lock order, everywhere: the class lock first, then rows. A save, a
---    return, a setting change (its trigger is named a_... so it fires before
---    the sync-cursor trigger on course) and a delete of a criterion,
---    checkbox, competency or rubric (a statement trigger before each, which
---    locks each of the caller's classes) all take the class lock before
---    they hold anything a save waits on.
+--    ONE LOCK PER CLASS, and it is the one the database already has. Every
+--    table that holds a class's data carries a sync-cursor trigger
+--    (_touch_course_sync_cursor_from_trigger) that updates the class's row
+--    in course_sync_cursor after the statement's rows are written, so every
+--    writer to a class already queues on that row, always in the same
+--    position: its own rows first, then the class's cursor row. Batch A
+--    uses that row as its class lock (_grade_return_lock: select ... for
+--    update) and takes it in the same position, never earlier:
+--      the statement triggers on the score tables   after the statement's
+--                                    rows, before they read the grade
+--      move_rubric_scores re-pointing a row          the same
+--      a student or an assessment being deleted      after its rows and the
+--                                    score rows that go with it
+--      return_grades                 first: it writes no other row
+--      a class leaving When I Return Them           after the course row
+--      the restore                   at its end, after its rows
+--      the student page's seen()     after the session row
+--    and behind it there is only grade_return: a grade_return row is read
+--    for update, written or deleted only by a transaction that already
+--    holds the class's cursor row, and such a transaction then waits for
+--    nothing else. That is why grade_return has NO FOREIGN KEYS. A cascade
+--    from enrollment or assessment would delete its rows before the deleting
+--    transaction reached the cursor row, and a foreign-key check on a new
+--    row would wait on a student or an assessment that is being deleted;
+--    either is a lock taken in the other order, and a deadlock with a save
+--    or a Return in the same class. Instead a trigger on enrollment and on
+--    assessment deletes the rows, in the position above, and nothing but
+--    the functions here can insert one (they take the student and the
+--    assessment from rows that exist, under the lock). The last statements
+--    of this file remove any row left without its student or assessment and
+--    can be run again at any time.
+--    So Batch A adds no second lock that a code path could reach in the
+--    other order. An earlier draft had a separate advisory lock per class
+--    and it deadlocked three ways with the cursor row (saves against
+--    returns, against a setting change, against a rubric save); it is gone,
+--    and so are the guards it needed.
+--    Why not take the class lock before the statement's rows, at the start?
+--    Because no existing writer does: a save that took the cursor row first
+--    and its score row second would be the one path in the opposite order,
+--    and would deadlock with any writer holding that score row.
+--    The cursor row is made when its class is (the trigger on course), and
+--    _grade_return_lock makes it if it is somehow missing.
+--    Who is signed in does not matter: a delete by the database owner
+--    (the nightly purge) goes through the same triggers and takes the
+--    cursor row like any writer. The restore locks every class its payload
+--    names a class, a grade or a state in. Not locked: a class that is
+--    itself being deleted, when there is nothing left to keep right.
+--    What working_copy depends on: every change to a score table going
+--    through these triggers. A write made with them switched off (a
+--    superuser's session_replication_role = replica) leaves it behind, and
+--    the next save to that cell would be compared with an old copy; the
+--    last statement of this file brings every row up to date and can be run
+--    again at any time.
 --
---    Two saves at once: the BEFORE trigger and return_grades take one lock
---    per class (_grade_return_lock, an advisory lock held to the end of the
---    transaction) before they read a grade, so the second waits and sees
---    what the first did. Without it a save could compare against a grade
---    another save was halfway through changing, and settle a draft as
---    Returned. migrations/local-test/grade_return_race.py runs that race.
+--    Two saves at once: the second waits on the class's cursor row and then
+--    reads the grade as the first left it. Without that a save could
+--    compare against a grade another save was halfway through changing,
+--    and settle a draft as Returned. migrations/local-test/
+--    grade_return_race.py runs it, and every RPC that writes a class
+--    against saves and returns.
 --
 -- 5. return_grades(p_assessment_id, p_enrollment_ids, p_idempotency_key):
 --    Return, Return and Next, Return N Graded. For each listed student whose
@@ -156,38 +217,24 @@
 --    course_draft_count(p_course_id): how many grades in the class are
 --    waiting as drafts.
 --
--- 6. One server check on an existing RPC, patched in place from the live body
---    (the migration stops if the live body is not the one it was written
---    against). It refuses only what is certainly wrong: a refused write is a
---    dead letter in a teacher's outbox, with only the sync dot to say so.
---    (The plan's other check, upsert_rubric_score refusing a criterion that
---    is not on the work's rubric, is NOT here: upsert_rubric_score is left
---    exactly as live. The outbox can send a score ahead of the
---    update_assessment that changes the rubric, so the check would refuse
---    real grades. It waits until the client sends the rubric change first.
---    Meanwhile 2026110901 keeps a criterion to its own class and students
---    are not sent a level that is off the work's rubric.)
---      set_score_status refuses Missing on work that has a score (errcode
---        22023), unless it is already marked Missing. "Has a score" is what
---        the app shows as one, the rule of canSetAssignmentStatus in
---        shared/data.js for levels, points and marks: only the rows the
---        work's scoring uses NOW count (fv_private.work_is_scored, through
---        _grade_copy_in_use, 3b):
---          a rubric attached        criterion levels on that rubric
---          points or Complete       score.value; a 0 is a score
---          competencies linked      their levels (competencies still on the
---                                   class)
---          no level row at all      the Overall level (score.value), which
---                                   the app shows as Overall or under the
---                                   work's first competency; a 0 is no score
---        Rows the app hides do not count: a criterion level left from a
---        rubric the work no longer uses, a competency level on points work,
---        a score.value on rubric work or beside competency levels. Excused and Late are
---        not checked, and comments do not count as a score.
---        Rows of that hidden kind on gradebook-prod, counted 2026-11-09: 0
---        competency levels on points or rubric work, 0 criterion levels off
---        the current rubric, 1 score.value on competency or rubric work. To
---        count them again:
+-- 6. No existing score RPC is changed. The plan's two server checks are NOT
+--    in this batch:
+--      upsert_rubric_score refusing a criterion that is not on the work's
+--        rubric: the outbox can send a score ahead of the update_assessment
+--        that changes the rubric, so the check would refuse real grades.
+--      set_score_status refusing Missing on scored work: the shipped app
+--        sends Missing on cells the server still holds a score for (work
+--        whose rubric changed; a linked group member whose copy left a
+--        note; an Overall level on rubric work), and a refused write is a
+--        dead letter in a teacher's outbox with only the sync dot to say so.
+--    Both rules stay in the client until the client can be changed first.
+--    What Batch A does instead needs no refusal: 2026110901 keeps a score
+--    row to its own class, students are sent only the part of a grade the
+--    work's scoring uses now (3b), and Missing or Excused hides the result
+--    at once (2026110904).
+--    Rows the app hides, on gradebook-prod, counted 2026-11-09: 0 competency
+--    levels on points or rubric work, 0 criterion levels off the current
+--    rubric, 1 score.value on competency or rubric work. To count again:
 --          select (select count(*) from tag_score x join assessment a on a.id = x.assessment_id
 --                   where x.value is not null and (a.rubric_id is not null or a.score_mode <> 'proficiency'))
 --                   as competency_levels_on_points_or_rubric_work,
@@ -220,7 +267,8 @@
 -- student_page_enabled = false and return_grades = null. The backfill adds
 -- one grade_return row, not a draft, for every student and assessment that
 -- has a grade today (a level, points, a mark, a comment or a tick; a status
--- or a Note for the Report alone is not a grade). Its returned_at is when
+-- or a Note for the Report alone is not a grade), holding that grade as its
+-- working copy. Its returned_at is when
 -- that grade was last saved (the latest updated_at of its rows): these
 -- classes have always shown a grade as soon as it was saved, so that is when
 -- it was returned. The backfill skips rows that exist, so it can run again.
@@ -228,16 +276,18 @@
 -- Who else changes a class, and what happens to these rows: clear_data
 -- deletes the caller's classes and students, and relink_student deletes a
 -- duplicate enrollment when the real student is already in the class; in
--- both the enrollment's grade_return rows go with it (the foreign key), and
--- the triggers stand aside for a cell that is being deleted. When
+-- both the enrollment's grade_return rows go with it (the trigger on
+-- enrollment), and the score-table triggers stand aside for a cell that is
+-- being deleted. When
 -- relink_student instead moves an enrollment to the real student record, the
 -- enrollment keeps its id, so its grade_return rows stay as they are.
 -- Neither writes a score table.
 --
 -- Functions this file leaves callable by signed-in teachers through the API:
--- return_grades, list_course_grade_returns and course_draft_count. The helpers the SECURITY
--- INVOKER RPCs call (the restore's and move_rubric_scores', and the Missing
--- check's) are in schema fv_private, which the API does not expose.
+-- return_grades, list_course_grade_returns and course_draft_count. The two
+-- helpers that SECURITY INVOKER RPCs call (the restore's and
+-- move_rubric_scores') are in schema fv_private, which the API does not
+-- expose.
 --
 -- The whole file can be run again.
 --
@@ -263,7 +313,6 @@ begin
     -- already carry the patch (a second run).
     for _f in
         select * from (values
-            ('public.set_score_status(uuid,uuid,text)', '785597b37ce5d5fdb9b9c19f97c89fca', 'cannot be marked Missing'),
             ('public.update_course(uuid,jsonb)', '8aacf4f24b0b7133352379e89978776b', 'student_page_enabled'),
             ('public.move_rubric_scores(uuid,uuid,jsonb,jsonb,uuid)', '92f7ff4b840c1dd9fe473f8ecdee29b5', 'fv.moving_rubric'),
             ('public.import_json_restore(jsonb,uuid)', '58e48ae4f7ebcc05489b489a4f8906df', 'restore_grade_returns'),
@@ -295,15 +344,21 @@ comment on column public.course.return_grades is
 
 -- ── 2. grade_return ─────────────────────────────────────────────────────────
 create table if not exists public.grade_return (
-    enrollment_id uuid        not null references public.enrollment(id) on delete cascade,
-    assessment_id uuid        not null references public.assessment(id) on delete cascade,
+    -- No foreign keys, on purpose (see 4 in the header, ONE LOCK PER CLASS):
+    -- the rows go when their student or assessment does, by trigger.
+    enrollment_id uuid        not null,
+    assessment_id uuid        not null,
     is_draft      boolean     not null default false,
     returned_at   timestamptz,
     returned_copy jsonb,
     previous_copy jsonb,
     updated_at    timestamptz,
     seen_at       timestamptz,
+    -- The grade as the teacher's last save left it: what the next save is
+    -- compared with. Never sent to anyone.
+    working_copy  jsonb,
     primary key (enrollment_id, assessment_id),
+    constraint grade_return_working_copy_object check (working_copy is null or jsonb_typeof(working_copy) = 'object'),
     constraint grade_return_returned_copy_object check (returned_copy is null or jsonb_typeof(returned_copy) = 'object'),
     constraint grade_return_previous_copy_object check (previous_copy is null or jsonb_typeof(previous_copy) = 'object'),
     -- returned_copy is kept exactly while a draft sits on a returned grade.
@@ -459,151 +514,23 @@ create schema if not exists fv_private;
 revoke all on schema fv_private from public, anon;
 grant usage on schema fv_private to authenticated, service_role;
 
--- Does this work have a score, as the app shows one? set_score_status asks.
-create or replace function fv_private.work_is_scored(p_enrollment_id uuid, p_assessment_id uuid)
- returns boolean
- language sql
- stable security definer
- set search_path to 'public', 'pg_temp'
-as $function$
-    select fv_owns_enrollment(p_enrollment_id) and exists (
-        select 1 from (select _grade_copy_in_use(_grade_copy(p_enrollment_id, p_assessment_id), p_assessment_id) as c) x
-         where x.c->>'value' is not null
-            or exists (select 1 from jsonb_each(x.c->'tags') t where t.value->>'value' is not null)
-            or exists (select 1 from jsonb_each(x.c->'criteria') t where t.value->>'value' is not null));
-$function$;
-revoke all on function fv_private.work_is_scored(uuid, uuid) from public, anon;
-grant execute on function fv_private.work_is_scored(uuid, uuid) to authenticated, service_role;
-
 -- ── 4. The rule ─────────────────────────────────────────────────────────────
--- The copy a cell had before it was first changed in this transaction,
--- taken by a BEFORE trigger and used once by the statement trigger that
--- follows. It is what makes the rule independent of the order things
--- happen in: deleting a criterion removes its levels and its ticks through
--- two cascades whose order Postgres does not promise, and the copy the
--- student keeps must be the grade as it was before either. A row belongs
--- to one transaction: it is trusted only when both its transaction id and
--- its transaction start time are the current ones (ids alone repeat after a
--- dump and restore). It is deleted when it is used, and whatever a
--- statement kept and did not use (a save that changed nothing) is deleted
--- when that statement ends, so the table is empty between transactions.
--- It is in public, with no access for any API role, because the trigger
--- functions that use it are; nobody can read or write it but them.
-create table if not exists public.grade_return_before (
-    enrollment_id uuid   not null references public.enrollment(id) on delete cascade,
-    assessment_id uuid   not null references public.assessment(id) on delete cascade,
-    txid          bigint      not null,
-    at            timestamptz not null,
-    tbl           text        not null,
-    copy          jsonb,
-    primary key (enrollment_id, assessment_id)
-);
-create index if not exists grade_return_before_assessment_idx on public.grade_return_before (assessment_id);
-alter table public.grade_return_before enable row level security;
-revoke all on table public.grade_return_before from public, anon, authenticated;
 
--- One lock per class for everything that reads a grade and then writes its
--- state: two saves to one class at once take turns, so the second sees what
--- the first did. (Every score write already queues behind the class's
--- course_sync_cursor row, but only at the end of its statement; this does
--- not lean on that.) Held to the end of the transaction.
+-- The class lock: the class's row in course_sync_cursor, which every writer
+-- to the class already updates through the sync-cursor triggers (see 4 in
+-- the header). Held to the end of the transaction. The row is made with its
+-- class; if it is missing it is made here.
 create or replace function public._grade_return_lock(p_course_id uuid)
  returns void
- language sql
- security definer
- set search_path to 'public', 'pg_temp'
-as $function$
-    select pg_advisory_xact_lock(hashtextextended('fv.grade_return:' || p_course_id::text, 0));
-$function$;
-
--- Deleting a criterion, a checkbox, a competency or a rubric takes its
--- levels and ticks with it, and each of those takes the class lock. A save
--- for the same criterion takes the class lock first and then waits on the
--- criterion's row, so the delete must take the class lock before it holds
--- that row, or the two deadlock. A row trigger is too late (Postgres locks
--- the row before it fires one), so a statement trigger does it, before any
--- row is touched. It cannot know which class the statement is about, so it
--- takes the lock of each of the caller's classes, in id order: a teacher has
--- a handful, and these deletes are rare and short. With no teacher signed
--- in (the owner's own maintenance, the nightly purge) it takes none.
-create or replace function public._grade_return_lock_mine()
- returns trigger
  language plpgsql
  security definer
  set search_path to 'public', 'pg_temp'
 as $function$
 begin
-    if (select auth.uid()) is not null and coalesce(current_setting('fv.restoring', true), '') <> 'on' then
-        perform _grade_return_lock(c.id)
-           from (select id from course where teacher_id = (select auth.uid()) order by id) c;
-    end if;
-    return null;
-end;
-$function$;
-revoke all on function public._grade_return_lock_mine() from public, anon, authenticated;
-do $locks$
-declare
-    _t text;
-begin
-    foreach _t in array array['rubric', 'criterion', 'criterion_check', 'tag'] loop
-        execute format('drop trigger if exists grade_return_lock on public.%I', _t);
-        execute format('create trigger grade_return_lock before delete on public.%I '
-                       'for each statement execute function public._grade_return_lock_mine()', _t);
-    end loop;
-end
-$locks$;
-
--- Before a row of a score table changes: keep the cell's copy as it is now,
--- the first time this transaction touches the cell. tg_argv[0] is the part
--- of a copy the table holds ('score', 'tags', 'criteria' or 'checks').
-create or replace function public._grade_return_before()
- returns trigger
- language plpgsql
- security definer
- set search_path to 'public', 'pg_temp'
-as $function$
-declare
-    _part   text := tg_argv[0];
-    _o      jsonb := case when tg_op <> 'INSERT' then to_jsonb(old) end;
-    _n      jsonb := case when tg_op <> 'DELETE' then to_jsonb(new) end;
-    _skip   constant text[] := array['updated_at', 'scored_at', 'created_at', 'status', 'report_note'];
-    _cell   record;
-    _course uuid;
-begin
-    -- import_json_restore sets the state itself when its rows are in.
-    if current_setting('fv.restoring', true) = 'on' then
-        return coalesce(new, old);
-    end if;
-    -- Nothing a copy holds is changing: a status, a Note for the Report, a
-    -- timestamp, or a score row that only carries those.
-    if tg_op = 'UPDATE' and (_o - _skip) = (_n - _skip) then
-        return new;
-    end if;
-    if _part = 'score' and tg_op <> 'UPDATE'
-       and coalesce(_o, _n)->>'value' is null and nullif(btrim(coalesce(_o, _n)->>'comment'), '') is null then
-        return coalesce(new, old);
-    end if;
-
-    for _cell in
-        select distinct (r->>'enrollment_id')::uuid as e, (r->>'assessment_id')::uuid as a
-          from (values (_o), (_n)) v(r) where r is not null
-    loop
-        continue when exists (select 1 from grade_return_before b
-                               where b.enrollment_id = _cell.e and b.assessment_id = _cell.a
-                                 and b.txid = txid_current() and b.at = transaction_timestamp());
-        -- Inside a delete of the assessment, the student or the class: the
-        -- cell is going, and grade_return's own cascade takes its row.
-        select e.course_id into _course from enrollment e where e.id = _cell.e;
-        continue when _course is null or not exists (select 1 from assessment where id = _cell.a);
-        perform _grade_return_lock(_course);
-        -- A statement of its own, after the lock: it reads the cell as the
-        -- last save to this class left it.
-        insert into grade_return_before (enrollment_id, assessment_id, txid, at, tbl, copy)
-        values (_cell.e, _cell.a, txid_current(), transaction_timestamp(), tg_table_name, _grade_copy(_cell.e, _cell.a))
-        on conflict (enrollment_id, assessment_id) do update
-           set txid = excluded.txid, at = excluded.at, tbl = excluded.tbl, copy = excluded.copy;
-    end loop;
-    return coalesce(new, old);
+    insert into course_sync_cursor (course_id)
+    select p_course_id where exists (select 1 from course where id = p_course_id)
+    on conflict (course_id) do nothing;
+    perform 1 from course_sync_cursor where course_id = p_course_id for update;
 end;
 $function$;
 
@@ -699,9 +626,9 @@ begin
 end;
 $function$;
 
--- After a statement on a score table: for every cell it touched, the copy
--- kept before against the copy now. A cell with no kept copy was not
--- changed, or was already settled by an earlier trigger of the same delete.
+-- After a statement on a score table: for every cell it changed, the working
+-- copy grade_return holds against the copy now, both read under the class
+-- lock.
 create or replace function public._grade_return_on_change()
  returns trigger
  language plpgsql
@@ -709,47 +636,84 @@ create or replace function public._grade_return_on_change()
  set search_path to 'public', 'pg_temp'
 as $function$
 declare
-    _cells jsonb := '[]'::jsonb;
-    _more  jsonb;
-    _b     grade_return_before%rowtype;
+    -- Not in a copy: a change to these alone is no change to the grade.
+    _skip   constant text[] := array['updated_at', 'scored_at', 'created_at', 'status', 'report_note'];
+    _cells  jsonb;
+    _c      record;
+    _before jsonb;
+    _now    jsonb;
 begin
+    -- import_json_restore sets the state itself when its rows are in.
     if current_setting('fv.restoring', true) = 'on' then return null; end if;
 
     -- old_rows exists on UPDATE and DELETE, new_rows on INSERT and UPDATE.
-    if tg_op <> 'INSERT' then
+    if tg_op = 'INSERT' then
+        select coalesce(jsonb_agg(distinct jsonb_build_array(n.enrollment_id, n.assessment_id)), '[]'::jsonb)
+          into _cells from new_rows n;
+    elsif tg_op = 'DELETE' then
         select coalesce(jsonb_agg(distinct jsonb_build_array(o.enrollment_id, o.assessment_id)), '[]'::jsonb)
           into _cells from old_rows o;
-    end if;
-    if tg_op <> 'DELETE' then
-        select coalesce(jsonb_agg(distinct jsonb_build_array(n.enrollment_id, n.assessment_id)), '[]'::jsonb)
-          into _more from new_rows n;
-        _cells := _cells || _more;
+    else
+        -- An UPDATE: only rows where something a copy holds changed (a status
+        -- or a Note for the Report takes no lock here and reads no grade).
+        select coalesce(jsonb_agg(distinct jsonb_build_array(d.r->'enrollment_id', d.r->'assessment_id')), '[]'::jsonb)
+          into _cells
+          from ((select to_jsonb(o) - _skip as r from old_rows o except all select to_jsonb(n) - _skip from new_rows n)
+                union all
+                (select to_jsonb(n) - _skip from new_rows n except all select to_jsonb(o) - _skip from old_rows o)) d;
     end if;
 
-    -- Every copy this transaction kept for a cell this statement touched,
-    -- and every copy this table's BEFORE trigger kept whether or not a row
-    -- changed (upsert_score's insert meeting a row that is already there
-    -- keeps one and touches nothing). Each is used once and deleted, so
-    -- nothing is left for a later statement or a later transaction. One
-    -- statement can fire two of these triggers (INSERT ... ON CONFLICT DO
-    -- UPDATE fires the insert's and the update's); the first to run settles
-    -- the cell and the second finds nothing to do.
-    for _b in
-        delete from grade_return_before b
-         where b.txid = txid_current() and b.at = transaction_timestamp()
-           and (b.tbl = tg_table_name
-                or exists (select 1 from jsonb_array_elements(_cells) x
-                            where (x->>0)::uuid = b.enrollment_id and (x->>1)::uuid = b.assessment_id))
-        returning *
+    -- A cell whose student or assessment is being deleted is left alone: its
+    -- grade_return row goes with it. Classes in id order.
+    for _c in
+        select distinct (x->>0)::uuid as enrollment_id, (x->>1)::uuid as assessment_id, e.course_id
+          from jsonb_array_elements(_cells) x
+          join enrollment e on e.id = (x->>0)::uuid
+         where exists (select 1 from assessment a where a.id = (x->>1)::uuid)
+         order by e.course_id, 1, 2
     loop
-        continue when not exists (select 1 from assessment where id = _b.assessment_id)
-                   or not exists (select 1 from enrollment where id = _b.enrollment_id);
-        perform _grade_return_apply(_b.enrollment_id, _b.assessment_id, _b.copy,
-                                    _grade_copy(_b.enrollment_id, _b.assessment_id));
+        -- The class's lock (its sync-cursor row, which this statement's own
+        -- cursor trigger takes too); then both copies, as the last writer to
+        -- the class left them.
+        perform _grade_return_lock(_c.course_id);
+        _before := (select g.working_copy from grade_return g
+                     where g.enrollment_id = _c.enrollment_id and g.assessment_id = _c.assessment_id);
+        _now := _grade_copy(_c.enrollment_id, _c.assessment_id);
+        continue when _now is not distinct from _before;
+        perform _grade_return_apply(_c.enrollment_id, _c.assessment_id, _before, _now);
+        update grade_return set working_copy = _now
+         where enrollment_id = _c.enrollment_id and assessment_id = _c.assessment_id;
     end loop;
     return null;
 end;
 $function$;
+
+-- A student or an assessment is deleted: its grade_return rows go, under the
+-- class lock like every other write to them. The trigger's name puts it
+-- after the foreign-key cascades that take the score rows.
+create or replace function public._grade_return_gone()
+ returns trigger
+ language plpgsql
+ security definer
+ set search_path to 'public', 'pg_temp'
+as $function$
+begin
+    perform _grade_return_lock(old.course_id);
+    if tg_table_name = 'enrollment' then
+        delete from grade_return where enrollment_id = old.id;
+    else
+        delete from grade_return where assessment_id = old.id;
+    end if;
+    return null;
+end;
+$function$;
+revoke all on function public._grade_return_gone() from public, anon, authenticated;
+drop trigger if exists grade_return_gone on public.enrollment;
+create trigger grade_return_gone after delete on public.enrollment
+    for each row execute function public._grade_return_gone();
+drop trigger if exists grade_return_gone on public.assessment;
+create trigger grade_return_gone after delete on public.assessment
+    for each row execute function public._grade_return_gone();
 
 -- A copy with ids renamed: p_criterion_map and p_check_map are
 -- { "<old id>": "<new id>" }, as move_rubric_scores takes them; p_tag_map
@@ -772,7 +736,7 @@ $function$;
 
 -- A row pointed at another criterion or checkbox by move_rubric_scores (Edit
 -- a Copy): the grade is the same grade, so the ids inside the stored copies,
--- and inside the copy kept before, follow it. Only then: move_rubric_scores
+-- the working copy among them, follow it. Only then: move_rubric_scores
 -- sets fv.moving_rubric for its transaction, and without it an UPDATE of
 -- one of these ids is a change like any other. tg_argv[0] is the copy's
 -- part, tg_argv[1] the id column.
@@ -794,21 +758,18 @@ begin
         return null;
     end if;
     _map := jsonb_build_object(_old, _new);
+    perform _grade_return_lock((select e.course_id from enrollment e where e.id = new.enrollment_id));
     update grade_return g
        set returned_copy = _grade_copy_remap(g.returned_copy, case when tg_argv[0] = 'criteria' then _map else _none end,
                                case when tg_argv[0] = 'checks' then _map else _none end,
                                case when tg_argv[0] = 'tags' then _map else _none end),
            previous_copy = _grade_copy_remap(g.previous_copy, case when tg_argv[0] = 'criteria' then _map else _none end,
                                case when tg_argv[0] = 'checks' then _map else _none end,
+                               case when tg_argv[0] = 'tags' then _map else _none end),
+           working_copy = _grade_copy_remap(g.working_copy, case when tg_argv[0] = 'criteria' then _map else _none end,
+                               case when tg_argv[0] = 'checks' then _map else _none end,
                                case when tg_argv[0] = 'tags' then _map else _none end)
-     where g.enrollment_id = new.enrollment_id and g.assessment_id = new.assessment_id
-       and (g.returned_copy is not null or g.previous_copy is not null);
-    update grade_return_before b
-       set copy = _grade_copy_remap(b.copy, case when tg_argv[0] = 'criteria' then _map else _none end,
-                      case when tg_argv[0] = 'checks' then _map else _none end,
-                      case when tg_argv[0] = 'tags' then _map else _none end)
-     where b.enrollment_id = new.enrollment_id and b.assessment_id = new.assessment_id
-       and b.txid = txid_current() and b.at = transaction_timestamp() and b.copy is not null;
+     where g.enrollment_id = new.enrollment_id and g.assessment_id = new.assessment_id;
     return null;
 end;
 $function$;
@@ -828,6 +789,7 @@ begin
        or not fv_owns_assessment(p_assessment_id) then
         return;
     end if;
+    perform _grade_return_lock((select a.course_id from assessment a where a.id = p_assessment_id));
     update grade_return g
        set returned_copy = _grade_copy_remap(g.returned_copy, coalesce(p_criterion_map, '{}'::jsonb), coalesce(p_check_map, '{}'::jsonb)),
            previous_copy = _grade_copy_remap(g.previous_copy, coalesce(p_criterion_map, '{}'::jsonb), coalesce(p_check_map, '{}'::jsonb))
@@ -845,13 +807,12 @@ revoke all on function public._grade_copy_entry(integer, integer, text, text, bo
 revoke all on function public._grade_copy(uuid, uuid) from public, anon, authenticated;
 revoke all on function public._grade_return_holds(uuid) from public, anon, authenticated;
 revoke all on function public._grade_return_lock(uuid) from public, anon, authenticated;
-revoke all on function public._grade_return_before() from public, anon, authenticated;
 revoke all on function public._grade_return_apply(uuid, uuid, jsonb, jsonb) from public, anon, authenticated;
 revoke all on function public._grade_return_on_change() from public, anon, authenticated;
 revoke all on function public._grade_return_repoint() from public, anon, authenticated;
 
--- On each of the four tables: one row trigger before, and three statement
--- triggers after (a trigger with transition tables takes one event).
+-- On each of the four tables: three statement triggers after (a trigger
+-- with transition tables takes one event).
 do $triggers$
 declare
     _t record;
@@ -864,12 +825,9 @@ begin
             ('rubric_check_score', 'checks')
         ) as v(tbl, part)
     loop
-        execute format('drop trigger if exists grade_return_before on public.%I', _t.tbl);
         execute format('drop trigger if exists grade_return_insert on public.%I', _t.tbl);
         execute format('drop trigger if exists grade_return_update on public.%I', _t.tbl);
         execute format('drop trigger if exists grade_return_delete on public.%I', _t.tbl);
-        execute format('create trigger grade_return_before before insert or update or delete on public.%I '
-                       'for each row execute function public._grade_return_before(%L)', _t.tbl, _t.part);
         execute format('create trigger grade_return_insert after insert on public.%I '
                        'referencing new table as new_rows for each statement '
                        'execute function public._grade_return_on_change()', _t.tbl);
@@ -919,11 +877,12 @@ begin
     if _now is null then
         -- The teacher cleared a returned grade: returned, there is no grade.
         update grade_return
-           set is_draft = false, returned_at = null, returned_copy = null, previous_copy = null, updated_at = null
+           set is_draft = false, returned_at = null, returned_copy = null, previous_copy = null, updated_at = null,
+               working_copy = null
          where enrollment_id = p_enrollment_id and assessment_id = p_assessment_id;
     else
         update grade_return
-           set is_draft = false, returned_at = p_at, returned_copy = null,
+           set is_draft = false, returned_at = p_at, returned_copy = null, working_copy = _now,
                previous_copy = case when _g.returned_copy is not null then _g.returned_copy else previous_copy end,
                updated_at = case when _g.returned_copy is not null then p_at else updated_at end
          where enrollment_id = p_enrollment_id and assessment_id = p_assessment_id;
@@ -951,14 +910,10 @@ begin
 end;
 $function$;
 revoke all on function public._grade_return_release() from public, anon, authenticated;
--- The name carries the lock order. Triggers fire in name order, and
--- course_sync_cursor_course_gradebook locks the class's sync-cursor row. A
--- save takes the class lock first and that row second, so this trigger must
--- take the class lock before that one fires, or a setting change and a save
--- deadlock: hence the leading a_.
+-- It takes the class's sync-cursor row, as the course's own sync-cursor
+-- trigger does for the same UPDATE, so the two can fire in either order.
 drop trigger if exists grade_return_release on public.course;
-drop trigger if exists a_grade_return_release on public.course;
-create trigger a_grade_return_release
+create trigger grade_return_release
     after update of student_page_enabled, return_grades on public.course
     for each row
     when ((old.student_page_enabled and old.return_grades is not distinct from 'on_return')
@@ -1030,6 +985,7 @@ as $function$
                        'seen_at', g.seen_at, 'returned_copy', g.returned_copy, 'previous_copy', g.previous_copy))) as students
               from grade_return g
               join enrollment e on e.id = g.enrollment_id
+              join assessment a on a.id = g.assessment_id
              where e.course_id = p_course_id
                -- a row with nothing to say (a grade cleared, a save in flight) is left out
                and (g.is_draft or g.returned_at is not null or g.seen_at is not null)
@@ -1049,12 +1005,13 @@ as $function$
     select count(*)::int
       from grade_return g
       join enrollment e on e.id = g.enrollment_id
+      join assessment a on a.id = g.assessment_id
      where e.course_id = p_course_id and g.is_draft;
 $function$;
 revoke all on function public.course_draft_count(uuid) from public, anon;
 grant execute on function public.course_draft_count(uuid) to authenticated, service_role;
 
--- ── 6. The Missing check, update_course, move_rubric_scores, the restore ────
+-- ── 6. update_course, move_rubric_scores, duplicate_course, the restore ─────
 -- Each function is patched in place from its live definition. _was is
 -- md5(pg_get_functiondef) of the body this was written against, read from
 -- gradebook-prod on 2026-11-09; anything else stops the migration, unless
@@ -1063,25 +1020,6 @@ do $patch$
 declare
     _edits text[][] := array[
       -- function, md5 of the live definition, a line only the patch adds, text to find, replacement
-      array['public.set_score_status(uuid,uuid,text)',
-            '785597b37ce5d5fdb9b9c19f97c89fca',
-            'cannot be marked Missing',
-$s$        raise exception 'invalid status %', p_status using errcode = '22023';
-    end if;
-$s$,
-$s$        raise exception 'invalid status %', p_status using errcode = '22023';
-    end if;
-
-    -- Missing is for work with no score: refused on work the app shows as
-    -- scored (the rows its scoring uses now), unless it is already marked
-    -- Missing. Excused and Late are not checked; a comment is not a score.
-    if p_status = 'NS'
-       and not exists (select 1 from score where enrollment_id = p_enrollment_id
-                          and assessment_id = p_assessment_id and status = 'NS')
-       and fv_private.work_is_scored(p_enrollment_id, p_assessment_id) then
-        raise exception 'work that has a score cannot be marked Missing' using errcode = '22023';
-    end if;
-$s$],
       array['public.update_course(uuid,jsonb)',
             '8aacf4f24b0b7133352379e89978776b',
             'student_page_enabled',
@@ -1209,20 +1147,46 @@ create or replace function fv_private.restore_grade_returns(p_payload jsonb)
  set search_path to 'public', 'pg_temp'
 as $function$
 declare
-    _at timestamptz := clock_timestamp();
-    _n  integer := 0;
+    _at     timestamptz := clock_timestamp();
+    _n      integer := 0;
+    _es     uuid[];
+    _as     uuid[];
+    _course uuid;
 begin
     if (select auth.uid()) is null or coalesce(current_setting('fv.restoring', true), '') <> 'on' then
         return 0;
     end if;
 
-    -- A restore always makes a new class in the app. A hand-made one that
-    -- names a class the teacher already has waits for any save to it.
-    perform _grade_return_lock(c.id) from course c
-      where c.teacher_id = (select auth.uid())
-        and c.id::text in (select r->>'id' from jsonb_array_elements(
-                case when jsonb_typeof(p_payload->'courses') = 'array' then p_payload->'courses' else '[]'::jsonb end) r)
-      order by c.id;
+    -- Every student and assessment of the caller's that the payload names a
+    -- grade or a state for.
+    select coalesce(array_agg(c.enrollment_id), '{}'), coalesce(array_agg(c.assessment_id), '{}')
+      into _es, _as
+      from (select distinct (r->>'enrollment_id')::uuid as enrollment_id, (r->>'assessment_id')::uuid as assessment_id
+              from (select 'scores' union all select 'rubric_scores' union all select 'tag_scores'
+                    union all select 'rubric_check_scores' union all select 'grade_returns') k(arr)
+             cross join lateral jsonb_array_elements(
+                     case when jsonb_typeof(p_payload->k.arr) = 'array' then p_payload->k.arr else '[]'::jsonb end) r
+             where nullif(r->>'enrollment_id', '') is not null and nullif(r->>'assessment_id', '') is not null) c
+      join enrollment e on e.id = c.enrollment_id
+      join assessment a on a.id = c.assessment_id and a.course_id = e.course_id
+     where fv_owns_enrollment(c.enrollment_id);
+
+    -- The restore's rows are in. Now the class lock for each class the
+    -- payload names, or names a grade in, in id order, as any writer takes
+    -- it after its rows (the sync-cursor triggers stood aside during the
+    -- restore). A restore always makes a new class in the app; a hand-made
+    -- one that names a class the teacher already has waits here for any
+    -- save to it.
+    for _course in
+        select c.id from course c
+         where c.teacher_id = (select auth.uid())
+           and (c.id::text in (select r->>'id' from jsonb_array_elements(
+                    case when jsonb_typeof(p_payload->'courses') = 'array' then p_payload->'courses' else '[]'::jsonb end) r)
+                or c.id in (select e.course_id from enrollment e where e.id = any (_es)))
+         order by c.id
+    loop
+        perform _grade_return_lock(_course);
+    end loop;
 
     -- Every restored student and assessment that now has a grade: Returned.
     insert into grade_return (enrollment_id, assessment_id, is_draft, returned_at)
@@ -1288,6 +1252,13 @@ begin
         and c.id::text in (select r->>'id' from jsonb_array_elements(
                 case when jsonb_typeof(p_payload->'courses') = 'array' then p_payload->'courses' else '[]'::jsonb end) r)
         and not (c.student_page_enabled and c.return_grades is not distinct from 'on_return');
+
+    -- And the working copy the next save to each is compared with.
+    update grade_return g
+       set working_copy = _grade_copy(g.enrollment_id, g.assessment_id)
+      from unnest(_es, _as) c(enrollment_id, assessment_id)
+     where g.enrollment_id = c.enrollment_id and g.assessment_id = c.assessment_id
+       and g.working_copy is distinct from _grade_copy(g.enrollment_id, g.assessment_id);
     return _n;
 end;
 $function$;
@@ -1297,8 +1268,8 @@ revoke all on function fv_private.restore_grade_returns(jsonb) from public, anon
 grant execute on function fv_private.restore_grade_returns(jsonb) to authenticated, service_role;
 
 -- ── The backfill: every grade there is today is Returned ────────────────────
-insert into public.grade_return (enrollment_id, assessment_id, is_draft, returned_at)
-select c.enrollment_id, c.assessment_id, false, max(c.at)
+insert into public.grade_return (enrollment_id, assessment_id, is_draft, returned_at, working_copy)
+select c.enrollment_id, c.assessment_id, false, max(c.at), public._grade_copy(c.enrollment_id, c.assessment_id)
   from (select s.enrollment_id, s.assessment_id, greatest(s.updated_at, s.scored_at) as at
           from public.score s
          where s.value is not null or nullif(btrim(s.comment), '') is not null
@@ -1315,6 +1286,16 @@ select c.enrollment_id, c.assessment_id, false, max(c.at)
           from public.rubric_check_score k) c
  group by c.enrollment_id, c.assessment_id
 on conflict (enrollment_id, assessment_id) do nothing;
+
+-- The repair, for any later day (both do nothing on a first run): rows whose
+-- student or assessment is gone, and working copies that a write with the
+-- triggers switched off left behind.
+delete from public.grade_return g
+ where not exists (select 1 from public.enrollment e where e.id = g.enrollment_id)
+    or not exists (select 1 from public.assessment a where a.id = g.assessment_id);
+update public.grade_return g
+   set working_copy = public._grade_copy(g.enrollment_id, g.assessment_id)
+ where g.working_copy is distinct from public._grade_copy(g.enrollment_id, g.assessment_id);
 
 notify pgrst, 'reload schema';
 

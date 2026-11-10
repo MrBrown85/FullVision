@@ -7,15 +7,14 @@ then as Teacher B, with no JWT and as anon. Rows are read back as the
 database owner. One transaction, rolled back at the end.
 
 "today:" in a check's name marks a gap this pins as it is, not as it should
-be. Batch A closes two of them: Missing on scored work
-(migrations/2026110902_grade_return.sql) and a score row that names another
-class's records (migrations/2026110901_score_rows_same_class.sql). A
-criterion that is not on the assessment's rubric stays accepted:
-upsert_rubric_score is not changed.
+be. Batch A closes one of them: a score row that names another class's
+records (migrations/2026110901_score_rows_same_class.sql). Missing on
+scored work and a criterion that is not on the assessment's rubric stay
+accepted: Batch A changes no score RPC but move_rubric_scores.
 
 The script runs against either database and says which it found: before
-Batch A those two are pinned as "today: accepted"; with Batch A loaded
-they are "refused", and a section at the end tries every way in.
+Batch A the cross-class rows are pinned as "today: accepted"; with Batch A
+loaded they are "refused", and a section at the end tries every way in.
 
 PGPORT=54329 PGDATABASE=fv_score python3 run.py harness.sql score-prelude.sql score-tables.sql
 PGPORT=54329 PGDATABASE=fv_score python3 score_rpcs.py      # today
@@ -60,7 +59,7 @@ def same_shape(lines):
         lines = [l for l in lines[:cut] if 'grade_return_' not in l]
     return [re.sub(r'[()]', '', l) for l in lines if not re.match(r'  constraint \S+ NOT NULL ', l)]
 BATCH_A = c.run("select to_regclass('public.grade_return') is not null")[0][0]
-PATCHED = ['set_score_status', 'move_rubric_scores'] if BATCH_A else []
+PATCHED = ['move_rubric_scores'] if BATCH_A else []
 ok('running against a database %s Batch A' % ('with' if BATCH_A else 'without'), True)
 c.run("set search_path = ''")
 local = snapshot_blocks(c.run(open(os.path.join(HERE, '..', '..', 'scripts', 'schema-snapshot.sql')).read())[0][0])
@@ -339,29 +338,15 @@ ok('Late on scored work keeps the score', score_row(ENR1, PTS)[:3] == [6.0, 0, '
 rpc(A, 'set_score_status(:e, :a, null)', e=ENR2, a=PLAIN)
 ok('a null status clears it; today the empty row stays behind', score_row(ENR2, PLAIN) == [None, 0, None, None, None], score_row(ENR2, PLAIN))
 expect_error('a status that is not NS, EXC or LATE is refused', lambda: rpc(A, "set_score_status(:e, :a, 'missing')", e=ENR2, a=PLAIN), 'invalid status')
-# GAP 2 (Batch A closes it): Missing on work that has a score.
-def mark_missing(e, a):
-    """Batch A refuses Missing on scored work. The rest of this script reads
-    rows with that mark on them, so there the owner puts it on."""
-    as_owner()
-    c.run("""insert into score (enrollment_id, assessment_id, status) values (:e, :a, 'NS')
-             on conflict (enrollment_id, assessment_id) do update set status = 'NS'""", e=e, a=a)
-if BATCH_A:
-    expect_error('refused: Missing on work that has points', lambda: rpc(A, "set_score_status(:e, :a, 'NS')", e=ENR2, a=PTS), 'cannot be marked Missing')
-    mark_missing(ENR2, PTS)
-    rpc(A, 'upsert_tag_score(:e, :a, :t, 3)', e=ENR2, a=PROF, t=T2)
-    expect_error('refused: Missing on work that has a competency level', lambda: rpc(A, "set_score_status(:e, :a, 'NS')", e=ENR2, a=PROF), 'cannot be marked Missing')
-    mark_missing(ENR2, PROF)
-    expect_error('refused: Missing on work that has criterion levels', lambda: rpc(A, "set_score_status(:e, :a, 'NS')", e=ENR2, a=RUB), 'cannot be marked Missing')
-    mark_missing(ENR2, RUB)
-else:
-    rpc(A, "set_score_status(:e, :a, 'NS')", e=ENR2, a=PTS)
-    ok('today: accepted: Missing on work that has points', score_row(ENR2, PTS)[:3] == [250.0, 0, 'NS'], score_row(ENR2, PTS))
-    rpc(A, 'upsert_tag_score(:e, :a, :t, 3)', e=ENR2, a=PROF, t=T2)
-    rpc(A, "set_score_status(:e, :a, 'NS')", e=ENR2, a=PROF)
-    ok('today: accepted: Missing on work that has a competency level', score_row(ENR2, PROF)[2] == 'NS' and tag_row(ENR2, PROF, T2) == [3, 0, None], score_row(ENR2, PROF))
-    rpc(A, "set_score_status(:e, :a, 'NS')", e=ENR2, a=RUB)
-    ok('today: accepted: Missing on work that has criterion levels', score_row(ENR2, RUB)[2] == 'NS' and crit_row(ENR2, RUB, C1)[0] == 4, score_row(ENR2, RUB))
+# GAP 2, still open with Batch A: Missing on work that has a score. The
+# shipped app sends it on cells the server still holds a score for.
+rpc(A, "set_score_status(:e, :a, 'NS')", e=ENR2, a=PTS)
+ok('today: accepted: Missing on work that has points', score_row(ENR2, PTS)[:3] == [250.0, 0, 'NS'], score_row(ENR2, PTS))
+rpc(A, 'upsert_tag_score(:e, :a, :t, 3)', e=ENR2, a=PROF, t=T2)
+rpc(A, "set_score_status(:e, :a, 'NS')", e=ENR2, a=PROF)
+ok('today: accepted: Missing on work that has a competency level', score_row(ENR2, PROF)[2] == 'NS' and tag_row(ENR2, PROF, T2) == [3, 0, None], score_row(ENR2, PROF))
+rpc(A, "set_score_status(:e, :a, 'NS')", e=ENR2, a=RUB)
+ok('today: accepted: Missing on work that has criterion levels', score_row(ENR2, RUB)[2] == 'NS' and crit_row(ENR2, RUB, C1)[0] == 4, score_row(ENR2, RUB))
 rpc(A, 'upsert_score(:e, :a, 5)', e=ENR2, a=PLAIN)
 rpc(A, "set_score_status(:e, :a, 'EXC')", e=ENR2, a=PLAIN)
 rpc(A, 'upsert_score(:e, :a, 8)', e=ENR2, a=PLAIN)

@@ -9,16 +9,17 @@ the class settings back and deletes what it made, also when it fails.
    back to what was returned. Connection 2 must wait for connection 1 and
    then see its level: the grade stays a draft and the student keeps 3.
    The class's sync-cursor triggers are switched off for this part, so the
-   wait does not lean on them: it is Batch A's own (the class lock,
-   _grade_return_lock, and the row the BEFORE trigger keeps).
+   wait does not lean on them: it is Batch A's own (_grade_return_lock, in
+   the statement trigger).
+   Then three at once: a level is raised (not committed), a Return and a
+   tick both wait for it. Whichever of the two goes first, the student must
+   be given the raised level: the tick's trigger reads the grade as it was
+   when it got the lock, not as it was when the tick was sent.
 2. Two connections save one class's scores again and again while a third
    returns them, 150 calls each. No call may fail.
 3. The same with a fourth connection changing the class's settings (Return
    Grades, the student page, a rename), a fifth filling a rubric and a
-   sixth making card calls. Run first as a control with the release trigger
-   renamed so it fires after the sync-cursor trigger: a setting change then
-   takes the sync-cursor row before the class lock, a save takes them the
-   other way, and they deadlock (40P01).
+   sixth making card calls.
 4. A level saved for a criterion while that criterion is being deleted,
    150 times: no deadlock.
 
@@ -78,6 +79,32 @@ try:
     ok('and then sees it: the grade is still a draft and the student is still given the returned 3', is_draft is True and given == 3, (is_draft, given))
     for t in SCORE_TABLES:
         o.run('alter table public.%s enable trigger course_sync_cursor_%s_gradebook' % (t, t))
+
+    def three_at_once(label):
+        r, c1, k1, a = nid(), nid(), nid(), nid()
+        made['assessment'].append(a); made['rubric'].append(r)
+        o.run("insert into rubric (id, course_id, name, style) values (:r, :c, 'Race', 'advanced')", r=r, c=COURSE_A)
+        o.run("insert into criterion (id, rubric_id, name) values (:x, :r, 'Method')", x=c1, r=r)
+        o.run("insert into criterion_check (id, criterion_id, level, label) values (:k, :x, 3, 'Lists every step')", k=k1, x=c1)
+        o.run("insert into assessment (id, course_id, title, score_mode, rubric_id) values (:a, :c, :t, 'proficiency', :r)", a=a, c=COURSE_A, t=label, r=r)
+        t1 = conn(); t2 = conn(); t3 = conn(); teacher(t1); teacher(t2); teacher(t3)
+        t1.run('select upsert_rubric_score(:e, :a, :x, 3)', e=ENR1, a=a, x=c1)
+        t1.run('select return_grades(:a, :ids::uuid[], :k)', a=a, ids='{%s}' % ENR1, k=nid())       # returned: level 3
+        t1.run('begin'); t1.run('select upsert_rubric_score(:e, :a, :x, 4)', e=ENR1, a=a, x=c1)    # level 4, not committed
+        ret = threading.Thread(target=lambda: t3.run('select return_grades(:a, :ids::uuid[], :k)', a=a, ids='{%s}' % ENR1, k=nid()))
+        tick = threading.Thread(target=lambda: t2.run('select set_rubric_check(:e, :a, :k, true)', e=ENR1, a=a, k=k1))
+        ret.start(); time.sleep(0.5); tick.start(); time.sleep(0.5)
+        both_wait = ret.is_alive() and tick.is_alive()
+        t1.run('commit'); ret.join(); tick.join(); t1.close(); t2.close(); t3.close()
+        g = o.run('select is_draft, working_copy from grade_return where enrollment_id = :e and assessment_id = :a', e=ENR1, a=a)[0]
+        given = o.run('select student_submit._returned_grade(:e, :a)', e=ENR1, a=a)[0][0]['grade']
+        now = o.run('select public._grade_copy(:e, :a)', e=ENR1, a=a)[0][0]
+        return both_wait, g[0], given['criteria'][c1]['value'], given['checks'], g[1] == now
+    both_wait, is_draft, level, ticks, kept = three_at_once('Race of three')
+    ok('a Return and a tick both wait for a level that is being saved', both_wait)
+    ok('and the student is given the raised level 4 whichever went first (the Return first: no tick, a draft; the tick first: the tick, returned)',
+       level == 4 and ((is_draft and ticks == []) or (not is_draft and len(ticks) == 1)), (is_draft, level, ticks))
+    ok('and grade_return holds the grade as the score tables have it', kept)
 
     # ── 2. Saves against returns ───────────────────────────────────────
     def stress(label):
@@ -147,10 +174,6 @@ try:
         ]
         errs = run_threads(jobs, 150)
         return [e for e in errs if '40P01' in e[1]], errs
-    o.run('alter trigger a_grade_return_release on public.course rename to grade_return_release')
-    dead, errs = settings_run('Settings stress (control)')
-    ok('control, with the release trigger under a name that fires after the sync cursor: setting changes deadlock with saves (%d of 900 calls died with 40P01)' % len(dead), len(dead) > 0, errs[:2])
-    o.run('alter trigger grade_return_release on public.course rename to a_grade_return_release')
     dead, errs = settings_run('Settings stress')
     ok('saves, returns, fills and card calls against Return Grades, the student page and a rename changing, 150 calls each: no call fails', not errs, sorted(set(errs))[:3])
 
@@ -170,8 +193,6 @@ try:
        not dead, sorted(set(dead))[:2])
     ok('and the only refusals are for the criterion being gone', all('23503' in e[1] or '42501' in e[1] for e in errs), sorted(set(errs))[:3])
 finally:
-    try: o.run('alter trigger grade_return_release on public.course rename to a_grade_return_release')
-    except Exception: pass
     o.run('delete from student_card k using enrollment e where e.id = k.enrollment_id and e.course_id = :c', c=COURSE_A)
     o.run('update course set cards_work_until = null where id = :c', c=COURSE_A)
     o.run("delete from fv_idempotency where endpoint in ('set_cards_work_until', 'issue_student_cards')")
