@@ -23,9 +23,11 @@ NEW = ['course_sync_cursor', 'subject', 'competency_group', 'section', 'tag', 'c
        'assessment_tag', 'score', 'score_audit', 'tag_score', 'rubric_score', 'rubric_check_score']
 BASE = ['course', 'student', 'enrollment']
 # The few more tables Batch A's tests need: what create_course,
-# duplicate_course and import_json_restore write or name, and dibels_score
-# for the same-class policies. Loaded after score-tables.sql.
-BATCH_A = ['teacher_preference', 'report_config', 'custom_tag', 'observation_template', 'observation', 'dibels_score']
+# duplicate_course, import_json_restore and delete_withdrawn_student write or
+# name, and dibels_score for the same-class policies. Loaded after
+# score-tables.sql.
+BATCH_A = ['teacher_preference', 'report_config', 'custom_tag', 'observation_template', 'observation',
+           'observation_student', 'dibels_score']
 # observation_template's trigger calls a teacher-level sync function the
 # harness does not load.
 SKIP_TRIGGERS = {'teacher_sync_cursor_observation_template_student_records'}

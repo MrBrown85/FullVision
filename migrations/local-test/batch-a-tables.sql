@@ -50,6 +50,10 @@ create table public.observation (
   level smallint,
   template_id uuid
 );
+create table public.observation_student (
+  observation_id uuid not null,
+  enrollment_id uuid not null
+);
 create table public.dibels_score (
   id uuid not null default gen_random_uuid(),
   enrollment_id uuid not null,
@@ -72,6 +76,7 @@ alter table public.observation_template add constraint observation_template_pkey
 alter table public.observation add constraint observation_level_check CHECK (((level >= 1) AND (level <= 4)));
 alter table public.observation add constraint observation_pkey PRIMARY KEY (id);
 alter table public.observation add constraint observation_sentiment_check CHECK (((sentiment IS NULL) OR (sentiment = ANY (ARRAY['strength'::text, 'growth'::text, 'concern'::text, 'note'::text]))));
+alter table public.observation_student add constraint observation_student_pkey PRIMARY KEY (observation_id, enrollment_id);
 alter table public.dibels_score add constraint dibels_score_maze_correct_check CHECK ((maze_correct >= 0));
 alter table public.dibels_score add constraint dibels_score_maze_incorrect_check CHECK ((maze_incorrect >= 0));
 alter table public.dibels_score add constraint dibels_score_orf_errors_check CHECK ((orf_errors >= 0));
@@ -88,6 +93,8 @@ alter table public.observation_template add constraint observation_template_teac
 alter table public.observation add constraint observation_assessment_id_fkey FOREIGN KEY (assessment_id) REFERENCES public.assessment(id) ON DELETE SET NULL;
 alter table public.observation add constraint observation_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.course(id) ON DELETE CASCADE;
 alter table public.observation add constraint observation_template_id_fkey FOREIGN KEY (template_id) REFERENCES public.observation_template(id) ON DELETE SET NULL;
+alter table public.observation_student add constraint observation_student_enrollment_id_fkey FOREIGN KEY (enrollment_id) REFERENCES public.enrollment(id) ON DELETE CASCADE;
+alter table public.observation_student add constraint observation_student_observation_id_fkey FOREIGN KEY (observation_id) REFERENCES public.observation(id) ON DELETE CASCADE;
 alter table public.dibels_score add constraint dibels_score_assessment_id_fkey FOREIGN KEY (assessment_id) REFERENCES public.assessment(id) ON DELETE CASCADE;
 alter table public.dibels_score add constraint dibels_score_enrollment_id_fkey FOREIGN KEY (enrollment_id) REFERENCES public.enrollment(id) ON DELETE CASCADE;
 
@@ -99,11 +106,13 @@ CREATE INDEX observation_assessment_idx ON public.observation USING btree (asses
 CREATE INDEX observation_course_idx ON public.observation USING btree (course_id);
 CREATE INDEX observation_created_idx ON public.observation USING btree (course_id, created_at DESC);
 CREATE INDEX observation_template_id_idx ON public.observation USING btree (template_id) WHERE (template_id IS NOT NULL);
+CREATE INDEX observation_student_enrollment_idx ON public.observation_student USING btree (enrollment_id);
 CREATE INDEX dibels_score_assessment_idx ON public.dibels_score USING btree (assessment_id);
 
 CREATE TRIGGER course_sync_cursor_report_config_student_records AFTER INSERT OR DELETE OR UPDATE ON public.report_config FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('student-records', 'course');
 CREATE TRIGGER course_sync_cursor_custom_tag_student_records AFTER INSERT OR DELETE OR UPDATE ON public.custom_tag FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('student-records', 'course');
 CREATE TRIGGER course_sync_cursor_observation_student_records AFTER INSERT OR DELETE OR UPDATE ON public.observation FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('student-records', 'course');
+CREATE TRIGGER course_sync_cursor_observation_student_student_records AFTER INSERT OR DELETE OR UPDATE ON public.observation_student FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('student-records', 'observation');
 
 alter table public.teacher_preference enable row level security;
 create policy teacher_preference_self on public.teacher_preference for all to public using ((teacher_id = ( SELECT auth.uid() AS uid))) with check ((teacher_id = ( SELECT auth.uid() AS uid)));
@@ -115,5 +124,11 @@ alter table public.observation_template enable row level security;
 create policy observation_template_own on public.observation_template for all to public using ((teacher_id = ( SELECT auth.uid() AS uid))) with check ((teacher_id = ( SELECT auth.uid() AS uid)));
 alter table public.observation enable row level security;
 create policy observation_via_course on public.observation for all to public using (public.fv_owns_course(course_id)) with check (public.fv_owns_course(course_id));
+alter table public.observation_student enable row level security;
+create policy observation_student_via_obs on public.observation_student for all to public using ((EXISTS ( SELECT 1
+   FROM public.observation o
+  WHERE ((o.id = observation_student.observation_id) AND public.fv_owns_course(o.course_id))))) with check ((EXISTS ( SELECT 1
+   FROM public.observation o
+  WHERE ((o.id = observation_student.observation_id) AND public.fv_owns_course(o.course_id)))));
 alter table public.dibels_score enable row level security;
 create policy dibels_score_via_enrollment on public.dibels_score for all to public using (public.fv_owns_enrollment(enrollment_id)) with check (public.fv_owns_enrollment(enrollment_id));

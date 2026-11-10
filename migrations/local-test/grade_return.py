@@ -302,6 +302,15 @@ ok('the repair brings working_copy up to date and removes rows whose student or 
    one(DRIFT) == 0 and kept_copy(ENR1, pl)['value'] == 9
    and one('select count(*) from grade_return g where not exists (select 1 from enrollment e where e.id = g.enrollment_id) or not exists (select 1 from assessment a where a.id = g.assessment_id)') == 0)
 
+# The class lock is the class's sync-cursor row. A class gets one when it is
+# made; if it is missing, whoever needs the lock makes it.
+ok('a class made by create_course has its sync-cursor row', one('select count(*) from course_sync_cursor where course_id = :c', c=made) == 1)
+lk = new_assessment(K, 'points'); rpc(A, 'upsert_score(:e, :a, 4)', e=ENR1, a=lk)
+as_owner(); c.run('delete from course_sync_cursor where course_id = :c', c=COURSE_A)
+r = rpc(A, 'return_grades(:a, :ids::uuid[], :k)', a=lk, ids='{%s}' % ENR1, k=key())
+ok('a Return in a class whose sync-cursor row is missing makes the row, locks it and returns the grade',
+   r['returned'] == 1 and one('select count(*) from course_sync_cursor where course_id = :c', c=COURSE_A) == 1 and state(ENR1, lk) == 'returned', r)
+
 # grade_return has no foreign keys: its rows go by trigger, under the class lock.
 ok('grade_return has no foreign keys', one("select count(*) from pg_constraint where conrelid = 'public.grade_return'::regclass and contype = 'f'") == 0)
 gone_a = new_assessment(K, 'points')
@@ -726,7 +735,7 @@ ok("the same-class helpers say no for another teacher's cell",
 as_owner()
 ok('none of the trigger functions can be called by a teacher or anon',
    one("""select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-           where n.nspname = 'public' and p.proname in ('_grade_return_on_change', '_grade_return_repoint', '_grade_return_gone', '_grade_return_release', '_grade_return_lock', '_grade_return_apply', '_grade_return_one')
+           where n.nspname = 'public' and p.proname in ('_grade_return_on_change', '_grade_return_repoint', '_grade_return_gone', '_grade_return_release', '_grade_return_lock', '_grade_return_lock_first', '_grade_return_apply', '_grade_return_one')
              and (has_function_privilege('authenticated', p.oid, 'execute') or has_function_privilege('anon', p.oid, 'execute'))""") == 0)
 ok('every score table has its three statement triggers, and enrollment and assessment the one that takes the rows',
    one("select count(*) from pg_trigger where tgname in ('grade_return_insert', 'grade_return_update', 'grade_return_delete') and not tgisinternal") == 12

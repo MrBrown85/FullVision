@@ -666,7 +666,7 @@ begin
         return jsonb_build_object('ok', false, 'error', _in->>'error');
     end if;
     -- grade_return is written only under the class's lock (2026110902, 4).
-    perform public._grade_return_lock((_in->>'course_id')::uuid);
+    perform public._grade_return_lock_first((_in->>'course_id')::uuid);
     insert into grade_return (enrollment_id, assessment_id, seen_at)
     select p_enrollment_id, a.id, clock_timestamp()
       from assessment a

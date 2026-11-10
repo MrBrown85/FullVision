@@ -157,11 +157,12 @@
 --      return_grades                 first: it writes no other row
 --      a class leaving When I Return Them           after the course row
 --      the restore                   at its end, after its rows
---      the student page's seen()     after the session row
+--      the student page's seen()     first: it writes no other row
 --    and behind it there is only grade_return: a grade_return row is read
 --    for update, written or deleted only by a transaction that already
---    holds the class's cursor row, and such a transaction then waits for
---    nothing else. That is why grade_return has NO FOREIGN KEYS. A cascade
+--    holds the class's cursor row, so nobody waits for one while holding
+--    something a cursor holder wants. That is why grade_return has NO
+--    FOREIGN KEYS. A cascade
 --    from enrollment or assessment would delete its rows before the deleting
 --    transaction reached the cursor row, and a foreign-key check on a new
 --    row would wait on a student or an assessment that is being deleted;
@@ -177,6 +178,22 @@
 --    and it deadlocked three ways with the cursor row (saves against
 --    returns, against a setting change, against a rubric save); it is gone,
 --    and so are the guards it needed.
+--    WHAT THIS DOES NOT FIX. Some live RPCs already deadlock with a score
+--    save on the same rows, with no Batch A loaded: each holds the class's
+--    cursor row when it goes for score rows a save already holds, because
+--    the cursor triggers fire after every statement and after the first
+--    level of a cascade. They are the three clears and fill_rubric (several
+--    statements), move_rubric_scores (levels, then ticks), a rubric save
+--    that removes a criterion or a checkbox, and deleting a rubric, a
+--    section or a subject (a cascade two tables deep). Batch A changes none
+--    of them and adds no lock they could meet in a new order, but a save
+--    now holds the cursor row a little longer, so under the same load they
+--    collide more often (migrations/local-test/README.md has the counts,
+--    with and without this file). Ending them means moving the cursor
+--    triggers to commit, on every table that has one: not this batch.
+--    A Return or a student's seen() that is waiting in line when two such
+--    calls collide holds nothing they want, and waits again if Postgres
+--    picks it to stop (_grade_return_lock_first).
 --    Why not take the class lock before the statement's rows, at the start?
 --    Because no existing writer does: a save that took the cursor row first
 --    and its score row second would be the one path in the opposite order,
@@ -534,6 +551,30 @@ begin
 end;
 $function$;
 
+-- The class lock for a call that holds nothing yet (return_grades, the
+-- student page's seen()). Two other calls can deadlock on the class's rows
+-- while this one waits in line behind them (see the header: some live RPCs
+-- do, with or without this file), and Postgres may pick this one to stop. It
+-- holds nothing either of them wants, so it waits again.
+create or replace function public._grade_return_lock_first(p_course_id uuid)
+ returns void
+ language plpgsql
+ security definer
+ set search_path to 'public', 'pg_temp'
+as $function$
+begin
+    for _try in 1..5 loop
+        begin
+            perform _grade_return_lock(p_course_id);
+            return;
+        exception when deadlock_detected then
+            null;
+        end;
+    end loop;
+    perform _grade_return_lock(p_course_id);
+end;
+$function$;
+
 -- One cell's working copy went from p_before to _now.
 create or replace function public._grade_return_apply(
     p_enrollment_id uuid, p_assessment_id uuid, p_before jsonb, _now jsonb)
@@ -676,6 +717,9 @@ begin
         -- cursor trigger takes too); then both copies, as the last writer to
         -- the class left them.
         perform _grade_return_lock(_c.course_id);
+        -- Gone while this waited for the lock: its rows went with it.
+        continue when not exists (select 1 from enrollment e where e.id = _c.enrollment_id)
+                   or not exists (select 1 from assessment a where a.id = _c.assessment_id);
         _before := (select g.working_copy from grade_return g
                      where g.enrollment_id = _c.enrollment_id and g.assessment_id = _c.assessment_id);
         _now := _grade_copy(_c.enrollment_id, _c.assessment_id);
@@ -807,6 +851,7 @@ revoke all on function public._grade_copy_entry(integer, integer, text, text, bo
 revoke all on function public._grade_copy(uuid, uuid) from public, anon, authenticated;
 revoke all on function public._grade_return_holds(uuid) from public, anon, authenticated;
 revoke all on function public._grade_return_lock(uuid) from public, anon, authenticated;
+revoke all on function public._grade_return_lock_first(uuid) from public, anon, authenticated;
 revoke all on function public._grade_return_apply(uuid, uuid, jsonb, jsonb) from public, anon, authenticated;
 revoke all on function public._grade_return_on_change() from public, anon, authenticated;
 revoke all on function public._grade_return_repoint() from public, anon, authenticated;
@@ -944,7 +989,7 @@ begin
 
     select a.course_id into _course from assessment a where a.id = p_assessment_id;
     -- Wait for any save to this class that is under way, then read.
-    perform _grade_return_lock(_course);
+    perform _grade_return_lock_first(_course);
     for _e in
         select g.enrollment_id from grade_return g
           join enrollment e on e.id = g.enrollment_id
