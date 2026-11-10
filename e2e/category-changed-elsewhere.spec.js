@@ -10,8 +10,11 @@ import { mockAuth } from './helpers.js';
    computers"). A signed-in teacher: Demo Mode has one device and no server. */
 
 const CID = 'e0000000-0000-4000-8000-0000000000c1';
-const CHANGED = 'The categories changed on another device, so nothing was saved. These are the current ones.';
-const OFFLINE = 'Categories need a connection to save. Nothing was saved. Try again when you are online.';
+const CHANGED =
+  'The categories changed on another device, so nothing was saved. These are the current ones. What you typed is below.';
+const OFFLINE =
+  'Categories need a connection to save. Your changes are kept on this computer. Save again when you are online.';
+const KEPT = 'Your unsaved category changes were kept on this computer. Save Categories to send them.';
 const SERVER = [
   {
     id: 'e0000000-0000-4000-8000-0000000000a1',
@@ -82,10 +85,16 @@ test('Save Categories on a list changed on another device saves nothing and show
   await page.locator('.cm-cat-name').nth(1).fill('Quizzes');
   await page.locator('[data-action="cmCatSave"]').click();
 
-  await expect(page.locator('.cm-cat-notice')).toHaveText(CHANGED);
+  await expect(page.locator('.cm-cat-notice-text')).toHaveText(CHANGED);
   expect(await names(page)).toEqual(['Assignments', 'Tests', 'Projects']);
   expect(await sent(page, 'save_categories')).toBe(0);
   await expect(page.locator('[data-action="cmCatSave"]')).toBeDisabled();
+  // What was typed is not lost: it is listed under the line, to copy from.
+  await expect(page.locator('.cm-cat-typed-label')).toHaveText('What You Typed');
+  await expect(page.locator('.cm-cat-typed li')).toHaveText([
+    'Assignments · 60% · Total Points',
+    'Quizzes · 40% · Total Points',
+  ]);
 
   // Edited again on the current list: it saves, and the line goes.
   await page.locator('.cm-cat-name').nth(1).fill('Quizzes');
@@ -108,13 +117,32 @@ test('Save Categories with no connection saves nothing, says so, and keeps what 
   await page.locator('.cm-cat-name').nth(1).fill('Quizzes');
   await page.locator('[data-action="cmCatSave"]').click();
 
-  await expect(page.locator('.cm-cat-notice')).toHaveText(OFFLINE);
+  await expect(page.locator('.cm-cat-notice-text')).toHaveText(OFFLINE);
   expect(await names(page)).toEqual(['Assignments', 'Quizzes']);
   expect(await sent(page, 'save_categories')).toBe(0);
   expect(await page.evaluate(() => window.v2Queue.stats().queued)).toBe(0);
 
+  // The tab is closed and opened again, online: the changes are still there.
   await context.setOffline(false);
+  await page.reload();
+  await expect(page.locator('.cm-cat-notice-text')).toHaveText(KEPT);
+  expect(await names(page)).toEqual(['Assignments', 'Quizzes']);
   await page.locator('[data-action="cmCatSave"]').click();
   await expect(page.locator('.cm-cat-notice')).toHaveCount(0);
   expect(await sent(page, 'save_categories')).toBe(1);
+  expect(await page.evaluate(() => window.__serverCategories.map(c => c.name))).toEqual(['Assignments', 'Quizzes']);
+});
+
+test('Discard My Changes puts the class’s list back', async ({ page, context }) => {
+  await openGrading(page);
+  await context.setOffline(true);
+  await page.locator('.cm-cat-name').nth(1).fill('Quizzes');
+  await page.locator('[data-action="cmCatSave"]').click();
+  await expect(page.locator('.cm-cat-notice-text')).toHaveText(OFFLINE);
+  await context.setOffline(false);
+  await page.locator('[data-action="cmCatNoticeDone"]').click();
+  await expect(page.locator('.cm-cat-notice')).toHaveCount(0);
+  await expect(page.locator('.cm-cat-name')).toHaveCount(2);
+  expect(await names(page)).toEqual(['Assignments', 'Tests']);
+  expect(await page.evaluate(cid => localStorage.getItem('gb-category-draft-' + cid), CID)).toBe(null);
 });

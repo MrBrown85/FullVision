@@ -1244,8 +1244,13 @@ describe('lists saved whole', () => {
 
 describe('categories: the server’s list is read before the whole list is saved', () => {
   const CHANGED = 'The categories changed on another device, so nothing was saved. These are the current ones.';
-  const OFFLINE = 'Categories need a connection to save. Nothing was saved. Try again when you are online.';
+  const CHANGED_TYPED = CHANGED + ' What you typed is below.';
+  const OFFLINE =
+    'Categories need a connection to save. Your changes are kept on this computer. Save again when you are online.';
+  const OFFLINE_ORDER = 'Categories need a connection to save. Nothing was saved. Try again when you are online.';
+  const KEPT = 'Your unsaved category changes were kept on this computer. Save Categories to send them.';
   const SRC = 'e0000000-0000-4000-8000-0000000000b3';
+  const kept = () => JSON.parse(localStorage.getItem('gb-category-draft-' + CID));
   const schoolAddsProjects = () =>
     server.fromAnotherDevice('save_categories', {
       p_course_id: CID,
@@ -1279,7 +1284,7 @@ describe('categories: the server’s list is read before the whole list is saved
     await quiet();
 
     expect(sentNames()).toEqual([]);
-    expect(draft().notice).toBe(CHANGED);
+    expect(draft().notice).toBe(CHANGED_TYPED);
     expect(draft().dirty).toBe(false);
     expect(draft().rows.map(r => [r.name, r.weight])).toEqual([
       ['Assignments', 50],
@@ -1290,8 +1295,13 @@ describe('categories: the server’s list is read before the whole list is saved
     expect(getCategories(CID).map(c => c.name)).toEqual(['Assignments', 'Tests', 'Projects']);
     // The line is on the page once, above the categories.
     const html = gradingTabHtml();
-    expect(html.split(CHANGED).length - 1).toBe(1);
-    expect(html.indexOf(CHANGED)).toBeLessThan(html.indexOf('class="cm-cat-list"'));
+    expect(html.split(CHANGED_TYPED).length - 1).toBe(1);
+    expect(html.indexOf(CHANGED_TYPED)).toBeLessThan(html.indexOf('class="cm-cat-list"'));
+    // What the teacher had typed is not lost: it is listed under the line.
+    expect(draft().typed).toEqual(['Assignments · 60% · Total Points', 'Quizzes · 40% · Total Points']);
+    expect(html).toContain('What You Typed');
+    expect(html).toContain('<li>Quizzes · 40% · Total Points</li>');
+    expect(draft().action).toBe('Dismiss');
 
     // Edited again on the current list: saved, and the line goes.
     input('cmCatNameLive', { idx: '1' }, 'Quizzes');
@@ -1299,6 +1309,23 @@ describe('categories: the server’s list is read before the whole list is saved
     await quiet();
     expect(server.categories.map(c => c.name)).toEqual(['Assignments', 'Quizzes', 'Projects']);
     expect(draft().notice).toBe(null);
+    expect(gradingTabHtml()).not.toContain('cm-cat-notice');
+    expect(kept()).toBe(null);
+  });
+
+  it('what was typed stays through a closed tab, until it is dismissed', async () => {
+    await openApp();
+    schoolAddsProjects();
+    input('cmCatNameLive', { idx: '1' }, 'Quizzes');
+    act('cmCatSave');
+    await quiet();
+    await openApp();
+    expect(draft().notice).toBe(CHANGED_TYPED);
+    expect(draft().typed).toEqual(['Assignments · 60% · Total Points', 'Quizzes · 40% · Total Points']);
+    expect(draft().rows.map(r => r.name)).toEqual(['Assignments', 'Tests', 'Projects']);
+    act('cmCatNoticeDone');
+    expect(draft().notice).toBe(null);
+    expect(kept()).toBe(null);
     expect(gradingTabHtml()).not.toContain('cm-cat-notice');
   });
 
@@ -1324,7 +1351,7 @@ describe('categories: the server’s list is read before the whole list is saved
     expect(server.categories.map(c => c.name)).toEqual(['Assignments', 'Quizzes']);
   });
 
-  it('with no connection: nothing is saved or queued, the line says a connection is needed, and the typing stays', async () => {
+  it('with no connection: nothing is saved or queued, the line says so, and the typing stays', async () => {
     await openApp();
     await goOffline();
     server.sent.length = 0;
@@ -1333,6 +1360,7 @@ describe('categories: the server’s list is read before the whole list is saved
     await settle();
     expect(window.v2Queue.stats().queued).toBe(0);
     expect(draft().notice).toBe(OFFLINE);
+    expect(draft().action).toBe('Discard My Changes');
     expect(draft().dirty).toBe(true);
     expect(draft().rows.map(r => r.name)).toEqual(['Assignments', 'Quizzes']);
     expect(gradingTabHtml()).toContain(OFFLINE);
@@ -1343,6 +1371,135 @@ describe('categories: the server’s list is read before the whole list is saved
     await quiet();
     expect(server.categories.map(c => c.name)).toEqual(['Assignments', 'Quizzes']);
     expect(draft().notice).toBe(null);
+    expect(kept()).toBe(null);
+  });
+
+  it('with no connection, then the tab is closed: the changes are still there the next time, and save', async () => {
+    await openApp();
+    await goOffline();
+    input('cmCatNameLive', { idx: '1' }, 'Quizzes');
+    act('cmCatSave');
+    await settle();
+    // More typing after the line: kept too.
+    input('cmCatWeightLive', { idx: '0' }, 70);
+    input('cmCatWeightLive', { idx: '1' }, 30);
+    expect(kept().rows.map(r => [r.name, r.weight])).toEqual([
+      ['Assignments', 70],
+      ['Quizzes', 30],
+    ]);
+
+    server.sent.length = 0;
+    await openApp(); // the next day, online
+    expect(sentNames()).toEqual([]);
+    expect(draft().notice).toBe(KEPT);
+    expect(draft().dirty).toBe(true);
+    expect(draft().rows.map(r => [r.name, r.weight])).toEqual([
+      ['Assignments', 70],
+      ['Quizzes', 30],
+    ]);
+    expect(gradingTabHtml()).toContain('Discard My Changes');
+    act('cmCatSave');
+    await quiet();
+    expect(server.categories.map(c => [c.name, c.weight])).toEqual([
+      ['Assignments', 70],
+      ['Quizzes', 30],
+    ]);
+    expect(draft().notice).toBe(null);
+    expect(kept()).toBe(null);
+  });
+
+  it('changes kept with no connection, and the list changed elsewhere before the next time: the current ones show, with what was typed', async () => {
+    await openApp();
+    await goOffline();
+    input('cmCatNameLive', { idx: '1' }, 'Quizzes');
+    act('cmCatSave');
+    await settle();
+    schoolAddsProjects();
+    server.sent.length = 0;
+    await openApp();
+    expect(draft().notice).toBe(CHANGED_TYPED);
+    expect(draft().rows.map(r => r.name)).toEqual(['Assignments', 'Tests', 'Projects']);
+    expect(draft().typed).toEqual(['Assignments · 60% · Total Points', 'Quizzes · 40% · Total Points']);
+    expect(draft().dirty).toBe(false);
+    expect(sentNames()).toEqual([]);
+  });
+
+  it('Discard My Changes puts the class’s own list back and keeps nothing', async () => {
+    await openApp();
+    await goOffline();
+    input('cmCatNameLive', { idx: '1' }, 'Quizzes');
+    act('cmCatSave');
+    await settle();
+    await goOnline();
+    act('cmCatNoticeDone');
+    await quiet();
+    expect(kept()).toBe(null);
+    expect(draft().notice).toBe(null);
+    expect(draft().dirty).toBe(false);
+    expect(draft().rows.map(r => r.name)).toEqual(['Assignments', 'Tests']);
+    expect(sentNames()).toEqual([]);
+  });
+
+  it('the connection goes between the read and the save: nothing waits to go out later over a change made elsewhere', async () => {
+    await openApp();
+    const send = server.fake.rpc;
+    server.fake.rpc = function (name, params) {
+      const res = send(name, params);
+      if (name === 'list_categories') server.reachable = false; // answered; then it goes
+      return res;
+    };
+    server.sent.length = 0;
+    input('cmCatWeightLive', { idx: '0' }, 70);
+    input('cmCatWeightLive', { idx: '1' }, 30);
+    act('cmCatSave');
+    for (let i = 0; i < 4; i++) await settle();
+    server.fake.rpc = send;
+    expect(window.v2Queue.stats().queued).toBe(0);
+    expect(draft().notice).toBe(OFFLINE);
+    expect(draft().rows.map(r => r.weight)).toEqual([70, 30]);
+    // At school, an hour later: a category is added.
+    schoolAddsProjects();
+    await goOnline();
+    expect(sentNames()).toEqual([]);
+    expect(server.categories.map(c => [c.name, c.weight])).toEqual([
+      ['Assignments', 50],
+      ['Tests', 30],
+      ['Projects', 20],
+    ]);
+    // Save again: it is checked again, and says what happened.
+    act('cmCatSave');
+    await quiet();
+    expect(sentNames()).toEqual([]);
+    expect(draft().notice).toBe(CHANGED_TYPED);
+    expect(draft().typed).toEqual(['Assignments · 70% · Total Points', 'Tests · 30% · Total Points']);
+  });
+
+  it('the save reaches the server but its answer never comes: the next Save finds it landed and sends nothing twice', async () => {
+    await openApp();
+    const send = server.fake.rpc;
+    server.fake.rpc = function (name, params) {
+      const res = send(name, params);
+      if (name !== 'save_categories') return res;
+      return res.then(() => ({ data: null, error: { message: 'network: failed to fetch' } })); // saved; the answer is lost
+    };
+    act('cmCatAdd');
+    input('cmCatNameLive', { idx: '2' }, 'Projects');
+    input('cmCatWeightLive', { idx: '0' }, 50);
+    input('cmCatWeightLive', { idx: '1' }, 30);
+    input('cmCatWeightLive', { idx: '2' }, 20);
+    act('cmCatSave');
+    await quiet();
+    server.fake.rpc = send;
+    expect(server.categories.map(c => c.name)).toEqual(['Assignments', 'Tests', 'Projects']);
+    expect(draft().notice).toBe(OFFLINE);
+    server.sent.length = 0;
+    act('cmCatSave');
+    await quiet();
+    expect(sentNames()).toEqual([]);
+    expect(draft().notice).toBe(null);
+    expect(draft().dirty).toBe(false);
+    expect(draft().rows.map(r => r.id)).toEqual(server.categories.map(c => c.id));
+    expect(kept()).toBe(null);
   });
 
   it('a connection that answers with an error is no check: nothing is saved', async () => {
@@ -1364,6 +1521,7 @@ describe('categories: the server’s list is read before the whole list is saved
     await quiet();
     expect(sentNames()).toEqual([]);
     expect(draft().notice).toBe(CHANGED);
+    expect(draft().typed).toBe(null); // a drag: nothing was typed
     expect(draft().rows.map(r => r.name)).toEqual(['Assignments', 'Tests', 'Projects']);
   });
 
@@ -1449,8 +1607,9 @@ describe('categories: the server’s list is read before the whole list is saved
     await DashClassManager.reorderCategory(0, 1);
     await settle();
     expect(window.v2Queue.stats().queued).toBe(0);
-    expect(draft().notice).toBe(OFFLINE);
+    expect(draft().notice).toBe(OFFLINE_ORDER);
     expect(draft().rows.map(r => r.name)).toEqual(['Assignments', 'Tests']);
+    expect(kept()).toBe(null);
   });
 
   /* Copy Grading Setup replaces the target's whole list with the plan it
@@ -1480,6 +1639,19 @@ describe('categories: the server’s list is read before the whole list is saved
       'The categories in History 12 changed on another device, so they were not copied.',
     );
     expect(getCategories(CID).map(c => c.name)).toEqual(['Assignments', 'Tests', 'Projects']);
+    // The message after a copy is gone in seconds. The class says so itself
+    // the next time it is opened in Class Settings, even another day.
+    await openApp();
+    expect(draft().notice).toBe(
+      'The categories were not copied from History 11: they changed on another device first. These are the current ones.',
+    );
+    expect(draft().action).toBe('Dismiss');
+    expect(draft().rows.map(r => r.name)).toEqual(['Assignments', 'Tests', 'Projects']);
+    await openApp();
+    expect(gradingTabHtml()).toContain('The categories were not copied from History 11');
+    act('cmCatNoticeDone');
+    await openApp();
+    expect(draft().notice).toBe(null);
   });
 
   it('Copy Grading Setup onto a list nobody else changed: one read, then the copy', async () => {
@@ -1511,6 +1683,10 @@ describe('categories: the server’s list is read before the whole list is saved
     await goOnline();
     expect(server.categories.map(c => c.weight)).toEqual([60, 40]);
     expect(server.course.round_percent).toBe(true);
+    await openApp();
+    expect(draft().notice).toBe(
+      'The categories were not copied from History 11: there was no connection. Everything else was copied.',
+    );
   });
 
   it('every whole-list save of categories is one this file knows, and each is behind the check or is a new class', () => {
@@ -1530,12 +1706,30 @@ describe('categories: the server’s list is read before the whole list is saved
     };
     // The request itself (save_categories, reorder_categories).
     expect(count(/\bv2\.saveCategories\(/g)).toEqual({
-      'shared/data.js': 1, // _persistCategoriesToCanonical, for saveCategories below
-      'teacher/dash-class-manager.js': 1, // Save Categories
+      // _persistCategoriesToCanonical, for saveCategories below; and
+      // saveCategoriesNow for a class no server holds (Demo Mode)
+      'shared/data.js': 2,
     });
     expect(count(/\bv2\.reorderCategories\(/g)).toEqual({
-      'teacher/dash-class-manager.js': 1, // a drag
+      'shared/data.js': 1, // reorderCategoriesNow for a class no server holds
     });
+    // Class Settings saves and reorders through the two that check and send in one moment.
+    expect(count(/(?<![.\w])saveCategoriesNow\(/g)).toEqual({
+      'shared/data.js': 1,
+      'teacher/dash-class-manager.js': 1,
+    });
+    expect(count(/(?<![.\w])reorderCategoriesNow\(/g)).toEqual({
+      'shared/data.js': 1,
+      'teacher/dash-class-manager.js': 1,
+    });
+    // Asked of the server directly, never left in the outbox.
+    const data = read('shared/data.js');
+    const now = data.slice(
+      data.indexOf('async function _categoryWriteNow('),
+      data.indexOf('function _noAnswerFromServer('),
+    );
+    expect(now).toMatch(/_readServerCategories\(cid\)[\s\S]*_callRpcWithAuthGuard\(name, params/);
+    expect(now).not.toMatch(/_writeRpc\(|_rpcOrNoop\(|v2Queue|outbox\./i);
     expect(count(/\bv2\.(upsertCategory|deleteCategory)\(/g)).toEqual({});
     // The data layer's whole-list save.
     expect(count(/(?<![.\w])saveCategories\(/g)).toEqual({
@@ -1555,17 +1749,166 @@ describe('categories: the server’s list is read before the whole list is saved
       expect(text.indexOf(ask), ask).toBeGreaterThan(-1);
       expect(text.indexOf(ask)).toBeLessThan(text.indexOf(save));
     };
-    asksFirst(body('teacher/dash-class-manager.js', '_cmCatSaveRows'), '_cmCatStillCurrent(cid)', 'v2.saveCategories(');
-    asksFirst(
-      body('teacher/dash-class-manager.js', '_cmCatReorder'),
-      '_cmCatStillCurrent(cid, undo)',
-      'v2.reorderCategories(ids)',
-    );
     asksFirst(
       body('teacher/grading-setup-copy.js', 'applySetup'),
       '_categoriesCurrent(dstCid, plan.categories)',
       '_applyCategories(dstCid',
     );
+  });
+});
+
+describe('a list of categories that waited in the outbox is never sent blind', () => {
+  const OLD_NOT_SENT = ['An older category save that could not be checked was not sent', 'warning'];
+  const WAITED_NOT_SENT = ['A category save that waited was not sent: the list had changed', 'warning'];
+  const names = () => server.categories.map(c => [c.name, c.weight]);
+  const sentNames = () => server.sent.map(s => s.name);
+  const schoolAddsProjects = () =>
+    server.fromAnotherDevice('save_categories', {
+      p_course_id: CID,
+      p_categories: [
+        { id: CAT_ASSIGNMENTS, name: 'Assignments', weight: 50 },
+        { id: CAT_TESTS, name: 'Tests', weight: 30 },
+        { name: 'Projects', weight: 20 },
+      ],
+    });
+  /* Save Categories with no connection, as the build before this fix did
+     it: the list on this device, and the whole of it left in the outbox. */
+  async function oldCodeQueues(rows) {
+    await goOffline();
+    adoptCategoriesFromServer(
+      CID,
+      rows.map((r, i) => ({ id: r.id, name: r.name, weight: r.weight, displayOrder: i, calcMode: 'points' })),
+    );
+    _outbox();
+    window.v2Queue.push('save_categories', {
+      p_course_id: CID,
+      p_categories: rows.map(r => ({ id: r.id, name: r.name, weight: r.weight, calc_mode: 'points' })),
+    });
+    await settle();
+  }
+  const REWEIGHTED = [
+    { id: CAT_ASSIGNMENTS, name: 'Assignments', weight: 70 },
+    { id: CAT_TESTS, name: 'Tests', weight: 30 },
+  ];
+  let told;
+  let sentry;
+  beforeEach(() => {
+    told = [];
+    sentry = window.Sentry;
+    window.Sentry = { captureMessage: (message, level) => told.push([message, level]), captureException() {} };
+    localStorage.setItem('sb-testproject-auth-token', JSON.stringify({ user: { id: TEACHER } }));
+  });
+  afterEach(() => {
+    window.Sentry = sentry;
+  });
+
+  it('an older build’s save, and a category was added at school since: it is not sent, and the category stays', async () => {
+    await openApp();
+    await oldCodeQueues(REWEIGHTED);
+    schoolAddsProjects();
+    server.sent.length = 0;
+    await openApp();
+    await goOnline();
+    expect(sentNames()).toEqual([]);
+    expect(names()).toEqual([
+      ['Assignments', 50],
+      ['Tests', 30],
+      ['Projects', 20],
+    ]);
+    expect(getSyncDotState()).toEqual({ status: 'error', title: "Some changes couldn't be saved" });
+    expect(told).toEqual([OLD_NOT_SENT]);
+    // The class was read again: this device grades with the server's list.
+    expect(getCategories(CID).map(c => [c.name, c.weight])).toEqual(names());
+    // Red until the class has been read again and the app opened again.
+    await openApp();
+    expect(getSyncDotState().status).toBe('idle');
+    expect(sentNames()).toEqual([]);
+  });
+
+  it('an older build’s save, and nobody else changed the list: it is still not sent (what its device had loaded was never kept)', async () => {
+    await openApp();
+    await oldCodeQueues(REWEIGHTED);
+    server.sent.length = 0;
+    await openApp();
+    await goOnline();
+    expect(sentNames()).toEqual([]);
+    expect(names()).toEqual([
+      ['Assignments', 60],
+      ['Tests', 40],
+    ]);
+    expect(getSyncDotState().status).toBe('error');
+    expect(told).toEqual([OLD_NOT_SENT]);
+    expect(getCategories(CID).map(c => c.weight)).toEqual([60, 40]);
+  });
+
+  it('an older build’s save of the list the server already holds: dropped, and nothing is wrong', async () => {
+    await openApp();
+    await oldCodeQueues([
+      { id: CAT_ASSIGNMENTS, name: 'Assignments', weight: 60 },
+      { id: CAT_TESTS, name: 'Tests', weight: 40 },
+    ]);
+    server.sent.length = 0;
+    await openApp();
+    await goOnline();
+    expect(sentNames()).toEqual([]);
+    expect(window.v2Queue.stats()).toMatchObject({ queued: 0, deadLettered: 0 });
+    expect(getSyncDotState().status).toBe('idle');
+    expect(told).toEqual([]);
+  });
+
+  /* This build's own list can still end up waiting: Copy Grading Setup
+     saves through the outbox, and the connection can go as it leaves. */
+  async function thisBuildsSaveWaits() {
+    await openApp();
+    server.reachable = false; // the browser says online; the request fails
+    saveCategories(
+      CID,
+      REWEIGHTED.map((r, i) => ({ id: r.id, name: r.name, weight: r.weight, displayOrder: i, calcMode: 'points' })),
+    );
+    await settle();
+    expect(window.v2Queue.stats().queued).toBe(1);
+    server.sent.length = 0;
+    server.fake.calls.length = 0;
+  }
+
+  it('this build’s save that had to wait goes when the server still holds the list it was made over, after one read', async () => {
+    await thisBuildsSaveWaits();
+    await goOnline();
+    expect(server.fake.calls.filter(c => /categories/.test(c.name)).map(c => c.name)).toEqual([
+      'list_categories',
+      'save_categories',
+    ]);
+    expect(names()).toEqual([
+      ['Assignments', 70],
+      ['Tests', 30],
+    ]);
+    expect(told).toEqual([]);
+    expect(getSyncDotState().status).toBe('idle');
+  });
+
+  it('this build’s save that had to wait, and the list changed at school meanwhile: it is not sent', async () => {
+    await thisBuildsSaveWaits();
+    schoolAddsProjects();
+    await goOnline();
+    expect(sentNames()).toEqual([]);
+    expect(names()).toEqual([
+      ['Assignments', 50],
+      ['Tests', 30],
+      ['Projects', 20],
+    ]);
+    expect(told).toEqual([WAITED_NOT_SENT]);
+    expect(getSyncDotState().status).toBe('error');
+    expect(getCategories(CID).map(c => c.name)).toEqual(['Assignments', 'Tests', 'Projects']);
+  });
+
+  it('this build’s save that waits through a closed tab is weighed the same way by the next page', async () => {
+    await thisBuildsSaveWaits();
+    schoolAddsProjects();
+    await openApp();
+    await goOnline();
+    expect(sentNames()).toEqual([]);
+    expect(names().length).toBe(3);
+    expect(told).toEqual([WAITED_NOT_SENT]);
   });
 });
 

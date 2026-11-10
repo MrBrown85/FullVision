@@ -3508,6 +3508,19 @@ a.dash-ins-name:hover {
   font-size: var(--text-sm);
   line-height: 1.35;
 }
+.cm-cat-notice .cm-add-link {
+  margin-top: 6px;
+}
+.cm-cat-typed {
+  margin-top: 6px;
+}
+.cm-cat-typed-label {
+  font-weight: 600;
+}
+.cm-cat-typed ul {
+  margin: 2px 0 0;
+  padding-left: 18px;
+}
 .cm-cat-list {
   display: flex;
   flex-direction: column;

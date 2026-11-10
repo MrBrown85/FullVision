@@ -386,6 +386,7 @@ describe('the export stays complete', () => {
     getAssignmentObs: 'a subset of getAllQuickObs',
     getCategories: 'read through getAssessmentCategoryName',
     getCategoryById: 'read through getAssessmentCategoryName',
+    getCategoryDraft: 'category edits not yet saved, kept on this device until they are; not a record',
     getCompetencyGroupById: 'the learning map, not student data',
     getCompetencyGroups: 'the learning map, not student data',
     getCoreSelf: 'Core Competency steps entered from reflection sheets; shown on the Dashboard only',

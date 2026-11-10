@@ -486,9 +486,20 @@ window.GradingSetupCopy = (function () {
       keys.categories && plan.categories
         ? _categoriesCurrent(dstCid, plan.categories).then(function (why) {
             // Not copied: plan.categoriesNotCopied says why ('changed' on
-            // another device, or 'offline').
-            if (why) plan.categoriesNotCopied = why;
-            else return _applyCategories(dstCid, plan.categories, moves);
+            // another device, or 'offline'), and the class says so itself
+            // above its categories when it is next opened in Class
+            // Settings: the message after the copy is gone in seconds.
+            if (!why) return _applyCategories(dstCid, plan.categories, moves);
+            plan.categoriesNotCopied = why;
+            if (typeof noteCategoriesNotCopied === 'function') {
+              noteCategoriesNotCopied(dstCid, {
+                why: why,
+                from: _className(srcCid),
+                rest: plan.changes.some(function (c) {
+                  return c.key !== 'categories';
+                }),
+              });
+            }
           })
         : null;
     return Promise.resolve(done).then(function () {
@@ -851,18 +862,12 @@ window.GradingSetupCopy = (function () {
           }),
         ).then(function () {
           _toast(copiedMessage(changing));
-          if (onDone) {
-            var notCopied = {};
-            changing.forEach(function (p) {
-              if (p.categoriesNotCopied) notCopied[p.dstCid] = p.categoriesNotCopied;
-            });
+          if (onDone)
             onDone(
               changing.map(function (p) {
                 return p.dstCid;
               }),
-              notCopied,
             );
-          }
         });
         return true;
       },
