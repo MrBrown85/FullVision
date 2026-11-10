@@ -958,3 +958,38 @@ describe('the returned set is always a plain object with a list for every studen
     });
   });
 });
+
+/* A returned copy from the server may hold an Overall level on competency
+   work (score.value). It is in use only when the copy holds no competency
+   or criterion row at all, and then it reads back under the first
+   competency, as a loaded grade does. */
+describe('an Overall level on competency work, in a returned copy', () => {
+  const draftOn = copy => ({ is_draft: true, returned_at: '2026-11-03T17:00:00.000Z', returned_copy: copy });
+  const back = () => getReturnedScores(CID).s1.map(e => [e.assessmentId, e.tagId, e.score, e.mod || 0]);
+
+  beforeEach(() => {
+    held();
+    // The working copy since: a level under each competency.
+    level('s1', 'essay', 't1', 1);
+    level('s1', 'essay', 't2', 1);
+  });
+  const returnedAs = copy => {
+    _cache.gradeReturns[CID] = { essay: { s1: draftOn(GradeState.copyOf(copy)) } };
+    delete _returnedSets[CID];
+  };
+
+  it('alone, it is the returned grade, under the first competency', () => {
+    returnedAs({ value: 3, modifier: 1 });
+    expect(back()).toEqual([['essay', 't1', 3, 1]]);
+  });
+
+  it('beside a competency level, only the competency level is', () => {
+    returnedAs({ value: 3, tags: { t2: { value: 2 } } });
+    expect(back()).toEqual([['essay', 't2', 2, 0]]);
+  });
+
+  it('beside a row the work no longer uses, nothing is', () => {
+    returnedAs({ value: 3, tags: { gone: { value: 2 } } });
+    expect(back()).toEqual([]);
+  });
+});

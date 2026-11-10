@@ -190,7 +190,7 @@ function seen(world, sid) {
 describe('the grade-state cases the SQL triggers also run', () => {
   it('the file is the format this runner reads', () => {
     expect(SUITE.format).toBe(1);
-    expect(SUITE.cases.length).toBeGreaterThanOrEqual(42);
+    expect(SUITE.cases.length).toBeGreaterThanOrEqual(44);
     // Every kind of work, step and check the file says it uses is one the runner knows.
     expect(SUITE.cases.map(c => c.work).filter(w => !SCORING[w])).toEqual([]);
     const steps = Object.keys(SUITE.how_to_read.do).filter(name => name !== 'student (on any step)');
@@ -292,6 +292,27 @@ describe('the part of a copy the work is scored by now', () => {
       criteria: {},
       checks: [],
     });
+  });
+
+  it('competency work whose grade holds only an Overall level gives that level; with any competency or criterion row, it does not', () => {
+    const scoring = { kind: 'competencies', tags: ['t1', 't2'] };
+    expect(GradeState.partInUse({ value: 3, modifier: 1 }, scoring)).toMatchObject({ value: 3, modifier: 1, tags: {} });
+    expect(GradeState.partInUse({ value: 3, tags: { t1: { value: 2 } } }, scoring)).toMatchObject({
+      value: null,
+      modifier: 0,
+      tags: { t1: { value: 2, modifier: 0, comment: null } },
+    });
+    // A row the work no longer uses still means the grade is not only an Overall level.
+    expect(GradeState.partInUse({ value: 3, tags: { t9: { value: 2 } } }, scoring)).toBe(null);
+    expect(GradeState.partInUse({ value: 3, criteria: { c9: { comment: 'Old note' } } }, scoring)).toBe(null);
+    // A 0 is no level; a comment alone is not a row.
+    expect(GradeState.partInUse({ value: 0 }, scoring)).toBe(null);
+    expect(GradeState.partInUse({ value: 3, comment: 'See me' }, scoring)).toMatchObject({
+      value: 3,
+      comment: 'See me',
+    });
+    // A rubric never takes it.
+    expect(GradeState.partInUse({ value: 3 }, { kind: 'rubric', criteria: ['c1'], checks: [] })).toBe(null);
   });
 
   it('none of those: the one Overall level, where a 0 is none', () => {

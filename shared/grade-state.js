@@ -338,7 +338,10 @@ window.GradeState = (function () {
                        and checkboxes (`criteria`, `checks`: their ids)
        'points'        the score (also Complete/Incomplete); a 0 is a score
        'competencies'  the levels of the linked competencies still on the
-                       class (`tags`: their ids)
+                       class (`tags`: their ids). A grade that holds no
+                       competency or criterion row at all, only an Overall
+                       level, gives that level: the app shows it under the
+                       first competency (the loader's fallbackTag rule)
        'overall'       the one Overall level; a 0 is none
      The Overall Comment is always in it. null with nothing left; the whole
      copy when no scoring is given. */
@@ -353,8 +356,12 @@ window.GradeState = (function () {
       });
       return out;
     };
+    // An Overall level counts on work scored as a whole, and on competency
+    // work whose grade holds nothing else.
+    var bare = !Object.keys(copy.tags).length && !Object.keys(copy.criteria).length;
+    var level = kind === 'overall' || (kind === 'competencies' && bare);
     return copyOf({
-      value: kind === 'points' ? copy.value : kind === 'overall' ? copy.value || null : null,
+      value: kind === 'points' ? copy.value : level ? copy.value || null : null,
       modifier: copy.modifier,
       comment: copy.comment,
       tags: kind === 'competencies' ? only(copy.tags, scoring.tags) : {},
