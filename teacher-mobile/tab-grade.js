@@ -1301,6 +1301,7 @@ window.MGrade = (function () {
     return (
       '<div class="m-grade-return' +
       (parts.state || parts.act ? '' : ' is-empty') +
+      (parts.act ? '' : ' is-alone') +
       '" id="m-grade-return" tabindex="-1">' +
       '<div class="m-grade-return-state" id="m-grade-return-state" role="status">' +
       parts.state +
@@ -1343,6 +1344,8 @@ window.MGrade = (function () {
       if (held) (act.querySelector('button:not([disabled])') || bar).focus({ preventScroll: true });
     }
     bar.classList.toggle('is-empty', !parts.state && !parts.act);
+    // "Returned Nov 3" stands alone, with no button under it.
+    bar.classList.toggle('is-alone', !parts.act);
   }
 
   /* A grading screen just drawn (renderSwiper) shows its first card's bar:

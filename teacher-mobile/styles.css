@@ -4673,8 +4673,7 @@ body.fv-switching-course::after {
   display: none;
 }
 /* "Returned Nov 3" stands alone: the same room under it as over it. */
-.m-grade-return-state:last-child,
-.m-grade-return-state:has(+ .m-grade-return-act:empty) {
+.m-grade-return.is-alone .m-grade-return-state {
   padding-bottom: 10px;
 }
 .m-grade-return-still {
