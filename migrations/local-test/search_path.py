@@ -126,6 +126,19 @@ def wrong_order():
             print('%s: STOPS with nothing changed -> %s' % (rel, e.args[0].get('M')))
     c.close()
 
+def alters_only():
+    """For the smaller harness databases (score_rpcs.py's, the term rating
+    ones), where the file's own checks rightly refuse to run: its ALTER
+    statements alone, for the functions that database has."""
+    c = connect(); ran = 0
+    for st in statements():
+        if not bare(st).lower().startswith('alter function'): continue
+        name = bare(st).split()[2].split('(')[0]
+        if c.run('select count(*) from pg_proc where oid = to_regproc(:n)', n=name)[0][0]:
+            c.run(st); ran += 1
+    print('%d of the sixteen are in this database; each now ends its search_path with pg_temp' % ran)
+    c.close()
+
 # ── The checks ──────────────────────────────────────────────────────────────
 A = '11111111-1111-1111-1111-111111111111'; B = '22222222-2222-2222-2222-222222222222'
 ORPHAN = '33333333-3333-3333-3333-333333333333'; GONE = '44444444-4444-4444-4444-444444444444'
@@ -852,6 +865,20 @@ def main():
     ok('a lock it cannot get: it gives up after five seconds (55P03, lock_not_available)', got == '55P03' and 4.5 < waited < 9, (got, round(waited, 2)))
     ok('... and none of the sixteen was changed', now == start, now)
 
+    # It needs no table: with the busiest ones locked whole by another
+    # session, it still runs straight through.
+    holder = connect(); holder.run('begin')
+    holder.run('lock table public.course, public.enrollment, public.assessment, public.score, public.course_sync_cursor, public.fv_idempotency in access exclusive mode')
+    t0 = time.time(); got = 'applied'
+    try:
+        s = Session(applied=True, seeded=False); s.close()
+    except pg.DatabaseError as e:
+        got = e.args[0].get('M')
+    waited = time.time() - t0
+    holder.run('rollback'); holder.close()
+    ok('it takes no lock on any table: with course, enrollment, assessment, score, course_sync_cursor and fv_idempotency locked whole by another session, it runs at once',
+       got == 'applied' and waited < 2, (got, round(waited, 2)))
+
     # The same, stopped by its last check, with its own commit sent after the
     # error (a commit on a failed transaction is a rollback).
     c = connect(); c.run('begin')
@@ -882,4 +909,5 @@ def main():
 if __name__ == '__main__':
     if sys.argv[1:] == ['build']: build()
     elif sys.argv[1:] == ['wrong-order']: wrong_order()
+    elif sys.argv[1:] == ['alters']: alters_only()
     else: main()
