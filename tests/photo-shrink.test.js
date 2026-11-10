@@ -839,6 +839,18 @@ describe('the PDF seam', () => {
     expect(log.rendered).toEqual([]);
     expect(log.closed).toBe(true);
   });
+
+  it('takes a 20-page PDF and refuses a 21-page one when the caller sets no limit', async () => {
+    expect(PS.MAX_PDF_PAGES).toBe(20);
+    const twenty = await PS.prepare(pdfFile(), { surface: fakeSurface(), openPdf: fakePdf(20) });
+    expect(twenty.ok).toBe(true);
+    expect(twenty.pages).toHaveLength(20);
+    const log = {};
+    const over = await PS.prepare(pdfFile(), { surface: fakeSurface(), openPdf: fakePdf(21, log) });
+    expect(over).toMatchObject({ ok: false, reason: 'too_many_pages', kind: 'pdf', pageCount: 21, limit: 20 });
+    expect(log.rendered).toEqual([]);
+    expect(log.closed).toBe(true);
+  });
 });
 
 /* ── What the file must not do ──────────────────────────────────────────── */
