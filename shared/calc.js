@@ -1947,22 +1947,28 @@ function getTagProficiency(cid, studentId, tagId) {
   return result;
 }
 
-/** Calculate section proficiency as the average of its tags, using teacher override if one exists.
+/** A section's proficiency: the level the teacher set by hand when there is
+ * one in view (sectionOverrideInView), else the average of its tags.
+ *
+ * A level set by hand stands on its own. It applies whether or not the
+ * section has scored work under it, in all work and in returned grades alike
+ * (Colin, 2026-11-09: "Show the hand-set level now"; DECISIONS, "Student
+ * page build rulings" 14). So it counts in the folder and the overall like
+ * any other section's level. It is not evidence: the section's evidence
+ * count, trend, growth and calculated level (getSectionProficiencyRaw) still
+ * say there is none, and it never touches the course % or letter, which come
+ * from the work itself.
  * @param {string} cid - Course ID
  * @param {string} studentId - Student ID
  * @param {string} sectionId - Section ID
- * @returns {number} Proficiency level (0-4), or 0 if no evidence
+ * @returns {number} Proficiency level (0-4), or 0 with no evidence and no level set by hand
  */
 function getSectionProficiency(cid, studentId, sectionId) {
   const section = _getSectionById(cid, sectionId);
   if (!section) return 0;
-  const profs = section.tags.map(t => getTagProficiency(cid, studentId, t.id)).filter(p => p > 0);
-  if (profs.length === 0) return 0;
-  const calculated = profs.reduce((a, b) => a + b, 0) / profs.length;
-  // Check for teacher override
   const override = sectionOverrideInView(cid, studentId, sectionId);
   if (override) return override.level;
-  return calculated;
+  return getSectionProficiencyRaw(cid, studentId, sectionId);
 }
 
 /** The teacher's override for a section when it applies to the grade in
@@ -2020,6 +2026,7 @@ function setSectionOverride(cid, studentId, sectionId, level, reason) {
       level: level,
       reason: reason,
       date: typeof courseToday === 'function' ? courseToday(cid) : new Date().toISOString().slice(0, 10),
+      // 0 when the section has no scored work: nothing was calculated.
       calculated: Math.round(raw * 10) / 10,
     };
   } else {
