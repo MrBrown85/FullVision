@@ -21,6 +21,8 @@ var _assessmentOverallCache = {};
 var _categoryAvgCache = {};
 var _courseLetterCache = {};
 var _pieceIndexCache = {}; // cid → Map<assessmentId, { keys, fed }>: what each piece of work measures now
+var _pieceRankCache = {}; // cid → Map<assessmentId, n>: the order same-date pieces count in
+var _orderedEntriesCache = {}; // class, term, set and student → the student's score entries in counting order
 
 /* ── The score set and its reader ──────────────────────────────
    Every score, status, points score, Complete/Incomplete mark, Overall
@@ -297,6 +299,8 @@ function clearProfCache() {
   _categoryAvgCache = {};
   _courseLetterCache = {};
   _pieceIndexCache = {};
+  _pieceRankCache = {};
+  _orderedEntriesCache = {};
 }
 
 /** Get or build assessment weights map for a course. */
@@ -384,6 +388,132 @@ function _pieceMeasures(cid, assessmentId, key) {
   // 'overall', and '' in scores loaded before the Overall key had a name.
   if (isUnlinkedTag(key)) return isUnlinkedTag(piece.keys[0]);
   return piece.keys.indexOf(key) >= 0 || !!(piece.fed && piece.fed[key]);
+}
+
+/* ── The order same-date work counts in ───────────────────────────
+   Colin, 2026-11-09, "Order in the assignment list": two pieces of work on
+   one competency with the same date count in a fixed order, whatever order
+   they were graded in. WHICH order is not settled (see below), so it is
+   decided in one place: _sameDatePieceOrder. Everything else here only
+   applies it.
+
+   _sameDatePieceOrder(x, y) is given two pieces as _pieceOrderFacts
+   describes them, and returns < 0 when x counts first (so y is the later,
+   "most recent" one):
+     id           the piece's id
+     placed       display_order: 1..n once the class's cards have been
+                  dragged; 0 for a card never placed (the Assignments page
+                  shows those first)
+     stored       its position in getAssessments(cid): the order the server
+                  sent (display_order, created_at, id), with pieces made on
+                  this device since then at the end
+     made         when it was made, as far as this device knows: its own
+                  clock for a piece made here and not yet reloaded
+                  (assessment.created), '' for a piece loaded from the
+                  server (the class bundle does not send created_at)
+     folder       the module folder it is filed in, or ''
+     folderPlace  that folder's place among the folders; Infinity when it is
+                  in none (the page lists unfiled cards after the folders)
+
+   AS BUILT: the class's cards read top to bottom as first to last, taking
+   no account of folders. The independent review found this is not what a
+   teacher sees once cards sit in folders, that a card made after a drag
+   (placed 0) counts first on its date, and that pieces made in one batch
+   can change order across a reload. The owner chooses between:
+     (1) the piece made later counts later:
+           return _cmpText(x.made, y.made) || _cmpText(x.id, y.id);
+         It needs `made` for every piece, which means the class bundle
+         sending created_at; nothing else here changes.
+     (2) exactly as the Assignments page shows them:
+           return x.folderPlace - y.folderPlace || x.placed - y.placed || x.stored - y.stored;
+         with new cards given a place so they do not jump ahead (a data
+         layer change).
+     (3) leave it to whichever was graded last, as on main: take
+         _orderedEntries' sort out. */
+function _sameDatePieceOrder(x, y) {
+  return x.placed - y.placed || x.stored - y.stored;
+}
+
+function _cmpText(a, b) {
+  a = String(a == null ? '' : a);
+  b = String(b == null ? '' : b);
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/* What _sameDatePieceOrder is told about each piece of work in the class. */
+function _pieceOrderFacts(cid) {
+  var folders = {};
+  (typeof getModules === 'function' ? getModules(cid) || [] : []).forEach(function (m, i) {
+    if (m && m.id) folders[m.id] = i;
+  });
+  return (getAssessments(cid) || []).filter(Boolean).map(function (a, i) {
+    var folder = a.moduleId && folders[a.moduleId] != null ? a.moduleId : '';
+    return {
+      id: a.id,
+      placed: Number(a.display_order || 0) || 0,
+      stored: i,
+      made: a.created || '',
+      folder: folder,
+      folderPlace: folder ? folders[folder] : Infinity,
+    };
+  });
+}
+
+/* Each piece's place among the class's pieces by _sameDatePieceOrder,
+   worked out once per class. */
+function _pieceRank(cid) {
+  if (_pieceRankCache[cid]) return _pieceRankCache[cid];
+  var rank = new Map();
+  _pieceOrderFacts(cid)
+    .sort(_sameDatePieceOrder)
+    .forEach(function (x, n) {
+      rank.set(x.id, n);
+    });
+  _pieceRankCache[cid] = rank;
+  return rank;
+}
+
+/* The order evidence counts in: by date; work with the same date by
+   _pieceRank; and the scores of one piece in the order the piece lists what
+   it measures (its competencies, or its rubric's criteria). Never by where
+   an entry sits in the student's score list: re-entering a score moves it to
+   the end of that list, and Most Recent, Mode's tie and Decaying Average
+   must not move with it. Two entries under the same key of one piece are
+   one score stored twice; they keep the order given. */
+function _evidenceCompare(cid) {
+  var rank = _pieceRank(cid);
+  var pieces = _pieceIndex(cid);
+  function place(entry) {
+    var piece = pieces.get(entry.assessmentId);
+    var keys = (piece && piece.keys) || [];
+    var at = keys.indexOf(entry.criterionId || entry.tagId);
+    return at < 0 ? keys.length : at;
+  }
+  return function (a, b) {
+    var byDate = (a.date || '').localeCompare(b.date || '');
+    if (byDate) return byDate;
+    if (a.assessmentId !== b.assessmentId) {
+      var ra = rank.get(a.assessmentId);
+      var rb = rank.get(b.assessmentId);
+      // A piece no longer in the class sorts after those that are, by its id.
+      if (ra == null && rb == null) return _cmpText(a.assessmentId, b.assessmentId);
+      if (ra == null) return 1;
+      if (rb == null) return -1;
+      return ra - rb;
+    }
+    return place(a) - place(b) || _cmpText(a.criterionId || a.tagId, b.criterionId || b.tagId);
+  };
+}
+
+/* One student's score entries in counting order (_evidenceCompare), from
+   the set of scores in use. Everything that turns entries into evidence
+   reads them here, so no result depends on the order of the score list. */
+function _orderedEntries(cid, studentId) {
+  var key = _ck(cid) + ':' + studentId;
+  if (_orderedEntriesCache[key]) return _orderedEntriesCache[key];
+  var ordered = (_scoreRead.scores(cid)[studentId] || []).slice().sort(_evidenceCompare(cid));
+  _orderedEntriesCache[key] = ordered;
+  return ordered;
 }
 
 /* An Overall level counts only when it stands alone: the student's grade on
@@ -698,7 +828,7 @@ function getAssessmentOverallScore(cid, studentId, assessmentId) {
     return 0;
   }
 
-  var entries = (_scoreRead.scores(cid)[studentId] || []).filter(function (entry) {
+  var entries = _orderedEntries(cid, studentId).filter(function (entry) {
     return entry.assessmentId === assessmentId;
   });
   var rubricResult = getRubricAssessmentScore(cid, assessment, entries);
@@ -1866,8 +1996,8 @@ function getTagScores(cid, studentId, tagId) {
   var cacheKey = _ck(cid) + ':' + studentId + ':' + tagId;
   if (_tagScoresCache[cacheKey]) return _tagScoresCache[cacheKey];
 
-  const allScores = _scoreRead.scores(cid);
-  const studentScores = allScores[studentId] || [];
+  // In counting order, so the evidence below comes out in it too.
+  const studentScores = _orderedEntries(cid, studentId);
   const statuses = _scoreRead.statuses(cid);
   // Use Map for O(1) lookup instead of O(n) find() per score entry
   const assessMap = _getAssessMap(cid);
@@ -2322,7 +2452,7 @@ function getSectionTrend(cid, studentId, sectionId) {
       .forEach(s => allScores.push(s));
   });
   if (allScores.length < 2) return 'flat';
-  allScores.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  allScores.sort(_evidenceCompare(cid));
   const recent = allScores[allScores.length - 1].score;
   const prev = allScores[allScores.length - 2].score;
   if (recent > prev) return 'up';
@@ -2372,7 +2502,7 @@ function sectionCountedEvidence(cid, studentId, sectionId) {
         out.push(s);
       });
   });
-  return out;
+  return out.sort(_evidenceCompare(cid));
 }
 
 /** Count the number of scored evidence entries across all tags in a section.
@@ -2514,7 +2644,7 @@ function getSectionGrowthData(cid, studentId, sectionId) {
   // Sort allScores once by date, then use a running pointer — O(n) instead of O(n²).
   // For each date, advance the pointer to include all scores up to that date,
   // accumulating them into a per-tag Map so grouping is also O(1) per score.
-  allScores.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  allScores.sort(_evidenceCompare(cid));
   const runningByTag = new Map(section.tags.map(t => [t.id, []]));
   let ri = 0;
 
@@ -3633,7 +3763,10 @@ function earlierInCategory(cid, assessment, n) {
       );
     })
     .sort(function (x, y) {
-      return _assessmentDate(y).localeCompare(_assessmentDate(x));
+      // Newest first; same-date pieces by the order they count in, later first.
+      return (
+        _assessmentDate(y).localeCompare(_assessmentDate(x)) || _pieceRank(cid).get(y.id) - _pieceRank(cid).get(x.id)
+      );
     })
     .map(function (x) {
       var avg = classColumnAverage(cid, students, { assessment: x });
