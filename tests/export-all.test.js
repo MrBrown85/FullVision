@@ -408,7 +408,6 @@ describe('the export stays complete', () => {
     getRemovedSections: 'the learning map, not student data',
     getReportConfig: 'report layout settings, not student data',
     getReturnSettings: 'class settings, not student data',
-    getReturnedScores: 'the returned set of scores; the export shows all work (build plan 1.3)',
     getRubricById: 'read through _assessmentRubric',
     getRubricCheckIds: 'Advanced Rubric ticks; the level they suggest is on Rubric Levels',
     getRubricChecks: 'Advanced Rubric ticks; the level they suggest is on Rubric Levels',

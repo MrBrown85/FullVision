@@ -10417,8 +10417,12 @@ function _pointsScoreKeys(a, own, working, loadedKey) {
    Built once for each working copy; any save of the class's data has it
    built again. Checklist ticks are not in it (getScores holds none); the
    returned ticks are kept in each row's returned_copy for a reader to
-   come (S2). */
-function getReturnedScores(cid) {
+   come (S2).
+   It is set on window, not declared: calc.js looks for it by name and
+   fails closed when it is not there, and its tests take it away (and put
+   their own in its place) to prove that. A declared function could be
+   neither removed nor told from one that never loaded. */
+window.getReturnedScores = function getReturnedScores(cid) {
   var working = getScores(cid) || {};
   var kept = _returnedSets[cid];
   if (kept && kept.working === working) return kept.set;
@@ -10467,7 +10471,7 @@ function getReturnedScores(cid) {
   }
   _returnedSets[cid] = { working: working, set: set };
   return set;
-}
+};
 
 /* A local id became a server id (_rekey): the rows move with it, whether it
    named an assessment, a student, or a competency, criterion or checkbox

@@ -202,7 +202,7 @@ describe('returned grades fail closed', () => {
     try {
       expect(() => withReturnedOnly(() => getTagProficiency(CID, 's1', TAG))).toThrow(/none came back/);
     } finally {
-      globalThis.getReturnedScores = undefined;
+      delete globalThis.getReturnedScores;
       installed = installReturnedScores(rowsByClass);
     }
   });
