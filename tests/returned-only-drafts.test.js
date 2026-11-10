@@ -311,7 +311,7 @@ describe('History 12 (Letter): drafts and statuses', () => {
     expect(returnedOnly(cid)).toEqual(cleared);
   });
 
-  it('Missing after a returned grade was cleared: the % counts 0 at once; the competency keeps the returned level until the clear is returned (question 2 for Colin)', () => {
+  it('Missing after a returned grade was cleared: Missing wins at once in every number, in both sets (Colin, 2026-11-09)', () => {
     const cid = ctx.cid;
     const noor = student(cid, 'Noor');
     const poster = piece(cid, 'What Does the Poster Show, and What Does It Hide?');
@@ -327,10 +327,11 @@ describe('History 12 (Letter): drafts and statuses', () => {
     expect(returned[noor].shown.percent).toBe(all[noor].shown.percent);
     expect(returned[noor].shown.letter).toBe(all[noor].shown.letter);
     expect(returned[noor].levels.workPercent[poster.id]).toBe(0);
-    // Competency levels: all-work has no evidence from the piece; returned-only
-    // still has the returned 3, so its levels are the ones from before.
+    // Competency levels: the returned 3 stopped counting when the piece was
+    // marked Missing, so returned-only has what all-work has. (Before S0-F1d
+    // returned-only kept the levels from before the clear.)
     expect(all[noor].levels.competencies).not.toEqual(before[noor].levels.competencies);
-    expect(returned[noor].levels.competencies).toEqual(before[noor].levels.competencies);
-    expect(returned[noor].levels.overall).toBe(before[noor].levels.overall);
+    expect(returned[noor].levels.competencies).toEqual(all[noor].levels.competencies);
+    expect(returned[noor].levels.overall).toBe(all[noor].levels.overall);
   });
 });
