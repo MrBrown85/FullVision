@@ -31,6 +31,18 @@
  * openStudentPage({ noStorage: true }) is a private window, where every use
  * of localStorage throws.
  *
+ * The window. fire(name) sends the window an event (pageshow, storage,
+ * pointerdown, keydown, scroll…) and fireDocument(name) the document.
+ * hide() and show() make the tab hidden or visible, as switching tabs or
+ * closing a lid does. advance(ms) moves the page's clock (Date.now) on
+ * without running its timers, as a closed lid does; a timer the page set
+ * for longer than a second never fires here, so a test moves the clock and
+ * then sends the event that would wake the page.
+ *
+ * What is on screen. There is no layout here, so the page's
+ * IntersectionObserver is a stand-in a test drives: onScreen(el => true or
+ * false) tells every observer which of the rows it watches are in view.
+ *
  * watchGlobals(files) finds every global name those files read that the
  * page does not define (a reader the teacher's apps get from
  * shared/data.js, say) and returns a Set that fills with each such name as
@@ -88,11 +100,42 @@ export function openStudentPage(opts = {}) {
     setItem: (k, v) => (kept[k] = String(v)),
     removeItem: k => delete kept[k],
   });
+  const win = new EventTarget();
+  const observers = [];
+  class FakeIntersectionObserver {
+    constructor(callback, options) {
+      this.callback = callback;
+      this.options = options;
+      this.watched = new Set();
+      observers.push(this);
+    }
+    observe(el) {
+      this.watched.add(el);
+    }
+    unobserve(el) {
+      this.watched.delete(el);
+    }
+    disconnect() {
+      this.watched.clear();
+      const at = observers.indexOf(this);
+      if (at >= 0) observers.splice(at, 1);
+    }
+  }
+  let visibility = 'visible';
+  Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => visibility });
   const sandbox = {
     document,
     console,
-    setTimeout,
+    // A long timer (a session's end, fifteen idle minutes) must not hold the test run open.
+    setTimeout: (fn, ms) => {
+      const t = setTimeout(fn, ms);
+      if (ms > 1000) t.unref();
+      return t;
+    },
     clearTimeout,
+    addEventListener: win.addEventListener.bind(win),
+    removeEventListener: win.removeEventListener.bind(win),
+    IntersectionObserver: opts.noObserver ? undefined : FakeIntersectionObserver,
     // The loading screen turns its lines on a timer; nothing here waits on it.
     setInterval: () => 0,
     clearInterval() {},
@@ -186,6 +229,30 @@ export function openStudentPage(opts = {}) {
     store,
     addresses,
     tab,
+    observers,
+    fire: (name, init) => {
+      const e = new Event(name);
+      win.dispatchEvent(Object.assign(e, init));
+    },
+    fireDocument: name => document.dispatchEvent(new window.Event(name)),
+    hide: () => {
+      visibility = 'hidden';
+      document.dispatchEvent(new window.Event('visibilitychange'));
+    },
+    show: () => {
+      visibility = 'visible';
+      document.dispatchEvent(new window.Event('visibilitychange'));
+    },
+    advance: ms =>
+      run('Date.now = (function (now, by) { return function () { return now() + by; }; })(Date.now, ' + ms + ')'),
+    onScreen: inView => {
+      observers.slice().forEach(o => {
+        const entries = [...o.watched]
+          .filter(el => root().contains(el))
+          .map(el => ({ target: el, isIntersecting: !!inView(el) }));
+        if (entries.length) o.callback(entries, o);
+      });
+    },
     tick,
     settle,
     watchGlobals: files => {
@@ -232,6 +299,10 @@ export function openStudentPage(opts = {}) {
       find(sel).dispatchEvent(new window.Event('click', { bubbles: true }));
       await settle();
     },
+    // A click that is not waited for: what it started is still on its way.
+    tap: sel => {
+      find(sel).dispatchEvent(new window.Event('click', { bubbles: true }));
+    },
     type: (sel, value) => {
       const el = find(sel);
       el.value = value;
@@ -246,6 +317,10 @@ export function openStudentPage(opts = {}) {
     submit: async sel => {
       find(sel).dispatchEvent(new window.Event('submit', { bubbles: true }));
       await settle();
+    },
+    // A form sent and not waited for.
+    send: sel => {
+      find(sel).dispatchEvent(new window.Event('submit', { bubbles: true }));
     },
   });
 }

@@ -154,8 +154,9 @@ describe('Demo Mode sends nothing from the student page', () => {
     // One call, and no other name for it.
     expect(src.match(/StudentPage\.call\b/g)).toHaveLength(1);
     expect(src).not.toMatch(/=\s*StudentPage\.call\b|StudentPage\[/);
-    // It is the last line of `ask`, after Demo Mode has returned its own answer.
-    const ask = /\n {2}function ask\(route, body\) \{\n([\s\S]*?)\n {2}\}\n/.exec(src)[1];
+    // It is the last line of `fromFunction` (all `ask` calls), after Demo Mode has returned its own answer.
+    expect(src.match(/\bfromFunction\(/g)).toHaveLength(2);
+    const ask = /\n {2}function fromFunction\(route, body\) \{\n([\s\S]*?)\n {2}\}\n/.exec(src)[1];
     expect(ask.replace(/\s+/g, ' ').trim()).toBe(
       'if (S.demo) { var answer = demo ? DEMO_ANSWERS[route] : null; ' +
         "return Promise.resolve(answer ? answer(body || {}) : { ok: false, error: 'not_found' }); } " +

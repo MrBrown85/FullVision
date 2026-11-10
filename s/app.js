@@ -24,13 +24,15 @@
 
    The session. A right answer to Is This You? starts one; the function
    gives back a token, and that token is the only thing this page keeps on
-   the device (localStorage, with the time it ends and the id of the class
-   it opens: no name, code, birthday or grade). It lasts until midnight
-   where the class is, or until Done. While it lasts, opening the page
-   again opens the student's page without the card. A card scanned or typed
-   from the start signs the last student out first (Colin, Nov 9: "start
-   fresh"), so two students on one Chromebook never share a session. The
-   card's code leaves the address as soon as the card is recognised.
+   the device (localStorage, with the time it ends, the id of the class it
+   opens and the time the student last touched the page: no name, code,
+   birthday or grade). It lasts until midnight where the class is, until
+   Done, or until fifteen minutes pass with no activity (Colin, Nov 10).
+   While it lasts, opening the page again opens the student's page without
+   the card. Any card recognised on the device signs the last student out
+   first (Colin, Nov 9: "start fresh"), so two students on one Chromebook
+   never share a session. The card's code leaves the address as soon as
+   the card is recognised.
 
    student.js holds the code box, the identity fields and check, and the
    lock messages, and loads first. This file adds its screens with
@@ -529,8 +531,23 @@
      answers on the device and nothing is sent; a real card asks the edge
      function, the way a slip does (student.js's `call`: pinned to
      ca-central-1, no key, nothing in the address). A failed call comes back
-     as { ok: false, error: 'network' }. */
+     as { ok: false, error: 'network' }.
+     The page's reply comes back once calc.js is in, so the list is drawn
+     once, with its results.
+     Every answer, Demo Mode's too, goes through student.js's one guard
+     (`whileCurrent`): an answer that lands after the page has moved on to
+     another code or session is dropped, and nothing below sees it. */
   function ask(route, body) {
+    var reply = fromFunction(route, body);
+    if (route === 'page') {
+      reply = Promise.all([reply, whenGradesAreIn()]).then(function (both) {
+        return both[0];
+      });
+    }
+    return StudentPage.whileCurrent(reply);
+  }
+
+  function fromFunction(route, body) {
     if (S.demo) {
       var answer = demo ? DEMO_ANSWERS[route] : null;
       return Promise.resolve(answer ? answer(body || {}) : { ok: false, error: 'not_found' });
@@ -551,13 +568,16 @@
     locked: 'locked',
     signed_out: 'signed_out',
   };
+  function has(map, key) {
+    return typeof key === 'string' && Object.prototype.hasOwnProperty.call(map, key);
+  }
   function cardMessage(res) {
     var e = res && !res.ok ? res.error : '';
-    return MESSAGES[(Object.prototype.hasOwnProperty.call(CARD_WORDS, e) && CARD_WORDS[e]) || 'card_network'];
+    return MESSAGES[has(CARD_WORDS, e) ? CARD_WORDS[e] : 'card_network'];
   }
   // Whether the function itself refused (true), or the call never arrived.
   function refusedByFunction(res) {
-    return !!(res && !res.ok && Object.prototype.hasOwnProperty.call(CARD_WORDS, res.error));
+    return !!(res && !res.ok && has(CARD_WORDS, res.error));
   }
 
   function setTitle() {
@@ -566,20 +586,29 @@
 
   /* ── The session on this device ────────────────────────────── */
 
-  /* { token, expires, enrollment, kept }: the session this tab is showing.
-     `kept` is true once it is in localStorage, where the next visit and the
-     device's other tabs read it. Nothing else of the card path is stored. */
+  /* { token, expires, enrollment, active, kept }: the session this tab is
+     showing. `active` is when the student last touched the page. `kept` is
+     true once it is in localStorage, where the next visit and the device's
+     other tabs read it. Nothing else of the card path is stored. */
   var SESSION_KEY = 'fv-s-session';
+  // No touch, key, pointer or scroll for this long ends the session, as Done does (Colin, Nov 10).
+  var IDLE_MS = 15 * 60 * 1000;
   var session = null;
   // The last student's token: sent with the next check, so the server ends it.
   var ending = '';
   var timer = 0;
+  // When this tab last wrote the time of the last activity.
+  var wrote = 0;
+
+  function clock(now) {
+    return now == null ? Date.now() : now;
+  }
 
   function readStored() {
     try {
       var v = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
       if (!v || !/^[0-9a-f]{64}$/.test(String(v.t || '')) || typeof v.e !== 'string' || !v.e) return null;
-      var stored = { token: v.t, expires: String(v.x || ''), enrollment: v.e, kept: true };
+      var stored = { token: v.t, expires: String(v.x || ''), enrollment: v.e, active: Number(v.a) || 0, kept: true };
       return endsAt(stored) == null ? null : stored;
     } catch (e) {
       return null; // no storage (a private window): the session lasts while this tab is open
@@ -592,28 +621,48 @@
     return isFinite(t) ? t : null;
   }
 
-  function isOver(s, now) {
-    var t = endsAt(s);
-    return t != null && t <= (now == null ? Date.now() : now);
+  /* When the student last touched the page: in this tab, or in another tab
+     on this device showing the same session. */
+  function lastActive(s) {
+    var stored = s.kept ? readStored() : null;
+    return Math.max(s.active || 0, stored && stored.token === s.token ? stored.active : 0);
+  }
+
+  /* Why a session is over at `now`: 'ended' (its midnight has come), 'idle'
+     (fifteen minutes with no activity), or '' while it is live. The one
+     place that decides it: the timer, the page being shown again and the
+     page being opened again all ask here. */
+  function over(s, now) {
+    var end = endsAt(s);
+    if (end != null && end <= clock(now)) return 'ended';
+    return clock(now) - lastActive(s) >= IDLE_MS ? 'idle' : '';
   }
 
   // Kept only with an end this page can read, so nothing stays past its midnight.
   function keep(s) {
+    var end = endsAt(s);
     s.kept = false;
-    if (endsAt(s) == null || isOver(s)) return;
+    if (end == null || end <= Date.now()) return;
     try {
-      localStorage.setItem(SESSION_KEY, JSON.stringify({ t: s.token, x: s.expires, e: s.enrollment }));
+      write(s);
       s.kept = !!readStored();
     } catch (e) {
       /* a private window: this tab only */
     }
   }
 
+  // The one thing this page writes to the device, and the one place it does.
+  function write(s) {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ t: s.token, x: s.expires, e: s.enrollment, a: s.active }));
+    wrote = s.active || 0;
+  }
+
   // `stored` false leaves another student's session, kept by another tab, where it is.
   function forget(stored) {
     session = null;
-    if (timer && typeof clearInterval === 'function') clearInterval(timer);
+    if (timer) clearTimeout(timer);
     timer = 0;
+    stopWatchingRows();
     if (stored === false) return;
     try {
       localStorage.removeItem(SESSION_KEY);
@@ -628,9 +677,15 @@
   }
 
   /* A card was recognised: whoever was signed in on this device is signed
-     out now, before Is This You? is drawn, so nothing of theirs can be
-     opened again from this device whether or not the check is passed. The
-     token also goes with the check, in case this Done never arrived. */
+     out now, on the server and on the device, before anything about the
+     card is drawn. It makes no difference whether the card will open: one
+     that is locked, past its date, turned off or in need of reprinting is
+     still someone else's card in someone else's hand (Colin, Nov 9: a card
+     scanned from the start screen signs the last student out).
+     A code that is no card (a slip, a mistyped code) does not do this: a
+     student signed in who opens their own questionnaire slip keeps their
+     page, and a typing mistake says nothing about who holds the device.
+     The token also goes with the check, in case this Done never arrived. */
   function leaveLast() {
     if (S.demo) return;
     var shown = session;
@@ -661,48 +716,223 @@
     paint('#sp-code');
   }
 
-  /* Is the session this tab shows still the device's? Asked every few
-     seconds while a page is open, and when the tab is shown again (a laptop
-     opened after midnight, the Back button, another tab's Done). */
-  function checkSession(now) {
-    if (!session || S.demo) return;
-    if (isOver(session, now)) {
-      leave(MESSAGES.signed_out);
-      return;
-    }
-    if (!session.kept) return;
-    var stored = readStored();
-    // Done in another tab, or another student signed in there.
-    if (!stored) leave(MESSAGES.signed_out);
-    else if (stored.token !== session.token) leave(MESSAGES.signed_out, false);
+  /* The session ends here, as Done ends it: the server is told, then the
+     device forgets. Done and fifteen idle minutes both come this way. With
+     the page open in two tabs, the tab that still finds the token on the
+     device is the one that tells the server, so it is told once. */
+  function signOut(message) {
+    var s = session;
+    var stored = s && s.kept ? readStored() : null;
+    var others = !!(stored && stored.token !== s.token);
+    if (s && (!s.kept || (stored && !others))) endOnServer(s.token);
+    leave(message, others ? false : undefined);
   }
 
-  function watch() {
-    if (timer || S.demo || typeof setInterval !== 'function') return;
-    timer = setInterval(checkSession, 20000);
+  /* The card's own screens that show, or are opening, the session's page.
+     The session is watched only while one of them is up: a questionnaire or
+     a report opened in the same tab is never taken down for it. */
+  function showing() {
+    return (
+      S.screen === 'assignments' ||
+      (S.screen === 'cardmessage' && !!S.again) ||
+      (S.screen === 'loading' && S.heading === TITLE)
+    );
+  }
+
+  /* Is the session this tab shows still the device's, and still live?
+     Asked when its end or its idle limit comes due, and before the page is
+     shown again (the lid opened, the tab switched to, the Back button), so
+     a list whose session is over is never drawn or uncovered. */
+  function checkSession(now) {
+    if (!session || S.demo || !showing()) return;
+    if (session.kept) {
+      var stored = readStored();
+      // Done in another tab, or another student signed in there.
+      if (!stored) return leave(MESSAGES.signed_out);
+      if (stored.token !== session.token) return leave(MESSAGES.signed_out, false);
+    }
+    var why = over(session, now);
+    if (why === 'ended') return leave(MESSAGES.signed_out);
+    if (why === 'idle') return signOut(MESSAGES.signed_out);
+    return arm(now);
+  }
+
+  // One timer, set for whichever comes first: the session's end or the idle limit.
+  function arm(now) {
+    if (timer) clearTimeout(timer);
+    timer = 0;
+    if (!session || S.demo) return;
+    var end = endsAt(session);
+    var due = Math.min(end == null ? Infinity : end, lastActive(session) + IDLE_MS) - clock(now);
+    timer = setTimeout(
+      function () {
+        timer = 0;
+        checkSession();
+      },
+      Math.min(Math.max(due, 0) + 50, 0x7fffffff),
+    );
+  }
+
+  /* The student touched the page. Counted for the card's session only, at
+     most once a second; written beside the token every few seconds, so the
+     device's other tabs see it. A touch after the limit does not bring the
+     session back: it is checked first. */
+  function active(now) {
+    if (!session || S.demo || !showing()) return;
+    var at = clock(now);
+    if (at - (session.active || 0) < 1000) return;
+    if (over(session, at)) {
+      checkSession(at);
+      return;
+    }
+    session.active = at;
+    if (!session.kept || at - wrote < 5000) return;
+    var stored = readStored();
+    if (!stored || stored.token !== session.token) return;
+    try {
+      write(session);
+    } catch (e) {
+      /* this tab only */
+    }
+  }
+
+  /* While the tab is hidden the page is covered (student.css, .sp-away),
+     and it is uncovered only after the session has been checked. So the
+     list of a session that ended while nobody was looking is never on
+     screen, not for one frame, however the browser orders its events. */
+  function cover() {
+    if (session && !S.demo && showing() && typeof document !== 'undefined') {
+      document.documentElement.classList.add('sp-away');
+    }
+  }
+  function uncover() {
+    checkSession();
+    if (typeof document !== 'undefined') document.documentElement.classList.remove('sp-away');
+  }
+
+  /* ── What the student has opened ───────────────────────────── */
+
+  /* A returned piece counts as opened once its row has been on screen in a
+     visible tab (Colin, Nov 10). assignments.js marks the rows that could
+     be (data-unseen: returned, a result drawn, not opened since it came
+     back). They are watched here; the ones seen are told to the server in
+     one call a moment later, once each. Nothing is watched while the
+     results have not loaded, and nothing counts in a tab nobody is looking
+     at. A browser that cannot say what is on screen sends nothing.
+     The feedback screen (S4) will tighten this to a piece actually opened:
+     it changes `watchRows` and `shown`, and nothing else. */
+  var SEEN_AFTER_MS = 600;
+  var watching = null; // { page, observer, inView: { id: true }, pending: { id: true }, timer }
+
+  function stopWatchingRows() {
+    if (!watching) return;
+    if (watching.timer) clearTimeout(watching.timer);
+    if (watching.observer) watching.observer.disconnect();
+    watching = null;
+  }
+
+  function watchRows() {
+    stopWatchingRows();
+    if (!S.page || !session || S.screen !== 'assignments') return;
+    if (typeof IntersectionObserver !== 'function' || typeof document === 'undefined') return;
+    var rows = document.querySelectorAll('.sp-row[data-unseen]');
+    if (!rows.length) return;
+    var w = { page: S.page, observer: null, inView: {}, pending: {}, timer: 0 };
+    // The header stays over the top of the list: a row under it is not on screen.
+    var head = document.querySelector('.sp-head');
+    var under = (head && head.offsetHeight) || 0;
+    w.observer = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (entry) {
+          var id = entry.target.getAttribute('data-unseen');
+          if (entry.isIntersecting) w.inView[id] = true;
+          else delete w.inView[id];
+        });
+        if (watching === w) shown();
+      },
+      { rootMargin: '-' + under + 'px 0px 0px 0px', threshold: 0.6 },
+    );
+    Array.prototype.forEach.call(rows, function (row) {
+      w.observer.observe(row);
+    });
+    watching = w;
+  }
+
+  // The rows in view are counted, if the tab is one somebody can see.
+  function shown() {
+    var w = watching;
+    if (!w || S.page !== w.page || S.screen !== 'assignments') return;
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+    Object.keys(w.inView).forEach(function (id) {
+      w.pending[id] = true;
+    });
+    if (!w.timer && Object.keys(w.pending).length) w.timer = setTimeout(tellSeen, SEEN_AFTER_MS);
+  }
+
+  /* Tells the server which pieces were opened: one call for all that are
+     waiting. A piece is marked as told when it is sent, so it is sent once
+     in a session whatever the answer; the server's own record decides what
+     the next visit shows. A session that has ended signs this tab out. */
+  function tellSeen() {
+    var w = watching;
+    if (!w) return Promise.resolve();
+    if (w.timer) clearTimeout(w.timer);
+    w.timer = 0;
+    var page = w.page;
+    if (S.page !== page || !session) return Promise.resolve();
+    var ids = page.assessments
+      .filter(function (a) {
+        return a.unseen && w.pending[a.id];
+      })
+      .map(function (a) {
+        return a.id;
+      })
+      .slice(0, 500);
+    w.pending = {};
+    if (!ids.length) return Promise.resolve();
+    page.assessments.forEach(function (a) {
+      if (ids.indexOf(a.id) >= 0) a.unseen = false;
+    });
+    return ask('seen', { session: session.token, enrollment_id: session.enrollment, assessment_ids: ids }).then(
+      function (res) {
+        if (res && res.error === 'signed_out' && S.page === page) leave(MESSAGES.signed_out);
+      },
+    );
   }
 
   /* ── Flow ──────────────────────────────────────────────────── */
 
-  /* What `card` said about a code: true when it is a card and its screen is
-     drawn (Is This You?, or why the card won't open), false when it is not
-     a card, 'locked' when this address has made too many wrong tries. */
+  /* What `card` said about a code:
+       true         it is a card, and its screen is drawn (Is This You?, or
+                    why the card won't open);
+       false        it is not a card: the function said not_found, or it is
+                    the function from before cards, which answers a route
+                    it does not know with bad_request;
+       'locked'     this address has made too many wrong tries;
+       'unreached'  anything else (no internet, a server error, an answer
+                    with no meaning here): not known. */
+  var WONT_OPEN = { closed: 1, card_locked: 1, card_expired: 1, reprint: 1 };
   function cardSaid(res) {
-    if (res && res.ok && res.kind === 'card') {
-      leaveLast();
+    var isCard = !!(res && res.ok === true && res.kind === 'card');
+    var e = res && res.ok === false ? res.error : '';
+    if (!isCard && !has(WONT_OPEN, e)) {
+      if (e === 'locked') return 'locked';
+      return e === 'not_found' || e === 'bad_request' ? false : 'unreached';
+    }
+    // A card, whether or not it will open: the last student is signed out.
+    leaveLast();
+    S.sending = false;
+    S.again = false;
+    S.typed = '';
+    S.number = '';
+    S.bday = { m: '', d: '', y: '' };
+    if (isCard) {
       S.data = res;
-      S.number = '';
-      S.bday = { m: '', d: '', y: '' };
-      S.typed = '';
       S.message = '';
-      S.again = false;
       S.screen = 'cardcheck';
     } else {
-      var e = res && !res.ok ? res.error : '';
-      if (e === 'locked') return 'locked';
-      if (e !== 'closed' && e !== 'card_locked' && e !== 'card_expired' && e !== 'reprint') return false;
+      S.data = null;
       S.message = cardMessage(res);
-      S.again = false;
       S.screen = 'cardmessage';
     }
     // The code leaves the address: it is not left in the bar or for Back.
@@ -714,7 +944,8 @@
       }
     }
     setTitle();
-    paint();
+    // The keyboard and a screen reader start at the first thing to answer.
+    paint(isCard ? (res.check === 'password' ? '#sp-ident' : '#sp-bm') : undefined);
     return true;
   }
 
@@ -753,6 +984,7 @@
     S.message = '';
     // A real code may be a slip's: student.js asks `card`, then `open`.
     if (!S.demo) return StudentPage.openCode(c, 'card');
+    StudentPage.newTurn();
     S.code = c;
     return ask('card', { code: c }).then(function (res) {
       if (cardSaid(res) !== true) refused(res);
@@ -812,26 +1044,6 @@
     return fetching;
   }
 
-  /* The pieces whose result the list has just drawn, told to the server
-     once each (assignments.js's `opened`): what marks a grade Updated the
-     next time it changes. A session that has ended signs this tab out. */
-  function tellSeen() {
-    var page = S.page;
-    var ids = page && session && StudentPage.opened ? StudentPage.opened(page).slice(0, 500) : [];
-    if (!ids.length) return Promise.resolve();
-    return ask('seen', { session: session.token, enrollment_id: session.enrollment, assessment_ids: ids }).then(
-      function (res) {
-        if (res && res.ok) {
-          page.assessments.forEach(function (a) {
-            if (ids.indexOf(a.id) >= 0) a.unseen = false;
-          });
-        } else if (res && res.error === 'signed_out' && S.page === page) {
-          leave(MESSAGES.signed_out);
-        }
-      },
-    );
-  }
-
   /* `page` would not open. A session that has ended goes back to the card's
      first screen; a card or class that can no longer open says why, and the
      session is dropped; a call that never arrived keeps the session and
@@ -848,7 +1060,7 @@
       leave(MESSAGES.signed_out);
       return;
     }
-    var words = Object.prototype.hasOwnProperty.call(PAGE_WORDS, e) ? PAGE_WORDS[e] : '';
+    var words = has(PAGE_WORDS, e) ? PAGE_WORDS[e] : '';
     if (words && session) {
       endOnServer(session.token);
       forget();
@@ -863,10 +1075,10 @@
 
   /* The student's page for the session's class. The screen that asked stays
      up (Is This You? with its button reading Checking, or the loading
-     screen) until the page's data and calc.js are both in, so the list is
-     drawn once, with its results. If calc.js can't be fetched the list
-     still opens, without results (assignments.js says so and offers Try
-     Again). */
+     screen) until the page's data and calc.js are both in (`ask` waits for
+     both), so the list is drawn once, with its results. If calc.js can't be
+     fetched the list still opens, without results (assignments.js says so
+     and offers Try Again). */
   function openPage() {
     if (!session) {
       leave('');
@@ -876,35 +1088,32 @@
     S.sending = true;
     S.message = '';
     paint();
-    return Promise.all([whenGradesAreIn(), ask('page', { session: mine.token, enrollment_id: mine.enrollment })]).then(
-      function (both) {
-        var res = both[1];
-        S.sending = false;
-        // Signed out, or another card scanned, while this was on its way.
-        if (session !== mine) return;
-        if (!(res && res.ok && typeof StudentData !== 'undefined')) {
-          pageRefused(res && res.ok ? { ok: false, error: 'network' } : res);
-          return;
-        }
-        // The session's end as the server has it now.
-        if (res.expires_at && String(res.expires_at) !== mine.expires) {
-          mine.expires = String(res.expires_at);
-          if (mine.kept) keep(mine);
-        }
-        S.page = StudentData.fromServer(res);
-        StudentData.use(S.page);
-        // What the student typed to get in is not kept once they are in.
-        S.number = '';
-        S.bday = { m: '', d: '', y: '' };
-        S.again = false;
-        S.screen = 'assignments';
-        setTitle();
-        paint('.sp-page-title');
-        window.scrollTo(0, 0);
-        watch();
-        tellSeen();
-      },
-    );
+    return ask('page', { session: mine.token, enrollment_id: mine.enrollment }).then(function (res) {
+      S.sending = false;
+      if (!(res && res.ok && typeof StudentData !== 'undefined')) {
+        pageRefused(res && res.ok ? { ok: false, error: 'network' } : res);
+        return;
+      }
+      // The session's end as the server has it now.
+      if (res.expires_at && String(res.expires_at) !== mine.expires) {
+        mine.expires = String(res.expires_at);
+        if (mine.kept) keep(mine);
+      }
+      S.page = StudentData.fromServer(res);
+      StudentData.use(S.page);
+      // What the student typed to get in is not kept once they are in.
+      S.number = '';
+      S.bday = { m: '', d: '', y: '' };
+      S.again = false;
+      S.screen = 'assignments';
+      setTitle();
+      paint('.sp-page-title');
+      window.scrollTo(0, 0);
+      // Drawn in a tab nobody is looking at: covered until it is shown.
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') cover();
+      arm();
+      watchRows();
+    });
   }
 
   // Try Again on a list whose results didn't load.
@@ -914,7 +1123,7 @@
     return whenGradesAreIn().then(function () {
       S.sending = false;
       paint();
-      tellSeen();
+      watchRows();
     });
   }
 
@@ -926,6 +1135,7 @@
       token: String(res.session_token || ''),
       expires: String(res.expires_at || ''),
       enrollment: String(res.enrollment_id || ''),
+      active: Date.now(),
       kept: false,
     };
     if (!session.token || !session.enrollment) {
@@ -954,12 +1164,6 @@
     });
   }
 
-  // Done: signed out here at once, with or without the internet.
-  function done() {
-    if (session) endOnServer(session.token);
-    leave('');
-  }
-
   function startDemo(hash) {
     var m = /^demo-card(?:-(password|letter|both))?$/i.exec(hash || '');
     if (!m) return false;
@@ -980,14 +1184,19 @@
   }
 
   /* The page opened with no code in its address. A device that is signed
-     in opens the student's page again; one whose session ran out at
-     midnight says so on the card's first screen. Anything else is left to
-     student.js (the slip's first screen). */
+     in opens the student's page again; one whose session is over (its
+     midnight has passed, or nobody touched it for fifteen minutes) says so
+     on the card's first screen, and the list is never drawn. Opening the
+     page is not activity. Anything else is left to student.js (the slip's
+     first screen). */
   function resume() {
     var stored = readStored();
     if (!stored) return false;
     setTitle();
-    if (isOver(stored)) {
+    var why = over(stored);
+    if (why) {
+      // Idle ends it as Done does: the server is told first.
+      if (why === 'idle') endOnServer(stored.token);
       leave(MESSAGES.signed_out);
       return true;
     }
@@ -1003,6 +1212,7 @@
     var hash = demo && demo.hash;
     StudentPage.reset();
     if (typeof StudentData !== 'undefined') StudentData.use(null);
+    stopWatchingRows();
     if (hash && startDemo(hash)) return;
     S.screen = 'cardstart';
     setTitle();
@@ -1013,13 +1223,16 @@
     if (act === 'card-yes') {
       checkCard();
     } else if (act === 'card-notme') {
+      // An answer still on its way is for a card this student has handed back.
+      StudentPage.newTurn();
+      S.sending = false;
       S.message = '';
       S.screen = 'cardnotme';
       paint();
     } else if (act === 'card-restart') {
       restartCard();
     } else if (act === 'card-done') {
-      done();
+      signOut('');
     } else if (act === 'page-retry') {
       openPage();
     } else if (act === 'grades-retry') {
@@ -1033,20 +1246,38 @@
     openCard(input ? input.value : '');
   }
 
-  /* A tab shown again may be showing a session that has since ended: after
-     midnight, after Done in another tab, or brought back by the Back
-     button. */
-  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
-    ['pageshow', 'focus', 'storage'].forEach(function (name) {
-      window.addEventListener(name, function () {
-        checkSession();
-      });
+  /* The window's events. A tab shown again may be showing a session that
+     has since ended: after midnight, after fifteen idle minutes, after Done
+     in another tab, or brought back by the Back button. Each of these
+     checks the session before the page is uncovered. */
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden') {
+        cover();
+        return;
+      }
+      uncover();
+      shown();
     });
-    if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
-      document.addEventListener('visibilitychange', function () {
-        checkSession();
-      });
-    }
+  }
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    ['pageshow', 'focus'].forEach(function (name) {
+      window.addEventListener(name, uncover);
+    });
+    window.addEventListener('pagehide', cover);
+    window.addEventListener('storage', function () {
+      checkSession();
+    });
+    // What counts as activity: a touch, a key, the pointer, a scroll.
+    ['pointerdown', 'pointermove', 'keydown', 'touchstart', 'wheel', 'scroll'].forEach(function (name) {
+      window.addEventListener(
+        name,
+        function () {
+          active();
+        },
+        { capture: true, passive: true },
+      );
+    });
   }
 
   StudentPage.pageFrame = pageFrame;
@@ -1063,6 +1294,14 @@
     submit: onSubmit,
     start: function (hash) {
       demo = null;
+      /* The page is starting over. Whatever this tab was showing, it is not
+         showing the session now: the device's copy stays where it is, for a
+         card to end or the page to open again. */
+      session = null;
+      if (timer) clearTimeout(timer);
+      timer = 0;
+      stopWatchingRows();
+      if (typeof document !== 'undefined') document.documentElement.classList.remove('sp-away');
       if (startDemo(hash)) return true;
       // A demo address, or a code to open, is student.js's.
       return hash ? false : resume();
@@ -1081,7 +1320,9 @@
       openCard: openCard,
       checkCard: checkCard,
       checkSession: checkSession,
+      tellSeen: tellSeen,
       SESSION_KEY: SESSION_KEY,
+      IDLE_MS: IDLE_MS,
       DEMO: DEMO,
     },
   });

@@ -660,6 +660,11 @@ button {
   margin: 0;
 }
 
+/* A card's page in a tab nobody is looking at is covered, and uncovered
+   only once its session has been checked (app.js, cover and uncover). */
+.sp-away #app {
+  visibility: hidden;
+}
 /* The page's header: the class on the left, Done on the right, both in
    reach as the list scrolls. */
 .sp-head-page {

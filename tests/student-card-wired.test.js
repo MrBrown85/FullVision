@@ -41,6 +41,14 @@ const row = (page, title) => rows(page).find(r => r.title === title);
 const routes = page => page.calls.map(c => c.body.route);
 const text = page => page.root().textContent;
 const alertText = page => (page.root().querySelector('[role="alert"]') || {}).textContent || '';
+/* Every row the page is watching comes on screen, and the page tells the
+   server at once. A piece counts as opened only once its row has been on
+   screen (tests/student-card-session.test.js has that rule's own tests). */
+async function scrollThroughAll(page) {
+  page.onScreen(() => true);
+  await page.T.tellSeen();
+  await page.settle();
+}
 
 /* One school device and the function it talks to. open() is the page
    opened (or opened again) on that device. */
@@ -65,7 +73,7 @@ async function signIn(dev, hash) {
 }
 
 describe('a real card: the code, Is This You?, the Assignments list', () => {
-  it('asks card, verify, page and seen, in that order, each as the function takes it', async () => {
+  it('asks card, verify and page, then seen once the rows have been on screen, each as the function takes it', async () => {
     const dev = school();
     const page = await dev.open('#p3r-8wd');
     expect(page.calls.map(c => c.body)).toEqual([{ route: 'card', code: 'P3R8WD' }]);
@@ -76,6 +84,8 @@ describe('a real card: the code, Is This You?, the Assignments list', () => {
 
     page.type('#sp-ident', '0123456');
     await page.click('[data-act="card-yes"]');
+    expect(routes(page)).toEqual(['card', 'verify', 'page']);
+    await scrollThroughAll(page);
     expect(routes(page)).toEqual(['card', 'verify', 'page', 'seen']);
     // The code goes again with what was typed. No token, and no session: this device had none.
     expect(page.calls[1].body).toEqual({
@@ -123,6 +133,7 @@ describe('a real card: the code, Is This You?, the Assignments list', () => {
   it('every request goes to the function in Canada with no key, no cookie, and nothing in the address', async () => {
     const dev = school();
     const page = await signIn(dev);
+    await scrollThroughAll(page);
     await page.click('[data-act="card-done"]');
     expect(routes(page)).toEqual(['card', 'verify', 'page', 'seen', 'done']);
     page.calls.forEach(c => {
@@ -233,14 +244,7 @@ describe('a slip still opens: the card is asked first, then open', () => {
      know with HTTP 400 and { ok: false, error: 'bad_request' }. */
   it.each([
     ['the function deployed today, which has no card route', () => ({ ok: false, error: 'bad_request' })],
-    ['a function that fails on card', () => ({ ok: false, error: 'server' })],
-    ['a reply that is not a card', () => ({ ok: true })],
-    [
-      'a card call that never arrives',
-      () => {
-        throw new Error('offline');
-      },
-    ],
+    ['the function with the card’s routes, which says it is no card', () => ({ ok: false, error: 'not_found' })],
   ])('a slip opens against %s', async (name, cardSays) => {
     const dev = school({ slips: { K7M4QX: SLIP } });
     const page = await dev.open('#K7M-4QX', {
@@ -273,17 +277,20 @@ describe('a slip still opens: the card is asked first, then open', () => {
     );
   });
 
-  it('with no internet a scanned code says so once, after both tries', async () => {
+  /* The page does not know yet whether the code is a card's or a slip's, so
+     it speaks as neither and does not go on to the slip route (review of PR
+     998; tests/student-card-session.test.js has the rest). */
+  it('with no internet a scanned code says so once, in words that fit a card and a slip alike', async () => {
     const dev = school();
     const page = await dev.open('#P3R-8WD', {
       server: () => {
         throw new Error('offline');
       },
     });
-    expect(routes(page)).toEqual(['card', 'open']);
-    expect(alertText(page)).toBe(
-      "Couldn't reach FullVision. Check your internet and try again. Your answers are still here.",
-    );
+    expect(routes(page)).toEqual(['card']);
+    expect(alertText(page)).toBe("Couldn't reach FullVision. Check your internet and try again.");
+    expect(text(page)).not.toMatch(/slip|answers|Student Questions/i);
+    expect(page.root().querySelector('[data-act="code-retry"]').textContent).toBe('Try Again');
   });
 });
 
@@ -538,6 +545,7 @@ describe('the page won’t open: each refusal has its line', () => {
     });
     page.type('#sp-ident', '0123456');
     await page.click('[data-act="card-yes"]');
+    await scrollThroughAll(page);
     expect(routes(page)).toEqual(['card', 'verify', 'page', 'seen']);
     expect(page.root().querySelector('.sp-row')).toBeNull();
     expect(page.root().querySelector('.sp-msg').textContent).toBe(SIGNED_OUT);
@@ -545,13 +553,14 @@ describe('the page won’t open: each refusal has its line', () => {
   });
 });
 
-describe('the session: one token, kept until midnight or Done', () => {
-  it('keeps the token, when it ends and which class it opens, and nothing else anywhere', async () => {
+describe('the session: one token, kept until midnight, Done or fifteen idle minutes', () => {
+  it('keeps the token, when it ends, which class it opens and when it was last touched, and nothing else anywhere', async () => {
     const dev = school();
     const page = await signIn(dev);
     expect(Object.keys(dev.store)).toEqual([KEY]);
     const kept = JSON.parse(dev.store[KEY]);
-    expect(Object.keys(kept).sort()).toEqual(['e', 't', 'x']);
+    expect(Object.keys(kept).sort()).toEqual(['a', 'e', 't', 'x']);
+    expect(typeof kept.a).toBe('number');
     expect(kept.t).toBe(Object.keys(dev.fn.state.sessions)[0]);
     expect(kept.e).toBe(CECE);
     expect(kept.x).toBe(dev.fn.state.sessions[kept.t].expires);
@@ -636,7 +645,8 @@ describe('the session: one token, kept until midnight or Done', () => {
   });
 
   it('at its midnight an open page is taken down and the token is gone', async () => {
-    const dev = school();
+    // Ten minutes long, so its end comes before the fifteen idle minutes do.
+    const dev = school({ lasts: 10 * 60 * 1000 });
     const page = await signIn(dev);
     const ends = Date.parse(JSON.parse(dev.store[KEY]).x);
     page.T.checkSession(ends - 1000);
@@ -904,6 +914,7 @@ describe('what the list shows from a page reply', () => {
     expect(row(page, 'Late And Back').result).toBe('3.0');
     expect(row(page, 'Late And Back').sub).toMatch(/· Proficient · Late$/);
     // A Missing or Excused piece is not counted as opened: no result was shown.
+    await scrollThroughAll(page);
     const seen = page.calls.find(c => c.body.route === 'seen').body;
     expect(seen.assessment_ids).toEqual([id(104)]);
   });
@@ -999,51 +1010,6 @@ describe('what the list shows from a page reply', () => {
     expect(JSON.stringify(page.T.state().page)).not.toContain('"previous"');
     expect(row(page, 'Changed Since').result).toBe('3.0');
     expect(text(page)).not.toContain('Developing');
-  });
-
-  it('a piece counts as opened once its result is on the list; the mark clears the next time', async () => {
-    const later = '2026-11-05T20:00:00+00:00';
-    const { dev, page } = await listOf([
-      piece(1, 'Changed Since', { returned_at: later, updated_at: later, seen_at: at, grade: three, previous: two }),
-      piece(2, 'Seen Already', { returned_at: at, seen_at: later, grade: three }),
-      piece(3, 'New', { returned_at: later, grade: two }),
-      piece(4, 'Comment Only', { returned_at: later, grade: copy({ comment: 'See me.' }) }),
-      piece(5, 'Not Back'),
-    ]);
-    const seen = page.calls.filter(c => c.body.route === 'seen');
-    expect(seen).toHaveLength(1);
-    // The ones whose result was drawn and that had not been opened since they last came back.
-    expect(seen[0].body).toEqual({
-      route: 'seen',
-      session: JSON.parse(dev.store[KEY]).t,
-      enrollment_id: CECE,
-      assessment_ids: [id(101), id(103)],
-    });
-    expect(dev.fn.logs[dev.fn.logs.length - 1]).toMatchObject({ route: 'seen', outcome: 'ok' });
-    // Still marked on this visit; gone on the next, and nothing more is sent.
-    expect(row(page, 'Changed Since').sub).toMatch(/· Updated$/);
-    const next = await dev.open('');
-    expect(row(next, 'Changed Since').sub).not.toMatch(/Updated/);
-    expect(routes(next)).toEqual(['page']);
-  });
-
-  it('nothing is told to the server while the results have not loaded', async () => {
-    const dev = school();
-    const page = openStudentPage({ store: dev.store });
-    page.server = body => dev.fn.handle(body);
-    page.net.fail = src => /calc\.js$/.test(src);
-    await page.start('#P3R-8WD');
-    page.type('#sp-ident', '0123456');
-    await page.click('[data-act="card-yes"]');
-    expect(page.root().querySelector('.sp-no-results .sp-msg').textContent).toBe(
-      'Your results didn’t load. Check your internet and try again.',
-    );
-    expect(page.root().querySelectorAll('.sp-row-result')).toHaveLength(0);
-    expect(routes(page)).toEqual(['card', 'verify', 'page']);
-    page.net.fail = () => false;
-    await page.click('[data-act="grades-retry"]');
-    expect(row(page, 'Cell Structure Quiz').result).toBe('8 / 10');
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'seen']);
   });
 
   it.each([
@@ -1234,8 +1200,12 @@ describe('Demo Mode and a real card cannot drift', () => {
         .filter(r => / · Updated$/.test(r.sub))
         .map(r => r.title),
     ).toEqual(['Lab Safety Contract']);
-    // And each walked the same steps: card, verify, page, seen.
+    // And each walked the same steps: card, verify, page, then seen for the rows that came on screen.
+    expect(routes(real)).toEqual(['card', 'verify', 'page']);
+    await scrollThroughAll(demo);
+    await scrollThroughAll(real);
     expect(routes(real)).toEqual(['card', 'verify', 'page', 'seen']);
+    expect(demo.calls).toEqual([]);
   });
 
   it('Demo Mode answers all five routes on the device, in the function’s shapes', async () => {
@@ -1245,7 +1215,8 @@ describe('Demo Mode and a real card cannot drift', () => {
     demo.type('#sp-ident', demo.T.DEMO.number);
     await demo.click('[data-act="card-yes"]');
     expect(row(demo, 'Lab Safety Contract').sub).toMatch(/^Back \S+ \d+ · Updated$/);
-    // Opened now: the demo's own `seen` has recorded it, as the server would.
+    // On screen now: the demo's own `seen` records it, as the server would.
+    await scrollThroughAll(demo);
     const reply = demo.T.demoPage('proficiency');
     const contract = reply.assessments.find(a => a.id === 'demo-contract');
     expect(Date.parse(contract.seen_at)).toBeGreaterThan(Date.parse(contract.updated_at));
@@ -1302,7 +1273,7 @@ describe('the page sends nothing anywhere else', () => {
     const app = read('s/app.js');
     expect(app.match(/localStorage\.setItem\(/g)).toHaveLength(1);
     expect(app).toContain(
-      'localStorage.setItem(SESSION_KEY, JSON.stringify({ t: s.token, x: s.expires, e: s.enrollment }))',
+      'localStorage.setItem(SESSION_KEY, JSON.stringify({ t: s.token, x: s.expires, e: s.enrollment, a: s.active }))',
     );
     expect(read('s/assignments.js') + read('s/student-data.js')).not.toMatch(/localStorage/);
     // The address is only ever set to the page's own path.

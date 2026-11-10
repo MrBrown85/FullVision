@@ -96,8 +96,9 @@ var StudentPage = (function () {
       bday: { m: '', d: '', y: '' }, // the pickers as chosen
       report: null, // the report as the teacher sent it
       page: null, // a card's page for one class, as student-data.js reads it
-      heading: '', // the loading screen's title while a card's page opens again
+      heading: '', // the loading screen's title when it is not a slip's: a card's page, or a code not yet known
       again: false, // a card's page couldn't be reached: offer Try Again
+      from: '', // 'card' when the code was typed on one of the card's screens
     };
   }
 
@@ -177,14 +178,37 @@ var StudentPage = (function () {
 
   // The desktop's loading screen with lines for students
   // (shared/loading-screen.js); paint() starts the lines turning.
+  // The page's name while it does not know whose page it is opening.
+  var NEITHER = 'FullVision';
+
   function renderLoading(state) {
+    var heading = (state && state.heading) || '';
     var body = window.FVLoading
       ? window.FVLoading.html('student', 'Opening your page', true)
       : '<p class="sp-lead sp-msg-calm" role="status">Opening your page\u2026</p>';
     return (
-      header((state && state.heading) || 'Student Questions', 'FullVision') +
+      header(heading || 'Student Questions', heading === NEITHER ? '' : 'FullVision') +
       '<main class="sp-main sp-main-center sp-main-middle">' +
       body +
+      '</main>'
+    );
+  }
+
+  /* A scanned or typed code could not be looked up, so the page does not
+     know yet whether it is a card's or a slip's, and speaks as neither: no
+     "slip", no "card", no code box that names one. */
+  function renderUnreached(state) {
+    return (
+      header(NEITHER, '') +
+      '<main class="sp-main sp-main-center">' +
+      '<section class="sp-card sp-hello"><p class="sp-lead" role="alert">' +
+      esc(MESSAGES.card_network) +
+      '</p></section>' +
+      '<button type="button" class="sp-btn sp-btn-primary" data-act="code-retry"' +
+      (state.sending ? ' disabled' : '') +
+      '>' +
+      (state.sending ? 'Loading\u2026' : 'Try Again') +
+      '</button>' +
       '</main>'
     );
   }
@@ -216,14 +240,18 @@ var StudentPage = (function () {
   function identityFields(state) {
     var by = state.data.check;
     var paper = paperOf(state.data);
-    var msg = state.message ? '<p class="sp-msg" role="alert">' + esc(state.message) + '</p>' : '';
+    var msg = state.message ? '<p class="sp-msg" role="alert" id="sp-check-msg">' + esc(state.message) + '</p>' : '';
+    // With a message up, each field says it is the one the message is about.
+    var told = state.message ? ' aria-describedby="sp-check-msg" aria-invalid="true"' : '';
     if (by === 'password') {
       return (
         '<p class="sp-lead">To make sure it\u2019s you, type the password printed on your ' +
         paper +
         '.</p>' +
         '<label class="sp-sub-label" for="sp-ident">Password</label>' +
-        '<input id="sp-ident" class="sp-input" inputmode="numeric" autocomplete="off" maxlength="16" value="' +
+        '<input id="sp-ident" class="sp-input" inputmode="numeric" autocomplete="off" maxlength="16"' +
+        told +
+        ' value="' +
         esc(state.number) +
         '">' +
         msg
@@ -236,19 +264,22 @@ var StudentPage = (function () {
       '<p class="sp-lead">To make sure it\u2019s you, enter your birthday or your student number' +
       (pw ? ', or the password on your ' + paper : '') +
       '.</p>' +
-      birthdayPickers(state) +
+      birthdayPickers(state, told) +
       '<div class="sp-or" aria-hidden="true">or</div>' +
       '<label class="sp-sub-label" for="sp-ident">' +
       (pw ? 'Student Number or Password' : 'Student Number') +
       '</label>' +
-      '<input id="sp-ident" class="sp-input" inputmode="numeric" autocomplete="off" maxlength="32" value="' +
+      '<input id="sp-ident" class="sp-input" inputmode="numeric" autocomplete="off" maxlength="32"' +
+      told +
+      ' value="' +
       esc(state.number) +
       '">' +
       msg
     );
   }
 
-  function birthdayPickers(state) {
+  // `told` is extra attributes for each picker (identityFields' pointer at its message).
+  function birthdayPickers(state, told) {
     var b = state.bday || {};
     var now = new Date().getFullYear();
     var years = [];
@@ -264,7 +295,9 @@ var StudentPage = (function () {
         label +
         '</label><select class="sp-input sp-select" id="' +
         id +
-        '"><option value=""></option>' +
+        '"' +
+        (told || '') +
+        '><option value=""></option>' +
         opts +
         '</select></div>'
       );
@@ -329,7 +362,7 @@ var StudentPage = (function () {
      and root, the same objects as the ones here: share(S, root) hands them
      over again each time either is replaced. test adds to
      StudentPage._test. */
-  var SCREENS = { loading: renderLoading, notme: renderNotMe, message: renderMessage };
+  var SCREENS = { loading: renderLoading, notme: renderNotMe, message: renderMessage, unreached: renderUnreached };
   var files = [];
 
   function addScreens(f) {
@@ -356,7 +389,32 @@ var StudentPage = (function () {
     return base + '/functions/v1/student-submit?forceFunctionRegion=ca-central-1';
   }
 
+  /* Replies are applied only for the code or session that asked. The turn
+     moves on whenever what the page is opening changes: the page starts
+     over (a new address), a new code is typed, the state is reset (Type a
+     Different Code, Done, signed out), or a screen file says so. A reply
+     that lands after that belongs to something no longer on the page, and
+     is dropped: its promise never settles, so nothing that waited on it
+     runs. This is the one place that is decided, for a slip, a card and
+     Demo Mode alike: `call` goes through it, and so does app.js's `ask`. */
+  var turn = 0;
+  function newTurn() {
+    turn += 1;
+  }
+  function whileCurrent(promise) {
+    var mine = turn;
+    return new Promise(function (resolve) {
+      Promise.resolve(promise).then(function (value) {
+        if (mine === turn) resolve(value);
+      });
+    });
+  }
+
   function call(body) {
+    return whileCurrent(send(body));
+  }
+
+  function send(body) {
     return fetch(endpoint(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -567,9 +625,14 @@ var StudentPage = (function () {
   /* A typed or scanned code. It is put to the card's screens first
      (app.js's `card`, which asks the function's `card` route) and, when
      they say it is no card, opened as a slip, as it always was.
-     `card(code)` gives a promise of true (a card: its screen is drawn),
-     false (not a card), or 'locked' (this address has made too many wrong
-     tries on cards; a slip may still open).
+     `card(code)` gives a promise of
+       true         a card: its screen is drawn;
+       false        not a card: the function said so (or is the one deployed
+                    before cards, which does not know the question);
+       'locked'     this address has made too many wrong tries on cards; a
+                    slip may still open;
+       'unreached'  no answer the page can use (no internet, a server
+                    error): it is not known what the code is.
      `from` is 'card' when the code was typed on one of the card's screens:
      a code that opens nothing is then answered there, in the card's words
      (app.js's `refused`). */
@@ -582,17 +645,33 @@ var StudentPage = (function () {
       paint('#sp-code');
       return Promise.resolve();
     }
+    newTurn();
     S.code = c;
+    S.from = from || '';
     S.message = '';
+    S.sending = false;
+    // Not known yet whose page this is: the loading screen says neither.
+    if (!S.demo) S.heading = NEITHER;
     S.screen = 'loading';
     paint();
     var cards = files.filter(function (f) {
       return !!f.card;
     })[0];
+    var onCard = from === 'card' ? cards : null;
     return (cards ? cards.card(c) : Promise.resolve(false)).then(function (said) {
       if (said === true) return undefined;
-      return openSlip(c, said === 'locked', from === 'card' ? cards : null);
+      if (said === 'unreached') return unreached(onCard);
+      return openSlip(c, said === 'locked', onCard);
     });
+  }
+
+  /* The code could not be looked up. Typed on a card's screen, that screen
+     says so; scanned, or typed anywhere else, the neutral screen does. */
+  function unreached(cards) {
+    if (cards && cards.refused({ ok: false, error: 'network' })) return undefined;
+    S.screen = 'unreached';
+    paint('[data-act="code-retry"]');
+    return undefined;
   }
 
   function openSlip(c, cardsLocked, cards) {
@@ -601,6 +680,11 @@ var StudentPage = (function () {
       if (cardsLocked && res && !res.ok && res.error === 'not_found') res = { ok: false, error: 'locked' };
       // Typed on a card's screen and it opened nothing: that screen answers.
       if (cards && !(res && res.ok) && cards.refused(res)) return;
+      // The card route would not say (locked) and the slip route can't be reached: still not known.
+      if (cardsLocked && !(res && res.ok) && (res.error === 'network' || !MESSAGES[res.error])) {
+        unreached(null);
+        return;
+      }
       // A slip typed on a card's screen: the tab is named for the slip's page again.
       if (cards && typeof document !== 'undefined') document.title = 'Student Questions — FullVision';
       if (res && res.ok && res.kind === 'report') {
@@ -649,6 +733,10 @@ var StudentPage = (function () {
     S.number = typed;
     S.bday = { m: m, d: dd, y: y };
     var ident = { birthday: null, student_number: null, password: null };
+    /* On a card, a message leaves the focus on the field it is about: the
+       one typed in, or the first. The screen was drawn again, so without
+       this the focus is on nothing. A slip's check is as it was. */
+    var back = card ? (by === 'password' || typed ? '#sp-ident' : '#sp-bm') : undefined;
     if (by === 'password') {
       if (!typed) {
         S.message = 'Type the password printed on your ' + paper + '.';
@@ -660,7 +748,7 @@ var StudentPage = (function () {
       var some = m || dd || y;
       if (some && !(m && dd && y)) {
         S.message = 'Choose the month, day and year you were born.';
-        paint();
+        paint(card ? '#sp-bm' : undefined);
         return Promise.resolve();
       }
       if (some) ident.birthday = y + '-' + String(m).padStart(2, '0') + '-' + String(dd).padStart(2, '0');
@@ -668,7 +756,7 @@ var StudentPage = (function () {
       if (typed && S.data.also_password && typed.length <= 16) ident.password = typed;
       if (!some && !typed) {
         S.message = 'Choose your birthday or type your student number.';
-        paint();
+        paint(back);
         return Promise.resolve();
       }
     }
@@ -703,7 +791,7 @@ var StudentPage = (function () {
         S.message = messageFor(res);
         if (e !== 'network' && e !== 'busy') S.screen = card ? card.messageScreen : 'message';
       }
-      paint();
+      paint(back);
     };
     if (card) {
       S.sending = true;
@@ -731,6 +819,7 @@ var StudentPage = (function () {
 
   /* A clean state, handed to every screen file. */
   function reset() {
+    newTurn();
     S = freshState();
     share();
     return S;
@@ -743,6 +832,8 @@ var StudentPage = (function () {
     if (act === 'notme') {
       S.screen = 'notme';
       paint();
+    } else if (act === 'code-retry') {
+      openCode(S.code, S.from);
     } else if (act === 'restart') {
       reset();
       try {
@@ -823,6 +914,7 @@ var StudentPage = (function () {
   }
 
   function start(el, hash) {
+    newTurn();
     root = el;
     S = freshState();
     share();
@@ -935,6 +1027,8 @@ var StudentPage = (function () {
       return CODE_RE.test(c);
     },
     reset: reset,
+    newTurn: newTurn,
+    whileCurrent: whileCurrent,
     openCode: openCode,
     slipParts: slipParts,
     identityFields: identityFields,
