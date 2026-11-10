@@ -289,4 +289,506 @@ describe('with the build switch off the gradebook is what it was', () => {
       session.signOut();
     }
   });
+
+  it('draws no mark, key line, count or Return, even after grading', () => {
+    mount(seedWith({ config: { student_page_enabled: true, return_grades: 'on_save' } }), { course: CID });
+    Grader.setLevel(CID, BEN, ESSAY, QUESTION, 3, 0);
+    PageGradebook.render();
+    expect(main()).not.toMatch(/gb-draft|gb-to-return|gb-return-drafts|gb-key-draft|Draft/);
+    expect(openColumnMenu(ESSAY).textContent).not.toMatch(/Return|draft/i);
+  });
+});
+
+/* ── With the switch on and When I Return Them ─────────────────────────── */
+const HELD = { student_page_enabled: true, return_grades: 'on_return' };
+const WORDS_HEARD = ', Draft, not returned yet';
+
+const open = more => mount(seedWith({ config: HELD, ...more }), { course: CID });
+const redraw = () => PageGradebook.render();
+const pill = () => document.querySelector('.gb-to-return');
+const pillCount = () => (pill() ? parseInt(pill().textContent, 10) : 0);
+const label = cell => cell.getAttribute('aria-label');
+const isDashed = cell => cell.classList.contains('gb-draft');
+const rowIds = () =>
+  Array.from(document.querySelectorAll('#gb-data tr[data-sid]')).map(r => r.getAttribute('data-sid'));
+const columnIds = () =>
+  Array.from(document.querySelectorAll('#gb-colheads .gb-grid-colhead[data-aid]')).map(h => h.getAttribute('data-aid'));
+const headerButtons = () => Array.from(document.querySelectorAll('.gb-return-drafts'));
+const headerButton = aid => headerButtons().find(b => b.getAttribute('data-aid') === aid);
+const returnItem = () => document.querySelector('.gb-ctx-menu [data-ctx="returnDrafts"]');
+const closeMenu = () => key(document.querySelector('.gb-ctx-menu'), 'Escape');
+// What a Scores column's menu offers to return: its N, or 0 with no item.
+function menuCount(aid) {
+  openColumnMenu(aid);
+  const item = returnItem();
+  const n = item ? parseInt(item.textContent.replace('Return ', ''), 10) : 0;
+  closeMenu();
+  return n;
+}
+// The students the grader dialog would show its Draft row for (stateOf).
+const dialogDrafts = aid => EVERYONE.filter(sid => GradeState.stateOf(CID, sid, aid) === GradeState.DRAFT);
+
+/* One grade for `sid` on each kind of work, saved through the one grader. */
+const GRADE = {
+  [ESSAY]: sid => Grader.setLevel(CID, sid, ESSAY, QUESTION, 2, 0),
+  [QUIZ]: sid => Grader.setPoints(CID, sid, QUIZ, 9),
+  [LAB]: sid => Grader.setLevel(CID, sid, LAB, SAFETY, 2, 0),
+  [EXIT]: sid => Grader.setMark(CID, sid, EXIT, 'incomplete'),
+  [JOURNAL]: sid => Grader.setLevel(CID, sid, JOURNAL, 'overall', 2, 0),
+  [CLAIM]: sid => Grader.setLevel(CID, sid, CLAIM, STATES, 2, 0),
+  [TALK]: sid => Grader.setLevel(CID, sid, TALK, QUESTION, 4, 0),
+};
+const gradeEverything = sid => GRADED_WORK.forEach(aid => GRADE[aid](sid));
+// The numbers a row and the Class Average row show.
+const numbers = () =>
+  Array.from(document.querySelectorAll('#gb-rowheads .gb-grid-rowhead, #gb-data .gb-stats-row td')).map(
+    el => el.textContent,
+  );
+
+describe.skipIf(UPDATE)('with the build switch on and When I Return Them', () => {
+  it('with nothing waiting: the key explains the mark, and there is no count, mark or Return', () => {
+    open();
+    expect(pill()).toBe(null);
+    expect(document.querySelectorAll('.gb-draft').length).toBe(0);
+    const key = document.querySelector('.gb-key .gb-key-item-draft');
+    expect(key.textContent).toBe('Draft: graded, not returned');
+    expect(key.querySelector('.gb-key-draft')).not.toBe(null);
+    // After No Score, the last of the key.
+    expect(key.previousElementSibling.textContent).toBe('—No Score');
+    expect(key.nextElementSibling).toBe(null);
+    expect(openColumnMenu(ESSAY).textContent).not.toMatch(/Return|draft/i);
+    closeMenu();
+    showCompetencies();
+    expect(headerButtons()).toEqual([]);
+    expect(document.querySelector('.gb-key .gb-key-item-draft')).not.toBe(null);
+  });
+
+  it('a draft is dashed and said in words, on every kind of work, in the Scores view', () => {
+    open();
+    gradeEverything(BEN);
+    redraw();
+    GRADED_WORK.forEach(aid => {
+      const cell = scoresCell(aid, BEN);
+      expect(isDashed(cell), aid).toBe(true);
+      expect(label(cell).endsWith(WORDS_HEARD), label(cell)).toBe(true);
+      // No fill under the outline: only the level's colour.
+      expect(cell.getAttribute('style'), aid).not.toMatch(/background/);
+    });
+    expect(label(scoresCell(ESSAY, BEN))).toBe('Ben Brown, Essay: 2.0, Developing, Draft, not returned yet');
+    expect(label(scoresCell(QUIZ, BEN))).toBe('Ben Brown, Quiz: 9 out of 10, Draft, not returned yet');
+    expect(label(scoresCell(EXIT, BEN))).toBe('Ben Brown, Exit Ticket: Incomplete, Draft, not returned yet');
+    // Grades that were there before the switch came on are Returned: plain.
+    GRADED_WORK.filter(aid => aid !== TALK).forEach(aid => {
+      expect(isDashed(scoresCell(aid, AVA)), aid).toBe(false);
+      expect(label(scoresCell(aid, AVA))).not.toContain('Draft');
+    });
+    expect(scoresCell(ESSAY, AVA).getAttribute('style')).toMatch(/^background:/);
+    // The benchmark has no grade: nothing to mark.
+    expect(isDashed(scoresCell(BENCH, BEN))).toBe(false);
+    // Ben's seven, and Ava's copy of the pair's grade.
+    expect(document.querySelectorAll('#gb-data .gb-draft').length).toBe(GRADED_WORK.length + 1);
+  });
+
+  it('and in the Competencies view, where each cell of the piece is dashed', () => {
+    for (const columns of ['criteria', 'competencies']) {
+      open({ columns });
+      gradeEverything(BEN);
+      showCompetencies();
+      GRADED_WORK.forEach(aid => {
+        const cells = compCells(aid, BEN);
+        expect(cells.length, aid).toBeGreaterThan(0);
+        cells.forEach(cell => {
+          expect(isDashed(cell), columns + ' ' + aid).toBe(true);
+          expect(label(cell), aid).toContain(WORDS_HEARD);
+        });
+        compCells(aid, CARA).forEach(cell => expect(isDashed(cell), aid).toBe(false));
+      });
+      expect(label(compCell(ESSAY, BEN, QUESTION))).toBe(
+        'Ben Brown, Essay, Question: 2, Developing, Draft, not returned yet',
+      );
+      // The piece's other competency has no level yet; it is part of the draft.
+      expect(label(compCell(ESSAY, BEN, PLAN))).toBe('Ben Brown, Essay, Plan: No score, Draft, not returned yet');
+      expect(label(compCell(QUIZ, BEN))).toBe('Ben Brown, Quiz: 9 out of 10, Draft, not returned yet');
+      expect(label(compCell(EXIT, BEN))).toBe('Ben Brown, Exit Ticket: Incomplete, Draft, not returned yet');
+      unmount();
+      clearClass(CID);
+    }
+  });
+
+  it('Missing, Excused and Late with nothing else show no mark; Late on a draft keeps it', () => {
+    open();
+    redraw();
+    [
+      [ESSAY, CARA, 'Cara Chen, Essay: Missing'],
+      [QUIZ, DEV, 'Dev Dhillon, Quiz: Excused'],
+      [QUIZ, ELI, 'Eli Evans, Quiz: no score, Late'],
+      // Late on a grade from before the switch: Returned.
+      [ESSAY, ELI, 'Eli Evans, Essay: 3.5, Extending, Late'],
+    ].forEach(([aid, sid, heard]) => {
+      expect(isDashed(scoresCell(aid, sid)), heard).toBe(false);
+      expect(label(scoresCell(aid, sid))).toBe(heard);
+    });
+    expect(pill()).toBe(null);
+    // Late is only a label: a grade given under it is a draft like any other.
+    Grader.setPoints(CID, ELI, QUIZ, 6);
+    redraw();
+    expect(isDashed(scoresCell(QUIZ, ELI))).toBe(true);
+    expect(label(scoresCell(QUIZ, ELI))).toBe('Eli Evans, Quiz: 6 out of 10, Late, Draft, not returned yet');
+    showCompetencies();
+    expect(label(compCell(QUIZ, ELI))).toBe('Eli Evans, Quiz: 6 out of 10, Late, Draft, not returned yet');
+    expect(isDashed(compCell(ESSAY, CARA, QUESTION))).toBe(false);
+    expect(isDashed(compCell(QUIZ, DEV))).toBe(false);
+  });
+
+  it('a draft under Missing shows the status, not the mark, and is not counted', () => {
+    open();
+    Grader.setLevel(CID, DEV, ESSAY, QUESTION, 3, 0);
+    Grader.setLevel(CID, BEN, ESSAY, QUESTION, 3, 0);
+    const statuses = getAssignmentStatuses(CID);
+    statuses[DEV + ':' + ESSAY] = 'NS';
+    saveAssignmentStatuses(CID, statuses);
+    redraw();
+    expect(getGradeReturn(CID, DEV, ESSAY).is_draft).toBe(true);
+    expect(isDashed(scoresCell(ESSAY, DEV))).toBe(false);
+    expect(label(scoresCell(ESSAY, DEV))).toBe('Dev Dhillon, Essay: Missing');
+    expect(pill().textContent).toBe('1 to return');
+    expect(menuCount(ESSAY)).toBe(1);
+  });
+
+  it('a returned grade changed since is a draft again; put back, it is not', () => {
+    open();
+    expect(isDashed(scoresCell(ESSAY, AVA))).toBe(false);
+    Grader.setLevel(CID, AVA, ESSAY, QUESTION, 4, 0);
+    redraw();
+    expect(isDashed(scoresCell(ESSAY, AVA))).toBe(true);
+    expect(label(scoresCell(ESSAY, AVA))).toContain(WORDS_HEARD);
+    expect(pill().textContent).toBe('1 to return');
+    // The student still has what was returned.
+    expect(getGradeReturn(CID, AVA, ESSAY).returned_copy.tags[QUESTION].value).toBe(3);
+    Grader.setLevel(CID, AVA, ESSAY, QUESTION, 3, 0);
+    redraw();
+    expect(isDashed(scoresCell(ESSAY, AVA))).toBe(false);
+    expect(pill()).toBe(null);
+    // A new draft, returned from its column, then changed: a draft again.
+    Grader.setPoints(CID, BEN, QUIZ, 8);
+    redraw();
+    openColumnMenu(QUIZ);
+    click(returnItem());
+    expect(isDashed(scoresCell(QUIZ, BEN))).toBe(false);
+    expect(GradeState.stateOf(CID, BEN, QUIZ)).toBe('returned');
+    Grader.setPoints(CID, BEN, QUIZ, 10);
+    redraw();
+    expect(isDashed(scoresCell(QUIZ, BEN))).toBe(true);
+    // A returned grade cleared waits too: the empty cell is dashed.
+    Grader.setPoints(CID, BEN, QUIZ, null);
+    redraw();
+    expect(isDashed(scoresCell(QUIZ, BEN))).toBe(true);
+    expect(label(scoresCell(QUIZ, BEN))).toBe('Ben Brown, Quiz: no score, Draft, not returned yet');
+  });
+
+  it('the count on "N to return" is the sum of the columns’ counts, in both views', () => {
+    open();
+    gradeEverything(DEV);
+    gradeEverything(CARA); // Cara's essay is Missing: no draft there
+    Grader.setLevel(CID, BEN, TALK, QUESTION, 4, 0); // the pair: Ava too
+    redraw();
+    const expected = {
+      [ESSAY]: 1,
+      [QUIZ]: 1, // Dev's quiz is Excused
+      [LAB]: 2,
+      [EXIT]: 2,
+      [JOURNAL]: 2,
+      [CLAIM]: 2,
+      [TALK]: 4,
+      [BENCH]: 0,
+    };
+    const total = Object.values(expected).reduce((a, b) => a + b, 0);
+    Object.keys(expected).forEach(aid => expect(menuCount(aid), aid).toBe(expected[aid]));
+    expect(pill().textContent).toBe(total + ' to return');
+    expect(pill().getAttribute('aria-pressed')).toBe('false');
+    expect(document.querySelectorAll('#gb-data .gb-draft').length).toBe(total);
+    showCompetencies();
+    expect(pill().textContent).toBe(total + ' to return');
+    Object.keys(expected).forEach(aid => {
+      const button = headerButton(aid);
+      expect(button ? button.textContent : 'Return 0 Graded', aid).toBe('Return ' + expected[aid] + ' Graded');
+    });
+    expect(headerButtons().length).toBe(7);
+  });
+
+  it('who is waiting is named, by first name', () => {
+    open();
+    const sentence = aid => {
+      const note = openColumnMenu(aid).querySelector('.gb-ctx-note').textContent;
+      closeMenu();
+      return note;
+    };
+    Grader.setPoints(CID, DEV, EXIT, 1);
+    redraw();
+    expect(sentence(EXIT)).toBe('1 draft: Dev can’t see it yet.');
+    Grader.setPoints(CID, BEN, EXIT, 1);
+    redraw();
+    expect(sentence(EXIT)).toBe('2 drafts: Ben and Dev can’t see them yet.');
+    Grader.setPoints(CID, ELI, EXIT, 1);
+    redraw();
+    expect(sentence(EXIT)).toBe('3 drafts: Ben, Dev and Eli can’t see them yet.');
+    Grader.setPoints(CID, CARA, EXIT, 1);
+    Grader.setPoints(CID, AVA, EXIT, 0);
+    redraw();
+    expect(sentence(EXIT)).toBe('5 drafts: Ava, Ben, Cara and 2 others can’t see them yet.');
+    // The same line is the Competencies button's tip.
+    showCompetencies();
+    expect(headerButton(EXIT).getAttribute('title')).toBe('5 drafts: Ava, Ben, Cara and 2 others can’t see them yet.');
+    // The note sits above Return N Graded, the menu's first item.
+    showScores();
+    const menu = openColumnMenu(EXIT);
+    expect(menu.firstElementChild.className).toBe('gb-ctx-note');
+    expect(menu.querySelector('.gb-ctx-item').textContent).toBe('Return 5 Graded');
+    expect(menu.querySelector('.gb-ctx-item').getAttribute('role')).toBe('menuitem');
+  });
+
+  it('Return N Graded in a Scores column’s menu returns that column’s drafts in one action, through the one grader', () => {
+    open();
+    [BEN, CARA, DEV].forEach(sid => Grader.setLevel(CID, sid, LAB, SAFETY, 3, 0));
+    Grader.setPoints(CID, BEN, QUIZ, 8);
+    redraw();
+    expect(pill().textContent).toBe('4 to return');
+    const returned = vi.spyOn(Grader, 'returnGrades');
+    openColumnMenu(LAB);
+    expect(returnItem().textContent).toBe('Return 3 Graded');
+    click(returnItem());
+    expect(returned.mock.calls).toEqual([[CID, LAB, [BEN, CARA, DEV]]]);
+    returned.mockRestore();
+    expect(document.querySelector('.gb-ctx-menu')).toBe(null);
+    [BEN, CARA, DEV].forEach(sid => {
+      expect(GradeState.stateOf(CID, sid, LAB)).toBe('returned');
+      expect(isDashed(scoresCell(LAB, sid))).toBe(false);
+      expect(scoresCell(LAB, sid).getAttribute('style')).toMatch(/^background:/);
+      expect(label(scoresCell(LAB, sid))).not.toContain('Draft');
+    });
+    // The other column's draft waits.
+    expect(isDashed(scoresCell(QUIZ, BEN))).toBe(true);
+    expect(pill().textContent).toBe('1 to return');
+    expect(menuCount(LAB)).toBe(0);
+    // The column's title has the focus back.
+    expect(document.activeElement.className).toBe('gb-grid-colhead-label');
+    expect(document.activeElement.closest('.gb-grid-colhead').getAttribute('data-aid')).toBe(LAB);
+  });
+
+  it('Return N Graded under a Competencies header does the same, and the title takes the focus', () => {
+    open();
+    [CARA, DEV].forEach(sid => Grader.setPoints(CID, sid, EXIT, 1));
+    showCompetencies();
+    const button = headerButton(EXIT);
+    expect(button.textContent).toBe('Return 2 Graded');
+    expect(button.tagName).toBe('BUTTON');
+    // Under the date and badges, inside the assessment's own header.
+    expect(button.previousElementSibling.className).toBe('gb-assess-meta');
+    expect(button.parentNode.querySelector('.gb-assess-title').textContent).toBe('Exit Ticket');
+    const returned = vi.spyOn(Grader, 'returnGrades');
+    click(button);
+    expect(returned.mock.calls).toEqual([[CID, EXIT, [CARA, DEV]]]);
+    returned.mockRestore();
+    expect(headerButtons()).toEqual([]);
+    expect(pill()).toBe(null);
+    expect(isDashed(compCell(EXIT, CARA))).toBe(false);
+    expect(document.activeElement.className).toBe('gb-assess-title');
+    expect(document.activeElement.textContent).toBe('Exit Ticket');
+  });
+
+  it('pair work is returned together, as the grader dialog returns it', () => {
+    open();
+    Grader.setLevel(CID, BEN, TALK, QUESTION, 4, 0);
+    redraw();
+    expect(dialogDrafts(TALK)).toEqual([AVA, BEN]);
+    expect(menuCount(TALK)).toBe(2);
+    // With only Ben on screen the count is his, and Return gives it to both.
+    search('ben');
+    expect(rowIds()).toEqual([BEN]);
+    expect(pill().textContent).toBe('1 to return');
+    openColumnMenu(TALK);
+    expect(returnItem().textContent).toBe('Return 1 Graded');
+    click(returnItem());
+    expect(GradeState.stateOf(CID, BEN, TALK)).toBe('returned');
+    expect(GradeState.stateOf(CID, AVA, TALK)).toBe('returned');
+    search('');
+    expect(pill()).toBe(null);
+    expect(isDashed(scoresCell(TALK, AVA))).toBe(false);
+    // A member graded separately is not returned with the pair.
+    Grader.gradeSeparately(CID, TALK, AVA);
+    Grader.setLevel(CID, AVA, TALK, QUESTION, 2, 0);
+    Grader.setLevel(CID, BEN, TALK, QUESTION, 3, 0);
+    search('ben');
+    openColumnMenu(TALK);
+    click(returnItem());
+    expect(GradeState.stateOf(CID, BEN, TALK)).toBe('returned');
+    expect(GradeState.stateOf(CID, AVA, TALK)).toBe('draft');
+  });
+
+  it('"N to return" is a filter: only the students and assessments with a draft', () => {
+    open();
+    Grader.setPoints(CID, BEN, QUIZ, 8);
+    Grader.setPoints(CID, DEV, EXIT, 1);
+    Grader.setPoints(CID, BEN, EXIT, 1);
+    redraw();
+    const everyone = rowIds();
+    const everyColumn = columnIds();
+    expect(everyone).toEqual(EVERYONE);
+    expect(everyColumn.length).toBe(8);
+    const whole = numbers();
+    click(pill());
+    expect(pill().getAttribute('aria-pressed')).toBe('true');
+    expect(pill().classList.contains('active')).toBe(true);
+    expect(pill().textContent).toBe('3 to return ×');
+    expect(document.activeElement).toBe(pill());
+    expect(rowIds()).toEqual([BEN, DEV]);
+    // Newest first: the Exit Ticket, then the Quiz.
+    expect(columnIds()).toEqual([EXIT, QUIZ]);
+    // The cells on screen that are not drafts stay plain.
+    expect(isDashed(scoresCell(QUIZ, BEN))).toBe(true);
+    expect(isDashed(scoresCell(QUIZ, DEV))).toBe(false);
+    expect(document.querySelectorAll('#gb-data .gb-draft').length).toBe(3);
+    // The same rows and columns in the Competencies view.
+    showCompetencies();
+    expect(rowIds()).toEqual([BEN, DEV]);
+    expect(headerButtons().map(b => b.getAttribute('data-aid'))).toEqual([EXIT, QUIZ]);
+    expect(document.querySelectorAll('.gb-grid-assess-group').length).toBe(2);
+    showScores();
+    // Each student's Overall and the Class Average are the whole class's.
+    const shown = numbers();
+    expect(shown.slice(0, 2)).toEqual([whole[1], whole[3]]);
+    expect(shown[2]).toBe(whole[5]);
+    // Off again: everything is back.
+    click(pill());
+    expect(pill().getAttribute('aria-pressed')).toBe('false');
+    expect(pill().textContent).toBe('3 to return');
+    expect(rowIds()).toEqual(everyone);
+    expect(columnIds()).toEqual(everyColumn);
+  });
+
+  it('returning the last draft under the filter shows the whole gradebook again', () => {
+    open();
+    Grader.setPoints(CID, BEN, QUIZ, 8);
+    Grader.setPoints(CID, DEV, EXIT, 1);
+    redraw();
+    click(pill());
+    expect(columnIds()).toEqual([EXIT, QUIZ]);
+    openColumnMenu(QUIZ);
+    click(returnItem());
+    // One column and one student left.
+    expect(pill().textContent).toBe('1 to return ×');
+    expect(columnIds()).toEqual([EXIT]);
+    expect(rowIds()).toEqual([DEV]);
+    openColumnMenu(EXIT);
+    click(returnItem());
+    expect(pill()).toBe(null);
+    expect(rowIds()).toEqual(EVERYONE);
+    expect(columnIds().length).toBe(8);
+    expect(document.querySelector('.gb-empty')).toBe(null);
+  });
+
+  it('a search narrows the counts to the students shown', () => {
+    open();
+    [BEN, CARA, DEV].forEach(sid => Grader.setPoints(CID, sid, EXIT, 1));
+    redraw();
+    expect(pill().textContent).toBe('3 to return');
+    search('dev');
+    expect(pill().textContent).toBe('1 to return');
+    expect(menuCount(EXIT)).toBe(1);
+    openColumnMenu(EXIT);
+    click(returnItem());
+    search('');
+    expect(pill().textContent).toBe('2 to return');
+    expect(dialogDrafts(EXIT)).toEqual([BEN, CARA]);
+  });
+
+  it('no number moves because a grade is a draft: the gradebook counts all work', () => {
+    // The same grades in a class that holds them and in one that does not.
+    const drawn = config => {
+      mount(seedWith({ config }), { course: CID });
+      gradeEverything(DEV);
+      gradeEverything(BEN);
+      Grader.setLevel(CID, AVA, ESSAY, QUESTION, 1, 0);
+      redraw();
+      const out = { scores: numbers(), overall: EVERYONE.map(sid => getOverallProficiency(CID, sid)) };
+      out.cells = Array.from(document.querySelectorAll('#gb-data td.gb-scores-cell')).map(td => td.textContent);
+      showCompetencies();
+      out.competencies = numbers();
+      out.tiles = Array.from(document.querySelectorAll('#gb-data td.gb-score')).map(td => td.textContent);
+      out.drafts = document.querySelectorAll('#gb-data .gb-draft').length;
+      unmount();
+      clearClass(CID);
+      return out;
+    };
+    const held = drawn(HELD);
+    const plain = drawn({});
+    expect(held.drafts).toBeGreaterThan(10);
+    expect(plain.drafts).toBe(0);
+    ['scores', 'overall', 'cells', 'competencies', 'tiles'].forEach(part =>
+      expect(held[part], part).toEqual(plain[part]),
+    );
+    // And the grades moved: Dev had none before.
+    expect(held.overall[3]).toBeGreaterThan(0);
+  });
+
+  it('a class change clears the filter', () => {
+    open();
+    Grader.setPoints(CID, BEN, QUIZ, 8);
+    redraw();
+    click(pill());
+    expect(rowIds()).toEqual([BEN]);
+    PageGradebook.destroy();
+    PageGradebook.init({ course: CID });
+    expect(pill().getAttribute('aria-pressed')).toBe('false');
+    expect(rowIds()).toEqual(EVERYONE);
+  });
+});
+
+/* Plan S1: "counts agree across gradebook, grader and phone for the same
+   class". The gradebook's side: its counts against the function the grader
+   dialog reads for its Draft row (GradeState.stateOf), and against Class
+   Settings' count of the class (GradeState.draftsWaiting, S1-F4). */
+describe.skipIf(UPDATE)('the gradebook’s counts agree with the grader dialog’s and Class Settings’', () => {
+  it('each column’s Return N Graded is the students the dialog shows as Draft, and the sum is draftsWaiting', () => {
+    open();
+    gradeEverything(DEV);
+    gradeEverything(CARA);
+    gradeEverything(BEN);
+    Grader.setLevel(CID, AVA, ESSAY, QUESTION, 1, 0);
+    Grader.setOverallComment(CID, ELI, BENCH, 'Read with expression.');
+    applyAssignmentStatus(CID, ELI, EXIT, 'LATE');
+    const check = () => {
+      redraw();
+      let sum = 0;
+      columnIds().forEach(aid => {
+        const waiting = dialogDrafts(aid);
+        expect(menuCount(aid), aid).toBe(waiting.length);
+        expect(
+          EVERYONE.filter(sid => isDashed(scoresCell(aid, sid))),
+          aid,
+        ).toEqual(waiting);
+        sum += waiting.length;
+      });
+      expect(pillCount()).toBe(sum);
+      expect(sum).toBe(GradeState.draftsWaiting(CID));
+      showCompetencies();
+      expect(pillCount()).toBe(sum);
+      expect(headerButtons().reduce((n, b) => n + parseInt(b.textContent.replace('Return ', ''), 10), 0)).toBe(sum);
+      showScores();
+      return sum;
+    };
+    const first = check();
+    expect(first).toBeGreaterThan(15);
+    // A benchmark's Overall Comment is a draft to all three.
+    expect(dialogDrafts(BENCH)).toEqual([ELI]);
+    const lab = dialogDrafts(LAB).length;
+    expect(lab).toBe(3);
+    openColumnMenu(LAB);
+    click(returnItem());
+    const second = check();
+    expect(second).toBe(first - lab);
+    openColumnMenu(BENCH);
+    click(returnItem());
+    expect(check()).toBe(second - 1);
+  });
 });

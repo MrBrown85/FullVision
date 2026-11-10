@@ -2127,7 +2127,7 @@ window.PageGradebook = (function () {
         var draft = _isDraft(s.id, a.id);
         if (draft) {
           cellClass += ' gb-draft';
-          if (cell.kind === 'points' || cell.kind === 'level') cellStyle = 'color:' + PROF_COLORS[cell.level];
+          cellStyle = cellStyle.replace(/^background:[^;]*;/, '');
         }
         var isScoreModeCell = _scoreMode && _scoreMode.assessmentId === a.id && si === _scoreMode.studentIdx;
         var isScoreModeCol = _scoreMode && _scoreMode.assessmentId === a.id;
