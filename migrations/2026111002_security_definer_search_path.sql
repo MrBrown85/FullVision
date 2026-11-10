@@ -111,7 +111,7 @@
 -- committed; it gives up after five seconds, with nothing changed.
 --
 -- ── Before the apply (read-only) ────────────────────────────────────────────
--- Fourteen of the sixteen were tested as the repo's migrations define them,
+-- Fifteen of the sixteen were tested as the repo's migrations define them,
 -- and rls_auto_enable as a stand-in: only fv_owns_course, fv_owns_enrollment,
 -- fv_owns_assessment and get_class_bundle are known to be the live
 -- definitions byte for byte. This lists every function that is NOT as it was

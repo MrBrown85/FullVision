@@ -271,7 +271,8 @@ in a transaction that is rolled back.
   with its schema and were never fooled that way (38 tables shadowed, same
   bundle); what was open in them is type names: a temporary table called
   `jsonb`, `text`, `uuid` or `record` made the call fail before, and does
-  nothing after (13 cases across nine functions). The four ownership helpers,
+  nothing after (13 cases across eight functions, and `record` for the
+  `rls_auto_enable` stand-in). The four ownership helpers,
   `_score_audit_diff`, `_term_rating_audit_field` and
   `_fv_teacher_sign_in_deleted` name no type.
 - **Nothing else changes.** Each function's row in `pg_proc`, column for
