@@ -145,6 +145,8 @@ window.DraftsBeforePrint = (function () {
         e.stopPropagation();
         finish('cancel');
       } else if (e.key === 'Tab') {
+        // The dialog under this one (Print, Print Rubrics) keeps its own Tab inside it: not while this is open.
+        e.stopPropagation();
         var buttons = Array.prototype.slice.call(overlay.querySelectorAll('button'));
         var first = buttons[0];
         var last = buttons[buttons.length - 1];

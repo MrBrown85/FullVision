@@ -115,6 +115,11 @@ test.describe('Print Reports with drafts', () => {
     await expect(buttons).toHaveText(['Return Them, Then Print', 'Print Without Them', 'Cancel']);
     // The keyboard starts on Cancel: a Return cannot be undone.
     await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused();
+    // Tab stays in the question, not the Print dialog under it.
+    await page.keyboard.press('Tab');
+    await expect(dialog.getByRole('button', { name: 'Return Them, Then Print' })).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused();
 
     await dialog.getByRole('button', { name: 'Cancel' }).click();
     await expect(dialog).toHaveCount(0);
