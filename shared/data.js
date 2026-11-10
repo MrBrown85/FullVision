@@ -1680,6 +1680,7 @@ function _keepOrDefaultField(cid, field, fallback) {
 function _persistLoadedField(cid, field, value) {
   if (_refreshMustSkip(cid, field)) return;
   _cache[field][cid] = value;
+  if (field === 'scores') _gradeScoresLoaded(cid); // Draft and Returned: the rows are from before this load
   if (field === 'rubrics') _noteRubricsSet(cid);
   var key = _DATA_KEYS[field];
   if (key) {
@@ -10200,6 +10201,17 @@ function _loadGradeReturns(cid, rows) {
   _safeLSSet('gb-grade-returns-' + cid, JSON.stringify(_cache.gradeReturns[cid]));
   delete _returnedSets[cid];
   if (typeof clearProfCache === 'function') clearProfCache();
+}
+/* The class's scores were just replaced by a load from the server (a
+   refresh, or a full download after a saved copy was refused as an older
+   shape). The rows this device holds are from before that load, so they
+   are not "loaded" again until _loadGradeReturns runs for it: a class that
+   holds grades fails closed in between rather than read old rows against
+   new scores. The rows themselves are left where they are. A class kept on
+   this device only is never loaded from a server, and keeps its rows. */
+function _gradeScoresLoaded(cid) {
+  delete _gradeReturnsLoadedFor[cid];
+  delete _returnedSets[cid];
 }
 /* True when the class's rows are known. A class kept on this device only
    (Demo Mode) keeps them in localStorage, which is always there to read:

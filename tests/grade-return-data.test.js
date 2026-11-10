@@ -1728,3 +1728,78 @@ describe('a DIBELS benchmark is never a draft and is never returned', () => {
     expect(state('s1', 'bench')).toBe(null);
   });
 });
+
+/* A saved copy of a class in an older shape is refused and the class is
+   downloaded in full (_BUNDLE_SCHEMA, _savedCopyUsable). The rows are kept
+   beside the scores, so what becomes of them is pinned here. */
+describe('the rows across a saved copy that is refused', () => {
+  it('a Demo class is never downloaded: its rows stay, whatever shape its saved copy says it is', async () => {
+    held();
+    level('s1', 'essay', 't1', 3);
+    give('essay', 's1');
+    level('s1', 'essay', 't1', 4);
+    level('s2', 'essay', 't1', 2);
+    const rows = structuredClone(getGradeReturns(CID));
+    // A saved copy marked as an older shape.
+    localStorage.setItem('gb-bundle-meta-' + CID, JSON.stringify({ schema: _BUNDLE_SCHEMA - 1, owner: _teacherId }));
+    expect(_savedCopyUsable(CID)).toBe(false);
+    // The class is read again from this device, as opening it does.
+    Object.keys(_cache).forEach(field => {
+      if (_cache[field] && typeof _cache[field] === 'object' && field !== 'courses') delete _cache[field][CID];
+    });
+    await _initClassData(CID);
+    expect(getGradeReturns(CID)).toEqual(rows);
+    expect(JSON.parse(storedRows())).toEqual(rows);
+    expect([state('s1', 'essay'), state('s2', 'essay')]).toEqual(['draft', 'draft']);
+    expect(getReturnedScores(CID).s1.map(e => e.score)).toEqual([3]);
+    expect(getReturnedScores(CID).s2).toEqual([]);
+  });
+
+  it('a signed-in class: a full download of its scores makes its rows "not loaded" until they are loaded again', () => {
+    const LIVE = U(1);
+    const HELD = { student_page: true, return_grades: 'on_return' };
+    const entry = score => ({
+      id: 'e1',
+      assessmentId: U(31),
+      tagId: U(51),
+      score,
+      date: '2026-10-10',
+      type: 'summative',
+      note: '',
+    });
+    seedClass(LIVE, {
+      students: [{ id: U(11), firstName: 'Jordan', lastName: 'Test' }],
+      assessments: [{ id: U(31), title: 'Essay', date: '2026-10-10', type: 'summative', tagIds: [U(51)] }],
+      scores: { [U(11)]: [entry(3)] },
+    });
+    const session = signIn();
+    const realSettings = globalThis.getReturnSettings;
+    globalThis.getReturnSettings = () => HELD;
+    try {
+      // Loaded once, with a draft the server knows of.
+      _loadGradeReturns(LIVE, { [U(31)]: { [U(11)]: { is_draft: true } } });
+      expect(getReturnedScores(LIVE)).toEqual({ [U(11)]: [] });
+      // The saved copy is an older shape: refused, and the class comes down in full.
+      localStorage.setItem('gb-bundle-meta-' + LIVE, JSON.stringify({ schema: _BUNDLE_SCHEMA - 1, owner: _teacherId }));
+      expect(_savedCopyUsable(LIVE)).toBe(false);
+      _persistLoadedField(LIVE, 'scores', { [U(11)]: [entry(4)] });
+      // The rows on the device are from before the download: not loaded, so no grade is worked out.
+      expect(() => getReturnedScores(LIVE)).toThrow(/has not loaded/);
+      // They are still there (what shows if the download had failed)...
+      expect(getGradeReturn(LIVE, U(11), U(31))).toEqual({ is_draft: true });
+      // ...and the load's own rows replace them.
+      _loadGradeReturns(LIVE, {});
+      expect(getReturnedScores(LIVE)).toBe(getScores(LIVE));
+      expect(JSON.parse(localStorage.getItem('gb-grade-returns-' + LIVE))).toEqual({});
+      // In this build the switch reads off for a signed-in class: nothing is asked of the rows at all.
+      globalThis.getReturnSettings = realSettings;
+      _persistLoadedField(LIVE, 'scores', { [U(11)]: [entry(2)] });
+      expect(getReturnedScores(LIVE)).toBe(getScores(LIVE));
+    } finally {
+      globalThis.getReturnSettings = realSettings;
+      session.signOut();
+      clearClass(LIVE);
+      delete _gradeReturnsLoadedFor[LIVE];
+    }
+  });
+});
