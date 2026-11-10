@@ -579,64 +579,145 @@ writes `score-tables.sql` byte for byte.
 
 ## Batch A: the way back (2026-11-10)
 
-`batch-a-undo.sql` undoes Batch A (`../2026110901` to `../2026110904`). It is
-**not a migration** and is kept here, not in `migrations/`, so CI's drift
-check does not wait for it to be applied. It is three transactions, each
-with its checks first, each safe to run again:
+`batch-a-undo.sql` undoes Batch A (`../2026110901` to `../2026110904`), which
+was applied to `gradebook-prod` on Nov 10. It is **not a migration** and is
+kept here, not in `migrations/`, so CI's drift check does not wait for it to
+be applied. Its header is the operator's page: what each part does, what
+students see after it, what still runs, what it leaves. In short:
 
-- **PART 1, the fast stop:** drops Batch A's 18 triggers and nothing else.
-  Every save, delete and setting change then runs no Batch A code.
-  `grade_return` is left as it was at that moment.
+- **PART 1, the fast stop:** drops Batch A's 18 triggers and nothing else,
+  one table at a time, each in its own transaction that waits at most 200 ms
+  for its table and tries again, so it never holds two tables and a save is
+  never the one Postgres kills. An ordinary save then no longer touches
+  `grade_return`. Batch A's functions and file 01's policies all stay and
+  still run. In a class with the Student Page on, students are then shown
+  some grades early and not shown others (the header lists the cases); the
+  header gives the one UPDATE that turns the page off.
 - **PART 1B:** the five score-table policies as they were before file 01.
   Only for a save refused by row security.
 - **PART 2, the full removal:** everything the four files made or changed,
   with the seven patched functions put back by making each edit backwards
-  and then checked against their fingerprints from before. It deletes
-  `grade_return`, the cards, the sessions, the sign-in log's card rows and
-  the three class settings. The file's header says what that loses once a
-  class has used the student page.
+  and then checked against their fingerprints from before. One transaction.
+  It deletes `grade_return`, the cards, the sessions, the sign-in log's card
+  rows and the three class settings. It stops, with nothing changed, if
+  anything is built on Batch A that it does not know (S0-M4b, PR 989: run
+  that file's own undo first). It does not touch the migration record; the
+  header has the one optional statement for that.
 
 No part touches a score table.
 
-`batch_a_undo.py` proves it. It commits and runs other scripts on the same
-database between its steps, so it needs a database of its own, built without
-the four migrations:
+`batch_a_undo.py` proves it. The database it is given is only a template:
+each scenario runs on a copy (`<PGDATABASE>_<scenario>`, made and dropped by
+the script), so it can be run again and again.
 
 ```bash
-PGPORT=54329 PGDATABASE=fv_undo python3 run.py $BASE      # BASE as under "Batch A" above
-PGPORT=54329 PGDATABASE=fv_undo python3 batch_a_undo.py
+PGPORT=54331 PGDATABASE=fv_undo python3 batch_a_undo.py build   # an empty database: everything but the four files
+PGPORT=54331 PGDATABASE=fv_undo python3 batch_a_undo.py         # the proof
+PGPORT=54331 PGDATABASE=fv_undo python3 batch_a_undo.py partial s0-m4b   # or only some scenarios
+PGPORT=54331 PGDATABASE=fv_undo python3 batch_a_undo_load.py    # PART 1 against looping saves, about three minutes
 ```
 
-It takes the whole catalog (`catalog.py`: every function with the md5 of its
-definition, owner and grants, every table, column, constraint, index,
-trigger, policy, comment and default privilege) and a checksum of every
-table's rows; applies the four files; has a teacher turn the student page
-on, save, return and issue cards and a student sign in with one; then runs
-the parts in turn:
+What it compares. `catalog.py` lists everything the database holds outside
+the system schemas, one line each (2,029 lines here): schemas, functions
+(md5 of the definition, owner, grants, and separately language, volatility,
+SECURITY DEFINER, settings, argument defaults, comment), tables, views and
+their definitions, rules, columns, dropped-column slots, constraints,
+indexes, triggers, policies, types, sequences, default privileges, comments
+on every kind of object, event triggers, extensions, publications, the
+shape of `pg_depend`, and, where they exist, pg_cron's jobs and the
+migration record. The `notices` scenario makes one of each of 14 kinds and
+checks the catalog sees it. Roles are left out: they belong to the whole
+server. Rows are a checksum of every row of every table, columns by name.
+The harness has no pg_cron and no Supabase migration record; the proof
+makes a stand-in record (three earlier rows, then one per file as it is
+applied), and the catalog's cron lines are tested against a stand-in table
+only.
 
-- after PART 1 no Batch A trigger is left, everything else of Batch A is as
-  it was, saves, a clear, a setting change and a delete work,
-  `grade_return` no longer changes, and `score_rpcs.py` passes as it does
-  with Batch A loaded (236 of 236: file 01's policies are still there);
-- after PART 1B the five policies are the ones from before;
-- after PART 2 the catalog is identical to the one taken first, line by
-  line (1,007 lines on both versions); no row of any table that was
-  there before has changed (54 tables compared) except the sign-in log, which lost its card rows and
-  nothing else; the five score tables are row for row what they were;
-- the suites from before Batch A pass on it: `score_rpcs.py` (183 of 183 on
-  this database; it is 176 on the score-only one, and the seven more are the
-  five functions Batch A patches and the two bundle functions, each compared
-  with its live fingerprint),
-  `student_submit.py` 79, `questionnaire_identity.py` 47, `phone_reports.py`
-  37, `questionnaires.py` 42;
-- every part run again changes nothing;
-- the four files then apply again and give the same database as the first
-  time, with every grade Returned (the backfill): the line between Draft
-  and Returned does not survive the undo.
+The scenarios:
 
-Result on 2026-11-10: 27 of 27 on Postgres 18.6 (port 54329) and 27 of 27 on
-Postgres 17.11 (port 54331), which is what production runs. Run again after
-file 01's four helpers became plpgsql and the harness began loading S0-M4:
-`make_undo`'s output, `batch-a-undo.sql`, came out byte for byte the same
-(the helpers are dropped by name and arguments, whatever their language),
-and the counts above are the ones from that run.
+- **main.** Catalog and rows before anything; the four files; a teacher and
+  a student use it (returned grades, drafts, a draft on a returned grade, a
+  rubric piece, cards, two signed-in phones, in a When I Return Them class
+  and an As Soon As I Save one). Applying the files changes no row of any
+  table that was there.
+  - After **PART 1**: the 18 triggers are gone and no other catalog line
+    differs. What the student is shown, case by case: a Returned 7 changed
+    to 3 is shown at once; a first grade on a new piece is not shown, in
+    either kind of class; a draft stays hidden; a draft on a returned grade
+    stays as returned. With the Student Page turned off by one UPDATE, the
+    page and a card scan are refused; on again, students see what they saw.
+    What still runs: file 01's policies, Return Grades, a rubric move
+    (still rewrites the returned copy), a restore (still writes
+    `grade_return`), the cards and the student's functions; a class leaving
+    When I Return Them no longer returns what was waiting; a deleted piece
+    leaves its row behind. `score_rpcs.py` passes as with Batch A loaded
+    (236 of 236). A second run takes no lock: it goes through with all
+    seven tables locked by another session.
+  - After **PART 1B**: the five policies are the ones from before.
+  - After **PART 2**: the catalog is the one from before Batch A, line for
+    line, but for two things: **three dropped-column slots on `course`**
+    (where the three class settings were; a dropped column keeps its slot,
+    which holds nothing and which nothing reads) and the migration record's
+    four rows, which the header's optional statement then removes, and no
+    other. Rows: compared with just before PART 2, nothing changed but the
+    sign-in log, which lost its card rows and nothing else; compared with
+    **before Batch A**, the only tables that differ are the eleven the
+    teacher's own saves, new pieces, rubric move and restore wrote in
+    between. The suites from before Batch A pass (`score_rpcs.py` 183 on
+    this database, `student_submit.py` 79, `questionnaire_identity.py` 47,
+    `phone_reports.py` 37, `questionnaires.py` 42). Every part run again
+    changes nothing. The four files apply again and give the same database
+    as the first time, every grade Returned (the backfill).
+- **apply-only.** The four files, then PART 2, nothing in between: every
+  row of every table (54) is what it was before Batch A.
+- **partial.** Only file 01, files 01 and 02, files 01 to 03 applied: PART
+  1, 1B and 2 in turn, and PART 2 alone, each take it back out (no row
+  differs; the catalog is the one from before but for the dropped slots of
+  the columns that had been added).
+- **back-on.** PART 1, saves while it is off, then file 02 again: 18
+  triggers; every `grade_return` row holds the grade as the score tables
+  have it; the first grade saved in between is made Returned and the
+  student sees it; the drafts are still drafts; a row left by a piece
+  deleted in between is cleared; a change to a Returned grade waits as a
+  draft again.
+- **half-way.** PART 1 stopped after each of its first six tables, then run
+  again from the top: it finishes. With one table held by another session
+  for good it tries 40 times (about twelve seconds), stops with a message
+  naming the table, keeps what it had done, and finishes when run again.
+- **s0-m4b.** With PR 989's file on top: PART 1 drops Batch A's 18, leaves
+  S0-M4b's three triggers and lists them; PART 2 stops before it changes
+  anything, says to run S0-M4b's undo first and names what it found; after
+  S0-M4b's own undo (`s0-m4b-undo.sql`, read from its branch), PART 2 runs
+  and the database is the one from before Batch A. (The first check here
+  looked for one of S0-M4b's function names, which that PR then changed:
+  PART 2 ran straight through on top of it. It now looks for anything that
+  names `grade_return` and is not Batch A's.)
+
+Result on 2026-11-10: **80 of 80 on PostgreSQL 17.11 (port 54331), which is
+what production runs, and 80 of 80 on 18.6 (port 54329)**, the same checks
+with the same results.
+
+`batch_a_undo_load.py`: four connections saving in a loop (points, a rubric
+fill, one criterion, a comment), PART 1 run against them again and again,
+the saves paused between runs while file 02 puts the triggers back. On
+17.11, 160 runs with a class at work and 80 flat out:
+
+| PART 1                            | Saves a second | Runs finished | Saves that failed   | Slowest save |
+| --------------------------------- | -------------- | ------------- | ------------------- | ------------ |
+| as first written, a class at work | about 30       | 160 of 160    | 4 (killed, 40P01)   | 2.4 s        |
+| as it is now, a class at work     | about 30       | 160 of 160    | none                | 0.4 s        |
+| as first written, flat out        | about 60       | 29 of 80      | 229 (killed, 40P01) | 4.0 s        |
+| as it is now, flat out            | about 520      | 80 of 80      | none                | 0.3 s        |
+
+On 18.6 the same run: as first written, 160 of 160 with a class at work
+and no save failed, 20 of 80 flat out with 223 saves killed; as it is now,
+160 of 160 and 80 of 80, no save failed, slowest save 0.3 s.
+
+PART 2 is one transaction on purpose and holds the score tables until it
+commits: with a class at work 10 of 10 runs finished and no save failed;
+flat out 9 of 10 finished (the tenth was stopped by a deadlock, nothing
+changed) and 5 saves were killed. It is for a quiet moment.
+
+Not verified: pg_cron and Supabase's real migration record (stand-ins
+here); the edge function and the app against a database after PART 2;
+anything on `gradebook-prod` itself.
