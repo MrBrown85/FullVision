@@ -12111,6 +12111,22 @@ window.getReturnedScores = function getReturnedScores(cid) {
   return set;
 };
 
+/* The Advanced Rubric ticks one student has been given on one piece: the
+   returned set's ticks, which getReturnedScores leaves out (getScores holds
+   none). The rule is GradeState.returnedCheckIds. A class that holds
+   grades whose rows have not loaded throws, as getReturnedScores does; a
+   DIBELS benchmark has no ticks to hold, so it gives the working ones; in
+   any other class this is getRubricCheckIds. Set on window for the same
+   reason as getReturnedScores. (S2-F1) */
+window.getReturnedRubricCheckIds = function getReturnedRubricCheckIds(cid, sid, aid) {
+  getReturnedScores(cid);
+  var working = getRubricCheckIds(cid, sid, aid);
+  if (isDibelsScored(_assessmentById(cid, aid))) return working;
+  var klass = getReturnSettings(cid);
+  var holds = klass.student_page && GradeState.holds(klass);
+  return GradeState.returnedCheckIds(holds ? getGradeReturn(cid, sid, aid) : null, working, holds);
+};
+
 /* A local id became a server id (_rekey): the rows move with it, whether it
    named an assessment, a student, or a competency, criterion or checkbox
    inside a kept copy. */
