@@ -125,13 +125,13 @@ describe('GradeState.draftsIn', () => {
     Grader.returnGrades(CID, 'talk', drafts('talk'));
     expect(total()).toBe(2);
     expect(GradeState.draftsWaiting(CID)).toBe(2);
-    // An Overall Comment on a DIBELS benchmark is a draft to stateOf, so
-    // both count it (the grader dialog draws no Draft row for a benchmark).
+    // A DIBELS benchmark has no Draft or Returned state, whatever is saved
+    // on it (stateOf), so neither count has it.
     saveScoreComment(CID, 's1', 'bench', 'Read with expression.');
-    expect(GradeState.stateOf(CID, 's1', 'bench')).toBe('draft');
-    expect(drafts('bench')).toEqual(['s1']);
-    expect(total()).toBe(3);
-    expect(GradeState.draftsWaiting(CID)).toBe(3);
+    expect(GradeState.stateOf(CID, 's1', 'bench')).toBe(null);
+    expect(drafts('bench')).toEqual([]);
+    expect(total()).toBe(2);
+    expect(GradeState.draftsWaiting(CID)).toBe(2);
   });
 
   it('work that is not in the class has none', () => {

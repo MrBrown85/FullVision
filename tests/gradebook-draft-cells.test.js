@@ -779,16 +779,15 @@ describe.skipIf(UPDATE)('the gradebookâ€™s counts agree with the grader dialogâ€
     };
     const first = check();
     expect(first).toBeGreaterThan(15);
-    // A benchmark's Overall Comment is a draft to all three.
-    expect(dialogDrafts(BENCH)).toEqual([ELI]);
+    // A benchmark has no Draft state, whatever is saved on it: its Overall
+    // Comment is on no count, its cell is plain and its column has no Return.
+    expect(dialogDrafts(BENCH)).toEqual([]);
+    expect(isDashed(scoresCell(BENCH, ELI))).toBe(false);
+    expect(menuCount(BENCH)).toBe(0);
     const lab = dialogDrafts(LAB).length;
     expect(lab).toBe(3);
     openColumnMenu(LAB);
     click(returnItem());
-    const second = check();
-    expect(second).toBe(first - lab);
-    openColumnMenu(BENCH);
-    click(returnItem());
-    expect(check()).toBe(second - 1);
+    expect(check()).toBe(first - lab);
   });
 });
