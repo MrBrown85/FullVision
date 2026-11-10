@@ -87,7 +87,7 @@ STUDENT = {'s1': ENR1, 's2': ENR2}
 # 2026110905 (S0-M4b) leaves DIBELS work out of Draft and Returned. Batch A
 # alone treats it like any grade, so without that file the DIBELS case is
 # pinned as it is today instead of run.
-LIMITS = one("select to_regprocedure('public.grade_return_repair()') is not null")
+LIMITS = one("select to_regprocedure('public._grade_return_repair_class(uuid)') is not null")
 for case in doc['cases']:
     set_class(case['class']['student_page'], case['class']['return_grades'])
     K = build_class()   # a class of its own, so a case can delete from it
