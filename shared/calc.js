@@ -1904,7 +1904,8 @@ function getTagScores(cid, studentId, tagId) {
     /* Excused work is left out. So is Missing work (Colin, 2026-11-09:
        "Missing wins everywhere"): a piece marked Missing counts no level,
        even if one is still stored for it. What Missing does to the course %
-       is not decided here (0 in a Letter class, left out otherwise). */
+       and to the average of levels is decided where those are worked out,
+       and is not changed. */
     const status = statuses[studentId + ':' + entry.assessmentId];
     if (status === 'EXC' || status === 'NS') return;
     filtered.push(entry);
