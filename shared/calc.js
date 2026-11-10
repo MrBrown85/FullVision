@@ -20,8 +20,7 @@ var _sectionByIdCache = {}; // cid → Map<sectionId, section>      — avoids r
 var _assessmentOverallCache = {};
 var _categoryAvgCache = {};
 var _courseLetterCache = {};
-var _pieceIndexCache = {}; // cid → { rank, keys }: each piece's place in the assignment list and what it measures
-var _orderedEntriesCache = {}; // class, term, set and student → the student's score entries in counting order
+var _pieceIndexCache = {}; // cid → Map<assessmentId, { keys, fed }>: what each piece of work measures now
 
 /* ── The score set and its reader ──────────────────────────────
    Every score, status, points score, Complete/Incomplete mark, Overall
@@ -127,18 +126,18 @@ var _scoreRead = {
   status: function (cid, sid, aid) {
     return _scoreRead.statuses(cid)[sid + ':' + aid] || null;
   },
-  // A points score, or null when none is entered; 0 is a score.
-  pointsScore: function (cid, sid, aid) {
-    var entry = (_scoreRead.scores(cid)[sid] || []).find(function (e) {
-      return e.assessmentId === aid && e.score != null && e.score !== '';
-    });
+  /* A points score, or null when none is entered; 0 is a score. `piece` is
+     the assessment, and the score is read from the one entry that holds it
+     (_pieceScoreEntry). Given only the assessment's id, it is the first
+     entry with a score, as the data layer's own reader gives it. */
+  pointsScore: function (cid, sid, piece) {
+    var entry = _pieceScoreEntry(cid, sid, piece, _holdsPoints);
     return entry ? Number(entry.score) : null;
   },
-  // A Complete/Incomplete mark: 'complete', 'incomplete', or null when unmarked.
-  completionMark: function (cid, sid, aid) {
-    var entry = (_scoreRead.scores(cid)[sid] || []).find(function (e) {
-      return e.assessmentId === aid;
-    });
+  /* A Complete/Incomplete mark: 'complete', 'incomplete', or null when
+     unmarked. `piece` as for pointsScore. */
+  completionMark: function (cid, sid, piece) {
+    var entry = _pieceScoreEntry(cid, sid, piece, null);
     if (!entry || entry.score == null) return null;
     return Number(entry.score) > 0 ? 'complete' : 'incomplete';
   },
@@ -298,7 +297,6 @@ function clearProfCache() {
   _categoryAvgCache = {};
   _courseLetterCache = {};
   _pieceIndexCache = {};
-  _orderedEntriesCache = {};
 }
 
 /** Get or build assessment weights map for a course. */
@@ -340,42 +338,30 @@ function _getSectionById(cid, sectionId) {
   return _sectionByIdCache[cid].get(sectionId);
 }
 
-/* ── What each piece of work measures, and the order work counts in ──
-   Two rules read the class's pieces of work the same way, so they share one
-   index, built once per class and thrown away by clearProfCache.
+/* ── What each piece of work measures ─────────────────────────────
+   Built once per class and thrown away by clearProfCache. For each piece:
 
-   keys: what each piece measures now, as its score keys (scoreTagIds, the
-   list the gradebook cell is drawn from): on competency work the
-   competencies linked to it that are still on the class; on rubric work the
-   criteria of the rubric it has now; on points and Complete/Incomplete work
-   its linked competencies; and the one Overall key when it has none of
-   these.
-
-   rank: each piece's place in the class's assignment list, for telling
-   same-date work apart. The Assignments page lists by display_order (a
-   teacher's drag sets 1..n; 0 is never placed, and sits first), then for
-   pieces with the same date by the order they are stored in, which is the
-   order they were made (the server sends display_order, created_at, id). */
+   keys: what it measures now, as its score keys (scoreTagIds, the list the
+   gradebook cell is drawn from): on competency work the competencies linked
+   to it that are still on the class; on rubric work the criteria of the
+   rubric it has now; on points and Complete/Incomplete work its linked
+   competencies; and the one Overall key when it has none of these.
+   fed: on rubric work, the competencies its rubric's criteria feed. */
 function _pieceIndex(cid) {
   if (_pieceIndexCache[cid]) return _pieceIndexCache[cid];
-  var all = (getAssessments(cid) || []).filter(Boolean);
-  var rank = new Map();
-  all
-    .map(function (a, i) {
-      return { id: a.id, placed: Number(a.display_order || 0) || 0, stored: i };
-    })
-    .sort(function (x, y) {
-      return x.placed - y.placed || x.stored - y.stored;
-    })
-    .forEach(function (x, n) {
-      rank.set(x.id, n);
+  var pieces = new Map();
+  (getAssessments(cid) || []).filter(Boolean).forEach(function (a) {
+    var rubric = _assessmentRubric(cid, a);
+    var fed = null;
+    ((rubric && rubric.criteria) || []).forEach(function (c) {
+      ((c && c.id && c.tagIds) || []).forEach(function (t) {
+        (fed = fed || {})[t] = true;
+      });
     });
-  var keys = new Map();
-  all.forEach(function (a) {
-    keys.set(a.id, scoreTagIds(a, cid));
+    pieces.set(a.id, { keys: scoreTagIds(a, cid), fed: fed });
   });
-  _pieceIndexCache[cid] = { rank: rank, keys: keys };
-  return _pieceIndexCache[cid];
+  _pieceIndexCache[cid] = pieces;
+  return pieces;
 }
 
 /* Only what a piece measures now counts (Colin, 2026-11-09: "Yes, count
@@ -384,59 +370,76 @@ function _pieceIndex(cid) {
    a competency when the piece now has a rubric, counts nowhere, in either
    set of scores. The entry itself stays in the data, so putting the
    competency or the rubric back brings its level back. A piece that is no
-   longer in the class has no say: its scores are left as they were. */
+   longer in the class has no say: its scores are left as they were.
+
+   One case counts although the key is not the piece's own: on rubric work,
+   a level under a competency one of the rubric's criteria feeds. That is a
+   level from before the piece had the rubric. The data layer moves it onto
+   the criterion the next time it reads the scores afresh (a reload), and it
+   counts then; counting it here too keeps a competency's level from changing
+   across a reload with no edit. */
 function _pieceMeasures(cid, assessmentId, key) {
-  var keys = _pieceIndex(cid).keys.get(assessmentId);
-  if (!keys) return true;
-  if (isUnlinkedTag(key)) return isUnlinkedTag(keys[0]);
-  return keys.indexOf(key) >= 0;
+  var piece = _pieceIndex(cid).get(assessmentId);
+  if (!piece) return true;
+  // 'overall', and '' in scores loaded before the Overall key had a name.
+  if (isUnlinkedTag(key)) return isUnlinkedTag(piece.keys[0]);
+  return piece.keys.indexOf(key) >= 0 || !!(piece.fed && piece.fed[key]);
 }
 
-/* The order evidence counts in: by date; work with the same date in the
-   order it sits in the class's assignment list (_pieceIndex's rank),
-   whatever order it was graded in (Colin, 2026-11-09: "Order in the
-   assignment list"); and the scores of one piece in the order the piece
-   lists what it measures (its competencies, or its rubric's criteria).
-   Never by where an entry sits in the student's score list: re-entering a
-   score moves it to the end of that list, and Most Recent, Mode's tie and
-   Decaying Average must not move with it. Two entries under the same key of
-   one piece are one score stored twice; they keep the order given. */
-function _evidenceCompare(cid) {
-  var index = _pieceIndex(cid);
-  function place(entry) {
-    var keys = index.keys.get(entry.assessmentId) || [];
-    var at = keys.indexOf(entry.criterionId || entry.tagId);
-    return at < 0 ? keys.length : at;
-  }
-  return function (a, b) {
-    var byDate = (a.date || '').localeCompare(b.date || '');
-    if (byDate) return byDate;
-    if (a.assessmentId !== b.assessmentId) {
-      var ra = index.rank.get(a.assessmentId);
-      var rb = index.rank.get(b.assessmentId);
-      // A piece no longer in the class sorts after those that are, by its id.
-      if (ra == null && rb == null) return String(a.assessmentId) < String(b.assessmentId) ? -1 : 1;
-      if (ra == null) return 1;
-      if (rb == null) return -1;
-      return ra - rb;
+/* An Overall level counts only when it stands alone: the student's grade on
+   the piece holds no level under a competency or criterion. Beside such
+   levels (left from when the piece measured them) the server gives the
+   student nothing, and a reload does not load the Overall level at all, so
+   it is not counted here either. `entries` may hold other pieces' too. */
+function _overallStandsAlone(entries, assessmentId) {
+  return !(entries || []).some(function (e) {
+    return e && e.assessmentId === assessmentId && !isUnlinkedTag(e.tagId) && Number(e.score) > 0;
+  });
+}
+
+function _holdsPoints(e) {
+  return e.score != null && e.score !== '';
+}
+
+/* The one entry that holds a points or Complete/Incomplete piece's score.
+   Such a piece has one score, kept under a competency it lists (this device
+   keeps it under each; a reload under the first) or under the Overall key.
+   So, of the student's entries on the piece that `holds` passes:
+   - one under a key the piece lists comes first, in the piece's order;
+   - then one under the Overall key;
+   - then one under any other key that is not a rubric criterion's (a score
+     from before the piece was moved off a competency), the first by key;
+   - an entry under a rubric criterion is never the score: it is a level
+     left from before the piece was switched from its rubric.
+   Which entry is found does not depend on the order they are stored in. Two
+   under the same key are one score stored twice; the first is taken.
+   `piece` is the assessment. Given only its id, the first entry is taken,
+   as the data layer's own reader takes it. */
+function _pieceScoreEntry(cid, sid, piece, holds) {
+  var entries = _scoreRead.scores(cid)[sid] || [];
+  var id = piece && typeof piece === 'object' ? piece.id : piece;
+  var keys = piece && typeof piece === 'object' ? scoreTagIds(piece, cid) : null;
+  var best = null;
+  var bestAt = Infinity;
+  for (var i = 0; i < entries.length; i++) {
+    var e = entries[i];
+    if (e.assessmentId !== id || (holds && !holds(e))) continue;
+    var at = 0;
+    if (keys) {
+      at = isUnlinkedTag(e.tagId) && isUnlinkedTag(keys[0]) ? 0 : keys.indexOf(e.tagId);
+      if (at < 0) {
+        if (isUnlinkedTag(e.tagId)) at = keys.length;
+        else if (_criterionIndex(cid)[e.tagId]) continue;
+        else at = keys.length + 1;
+      }
     }
-    var byPlace = place(a) - place(b);
-    if (byPlace) return byPlace;
-    var ka = String(a.criterionId || a.tagId || '');
-    var kb = String(b.criterionId || b.tagId || '');
-    return ka < kb ? -1 : ka > kb ? 1 : 0;
-  };
-}
-
-/* One student's score entries in counting order (_evidenceCompare), from
-   the set of scores in use. Everything that turns entries into evidence
-   reads them here, so no result depends on the order of the score list. */
-function _orderedEntries(cid, studentId) {
-  var key = _ck(cid) + ':' + studentId;
-  if (_orderedEntriesCache[key]) return _orderedEntriesCache[key];
-  var ordered = (_scoreRead.scores(cid)[studentId] || []).slice().sort(_evidenceCompare(cid));
-  _orderedEntriesCache[key] = ordered;
-  return ordered;
+    if (at < bestAt || (at === bestAt && at > keys.length && String(e.tagId) < String(best.tagId))) {
+      best = e;
+      bestAt = at;
+    }
+    if (at === 0) break;
+  }
+  return best;
 }
 
 /** Convert a raw point score to a proficiency level using percentage boundaries.
@@ -695,7 +698,7 @@ function getAssessmentOverallScore(cid, studentId, assessmentId) {
     return 0;
   }
 
-  var entries = _orderedEntries(cid, studentId).filter(function (entry) {
+  var entries = (_scoreRead.scores(cid)[studentId] || []).filter(function (entry) {
     return entry.assessmentId === assessmentId;
   });
   var rubricResult = getRubricAssessmentScore(cid, assessment, entries);
@@ -704,14 +707,21 @@ function getAssessmentOverallScore(cid, studentId, assessmentId) {
     return rubricResult;
   }
 
-  // A leftover overall score (from before the assessment was linked to a
-  // competency) must not count beside the new scores.
-  var countsOverallKey = isPointsScored(assessment) || isUnlinkedTag(scoreTagIds(assessment, cid)[0]);
-  // A removed competency's scores don't count; a points score is one number
-  // for the assessment, so it always does.
+  // A points score is one number for the assessment: the one entry that
+  // holds it (_pieceScoreEntry), whatever else is stored on the piece.
   var points = isPointsScored(assessment);
+  if (points) {
+    var one = _pieceScoreEntry(cid, studentId, assessment, _holdsPoints);
+    entries = one ? [one] : [];
+  }
+  // A leftover overall score (from before the assessment was linked to a
+  // competency) must not count beside the new scores, nor beside levels
+  // left under competencies the piece no longer measures.
+  var countsOverallKey =
+    points || (isUnlinkedTag(scoreTagIds(assessment, cid)[0]) && _overallStandsAlone(entries, assessmentId));
   var values = entries
     .filter(function (entry) {
+      // A removed competency's scores don't count.
       if (!points && _isRemovedCompetency(cid, entry.tagId)) return false;
       // Nor does a level under a competency the piece no longer measures.
       if (!points && !_pieceMeasures(cid, assessmentId, entry.tagId)) return false;
@@ -884,9 +894,7 @@ function _assessmentPoints(cid, studentId, assessment) {
   var possible = isCompletionScored(assessment) ? COMPLETE_MAX_POINTS : Number(assessment.maxPoints) || 0;
   if (!(possible > 0)) return null;
   if (status === 'NS') return { earned: 0, possible: possible };
-  var entry = (_scoreRead.scores(cid)[studentId] || []).find(function (e) {
-    return e.assessmentId === assessment.id && e.score != null && e.score !== '';
-  });
+  var entry = _pieceScoreEntry(cid, studentId, assessment, _holdsPoints);
   if (!isScoreEntered(assessment, entry)) return null;
   var cap = isCompletionScored(assessment) ? possible : possible * POINTS_EXTRA_CREDIT_FACTOR;
   return { earned: Math.max(0, Math.min(cap, Number(entry.score) || 0)), possible: possible };
@@ -943,6 +951,7 @@ function columnCountedValue(cid, sid, col) {
     var vals = [];
     _columnScoreKeys(cid, a, col.tagIds).forEach(function (key) {
       if (!_pieceMeasures(cid, a.id, key)) return;
+      if (isUnlinkedTag(key) && !_overallStandsAlone(entries, a.id)) return;
       var entry = entries.find(function (e) {
         return e.assessmentId === a.id && e.tagId === key;
       });
@@ -1857,8 +1866,8 @@ function getTagScores(cid, studentId, tagId) {
   var cacheKey = _ck(cid) + ':' + studentId + ':' + tagId;
   if (_tagScoresCache[cacheKey]) return _tagScoresCache[cacheKey];
 
-  // In counting order, so the evidence below comes out in it too.
-  const studentScores = _orderedEntries(cid, studentId);
+  const allScores = _scoreRead.scores(cid);
+  const studentScores = allScores[studentId] || [];
   const statuses = _scoreRead.statuses(cid);
   // Use Map for O(1) lookup instead of O(n) find() per score entry
   const assessMap = _getAssessMap(cid);
@@ -2313,7 +2322,7 @@ function getSectionTrend(cid, studentId, sectionId) {
       .forEach(s => allScores.push(s));
   });
   if (allScores.length < 2) return 'flat';
-  allScores.sort(_evidenceCompare(cid));
+  allScores.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   const recent = allScores[allScores.length - 1].score;
   const prev = allScores[allScores.length - 2].score;
   if (recent > prev) return 'up';
@@ -2363,7 +2372,7 @@ function sectionCountedEvidence(cid, studentId, sectionId) {
         out.push(s);
       });
   });
-  return out.sort(_evidenceCompare(cid));
+  return out;
 }
 
 /** Count the number of scored evidence entries across all tags in a section.
@@ -2505,7 +2514,7 @@ function getSectionGrowthData(cid, studentId, sectionId) {
   // Sort allScores once by date, then use a running pointer — O(n) instead of O(n²).
   // For each date, advance the pointer to include all scores up to that date,
   // accumulating them into a per-tag Map so grouping is also O(1) per score.
-  allScores.sort(_evidenceCompare(cid));
+  allScores.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   const runningByTag = new Map(section.tags.map(t => [t.id, []]));
   let ri = 0;
 
@@ -2654,6 +2663,8 @@ function assessmentCellValue(cid, sid, assessment) {
   var entries = _scoreRead.scores(cid)[sid] || [];
   var tagScores = scoreTagIds(a, cid)
     .map(function (tid) {
+      // An Overall level shows only when it stands alone, as it counts.
+      if (isUnlinkedTag(tid) && !_overallStandsAlone(entries, a.id)) return 0;
       var entry = entries.find(function (e) {
         return e.assessmentId === a.id && e.tagId === tid;
       });
@@ -2674,7 +2685,7 @@ function assessmentCellValue(cid, sid, assessment) {
   var isPoints = isPointsScored(a);
   var isComplete = isCompletionScored(a);
   // A points 0 is a score; on proficiency work 0 is none.
-  var pointsVal = isPoints && !isComplete ? _scoreRead.pointsScore(cid, sid, a.id) : null;
+  var pointsVal = isPoints && !isComplete ? _scoreRead.pointsScore(cid, sid, a) : null;
   if (pointsVal != null) val = pointsVal;
   var status = _scoreRead.status(cid, sid, a.id);
   var out = {
@@ -2710,7 +2721,7 @@ function assessmentCellValue(cid, sid, assessment) {
     }
     return out;
   }
-  var mark = isComplete ? _scoreRead.completionMark(cid, sid, a.id) : null;
+  var mark = isComplete ? _scoreRead.completionMark(cid, sid, a) : null;
   if (mark) {
     out.kind = 'complete';
     out.mark = mark;
@@ -3690,7 +3701,7 @@ function completionCounts(cid, students, assessment) {
     var status = _scoreRead.status(cid, s.id, assessment.id);
     if (status === 'NS') return res.missing.push(s.id);
     if (status === 'EXC') return res.excused.push(s.id);
-    var mark = _scoreRead.completionMark(cid, s.id, assessment.id);
+    var mark = _scoreRead.completionMark(cid, s.id, assessment);
     if (mark === 'complete') res.complete.push(s.id);
     else if (mark === 'incomplete') res.incomplete.push(s.id);
     else res.unmarked.push(s.id);
