@@ -658,6 +658,24 @@ describe('with the switch on and When I Return Them', () => {
       expect(drafts(TALK)).toEqual([]);
     });
 
+    it('the bar follows the card on screen when the cards are drawn again under it', () => {
+      held();
+      openGrading(TALK);
+      MGrade.jumpToStudent(1, true); // Cara
+      MGrade.setScore(CID, CARA, TALK, QUESTION, 2);
+      expect(barState()).toBe('DraftSaved. Not returned yet.');
+      // Late on group work draws every card again; Cara's is still on screen.
+      MGrade.setStatus(CID, CARA, TALK, 'LATE');
+      expect(onCard()).toBe(1);
+      expect(barState()).toBe('DraftSaved. Not returned yet.');
+      // Ben graded separately gets a card of his own after the pair's: the
+      // second card is now his, and his grade was returned.
+      MGrade.gradeSeparately(CID, TALK, BEN);
+      expect(document.querySelectorAll('.m-swiper-card')[1].getAttribute('data-sid')).toBe(BEN);
+      expect(barState()).toBe('Returned');
+      expect(barButton()).toBe(null);
+    });
+
     it('a DIBELS benchmark has no bar to speak of, whatever is saved on it', () => {
       held();
       Grader.setDibels(CID, AVA, BENCH, 'boy', { orfWrc: 90 });

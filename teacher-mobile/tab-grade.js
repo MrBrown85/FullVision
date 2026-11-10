@@ -1229,7 +1229,6 @@ window.MGrade = (function () {
      still graded with the group. It is drawn only in a class that holds
      grades (renderSwiper), and again only when it changes. */
   var _swiperAid = null;
-  var _returnBarShown = null;
   // Set while the next card slides in after Return and Next.
   var _returnSliding = null;
   var RETURN_SLIDE_MS = 500;
@@ -1290,10 +1289,15 @@ window.MGrade = (function () {
     };
   }
 
+  // The card on screen's parts.
+  function _returnBarNow(cid, a) {
+    var units = _swiperUnits(cid, a);
+    return _returnBarParts(cid, a, units[_currentIdx], _currentIdx >= units.length - 1);
+  }
+
   // html-safe: built by _returnBarParts
   function _returnBarHtml(cid, a, units, idx) {
     var parts = _returnBarParts(cid, a, units[idx], idx >= units.length - 1);
-    _returnBarShown = parts.state + '\n' + parts.act;
     return (
       '<div class="m-grade-return' +
       (parts.state || parts.act ? '' : ' is-empty') +
@@ -1320,22 +1324,34 @@ window.MGrade = (function () {
     var bar = document.getElementById('m-grade-return');
     var a = _assessmentById(cid, _swiperAid);
     if (!bar || !a) return;
-    var units = _swiperUnits(cid, a);
-    var parts = _returnBarParts(cid, a, units[_currentIdx], _currentIdx >= units.length - 1);
-    var shown = parts.state + '\n' + parts.act;
-    if (shown === _returnBarShown) return;
-    _returnBarShown = shown;
+    var parts = _returnBarNow(cid, a);
+    var shown = bar._fvShown || {};
+    if (shown.state === parts.state && shown.act === parts.act) return;
+    bar._fvShown = parts;
     var state = document.getElementById('m-grade-return-state');
     var act = document.getElementById('m-grade-return-act');
-    var held = !!document.activeElement && act.contains(document.activeElement);
-    // html-safe: built by _returnBarParts
-    if (state.innerHTML !== parts.state) state.innerHTML = parts.state;
-    // html-safe: built by _returnBarParts
-    act.innerHTML = parts.act;
+    // Each part is drawn again only when it changes: the line is read out
+    // when it does, and a button swapped out under a finger loses its tap.
+    if (shown.state !== parts.state) {
+      // html-safe: built by _returnBarParts
+      state.innerHTML = parts.state;
+    }
+    if (shown.act !== parts.act) {
+      var held = !!document.activeElement && act.contains(document.activeElement);
+      // html-safe: built by _returnBarParts
+      act.innerHTML = parts.act;
+      if (held) (act.querySelector('button:not([disabled])') || bar).focus({ preventScroll: true });
+    }
     bar.classList.toggle('is-empty', !parts.state && !parts.act);
-    if (!held) return;
-    var button = act.querySelector('button:not([disabled])');
-    (button || bar).focus({ preventScroll: true });
+  }
+
+  /* A grading screen just drawn (renderSwiper) shows its first card's bar:
+     the bar is told so, and is not drawn a second time. */
+  function _noteReturnBar(cid, aid) {
+    if (!_holdsGrades(cid)) return;
+    var bar = document.getElementById('m-grade-return');
+    var a = _assessmentById(cid, aid);
+    if (bar && a) bar._fvShown = _returnBarNow(cid, a);
   }
 
   /* What is typed on the card but not saved yet: a comment saves a moment
@@ -2387,6 +2403,7 @@ window.MGrade = (function () {
     });
     if (hasBank && window.CompetencyWording) CompetencyWording.loadBank();
     _fitCritComments(swiper);
+    _noteReturnBar(cid, aid);
 
     // Points field: tapping selects the number so typing replaces it; Done
     // or tapping away saves. The tap's mouseup would put the caret back, so
