@@ -518,6 +518,22 @@ def scen_half_way():
     ok('half-way: a table held by another session for good: PART 1 tries 40 times (about twelve seconds), stops with a message naming it, and keeps what it had done',
        r.startswith('STOPPED: PART 1 could not get public.rubric_score in 40 tries') and left == 11 and 8 < took < 20, (r, left, round(took, 1)))
     ok('half-way: and run again once the table is free, it finishes', d.part('PART 1') == 'ok' and d.one(TRIGGERS) == 0)
+    # Pasted whole, as the SQL editor sends it: one message, many statements.
+    # Its own begin and commit must still make seven transactions of it.
+    text = open(os.path.join(HERE, UNDO)).read()
+    whole = text[text.index('\n-- PART 1: '):text.index('\n-- PART 1B: ')]
+    d.file(FILES[1])
+    holder = connect(d.name); holder.run('begin'); holder.run('lock table public.rubric_score in access exclusive mode')
+    try: d.run(whole); r = 'ok'
+    except Exception as e: r = message(e); d.run('rollback')
+    left = d.one(TRIGGERS)
+    holder.run('rollback'); holder.close()
+    ok('half-way: PART 1 sent as ONE message (a paste) is still seven transactions: stopped at the third table, the first two are done and stay done',
+       r.startswith('PART 1 could not get public.rubric_score') and left == 11, (r, left))
+    d.file(FILES[1])
+    try: d.run(whole); r = 'ok'
+    except Exception as e: r = message(e); d.run('rollback')
+    ok('half-way: and sent as one message with nothing in its way, it drops all 18', r == 'ok' and d.one(TRIGGERS) == 0, r)
     d.close()
 
 # ── s0-m4b: PR 989 on top ───────────────────────────────────────────────────

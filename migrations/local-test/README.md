@@ -684,6 +684,9 @@ The scenarios:
   again from the top: it finishes. With one table held by another session
   for good it tries 40 times (about twelve seconds), stops with a message
   naming the table, keeps what it had done, and finishes when run again.
+  Sent as one message, the way a paste into the SQL editor arrives, it is
+  still seven transactions: stopped at the third table, the first two stay
+  done.
 - **s0-m4b.** With PR 989's file on top: PART 1 drops Batch A's 18, leaves
   S0-M4b's three triggers and lists them; PART 2 stops before it changes
   anything, says to run S0-M4b's undo first and names what it found; after
@@ -693,8 +696,8 @@ The scenarios:
   PART 2 ran straight through on top of it. It now looks for anything that
   names `grade_return` and is not Batch A's.)
 
-Result on 2026-11-10: **80 of 80 on PostgreSQL 17.11 (port 54331), which is
-what production runs, and 80 of 80 on 18.6 (port 54329)**, the same checks
+Result on 2026-11-10: **82 of 82 on PostgreSQL 17.11 (port 54331), which is
+what production runs, and 82 of 82 on 18.6 (port 54329)**, the same checks
 with the same results.
 
 `batch_a_undo_load.py`: four connections saving in a loop (points, a rubric
