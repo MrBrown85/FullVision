@@ -30,6 +30,8 @@ const PRECACHE_URLS = [
   '/shared/offline-queue.js',
   '/shared/auto-update.js',
   '/shared/calc.js',
+  '/shared/grade-state.js',
+  '/shared/grader.js',
   '/shared/rubric-draft.js',
   '/shared/rubric-checks.js',
   '/shared/core-self.js',
