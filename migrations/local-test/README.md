@@ -461,3 +461,62 @@ sixth fail, with nothing in the server log for the five.
 Not verified: Postgres 17 (everything here ran on 18.6), cascades from the
 tables this harness does not carry, and how often a collision happens in
 real use.
+
+## Batch A: the way back (2026-11-10)
+
+`batch-a-undo.sql` undoes Batch A (`../2026110901` to `../2026110904`). It is
+**not a migration** and is kept here, not in `migrations/`, so CI's drift
+check does not wait for it to be applied. It is three transactions, each
+with its checks first, each safe to run again:
+
+- **PART 1, the fast stop:** drops Batch A's 18 triggers and nothing else.
+  Every save, delete and setting change then runs no Batch A code.
+  `grade_return` is left as it was at that moment.
+- **PART 1B:** the five score-table policies as they were before file 01.
+  Only for a save refused by row security.
+- **PART 2, the full removal:** everything the four files made or changed,
+  with the seven patched functions put back by making each edit backwards
+  and then checked against their fingerprints from before. It deletes
+  `grade_return`, the cards, the sessions, the sign-in log's card rows and
+  the three class settings. The file's header says what that loses once a
+  class has used the student page.
+
+No part touches a score table.
+
+`batch_a_undo.py` proves it. It commits and runs other scripts on the same
+database between its steps, so it needs a database of its own, built without
+the four migrations:
+
+```bash
+PGPORT=54329 PGDATABASE=fv_undo python3 run.py $BASE      # BASE as under "Batch A" above
+PGPORT=54329 PGDATABASE=fv_undo python3 batch_a_undo.py
+```
+
+It takes the whole catalog (`catalog.py`: every function with the md5 of its
+definition, owner and grants, every table, column, constraint, index,
+trigger, policy, comment and default privilege) and a checksum of every
+table's rows; applies the four files; has a teacher turn the student page
+on, save, return and issue cards and a student sign in with one; then runs
+the parts in turn:
+
+- after PART 1 no Batch A trigger is left, everything else of Batch A is as
+  it was, saves, a clear, a setting change and a delete work,
+  `grade_return` no longer changes, and `score_rpcs.py` passes as it does
+  with Batch A loaded (234 of 234: file 01's policies are still there);
+- after PART 1B the five policies are the ones from before;
+- after PART 2 the catalog is identical to the one taken first, line by
+  line (829 lines on Postgres 17, 875 on 18); no row of any table that was
+  there before has changed (42 tables compared) except the sign-in log, which lost its card rows and
+  nothing else; the five score tables are row for row what they were;
+- the suites from before Batch A pass on it: `score_rpcs.py` (181 of 181 on
+  this database; it is 176 on the score-only one, and the five more are the
+  functions Batch A patches, each compared with its live fingerprint),
+  `student_submit.py` 79, `questionnaire_identity.py` 47, `phone_reports.py`
+  37, `questionnaires.py` 42;
+- every part run again changes nothing;
+- the four files then apply again and give the same database as the first
+  time, with every grade Returned (the backfill): the line between Draft
+  and Returned does not survive the undo.
+
+Result on 2026-11-10: 27 of 27 on Postgres 18.6 (port 54329) and 27 of 27 on
+Postgres 17.11 (port 54331), which is what production runs.
