@@ -514,6 +514,7 @@ function _exitDegradedMode(bootstrapData) {
     COURSES = _cache.courses;
     _safeLSSet('gb-courses', JSON.stringify(_cache.courses));
     _safeLSSet('gb-config', JSON.stringify(_cache.config));
+    _releaseDiscardsByClassList(bootstrapData.courseRows);
   }
   var outbox = _outbox();
   if (outbox) outbox.flush();
@@ -1151,6 +1152,37 @@ function _purgeUnlistedCourseData(courses) {
   });
 }
 
+/* The server's class list has just been read (`rows`). A save discarded
+   for a class keeps the sync dot red until that class has been read again
+   (_discardWrite). Two classes never are: one gone from the server (deleted
+   on another device, or no longer this teacher's), and an archived one,
+   which is not preloaded. For those the list itself is the server's word:
+   a class gone from it ends the red dot now; an archived class's ends at
+   the next app open, so it lasts through the sitting the save was
+   discarded in. A live class waits to be read, as before. */
+function _releaseDiscardsByClassList(rows) {
+  var q = typeof window !== 'undefined' ? window.v2Queue : null;
+  if (!q || typeof q.deadLetter !== 'function' || typeof q.releaseDiscarded !== 'function') return;
+  try {
+    var listed = {};
+    (rows || []).forEach(function (r) {
+      if (r && r.id) listed[r.id] = r;
+    });
+    var seen = {};
+    var released = 0;
+    q.deadLetter().forEach(function (e) {
+      var cid = e && e.until_reload;
+      if (!cid || seen[cid]) return;
+      seen[cid] = true;
+      if (!listed[cid]) released += q.releaseDiscarded(cid);
+      else if (listed[cid].is_archived) released += q.releaseDiscarded(cid, { earlierPage: true });
+    });
+    if (released) _updateSyncIndicator();
+  } catch (e) {
+    /* the dot stays red; the next list read tries again */
+  }
+}
+
 function _removeLocalKeys(test) {
   try {
     var keys = [];
@@ -1242,6 +1274,7 @@ async function initAllCourses() {
       _safeLSSet('gb-config', JSON.stringify(_cache.config));
       _purgeUnlistedCourseData(_cache.courses);
       _purgeStaleSavedCopies();
+      _releaseDiscardsByClassList(data.courseRows);
       _syncStatus = 'idle';
       _updateSyncIndicator();
     } catch (e) {
@@ -9437,7 +9470,8 @@ function _isOldSettingsPatch(patch) {
      only). noRetry: it gets no last try. untilReload: no later write and
      no page load clears it until this class has been read again
      (_classReadFromServer), so the dot is red for as long as the screen
-     may still show the change that was not saved. */
+     may still show the change that was not saved. A class that is gone,
+     or archived, is ended by the class list (_releaseDiscardsByClassList). */
 var _WRITE_DISCARDED = 'FV409';
 function _discardWrite(cid, what) {
   console.warn(what);

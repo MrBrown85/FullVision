@@ -1081,6 +1081,81 @@ describe('an old whole-copy update_course is weighed against the server’s row 
     expect(server.patches()).toEqual([{ round_percent: true }]);
   });
 
+  /* A page load, as far as the outbox and the class list: the outbox loads
+     and sends what waits; no class is opened. */
+  async function pageWithoutTheClass() {
+    forgetPage();
+    loadOutbox();
+    server.reachable = true;
+    setOnline(true);
+    await initAllCourses();
+    await window.v2Queue.flush();
+    await settle();
+  }
+
+  it('a class deleted on another device after the discard, before this computer read it again: the dot clears once the class list says it is gone', async () => {
+    await openApp();
+    await oldCodeQueues({ grading_scale: BC_SCALE(), level_order: 'desc' }, { gradingScale: BC_SCALE() });
+    // The next page: the old save is weighed and discarded before the class
+    // is read again.
+    await pageWithoutTheClass();
+    expect(told).toEqual([NOT_SENT]);
+    expect(getSyncDotState().status).toBe('error');
+    // On another device the class is deleted.
+    const gone = () => ({ data: null, error: { message: 'course not found', code: 'P0002' } });
+    server.fake.on('get_class_bundle', gone);
+    server.fake.on('get_gradebook', gone);
+    server.fake.on('list_teacher_courses', () => ({ data: [], error: null }));
+    // It used to stay red on every page load until sign-out.
+    await pageWithoutTheClass();
+    expect(window.v2Queue.stats().deadLettered).toBe(0);
+    expect(getSyncDotState().status).toBe('idle');
+    await pageWithoutTheClass();
+    expect(getSyncDotState().status).toBe('idle');
+  });
+
+  it('an archived class nobody opens: red for the rest of that sitting, clear at the next app open once the class list has been read', async () => {
+    await openApp();
+    await oldCodeQueues({ calc_method: 'median', round_percent: true, level_order: 'desc' }, { roundPercent: true });
+    server.course.is_archived = true;
+    // The class open on screen is another one: an archived class is not preloaded.
+    server.fake.on('bootstrap_teacher', () => ({
+      data: { id: TEACHER, email: 'teacher@example.test', preferences: { active_course_id: null } },
+      error: null,
+    }));
+    await pageWithoutTheClass();
+    await preloadClasses();
+    await settle();
+    expect(told).toEqual([NOT_SENT]);
+    expect(isCourseArchived(CID)).toBe(true);
+    expect(isClassLoaded(CID)).toBe(false);
+    expect(getSyncDotState().status).toBe('error');
+    // The class list read again in the same sitting: still red, so it is seen.
+    await initAllCourses();
+    await settle();
+    expect(getSyncDotState().status).toBe('error');
+    // The next time the app is opened, the list is the server's word on it.
+    await pageWithoutTheClass();
+    expect(window.v2Queue.stats().deadLettered).toBe(0);
+    expect(getSyncDotState().status).toBe('idle');
+    expect(server.patches()).toEqual([]);
+  });
+
+  it('an open class that is not archived still stays red, through page loads that read the class list, until the class itself has been read again', async () => {
+    await openApp();
+    await oldCodeQueues({ grading_scale: BC_SCALE(), level_order: 'desc' }, { gradingScale: BC_SCALE() });
+    await pageWithoutTheClass();
+    expect(getSyncDotState().status).toBe('error');
+    await pageWithoutTheClass();
+    await pageWithoutTheClass();
+    expect(window.v2Queue.stats().deadLettered).toBe(1);
+    expect(getSyncDotState().status).toBe('error');
+    await openApp(); // the class is read again: red for the rest of this page
+    expect(getSyncDotState().status).toBe('error');
+    await openApp();
+    expect(getSyncDotState().status).toBe('idle');
+  });
+
   it('waits when the class cannot be read, and is weighed once it can', async () => {
     await openApp();
     await laptopHolds(byName('Calculation Method'));

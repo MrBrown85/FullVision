@@ -23,7 +23,9 @@
  *   kept in the failed list without a last try. When it also names a class
  *   (error.untilReload), no later write clears it and no page load drops it
  *   until that class has been read again from the server (markReloaded):
- *   the sync dot stays red until what is on screen is the server's.
+ *   the sync dot stays red until what is on screen is the server's. The
+ *   class list can end it sooner (releaseDiscarded): a class gone from the
+ *   server, or an archived one at the next page load.
  *
  * Tabs: every tab shares the queue, but only one tab — the owner — sends.
  *   The owner holds the Web Lock fv-sync-queue-v1 for as long as it is open;
@@ -1521,6 +1523,32 @@
     return n;
   }
 
+  /* The server's class list says a class's discarded writes (until_reload)
+     have nothing left to show: the class is gone from it, or it is archived
+     and the writes were discarded before this page loaded (_discardedBefore).
+     They leave the failed list now, with the red dot. Returns how many. */
+  var _discardedBefore = {}; // entry id → discarded before this page loaded
+  function releaseDiscarded(classId, opts) {
+    if (!classId) return 0;
+    var earlierOnly = !!(opts && opts.earlierPage);
+    var owner = currentOwner();
+    var gone = [];
+    var keep = _readDead().filter(function (e) {
+      var go = e.until_reload === classId && !_isForeign(e, owner) && (!earlierOnly || _discardedBefore[e.id] === true);
+      if (go) gone.push(e);
+      return !go;
+    });
+    if (!gone.length) return 0;
+    _writeDead(keep);
+    gone.forEach(_reportDropped);
+    _notify('dead-letter:dismiss', {
+      ids: gone.map(function (e) {
+        return e.id;
+      }),
+    });
+    return gone.length;
+  }
+
   function dismissDeadLetter(id) {
     var d = _readDead().filter(function (e) {
       return e.id !== id;
@@ -1564,6 +1592,9 @@
   window.addEventListener('pagehide', release);
   window.addEventListener('pageshow', claim);
   _retryDeadOnLoad();
+  _readDead().forEach(function (e) {
+    if (e && e.until_reload) _discardedBefore[e.id] = true;
+  });
   _openChannel();
   // A page loads this file once. A test loading it again stands for a
   // reload: the old copy's page is gone, so it lets go of the queue.
@@ -1585,6 +1616,7 @@
     deadLetter: deadLetter,
     dismissDeadLetter: dismissDeadLetter,
     markReloaded: markReloaded,
+    releaseDiscarded: releaseDiscarded,
     resume: resume,
     clear: clear,
     claim: claim,
