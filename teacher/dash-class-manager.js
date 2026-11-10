@@ -5991,7 +5991,7 @@ window.DashClassManager = (function () {
     offlineOrder: 'Categories need a connection to save. Nothing was saved. Try again when you are online.',
     kept: 'Your unsaved category changes were kept on this computer. Save Categories to send them.',
     // After Discard My Changes: a save whose answer never came had landed.
-    landed: 'Your earlier save had reached the server after all. These are the current ones.',
+    landed: 'Your earlier save went through after all. These are the saved categories.',
     // Online, but other changes from this computer had not gone yet.
     waiting:
       'Other changes from this computer are still being sent, so nothing was saved. Your changes are kept on this computer. Save again in a moment.',

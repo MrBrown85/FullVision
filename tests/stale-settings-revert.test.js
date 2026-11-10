@@ -1557,7 +1557,7 @@ describe('categories: the server’s list is read before the whole list is saved
     ['Tests', 30],
     ['Projects', 20],
   ];
-  const LANDED = 'Your earlier save had reached the server after all. These are the current ones.';
+  const LANDED = 'Your earlier save went through after all. These are the saved categories.';
   const formRows = () => draft().rows.map(r => [r.name, r.weight]);
 
   it('Discard My Changes after a lost answer, online: the form shows the server’s list, and says only what is true', async () => {
