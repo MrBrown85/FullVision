@@ -1,7 +1,7 @@
 file,line,col,sink,classification,note,via,snippet
 login-auth.js,68,4,innerHTML,ESC_WRAPPED,template,,"overlay.innerHTML = `<div class=""confirm-card""> <div class=""confirm-title"" id=""restore-account-title"">Restore Account</div> <div class=""confirm-message"">Your account is scheduled …"
-s/student.js,1188,4,innerHTML,REVIEWED,marked at the sink,,root.innerHTML = render(S)
-s/student.js,1453,4,innerHTML,ESC_WRAPPED,helper:progressHtml,,tmp.innerHTML = progressHtml(S)
+s/questionnaire.js,763,4,innerHTML,ESC_WRAPPED,helper:progressHtml,,tmp.innerHTML = progressHtml(S)
+s/student.js,469,4,innerHTML,REVIEWED,marked at the sink,,root.innerHTML = render(S)
 shared/supabase.js,165,4,innerHTML,LITERAL,,,"toast.innerHTML = '<span>Session expired</span><button class=""sync-toast-btn"" data-action=""go-login"">Sign In</button>'"
 teacher-mobile/card-stack.js,54,6,innerHTML,REVIEWED,marked at the sink,,"el.innerHTML = _renderCard(_cards[idx], idx)"
 teacher-mobile/card-stack.js,59,6,innerHTML,LITERAL,,,containerEl.innerHTML = ''

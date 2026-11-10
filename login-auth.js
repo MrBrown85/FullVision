@@ -230,7 +230,13 @@ async function goIn(user) {
       var session = result.data.session;
       if (session) {
         var user = fromGoogle ? await ensureDisplayName(session.user) : session.user;
-        var shouldRedirect = await maybePromptRestoreAccount(user);
+        var shouldRedirect;
+        try {
+          shouldRedirect = await maybePromptRestoreAccount(user);
+        } catch (err) {
+          // Signed in, but the account wouldn't open: say so on Sign In.
+          return confirmLinkFailed((err && err.code === 'account_open_failed' && err.message) || ACCOUNT_OPEN_FAILED);
+        }
         if (shouldRedirect) {
           portalRedirect(user);
           return;

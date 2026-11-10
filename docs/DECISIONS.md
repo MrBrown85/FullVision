@@ -171,7 +171,7 @@ Colin chose option A on Kanban card t4. Microsoft Teams Assignments requires a c
 - **Manual archive; delete only after archive; soft delete with a 30-day purge.**
 - **Letter cutoffs are the BC scale,** fixed, not editable schemes. **Under 50% is IE (Insufficient Evidence) until the course ends, then F** (Colin, 2026-10-27, BC reporting policy). It applies to every letter, however the % was earned; proficiency words such as Emerging are never replaced. The course has ended once today reaches the last reporting term's end, or while that last term is in view (the final report). The final report's letter is the whole year, since a report reads the year to date as of its end (Reporting periods 2, 2026-11-03). A class with no terms shows IE.
 - **Overrides are per competency with a required reason.** No course-level final-grade override.
-- **No LMS features:** no assignment submission, content pages, discussions or quizzes. FullVision sits beside the district LMS.
+- **No LMS features:** no assignment submission, content pages, discussions or quizzes. FullVision sits beside the district LMS. _Assignment submission superseded 2026-11-09: see "Student page build answers" 1._
 - **Students are removed by withdrawal, not deletion** (2026-10-19). The roster's remove button withdraws: the student leaves the roster, gradebook, dashboard, observations, phone app and reports, and their scores, observations and reports stay on the server. Class Settings lists them under Withdrawn with Re-enrol. Permanent delete is the second step, only from that list, and only for a withdrawn student (`delete_withdrawn_student`); it has no Undo.
 - **Sync failures show only on the sync dot.** No banners or toasts. No count of unsynced changes either (2026-10-27): the dot's colour and tooltip are the whole sync display.
 - **Plain language in the UI:** no jargon without a legend. Casing: see "Text size and casing" (2026-10-19).
@@ -194,8 +194,8 @@ Context: `STUDENT-VOICE-PLAN.md`.
 
 Supersedes Student voice 2's one single-use code per student per questionnaire, for the planned student page (photo submissions, feedback, reflections, My Learning) once it is built. Nothing is built yet. With a slip per questionnaire or phone report, students would sign in for nearly every assignment. Colin: "one card per term."
 
-1. **One card per student per term.** The same code opens assignments, sending work, feedback, questionnaires and reports until a date the teacher sets; the default is the end of the reporting term.
-2. **The identity check stays as it is today:** birthday or student number, or the card's password when neither is on file (`student.slip_password`), with the same wrong-try locks.
+1. **One card per student per term.** The same code opens assignments, sending work, feedback, questionnaires and reports until a date the teacher sets; the default is the end of the reporting term. _The default became the end of the course on 2026-11-08; see "Grades, photos and sign-in on the student page" 9._
+2. **The identity check stays as it is today:** birthday or student number, or the card's password when neither is on file (`student.slip_password`), with the same wrong-try locks. _The lock rule for cards changed on 2026-11-09; see "Student page build rulings" 1._
 3. **Teachers print cards** eight to a letter page, like the questionnaire slips. They can Unlock a locked card or Reissue a lost one; reissuing stops the old code at once and keeps everything the student sent.
 4. **Single-use slips stay only for one-offs,** such as a phone report for a student with no card.
 
@@ -210,6 +210,98 @@ Context: the student page designed on Nov 6–7 (photo submissions, feedback, re
 5. **Next steps come from the comment bank; I Can statements from the curriculum bank.** Nothing is written for the student page alone.
 6. **No class averages and no comparisons** with other students.
 7. **Preview as Student shows exactly what one student sees.**
+
+## Grades, photos and sign-in on the student page (2026-11-08)
+
+Context: the student page and photo submissions designed on the "Photo Submissions" artboard (version 109). Nothing is built yet. Colin made these calls one at a time on Nov 8, before any building. Every grade is Draft or Returned; every number comes from one `calc.js` function fed all scores or returned scores only; every grading action goes through one grader, and the server rejects invalid writes.
+
+1. **Return Grades defaults to When I Return Them,** per class in Class Settings › Student Page. A grade is a draft only the teacher sees until Return, Return and Next or Return N Graded. The other choice is As Soon As I Save. A change to a returned grade follows the same setting: under When I Return Them it waits as a draft until returned again; the student then sees it marked Updated.
+2. **Scores entered before Draft and Returned ship become Returned.** Reports, MyEd filling and the gradebook keep working as they do; students see past grades only once a class turns on the student page.
+3. **Printing progress reports with drafts asks first:** it names the draft grades and offers Return Them, Then Print; Print Without Them; Cancel. A report shows grades to families, so drafts never print silently.
+4. **Mark Up shows to students when the work is returned.** It is saved as drawing data over the photo, never burned in, so the teacher can erase any mark before returning.
+5. **Keep Photos Until defaults to End of Year** (after June report cards), with End of Term offered, per class. A reminder comes a week before. Grades, comments and Mark Up stay; the photos and files are deleted.
+6. **No second copy of submitted photos** (Colin chose this over a nightly copy kept 30 days). Database backups don't include stored files, so a deleted photo can't come back. Keep Photos Until, Unsend, purging a class and deleting a student must say plainly that photos go for good.
+7. **Supabase's spend cap goes off before photo submissions launch,** with usage alerts at about 70% of each quota, so FullVision is never limited mid-semester. The pilot (about 22 teachers and 3,000 students) is estimated at 35–50 GB a semester, inside Pro's 100 GB.
+8. **Photos and PDFs only.** A Word or PowerPoint file gets "Save it as a PDF first", with how in Word, PowerPoint and Google, so every submission can be marked up. Every photo is made smaller in the browser before it uploads, on every path (about 2000 px, 300–500 KB a page; iPhone HEIC becomes JPEG; a thumbnail at the same time); PDFs upload as they are, up to 20 MB; the server refuses a photo over 2 MB. _The PDF part superseded 2026-11-09: see "Student page build answers" 2._
+9. **A student card lasts the course by default** (the class's last reporting date), with End of Term offered. Supersedes Student cards 1's term default. The identity check, the lock after five wrong tries and Reissue cover a lost card, and teachers print once per course.
+10. **A graded revision's new grade replaces the old one** when it is returned; the first version and its grade stay as history (the student's Before and After). This changes what counts in the grade math and gets Colin's review in the PR that builds it.
+11. **"Followed it" is the student's word.** When a student sends work they say whether they followed their plan from last time (Yes, Partly, Not This Time). It is shown and reused labelled as theirs ("Jordan says…"); no teacher confirmation.
+12. **The student page's tab is Questionnaires,** the same word teachers use, not Questions, which reads as asking the teacher something.
+13. **Cards for the pilot, built account-ready.** Semester 2 (from late January 2027) uses cards; a student with several FullVision teachers adds each card (Switching Classes). The student's session belongs to the student, not the card, so Microsoft sign-in and one account across teachers can come later without rework.
+
+## Student page build answers (2026-11-09)
+
+Context: [`plans/student-page-build-plan.md`](plans/student-page-build-plan.md), section 6. Colin answered the plan's questions one at a time on Nov 9. Nothing is built yet. Only the answers that change a recorded decision or a project rule, or set a rule the build needs, are listed here; the plan has all 25.
+
+1. **Students can send their work.** For an assessment the teacher sets to take student work, students send photos and PDFs of it from the student page. FullVision still has no content pages, discussions or quizzes, and still sits beside the district LMS. Supersedes Product shape's "no assignment submission".
+2. **A PDF becomes pages.** The browser turns each page of a PDF (up to 20 MB) into a shrunk JPEG, like a photo, and uploads the pages; the PDF itself is not kept. Every submission is then JPEG pages that can be marked up the same way. Supersedes the PDF part of Grades, photos and sign-in 8 ("PDFs upload as they are, up to 20 MB"). An iPhone photo (HEIC) chosen on a Chromebook is converted to JPEG in the browser.
+3. **A changed grade waits with the old one showing.** Under When I Return Them, while a change to a returned grade waits as a draft, the student and reports keep the grade that was returned. The teacher sees the Draft mark and "Jordan still sees the grade you returned Nov 3." Adds to Grades, photos and sign-in 1.
+4. **Missing, Excused and Late are never drafts.** They show and count as soon as they are set. _See also "Student page build rulings" 13: Missing also hides a grade returned earlier._
+5. **Existing classes start on As Soon As I Save** until their teacher first opens Class Settings › Student Page; new classes start on When I Return Them. Grades from the grade-scans skill follow the class's setting, so they can arrive as drafts.
+6. **Which grades each screen uses.** Returned only for anything a family or student reads (Progress Reports, the Term Questionnaire's facts and Generate, Sent to Phones, MyEdBC Input, the student page, Preview as Student). All work, drafts marked, for the teacher's own views. A grade hidden during a revision is a draft.
+7. **Cards.** The class's teacher can see a card's code again, so reprinting never stops a card. A device stays signed in until midnight or until Done. Today Only codes wait with Family Codes. A card can send 20 times an hour.
+8. **Keep Photos Until is per class only.** Backups and Download All My Data leave photos out and say so.
+9. **Migrations are tested locally only,** on the throwaway Postgres harness; no Supabase branch. The first real check is in Colin's own test class after a batch is applied.
+10. **The MyEd extension is not in this build.** MyEdBC Input and the Export Sheet are.
+11. **The old score RPCs keep no idempotency key** (`upsert_score`, `upsert_tag_score`, `upsert_rubric_score`, `save_score_comment`, `set_score_status`, `clear_score`, `set_rubric_check`): each overwrites one cell, so a retry is safe. Every new write RPC takes `p_idempotency_key`.
+
+## Student page build rulings (2026-11-09, evening)
+
+Context: the first night of the build ([`plans/student-page-build-plan.md`](plans/student-page-build-plan.md)). The first migration batch (PR 966, not applied) went to two independent reviewers, and the first screens and `calc.js`'s returned-only option were built. The reviewers and builders raised points the plan did not cover. Colin ruled on each, one at a time, from options put to him.
+
+**Cards and sign-in**
+
+1. **Five wrong tries in a row lock a card; a right answer resets the count.** A student does the identity check every morning, so a lifetime count would lock cards over a semester of typos. A card also locks after 15 wrong tries in any 7 days, whatever right answers come between, so someone holding a real code cannot guess four birthdays a day unseen. Class Settings gets Unlock All. Changes Student cards 2's "same wrong-try locks" for cards; slips keep theirs.
+2. **A card scanned from the start screen starts fresh.** It signs the last student out and starts a new session. A card joins a session only through Add Another Card (Switching Classes), so two students on one Chromebook never share a session.
+3. **Cards have a per-address guessing limit only: 300 wrong codes in 15 minutes.** A school shares one public address, and one class's typos could reach the old 60. The everyone-is-busy stop (500 wrong codes in ten minutes) is not used for cards: one person could shut sign-in for every class. Slips keep that stop, and their per-address limit also becomes 300, because a mistyped card code is tried as a slip and counts there too.
+4. **A card that won't open says why** (locked, past its date, the class's Student Page is off, needs reprinting), as slips do.
+5. **A new slip avoids every live card code,** as a new card avoids every live slip code.
+6. **With no reporting dates, a card lasts until June 30** of the school year it was made in, fixed on the card at printing. Cards Work Until still overrides. Adds to Grades, photos and sign-in 9.
+7. **The card screens' wording is approved as built** (PR 965): the code and password messages, the lock message, Give This Card Back, "Your results didn't load. Check your internet and try again.", and the Assignments list labels.
+
+**Draft and Returned**
+
+8. **Leaving When I Return Them returns the waiting drafts.** Switching a class to As Soon As I Save, or turning its Student Page off, asks first ("12 grades are waiting as drafts. Changing this returns them to students now."), then returns them. No draft is left where no Draft mark or Return button shows.
+9. **Under As Soon As I Save, a changed grade is marked Updated only if the student had opened the earlier one.** Grading in several clicks never shows as an update. Under When I Return Them a re-returned grade is always marked.
+10. **A cleared grade, once returned, shows no result.** The student is not told a grade was removed.
+11. **A Note for the Report prints only once that piece's grade has been returned.** A note alone never makes a draft.
+12. **Duplicate Class copies the original's Return Grades choice;** the copy's Student Page starts off.
+13. **Missing wins at once.** Once a piece is marked Missing, a grade returned earlier for it stops counting and stops showing everywhere straight away, with no Return: the course grade and the competency levels agree, and the student sees Missing with no result. Adds to Student page build answers 4. This changes what `calc.js` counts from returned grades and gets Colin's review in the PR that builds it.
+14. **Section overrides count at once** on every screen. A hand-set section level has no Draft or Returned state, and it applies whether or not the section has scored work under it: a report shows it even when every piece in the section is still a draft. Before this a hand-set level on a section with no scored work was stored and showed a dash. It counts in the folder and the overall proficiency; the course %, letter and category grades come from the work and do not move (PR 974).
+15. **DIBELS numbers show at once.** A benchmark is a reading record, not a grade that is returned.
+16. **An assessment with no assigned date shows on the student's list as soon as it exists.**
+
+**Photos**
+
+17. **Nothing is handed in until every page is up.** One Page Didn't Send offers Try Again or Remove the Page; the teacher never opens a submission with a page missing.
+18. **A PDF can have 20 pages at most.** A longer one is refused with a plain line. Adds to Student page build answers 2.
+
+**The server checks wait for the client.** The plan had the first migration batch make two client-only rules server rules: refuse a rubric level for a criterion that is not on the work's rubric, and refuse Missing on scored work. The reviews found cases where the app teachers already have sends exactly those writes (a level that arrives before its rubric change; Missing on a cell whose score the screen hides), and a refused write becomes a dead letter. Both checks are out of the batch until the client is changed first. The batch changes no existing score function.
+
+Still open: the blurry-photo threshold, which needs real classroom photos; and the privacy page's wording, which must change before cards go live (codes are no longer stored only as hashes or used once; students can read returned grades; FullVision records when a student opened a piece of feedback).
+
+## Student page build rulings (2026-11-10)
+
+Context: the second day of the build. The math and screen reviews, and the first migration batch's last review rounds, raised more points. Colin ruled on each, one at a time. From this day each decision goes to him with what the people who set the practice would say (Beck, Fowler, Humble and Forsgren, Nygard and Kleppmann on building and databases; OWASP and the privacy commissioner's office on student data; Guskey, O'Connor, Wiliam and the Ministry's reporting policy on grades; Krug and Nielsen on screens) and a recommendation: the council advises, Colin decides. He also asked that the stronger fix be built now rather than deferred; applying anything to the database still waits for his OK.
+
+**What counts in a grade**
+
+1. **Missing wins everywhere.** A piece marked Missing counts no level on any screen, the gradebook included. Extends the evening rulings' 13 from returned grades to all work (PR 979). Undo must not put a level back under a Missing mark; that fix is owed.
+2. **Only what a piece measures now counts.** A level stored for a competency or a rubric criterion that is no longer on the piece counts nowhere. The stored score stays, so putting the competency back restores it (PR 979). On Nov 9 no live class held such a level: of 697 competency levels, none was on a competency its piece had dropped, and no rubric level was off its rubric. Owed in S1: a warning at the moment of removal ("3 students have a level for Plan on this piece. Removing it stops those levels counting."). The grade-scans skill, which writes grades from scanned work, gets the same check and refuses before writing anything.
+3. **When two pieces share a date, the one made later counts later.** Most Recent and Decaying Average need an order, and before this the order was whichever piece was graded last. Colin first chose the order of the assignment list; the live data showed that order disagrees with what the page shows once folders or dragging are involved (22 of the 39 same-date groups in live classes span two folders), so he replaced it. Pieces made at the same instant fall to a fixed order by id. The class load now sends when each piece was made (`migrations/2026111001_assessment_created_at_in_bundle.sql`, applied Nov 10; PR 986). Every live class uses Average, where order does not matter, so no grade moved.
+4. **Undated work is dated once, then left alone.** On work with no date, a student's level is dated the day it is first entered and keeps that date when the level changes later. The desktop grading dialog already does this; the phone and the gradebook's Scores view re-date it to today on every change and will be brought into line. Without this a draft change could move a returned grade's place in the order. Not built yet; its own PR, with Colin's review.
+
+**Teacher screens**
+
+5. **The phone gets an Undo** after a clear, behaving as the desktop's does. Built in S1, after the desktop's Undo fix in 1.
+6. **The rubric handout prints returned grades only, and asks** when the piece is still a draft: Return It, Then Print; Print Without It; Cancel. Built in S2.
+
+**The database**
+
+7. **The first migration batch (PR 966) is applied as verified,** with its three known limits closed in a small migration straight behind it (PR 989) rather than by reopening a batch that four review rounds had proven. One exception: its four ownership helpers are rewritten before applying. Production runs PostgreSQL 17, which plans a SQL-language function again on every statement; with the helpers written that way the batch took a 30-student rubric fill from about 23 ms to about 100 ms. Written in PL/pgSQL they cost what a save costs today.
+8. **Three stronger measures are built now, each its own migration:** every security-definer function in `public` names `pg_temp` last in its search path (PR 991); score rows carry their class, so a score filed under another class's student is refused from any writer; and the class's sync row is taken once at commit, which ends nine ways two of today's saves can block each other. None is applied without Colin.
+9. **A card's code and password stay readable by the class's teacher.** The privacy page must say so, and Colin puts it to his district's privacy officer.
+10. **When a student opens a returned piece is recorded for the student's own page only.** It is what marks a grade Updated (evening rulings 9). It is not shown to teachers, is kept as long as the grade, and goes on the privacy page.
 
 ## Phone-report birthday tries (2026-11-03)
 
@@ -327,7 +419,7 @@ Context: building a rubric meant typing every descriptor by hand. Canvas creates
 1. **"+ From competency" in the rubric editor** turns each picked competency into a criterion: named after it, linked to it, descriptors drafted. A competency already on a criterion of the rubric can't be picked. A new rubric's untouched first criterion is replaced, not left beside the new ones.
 2. **The draft is deterministic and needs no backend.** Proficient is the competency's I-can statements (at most three, so half and quarter-sheet handouts still fit); Extending, Developing and Emerging put the first statement into the BC scale's words ("Independently and in new situations…", "In familiar situations and with some help…", "With support, I am beginning to…"). Written in the student's voice because it prints on the handout. A competency with no I-can text gets the scale wording alone.
 3. **"Draft from …" beside Level descriptors** drafts a criterion that has exactly one competency. Typed descriptors are only replaced after the teacher confirms.
-4. **The criterion comment is a speech-bubble cell after −/+**, always visible, filled when there is a comment, with C as the shortcut on the focused row. It is its own cell because the −/+ group is redrawn on every score change.
+4. **The criterion comment is a labelled button under the criterion's name**, beside the checklist button and the same size, always visible, filled when there is a comment, with C as the shortcut on the focused row. A saved comment's text shows under the levels. It stays out of the level control because the −/+ group is redrawn on every score change. Changed 2026-11-06 (Colin): it was a pill after the levels, which crowded the row and the checklist panel. The same day the checklist button dropped its "ticked/total" count for the ticked count alone, because teachers tick only what the student showed at the level they reached, so a total read as unfinished work.
 5. **A teacher's own wording carries to the next draft** (`migrations/20261018_competency_descriptor.sql`). Saving a rubric keeps, for each criterion with one competency, any level the teacher wrote themselves (not the plain draft), per teacher and competency. The next "From competency" or "Draft from …" for that competency, in any class, starts from it level by level. The key is the competency's short label plus a hash of its I-can text, never a tag id, so another section or next year's class finds it and a same-named competency in another grade doesn't. The last save wins. Stored on the device for Demo Mode and offline; sent through the outbox when signed in; a load never overwrites a save still in the outbox.
 6. **No AI rewrite of descriptors.** Ruled out on 2026-10-18. Descriptors come only from the I-can draft and the teacher's own saved wording.
 

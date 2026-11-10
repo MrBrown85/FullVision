@@ -1,0 +1,150 @@
+<!doctype html>
+<!--
+  Supabase › Authentication › Emails › Confirm signup.
+  Subject: Confirm your FullVision account
+  Paste this whole file into the message body. Supabase fills in
+  the confirmation link and the teacher's display name.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <meta name="supported-color-schemes" content="light" />
+    <title>Confirm your FullVision account</title>
+  </head>
+  <body style="margin: 0; padding: 0; background: #f2f4f8">
+    <div style="display: none; max-height: 0; overflow: hidden">
+      One click to confirm your email and open your gradebook.
+    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #f2f4f8">
+      <tr>
+        <td align="center" style="padding: 32px 16px">
+          <table
+            role="presentation"
+            width="100%"
+            cellpadding="0"
+            cellspacing="0"
+            border="0"
+            style="max-width: 520px; background: #ffffff; border-radius: 16px; border: 1px solid #e3e6ec"
+          >
+            <tr>
+              <td
+                style="
+                  padding: 32px 32px 8px;
+                  font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                "
+              >
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="vertical-align: middle">
+                      <img
+                        src="https://fullvision.ca/assets/icons/icon-192.png"
+                        width="40"
+                        height="40"
+                        alt=""
+                        style="display: block; border: 0; border-radius: 10px"
+                      />
+                    </td>
+                    <td
+                      style="
+                        vertical-align: middle;
+                        padding-left: 12px;
+                        font-size: 20px;
+                        font-weight: 700;
+                        color: #1d1d1f;
+                        letter-spacing: -0.2px;
+                      "
+                    >
+                      FullVision
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td
+                style="
+                  padding: 24px 32px 0;
+                  font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                  color: #1d1d1f;
+                "
+              >
+                <h1 style="margin: 0 0 12px; font-size: 24px; line-height: 1.25; font-weight: 700">
+                  Welcome{{ if .Data.display_name }}, {{ .Data.display_name }}{{ end }}
+                </h1>
+                <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.5; color: #3a3a3c">
+                  Confirm your email and you'll go straight to your gradebook. The link works on any device.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 0 32px 8px">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="border-radius: 10px; background: #0066d6">
+                      <a
+                        href="{{ .ConfirmationURL }}"
+                        style="
+                          display: inline-block;
+                          padding: 14px 28px;
+                          font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                          font-size: 16px;
+                          font-weight: 600;
+                          color: #ffffff;
+                          text-decoration: none;
+                          border-radius: 10px;
+                        "
+                        >Confirm My Email</a
+                      >
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td
+                style="
+                  padding: 20px 32px 32px;
+                  font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                  font-size: 14px;
+                  line-height: 1.5;
+                  color: #6e6e73;
+                "
+              >
+                <p style="margin: 0 0 8px">
+                  The button works once. If it has expired, sign in and FullVision will offer to send a new one.
+                </p>
+                <p style="margin: 0">
+                  If you didn't create a FullVision account, you can ignore this email. Nothing happens until the link
+                  is opened.
+                </p>
+              </td>
+            </tr>
+          </table>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 520px">
+            <tr>
+              <td
+                style="
+                  padding: 20px 32px 0;
+                  font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                  font-size: 12px;
+                  line-height: 1.5;
+                  color: #6e6e73;
+                  text-align: center;
+                "
+              >
+                FullVision · The Gradebook for Communicating Student Learning in BC<br />
+                <a href="https://fullvision.ca" style="color: #0066d6; text-decoration: none">fullvision.ca</a>
+                ·
+                <a href="https://fullvision.ca/privacy.html" style="color: #0066d6; text-decoration: none"
+                  >Privacy Policy</a
+                >
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

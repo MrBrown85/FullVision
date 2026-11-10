@@ -10,6 +10,24 @@
 window.ReportQuestionnaire = (function () {
   'use strict';
 
+  /* The Term Questionnaire's set of scores (teacher/report-scores.js). The
+     facts come from CommentBank.facts, which runs in it. The five functions
+     here that work a grade out themselves run inside
+     ReportScores.withReportScores every time they are called, from a
+     click, a timer or a redraw alike. What this screen keeps to draw
+     faster (_factsCache, _staleCache, _claimCache, _shared) is keyed by the set. */
+  var _inReportScores = function (fn) {
+    return ReportScores.scoped('questionnaire', fn);
+  };
+  headerGrade = _inReportScores(headerGrade);
+  notHandedIn = _inReportScores(notHandedIn);
+  missingAndLate = _inReportScores(missingAndLate);
+  _basisHtml = _inReportScores(_basisHtml);
+  _requiredSource = _inReportScores(_requiredSource);
+  function _scoreSetKey() {
+    return ReportScores.reportScoreSet('questionnaire');
+  }
+
   /* ── Parent state injection ──────────────────────────────── */
   var _activeCourse = null;
   var _renderReports = null;
@@ -39,7 +57,7 @@ window.ReportQuestionnaire = (function () {
      attendance); typing never re-reads it. */
   var _factsCache = null;
   function _facts(student, fresh) {
-    var key = _activeCourse + '|' + student.id + '|' + getTermId();
+    var key = _activeCourse + '|' + student.id + '|' + getTermId() + '|' + _scoreSetKey();
     if (fresh || !_factsCache || _factsCache.key !== key) {
       _factsCache = { key: key, f: CommentBank.facts(_activeCourse, student, getTermId()) };
     }
@@ -576,7 +594,7 @@ window.ReportQuestionnaire = (function () {
     var renamed = r.approvedAt ? nameWas(r, student) : null;
     if (!marks && !pron && !renamed) return null;
     var text = plainComment(r.narrative || '');
-    var key = cid + '|' + student.id + '|' + termId;
+    var key = cid + '|' + student.id + '|' + termId + '|' + _scoreSetKey();
     var sig =
       JSON.stringify(meta) +
       '\u0000' +
@@ -2630,7 +2648,7 @@ window.ReportQuestionnaire = (function () {
       meta.facts_hash +
       '\u0000' +
       displayNameFirst(st);
-    var hit = _claimCache[key];
+    var hit = _claimCache[key + '|' + _scoreSetKey()];
     if (hit && hit.sig === sig) return hit.v;
     var stale = CommentBank.staleness(meta, f, picks, {});
     var v = ((stale && stale.changes) || [])
@@ -2680,7 +2698,7 @@ window.ReportQuestionnaire = (function () {
     v.sort(function (a, b) {
       return a.row - b.row;
     });
-    _claimCache[key] = { sig: sig, v: v };
+    _claimCache[key + '|' + _scoreSetKey()] = { sig: sig, v: v };
     return v;
   }
 
@@ -5018,10 +5036,10 @@ window.ReportQuestionnaire = (function () {
         : '';
     // A sentence the teacher typed: Options (Add to My Bank, Remove From
     // Comment), the InsertRows mockup.
-    var wordingBtn =
-      row.step && row.s
-        ? `<button type="button" class="qn-line-menu${open ? ' on' : ''}" data-action="tqSentences" data-do="wording" data-row="${i}" aria-haspopup="menu" aria-expanded="${open}" title="${edited ? 'Go back to the bank’s wording, pick another, or remove the sentence.' : 'Other ways to say this sentence, every sentence for this part, or remove it.'}">Options ▾</button>`
-        : '';
+    var from = _sourceOf(row);
+    var wordingBtn = from
+      ? `<button type="button" class="qn-line-menu${open ? ' on' : ''}" data-action="tqSentences" data-do="wording" data-row="${i}" aria-haspopup="menu" aria-expanded="${open}" title="${edited ? 'Go back to the bank’s wording, pick another, or remove the sentence.' : 'Other ways to say this sentence, every sentence for this part, or remove it.'}">Options ▾</button>`
+      : '';
     // An edited bank sentence keeps Other Wording, so it can go back to a
     // bank wording (Nov 3 sweep).
     var earlier = !!row.earlier;
@@ -5055,7 +5073,7 @@ window.ReportQuestionnaire = (function () {
       }${ownBox}</div>
       ${act}
       ${low ? _checkHtml(student.id, 'low') : ''}
-      ${open ? (typed || earlier ? _optionsMenuHtml(i, earlier) : _wordingMenuHtml(cid, student, ctx, rows, i)) : ''}
+      ${open ? (typed || earlier ? _optionsMenuHtml(i, earlier) : (from || BANK_SOURCE).optionsMenu(cid, student, ctx, rows, i)) : ''}
     </div>`;
   }
 
@@ -5171,6 +5189,87 @@ window.ReportQuestionnaire = (function () {
     };
   }
 
+  /* ── Sentence sources (S18-T1) ───────────────────────────────
+     Where a sentence put in from the + menu comes from. A source is
+     registered once (registerSource) as:
+       id           its name.
+       label        the heading of its group in the Add Here menu, drawn
+                    only when more than one source has a sentence to
+                    offer.
+       list         (at) → the sentences it offers this student at this
+                    gap, each a choice { step, part, label, id, text, … }
+                    with an id no other source uses. at: { cid, student,
+                    f, ctx, rows, gap, opts } (opts: what the bank drafts
+                    with, _insertOpts).
+       row          (choice, ctx) → the comment's row for a choice.
+       owns         (row) → whether a row of the comment is one of its
+                    sentences: the row then has Options, with its menu.
+       optionsMenu  (cid, student, ctx, rows, i) → the open Options menu
+                    of row i.
+       pick         (st, i, id) → a pick in that menu: its sentence `id`
+                    in the row's place.
+     The comment bank is the one source today. */
+  var _sources = [];
+  /* Adds a source after the ones there; returns a function that takes it
+     out again. */
+  function registerSource(src) {
+    _sources.push(src);
+    return function () {
+      var at = _sources.indexOf(src);
+      if (at >= 0) _sources.splice(at, 1);
+    };
+  }
+  /* The source a row's sentence came from, null when it has none (a typed
+     sentence, a class line, the Earlier Comment). */
+  function _sourceOf(row) {
+    return (
+      (row &&
+        _sources.find(function (src) {
+          return src.owns(row);
+        })) ||
+      null
+    );
+  }
+  /* What the + menu offers at a gap: a group for each source with a
+     sentence to offer, in the order registered. Each: { source, choices }. */
+  function sourceChoices(at) {
+    return _sources
+      .map(function (src) {
+        return { source: src, choices: src.list(at) };
+      })
+      .filter(function (grp) {
+        return grp.choices.length > 0;
+      });
+  }
+  function _gapChoices(cid, student, f, ctx, rows, g) {
+    return sourceChoices({
+      cid: cid,
+      student: student,
+      f: f,
+      ctx: ctx,
+      rows: rows,
+      gap: g,
+      opts: _insertOpts(cid, student),
+    });
+  }
+  /* The comment bank: the draft's sentence for each part the comment has
+     none for (insertChoices); its Options menu is "Other ways to say
+     this" (_wordingMenuHtml, _pickWording). */
+  var BANK_SOURCE = {
+    id: 'bank',
+    label: 'Sentence Bank',
+    list: function (at) {
+      return insertChoices(at.rows, at.ctx, at.opts);
+    },
+    row: _choiceRow,
+    owns: function (row) {
+      return !!row.step && !!row.s;
+    },
+    optionsMenu: _wordingMenuHtml,
+    pick: _pickWording,
+  };
+  registerSource(BANK_SOURCE);
+
   /* A choice put in at a gap: the row there with a brief tint, the
      sentence at the same place in the comment (the realiser moves the name
      to the first sentence), the count, the checks and Approve following
@@ -5180,8 +5279,15 @@ window.ReportQuestionnaire = (function () {
     var ctx = _bankContext(_activeCourse, st, f);
     var key = _rowKey(st);
     var rows = _rows[key] || _rowsFor(st, f);
-    var c = insertChoices(rows, ctx, _insertOpts(_activeCourse, st)).find(function (x) {
-      return x.id === id && (!step || x.step === step);
+    var c = null;
+    var from = null;
+    _gapChoices(_activeCourse, st, f, ctx, rows, g).forEach(function (grp) {
+      if (c) return;
+      c =
+        grp.choices.find(function (x) {
+          return x.id === id && (!step || x.step === step);
+        }) || null;
+      if (c) from = grp.source;
     });
     if (!c) {
       _addAt = null;
@@ -5189,7 +5295,7 @@ window.ReportQuestionnaire = (function () {
       _focusGap(g);
       return;
     }
-    var row = _choiceRow(c, ctx);
+    var row = from.row(c, ctx);
     _rows[key] = insertRow(rows, row, g);
     _markAdded(st, row);
     _addAt = null;
@@ -5224,10 +5330,20 @@ window.ReportQuestionnaire = (function () {
   var _addAt = null; // the gap (rows before it) whose menu is open
   function _addMenuHtml(cid, student, f, ctx, rows, g) {
     var first = _first(student);
-    var items = insertChoices(rows, ctx, _insertOpts(cid, student))
-      .map(function (c) {
-        var row = _choiceRow(c, ctx);
-        return `<button type="button" role="menuitem" class="qn-menu-item qn-add-item" data-action="tqSentences" data-do="insert" data-gap="${g}" data-step="${esc(c.step)}" data-sentence="${esc(c.id)}" title="Puts this sentence in the comment here."><span class="qn-add-part">${esc(c.label)}</span><span class="qn-menu-body"><span class="qn-menu-text">${esc(row.text)}</span><span class="qn-menu-meta">${esc(rowSource(row, cid, student, f, ctx))}</span></span></button>`;
+    var groups = _gapChoices(cid, student, f, ctx, rows, g);
+    var items = groups
+      .map(function (grp) {
+        // A group's heading only when more than one source offers a sentence.
+        var head = groups.length > 1 ? `<span class="qn-menu-head qn-add-source">${esc(grp.source.label)}</span>` : '';
+        return (
+          head +
+          grp.choices
+            .map(function (c) {
+              var row = grp.source.row(c, ctx);
+              return `<button type="button" role="menuitem" class="qn-menu-item qn-add-item" data-action="tqSentences" data-do="insert" data-gap="${g}" data-step="${esc(c.step)}" data-sentence="${esc(c.id)}" title="Puts this sentence in the comment here."><span class="qn-add-part">${esc(c.label)}</span><span class="qn-menu-body"><span class="qn-menu-text">${esc(row.text)}</span><span class="qn-menu-meta">${esc(rowSource(row, cid, student, f, ctx))}</span></span></button>`;
+            })
+            .join('')
+        );
       })
       .join('');
     var none = items
@@ -6491,7 +6607,7 @@ window.ReportQuestionnaire = (function () {
       }
       case 'pick':
         tqSaveCurrentIfNeeded();
-        _pickWording(st, i, ds.sentence);
+        (_sourceOf((_rows[key] || [])[i]) || BANK_SOURCE).pick(st, i, ds.sentence);
         return;
       case 'all': {
         var row = (_rows[key] || [])[i];
@@ -7328,7 +7444,7 @@ window.ReportQuestionnaire = (function () {
   var _shared = null;
   function _sharedStepHtml(cid) {
     var termId = getTermId();
-    var key = cid + '|' + termId;
+    var key = cid + '|' + termId + '|' + _scoreSetKey();
     if (!_shared || _shared.key !== key)
       _shared = { key: key, r: CommentBank.sharedNextStep(cid, { termId: termId, students: getTqStudents() }) };
     var r = _shared.r;
@@ -8537,6 +8653,8 @@ window.ReportQuestionnaire = (function () {
     gradeClaimWrong: gradeClaimWrong,
     insertRow: insertRow,
     insertChoices: insertChoices,
+    registerSource: registerSource,
+    sourceChoices: sourceChoices,
     gapPart: _gapPart,
     recoverRows: recoverRows,
     composeRows: composeRows,

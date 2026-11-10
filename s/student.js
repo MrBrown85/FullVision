@@ -8,43 +8,28 @@
    sits after # so it never reaches a server log. Answers in progress stay
    in this tab's sessionStorage and are cleared once sent.
 
+   A code is a slip's or a student card's, and the two look alike, so the
+   server tells: the code is put to the function's `card` route first
+   (app.js) and, when that says it is no card, to `open` as a slip. The
+   card route does not count a slip's code as a guess; asking `open` first
+   would count every card scan against the slips' limits.
+
    Demo Mode (#demo for the November Reflection, #demo-about for About Me)
    builds the same screens from shared/questionnaire-templates.js and never
    calls the function.
+
+   This file is the shell: the code box, the identity check, the edge
+   function, drafts, Demo Mode, and which screen shows. The questionnaire's
+   screens are in questionnaire.js and the phone report's in report.js; a
+   student card's are in app.js (the card, Is This You?) and assignments.js
+   (the Assignments list). They load after this file and hand their screens
+   to StudentPage.addScreens.
 
    The render functions are pure (state in, HTML out) and exposed as
    StudentPage._test for tests. */
 var StudentPage = (function () {
   'use strict';
 
-  var CORE = {
-    COM: { name: 'Communicating', group: 'Communication', line: 'I can share my ideas and listen to others.' },
-    COL: { name: 'Collaborating', group: 'Communication', line: 'I can work with others toward a shared goal.' },
-    CT: { name: 'Creative Thinking', group: 'Thinking', line: 'I can come up with new ideas and try them out.' },
-    CRT: {
-      name: 'Critical & Reflective Thinking',
-      group: 'Thinking',
-      line: 'I can ask questions, weigh evidence and think about my learning.',
-    },
-    PPI: {
-      name: 'Personal & Cultural Identity',
-      group: 'Personal & Social',
-      line: 'I know what makes me who I am and what I value.',
-    },
-    PAR: {
-      name: 'Personal Awareness & Responsibility',
-      group: 'Personal & Social',
-      line: 'I can set goals, manage my feelings and take care of myself.',
-    },
-    SAR: {
-      name: 'Social Awareness & Responsibility',
-      group: 'Personal & Social',
-      line: 'I can be kind, include others and care for my community.',
-    },
-  };
-  var CORE_ORDER = ['COM', 'COL', 'CT', 'CRT', 'PPI', 'PAR', 'SAR'];
-  var GROUPS = ['Communication', 'Thinking', 'Personal & Social'];
-  var STEPS = ['Beginning', 'Growing', 'Confident', 'Leading'];
   var CODE_RE = /^[ABCDEFGHJKMNPQRTUVWXYZ2346789]{6}$/;
 
   var MESSAGES = {
@@ -65,6 +50,18 @@ var StudentPage = (function () {
     wrong_password: "That password doesn't match. Check the password on your slip.",
     slip_locked: 'This slip is locked after too many wrong tries. Ask your teacher for a new slip.',
     reprint: 'This slip needs to be printed again. Ask your teacher for a new slip.',
+    // A student card (app.js). A teacher unlocks a card; a slip is replaced.
+    card_not_found: "That code didn't work. Check the letters and numbers on your card.",
+    wrong_card_password: "That password doesn't match. Check the password on your card.",
+    card_locked: 'This card is locked after too many wrong tries. Ask your teacher to unlock it.',
+    // A card that won't open says why (Colin, Nov 9).
+    card_closed: 'The student page is turned off for this class. Ask your teacher.',
+    card_expired: "This card's last day has passed. Ask your teacher for a new card.",
+    card_reprint: 'This card needs to be printed again. Ask your teacher for a new card.',
+    card_stopped: 'This card has been replaced. Ask your teacher for your new card.',
+    card_gone: "Your page for this class can't be opened any more. Ask your teacher.",
+    card_network: "Couldn't reach FullVision. Check your internet and try again.",
+    signed_out: 'You are signed out. Scan or type your card to open your page again.',
   };
   var MONTHS = [
     'January',
@@ -98,6 +95,10 @@ var StudentPage = (function () {
       number: '', // the student number or slip password as typed
       bday: { m: '', d: '', y: '' }, // the pickers as chosen
       report: null, // the report as the teacher sent it
+      page: null, // a card's page for one class, as student-data.js reads it
+      heading: '', // the loading screen's title when it is not a slip's: a card's page, or a code not yet known
+      again: false, // a card's page couldn't be reached: offer Try Again
+      from: '', // 'card' when the code was typed on one of the card's screens
     };
   }
 
@@ -128,116 +129,6 @@ var StudentPage = (function () {
     return isNaN(t) ? '' : t.toLocaleDateString('en-CA', opts || { month: 'long', day: 'numeric' });
   }
 
-  function allQuestions(data) {
-    var out = [];
-    var skip = noGoalQuestions(data);
-    ((data && data.parts) || []).forEach(function (p) {
-      (p.questions || []).forEach(function (q) {
-        if (!skip[q.id]) out.push(q);
-      });
-    });
-    return out;
-  }
-
-  /* A Goal Check-In's part is grouped as the phone shows it: a goal status
-     question and the ones after it, then a Core Competency pick and the
-     ones after it. */
-  function goalGroups(part) {
-    var groups = [];
-    var cur = null;
-    (part.questions || []).forEach(function (q) {
-      if (q.kind === 'goal_status' || q.kind === 'core_pick' || !cur) {
-        cur = { lead: q.kind, items: [] };
-        groups.push(cur);
-      }
-      cur.items.push(q);
-    });
-    return groups;
-  }
-
-  function hasCourseGoal(data) {
-    var goal = data && data.context && data.context.course_goal;
-    return !!(goal && String(goal.text || '').trim());
-  }
-
-  /* With no course goal written yet there is nothing to check on: the goal
-     status and its next step are left out ({question id: true}). */
-  function noGoalQuestions(data) {
-    var out = {};
-    if (!data || !data.parts || hasCourseGoal(data)) return out;
-    data.parts.forEach(function (p) {
-      if (p.kind !== 'goal_checkin') return;
-      goalGroups(p).forEach(function (g) {
-        if (g.lead !== 'goal_status') return;
-        g.items.forEach(function (q) {
-          out[q.id] = true;
-        });
-      });
-    });
-    return out;
-  }
-
-  /* "this class" in a template prompt reads as the class's name. */
-  function promptText(q, course) {
-    var p = q.prompt || '';
-    return course ? p.replace(/\bthis class\b/g, course) : p;
-  }
-
-  function isAnswered(q, v) {
-    if (v == null) return false;
-    if (typeof v === 'string') return v.trim() !== '';
-    if (Array.isArray(v))
-      return v.some(function (x) {
-        return String(x || '').trim() !== '';
-      });
-    if (q.kind === 'scale4') {
-      if (v.level) return true;
-      if (v.levels && Object.keys(v.levels).length) return true;
-      var w = v.why;
-      if (typeof w === 'string') return w.trim() !== '';
-      return !!(
-        w &&
-        Object.keys(w).some(function (k) {
-          return String(w[k] || '').trim() !== '';
-        })
-      );
-    }
-    return false;
-  }
-
-  /* The progress counts the questions every student answers; the private
-     note to the teacher is extra. */
-  function countedQuestions(data) {
-    return allQuestions(data).filter(function (q) {
-      return !q.teacher_only;
-    });
-  }
-
-  function answeredCount(state) {
-    return countedQuestions(state.data).filter(function (q) {
-      return isAnswered(q, state.answers[q.id]);
-    }).length;
-  }
-
-  /* The answers as submit takes them: only the answered ones. */
-  function collect(state) {
-    var out = {};
-    allQuestions(state.data).forEach(function (q) {
-      var v = state.answers[q.id];
-      if (!isAnswered(q, v)) return;
-      if (q.kind === 'short_set') {
-        out[q.id] = v.map(function (x) {
-          return String(x || '').trim();
-        });
-      } else if (typeof v === 'string') {
-        out[q.id] = v.trim();
-      } else {
-        out[q.id] = v;
-      }
-    });
-    return out;
-  }
-
   /* ── Rendering ─────────────────────────────────────────────── */
 
   function header(title, sub, progress) {
@@ -252,27 +143,15 @@ var StudentPage = (function () {
     );
   }
 
-  function progressHtml(state) {
-    var qs = countedQuestions(state.data);
-    var done = answeredCount(state);
-    var segs = qs.length <= 16 ? qs.length : 16;
-    var lit = qs.length <= 16 ? done : Math.round((done / qs.length) * 16);
-    var bar = '';
-    for (var i = 0; i < segs; i++) bar += '<span' + (i < lit ? ' class="on"' : '') + '></span>';
-    return (
-      '<div class="sp-progress"><div class="sp-head-sub" id="sp-count">' +
-      esc(done + ' of ' + qs.length + ' answered') +
-      '</div><div class="sp-bar" aria-hidden="true">' +
-      bar +
-      '</div></div>'
-    );
-  }
-
-  function codeBox(state, label, top) {
+  /* `form` names the form for a screen file that opens the code itself
+     (addScreens' submit); without it the shell opens the code as a slip. */
+  function codeBox(state, label, top, form) {
     return (
       '<form class="sp-code-box' +
       (top ? ' sp-code-box-top' : '') +
-      '" data-form="code" novalidate>' +
+      '" data-form="' +
+      (form || 'code') +
+      '" novalidate>' +
       '<label for="sp-code">' +
       esc(label) +
       '</label><div class="sp-code-row">' +
@@ -299,14 +178,37 @@ var StudentPage = (function () {
 
   // The desktop's loading screen with lines for students
   // (shared/loading-screen.js); paint() starts the lines turning.
-  function renderLoading() {
+  // The page's name while it does not know whose page it is opening.
+  var NEITHER = 'FullVision';
+
+  function renderLoading(state) {
+    var heading = (state && state.heading) || '';
     var body = window.FVLoading
       ? window.FVLoading.html('student', 'Opening your page', true)
       : '<p class="sp-lead sp-msg-calm" role="status">Opening your page\u2026</p>';
     return (
-      header('Student Questions', 'FullVision') +
+      header(heading || 'Student Questions', heading === NEITHER ? '' : 'FullVision') +
       '<main class="sp-main sp-main-center sp-main-middle">' +
       body +
+      '</main>'
+    );
+  }
+
+  /* A scanned or typed code could not be looked up, so the page does not
+     know yet whether it is a card's or a slip's, and speaks as neither: no
+     "slip", no "card", no code box that names one. */
+  function renderUnreached(state) {
+    return (
+      header(NEITHER, '') +
+      '<main class="sp-main sp-main-center">' +
+      '<section class="sp-card sp-hello"><p class="sp-lead" role="alert">' +
+      esc(state.message || MESSAGES.card_network) +
+      '</p></section>' +
+      '<button type="button" class="sp-btn sp-btn-primary" data-act="code-retry"' +
+      (state.sending ? ' disabled' : '') +
+      '>' +
+      (state.sending ? 'Loading\u2026' : 'Try Again') +
+      '</button>' +
       '</main>'
     );
   }
@@ -328,15 +230,28 @@ var StudentPage = (function () {
     return d.preview || [];
   }
 
-  /* Who are you? A birthday or student number, or the slip's password. */
+  /* What the student is holding: a card (app.js) or a slip. */
+  function paperOf(data) {
+    return data && data.kind === 'card' ? 'card' : 'slip';
+  }
+
+  /* Who are you? A birthday or student number, or the slip's or card's
+     password. */
   function identityFields(state) {
     var by = state.data.check;
-    var msg = state.message ? '<p class="sp-msg" role="alert">' + esc(state.message) + '</p>' : '';
+    var paper = paperOf(state.data);
+    var msg = state.message ? '<p class="sp-msg" role="alert" id="sp-check-msg">' + esc(state.message) + '</p>' : '';
+    // With a message up, each field says it is the one the message is about.
+    var told = state.message ? ' aria-describedby="sp-check-msg" aria-invalid="true"' : '';
     if (by === 'password') {
       return (
-        '<p class="sp-lead">To make sure it\u2019s you, type the password printed on your slip.</p>' +
+        '<p class="sp-lead">To make sure it\u2019s you, type the password printed on your ' +
+        paper +
+        '.</p>' +
         '<label class="sp-sub-label" for="sp-ident">Password</label>' +
-        '<input id="sp-ident" class="sp-input" inputmode="numeric" autocomplete="off" maxlength="16" value="' +
+        '<input id="sp-ident" class="sp-input" inputmode="numeric" autocomplete="off" maxlength="16"' +
+        told +
+        ' value="' +
         esc(state.number) +
         '">' +
         msg
@@ -347,507 +262,24 @@ var StudentPage = (function () {
     var pw = !!state.data.also_password;
     return (
       '<p class="sp-lead">To make sure it\u2019s you, enter your birthday or your student number' +
-      (pw ? ', or the password on your slip' : '') +
+      (pw ? ', or the password on your ' + paper : '') +
       '.</p>' +
-      birthdayPickers(state) +
+      birthdayPickers(state, told) +
       '<div class="sp-or" aria-hidden="true">or</div>' +
       '<label class="sp-sub-label" for="sp-ident">' +
       (pw ? 'Student Number or Password' : 'Student Number') +
       '</label>' +
-      '<input id="sp-ident" class="sp-input" inputmode="numeric" autocomplete="off" maxlength="32" value="' +
+      '<input id="sp-ident" class="sp-input" inputmode="numeric" autocomplete="off" maxlength="32"' +
+      told +
+      ' value="' +
       esc(state.number) +
       '">' +
       msg
     );
   }
 
-  function renderConfirm(state) {
-    var d = state.data;
-    var first = (d.student && d.student.first_name) || '';
-    var parts = slipParts(d);
-    var n = parts.reduce(function (sum, p) {
-      return sum + (p.count || 0);
-    }, 0);
-    var minutes = Math.max(2, Math.round((n * 1.4) / 5) * 5 || 5);
-    return (
-      header(className(d.course), 'Student Questions') +
-      '<main class="sp-main sp-main-center">' +
-      '<section class="sp-card sp-hello">' +
-      '<div class="sp-avatar" aria-hidden="true">' +
-      esc(first.charAt(0).toUpperCase()) +
-      '</div>' +
-      '<h1 class="sp-big">Hi ' +
-      esc(first) +
-      '!</h1>' +
-      '<p class="sp-lead">Is this you? Your teacher made these questions just for you.</p>' +
-      '<div class="sp-will"><div class="sp-head-sub">You will answer</div><strong>' +
-      esc(
-        parts
-          .map(function (p) {
-            return p.title;
-          })
-          .join(' and '),
-      ) +
-      '</strong><div class="sp-head-sub">' +
-      esc('About ' + minutes + ' minutes \u00b7 ' + n + ' question' + (n === 1 ? '' : 's')) +
-      '</div></div>' +
-      (d.check ? '<div class="sp-ident">' + identityFields(state) + '</div>' : '') +
-      '</section>' +
-      '<button type="button" class="sp-btn sp-btn-primary" data-act="start"' +
-      (state.sending ? ' disabled' : '') +
-      '>' +
-      (state.sending ? 'Checking\u2026' : 'Yes, Start') +
-      '</button>' +
-      '<button type="button" class="sp-btn sp-btn-line" data-act="notme">No, That\u2019s Not Me</button>' +
-      codeBox(state, 'No camera? Type the code on your slip') +
-      '</main>'
-    );
-  }
-
-  function renderNotMe(state) {
-    return (
-      header('Student Questions', (state.data && state.data.course.name) || 'FullVision') +
-      '<main class="sp-main sp-main-center sp-main-middle">' +
-      '<section class="sp-card sp-hello"><h1 class="sp-big">Give This Slip Back</h1>' +
-      '<p class="sp-lead">This slip is for someone else. Give it back to your teacher and ask for your own.</p></section>' +
-      '<button type="button" class="sp-btn sp-btn-line" data-act="restart">Type a Different Code</button>' +
-      '</main>'
-    );
-  }
-
-  function renderMessage(state) {
-    return (
-      header('Student Questions', 'FullVision') +
-      '<main class="sp-main sp-main-center">' +
-      '<section class="sp-card sp-hello"><p class="sp-lead" role="alert">' +
-      esc(state.message) +
-      '</p></section>' +
-      codeBox(Object.assign({}, state, { message: '' }), 'Type the code on your slip', true) +
-      '</main>'
-    );
-  }
-
-  /* One question's controls. */
-  function textArea(id, value, rows, attrs) {
-    return (
-      '<textarea class="sp-text" id="' +
-      esc(id) +
-      '" rows="' +
-      (rows || 2) +
-      '"' +
-      (attrs || '') +
-      '>' +
-      esc(value || '') +
-      '</textarea>'
-    );
-  }
-
-  function questionBody(q, v, course) {
-    var o = q.options || {};
-    var id = 'q-' + q.id;
-    var html = '';
-    if (q.kind === 'text') {
-      html +=
-        '<label class="sp-q" for="' +
-        id +
-        '">' +
-        esc(promptText(q, course)) +
-        (o.optional ? ' (Optional)' : '') +
-        '</label>';
-      html += textArea(id, v, 2, ' data-q="' + q.id + '" data-kind="text" maxlength="2000"');
-      if ((o.starters || []).length) {
-        html +=
-          '<div class="sp-starters"><span>Start with:</span>' +
-          o.starters
-            .map(function (s) {
-              return (
-                '<button type="button" class="sp-starter" data-act="starter" data-q="' +
-                q.id +
-                '" data-text="' +
-                esc(s) +
-                '">' +
-                esc(s) +
-                '</button>'
-              );
-            })
-            .join('') +
-          '</div>';
-      }
-      return html;
-    }
-    if (q.kind === 'short_set') {
-      var labels = o.labels && o.labels.length ? o.labels : [''];
-      var vals = Array.isArray(v) ? v : [];
-      html += '<div class="sp-q" id="' + id + '">' + esc(promptText(q, course)) + '</div><div class="sp-shield">';
-      labels.forEach(function (lab, i) {
-        var fid = id + '-' + i;
-        html +=
-          '<div><label class="sp-sub-label" for="' +
-          fid +
-          '">' +
-          esc(lab) +
-          '</label><input class="sp-input" id="' +
-          fid +
-          '" maxlength="300" data-q="' +
-          q.id +
-          '" data-kind="short_set" data-i="' +
-          i +
-          '" value="' +
-          esc(vals[i] || '') +
-          '"></div>';
-      });
-      return html + '</div>';
-    }
-    if (q.kind === 'choice') {
-      var picked = Array.isArray(v) ? v : [];
-      var choices = (o.choices || []).slice();
-      picked.forEach(function (p) {
-        if (choices.indexOf(p) < 0) choices.push(p);
-      });
-      html += '<div class="sp-q" id="' + id + '">' + esc(promptText(q, course)) + '</div>';
-      if (o.multiple === false && choices.length <= 3) {
-        html +=
-          '<div class="sp-seg" role="radiogroup" aria-labelledby="' +
-          id +
-          '" style="grid-template-columns:repeat(' +
-          choices.length +
-          ',minmax(0,1fr))">' +
-          choices
-            .map(function (c) {
-              var on = picked.indexOf(c) >= 0;
-              return (
-                '<button type="button" role="radio" aria-checked="' +
-                on +
-                '" data-act="choice" data-q="' +
-                q.id +
-                '" data-value="' +
-                esc(c) +
-                '">' +
-                esc(c) +
-                '</button>'
-              );
-            })
-            .join('') +
-          '</div>';
-        return html;
-      }
-      var single = o.multiple === false;
-      html +=
-        '<div class="sp-chips"' +
-        (single ? ' role="radiogroup" aria-labelledby="' + id + '"' : ' role="group" aria-labelledby="' + id + '"') +
-        '>' +
-        choices
-          .map(function (c) {
-            var on = picked.indexOf(c) >= 0;
-            return (
-              '<button type="button" class="sp-chip" ' +
-              (single ? 'role="radio" aria-checked="' : 'aria-pressed="') +
-              on +
-              '" data-act="choice" data-q="' +
-              q.id +
-              '" data-value="' +
-              esc(c) +
-              '">' +
-              esc(c) +
-              '</button>'
-            );
-          })
-          .join('') +
-        (o.other
-          ? '<button type="button" class="sp-chip" data-act="other-open" data-q="' + q.id + '">+ Another</button>'
-          : '') +
-        '</div>';
-      if (o.other) {
-        html +=
-          '<div class="sp-other" hidden data-other="' +
-          q.id +
-          '"><label class="sp-vh" for="' +
-          id +
-          '-other">Another answer</label><input class="sp-input" id="' +
-          id +
-          '-other" maxlength="60" placeholder="Type it here"><button type="button" class="sp-btn sp-btn-quiet sp-btn-small" data-act="other-add" data-q="' +
-          q.id +
-          '">Add</button></div>';
-      }
-      return html;
-    }
-    if (q.kind === 'goal_status') {
-      var gs = typeof v === 'string' ? v : '';
-      html += '<div class="sp-q" id="' + id + '">' + esc(promptText(q, course)) + '</div>';
-      html +=
-        '<div class="sp-grid2" role="radiogroup" aria-labelledby="' +
-        id +
-        '">' +
-        (o.choices || [])
-          .map(function (c) {
-            return (
-              '<button type="button" class="sp-opt" role="radio" aria-checked="' +
-              (gs === c) +
-              '" data-act="pick" data-q="' +
-              q.id +
-              '" data-value="' +
-              esc(c) +
-              '">' +
-              esc(c) +
-              '</button>'
-            );
-          })
-          .join('') +
-        '</div>';
-      return html;
-    }
-    if (q.kind === 'core_pick') {
-      var cp = typeof v === 'string' ? v : '';
-      var allowed = q.core_ids && q.core_ids.length ? q.core_ids : CORE_ORDER;
-      html +=
-        '<div class="sp-q" id="' +
-        id +
-        '">' +
-        esc(promptText(q, course)) +
-        '</div><div role="radiogroup" aria-labelledby="' +
-        id +
-        '" class="sp-core">';
-      GROUPS.forEach(function (g) {
-        var ids = CORE_ORDER.filter(function (k) {
-          return CORE[k].group === g && allowed.indexOf(k) >= 0;
-        });
-        if (!ids.length) return;
-        html +=
-          '<div class="sp-pick-group"><div class="sp-tag">' +
-          esc(g) +
-          '</div><div class="sp-chips">' +
-          ids
-            .map(function (k) {
-              return (
-                '<button type="button" class="sp-pick" role="radio" aria-checked="' +
-                (cp === k) +
-                '" data-act="pick" data-q="' +
-                q.id +
-                '" data-value="' +
-                k +
-                '">' +
-                esc(CORE[k].name) +
-                '</button>'
-              );
-            })
-            .join('') +
-          '</div></div>';
-      });
-      return html + '</div>';
-    }
-    if (q.kind === 'scale4') {
-      var sv = v && typeof v === 'object' ? v : {};
-      html += '<div class="sp-q">' + esc(promptText(q, course)) + '</div>';
-      var cores = q.core_ids && q.core_ids.length ? q.core_ids : [null];
-      cores.forEach(function (k) {
-        var key = k || '_';
-        var level = k ? (sv.levels || {})[k] : sv.level;
-        var why = k
-          ? sv.why && typeof sv.why === 'object'
-            ? sv.why[k]
-            : ''
-          : typeof sv.why === 'string'
-            ? sv.why
-            : '';
-        var gid = id + '-' + key;
-        html += '<div class="sp-core">';
-        if (k && CORE[k]) {
-          html +=
-            '<div class="sp-core-name" id="' +
-            esc(gid) +
-            '">' +
-            esc(CORE[k].name) +
-            '</div><div class="sp-core-line">' +
-            esc(CORE[k].line) +
-            '</div>';
-        }
-        html +=
-          '<div class="sp-grid4" role="radiogroup" aria-label="' +
-          esc(k && CORE[k] ? CORE[k].name : promptText(q, course)) +
-          '">' +
-          STEPS.map(function (s, i) {
-            return (
-              '<button type="button" class="sp-opt" role="radio" data-step="' +
-              (i + 1) +
-              '" aria-checked="' +
-              (level === i + 1) +
-              '" data-act="step" data-q="' +
-              q.id +
-              '" data-core="' +
-              esc(key) +
-              '" data-value="' +
-              (i + 1) +
-              '">' +
-              s +
-              '</button>'
-            );
-          }).join('') +
-          '</div>' +
-          '<label class="sp-sub-label" for="' +
-          esc(gid) +
-          '-why">Why? One sentence.</label>' +
-          textArea(
-            gid + '-why',
-            why,
-            2,
-            ' data-q="' + q.id + '" data-kind="why" data-core="' + esc(key) + '" maxlength="1000"',
-          ) +
-          '</div>';
-      });
-      return html;
-    }
-    return html;
-  }
-
-  function questionCard(q, v, part, course) {
-    if (q.teacher_only) {
-      return (
-        '<section class="sp-card sp-card-private"><div class="sp-private-tag">' +
-        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7a5900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>' +
-        '<span>Only your teacher sees this</span></div>' +
-        questionBody(q, v, course) +
-        '</section>'
-      );
-    }
-    var tag = '';
-    if (part.kind === 'about_me' && q.repeated_key) {
-      tag = (q.repeated_key === 'better_at' ? 'Your course goal \u00b7 ' : '') + 'Asked again in January and June';
-    }
-    return (
-      '<section class="sp-card">' +
-      (tag ? '<div class="sp-tag">' + esc(tag) + '</div>' : '') +
-      questionBody(q, v, course) +
-      '</section>'
-    );
-  }
-
-  /* The Goal Check-In in two cards: the course goal (from its goal status
-     question) and the Core Competency goal (from its pick). */
-  function goalSections(state, part) {
-    var course = state.data.course.name;
-    var groups = goalGroups(part);
-    return groups
-      .map(function (g) {
-        var html = '<section class="sp-card">';
-        if (g.lead === 'goal_status' && !hasCourseGoal(state.data)) {
-          // No goal to check on: say so instead of asking how it is going.
-          return (
-            html +
-            '<h2 class="sp-h2">' +
-            esc('My ' + course + ' Goal') +
-            '</h2><p class="sp-note">' +
-            esc('You haven’t written a ' + course + ' goal yet, so there is nothing to check on here.') +
-            '</p></section>'
-          );
-        }
-        if (g.lead === 'goal_status') {
-          html += '<h2 class="sp-h2">' + esc('My ' + course + ' Goal') + '</h2>';
-          var goal = state.data.context && state.data.context.course_goal;
-          if (goal && goal.text) {
-            html +=
-              '<div class="sp-earlier"><div class="sp-tag">' +
-              esc('You wrote in ' + fmtDate(goal.at, { month: 'long' })) +
-              '</div><div>' +
-              esc(goal.text) +
-              '</div></div>';
-          }
-        } else if (g.lead === 'core_pick') {
-          html += '<h2 class="sp-h2">My Core Competency Goal</h2>';
-        }
-        g.items.forEach(function (q) {
-          html += questionBody(q, state.answers[q.id], course);
-        });
-        return html + '</section>';
-      })
-      .join('');
-  }
-
-  function reflectionIntro(part) {
-    var scale = (part.questions || []).filter(function (q) {
-      return q.kind === 'scale4' && (q.core_ids || []).length;
-    })[0];
-    var groups = {};
-    ((scale && scale.core_ids) || []).forEach(function (k) {
-      if (CORE[k]) groups[CORE[k].group] = true;
-    });
-    var g = Object.keys(groups);
-    var kicker = [g.length === 1 ? g[0] : '', part.grade ? 'Grade ' + part.grade : ''].filter(Boolean).join(' \u00b7 ');
-    return (
-      '<section class="sp-card">' +
-      (kicker ? '<div class="sp-kicker">' + esc(kicker) + '</div>' : '') +
-      '<h1 class="sp-h1">' +
-      esc(part.theme || part.title) +
-      '</h1><p class="sp-note">This is about you, not your marks. Your family will see what you write here.</p></section>'
-    );
-  }
-
-  function renderPart(state) {
-    var d = state.data;
-    var part = d.parts[state.part];
-    var course = d.course.name;
-    var body = '';
-    if (part.kind === 'core_reflection') body += reflectionIntro(part);
-    if (part.kind === 'goal_checkin') {
-      body += goalSections(state, part);
-    } else {
-      (part.questions || []).forEach(function (q) {
-        body += questionCard(q, state.answers[q.id], part, course);
-      });
-    }
-    var last = state.part === d.parts.length - 1;
-    var next = d.parts[state.part + 1];
-    var nextLabel = next ? 'Next: ' + (next.kind === 'goal_checkin' ? 'My Goals' : next.title) : '';
-    var title = part.kind === 'goal_checkin' && state.part > 0 ? d.parts[0].title : part.title;
-    return (
-      header(title, course, progressHtml(state)) +
-      '<main class="sp-main">' +
-      body +
-      '</main>' +
-      '<footer class="sp-foot">' +
-      (state.message ? '<p class="sp-msg" role="alert">' + esc(state.message) + '</p>' : '') +
-      '<div class="sp-foot-row">' +
-      '<button type="button" class="sp-btn sp-btn-quiet" data-act="back">Back</button>' +
-      (last
-        ? '<button type="button" class="sp-btn sp-btn-primary" data-act="send"' +
-          (state.sending ? ' disabled' : '') +
-          '>' +
-          (state.sending ? 'Sending\u2026' : 'Send to My Teacher') +
-          '</button>'
-        : '<button type="button" class="sp-btn sp-btn-primary" data-act="next">' + esc(nextLabel) + '</button>') +
-      '</div></footer>'
-    );
-  }
-
-  function renderSent(state) {
-    var d = state.data;
-    var first = (d.student && d.student.first_name) || '';
-    var reflection = d.parts.some(function (p) {
-      return p.kind === 'core_reflection';
-    });
-    return (
-      header(d.parts[0].title, d.course.name) +
-      '<main class="sp-main sp-main-center sp-main-middle">' +
-      '<section class="sp-card sp-hello"><div class="sp-avatar sp-avatar-done" aria-hidden="true">' +
-      '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"></path></svg></div>' +
-      '<h1 class="sp-big">Sent to Your Teacher</h1>' +
-      '<p class="sp-lead">' +
-      esc('Thanks' + (first ? ', ' + first : '') + '. You can close this page now.') +
-      '</p>' +
-      (reflection
-        ? '<p class="sp-note">Talk with your family about what you wrote. It will be part of your report.</p>'
-        : '') +
-      (state.demo ? '<p class="sp-note">This was Demo Mode. Nothing was sent.</p>' : '') +
-      '</section></main>'
-    );
-  }
-
-  /* ── Phone reports (canvas R1–R4) ──────────────────────────── */
-
-  function reportSub(d) {
-    return d.report && d.report.title ? d.report.title : 'Report';
-  }
-
-  function birthdayPickers(state) {
+  // `told` is extra attributes for each picker (identityFields' pointer at its message).
+  function birthdayPickers(state, told) {
     var b = state.bday || {};
     var now = new Date().getFullYear();
     var years = [];
@@ -863,7 +295,9 @@ var StudentPage = (function () {
         label +
         '</label><select class="sp-input sp-select" id="' +
         id +
-        '"><option value=""></option>' +
+        '"' +
+        (told || '') +
+        '><option value=""></option>' +
         opts +
         '</select></div>'
       );
@@ -893,112 +327,59 @@ var StudentPage = (function () {
     );
   }
 
-  function renderRCheck(state) {
-    var d = state.data;
-    var first = (d.student && d.student.first_name) || '';
-    var until = d.report && d.report.expires_on ? fmtDate(d.report.expires_on, { month: 'short', day: 'numeric' }) : '';
+  function renderNotMe(state) {
     return (
-      header(className(d.course), reportSub(d)) +
-      '<main class="sp-main sp-main-center">' +
-      '<section class="sp-card sp-hello"><div class="sp-avatar" aria-hidden="true">' +
-      esc(first.charAt(0).toUpperCase()) +
-      '</div><h1 class="sp-big">' +
-      esc('Your report is ready, ' + first) +
-      '</h1>' +
-      (d.has_birthday === false
-        ? '<p class="sp-lead">' + esc(MESSAGES.no_birthday) + '</p>'
-        : '<p class="sp-lead">To make sure it\u2019s you, enter your birthday.</p>' + birthdayPickers(state)) +
-      (state.message ? '<p class="sp-msg" role="alert">' + esc(state.message) + '</p>' : '') +
-      '</section>' +
-      (d.has_birthday === false
-        ? ''
-        : '<button type="button" class="sp-btn sp-btn-primary" data-act="rcheck"' +
-          (state.sending ? ' disabled' : '') +
-          '>' +
-          (state.sending ? 'Opening\u2026' : 'Open My Report') +
-          '</button>') +
-      '<button type="button" class="sp-btn sp-btn-line" data-act="notme">This Isn\u2019t Me</button>' +
-      '<p class="sp-fine">' +
-      esc((until ? 'This link works until ' + until + '. ' : '') + 'Keep your slip private, like a password.') +
-      '</p></main>'
+      header('Student Questions', (state.data && state.data.course.name) || 'FullVision') +
+      '<main class="sp-main sp-main-center sp-main-middle">' +
+      '<section class="sp-card sp-hello"><h1 class="sp-big">Give This Slip Back</h1>' +
+      '<p class="sp-lead">This slip is for someone else. Give it back to your teacher and ask for your own.</p></section>' +
+      '<button type="button" class="sp-btn sp-btn-line" data-act="restart">Type a Different Code</button>' +
+      '</main>'
     );
   }
 
-  function renderReport(state) {
+  function renderMessage(state) {
     return (
-      '<div class="pr-view">' +
-      (typeof PhoneReportView !== 'undefined' ? PhoneReportView.html(state.report) : '') +
-      '</div>'
+      header('Student Questions', 'FullVision') +
+      '<main class="sp-main sp-main-center">' +
+      '<section class="sp-card sp-hello"><p class="sp-lead" role="alert">' +
+      esc(state.message) +
+      '</p></section>' +
+      codeBox(Object.assign({}, state, { message: '' }), 'Type the code on your slip', true) +
+      '</main>'
     );
+  }
+
+  /* ── The screen files ──────────────────────────────────────── */
+
+  /* questionnaire.js, report.js, app.js and assignments.js each hand over
+       {file, render: {screen name: function}, click, input, submit, start,
+        share, test}.
+     render joins the screens below. click(act, el), input(el) and
+     submit(name, form) get what this file's own handlers don't take.
+     start(hash) is asked first when the page opens and returns true when
+     the address is its own (a demo address). A screen file keeps its own S
+     and root, the same objects as the ones here: share(S, root) hands them
+     over again each time either is replaced. test adds to
+     StudentPage._test. */
+  var SCREENS = { loading: renderLoading, notme: renderNotMe, message: renderMessage, unreached: renderUnreached };
+  var files = [];
+
+  function addScreens(f) {
+    files.push(f);
+    Object.assign(SCREENS, f.render);
+    Object.assign(api._test, f.test);
+    f.share(S, root);
+  }
+
+  function share() {
+    files.forEach(function (f) {
+      f.share(S, root);
+    });
   }
 
   function render(state) {
-    switch (state.screen) {
-      case 'loading':
-        return renderLoading(state);
-      case 'confirm':
-        return renderConfirm(state);
-      case 'notme':
-        return renderNotMe(state);
-      case 'part':
-        return renderPart(state);
-      case 'sent':
-        return renderSent(state);
-      case 'message':
-        return renderMessage(state);
-      case 'rcheck':
-        return renderRCheck(state);
-      case 'report':
-        return renderReport(state);
-      default:
-        return renderStart(state);
-    }
-  }
-
-  /* ── Answers ───────────────────────────────────────────────── */
-
-  function setAnswer(state, q, el) {
-    var id = q.id;
-    var kind = el.dataset.kind;
-    if (kind === 'text') {
-      state.answers[id] = el.value;
-    } else if (kind === 'short_set') {
-      var arr = Array.isArray(state.answers[id]) ? state.answers[id].slice() : [];
-      var n = ((q.options || {}).labels || ['']).length;
-      while (arr.length < n) arr.push('');
-      arr[Number(el.dataset.i)] = el.value;
-      state.answers[id] = arr;
-    } else if (kind === 'why') {
-      var cur = Object.assign({}, state.answers[id] || {});
-      if (el.dataset.core === '_') cur.why = el.value;
-      else
-        cur.why = Object.assign({}, typeof cur.why === 'object' && cur.why ? cur.why : {}, {
-          [el.dataset.core]: el.value,
-        });
-      state.answers[id] = cur;
-    }
-  }
-
-  function toggleChoice(state, q, value) {
-    var single = (q.options || {}).multiple === false;
-    var cur = Array.isArray(state.answers[q.id]) ? state.answers[q.id].slice() : [];
-    var at = cur.indexOf(value);
-    if (single) cur = at >= 0 ? [] : [value];
-    else if (at >= 0) cur.splice(at, 1);
-    else cur.push(value);
-    state.answers[q.id] = cur;
-  }
-
-  function setStep(state, q, core, step) {
-    var cur = Object.assign({}, state.answers[q.id] || {});
-    if (core === '_') cur.level = cur.level === step ? undefined : step;
-    else {
-      var lv = Object.assign({}, cur.levels || {});
-      if (lv[core] === step) delete lv[core];
-      else lv[core] = step;
-      cur.levels = lv;
-    }
-    state.answers[q.id] = cur;
+    return (SCREENS[state.screen] || renderStart)(state);
   }
 
   /* ── The edge function ─────────────────────────────────────── */
@@ -1008,7 +389,32 @@ var StudentPage = (function () {
     return base + '/functions/v1/student-submit?forceFunctionRegion=ca-central-1';
   }
 
+  /* Replies are applied only for the code or session that asked. The turn
+     moves on whenever what the page is opening changes: the page starts
+     over (a new address), a new code is typed, the state is reset (Type a
+     Different Code, Done, signed out), or a screen file says so. A reply
+     that lands after that belongs to something no longer on the page, and
+     is dropped: its promise never settles, so nothing that waited on it
+     runs. This is the one place that is decided, for a slip, a card and
+     Demo Mode alike: `call` goes through it, and so does app.js's `ask`. */
+  var turn = 0;
+  function newTurn() {
+    turn += 1;
+  }
+  function whileCurrent(promise) {
+    var mine = turn;
+    return new Promise(function (resolve) {
+      Promise.resolve(promise).then(function (value) {
+        if (mine === turn) resolve(value);
+      });
+    });
+  }
+
   function call(body) {
+    return whileCurrent(send(body));
+  }
+
+  function send(body) {
     return fetch(endpoint(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1157,7 +563,7 @@ var StudentPage = (function () {
 
   function paint(focusSel) {
     if (!root) return;
-    // html-safe: this file's render (the name is shared): every screen escapes server and typed text with esc; q.id is a question uuid; PhoneReportView.html escapes the report.
+    // html-safe: the page's render (the name is shared), over this file's screens and the ones questionnaire.js, report.js, app.js and assignments.js add: every screen escapes server and typed text with esc; q.id is a question uuid; PhoneReportView.html escapes the report; a result on the Assignments list is calc.js's text, escaped.
     root.innerHTML = render(S);
     if (S.screen === 'loading' && window.FVLoading) window.FVLoading.start(root, 'student');
     root.querySelectorAll('textarea.sp-text').forEach(grow);
@@ -1207,14 +613,34 @@ var StudentPage = (function () {
   }
 
   /* "2 tries left." and, before the last, what happens after it. */
-  function triesLeftText(n) {
+  function triesLeftText(n, paper) {
     if (n == null) return '';
+    if (n === 1 && paper === 'card')
+      return ' 1 try left. One more wrong try locks this card, and your teacher will need to unlock it.';
     if (n === 1)
       return ' 1 try left. One more wrong try locks this slip, and you will need a new one from your teacher.';
     return ' ' + n + ' tries left.';
   }
 
-  function openCode(code) {
+  /* A typed or scanned code. It is put to the card's screens first
+     (app.js's `card`, which asks the function's `card` route), and then,
+     unless that said it is a card, to the slip route, as it always was.
+     `card(code)` gives a promise of
+       true         a card: its screen is drawn;
+       false        not a card: the function said so (or is the one deployed
+                    before cards, which does not know the question);
+       'locked'     this address has made too many wrong tries on cards;
+       'unreached'  no answer the page can use (no internet, a server
+                    error, a timeout).
+     A slip opens whenever the slip route is healthy, whatever the card
+     route does: after 'locked' and 'unreached' the slip route is still
+     asked. What differs is what "nothing opened" then means. After false,
+     the code is no card and no slip: "That code didn't work." After the
+     other two it is not known what the code is, so the page speaks as
+     neither (`unreached`).
+     `from` is 'card' when the code was typed on one of the card's screens:
+     a code that opens nothing is then answered there (app.js's `refused`). */
+  function openCode(code, from) {
     var c = cleanCode(code);
     S.typed = prettyCode(c);
     if (!CODE_RE.test(c)) {
@@ -1223,11 +649,54 @@ var StudentPage = (function () {
       paint('#sp-code');
       return Promise.resolve();
     }
+    newTurn();
     S.code = c;
+    S.from = from || '';
     S.message = '';
+    S.sending = false;
+    // Not known yet whose page this is: the loading screen says neither.
+    if (!S.demo) S.heading = NEITHER;
     S.screen = 'loading';
     paint();
+    var cards = files.filter(function (f) {
+      return !!f.card;
+    })[0];
+    var onCard = from === 'card' ? cards : null;
+    return (cards ? cards.card(c) : Promise.resolve(false)).then(function (said) {
+      if (said === true) return undefined;
+      return openSlip(c, said, onCard);
+    });
+  }
+
+  /* Nothing opened, and it is not known whether the code is a card's or a
+     slip's. Typed on a card's screen, that screen says so; scanned, or
+     typed anywhere else, the neutral screen does, with Try Again. `why` is
+     'locked' or 'busy' when the function said so, else the code could not
+     be looked up. */
+  function unreached(cards, why) {
+    var e = why === 'locked' || why === 'busy' ? why : 'network';
+    if (cards && cards.refused({ ok: false, error: e })) return;
+    S.message = e === 'network' ? '' : MESSAGES[e];
+    S.screen = 'unreached';
+    paint('[data-act="code-retry"]');
+  }
+
+  // What the slip route says only of a slip: it is one, whatever the card route said.
+  var A_SLIP = { used: 1, closed: 1, not_open_yet: 1 };
+
+  /* `cardSaid` is false, 'locked' or 'unreached' (openCode). */
+  function openSlip(c, cardSaid, cards) {
     return call({ route: 'open', code: c }).then(function (res) {
+      var e = res && res.ok ? '' : (res && res.error) || 'network';
+      if (cardSaid !== false && e && !Object.prototype.hasOwnProperty.call(A_SLIP, e)) {
+        // The card route did not say what the code is and the slip route has not opened it.
+        unreached(cards, cardSaid === 'locked' && e === 'not_found' ? 'locked' : e);
+        return;
+      }
+      // Typed on a card's screen and it opened nothing: that screen answers.
+      if (cards && e && cards.refused(res)) return;
+      // A slip typed on a card's screen: the tab is named for the slip's page again.
+      if (cards && typeof document !== 'undefined') document.title = 'Student Questions — FullVision';
       if (res && res.ok && res.kind === 'report') {
         S.data = res;
         S.screen = 'rcheck';
@@ -1254,67 +723,28 @@ var StudentPage = (function () {
     });
   }
 
-  function send() {
-    if (S.sending) return Promise.resolve();
-    var answers = collect(S);
-    if (!Object.keys(answers).length) {
-      S.message = MESSAGES.empty;
-      paint();
-      return Promise.resolve();
-    }
-    if (S.demo) {
-      S.screen = 'sent';
-      S.message = '';
-      paint();
-      return Promise.resolve();
-    }
-    S.sending = true;
-    S.message = '';
-    paint();
-    function attempt(retried) {
-      return call({ route: 'submit', token: S.data.token, answers: answers }).then(function (res) {
-        if (res && res.ok) return res;
-        // The 80-minute token (a class block) ran out while they wrote: open again for a
-        // fresh one (the code is still unused) and send once more.
-        if (res && res.error === 'expired' && !retried) {
-          return call({ route: 'open', code: S.code }).then(function (again) {
-            if (!again || !again.ok) return again;
-            S.data.token = again.token;
-            // A slip that asks who you are asks again on the new session.
-            if (again.check && S.ident) {
-              return call(Object.assign({ route: 'verify', token: again.token }, S.ident)).then(function (ok) {
-                return ok && ok.ok ? attempt(true) : ok;
-              });
-            }
-            return attempt(true);
-          });
-        }
-        return res;
-      });
-    }
-    return attempt(false).then(function (res) {
-      S.sending = false;
-      if (res && res.ok) {
-        clearDraft();
-        S.screen = 'sent';
-        S.message = '';
-        try {
-          history.replaceState(null, '', location.pathname);
-        } catch (e) {
-          /* the code stays in the address; it no longer works */
-        }
-      } else {
-        S.message = messageFor(res);
-      }
-      paint();
-    });
+  /* The focus has gone back to a box that holds the answer that was wrong.
+     Its text is selected, so typing the right one replaces it: typed after
+     it, "0123456" on "999" would be a second wrong try, and five lock the
+     card. A birthday picker needs nothing: choosing replaces its choice. */
+  function selectAnswer(sel) {
+    var el = sel && root ? root.querySelector(sel) : null;
+    if (el && el.tagName === 'INPUT' && typeof el.select === 'function') el.select();
   }
 
   /* A questionnaire slip: the birthday, student number or slip password
      hands over the questions. A session that ran out opens again from the
-     code, once. */
-  function verifyIdentity() {
+     code, once.
+
+     A student card (app.js) reads the same fields and gets the same
+     messages, and does its own asking and its own next step:
+       card = { send(ident) → a promise of the reply, ok(reply),
+                messageScreen: the screen a refusal shows on,
+                message(reply) → the card's words for a refusal,
+                stops(reply) → whether that refusal ends the check }. */
+  function verifyIdentity(card) {
     var by = S.data.check;
+    var paper = paperOf(S.data);
     var typed = ((root.querySelector('#sp-ident') || {}).value || '').trim();
     var m = (root.querySelector('#sp-bm') || {}).value || '';
     var dd = (root.querySelector('#sp-bd') || {}).value || '';
@@ -1322,9 +752,13 @@ var StudentPage = (function () {
     S.number = typed;
     S.bday = { m: m, d: dd, y: y };
     var ident = { birthday: null, student_number: null, password: null };
+    /* On a card, a message leaves the focus on the field it is about: the
+       one typed in, or the first. The screen was drawn again, so without
+       this the focus is on nothing. A slip's check is as it was. */
+    var back = card ? (by === 'password' || typed ? '#sp-ident' : '#sp-bm') : undefined;
     if (by === 'password') {
       if (!typed) {
-        S.message = 'Type the password printed on your slip.';
+        S.message = 'Type the password printed on your ' + paper + '.';
         paint('#sp-ident');
         return Promise.resolve();
       }
@@ -1333,7 +767,7 @@ var StudentPage = (function () {
       var some = m || dd || y;
       if (some && !(m && dd && y)) {
         S.message = 'Choose the month, day and year you were born.';
-        paint();
+        paint(card ? '#sp-bm' : undefined);
         return Promise.resolve();
       }
       if (some) ident.birthday = y + '-' + String(m).padStart(2, '0') + '-' + String(dd).padStart(2, '0');
@@ -1341,13 +775,14 @@ var StudentPage = (function () {
       if (typed && S.data.also_password && typed.length <= 16) ident.password = typed;
       if (!some && !typed) {
         S.message = 'Choose your birthday or type your student number.';
-        paint();
+        paint(back);
         return Promise.resolve();
       }
     }
     S.message = '';
     var done = function (res) {
       S.sending = false;
+      if (res && res.ok && card) return card.ok(res);
       if (res && res.ok) {
         S.ident = ident;
         S.data.parts = res.parts || [];
@@ -1364,13 +799,25 @@ var StudentPage = (function () {
       var e = res && res.error;
       if (e === 'slip_locked' && !S.demo) markSlipLocked(S.code);
       if (e === 'wrong_identity') {
-        S.message = MESSAGES[by === 'password' ? 'wrong_password' : 'wrong_identity'] + triesLeftText(res.tries_left);
+        var wrong = by !== 'password' ? 'wrong_identity' : card ? 'wrong_card_password' : 'wrong_password';
+        S.message = MESSAGES[wrong] + triesLeftText(res.tries_left, paper);
+      } else if (card && card.message) {
+        // A card's refusals have the card's own words. One the function
+        // gave stops the check; a call that never arrived can be tried again.
+        S.message = card.message(res);
+        if (card.stops(res)) S.screen = card.messageScreen;
       } else {
         S.message = messageFor(res);
-        if (e !== 'network' && e !== 'busy') S.screen = 'message';
+        if (e !== 'network' && e !== 'busy') S.screen = card ? card.messageScreen : 'message';
       }
-      paint();
+      paint(back);
+      selectAnswer(back);
     };
+    if (card) {
+      S.sending = true;
+      paint();
+      return card.send(ident).then(done);
+    }
     if (S.demo) {
       return Promise.resolve(done({ ok: true, parts: S.demoParts, context: S.demoContext }));
     }
@@ -1390,168 +837,36 @@ var StudentPage = (function () {
       .then(done);
   }
 
-  /* The birthday opens a phone report. A session that ran out opens again
-     from the code, once. */
-  function checkBirthday() {
-    var m = (root.querySelector('#sp-bm') || {}).value;
-    var dd = (root.querySelector('#sp-bd') || {}).value;
-    var y = (root.querySelector('#sp-by') || {}).value;
-    if (!m || !dd || !y) {
-      S.bday = { m: m || '', d: dd || '', y: y || '' };
-      S.message = 'Choose the month, day and year you were born.';
-      paint();
-      return Promise.resolve();
-    }
-    S.bday = { m: m, d: dd, y: y };
-    var birthday = y + '-' + String(m).padStart(2, '0') + '-' + String(dd).padStart(2, '0');
-    S.message = '';
-    var done = function (res) {
-      S.sending = false;
-      if (res && res.ok) {
-        S.report = res.report || {};
-        S.screen = 'report';
-        paint();
-        window.scrollTo(0, 0);
-        return;
-      }
-      var e = res && res.error;
-      S.message =
-        e === 'wrong_birthday'
-          ? MESSAGES.wrong_birthday +
-            (res.tries_left != null ? ' ' + res.tries_left + (res.tries_left === 1 ? ' try' : ' tries') + ' left.' : '')
-          : messageFor(res);
-      if (e === 'report_closed' || e === 'not_found' || e === 'locked') S.screen = 'message';
-      paint();
-    };
-    if (S.demo) {
-      return Promise.resolve(done({ ok: true, report: demoReport() }));
-    }
-    S.sending = true;
-    paint();
-    return call({ route: 'check', token: S.data.token, birthday: birthday })
-      .then(function (res) {
-        if (res && res.error === 'expired') {
-          return call({ route: 'open', code: S.code }).then(function (again) {
-            if (!again || !again.ok) return again;
-            S.data.token = again.token;
-            return call({ route: 'check', token: again.token, birthday: birthday });
-          });
-        }
-        return res;
-      })
-      .then(done);
-  }
-
-  function questionById(id) {
-    return (
-      allQuestions(S.data).find(function (q) {
-        return q.id === id;
-      }) || null
-    );
-  }
-
-  function updateCount() {
-    var box = root && root.querySelector('.sp-progress');
-    if (!box) return;
-    var tmp = document.createElement('div');
-    tmp.innerHTML = progressHtml(S);
-    box.replaceWith(tmp.firstChild);
+  /* A clean state, handed to every screen file. */
+  function reset() {
+    newTurn();
+    S = freshState();
+    share();
+    return S;
   }
 
   function onClick(e) {
     var el = e.target.closest('[data-act]');
     if (!el || !root.contains(el)) return;
     var act = el.dataset.act;
-    var q = el.dataset.q ? questionById(el.dataset.q) : null;
-    if (act === 'start' && S.data && S.data.check) {
-      verifyIdentity();
-    } else if (act === 'start') {
-      S.screen = 'part';
-      S.part = 0;
-      paint();
-      window.scrollTo(0, 0);
-    } else if (act === 'notme') {
+    if (act === 'notme') {
       S.screen = 'notme';
       paint();
+    } else if (act === 'code-retry') {
+      openCode(S.code, S.from);
     } else if (act === 'restart') {
-      S = freshState();
+      reset();
       try {
         history.replaceState(null, '', location.pathname);
       } catch (err) {
         /* fine */
       }
       paint('#sp-code');
-    } else if (act === 'next') {
-      S.part = Math.min(S.part + 1, S.data.parts.length - 1);
-      S.message = '';
-      saveDraft();
-      paint();
-      window.scrollTo(0, 0);
-    } else if (act === 'back') {
-      S.message = '';
-      if (S.part > 0) S.part -= 1;
-      else S.screen = 'confirm';
-      saveDraft();
-      paint();
-      window.scrollTo(0, 0);
-    } else if (act === 'send') {
-      send();
-    } else if (act === 'rcheck') {
-      checkBirthday();
-    } else if (act === 'choice' && q) {
-      toggleChoice(S, q, el.dataset.value);
-      saveDraft();
-      paint('[data-act="choice"][data-q="' + q.id + '"][data-value="' + cssEsc(el.dataset.value) + '"]');
-    } else if (act === 'pick' && q) {
-      S.answers[q.id] = S.answers[q.id] === el.dataset.value ? '' : el.dataset.value;
-      saveDraft();
-      paint('[data-act="pick"][data-q="' + q.id + '"][data-value="' + cssEsc(el.dataset.value) + '"]');
-    } else if (act === 'step' && q) {
-      setStep(S, q, el.dataset.core, Number(el.dataset.value));
-      saveDraft();
-      paint(
-        '[data-act="step"][data-q="' +
-          q.id +
-          '"][data-core="' +
-          el.dataset.core +
-          '"][data-value="' +
-          el.dataset.value +
-          '"]',
-      );
-    } else if (act === 'starter' && q) {
-      var box = root.querySelector('#q-' + q.id);
-      var cur = (S.answers[q.id] || '').replace(/\s+$/, '');
-      var add = el.dataset.text.replace(/\u2026$/, '').trim() + ' ';
-      S.answers[q.id] = cur ? cur + '\n' + add : add;
-      if (box) {
-        box.value = S.answers[q.id];
-        grow(box);
-        box.focus();
-        box.setSelectionRange(box.value.length, box.value.length);
-      }
-      saveDraft();
-      updateCount();
-    } else if (act === 'other-open' && q) {
-      var row = root.querySelector('[data-other="' + q.id + '"]');
-      if (row) {
-        row.hidden = false;
-        row.querySelector('input').focus();
-      }
-    } else if (act === 'other-add' && q) {
-      var input = root.querySelector('#q-' + q.id + '-other');
-      var val = input ? input.value.trim().slice(0, 60) : '';
-      if (val) {
-        var list = Array.isArray(S.answers[q.id]) ? S.answers[q.id].slice() : [];
-        if (list.indexOf(val) < 0) list.push(val);
-        S.answers[q.id] = list;
-        saveDraft();
-        paint('[data-act="other-open"][data-q="' + q.id + '"]');
-      }
+    } else {
+      files.forEach(function (f) {
+        if (f.click) f.click(act, el);
+      });
     }
-  }
-
-  function cssEsc(s) {
-    return String(s).replace(/["\\]/g, '\\$&');
   }
 
   function onInput(e) {
@@ -1564,19 +879,22 @@ var StudentPage = (function () {
       S.number = el.value;
       return;
     }
-    if (!el.dataset || !el.dataset.q) return;
-    var q = questionById(el.dataset.q);
-    if (!q) return;
-    setAnswer(S, q, el);
-    if (el.tagName === 'TEXTAREA') grow(el);
-    saveDraft();
-    updateCount();
+    files.forEach(function (f) {
+      if (f.input) f.input(el);
+    });
   }
 
   function onSubmit(e) {
-    var form = e.target.closest('[data-form="code"]');
+    var form = e.target.closest('[data-form]');
     if (!form) return;
     e.preventDefault();
+    var name = form.getAttribute('data-form');
+    if (name !== 'code') {
+      files.forEach(function (f) {
+        if (f.submit) f.submit(name, form);
+      });
+      return;
+    }
     var input = form.querySelector('#sp-code');
     openCode(input ? input.value : '');
   }
@@ -1605,16 +923,31 @@ var StudentPage = (function () {
       var add = e.target.parentNode.querySelector('[data-act="other-add"]');
       if (add) add.click();
     }
+    // Enter in a card's Is This You? box answers it, as Yes, That's Me does.
+    if (e.key === 'Enter' && e.target && e.target.id === 'sp-ident') {
+      var yes = root.querySelector('[data-act="card-yes"]');
+      if (yes && !yes.disabled) {
+        e.preventDefault();
+        yes.click();
+      }
+    }
   }
 
   function start(el, hash) {
+    newTurn();
     root = el;
     S = freshState();
+    share();
     root.addEventListener('click', onClick);
     root.addEventListener('input', onInput);
     root.addEventListener('submit', onSubmit);
     root.addEventListener('keydown', onKeydown);
     var h = String(hash || '').replace(/^#/, '');
+    // A screen file's own address (app.js: #demo-card).
+    var theirs = files.some(function (f) {
+      return !!(f.start && f.start(h));
+    });
+    if (theirs) return;
     if (/^demo-report$/i.test(h)) {
       S.demo = true;
       var until = new Date(Date.now() + 60 * 864e5).toISOString().slice(0, 10);
@@ -1659,28 +992,78 @@ var StudentPage = (function () {
     paint();
   }
 
+  /* The screen files load after this file, so the page starts once its
+     scripts are read. A copy of index.html from before the split names only
+     this file, and one from before student cards leaves out app.js and
+     assignments.js: a screen file that hasn't joined is fetched here. */
+  function whenScreensAreIn(done) {
+    function fetchMissing() {
+      var missing = ['questionnaire', 'report', 'app', 'assignments'].filter(function (name) {
+        return !files.some(function (f) {
+          return f.file === name;
+        });
+      });
+      var left = missing.length;
+      if (!left) return done();
+      missing.forEach(function (name) {
+        var s = document.createElement('script');
+        s.src = name + '.js';
+        s.onload = s.onerror = function () {
+          left -= 1;
+          if (!left) done();
+        };
+        document.head.appendChild(s);
+      });
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fetchMissing);
+    else fetchMissing();
+  }
+
   var app = typeof document !== 'undefined' && document.getElementById ? document.getElementById('app') : null;
   if (app && typeof app.addEventListener === 'function' && typeof location !== 'undefined') {
-    start(app, location.hash);
-    window.addEventListener('hashchange', function () {
-      var h = location.hash.replace(/^#/, '');
-      if (h && cleanCode(h) !== S.code) {
-        root.replaceWith((root = root.cloneNode(false)));
-        start(root, location.hash);
-      }
+    whenScreensAreIn(function () {
+      start(app, location.hash);
+      window.addEventListener('hashchange', function () {
+        var h = location.hash.replace(/^#/, '');
+        if (h && cleanCode(h) !== S.code) {
+          root.replaceWith((root = root.cloneNode(false)));
+          start(root, location.hash);
+        }
+      });
     });
   }
 
-  return {
+  var api = {
+    addScreens: addScreens,
+    // What the screen files use.
+    MESSAGES: MESSAGES,
+    className: className,
+    fmtDate: fmtDate,
+    header: header,
+    codeBox: codeBox,
+    cleanCode: cleanCode,
+    prettyCode: prettyCode,
+    isCode: function (c) {
+      return CODE_RE.test(c);
+    },
+    reset: reset,
+    newTurn: newTurn,
+    whileCurrent: whileCurrent,
+    openCode: openCode,
+    slipParts: slipParts,
+    identityFields: identityFields,
+    birthdayPickers: birthdayPickers,
+    verifyIdentity: verifyIdentity,
+    call: call,
+    messageFor: messageFor,
+    saveDraft: saveDraft,
+    clearDraft: clearDraft,
+    demoReport: demoReport,
+    paint: paint,
+    grow: grow,
     _test: {
       freshState: freshState,
       render: render,
-      collect: collect,
-      isAnswered: isAnswered,
-      answeredCount: answeredCount,
-      setAnswer: setAnswer,
-      toggleChoice: toggleChoice,
-      setStep: setStep,
       demoData: demoData,
       cleanCode: cleanCode,
       start: start,
@@ -1689,4 +1072,5 @@ var StudentPage = (function () {
       },
     },
   };
+  return api;
 })();

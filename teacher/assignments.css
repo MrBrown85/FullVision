@@ -4136,11 +4136,6 @@ body:has(.af-comp-overlay:not([hidden])) #gb-tooltip {
 .rsg-header-level.hl4::before {
   background: var(--score-4);
 }
-.rsg-header-hint {
-  margin-left: auto;
-  font-size: var(--text-xs);
-  color: var(--text);
-}
 
 /* A student: the name at 21px with status and Comment beside it, and the
    criteria indented under it. */
@@ -5393,32 +5388,41 @@ body:has(#page-layout.sidebar-hidden) .rsg-descriptor-bar {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* The criterion comment: a labelled blue pill at the end of the levels,
-   solid blue once the criterion has a comment. C opens it on the focused
-   row. */
-.rsg-comment-cell {
-  display: flex;
-  margin-top: 4px;
-}
+/* The criterion comment: a labelled blue button under the criterion's name,
+   beside the checklist button and the same size, solid blue once the
+   criterion has a comment. C opens it on the focused row. */
 .rsg-crit-comment {
-  height: 32px;
-  padding: 0 14px 0 12px;
+  height: 26px;
+  padding: 0 9px;
   border: none;
-  border-radius: 16px;
+  border-radius: 7px;
   background: rgba(0, 122, 255, 0.12);
   color: #0058d0;
   font-family: inherit;
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 .rsg-crit-comment svg {
-  width: 15px;
-  height: 15px;
+  width: 13px;
+  height: 13px;
+}
+/* The saved comment, read in place under the levels. */
+.rsg-crit-note {
+  padding: 0 4px;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 .rsg-crit-comment:hover,
 .rsg-crit-comment:focus-visible {
@@ -5719,8 +5723,10 @@ body:has(#page-layout.sidebar-hidden) .rsg-descriptor-bar {
 }
 
 /* ── Advanced Rubric checklists (scoring) ─────────────────── */
-/* A Checks column between the levels and −/+; the checklist opens under
-   its row with one column under each level button. */
+/* The checklist button under the criterion's name, beside Comment, showing
+   how many boxes are ticked (never a total: teachers tick only what the
+   student showed). The checklist opens under its row with one column under
+   each level button. */
 .rsg-checks-cell {
   display: flex;
 }
@@ -5763,20 +5769,9 @@ body:has(#page-layout.sidebar-hidden) .rsg-descriptor-bar {
 }
 .rsg-criterion-main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  column-gap: 10px;
+  grid-template-columns: minmax(0, 1fr);
   row-gap: 6px;
   min-width: 0;
-}
-.rsg-criterion-main:not(:has(> .rsg-comment-cell)) {
-  grid-template-columns: minmax(0, 1fr);
-}
-.rsg-criterion-main > * {
-  grid-column: 1;
-}
-.rsg-criterion-main > .rsg-comment-cell {
-  grid-column: 2;
-  grid-row: 1;
 }
 .rsg-checklist-advice {
   display: flex;
@@ -6419,6 +6414,256 @@ button.grader-member-name {
 .grader-body .ldg-bar,
 .grader-body .ldg-stats {
   display: none;
+}
+
+/* ── Draft and Returned in the dialog (S0-F2) ────────────────
+   Return and where the grade stands, in a row above the footer that does
+   not scroll away: Return on the left, the Draft mark and its line on the
+   right; "Returned Nov 3" once the grade is given. In the grading cards'
+   lane. The level-wording bar moves up to sit above the row. */
+.grader-return {
+  flex-shrink: 0;
+  min-height: 56px;
+  box-sizing: border-box;
+  padding: 6px 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  box-shadow: 0 -0.5px 0 var(--divider-heavy);
+  color: var(--text);
+}
+.grader-dialog.has-return .grdl-wording-bar {
+  bottom: 120px;
+}
+.grader-return-btn {
+  height: 34px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 17px;
+  background: var(--active);
+  color: #fff;
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+}
+.grader-return-btn:hover {
+  background: var(--btn-hover-blue);
+}
+.grader-return-btn:disabled {
+  background: var(--seg-track);
+  color: var(--text-3);
+  cursor: default;
+}
+.grader-returned {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 17px;
+  display: inline-flex;
+  align-items: center;
+  background: var(--score-3-bg);
+  color: var(--score-3-text);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+.grader-draft {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 0;
+}
+.grader-draft-line {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.grader-draft-mark {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 12px;
+  border: 1.5px dashed var(--score-3);
+  color: var(--score-3-text);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.grader-draft-text,
+.grader-draft-still {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+
+/* ── What is waiting to return (S1-F2) ────────────────────────
+   In a class that returns grades When I Return Them: the toolbar's
+   "N to return", a card's chips and Return N Graded, a row's Draft or
+   Returned mark, Return under one student's grader, and the dialog's bar
+   with Show and Return N Graded. Colours are the app's tokens, each with
+   its dark pair: the Demo Mode pill's amber for a count that waits, the
+   Proficient green for the Draft mark's dashes (as in the dialog), the
+   app's blue for a button that returns. */
+.assess-to-return-slot,
+.assess-returns,
+.assess-return-slot {
+  display: contents;
+}
+.assess-to-return-btn {
+  flex-shrink: 0;
+  height: var(--control-h);
+  padding: 0 12px;
+  border: none;
+  border-radius: 16px;
+  background: var(--demo-pill-bg);
+  color: var(--demo-pill-text);
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.assess-to-return-btn:hover,
+.assess-to-return-btn.active {
+  box-shadow: inset 0 0 0 1.5px var(--demo-pill-text);
+}
+.assess-to-return-btn:focus-visible,
+.assess-return-btn:focus-visible,
+.grader-return-all:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.assess-to-return {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 10px;
+  background: var(--demo-pill-bg);
+  color: var(--demo-pill-text);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.assess-returned {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.assess-return-btn,
+.grader-return-all {
+  flex-shrink: 0;
+  height: 30px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 15px;
+  background: var(--active);
+  color: #fff;
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.assess-return-btn:hover {
+  background: var(--btn-hover-blue);
+}
+/* In the dialog it is tinted, as the board draws it and as Print is: Done
+   and Return stay the dialog's solid blue buttons. */
+.grader-return-all {
+  background: rgba(0, 122, 255, 0.1);
+  color: #0062cc;
+}
+.grader-return-all:hover {
+  background: rgba(0, 122, 255, 0.16);
+}
+@media (prefers-color-scheme: dark) {
+  .grader-return-all {
+    background: rgba(10, 132, 255, 0.2);
+    color: var(--active);
+  }
+  .grader-return-all:hover {
+    background: rgba(10, 132, 255, 0.28);
+  }
+}
+/* A row's mark beside the student's name. */
+.ret-mark {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.ret-mark:empty {
+  display: none;
+}
+.ret-draft {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 10px;
+  border: 1.5px dashed var(--score-3);
+  color: var(--score-3-text);
+  font-family: var(--font-base);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+.ret-returned {
+  font-family: var(--font-base);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--text-2);
+}
+/* A ledger's name cell holds the name and the mark; the name still ends
+   in an ellipsis when it is too long. */
+.ldg-name.ldg-name-ret {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ldg-name-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* One student on the page: the dialog's row, under their grader in the
+   open card. */
+.grader-return.grader-return-inline {
+  min-height: 0;
+  margin-top: 8px;
+  padding: 12px 0 2px;
+  background: transparent;
+  box-shadow: inset 0 0.5px 0 var(--divider-medium);
+}
+.grader-return.grader-return-inline[hidden] {
+  display: none;
+}
+/* The dialog's bar under its title: Show on the left, Return N Graded on
+   the right. It does not scroll away. */
+.grader-show {
+  flex-shrink: 0;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 6px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  background: var(--surface);
+  box-shadow: 0 0.5px 0 var(--divider-heavy);
+}
+.grader-show-n {
+  font-variant-numeric: tabular-nums;
+}
+.grader-show .grader-return-all {
+  margin-left: auto;
 }
 
 /* ── Rubric tiles (grader, one student) ─────────────────────── */
@@ -8505,14 +8750,6 @@ button.grader-member-name {
   .rsg-criterion-row {
     grid-template-columns: minmax(0, 1fr);
     gap: 4px;
-  }
-  .rsg-criterion-main {
-    grid-template-columns: minmax(0, 1fr) !important;
-  }
-  .rsg-criterion-main > .rsg-comment-cell {
-    grid-column: 1;
-    grid-row: auto;
-    justify-self: start;
   }
   .rsg-level {
     overflow: hidden;

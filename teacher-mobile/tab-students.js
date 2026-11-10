@@ -158,6 +158,11 @@ window.MStudents = (function () {
     if (_stackInstance) _stackInstance.goTo(idx);
   }
 
+  // The cards drawn again where they are, after a Return on one (S1-F3).
+  function refreshCards() {
+    if (_stackInstance) _stackInstance.goTo(_stackInstance.getCurrentIndex());
+  }
+
   function destroyCardStack() {
     if (_stackInstance) {
       _stackInstance.destroy();
@@ -245,6 +250,7 @@ window.MStudents = (function () {
     destroyCardStack: destroyCardStack,
     getCardIndex: getCardIndex,
     goToCard: goToCard,
+    refreshCards: refreshCards,
     renderAllStudents: renderAllStudents,
     showAllStudents: showAllStudents,
     jumpToStudent: jumpToStudent,

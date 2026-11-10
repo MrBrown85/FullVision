@@ -336,7 +336,9 @@ describe('the grader card’s hint', () => {
       /\.grader-report-note-preview\.warn \.grader-report-note-hint \{\n  color: var\(--score-2-text\);/,
     );
     const save = src.slice(src.indexOf('function _saveReportNote('), src.indexOf('function _graderGrade('));
-    expect(save).toContain('saveScoreReportNote(cid, sid, aid, input.value)');
+    // Through Grader.setReportNote since S1-T3; tests/grader.test.js holds
+    // that it calls saveScoreReportNote with the same arguments.
+    expect(save).toContain('Grader.setReportNote(cid, sid, aid, input.value)');
     expect(save).not.toContain('startsPastTense');
   });
 });

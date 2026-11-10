@@ -36,6 +36,9 @@ create table teacher (
   created_at   timestamptz not null default now(),
   deleted_at   timestamptz                                         -- soft-delete (Q29); purged after 30d by fv_retention_cleanup
 );
+-- teacher.id has no foreign key to auth.users. Deleting a sign-in account
+-- soft-deletes its teacher (trigger below), and a first sign-in frees the
+-- email from a teacher left without one (20261108_teacher_outlives_sign_in).
 
 create table teacher_preference (
   teacher_id          uuid  not null primary key references teacher(id) on delete cascade,
@@ -74,6 +77,10 @@ create table course (
   curriculum_tags  text[],                                         -- BC bank course keys the class is linked to, e.g. {HIST12} (20261102_course_curriculum_tags)
   folders_count_as_one boolean not null default true,             -- overall averages each folder first; false: plain mean of every competency (20261102_folders_count_as_one)
   courses_count_equally boolean not null default false,           -- combined class: roll up each course on its own, then average the courses (20261102_courses_count_equally)
+  student_page_enabled boolean not null default false,            -- the student page build switch; off: every save is returned at once (2026110902_grade_return)
+  return_grades    text default 'on_return'                        -- 'on_return' When I Return Them | 'on_save' As Soon As I Save | null no choice made, works as on_save;
+                   check (return_grades is null or return_grades in ('on_return', 'on_save')), -- classes from before 2026-11-09 are null (2026110902_grade_return)
+  cards_work_until date,                                           -- last day the class's student cards work; null: the last reporting date (2026110903_student_card)
   deleted_at       timestamptz                                         -- soft-delete marker; hidden immediately, purged after 30d by fv_retention_cleanup (20261012_course_soft_delete)
 );
 
@@ -323,6 +330,75 @@ create table rubric_check_score (
   created_at    timestamptz not null default now(),
   primary key (enrollment_id, assessment_id, check_id)
 );
+
+-- Draft or Returned, per student per assessment: what the student has been
+-- given (2026110902_grade_return; plan 1.2). The teacher's working copy stays
+-- in score, tag_score, rubric_score and rubric_check_score. Statement triggers
+-- on those four keep this table right for any writer: after each change they
+-- take the class lock (the class's course_sync_cursor row, after the
+-- statement's rows, as the sync-cursor triggers do), compare working_copy with
+-- the grade now, and write the grade back. return_grades returns drafts; a
+-- class leaving When I Return Them returns what was waiting (a trigger on
+-- course); the restore sets the backup's state. Teachers read their own rows;
+-- nobody writes it directly. A copy is { v, value, modifier, comment, tags
+-- {tag id: {value, modifier, comment}}, criteria {criterion id: {value,
+-- modifier, comment, beyond}}, checks [check ids] }; status and report_note
+-- are never in one. Students are sent only the part of a copy the work's
+-- scoring uses now (_grade_copy_in_use), and nothing while the piece is
+-- Missing or Excused.
+-- No foreign keys, on purpose: a row is read for update, written or deleted
+-- only by a transaction that holds the class lock, and a cascade or a
+-- foreign-key check would take a lock in the other order. A trigger on
+-- enrollment and on assessment deletes the rows (grade_return_gone); the
+-- migration's last two statements are the repair and can be run again.
+create table grade_return (
+  enrollment_id uuid        not null,                               -- enrollment(id), kept by trigger
+  assessment_id uuid        not null,                               -- assessment(id), kept by trigger
+  is_draft      boolean     not null default false,                -- the working copy holds something the student has not been given
+  returned_at   timestamptz,                                        -- last returned; null = never
+  returned_copy jsonb,                                              -- the grade as last returned, kept only while a draft sits on a returned grade
+  previous_copy jsonb,                                              -- the grade the student had before the newest return
+  updated_at    timestamptz,                                        -- when a returned grade last changed for the student
+  seen_at       timestamptz,                                        -- when the student last opened this piece
+  working_copy  jsonb,                                              -- the grade as the last save left it: what the next save is compared with
+  primary key (enrollment_id, assessment_id),
+  check ((returned_copy is not null) = (is_draft and returned_at is not null))
+);
+-- RLS: select only, fv_owns_enrollment(enrollment_id).
+
+-- 2026110905_grade_return_limits (S0-M4b; not applied when this was written):
+-- _grade_return_repair_class(course) settles every cell of a class that has a
+-- grade or a row by the rule a save follows (_grade_return_settle), and
+-- removes rows whose student or assessment is gone; the procedure
+-- grade_return_repair_nightly() runs it class by class, committing after
+-- each, once a day (pg_cron job fv_grade_return_repair_daily, 10:47 UTC). A
+-- trigger after TRUNCATE on enrollment and assessment removes orphan rows.
+-- A DIBELS piece (assessment.score_mode = 'dibels') has no Draft or Returned:
+-- its rows are dormant, read and written by nothing, and are settled by
+-- trigger grade_return_mode when its scoring is changed from DIBELS.
+-- list_course_grade_returns sends no seen_at; student_submit.page sends each
+-- assessment's created_at.
+create table grade_return_repair_log (                              -- what a night's repair could not do; owner only
+  id         bigint      generated always as identity primary key,
+  at         timestamptz not null default now(),
+  course_id  uuid,                                                  -- the class whose repair failed; null for the step after the last class
+  sqlstate   text        not null,
+  message    text        not null
+);
+-- RLS on, no policy; no grant to anon, authenticated or service_role.
+
+-- Schema fv_private (2026110902_grade_return): helpers that SECURITY INVOKER
+-- RPCs call, so signed-in teachers can run them, kept out of the API (the API
+-- serves schema public only): restore_grade_returns (import_json_restore),
+-- grade_return_remap (move_rubric_scores).
+-- docs/schema.generated.sql does not list this schema.
+
+-- Row security on score, tag_score, rubric_score, rubric_check_score and
+-- dibels_score (2026110901_score_rows_same_class): the caller owns the
+-- enrollment and the assessment is in the enrollment's class
+-- (fv_owns_score_cell); on writes the competency, criterion or checkbox the
+-- row names must be in that class too (fv_owns_tag_score_cell,
+-- fv_owns_rubric_score_cell, fv_owns_rubric_check_cell).
 
 -- A completed rubric handout printed for one student: when, and a fingerprint
 -- of what the sheet showed, so the client can tell when it has changed since
@@ -698,6 +774,54 @@ create table student_submit.attempt (                                 -- rate li
   ip_hash text, code_id uuid, course_id uuid                          -- an HMAC of the IP; never answers or names
 );
 
+-- Student cards (2026110903_student_card; plan 1.5). One live card per
+-- enrollment (unique where stopped_at is null); a reissue stops the old card
+-- and keeps its row. The code is kept readable for the class's teacher
+-- (select only, fv_owns_enrollment) beside the salted hash the student path
+-- checks. Written only by issue_student_cards, mark_student_cards_printed,
+-- unlock_student_card, unlock_all_student_cards, reissue_student_card,
+-- set_cards_work_until and the student path. A new slip never draws a live
+-- card's code, nor a new card a live slip's.
+create table student_card (
+  id             uuid        primary key default gen_random_uuid(),
+  enrollment_id  uuid        not null references enrollment(id) on delete cascade,
+  code           text        not null,                              -- as printed, K7M-4QX; unique among live cards
+  code_hash      text        not null unique,                       -- _access_code_hash(code, salt), as a slip's
+  salt           text        not null,
+  created_at     timestamptz not null default now(),
+  printed_at     timestamptz,
+  last_opened_at timestamptz,
+  wrong_tries    integer     not null default 0,                    -- wrong answers to "Is This You?" in a row; a right one resets it; the fifth locks the card
+  wrong_times    timestamptz[] not null default '{}',               -- when each wrong answer of the last 7 days was given; the fifteenth locks the card (the slow lock)
+  locked_at      timestamptz,                                       -- Unlock clears it and the count
+  stopped_at     timestamptz,                                       -- reissued; never opens again
+  works_until    date        not null,                              -- the card's last day, written when it is made: the class's Cards Work Until, else its last reporting date if still ahead, else the next June 30
+  password       text                                               -- the card password printed on it, for a student with no birthday or number then; the card's own
+);
+
+-- A signed-in student device (2026110904_student_sessions_page). A session
+-- belongs to the device, not to a card; device_session_enrollment lists the
+-- classes it has opened, one per card added. A card checked from the start
+-- screen starts a fresh session; only Add Another Card joins one. It ends at
+-- the next midnight in the class's time zone, or on Done (the row is
+-- deleted; any card scan deletes rows past their midnight). card,
+-- verify_card, page, seen and done are the edge function's; _returned_grade
+-- is the only function in the schema that reads a grade.
+create table student_submit.device_session (
+  id uuid primary key default gen_random_uuid(),
+  token_hash text not null unique,                                    -- the phone holds the token
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null
+);
+create table student_submit.device_session_enrollment (
+  session_id uuid not null references student_submit.device_session(id) on delete cascade,
+  enrollment_id uuid not null references public.enrollment(id) on delete cascade,
+  card_id uuid not null references public.student_card(id) on delete cascade,
+  added_at timestamptz not null default clock_timestamp(),
+  primary key (session_id, enrollment_id)
+);
+-- student_submit.attempt.route also takes 'card'; code_id then holds the card's id.
+
 -- Reports on students' phones (20261025_phone_reports). The teacher's copy of
 -- each student's report, fixed until updated; codes in student_access_code
 -- (phone_report_id) open it after a birthday check. Read-only: no reply
@@ -768,6 +892,11 @@ create table support_report (
 -- `category_weight_sum_check(_update)` deferred constraint triggers on category → fv_check_category_weight_sum()
 -- `score_audit_trigger`         after  update on score          → _score_audit_diff(...)
 -- `term_rating_audit_trigger`   after  update on term_rating    → _term_rating_audit_field(...)
+-- `grade_return_insert|update|delete` after each statement on score, tag_score, rubric_score, rubric_check_score → _grade_return_on_change(): the class lock, then working_copy against the grade now
+-- `grade_return_gone`           after  delete (row) on enrollment, assessment → _grade_return_gone(): the class lock, then its grade_return rows go
+-- `grade_return_repoint`        after  update (row) on tag_score, rubric_score, rubric_check_score when its tag, criterion or check id changes → _grade_return_repoint(part, id column); acts only inside move_rubric_scores
+-- `grade_return_release`        after  update of student_page_enabled, return_grades on course, when the class stops holding grades → _grade_return_release()
+-- `fv_teacher_sign_in_deleted`  after  delete on auth.users     → _fv_teacher_sign_in_deleted() (soft-deletes the teacher)
 
 -- ─── Publications ───────────────────────────────────────────────────────────
 -- `course_sync_cursor` is the intended narrow Realtime surface for v2 course invalidation:

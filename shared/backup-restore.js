@@ -267,6 +267,12 @@
       level_order: config.levelOrder === 'asc' ? 'asc' : 'desc',
       folders_count_as_one: config.foldersCountAsOne !== false,
       courses_count_equally: config.coursesCountEqually === true,
+      // The student page (docs/plans/student-page-build-plan.md): a restored
+      // class starts with it off, whatever the backup's class had, as a
+      // duplicated class does; its Return Grades choice comes along.
+      student_page_enabled: false,
+      return_grades:
+        config.return_grades === 'on_return' || config.return_grades === 'on_save' ? config.return_grades : null,
     });
 
     var rc = backup.reportConfig;
@@ -771,6 +777,12 @@
       if (remapped[key] === undefined || remapped[key] === null) return;
       cache[CACHE_FIELDS[key]] = key === 'students' ? remapped.students.map(stripOriginal) : remapped[key];
     });
+    // The restored class's student page is off on this device as well (see
+    // backupToPayload): the backup's switch is not carried into its settings.
+    if (cache.courseConfigs && typeof cache.courseConfigs === 'object' && !Array.isArray(cache.courseConfigs)) {
+      cache.courseConfigs = Object.assign({}, cache.courseConfigs);
+      delete cache.courseConfigs.student_page_enabled;
+    }
     return { cid: cid, course: course, cache: cache, payload: payload, ids: remap.ids };
   }
 

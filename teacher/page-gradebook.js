@@ -54,6 +54,10 @@ window.PageGradebook = (function () {
   var sortCol = null;
   var _filterStripOpen = false;
   var _printShownIds = null;
+  // Draft and Returned (S1-F1): the "N to return" filter, and the drafts on
+  // screen as the last render counted them (null where grades aren't held).
+  var _toReturnOnly = false;
+  var _drafts = null;
   var _scrollShadowCleanup = null;
   var _scrollKey = null; // class and view of the last render, so a redraw keeps the table's scroll
   var _tipSource = null;
@@ -102,6 +106,7 @@ window.PageGradebook = (function () {
     if (window.ClassResults) ClassResults.close();
     activeCourse = cid;
     if (!(await switchActiveCourse(cid))) return;
+    _toReturnOnly = false;
     filterStudentIds = [];
     filterSections = [];
     filterModules = [];
@@ -335,6 +340,19 @@ window.PageGradebook = (function () {
           })
         : null;
 
+    // Draft and Returned (S1-F1): the drafts among the students and columns
+    // shown, and the "N to return" filter, which leaves only those.
+    _drafts = _countDrafts(cid, students, assessments);
+    if (!_drafts || !_drafts.total) _toReturnOnly = false;
+    if (_toReturnOnly) {
+      students = students.filter(function (s) {
+        return _drafts.bySid[s.id];
+      });
+      assessments = assessments.filter(function (a) {
+        return _drafts.byAid[a.id];
+      });
+    }
+
     var html = '';
 
     // ── Toolbar ──
@@ -409,6 +427,8 @@ window.PageGradebook = (function () {
         (filterStudentIds.length === 1 ? '' : 's') +
         ' <span aria-hidden="true">\u00D7</span></button>';
     }
+
+    html += _toReturnButton();
 
     html +=
       '<div style="margin-left:auto;display:flex;align-items:center;gap:12px">' +
@@ -497,8 +517,9 @@ window.PageGradebook = (function () {
     }
 
     // A redraw (a saved score, a sort, a filter) leaves the table where it
-    // was; another class or view starts at the top.
-    var scrollKey = cid + '|' + viewMode;
+    // was; another class or view starts at the top, and so does the "N to
+    // return" filter's shorter grid.
+    var scrollKey = cid + '|' + viewMode + (_toReturnOnly ? '|toReturn' : '');
     var prevData = document.getElementById('gb-data');
     var keepScroll =
       prevData && _scrollKey === scrollKey ? { top: prevData.scrollTop, left: prevData.scrollLeft } : null;
@@ -779,8 +800,162 @@ window.PageGradebook = (function () {
       '<span class="gb-key-item"><span class="gb-late">L</span>Late</span>' +
       (separate ? '<span class="gb-key-item"><span class="gb-late gb-separate">S</span>Graded Separately</span>' : '') +
       '<span class="gb-key-item"><span class="gb-key-dash">\u2014</span>No Score</span>' +
+      // The dashed mark, in a class that holds grades until they are returned.
+      (_drafts
+        ? '<span class="gb-key-item gb-key-item-draft"><span class="gb-key-draft"></span>' + DRAFT_KEY_TEXT + '</span>'
+        : '') +
       '</div>';
     return html;
+  }
+
+  /* \u2500\u2500 Draft and Returned (S1-F1) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+     In a class whose student page is on (the build switch) and that returns
+     grades When I Return Them, a grade is a draft until it is returned
+     (shared/grade-state.js). The gradebook marks each draft with a dashed
+     outline and says so in the key; the toolbar's "N to return" counts the
+     drafts on screen and, pressed, leaves only the students and assessments
+     that have one; each column's Return N Graded returns its drafts, and
+     with a draft of pair or group work the partners' drafts, which its N
+     and names include even when a search hides a partner.
+     In any other class none of it is drawn: the page's HTML is what it was
+     (tests/gradebook-draft-cells.test.js).
+
+     Every count is GradeState.draftsIn, which asks GradeState.stateOf, as
+     the grader dialog and GradeState.draftsWaiting (Class Settings' count)
+     do: a Missing or Excused piece is never a draft, and the columns'
+     counts over a whole class add up to draftsWaiting. Nothing here changes a
+     number: every grade, average and roll-up in the gradebook is worked
+     out from all work, drafts included (the plan, 1.3). */
+  var DRAFT_KEY_TEXT = 'Draft: graded, not returned';
+  // What a screen reader hears after a draft cell's score.
+  var DRAFT_CELL_WORDS = ', Draft, not returned yet';
+
+  /* The drafts among `students` in each of `assessments`:
+     { byAid: { aid: [sid] }, bySid: { sid: true }, total, returns }, or
+     null in a class that doesn't hold grades. `returns` is who each
+     column's Return N Graded returns (GradeState.draftsReturned): the same
+     students, and any partner of theirs a search has hidden. */
+  function _countDrafts(cid, students, assessments) {
+    var klass = getReturnSettings(cid);
+    if (!klass.student_page || !GradeState.holds(klass)) return null;
+    var ids = students.map(function (s) {
+      return s.id;
+    });
+    var out = { byAid: {}, bySid: {}, total: 0, returns: {} };
+    assessments.forEach(function (a) {
+      var waiting = GradeState.draftsIn(cid, a.id, ids);
+      if (!waiting.length) return;
+      out.byAid[a.id] = waiting;
+      out.returns[a.id] = GradeState.draftsReturned(cid, a.id, ids);
+      waiting.forEach(function (sid) {
+        out.bySid[sid] = true;
+      });
+      out.total += waiting.length;
+    });
+    return out;
+  }
+
+  // True when `sid`'s piece on `aid` was a draft at the last render.
+  function _isDraft(sid, aid) {
+    return !!(_drafts && _drafts.byAid[aid] && _drafts.byAid[aid].indexOf(sid) >= 0);
+  }
+
+  /* The toolbar's "N to return": the drafts on screen, summed over the
+     columns. Pressed, it is the filter; nothing is drawn when N is 0. */
+  function _toReturnButton() {
+    if (!_drafts || !_drafts.total) return '';
+    return (
+      '<button type="button" class="gb-to-return' +
+      (_toReturnOnly ? ' active' : '') +
+      '" data-action="toggleToReturn" aria-pressed="' +
+      _toReturnOnly +
+      '" title="' +
+      (_toReturnOnly
+        ? 'Showing only the drafts to return. Click to show everything.'
+        : 'Show only the students and assessments with a draft to return.') +
+      '">' +
+      _drafts.total +
+      ' to return' +
+      (_toReturnOnly ? ' <span aria-hidden="true">\u00d7</span>' : '') +
+      '</button>'
+    );
+  }
+
+  // The student ids of the rows on screen, top to bottom.
+  function _rowIds() {
+    return Array.prototype.map.call(document.querySelectorAll('#gb-data tr[data-sid]'), function (row) {
+      return row.dataset.sid;
+    });
+  }
+
+  /* Return N Graded: every draft in the column, among the rows on screen
+     and the partners graded with them (GradeState.draftsReturned), is returned in one
+     action through the one grader. True when any was. The grader is handed
+     each of those students' whole pair or group, as the dialog's Return
+     hands it, and returns the drafts among them. */
+  function _returnDrafts(aid) {
+    var cid = activeCourse;
+    var klass = getReturnSettings(cid);
+    if (!klass.student_page || !GradeState.holds(klass)) return false;
+    var waiting = GradeState.draftsIn(cid, aid, _rowIds());
+    if (!waiting.length) return false;
+    Grader.returnGrades(cid, aid, GradeState.returnTogether(cid, aid, waiting));
+    clearProfCache();
+    render();
+    return true;
+  }
+
+  /* A Competencies header's Return N Graded asks first (Colin, 2026-11-10):
+     the button shows no names, so the app's confirm dialog says who gets
+     their grade, the line the Scores column's menu shows above its own
+     Return N Graded, which stays one click. Cancel returns nothing and
+     gives the button the focus back. Return counts the drafts again from
+     the rows on screen (_returnDrafts) and does nothing if none is left;
+     the button goes with the drafts, so the assessment's title takes the
+     focus. */
+  function _askReturnDrafts(button) {
+    var cid = activeCourse;
+    var aid = button.dataset.aid;
+    var waiting = _drafts ? GradeState.draftsReturned(cid, aid, _rowIds()) : [];
+    var n = waiting.length;
+    if (!n) return;
+    // The dialog gives the focus back to what had it when it opened. Safari
+    // does not focus a button it clicks, so the button takes it first.
+    button.focus({ preventScroll: true });
+    showConfirm(
+      GradeState.returnQuestion(n),
+      GradeState.draftsSentence(cid, waiting),
+      GradeState.returnNGraded(n),
+      'primary',
+      function () {
+        if (!_mounted || activeCourse !== cid || !_returnDrafts(aid)) return;
+        var title = Array.prototype.find.call(
+          document.querySelectorAll('.gb-grid-assess-group .gb-assess-title'),
+          function (t) {
+            return (t.dataset.href || '').split('&open=')[1] === aid;
+          },
+        );
+        if (title) title.focus({ preventScroll: true });
+      },
+    );
+  }
+
+  /* Return N Graded under a Competencies header, where the column has no
+     menu: drawn only while the assessment has drafts on screen. The Scores
+     view has it at the top of the column's menu (showHeaderContextMenu). */
+  // html-safe: the id is ours; the names in the title go through esc
+  function _returnDraftsButton(cid, a) {
+    var waiting = _drafts && _drafts.returns[a.id];
+    if (!waiting) return '';
+    return (
+      '<button type="button" class="gb-return-drafts" data-action="returnDrafts" data-aid="' +
+      a.id +
+      '" title="' +
+      esc(GradeState.draftsSentence(cid, waiting)) +
+      '">' +
+      esc(GradeState.returnNGraded(waiting.length)) +
+      '</button>'
+    );
   }
 
   /* What the page says when there is nothing to show, and the one step that
@@ -1109,10 +1284,12 @@ window.PageGradebook = (function () {
   /* What a screen reader hears on a Competencies cell, as the Scores view
      says it: "Mateo Alvarez, Density Worksheet, QAP1: 3, Proficient".
      `value` is the score's text ('' for none); a status replaces it, and
-     Late follows it. Escaped for an attribute. */
-  function _compCellLabel(s, assess, col, status, value, hint) {
+     Late follows it, then that the grade is a draft (`draft`). Escaped for
+     an attribute. */
+  function _compCellLabel(s, assess, col, status, value, hint, draft) {
     var what = status === 'NS' ? 'Missing' : status === 'EXC' ? 'Excused' : value ? value : 'No score';
     if (status === 'LATE' && value) what += ', Late';
+    if (draft) what += DRAFT_CELL_WORDS;
     var code = col.isPointsCol ? '' : col.tagCode ? ', ' + col.tagCode : '';
     return esc(
       fullName(s) + ', ' + ((assess && assess.title) || 'Assessment') + code + ': ' + what + (hint ? '. ' + hint : ''),
@@ -1410,6 +1587,7 @@ window.PageGradebook = (function () {
         '</span>' +
         badges +
         '</div>' +
+        _returnDraftsButton(cid, a) +
         '<div class="gb-assess-stripe" style="background:' +
         stripeColor +
         '"></div>' +
@@ -1516,16 +1694,28 @@ window.PageGradebook = (function () {
         var cellStatus = getAssignmentStatus(cid, s.id, col.assessmentId);
         var statusMark = scoreStatusMarker(cellStatus, cid, assess);
         var lateMark = cellStatus === 'LATE' ? lateMarkHtml() : '';
+        // A draft is the whole piece: each of its cells is dashed (S1-F1).
+        var draft = _isDraft(s.id, col.assessmentId);
+        var draftClass = draft ? ' gb-draft' : '';
         if (col.isPointsCol && isCompletionScored(assess)) {
           var mark = getCompletionMark(cid, s.id, col.assessmentId);
           html +=
             '<td class="gb-score gb-score-pts' +
             startClass +
             altClass +
+            draftClass +
             '"' +
             cellStyle +
             ' tabindex="-1" role="gridcell" aria-label="' +
-            _compCellLabel(s, assess, col, cellStatus, mark ? (mark === 'complete' ? 'Complete' : 'Incomplete') : '') +
+            _compCellLabel(
+              s,
+              assess,
+              col,
+              cellStatus,
+              mark ? (mark === 'complete' ? 'Complete' : 'Incomplete') : '',
+              '',
+              draft,
+            ) +
             '" data-aid="' +
             col.assessmentId +
             '" data-pts="1" data-cmp="1" data-sid="' +
@@ -1556,10 +1746,19 @@ window.PageGradebook = (function () {
             '<td class="gb-score gb-score-pts' +
             startClass +
             altClass +
+            draftClass +
             '"' +
             cellStyle +
             ' tabindex="-1" role="gridcell" aria-label="' +
-            _compCellLabel(s, assess, col, cellStatus, score != null ? formatPoints(score) + ' out of ' + max : '') +
+            _compCellLabel(
+              s,
+              assess,
+              col,
+              cellStatus,
+              score != null ? formatPoints(score) + ' out of ' + max : '',
+              '',
+              draft,
+            ) +
             '" data-aid="' +
             col.assessmentId +
             '" data-pts="1" data-sid="' +
@@ -1604,6 +1803,7 @@ window.PageGradebook = (function () {
             '<td class="gb-score' +
             startClass +
             altClass +
+            draftClass +
             '"' +
             cellStyle +
             ' tabindex="-1" role="gridcell" aria-label="' +
@@ -1614,6 +1814,7 @@ window.PageGradebook = (function () {
               cellStatus,
               score > 0 ? formatScoreLevel(score, entry.mod) + ', ' + scoreLevelText(score, entry.mod) : '',
               rubricCol ? 'Scored on the rubric. Press Return to open it.' : '',
+              draft,
             ) +
             '" data-aid="' +
             col.assessmentId +
@@ -1908,6 +2109,13 @@ window.PageGradebook = (function () {
           cellStyle = 'color:var(--text-3)';
           display = '\u2014';
         }
+        // A draft: the dashed outline in the level's colour, and no fill
+        // (S1-F1). A Missing or Excused piece is never one.
+        var draft = _isDraft(s.id, a.id);
+        if (draft) {
+          cellClass += ' gb-draft';
+          cellStyle = cellStyle.replace(/^background:[^;]*;/, '');
+        }
         var isScoreModeCell = _scoreMode && _scoreMode.assessmentId === a.id && si === _scoreMode.studentIdx;
         var isScoreModeCol = _scoreMode && _scoreMode.assessmentId === a.id;
         html +=
@@ -1936,6 +2144,7 @@ window.PageGradebook = (function () {
                   : cell.text + (levelWord(cid, cell.level) ? ', ' + levelWord(cid, cell.level) : '')
                 : 'no score') +
           (cell.late && !statusMark ? ', Late' : '') +
+          (draft ? DRAFT_CELL_WORDS : '') +
           '" data-action="editScoreCell" data-aid="' +
           a.id +
           '" data-sid="' +
@@ -2280,7 +2489,7 @@ window.PageGradebook = (function () {
       return a.id === aid;
     });
     var undo = _pushUndo(cid, sid, aid, assess ? scoreTagIds(assess, cid) : []);
-    setCompletionMark(cid, sid, aid, mark);
+    Grader.setMark(cid, sid, aid, mark);
     _undoSaved(undo);
     return _redrawCompetencyCell(td);
   }
@@ -2400,11 +2609,10 @@ window.PageGradebook = (function () {
       // Restore previous entry if it existed
       if (prevEntry) scores[undo.sid].push(prevEntry);
     });
-    saveScores(undo.cid, scores);
-    persistScoreDiffToCanonical(undo.cid, beforeScores, scores);
+    Grader.undoCell(undo.cid, undo.sid, undo.aid, beforeScores, scores);
     // The Advanced Rubric ticks Clear Score took off.
     (undo.checkIds || []).forEach(function (id) {
-      setRubricCheck(undo.cid, undo.sid, undo.aid, id, true);
+      Grader.setTick(undo.cid, undo.sid, undo.aid, id, true);
     });
     clearProfCache();
     if (_mounted && activeCourse === undo.cid) render();
@@ -2490,7 +2698,7 @@ window.PageGradebook = (function () {
     var undo = _pushUndo(cid, sid, aid, tids);
     var level = entry.score;
     tids.forEach(function (key) {
-      upsertScore(
+      Grader.typePlusMinus(
         cid,
         sid,
         aid,
@@ -2563,10 +2771,10 @@ window.PageGradebook = (function () {
       var raw = parsePointsInput(inp.value, max);
       var undo = _pushUndo(cid, sid, aid, isPtsCol ? scoreTagIds(assess, cid) : [td.dataset.tid]);
       if (isPtsCol) {
-        setPointsScore(cid, sid, aid, raw);
+        Grader.setPoints(cid, sid, aid, raw);
       } else {
         var tidVal = td.dataset.tid;
-        upsertScore(cid, sid, aid, tidVal, raw || 0, assess.date || courseToday(cid), scoreTypeFor(assess));
+        Grader.typeLevel(cid, sid, aid, tidVal, raw || 0, assess.date || courseToday(cid), scoreTypeFor(assess));
       }
       _undoSaved(undo);
       _redrawCompetencyCell(td);
@@ -3002,22 +3210,21 @@ window.PageGradebook = (function () {
           // An Advanced Rubric's ticks go with the score, so reopening it
           // doesn't suggest a level for work that has none.
           checkIds.forEach(function (id) {
-            setRubricCheck(cid, sid, aid, id, false);
+            Grader.setTick(cid, sid, aid, id, false);
           });
           var hadScore = _undoHadScore(undo) || checkIds.length > 0;
-          clearScoreEntries(cid, scores, sid, assess, clearIds);
-          saveScores(cid, scores);
+          Grader.clearScore(cid, scores, sid, assess, clearIds);
           _undoSaved(undo);
           clearProfCache();
           render();
-          window.clearScore(sid, aid);
+          Grader.clearScoreOnServer(cid, sid, aid);
           if (hadScore) _showClearToast(undo);
         }
       } else if (action === 'markMissing' || action === 'excuseCell' || action === 'lateCell') {
         // Same path as the Assignments page's NS / EXC / Late buttons; picking
         // the cell's current status again takes it off.
         var next = action === 'markMissing' ? 'NS' : action === 'excuseCell' ? 'EXC' : 'LATE';
-        applyAssignmentStatus(activeCourse, sid, aid, status === next ? null : next);
+        Grader.setStatus(activeCourse, sid, aid, status === next ? null : next);
         clearProfCache();
         render();
       }
@@ -3083,7 +3290,7 @@ window.PageGradebook = (function () {
       var key = u.sid + ':' + undo.aid;
       if (st[key] === u.status) delete st[key];
     });
-    saveAssignmentStatuses(undo.cid, st);
+    Grader.undoMarkBlankCells(undo.cid, undo.aid, st);
     _saveBulkStatusUndo(
       undo.cid,
       undo.aid,
@@ -3123,7 +3330,7 @@ window.PageGradebook = (function () {
       }
     });
     if (!marked.length) return;
-    saveAssignmentStatuses(activeCourse, statuses);
+    Grader.markBlankCells(activeCourse, aid, statuses);
     _saveBulkStatusUndo(activeCourse, aid, undo);
     clearProfCache();
     render();
@@ -3163,13 +3370,27 @@ window.PageGradebook = (function () {
       });
       if (colAvg) avgHint = 'Avg ' + classColumnAverageText(activeCourse, assess, colAvg);
     }
-    // html-safe: the hint is a figure from calc.js, escaped
+    // Print Rubrics (or Print Scores), as on Class Results and the grader.
+    var printLabel = window.RubricPrint ? RubricPrint.printLabel(activeCourse, assess) : '';
+    // Return N Graded and who is waiting, when the column has drafts (S1-F1).
+    var waiting = _drafts ? GradeState.draftsReturned(activeCourse, aid, _rowIds()) : [];
+    // html-safe: the hint is a figure from calc.js, escaped; the drafts line's names go through esc
     menu.innerHTML =
+      (waiting.length
+        ? '<div class="gb-ctx-note">' +
+          esc(GradeState.draftsSentence(activeCourse, waiting)) +
+          '</div>' +
+          '<div class="gb-ctx-item gb-ctx-return" data-ctx="returnDrafts">' +
+          esc(GradeState.returnNGraded(waiting.length)) +
+          '</div>' +
+          '<div class="gb-ctx-divider"></div>'
+        : '') +
       '<div class="gb-ctx-item" data-ctx="scoreMode">Grade This Assessment</div>' +
       '<div class="gb-ctx-item gb-ctx-split" data-ctx="viewResults"><span>View Class Results</span>' +
       (avgHint ? '<span class="gb-ctx-hint">' + esc(avgHint) + '</span>' : '') +
       '</div>' +
       '<div class="gb-ctx-item" data-ctx="editAssess">Edit Assessment Details</div>' +
+      (printLabel ? '<div class="gb-ctx-item" data-ctx="printRubrics">' + esc(printLabel) + '</div>' : '') +
       '<div class="gb-ctx-divider"></div>' +
       '<div class="gb-ctx-item" data-ctx="markUngradedNS">Mark Blank Cells Missing</div>' +
       '<div class="gb-ctx-item" data-ctx="markUngradedEXC">Mark Blank Cells Excused</div>' +
@@ -3191,7 +3412,8 @@ window.PageGradebook = (function () {
       if (!item) return;
       var action = item.dataset.ctx;
       _dismissContextMenu(true);
-      if (action === 'scoreMode') {
+      if (action === 'returnDrafts') _returnDrafts(aid);
+      else if (action === 'scoreMode') {
         // The grader opens on the top student in the order shown.
         var firstRow = document.querySelector('.gb-scores-row[data-sid]');
         if (firstRow) openGrader(firstRow.dataset.sid, aid);
@@ -3199,7 +3421,9 @@ window.PageGradebook = (function () {
         if (window.ClassResults)
           ClassResults.open(activeCourse, aid, { from: header.querySelector('.gb-grid-colhead-label') || header });
       } else if (action === 'editAssess') Router.navigate('/assignments?course=' + activeCourse + '&edit=' + aid);
-      else if (action === 'markUngradedNS' || action === 'markUngradedEXC') {
+      else if (action === 'printRubrics') {
+        if (window.RubricPrint) RubricPrint.open(activeCourse, aid);
+      } else if (action === 'markUngradedNS' || action === 'markUngradedEXC') {
         // Every student row on screen with nothing in this column.
         _markBlankCells(
           aid,
@@ -3216,7 +3440,7 @@ window.PageGradebook = (function () {
           var key = u.sid + ':' + aid;
           if (st[key] === u.status) delete st[key];
         });
-        saveAssignmentStatuses(activeCourse, st);
+        Grader.undoMarkBlankCells(activeCourse, aid, st);
         _saveBulkStatusUndo(activeCourse, aid, []);
         clearProfCache();
         render();
@@ -3293,7 +3517,7 @@ window.PageGradebook = (function () {
         return e.assessmentId !== aid;
       });
     });
-    saveScores(cid, scores);
+    Grader.deleteAssessmentScores(cid, aid, scores);
     // P6.5: previously this branch only cleaned scores+assessments,
     // leaving status pills + observations orphaned in LS and on the
     // server. Mirror page-assignments.js's deleteAssess so the two
@@ -3306,7 +3530,7 @@ window.PageGradebook = (function () {
         statusChanged = true;
       }
     });
-    if (statusChanged) saveAssignmentStatuses(cid, statuses);
+    if (statusChanged) Grader.deleteAssessmentStatuses(cid, aid, statuses);
     deleteAssessmentObservations(cid, aid);
     clearProfCache();
   }
@@ -3472,10 +3696,10 @@ window.PageGradebook = (function () {
       // couldn't keep shows on the sync dot (data.js), not here.
       if (isPts) {
         // One value for the whole assessment, mirrored onto each competency.
-        setPointsScore(cid, sid, aid, val);
+        Grader.setPoints(cid, sid, aid, val);
       } else {
         tagIds.forEach(function (tid) {
-          upsertScore(cid, sid, aid, tid, val, assess.date || courseToday(cid), scoreTypeFor(assess), '');
+          Grader.typeLevel(cid, sid, aid, tid, val, assess.date || courseToday(cid), scoreTypeFor(assess), '');
         });
       }
       _undoSaved(undo);
@@ -3752,7 +3976,7 @@ window.PageGradebook = (function () {
         var keys = _cellScoreKeys(focused);
         var undo = _pushUndo(activeCourse, sid, aid, keys);
         keys.forEach(function (key) {
-          upsertScore(
+          Grader.typeLevel(
             activeCourse,
             sid,
             aid,
@@ -3787,13 +4011,13 @@ window.PageGradebook = (function () {
         var undo = null;
         if (focused.dataset.pts === '1') {
           undo = _pushUndo(activeCourse, sid, aid, assess ? scoreTagIds(assess, activeCourse) : []);
-          setPointsScore(activeCourse, sid, aid, null);
+          Grader.setPoints(activeCourse, sid, aid, null);
           _undoSaved(undo);
         } else if (tid) {
           var clearKeys = _cellScoreKeys(focused);
           undo = _pushUndo(activeCourse, sid, aid, clearKeys);
           clearKeys.forEach(function (key) {
-            upsertScore(
+            Grader.typeLevel(
               activeCourse,
               sid,
               aid,
@@ -4166,6 +4390,19 @@ window.PageGradebook = (function () {
       clearSearch: function () {
         onSearch('', 0);
       },
+      // Draft and Returned (S1-F1). The button is redrawn with the page, so
+      // the new one takes the focus.
+      toggleToReturn: function () {
+        _flushActiveScoreEditor();
+        _toReturnOnly = !_toReturnOnly;
+        render();
+        var again = document.querySelector('.gb-to-return');
+        if (again) again.focus({ preventScroll: true });
+      },
+      // A Competencies header's Return N Graded.
+      returnDrafts: function () {
+        _askReturnDrafts(el);
+      },
       toggleSort: function () {
         toggleSort(el.dataset.sortkey);
       },
@@ -4227,6 +4464,8 @@ window.PageGradebook = (function () {
     filterCategories = [];
     // From a dashboard link: these students, and one competency's columns.
     filterStudentIds = params.students ? String(params.students).split(',').filter(Boolean) : [];
+    _toReturnOnly = false;
+    _drafts = null;
     var linkedSection = params.section;
     if (
       linkedSection &&

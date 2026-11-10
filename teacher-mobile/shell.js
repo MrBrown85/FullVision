@@ -799,6 +799,7 @@
       return;
     }
 
+    _refreshUnder(below);
     below.style.display = '';
     below.classList.add('m-pop-enter');
     top.classList.add('m-pop-exit-active');
@@ -810,6 +811,13 @@
         _finishPop(top, below, fromHistory);
       }, 360);
     });
+  }
+
+  /* The Grade tab's list, about to show again from under a grading screen:
+     its To Return list and count follow what was graded or returned there
+     (S1-F3). Nothing is drawn in a class that holds no grades. */
+  function _refreshUnder(below) {
+    if (below && below.id === 'm-screen-grade-picker') MGrade.refreshToReturn(_cid);
   }
 
   function _finishPop(top, below, fromHistory) {
@@ -926,6 +934,7 @@
           }
           active = true;
           _swipeActive = true;
+          _refreshUnder(below);
           below.style.display = '';
           top.classList.add('m-swipe-back');
           below.classList.add('m-swipe-back');
@@ -1433,6 +1442,34 @@
         // Wired at once, as when grading from a student: a score typed or an
         // avatar tapped while the screen slides in is not lost.
         MGrade.setupSwiper(_cid, aid);
+        // A To Return row opens on the first draft (S1-F3).
+        if (target.getAttribute('data-open') === 'draft') MGrade.jumpToFirstDraft(_cid, aid);
+        return;
+      }
+
+      // Draft and Returned (S1-F3): Return and Next on the grading screen,
+      // Return N on the To Return list, Return on a student card.
+      if (action === 'm-grade-return-next') {
+        MGrade.returnAndNext();
+        return;
+      }
+      if (action === 'm-grade-return-all') {
+        MGrade.askReturnAll(_cid, target.getAttribute('data-aid'), target);
+        return;
+      }
+      if (action === 'm-card-return') {
+        MGrade.returnFromCard(
+          _cid,
+          target.getAttribute('data-aid'),
+          target.getAttribute('data-sid'),
+          target,
+          function () {
+            MStudents.refreshCards();
+            // The row is gone: the cards keep the focus.
+            var cards = document.getElementById('m-student-card-stack');
+            if (cards) cards.focus({ preventScroll: true });
+          },
+        );
         return;
       }
 

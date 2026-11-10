@@ -27,7 +27,7 @@ The app persists teacher data through Supabase Auth plus a public RPC surface. I
 
 - `login.html` and `login-auth.js` handle sign-in, sign-up, password reset, and Demo Mode entry.
 - Authenticated users are routed into the teacher experience.
-- Teachers are the only accounts. Students answer questionnaires and read phone reports on the student page (`s/index.html`, `s/student.js`, `shared/phone-report-view.js`) with a code from their slip, through the `student-submit` Supabase edge function. There is no parent portal.
+- Teachers are the only accounts. Students answer questionnaires and read phone reports on the student page (`s/index.html`; `s/student.js`, the shell, then its screens in `s/questionnaire.js` and `s/report.js`; `shared/phone-report-view.js`) with a code from their slip, through the `student-submit` Supabase edge function. A student card's screens are `s/app.js` (the card, Is This You?) and `s/assignments.js` (the Assignments list), with `s/student-data.js` feeding `shared/calc.js` from the student's own page (`calc.js` and `constants.js` are fetched only when the list is about to open, so a slip never loads them); they run in Demo Mode only (`/s/#demo-card`) until the card routes exist. There is no parent portal.
 
 ### Desktop SPA
 
@@ -40,7 +40,7 @@ The app persists teacher data through Supabase Auth plus a public RPC surface. I
   - `page-gradebook.js`
   - `page-observations.js`
   - `page-starters.js`: Observations › Starters (`/observations/starters`)
-  - `page-reports.js`: Reports, with two tabs. The Term Questionnaire is `report-questionnaire.js` (one student at a time: the student strip, What FullVision Has, the Comment Bank and the Teacher Comment); its Comment Bank is data in `shared/comment-bank.js` and a pure engine in `teacher/comment-bank.js` (`facts` reads one student's term from the data layer; `context`, `fits`, `fill`, `parts` decide what is offered). Generate assembles a draft from the bank's sentences; no model writes text (docs/DECISIONS.md). Progress Reports are `report-studio.js`, `report-sheets.js` (forms, layout and fit) and `report-blocks.js` (one renderer per printed block).
+  - `page-reports.js`: Reports, with two tabs. The Term Questionnaire is `report-questionnaire.js` (one student at a time: the student strip, What FullVision Has, the Comment Bank and the Teacher Comment); its Comment Bank is data in `shared/comment-bank.js` and a pure engine in `teacher/comment-bank.js` (`facts` reads one student's term from the data layer; `context`, `fits`, `fill`, `parts` decide what is offered). Generate assembles a draft from the bank's sentences; no model writes text (docs/DECISIONS.md). Progress Reports are `report-studio.js`, `report-sheets.js` (forms, layout and fit) and `report-blocks.js` (one renderer per printed block). Every report surface (these, the Quick Report and its Feedback Pages, Sent to Phones, Print Grades, Export) reads grades through `report-scores.js` (`ReportScores`): one table says which set of scores each surface uses (all work today), `withReportScores` runs a report in it, and its readers are the only way a report file reads a score, comment, note, tick or status from the data layer. `tests/report-score-seam.test.js` holds that.
 - Shared desktop UI shell: `teacher/ui.js`
 
 The desktop app is a single-page app on real paths: `/dashboard`, `/assignments`, `/gradebook`, `/observations`, `/observations/starters`, `/reports` and `/student?id=…`. Netlify serves `teacher/app.html` at each of them and `teacher/router.js` draws the page with `history.pushState`; the list is repeated in `netlify.toml`, `sw.js`, `serve.json` and the local servers, and `tests/app-routes.test.js` keeps them in step. Old `/teacher/app.html#/…` links are rewritten to the clean address at boot. Page modules render into shared mount points for the dock, sidebar, page toolbar, and main content area.
@@ -78,8 +78,10 @@ Shared runtime modules load before desktop or mobile page modules, in this order
 10. `shared/offline-queue.js`
 11. `shared/auto-update.js`
 12. `shared/calc.js`
-13. `shared/rubric-draft.js`
-14. `shared/rubric-checks.js`
+13. `shared/grade-state.js` (the Draft and Returned rule; a class whose student page is off returns every save at once)
+14. `shared/grader.js` (`Grader`, the one module a screen writes a grade through)
+15. `shared/rubric-draft.js`
+16. `shared/rubric-checks.js`
 
 The phone loads the same list without `link-nav.js`, `reporting-term-presets.js` and `rubric-draft.js`.
 
@@ -190,6 +192,18 @@ Desktop UI currently exposes queue and offline state through:
 - the sync dot (green saved, yellow syncing, red a problem; the tooltip says which). No count or popover (removed Oct 2026: the number next to the teacher's name confused people).
 
 The queue is the active retry mechanism for flows that opt into queued dispatch.
+
+### Draft and Returned, and student cards
+
+Behind a per-class build switch (`course.student_page_enabled`, off for every class until its teacher turns it on; `docs/plans/student-page-build-plan.md`). With the switch off none of this runs and nothing here is asked of the server.
+
+- **The two settings** (`student_page_enabled`, `return_grades`) are columns on `course`. They reach the client on the course row inside `get_class_bundle`. The switch counts for a signed-in teacher only once the server has said it is on (`_serverSaysStudentPage`, kept in the class's saved-copy record, not in its settings object): a value the device merely holds (a restored backup, a copied class) shows nothing and sends nothing. The switch is offered only in Class Settings › Student Page when the app is opened at an address carrying `?build=student-page` (`teacher/cm-student-page.js`).
+- **They are sent only by the actions that change them**, through `saveReturnSettings`: the Return Grades choice, the build switch, and a class made on the device going up with the choice it was made with (Duplicate Class). `saveCourseConfig` sends neither and cannot change either, so a device holding an old copy of a class's settings cannot put an old choice back by saving something else. A change that starts a class holding grades (the switch on, When I Return Them) is asked of the server directly and made on the device only when the server has answered. A change that stops it first asks the server how many grades wait (`course_draft_count`), then is made on the device and queued; the server returns what waits by a trigger and the device does the same to its rows.
+- **The rows** (one per student per assessment: Draft or Returned, and what the student was last given) are kept by database triggers (`grade_return`). The client reads them with `list_course_grade_returns` after the class loads, after a change from another device, and once its own writes have landed, into the `gradeReturns` cache Demo Mode also uses. Between a save and that read the row is the one `shared/grade-state.js` works out: the same rule as the triggers, held to them by `tests/fixtures/grade-state-cases.json`. Rows read from before a newer local change are never applied. A DIBELS benchmark has no row on either side.
+- **Return** (`Grader.returnGrades`) is optimistic on the device and goes to the server as `return_grades`, one call for each student, through the outbox under the cell's key (`cell:<student>:<assessment>`), so it follows that cell's score writes; the outbox also holds it behind any queued write to the whole student or the whole piece of work, and such a write behind it.
+- **A refused write** of a Return or of either setting has the class read again whole (settings and rows), and that read is retried like any failed class load, so the device converges on the server. So does an ask of the server that fails or goes unanswered (a change that starts holding, the count of drafts): the server may have made the change and only its answer been lost.
+- **Student cards** (`teacher/student-cards.js`): `issue_student_cards` and `list_student_cards` are asked for online with the teacher waiting, as slip codes are; `mark_student_cards_printed` goes through the outbox. A signed-in teacher's card codes are held in memory only, and are read only while the Student Cards list is on the page. Cards print on the questionnaire slips' sheet (`QrSlips.printSheet`).
+- **Demo Mode** runs all of it on the device (`gb-grade-returns-<cid>`, `gb-student-cards-<cid>`) and sends nothing.
 
 ### Cross-tab behavior
 

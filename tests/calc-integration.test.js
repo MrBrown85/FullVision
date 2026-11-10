@@ -21,6 +21,20 @@ function mockDataLayer(overrides) {
   };
 
   const mocks = { ...defaults, ...overrides };
+  // A level counts only for a competency its piece is linked to (S0-F1d).
+  // The pieces in this file list no competencies, so each is linked to the
+  // ones its scores sit under; a piece that lists its own keeps them.
+  const pieces = mocks.getAssessments;
+  const scored = mocks.getScores;
+  mocks.getAssessments = (...args) => {
+    const on = {};
+    Object.values(scored(...args) || {}).forEach(list =>
+      (list || []).forEach(e => {
+        if (e && e.tagId) (on[e.assessmentId] = on[e.assessmentId] || new Set()).add(e.tagId);
+      }),
+    );
+    return pieces(...args).map(a => (a && !a.tagIds && !a.tag_ids && on[a.id] ? { ...a, tagIds: [...on[a.id]] } : a));
+  };
   Object.keys(mocks).forEach(fn => {
     originals[fn] = globalThis[fn];
     globalThis[fn] = mocks[fn];

@@ -18,6 +18,20 @@ function mockDataLayer(overrides) {
     getGradingScale: () => DEFAULT_GRADING_SCALE,
   };
   const mocks = { ...defaults, ...overrides };
+  // A level counts only for a competency its piece is linked to (S0-F1d).
+  // The pieces in this file list no competencies, so each is linked to the
+  // ones its scores sit under; a piece that lists its own keeps them.
+  const pieces = mocks.getAssessments;
+  const scored = mocks.getScores;
+  mocks.getAssessments = (...args) => {
+    const on = {};
+    Object.values(scored(...args) || {}).forEach(list =>
+      (list || []).forEach(e => {
+        if (e && e.tagId) (on[e.assessmentId] = on[e.assessmentId] || new Set()).add(e.tagId);
+      }),
+    );
+    return pieces(...args).map(a => (a && !a.tagIds && !a.tag_ids && on[a.id] ? { ...a, tagIds: [...on[a.id]] } : a));
+  };
   Object.keys(mocks).forEach(fn => {
     originals[fn] = globalThis[fn];
     globalThis[fn] = mocks[fn];
@@ -271,6 +285,8 @@ describe('getCompletionPct', () => {
     mockDataLayer({
       getSections: () => [{ id: 'sec1', tags: [{ id: 't1' }, { id: 't2' }, { id: 't3' }, { id: 't4' }] }],
       getAllTags: () => [{ id: 't1' }, { id: 't2' }, { id: 't3' }, { id: 't4' }],
+      // The class's competencies sit in its one section (S0-F1d reads this).
+      getSectionForTag: () => ({ id: 'sec1' }),
       getScores: () => ({
         stu1: [
           { score: 3, tagId: 't1', assessmentId: 'a1', date: '2025-01-01', type: 'summative' },
@@ -290,6 +306,8 @@ describe('getCompletionPct', () => {
     mockDataLayer({
       getSections: () => [{ id: 'sec1', tags: [{ id: 't1' }] }],
       getAllTags: () => [{ id: 't1' }],
+      // The class's competencies sit in its one section (S0-F1d reads this).
+      getSectionForTag: () => ({ id: 'sec1' }),
       getScores: () => ({
         stu1: [{ score: 3, tagId: 't1', assessmentId: 'a1', date: '2025-01-01', type: 'summative' }],
       }),
@@ -320,6 +338,8 @@ describe('getCompletionPct', () => {
     mockDataLayer({
       getSections: () => [{ id: 'sec1', tags: [{ id: 't1' }] }],
       getAllTags: () => [{ id: 't1' }],
+      // The class's competencies sit in its one section (S0-F1d reads this).
+      getSectionForTag: () => ({ id: 'sec1' }),
       getScores: () => ({
         stu1: [{ score: 3, tagId: 't1', assessmentId: 'a1', date: '2025-01-01', type: 'formative' }],
       }),

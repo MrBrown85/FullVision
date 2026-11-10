@@ -73,8 +73,8 @@ test('a rubric card opened after scoring a competency shows its own prompt', asy
   await rubric.scrollIntoViewIfNeeded();
   if (!(await rubric.evaluate(el => el.classList.contains('open')))) await rubric.locator('.assess-title').click();
   const bar = page.locator('#rsg-descriptor-bar');
-  // Idle, the bar is out of sight: the card's hint is the prompt.
-  await expect(rubric.locator('.rsg-header-hint')).toHaveText('Hover a level to see its wording');
+  // Idle, the bar is out of sight, and no hint line asks for a hover.
+  await expect(rubric.locator('.rsg-header-hint')).toHaveCount(0);
   await expect(bar).toBeHidden();
   await expect(bar).not.toContainText('Proficient means:');
 });

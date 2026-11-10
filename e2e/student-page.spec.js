@@ -62,6 +62,12 @@ const OPEN = {
   ],
 };
 
+/* Since S0-W1 the page puts a code to the function's `card` route before it
+   opens it as a slip. The mock answers that as the function answers a
+   slip's code, not_found, and keeps it out of `posts`, which stay the slip
+   routes' own posts. e2e/student-card-wired.spec.js checks the order. */
+const NOT_A_CARD = { ok: false, error: 'not_found' };
+
 async function mockFunction(page) {
   const posts = [];
   await page.route('**/functions/v1/student-submit**', async route => {
@@ -73,6 +79,13 @@ async function mockFunction(page) {
     };
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
     const body = JSON.parse(req.postData() || '{}');
+    if (body.route === 'card') {
+      return route.fulfill({
+        status: 200,
+        headers: { ...cors, 'content-type': 'application/json' },
+        body: JSON.stringify(NOT_A_CARD),
+      });
+    }
     posts.push({ url: req.url(), body });
     const reply = body.route === 'open' ? OPEN : { ok: true, submitted_at: '2026-11-04T10:00:00Z' };
     return route.fulfill({
@@ -160,8 +173,9 @@ test('a report slip: birthday, then the report as sent, to read', async ({ page 
     };
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
     const body = JSON.parse(req.postData() || '{}');
-    posts.push(body);
+    if (body.route !== 'card') posts.push(body);
     const replies = {
+      card: NOT_A_CARD,
       open: {
         ok: true,
         kind: 'report',

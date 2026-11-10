@@ -367,8 +367,16 @@ window.ClassResults = (function () {
       '<div class="cr-head-btns">' +
       '<button type="button" class="cr-btn cr-btn-primary" data-cr="grade">Grade This Assessment</button>' +
       '<button type="button" class="cr-btn" data-cr="edit">Edit Assessment Details</button>' +
+      _printButton(cid, a) +
       '</div></div>'
     );
+  }
+
+  // The same print the grader offers (RubricPrint): none on DIBELS.
+  // html-safe: printLabel is a fixed label
+  function _printButton(cid, a) {
+    var label = window.RubricPrint ? RubricPrint.printLabel(cid, a) : '';
+    return label ? '<button type="button" class="cr-btn" data-cr="print">' + label + '</button>' : '';
   }
 
   function _stat(label, value, color) {
@@ -1642,7 +1650,7 @@ window.ClassResults = (function () {
       }
     });
     if (!marked.length) return;
-    saveAssignmentStatuses(cid, statuses);
+    Grader.markBlankCells(cid, aid, statuses);
     _changed();
     showUndoToast(
       marked.length +
@@ -1654,7 +1662,7 @@ window.ClassResults = (function () {
         marked.forEach(function (sid) {
           if (st[sid + ':' + aid] === status) delete st[sid + ':' + aid];
         });
-        saveAssignmentStatuses(cid, st);
+        Grader.undoMarkBlankCells(cid, aid, st);
         _changed();
       },
       null,
@@ -1747,6 +1755,8 @@ window.ClassResults = (function () {
     } else if (what === 'edit') {
       if (window.Router)
         Router.navigate('/assignments?course=' + encodeURIComponent(cid) + '&edit=' + encodeURIComponent(aid));
+    } else if (what === 'print') {
+      if (window.RubricPrint) RubricPrint.open(cid, aid);
     } else if (what === 'pick') {
       var key = el.getAttribute('data-key');
       _state.sel = _state.sel && _state.sel.key === key ? null : _pick(key);
