@@ -77,6 +77,10 @@ create table course (
   curriculum_tags  text[],                                         -- BC bank course keys the class is linked to, e.g. {HIST12} (20261102_course_curriculum_tags)
   folders_count_as_one boolean not null default true,             -- overall averages each folder first; false: plain mean of every competency (20261102_folders_count_as_one)
   courses_count_equally boolean not null default false,           -- combined class: roll up each course on its own, then average the courses (20261102_courses_count_equally)
+  student_page_enabled boolean not null default false,            -- the student page build switch; off: every save is returned at once (2026110902_grade_return)
+  return_grades    text default 'on_return'                        -- 'on_return' When I Return Them | 'on_save' As Soon As I Save | null no choice made, works as on_save;
+                   check (return_grades is null or return_grades in ('on_return', 'on_save')), -- classes from before 2026-11-09 are null (2026110902_grade_return)
+  cards_work_until date,                                           -- last day the class's student cards work; null: the last reporting date (2026110903_student_card)
   deleted_at       timestamptz                                         -- soft-delete marker; hidden immediately, purged after 30d by fv_retention_cleanup (20261012_course_soft_delete)
 );
 
@@ -326,6 +330,37 @@ create table rubric_check_score (
   created_at    timestamptz not null default now(),
   primary key (enrollment_id, assessment_id, check_id)
 );
+
+-- Draft or Returned, per student per assessment: what the student has been
+-- given (2026110902_grade_return; plan 1.2). The teacher's working copy stays
+-- in score, tag_score, rubric_score and rubric_check_score. Statement triggers
+-- on those four (grade_return_insert / _update / _delete ->
+-- _grade_return_on_change) keep this table right for any writer; return_grades
+-- returns drafts; the restore sets the backup's state. Teachers read their own
+-- rows; nobody writes it directly. A copy is { v, value, modifier, comment,
+-- tags {tag id: {value, modifier, comment}}, criteria {criterion id: {value,
+-- modifier, comment, beyond}}, checks [check ids] }; status and report_note
+-- are never in one.
+create table grade_return (
+  enrollment_id uuid        not null references enrollment(id) on delete cascade,
+  assessment_id uuid        not null references assessment(id) on delete cascade,
+  is_draft      boolean     not null default false,                -- the working copy holds something the student has not been given
+  returned_at   timestamptz,                                        -- last returned; null = never
+  returned_copy jsonb,                                              -- the grade as last returned, kept only while a draft sits on a returned grade
+  previous_copy jsonb,                                              -- the grade the student had before the newest return
+  updated_at    timestamptz,                                        -- when a returned grade last changed for the student
+  seen_at       timestamptz,                                        -- when the student last opened this piece
+  primary key (enrollment_id, assessment_id),
+  check ((returned_copy is not null) = (is_draft and returned_at is not null))
+);
+-- RLS: select only, fv_owns_enrollment(enrollment_id).
+
+-- Row security on score, tag_score, rubric_score, rubric_check_score and
+-- dibels_score (2026110901_score_rows_same_class): the caller owns the
+-- enrollment and the assessment is in the enrollment's class
+-- (fv_owns_score_cell); on writes the competency, criterion or checkbox the
+-- row names must be in that class too (fv_owns_tag_score_cell,
+-- fv_owns_rubric_score_cell, fv_owns_rubric_check_cell).
 
 -- A completed rubric handout printed for one student: when, and a fingerprint
 -- of what the sheet showed, so the client can tell when it has changed since
@@ -701,6 +736,50 @@ create table student_submit.attempt (                                 -- rate li
   ip_hash text, code_id uuid, course_id uuid                          -- an HMAC of the IP; never answers or names
 );
 
+-- Student cards (2026110903_student_card; plan 1.5). One live card per
+-- enrollment (unique where stopped_at is null); a reissue stops the old card
+-- and keeps its row. The code is kept readable for the class's teacher
+-- (select only, fv_owns_enrollment) beside the salted hash the student path
+-- checks. Written only by issue_student_cards, mark_student_cards_printed,
+-- unlock_student_card, reissue_student_card, set_cards_work_until and the
+-- student path.
+create table student_card (
+  id             uuid        primary key default gen_random_uuid(),
+  enrollment_id  uuid        not null references enrollment(id) on delete cascade,
+  code           text        not null,                              -- as printed, K7M-4QX
+  code_hash      text        not null unique,                       -- _access_code_hash(code, salt), as a slip's
+  salt           text        not null,
+  created_at     timestamptz not null default now(),
+  printed_at     timestamptz,
+  last_opened_at timestamptz,
+  wrong_tries    integer     not null default 0,                    -- wrong answers to "Is This You?"; the fifth locks the card
+  locked_at      timestamptz,                                       -- Unlock clears it and the count
+  stopped_at     timestamptz,                                       -- reissued; never opens again
+  works_until    date                                               -- this card's last day; null: the class's (course.cards_work_until, else the last reporting date)
+);
+
+-- A signed-in student device (2026110904_student_sessions_page). A session
+-- belongs to the device, not to a card; device_session_enrollment lists the
+-- classes it has opened, one per card added. It ends at the next midnight in
+-- the class's time zone, or on Done. card, verify_card, page, seen and done
+-- are the edge function's; _returned_grade is the only function in the schema
+-- that reads a grade.
+create table student_submit.device_session (
+  id uuid primary key default gen_random_uuid(),
+  token_hash text not null unique,                                    -- the phone holds the token
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null,
+  ended_at timestamptz
+);
+create table student_submit.device_session_enrollment (
+  session_id uuid not null references student_submit.device_session(id) on delete cascade,
+  enrollment_id uuid not null references public.enrollment(id) on delete cascade,
+  card_id uuid not null references public.student_card(id) on delete cascade,
+  added_at timestamptz not null default clock_timestamp(),
+  primary key (session_id, enrollment_id)
+);
+-- student_submit.attempt.route also takes 'card'; code_id then holds the card's id.
+
 -- Reports on students' phones (20261025_phone_reports). The teacher's copy of
 -- each student's report, fixed until updated; codes in student_access_code
 -- (phone_report_id) open it after a birthday check. Read-only: no reply
@@ -771,6 +850,8 @@ create table support_report (
 -- `category_weight_sum_check(_update)` deferred constraint triggers on category → fv_check_category_weight_sum()
 -- `score_audit_trigger`         after  update on score          → _score_audit_diff(...)
 -- `term_rating_audit_trigger`   after  update on term_rating    → _term_rating_audit_field(...)
+-- `grade_return_insert|update|delete` after each statement on score, tag_score, rubric_score, rubric_check_score → _grade_return_on_change(part, id column)
+-- `grade_return_repoint`        after  update (row) on tag_score, rubric_score, rubric_check_score when its tag, criterion or check id changes → _grade_return_repoint(part, id column)
 -- `fv_teacher_sign_in_deleted`  after  delete on auth.users     → _fv_teacher_sign_in_deleted() (soft-deletes the teacher)
 
 -- ─── Publications ───────────────────────────────────────────────────────────

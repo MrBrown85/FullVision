@@ -1,0 +1,360 @@
+-- Student cards (2026-11-09). Student page build plan, S0-M2 (Batch A).
+-- docs/plans/student-page-build-plan.md 1.5 and S3; DECISIONS, "Student
+-- cards" (2026-11-07), "Grades, photos and sign-in on the student page" 9
+-- and 13, "Student page build answers" 7.
+--
+-- What is needed: one printed card per student per course. Its code opens
+-- the student's page until a date the teacher sets, where a questionnaire
+-- slip's code opens one questionnaire once. Nothing uses a card until the
+-- sessions migration (2026110904) and the edge function are in.
+--
+-- ── What it adds ────────────────────────────────────────────────────────────
+-- 1. student_card, one LIVE card per enrollment (a unique index on the rows
+--    with no stopped_at):
+--      code            the code as printed, K7M-4QX. Kept readable so the
+--                      class's teacher can show or reprint a card without
+--                      stopping it (Colin, Nov 9). Row security shows it to
+--                      that teacher only.
+--      code_hash, salt what the student path checks: the same alphabet,
+--                      length and salted SHA-256 as a questionnaire slip
+--                      (_new_access_code, _access_code_hash).
+--      created_at, printed_at, last_opened_at
+--      wrong_tries     wrong answers to "Is This You?" since the card was
+--                      made or last unlocked. The fifth locks it.
+--      locked_at       when it locked. Unlock clears both.
+--      stopped_at      when it was reissued. A stopped card never opens
+--                      again; its row stays as history.
+--      works_until     this one card's last day, or null to follow the class.
+--    Teachers read their own rows (fv_owns_enrollment). Nobody writes the
+--    table directly: only the functions below and the student path do.
+--
+-- 2. course.cards_work_until date, null. The class's Cards Work Until. Null
+--    means the default: the class's last reporting date (the latest ends_on
+--    in course.reporting_terms), or June 30 of the school year when the
+--    class has no terms. A card works through that day in the class's time
+--    zone.
+--
+-- 3. Teacher RPCs. Each is SECURITY DEFINER with its own ownership check
+--    and takes p_idempotency_key (fv_idem_check).
+--      issue_student_cards(p_course_id, p_enrollment_ids, p_idempotency_key)
+--        makes a card for every enrolled student in the class (or the
+--        listed ones) who has no live card. A student who has one keeps it:
+--        printing again never stops a card. A student with no birthday and
+--        no student number gets a four-digit card password, as slips do
+--        (_slip_password). Returns { issued, cards }.
+--      list_student_cards(p_course_id)
+--        the class's live cards for the Student Cards page and the print
+--        sheet: [{ id, enrollment_id, code, created_at, printed_at,
+--        last_opened_at, locked_at, wrong_tries, works_until, check,
+--        password }]. works_until is the day in force (the card's own, else
+--        the class's). check is 'identity' (birthday or student number) or
+--        'password'; password is the card password to print, else null.
+--      mark_student_cards_printed(p_card_ids, p_idempotency_key)
+--        sets printed_at. Returns { printed }.
+--      unlock_student_card(p_card_id, p_idempotency_key)
+--        clears the lock and the wrong-try count. Returns the card.
+--      reissue_student_card(p_card_id, p_idempotency_key)
+--        stops the card at once and makes a new one for the same student.
+--        Everything the student sent stays: nothing points at a card but
+--        the device sessions it opened, and those end. Returns the new card.
+--      set_cards_work_until(p_course_id, p_date, p_idempotency_key)
+--        sets the class's date (null = the default) and clears any card's
+--        own date in the class. Returns { works_until }.
+--    Errors: PT401 not signed in; P0002 class or card not found (or not the
+--    caller's); 22023 a card already stopped.
+--
+-- No existing row changes. Every class gets cards_work_until = null. The
+-- file can be run again. Apply in one transaction.
+
+alter table public.course add column if not exists cards_work_until date;
+comment on column public.course.cards_work_until is
+    'The last day the class''s student cards work. Null: the class''s last reporting date.';
+
+create table if not exists public.student_card (
+    id             uuid        primary key default gen_random_uuid(),
+    enrollment_id  uuid        not null references public.enrollment(id) on delete cascade,
+    code           text        not null,
+    code_hash      text        not null constraint student_card_code_hash_key unique,
+    salt           text        not null,
+    created_at     timestamptz not null default now(),
+    printed_at     timestamptz,
+    last_opened_at timestamptz,
+    wrong_tries    integer     not null default 0 constraint student_card_wrong_tries_check check (wrong_tries >= 0),
+    locked_at      timestamptz,
+    stopped_at     timestamptz,
+    works_until    date
+);
+create unique index if not exists student_card_one_live on public.student_card (enrollment_id) where stopped_at is null;
+create index if not exists student_card_enrollment_idx on public.student_card (enrollment_id);
+comment on table public.student_card is
+    'A student''s printed card for one class. One live card per enrollment; a reissue stops the old one and keeps its row.';
+
+alter table public.student_card enable row level security;
+drop policy if exists student_card_read on public.student_card;
+create policy student_card_read on public.student_card
+    for select
+    using (public.fv_owns_enrollment(enrollment_id));
+revoke all on table public.student_card from public, anon, authenticated;
+grant select on table public.student_card to authenticated;
+
+-- ── The class's Cards Work Until, as a date ─────────────────────────────────
+create or replace function public._cards_work_until(p_course_id uuid)
+ returns date
+ language sql
+ stable security definer
+ set search_path to 'public'
+as $function$
+    select coalesce(
+        c.cards_work_until,
+        (select max((t->>'ends_on')::date) from jsonb_array_elements(
+             case when jsonb_typeof(c.reporting_terms) = 'array' then c.reporting_terms else '[]'::jsonb end) t
+          where (t->>'ends_on') ~ '^\d{4}-\d{2}-\d{2}$'),
+        -- No reporting terms: June 30 of the school year (August starts a new one).
+        make_date(extract(year from (now() at time zone c.timezone))::int
+                    + case when extract(month from (now() at time zone c.timezone)) >= 8 then 1 else 0 end, 6, 30))
+      from course c
+     where c.id = p_course_id;
+$function$;
+revoke all on function public._cards_work_until(uuid) from public, anon, authenticated;
+
+-- One card as the teacher's screens read it.
+create or replace function public._student_card_json(p_card_id uuid)
+ returns jsonb
+ language sql
+ stable security definer
+ set search_path to 'public'
+as $function$
+    select jsonb_build_object(
+               'id', k.id, 'enrollment_id', k.enrollment_id, 'code', k.code,
+               'created_at', k.created_at, 'printed_at', k.printed_at, 'last_opened_at', k.last_opened_at,
+               'locked_at', k.locked_at, 'wrong_tries', k.wrong_tries,
+               'works_until', coalesce(k.works_until, _cards_work_until(e.course_id)),
+               'check', case when s.date_of_birth is not null or nullif(btrim(s.student_number), '') is not null
+                             then 'identity' else 'password' end,
+               'password', case when s.date_of_birth is null and nullif(btrim(s.student_number), '') is null
+                                then nullif(btrim(s.slip_password), '') end)
+      from student_card k
+      join enrollment e on e.id = k.enrollment_id
+      join student s on s.id = e.student_id
+     where k.id = p_card_id;
+$function$;
+revoke all on function public._student_card_json(uuid) from public, anon, authenticated;
+
+-- A new live card for one enrollment. The code reads like no other live
+-- card and no live slip, so a typed code opens one thing.
+create or replace function public._issue_student_card(p_enrollment_id uuid)
+ returns uuid
+ language plpgsql
+ volatile
+ security definer
+ set search_path to 'public', 'pg_temp'
+as $function$
+declare
+    _code text;
+    _salt text;
+    _id   uuid;
+begin
+    if not fv_owns_enrollment(p_enrollment_id) then
+        raise exception 'enrollment not found' using errcode = 'P0002';
+    end if;
+    -- A student with no birthday and no number on file needs a password to
+    -- answer "Is This You?"; with either, a stale one stops being offered.
+    perform _slip_password(p_enrollment_id);
+    loop
+        _code := _new_access_code();
+        continue when exists (select 1 from student_card where stopped_at is null and code = _code)
+                   or exists (select 1 from student_access_code
+                               where revoked_at is null and expires_at > now()
+                                 and code_hash = _access_code_hash(_code, salt));
+        _salt := encode(uuid_send(gen_random_uuid()), 'hex');
+        begin
+            insert into student_card (enrollment_id, code, code_hash, salt)
+            values (p_enrollment_id, _code, _access_code_hash(_code, _salt), _salt)
+            returning id into _id;
+            return _id;
+        exception when unique_violation then
+            -- The student already has a live card (two issues at once): keep it.
+            select id into _id from student_card where enrollment_id = p_enrollment_id and stopped_at is null;
+            if _id is not null then return _id; end if;
+            -- Otherwise a hash collision: draw again.
+        end;
+    end loop;
+end;
+$function$;
+revoke all on function public._issue_student_card(uuid) from public, anon, authenticated;
+
+-- ── The teacher's RPCs ──────────────────────────────────────────────────────
+create or replace function public.list_student_cards(p_course_id uuid)
+ returns jsonb
+ language plpgsql
+ stable
+ security definer
+ set search_path to 'public'
+as $function$
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    if not fv_owns_course(p_course_id) then
+        raise exception 'course not found' using errcode = 'P0002';
+    end if;
+    return coalesce((
+        select jsonb_agg(_student_card_json(k.id) order by e.roster_position nulls last, e.id)
+          from student_card k
+          join enrollment e on e.id = k.enrollment_id
+         where e.course_id = p_course_id and k.stopped_at is null and e.withdrawn_at is null), '[]'::jsonb);
+end;
+$function$;
+
+create or replace function public.issue_student_cards(
+    p_course_id uuid, p_enrollment_ids uuid[] default null, p_idempotency_key uuid default null)
+ returns jsonb
+ language plpgsql
+ security definer
+ set search_path to 'public'
+as $function$
+declare
+    _cached jsonb;
+    _eid    uuid;
+    _n      int := 0;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    if not fv_owns_course(p_course_id) then
+        raise exception 'course not found' using errcode = 'P0002';
+    end if;
+    -- A replay issues nothing new by itself (a student with a live card is
+    -- skipped), so it only needs the first call's count back.
+    _cached := fv_idem_check(p_idempotency_key, 'issue_student_cards');
+    if _cached is null then
+        for _eid in
+            select e.id from enrollment e
+             where e.course_id = p_course_id and e.withdrawn_at is null
+               and (p_enrollment_ids is null or e.id = any (p_enrollment_ids))
+               and not exists (select 1 from student_card k where k.enrollment_id = e.id and k.stopped_at is null)
+             order by e.roster_position nulls last, e.id
+        loop
+            perform _issue_student_card(_eid);
+            _n := _n + 1;
+        end loop;
+        _cached := jsonb_build_object('issued', _n);
+        perform fv_idem_store(p_idempotency_key, 'issue_student_cards', _cached);
+    end if;
+    return _cached || jsonb_build_object('cards', list_student_cards(p_course_id));
+end;
+$function$;
+
+create or replace function public.mark_student_cards_printed(p_card_ids uuid[], p_idempotency_key uuid default null)
+ returns jsonb
+ language plpgsql
+ security definer
+ set search_path to 'public'
+as $function$
+declare
+    _cached jsonb;
+    _n      int;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    _cached := fv_idem_check(p_idempotency_key, 'mark_student_cards_printed');
+    if _cached is not null then return _cached; end if;
+    update student_card k set printed_at = now()
+     where k.id = any (coalesce(p_card_ids, '{}')) and k.stopped_at is null and fv_owns_enrollment(k.enrollment_id);
+    get diagnostics _n = row_count;
+    _cached := jsonb_build_object('printed', _n);
+    perform fv_idem_store(p_idempotency_key, 'mark_student_cards_printed', _cached);
+    return _cached;
+end;
+$function$;
+
+create or replace function public.unlock_student_card(p_card_id uuid, p_idempotency_key uuid default null)
+ returns jsonb
+ language plpgsql
+ security definer
+ set search_path to 'public'
+as $function$
+declare
+    _cached jsonb;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    _cached := fv_idem_check(p_idempotency_key, 'unlock_student_card');
+    if _cached is not null then return _cached; end if;
+    update student_card k set locked_at = null, wrong_tries = 0
+     where k.id = p_card_id and fv_owns_enrollment(k.enrollment_id);
+    if not found then
+        raise exception 'card not found' using errcode = 'P0002';
+    end if;
+    _cached := _student_card_json(p_card_id);
+    perform fv_idem_store(p_idempotency_key, 'unlock_student_card', _cached);
+    return _cached;
+end;
+$function$;
+
+create or replace function public.reissue_student_card(p_card_id uuid, p_idempotency_key uuid default null)
+ returns jsonb
+ language plpgsql
+ security definer
+ set search_path to 'public'
+as $function$
+declare
+    _cached jsonb;
+    _k      student_card%rowtype;
+    _new    uuid;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    _cached := fv_idem_check(p_idempotency_key, 'reissue_student_card');
+    if _cached is not null then return _cached; end if;
+    select * into _k from student_card k
+     where k.id = p_card_id and fv_owns_enrollment(k.enrollment_id)
+       for update;
+    if not found then
+        raise exception 'card not found' using errcode = 'P0002';
+    end if;
+    if _k.stopped_at is not null then
+        raise exception 'that card was already reissued' using errcode = '22023';
+    end if;
+    -- The old code stops here, before the new card exists.
+    update student_card set stopped_at = now() where id = _k.id;
+    -- Two statements: the card must exist before it is read back.
+    _new := _issue_student_card(_k.enrollment_id);
+    _cached := _student_card_json(_new);
+    perform fv_idem_store(p_idempotency_key, 'reissue_student_card', _cached);
+    return _cached;
+end;
+$function$;
+
+create or replace function public.set_cards_work_until(p_course_id uuid, p_date date, p_idempotency_key uuid default null)
+ returns jsonb
+ language plpgsql
+ security definer
+ set search_path to 'public'
+as $function$
+declare
+    _cached jsonb;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    if not fv_owns_course(p_course_id) then
+        raise exception 'course not found' using errcode = 'P0002';
+    end if;
+    _cached := fv_idem_check(p_idempotency_key, 'set_cards_work_until');
+    if _cached is not null then return _cached; end if;
+    update course set cards_work_until = p_date, updated_at = now() where id = p_course_id;
+    update student_card k set works_until = null
+      from enrollment e
+     where e.id = k.enrollment_id and e.course_id = p_course_id and k.works_until is not null;
+    _cached := jsonb_build_object('works_until', _cards_work_until(p_course_id));
+    perform fv_idem_store(p_idempotency_key, 'set_cards_work_until', _cached);
+    return _cached;
+end;
+$function$;
+
+revoke all on function public.list_student_cards(uuid) from public, anon;
+revoke all on function public.issue_student_cards(uuid, uuid[], uuid) from public, anon;
+revoke all on function public.mark_student_cards_printed(uuid[], uuid) from public, anon;
+revoke all on function public.unlock_student_card(uuid, uuid) from public, anon;
+revoke all on function public.reissue_student_card(uuid, uuid) from public, anon;
+revoke all on function public.set_cards_work_until(uuid, date, uuid) from public, anon;
+grant execute on function public.list_student_cards(uuid) to authenticated, service_role;
+grant execute on function public.issue_student_cards(uuid, uuid[], uuid) to authenticated, service_role;
+grant execute on function public.mark_student_cards_printed(uuid[], uuid) to authenticated, service_role;
+grant execute on function public.unlock_student_card(uuid, uuid) to authenticated, service_role;
+grant execute on function public.reissue_student_card(uuid, uuid) to authenticated, service_role;
+grant execute on function public.set_cards_work_until(uuid, date, uuid) to authenticated, service_role;
+
+notify pgrst, 'reload schema';
