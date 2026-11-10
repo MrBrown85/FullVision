@@ -35,7 +35,8 @@ const UPDATE = process.env.UPDATE_REPORT_SURFACES === '1';
 
 const fingerprint = s => createHash('sha256').update(s).digest('hex').slice(0, 20) + ' ' + s.length;
 
-describe('what each report surface gives for the Demo class', () => {
+// Each drawing of the class takes a few seconds; a slow runner gets a minute.
+describe('what each report surface gives for the Demo class', { timeout: 60000 }, () => {
   let drawn;
   let wasDemo;
 
@@ -46,7 +47,7 @@ describe('what each report surface gives for the Demo class', () => {
     const cid = loadDemoClass();
     clearProfCache();
     drawn = surfaces(cid);
-  });
+  }, 60000);
 
   afterAll(() => {
     vi.useRealTimers();

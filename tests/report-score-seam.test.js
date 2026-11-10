@@ -1,0 +1,928 @@
+/**
+ * Reports read grades through one entry, teacher/report-scores.js
+ * (student page build plan 1.3, S2 and section 5, "A draft leaks to a
+ * family"; S2-T1).
+ *
+ * 1. The source guard. No report file names one of the data layer's
+ *    readers of scores, comments, notes, ticks or statuses, reaches into
+ *    its cache, or switches the set of scores itself. Each reads through
+ *    ReportScores. The functions each file runs inside withReportScores
+ *    are pinned by name.
+ * 2. The seam itself: the table, withReportScores, scoped, the readers.
+ * 3. Behaviour, on Demo Mode's Science 8. Every score read made while a
+ *    report surface is drawn happens inside withReportScores, and no
+ *    function run there leaves work for later.
+ * 4. The plan's test, ready for S2-F1 and S2-F2: with a surface's row set
+ *    to 'returned' and drafts in the class, the report is exactly the
+ *    report of a class that has only the returned grades, a draft's
+ *    comment, note and tick are nowhere in it, and Print Grades and Export
+ *    still give all work. Today every row is 'all'; the test changes the
+ *    rows the way S2-F1 will (it loads the seam's source with the row
+ *    edited), so that PR turns the row and this file needs no change.
+ *
+ * tests/report-surfaces-output.test.js holds what each surface prints today.
+ */
+import './setup.js';
+import { readFileSync, readdirSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { runInThisContext } from 'vm';
+import { parse } from 'acorn';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { FROZEN_AT, loadDemoClass } from './helpers/golden-grades.js';
+import { freshGenerate, surfaceOf, surfaces } from './helpers/report-surfaces.js';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const read = file => readFileSync(resolve(ROOT, file), 'utf-8');
+const SEAM = 'teacher/report-scores.js';
+const SEAM_SOURCE = read(SEAM);
+
+/* ── 1. The source guard ─────────────────────────────────────── */
+
+/* A report file: anything in teacher/ named for a report, a comment, a
+   printout or the export, and the phone copy's own page. A new one is
+   guarded as soon as it is added. */
+const REPORT_FILE =
+  /^(page-reports|report-.*|comment-.*|grade-report|grades-print|rubric-print|phone-reports|export-all)\.js$/;
+const REPORT_FILES = readdirSync(resolve(ROOT, 'teacher'))
+  .filter(name => REPORT_FILE.test(name))
+  .map(name => 'teacher/' + name)
+  .filter(file => file !== SEAM)
+  .concat(['shared/phone-report-view.js'])
+  .sort();
+
+/* The data layer's readers of a score, a status, a comment, a note, a tick
+   or a DIBELS number (the list tests/calc-score-reader.test.js holds
+   calc.js to), and the returned set's builders. */
+const DATA_READERS = [
+  'getScores',
+  'getAssignmentStatuses',
+  'getAssignmentStatus',
+  'getPointsScore',
+  'getCompletionMark',
+  'getScoreComment',
+  'getScoreReportNote',
+  'getTagComment',
+  'getRubricCriterionComment',
+  'getRubricCriterionBeyond',
+  'getDibelsScores',
+  'getDibelsScore',
+  'getRubricChecks',
+  'getRubricCheckIds',
+  'isRubricCheckOn',
+  'hasScoreOrFeedback',
+  'canSetAssignmentStatus',
+  'isScoreLocked',
+  'isGroupWithheld',
+  'backToGroupGradeSource',
+  '_rubricCriterionNoteFor',
+  '_rubricCriterionCommentFor',
+  '_getRubricCriterionNote',
+  '_groupGradeHolder',
+  '_holdsGroupCopy',
+  'getReturnedScores',
+  'getReturnedRubricCheckIds',
+];
+// calc.js's own switch and reader: only the seam turns a report to returned grades.
+const SET_SWITCHES = ['withReturnedOnly', '_scoreSet', '_scoreRead'];
+const FORBIDDEN = new Set(DATA_READERS.concat(SET_SWITCHES, ['_cache']));
+// Where the data layer keeps scores, statuses and ticks on the device.
+const STORED = /gb-(scores|statuses|rubric-checks)-/;
+// Sorting the roster by name reads no score; by Missing or by grade it does.
+const NAME_SORTS = ['lastName', 'firstName'];
+
+function eachNode(node, visit, parent) {
+  if (!node || typeof node.type !== 'string') return;
+  visit(node, parent);
+  Object.keys(node).forEach(key => {
+    const value = node[key];
+    if (Array.isArray(value)) value.forEach(child => eachNode(child, visit, node));
+    else if (value && typeof value.type === 'string') eachNode(value, visit, node);
+  });
+}
+
+const isNameSort = arg =>
+  !!arg &&
+  ((arg.type === 'Literal' && NAME_SORTS.indexOf(arg.value) >= 0) ||
+    (arg.type === 'ConditionalExpression' && isNameSort(arg.consequent) && isNameSort(arg.alternate)));
+
+/* Every way a piece of source goes around the seam, counted by name:
+   a forbidden name as an identifier, a property or a string (comments are
+   not code and do not count), a stored-scores key, and a roster sort that
+   is not by name. */
+function aroundTheSeam(source) {
+  const found = {};
+  const add = what => (found[what] = (found[what] || 0) + 1);
+  const sortCalls = new Set();
+  const ast = parse(source, { ecmaVersion: 'latest', sourceType: 'script' });
+  eachNode(ast, node => {
+    if (node.type === 'CallExpression') {
+      const callee = node.callee;
+      const name =
+        callee.type === 'Identifier' ? callee.name : callee.type === 'MemberExpression' ? callee.property.name : '';
+      if (name === 'sortStudents') {
+        sortCalls.add(callee.type === 'Identifier' ? callee : callee.property);
+        if (!isNameSort(node.arguments[1])) add('sortStudents (not by name)');
+      }
+    }
+  });
+  eachNode(ast, node => {
+    if (node.type === 'Identifier') {
+      if (FORBIDDEN.has(node.name)) add(node.name);
+      // sortStudents kept under another name, or handed on, could sort by anything.
+      if (node.name === 'sortStudents' && !sortCalls.has(node)) add('sortStudents (not called)');
+    }
+    if (node.type === 'Literal' && typeof node.value === 'string') {
+      if (FORBIDDEN.has(node.value)) add(node.value);
+      if (STORED.test(node.value)) add('stored scores (' + node.value + ')');
+    }
+    if (node.type === 'TemplateElement' && STORED.test(node.value.raw)) add('stored scores (' + node.value.raw + ')');
+  });
+  return found;
+}
+
+/* The reads left outside the seam, each with its reason. Anything else,
+   or one more of these, fails.
+
+   teacher/export-all.js: Export is the teacher's own record and stays on
+   all work (plan 1.3, the artboard). tests/export-all.test.js checks that
+   it names each of the data layer's readers, so it keeps the data layer's
+   own. They are allowed only while the 'exportData' row says 'all' (a test
+   below holds the row there).
+
+   teacher/report-preview.js: asks whether the class has any score at all,
+   to choose between the reports and "No report data yet". It prints no
+   grade. The file was outside S2-T1's files; it is drawn inside
+   withReportScores by page-reports.js, and moving this one read to
+   ReportScores.scores is a one-line change for S2-F1. */
+const LEFT_OUTSIDE = {
+  'teacher/export-all.js': {
+    getAssignmentStatuses: 1,
+    getRubricCriterionComment: 1,
+    getRubricCriterionBeyond: 1,
+    getScoreComment: 1,
+    getScoreReportNote: 1,
+    getTagComment: 1,
+  },
+  'teacher/report-preview.js': { getScores: 1 },
+};
+
+/* The functions each file runs inside withReportScores, by surface: the
+   lines `name = _inReportScores(name)` or `name = ReportScores.scoped(…)`
+   at the top of the file, before anything can call or keep the function. */
+function doorsOf(source) {
+  const ast = parse(source, { ecmaVersion: 'latest', sourceType: 'script' });
+  const out = { surface: null, names: [], late: [] };
+  let surfaceOfHelper = null;
+  const scopedSurface = call =>
+    call &&
+    call.type === 'CallExpression' &&
+    call.callee.type === 'MemberExpression' &&
+    call.callee.object.name === 'ReportScores' &&
+    call.callee.property.name === 'scoped'
+      ? call.arguments[0].value
+      : null;
+  eachNode(ast, node => {
+    // The file's own helper: fn => ReportScores.scoped('surface', fn).
+    if (node.type === 'VariableDeclarator' && node.id.name === '_inReportScores') {
+      eachNode(node.init, inner => {
+        if (scopedSurface(inner)) surfaceOfHelper = scopedSurface(inner);
+      });
+    }
+  });
+  eachNode(ast, (node, parent) => {
+    if (node.type !== 'AssignmentExpression' || node.left.type !== 'Identifier') return;
+    const call = node.right;
+    if (!call || call.type !== 'CallExpression') return;
+    const viaHelper = call.callee.type === 'Identifier' && call.callee.name === '_inReportScores';
+    const surface = viaHelper ? surfaceOfHelper : scopedSurface(call);
+    if (!surface) return;
+    const arg = call.arguments[viaHelper ? 0 : 1];
+    expect(arg && arg.name, 'a door wraps the function it is named for').toBe(node.left.name);
+    expect(out.surface === null || out.surface === surface, 'one surface for each file').toBe(true);
+    out.surface = surface;
+    out.names.push(node.left.name);
+    // A statement of its own (never inside a function that might not have run).
+    if (!parent || parent.type !== 'ExpressionStatement') out.late.push(node.left.name);
+  });
+  return out;
+}
+
+const BLOCKS = [
+  'renderReportBlock',
+  'focusArea',
+  'renderBlockHeader',
+  'renderBlockAcademicSummary',
+  'renderBlockLearnerDimensions',
+  'renderBlockTeacherNarrative',
+  'renderBlockCompetencyTable',
+  'renderBlockObservations',
+  'renderBlockSectionOutcomes',
+  'renderBlockNextSteps',
+  'renderBlockProgress',
+  'renderBlockProficiency',
+  'renderBlockLegend',
+  'renderBlockParentResponse',
+  'renderBlockStudentReflectionLearning',
+  'renderBlockStudentReflectionHabits',
+  'renderBlockSectionChart',
+  'renderBlockScoreDistribution',
+  'renderBlockGradeTable',
+  'renderBlockCoreCompetencies',
+  'renderBlockSupportHome',
+  'renderBlockTermGlance',
+  'renderBlockGrowth',
+  'renderBlockMissingWork',
+  'renderBlockAttendance',
+  'renderBlockSelfAssessment',
+];
+const DOORS = {
+  'teacher/report-blocks.js': { surface: 'progress', names: BLOCKS },
+  'teacher/grade-report.js': {
+    surface: 'progress',
+    names: ['rows', 'categorySummary', 'feedbackItems', 'extraCards', 'layoutStudent'],
+  },
+  'teacher/report-feedback.js': { surface: 'progress', names: ['forStudent'] },
+  'teacher/page-reports.js': {
+    surface: 'progress',
+    names: [
+      'renderReportPreview',
+      'renderStudioPanels',
+      '_templateThumbs',
+      '_measureBlockSizes',
+      '_classSummary',
+      '_blockHtml',
+    ],
+  },
+  'teacher/comment-bank.js': { surface: 'questionnaire', names: ['facts', 'compsOf', 'markedCounts'] },
+  'teacher/report-questionnaire.js': {
+    surface: 'questionnaire',
+    names: ['headerGrade', 'notHandedIn', 'missingAndLate', '_basisHtml', '_requiredSource'],
+  },
+  'teacher/phone-reports.js': { surface: 'phones', names: ['snapshot'] },
+  'teacher/grades-print.js': { surface: 'printGrades', names: ['buildModel', 'cellText', 'columnAverageText'] },
+  'teacher/export-all.js': { surface: 'exportData', names: ['rows'] },
+};
+
+describe('report files read scores only through ReportScores', () => {
+  it('covers the report files S2 names, and their neighbours', () => {
+    [
+      'teacher/page-reports.js',
+      'teacher/report-blocks.js',
+      'teacher/report-studio.js',
+      'teacher/report-questionnaire.js',
+      'teacher/comment-bank.js',
+      'teacher/phone-reports.js',
+      'teacher/grade-report.js',
+      'teacher/report-feedback.js',
+      'teacher/rubric-print.js',
+      'teacher/grades-print.js',
+      'teacher/export-all.js',
+      'teacher/report-preview.js',
+      'teacher/report-sheets.js',
+      'teacher/report-issues.js',
+      'teacher/report-feedback-cards.js',
+      'teacher/comment-personal.js',
+      'shared/phone-report-view.js',
+    ].forEach(file => expect(REPORT_FILES, file).toContain(file));
+    expect(REPORT_FILES).not.toContain(SEAM);
+  });
+
+  it.each(REPORT_FILES)('%s names no reader of scores, comments, notes, ticks or statuses', file => {
+    expect(aroundTheSeam(read(file))).toEqual(LEFT_OUTSIDE[file] || {});
+  });
+
+  it('allows Export its own reads only while Export stays on all work', () => {
+    // Plan 1.3: Print Grades and Export use all work (the artboard). Before
+    // either row changes, that file's reads move to ReportScores first.
+    expect(ReportScores.reportScoreSet('exportData')).toBe('all');
+    expect(ReportScores.reportScoreSet('printGrades')).toBe('all');
+    expect(SEAM_SOURCE).toMatch(/\n\s*printGrades: 'all',/);
+    expect(SEAM_SOURCE).toMatch(/\n\s*exportData: 'all',/);
+  });
+
+  it('the guard sees each way around the seam, and no way through a comment', () => {
+    const caught = source => Object.keys(aroundTheSeam(source));
+    expect(caught('var all = getScores(cid)[sid] || [];')).toEqual(['getScores']);
+    expect(caught('var s = getAssignmentStatus(cid, sid, aid);')).toEqual(['getAssignmentStatus']);
+    expect(caught('var s = typeof getScoreReportNote === "function" ? 1 : 0;')).toEqual(['getScoreReportNote']);
+    expect(caught('var read = window.getScoreComment;')).toEqual(['getScoreComment']);
+    expect(caught('var read = window["getRubricCheckIds"];')).toEqual(['getRubricCheckIds']);
+    expect(caught('var { getPointsScore: read } = window;')).toEqual(['getPointsScore']);
+    expect(caught('var x = _cache.scores[cid];')).toEqual(['_cache']);
+    expect(caught('var x = JSON.parse(localStorage.getItem("gb-scores-" + cid));')).toEqual([
+      'stored scores (gb-scores-)',
+    ]);
+    expect(caught('var x = localStorage.getItem(`gb-rubric-checks-${cid}`);')).toEqual([
+      'stored scores (gb-rubric-checks-)',
+    ]);
+    expect(caught('withReturnedOnly(function () { return draw(); });')).toEqual(['withReturnedOnly']);
+    expect(caught('if (_scoreSet === "returned") draw();')).toEqual(['_scoreSet']);
+    expect(caught('var list = sortStudents(getStudents(cid), "missing", cid);')).toEqual([
+      'sortStudents (not by name)',
+    ]);
+    expect(caught('var list = sortStudents(getStudents(cid), mode, cid);')).toEqual(['sortStudents (not by name)']);
+    expect(caught('var sort = sortStudents;')).toEqual(['sortStudents (not called)']);
+    // What a report file may write.
+    expect(caught('var list = sortStudents(getStudents(cid), "lastName");')).toEqual([]);
+    expect(caught('var list = sortStudents(getStudents(cid), first ? "firstName" : "lastName");')).toEqual([]);
+    expect(caught('var all = ReportScores.entries(cid, sid); var s = ReportScores.status(cid, sid, aid);')).toEqual([]);
+    expect(caught('/* getScores(cid) is read through ReportScores */ var x = 1; // getAssignmentStatus')).toEqual([]);
+  });
+
+  it('the seam is the only file that names the returned set or turns a report to returned grades', () => {
+    const named = aroundTheSeam(SEAM_SOURCE);
+    // Built on these, and nothing else of the data layer's.
+    expect(Object.keys(named).sort()).toEqual(
+      [
+        '_scoreSet',
+        'getAssignmentStatuses',
+        'getCompletionMark',
+        'getPointsScore',
+        'getReturnedRubricCheckIds',
+        'getReturnedScores',
+        'getRubricCheckIds',
+        'getRubricCriterionBeyond',
+        'getRubricCriterionComment',
+        'getScoreComment',
+        'getScoreReportNote',
+        'getScores',
+        'getTagComment',
+        'withReturnedOnly',
+      ].sort(),
+    );
+    expect(named.withReturnedOnly).toBe(1);
+    expect(named.getScores).toBe(1);
+  });
+
+  it.each(Object.keys(DOORS))('%s runs these functions inside withReportScores, from its first lines', file => {
+    const doors = doorsOf(read(file));
+    expect(doors.surface).toBe(DOORS[file].surface);
+    expect(doors.names).toEqual(DOORS[file].names);
+    expect(doors.late).toEqual([]);
+  });
+
+  it('no other report file has functions of its own to run there', () => {
+    REPORT_FILES.filter(file => !DOORS[file]).forEach(file => {
+      expect(doorsOf(read(file)).names, file).toEqual([]);
+    });
+  });
+
+  it('every block renderer report-blocks.js gives out is one of them', () => {
+    const given = Object.keys(ReportBlocks).filter(name => /^renderBlock|^renderReportBlock$|^focusArea$/.test(name));
+    expect(given.length).toBeGreaterThan(20);
+    expect(given.filter(name => BLOCKS.indexOf(name) < 0)).toEqual([]);
+  });
+
+  /* What a report keeps to draw faster holds the set of scores in its key,
+     so a level or a page read from one set is never given to the other. */
+  it.each([
+    ['teacher/report-blocks.js', '_passCache', "key = ReportScores.setInUse() + '#' + key;"],
+    [
+      'teacher/report-questionnaire.js',
+      '_factsCache',
+      "var key = _activeCourse + '|' + student.id + '|' + getTermId() + '|' + _scoreSetKey();",
+    ],
+    [
+      'teacher/report-questionnaire.js',
+      '_staleCache',
+      "var key = cid + '|' + student.id + '|' + termId + '|' + _scoreSetKey();",
+    ],
+    ['teacher/report-questionnaire.js', '_claimCache (read)', "var hit = _claimCache[key + '|' + _scoreSetKey()];"],
+    [
+      'teacher/report-questionnaire.js',
+      '_claimCache (kept)',
+      "_claimCache[key + '|' + _scoreSetKey()] = { sig: sig, v: v };",
+    ],
+    ['teacher/report-questionnaire.js', '_shared', "var key = cid + '|' + termId + '|' + _scoreSetKey();"],
+    [
+      'teacher/report-questionnaire.js',
+      'the set in those keys',
+      "return ReportScores.reportScoreSet('questionnaire');",
+    ],
+    ['teacher/page-reports.js', '_thumbCache', 'JSON.stringify(list),\n      _reportSet(),\n    ].join'],
+    [
+      'teacher/page-reports.js',
+      '_blockSizes',
+      'if (_blockSizes === null || _blockSizesSet !== _reportSet()) {\n        _blockSizes = _measureBlockSizes();\n        _blockSizesSet = _reportSet();',
+    ],
+    [
+      'teacher/page-reports.js',
+      '_classFit',
+      "_isGrade() ? 'grade:' + JSON.stringify(_gradeOpts()) : JSON.stringify(_formOf()),\n      _reportSet(),\n    ].join",
+    ],
+    ['teacher/page-reports.js', '_lastSummary (kept)', '_lastSummary = summary;\n    _lastSummarySet = _reportSet();'],
+    [
+      'teacher/page-reports.js',
+      '_lastSummary (read)',
+      'var s = (_lastSummarySet === _reportSet() && _lastSummary) || {',
+    ],
+    ['teacher/page-reports.js', 'the set in those keys', "return ReportScores.reportScoreSet('progress');"],
+  ])('%s keys %s by the set of scores', (file, what, text) => {
+    expect(read(file)).toContain(text);
+  });
+
+  it('every surface a file names is in the one table', () => {
+    const named = Object.keys(DOORS).map(file => DOORS[file].surface);
+    expect(ReportScores.surfaces().slice().sort()).toEqual(Array.from(new Set(named)).sort());
+  });
+});
+
+/* ── Loading the seam with a row changed, as S2-F1 will change it ── */
+
+/* The seam's source with these surfaces' rows set ({ progress: 'returned' }),
+   run in place of the one loaded. With no rows, the seam as it is written. */
+function loadSeam(rows) {
+  let source = SEAM_SOURCE;
+  Object.keys(rows || {}).forEach(surface => {
+    const row = new RegExp('(\\n\\s*' + surface + ": )'(all|returned)',");
+    expect(row.test(source), surface + ' has a row in the table').toBe(true);
+    source = source.replace(row, "$1'" + rows[surface] + "',");
+  });
+  runInThisContext(source, { filename: SEAM });
+}
+const REPORTS_ON_RETURNED = { progress: 'returned', questionnaire: 'returned', phones: 'returned' };
+
+/* ── 2. The seam itself ──────────────────────────────────────── */
+
+describe('ReportScores', () => {
+  afterEach(() => {
+    loadSeam();
+    delete globalThis.getReturnedScores;
+    delete globalThis.getReturnedRubricCheckIds;
+    _scoreSet = 'all';
+  });
+
+  it('puts every surface on all work today', () => {
+    expect(ReportScores.surfaces()).toEqual(['progress', 'questionnaire', 'phones', 'printGrades', 'exportData']);
+    ReportScores.surfaces().forEach(surface => expect(ReportScores.reportScoreSet(surface), surface).toBe('all'));
+  });
+
+  it('refuses a surface that is not in the table, when it is named and when it is run', () => {
+    expect(() => ReportScores.reportScoreSet('gradebook')).toThrow(/not a report surface/);
+    expect(() => ReportScores.withReportScores('gradebook', () => 1)).toThrow(/not a report surface/);
+    expect(() => ReportScores.scoped('gradebook', () => 1)).toThrow(/not a report surface/);
+  });
+
+  it('withReportScores runs the function, gives back what it returns, and says which surface is running', () => {
+    expect(ReportScores.running()).toBe(null);
+    const got = ReportScores.withReportScores('progress', () => ({ running: ReportScores.running(), set: _scoreSet }));
+    expect(got).toEqual({ running: 'progress', set: 'all' });
+    expect(ReportScores.running()).toBe(null);
+  });
+
+  it('lets go of the surface when the function throws', () => {
+    expect(() =>
+      ReportScores.withReportScores('progress', () => {
+        throw new Error('a block failed');
+      }),
+    ).toThrow('a block failed');
+    expect(ReportScores.running()).toBe(null);
+  });
+
+  it('the outermost surface decides: a report drawn inside another takes its set', () => {
+    const seen = ReportScores.withReportScores('phones', () =>
+      ReportScores.withReportScores('progress', () => ReportScores.running()),
+    );
+    expect(seen).toBe('phones');
+  });
+
+  it('scoped keeps the arguments, `this` and the result', () => {
+    const owner = {
+      base: 10,
+      add: ReportScores.scoped('questionnaire', function (a, b) {
+        return { sum: this.base + a + b, running: ReportScores.running(), count: arguments.length };
+      }),
+    };
+    expect(owner.add(1, 2)).toEqual({ sum: 13, running: 'questionnaire', count: 2 });
+    expect(ReportScores.running()).toBe(null);
+  });
+
+  it('follows the set calc.js is using: inside withReturnedOnly everything here is returned grades', () => {
+    globalThis.getReturnedScores = () => ({ s1: [{ assessmentId: 'a1', tagId: 't', score: 4, note: 'Returned.' }] });
+    expect(ReportScores.setInUse()).toBe('all');
+    const inside = withReturnedOnly(() => ({
+      set: ReportScores.setInUse(),
+      // A surface on all work is never given all work inside returned grades.
+      surface: ReportScores.reportScoreSet('printGrades'),
+      nested: ReportScores.withReportScores('printGrades', () => _scoreSet),
+      entries: ReportScores.entries('c', 's1'),
+      comment: ReportScores.comment('c', 's1', 'a1'),
+    }));
+    expect(inside.set).toBe('returned');
+    expect(inside.surface).toBe('returned');
+    expect(inside.nested).toBe('returned');
+    expect(inside.entries).toHaveLength(1);
+    expect(inside.comment).toBe('Returned.');
+    expect(ReportScores.setInUse()).toBe('all');
+  });
+
+  describe('with a surface’s row set to returned', () => {
+    it('runs that surface’s reports in returned grades and leaves the others on all work', () => {
+      loadSeam({ progress: 'returned' });
+      globalThis.getReturnedScores = () => ({});
+      expect(ReportScores.reportScoreSet('progress')).toBe('returned');
+      expect(ReportScores.reportScoreSet('questionnaire')).toBe('all');
+      expect(ReportScores.withReportScores('progress', () => [_scoreSet, ReportScores.setInUse()])).toEqual([
+        'returned',
+        'returned',
+      ]);
+      expect(ReportScores.withReportScores('questionnaire', () => _scoreSet)).toBe('all');
+      expect(_scoreSet).toBe('all');
+      // A function wrapped before the row changed follows the row as it is now.
+      const scopedBefore = ReportScores.scoped('progress', () => _scoreSet);
+      loadSeam();
+      expect(scopedBefore()).toBe('all');
+      loadSeam({ progress: 'returned' });
+      expect(scopedBefore()).toBe('returned');
+    });
+
+    it('a report drawn inside an all-work surface stays on all work, and inside a returned one on returned', () => {
+      loadSeam({ progress: 'returned' });
+      globalThis.getReturnedScores = () => ({});
+      // Print Grades calling a block: the class sheet stays the teacher's.
+      expect(
+        ReportScores.withReportScores('printGrades', () =>
+          ReportScores.withReportScores('progress', () => [_scoreSet, ReportScores.reportScoreSet('progress')]),
+        ),
+      ).toEqual(['all', 'all']);
+      // A phone copy (all work here) drawn inside a Progress Report takes the report's set.
+      expect(
+        ReportScores.withReportScores('progress', () => ReportScores.withReportScores('phones', () => _scoreSet)),
+      ).toBe('returned');
+    });
+
+    it('refuses a report that leaves work for later, as calc.js does', () => {
+      loadSeam({ progress: 'returned' });
+      expect(() => ReportScores.withReportScores('progress', async () => 1)).toThrow(/does not finish at once/);
+      expect(ReportScores.running()).toBe(null);
+      expect(_scoreSet).toBe('all');
+    });
+
+    it('fails closed: with nothing to give the returned set, a read stops with an error', () => {
+      loadSeam({ progress: 'returned' });
+      const draw = () => ReportScores.withReportScores('progress', () => ReportScores.entries('c', 's1'));
+      expect(draw).toThrow(/nothing loaded here can give them/);
+      globalThis.getReturnedScores = () => null;
+      expect(draw).toThrow(/not a set of scores/);
+      globalThis.getReturnedScores = () => [];
+      expect(draw).toThrow(/not a set of scores/);
+      globalThis.getReturnedScores = () => ({ s1: 'x' });
+      expect(draw).toThrow(/not a set of scores/);
+      globalThis.getReturnedScores = () => Promise.resolve({});
+      expect(draw).toThrow(/not a set of scores/);
+      globalThis.getReturnedScores = () => ({});
+      // A student who is not in the set has no returned grade.
+      expect(draw()).toEqual([]);
+      expect(ReportScores.running()).toBe(null);
+    });
+
+    it('checklist ticks have no returned reader yet: on returned grades they stop with an error, never the draft ticks', () => {
+      loadSeam({ progress: 'returned' });
+      globalThis.getReturnedScores = () => ({});
+      const ticks = () => ReportScores.withReportScores('progress', () => ReportScores.checkIds('c', 's1', 'a1'));
+      expect(ticks).toThrow(/returned checklist ticks/);
+      globalThis.getReturnedRubricCheckIds = (cid, sid, aid) => [cid, sid, aid];
+      expect(ticks()).toEqual(['c', 's1', 'a1']);
+    });
+  });
+});
+
+/* ── 3 and 4. Behaviour, on the Demo class ───────────────────── */
+
+// Each drawing of the class takes a few seconds; a slow runner gets a minute.
+describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
+  const REPORTS = ['progress', 'quick', 'questionnaire', 'phones'];
+  const TEACHERS = ['printGrades', 'export'];
+  let cid;
+  let working; // the teacher's working copy, drafts and all
+  let ticks;
+  let wasDemo;
+
+  // Lets a render's kept levels go (report-blocks.js keeps them until the task ends).
+  const settle = () => new Promise(done => setTimeout(done, 0));
+
+  // Every surface, drawn from a clean start.
+  async function draw(only) {
+    await settle();
+    clearProfCache();
+    freshGenerate();
+    return surfaces(cid, only, { handout: false });
+  }
+
+  beforeAll(() => {
+    wasDemo = window.isDemoMode;
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(FROZEN_AT));
+    cid = loadDemoClass();
+    setActiveTerm(cid, null);
+    working = structuredClone(getScores(cid));
+    ticks = structuredClone(getRubricChecks(cid));
+  });
+
+  afterEach(() => {
+    loadSeam();
+    delete globalThis.getReturnedScores;
+    delete globalThis.getReturnedRubricCheckIds;
+    _cache.scores[cid] = structuredClone(working);
+    _cache.rubricChecks[cid] = structuredClone(ticks);
+    _scoreSet = 'all';
+    clearProfCache();
+  });
+
+  afterAll(() => {
+    vi.useRealTimers();
+    window.isDemoMode = wasDemo;
+    CURRICULUM_INDEX = null;
+    localStorage.clear();
+    clearProfCache();
+  });
+
+  /* Runs `fn` and gives back every read of the class's scores, statuses or
+     ticks made while no report surface was running: "reader at file:line". */
+  function readsOutsideTheSeam(fn) {
+    const names = ['getScores', 'getAssignmentStatuses', 'getRubricChecks'];
+    const kept = {};
+    const outside = new Set();
+    let inside = 0;
+    names.forEach(name => {
+      kept[name] = globalThis[name];
+      globalThis[name] = function () {
+        if (ReportScores.running() === null) {
+          const frame = (new Error().stack || '').split('\n').find(line => /teacher\/[a-z-]+\.js/.test(line)) || '';
+          outside.add(name + ' at ' + ((frame.match(/teacher\/[a-z-]+\.js:\d+/) || [])[0] || 'unknown'));
+        } else inside++;
+        return kept[name].apply(this, arguments);
+      };
+    });
+    try {
+      fn();
+    } finally {
+      names.forEach(name => (globalThis[name] = kept[name]));
+    }
+    return { outside: Array.from(outside).sort(), inside };
+  }
+
+  it('the spy sees a read made outside the seam', () => {
+    const student = getStudents(cid)[0];
+    const bare = readsOutsideTheSeam(() => getOverallProficiency(cid, student.id));
+    clearProfCache();
+    const inSeam = readsOutsideTheSeam(() =>
+      ReportScores.withReportScores('progress', () => getOverallProficiency(cid, student.id)),
+    );
+    expect(bare.outside.length).toBeGreaterThan(0);
+    expect(inSeam.outside).toEqual([]);
+    expect(inSeam.inside).toBeGreaterThan(0);
+    // A rubric handout asked for as Print Rubrics asks is not a report surface: it reads the working copy.
+    const lab = getAssessments(cid).find(a => a.rubricId);
+    const handout = readsOutsideTheSeam(() => RubricPrint.sheetData(cid, lab.id, student.id));
+    expect(handout.outside.join(' ')).toContain('teacher/rubric-print.js');
+  });
+
+  it('every score, status and tick read while a surface is drawn is made inside withReportScores', async () => {
+    await settle();
+    clearProfCache();
+    freshGenerate();
+    const reads = readsOutsideTheSeam(() => surfaces(cid, null, { handout: false }));
+    expect(reads.outside).toEqual([]);
+    // And there were reads to see: the reports were drawn from scores.
+    expect(reads.inside).toBeGreaterThan(1000);
+  });
+
+  it('no function run inside withReportScores leaves work for later (S2-F1 would refuse it)', async () => {
+    await settle();
+    clearProfCache();
+    const real = ReportScores.withReportScores;
+    const later = [];
+    let runs = 0;
+    ReportScores.withReportScores = function (surface, fn) {
+      const result = real.call(this, surface, fn);
+      runs++;
+      if (result && typeof result.then === 'function') later.push(surface);
+      return result;
+    };
+    try {
+      surfaces(cid, null, { handout: false });
+    } finally {
+      ReportScores.withReportScores = real;
+    }
+    expect(later).toEqual([]);
+    expect(runs).toBeGreaterThan(1000);
+  });
+
+  /* The class with drafts: for every second student everything dated
+     after July is a draft never returned, and for every student the last
+     two pieces of the year are. One student's lab also has a draft Overall
+     Comment, criterion comment, Note for the Report and ticks. */
+  function classWithDrafts() {
+    const assessments = getAssessments(cid);
+    const late = new Set(assessments.filter(a => a.date > '2026-10-28').map(a => a.id));
+    const afterJuly = new Set(assessments.filter(a => a.date > '2026-07-31').map(a => a.id));
+    expect(late.size).toBeGreaterThan(0);
+    expect(afterJuly.size).toBeGreaterThan(late.size);
+    const drafts = {};
+    getStudents(cid).forEach((s, i) => (drafts[s.id] = i % 2 ? afterJuly : late));
+    // The marked draft: a rubric piece dated after July, for a student whose later work is all draft.
+    const student = getStudents(cid).find(
+      (s, i) => i % 2 && (working[s.id] || []).some(e => afterJuly.has(e.assessmentId)),
+    );
+    const lab = assessments.find(
+      a =>
+        a.rubricId &&
+        afterJuly.has(a.id) &&
+        (working[student.id] || []).some(e => e.assessmentId === a.id && e.score > 0),
+    );
+    expect(lab, 'a scored rubric piece among the drafts').toBeTruthy();
+    const scores = structuredClone(working);
+    scores[student.id].forEach(e => {
+      if (e.assessmentId !== lab.id) return;
+      e.note = 'ZZDRAFT overall comment.';
+      e.critNote = 'ZZDRAFT criterion comment.';
+      e.reportNote = 'ZZDRAFT note for the report';
+    });
+    const rubric = getRubricById(cid, lab.rubricId);
+    const checks = structuredClone(ticks);
+    const someCheck = (rubric.criteria || []).flatMap(c => c.checks || [])[0];
+    if (someCheck) checks[student.id + ':' + lab.id] = [someCheck.id];
+    // What students have been given: the working copy without the drafts.
+    const returned = {};
+    Object.keys(scores).forEach(sid => {
+      returned[sid] = structuredClone(scores[sid]).filter(e => !(drafts[sid] && drafts[sid].has(e.assessmentId)));
+    });
+    const returnedTicks = {};
+    Object.keys(checks).forEach(key => {
+      const [sid, aid] = key.split(':');
+      if (!(drafts[sid] && drafts[sid].has(aid))) returnedTicks[key] = checks[key];
+    });
+    return { scores, checks, returned, returnedTicks, student, lab, tick: someCheck || null };
+  }
+
+  it('with the reports’ rows on returned, each report is the report of a class that has only the returned grades', async () => {
+    const c = classWithDrafts();
+
+    // All work, as every surface is today.
+    _cache.scores[cid] = structuredClone(c.scores);
+    _cache.rubricChecks[cid] = structuredClone(c.checks);
+    const allWork = await draw();
+
+    // The rows turned, as S2-F1 and S2-F2 will turn them; the class unchanged.
+    loadSeam(REPORTS_ON_RETURNED);
+    globalThis.getReturnedScores = () => c.returned;
+    globalThis.getReturnedRubricCheckIds = (id, sid, aid) => (c.returnedTicks[sid + ':' + aid] || []).slice();
+    const onReturned = await draw();
+
+    // A class whose working copy is the returned grades, on all work.
+    loadSeam();
+    delete globalThis.getReturnedScores;
+    delete globalThis.getReturnedRubricCheckIds;
+    _cache.scores[cid] = structuredClone(c.returned);
+    _cache.rubricChecks[cid] = structuredClone(c.returnedTicks);
+    const returnedClass = await draw();
+
+    const keys = Object.keys(allWork);
+    expect(Object.keys(onReturned)).toEqual(keys);
+    expect(Object.keys(returnedClass)).toEqual(keys);
+    const of = names => keys.filter(k => names.indexOf(surfaceOf(k)) >= 0);
+
+    // Every report surface, part for part: nothing in it came from a draft.
+    const leaked = of(REPORTS).filter(k => onReturned[k] !== returnedClass[k]);
+    expect(leaked).toEqual([]);
+    // The drafts matter in this class: all work prints something else.
+    const moved = of(REPORTS).filter(k => onReturned[k] !== allWork[k]);
+    REPORTS.forEach(surface => expect(moved.filter(k => surfaceOf(k) === surface).length, surface).toBeGreaterThan(0));
+
+    // Print Grades and Export stay on all work: the same with the rows turned.
+    expect(of(TEACHERS).filter(k => onReturned[k] !== allWork[k])).toEqual([]);
+    expect(of(TEACHERS).filter(k => onReturned[k] !== returnedClass[k]).length).toBeGreaterThan(0);
+  });
+
+  it('a draft’s comment, note and tick are nowhere in a report on returned grades, and still in the teacher’s own', async () => {
+    const c = classWithDrafts();
+    _cache.scores[cid] = structuredClone(c.scores);
+    _cache.rubricChecks[cid] = structuredClone(c.checks);
+    const holding = (drawn, names, needle) =>
+      Object.keys(drawn).filter(k => names.indexOf(surfaceOf(k)) >= 0 && drawn[k].indexOf(needle) >= 0);
+
+    // On all work the draft is on the reports: the test has something to find.
+    const allWork = await draw();
+    expect(holding(allWork, ['quick'], 'ZZDRAFT overall comment.').length).toBeGreaterThan(0);
+    expect(holding(allWork, ['quick'], 'ZZDRAFT criterion comment.').length).toBeGreaterThan(0);
+    expect(holding(allWork, ['questionnaire'], 'ZZDRAFT note for the report').length).toBeGreaterThan(0);
+    if (c.tick) {
+      const card = k => JSON.parse(allWork[k]).feedback.find(item => item.id === c.lab.id);
+      const key = 'year › quick › ' + c.student.id;
+      const tickedOn = item =>
+        item.rubric.rows.some(row => Object.values(row.checks || {}).some(list => list.some(x => x.ticked)));
+      expect(tickedOn(card(key))).toBe(true);
+    }
+
+    loadSeam(REPORTS_ON_RETURNED);
+    globalThis.getReturnedScores = () => c.returned;
+    globalThis.getReturnedRubricCheckIds = (id, sid, aid) => (c.returnedTicks[sid + ':' + aid] || []).slice();
+    const onReturned = await draw();
+    expect(holding(onReturned, REPORTS, 'ZZDRAFT')).toEqual([]);
+    // The piece itself is not on the student's Feedback Pages: its grade was never returned.
+    const feedback = JSON.parse(onReturned['year › quick › ' + c.student.id]).feedback;
+    expect(feedback.find(item => item.id === c.lab.id)).toBeUndefined();
+    // The teacher's own record keeps it.
+    expect(holding(onReturned, ['export'], 'ZZDRAFT overall comment.').length).toBe(1);
+    expect(holding(onReturned, ['export'], 'ZZDRAFT note for the report').length).toBe(1);
+  });
+
+  it('levels a render keeps are kept for one set: a block drawn on all work, then on returned grades in the same task', async () => {
+    const c = classWithDrafts();
+    _cache.scores[cid] = structuredClone(c.scores);
+    globalThis.getReturnedScores = () => c.returned;
+    const term = getReportingTerms(cid)[1];
+    const ctx = { termId: 'term-' + term.ordinal, termLabel: term.label };
+    const autos = ReportBlocks.showDefaults(cid);
+    // The blocks that read the start of the term and the last report's levels (report-blocks.js _pass).
+    const blocks = () =>
+      ['proficiency', 'progress', 'next-steps', 'competency-table']
+        .map(id =>
+          ReportBlocks.renderReportBlock(id, cid, c.student, ctx, ReportSheets.optionsFor({ block: id }, autos)),
+        )
+        .join('\n');
+    setActiveTerm(cid, term.ordinal);
+    try {
+      await settle();
+      clearProfCache();
+      const allWork = blocks();
+      // No pause: what the all-work render kept is still held.
+      const straightAfter = withReturnedOnly(blocks);
+      await settle();
+      clearProfCache();
+      const fromClean = withReturnedOnly(blocks);
+      expect(straightAfter).toBe(fromClean);
+      expect(fromClean).not.toBe(allWork);
+    } finally {
+      setActiveTerm(cid, null);
+    }
+  });
+
+  it('a Note for the Report prints only once that piece’s grade has been returned (ruling 11)', () => {
+    const c = classWithDrafts();
+    _cache.scores[cid] = structuredClone(c.scores);
+    // A second note, on a piece of the same student's that was returned.
+    const returnedPiece = c.returned[c.student.id].find(e => e.score > 0);
+    _cache.scores[cid][c.student.id].forEach(e => {
+      if (e.assessmentId === returnedPiece.assessmentId) e.reportNote = 'Linked the poster to the Act';
+    });
+    globalThis.getReturnedScores = () => c.returned;
+    const notes = () => [
+      ReportScores.reportNote(cid, c.student.id, c.lab.id),
+      ReportScores.reportNote(cid, c.student.id, returnedPiece.assessmentId),
+    ];
+    expect(notes()).toEqual(['ZZDRAFT note for the report', 'Linked the poster to the Act']);
+    expect(withReturnedOnly(notes)).toEqual(['', 'Linked the poster to the Act']);
+  });
+
+  it('on a class with nothing in draft, every reader gives on returned grades what the data layer gives', () => {
+    const c = classWithDrafts();
+    _cache.scores[cid] = structuredClone(c.scores);
+    _cache.rubricChecks[cid] = structuredClone(c.checks);
+    globalThis.getReturnedScores = id => getScores(id);
+    globalThis.getReturnedRubricCheckIds = (id, sid, aid) => getRubricCheckIds(id, sid, aid);
+    const readAll = via => {
+      const out = [];
+      getStudents(cid).forEach(s => {
+        out.push(via.entries(cid, s.id));
+        getAssessments(cid).forEach(a => {
+          const rubric = a.rubricId ? getRubricById(cid, a.rubricId) : null;
+          out.push([
+            via.pointsScore(cid, s.id, a.id),
+            via.completionMark(cid, s.id, a.id),
+            via.comment(cid, s.id, a.id),
+            via.reportNote(cid, s.id, a.id),
+            via.checkIds(cid, s.id, a.id),
+            via.status(cid, s.id, a.id),
+            (a.tagIds || []).map(t => via.tagComment(cid, s.id, a.id, t)),
+            ((rubric && rubric.criteria) || []).map(crit => [
+              via.criterionComment(cid, s.id, a.id, crit),
+              via.criterionBeyond(cid, s.id, a.id, crit),
+            ]),
+          ]);
+        });
+      });
+      return JSON.stringify(out);
+    };
+    const dataLayer = readAll({
+      entries: (id, sid) => getScores(id)[sid] || [],
+      pointsScore: getPointsScore,
+      completionMark: getCompletionMark,
+      comment: getScoreComment,
+      reportNote: getScoreReportNote,
+      checkIds: getRubricCheckIds,
+      status: getAssignmentStatus,
+      tagComment: getTagComment,
+      criterionComment: getRubricCriterionComment,
+      criterionBeyond: getRubricCriterionBeyond,
+    });
+    // On all work the readers are the data layer's own.
+    expect(readAll(ReportScores)).toBe(dataLayer);
+    // On returned grades they work it out from the returned set: the same, with nothing in draft.
+    expect(withReturnedOnly(() => readAll(ReportScores))).toBe(dataLayer);
+    expect(dataLayer).toContain('ZZDRAFT criterion comment.');
+    expect(ReportScores.statuses(cid)).toBe(getAssignmentStatuses(cid));
+  });
+});

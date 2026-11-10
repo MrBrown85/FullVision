@@ -19,6 +19,9 @@
  *
  * surfaces(cid) gives { 'view › surface › part': text }. The text is the
  * output itself; a test hashes it or searches it.
+ *
+ * freshGenerate() makes Generate forget the stories it has told, so the
+ * same class drafts the same comments again.
  */
 import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
@@ -27,6 +30,15 @@ import { runInThisContext } from 'vm';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '../..');
+
+/* Generate remembers, for this session, the stories and strengths it has
+   told each class, and picks the least used. Loading its file again starts
+   that memory empty, as a reload of the page does. */
+export function freshGenerate() {
+  runInThisContext(readFileSync(resolve(ROOT, 'teacher/comment-bank.js'), 'utf-8'), {
+    filename: 'teacher/comment-bank.js',
+  });
+}
 
 /* Which of the six surfaces a part belongs to: the part's name starts with it. */
 export const SURFACES = ['progress', 'quick', 'questionnaire', 'phones', 'printGrades', 'export'];
@@ -92,7 +104,7 @@ function progress(cid, students, ctx, out, view) {
     .join('\n');
 }
 
-function quick(cid, students, ctx, out, view) {
+function quick(cid, students, ctx, out, view, handout) {
   const assessments = getAssessments(cid);
   students.forEach(st => {
     const part = view + ' › quick › ' + st.id;
@@ -107,20 +119,23 @@ function quick(cid, students, ctx, out, view) {
       extra: GradeReport.extraCards(cid, st, ctx, { observations: true, termComment: true }),
       observations: ReportFeedback.observations(cid, st, ctx.termId),
       termComment: ReportFeedback.termComment(cid, st, ctx.termId),
-      sheets: assessments.map(a => {
-        const sheet = RubricPrint.sheetData(cid, a.id, st.id);
-        return (
-          sheet && {
-            status: sheet.status,
-            scored: sheet.scored,
-            rows: sheet.rows.map(r => [r.criterion.id, r.level, r.mod, r.mixed, r.comment, r.beyond]),
-            overall: sheet.overall,
-            feedback: sheet.feedback,
-            ticked: sheet.ticked,
-          }
-        );
-      }),
-      comments: assessments.map(a => RubricPrint.feedbackItems(cid, st.id, a.id)),
+      // The rubric sheet itself, asked for as Print Rubrics asks: the handout, not a report.
+      sheets: !handout
+        ? undefined
+        : assessments.map(a => {
+            const sheet = RubricPrint.sheetData(cid, a.id, st.id);
+            return (
+              sheet && {
+                status: sheet.status,
+                scored: sheet.scored,
+                rows: sheet.rows.map(r => [r.criterion.id, r.level, r.mod, r.mixed, r.comment, r.beyond]),
+                overall: sheet.overall,
+                feedback: sheet.feedback,
+                ticked: sheet.ticked,
+              }
+            );
+          }),
+      comments: handout ? assessments.map(a => RubricPrint.feedbackItems(cid, st.id, a.id)) : undefined,
     });
   });
 }
@@ -180,9 +195,13 @@ function exported(cid, out, view) {
   out[view + ' › export › workbook'] = text(sheets);
 }
 
-/** Every surface for the class, for the year so far and as of each reporting term. */
-export function surfaces(cid, only) {
+/** Every surface for the class, for the year so far and as of each reporting term.
+ * only: the surfaces to draw (all six without it). opts.handout false leaves
+ * out the rubric sheets asked for as Print Rubrics asks, which are the
+ * grader's handout and not part of a report. */
+export function surfaces(cid, only, opts) {
   const want = name => !only || only.indexOf(name) >= 0;
+  const handout = !(opts && opts.handout === false);
   const students = sortStudents(getStudents(cid), 'lastName');
   const was = getActiveTerm(cid);
   const out = {};
@@ -194,7 +213,7 @@ export function surfaces(cid, only) {
       const ctx = { termId: 'term-' + (ordinal == null ? 1 : ordinal), termLabel: term ? term.label : 'Report 1' };
       setActiveTerm(cid, ordinal);
       if (want('progress')) progress(cid, students, ctx, out, view);
-      if (want('quick')) quick(cid, students, ctx, out, view);
+      if (want('quick')) quick(cid, students, ctx, out, view, handout);
       if (want('questionnaire')) questionnaire(cid, students, ctx, out, view, ordinal == null ? 1 : ordinal);
       if (want('phones')) phones(cid, students, ctx, out, view);
       // Print Grades sets its own period; Export reads the year so far.
