@@ -171,15 +171,18 @@ PGPORT=54329 PGDATABASE=fv_score python3 score_rpcs.py
 
 Result on 2026-11-09 (Postgres 18.6, local; production is 17): 176 of 176.
 Against a database with Batch A loaded (below) the same script finds it and
-expects the three gaps Batch A closes to be refused: 235 of 235.
+expects the two gaps Batch A closes to be refused: 234 of 234.
 
-Checks named "today:" pin a gap as it is. Batch A closes three and its
-database flips their checks to "refused": `upsert_rubric_score` takes a
-criterion that is not on the assessment's rubric; `set_score_status` takes
-Missing on scored work; and row security on the score tables checks the
-enrollment only, so a teacher can save a score for their own student against
-another teacher's assessment, competency or criterion by id. The others it
-found, left as they are:
+Checks named "today:" pin a gap as it is. Batch A closes two and its
+database flips their checks to "refused": `set_score_status` takes Missing
+on scored work; and row security on the score tables checks the enrollment
+only, so a teacher can save a score for their own student against another
+teacher's assessment, competency or criterion by id. The others it found,
+left as they are:
+
+- `upsert_rubric_score` takes a criterion that is not on the assessment's
+  rubric. Batch A leaves it: the outbox can send a score ahead of the rubric
+  change it belongs to, so a refusal would lose real grades.
 
 - `upsert_tag_score` takes a competency the assessment is not linked to.
 - `upsert_score` takes points over the assessment's maximum, and a score on
@@ -247,7 +250,7 @@ What each covers:
 - `grade_return.py` runs every case in `tests/fixtures/grade-state-cases.json`
   through the score RPCs, the triggers and `student_submit._returned_grade`
   (the same file runs through `shared/grade-state.js`). Then: the two server
-  checks, each against what shipped clients send; `return_grades`; the class
+  check on Missing, against what shipped clients send; `return_grades`; the class
   settings, and a class leaving When I Return Them returning what was
   waiting; each bulk path by name (the restore from a new backup, an old one
   and a 30 by 40 class, `move_rubric_scores`, Duplicate Class, Copy
@@ -255,13 +258,17 @@ What each covers:
   box in each order the cascades can run, a checkbox, a competency, a rubric
   and a student; a statement that adds and changes rows of one grade; an id
   re-pointed by hand; what a student is sent when the work's scoring has
-  changed; then who can reach what.
+  changed; a planted scratch row that must not be trusted, and the scratch
+  table empty between statements; a restore over a class that exists; then
+  who can reach what.
 - `student_page.py` runs the card RPCs and `card`, `verify_card`, `page`,
   `seen` and `done` as the edge function calls them: five wrong tries in a
-  row, Unlock and Unlock All, Reissue, Cards Work Until, a fresh session
+  row and the slow lock (fifteen in 7 days), Unlock and Unlock All, Reissue
+  with a new password, Cards Work Until, a fresh session
   from the start screen and Add Another Card joining one, midnight in the
-  class's time zone, Done, the per-address limit, a slip's code not
-  counting toward it, housekeeping, the log. A draft never comes back from
+  class's time zone, Done, the per-address limit of 300 in 15 minutes, a
+  slip's code answered as unknown and not counted toward it, housekeeping,
+  the log. A draft never comes back from
   `page`: by hand, then for 300 seeded random saves, edits, clears, returns
   and setting changes. Missing and Excused show no result. Last, no function
   in `student_submit` but `_returned_grade` names a score table.
@@ -273,18 +280,21 @@ What each covers:
 - `grade_return_race.py` uses several connections and commits (it cleans up
   after itself). Two saves on one grade: the second waits and the draft
   stays a draft. 150 saves on each of two students against 150 returns: no
-  call fails; with the class lock made a no-op, as a control, the same run
-  deadlocks.
+  call fails. The same with setting changes, rubric fills and card calls:
+  no call fails; as a control, with the release trigger renamed so it fires
+  after the sync-cursor trigger, the run deadlocks. A level saved for a
+  criterion while it is being deleted, 150 times: no deadlock.
 
 Result on 2026-11-09 (Postgres 18.6, local; production is 17):
-`batch_a_apply.py` 80 of 80, `grade_return.py` 273 of 273, `student_page.py`
-197 of 197, `score_rpcs.py` 235 of 235 (176 of 176 without Batch A),
-`grade_return_race.py` 6 of 6. With Batch A loaded the earlier suites pass
+`batch_a_apply.py` 80 of 80, `grade_return.py` 282 of 282, `student_page.py`
+216 of 216, `score_rpcs.py` 234 of 234 (176 of 176 without Batch A),
+`grade_return_race.py` 9 of 9 (three runs). With Batch A loaded the earlier suites pass
 as before: `student_submit.py` 79 of 79, `questionnaire_identity.py` 47 of
 47, `phone_reports.py` 37 of 37, `questionnaires.py` 42 of 42.
 
-Timing, same run: a rubric fill for 30 students with 5 criteria (30
-`fill_rubric` calls, 150 rows) took about 17 ms before the batch, 21 ms with
-the same-class policies and 45 ms with the Draft and Returned triggers too.
-A restore of a 30 by 40 class (4,800 score rows) took 0.30 s; the triggers
-stand aside during a restore and it sets the state in a few statements.
+Timing: a rubric fill for 30 students with 5 criteria (30 `fill_rubric`
+calls, 150 rows) took about 15 ms before the batch, 20 ms with the
+same-class policies and 40 to 45 ms with the Draft and Returned triggers
+too. A restore of a 30 by 40 class (4,800 score rows) took between 0.3 and
+0.7 s; the triggers stand aside during a restore and it sets the state in a
+few statements.

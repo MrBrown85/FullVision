@@ -359,11 +359,15 @@ create table grade_return (
 -- RLS: select only, fv_owns_enrollment(enrollment_id).
 
 -- Scratch for the triggers: the copy a cell had before a transaction first
--- changed it. A row is deleted when it is used. No access for any API role.
+-- changed it. A row is trusted only with its own transaction's id and start
+-- time and is gone when its statement ends, so the table is empty between
+-- transactions. No access for any API role.
 create table grade_return_before (
-  enrollment_id uuid   not null references enrollment(id) on delete cascade,
-  assessment_id uuid   not null references assessment(id) on delete cascade,
-  txid          bigint not null,
+  enrollment_id uuid        not null references enrollment(id) on delete cascade,
+  assessment_id uuid        not null references assessment(id) on delete cascade,
+  txid          bigint      not null,
+  at            timestamptz not null,
+  tbl           text        not null,
   copy          jsonb,
   primary key (enrollment_id, assessment_id)
 );
@@ -773,9 +777,10 @@ create table student_card (
   printed_at     timestamptz,
   last_opened_at timestamptz,
   wrong_tries    integer     not null default 0,                    -- wrong answers to "Is This You?" in a row; a right one resets it; the fifth locks the card
+  wrong_times    timestamptz[] not null default '{}',               -- when each wrong answer of the last 7 days was given; the fifteenth locks the card (the slow lock)
   locked_at      timestamptz,                                       -- Unlock clears it and the count
   stopped_at     timestamptz,                                       -- reissued; never opens again
-  works_until    date        not null,                              -- the card's last day, written when it is made: the class's Cards Work Until, else its last reporting date, else the next June 30
+  works_until    date        not null,                              -- the card's last day, written when it is made: the class's Cards Work Until, else its last reporting date if still ahead, else the next June 30
   password       text                                               -- the card password printed on it, for a student with no birthday or number then; the card's own
 );
 
@@ -875,7 +880,8 @@ create table support_report (
 -- `grade_return_before`        before insert, update or delete (row) on score, tag_score, rubric_score, rubric_check_score → _grade_return_before(part)
 -- `grade_return_insert|update|delete` after each statement on those four → _grade_return_on_change()
 -- `grade_return_repoint`        after  update (row) on tag_score, rubric_score, rubric_check_score when its tag, criterion or check id changes → _grade_return_repoint(part, id column); acts only inside move_rubric_scores
--- `grade_return_release`        after  update of student_page_enabled, return_grades on course, when the class stops holding grades → _grade_return_release()
+-- `a_grade_return_release`      after  update of student_page_enabled, return_grades on course, when the class stops holding grades → _grade_return_release(); named to fire before the sync-cursor trigger (lock order)
+-- `grade_return_lock`           before delete (statement) on rubric, criterion, criterion_check, tag → _grade_return_lock_mine(): the caller's class locks, before any row
 -- `fv_teacher_sign_in_deleted`  after  delete on auth.users     → _fv_teacher_sign_in_deleted() (soft-deletes the teacher)
 
 -- ─── Publications ───────────────────────────────────────────────────────────
