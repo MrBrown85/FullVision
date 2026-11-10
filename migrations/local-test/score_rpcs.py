@@ -65,6 +65,21 @@ ok('all twelve score RPCs are loaded, one version each',
 ok('none of them is SECURITY DEFINER: row security is their ownership check',
    not [f for f in local['functions'] if f.split('(')[0].split('.')[-1] in RPCS and 'security definer' in f])
 
+# ── Every function is the live one, byte for byte ──────────────────────
+# live-function-md5.txt holds md5(pg_get_functiondef) for 21 live functions.
+# Postgres 18 prints these headers as 17 does, so the whole definition is
+# compared, not only the body.
+want = {}
+for line in open(os.path.join(HERE, 'live-function-md5.txt')):
+    if line.strip() and not line.startswith('#'):
+        name, md5, _length = line.split(); want[name] = md5
+got = {r[0]: r[1] for r in c.run("""select p.proname, md5(pg_get_functiondef(p.oid)) from pg_proc p
+                                     join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public'""")}
+for name in sorted(n for n in want if n in got):
+    ok('%s is the live function, byte for byte' % name, got[name] == want[name], got[name])
+ok('all twelve score RPCs and the three ownership helpers were compared',
+   all(n in want and n in got for n in RPCS + ['fv_owns_course', 'fv_owns_enrollment', 'fv_owns_assessment']))
+
 c.run('begin')
 def as_teacher(uid):
     c.run('reset role'); c.run("select set_config('request.jwt.claim.sub', :u, true)", u=uid or ''); c.run('set role authenticated')

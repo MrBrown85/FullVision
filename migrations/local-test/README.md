@@ -149,9 +149,14 @@ Two files build the score paths on top of `harness.sql`:
 - `score-prelude.sql`: the functions, each copied from the migration that
   last defined it (named above each one). `set_score_status`,
   `save_score_comment`, `clear_row_scores` and `clear_column_scores` have no
-  migration; theirs are the April bodies in
-  `docs/backend-design/write-paths.sql`, so compare them with the live ones
-  before relying on a detail.
+  migration; theirs are the live bodies, read from `gradebook-prod` on
+  2026-11-09.
+- `live-function-md5.txt`: `md5(pg_get_functiondef)` of 21 live functions.
+  `score_rpcs.py` compares every function it loads that is in the table (the
+  twelve RPCs and `fv_owns_course`, `fv_owns_enrollment`,
+  `fv_owns_assessment`), so each is the live one byte for byte. The check
+  found one difference from the repo: the live `save_score_report_note` is
+  its migration's body with the five blank lines removed.
 - `score-tables.sql`: nineteen tables with their constraints, indexes,
   triggers and policies, written by `make-score-tables.py` from
   `docs/schema.generated.sql`. Run the script again when the snapshot
@@ -164,7 +169,7 @@ PGPORT=54329 PGDATABASE=fv_score python3 run.py harness.sql score-prelude.sql sc
 PGPORT=54329 PGDATABASE=fv_score python3 score_rpcs.py
 ```
 
-Result on 2026-11-09 (Postgres 18.6, local; production is 17): 159 of 159.
+Result on 2026-11-09 (Postgres 18.6, local; production is 17): 175 of 175.
 
 Checks named "today:" pin a gap as it is. Batch A closes two and flips their
 checks to "refused": `upsert_rubric_score` takes a criterion that is not on

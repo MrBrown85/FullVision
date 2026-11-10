@@ -15,7 +15,28 @@
 -- `assessment` does not exist until score-tables.sql.
 set check_function_bodies = off;
 
--- Ownership through the assessment. migrations/20261012_course_soft_delete.sql
+-- The ownership helpers, as live (harness.sql has fv_owns_course and
+-- fv_owns_enrollment on one line each; these replace them). migrations/20261012_course_soft_delete.sql
+create or replace function public.fv_owns_course(cid uuid)
+ returns boolean
+ language sql
+ stable security definer
+ set search_path to 'public'
+as $function$
+    select exists (select 1 from course c
+                   where c.id = cid and c.teacher_id = (select auth.uid())
+                     and c.deleted_at is null);
+$function$;
+create or replace function public.fv_owns_enrollment(eid uuid)
+ returns boolean
+ language sql
+ stable security definer
+ set search_path to 'public'
+as $function$
+    select exists (select 1 from enrollment e join course c on c.id = e.course_id
+                   where e.id = eid and c.teacher_id = (select auth.uid())
+                     and c.deleted_at is null);
+$function$;
 create or replace function public.fv_owns_assessment(aid uuid)
  returns boolean
  language sql
@@ -400,7 +421,9 @@ begin
 end;
 $function$;
 
--- save_score_report_note. migrations/20261031_score_report_note.sql
+-- save_score_report_note. migrations/20261031_score_report_note.sql, with its five blank
+-- lines taken out: the live body has none (it was applied that way), and the
+-- fingerprint check in score_rpcs.py needs the live text.
 create or replace function public.save_score_report_note(
   p_enrollment_id uuid,
   p_assessment_id uuid,
@@ -414,20 +437,16 @@ as $function$
 declare _id uuid; _note text; _cached jsonb;
 begin
     if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
-
     _cached := fv_idem_check(p_idempotency_key, 'save_score_report_note');
     if _cached is not null then
         return (_cached->>'id')::uuid;
     end if;
-
     _note := nullif(btrim(p_note), '');
     if char_length(_note) > 300 then
         raise exception 'report note must be 300 characters or fewer' using errcode = '22023';
     end if;
-
     select id into _id from score
      where enrollment_id = p_enrollment_id and assessment_id = p_assessment_id;
-
     if _id is null then
         insert into score (enrollment_id, assessment_id, report_note)
         values (p_enrollment_id, p_assessment_id, _note)
@@ -435,7 +454,6 @@ begin
     else
         update score set report_note = _note, updated_at = now() where id = _id;
     end if;
-
     perform fv_idem_store(p_idempotency_key, 'save_score_report_note', jsonb_build_object('id', _id));
     return _id;
 end; $function$;
@@ -544,54 +562,66 @@ $function$;
 
 -- set_score_status, save_score_comment, clear_row_scores and clear_column_scores
 -- have no migration file: they were applied in April 2026 from the design
--- file docs/backend-design/write-paths.sql ("Phase 1.7") and no
--- migration in the repo has redefined them since. These are that file's
--- bodies. docs/schema.generated.sql confirms the live signatures and that
--- all four are SECURITY INVOKER; it does not hold bodies, so the live
--- bodies are unconfirmed (compare with pg_get_functiondef on gradebook-prod).
-create or replace function set_score_status(
-    p_enrollment_id uuid, p_assessment_id uuid, p_status text
-) returns uuid
-language plpgsql security invoker set search_path = public as $$
+-- file docs/backend-design/write-paths.sql and no migration in the
+-- repo has redefined them. These are the live bodies, as pg_get_functiondef
+-- returned them from gradebook-prod on 2026-11-09 (read by the orchestrator,
+-- read-only). They differ from the design file only in blank lines.
+CREATE OR REPLACE FUNCTION public.set_score_status(p_enrollment_id uuid, p_assessment_id uuid, p_status text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
 declare _id uuid; _old_v numeric; _old_s text;
 begin
     if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
     if p_status is not null and p_status not in ('NS','EXC','LATE') then
         raise exception 'invalid status %', p_status using errcode = '22023';
     end if;
+
     select id, value, status into _id, _old_v, _old_s
       from score where enrollment_id = p_enrollment_id and assessment_id = p_assessment_id;
+
     if _id is null then
         insert into score (enrollment_id, assessment_id, status)
-        values (p_enrollment_id, p_assessment_id, p_status) returning id into _id;
+        values (p_enrollment_id, p_assessment_id, p_status)
+        returning id into _id;
         perform _score_audit_diff(_id, null, null, null, p_status);
     else
         update score set status = p_status, updated_at = now() where id = _id;
         perform _score_audit_diff(_id, _old_v, _old_v, _old_s, p_status);
     end if;
     return _id;
-end; $$;
-create or replace function save_score_comment(
-    p_enrollment_id uuid, p_assessment_id uuid, p_comment text
-) returns uuid
-language plpgsql security invoker set search_path = public as $$
+end; $function$;
+CREATE OR REPLACE FUNCTION public.save_score_comment(p_enrollment_id uuid, p_assessment_id uuid, p_comment text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
 declare _id uuid;
 begin
     if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
-    select id into _id from score where enrollment_id = p_enrollment_id and assessment_id = p_assessment_id;
+
+    select id into _id from score
+     where enrollment_id = p_enrollment_id and assessment_id = p_assessment_id;
+
     if _id is null then
         insert into score (enrollment_id, assessment_id, comment)
-        values (p_enrollment_id, p_assessment_id, p_comment) returning id into _id;
+        values (p_enrollment_id, p_assessment_id, p_comment)
+        returning id into _id;
     else
         update score set comment = p_comment, updated_at = now() where id = _id;
     end if;
     return _id;
-end; $$;
-create or replace function clear_row_scores(p_enrollment_id uuid, p_course_id uuid) returns int
-language plpgsql security invoker set search_path = public as $$
+end; $function$;
+CREATE OR REPLACE FUNCTION public.clear_row_scores(p_enrollment_id uuid, p_course_id uuid)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
 declare _n int := 0; _s record;
 begin
     if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+
     for _s in select s.id, s.value, s.status from score s
               join assessment a on a.id = s.assessment_id
               where s.enrollment_id = p_enrollment_id and a.course_id = p_course_id
@@ -599,6 +629,7 @@ begin
         perform _score_audit_diff(_s.id, _s.value, null, _s.status, null);
         _n := _n + 1;
     end loop;
+
     delete from score
      where enrollment_id = p_enrollment_id
        and assessment_id in (select id from assessment where course_id = p_course_id);
@@ -609,22 +640,27 @@ begin
      where enrollment_id = p_enrollment_id
        and assessment_id in (select id from assessment where course_id = p_course_id);
     return _n;
-end; $$;
-create or replace function clear_column_scores(p_assessment_id uuid) returns int
-language plpgsql security invoker set search_path = public as $$
+end; $function$;
+CREATE OR REPLACE FUNCTION public.clear_column_scores(p_assessment_id uuid)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
 declare _n int := 0; _s record;
 begin
     if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+
     for _s in select id, value, status from score where assessment_id = p_assessment_id
     loop
         perform _score_audit_diff(_s.id, _s.value, null, _s.status, null);
         _n := _n + 1;
     end loop;
+
     delete from score        where assessment_id = p_assessment_id;
     delete from rubric_score where assessment_id = p_assessment_id;
     delete from tag_score    where assessment_id = p_assessment_id;
     return _n;
-end; $$;
+end; $function$;
 
 set check_function_bodies = on;
 
