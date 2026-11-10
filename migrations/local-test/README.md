@@ -169,17 +169,18 @@ PGPORT=54329 PGDATABASE=fv_score python3 run.py harness.sql score-prelude.sql sc
 PGPORT=54329 PGDATABASE=fv_score python3 score_rpcs.py
 ```
 
-Result on 2026-11-09 (Postgres 18.6, local; production is 17): 175 of 175.
+Result on 2026-11-09 (Postgres 18.6, local; production is 17): 176 of 176.
+Against a database with Batch A loaded (below) the same script finds it and
+expects the three gaps Batch A closes to be refused: 236 of 236.
 
-Checks named "today:" pin a gap as it is. Batch A closes two and flips their
-checks to "refused": `upsert_rubric_score` takes a criterion that is not on
-the assessment's rubric, and `set_score_status` takes Missing on scored
-work. The others it found, left as they are:
+Checks named "today:" pin a gap as it is. Batch A closes three and its
+database flips their checks to "refused": `upsert_rubric_score` takes a
+criterion that is not on the assessment's rubric; `set_score_status` takes
+Missing on scored work; and row security on the score tables checks the
+enrollment only, so a teacher can save a score for their own student against
+another teacher's assessment, competency or criterion by id. The others it
+found, left as they are:
 
-- Row security on the score tables checks the enrollment only. A teacher
-  can save a score for their own student against another teacher's
-  assessment, competency or criterion by id. Nothing reads such a row back
-  to the other teacher.
 - `upsert_tag_score` takes a competency the assessment is not linked to.
 - `upsert_score` takes points over the assessment's maximum, and a score on
   Excused or Missing work.
@@ -193,3 +194,83 @@ work. The others it found, left as they are:
 
 `import_json_restore`, `duplicate_course` and `duplicate_assessment` are not
 loaded: they need most of the schema. Batch A's tests load them.
+
+## Batch A: Draft and Returned, student cards, sessions and the page (2026-11-09)
+
+Four migrations, tested here only (no Supabase branch, never
+`gradebook-prod`): `2026110901_score_rows_same_class.sql`,
+`2026110902_grade_return.sql`, `2026110903_student_card.sql`,
+`2026110904_student_sessions_page.sql`.
+
+Two more files build what they need on top of the score paths:
+
+- `batch-a-tables.sql`: six more tables from the live snapshot
+  (`python3 make-score-tables.py batch-a`).
+- `batch-a-prelude.sql`: `update_course`, `import_json_restore`,
+  `create_course`, `duplicate_course` and `duplicate_assessment`. No one
+  migration holds any of them whole; each is the migration that last wrote
+  it in full plus every later in-place patch, in order.
+  `live-function-md5.txt` proves each result is the live function.
+
+Two databases, one without the four migrations (for `batch_a_apply.py`,
+which applies them itself) and one with:
+
+```bash
+BASE="harness.sql score-prelude.sql score-tables.sql student-submit-prelude.sql \
+  ../20261025_questionnaires_tables_and_functions.sql ../20261025_questionnaires_templates.sql \
+  ../20261025_student_submit.sql ../20261025_student_submit_phone.sql \
+  ../20261025_student_submit_token_80.sql ../20261025_phone_reports.sql \
+  ../20261101_questionnaire_identity_check.sql ../20261101_questionnaire_slip_fixes.sql \
+  ../20261103_slip_password_kept_for_live_slips.sql batch-a-tables.sql batch-a-prelude.sql"
+PGPORT=54329 PGDATABASE=fv_a_pre python3 run.py $BASE
+PGPORT=54329 PGDATABASE=fv_a python3 run.py $BASE ../2026110901_score_rows_same_class.sql \
+  ../2026110902_grade_return.sql ../2026110903_student_card.sql ../2026110904_student_sessions_page.sql
+
+PGPORT=54329 PGDATABASE=fv_a_pre python3 batch_a_apply.py
+PGPORT=54329 PGDATABASE=fv_a python3 grade_return.py
+PGPORT=54329 PGDATABASE=fv_a python3 student_page.py
+PGPORT=54329 PGDATABASE=fv_a python3 score_rpcs.py
+```
+
+What each covers:
+
+- `batch_a_apply.py` meets the migrations the way production will: scores
+  first, then the four files. Every function the batch patches or copies
+  starts as the live one (20 fingerprints); the patch refuses any other
+  body; the backfill makes every existing grade Returned and changes no
+  score row (a checksum of the four score tables before and after); every
+  class has the student page off and no Return Grades choice; a second run
+  of all four files changes nothing.
+- `grade_return.py` runs every case in `tests/fixtures/grade-state-cases.json`
+  through the score RPCs, the triggers and `student_submit._returned_grade`
+  (the same file runs through `shared/grade-state.js`), then the two server
+  checks, `return_grades`, the class settings, and each bulk path by name:
+  the restore (a new backup and an old one, and a 30 by 40 class),
+  `move_rubric_scores`, Duplicate Class, Copy Assessment, the two bulk
+  clears, deleting an assessment, a criterion and a student; then who can
+  reach what.
+- `student_page.py` runs the card RPCs and `card`, `verify_card`, `page`,
+  `seen` and `done` as the edge function calls them: five wrong tries,
+  Unlock, Reissue, Cards Work Until, one session holding two classes,
+  midnight in the class's time zone, Done, the rate limits, the log. A draft
+  never comes back from `page`: by hand, then for 300 seeded random saves,
+  edits, clears, returns and setting changes. Last, no function in
+  `student_submit` but `_returned_grade` names a score table.
+- `score_rpcs.py` with Batch A loaded: everything it pinned still holds for
+  a teacher's own class, and every way in against another class's
+  assessment, competency, criterion or checkbox is refused (each RPC, then a
+  direct insert and update on each table), for Teacher B's records and for
+  another class of Teacher A's own.
+
+Result on 2026-11-09 (Postgres 18.6, local; production is 17):
+`batch_a_apply.py` 68 of 68, `grade_return.py` 158 of 158, `student_page.py`
+141 of 141, `score_rpcs.py` 236 of 236. With Batch A loaded the earlier
+suites pass as before: `student_submit.py` 79 of 79,
+`questionnaire_identity.py` 47 of 47, `phone_reports.py` 37 of 37,
+`questionnaires.py` 42 of 42.
+
+Timing, same run: a rubric fill for 30 students with 5 criteria (30
+`fill_rubric` calls, 150 rows) took about 15 ms before the batch, 21 ms with
+the same-class policies and 51 ms with the Draft and Returned triggers too.
+A restore of a 30 by 40 class (4,800 score rows) took 0.28 s; the triggers
+stand aside during a restore and it sets the state in two statements.
