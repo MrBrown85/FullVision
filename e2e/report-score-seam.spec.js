@@ -191,15 +191,29 @@ test('the watch sees a read a report file makes outside the seam', async ({ page
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await watch(page);
-  // A rubric handout, asked for as Print Rubrics asks, is not a report surface.
+  // The rubric handout is a report surface of its own (S2-F1): asked for as Print Rubrics asks, it reads inside.
   await page.evaluate(() => {
     const cid = 'sci8';
     const lab = getAssessments(cid).find(a => a.rubricId);
     const scored = getStudents(cid).find(s => getAssessmentOverallScore(cid, s.id, lab.id) > 0);
     RubricPrint.sheetData(cid, lab.id, scored.id);
   });
-  const seam = await seen(page);
-  // Both watches: the read, and the grade asked of calc.js.
+  let seam = await seen(page);
+  expect(seam.outside).toEqual([]);
+  expect(seam.inside).toBeGreaterThan(0);
+  // Code in a report file that asks outside every surface is seen. Both watches: the read, and the grade asked of calc.js.
+  await page.evaluate(
+    '(function () {\n' +
+      "  var cid = 'sci8';\n" +
+      '  var lab = getAssessments(cid).find(function (a) { return a.rubricId; });\n' +
+      '  var sid = getStudents(cid)[0].id;\n' +
+      '  getScores(cid);\n' +
+      '  getAssessmentOverallScore(cid, sid, lab.id);\n' +
+      '})();\n' +
+      '//# sourceURL=' +
+      new URL('/teacher/rubric-print.js', page.url()).href,
+  );
+  seam = await seen(page);
   expect(seam.outside.join(' ')).toContain('getScores from rubric-print.js');
   expect(seam.outside.join(' ')).toContain('getAssessmentOverallScore from rubric-print.js');
 });
