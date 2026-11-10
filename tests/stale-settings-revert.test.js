@@ -35,6 +35,7 @@ import {
   CAT_ASSIGNMENTS,
   CAT_TESTS,
   CID,
+  TEACHER,
   UPDATE_COURSE_COLUMNS,
   classSettingsServer,
 } from './helpers/class-settings-server.js';
@@ -807,6 +808,205 @@ describe('an update_course written to the outbox by the code before this fix', (
   });
 });
 
+describe('an old whole-copy update_course is weighed against the server’s row before it goes', () => {
+  /* The old code's save, as the tests above make it: the copy saved on this
+     device, and the whole of it queued. */
+  async function oldCodeQueues(patch, localCopy) {
+    await goOffline();
+    _saveCourseField('courseConfigs', CID, Object.assign({}, getCourseConfig(CID), localCopy));
+    _outbox();
+    window.v2Queue.push('update_course', { p_course_id: CID, p_patch: clone(patch) });
+    await settle();
+  }
+  let told;
+  let sentry;
+  beforeEach(() => {
+    told = [];
+    sentry = window.Sentry;
+    window.Sentry = { captureMessage: (message, level) => told.push([message, level]), captureException() {} };
+    // The outbox knows who is signed in from the session the browser keeps:
+    // it gives a failed write its one more try on the next page only then.
+    localStorage.setItem('sb-testproject-auth-token', JSON.stringify({ user: { id: TEACHER } }));
+  });
+  afterEach(() => {
+    window.Sentry = sentry;
+  });
+
+  it('two settings differ: neither is sent, the sync dot and Sentry say so, and the laptop shows the server’s', async () => {
+    await openApp();
+    await laptopHolds(byName('Calculation Method')); // Most Recent
+    // The old code's save of Emerging First: the method went with it.
+    await oldCodeQueues({ calc_method: 'mostRecent', level_order: 'asc' }, { levelOrder: 'asc' });
+    schoolSets(byName('Calculation Method')); // Highest
+    server.sent.length = 0;
+    await openApp();
+    await goOnline();
+
+    expect(server.patches()).toEqual([]);
+    expect(server.course.calc_method).toBe('highest');
+    expect(server.course.level_order).toBe('desc');
+    // Rule 5: the sync dot, and nothing else.
+    expect(getSyncDotState()).toEqual({ status: 'error', title: "Some changes couldn't be saved" });
+    expect(told).toEqual([['Old settings save not sent: the class changed on another device', 'warning']]);
+    // The class was read again: this device shows what the server holds.
+    expect(byName('Calculation Method').held()).toBe('highest');
+    expect(byName('Rubric Levels').held()).toBe('desc');
+    expect(window.v2Queue.stats().queued).toBe(0);
+
+    // The next page does not try it again: it is dropped, and the dot clears.
+    told.length = 0;
+    await openApp();
+    expect(server.patches()).toEqual([]);
+    expect(window.v2Queue.stats().deadLettered).toBe(0);
+    expect(getSyncDotState().status).toBe('idle');
+    expect(told).toEqual([['Outbox dropped update_course (FV409)', 'warning']]);
+  });
+
+  it('no setting differs: nothing is sent, and nothing is wrong', async () => {
+    await openApp();
+    await laptopHolds(byName('Calculation Method'));
+    await oldCodeQueues({ calc_method: 'mostRecent', level_order: 'desc' }, {});
+    server.sent.length = 0;
+    await openApp();
+    await goOnline();
+    expect(server.patches()).toEqual([]);
+    expect(window.v2Queue.stats()).toMatchObject({ queued: 0, deadLettered: 0 });
+    expect(getSyncDotState().status).toBe('idle');
+    expect(told).toEqual([]);
+  });
+
+  it('one setting differs: that key alone goes', async () => {
+    await openApp();
+    await laptopHolds(byName('Calculation Method'));
+    await oldCodeQueues({ calc_method: 'mostRecent', level_order: 'asc' }, { levelOrder: 'asc' });
+    server.sent.length = 0;
+    await openApp();
+    await goOnline();
+    expect(server.patches()).toEqual([{ level_order: 'asc' }]);
+    expect(told).toEqual([]);
+  });
+
+  it('what is not a setting in it is still sent when the settings are not', async () => {
+    await openApp();
+    await laptopHolds(byName('Calculation Method'));
+    await oldCodeQueues(
+      { name: 'History 12 (Block C)', calc_method: 'mostRecent', level_order: 'asc' },
+      { levelOrder: 'asc' },
+    );
+    schoolSets(byName('Calculation Method'));
+    server.sent.length = 0;
+    await openApp();
+    await goOnline();
+    expect(server.patches()).toEqual([{ name: 'History 12 (Block C)' }]);
+    expect(server.course.calc_method).toBe('highest');
+    expect(server.course.level_order).toBe('desc');
+  });
+
+  it('waits when the class cannot be read, and is weighed once it can', async () => {
+    await openApp();
+    await laptopHolds(byName('Calculation Method'));
+    await oldCodeQueues({ calc_method: 'mostRecent', level_order: 'asc' }, { levelOrder: 'asc' });
+    server.sent.length = 0;
+    setOnline(true); // the browser says it is online; the server does not answer
+    await window.v2Queue.flush();
+    await settle();
+    expect(window.v2Queue.stats()).toMatchObject({ queued: 1, deadLettered: 0 });
+    await goOnline();
+    expect(server.patches()).toEqual([{ level_order: 'asc' }]);
+  });
+
+  it('one the server had already refused under the old code is not weighed on its one more try: no setting of it goes', async () => {
+    await openApp();
+    await laptopHolds(byName('Calculation Method'));
+    closeApp();
+    // As the old code left it: refused once, waiting for the next page.
+    localStorage.setItem(
+      'fv-sync-dead-letter-v1',
+      JSON.stringify([
+        {
+          id: 'e0000000-0000-4000-8000-00000000dead',
+          created_at: '2026-11-09T18:00:00.000Z',
+          owner: TEACHER,
+          key: 'course:' + CID,
+          endpoint: 'update_course',
+          payload: { p_course_id: CID, p_patch: { calc_method: 'mostRecent', level_order: 'asc' } },
+          attempts: 1,
+          last_error: 'statement timeout',
+          last_code: '57014',
+        },
+      ]),
+    );
+    server.sent.length = 0;
+    await openApp();
+    await goOnline();
+    expect(server.patches()).toEqual([]);
+    expect(server.course.level_order).toBe('desc');
+    expect(window.v2Queue.stats()).toMatchObject({ queued: 0, deadLettered: 0 });
+    expect(told).toEqual([['Outbox dropped update_course (FV409)', 'warning']]);
+  });
+});
+
+describe('what a settings write is kept and sent as', () => {
+  it('a save that changes nothing sends no request', async () => {
+    await openApp();
+    const before = server.fake.calls.length;
+    saveCourseConfig(CID, Object.assign({}, getCourseConfig(CID)));
+    act('cmSetLevelOrder', { value: 'desc' }); // Extending First, as the class already is
+    await quiet();
+    expect(server.fake.calls.slice(before)).toEqual([]);
+  });
+
+  it('is queued with a mark that says "only what changed", and no request carries the mark', async () => {
+    await openApp();
+    await goOffline();
+    act('cmSetRoundPercent', { value: 'whole' });
+    act('cmSetGradingSystem', { value: 'letter' });
+    await settle();
+    expect(window.v2Queue.queued('update_course').map(e => e.payload.p_patch)).toEqual([
+      { round_percent: true, _changed_only: true },
+      { grading_system: 'letter', _changed_only: true },
+    ]);
+    await goOnline();
+    expect(server.patches()).toEqual([{ round_percent: true }, { grading_system: 'letter' }]);
+  });
+
+  it('every save in Class Settings sends the key it changed and nothing else', async () => {
+    await openApp();
+    for (const s of SETTINGS.filter(x => x.set)) {
+      server.sent.length = 0;
+      // A value the class does not already have, so there is a change to send.
+      s.set(JSON.stringify(s.held()) === JSON.stringify(s.now) ? s.was : s.now);
+      await quiet();
+      const keys = [].concat(...server.patches().map(Object.keys));
+      expect(
+        keys.filter(k => k !== s.col),
+        s.name,
+      ).toEqual([]);
+      expect(keys, s.name).toContain(s.col);
+    }
+  });
+
+  it('a write the server refused keeps what a later save did not set, and loses what it did', async () => {
+    await openApp();
+    server.rejects = (name, params) =>
+      name === 'update_course' && params.p_patch.calc_method === 'bogus'
+        ? { message: 'calc_method is not one this class can use', code: '22023' }
+        : null;
+    saveCourseConfig(CID, Object.assign({}, getCourseConfig(CID), { calcMethod: 'bogus', roundPercent: true }));
+    await quiet();
+    expect(window.v2Queue.deadLetter().map(e => e.payload.p_patch)).toEqual([
+      { calc_method: 'bogus', round_percent: true, _changed_only: true },
+    ]);
+    act('cmSetRoundPercent', { value: 'decimal' });
+    await quiet();
+    expect(server.course.round_percent).toBe(false);
+    // The newer Round to a Whole % landed: the refused one no longer sets it.
+    expect(window.v2Queue.deadLetter().map(e => e.payload.p_patch)).toEqual([
+      { calc_method: 'bogus', _changed_only: true },
+    ]);
+  });
+});
+
 /* ── Lists: categories and reporting terms ──────────────────────────────── */
 
 describe('lists saved whole', () => {
@@ -855,6 +1055,276 @@ describe('lists saved whole', () => {
     await quiet();
     expect(server.course.reporting_terms.map(t => t.label)).toEqual(['First Half', 'Term 2']);
     expect(server.course.reporting_terms[0].ends_on).toBe(TERMS_A[0].ends_on);
+  });
+});
+
+describe('categories: the server’s list is read before the whole list is saved', () => {
+  const CHANGED = 'The categories changed on another device, so nothing was saved. These are the current ones.';
+  const OFFLINE = 'Categories need a connection to save. Nothing was saved. Try again when you are online.';
+  const SRC = 'e0000000-0000-4000-8000-0000000000b3';
+  const schoolAddsProjects = () =>
+    server.fromAnotherDevice('save_categories', {
+      p_course_id: CID,
+      p_categories: [
+        { id: CAT_ASSIGNMENTS, name: 'Assignments', weight: 50 },
+        { id: CAT_TESTS, name: 'Tests', weight: 30 },
+        { name: 'Projects', weight: 20 },
+      ],
+    });
+  const sentNames = () => server.sent.map(s => s.name);
+  const listed = () => server.fake.calls.filter(c => c.name === 'list_categories').length;
+  const draft = () => DashClassManager.categoriesDraft();
+  const gradingTabHtml = () => {
+    const main = { innerHTML: '' };
+    const real = document.getElementById;
+    document.getElementById = id => (id === 'main' ? main : real(id));
+    try {
+      act('cmSetTab', { tab: 'grading' });
+    } finally {
+      document.getElementById = real;
+    }
+    return main.innerHTML;
+  };
+
+  it('Save Categories on a list that changed: nothing is saved, one line says so, and the current ones show', async () => {
+    await openApp();
+    schoolAddsProjects();
+    server.sent.length = 0;
+    input('cmCatNameLive', { idx: '1' }, 'Quizzes');
+    act('cmCatSave');
+    await quiet();
+
+    expect(sentNames()).toEqual([]);
+    expect(draft().notice).toBe(CHANGED);
+    expect(draft().dirty).toBe(false);
+    expect(draft().rows.map(r => [r.name, r.weight])).toEqual([
+      ['Assignments', 50],
+      ['Tests', 30],
+      ['Projects', 20],
+    ]);
+    // Grades follow the current list at once.
+    expect(getCategories(CID).map(c => c.name)).toEqual(['Assignments', 'Tests', 'Projects']);
+    // The line is on the page once, above the categories.
+    const html = gradingTabHtml();
+    expect(html.split(CHANGED).length - 1).toBe(1);
+    expect(html.indexOf(CHANGED)).toBeLessThan(html.indexOf('class="cm-cat-list"'));
+
+    // Edited again on the current list: saved, and the line goes.
+    input('cmCatNameLive', { idx: '1' }, 'Quizzes');
+    act('cmCatSave');
+    await quiet();
+    expect(server.categories.map(c => c.name)).toEqual(['Assignments', 'Quizzes', 'Projects']);
+    expect(draft().notice).toBe(null);
+    expect(gradingTabHtml()).not.toContain('cm-cat-notice');
+  });
+
+  it('Save Categories on a list nobody else changed: one read, then the save', async () => {
+    await openApp();
+    const before = listed();
+    server.fake.calls.length = 0;
+    input('cmCatWeightLive', { idx: '0' }, 70);
+    input('cmCatWeightLive', { idx: '1' }, 30);
+    act('cmCatSave');
+    await quiet();
+    expect(before).toBe(1); // the form's own read when it opened
+    expect(server.fake.calls.map(c => c.name)).toEqual(['list_categories', 'save_categories']);
+    expect(server.categories.map(c => c.weight)).toEqual([70, 30]);
+    expect(draft().notice).toBe(null);
+
+    // A second save in the same sitting is checked against what the first left.
+    server.fake.calls.length = 0;
+    input('cmCatNameLive', { idx: '1' }, 'Quizzes');
+    act('cmCatSave');
+    await quiet();
+    expect(server.fake.calls.map(c => c.name)).toEqual(['list_categories', 'save_categories']);
+    expect(server.categories.map(c => c.name)).toEqual(['Assignments', 'Quizzes']);
+  });
+
+  it('with no connection: nothing is saved or queued, the line says a connection is needed, and the typing stays', async () => {
+    await openApp();
+    await goOffline();
+    server.sent.length = 0;
+    input('cmCatNameLive', { idx: '1' }, 'Quizzes');
+    act('cmCatSave');
+    await settle();
+    expect(window.v2Queue.stats().queued).toBe(0);
+    expect(draft().notice).toBe(OFFLINE);
+    expect(draft().dirty).toBe(true);
+    expect(draft().rows.map(r => r.name)).toEqual(['Assignments', 'Quizzes']);
+    expect(gradingTabHtml()).toContain(OFFLINE);
+
+    await goOnline();
+    expect(sentNames()).toEqual([]); // nothing waited to go
+    act('cmCatSave');
+    await quiet();
+    expect(server.categories.map(c => c.name)).toEqual(['Assignments', 'Quizzes']);
+    expect(draft().notice).toBe(null);
+  });
+
+  it('a connection that answers with an error is no check: nothing is saved', async () => {
+    await openApp();
+    server.fake.on('list_categories', () => ({ data: null, error: { message: 'permission denied', code: '42501' } }));
+    server.sent.length = 0;
+    input('cmCatNameLive', { idx: '1' }, 'Quizzes');
+    act('cmCatSave');
+    await quiet();
+    expect(sentNames()).toEqual([]);
+    expect(draft().notice).toBe(OFFLINE);
+  });
+
+  it('a drag to reorder on a list that changed: the order is not sent, and the current ones show', async () => {
+    await openApp();
+    schoolAddsProjects();
+    server.sent.length = 0;
+    await DashClassManager.reorderCategory(0, 1);
+    await quiet();
+    expect(sentNames()).toEqual([]);
+    expect(draft().notice).toBe(CHANGED);
+    expect(draft().rows.map(r => r.name)).toEqual(['Assignments', 'Tests', 'Projects']);
+  });
+
+  it('a drag to reorder on a list nobody else changed: one read, then the new order', async () => {
+    await openApp();
+    server.fake.calls.length = 0;
+    await DashClassManager.reorderCategory(0, 1);
+    await quiet();
+    expect(server.fake.calls.map(c => c.name)).toEqual(['list_categories', 'reorder_categories']);
+    expect(server.categories.map(c => c.name)).toEqual(['Tests', 'Assignments']);
+    // And a save after it is checked against the new order, not the old.
+    input('cmCatWeightLive', { idx: '0' }, 45);
+    input('cmCatWeightLive', { idx: '1' }, 55);
+    act('cmCatSave');
+    await quiet();
+    expect(server.categories.map(c => [c.name, c.weight])).toEqual([
+      ['Tests', 45],
+      ['Assignments', 55],
+    ]);
+    expect(draft().notice).toBe(null);
+  });
+
+  it('a drag to reorder with no connection: the row goes back, and nothing is queued', async () => {
+    await openApp();
+    await goOffline();
+    await DashClassManager.reorderCategory(0, 1);
+    await settle();
+    expect(window.v2Queue.stats().queued).toBe(0);
+    expect(draft().notice).toBe(OFFLINE);
+    expect(draft().rows.map(r => r.name)).toEqual(['Assignments', 'Tests']);
+  });
+
+  /* Copy Grading Setup replaces the target's whole list with the plan it
+     showed the teacher. */
+  function anotherClass() {
+    COURSES[SRC] = { id: SRC, name: 'History 11', gradeLevel: '11', gradingSystem: 'proficiency' };
+    _cache.courseConfigs[SRC] = {};
+    _cache.categories[SRC] = [
+      { id: 's1', name: 'Assignments', weight: 50, displayOrder: 0 },
+      { id: 's2', name: 'Tests', weight: 50, displayOrder: 1 },
+    ];
+  }
+
+  it('Copy Grading Setup onto a list that changed since the plan: the categories are not copied, and it says so', async () => {
+    await openApp();
+    anotherClass();
+    const plan = GradingSetupCopy.planSetup(SRC, CID, { categories: true });
+    expect(plan.changes.map(c => c.key)).toEqual(['categories']);
+    schoolAddsProjects();
+    server.sent.length = 0;
+    await GradingSetupCopy.applySetup(plan, {});
+    await quiet();
+    expect(sentNames()).toEqual([]);
+    expect(server.categories.map(c => c.name)).toEqual(['Assignments', 'Tests', 'Projects']);
+    expect(plan.categoriesNotCopied).toBe('changed');
+    expect(GradingSetupCopy.copiedMessage([plan])).toBe(
+      'The categories in History 12 changed on another device, so they were not copied.',
+    );
+    expect(getCategories(CID).map(c => c.name)).toEqual(['Assignments', 'Tests', 'Projects']);
+  });
+
+  it('Copy Grading Setup onto a list nobody else changed: one read, then the copy', async () => {
+    await openApp();
+    anotherClass();
+    const plan = GradingSetupCopy.planSetup(SRC, CID, { categories: true });
+    server.fake.calls.length = 0;
+    await GradingSetupCopy.applySetup(plan, {});
+    await quiet();
+    expect(server.fake.calls.map(c => c.name)).toEqual(['list_categories', 'save_categories']);
+    expect(server.categories.map(c => c.weight)).toEqual([50, 50]);
+    expect(plan.categoriesNotCopied).toBeUndefined();
+    expect(GradingSetupCopy.copiedMessage([plan])).toBe('Copied the grading setup to History 12.');
+  });
+
+  it('Copy Grading Setup with no connection: the categories are not copied, the rest is', async () => {
+    await openApp();
+    anotherClass();
+    _cache.courseConfigs[SRC] = { roundPercent: true };
+    const plan = GradingSetupCopy.planSetup(SRC, CID, { categories: true, roundPercent: true });
+    expect(plan.changes.map(c => c.key)).toEqual(['categories', 'roundPercent']);
+    await goOffline();
+    await GradingSetupCopy.applySetup(plan, {});
+    await settle();
+    expect(plan.categoriesNotCopied).toBe('offline');
+    expect(GradingSetupCopy.copiedMessage([plan])).toBe(
+      'Categories need a connection to copy, so the categories in History 12 were not copied. Everything else was copied.',
+    );
+    await goOnline();
+    expect(server.categories.map(c => c.weight)).toEqual([60, 40]);
+    expect(server.course.round_percent).toBe(true);
+  });
+
+  it('every whole-list save of categories is one this file knows, and each is behind the check or is a new class', () => {
+    const sources = [];
+    ['shared', 'teacher', 'teacher-mobile'].forEach(dir =>
+      readdirSync(resolve(root, dir))
+        .filter(f => f.endsWith('.js'))
+        .forEach(f => sources.push(dir + '/' + f)),
+    );
+    const count = re => {
+      const found = {};
+      sources.forEach(file => {
+        const n = (read(file).match(re) || []).length;
+        if (n) found[file] = n;
+      });
+      return found;
+    };
+    // The request itself (save_categories, reorder_categories).
+    expect(count(/\bv2\.saveCategories\(/g)).toEqual({
+      'shared/data.js': 1, // _persistCategoriesToCanonical, for saveCategories below
+      'teacher/dash-class-manager.js': 1, // Save Categories
+    });
+    expect(count(/\bv2\.reorderCategories\(/g)).toEqual({
+      'teacher/dash-class-manager.js': 1, // a drag
+    });
+    expect(count(/\bv2\.(upsertCategory|deleteCategory)\(/g)).toEqual({});
+    // The data layer's whole-list save.
+    expect(count(/(?<![.\w])saveCategories\(/g)).toEqual({
+      'shared/data.js': 2, // its definition; a class just made on this device going up
+      'shared/seed-data.js': 1, // Demo Mode's sample class
+      'teacher/dash-class-manager.js': 1, // Duplicate Class: a new class
+      'teacher/grading-setup-copy.js': 1, // Copy Grading Setup: an existing class
+    });
+    // The three that save over an existing class ask first.
+    const body = (file, fn) => {
+      const src = read(file);
+      const from = src.indexOf('function ' + fn + '(');
+      expect(from, fn).toBeGreaterThan(-1);
+      return src.slice(from, src.indexOf('\n  }\n', from));
+    };
+    const asksFirst = (text, ask, save) => {
+      expect(text.indexOf(ask), ask).toBeGreaterThan(-1);
+      expect(text.indexOf(ask)).toBeLessThan(text.indexOf(save));
+    };
+    asksFirst(body('teacher/dash-class-manager.js', '_cmCatSaveRows'), '_cmCatStillCurrent(cid)', 'v2.saveCategories(');
+    asksFirst(
+      body('teacher/dash-class-manager.js', '_cmCatReorder'),
+      '_cmCatStillCurrent(cid, undo)',
+      'v2.reorderCategories(ids)',
+    );
+    asksFirst(
+      body('teacher/grading-setup-copy.js', 'applySetup'),
+      '_categoriesCurrent(dstCid, plan.categories)',
+      '_applyCategories(dstCid',
+    );
   });
 });
 

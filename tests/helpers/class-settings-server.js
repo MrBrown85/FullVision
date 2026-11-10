@@ -13,6 +13,9 @@
  *   save_categories      migrations/20261029_category_calc_mode.sql: the
  *                        list replaces the class's categories; weights must
  *                        total 100; a category with work in it can't go.
+ *   reorder_categories   the ids given take their place in the list, in the
+ *                        order given (its body is not in this repository:
+ *                        only that much is assumed).
  *   list_categories, list_teacher_courses, bootstrap_teacher, get_class_bundle
  *   and get_gradebook    reads of the same rows.
  *
@@ -135,6 +138,8 @@ export function classSettingsServer(start) {
     sent: [],
     /** False: every request fails as a dropped connection does. */
     reachable: true,
+    /** (name, params) => an error the server answers a write with, or nothing. */
+    rejects: null,
   };
   let seq = 0;
   const newId = () => 'cccccccc-0000-4000-8000-' + String(++seq).padStart(12, '0');
@@ -190,6 +195,16 @@ export function classSettingsServer(start) {
       server.version += 1;
       return ok(ids);
     },
+    reorder_categories(p) {
+      const ids = clone(p.p_ids) || [];
+      const at = c => (ids.indexOf(c.id) < 0 ? ids.length + c.display_order : ids.indexOf(c.id));
+      server.categories = server.categories
+        .slice()
+        .sort((a, b) => at(a) - at(b))
+        .map((c, i) => Object.assign({}, c, { display_order: i }));
+      server.version += 1;
+      return ok(null);
+    },
   };
 
   function classFile() {
@@ -244,6 +259,8 @@ export function classSettingsServer(start) {
   Object.keys(writes).forEach(name =>
     fake.on(name, params => {
       if (!server.reachable) return dropped();
+      const refused = server.rejects && server.rejects(name, params);
+      if (refused) return { data: null, error: refused };
       const res = writes[name](params);
       if (!res.error) server.sent.push({ name, params: clone(params) });
       return res;

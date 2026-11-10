@@ -4801,26 +4801,30 @@ function _applyBundleCurriculumTags(cid, courseRow) {
    (FV_SETTINGS_CHANGED_ONLY): not a whole copy an earlier build queued, and
    not the student page's two settings, which have their own rules. */
 function _unsentCourseChanges(cid) {
-  var out = {};
+  return (cid && _unsentCourseChangesByClass()[cid]) || {};
+}
+// The same for every class at once: cid → patch.
+function _unsentCourseChangesByClass() {
+  var byClass = {};
   var q = typeof window !== 'undefined' ? window.v2Queue : null;
-  if (!cid || !q || typeof q.queued !== 'function') return out;
+  if (!q || typeof q.queued !== 'function') return byClass;
   var entries;
   try {
     entries = q.queued('update_course') || [];
   } catch (e) {
-    return out;
+    return byClass;
   }
   entries.forEach(function (entry) {
     var p = (entry && entry.payload) || {};
-    if (p.p_course_id !== cid || !_plainObject(p.p_patch) || !p.p_patch[FV_SETTINGS_CHANGED_ONLY]) return;
+    if (!p.p_course_id || !_plainObject(p.p_patch) || !p.p_patch[FV_SETTINGS_CHANGED_ONLY]) return;
+    var out = byClass[p.p_course_id] || (byClass[p.p_course_id] = {});
     Object.keys(p.p_patch).forEach(function (col) {
-      if (col !== FV_SETTINGS_CHANGED_ONLY) out[col] = p.p_patch[col];
+      // Only the server's word turns the student page on or sets Return Grades.
+      if (col === FV_SETTINGS_CHANGED_ONLY || col === 'student_page_enabled' || col === 'return_grades') return;
+      out[col] = p.p_patch[col];
     });
   });
-  // Only the server's word turns the student page on or sets Return Grades.
-  delete out.student_page_enabled;
-  delete out.return_grades;
-  return out;
+  return byClass;
 }
 
 // What updateCourse counts its edits under (_localWrites): the class's own row.
@@ -5261,12 +5265,13 @@ function _loadPersistedCourseFieldSnapshot(field, cid, fallbackValue) {
    kept from before (`prev`) stays, and _sendUpCurriculumTags saves it. */
 function _canonicalCoursesToBlob(rows, prev) {
   var out = {};
+  var unsent = _unsentCourseChangesByClass();
   (rows || []).forEach(function (r) {
     if (!r || !r.id) return;
     var mine = prev && prev[r.id] && Array.isArray(prev[r.id].curriculumTags) ? prev[r.id].curriculumTags : [];
     // A change made on this device and not yet sent (a name or grading
     // style changed offline) stays: the server's row is from before it.
-    r = Object.assign({}, r, _unsentCourseChanges(r.id));
+    r = Object.assign({}, r, unsent[r.id]);
     out[r.id] = {
       id: r.id,
       name: r.name || 'Untitled Class',
