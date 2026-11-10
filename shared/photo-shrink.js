@@ -53,6 +53,7 @@ window.PhotoShrink = (function () {
   var AIM_BYTES = 500 * 1000; // quality steps down until a page is at or under this
   var MAX_BYTES = 2 * 1000 * 1000; // a page is always under the bucket's 2 MB limit
   var MAX_PDF_BYTES = 20 * 1024 * 1024; // a PDF over this is refused
+  var MAX_PDF_PAGES = 20; // a PDF with more pages is refused (DECISIONS, Student page build rulings 18)
   var QUALITY_STEPS = [0.82, 0.74, 0.66, 0.58, 0.5];
   var THUMB_QUALITY = 0.7;
   var SIZE_STEP = 0.8; // each redraw-smaller step, when the lowest quality is still too big
@@ -68,7 +69,7 @@ window.PhotoShrink = (function () {
     UNSUPPORTED: 'unsupported', // not a photo or a PDF
     EMPTY: 'empty', // no bytes
     PDF_TOO_LARGE: 'pdf_too_large', // over MAX_PDF_BYTES
-    TOO_MANY_PAGES: 'too_many_pages', // over opts.maxPages
+    TOO_MANY_PAGES: 'too_many_pages', // over MAX_PDF_PAGES, or over opts.maxPages when a caller sets one
     NO_DECODER: 'no_decoder', // a PDF or HEIC with nothing to read it
     UNREADABLE: 'unreadable', // damaged, locked, or not what its name says
     TOO_LARGE: 'too_large', // could not get a page under MAX_BYTES
@@ -698,9 +699,10 @@ window.PhotoShrink = (function () {
     try {
       var count = Number(doc && doc.pages) || 0;
       if (count < 1) throw _fail(REASONS.UNREADABLE, 'The PDF has no pages');
-      if (o.maxPages && count > o.maxPages) {
+      var maxPages = o.maxPages || MAX_PDF_PAGES;
+      if (count > maxPages) {
         var over = _fail(REASONS.TOO_MANY_PAGES, 'The PDF has too many pages');
-        over.extra = { pageCount: count, limit: o.maxPages };
+        over.extra = { pageCount: count, limit: maxPages };
         throw over;
       }
       var pages = [];
@@ -729,7 +731,8 @@ window.PhotoShrink = (function () {
      or a refusal:
        { ok: false, reason, ... }   (REASONS; 'office' also says which: office)
      opts: surface, decodeHeic, openPdf (see the top of this file),
-     maxPages (refuse a longer PDF), onProgress({ page, pages }) per PDF page. */
+     maxPages (refuse a longer PDF; MAX_PDF_PAGES when not given),
+     onProgress({ page, pages }) per PDF page. */
   async function prepare(file, opts) {
     var o = {};
     [_defaults, opts || {}].forEach(function (src) {
@@ -785,6 +788,7 @@ window.PhotoShrink = (function () {
     AIM_BYTES: AIM_BYTES,
     MAX_BYTES: MAX_BYTES,
     MAX_PDF_BYTES: MAX_PDF_BYTES,
+    MAX_PDF_PAGES: MAX_PDF_PAGES,
     QUALITY_STEPS: QUALITY_STEPS,
     BLURRY_BELOW: BLURRY_BELOW,
   };
