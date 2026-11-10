@@ -485,6 +485,17 @@ window.GradeState = (function () {
     return hasScoreOrFeedback(cid, sid, aid) || getRubricCheckIds(cid, sid, aid).length ? RETURNED : null;
   }
 
+  /* The students in `studentIds` whose piece on `aid` is a draft, in the
+     order given: who a Return N Graded returns, and its N. It is
+     draftsWaiting's test of a cell (what a screen shows as Draft, stateOf)
+     asked for one piece of work, so over a class's students and assessments
+     the lengths add up to draftsWaiting(cid). (S1-F1) */
+  function draftsIn(cid, aid, studentIds) {
+    return (studentIds || []).filter(function (sid) {
+      return stateOf(cid, sid, aid) === DRAFT;
+    });
+  }
+
   /* A grade was saved for student `sid` on assessment `aid`; `what` names
      the kind of save ('level', 'points', 'status' …). shared/data.js has
      applied the rule by now; this answers with the state the piece is in.
@@ -540,6 +551,7 @@ window.GradeState = (function () {
     returnedScores: returnedScores,
     afterSave: afterSave,
     stateOf: stateOf,
+    draftsIn: draftsIn,
     draftsWaiting: draftsWaiting,
   };
 })();
