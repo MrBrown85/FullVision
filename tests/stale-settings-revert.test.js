@@ -1607,6 +1607,96 @@ describe('categories: the server’s list is read before the whole list is saved
     expect(draft().notice).toBe(LANDED);
   });
 
+  /* What Class Settings draws while it is watched: the page's mounts are
+     empty elements, and what is drawn into them is read back after. */
+  function watchPage() {
+    const real = document.getElementById;
+    const mounts = {};
+    ['main', 'sidebar-mount', 'page-toolbar-mount'].forEach(id => (mounts[id] = document.createElement('div')));
+    document.getElementById = id => mounts[id] || real.call(document, id);
+    return {
+      drawn: () =>
+        Object.keys(mounts)
+          .filter(id => mounts[id].innerHTML !== '')
+          .map(id => id + ': ' + mounts[id].innerHTML),
+      stop: () => (document.getElementById = real),
+    };
+  }
+  const OTHER = 'e0000000-0000-4000-8000-0000000000c4';
+  /* The teacher leaves before the answer comes: Class Settings closed, or
+     another class picked in it. */
+  const LEAVE = {
+    'Class Settings closed': {
+      leave: () => DashClassManager.closeClassManager(),
+      back: () => DashClassManager.openClassManager(),
+    },
+    'another class picked': {
+      leave: () => {
+        COURSES[OTHER] = { id: OTHER, name: 'Law 12', gradeLevel: '12', gradingSystem: 'proficiency' };
+        _classLoads[OTHER] = true;
+        act('cmSelectClass', { cid: OTHER });
+      },
+      back: () => act('cmSelectClass', { cid: CID }),
+    },
+  };
+  /* What the teacher starts, and what the class shows once the answer has
+     come and the teacher is back. */
+  const STARTED = {
+    'Discard My Changes after a lost answer': {
+      start: async () => {
+        await saveWithAnswerLost();
+        act('cmCatNoticeDone');
+      },
+      line: LANDED,
+      rows: ON_SERVER,
+    },
+    'Save Categories': {
+      start: async () => {
+        schoolAddsProjects();
+        input('cmCatWeightLive', { idx: '0' }, 70);
+        input('cmCatWeightLive', { idx: '1' }, 30);
+        act('cmCatSave');
+      },
+      line: CHANGED_TYPED,
+      rows: ON_SERVER,
+    },
+    'a drag': {
+      start: async () => {
+        schoolAddsProjects();
+        DashClassManager.reorderCategory(1, 0);
+      },
+      line: CHANGED,
+      rows: ON_SERVER,
+    },
+  };
+  Object.keys(STARTED).forEach(what => {
+    Object.keys(LEAVE).forEach(how => {
+      it(
+        what + ', then ' + how + ' before the answer: nothing is drawn after, and the class shows it when back',
+        async () => {
+          await openApp();
+          await STARTED[what].start();
+          LEAVE[how].leave();
+          const page = watchPage();
+          try {
+            await quiet();
+            await new Promise(r => setTimeout(r, 20));
+            await quiet();
+          } finally {
+            page.stop();
+          }
+          const drawn = page.drawn();
+          if (how === 'Class Settings closed') expect(drawn).toEqual([]);
+          // Nothing drawn says this class's line, on any page.
+          expect(drawn.filter(w => w.indexOf('cm-cat-notice') >= 0)).toEqual([]);
+          LEAVE[how].back();
+          expect(draft().notice).toBe(STARTED[what].line);
+          expect(formRows()).toEqual(STARTED[what].rows);
+        },
+      );
+    });
+  });
+
   it('the connection goes between the read and the save: nothing waits to go out later over a change made elsewhere', async () => {
     await openApp();
     const send = server.fake.rpc;

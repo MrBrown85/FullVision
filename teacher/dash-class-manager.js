@@ -6232,9 +6232,19 @@ window.DashClassManager = (function () {
         st.typed = null;
         st.notice = { kind: same(rows, tried) ? 'landed' : 'changed' };
         _cmMirrorCategoriesToCache(cid);
-        renderClassManager();
+        _cmCatRedraw(cid);
       });
     });
+  }
+
+  /* A redraw after something the category code waited for (a read, a
+     save's or a drag's answer, a copy). Only while Class Settings is still
+     open on that class: drawn after the teacher left, it would put Class
+     Settings back over the page they went to, or show this class's line on
+     another class. The state is updated either way, so the class shows the
+     right list and line when it is next opened. */
+  function _cmCatRedraw(cid) {
+    if (classManagerOpen && cmMode === 'edit' && cmSelectedCourse === cid) renderClassManager();
   }
 
   /* One save of the list at a time, in the order asked: each one's check
@@ -6295,7 +6305,7 @@ window.DashClassManager = (function () {
     if (st.loaded || st.loading) return;
     if (_cmCatsLocalOnly()) {
       _cmCatFillLocal(cid, st);
-      if (st.rows.length) renderClassManager();
+      if (st.rows.length) _cmCatRedraw(cid);
       return;
     }
     st.loading = window.v2
@@ -6320,7 +6330,7 @@ window.DashClassManager = (function () {
           _cmCatRemember(st, st.rows);
           _cmMirrorCategoriesToCache(cid);
           _cmCatApplyKept(cid, st);
-          renderClassManager();
+          _cmCatRedraw(cid);
         }
       })
       .catch(function () {
@@ -6768,7 +6778,7 @@ window.DashClassManager = (function () {
         _cmCatRemember(st, rows, true);
         _cmCatKeep(cid);
         _cmMirrorCategoriesToCache(cid);
-        renderClassManager();
+        _cmCatRedraw(cid);
         return;
       }
       if (res.why === 'changed') {
@@ -6784,7 +6794,7 @@ window.DashClassManager = (function () {
         st.notice = { kind: 'changed' };
         _cmCatKeep(cid);
         _cmMirrorCategoriesToCache(cid);
-        renderClassManager();
+        _cmCatRedraw(cid);
         return;
       }
       if (res.why === 'refused') {
@@ -6800,7 +6810,7 @@ window.DashClassManager = (function () {
       st.keeping = true;
       st.notice = { kind: res.why === 'waiting' ? 'waiting' : 'offline' };
       _cmCatKeep(cid);
-      renderClassManager();
+      _cmCatRedraw(cid);
     });
   }
   /* A list sent whose answer never came. Its new rows get a key, kept with
@@ -6834,7 +6844,7 @@ window.DashClassManager = (function () {
             delete _cmCategoryState[c];
             delete _cmTermState[c];
           });
-          renderClassManager();
+          _cmCatRedraw(cid);
         },
       }),
     );
@@ -6910,7 +6920,7 @@ window.DashClassManager = (function () {
           undo();
           st.notice = { kind: res.why === 'waiting' ? 'waitingOrder' : 'offlineOrder' };
         }
-        renderClassManager();
+        _cmCatRedraw(cid);
       });
     });
   }
