@@ -89,11 +89,12 @@ live = {}
 for line in open(os.path.join(HERE, 'live-function-md5.txt')):
     if line.strip() and not line.startswith('#'): live[line.split()[0]] = line.split()[1]
 guard = dict(re.findall(r"\('public\.(\w+)\([^']*\)',\s+'([0-9a-f]{32})'", open(MIGRATION).read()))
-ok('get_class_bundle as loaded is the live function, byte for byte', md5(BUNDLE) == live['get_class_bundle'], md5(BUNDLE))
-ok("the migration's check on get_class_bundle expects that fingerprint", guard.get('get_class_bundle') == live['get_class_bundle'])
-ok("get_gradebook as loaded is the definition the migration's check expects", md5(GRADEBOOK) == guard.get('get_gradebook'), md5(GRADEBOOK))
-if 'get_gradebook' in live:
-    ok('and that is the live function, byte for byte', md5(GRADEBOOK) == live['get_gradebook'], md5(GRADEBOOK))
+# The migration is applied on the live database now (2026-11-10), so
+# live-function-md5.txt holds the definitions AFTER it. This script still
+# starts from the ones before it, which bundle-prelude.sql rebuilds and the
+# migration's own check expects, and ends at the live ones.
+ok("get_class_bundle as loaded is the definition the migration's check expects (the live one before S0-M4)", md5(BUNDLE) == guard.get('get_class_bundle'), md5(BUNDLE))
+ok("get_gradebook as loaded is the definition the migration's check expects (the live one before S0-M4)", md5(GRADEBOOK) == guard.get('get_gradebook'), md5(GRADEBOOK))
 
 # ── A class with work in it ────────────────────────────────────────────
 as_owner()
@@ -161,6 +162,8 @@ c.run('savepoint clean')
 
 # ── The migration ──────────────────────────────────────────────────────
 apply()
+ok('after the migration both are the live functions of today, byte for byte',
+   md5(BUNDLE) == live['get_class_bundle'] and md5(GRADEBOOK) == live['get_gradebook'], (md5(BUNDLE), md5(GRADEBOOK)))
 after = {name: call(who, sql, c=cid) for name, who, sql, cid in CALLS}
 bundle1, gb1 = after[CALLS[0][0]], after[CALLS[1][0]]
 table = {r[0]: r[1] for r in rows("select id::text, to_jsonb(created_at) #>> '{}' from assessment where course_id = :c", c=COURSE_A)}
@@ -212,7 +215,7 @@ m = (md5(BUNDLE), md5(GRADEBOOK))
 apply()
 ok('a second run changes nothing', (md5(BUNDLE), md5(GRADEBOOK)) == m)
 c.run('rollback to savepoint clean')
-ok('(back to the functions as they were)', md5(BUNDLE) == live['get_class_bundle'] and md5(GRADEBOOK) == guard['get_gradebook'])
+ok('(back to the functions as they were)', md5(BUNDLE) == guard['get_class_bundle'] and md5(GRADEBOOK) == guard['get_gradebook'])
 for fn, other_fn, edit in ((GRADEBOOK, BUNDLE, ("'due_date', a.due_date,", "'due_date',  a.due_date,")),
                            (BUNDLE, GRADEBOOK, ("'due_date', asm.due_date,", "'due_date',  asm.due_date,"))):
     c.run('savepoint guard'); as_owner()
