@@ -391,6 +391,11 @@ describe('Class Settings: the student page’s build switch', () => {
           okLabel: 'Return and Change',
         });
         expect(getReturnSettings(LIVE).student_page).toBe(true);
+        // While the question is up the switch is drawn as it was, and can be
+        // pressed again after Cancel (it was greyed out while the count was read).
+        expect(switchDrawn()).toBe(true);
+        expect(disabled()).toBe(false);
+        expect(note()).toBe(null);
         expect(session.since().filter(c => !/^(list|get)_/.test(c[0]))).toEqual([
           ['course_draft_count', { p_course_id: LIVE }],
         ]);

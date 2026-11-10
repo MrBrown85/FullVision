@@ -191,6 +191,7 @@ var CmStudentPage = (function () {
   function _askThenMake(cid, row, change, focusId) {
     if (!_mayChange(cid, row)) return;
     var st = _st(cid);
+    var waited = false;
     var counted = function (out) {
       st.busy = null;
       var n = out ? out.count : null;
@@ -205,6 +206,13 @@ var CmStudentPage = (function () {
         _make(cid, row, change, focusId);
         return;
       }
+      // The row said Changing… while the count was fetched: it is drawn as
+      // it was again before the question goes up, so Cancel leaves a
+      // control that can be pressed.
+      if (waited) {
+        _rerender();
+        _focus(focusId);
+      }
       var q = _leaveQuestion(n);
       showConfirm(q.title, q.message, 'Return and Change', 'primary', function () {
         _make(cid, row, change, focusId);
@@ -215,6 +223,7 @@ var CmStudentPage = (function () {
       counted(asked.now);
       return;
     }
+    waited = true;
     st.busy = { row: row, want: null };
     st.note = null;
     _rerender();

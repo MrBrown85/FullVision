@@ -6,8 +6,12 @@ import { mockAuth } from './helpers.js';
 //
 // - With the class's student page off, nothing new is asked of the server
 //   and no screen shows any of it.
-// - At the build address the switch turns it on: one update_course, then
-//   the class's rows are read (list_course_grade_returns).
+// - At the build address the switch turns it on: the server is asked
+//   first, for the switch alone, and the class is on only once it has
+//   answered; then the class and its rows are read.
+// - Starting to hold grades needs a connection: offline, the control says
+//   it could not be changed and nothing changes. Stopping asks the server
+//   how many grades wait, and asks the teacher before returning them.
 // - A grade saved in the dialog is a Draft at once; Return sends
 //   return_grades for that student and that work, with a key.
 // - Student Cards: Make Cards is issue_student_cards, Print All marks them
@@ -153,6 +157,12 @@ async function serverWithStudentPage(page, start) {
         if (name === 'list_course_grade_returns') {
           window.__e2eRpcLog.push({ name, params, at: Date.now() });
           return ok(s.rows);
+        }
+        if (name === 'course_draft_count') {
+          window.__e2eRpcLog.push({ name, params, at: Date.now() });
+          let n = 0;
+          Object.values(s.rows).forEach(of => Object.values(of).forEach(r => (n += r.is_draft ? 1 : 0)));
+          return ok(n);
         }
         if (name === 'update_course') {
           const patch = params.p_patch || {};
@@ -309,17 +319,14 @@ test('switch on at the build address, a draft, Return, and a card for each stude
   page.on('pageerror', e => errors.push(String(e)));
   await serverWithStudentPage(page, { course: { student_page_enabled: false, return_grades: 'on_return' } });
 
-  // The switch: one update_course, then the class's rows are read.
+  // The switch: the server is asked for it alone, then the class and its rows are read.
   await page.goto('/dashboard?manage=student-page&build=student-page');
   const theSwitch = page.getByRole('switch', { name: 'Student Page' });
   await expect(theSwitch).not.toBeChecked();
   await page.locator('.sp-build .gpd-switch').click();
   await expect(theSwitch).toBeChecked();
-  await expect.poll(async () => (await calls(page, 'update_course')).length).toBe(1);
-  expect((await calls(page, 'update_course'))[0]).toEqual({
-    p_course_id: CID,
-    p_patch: { student_page_enabled: true, return_grades: 'on_return' },
-  });
+  await expect(page.getByRole('radiogroup', { name: 'Return Grades' })).toBeVisible();
+  expect(await calls(page, 'update_course')).toEqual([{ p_course_id: CID, p_patch: { student_page_enabled: true } }]);
   await expect.poll(async () => (await calls(page, 'list_course_grade_returns')).length).toBeGreaterThan(0);
   expect((await calls(page, 'list_course_grade_returns'))[0]).toEqual({ p_course_id: CID });
   expect((await server(page)).course).toEqual({ student_page_enabled: true, return_grades: 'on_return' });
@@ -434,5 +441,92 @@ test('switch on at the build address, a draft, Return, and a card for each stude
   // The sync dot is quiet, and nothing asked for a count of drafts.
   await expect(page.locator('#sync-indicator-dot').first()).toHaveClass(/idle/);
   expect((await log(page)).filter(c => c.name === 'course_draft_count')).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test('starting to hold grades needs a connection; stopping asks the server how many wait', async ({
+  page,
+  context,
+}) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  // The class's student page is on, set to As Soon As I Save.
+  await serverWithStudentPage(page, { course: { student_page_enabled: true, return_grades: 'on_save' } });
+  await page.goto('/dashboard?manage=student-page&build=student-page');
+  const group = page.getByRole('radiogroup', { name: 'Return Grades' });
+  const onReturn = group.getByRole('radio', { name: 'When I Return Them' });
+  const onSave = group.getByRole('radio', { name: 'As Soon As I Save' });
+  await expect(onSave).toBeChecked();
+  await expect
+    .poll(() => page.evaluate(cid => _gradeReturnsLoadedFor[cid] === true, CID), { timeout: 10000 })
+    .toBe(true);
+
+  // Offline: When I Return Them is not made, and the row says so.
+  await context.setOffline(true);
+  await onReturn.click();
+  await expect(page.locator('#sp-return-note')).toHaveText(
+    'Could not change this. Check the connection and try again.',
+  );
+  await expect(onSave).toBeChecked();
+  await expect(onReturn).not.toBeChecked();
+  expect(await page.evaluate(cid => getReturnSettings(cid).return_grades, CID)).toBe('on_save');
+  expect(await calls(page, 'update_course')).toEqual([]);
+  expect(await page.evaluate(() => window.v2Queue.stats().queued)).toBe(0);
+
+  // Online: it is asked of the server, for that one setting, and then shows.
+  await context.setOffline(false);
+  await onReturn.click();
+  await expect(onReturn).toBeChecked();
+  await expect(page.locator('#sp-return-note')).toHaveCount(0);
+  expect(await calls(page, 'update_course')).toEqual([{ p_course_id: CID, p_patch: { return_grades: 'on_return' } }]);
+  expect((await server(page)).course).toEqual({ student_page_enabled: true, return_grades: 'on_return' });
+
+  // A grade saved now waits as a draft, here and on the server.
+  await page.evaluate(a => Grader.setLevel(a.cid, a.sid, a.aid, a.tag, 3, 0), {
+    cid: CID,
+    sid: ALICE,
+    aid: LAB,
+    tag: TAG,
+  });
+  await expect.poll(async () => ((await server(page)).rows[LAB] || {})[ALICE]).toEqual({ is_draft: true });
+
+  // Turning the page off offline: the count cannot be read, so it stays on.
+  const theSwitch = page.getByRole('switch', { name: 'Student Page' });
+  await expect(theSwitch).toBeChecked();
+  await context.setOffline(true);
+  await page.locator('.sp-build .gpd-switch').click();
+  await expect(page.locator('#sp-switch-note')).toHaveText(
+    'Could not check for grades waiting to be returned. Check the connection and try again.',
+  );
+  await expect(theSwitch).toBeChecked();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(await page.evaluate(cid => getReturnSettings(cid).student_page, CID)).toBe(true);
+
+  // Online: the server's count is asked, and the teacher is asked before anything is returned.
+  await context.setOffline(false);
+  await page.locator('.sp-build .gpd-switch').click();
+  const ask = page.getByRole('dialog', { name: 'Return 1 Grade Now?' });
+  await expect(ask).toBeVisible();
+  await expect(ask.locator('.confirm-message')).toHaveText(
+    '1 grade is waiting as a draft. Changing this returns it to the student now.',
+  );
+  expect((await calls(page, 'course_draft_count')).pop()).toEqual({ p_course_id: CID });
+  await ask.getByRole('button', { name: 'Cancel' }).click();
+  await expect(theSwitch).toBeChecked();
+  expect((await server(page)).rows[LAB][ALICE].is_draft).toBe(true);
+  await page.locator('.sp-build .gpd-switch').click();
+  await page
+    .getByRole('dialog', { name: 'Return 1 Grade Now?' })
+    .getByRole('button', { name: 'Return and Change' })
+    .click();
+  await expect(theSwitch).not.toBeChecked();
+  await expect.poll(async () => (await calls(page, 'update_course')).length).toBe(2);
+  expect((await calls(page, 'update_course'))[1]).toEqual({
+    p_course_id: CID,
+    p_patch: { student_page_enabled: false },
+  });
+  // The server returned it itself; no return was sent.
+  expect(await calls(page, 'return_grades')).toEqual([]);
+  await expect.poll(async () => (await server(page)).rows[LAB][ALICE].is_draft).toBe(false);
   expect(errors).toEqual([]);
 });
