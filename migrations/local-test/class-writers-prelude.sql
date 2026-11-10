@@ -1,12 +1,14 @@
 -- GENERATED: the other RPCs that write a class's tables, for grade_return_race.py.
--- Each is copied whole and unchanged from the migration that last defined it.
+-- Each is copied whole and unchanged from the migration that last defined it,
+-- or is the live definition itself where the repo has no copy of that.
 -- Four have no migration (they date from the April design and were applied by
 -- hand). delete_assessment is copied from docs/backend-design/write-paths.sql,
--- which matches the live database. The other three are the live definitions
--- themselves, as pg_get_functiondef printed them on 2026-11-09 (read by the
--- orchestrator): the design file differs from them in a comment and spacing.
+-- which matches the live database. The other three, and upsert_subject and
+-- upsert_section (whose only migration is not what the live database runs), are
+-- the live definitions themselves, as pg_get_functiondef printed them on
+-- 2026-11-09 (read by the orchestrator).
 -- grade_return_race.py compares every function here with live-function-md5.txt
--- (the lines marked class-writer) and names the ones that are not the live body.
+-- (the lines marked class-writer): all 21 are the live functions.
 -- Load after batch-a-prelude.sql.
 
 -- create_assessment: migrations/20261027_assessment_core_competencies.sql
@@ -350,50 +352,33 @@ begin
 end;
 $function$;
 
--- upsert_subject: migrations/20260423_write_path_idempotency_phase2.sql
-create or replace function upsert_subject(
-    p_id                uuid,
-    p_course_id         uuid,
-    p_name              text,
-    p_color             text    default null,
-    p_display_order     integer default null,
-    p_idempotency_key   uuid    default null
-) returns uuid
-language plpgsql set search_path to 'public' as $$
-declare
-    _id uuid;
-    _cached jsonb;
+-- upsert_subject: gradebook-prod
+CREATE OR REPLACE FUNCTION public.upsert_subject(p_id uuid, p_course_id uuid, p_name text, p_color text DEFAULT NULL::text, p_display_order integer DEFAULT NULL::integer, p_idempotency_key uuid DEFAULT NULL::uuid)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+declare _id uuid; _cached jsonb;
 begin
-    if (select auth.uid()) is null then
-        raise exception 'not authenticated' using errcode = 'PT401';
-    end if;
-
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
     if p_id is null then
         _cached := fv_idem_check(p_idempotency_key, 'upsert_subject');
-        if _cached is not null then
-            return (_cached->>'id')::uuid;
-        end if;
-
+        if _cached is not null then return (_cached->>'id')::uuid; end if;
         insert into subject (course_id, name, color, display_order)
         values (p_course_id, p_name, p_color,
                 coalesce(p_display_order,
                          (select coalesce(max(display_order)+1, 0) from subject where course_id = p_course_id)))
         returning id into _id;
-
         perform fv_idem_store(p_idempotency_key, 'upsert_subject', jsonb_build_object('id', _id));
     else
-        update subject set
-            name          = p_name,
-            color         = p_color,
+        update subject set name = p_name, color = p_color,
             display_order = coalesce(p_display_order, display_order),
-            updated_at    = now()
-         where id = p_id
-        returning id into _id;
+            updated_at = now()
+         where id = p_id returning id into _id;
         if _id is null then raise exception 'subject not found' using errcode = 'P0002'; end if;
     end if;
     return _id;
-end;
-$$;
+end; $function$;
 
 -- delete_subject: migrations/20261012_fix_score_writes_and_deletes.sql
 create or replace function public.delete_subject(p_id uuid)
@@ -460,55 +445,38 @@ begin
     delete from competency_group where id = p_id;
 end; $function$;
 
--- upsert_section: migrations/20260423_write_path_idempotency_phase2.sql
-create or replace function upsert_section(
-    p_id                     uuid,
-    p_subject_id             uuid,
-    p_name                   text,
-    p_color                  text    default null,
-    p_competency_group_id    uuid    default null,
-    p_display_order          integer default null,
-    p_idempotency_key        uuid    default null
-) returns uuid
-language plpgsql set search_path to 'public' as $$
-declare
-    _id        uuid;
-    _course_id uuid;
-    _cached    jsonb;
+-- upsert_section: gradebook-prod
+CREATE OR REPLACE FUNCTION public.upsert_section(p_id uuid, p_subject_id uuid, p_name text, p_color text DEFAULT NULL::text, p_competency_group_id uuid DEFAULT NULL::uuid, p_display_order integer DEFAULT NULL::integer, p_idempotency_key uuid DEFAULT NULL::uuid)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+declare _id uuid; _course_id uuid; _cached jsonb;
 begin
     if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
     select course_id into _course_id from subject where id = p_subject_id;
     if _course_id is null then raise exception 'subject not found' using errcode = 'P0002'; end if;
-
     if p_id is null then
         _cached := fv_idem_check(p_idempotency_key, 'upsert_section');
-        if _cached is not null then
-            return (_cached->>'id')::uuid;
-        end if;
-
+        if _cached is not null then return (_cached->>'id')::uuid; end if;
         insert into section (course_id, subject_id, competency_group_id, name, color, display_order)
         values (_course_id, p_subject_id, p_competency_group_id, p_name, p_color,
                 coalesce(p_display_order,
                          (select coalesce(max(display_order)+1, 0) from section where subject_id = p_subject_id)))
         returning id into _id;
-
         perform fv_idem_store(p_idempotency_key, 'upsert_section', jsonb_build_object('id', _id));
     else
         update section set
-            subject_id          = p_subject_id,
-            course_id           = _course_id,
+            subject_id = p_subject_id, course_id = _course_id,
             competency_group_id = p_competency_group_id,
-            name                = p_name,
-            color               = p_color,
-            display_order       = coalesce(p_display_order, display_order),
-            updated_at          = now()
-         where id = p_id
-        returning id into _id;
+            name = p_name, color = p_color,
+            display_order = coalesce(p_display_order, display_order),
+            updated_at = now()
+         where id = p_id returning id into _id;
         if _id is null then raise exception 'section not found' using errcode = 'P0002'; end if;
     end if;
     return _id;
-end;
-$$;
+end; $function$;
 
 -- delete_section: migrations/20261012_fix_score_writes_and_deletes.sql
 create or replace function public.delete_section(p_id uuid)

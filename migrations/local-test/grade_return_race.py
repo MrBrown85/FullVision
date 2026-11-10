@@ -44,17 +44,16 @@ With Batch A loaded:
    the call that died. Against returns alone all of them are clean.
 
 First, every function in class-writers-prelude.sql is compared with its live
-fingerprint (live-function-md5.txt, the lines marked class-writer). One that
-differs is named in NOT_LIVE until its live body is loaded: its row of the
-matrix is then for the body the repo has, not the live one. RACE_ONLY runs
-the named rows alone, without the all-at-once runs.
+fingerprint (live-function-md5.txt, the lines marked class-writer): all 21
+must be the live functions, byte for byte. RACE_ONLY runs the named rows
+alone, without the all-at-once runs; RACE_ONLY=all runs only those.
 
 Without Batch A (the same database before the four migrations) only the
 matrix runs, against saves alone, and nothing is asserted: it is the
 baseline, the deadlocks the live functions have between themselves today.
 
 PGPORT=54329 PGDATABASE=fv_a python3 grade_return_race.py
-RACE_CALLS=300 RACE_ONLY=upsert_rubric,delete_tag RACE_JSON=/tmp/out.json ...
+RACE_CALLS=300 RACE_ONLY=upsert_section,delete_tag RACE_JSON=/tmp/out.json ...
 """
 import json, os, random, re, sys, threading, time, uuid
 if os.environ.get('PG8000_PATH'): sys.path.insert(0, os.environ['PG8000_PATH'])
@@ -66,6 +65,7 @@ STU1 = 'aaaaaaaa-1111-0000-0000-000000000001'
 SCORE_TABLES = ('score', 'tag_score', 'rubric_score', 'rubric_check_score')
 CALLS = int(os.environ.get('RACE_CALLS', '300'))
 ONLY = [x for x in os.environ.get('RACE_ONLY', '').split(',') if x]
+MIXED_ONLY = ONLY == ['all']
 passed = []; failed = []
 def ok(name, cond, detail=''):
     (passed if cond else failed).append(name + ('' if cond else ' :: ' + str(detail)[:400]))
@@ -107,21 +107,11 @@ LIVE = {}
 for line in open(os.path.join(HERE, 'live-function-md5.txt')):
     parts = line.split()
     if len(parts) == 4 and not line.startswith('#'): LIVE[parts[0]] = parts[1]
-# Loaded from the last migration that defines them
-# (20260423_write_path_idempotency_phase2.sql), which is not what the live
-# database runs. Take a name out when its live body is in
-# class-writers-prelude.sql.
-NOT_LIVE = ('upsert_section', 'upsert_subject')
 LOADED = {r[0]: r[1] for r in o.run("""select p.proname, md5(pg_get_functiondef(p.oid)) from pg_proc p
                                          where p.pronamespace = 'public'::regnamespace and p.proname = any (:n)""", n=WRITERS)}
 def writers():
-    for name in sorted(LIVE):
-        if name in NOT_LIVE:
-            ok('today: %s is NOT the live function (the repo\'s last migration for it is loaded; the live one has been asked for)' % name,
-               LOADED.get(name) is not None and LOADED[name] != LIVE[name], LOADED.get(name))
-        else:
-            ok('%s is the live function, byte for byte' % name, LOADED.get(name) == LIVE[name], LOADED.get(name))
-    return sorted(n for n in WRITERS if n not in LIVE)
+    for name in WRITERS:
+        ok('%s is the live function, byte for byte' % name, name in LIVE and LOADED.get(name) == LIVE[name], LOADED.get(name))
 
 def cleanup():
     for t in SCORE_TABLES:
@@ -590,7 +580,7 @@ def judge(r, name, versus):
     odd = {k: v for k, v in r['refused'].items() if k not in EXPECTED}
     ok('%s: the only calls refused lost a race for a row that was deleted' % label, not odd, {k: r['first'][k] for k in odd})
 try:
-    unchecked = writers() if BATCH_A else sorted(n for n in WRITERS if n not in LIVE)
+    if BATCH_A: writers()
     if BATCH_A:
         o.run("update course set student_page_enabled = true, return_grades = 'on_return' where id = :c", c=COURSE_A)
         if not ONLY:
@@ -609,9 +599,9 @@ try:
 
     W = World()
     S = scenarios()
-    names = [n for n in S if not ONLY or n in ONLY]
+    names = [n for n in S if not ONLY or MIXED_ONLY or n in ONLY]
     VERSUS = [('saves', 2, 0), ('returns', 0, 2), ('saves and returns', 2, 1)] if BATCH_A else [('saves', 2, 0)]
-    for seed, name in enumerate(names):
+    for seed, name in enumerate([] if MIXED_ONLY else names):
         for versus, savers, returners in VERSUS:
             try:
                 W.reset()
@@ -627,7 +617,7 @@ try:
     # both rewrite one assessment's links), so neither run can be asked for
     # no deadlock: both are counted, beside the baseline's.
     for label, group in (('all that are clean against saves, at once', [n for n in names if n not in TODAY]), ('all at once', names)):
-        if ONLY: break
+        if ONLY and not MIXED_ONLY: break
         try:
             W.reset()
             mixed = [(n, S[n], S[n][0]() if S[n][0] else {}) for n in group]
@@ -645,8 +635,7 @@ finally:
     cleanup()
 
 print('\n'.join('PASS ' + p for p in passed))
-print('class writers: %d compared with the live database, %d of them not the live body (%s), %d with no live fingerprint yet (%s)'
-      % (len(LIVE), len(NOT_LIVE), ', '.join(NOT_LIVE), len(unchecked), ', '.join(unchecked)))
+print('class writers: %d of %d are the live functions' % (sum(1 for n in WRITERS if LOADED.get(n) == LIVE.get(n)), len(WRITERS)))
 print('%-34s %-18s %7s %9s  %s' % ('RPC', 'against', 'calls', 'deadlocks', 'refused (SQLSTATE: calls)'))
 for r in results:
     print('%-34s %-18s %7d %9d  %s%s' % (r['x'][:34], r['versus'], r['calls'], r['dead'], ', '.join('%s: %d' % kv for kv in sorted(r['refused'].items())) or '-',
