@@ -289,7 +289,7 @@ describe('a slip still opens: the card is asked first, then open', () => {
 
 describe('a card that won’t open says why', () => {
   const WHY = [
-    ['closed', { closed: true }, 'Your teacher has turned the student page off for this class. Ask your teacher.'],
+    ['closed', { closed: true }, 'The student page is turned off for this class. Ask your teacher.'],
     ['card_locked', { locked: true }, 'This card is locked after too many wrong tries. Ask your teacher to unlock it.'],
     ['card_expired', { expired: true }, "This card's last day has passed. Ask your teacher for a new card."],
     [
@@ -465,7 +465,7 @@ describe('the page won’t open: each refusal has its line', () => {
   const REFUSED = [
     ['card_stopped', { stopped: true }, 'This card has been replaced. Ask your teacher for your new card.'],
     ['card_expired', { expired: true }, "This card's last day has passed. Ask your teacher for a new card."],
-    ['closed', { closed: true }, 'Your teacher has turned the student page off for this class. Ask your teacher.'],
+    ['closed', { closed: true }, 'The student page is turned off for this class. Ask your teacher.'],
     ['not_found', { withdrawn: true }, "Your page for this class can't be opened any more. Ask your teacher."],
   ];
 

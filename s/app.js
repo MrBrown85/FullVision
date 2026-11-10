@@ -538,9 +538,9 @@
     return StudentPage.call(Object.assign({ route: route }, body));
   }
 
-  /* A refusal's words. A card that won't open says why (Colin, Nov 9); a
-     call that never arrived, or a code this page does not know, says to
-     check the internet and try again. */
+  /* A refusal's words. A card that won't open says why (Colin, Nov 9). A
+     call that never arrived, or an answer this page has no words for, says
+     to check the internet and try again. */
   var CARD_WORDS = {
     not_found: 'card_not_found',
     closed: 'card_closed',

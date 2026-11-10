@@ -55,7 +55,7 @@ var StudentPage = (function () {
     wrong_card_password: "That password doesn't match. Check the password on your card.",
     card_locked: 'This card is locked after too many wrong tries. Ask your teacher to unlock it.',
     // A card that won't open says why (Colin, Nov 9).
-    card_closed: 'Your teacher has turned the student page off for this class. Ask your teacher.',
+    card_closed: 'The student page is turned off for this class. Ask your teacher.',
     card_expired: "This card's last day has passed. Ask your teacher for a new card.",
     card_reprint: 'This card needs to be printed again. Ask your teacher for a new card.',
     card_stopped: 'This card has been replaced. Ask your teacher for your new card.',

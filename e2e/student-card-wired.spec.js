@@ -277,7 +277,7 @@ test.describe('a real card: what stops it, and what each one says', () => {
   test.use(PHONE);
 
   const WHY = [
-    ['closed', { closed: true }, 'Your teacher has turned the student page off for this class. Ask your teacher.'],
+    ['closed', { closed: true }, 'The student page is turned off for this class. Ask your teacher.'],
     ['card_locked', { locked: true }, 'This card is locked after too many wrong tries. Ask your teacher to unlock it.'],
     ['card_expired', { expired: true }, "This card's last day has passed. Ask your teacher for a new card."],
     [
@@ -408,7 +408,7 @@ test.describe('a real card: what stops it, and what each one says', () => {
   const GONE = [
     ['card_stopped', { stopped: true }, 'This card has been replaced. Ask your teacher for your new card.'],
     ['card_expired', { expired: true }, "This card's last day has passed. Ask your teacher for a new card."],
-    ['closed', { closed: true }, 'Your teacher has turned the student page off for this class. Ask your teacher.'],
+    ['closed', { closed: true }, 'The student page is turned off for this class. Ask your teacher.'],
     ['not_found', { withdrawn: true }, "Your page for this class can't be opened any more. Ask your teacher."],
   ];
   for (const [error, change, line] of GONE) {
@@ -519,6 +519,28 @@ test.describe('a real card: a shared Chromebook', () => {
     expect(now.t).not.toBe(cece);
     expect(posts.elsewhere.concat(tabPosts.elsewhere)).toEqual([]);
     await shot(tab, 'chromebook-05-no-assignments-yet');
+  });
+
+  test('the next card opened in the same tab signs the last student out too', async ({ page }) => {
+    const fn = school();
+    fn.state.cards.K7M4QX = omar();
+    const posts = await serve(page, fn);
+    await signIn(page);
+    const cece = JSON.parse((await stored(page)).local[KEY]).t;
+    posts.length = 0;
+    // The address changes under the open page, as a scanned link does in a tab that is already there.
+    await page.evaluate(() => (location.hash = '#K7M-4QX'));
+    await expect(page.getByRole('heading', { name: 'Is this you, Omar?' })).toBeVisible();
+    await expect(page.locator('.sp-row')).toHaveCount(0);
+    expect(await page.locator('body').innerText()).not.toMatch(/Cece|Extending/);
+    await expect
+      .poll(() => posts.map(p => p.body))
+      .toEqual([
+        { route: 'card', code: 'K7M4QX' },
+        { route: 'done', session: cece },
+      ]);
+    await expect(page).toHaveURL(/\/s\/$/);
+    expect((await stored(page)).local).toEqual({});
   });
 
   test('after Done, Back and Forward bring back nothing of the last student', async ({ page }) => {
