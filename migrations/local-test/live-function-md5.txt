@@ -11,13 +11,15 @@
 # get_gradebook was read the same way on 2026-11-10 (22 functions now).
 # 2026111001_assessment_created_at_in_bundle.sql (S0-M4) was APPLIED to
 # gradebook-prod on 2026-11-10 (recorded as 20261110131526). The two lines
-# below for get_class_bundle and get_gradebook are the definitions from
-# BEFORE it, which the harness rebuilds and that migration's guard expects.
-# Live after it, confirmed by read-only query the same minute:
-#   get_class_bundle 845b42513d1f556dc941a1cc11cf9567 22591
-#   get_gradebook    beec0fae104cd7f4a0e96364130f267d 6859
-# A migration written after S0-M4 (S0-M5 changes get_class_bundle's
-# search_path) must guard on these, not on the lines below.
+# below for get_class_bundle and get_gradebook are the live definitions
+# AFTER it, confirmed by read-only query the same minute. A migration
+# written after S0-M4 (S0-M5 changes get_class_bundle's search_path) guards
+# on these.
+# Before S0-M4 they were, and bundle-prelude.sql still rebuilds, these two,
+# which that migration's own guard expects and bundle_created_at.py starts
+# from:
+#   get_class_bundle 119165287207814181c5875d81451147 22538
+#   get_gradebook    2876cd40c373b8a59bff4464008c8601 6816
 # function md5 length
 clear_column_scores 2eef90e77ca6c84c36832bdd18bb53e5 746
 clear_row_scores 326e27cf74efda1aba93850f4b64baed 1136
@@ -29,8 +31,8 @@ fill_rubric 59c53fb566c6d47fbf0030586a18113c 837
 fv_owns_assessment 852322ca22024d49dcc4f88a6863a4cf 378
 fv_owns_course 61fa41c6c4e94a1e27b606e454262baf 334
 fv_owns_enrollment 9c1d01d07ad0e2402784a2257e13aecb 378
-get_class_bundle 119165287207814181c5875d81451147 22538
-get_gradebook 2876cd40c373b8a59bff4464008c8601 6816
+get_class_bundle 845b42513d1f556dc941a1cc11cf9567 22591
+get_gradebook beec0fae104cd7f4a0e96364130f267d 6859
 import_json_restore 58e48ae4f7ebcc05489b489a4f8906df 36519
 move_rubric_scores 92f7ff4b840c1dd9fe473f8ecdee29b5 3216
 save_score_comment 26a6f288a2594c54c7e94f4a8b5b5c21 753
@@ -41,3 +43,30 @@ update_course 8aacf4f24b0b7133352379e89978776b 3747
 upsert_rubric_score 969a701836ca6c50a92327e66efa0055 2307
 upsert_score 4422dd90a27fea0e5f50ec2425d07bf3 1360
 upsert_tag_score 3a878c46479fef1f84c18ffc0802e0cf 2448
+
+# The class writers grade_return_race.py loads from class-writers-prelude.sql,
+# read from gradebook-prod the same way on 2026-11-09 by the orchestrator. A
+# fourth word marks these lines: score_rpcs.py and batch_a_apply.py compare
+# the lines above, grade_return_race.py compares these. All 21 functions in
+# that prelude have a line.
+create_assessment b3f6055028ea0ea1bdcb2f481959d9cf 2237 class-writer
+delete_assessment b0557c759c662175194a75bff27c7001 407 class-writer
+delete_competency_group 01ac8ad9471a683ea1aa0dbb48296065 424 class-writer
+delete_rubric 8800838f8148a080b9042c1e646c1ca7 517 class-writer
+delete_section a970727ecbd4a513bfa2e43a1a263d14 319 class-writer
+delete_subject 507635467c25f6756ddd01010fdcc5a8 319 class-writer
+delete_tag 47f70892bd70be92dafe0e8c7a6488de 311 class-writer
+save_assessment_tags feafcae04a90f26cd44707e26f911a45 747 class-writer
+update_assessment 523f9491dc3b689dc3d6473e411e4876 2939 class-writer
+update_enrollment 3cfcb3dd88253a54a5fc5b65a749ac82 1249 class-writer
+upsert_rubric 09bf9d14cf82a5b2c29abe3822227c2c 7572 class-writer
+create_student_and_enroll d63bd1f5393fdfb3ff26e9439f906dce 1931 class-writer
+delete_withdrawn_student ad4c98f316f4f41f7ac7eec80f1c0093 2120 class-writer
+reenrol_student 20034fbb80d524258b88a19a6bd0c138 1043 class-writer
+remove_section 7d36db01b87668b76fd5894fdd2031c9 909 class-writer
+restore_section 8cc2f6acd6ff061eaefad65be417a348 835 class-writer
+upsert_competency_group 18b590375a3b599c944e843116ca60eb 1609 class-writer
+upsert_section 07e3bfc041047a08b6c34dd431d86da1 1808 class-writer
+upsert_subject 3fa8209ed1f82365ac49d745c1b7b301 1365 class-writer
+upsert_tag 3a527f37023f8290a9bfe63c91320aca 1903 class-writer
+withdraw_student c4fc1f0e7c9ecee57726e975c0b89847 1153 class-writer

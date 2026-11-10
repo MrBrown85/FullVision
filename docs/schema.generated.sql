@@ -60,6 +60,7 @@ table public.assessment (rls on)
   CREATE UNIQUE INDEX assessment_pkey ON public.assessment USING btree (id)
   CREATE INDEX assessment_rubric_idx ON public.assessment USING btree (rubric_id)
   CREATE TRIGGER course_sync_cursor_assessment_gradebook AFTER INSERT OR DELETE OR UPDATE ON public.assessment FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('gradebook', 'course')
+  CREATE TRIGGER grade_return_gone AFTER DELETE ON public.assessment FOR EACH ROW EXECUTE FUNCTION public._grade_return_gone()
   policy assessment_via_course for all to public using (public.fv_owns_course(course_id)) with check (public.fv_owns_course(course_id))
 table public.assessment_tag (rls on)
   assessment_id uuid not null
@@ -200,6 +201,9 @@ table public.course (rls on)
   curriculum_tags text[]
   folders_count_as_one boolean not null default true
   courses_count_equally boolean not null default false
+  student_page_enabled boolean not null default false
+  return_grades text default 'on_return'::text
+  cards_work_until date
   constraint course_block_len CHECK (((block IS NULL) OR ((char_length(block) >= 1) AND (char_length(block) <= 24))))
   constraint course_calc_method_check CHECK ((calc_method = ANY (ARRAY['average'::text, 'median'::text, 'mostRecent'::text, 'highest'::text, 'mode'::text, 'decayingAvg'::text])))
   constraint course_category_weights_is_object CHECK (((category_weights IS NULL) OR (jsonb_typeof(category_weights) = 'object'::text)))
@@ -211,11 +215,13 @@ table public.course (rls on)
   constraint course_pkey PRIMARY KEY (id)
   constraint course_recent_score_limit_range CHECK (((recent_score_limit IS NULL) OR ((recent_score_limit >= 1) AND (recent_score_limit <= 20))))
   constraint course_reporting_terms_check CHECK (public.fv_check_reporting_terms(reporting_terms))
+  constraint course_return_grades_check CHECK (((return_grades IS NULL) OR (return_grades = ANY (ARRAY['on_return'::text, 'on_save'::text]))))
   constraint course_teacher_id_fkey FOREIGN KEY (teacher_id) REFERENCES public.teacher(id) ON DELETE CASCADE
   CREATE INDEX course_deleted_at_idx ON public.course USING btree (deleted_at) WHERE (deleted_at IS NOT NULL)
   CREATE UNIQUE INDEX course_pkey ON public.course USING btree (id)
   CREATE INDEX course_teacher_idx ON public.course USING btree (teacher_id) WHERE (is_archived = false)
   CREATE TRIGGER course_sync_cursor_course_gradebook AFTER INSERT OR DELETE OR UPDATE ON public.course FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('gradebook', 'course')
+  CREATE TRIGGER grade_return_release AFTER UPDATE OF student_page_enabled, return_grades ON public.course FOR EACH ROW WHEN ((old.student_page_enabled AND (NOT (old.return_grades IS DISTINCT FROM 'on_return'::text)) AND (NOT (new.student_page_enabled AND (NOT (new.return_grades IS DISTINCT FROM 'on_return'::text)))))) EXECUTE FUNCTION public._grade_return_release()
   policy course_owner for all to public using ((teacher_id = ( SELECT auth.uid() AS uid))) with check ((teacher_id = ( SELECT auth.uid() AS uid)))
 table public.course_sync_cursor (rls on)
   course_id uuid not null
@@ -324,7 +330,7 @@ table public.dibels_score (rls on)
   CREATE INDEX dibels_score_assessment_idx ON public.dibels_score USING btree (assessment_id)
   CREATE UNIQUE INDEX dibels_score_pkey ON public.dibels_score USING btree (id)
   CREATE UNIQUE INDEX dibels_score_unique ON public.dibels_score USING btree (enrollment_id, assessment_id, period)
-  policy dibels_score_via_enrollment for all to public using (public.fv_owns_enrollment(enrollment_id)) with check (public.fv_owns_enrollment(enrollment_id))
+  policy dibels_score_same_class for all to public using (public.fv_owns_score_cell(enrollment_id, assessment_id)) with check (public.fv_owns_score_cell(enrollment_id, assessment_id))
 table public.enrollment (rls on)
   id uuid not null default gen_random_uuid()
   student_id uuid not null
@@ -344,6 +350,7 @@ table public.enrollment (rls on)
   CREATE UNIQUE INDEX enrollment_student_id_course_id_key ON public.enrollment USING btree (student_id, course_id)
   CREATE INDEX enrollment_student_idx ON public.enrollment USING btree (student_id)
   CREATE TRIGGER course_sync_cursor_enrollment_gradebook AFTER INSERT OR DELETE OR UPDATE ON public.enrollment FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('gradebook', 'course')
+  CREATE TRIGGER grade_return_gone AFTER DELETE ON public.enrollment FOR EACH ROW EXECUTE FUNCTION public._grade_return_gone()
   policy enrollment_via_course for all to public using (public.fv_owns_course(course_id)) with check (public.fv_owns_course(course_id))
 table public.fv_idempotency (rls on)
   key uuid not null
@@ -373,6 +380,24 @@ table public.goal (rls on)
   CREATE INDEX goal_section_idx ON public.goal USING btree (section_id)
   CREATE TRIGGER course_sync_cursor_goal_student_records AFTER INSERT OR DELETE OR UPDATE ON public.goal FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('student-records', 'enrollment')
   policy goal_via_enrollment for all to public using (public.fv_owns_enrollment(enrollment_id)) with check (public.fv_owns_enrollment(enrollment_id))
+table public.grade_return (rls on)
+  enrollment_id uuid not null
+  assessment_id uuid not null
+  is_draft boolean not null default false
+  returned_at timestamp with time zone
+  returned_copy jsonb
+  previous_copy jsonb
+  updated_at timestamp with time zone
+  seen_at timestamp with time zone
+  working_copy jsonb
+  constraint grade_return_copy_while_draft CHECK (((returned_copy IS NOT NULL) = (is_draft AND (returned_at IS NOT NULL))))
+  constraint grade_return_pkey PRIMARY KEY (enrollment_id, assessment_id)
+  constraint grade_return_previous_copy_object CHECK (((previous_copy IS NULL) OR (jsonb_typeof(previous_copy) = 'object'::text)))
+  constraint grade_return_returned_copy_object CHECK (((returned_copy IS NULL) OR (jsonb_typeof(returned_copy) = 'object'::text)))
+  constraint grade_return_working_copy_object CHECK (((working_copy IS NULL) OR (jsonb_typeof(working_copy) = 'object'::text)))
+  CREATE INDEX grade_return_assessment_idx ON public.grade_return USING btree (assessment_id)
+  CREATE UNIQUE INDEX grade_return_pkey ON public.grade_return USING btree (enrollment_id, assessment_id)
+  policy grade_return_read for select to public using (public.fv_owns_enrollment(enrollment_id))
 table public.guardian (rls on)
   id uuid not null default gen_random_uuid()
   student_id uuid not null
@@ -753,7 +778,11 @@ table public.rubric_check_score (rls on)
   CREATE INDEX rubric_check_score_check_idx ON public.rubric_check_score USING btree (check_id)
   CREATE UNIQUE INDEX rubric_check_score_pkey ON public.rubric_check_score USING btree (enrollment_id, assessment_id, check_id)
   CREATE TRIGGER course_sync_cursor_rubric_check_score_gradebook AFTER INSERT OR DELETE OR UPDATE ON public.rubric_check_score FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('gradebook', 'assessment')
-  policy rubric_check_score_via_enrollment for all to public using (public.fv_owns_enrollment(enrollment_id)) with check (public.fv_owns_enrollment(enrollment_id))
+  CREATE TRIGGER grade_return_delete AFTER DELETE ON public.rubric_check_score REFERENCING OLD TABLE AS old_rows FOR EACH STATEMENT EXECUTE FUNCTION public._grade_return_on_change()
+  CREATE TRIGGER grade_return_insert AFTER INSERT ON public.rubric_check_score REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public._grade_return_on_change()
+  CREATE TRIGGER grade_return_repoint AFTER UPDATE ON public.rubric_check_score FOR EACH ROW WHEN ((old.check_id IS DISTINCT FROM new.check_id)) EXECUTE FUNCTION public._grade_return_repoint('checks', 'check_id')
+  CREATE TRIGGER grade_return_update AFTER UPDATE ON public.rubric_check_score REFERENCING OLD TABLE AS old_rows NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public._grade_return_on_change()
+  policy rubric_check_score_same_class for all to public using (public.fv_owns_score_cell(enrollment_id, assessment_id)) with check (public.fv_owns_rubric_check_cell(enrollment_id, assessment_id, check_id))
 table public.rubric_print (rls on)
   enrollment_id uuid not null
   assessment_id uuid not null
@@ -789,7 +818,11 @@ table public.rubric_score (rls on)
   CREATE UNIQUE INDEX rubric_score_enrollment_id_assessment_id_criterion_id_key ON public.rubric_score USING btree (enrollment_id, assessment_id, criterion_id)
   CREATE UNIQUE INDEX rubric_score_pkey ON public.rubric_score USING btree (id)
   CREATE TRIGGER course_sync_cursor_rubric_score_gradebook AFTER INSERT OR DELETE OR UPDATE ON public.rubric_score FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('gradebook', 'enrollment')
-  policy rubric_score_via_enrollment for all to public using (public.fv_owns_enrollment(enrollment_id)) with check (public.fv_owns_enrollment(enrollment_id))
+  CREATE TRIGGER grade_return_delete AFTER DELETE ON public.rubric_score REFERENCING OLD TABLE AS old_rows FOR EACH STATEMENT EXECUTE FUNCTION public._grade_return_on_change()
+  CREATE TRIGGER grade_return_insert AFTER INSERT ON public.rubric_score REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public._grade_return_on_change()
+  CREATE TRIGGER grade_return_repoint AFTER UPDATE ON public.rubric_score FOR EACH ROW WHEN ((old.criterion_id IS DISTINCT FROM new.criterion_id)) EXECUTE FUNCTION public._grade_return_repoint('criteria', 'criterion_id')
+  CREATE TRIGGER grade_return_update AFTER UPDATE ON public.rubric_score REFERENCING OLD TABLE AS old_rows NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public._grade_return_on_change()
+  policy rubric_score_same_class for all to public using (public.fv_owns_score_cell(enrollment_id, assessment_id)) with check (public.fv_owns_rubric_score_cell(enrollment_id, assessment_id, criterion_id))
 table public.rubric_tag (rls on)
   rubric_id uuid not null
   tag_id uuid not null
@@ -829,7 +862,10 @@ table public.score (rls on)
   CREATE INDEX score_enrollment_idx ON public.score USING btree (enrollment_id)
   CREATE UNIQUE INDEX score_pkey ON public.score USING btree (id)
   CREATE TRIGGER course_sync_cursor_score_gradebook AFTER INSERT OR DELETE OR UPDATE ON public.score FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('gradebook', 'enrollment')
-  policy score_via_enrollment for all to public using (public.fv_owns_enrollment(enrollment_id)) with check (public.fv_owns_enrollment(enrollment_id))
+  CREATE TRIGGER grade_return_delete AFTER DELETE ON public.score REFERENCING OLD TABLE AS old_rows FOR EACH STATEMENT EXECUTE FUNCTION public._grade_return_on_change()
+  CREATE TRIGGER grade_return_insert AFTER INSERT ON public.score REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public._grade_return_on_change()
+  CREATE TRIGGER grade_return_update AFTER UPDATE ON public.score REFERENCING OLD TABLE AS old_rows NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public._grade_return_on_change()
+  policy score_same_class for all to public using (public.fv_owns_score_cell(enrollment_id, assessment_id)) with check (public.fv_owns_score_cell(enrollment_id, assessment_id))
 table public.score_audit (rls on)
   id uuid not null default gen_random_uuid()
   score_id uuid not null
@@ -934,6 +970,31 @@ table public.student_access_code (rls on)
   CREATE UNIQUE INDEX student_access_code_pkey ON public.student_access_code USING btree (id)
   CREATE INDEX student_access_code_questionnaire_id_idx ON public.student_access_code USING btree (questionnaire_id)
   policy student_access_code_via_enrollment for all to public using (public.fv_owns_enrollment(enrollment_id)) with check (public.fv_owns_enrollment(enrollment_id))
+table public.student_card (rls on)
+  id uuid not null default gen_random_uuid()
+  enrollment_id uuid not null
+  code text not null
+  code_hash text not null
+  salt text not null
+  created_at timestamp with time zone not null default now()
+  printed_at timestamp with time zone
+  last_opened_at timestamp with time zone
+  wrong_tries integer not null default 0
+  wrong_times timestamp with time zone[] not null default '{}'::timestamp with time zone[]
+  locked_at timestamp with time zone
+  stopped_at timestamp with time zone
+  works_until date not null
+  password text
+  constraint student_card_code_hash_key UNIQUE (code_hash)
+  constraint student_card_enrollment_id_fkey FOREIGN KEY (enrollment_id) REFERENCES public.enrollment(id) ON DELETE CASCADE
+  constraint student_card_pkey PRIMARY KEY (id)
+  constraint student_card_wrong_tries_check CHECK ((wrong_tries >= 0))
+  CREATE UNIQUE INDEX student_card_code_hash_key ON public.student_card USING btree (code_hash)
+  CREATE INDEX student_card_enrollment_idx ON public.student_card USING btree (enrollment_id)
+  CREATE UNIQUE INDEX student_card_live_code ON public.student_card USING btree (code) WHERE (stopped_at IS NULL)
+  CREATE UNIQUE INDEX student_card_one_live ON public.student_card USING btree (enrollment_id) WHERE (stopped_at IS NULL)
+  CREATE UNIQUE INDEX student_card_pkey ON public.student_card USING btree (id)
+  policy student_card_read for select to public using (public.fv_owns_enrollment(enrollment_id))
 table public.subject (rls on)
   id uuid not null default gen_random_uuid()
   course_id uuid not null
@@ -1011,7 +1072,11 @@ table public.tag_score (rls on)
   CREATE UNIQUE INDEX tag_score_pkey ON public.tag_score USING btree (id)
   CREATE INDEX tag_score_tag_idx ON public.tag_score USING btree (tag_id)
   CREATE TRIGGER course_sync_cursor_tag_score_gradebook AFTER INSERT OR DELETE OR UPDATE ON public.tag_score FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('gradebook', 'enrollment')
-  policy tag_score_via_enrollment for all to public using (public.fv_owns_enrollment(enrollment_id)) with check (public.fv_owns_enrollment(enrollment_id))
+  CREATE TRIGGER grade_return_delete AFTER DELETE ON public.tag_score REFERENCING OLD TABLE AS old_rows FOR EACH STATEMENT EXECUTE FUNCTION public._grade_return_on_change()
+  CREATE TRIGGER grade_return_insert AFTER INSERT ON public.tag_score REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public._grade_return_on_change()
+  CREATE TRIGGER grade_return_repoint AFTER UPDATE ON public.tag_score FOR EACH ROW WHEN ((old.tag_id IS DISTINCT FROM new.tag_id)) EXECUTE FUNCTION public._grade_return_repoint('tags', 'tag_id')
+  CREATE TRIGGER grade_return_update AFTER UPDATE ON public.tag_score REFERENCING OLD TABLE AS old_rows NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public._grade_return_on_change()
+  policy tag_score_same_class for all to public using (public.fv_owns_score_cell(enrollment_id, assessment_id)) with check (public.fv_owns_tag_score_cell(enrollment_id, assessment_id, tag_id))
 table public.teacher (rls on)
   id uuid not null default gen_random_uuid()
   email text not null
@@ -1151,11 +1216,33 @@ table student_submit.attempt (rls on)
   code_id uuid
   course_id uuid
   constraint attempt_pkey PRIMARY KEY (id)
-  constraint attempt_route_check CHECK ((route = ANY (ARRAY['open'::text, 'submit'::text])))
+  constraint attempt_route_check CHECK ((route = ANY (ARRAY['open'::text, 'submit'::text, 'card'::text])))
   CREATE INDEX attempt_at ON student_submit.attempt USING btree (at)
   CREATE INDEX attempt_course ON student_submit.attempt USING btree (course_id, at)
   CREATE INDEX attempt_ip ON student_submit.attempt USING btree (ip_hash, at)
   CREATE UNIQUE INDEX attempt_pkey ON student_submit.attempt USING btree (id)
+table student_submit.device_session (rls on)
+  id uuid not null default gen_random_uuid()
+  token_hash text not null
+  created_at timestamp with time zone not null default now()
+  expires_at timestamp with time zone not null
+  constraint device_session_pkey PRIMARY KEY (id)
+  constraint device_session_token_hash_key UNIQUE (token_hash)
+  CREATE INDEX device_session_expires ON student_submit.device_session USING btree (expires_at)
+  CREATE UNIQUE INDEX device_session_pkey ON student_submit.device_session USING btree (id)
+  CREATE UNIQUE INDEX device_session_token_hash_key ON student_submit.device_session USING btree (token_hash)
+table student_submit.device_session_enrollment (rls on)
+  session_id uuid not null
+  enrollment_id uuid not null
+  card_id uuid not null
+  added_at timestamp with time zone not null default clock_timestamp()
+  constraint device_session_enrollment_card_id_fkey FOREIGN KEY (card_id) REFERENCES public.student_card(id) ON DELETE CASCADE
+  constraint device_session_enrollment_enrollment_id_fkey FOREIGN KEY (enrollment_id) REFERENCES public.enrollment(id) ON DELETE CASCADE
+  constraint device_session_enrollment_pkey PRIMARY KEY (session_id, enrollment_id)
+  constraint device_session_enrollment_session_id_fkey FOREIGN KEY (session_id) REFERENCES student_submit.device_session(id) ON DELETE CASCADE
+  CREATE INDEX device_session_enrollment_card ON student_submit.device_session_enrollment USING btree (card_id)
+  CREATE INDEX device_session_enrollment_enrollment ON student_submit.device_session_enrollment USING btree (enrollment_id)
+  CREATE UNIQUE INDEX device_session_enrollment_pkey ON student_submit.device_session_enrollment USING btree (session_id, enrollment_id)
 table student_submit.session (rls on)
   id uuid not null default gen_random_uuid()
   token_hash text not null
@@ -1173,10 +1260,28 @@ table student_submit.session (rls on)
   CREATE UNIQUE INDEX session_pkey ON student_submit.session USING btree (id)
   CREATE UNIQUE INDEX session_token_hash_key ON student_submit.session USING btree (token_hash)
 function public._access_code_hash(p_code text, p_salt text) returns text
+function public._cards_work_until(p_course_id uuid) returns date security definer
+function public._fv_date(p text) returns date
 function public._fv_release_orphan_teacher_email() returns void security definer
 function public._fv_teacher_sign_in_deleted() returns trigger security definer
+function public._fv_timezone(p_tz text) returns text
+function public._grade_copy(p_enrollment_id uuid, p_assessment_id uuid) returns jsonb security definer
+function public._grade_copy_entry(p_value integer, p_modifier integer, p_comment text, p_beyond text, p_criterion boolean) returns jsonb
+function public._grade_copy_in_use(p_copy jsonb, p_assessment_id uuid) returns jsonb security definer
+function public._grade_copy_of(p_value numeric, p_modifier integer, p_comment text, p_tags jsonb, p_criteria jsonb, p_checks jsonb) returns jsonb
+function public._grade_copy_remap(p_copy jsonb, p_criterion_map jsonb, p_check_map jsonb, p_tag_map jsonb) returns jsonb
+function public._grade_return_apply(p_enrollment_id uuid, p_assessment_id uuid, p_before jsonb, _now jsonb) returns void security definer
+function public._grade_return_gone() returns trigger security definer
+function public._grade_return_holds(p_enrollment_id uuid) returns boolean security definer
+function public._grade_return_lock(p_course_id uuid) returns void security definer
+function public._grade_return_lock_first(p_course_id uuid) returns void security definer
+function public._grade_return_on_change() returns trigger security definer
+function public._grade_return_one(p_enrollment_id uuid, p_assessment_id uuid, p_at timestamp with time zone) returns boolean security definer
+function public._grade_return_release() returns trigger security definer
+function public._grade_return_repoint() returns trigger security definer
 function public._issue_access_code(p_enrollment_id uuid, p_questionnaire_id uuid, p_expires_at timestamp with time zone) returns text security definer
 function public._issue_report_code(p_enrollment_id uuid, p_report_id uuid, p_expires_at timestamp with time zone) returns text security definer
+function public._issue_student_card(p_enrollment_id uuid, p_not_password text) returns uuid security definer
 function public._new_access_code() returns text
 function public._phone_report_json(p_id uuid) returns jsonb
 function public._phone_report_put(p_report_id uuid, p_course_id uuid, p_students jsonb) returns void
@@ -1184,6 +1289,7 @@ function public._questionnaire_json(p_id uuid) returns jsonb
 function public._report_preset_defaults(p_preset text) returns jsonb
 function public._score_audit_diff(p_score_id uuid, p_old_value numeric, p_new_value numeric, p_old_status text, p_new_status text) returns void security definer
 function public._slip_password(p_enrollment_id uuid) returns text security definer
+function public._student_card_json(p_card_id uuid) returns jsonb security definer
 function public._term_rating_audit_field(p_tr_id uuid, p_field text, p_old text, p_new text) returns void security definer
 function public._touch_course_sync_cursor(p_course_id uuid, p_bucket text) returns void security definer
 function public._touch_course_sync_cursor_from_trigger() returns trigger security definer
@@ -1199,6 +1305,7 @@ function public.clear_row_scores(p_enrollment_id uuid, p_course_id uuid) returns
 function public.clear_score(p_enrollment_id uuid, p_assessment_id uuid) returns void
 function public.clear_section_override(p_enrollment_id uuid, p_section_id uuid) returns void
 function public.close_phone_report(p_id uuid, p_idempotency_key uuid) returns jsonb
+function public.course_draft_count(p_course_id uuid) returns integer
 function public.create_assessment(p_course_id uuid, p_title text, p_category_id uuid, p_description text, p_date_assigned date, p_due_date date, p_score_mode text, p_max_points numeric, p_weight numeric, p_evidence_type text, p_rubric_id uuid, p_module_id uuid, p_tag_ids uuid[], p_copy_group uuid, p_core_competency_ids text[], p_idempotency_key uuid) returns uuid
 function public.create_course(p_name text, p_grade_level text, p_description text, p_color text, p_grading_system text, p_calc_method text, p_decay_weight numeric, p_timezone text, p_late_work_policy text, p_subjects text[], p_idempotency_key uuid, p_block text) returns uuid
 function public.create_custom_tag(p_course_id uuid, p_label text, p_idempotency_key uuid) returns uuid
@@ -1239,6 +1346,10 @@ function public.fv_overall_proficiency(p_enrollment_id uuid, p_course_id uuid) r
 function public.fv_owns_assessment(aid uuid) returns boolean security definer
 function public.fv_owns_course(cid uuid) returns boolean security definer
 function public.fv_owns_enrollment(eid uuid) returns boolean security definer
+function public.fv_owns_rubric_check_cell(eid uuid, aid uuid, ckid uuid) returns boolean security definer
+function public.fv_owns_rubric_score_cell(eid uuid, aid uuid, crid uuid) returns boolean security definer
+function public.fv_owns_score_cell(eid uuid, aid uuid) returns boolean security definer
+function public.fv_owns_tag_score_cell(eid uuid, aid uuid, tid uuid) returns boolean security definer
 function public.fv_owns_term_rating(trid uuid) returns boolean security definer
 function public.fv_q_to_percentage(q numeric) returns numeric
 function public.fv_retention_cleanup() returns jsonb security definer
@@ -1260,6 +1371,7 @@ function public.import_roster_csv(p_course_id uuid, p_rows jsonb, p_idempotency_
 function public.import_teams_class(p_payload jsonb, p_idempotency_key uuid) returns jsonb
 function public.issue_access_codes(p_questionnaire_id uuid, p_enrollment_ids uuid[], p_idempotency_key uuid) returns jsonb
 function public.issue_report_codes(p_report_id uuid, p_enrollment_ids uuid[], p_idempotency_key uuid) returns jsonb
+function public.issue_student_cards(p_course_id uuid, p_enrollment_ids uuid[], p_idempotency_key uuid) returns jsonb security definer
 function public.list_assessment_copies(p_copy_group uuid) returns TABLE(assessment_id uuid, course_id uuid, course_name text, title text)
 function public.list_categories(p_course_id uuid) returns TABLE(id uuid, course_id uuid, name text, weight numeric, display_order integer, calc_mode text, created_at timestamp with time zone, updated_at timestamp with time zone)
 function public.list_comment_templates() returns jsonb
@@ -1267,6 +1379,7 @@ function public.list_competency_descriptors() returns TABLE(competency_key text,
 function public.list_course_core_self_assessments(p_course_id uuid) returns jsonb
 function public.list_course_dibels(p_course_id uuid) returns jsonb
 function public.list_course_goal_dates(p_course_id uuid) returns jsonb
+function public.list_course_grade_returns(p_course_id uuid) returns jsonb
 function public.list_course_guardians(p_course_id uuid) returns jsonb
 function public.list_course_questionnaires(p_course_id uuid) returns jsonb
 function public.list_course_responses(p_course_id uuid) returns jsonb
@@ -1278,9 +1391,12 @@ function public.list_removed_sections(p_course_id uuid) returns jsonb
 function public.list_report_issues(p_course_id uuid, p_term integer) returns jsonb
 function public.list_report_templates() returns jsonb
 function public.list_rubric_copies(p_copy_group uuid) returns TABLE(rubric_id uuid, course_id uuid, course_name text, name text)
+function public.list_student_cards(p_course_id uuid) returns jsonb security definer
 function public.list_teacher_courses() returns TABLE(id uuid, name text, grade_level text, description text, color text, is_archived boolean, display_order integer, grading_system text, calc_method text, decay_weight numeric, timezone text, late_work_policy text, created_at timestamp with time zone, updated_at timestamp with time zone, block text, curriculum_tags text[])
+function public.mark_student_cards_printed(p_card_ids uuid[], p_idempotency_key uuid) returns jsonb security definer
 function public.move_rubric_scores(p_assessment_id uuid, p_rubric_id uuid, p_criterion_map jsonb, p_check_map jsonb, p_idempotency_key uuid) returns jsonb
 function public.reenrol_student(p_enrollment_id uuid, p_idempotency_key uuid) returns jsonb
+function public.reissue_student_card(p_card_id uuid, p_idempotency_key uuid) returns jsonb security definer
 function public.relink_student(p_ghost_student_id uuid, p_canonical_student_id uuid) returns jsonb
 function public.remove_section(p_id uuid, p_idempotency_key uuid) returns jsonb
 function public.reorder_categories(p_ids uuid[]) returns void
@@ -1292,6 +1408,7 @@ function public.reorder_subjects(p_ids uuid[]) returns void
 function public.reorder_tags(p_ids uuid[]) returns void
 function public.restore_section(p_id uuid, p_idempotency_key uuid) returns jsonb
 function public.restore_teacher() returns void
+function public.return_grades(p_assessment_id uuid, p_enrollment_ids uuid[], p_idempotency_key uuid) returns jsonb security definer
 function public.rls_auto_enable() returns event_trigger security definer
 function public.save_assessment_tags(p_id uuid, p_tag_ids uuid[]) returns void
 function public.save_categories(p_course_id uuid, p_categories jsonb) returns uuid[]
@@ -1305,6 +1422,7 @@ function public.save_score_report_note(p_enrollment_id uuid, p_assessment_id uui
 function public.save_teacher_preferences(p_patch jsonb) returns void
 function public.save_term_attendance(p_enrollment_id uuid, p_term integer, p_absences integer, p_lates integer) returns uuid
 function public.save_term_rating(p_enrollment_id uuid, p_term integer, p_payload jsonb) returns uuid
+function public.set_cards_work_until(p_course_id uuid, p_date date, p_idempotency_key uuid) returns jsonb security definer
 function public.set_questionnaire_on(p_id uuid, p_is_on boolean, p_idempotency_key uuid) returns jsonb
 function public.set_rubric_check(p_enrollment_id uuid, p_assessment_id uuid, p_check_id uuid, p_on boolean) returns boolean
 function public.set_rubric_printed(p_enrollment_id uuid, p_assessment_id uuid, p_hash text, p_printed_at timestamp with time zone, p_idempotency_key uuid) returns boolean
@@ -1312,6 +1430,8 @@ function public.set_score_status(p_enrollment_id uuid, p_assessment_id uuid, p_s
 function public.soft_delete_teacher() returns void
 function public.submit_support_report(p_page text, p_message text, p_browser text, p_app_version text, p_idempotency_key uuid) returns uuid security definer
 function public.toggle_report_block(p_course_id uuid, p_block_key text, p_enabled boolean) returns void
+function public.unlock_all_student_cards(p_course_id uuid, p_idempotency_key uuid) returns jsonb security definer
+function public.unlock_student_card(p_card_id uuid, p_idempotency_key uuid) returns jsonb security definer
 function public.update_assessment(p_id uuid, p_patch jsonb, p_tag_ids uuid[]) returns void
 function public.update_course(p_course_id uuid, p_patch jsonb) returns void
 function public.update_enrollment(p_id uuid, p_patch jsonb) returns void
@@ -1338,14 +1458,26 @@ function public.upsert_subject(p_id uuid, p_course_id uuid, p_name text, p_color
 function public.upsert_tag(p_id uuid, p_section_id uuid, p_label text, p_code text, p_i_can_text text, p_display_order integer, p_idempotency_key uuid, p_i_can_statements text[], p_source_text text, p_bank_id text) returns uuid
 function public.upsert_tag_score(p_enrollment_id uuid, p_assessment_id uuid, p_tag_id uuid, p_value integer, p_modifier smallint, p_comment text) returns uuid
 function public.withdraw_student(p_enrollment_id uuid, p_idempotency_key uuid) returns jsonb
+function student_submit._card_lookup(p_code text, p_ip_hash text) returns jsonb security definer
+function student_submit._card_refusal(p_card_id uuid) returns text security definer
 function student_submit._clean_answer(p_kind text, p_options jsonb, p_core_ids text[], p_value jsonb) returns jsonb security definer
 function student_submit._closed_reason(p_q public.questionnaire, p_tz text) returns text security definer
+function student_submit._device_session(p_token text) returns student_submit.device_session security definer
 function student_submit._log(p_route text, p_outcome text, p_ip_hash text, p_code_id uuid, p_course_id uuid) returns void security definer
+function student_submit._midnight(p_tz text) returns timestamp with time zone
 function student_submit._norm(p text) returns text
 function student_submit._part(p_id uuid) returns jsonb security definer
 function student_submit._payload(p_code_id uuid) returns jsonb security definer
 function student_submit._preview(p_code_id uuid) returns jsonb security definer
+function student_submit._returned_grade(p_enrollment_id uuid, p_assessment_id uuid) returns jsonb security definer
+function student_submit._session_class(p_session_token text, p_enrollment_id uuid) returns jsonb security definer
+function student_submit._session_classes(p_session_id uuid) returns jsonb security definer
+function student_submit.card(p_code text, p_ip_hash text) returns jsonb security definer
 function student_submit.check(p_token text, p_birthday text, p_ip_hash text) returns jsonb security definer
+function student_submit.done(p_session_token text, p_ip_hash text) returns jsonb security definer
 function student_submit.open(p_code text, p_ip_hash text) returns jsonb security definer
+function student_submit.page(p_session_token text, p_enrollment_id uuid, p_ip_hash text) returns jsonb security definer
+function student_submit.seen(p_session_token text, p_enrollment_id uuid, p_assessment_ids uuid[], p_ip_hash text) returns jsonb security definer
 function student_submit.submit(p_token text, p_answers jsonb, p_ip_hash text) returns jsonb security definer
 function student_submit.verify(p_token text, p_birthday text, p_student_number text, p_password text, p_ip_hash text) returns jsonb security definer
+function student_submit.verify_card(p_code text, p_birthday text, p_student_number text, p_password text, p_session_token text, p_ip_hash text, p_add boolean) returns jsonb security definer
