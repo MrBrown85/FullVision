@@ -287,11 +287,21 @@ describe('what decides the order of same-date pieces', () => {
     ).toBe(1);
   });
 
-  it('the server’s created_at is read when a piece has one, in place of this device’s time', () => {
-    // The server says A was made last; the device's own (earlier) time for it is ignored.
+  it('the server’s created_at is read for a loaded piece; a piece that also has this device’s time is read by that', () => {
+    // A carries the server's 9:30 and this device's 9:00 (a copy made here of
+    // a loaded piece carries both). The device's time is the one read, so A
+    // is the earliest and C, at 9:20, the latest.
     expect(
       mostRecent([
         piece('A', { created_at: '2026-10-01T09:30:00+00:00', created: at(0) }),
+        piece('B', { created_at: '2026-10-01T09:10:00+00:00' }),
+        piece('C', { created_at: '2026-10-01T09:20:00+00:00' }),
+      ]),
+    ).toBe(2);
+    // With the server's time alone, A at 9:30 is the latest.
+    expect(
+      mostRecent([
+        piece('A', { created_at: '2026-10-01T09:30:00+00:00' }),
         piece('B', { created_at: '2026-10-01T09:10:00+00:00' }),
         piece('C', { created_at: '2026-10-01T09:20:00+00:00' }),
       ]),
@@ -375,6 +385,70 @@ describe('what decides the order of same-date pieces', () => {
   });
 });
 
+/* A piece made on this device keeps this device's time until the class is
+   next loaded, and in that time its id changes: it is made under a local id
+   ('s' and the time) and takes the server's id when its save lands. Nothing
+   a grade shows may move at that moment. */
+describe('a piece made on this device and not loaded since', () => {
+  afterEach(drop);
+  const LOCAL_1 = 's1790000000000aaaaaaaa';
+  const LOCAL_2 = 's1790000000000bbbbbbbb';
+  // The server's ids: every one sorts before a local id.
+  const UUID_LOW = '1a000000-0000-4000-8000-000000000001';
+  const UUID_MID = '5f000000-0000-4000-8000-000000000002';
+  const UUID_HIGH = 'e9000000-0000-4000-8000-000000000003';
+  const counted = () => sectionCountedEvidence(CID, 'sam', 'S1').map(e => e.assessmentId);
+
+  describe('a duplicate of a loaded piece', () => {
+    /* The Assignments page's Duplicate copies the whole piece, the server's
+       created_at with it, and gives the copy this device's time. The
+       original is scored 4 and the copy 2. */
+    const original = () => piece(UUID_MID, { title: 'Lab', created_at: '2026-10-01T09:00:00.000000+00:00' });
+    const duplicate = id =>
+      Object.assign(structuredClone(original()), { id, title: 'Lab (Copy)', created: '2026-10-08T17:00:00.000Z' });
+    const both = id => {
+      seed([original(), duplicate(id)], 'mostRecent');
+      const got = orders([score(UUID_MID, 4), score(id, 2)]).map(order => {
+        graded(order);
+        expect(counted()).toEqual([UUID_MID, id]);
+        return level();
+      });
+      expect(new Set(got).size).toBe(1);
+      return got[0];
+    };
+
+    it('counts after its original from the moment it is made', () => {
+      expect(both(LOCAL_1)).toBe(2);
+    });
+
+    it('and still does when its save lands, whichever way the server’s id sorts', () => {
+      expect(both(UUID_LOW)).toBe(2); // before the original's id
+      expect(both(UUID_HIGH)).toBe(2); // after it
+    });
+
+    it('and after the next load, when it has its own time from the server', () => {
+      seed(
+        [original(), piece(UUID_LOW, { title: 'Lab (Copy)', created_at: '2026-10-08T17:00:01.250000+00:00' })],
+        'mostRecent',
+      );
+      orders([score(UUID_MID, 4), score(UUID_LOW, 2)]).forEach(order => {
+        graded(order);
+        expect(level()).toBe(2);
+      });
+    });
+
+    it('this device’s time is read first: a piece has both only when it was copied here', () => {
+      const copy = duplicate(LOCAL_1);
+      expect(copy.created_at).toBe('2026-10-01T09:00:00.000000+00:00');
+      expect(_pieceMadeAt(copy)).toBe(Date.UTC(2026, 9, 8, 17, 0, 0));
+      // A time this device wrote that cannot be read leaves the server's.
+      expect(_pieceMadeAt({ created: 'not a time', created_at: '2026-10-01T09:00:00+00:00' })).toBe(
+        Date.UTC(2026, 9, 1, 9, 0, 0),
+      );
+    });
+  });
+});
+
 describe('ties the list cannot settle are still fixed', () => {
   afterEach(drop);
 
@@ -420,7 +494,7 @@ describe('the one place the order of same-date pieces is decided', () => {
     expect(_pieceOrderFacts(CID)).toEqual([
       { id: 'A', made: null },
       { id: 'B', made: Date.UTC(2026, 9, 5, 17, 0, 0) },
-      { id: 'C', made: Date.UTC(2026, 9, 5, 16, 0, 0, 250) },
+      { id: 'C', made: Date.UTC(2026, 9, 5, 17, 30, 0) }, // this device's time, not the server's 16:00
     ]);
   });
 

@@ -428,10 +428,24 @@ function _cmpText(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-/* When a piece of work was made, in milliseconds since 1970, or null: the
-   server's created_at when it has one, else this device's `created`. */
+/* When this device made a piece of work, in milliseconds since 1970, or
+   null for a piece it did not make (or has loaded since): the loader gives
+   a loaded piece no `created`. */
+function _pieceMadeHereAt(assessment) {
+  var t = Date.parse((assessment && assessment.created) || '');
+  return isFinite(t) ? t : null;
+}
+
+/* When a piece of work was made, in milliseconds since 1970, or null: this
+   device's `created` when the piece was made here and not loaded since,
+   else the server's created_at. The device's time is read first because a
+   piece has both only when it was duplicated here from a loaded piece: the
+   copy carries its original's created_at, which is not when the copy was
+   made. */
 function _pieceMadeAt(assessment) {
-  var t = Date.parse((assessment && (assessment.created_at || assessment.created)) || '');
+  var here = _pieceMadeHereAt(assessment);
+  if (here != null) return here;
+  var t = Date.parse((assessment && assessment.created_at) || '');
   return isFinite(t) ? t : null;
 }
 
