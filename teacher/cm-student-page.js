@@ -3,16 +3,20 @@
 
    The tab is there only for a class whose student page is on (the build
    switch, course.student_page_enabled, read through getReturnSettings). For
-   every other class, and for every signed-in teacher until the server knows
-   the setting (S0-W1), it has no button, no address and no panel.
+   every other class it has no button, no address and no panel, unless the
+   app was opened at the build address (below).
 
    What is on it:
 
    - S1-F4: Return Grades (When I Return Them, As Soon As I Save).
+   - S0-W1: Student Cards, a bare list with Make Cards and Print All
+     (teacher/student-cards.js).
+   - S0-W1: the build switch itself, at the build address only.
 
    What later PRs add, none of which needs to change dash-class-manager.js:
 
-   - S3: the Student Cards card.
+   - S3: the rest of Student Cards (filters, Unlock, Reissue, Cards Work
+     Until).
    - S5-F1: Send Work and Keep Photos Until.
    - S8-F1: the reminder and the "photos go for good" line on Keep Photos
      Until.
@@ -36,7 +40,21 @@
    - Leaving When I Return Them returns every grade that waits (DECISIONS,
      Student page build rulings 8). With grades waiting the tab asks first
      and names how many; Cancel leaves the setting and every one of them as
-     they were. */
+     they were.
+
+   THE BUILD SWITCH is the class's student_page_enabled, off for every class
+   until its teacher turns it on. Nothing in the app offers it. It shows, as
+   a Student Page switch in a card of its own above the rest, only when the
+   app was opened at an address that carries ?build=student-page, for
+   example
+     /dashboard?manage=student-page&build=student-page
+   The address is read once, when this file loads (the app tidies its
+   address afterwards), and holds until the page is reloaded without it.
+   Opened that way, a class whose student page is off has the tab too, with
+   the switch alone on it. Turning the switch off is leaving When I Return
+   Them: with grades waiting it asks first, in the same words. It is saved
+   through saveCourseConfig, like Return Grades, and a class turned on with
+   no Return Grades choice made keeps none until its teacher picks. */
 var CmStudentPage = (function () {
   'use strict';
 
@@ -45,14 +63,26 @@ var CmStudentPage = (function () {
     { value: 'on_save', label: 'As Soon As I Save' },
   ];
 
+  // True when the app was opened at the build address (see the top).
+  function _addressHasBuildFlag() {
+    try {
+      return new URLSearchParams(window.location.search).get('build') === 'student-page';
+    } catch (e) {
+      return false;
+    }
+  }
+  var _buildFlag = _addressHasBuildFlag();
+
   function _settings(cid) {
     return typeof getReturnSettings === 'function' && cid ? getReturnSettings(cid) : null;
   }
 
-  // Whether this class has the tab: only with its student page on.
+  // Whether this class has the tab: with its student page on, or, at the
+  // build address, any class (to turn it on).
   function isShown(cid) {
     var s = _settings(cid);
-    return !!s && s.student_page === true;
+    if (!s) return false;
+    return s.student_page === true || (_buildFlag && typeof COURSES !== 'undefined' && !!COURSES[cid]);
   }
 
   function _rerender() {
@@ -64,6 +94,12 @@ var CmStudentPage = (function () {
   function _cid(el) {
     var box = el && el.closest ? el.closest('[data-cid]') : null;
     return box ? box.dataset.cid : null;
+  }
+
+  // The tab's one writer: Return Grades and the build switch are both class
+  // settings, saved and sent as every class setting is.
+  function _save(cid, cfg) {
+    saveCourseConfig(cid, cfg);
   }
 
   /* ── Return Grades ─────────────────────────────────────────── */
@@ -123,12 +159,11 @@ var CmStudentPage = (function () {
   }
 
   function _saveReturnGrades(cid, value) {
-    if (!isShown(cid)) return;
+    if (!isShown(cid) || _settings(cid).student_page !== true) return;
     var cfg = Object.assign({}, getCourseConfig(cid));
     cfg.return_grades = value;
-    // The one writer of the setting. It returns what waits when the class
-    // stops holding grades.
-    saveCourseConfig(cid, cfg);
+    // It returns what waits when the class stops holding grades.
+    _save(cid, cfg);
     _rerender();
     // The redraw made the chosen button a new element.
     var again = typeof document !== 'undefined' ? document.getElementById('sp-return-' + value) : null;
@@ -136,7 +171,7 @@ var CmStudentPage = (function () {
   }
 
   function _chooseReturnGrades(cid, value) {
-    if (!isShown(cid)) return;
+    if (!isShown(cid) || _settings(cid).student_page !== true) return;
     var known = RETURN_CHOICES.some(function (c) {
       return c.value === value;
     });
@@ -153,38 +188,113 @@ var CmStudentPage = (function () {
     });
   }
 
+  /* ── The build switch ──────────────────────────────────────── */
+
+  // The switch's card: only at the build address. The row is Class
+  // Settings' own switch row (Folders Count as One).
+  function _buildSwitchCard(cid) {
+    var on = _settings(cid).student_page;
+    return (
+      '<div class="cm-section sp-build" data-cid="' +
+      esc(cid) +
+      '">' +
+      '<div class="cm-recent-limit sp-build-row">' +
+      '<span class="cm-recent-text"><label class="cm-label" for="sp-build-switch">Student Page</label>' +
+      '<span class="cm-hint">' +
+      esc(
+        on
+          ? 'On for this class: grades are Draft or Returned, and students can have cards. Still being built.'
+          : 'Off for this class. Still being built: turn it on only for a class you are testing with.',
+      ) +
+      '</span></span>' +
+      '<span class="gpd-switch"><input type="checkbox" role="switch" id="sp-build-switch" data-action-change="spBuildSwitch"' +
+      (on ? ' checked' : '') +
+      '><span class="gpd-switch-ui" aria-hidden="true"></span></span>' +
+      '</div>' +
+      '</div>'
+    );
+  }
+
+  function _saveBuildSwitch(cid, on) {
+    if (!_buildFlag || !isShown(cid)) return;
+    var cfg = Object.assign({}, getCourseConfig(cid));
+    if (on) cfg.student_page_enabled = true;
+    else delete cfg.student_page_enabled;
+    // Off returns what waits.
+    _save(cid, cfg);
+    _rerender();
+    var again = typeof document !== 'undefined' ? document.getElementById('sp-build-switch') : null;
+    if (again && typeof again.focus === 'function') again.focus({ preventScroll: true });
+  }
+
+  function _turnBuildSwitch(cid, el) {
+    if (!_buildFlag || !isShown(cid)) return;
+    var now = _settings(cid);
+    var on = !!(el && el.checked);
+    if (on === now.student_page) return;
+    var waiting = !on && GradeState.holds(now) ? GradeState.draftsWaiting(cid) : 0;
+    if (!waiting) {
+      _saveBuildSwitch(cid, on);
+      return;
+    }
+    // Still on until the teacher answers; Cancel leaves it so.
+    el.checked = true;
+    var q = _leaveQuestion(waiting);
+    showConfirm(q.title, q.message, 'Return and Change', 'primary', function () {
+      _saveBuildSwitch(cid, false);
+    });
+  }
+
   /* ── The panel ─────────────────────────────────────────────── */
 
   // The panel's HTML for a class: nothing for a class without the tab.
   function render(cid) {
     if (!isShown(cid)) return '';
+    var on = _settings(cid).student_page;
     return (
-      '<div class="cm-section sp-card" data-cid="' +
-      esc(cid) +
-      '">' +
-      '<h2 class="cm-grade-title">Student Page</h2>' +
-      _returnGradesRow(cid) +
-      '</div>'
+      (_buildFlag ? _buildSwitchCard(cid) : '') +
+      (on
+        ? '<div class="cm-section sp-card" data-cid="' +
+          esc(cid) +
+          '">' +
+          '<h2 class="cm-grade-title">Student Page</h2>' +
+          _returnGradesRow(cid) +
+          '</div>' +
+          (typeof StudentCards !== 'undefined' ? StudentCards.render(cid) : '')
+        : '')
     );
   }
 
   // Each returns true when the click, change or blur was this tab's.
   function handleAction(action, el) {
+    if (/^spCards/.test(action)) {
+      var cid = _cid(el);
+      if (typeof StudentCards === 'undefined' || !cid || _settings(cid).student_page !== true) return false;
+      return StudentCards.handleAction(action, el);
+    }
     if (action !== 'spReturnGrades') return false;
     _chooseReturnGrades(_cid(el), el && el.dataset ? el.dataset.value : null);
     return true;
   }
 
   function handleChange(el) {
-    return false;
+    if (!el || !el.dataset || el.dataset.actionChange !== 'spBuildSwitch') return false;
+    _turnBuildSwitch(_cid(el), el);
+    return true;
   }
 
   function handleBlur(el) {
     return false;
   }
 
-  // Forget what the tab holds between classes (tests). It holds nothing.
-  function _reset() {}
+  // Put the tab back as the address has it (tests).
+  function _reset() {
+    _buildFlag = _addressHasBuildFlag();
+  }
+  // Tests: as if the app had been opened at the build address, or not.
+  function _setBuildFlag(on) {
+    _buildFlag = !!on;
+  }
 
   return {
     isShown: isShown,
@@ -193,6 +303,7 @@ var CmStudentPage = (function () {
     handleChange: handleChange,
     handleBlur: handleBlur,
     _reset: _reset,
+    _setBuildFlag: _setBuildFlag,
   };
 })();
 if (typeof window !== 'undefined') window.CmStudentPage = CmStudentPage;

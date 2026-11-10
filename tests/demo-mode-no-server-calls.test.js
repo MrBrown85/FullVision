@@ -249,6 +249,28 @@ describe('Demo Mode sends nothing for Draft and Returned', () => {
     expect(JSON.parse(localStorage.getItem('gb-grade-returns-' + CID)).essay.s1.is_draft).toBe(false);
   });
 
+  // Student cards (S0-W1): made, listed and marked printed on the device.
+  it.each([false, true])(
+    'student cards: Make Cards and marking them printed (signed in behind it: %s)',
+    async signedIn => {
+      _useSupabase = signedIn;
+      setStudentPageSwitch(CID, true);
+      expect((await listStudentCards(CID)).data).toEqual([]);
+      const made = (await issueStudentCards(CID)).data;
+      expect(made.issued).toBe(1);
+      expect((await markStudentCardsPrinted(CID, [made.cards[0].id])).data.printed).toBe(1);
+      StudentCards._reset();
+      StudentCards.render(CID);
+      await StudentCards.load(CID);
+      await StudentCards.make(CID);
+      await tick();
+      expect(calls).toEqual([]);
+      expect(JSON.parse(localStorage.getItem('gb-student-cards-' + CID)).length).toBe(1);
+      // Nothing waits in an outbox either.
+      expect(localStorage.getItem('fv-sync-queue-v1')).toBe(null);
+    },
+  );
+
   it('the rule and the grader name no server function', () => {
     ['shared/grade-state.js', 'shared/grader.js'].forEach(file => {
       const src = readFileSync(new URL('../' + file, import.meta.url), 'utf-8');
