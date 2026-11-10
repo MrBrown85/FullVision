@@ -259,6 +259,13 @@ describe('pin: the phone Grade tab’s writes', () => {
      does, with the sheet and toast holders teacher-mobile/index.html has. */
   function open(aid, more) {
     seed(more);
+    // The class is on this device as a loaded class is, so data.js is told
+    // it is loaded. Without that, the load of the teacher's other classes
+    // that teacher/router.js starts 1.5 s after the test setup loads it
+    // (preloadClasses) fetches this class from the recording client, which
+    // holds nothing, and empties it under a test that is waiting. That only
+    // happened when a slow machine took 1.5 s to reach the first such wait.
+    _classLoads[CID] = true;
     const dom = parseHTML(
       '<!DOCTYPE html><html><body><div id="m-nav-stack"></div>' +
         '<div id="m-sheet-backdrop" class="u-hidden"></div><div id="m-sheet-container"></div>' +
@@ -376,6 +383,7 @@ describe('pin: the phone Grade tab’s writes', () => {
     session = null;
     globalThis.document = stubDocument;
     clearClass(CID);
+    delete _classLoads[CID];
   });
 
   describe('a competency level', () => {
