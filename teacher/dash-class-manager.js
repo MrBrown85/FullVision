@@ -5973,8 +5973,8 @@ window.DashClassManager = (function () {
     var st = _cmCatState(cid);
     if (typeof categoriesStillCurrent !== 'function') return Promise.resolve(true);
     return Promise.resolve(categoriesStillCurrent(cid, st.opened || [])).then(function (res) {
-      if (!res || res.ok) return true;
-      if (res.why === 'changed') {
+      if (res && res.ok) return true;
+      if (res && res.why === 'changed') {
         st.rows = (res.rows || []).map(function (r, i) {
           return {
             id: r.id,

@@ -374,7 +374,7 @@ window.GradingSetupCopy = (function () {
   function _categoriesCurrent(dstCid, cats) {
     if (typeof categoriesStillCurrent !== 'function') return Promise.resolve(null);
     return Promise.resolve(categoriesStillCurrent(dstCid, cats.opened || [])).then(function (res) {
-      return !res || res.ok ? null : res.why || 'offline';
+      return res && res.ok ? null : (res && res.why) || 'offline';
     });
   }
 
