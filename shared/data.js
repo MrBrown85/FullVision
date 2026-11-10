@@ -530,6 +530,16 @@ function _exitDegradedMode(bootstrapData) {
    inserts to the canonical store. */
 function _migrateCourseDataLocalToCanonical(localId, canonicalId) {
   if (!localId || !canonicalId || localId === canonicalId) return;
+  // Draft and Returned: the saves replayed below are the class's own data
+  // moving, not grading. The rule stands aside; the rows move as they are.
+  _movingClass = true;
+  try {
+    _moveCourseDataLocalToCanonical(localId, canonicalId);
+  } finally {
+    _movingClass = false;
+  }
+}
+function _moveCourseDataLocalToCanonical(localId, canonicalId) {
   // 1. Snapshot the user's edits from LS (preferred) or cache for each field.
   var userEdits = {};
   Object.keys(_DATA_KEYS).forEach(function (field) {
@@ -630,6 +640,13 @@ function _migrateCourseDataLocalToCanonical(localId, canonicalId) {
   if (userEdits.courseConfigs) {
     try {
       saveCourseConfig(canonicalId, userEdits.courseConfigs);
+      // A class made on this device goes up with the Return Grades choice
+      // it was made with (Duplicate Class copies the original's): the one
+      // time the choice is sent that is not a click on it. Never the
+      // switch: a new class's student page is off.
+      if (Object.prototype.hasOwnProperty.call(userEdits.courseConfigs, 'return_grades') && _writesEnabled()) {
+        saveReturnSettings(canonicalId, { return_grades: userEdits.courseConfigs.return_grades });
+      }
     } catch (e) {
       console.warn('Pending-cid replay saveCourseConfig failed', e);
     }
@@ -827,6 +844,9 @@ var _ECHO_SAFE_RPCS = {
   save_report_config: true,
   update_course: true,
   archive_course: true,
+  // Return changes only which grades are returned, which the class load does
+  // not carry: the rows are read on their own (_refreshGradeReturnsSoon).
+  return_grades: true,
 };
 var _echoNeedsReload = false;
 
@@ -2853,6 +2873,7 @@ function _onOutboxEvent(evt) {
     if (undo && undo.field === 'scores') _rejectedScoreWrites[meta.id] = { cid: undo.cid, row: meta.payload };
     if (undo && undo.field === 'statuses') _rejectedStatusWrites[meta.id] = { cid: undo.cid, row: meta.payload };
     _onCreateAbandoned(meta.id, true, meta.error);
+    _onReturnWriteRefused(meta.endpoint, meta.payload); // Draft and Returned
   } else if (evt.kind === 'dead-letter:dismiss') {
     delete _rejectedScoreWrites[meta.id];
     delete _rejectedStatusWrites[meta.id];
@@ -4158,21 +4179,45 @@ async function _doInitData(cid) {
       } else {
         var bundle = _rpcObject(bundleRes.data) || {};
         if (bundle.not_modified) {
-          _clearLoadError(cid);
+          if (!_serverKeepsRows(cid)) {
+            _clearLoadError(cid);
+            _classFresh[cid] = true;
+            _markLoadSynced();
+            return;
+          }
+          // Draft and Returned: the class's rows too, if this session has
+          // not read them. The load has worked only when they have: until
+          // then a load that failed stays failed, so its retries keep
+          // backing off (15 s, 30 s, 1 min, then every 2 min).
           _classFresh[cid] = true;
-          _markLoadSynced();
+          if ((await _loadServerGradeReturns(cid, false)) !== false) {
+            _clearLoadError(cid);
+            _markLoadSynced();
+          }
           return;
         }
+        var rowsToo = false;
         try {
           _bundleToCache(cid, bundle);
-          _clearLoadError(cid);
-          _markLoadSynced();
+          rowsToo = _serverKeepsRows(cid);
+          if (!rowsToo) {
+            _clearLoadError(cid);
+            _markLoadSynced();
+          }
         } catch (e) {
           // A payload this code can't read must not leave the class half
           // applied with no word to the teacher.
           console.error('get_class_bundle could not be applied for ' + cid + ':', e);
           if (window.Sentry && typeof window.Sentry.captureException === 'function') window.Sentry.captureException(e);
           _courseLoadFailed(cid, e);
+          return;
+        }
+        // Draft and Returned: the rows that go with the scores just loaded.
+        // After the scores, never before: rows older than the scores could
+        // read a draft as returned. The load has worked when they are in.
+        if (rowsToo && (await _loadServerGradeReturns(cid, true)) !== false) {
+          _clearLoadError(cid);
+          _markLoadSynced();
         }
         return;
       }
@@ -4192,6 +4237,7 @@ async function _doInitData(cid) {
     _v2GradebookToCache(cid, gbRes.data || {});
     await _hydrateCanonicalDetails(cid);
     await loadStudentProfileSummaries(cid);
+    if (_serverKeepsRows(cid)) await _loadServerGradeReturns(cid, true);
     return;
   }
 
@@ -4779,7 +4825,29 @@ function _applyBundleCourseConfig(cid, row, courseRow) {
     if (courseRow.courses_count_equally === true) config.coursesCountEqually = true;
     else delete config.coursesCountEqually;
   }
+  // The student page's build switch and Return Grades come on the course row
+  // (migrations/2026110902_grade_return.sql). The server never holds null
+  // for the switch; a bundle from before the column reads as off. Return
+  // Grades is 'on_return', 'on_save' or null for no choice made: the key is
+  // always written, null included, so a class whose settings came from the
+  // server can be told from one whose saved copy is from before the column
+  // (saveCourseConfig sends Return Grades only when it knows it).
+  var hasSwitch = !!courseRow && typeof courseRow === 'object' && 'student_page_enabled' in courseRow;
+  if (hasSwitch) {
+    if (courseRow.student_page_enabled === true) config.student_page_enabled = true;
+    else delete config.student_page_enabled;
+  }
+  if (courseRow && typeof courseRow === 'object' && 'return_grades' in courseRow) {
+    var returnChoice = courseRow.return_grades;
+    config.return_grades = returnChoice === 'on_return' || returnChoice === 'on_save' ? returnChoice : null;
+  }
   _persistLoadedField(cid, 'courseConfigs', config);
+  // The server's word on the switch, kept apart from the settings object
+  // (_serverSaysStudentPage). Only when these settings were taken: a load
+  // that left them alone for a newer change here is run again.
+  if (hasSwitch && _cache.courseConfigs[cid] === config) {
+    _setServerStudentPage(cid, courseRow.student_page_enabled === true);
+  }
 
   if (!Object.keys(missing).length || !_writesEnabled() || !_isUuid(cid)) return;
   _trackPendingSync(
@@ -4897,6 +4965,7 @@ function _loadCourseFromLS(cid) {
   _cache.rubricChecks[cid] = _safeParseLS('gb-rubric-checks-' + cid, {});
   _cache.rubricPrints[cid] = _safeParseLS('gb-rubric-prints-' + cid, {});
   delete _cache.gradeReturns[cid]; // read again when asked for (getGradeReturns)
+  delete _serverStudentPage[cid]; // and the server's word on its student page (_serverSaysStudentPage)
 
   // Learning map: check localStorage first, then fall back to LEARNING_MAP constant
   const lmRaw = _safeParseLS('gb-learningmap-' + cid, null);
@@ -6588,6 +6657,7 @@ function _clearCourseLocalState(id) {
     'rubric-checks',
     'rubric-prints',
     'grade-returns',
+    'student-cards',
     'statuses',
     'quick-obs',
     'term-ratings',
@@ -6605,6 +6675,8 @@ function _clearCourseLocalState(id) {
   ].forEach(k => localStorage.removeItem('gb-' + k + '-' + id));
   _forgetServerState(id);
   delete _classVersion[id];
+  delete _serverStudentPage[id];
+  delete _gradeReturnsStale[id];
 
   // Clear cache
   for (const field of Object.keys(_DATA_KEYS)) {
@@ -8945,7 +9017,12 @@ function getCourseConfig(cid) {
   }
 }
 function saveCourseConfig(cid, obj) {
-  var held = _returnSettingsBefore(cid); // Draft and Returned: did the class hold grades before this save
+  // Draft and Returned: the student page's switch and Return Grades are not
+  // this function's to change or send for a signed-in teacher
+  // (saveReturnSettings is their one writer). They stay as the class holds
+  // them, whatever copy of the settings the caller has.
+  if (_writesEnabled()) obj = _keepReturnSettings(cid, obj);
+  var held = _returnSettingsBefore(cid); // did the class hold grades before this save (Demo Mode)
   _saveCourseField('courseConfigs', cid, obj);
   if (_writesEnabled() && _isUuid(cid)) {
     // v2: policy fields live on the course row. save_course_policy is gone;
@@ -8967,6 +9044,7 @@ function saveCourseConfig(cid, obj) {
       if (typeof obj.foldersCountAsOne === 'boolean') patch.folders_count_as_one = obj.foldersCountAsOne;
       if (typeof obj.coursesCountEqually === 'boolean') patch.courses_count_equally = obj.coursesCountEqually;
       if (Array.isArray(obj.reportingTerms)) patch.reporting_terms = obj.reportingTerms;
+      // Never the student page's switch or Return Grades: see above.
       if (Object.keys(patch).length > 0) {
         _trackPendingSync(
           _writeRpc('update_course', { p_course_id: cid, p_patch: patch }).then(function (res) {
@@ -9341,6 +9419,11 @@ function saveAssessments(cid, arr) {
   if (!_writesEnabled() || !_isUuid(cid)) return;
   if (!cid || !arr) return;
   _persistAssessmentsToCanonical(cid, prev, arr);
+  // Draft and Returned: a change to a piece of work can change its rows on
+  // the server with no grade saved (its scoring moved to or from DIBELS,
+  // which has no Draft or Returned; the work deleted). Read them once the
+  // change has landed. Nothing for a class whose student page is off.
+  if (_serverKeepsRows(cid)) _refreshGradeReturnsSoon(cid);
 }
 
 /* Per-course save lock for assessments; see _studentSaveQueue for why the
@@ -10070,39 +10153,107 @@ function restoreScoreCells(cid, before, after) {
    a failure (_gradeStateFailed). Loads, re-keys, withdrawing a student and
    moveRubricScores do not grade, and do not run the rule.
 
-   NOT WIRED TO THE SERVER (S0-W1, once Batch A is applied). Three seams:
-   1. getReturnSettings and _gradesKept: a signed-in teacher's switch reads
-      off, because the live update_course does not know the two settings
-      and the rows have nowhere to go. saveCourseConfig sends neither.
-   2. returnGrades and _returnSettingsSaved: the server's return is queued
-      where the comments say.
-   3. Loading the class: _loadGradeReturns(cid, rows) is the one way rows
-      from the server get in. Until it has run for a class, a signed-in
-      class that holds grades has rows that are NOT LOADED, which is not
-      the same as none: getReturnedScores throws, so no draft is ever
-      counted as returned. And the class move
-      (_migrateCourseDataLocalToCanonical) must not run the rule while it
-      replays saveScores. */
+   THE SERVER (S0-W1). The database keeps the same rows by triggers
+   (migrations/2026110902_grade_return.sql). For a signed-in teacher:
+   1. The two settings are the server's. They come on the course row with
+      the class (_applyBundleCourseConfig), and the switch counts only once
+      the server has said it is on (_serverSaysStudentPage): a value this
+      device merely holds (a restored backup, a copied class, an old saved
+      copy's settings object) shows nothing and sends nothing.
+   2. They are sent ONLY by the actions that change them, through
+      saveReturnSettings: the Return Grades choice, the build switch, and a
+      class made on this device going up with the choice it was made with
+      (Duplicate Class). saveCourseConfig never sends either, and cannot
+      change either for a class the server has: any other settings save
+      from a device holding an old copy would otherwise put the old choice
+      back, and the server returns every waiting draft when a class stops
+      holding. An update_course that carries either beside another setting
+      has them taken out as it is sent (_onlyOwnReturnSettings).
+   3. A change that STARTS a class holding grades (the switch turned on,
+      When I Return Them chosen) is made on the server first, with the
+      teacher waiting, and on this device only when the server has
+      answered: a grade can then never be saved as a draft here and
+      returned there. A change that stops it is made here at once and
+      queued: both sides return what waits (the server by a trigger in that
+      update_course, this device in _returnSettingsSaved) and no return is
+      sent.
+   4. The rows are the server's too: list_course_grade_returns, read when
+      the class loads, after a change from another device (both in
+      _doInitData) and once this device's own grade writes, Return or
+      setting change have landed (_refreshGradeReturnsSoon). The read is
+      made only for a class whose student page is on.
+   5. Between a save here and that read, the row is the one the rule in
+      shared/grade-state.js gives (_gradeRule): the same rule the triggers
+      keep, held to them by one file of cases. Rows read from the server
+      are never put over a newer change made here (_fetchGradeReturns).
+   6. Return is queued for the server (_sendReturns), a call for each
+      student, under the cell's outbox key so it follows that cell's score
+      writes; the outbox also holds it behind any queued write to the whole
+      student or the whole piece of work (shared/offline-queue.js).
+   7. A write of any of these that the server refuses leaves this device
+      and the server apart: the class's settings and rows are read again,
+      and that read is retried until it works (_convergeOnServer). The same
+      after an ask of the server that fails or is not answered (a change
+      that starts holding, the count of drafts): the server may have made
+      the change and only the answer been lost.
+   A signed-in class that holds grades has rows that are NOT LOADED until
+   _loadGradeReturns has run for it this session, which is not the same as
+   none: getReturnedScores throws, so no draft is ever counted as returned.
+   The class move (_migrateCourseDataLocalToCanonical) replays saveScores
+   and must not run the rule while it does (_movingClass). */
 var _returnedSets = {}; // cid → { working, slot, set }: the returned set for one working copy and one set of rows
 var _gradeReturnsLoadedFor = {}; // cid → true once _loadGradeReturns has run for the class
+var _gradeReturnsStale = {}; // cid → true when the rows must be read again whatever the class's version says
+var _movingClass = false; // a class is being moved to its server id: its scores are replayed, not graded
+var _serverStudentPage = {}; // cid → what the server last said of the class's switch (see _serverSaysStudentPage)
+var START_HOLDING_WAIT_MS = 3000; // how long a change that needs the server waits for unsent writes to go first
+var RETURN_SETTINGS_ASK_MS = 15000; // how long an ask of the server (a change that starts holding, the count) waits for its answer
+
+/* Whether the server has said this class's student page is on. Kept apart
+   from the class's settings object, which backups, Duplicate Class and any
+   caller of saveCourseConfig can copy: the class's saved-copy record
+   (gb-bundle-meta-<cid>) holds it, written only when the class's row comes
+   from the server and when the server answers a change of the switch. */
+function _serverSaysStudentPage(cid) {
+  if (!cid) return false;
+  if (_serverStudentPage[cid] === undefined) {
+    _serverStudentPage[cid] = (_classMeta(cid) || {}).studentPage === true;
+  }
+  return _serverStudentPage[cid];
+}
+function _setServerStudentPage(cid, on) {
+  if (!cid) return;
+  _serverStudentPage[cid] = on === true;
+  if ((_classMeta(cid) || {}).studentPage !== (on === true)) _saveClassMeta(cid, { studentPage: on === true });
+  delete _returnedSets[cid];
+}
 
 /* The class's two settings, as the rule reads them: { student_page,
    return_grades }. return_grades is 'on_return' (When I Return Them),
    'on_save' (As Soon As I Save) or null for no choice made, which works as
    on_save. `saved` reads them from a copy of the class's settings in place
-   of the ones in the cache. */
+   of the ones in the cache. For a signed-in teacher the switch is on only
+   when the server has said so as well. */
 function getReturnSettings(cid, saved) {
   var cfg = saved || getCourseConfig(cid) || {};
   var choice = cfg.return_grades;
   return {
-    // Seam 1 (S0-W1): take `&& !_writesEnabled()` away, here and in _gradesKept.
-    student_page: cfg.student_page_enabled === true && !_writesEnabled(),
+    student_page: cfg.student_page_enabled === true && (!_writesEnabled() || _serverSaysStudentPage(cid)),
     return_grades: choice === 'on_return' || choice === 'on_save' ? choice : null,
   };
 }
 // True when rows are kept for the class: the switch alone, nothing else read.
 function _gradesKept(cid) {
-  return (getCourseConfig(cid) || {}).student_page_enabled === true && !_writesEnabled();
+  return (
+    (getCourseConfig(cid) || {}).student_page_enabled === true && (!_writesEnabled() || _serverSaysStudentPage(cid))
+  );
+}
+/* True when the class's rows are read from the server: a signed-in
+   teacher's class, with its server id, whose student page is on. Every
+   call this build adds for a class asks this first, so a class with the
+   switch off is sent nothing new. */
+function _serverKeepsRows(cid) {
+  return _useSupabase && _writesEnabled() && _isUuid(cid) && _gradesKept(cid);
 }
 /* The rule failed. The save it followed is done; the failure goes to the
    error channel, never to the teacher (no banner, no toast). */
@@ -10115,24 +10266,342 @@ function _gradeStateFailed(doing, e) {
   }
 }
 
-/* The build switch, by hand, until Class Settings has it (S1-F4). Demo Mode
-   and classes kept on this device only: for a signed-in teacher it does
-   nothing and answers false. From the console:
-     setStudentPageSwitch(getActiveCourse(), true)             When I Return Them
-     setStudentPageSwitch(getActiveCourse(), true, 'on_save')  As Soon As I Save
+/* The build switch, from the console (Class Settings turns it with its
+   hidden Student Page switch, teacher/cm-student-page.js):
+     setStudentPageSwitch(getActiveCourse(), true)             on
+     setStudentPageSwitch(getActiveCourse(), true, 'on_save')  on, As Soon As I Save
      setStudentPageSwitch(getActiveCourse(), false)            off again
-   Turning it on with no choice given keeps the class's choice, or starts it
-   on When I Return Them. Rows already kept stay. */
+   A class kept on this device (Demo Mode): done at once, and answers true.
+   Turned on with no choice given it keeps its choice, or starts on When I
+   Return Them. Turning it off returns every waiting draft.
+   A signed-in teacher's class: answers saveReturnSettings' promise. Turned
+   on, it keeps the choice the server holds for it, unless one is given. */
 function setStudentPageSwitch(cid, on, returnGrades) {
-  if (!cid || _writesEnabled()) return false;
+  if (!cid) return false;
+  var chosen = returnGrades === 'on_return' || returnGrades === 'on_save';
+  if (_writesEnabled()) {
+    var change = { student_page_enabled: !!on };
+    if (on && chosen) change.return_grades = returnGrades;
+    return saveReturnSettings(cid, change);
+  }
   var cfg = Object.assign({}, getCourseConfig(cid));
   if (on) {
     cfg.student_page_enabled = true;
-    if (returnGrades === 'on_return' || returnGrades === 'on_save') cfg.return_grades = returnGrades;
+    if (chosen) cfg.return_grades = returnGrades;
     else if (cfg.return_grades !== 'on_save') cfg.return_grades = 'on_return';
   } else delete cfg.student_page_enabled;
   saveCourseConfig(cid, cfg);
   return true;
+}
+
+/* saveCourseConfig, for a signed-in teacher: the settings to save, with the
+   two that are not this function's to change put back as the class holds
+   them (the saved copy; a caller may have changed the cached object in
+   place). A class the server does not have yet (one being made on this
+   device) keeps the Return Grades choice it is handed, which goes up when
+   the class does, and never the switch. Never throws. */
+function _keepReturnSettings(cid, obj) {
+  try {
+    if (!obj || typeof obj !== 'object') return obj;
+    var has = function (o, key) {
+      return !!o && Object.prototype.hasOwnProperty.call(o, key);
+    };
+    var held = _safeParseLS('gb-courseconfig-' + cid, null);
+    if (!_plainObject(held)) held = null;
+    var out = Object.assign({}, obj);
+    if (held && held.student_page_enabled === true && _serverSaysStudentPage(cid)) out.student_page_enabled = true;
+    else delete out.student_page_enabled;
+    if (held || _isUuid(cid)) {
+      if (has(held, 'return_grades')) out.return_grades = held.return_grades;
+      else delete out.return_grades;
+    }
+    // The caller's own object when it already says the same.
+    var same =
+      has(out, 'student_page_enabled') === has(obj, 'student_page_enabled') &&
+      out.student_page_enabled === obj.student_page_enabled &&
+      has(out, 'return_grades') === has(obj, 'return_grades') &&
+      out.return_grades === obj.return_grades;
+    return same ? obj : out;
+  } catch (e) {
+    _gradeStateFailed('keeping the class settings as they are', e);
+    return obj;
+  }
+}
+
+/* An update_course on its way out: when its patch carries the switch or
+   Return Grades beside any other setting, the two are taken out. Only a
+   patch of nothing but them is a change of them (saveReturnSettings). This
+   is what stops a write queued by an earlier build, or by a caller this
+   file does not know, from carrying a device's old copy of them. */
+function _onlyOwnReturnSettings(name, params) {
+  if (name !== 'update_course' || !params || !_plainObject(params.p_patch)) return params;
+  var patch = params.p_patch;
+  var theirs = 'student_page_enabled' in patch || 'return_grades' in patch;
+  var others = Object.keys(patch).some(function (k) {
+    return k !== 'student_page_enabled' && k !== 'return_grades';
+  });
+  if (!theirs || !others) return params;
+  var clean = Object.assign({}, patch);
+  delete clean.student_page_enabled;
+  delete clean.return_grades;
+  return Object.assign({}, params, { p_patch: clean });
+}
+
+// A promise that is already settled, with its answer on it as `now`.
+function _settledNow(answer) {
+  var p = Promise.resolve(answer);
+  p.now = answer;
+  return p;
+}
+// Resolves true once nothing waits to be sent, false if `ms` pass first.
+async function _unsentWritesGone(ms) {
+  var until = Date.now() + ms;
+  var q = window.v2Queue;
+  while (_hasUnsentWrites()) {
+    if (Date.now() >= until) return false;
+    try {
+      if (q && typeof q.flush === 'function') await q.flush();
+    } catch (e) {
+      /* the wait below tries again */
+    }
+    if (!_hasUnsentWrites()) return true;
+    await new Promise(function (resolve) {
+      setTimeout(resolve, 100);
+    });
+  }
+  return true;
+}
+function _isOffline() {
+  return _supabaseDegraded || (typeof navigator !== 'undefined' && navigator.onLine === false);
+}
+
+/* The one writer of a class's switch and Return Grades choice. `change` is
+   { student_page_enabled?: boolean, return_grades?: 'on_return' | 'on_save'
+   | null }: only what the action changes. Answers a promise of { ok }, or
+   { ok: false, error } when the change could not be made, in which case
+   nothing on this device has changed. A change made at once carries its
+   answer as `.now` too, so a screen can redraw without waiting.
+
+   - A class kept on this device (Demo Mode): saved at once.
+   - A signed-in teacher's class, a change that starts it holding grades
+     (the switch turned on; When I Return Them chosen while it is on): the
+     server is asked first, directly, after every write this device still
+     has to send has gone. Offline, with writes that will not go, or
+     refused: not made. Made: the device changes, and the class and its
+     rows are read again.
+   - Any other change (As Soon As I Save or no choice; the switch off): made
+     here at once, the waiting drafts returned here, and queued for the
+     server, which returns them itself.
+   What is sent is the changed key or keys and nothing else: never this
+   device's copy of the other one. */
+function saveReturnSettings(cid, change) {
+  change = change || {};
+  var patch = {};
+  if (change.student_page_enabled === true || change.student_page_enabled === false) {
+    patch.student_page_enabled = change.student_page_enabled;
+  }
+  if (Object.prototype.hasOwnProperty.call(change, 'return_grades')) {
+    patch.return_grades =
+      change.return_grades === 'on_return' || change.return_grades === 'on_save' ? change.return_grades : null;
+  }
+  if (!cid || !Object.keys(patch).length) return _settledNow({ ok: false, error: { message: 'nothing to change' } });
+
+  if (!_writesEnabled()) {
+    var cfg = Object.assign({}, getCourseConfig(cid));
+    if (patch.student_page_enabled === true) cfg.student_page_enabled = true;
+    else if (patch.student_page_enabled === false) delete cfg.student_page_enabled;
+    if ('return_grades' in patch) cfg.return_grades = patch.return_grades;
+    saveCourseConfig(cid, cfg);
+    return _settledNow({ ok: true });
+  }
+
+  // A class the server does not have yet cannot have its student page on,
+  // and goes up with its Return Grades choice when it does.
+  if (!_useSupabase || !_isUuid(cid)) {
+    return _settledNow({ ok: false, error: { message: 'this class is not on the server yet' } });
+  }
+  var was = getReturnSettings(cid);
+  var will = {
+    student_page: 'student_page_enabled' in patch ? patch.student_page_enabled : was.student_page,
+    return_grades: 'return_grades' in patch ? patch.return_grades : was.return_grades,
+  };
+  var turningOn = will.student_page && !was.student_page;
+  if (turningOn || (GradeState.holds(will) && !GradeState.holds(was))) {
+    // Not counted as a write still to send: it waits for those itself.
+    return _startHolding(cid, patch, turningOn);
+  }
+
+  _applyReturnSettingsHere(cid, patch);
+  _trackPendingSync(
+    Promise.resolve(_writeRpc('update_course', { p_course_id: cid, p_patch: patch })).then(function (res) {
+      if (res && res.error) {
+        if (!res.error.handledSessionExpired) console.warn('update_course (Return Grades) failed:', res.error);
+        // Refused, by the server or by an outbox with no room: this device
+        // has stopped holding and the server has not. (The outbox's own
+        // event says the same of a server's refusal, also after a reload.)
+        _convergeOnServer(cid);
+        return;
+      }
+      _refreshGradeReturnsSoon(cid);
+    }),
+  );
+  return _settledNow({ ok: true });
+}
+async function _startHolding(cid, patch, turningOn) {
+  var asked = false;
+  try {
+    if (_isOffline()) return { ok: false, error: { message: 'offline' } };
+    // A grade saved before this must not reach the server after it.
+    if (!(await _unsentWritesGone(START_HOLDING_WAIT_MS))) {
+      return { ok: false, error: { message: 'changes are still waiting to be sent' } };
+    }
+    if (_isOffline()) return { ok: false, error: { message: 'offline' } };
+    /* From here the server may make the change whatever this device hears
+       back: an answer can be lost on the way, or never come. So:
+       - realtime's word of the change is not this page's own echo (the
+         change is not made here yet): it has the class read;
+       - an answer that is an error, or does not come in time, is not taken
+         as "nothing happened": the class is read again from the server,
+         settings and rows, and that read is retried until it works
+         (_convergeOnServer). The device ends where the server is. */
+    asked = true;
+    _echoNeedsReload = true;
+    var res = await _withTimeout(
+      _callRpcWithAuthGuard(
+        'update_course',
+        { p_course_id: cid, p_patch: patch },
+        { suppressSessionExpiredModal: true },
+      ),
+      RETURN_SETTINGS_ASK_MS,
+      'the change of the class’s setting',
+    );
+    if (!res || res.error) {
+      _convergeOnServer(cid);
+      return { ok: false, error: (res && res.error) || { message: 'no answer' } };
+    }
+    // getSupabase() gone or a Demo session answers with no error and no call.
+    if (!_useSupabase || !_writesEnabled()) return { ok: false, error: { message: 'signed out' } };
+    // The server holds the class's grades from here. So does this device.
+    if (turningOn) _forgetGradeReturns(cid);
+    _applyReturnSettingsHere(cid, patch);
+    // The class again, whole: the server's own Return Grades choice (this
+    // device's copy of it was not sent and may be old), then its rows.
+    _gradeReturnsStale[cid] = true;
+    if (turningOn) delete _classVersion[cid];
+    _handleExternalCourseUpdate(cid, 'gradebook');
+    return { ok: true };
+  } catch (e) {
+    _gradeStateFailed('asking the server to hold the class’s grades', e);
+    if (asked) _convergeOnServer(cid);
+    return { ok: false, error: e };
+  }
+}
+/* The change, on this device: the settings saved, the server's word on the
+   switch kept, and every waiting draft returned if the class stopped
+   holding. Nothing is sent. */
+function _applyReturnSettingsHere(cid, patch) {
+  var held = _returnSettingsBefore(cid);
+  var cfg = Object.assign({}, getCourseConfig(cid));
+  if (patch.student_page_enabled === true) cfg.student_page_enabled = true;
+  else if (patch.student_page_enabled === false) delete cfg.student_page_enabled;
+  if ('return_grades' in patch) cfg.return_grades = patch.return_grades;
+  if ('student_page_enabled' in patch) _setServerStudentPage(cid, patch.student_page_enabled);
+  _saveCourseField('courseConfigs', cid, cfg);
+  _returnSettingsSaved(cid, held);
+}
+
+/* How many grades in the class wait as drafts: the number the screens ask
+   about before a class stops holding them. Answers a promise of { count },
+   null when it cannot be known (then the change is not offered). A class
+   kept on this device counts its own rows, at once (`.now`). A signed-in
+   teacher's class asks the server (course_draft_count), which counts every
+   draft it would return: this device's rows leave out a withdrawn
+   student's and one under Missing or Excused, and know nothing at all of a
+   class it has not loaded this session. Writes still to be sent go first,
+   so a draft made a moment ago is counted. */
+function draftsWaitingToReturn(cid) {
+  if (!_writesEnabled()) {
+    var holds = !!cid && GradeState.holds(getReturnSettings(cid));
+    return _settledNow({ count: holds ? GradeState.draftsWaiting(cid) : 0 });
+  }
+  if (!cid || !_useSupabase || !_isUuid(cid) || _isOffline()) return _settledNow({ count: null });
+  return (async function () {
+    try {
+      if (!(await _unsentWritesGone(START_HOLDING_WAIT_MS)) || _isOffline()) return { count: null };
+      var res = await _withTimeout(
+        _callRpcWithAuthGuard('course_draft_count', { p_course_id: cid }, { suppressSessionExpiredModal: true }),
+        RETURN_SETTINGS_ASK_MS,
+        'the count of drafts',
+      );
+      var n = res && !res.error && res.data != null ? Number(res.data) : NaN;
+      if (isFinite(n) && n >= 0) return { count: Math.floor(n) };
+      // Asked, and no number came back: something is wrong between this
+      // device and the server. The class is read again, as after any failed
+      // ask, so what the screen shows next is the server's.
+      _convergeOnServer(cid);
+      return { count: null };
+    } catch (e) {
+      _convergeOnServer(cid);
+      return { count: null };
+    }
+  })();
+}
+
+/* A write of Draft and Returned state or of the two settings was refused
+   (by the server, or by an outbox with no room): what this device shows
+   and what the server holds may now differ. The class is read again whole,
+   its settings and its rows, and the read is retried like any failed class
+   load until it works. If the class is not in memory its saved copy is
+   marked so that the next time it opens it is downloaded, not trusted. */
+function _convergeOnServer(cid) {
+  try {
+    if (!cid || !_useSupabase || !_writesEnabled() || !_isUuid(cid)) return;
+    _gradeReturnsStale[cid] = true;
+    delete _classVersion[cid];
+    _markSavedCopyDirty(cid);
+    if (_classMeta(cid)) _saveClassMeta(cid, { dirty: true });
+    if (_cache.students[cid] !== undefined) _handleExternalCourseUpdate(cid, 'gradebook');
+  } catch (e) {
+    _gradeStateFailed('reading the class again after a refused write', e);
+  }
+}
+// The class an assessment in memory belongs to, or null.
+function _classOfAssessment(aid) {
+  var cids = Object.keys(_cache.assessments);
+  for (var i = 0; i < cids.length; i++) {
+    var list = _cache.assessments[cids[i]];
+    if (
+      Array.isArray(list) &&
+      list.some(function (a) {
+        return a && a.id === aid;
+      })
+    )
+      return cids[i];
+  }
+  return null;
+}
+/* The outbox says the server refused a write (_onOutboxEvent). A refused
+   Return puts the row back to the draft it was at once, then both kinds
+   have the class read again. */
+function _onReturnWriteRefused(endpoint, payload) {
+  try {
+    payload = payload || {};
+    if (endpoint === 'return_grades') {
+      var cid = _classOfAssessment(payload.p_assessment_id);
+      if (!cid) return;
+      var back = false;
+      (payload.p_enrollment_ids || []).forEach(function (sid) {
+        if (_unreturn(cid, payload.p_assessment_id, sid)) back = true;
+      });
+      if (back) _invalidateAndRerender();
+      _convergeOnServer(cid);
+    } else if (endpoint === 'update_course') {
+      var patch = payload.p_patch || {};
+      if ('student_page_enabled' in patch || 'return_grades' in patch) _convergeOnServer(payload.p_course_id);
+    }
+  } catch (e) {
+    _gradeStateFailed('putting right a refused write', e);
+  }
 }
 
 /* saveCourseConfig, before it saves: how the class returned grades, from
@@ -10166,7 +10635,8 @@ function _returnSettingsSaved(cid, was) {
       },
       new Date().toISOString(),
     );
-    // Seam 2 (S0-W1): these returns go to the server with the setting.
+    // On the server the same returns are made by a trigger, in the
+    // update_course that carries the setting: no return is sent.
     if (out !== rows) _saveGradeReturns(cid, out);
   } catch (e) {
     _gradeStateFailed('returning the waiting drafts', e);
@@ -10191,16 +10661,195 @@ function _saveGradeReturns(cid, rows) {
   // Returned-only numbers follow the rows.
   if (typeof clearProfCache === 'function') clearProfCache();
 }
-/* Seam 3 (S0-W1): a signed-in class's rows, as loaded from the server.
-   The only way they get in: it marks the class loaded, drops the returned
-   set built from the rows before, and has returned-only numbers worked out
-   again. */
+/* A signed-in class's rows, as loaded from the server
+   (_fetchGradeReturns). The only way they get in: it marks the class
+   loaded, drops the returned set built from the rows before, and has
+   returned-only numbers worked out again. */
 function _loadGradeReturns(cid, rows) {
   _cache.gradeReturns[cid] = _plainObject(rows) ? rows : {};
   _gradeReturnsLoadedFor[cid] = true;
   _safeLSSet('gb-grade-returns-' + cid, JSON.stringify(_cache.gradeReturns[cid]));
   delete _returnedSets[cid];
   if (typeof clearProfCache === 'function') clearProfCache();
+}
+/* A signed-in class's student page was just turned on: the rows this
+   device kept from an earlier time it was on are dropped, and the class's
+   rows are not loaded until the server's have been read. */
+function _forgetGradeReturns(cid) {
+  delete _gradeReturnsLoadedFor[cid];
+  delete _returnedSets[cid];
+  _cache.gradeReturns[cid] = {};
+  try {
+    localStorage.removeItem('gb-grade-returns-' + cid);
+  } catch (e) {
+    /* nothing kept is nothing to remove */
+  }
+  if (typeof clearProfCache === 'function') clearProfCache();
+}
+
+/* ── The server's rows (S0-W1) ─────────────────────────────────────────── */
+
+/* The server's list as this device keeps rows: each row with its nulls left
+   out and its fields in the order the rule writes them, each kept copy in
+   its one written form (the server leaves a copy's null fields out too;
+   GradeState.copyOf puts them back). */
+function _serverGradeRows(list) {
+  var out = {};
+  Object.keys(_plainObject(list) ? list : {}).forEach(function (aid) {
+    var of = {};
+    Object.keys(_plainObject(list[aid]) ? list[aid] : {}).forEach(function (sid) {
+      var r = list[aid][sid];
+      if (!_plainObject(r)) return;
+      var row = { is_draft: r.is_draft === true };
+      if (r.returned_at != null) row.returned_at = r.returned_at;
+      ['returned_copy', 'previous_copy'].forEach(function (f) {
+        var copy = GradeState.copyOf(r[f]);
+        if (copy) row[f] = copy;
+      });
+      if (r.updated_at != null) row.updated_at = r.updated_at;
+      if (r.seen_at != null) row.seen_at = r.seen_at;
+      of[sid] = row;
+    });
+    if (Object.keys(of).length) out[aid] = of;
+  });
+  return out;
+}
+/* What a teacher's screen can show of a class's rows, as one string: the
+   same for two sets that would draw the same, whatever order their work,
+   students and fields are in. The times are days, since a Return made here
+   is timed by this device's clock and the server's own time for it is a
+   moment later. When a student opened a piece is on no teacher's screen. */
+function _gradeRowsLook(rows) {
+  var day = function (iso) {
+    return iso ? _localDayOf(iso) : null;
+  };
+  var copy = function (c) {
+    return c ? JSON.stringify(GradeState.copyOf(c)) : null;
+  };
+  rows = rows || {};
+  return JSON.stringify(
+    Object.keys(rows)
+      .sort()
+      .map(function (aid) {
+        var of = rows[aid] || {};
+        return [
+          aid,
+          Object.keys(of)
+            .sort()
+            .map(function (sid) {
+              var r = of[sid] || {};
+              return [
+                sid,
+                !!r.is_draft,
+                day(r.returned_at),
+                copy(r.returned_copy),
+                copy(r.previous_copy),
+                day(r.updated_at),
+              ];
+            }),
+        ];
+      }),
+  );
+}
+// How many changes this device has made to what a class's rows follow.
+function _gradeWritesSeen(cid) {
+  return ['scores', 'rubricChecks', 'gradeReturns', 'courseConfigs', 'assessments']
+    .map(function (field) {
+      return _localWriteCount(cid, field);
+    })
+    .join(':');
+}
+/* Read a class's rows from the server and keep them. Answers { error }
+   when the read failed, { skipped: true } when this device changed a grade,
+   a setting or a piece of work while it was out, or still has a change to
+   send (the rows read are from before it: they are left out, and the caller
+   reads again), else { changed } saying whether a screen would look
+   different. Only ever called for a class the server keeps rows for. */
+async function _fetchGradeReturns(cid) {
+  var seen = _gradeWritesSeen(cid);
+  var res;
+  try {
+    res = await _callRpcWithAuthGuard(
+      'list_course_grade_returns',
+      { p_course_id: cid },
+      { suppressSessionExpiredModal: true },
+    );
+  } catch (e) {
+    res = { error: e };
+  }
+  if (!res || res.error) return { error: (res && res.error) || { message: 'no answer' } };
+  // The server always answers with an object, an empty one for no rows.
+  var list = _rpcObject(res.data);
+  if (!list) return { error: { message: 'list_course_grade_returns sent no rows' } };
+  if (!_serverKeepsRows(cid)) return { skipped: true };
+  if (_gradeWritesSeen(cid) !== seen || _hasUnsentWrites()) return { skipped: true };
+  var was = _gradeRowsLook(getGradeReturns(cid));
+  var wasLoaded = _gradeReturnsLoadedFor[cid] === true;
+  _loadGradeReturns(cid, _serverGradeRows(list));
+  delete _gradeReturnsStale[cid];
+  return { changed: !wasLoaded || was !== _gradeRowsLook(getGradeReturns(cid)) };
+}
+/* The class has just been read from the server (_doInitData): read its
+   rows too. `fresh` is false when the server answered that the class has
+   not changed: its rows are then read only if this session has not read
+   them yet. A failed read is a failed load: the saved copy stays, the sync
+   dot says so and the load is tried again; it answers false then. Rows
+   left out because of a change made here have the refresh run again
+   (_refreshMustSkip's way). */
+async function _loadServerGradeReturns(cid, fresh) {
+  if (!_serverKeepsRows(cid)) return;
+  if (!fresh && _gradeReturnsLoadedFor[cid] === true && !_gradeReturnsStale[cid]) return;
+  var got = await _fetchGradeReturns(cid);
+  if (got.error) {
+    _courseLoadFailed(cid, got.error);
+    return false;
+  }
+  var st = _refreshState[cid];
+  if (got.skipped) {
+    if (st && st.snapshot) st.skipped = true;
+    else _refreshGradeReturnsSoon(cid);
+  } else if (got.changed && !fresh) {
+    // An unchanged class is not redrawn by the load; its rows just changed.
+    _invalidateAndRerender();
+  }
+}
+/* This device changed a grade, returned one or changed how the class
+   returns them. Once those writes have landed and the teacher has paused
+   (_waitForQuietCourse), the rows are read again, so what this device
+   worked out by the rule gives way to what the server holds: its times, a
+   grade marked Updated because the student had opened it, and anything
+   another writer did. One read for a burst of grading, however long. A
+   read that fails is a class load that failed: the rows are marked to be
+   read again, the sync dot says the class could not be loaded, and the
+   load is retried until it works (_courseLoadFailed). */
+var _gradeReturnsRefresh = {}; // cid → { again, running }
+function _refreshGradeReturnsSoon(cid) {
+  if (!_serverKeepsRows(cid)) return Promise.resolve();
+  var st = _gradeReturnsRefresh[cid] || (_gradeReturnsRefresh[cid] = {});
+  st.again = true;
+  if (!st.running) {
+    st.running = (async function () {
+      try {
+        while (st.again) {
+          await _waitForQuietCourse(cid);
+          // Everything asked for up to here is answered by this one read.
+          st.again = false;
+          if (!_serverKeepsRows(cid)) return;
+          var got = await _fetchGradeReturns(cid);
+          if (got.error) {
+            _gradeReturnsStale[cid] = true;
+            _courseLoadFailed(cid, got.error);
+          } else if (got.skipped && _serverKeepsRows(cid)) st.again = true;
+          else if (got.changed) _invalidateAndRerender();
+        }
+      } catch (e) {
+        _gradeStateFailed('reading which grades are returned', e);
+      } finally {
+        st.running = null;
+      }
+    })();
+  }
+  return st.running;
 }
 /* The class's scores were just replaced by a load from the server (a
    refresh, or a full download after a saved copy was refused as an older
@@ -10270,7 +10919,7 @@ function _gradeCells(scores, checks) {
    for the class, which is all the switch-off path does. Never throws. */
 function _gradeBefore(cid, field) {
   try {
-    if (!_gradesKept(cid)) return null;
+    if (!_gradesKept(cid) || _movingClass) return null;
     return field === 'scores'
       ? { scores: _migrateRubricScoreKeys(cid, _safeParseLS('gb-scores-' + cid, {})) }
       : { checks: _safeParseLS('gb-rubric-checks-' + cid, {}) };
@@ -10319,7 +10968,11 @@ function _gradeRule(cid, was, next) {
       changed = true;
     });
   });
-  if (changed) _saveGradeReturns(cid, out);
+  if (changed) {
+    _saveGradeReturns(cid, out);
+    // The server's triggers keep the same rows as the writes land; read them then.
+    _refreshGradeReturnsSoon(cid);
+  }
 }
 /* Return: `studentIds` (one id or a list) are given their grade on `aid`.
    Only drafts are returned; the rest are skipped. A class that does not
@@ -10363,13 +11016,77 @@ function _returnGrades(cid, aid, studentIds) {
       if (Object.keys(of).length) out[aid] = of;
       else delete out[aid];
       _saveGradeReturns(cid, out);
-      // Seam 2 (S0-W1): queue the server's return of `done` on `aid` here,
-      // with an idempotency key, under each cell's outbox key
-      // (cell:<student>:<assessment>) so it is sent after that cell's score
-      // writes and is never merged away with one.
+      _sendReturns(cid, aid, done, rows[aid] || {}, of);
     }
   }
   return { returned: done.length, enrollment_ids: done, returned_at: done.length ? at : null };
+}
+/* A signed-in teacher's Return, sent to the server: return_grades, one
+   call for each student returned on this device. One student to a call so
+   the outbox files it under that cell (cell:<student>:<assessment>,
+   shared/offline-queue.js): it goes after the score writes already queued
+   for the cell, a later save to the cell goes after it, and it is never
+   merged away with one. Each call carries its own idempotency key, so a
+   retry returns nothing twice. An id made on this device waits in the
+   outbox for its server id, as any write does; one the server will never
+   know is not sent.
+   The device has already returned them (`now` holds each row as it is now,
+   `was` as it was). Nothing waits on the answer: a call the outbox has no
+   room for puts the row back, and one the server refuses is put right by
+   the next read of the rows. Either shows on the sync dot only. */
+function _sendReturns(cid, aid, sids, was, now) {
+  if (!_writesEnabled() || !_isSendableId(aid)) return;
+  sids.forEach(function (sid) {
+    if (!_isSendableId(sid)) return;
+    if (was[sid]) _returnedHere[cid + ':' + aid + ':' + sid] = { was: was[sid], now: now[sid] || null };
+    var sent = _writeRpc('return_grades', {
+      p_assessment_id: aid,
+      p_enrollment_ids: [sid],
+      p_idempotency_key: _newEntryId(),
+    });
+    // No room in the outbox: nothing was sent, so the grade is still a draft.
+    if (sent && sent.refused) {
+      _unreturn(cid, aid, sid);
+      _convergeOnServer(cid);
+    }
+    _trackPendingSync(
+      Promise.resolve(sent).then(function (res) {
+        if (res && res.error && !res.error.refused && !res.error.handledSessionExpired) {
+          console.warn('return_grades failed:', res.error);
+        }
+        // A refusal by the server is put right from the outbox's own event
+        // (_onReturnWriteRefused), which also runs after a reload.
+        if (!(res && res.error)) delete _returnedHere[cid + ':' + aid + ':' + sid];
+        _refreshGradeReturnsSoon(cid);
+      }),
+    );
+  });
+}
+/* Each Return this device has made and not yet heard back about: the row as
+   it was (a draft) and as the Return left it. In memory only: after a
+   reload the class's rows are read from the server, which is the truth. */
+var _returnedHere = {}; // 'cid:aid:sid' → { was, now }
+/* A Return was not made (the outbox had no room, or the server refused
+   it): the row goes back to the draft it was, unless something has changed
+   it since. With no record of the Return (a reload came between) the row is
+   left for the read of the server's rows to put right. */
+function _unreturn(cid, aid, sid) {
+  try {
+    var key = cid + ':' + aid + ':' + sid;
+    var made = _returnedHere[key];
+    delete _returnedHere[key];
+    if (!made) return;
+    var rows = getGradeReturns(cid);
+    var at = (rows[aid] || {})[sid] || null;
+    if (JSON.stringify(at) !== JSON.stringify(made.now)) return;
+    var out = Object.assign({}, rows);
+    out[aid] = Object.assign({}, out[aid]);
+    out[aid][sid] = made.was;
+    _saveGradeReturns(cid, out);
+    return true;
+  } catch (e) {
+    _gradeStateFailed('putting back a grade that could not be returned', e);
+  }
 }
 
 /* A returned copy as the score entries this class would hold for it: read
@@ -10604,6 +11321,183 @@ function _dropGradeReturnsOf(cid, sid) {
   if (out) _saveGradeReturns(cid, out);
 }
 /* ── end Draft and Returned (S0-F2) ── */
+
+/* ── Student cards (S0-W1; docs/plans/student-page-build-plan.md 1.5) ─────
+   One card for each student in a class: a printed code that opens the
+   student's page (migrations/2026110903_student_card.sql). A card, as the
+   server lists it and as this file keeps it:
+     { id, enrollment_id, code, created_at, printed_at, last_opened_at,
+       locked_at, wrong_tries, wrong_tries_7d, works_until, check, password }
+   `check` is 'identity' (the student has a birthday or a student number on
+   file) or 'password'; `password` is the four digits to print when it is
+   'password'.
+
+   Only a class whose student page is on has cards (the build switch): for
+   any other class each function here answers with no data and calls
+   nothing. Each answers a promise of { data, error }.
+
+   A signed-in teacher's cards are the server's, and are kept nowhere on
+   this device: a card's code and password are read when the Student Cards
+   list is opened and held by that screen only. Making cards is asked for
+   online, with the teacher waiting on the answer, as slip codes are
+   (v2.issueAccessCodes); marking them printed is a write like any other,
+   through the outbox. In Demo Mode the cards are made and kept on this
+   device (gb-student-cards-<cid>) and nothing is sent. */
+var _CARD_CODE_LETTERS = 'ABCDEFGHJKMNPQRTUVWXYZ2346789'; // the slip alphabet (teacher/questionnaires.js)
+
+function _cardsAnswer(data, error) {
+  return Promise.resolve({ data: data == null ? null : data, error: error || null });
+}
+function _demoStudentCards(cid) {
+  var kept = _safeParseLS('gb-student-cards-' + cid, []);
+  return Array.isArray(kept) ? kept : [];
+}
+function _saveDemoStudentCards(cid, cards) {
+  _safeLSSet('gb-student-cards-' + cid, JSON.stringify(cards));
+}
+/* The class's last reporting date when that is still ahead, else the next
+   June 30: the day a card made on this device works until, as the server
+   works it out for its own. */
+function _demoCardsWorkUntil(cid) {
+  var today = courseToday(cid);
+  var last = '';
+  (getReportingTerms(cid) || []).forEach(function (t) {
+    if (t && /^\d{4}-\d{2}-\d{2}$/.test(t.ends_on) && t.ends_on > last) last = t.ends_on;
+  });
+  if (last && last >= today) return last;
+  var year = Number(today.slice(0, 4));
+  return (today <= year + '-06-30' ? year : year + 1) + '-06-30';
+}
+function _demoCardCode(taken) {
+  var code;
+  do {
+    code = '';
+    for (var i = 0; i < 6; i++) {
+      code += _CARD_CODE_LETTERS.charAt(Math.floor(Math.random() * _CARD_CODE_LETTERS.length));
+    }
+    code = code.slice(0, 3) + '-' + code.slice(3);
+  } while (taken[code]);
+  taken[code] = true;
+  return code;
+}
+// The cards of students still in the class, in roster order.
+function _demoCardsListed(cid) {
+  var order = {};
+  getStudents(cid).forEach(function (st, i) {
+    order[st.id] = i + 1;
+  });
+  return _demoStudentCards(cid)
+    .filter(function (c) {
+      return c && order[c.enrollment_id];
+    })
+    .sort(function (a, b) {
+      return order[a.enrollment_id] - order[b.enrollment_id];
+    });
+}
+
+/* The class's cards: [card], one for each student who has one. */
+function listStudentCards(cid) {
+  if (!cid || !_gradesKept(cid)) return _cardsAnswer(null);
+  if (!_writesEnabled()) return _cardsAnswer(_demoCardsListed(cid));
+  if (!_useSupabase || !_isUuid(cid)) return _cardsAnswer(null);
+  return _callRpcWithAuthGuard('list_student_cards', { p_course_id: cid }, { suppressSessionExpiredModal: true }).then(
+    function (res) {
+      if (res && res.error && !res.error.handledSessionExpired) console.warn('list_student_cards failed:', res.error);
+      var ok = res && !res.error && res.data != null;
+      return { data: ok ? _rpcRows(res.data) : null, error: (res && res.error) || null };
+    },
+  );
+}
+
+/* Make a card for every student in the class who has none (or for those of
+   `studentIds` who have none). A student who has a card keeps it. Answers
+   { issued, cards }: how many were made, and every card in the class, as
+   listStudentCards gives them. */
+function issueStudentCards(cid, studentIds) {
+  if (!cid || !_gradesKept(cid)) return _cardsAnswer(null);
+  var only = Array.isArray(studentIds) && studentIds.length ? studentIds : null;
+  if (!_writesEnabled()) {
+    var kept = _demoStudentCards(cid);
+    var has = {};
+    var taken = {};
+    kept.forEach(function (c) {
+      has[c.enrollment_id] = true;
+      taken[c.code] = true;
+    });
+    var until = _demoCardsWorkUntil(cid);
+    var made = 0;
+    getStudents(cid).forEach(function (st) {
+      if (has[st.id] || (only && only.indexOf(st.id) < 0)) return;
+      var identity = !!(st.dateOfBirth || st.studentNumber);
+      kept.push({
+        id: uid(),
+        enrollment_id: st.id,
+        code: _demoCardCode(taken),
+        created_at: new Date().toISOString(),
+        printed_at: null,
+        last_opened_at: null,
+        locked_at: null,
+        wrong_tries: 0,
+        wrong_tries_7d: 0,
+        works_until: until,
+        check: identity ? 'identity' : 'password',
+        password: identity ? null : String(1000 + Math.floor(Math.random() * 9000)),
+      });
+      made++;
+    });
+    if (made) _saveDemoStudentCards(cid, kept);
+    return _cardsAnswer({ issued: made, cards: _demoCardsListed(cid) });
+  }
+  if (!_useSupabase || !_isUuid(cid)) return _cardsAnswer(null);
+  var ids = only ? only.filter(_isUuid) : null;
+  return _trackPendingSync(
+    _callRpcWithAuthGuard('issue_student_cards', {
+      p_course_id: cid,
+      p_enrollment_ids: ids && ids.length ? ids : null,
+      p_idempotency_key: _newEntryId(),
+    }).then(function (res) {
+      if (res && res.error && !res.error.handledSessionExpired) console.warn('issue_student_cards failed:', res.error);
+      var out = res && !res.error ? _rpcObject(res.data) : null;
+      return {
+        data: out ? { issued: Number(out.issued) || 0, cards: Array.isArray(out.cards) ? out.cards : [] } : null,
+        error: (res && res.error) || null,
+      };
+    }),
+  );
+}
+
+/* These cards were printed. Answers { printed, printed_at } with the time
+   this device gave them; a signed-in teacher's go up through the outbox,
+   so a failure shows on the sync dot and nowhere else. */
+function markStudentCardsPrinted(cid, cardIds) {
+  var ids = (Array.isArray(cardIds) ? cardIds : []).filter(Boolean);
+  if (!cid || !ids.length || !_gradesKept(cid)) return _cardsAnswer(null);
+  var at = new Date().toISOString();
+  if (!_writesEnabled()) {
+    var kept = _demoStudentCards(cid);
+    var n = 0;
+    kept.forEach(function (c) {
+      if (ids.indexOf(c.id) < 0) return;
+      c.printed_at = at;
+      n++;
+    });
+    if (n) _saveDemoStudentCards(cid, kept);
+    return _cardsAnswer({ printed: n, printed_at: at });
+  }
+  ids = ids.filter(_isUuid);
+  if (!_useSupabase || !_isUuid(cid) || !ids.length) return _cardsAnswer(null);
+  _trackPendingSync(
+    Promise.resolve(
+      _writeRpc('mark_student_cards_printed', { p_card_ids: ids, p_idempotency_key: _newEntryId() }),
+    ).then(function (res) {
+      if (res && res.error && !res.error.handledSessionExpired) {
+        console.warn('mark_student_cards_printed failed:', res.error);
+      }
+    }),
+  );
+  return _cardsAnswer({ printed: ids.length, printed_at: at });
+}
+/* ── end Student cards ── */
 
 /* ── Points-mode helpers: one score → all tags ──────────────── */
 // A cell's points, or null when it has no score. A 0 is a score.
@@ -12146,6 +13040,10 @@ async function _callRpcWithAuthGuard(name, params, options) {
   options = options || {};
   var sb = getSupabase();
   if (!sb || _isDemoSession()) return { data: null, error: null };
+
+  // Draft and Returned: no update_course carries the student page's switch
+  // or Return Grades beside another setting, whoever queued it.
+  params = _onlyOwnReturnSettings(name, params);
 
   // Before either retry below can fire, so every attempt at this write carries
   // the same key and the server returns the first result instead of inserting
@@ -14167,10 +15065,15 @@ window.GB = {
   saveScores,
   getReturnSettings,
   setStudentPageSwitch,
+  saveReturnSettings,
+  draftsWaitingToReturn,
   getGradeReturns,
   getGradeReturn,
   getReturnedScores,
   returnGrades,
+  listStudentCards,
+  issueStudentCards,
+  markStudentCardsPrinted,
   upsertScore,
   persistScoreDiffToCanonical,
   getPointsScore,

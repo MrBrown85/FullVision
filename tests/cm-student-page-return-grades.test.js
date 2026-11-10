@@ -4,7 +4,10 @@
  * Student Page").
  *
  * - The tab is there only for a class whose student page is on (the build
- *   switch). A signed-in teacher never has it and never sends the setting.
+ *   switch). A signed-in teacher's switch is the server's (S0-W1): the two
+ *   settings on the device alone show no tab and send nothing. Once the
+ *   server has said the page is on, a choice is asked of the server (the
+ *   count of grades waiting, or the change itself) before it shows.
  * - Each choice is saved through saveCourseConfig and read back.
  * - A class with no choice made is offered When I Return Them first, and
  *   opening the tab saves nothing.
@@ -16,7 +19,7 @@
 import './setup.js';
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { U, signIn, seedClass, clearClass, settle } from './helpers/pin-save-paths.js';
+import { U, signIn, seedClass, clearClass, settle, serverSaysStudentPageOn } from './helpers/pin-save-paths.js';
 
 const CID = 'c-sp';
 const OTHER = 'c-other';
@@ -209,11 +212,15 @@ describe('Class Settings › Student Page: Return Grades', () => {
         'Keep Photos Until',
         'Reflect on Feedback',
         'Show My Learning',
-        'Student Cards',
         'Preview as Student',
         'Questionnaires and Reports',
       ].forEach(label => expect(html(), label).not.toContain(label));
       expect((html().match(/class="sp-row"/g) || []).length).toBe(1);
+      // Student Cards came with S0-W1, in a card of its own under this one
+      // (tests/student-cards.test.js), not as a row of it.
+      expect((html().match(/class="cm-section sp-card"/g) || []).length).toBe(1);
+      expect((html().match(/class="cm-section sc-card"/g) || []).length).toBe(1);
+      expect(html().indexOf('sc-card')).toBeGreaterThan(html().indexOf('sp-return-hint'));
     });
   });
 
@@ -521,7 +528,11 @@ describe('Class Settings › Student Page: Return Grades', () => {
     // Everything sent but Class Settings' own reads (family contacts, categories).
     const writes = () => session.sent().filter(c => !/^(list|get)_/.test(c[0]));
 
-    it('never has the tab, whatever the class holds', () => {
+    // As before S0-W1: the two settings on this device alone are not the
+    // server's word (shared/data.js _serverSaysStudentPage). These three are
+    // the tests main had, but for the console switch, which now asks the
+    // server for a signed-in teacher (tests/grade-return-server.test.js).
+    it('never has the tab, whatever the class holds on this device', () => {
       expect(getReturnSettings(REAL).student_page).toBe(false);
       expect(CmStudentPage.isShown(REAL)).toBe(false);
       expect(CmStudentPage.render(REAL)).toBe('');
@@ -533,9 +544,9 @@ describe('Class Settings › Student Page: Return Grades', () => {
         expect(html(), tab).not.toContain('data-tab="student-page"');
         expect(html(), tab).not.toContain('Return Grades');
         expect(html(), tab).not.toContain('sp-card');
+        expect(html(), tab).not.toContain('sc-card');
+        expect(html(), tab).not.toContain('sp-build');
       });
-      // The console switch does nothing for them either.
-      expect(setStudentPageSwitch(REAL, true)).toBe(false);
     });
 
     it('never sends the setting: a click that reaches the module saves and sends nothing', async () => {
@@ -546,10 +557,18 @@ describe('Class Settings › Student Page: Return Grades', () => {
         dataset: { value: 'on_save' },
         closest: () => ({ dataset: { cid: REAL } }),
       });
+      CmStudentPage.handleAction('spCardsMake', { closest: () => ({ dataset: { cid: REAL } }) });
+      CmStudentPage.handleChange({
+        checked: true,
+        dataset: { actionChange: 'spBuildSwitch' },
+        closest: () => ({ dataset: { cid: REAL } }),
+      });
       await settle();
       expect(confirms).toEqual([]);
       expect(stored('courseconfig', REAL)).toBe(before);
       expect(writes()).toEqual([]);
+      // Nor is anything read that main does not read.
+      expect(session.sent().filter(c => /grade_return|student_card|draft_count/.test(c[0]))).toEqual([]);
     });
 
     it('and a class setting saved beside it goes without the two keys', async () => {
@@ -561,14 +580,226 @@ describe('Class Settings › Student Page: Return Grades', () => {
       expect(sent[0][1].p_patch).toEqual({ level_order: 'desc' });
       expect(JSON.stringify(sent)).not.toMatch(/return_grades|student_page/);
     });
+
+    describe('whose class has its student page off on the server', () => {
+      beforeEach(() => {
+        seed(REAL, { levelOrder: 'asc', return_grades: 'on_return' });
+        serverSaysStudentPageOn(REAL, false);
+      });
+
+      it('never has the tab, whatever Return Grades the class holds', () => {
+        expect(getReturnSettings(REAL).student_page).toBe(false);
+        expect(CmStudentPage.isShown(REAL)).toBe(false);
+        open('student-page', REAL);
+        expect(tabIds()).toEqual(SIX);
+        expect(activeTab()).toBe('details');
+      });
+
+      it('and a class setting saved goes without the two keys, as it always has', async () => {
+        saveCourseConfig(REAL, Object.assign({}, getCourseConfig(REAL), { levelOrder: 'desc' }));
+        await settle();
+        var sent = writes();
+        expect(sent.map(c => c[0])).toEqual(['update_course']);
+        expect(sent[0][1].p_patch).toEqual({ level_order: 'desc' });
+      });
+    });
+
+    describe('once the server has said its student page is on', () => {
+      /* After an ask of the server that fails, shared/data.js reads the
+         class again (_convergeOnServer; tests/grade-return-server.test.js
+         walks it against a server that has a class to send). This file's
+         recording client has none, so the read is noted here, not made. */
+      var readAgain;
+      var realConverge;
+      beforeEach(() => {
+        serverSaysStudentPageOn(REAL);
+        readAgain = [];
+        realConverge = globalThis._convergeOnServer;
+        globalThis._convergeOnServer = cid => readAgain.push(cid);
+      });
+      afterEach(() => {
+        globalThis._convergeOnServer = realConverge;
+        serverSaysStudentPageOn(REAL, false);
+      });
+      // The server's count of the grades that wait.
+      const serverCounts = n => session.fake.on('course_draft_count', () => ({ data: n, error: null }));
+      const note = row =>
+        (html().match(new RegExp('id="sp-' + row + '-note" role="status">([^<]*)<')) || [])[1] || null;
+
+      it('has the tab, with Return Grades and Student Cards', () => {
+        expect(getReturnSettings(REAL)).toEqual({ student_page: true, return_grades: 'on_return' });
+        expect(CmStudentPage.isShown(REAL)).toBe(true);
+        open('student-page', REAL);
+        expect(tabIds()).toEqual(SEVEN);
+        expect(activeTab()).toBe('student-page');
+        expect(checked()).toEqual(['on_return']);
+        expect(html()).toContain('sc-card');
+        // The switch itself is not offered: that needs the build address.
+        expect(html()).not.toContain('sp-build');
+      });
+
+      it('As Soon As I Save with nothing waiting: the server is asked how many wait, then that one setting is sent', async () => {
+        serverCounts(0);
+        open('student-page', REAL);
+        expect(choose('on_save', REAL)).toBe(true);
+        // Not yet: the count is on its way.
+        expect(getReturnSettings(REAL).return_grades).toBe('on_return');
+        expect(note('return')).toBe('Changing…');
+        await settle();
+        expect(confirms).toEqual([]);
+        expect(getReturnSettings(REAL).return_grades).toBe('on_save');
+        expect(checked()).toEqual(['on_save']);
+        expect(note('return')).toBe(null);
+        await settle();
+        expect(writes()).toEqual([
+          ['course_draft_count', { p_course_id: REAL }],
+          ['update_course', { p_course_id: REAL, p_patch: { return_grades: 'on_save' } }],
+        ]);
+      });
+
+      it('the question names the server’s number, not this device’s (a class with drafts it has not read)', async () => {
+        // This device's rows know of no draft; the server holds three.
+        expect(GradeState.draftsWaiting(REAL)).toBe(0);
+        serverCounts(3);
+        open('student-page', REAL);
+        choose('on_save', REAL);
+        await settle();
+        expect(confirms.length).toBe(1);
+        expect(confirms[0]).toMatchObject({
+          title: 'Return 3 Grades Now?',
+          message: '3 grades are waiting as drafts. Changing this returns them to students now.',
+          okLabel: 'Return and Change',
+        });
+        // Nothing has changed while it asks; Cancel is never answering.
+        expect(getReturnSettings(REAL).return_grades).toBe('on_return');
+        expect(writes().map(c => c[0])).toEqual(['course_draft_count']);
+        confirms[0].onConfirm();
+        expect(getReturnSettings(REAL).return_grades).toBe('on_save');
+        await settle();
+        expect(writes().map(c => c[0])).toEqual(['course_draft_count', 'update_course']);
+      });
+
+      it('when the number cannot be read the change is not made, and the row says so', async () => {
+        session.fake.on('course_draft_count', () => ({ data: null, error: { message: 'network: failed to fetch' } }));
+        open('student-page', REAL);
+        var before = stored('courseconfig', REAL);
+        choose('on_save', REAL);
+        await settle();
+        expect(confirms).toEqual([]);
+        expect(stored('courseconfig', REAL)).toBe(before);
+        expect(checked()).toEqual(['on_return']);
+        expect(note('return')).toBe(
+          'Could not check for grades waiting to be returned. Check the connection and try again.',
+        );
+        expect(writes().map(c => c[0])).toEqual(['course_draft_count']);
+        // Asked and not answered: the class is read again from the server.
+        expect(readAgain).toEqual([REAL]);
+      });
+
+      it('When I Return Them is asked of the server first, and shows only when it has answered', async () => {
+        seed(REAL, { levelOrder: 'asc', student_page_enabled: true, return_grades: 'on_save' });
+        var answer;
+        session.fake.on('update_course', () => new Promise(r => (answer = () => r({ data: null, error: null }))));
+        open('student-page', REAL);
+        expect(choose('on_return', REAL)).toBe(true);
+        await settle();
+        expect(getReturnSettings(REAL).return_grades).toBe('on_save');
+        expect(checked()).toEqual(['on_save']);
+        expect(note('return')).toBe('Changing…');
+        // A second click while it waits does nothing.
+        choose('on_return', REAL);
+        await settle();
+        expect(writes()).toEqual([['update_course', { p_course_id: REAL, p_patch: { return_grades: 'on_return' } }]]);
+        answer();
+        await settle();
+        expect(getReturnSettings(REAL).return_grades).toBe('on_return');
+        expect(checked()).toEqual(['on_return']);
+        expect(note('return')).toBe(null);
+      });
+
+      it('refused or offline, it is not changed, and the row says so', async () => {
+        seed(REAL, { levelOrder: 'asc', student_page_enabled: true, return_grades: 'on_save' });
+        session.fake.on('update_course', () => ({ data: null, error: { message: 'network: failed to fetch' } }));
+        open('student-page', REAL);
+        var before = stored('courseconfig', REAL);
+        choose('on_return', REAL);
+        await settle();
+        expect(stored('courseconfig', REAL)).toBe(before);
+        expect(checked()).toEqual(['on_save']);
+        expect(note('return')).toBe('Could not change this. Check the connection and try again.');
+        // The server may have made the change and only its answer been lost:
+        // the class is read again.
+        expect(readAgain).toEqual([REAL]);
+        // Tried again with the connection back, the line goes.
+        session.fake.on('update_course', () => ({ data: null, error: null }));
+        choose('on_return', REAL);
+        await settle();
+        expect(checked()).toEqual(['on_return']);
+        expect(note('return')).toBe(null);
+      });
+
+      // Verify pass on PR 999, finding 1: an answer that comes after
+      // Class Settings was closed draws nothing and asks nothing.
+      it('the count arrives after Class Settings was closed: no question over the other page, nothing changed', async () => {
+        var answer;
+        session.fake.on('course_draft_count', () => new Promise(r => (answer = () => r({ data: 3, error: null }))));
+        open('student-page', REAL);
+        choose('on_save', REAL);
+        await settle();
+        try {
+          DashClassManager.closeClassManager();
+        } catch (e) {
+          /* the harness has no page behind Class Settings to draw */
+        }
+        expect(DashClassManager.classManagerOpen).toBe(false);
+        mounts.main.innerHTML = '<div id="gradebook">THE GRADEBOOK</div>';
+        answer();
+        await settle();
+        expect(confirms).toEqual([]);
+        expect(mounts.main.innerHTML).toBe('<div id="gradebook">THE GRADEBOOK</div>');
+        expect(getReturnSettings(REAL).return_grades).toBe('on_return');
+        expect(writes().map(c => c[0])).toEqual(['course_draft_count']);
+      });
+
+      it('the server’s answer to When I Return Them arrives after Class Settings was closed: nothing is drawn', async () => {
+        seed(REAL, { levelOrder: 'asc', student_page_enabled: true, return_grades: 'on_save' });
+        var answer;
+        session.fake.on('update_course', () => new Promise(r => (answer = () => r({ data: null, error: null }))));
+        open('student-page', REAL);
+        choose('on_return', REAL);
+        await settle();
+        try {
+          DashClassManager.closeClassManager();
+        } catch (e) {
+          /* as above */
+        }
+        mounts.main.innerHTML = '<div id="gradebook">THE GRADEBOOK</div>';
+        answer();
+        await settle();
+        expect(mounts.main.innerHTML).toBe('<div id="gradebook">THE GRADEBOOK</div>');
+        expect(getReturnSettings(REAL).return_grades).toBe('on_return');
+      });
+
+      it('and any class setting saved beside it carries neither of the two', async () => {
+        saveCourseConfig(REAL, Object.assign({}, getCourseConfig(REAL), { levelOrder: 'desc' }));
+        await settle();
+        var sent = writes();
+        expect(sent.map(c => c[0])).toEqual(['update_course']);
+        expect(sent[0][1].p_patch).toEqual({ level_order: 'desc' });
+      });
+    });
   });
 
   describe('the tab names no server function', () => {
-    it('teacher/cm-student-page.js writes only through saveCourseConfig', () => {
+    // Until the review of PR 999 this said "writes only through
+    // saveCourseConfig". The two settings now have a writer of their own
+    // (saveReturnSettings), and saveCourseConfig no longer sends or changes
+    // them: the tab's one way to write is that one.
+    it('teacher/cm-student-page.js writes only through saveReturnSettings', () => {
       const src = readFileSync(new URL('../teacher/cm-student-page.js', import.meta.url), 'utf-8');
       expect(src).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|sendBeacon|_writeRpc|\.rpc\(|getSupabase/);
-      expect(src).not.toMatch(/localStorage|_cache\b|_saveCourseField|setStudentPageSwitch/);
-      expect((src.match(/saveCourseConfig\(/g) || []).length).toBe(1);
+      expect(src).not.toMatch(/localStorage|_cache\b|_saveCourseField|setStudentPageSwitch|saveCourseConfig\(/);
+      expect((src.match(/saveReturnSettings\(/g) || []).length).toBe(1);
     });
   });
 });
@@ -677,6 +908,8 @@ describe('Class Settings with the switch off is what main draws', () => {
     expect(localStorage.getItem('gb-courseconfig-' + CID)).toBe(before);
   });
 
+  // As main had it: the two settings on this device alone are not the
+  // server's word, and draw nothing.
   it('a signed-in class, even one that holds the switch', async () => {
     var session = signIn();
     try {
@@ -691,6 +924,55 @@ describe('Class Settings with the switch off is what main draws', () => {
       // Class Settings reads; it writes nothing.
       expect(session.sent().filter(c => !/^(list|get)_/.test(c[0]))).toEqual([]);
     } finally {
+      session.signOut();
+    }
+  });
+
+  // And signed in, with every Return Grades choice a class can hold while
+  // its student page is off.
+  it.each([
+    ['no setting at all', {}],
+    ['When I Return Them, as every class made since Batch A holds', { return_grades: 'on_return' }],
+    ['As Soon As I Save', { return_grades: 'on_save' }],
+    ['no choice made, as the server sends it', { return_grades: null }],
+    ['its student page turned off again', { student_page_enabled: false, return_grades: 'on_return' }],
+  ])('a signed-in class with its student page off and %s', async (name, config) => {
+    var session = signIn();
+    try {
+      seed(U(1), config);
+      globalThis.CmStudentPage = mainModule();
+      var onMain = drawn(U(1));
+      await settle();
+      var asked = session.since().map(c => c[0]);
+      globalThis.CmStudentPage = original.module;
+      var here = drawn(U(1));
+      expect(here).toEqual(onMain);
+      expect(here.join('')).not.toContain('student-page');
+      await settle();
+      // Class Settings reads; it writes nothing.
+      expect(session.sent().filter(c => !/^(list|get)_/.test(c[0]))).toEqual([]);
+      // And it reads nothing main's module did not read.
+      var askedHere = session.since().map(c => c[0]);
+      expect(askedHere.filter(name => asked.indexOf(name) < 0)).toEqual([]);
+      expect(session.sent().filter(c => /grade_return|student_card|draft_count/.test(c[0]))).toEqual([]);
+    } finally {
+      session.signOut();
+    }
+  });
+
+  it('and the check can tell for a signed-in class too: one the server says is on is not what main draws', () => {
+    var session = signIn();
+    try {
+      seed(U(1), HELD);
+      serverSaysStudentPageOn(U(1));
+      globalThis.CmStudentPage = mainModule();
+      var onMain = drawn(U(1));
+      globalThis.CmStudentPage = original.module;
+      var here = drawn(U(1));
+      expect(here).not.toEqual(onMain);
+      expect(here[0]).toContain('Return Grades');
+    } finally {
+      serverSaysStudentPageOn(U(1), false);
       session.signOut();
     }
   });

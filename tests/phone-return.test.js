@@ -34,7 +34,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseHTML } from 'linkedom';
-import { U, signIn, seedClass, clearClass } from './helpers/pin-save-paths.js';
+import { U, signIn, seedClass, clearClass, serverSaysStudentPageOn } from './helpers/pin-save-paths.js';
 
 const SNAPSHOT = join(new URL('.', import.meta.url).pathname, 'fixtures', 'phone-switch-off.json');
 const UPDATE = process.env.UPDATE_PHONE_SNAPSHOT === '1';
@@ -289,12 +289,18 @@ afterEach(() => {
 const BOTH_SETTINGS = { student_page_enabled: true, return_grades: 'on_return' };
 const SIGNED_IN = 'signed in › ';
 
-// The walk as a signed-in teacher, who holds both settings on this device.
-function walkSignedIn() {
+/* The walk as a signed-in teacher, who holds both settings on this device
+   unless `config` says otherwise. On their own they are not the server's
+   word and turn nothing on; `fromServer` says the server has said the
+   class's student page is on. `asked` is given every RPC the walk sent. */
+function walkSignedIn(config, asked, fromServer) {
   const session = signIn();
+  if (fromServer) serverSaysStudentPageOn(CID);
   try {
-    return walk(BOTH_SETTINGS);
+    return walk(config || BOTH_SETTINGS);
   } finally {
+    if (asked) session.sent().forEach(c => asked.push(c[0]));
+    serverSaysStudentPageOn(CID, false);
     session.signOut();
   }
 }
@@ -361,10 +367,41 @@ describe('with the build switch off the phone is what it was', () => {
     Object.keys(before).forEach(name => expect(now[name] === before[name], name).toBe(true));
   });
 
+  // As before S0-W1: the two settings on this device alone are not the
+  // server's word (shared/data.js _serverSaysStudentPage), and draw nothing.
   it('byte for byte for a signed-in teacher, even with both settings on this device', () => {
     const now = walkSignedIn();
     expect(Object.keys(now)).toEqual(Object.keys(before));
     Object.keys(before).forEach(name => expect(now[name] === beforeSignedIn[name], name).toBe(true));
+  });
+
+  // And once the server has said the page is on (S0-W1), every class that
+  // still does not hold grades.
+  it.each([
+    ['a class with neither setting', {}],
+    ['a class set to When I Return Them whose student page is off', { return_grades: 'on_return' }],
+    ['a class whose student page was turned off again', { student_page_enabled: false, return_grades: 'on_return' }],
+    [
+      'a class whose student page is on, set to As Soon As I Save',
+      { student_page_enabled: true, return_grades: 'on_save' },
+    ],
+    ['a class whose student page is on with no choice made', { student_page_enabled: true }],
+  ])('byte for byte for a signed-in teacher, in %s', (_, config) => {
+    const asked = [];
+    const now = walkSignedIn(config, asked, config.student_page_enabled === true);
+    expect(Object.keys(now)).toEqual(Object.keys(before));
+    Object.keys(before).forEach(name => expect(now[name] === beforeSignedIn[name], name).toBe(true));
+    // With the student page off, nothing is asked of the server about Draft
+    // and Returned or cards.
+    if (config.student_page_enabled !== true) {
+      expect(asked.filter(name => /grade_return|return_grades|student_card|draft_count/.test(name))).toEqual([]);
+    }
+  });
+
+  it('and the check can tell: a signed-in class the server says holds grades is not what main draws (S0-W1)', () => {
+    const now = walkSignedIn(BOTH_SETTINGS, null, true);
+    const changed = Object.keys(before).filter(name => now[name] !== beforeSignedIn[name]);
+    expect(changed.length).toBeGreaterThan(0);
   });
 });
 

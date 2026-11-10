@@ -51,6 +51,7 @@ import {
   openAssignments,
   openGrader,
   closePages,
+  serverSaysStudentPageOn,
 } from './helpers/pin-save-paths.js';
 
 const SNAPSHOT = join(new URL('.', import.meta.url).pathname, 'fixtures', 'assignments-switch-off.json');
@@ -389,11 +390,56 @@ describe('with the build switch off the Assignments page is what it was', () => 
     same(await walk(config));
   });
 
+  // This one stands as S1-F2 wrote it. S0-W1 makes a signed-in teacher's
+  // switch the server's, but the two settings on the device alone are not
+  // the server's word (shared/data.js _serverSaysStudentPage): they draw
+  // nothing.
   it('byte for byte for a signed-in teacher, even with both settings on this device', async () => {
     const session = signIn();
     try {
       same(await walk({ student_page_enabled: true, return_grades: 'on_return' }));
     } finally {
+      session.signOut();
+    }
+  });
+
+  // S0-W1: signed in, every class that does not hold grades; and for one
+  // whose student page is off, nothing new is asked of the server.
+  it.each([
+    ['a class with neither setting', {}],
+    ['a class set to When I Return Them whose student page is off', { return_grades: 'on_return' }],
+    ['a class whose student page was turned off again', { student_page_enabled: false, return_grades: 'on_return' }],
+    [
+      'a class the server says is on, set to As Soon As I Save',
+      { student_page_enabled: true, return_grades: 'on_save' },
+    ],
+    ['a class the server says is on, with no choice made', { student_page_enabled: true }],
+  ])('byte for byte for a signed-in teacher, in %s', async (_, config) => {
+    const session = signIn();
+    if (config.student_page_enabled === true) serverSaysStudentPageOn(CID);
+    try {
+      same(await walk(config));
+      if (config.student_page_enabled !== true) {
+        expect(session.sent().filter(c => /grade_return|return_grades|student_card|draft_count/.test(c[0]))).toEqual(
+          [],
+        );
+        expect(Object.keys(localStorage._store).filter(k => k.indexOf('grade-returns') >= 0)).toEqual([]);
+      }
+    } finally {
+      serverSaysStudentPageOn(CID, false);
+      session.signOut();
+    }
+  });
+
+  it('and the check can tell: a signed-in class the server says holds grades is not what main draws', async () => {
+    const session = signIn();
+    serverSaysStudentPageOn(CID);
+    try {
+      const packed = pack(await walk({ student_page_enabled: true, return_grades: 'on_return' }));
+      const changed = Object.keys(before).filter(name => packed[name] !== before[name]);
+      expect(changed.length).toBeGreaterThan(0);
+    } finally {
+      serverSaysStudentPageOn(CID, false);
       session.signOut();
     }
   });
@@ -1207,5 +1253,137 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them: the gr
     await settled();
     expect(segs()).toEqual(['To Return 4', 'Returned 0', 'All 5']);
     expect(text(returnAll())).toBe('Return 4 Graded');
+  });
+});
+
+/* ── S0-W1: the same screens for a signed-in teacher ───────────────────────
+   Once the server has said the class's student page is on, the screens
+   S1-F2 built are live for a signed-in teacher, and Return goes to the
+   server: return_grades, one call for each student, for that work. (This
+   file loads no outbox, so each write goes straight to the recording
+   client in the order the page asked for it; the outbox's ordering is in
+   tests/grade-return-server.test.js.) */
+describe.skipIf(UPDATE)('signed in, in a class the server says holds grades', () => {
+  let session;
+  const returned = () =>
+    session
+      .sent()
+      .filter(c => c[0] === 'return_grades')
+      .map(c => [c[1].p_assessment_id, c[1].p_enrollment_ids, c[1].p_idempotency_key]);
+  const at = selector => overlay().querySelector(selector);
+
+  beforeEach(() => {
+    session = signIn();
+    serverSaysStudentPageOn(CID);
+  });
+  afterEach(() => {
+    serverSaysStudentPageOn(CID, false);
+    session.signOut();
+  });
+
+  it('the page counts the drafts and marks each row, as it does in Demo Mode', async () => {
+    openGraded();
+    expandAll();
+    await settled();
+    expect(text(pill())).toBe('8 to return');
+    expect(pillCount()).toBe(GradeState.draftsWaiting(CID));
+    expect(toReturnChip(ESSAY)).toBe('5 to return');
+    expect(text(cardReturn(ESSAY))).toBe('Return 5 Graded');
+    EVERYONE.forEach(sid => expect(mark(ESSAY, sid), sid).toBe('Draft'));
+    expect(mark(QUIZ, AVA)).toBe('Returned');
+    // A DIBELS benchmark has no state here either.
+    expect(card(BENCH).querySelector('.assess-returns, .assess-return-slot, .ret-mark')).toBe(null);
+    // Grading sent the scores as it always has, and no return yet.
+    expect(returned()).toEqual([]);
+  });
+
+  it('with the two settings on the device alone (no word from the server) none of it is drawn or sent', async () => {
+    serverSaysStudentPageOn(CID, false);
+    openGraded();
+    expandAll();
+    await settled();
+    expect(pill()).toBe(null);
+    expect(document.querySelector('#main .assess-to-return, #main .assess-return-btn, #main .ret-mark')).toBe(null);
+    expect(GradeState.draftsWaiting(CID)).toBe(0);
+    expect(session.sent().filter(c => /grade_return|return_grades|draft_count/.test(c[0]))).toEqual([]);
+  });
+
+  it('Return N Graded on a card: asked first, then one return for each student, for that work, each with a key', async () => {
+    openGraded({ open: ESSAY });
+    await settled();
+    click(cardReturn(ESSAY));
+    expect(asks()).toEqual({
+      title: 'Return 5 Grades Now?',
+      message: '5 drafts: Ava, Ben, Cara and 2 others can’t see them yet.',
+      buttons: ['Cancel', 'Return 5 Graded'],
+    });
+    confirmCancel();
+    await settled();
+    expect(returned()).toEqual([]);
+    click(cardReturn(ESSAY));
+    confirmOk();
+    await settled();
+    expect(returned().map(r => [r[0], r[1]])).toEqual(EVERYONE.map(sid => [ESSAY, [sid]]));
+    returned().forEach(r => expect(r[2]).toBe('<key>'));
+    // Returned on this device at once.
+    expect(drafts(ESSAY)).toEqual([]);
+    EVERYONE.forEach(sid => expect(mark(ESSAY, sid), sid).toBe('Returned ' + today()));
+    expect(text(pill())).toBe('3 to return');
+  });
+
+  it('with one student open, Return beside the Draft mark is one click and one return', async () => {
+    openGraded({ student: CARA });
+    await settled();
+    expect(text(inlineReturn(ESSAY))).toBe('Return');
+    click(inlineReturn(ESSAY));
+    await settled();
+    expect(confirmDialog()).toBe(null);
+    expect(returned().map(r => [r[0], r[1]])).toEqual([[ESSAY, [CARA]]]);
+    expect(text(inlineRow(ESSAY))).toBe('Returned ' + today());
+    expect(pill()).toBe(null);
+  });
+
+  it('pair work is returned together: one return for each partner', async () => {
+    openGraded({ open: TALK });
+    await settled();
+    click(cardReturn(TALK));
+    confirmOk();
+    await settled();
+    expect(returned().map(r => [r[0], r[1]])).toEqual([
+      [TALK, [AVA]],
+      [TALK, [BEN]],
+    ]);
+  });
+
+  it('the grader dialog’s Return N Graded sends the same', async () => {
+    openGrader(
+      () => {
+        seedWith({ config: HELD })();
+        grade();
+      },
+      CID,
+      ESSAY,
+      BEN,
+    );
+    await settled();
+    expect(text(at('.grader-return-all'))).toBe('Return 5 Graded');
+    click(at('.grader-return-all'));
+    confirmOk();
+    await settled();
+    expect(returned().map(r => [r[0], r[1]])).toEqual(EVERYONE.map(sid => [ESSAY, [sid]]));
+    expect(at('.grader-return-all')).toBe(null);
+    expect(text(at('.grader-returned'))).toBe('Returned ' + today());
+  });
+
+  it('in a class the server says is on As Soon As I Save, nothing is drawn and no return is sent', async () => {
+    openAssignments(() => {
+      seedWith({ config: { student_page_enabled: true, return_grades: 'on_save' } })();
+      grade();
+    }, CID);
+    expandAll();
+    await settled();
+    expect(pill()).toBe(null);
+    expect(document.querySelector('#main .assess-return-btn')).toBe(null);
+    expect(returned()).toEqual([]);
   });
 });

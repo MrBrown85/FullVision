@@ -98,6 +98,22 @@ export function clearClass(cid) {
   delete _classLoads[cid];
 }
 
+/* A signed-in teacher's class has its student page on only when the server
+   has said so (shared/data.js _serverSaysStudentPage): the two settings in
+   a seeded class's courseConfigs are, on their own, a value this device
+   merely holds. This says the class's row came from the server with the
+   switch on, as a class load does. It outlives clearClass and a cleared
+   localStorage (it is the app's memory of what the server said), so a test
+   that sets it takes it back: serverSaysStudentPageOn(cid, false). */
+export function serverSaysStudentPageOn(cid, on) {
+  if (on === false) {
+    delete _serverStudentPage[cid];
+    localStorage.removeItem('gb-bundle-meta-' + cid);
+    return;
+  }
+  _setServerStudentPage(cid, true);
+}
+
 /* One student's score entries (on one assessment when `aid` is given),
    without `created`, which is the clock. */
 export function entries(cid, sid, aid) {

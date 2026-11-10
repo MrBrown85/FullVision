@@ -34,6 +34,7 @@ import {
   typeAndLeave,
   openGrader,
   closePages,
+  serverSaysStudentPageOn,
 } from './helpers/pin-save-paths.js';
 
 const SNAPSHOT = join(new URL('.', import.meta.url).pathname, 'fixtures', 'grader-dialog-switch-off.json');
@@ -254,12 +255,47 @@ describe('with the build switch off the dialog is what it was', () => {
     expect(Object.keys(localStorage._store).filter(k => k.indexOf('grade-returns') >= 0)).toEqual([]);
   });
 
+  // As before S0-W1: the two settings on this device alone are not the
+  // server's word (shared/data.js _serverSaysStudentPage), and draw nothing.
   it('byte for byte for a signed-in teacher, even with both settings on this device', async () => {
     const session = signIn();
     try {
       const now = await walk({ student_page_enabled: true, return_grades: 'on_return' });
       Object.keys(before).forEach(name => expect(now[name] === before[name], name).toBe(true));
     } finally {
+      session.signOut();
+    }
+  });
+
+  // And signed in, every class whose student page is off.
+  it.each([
+    ['a class with neither setting', {}],
+    ['a class set to When I Return Them whose student page is off', { return_grades: 'on_return' }],
+    ['a class whose student page was turned off again', { student_page_enabled: false, return_grades: 'on_return' }],
+  ])('byte for byte for a signed-in teacher, in %s', async (_, config) => {
+    const session = signIn();
+    try {
+      const now = await walk(config);
+      expect(Object.keys(now)).toEqual(Object.keys(before));
+      Object.keys(before).forEach(name => expect(now[name] === before[name], name).toBe(true));
+      expect(Object.keys(localStorage._store).filter(k => k.indexOf('grade-returns') >= 0)).toEqual([]);
+      // Nothing is asked of the server about Draft and Returned or cards.
+      expect(session.sent().filter(c => /grade_return|return_grades|student_card|draft_count/.test(c[0]))).toEqual([]);
+    } finally {
+      session.signOut();
+    }
+  });
+
+  it('and the check can tell: a signed-in class the server says holds grades is not what main draws (S0-W1)', async () => {
+    const session = signIn();
+    serverSaysStudentPageOn(CID);
+    try {
+      const now = await walk({ student_page_enabled: true, return_grades: 'on_return' });
+      const changed = Object.keys(before).filter(name => now[name] !== before[name]);
+      expect(changed.length).toBeGreaterThan(0);
+      expect(changed.map(name => now[name]).join('')).toMatch(/grader-return|grader-draft-mark/);
+    } finally {
+      serverSaysStudentPageOn(CID, false);
       session.signOut();
     }
   });
