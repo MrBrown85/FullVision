@@ -34,21 +34,27 @@
 -- rubric_check_score, the 2 on enrollment and assessment deletes, and the 1
 -- on course settings.
 --
--- With teachers working. It takes one table at a time, each in its own
--- transaction: it waits at most 200 ms for the table, and if it cannot have
--- it, lets go and tries again, so it never holds two tables and never
--- outwaits Postgres's deadlock check (one second). Measured with four
--- connections saving in a loop (batch_a_undo_load.py), twice on PostgreSQL
--- 17.11 and twice on 18.6, the same every time:
---   a class at work (about 30 saves a second)   160 of 160 runs finished,
---       no save failed, the slowest save waited 0.4 s;
---   flat out (500 to 800 saves a second)         80 of 80 runs finished,
---       no save failed, the slowest save waited 0.3 s.
--- (As first written, in one transaction, the same test killed 4 saves in
--- one of its four runs at the first speed, and at the second finished 20 to
--- 33 of 80 runs and killed 220 to 330 saves.) A save can wait a few tenths
--- of a second behind it; none is refused. If one table cannot be had in 40 tries it stops there
--- and says which; run PART 1 again and it carries on from that table.
+-- With teachers working. It takes one table at a time, course first, each
+-- in its own transaction: it waits at most 200 ms for the table, and if it
+-- cannot have it, lets go and tries again, so it never holds two tables and
+-- never outwaits Postgres's deadlock check (deadlock_timeout, 1s on
+-- gradebook-prod, read 2026-11-10; it refuses to run if that is 400 ms or
+-- less). Measured with six connections saving in a loop (points, a rubric
+-- fill, one criterion, a comment, a clear, a change to the class itself;
+-- batch_a_undo_load.py), three runs here on PostgreSQL 17.11 and one on
+-- 18.6, and three by the independent reviewer:
+--   a class at work (each connection saving about four times a second):
+--       every run finished and no save failed. PART 1 took about 10 ms, at
+--       most 0.5 s; the slowest save waited 0.4 s.
+--   flat out (400 to 500 saves a second while it ran): every run finished
+--       and no save failed, but it is not quick. PART 1 took about a second
+--       as a rule and up to 8 s, and the slowest save waited anything from
+--       0.3 s to 4.6 s.
+-- So no save is refused; under heavy load one can wait seconds. (As first
+-- written, in one transaction, the same test flat out finished 5 to 11 of
+-- 20 runs and killed 106 to 146 saves.) If one table cannot be had in 40
+-- tries it stops there and says which; run PART 1 again and it carries on
+-- from that table.
 --
 -- DESTROYS: nothing.
 --
@@ -140,10 +146,14 @@
 --
 -- One transaction, on purpose: all or nothing. It holds locks on the score
 -- tables until it commits, so it is for a quiet moment, not a busy one.
--- Measured the same way, four times: with a class at work 10 of 10 runs
--- finished each time and no save failed (saves waited up to 0.4 s); flat
--- out, 9 or 10 of 10 finished (one was stopped by a deadlock, with nothing
--- changed) and between 1 and 5 saves were killed. If it stops, run it again.
+-- Measured the same way. With a class at work 10 of 10 runs finished every
+-- time; in three sets of ten no save failed, and in the fourth (on 18.6) 7
+-- saves were killed by deadlocks. Flat out it is the wrong tool: between 0
+-- and 6 of 10 runs finished (the others were stopped by a deadlock or the
+-- lock timeout, with nothing changed), 34 to 77 saves were killed in each
+-- set of ten, and a save caught in flight can fail once with "column does
+-- not exist". So a quiet moment means nobody saving. If it stops, nothing
+-- was changed: run it again.
 --
 -- What stops PART 2 before it changes anything. It knows what Batch A made:
 -- its 47 functions and the 7 it patched, by signature; its four tables with
@@ -242,6 +252,8 @@
 --         from dep d
 --        where not (d.classid = 'pg_proc'::regclass and exists (select 1 from known k where k.oid = d.objid))
 --          and not exists (select 1 from tbl t where t.oid = d.home)          -- part of one of its own tables: 2 below
+--          and not (d.classid = 'pg_constraint'::regclass                       -- a column's own NOT NULL (Postgres 18 lists it)
+--                   and exists (select 1 from pg_constraint k where k.oid = d.objid and k.contype = 'n'))
 --          and not (d.kind = 'function' and d.classid = 'pg_policy'::regclass   -- file 01's five policies
 --                   and coalesce(d.name in ('score_same_class', 'tag_score_same_class', 'rubric_score_same_class',
 --                                           'rubric_check_score_same_class', 'dibels_score_same_class'), false))
@@ -844,6 +856,8 @@ begin
               from dep d
              where not (d.classid = 'pg_proc'::regclass and exists (select 1 from known k where k.oid = d.objid))
                and not exists (select 1 from tbl t where t.oid = d.home)          -- part of one of its own tables: 2 below
+               and not (d.classid = 'pg_constraint'::regclass                       -- a column's own NOT NULL (Postgres 18 lists it)
+                        and exists (select 1 from pg_constraint k where k.oid = d.objid and k.contype = 'n'))
                and not (d.kind = 'function' and d.classid = 'pg_policy'::regclass   -- file 01's five policies
                         and coalesce(d.name in ('score_same_class', 'tag_score_same_class', 'rubric_score_same_class',
                                                 'rubric_check_score_same_class', 'dibels_score_same_class'), false))

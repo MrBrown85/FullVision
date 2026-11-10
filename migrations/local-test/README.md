@@ -831,23 +831,30 @@ database with both. It is **not a migration** and is kept here, not in
 students see after it, what still runs, what it leaves. In short:
 
 - **PART 1, the fast stop:** drops Batch A's 18 triggers and nothing else,
-  one table at a time, each in its own transaction that waits at most 200 ms
-  for its table and tries again, so it never holds two tables and a save is
-  never the one Postgres kills. An ordinary save then no longer touches
-  `grade_return`. Batch A's functions and file 01's policies all stay and
-  still run. In a class with the Student Page on, students are then shown
-  some grades early and not shown others (the header lists the cases); the
-  header gives the one UPDATE that turns the page off.
+  one table at a time (`course` first), each in its own transaction that
+  waits at most 200 ms for its table and tries again, so it never holds two
+  tables and a save is never the one Postgres kills. An ordinary save then
+  no longer touches `grade_return`. Batch A's functions and file 01's
+  policies all stay and still run. In a class with the Student Page on,
+  students are then shown some grades early and not shown others (the
+  header lists the cases).
+- **PART 1A, the Student Page off:** for every class that has it on, and it
+  answers with the list. It refuses, with nothing changed, while any of
+  Batch A's triggers is left: with `grade_return_release` still on `course`,
+  turning the page off returns every waiting draft to the students.
 - **PART 1B:** the five score-table policies as they were before file 01.
   Only for a save refused by row security.
 - **PART 2, the full removal:** everything the four files made or changed,
   with the seven patched functions put back by making each edit backwards
   and then checked against their fingerprints from before. One transaction.
   It deletes `grade_return`, the cards, the sessions, the sign-in log's card
-  rows and the three class settings. It stops, with nothing changed, if
-  anything is built on Batch A that it does not know (S0-M4b, PR 989: run
-  that file's own undo first). It does not touch the migration record; the
-  header has the one optional statement for that.
+  rows and the three class settings. It stops, with nothing changed and the
+  whole list, if anything else depends on what Batch A made, sits on one of
+  its tables, or is a function or cron job whose text names one of its
+  objects (S0-M4b, PR 989, is such a thing: run that file's own undo first).
+  The header carries the same check as one read-only query. It does not
+  touch the migration record; the header has the one optional statement for
+  that.
 
 No part touches a score table.
 
@@ -895,11 +902,15 @@ The scenarios:
     differs. What the student is shown, case by case: a Returned 7 changed
     to 3 is shown at once; a first grade on a new piece is not shown, in
     either kind of class; a draft stays hidden; a draft on a returned grade
-    stays as returned. With the Student Page turned off by one UPDATE, the
+    stays as returned. Return Grades on that first grade answers
+    "returned: 0" and shows the student nothing; the teacher's draft count
+    and Returned list answer from what was there at the stop. With the
+    Student Page turned off by PART 1A, the
     page and a card scan are refused; on again, students see what they saw.
     What still runs: file 01's policies, Return Grades, a rubric move
     (still rewrites the returned copy), a restore (still writes
-    `grade_return`), the cards and the student's functions; a class leaving
+    `grade_return`), Duplicate Class (still copies the setting), the cards
+    and the student's functions; a class leaving
     When I Return Them no longer returns what was waiting; a deleted piece
     leaves its row behind. `score_rpcs.py` passes as with Batch A loaded
     (236 of 236). A second run takes no lock: it goes through with all
@@ -945,40 +956,70 @@ The scenarios:
   for good it tries 40 times (about twelve seconds), stops with a message
   naming the table, keeps what it had done, and finishes when run again.
   Sent as one message, the way a paste into the SQL editor arrives, it is
-  still seven transactions: stopped at the third table, the first two stay
-  done.
+  still seven transactions: stopped at the fourth table, the first three
+  stay done.
+- **page-off.** With Batch A whole, a plain UPDATE turning the page off
+  returns every waiting draft (3 of 3). PART 1A, run before PART 1 and
+  after each of its first six tables, refuses each time, names the triggers
+  left and changes nothing; its UPDATE pasted alone turns no class off
+  either. Because `course` goes first, from PART 1's first table on even a
+  plain UPDATE returns no draft. After the whole of PART 1 it turns the two
+  classes off and lists them; no draft is returned and no row of
+  `grade_return` changes.
+- **fooled.** Fourteen things a later migration might build on Batch A, one
+  at a time: a function that reads `student_card`, one that calls
+  `return_grades`, one that reads `course.student_page_enabled`, a trigger
+  on `score` whose function calls `_grade_copy`, a function in another
+  schema calling `student_submit.page`, a view over `grade_return`, a view
+  over the class setting, a SQL-standard function, a policy on another
+  table, a foreign key to `student_card`, an index on a class setting, a
+  column and an index added to Batch A's tables, another function in
+  `fv_private`, a cron job. For each, PART 2 stops before it changes
+  anything and names it, and the header's pre-check lists the same. A
+  function that only mentions Batch A in a comment, or uses the words page,
+  done, seen and card for its own things, does not stop it; with the
+  fourteen gone PART 2 runs and a save still works.
 - **s0-m4b.** With PR 989's file on top: PART 1 drops Batch A's 18, leaves
   S0-M4b's three triggers and lists them; PART 2 stops before it changes
   anything, says to run S0-M4b's undo first and names what it found; after
   S0-M4b's own undo (`s0-m4b-undo.sql`, read from its branch), PART 2 runs
   and the database is the one from before Batch A, with S0-M5 still in
-  place. (The first check here
-  looked for one of S0-M4b's function names, which that PR then changed:
-  PART 2 ran straight through on top of it. It now looks for anything that
-  names `grade_return` and is not Batch A's.)
+  place.
 
-Result on 2026-11-10: **85 of 85 on PostgreSQL 17.11 (port 54331), which is
-what production runs, and 85 of 85 on 18.6 (port 54329)**, the same checks
-with the same results.
+Result on 2026-11-10: **116 of 116 on PostgreSQL 17.11 (port 54331), which is what
+production runs, and 116 of 116 on 18.6 (port 54329)**, the same checks with the
+same results.
 
-`batch_a_undo_load.py`: four connections saving in a loop (points, a rubric
-fill, one criterion, a comment), PART 1 run against them again and again,
-the saves paused between runs while file 02 puts the triggers back: 160
-runs with a class at work and 80 flat out. Run twice on 17.11 and twice on
-18.6 (the second time on each with S0-M5 on top):
+`batch_a_undo_load.py`: six connections saving in a loop (points, a rubric
+fill, one criterion, a comment, a clear, a change to the class itself: the
+reviewer's mix), PART 1 run against them again and again, the saves paused
+between runs while file 02 puts the triggers back. Three runs on 17.11 and
+one on 18.6; the reviewer's own three runs are in the last column.
 
-| PART 1                            | Saves a second | Runs finished, of 160 or 80 | Saves that failed          | Slowest save |
-| --------------------------------- | -------------- | --------------------------- | -------------------------- | ------------ |
-| as first written, a class at work | about 30       | 160 every time              | none three times, 4 once   | up to 2.4 s  |
-| as it is now, a class at work     | about 30       | 160 every time              | none                       | up to 0.4 s  |
-| as first written, flat out        | 30 to 75       | 20, 22, 29, 33              | 223, 229, 277, 331 (40P01) | 4 s and over |
-| as it is now, flat out            | 520 to 810     | 80 every time               | none                       | up to 0.3 s  |
+| PART 1                            | Runs finished             | Saves that failed         | PART 1 took                | Slowest save here | Reviewer's runs                                                      |
+| --------------------------------- | ------------------------- | ------------------------- | -------------------------- | ----------------- | -------------------------------------------------------------------- |
+| as it is now, a class at work     | 40 of 40 every time       | none                      | about 10 ms, at most 0.2 s | 0.1 s at most     | no save failed                                                       |
+| as it is now, flat out            | 20 of 20 every time       | none                      | about 1 s, up to 8.3 s     | 0.3 s to 0.9 s    | no save failed; slowest save 0.6 s, 1.6 s, 4.6 s; PART 1 up to 5.8 s |
+| as first written, a class at work | 40 of 40 every time       | none                      | a few ms                   | 0.4 s at most     |                                                                      |
+| as first written, flat out        | 5, 6 and 11 of 20 (17.11) | 106 to 146 killed (40P01) | 3 s as a rule              | 3 s to 16 s       |                                                                      |
+
+With nothing run against them the same saves ran at 900 to 1,200 a second
+flat out, none failed and the slowest took 0.06 s: every wait and every
+killed save above is the script's doing.
+
+The 18.6 run agrees: as it is now, every run finished and no save failed
+at either speed (slowest save 1.3 s flat out, PART 1 up to 3.7 s); as first
+written, 5 of 20 flat out and 75 saves killed.
 
 PART 2 is one transaction on purpose and holds the score tables until it
-commits: with a class at work 10 of 10 runs finished every time and no save
-failed; flat out 9 or 10 of 10 finished (one was stopped by a deadlock,
-nothing changed) and between 1 and 5 saves were killed. It is for a quiet
-moment.
+commits. With a class at work 10 of 10 runs finished every time; no save
+failed in the three sets on 17.11, and on 18.6 seven saves were killed by
+deadlocks in the one set. Flat out it is the wrong tool: 0, 3, 3 and 3 of
+10 runs finished here (4 and 6 for the reviewer; the others were stopped by
+a deadlock or the lock timeout, nothing changed), 50 to 77 saves were
+killed in each set of ten (34 and 42 for the reviewer), and six times a
+save caught in flight failed with "column does not exist". It is for a
+moment when nobody is saving.
 
 Not verified: pg_cron and Supabase's real migration record (stand-ins
 here); the edge function and the app against a database after PART 2;
