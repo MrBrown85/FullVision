@@ -38,6 +38,12 @@
 window.ReportFeedback = (function () {
   'use strict';
 
+  /* The Feedback Pages are drawn in the set of scores Progress Reports use
+     (teacher/report-scores.js): forStudent runs inside
+     ReportScores.withReportScores every time it is called, and every
+     score, mark and status below is read through ReportScores. */
+  forStudent = ReportScores.scoped('progress', forStudent);
+
   var LEVELS = [4, 3, 2, 1];
 
   function _when(iso) {
@@ -118,7 +124,7 @@ window.ReportFeedback = (function () {
   /* The item for one assessment, or null when it has nothing to show. */
   function _item(cid, student, a, dateIso, cats) {
     var sid = student.id;
-    var status = getAssignmentStatus(cid, sid, a.id);
+    var status = ReportScores.getAssignmentStatus(cid, sid, a.id);
     var feedback = _feedback(cid, sid, a.id);
     var item = {
       id: a.id,
@@ -137,10 +143,10 @@ window.ReportFeedback = (function () {
       if (!feedback.length) return null;
       if (isCompletionScored(a)) {
         item.kind = 'complete';
-        item.mark = off ? null : getCompletionMark(cid, sid, a.id);
+        item.mark = off ? null : ReportScores.getCompletionMark(cid, sid, a.id);
       } else {
         item.kind = 'points';
-        var points = off ? null : getPointsScore(cid, sid, a.id);
+        var points = off ? null : ReportScores.getPointsScore(cid, sid, a.id);
         var max = Number(a.maxPoints) || 100;
         item.score = points == null ? '' : formatPoints(points);
         item.outOf = formatPoints(max);

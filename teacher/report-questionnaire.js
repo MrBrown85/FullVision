@@ -10,6 +10,24 @@
 window.ReportQuestionnaire = (function () {
   'use strict';
 
+  /* The Term Questionnaire's set of scores (teacher/report-scores.js). The
+     facts come from CommentBank.facts, which runs in it. The five functions
+     here that work a grade out themselves run inside
+     ReportScores.withReportScores every time they are called, from a
+     click, a timer or a redraw alike. What this screen keeps to draw
+     faster (_factsCache, _staleCache, _claimCache, _shared) is keyed by the set. */
+  var _inReportScores = function (fn) {
+    return ReportScores.scoped('questionnaire', fn);
+  };
+  headerGrade = _inReportScores(headerGrade);
+  notHandedIn = _inReportScores(notHandedIn);
+  missingAndLate = _inReportScores(missingAndLate);
+  _basisHtml = _inReportScores(_basisHtml);
+  _requiredSource = _inReportScores(_requiredSource);
+  function _scoreSetKey() {
+    return ReportScores.reportScoreSet('questionnaire');
+  }
+
   /* ── Parent state injection ──────────────────────────────── */
   var _activeCourse = null;
   var _renderReports = null;
@@ -39,7 +57,7 @@ window.ReportQuestionnaire = (function () {
      attendance); typing never re-reads it. */
   var _factsCache = null;
   function _facts(student, fresh) {
-    var key = _activeCourse + '|' + student.id + '|' + getTermId();
+    var key = _activeCourse + '|' + student.id + '|' + getTermId() + '|' + _scoreSetKey();
     if (fresh || !_factsCache || _factsCache.key !== key) {
       _factsCache = { key: key, f: CommentBank.facts(_activeCourse, student, getTermId()) };
     }
@@ -576,7 +594,7 @@ window.ReportQuestionnaire = (function () {
     var renamed = r.approvedAt ? nameWas(r, student) : null;
     if (!marks && !pron && !renamed) return null;
     var text = plainComment(r.narrative || '');
-    var key = cid + '|' + student.id + '|' + termId;
+    var key = cid + '|' + student.id + '|' + termId + '|' + _scoreSetKey();
     var sig =
       JSON.stringify(meta) +
       '\u0000' +
@@ -2630,7 +2648,7 @@ window.ReportQuestionnaire = (function () {
       meta.facts_hash +
       '\u0000' +
       displayNameFirst(st);
-    var hit = _claimCache[key];
+    var hit = _claimCache[key + '|' + _scoreSetKey()];
     if (hit && hit.sig === sig) return hit.v;
     var stale = CommentBank.staleness(meta, f, picks, {});
     var v = ((stale && stale.changes) || [])
@@ -2680,7 +2698,7 @@ window.ReportQuestionnaire = (function () {
     v.sort(function (a, b) {
       return a.row - b.row;
     });
-    _claimCache[key] = { sig: sig, v: v };
+    _claimCache[key + '|' + _scoreSetKey()] = { sig: sig, v: v };
     return v;
   }
 
@@ -7426,7 +7444,7 @@ window.ReportQuestionnaire = (function () {
   var _shared = null;
   function _sharedStepHtml(cid) {
     var termId = getTermId();
-    var key = cid + '|' + termId;
+    var key = cid + '|' + termId + '|' + _scoreSetKey();
     if (!_shared || _shared.key !== key)
       _shared = { key: key, r: CommentBank.sharedNextStep(cid, { termId: termId, students: getTqStudents() }) };
     var r = _shared.r;

@@ -16,6 +16,14 @@
 (function () {
   'use strict';
 
+  /* The export is the teacher's own record: all work, drafts included
+     (student page build plan 1.3). That is said in one place, ReportScores'
+     table (teacher/report-scores.js, 'exportData'), and rows() runs inside
+     ReportScores.withReportScores so nothing else can decide it. Comments,
+     notes and statuses are read through ReportScores' readers, which have
+     the data layer's names. */
+  rows = ReportScores.scoped('exportData', rows);
+
   var LIB_URL = '/vendor/exceljs.min.js';
   var TEXT_WIDTH = 60;
 
@@ -255,7 +263,7 @@
       var cname = className(cid);
       var students = sortStudents(getStudents(cid), 'lastName');
       var assessments = sortByDate(getAssessments(cid), 'date');
-      var statuses = getAssignmentStatuses(cid) || {};
+      var statuses = ReportScores.getAssignmentStatuses(cid) || {};
       var byId = {};
       assessments.forEach(function (a) {
         byId[a.id] = a;
@@ -331,8 +339,8 @@
           crits.forEach(function (crit) {
             if (!crit) return;
             var lv = rubricCriterionLevel(cid, st.id, a, crit);
-            var workOn = text(getRubricCriterionComment(cid, st.id, a.id, crit));
-            var beyond = text(getRubricCriterionBeyond(cid, st.id, a.id, crit));
+            var workOn = text(ReportScores.getRubricCriterionComment(cid, st.id, a.id, crit));
+            var beyond = text(ReportScores.getRubricCriterionBeyond(cid, st.id, a.id, crit));
             if (!(lv > 0) && !workOn && !beyond) return;
             var lt = criterionLevelText(lv);
             rubric.push([
@@ -347,11 +355,11 @@
               beyond,
             ]);
           });
-          var overall = text(getScoreComment(cid, st.id, a.id));
-          var note = text(getScoreReportNote(cid, st.id, a.id));
+          var overall = text(ReportScores.getScoreComment(cid, st.id, a.id));
+          var note = text(ReportScores.getScoreReportNote(cid, st.id, a.id));
           if (overall || note) feedback.push([cname, text(a.title), date, studentName(st), '', overall, note]);
           tagIds.forEach(function (tid) {
-            var c = text(getTagComment(cid, st.id, a.id, tid));
+            var c = text(ReportScores.getTagComment(cid, st.id, a.id, tid));
             if (c) feedback.push([cname, text(a.title), date, studentName(st), tagLabel(cid, tid), c, '']);
           });
         });

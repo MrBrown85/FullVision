@@ -2,6 +2,32 @@
 window.PageReports = (function () {
   'use strict';
 
+  /* ── The report's set of scores ──────────────────────────────────
+     Which grades a report is drawn from is chosen in one place,
+     teacher/report-scores.js (student page build plan, S2-T1). This page
+     never decides it and never reads a score. Each function below that
+     draws or measures a Progress Report runs inside
+     ReportScores.withReportScores every time it is called: from a click,
+     the resize timer, the class-fit timer, the palette's peek timer or a
+     promise alike, because the function itself is wrapped, not the code
+     that schedules it. The blocks, the Quick Report, the questionnaire and
+     the phone copies wrap themselves the same way in their own files.
+     What this page keeps to draw faster (the template pictures, the block
+     heights, the class fit, the last render's summary) is keyed by the
+     set, _reportSet(). */
+  var _inReportScores = function (fn) {
+    return ReportScores.scoped('progress', fn);
+  };
+  renderReportPreview = _inReportScores(renderReportPreview);
+  renderStudioPanels = _inReportScores(renderStudioPanels);
+  _templateThumbs = _inReportScores(_templateThumbs);
+  _measureBlockSizes = _inReportScores(_measureBlockSizes);
+  _classSummary = _inReportScores(_classSummary);
+  _blockHtml = _inReportScores(_blockHtml);
+  function _reportSet() {
+    return ReportScores.reportScoreSet('progress');
+  }
+
   /* -- Listener tracking for cleanup ---------------------- */
   var _listeners = [];
   function _addDocListener(type, handler, options) {
@@ -763,10 +789,12 @@ window.PageReports = (function () {
      prints. The toolbar's copy picker shows the term's issues; choosing
      one shows and prints that copy instead of the live reports. */
   var _lastSummary = null;
+  var _lastSummarySet = ''; // the set of scores the summary was drawn from
   var viewingIssue = null; // the loaded copy while one is shown
 
   function _rememberSummary(summary) {
     _lastSummary = summary;
+    _lastSummarySet = _reportSet();
     _annotateSidebar(summary);
     _populateCopies();
     if (studioView === 'all') {
@@ -931,7 +959,13 @@ window.PageReports = (function () {
   var _issueState = null;
 
   function _issueCounts() {
-    var s = _lastSummary || { perStudent: {}, continued: [], noComment: [], noAttendance: [] };
+    // A summary drawn from another set of scores is not what would print now.
+    var s = (_lastSummarySet === _reportSet() && _lastSummary) || {
+      perStudent: {},
+      continued: [],
+      noComment: [],
+      noAttendance: [],
+    };
     var ids = Object.keys(s.perStudent || {});
     var sheets = 0;
     var hashes = {};
@@ -1270,6 +1304,7 @@ window.PageReports = (function () {
   var studioSelected = null; // the selected block id
   var studioTab = 'blocks'; // the palette's tab
   var _blockSizes = null; // every block's Row and Side by Side height for the class, measured once per class/paper/type
+  var _blockSizesSet = ''; // and per set of scores: the set those heights were measured in
 
   /* Every edit saves the form and can be undone: `label` names the change
      on the Undo toast ("Moved Teacher Comment up"); without one there is
@@ -1538,7 +1573,10 @@ window.PageReports = (function () {
       palette.setAttribute('aria-label', 'Quick Report');
     } else if (palette) {
       palette.setAttribute('aria-label', 'Blocks');
-      if (_blockSizes === null) _blockSizes = _measureBlockSizes();
+      if (_blockSizes === null || _blockSizesSet !== _reportSet()) {
+        _blockSizes = _measureBlockSizes();
+        _blockSizesSet = _reportSet();
+      }
       palette.innerHTML = ReportStudio.paletteHtml(
         _formOf(),
         studioTab,
@@ -1573,13 +1611,20 @@ window.PageReports = (function () {
 
   /* Each starter and saved template drawn with the previewed student's
      real report, for the Templates tab: { id: { html, sheets } }. Measured
-     once per class, student, paper and library. */
+     once per class, student, paper, library and set of scores. */
   var _thumbCache = { key: '', thumbs: null };
   function _templateThumbs() {
     var st = _previewStudent();
     if (!st) return null;
     var list = ReportSheets.templates();
-    var key = [activeCourse, st.id, reportPaper, ReportBlocks.reportContext().termId, JSON.stringify(list)].join('|');
+    var key = [
+      activeCourse,
+      st.id,
+      reportPaper,
+      ReportBlocks.reportContext().termId,
+      JSON.stringify(list),
+      _reportSet(),
+    ].join('|');
     if (_thumbCache.key === key) return _thumbCache.thumbs;
     var out = {};
     var ctx = ReportBlocks.reportContext();
@@ -1629,8 +1674,8 @@ window.PageReports = (function () {
   }
 
   /* The whole class laid out on the form, for the fit line, once per
-     class, report, paper and form, after the canvas has rendered. In
-     Everyone view the canvas render is that summary. */
+     class, report, paper, form and set of scores, after the canvas has
+     rendered. In Everyone view the canvas render is that summary. */
   var _classFit = null;
   var _classFitKey = '';
   function _classFitKeyNow() {
@@ -1640,7 +1685,17 @@ window.PageReports = (function () {
       ctx.termId,
       reportPaper,
       _isGrade() ? 'grade:' + JSON.stringify(_gradeOpts()) : JSON.stringify(_formOf()),
+      _reportSet(),
     ].join('|');
+  }
+  /* Every student laid out, off the canvas: the grades are read here, when
+     the timer below runs, inside the report's set of scores. */
+  function _classSummary(students) {
+    return ReportSheets.classSummary(activeCourse, students, ReportBlocks.reportContext(), {
+      paper: reportPaper,
+      form: _formOf(),
+      layout: _layout(),
+    });
   }
   function _scheduleClassFit() {
     if (activeTab !== 'progress') return;
@@ -1657,11 +1712,7 @@ window.PageReports = (function () {
       if (key !== _classFitKey || activeTab !== 'progress') return;
       try {
         var students = sortStudents(getStudents(activeCourse), 'lastName');
-        _classFit = ReportSheets.classSummary(activeCourse, students, ReportBlocks.reportContext(), {
-          paper: reportPaper,
-          form: _formOf(),
-          layout: _layout(),
-        });
+        _classFit = _classSummary(students);
       } catch (e) {
         _classFit = null;
       }
