@@ -48,9 +48,7 @@ ok('this database does not have Batch A yet', one("select to_regclass('public.gr
 want = live_md5()
 got = {r[0]: r[1] for r in rows("""select p.proname, md5(pg_get_functiondef(p.oid)) from pg_proc p
                                     join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public'""")}
-for name in sorted(want):
-    if name == 'get_class_bundle':
-        continue  # not loaded: the batch does not touch it
+for name in sorted(want):   # get_class_bundle and get_gradebook too: loaded with S0-M4 applied, as live has them
     ok('%s is the live function, byte for byte' % name, got.get(name) == want[name], got.get(name))
 
 c.run('begin')

@@ -27,7 +27,7 @@ The app persists teacher data through Supabase Auth plus a public RPC surface. I
 
 - `login.html` and `login-auth.js` handle sign-in, sign-up, password reset, and Demo Mode entry.
 - Authenticated users are routed into the teacher experience.
-- Teachers are the only accounts. Students answer questionnaires and read phone reports on the student page (`s/index.html`; `s/student.js`, the shell, then its screens in `s/questionnaire.js` and `s/report.js`; `shared/phone-report-view.js`) with a code from their slip, through the `student-submit` Supabase edge function. There is no parent portal.
+- Teachers are the only accounts. Students answer questionnaires and read phone reports on the student page (`s/index.html`; `s/student.js`, the shell, then its screens in `s/questionnaire.js` and `s/report.js`; `shared/phone-report-view.js`) with a code from their slip, through the `student-submit` Supabase edge function. A student card's screens are `s/app.js` (the card, Is This You?) and `s/assignments.js` (the Assignments list), with `s/student-data.js` feeding `shared/calc.js` from the student's own page (`calc.js` and `constants.js` are fetched only when the list is about to open, so a slip never loads them); they run in Demo Mode only (`/s/#demo-card`) until the card routes exist. There is no parent portal.
 
 ### Desktop SPA
 
@@ -40,7 +40,7 @@ The app persists teacher data through Supabase Auth plus a public RPC surface. I
   - `page-gradebook.js`
   - `page-observations.js`
   - `page-starters.js`: Observations › Starters (`/observations/starters`)
-  - `page-reports.js`: Reports, with two tabs. The Term Questionnaire is `report-questionnaire.js` (one student at a time: the student strip, What FullVision Has, the Comment Bank and the Teacher Comment); its Comment Bank is data in `shared/comment-bank.js` and a pure engine in `teacher/comment-bank.js` (`facts` reads one student's term from the data layer; `context`, `fits`, `fill`, `parts` decide what is offered). Generate assembles a draft from the bank's sentences; no model writes text (docs/DECISIONS.md). Progress Reports are `report-studio.js`, `report-sheets.js` (forms, layout and fit) and `report-blocks.js` (one renderer per printed block).
+  - `page-reports.js`: Reports, with two tabs. The Term Questionnaire is `report-questionnaire.js` (one student at a time: the student strip, What FullVision Has, the Comment Bank and the Teacher Comment); its Comment Bank is data in `shared/comment-bank.js` and a pure engine in `teacher/comment-bank.js` (`facts` reads one student's term from the data layer; `context`, `fits`, `fill`, `parts` decide what is offered). Generate assembles a draft from the bank's sentences; no model writes text (docs/DECISIONS.md). Progress Reports are `report-studio.js`, `report-sheets.js` (forms, layout and fit) and `report-blocks.js` (one renderer per printed block). Every report surface (these, the Quick Report and its Feedback Pages, Sent to Phones, Print Grades, Export) reads grades through `report-scores.js` (`ReportScores`): one table says which set of scores each surface uses (all work today), `withReportScores` runs a report in it, and its readers are the only way a report file reads a score, comment, note, tick or status from the data layer. `tests/report-score-seam.test.js` holds that.
 - Shared desktop UI shell: `teacher/ui.js`
 
 The desktop app is a single-page app on real paths: `/dashboard`, `/assignments`, `/gradebook`, `/observations`, `/observations/starters`, `/reports` and `/student?id=…`. Netlify serves `teacher/app.html` at each of them and `teacher/router.js` draws the page with `history.pushState`; the list is repeated in `netlify.toml`, `sw.js`, `serve.json` and the local servers, and `tests/app-routes.test.js` keeps them in step. Old `/teacher/app.html#/…` links are rewritten to the clean address at boot. Page modules render into shared mount points for the dock, sidebar, page toolbar, and main content area.
@@ -78,8 +78,10 @@ Shared runtime modules load before desktop or mobile page modules, in this order
 10. `shared/offline-queue.js`
 11. `shared/auto-update.js`
 12. `shared/calc.js`
-13. `shared/rubric-draft.js`
-14. `shared/rubric-checks.js`
+13. `shared/grade-state.js` (the Draft and Returned rule; today every save is returned at once)
+14. `shared/grader.js` (`Grader`, the one module a screen writes a grade through)
+15. `shared/rubric-draft.js`
+16. `shared/rubric-checks.js`
 
 The phone loads the same list without `link-nav.js`, `reporting-term-presets.js` and `rubric-draft.js`.
 

@@ -1,7 +1,8 @@
 // student-submit: where a student's phone opens a questionnaire and sends
-// its answers (docs/STUDENT-VOICE-PLAN.md, PR 6). Deployed with
-// verify_jwt off, since the phone holds no key; the slip's code is the
-// credential, checked in SQL.
+// its answers (docs/STUDENT-VOICE-PLAN.md, PR 6), and where a student's card
+// opens their page (docs/plans/student-page-build-plan.md 1.8). Deployed
+// with verify_jwt off, since the phone holds no key; the slip's or the
+// card's code is the credential, checked in SQL.
 //
 // The phone calls it with ?forceFunctionRegion=ca-central-1 so it runs
 // beside gradebook-prod; handler.ts refuses anywhere else. It reaches the
@@ -33,6 +34,11 @@ const handle = makeHandler({
     },
     async submit(token, answers, ipHash) {
       const [row] = await sql`select student_submit.submit(${token}, ${sql.json(answers)}, ${ipHash}) as r`;
+      return row.r;
+    },
+    // The card routes: one statement each, written in card-routes.ts.
+    async call(text, params) {
+      const [row] = await sql.unsafe(text, params);
       return row.r;
     },
   },

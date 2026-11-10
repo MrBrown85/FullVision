@@ -2280,7 +2280,7 @@ window.PageGradebook = (function () {
       return a.id === aid;
     });
     var undo = _pushUndo(cid, sid, aid, assess ? scoreTagIds(assess, cid) : []);
-    setCompletionMark(cid, sid, aid, mark);
+    Grader.setMark(cid, sid, aid, mark);
     _undoSaved(undo);
     return _redrawCompetencyCell(td);
   }
@@ -2400,11 +2400,10 @@ window.PageGradebook = (function () {
       // Restore previous entry if it existed
       if (prevEntry) scores[undo.sid].push(prevEntry);
     });
-    saveScores(undo.cid, scores);
-    persistScoreDiffToCanonical(undo.cid, beforeScores, scores);
+    Grader.undoCell(undo.cid, undo.sid, undo.aid, beforeScores, scores);
     // The Advanced Rubric ticks Clear Score took off.
     (undo.checkIds || []).forEach(function (id) {
-      setRubricCheck(undo.cid, undo.sid, undo.aid, id, true);
+      Grader.setTick(undo.cid, undo.sid, undo.aid, id, true);
     });
     clearProfCache();
     if (_mounted && activeCourse === undo.cid) render();
@@ -2490,7 +2489,7 @@ window.PageGradebook = (function () {
     var undo = _pushUndo(cid, sid, aid, tids);
     var level = entry.score;
     tids.forEach(function (key) {
-      upsertScore(
+      Grader.typePlusMinus(
         cid,
         sid,
         aid,
@@ -2563,10 +2562,10 @@ window.PageGradebook = (function () {
       var raw = parsePointsInput(inp.value, max);
       var undo = _pushUndo(cid, sid, aid, isPtsCol ? scoreTagIds(assess, cid) : [td.dataset.tid]);
       if (isPtsCol) {
-        setPointsScore(cid, sid, aid, raw);
+        Grader.setPoints(cid, sid, aid, raw);
       } else {
         var tidVal = td.dataset.tid;
-        upsertScore(cid, sid, aid, tidVal, raw || 0, assess.date || courseToday(cid), scoreTypeFor(assess));
+        Grader.typeLevel(cid, sid, aid, tidVal, raw || 0, assess.date || courseToday(cid), scoreTypeFor(assess));
       }
       _undoSaved(undo);
       _redrawCompetencyCell(td);
@@ -3002,22 +3001,21 @@ window.PageGradebook = (function () {
           // An Advanced Rubric's ticks go with the score, so reopening it
           // doesn't suggest a level for work that has none.
           checkIds.forEach(function (id) {
-            setRubricCheck(cid, sid, aid, id, false);
+            Grader.setTick(cid, sid, aid, id, false);
           });
           var hadScore = _undoHadScore(undo) || checkIds.length > 0;
-          clearScoreEntries(cid, scores, sid, assess, clearIds);
-          saveScores(cid, scores);
+          Grader.clearScore(cid, scores, sid, assess, clearIds);
           _undoSaved(undo);
           clearProfCache();
           render();
-          window.clearScore(sid, aid);
+          Grader.clearScoreOnServer(cid, sid, aid);
           if (hadScore) _showClearToast(undo);
         }
       } else if (action === 'markMissing' || action === 'excuseCell' || action === 'lateCell') {
         // Same path as the Assignments page's NS / EXC / Late buttons; picking
         // the cell's current status again takes it off.
         var next = action === 'markMissing' ? 'NS' : action === 'excuseCell' ? 'EXC' : 'LATE';
-        applyAssignmentStatus(activeCourse, sid, aid, status === next ? null : next);
+        Grader.setStatus(activeCourse, sid, aid, status === next ? null : next);
         clearProfCache();
         render();
       }
@@ -3083,7 +3081,7 @@ window.PageGradebook = (function () {
       var key = u.sid + ':' + undo.aid;
       if (st[key] === u.status) delete st[key];
     });
-    saveAssignmentStatuses(undo.cid, st);
+    Grader.undoMarkBlankCells(undo.cid, undo.aid, st);
     _saveBulkStatusUndo(
       undo.cid,
       undo.aid,
@@ -3123,7 +3121,7 @@ window.PageGradebook = (function () {
       }
     });
     if (!marked.length) return;
-    saveAssignmentStatuses(activeCourse, statuses);
+    Grader.markBlankCells(activeCourse, aid, statuses);
     _saveBulkStatusUndo(activeCourse, aid, undo);
     clearProfCache();
     render();
@@ -3216,7 +3214,7 @@ window.PageGradebook = (function () {
           var key = u.sid + ':' + aid;
           if (st[key] === u.status) delete st[key];
         });
-        saveAssignmentStatuses(activeCourse, st);
+        Grader.undoMarkBlankCells(activeCourse, aid, st);
         _saveBulkStatusUndo(activeCourse, aid, []);
         clearProfCache();
         render();
@@ -3293,7 +3291,7 @@ window.PageGradebook = (function () {
         return e.assessmentId !== aid;
       });
     });
-    saveScores(cid, scores);
+    Grader.deleteAssessmentScores(cid, aid, scores);
     // P6.5: previously this branch only cleaned scores+assessments,
     // leaving status pills + observations orphaned in LS and on the
     // server. Mirror page-assignments.js's deleteAssess so the two
@@ -3306,7 +3304,7 @@ window.PageGradebook = (function () {
         statusChanged = true;
       }
     });
-    if (statusChanged) saveAssignmentStatuses(cid, statuses);
+    if (statusChanged) Grader.deleteAssessmentStatuses(cid, aid, statuses);
     deleteAssessmentObservations(cid, aid);
     clearProfCache();
   }
@@ -3472,10 +3470,10 @@ window.PageGradebook = (function () {
       // couldn't keep shows on the sync dot (data.js), not here.
       if (isPts) {
         // One value for the whole assessment, mirrored onto each competency.
-        setPointsScore(cid, sid, aid, val);
+        Grader.setPoints(cid, sid, aid, val);
       } else {
         tagIds.forEach(function (tid) {
-          upsertScore(cid, sid, aid, tid, val, assess.date || courseToday(cid), scoreTypeFor(assess), '');
+          Grader.typeLevel(cid, sid, aid, tid, val, assess.date || courseToday(cid), scoreTypeFor(assess), '');
         });
       }
       _undoSaved(undo);
@@ -3752,7 +3750,7 @@ window.PageGradebook = (function () {
         var keys = _cellScoreKeys(focused);
         var undo = _pushUndo(activeCourse, sid, aid, keys);
         keys.forEach(function (key) {
-          upsertScore(
+          Grader.typeLevel(
             activeCourse,
             sid,
             aid,
@@ -3787,13 +3785,13 @@ window.PageGradebook = (function () {
         var undo = null;
         if (focused.dataset.pts === '1') {
           undo = _pushUndo(activeCourse, sid, aid, assess ? scoreTagIds(assess, activeCourse) : []);
-          setPointsScore(activeCourse, sid, aid, null);
+          Grader.setPoints(activeCourse, sid, aid, null);
           _undoSaved(undo);
         } else if (tid) {
           var clearKeys = _cellScoreKeys(focused);
           undo = _pushUndo(activeCourse, sid, aid, clearKeys);
           clearKeys.forEach(function (key) {
-            upsertScore(
+            Grader.typeLevel(
               activeCourse,
               sid,
               aid,

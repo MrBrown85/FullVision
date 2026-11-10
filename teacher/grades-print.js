@@ -30,6 +30,18 @@
 (function () {
   'use strict';
 
+  /* Print Grades is the teacher's own class sheet: all work, drafts
+     included (student page build plan 1.3). That is said in one place,
+     ReportScores' table (teacher/report-scores.js, 'printGrades'), and the
+     three functions here that read a grade run inside
+     ReportScores.withReportScores so nothing else can decide it. */
+  var _inReportScores = function (fn) {
+    return ReportScores.scoped('printGrades', fn);
+  };
+  buildModel = _inReportScores(buildModel);
+  cellText = _inReportScores(cellText);
+  columnAverageText = _inReportScores(columnAverageText);
+
   var ROOT_ID = 'grades-print-root';
   var STYLE_ID = 'grades-print-page';
   var OVERLAY_ID = 'grades-print-overlay';

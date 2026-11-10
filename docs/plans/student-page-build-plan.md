@@ -183,6 +183,8 @@ The one function, `student-submit`, keeps its four routes and gains these. Each 
 
 `page` returns returned grades only, through the one reader in 1.2.
 
+The card's routes are in `supabase/functions/student-submit/card-routes.ts` (`S0-F4`): `card`, `verify` for a card, `add-card`, `page`, `seen` and `done`. A `verify` that carries a slip's token is a slip's, as before; one that carries a card's code is the card's. A card's `verify` always starts a new session and ends the one the device sent, so a shared Chromebook signs the last student out; only `add-card` joins a session. Which of the two it is (`p_add`) is written into each route's statement and never read from the request (`S0-F4b`). The device's session token travels in the request body as `session`, as a slip's token does: no cookie, no header, never in the address, never in a log. Each route names its one SQL call and copies its reply field by field, so a field the SQL gains by mistake does not reach a phone.
+
 ### 1.9 Client modules
 
 | File                                                                                                                                                         | New or changed | What it is                                                                                                                                                 |

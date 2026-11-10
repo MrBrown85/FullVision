@@ -48,6 +48,7 @@ const FILES = [
   'shared/rubric-draft.js',
   'shared/rubric-checks.js',
   'teacher/ui.js',
+  'teacher/report-scores.js',
   'teacher/report-blocks.js',
   'shared/comment-bank.js',
   'teacher/comment-realiser.js',

@@ -16,6 +16,19 @@
 window.CommentBank = (function () {
   'use strict';
 
+  /* What the comment says about a student is read in the set of scores the
+     Term Questionnaire uses (teacher/report-scores.js): the three functions
+     that read grades run inside ReportScores.withReportScores every time
+     they are called, so the facts, Generate and every check made from
+     them leave out what that set leaves out. Called from a printed block,
+     they take the report's set. */
+  var _inReportScores = function (fn) {
+    return ReportScores.scoped('questionnaire', fn);
+  };
+  facts = _inReportScores(facts);
+  compsOf = _inReportScores(compsOf);
+  markedCounts = _inReportScores(markedCounts);
+
   /* The habit scale as stored in term_rating.habits. */
   var SCALE = ['Rarely', 'Sometimes', 'Usually', 'Consistently', 'Not Seen'];
   var CONSISTENTLY = 4;
@@ -2533,7 +2546,7 @@ window.CommentBank = (function () {
       .map(function (a) {
         var v = getAssessmentOverallScore(cid, sid, a.id);
         // The teacher's Note for the Report on the piece, for the best-piece sentence.
-        var note = typeof getScoreReportNote === 'function' ? getScoreReportNote(cid, sid, a.id) : '';
+        var note = ReportScores.getScoreReportNote(cid, sid, a.id);
         // Points work's own % (points earned out of possible, calc.js), the
         // mark a Letter class prints for it (workMark): its level is only a
         // band of that %. Rubric work's own % is its criteria's percents, as
