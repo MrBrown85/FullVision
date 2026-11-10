@@ -18,6 +18,11 @@ window.PageAssignments = (function () {
   var filterCategories = [];
   var assessSearch = '';
   var showUngraded = false;
+  // "N to return" pressed: only the assessments with a draft (S1-F2).
+  var _toReturnOnly = false;
+  // The drafts on screen, summed over the listed assessments at the last
+  // render or refresh.
+  var _toReturnTotal = 0;
   var _filterMenuOpen = false;
   var rubricViewStates = {};
   // Advanced Rubric checklists open under their criterion rows, keyed
@@ -270,6 +275,12 @@ window.PageAssignments = (function () {
   function stepFocusStudent(dir) {
     if (!focusStudentId) return;
     var memo = _graderFocusMemo();
+    // Show is on To Return or Returned: the next student it lists (S1-F2).
+    if (_grader && _graderStepShown(dir)) {
+      _graderToTop();
+      _restoreGraderFocus(memo);
+      return;
+    }
     if (_grader && _graderStepGroup(dir)) {
       _graderToTop();
       _restoreGraderFocus(memo);
@@ -515,6 +526,7 @@ window.PageAssignments = (function () {
       esc(assessSearch) +
       '" data-action-input="assessSearch" aria-label="Search assessments">' +
       '</div>' +
+      (_holdsGrades(cid) ? '<span class="assess-to-return-slot">' + _toReturnPillHtml() + '</span>' : '') +
       '<div class="seg assess-seg-control" role="group" aria-label="Expand or collapse all assessments">' +
       '<button class="seg-btn assess-seg-btn"' +
       segAttr(
@@ -1576,6 +1588,9 @@ window.PageAssignments = (function () {
           return st.id === focusStudentId;
         })
       : null;
+    // What is waiting to return (S1-F2), in a class that holds grades.
+    var holds = _holdsGrades(cid);
+    var shownIds = holds ? _returnShownIds(cid) : null;
     function renderAssessCard(a, isUncategorized) {
       var isOpen = focusStudentId
         ? _allExpanded
@@ -1693,9 +1708,23 @@ window.PageAssignments = (function () {
             ' missing</span>'
           );
         })() +
+        (holds && !isDibelsScored(a)
+          ? '<span class="assess-returns" data-returns-aid="' +
+            a.id +
+            '">' +
+            _returnChipsHtml(cid, a, shownIds) +
+            '</span>'
+          : '') +
         '</span>' +
         '</div>' +
         '<div class="assess-header-actions" data-stop-prop="true">' +
+        (holds && !isDibelsScored(a)
+          ? '<span class="assess-return-slot" data-return-slot-aid="' +
+            a.id +
+            '">' +
+            _returnDraftsButtonHtml(cid, a, shownIds) +
+            '</span>'
+          : '') +
         (a.rubricId && getRubricById(cid, a.rubricId)
           ? (function () {
               var showRubric = rubricViewStates[a.id] !== undefined ? rubricViewStates[a.id] : true;
@@ -1794,7 +1823,7 @@ window.PageAssignments = (function () {
       grouped[key].push(a);
     });
 
-    var filtersActive = filterCategories.length > 0 || showUngraded || !!assessSearch;
+    var filtersActive = filterCategories.length > 0 || showUngraded || !!assessSearch || _toReturnOnly;
     if (!filtersActive) _filterClosedModules = {};
 
     // Nothing to show: say so first, above any modules.
@@ -2493,6 +2522,25 @@ window.PageAssignments = (function () {
       });
     }
 
+    // What is waiting to return (S1-F2): the toolbar's count is the drafts
+    // on screen, summed over the assessments listed; pressed, it leaves
+    // only the assessments with one. A class that holds no grades has none.
+    _toReturnTotal = 0;
+    if (_holdsGrades(cid)) {
+      var shownIds = _returnShownIds(cid);
+      var waitingIn = {};
+      assessments.forEach(function (a) {
+        waitingIn[a.id] = GradeState.draftsIn(cid, a.id, shownIds).length;
+        _toReturnTotal += waitingIn[a.id];
+      });
+      // Returning the last draft turns the filter off.
+      if (!_toReturnTotal) _toReturnOnly = false;
+      if (_toReturnOnly)
+        assessments = assessments.filter(function (a) {
+          return waitingIn[a.id] > 0;
+        });
+    } else _toReturnOnly = false;
+
     // Render toolbar
     var result = renderAssessToolbar(cid, assessments);
     // html-safe: renderAssessToolbar escapes course names, category names, search text and student names
@@ -2521,6 +2569,8 @@ window.PageAssignments = (function () {
     }
     document.querySelectorAll('#main .ldg-grid').forEach(refreshLedgerSummary);
     _refreshClassResultsSoon();
+    // The marks and counts to return, as just drawn (S1-F2).
+    _refreshReturns(true);
 
     // Show/hide descriptor bar
     var hasActiveRubricView = false;
@@ -6683,6 +6733,9 @@ window.PageAssignments = (function () {
 
   function ledgerRowOpen(kind, aid, st, stStatus) {
     var disableRow = stStatus && stStatus !== 'LATE';
+    // Draft or Returned beside the name (S1-F2); '' in a class that holds
+    // no grades, where the row is as it was.
+    var mark = _returnMarkHtml(activeCourse, aid, st.id);
     return (
       '<div class="score-row ldg-row ldg-' +
       kind +
@@ -6695,12 +6748,16 @@ window.PageAssignments = (function () {
       '" data-status-assess="' +
       aid +
       '">' +
-      '<span class="ldg-name">' +
+      '<span class="ldg-name' +
+      (mark ? ' ldg-name-ret' : '') +
+      '">' +
+      (mark ? '<span class="ldg-name-text">' : '') +
       esc(
         _groupRowFor(aid, st.id) && _groupRowFor(aid, st.id).view
           ? _groupRowFor(aid, st.id).view.label
           : displayNameWithLast(st),
       ) +
+      (mark ? '</span>' + mark : '') +
       '</span>'
     );
   }
@@ -8009,6 +8066,9 @@ window.PageAssignments = (function () {
       esc(row && row.view ? row.view.label : displayNameWithLast(st)) +
       '</span>' +
       (row && row.view ? '' : _printMarkHtml(cid, aid, st.id)) +
+      // Draft or Returned (S1-F2). A rubric's second grid, Competencies Not
+      // in the Rubric, repeats the head: the mark is drawn once, above.
+      (_groupStripOff ? '' : _returnMarkHtml(cid, aid, st.id)) +
       (row && row.view
         ? ''
         : '<div class="grader-status rsg-status" role="group" aria-label="Status" data-stop-prop="true">' +
@@ -8092,6 +8152,8 @@ window.PageAssignments = (function () {
     el.classList.toggle('has-text', !!text);
     if (text === getScoreComment(activeCourse, el.dataset.sid, el.dataset.aid)) return;
     Grader.setOverallComment(activeCourse, el.dataset.sid, el.dataset.aid, text);
+    // A comment saved off its timer follows no click: the Draft marks do.
+    _returnsAfterEvent();
   }
   function _queueOverallComment(el) {
     el.classList.toggle('has-text', !!el.value.trim());
@@ -10819,6 +10881,16 @@ window.PageAssignments = (function () {
         render();
         _refocusFilterItem('[data-action="toggleUngraded"]');
       },
+      // What is waiting to return (S1-F2).
+      toggleToReturn: function () {
+        _toggleToReturn();
+      },
+      returnDrafts: function () {
+        _askReturnDrafts(el.dataset.aid, el);
+      },
+      returnOne: function () {
+        _returnOne(el.dataset.aid, el.dataset.sid, el);
+      },
       toggleAssessFilterMenu: function () {
         _setFilterMenu(!_filterMenuOpen);
       },
@@ -11866,6 +11938,8 @@ window.PageAssignments = (function () {
       // The gradebook's rows, in their order: group work steps through these.
       rowOrder: opts.studentIds && opts.studentIds.length ? opts.studentIds.slice() : null,
       onClose: opts.onClose || null,
+      // Show: To Return, Returned or All (S1-F2).
+      show: 'all',
     };
     overlay.addEventListener('mousedown', function (e) {
       if (e.target === overlay) closeGrader();
@@ -11877,6 +11951,8 @@ window.PageAssignments = (function () {
       if (what === 'close') closeGrader();
       else if (what === 'next' || what === 'prev') stepFocusStudent(what === 'next' ? 1 : -1);
       else if (what === 'return') _graderReturn();
+      else if (what === 'show') _graderSetShow(btn.dataset.show);
+      else if (what === 'returnAll') _graderReturnAll(btn);
       else _graderGroupAction(what, btn.dataset.sid);
     });
     // A click anywhere but the open ⋯ menu closes it.
@@ -12240,6 +12316,7 @@ window.PageAssignments = (function () {
           '</span>') +
       '</div>' +
       _graderHtml(cid, a, tagObjs, [st], scores, true) +
+      _inlineReturnRowHtml(cid, a, st.id) +
       '</div>'
     );
   }
@@ -12546,6 +12623,9 @@ window.PageAssignments = (function () {
       : returnStep + '\u2190 \u2192 change student \u00B7 Esc closes';
     _refreshReportNote(dialog, cid, a, sid);
     _refreshGraderReturn(dialog, cid, a, sid, view);
+    // To Return, Returned and All, and Return N Graded (S1-F2). It draws
+    // the dialog again itself when what Show lists has run out.
+    if (_refreshGraderShow(dialog, cid, a)) return;
     // Printed / Changed Since Printed beside the name (teacher/rubric-print.js).
     var markHtml = view ? '' : _printMarkHtml(cid, a.id, sid);
     var markBox = dialog.querySelector('.grader-print-mark');
@@ -12590,8 +12670,10 @@ window.PageAssignments = (function () {
     return view && view.linked ? view.linked.slice() : [sid];
   }
 
-  // html-safe: fixed labels; the name and the date go through esc
-  function _graderReturnHtml(cid, a, sid, view) {
+  // html-safe: fixed labels; the name and the date go through esc; `attrs` is built by the caller from our ids and an escaped title
+  function _graderReturnHtml(cid, a, sid, view, attrs) {
+    // The dialog's Return; one student's view on the page passes its own.
+    var act = attrs || 'data-grader="return"';
     var klass = getReturnSettings(cid);
     if (!klass.student_page || isDibelsScored(a)) return '';
     // A Missing or Excused piece is never a draft (GradeState.stateOf).
@@ -12609,7 +12691,7 @@ window.PageAssignments = (function () {
       if (GradeState.stateOf(cid, sid, a.id) !== GradeState.RETURNED) {
         // Missing, Excused or Late with nothing in: there is nothing to return.
         if (getAssignmentStatus(cid, sid, a.id)) return '';
-        return '<button type="button" class="grader-return-btn" data-grader="return" disabled>Return</button>';
+        return '<button type="button" class="grader-return-btn" ' + act + ' disabled>Return</button>';
       }
       var on = row && row.returned_at ? formatShortDate(row.returned_at) : '';
       return '<span class="grader-returned">' + esc(on ? 'Returned ' + on : 'Returned') + '</span>';
@@ -12628,7 +12710,9 @@ window.PageAssignments = (function () {
       still = '<p class="grader-draft-still">' + esc(who + ' still sees the grade you returned' + when + '.') + '</p>';
     }
     return (
-      '<button type="button" class="grader-return-btn" data-grader="return">Return</button>' +
+      '<button type="button" class="grader-return-btn" ' +
+      act +
+      '>Return</button>' +
       '<div class="grader-draft"><p class="grader-draft-line">' +
       '<span class="grader-draft-mark">Draft</span><span class="grader-draft-text">Saved. Not returned yet.</span>' +
       '</p>' +
@@ -12677,6 +12761,533 @@ window.PageAssignments = (function () {
     // The button is gone: the dialog keeps the keys.
     var dialog = _grader.overlay.querySelector('.grader-dialog');
     if (dialog && !_grader.overlay.contains(document.activeElement)) dialog.focus({ preventScroll: true });
+  }
+
+  /* ── What is waiting to return (S1-F2) ────────────────────
+     In a class whose student page is on (the build switch) and that returns
+     grades When I Return Them, a grade is a draft until it is returned
+     (shared/grade-state.js). The Assignments page then shows:
+     - on the toolbar, "N to return": the drafts on screen, summed over the
+       assessments listed. Pressed, it leaves only the assessments with one;
+     - on a card, "N to return" and "N returned" among its chips, and
+       Return N Graded among its buttons, which asks first: the button
+       names nobody, so the app's confirm dialog says who gets their grade;
+     - on a student's row, the Draft mark, or Returned with its date;
+     - with one student open, the dialog's row under each grader: Return
+       with the Draft mark and "Saved. Not returned yet.", or Returned.
+       Return is one click: it returns the grade on screen. On pair or
+       group work a partner's draft goes with it, so it asks first.
+     The grader dialog gets Show (To Return, Returned, All), which is what
+     ← → step through, and Return N Graded, in a bar under its title.
+     In any other class none of it is drawn and nothing here runs past
+     _holdsGrades: the page's HTML is what it was
+     (tests/assignments-return.test.js).
+
+     Every count is GradeState.draftsIn, which asks GradeState.stateOf, as
+     the gradebook, the phone and Class Settings do: a Missing or Excused
+     piece is never a draft and a DIBELS benchmark has no state. Who a
+     Return N Graded returns, its N, the line of names and the question's
+     words are GradeState's (draftsReturned, draftsSentence, returnQuestion,
+     returnNGraded), so the three screens say the same. Every return goes
+     through Grader.returnGrades. Nothing here changes a number. */
+  function _holdsGrades(cid) {
+    if (!cid || typeof getReturnSettings !== 'function') return false;
+    var klass = getReturnSettings(cid);
+    return !!klass.student_page && GradeState.holds(klass);
+  }
+
+  // The students on screen: the one open, or the whole class.
+  function _returnShownIds(cid) {
+    if (focusStudentId) return [focusStudentId];
+    return sortStudents(getStudents(cid), 'lastName').map(function (s) {
+      return s.id;
+    });
+  }
+
+  /* The toolbar's "N to return". Nothing is drawn when N is 0. */
+  // html-safe: a number and fixed words
+  function _toReturnPillHtml() {
+    if (!_toReturnTotal) return '';
+    return (
+      '<button type="button" class="assess-to-return-btn' +
+      (_toReturnOnly ? ' active' : '') +
+      '" data-action="toggleToReturn" aria-pressed="' +
+      _toReturnOnly +
+      '" title="' +
+      (_toReturnOnly
+        ? 'Showing only the assessments with a draft to return. Click to show everything.'
+        : 'Show only the assessments with a draft to return.') +
+      '">' +
+      _toReturnTotal +
+      ' to return' +
+      (_toReturnOnly ? ' <span aria-hidden="true">×</span>' : '') +
+      '</button>'
+    );
+  }
+
+  function _toggleToReturn() {
+    _toReturnOnly = !_toReturnOnly;
+    render();
+    var pill = document.querySelector('.assess-to-return-btn');
+    if (pill) pill.focus({ preventScroll: true });
+  }
+
+  /* A card's chips: the drafts among the students on screen, and with the
+     whole class on screen how many have their grade. */
+  // html-safe: numbers and fixed words
+  function _returnChipsHtml(cid, a, shownIds) {
+    var n = GradeState.draftsIn(cid, a.id, shownIds).length;
+    var given = focusStudentId
+      ? 0
+      : shownIds.filter(function (sid) {
+          return GradeState.stateOf(cid, sid, a.id) === GradeState.RETURNED;
+        }).length;
+    return (
+      (n ? '<span class="assess-to-return">' + n + ' to return</span>' : '') +
+      (given ? '<span class="assess-returned">' + given + ' returned</span>' : '')
+    );
+  }
+
+  /* A card's Return N Graded, with the whole class on screen: drawn only
+     while the assessment has drafts. With one student open, the row under
+     their grader has Return. */
+  // html-safe: the id is ours; the names and the title go through esc
+  function _returnDraftsButtonHtml(cid, a, shownIds) {
+    if (focusStudentId) return '';
+    var waiting = GradeState.draftsReturned(cid, a.id, shownIds);
+    if (!waiting.length) return '';
+    var label = GradeState.returnNGraded(waiting.length);
+    return (
+      '<button type="button" class="assess-return-btn" data-action="returnDrafts" data-aid="' +
+      a.id +
+      '" title="' +
+      esc(GradeState.draftsSentence(cid, waiting)) +
+      '" aria-label="' +
+      esc(label + ', ' + (a.title || 'Assessment')) +
+      '">' +
+      esc(label) +
+      '</button>'
+    );
+  }
+
+  // The students a row stands for: a group's members still graded with it, or one.
+  function _returnMarkIds(aid, sid) {
+    var row = _groupRowFor(aid, sid);
+    return row && row.view ? row.view.linked.slice() : [sid];
+  }
+
+  /* A row's mark: Draft while a grade of the row's waits, Returned (with
+     its date, when one is known) once it is given, nothing with no grade. */
+  // html-safe: fixed words; the date goes through esc
+  function _returnMarkInner(cid, aid, ids) {
+    if (GradeState.draftsIn(cid, aid, ids).length) return '<span class="ret-draft">Draft</span>';
+    var on = null;
+    var given = ids.filter(function (id) {
+      if (GradeState.stateOf(cid, id, aid) !== GradeState.RETURNED) return false;
+      var row = getGradeReturn(cid, id, aid);
+      if (on == null && row && row.returned_at) on = formatShortDate(row.returned_at);
+      return true;
+    });
+    if (!given.length) return '';
+    return '<span class="ret-returned">' + esc(on ? 'Returned ' + on : 'Returned') + '</span>';
+  }
+
+  /* The mark beside a student's name in a whole-class grid or ledger.
+     '' in a class that holds no grades and on a DIBELS benchmark. */
+  // html-safe: ids are ours; the inner HTML is _returnMarkInner's
+  function _returnMarkHtml(cid, aid, sid) {
+    if (!_holdsGrades(cid)) return '';
+    var a = _assessmentById(cid, aid);
+    if (!a || isDibelsScored(a)) return '';
+    var ids = _returnMarkIds(aid, sid);
+    return (
+      '<span class="ret-mark" data-ret-aid="' +
+      aid +
+      '" data-ret-sids="' +
+      ids.join(',') +
+      '">' +
+      _returnMarkInner(cid, aid, ids) +
+      '</span>'
+    );
+  }
+
+  /* With one student open: the dialog's row under their grader, Return
+     with the Draft mark and its line, or Returned. The row is about the
+     student on screen, on pair and group work too (the dialog shows the
+     group there; the page shows the student), so it agrees with the count
+     on the toolbar and with what Return does (_returnOne). */
+  // html-safe: ids are ours; the title goes through esc; the row is _graderReturnHtml's
+  function _inlineReturnInner(cid, a, sid) {
+    return _graderReturnHtml(
+      cid,
+      a,
+      sid,
+      null,
+      'data-action="returnOne" data-aid="' +
+        a.id +
+        '" data-sid="' +
+        sid +
+        '" aria-label="' +
+        esc('Return, ' + (a.title || 'Assessment')) +
+        '"',
+    );
+  }
+  // html-safe: ids are ours; the row is _inlineReturnInner's
+  function _inlineReturnRowHtml(cid, a, sid) {
+    if (!_holdsGrades(cid) || isDibelsScored(a)) return '';
+    var html = _inlineReturnInner(cid, a, sid);
+    return (
+      '<div class="grader-return grader-return-inline" data-return-row-aid="' +
+      a.id +
+      '" data-return-row-sid="' +
+      sid +
+      '"' +
+      (html ? '' : ' hidden') +
+      '>' +
+      html +
+      '</div>'
+    );
+  }
+
+  /* Brings the page's marks, counts and buttons up to date without a
+     redraw, after an event that may have saved a grade. Each piece is
+     written only when it changes: a button swapped out under the mouse
+     loses its click. What a piece holds is remembered on its element, as
+     the string its builder made: the browser's own copy of the HTML can
+     differ from it (an apostrophe in a title), and would look changed.
+     render() calls this with `drawn` set once it has drawn the page, to
+     remember what it drew and write nothing. */
+  function _refreshReturns(drawn) {
+    if (_grader) return;
+    var cid = activeCourse;
+    if (!_holdsGrades(cid) || !document.getElementById('main')) return;
+    var shownIds = _returnShownIds(cid);
+    var set = function (el, html) {
+      if (drawn === true || el._returnsHtml === html) {
+        el._returnsHtml = html;
+        return false;
+      }
+      el._returnsHtml = html;
+      // html-safe: every string set here is built by a reviewed builder above
+      el.innerHTML = html;
+      return true;
+    };
+    var total = 0;
+    document.querySelectorAll('#main [data-returns-aid]').forEach(function (el) {
+      var a = _assessmentById(cid, el.dataset.returnsAid);
+      if (!a) return;
+      total += GradeState.draftsIn(cid, a.id, shownIds).length;
+      set(el, _returnChipsHtml(cid, a, shownIds));
+    });
+    document.querySelectorAll('#main [data-return-slot-aid]').forEach(function (el) {
+      var a = _assessmentById(cid, el.dataset.returnSlotAid);
+      if (a) set(el, _returnDraftsButtonHtml(cid, a, shownIds));
+    });
+    document.querySelectorAll('#main [data-ret-aid]').forEach(function (el) {
+      set(el, _returnMarkInner(cid, el.dataset.retAid, el.dataset.retSids.split(',')));
+    });
+    document.querySelectorAll('#main [data-return-row-aid]').forEach(function (el) {
+      var a = _assessmentById(cid, el.dataset.returnRowAid);
+      if (!a) return;
+      var html = _inlineReturnInner(cid, a, el.dataset.returnRowSid);
+      if (set(el, html)) el.hidden = !html;
+    });
+    if (drawn === true || total === _toReturnTotal) return;
+    _toReturnTotal = total;
+    // The last draft is returned: the filter turns off and the list is whole again.
+    if (!total && _toReturnOnly) return render();
+    var slot = document.querySelector('.assess-to-return-slot');
+    // html-safe: built by _toReturnPillHtml
+    if (slot) slot.innerHTML = _toReturnPillHtml();
+  }
+  function _returnsAfterEvent() {
+    if (_grader || !_holdsGrades(activeCourse)) return;
+    setTimeout(_refreshReturns, 0);
+  }
+
+  /* Return the drafts `sids` hold on `aid`, and their partners': the
+     grader is handed each one's whole pair or group, as the dialog's
+     Return hands it, and returns the drafts among them. The drafts are
+     counted again here, so a question answered late returns what is
+     waiting now. True when any was returned. */
+  function _returnDrafts(cid, aid, sids) {
+    if (!_holdsGrades(cid)) return false;
+    var waiting = GradeState.draftsIn(cid, aid, sids);
+    if (!waiting.length) return false;
+    Grader.returnGrades(cid, aid, GradeState.returnTogether(cid, aid, waiting));
+    clearProfCache();
+    return true;
+  }
+
+  /* After a return on the page. With the filter on, a card with nothing
+     left to return leaves the list, so the list is drawn again. */
+  function _afterPageReturn() {
+    if (_toReturnOnly) render();
+    else _refreshReturns();
+  }
+
+  /* A Return that returns more than the one grade on screen, or names
+     nobody, asks first (Colin, 2026-11-10): "Return 3 Grades Now?", who
+     is waiting, Return 3 Graded and Cancel. Cancel returns nothing and
+     gives `button` the focus back. */
+  function _askReturn(cid, waiting, button, then) {
+    var n = waiting.length;
+    // The dialog gives the focus back to what had it when it opened. Safari
+    // does not focus a button it clicks, so the button takes it first.
+    if (button && button.focus) button.focus({ preventScroll: true });
+    showConfirm(
+      GradeState.returnQuestion(n),
+      GradeState.draftsSentence(cid, waiting),
+      GradeState.returnNGraded(n),
+      'primary',
+      then,
+    );
+  }
+
+  /* A card's Return N Graded. The button goes with the drafts, so the
+     card's next button takes the focus. */
+  function _askReturnDrafts(aid, button) {
+    var cid = activeCourse;
+    if (!_holdsGrades(cid) || focusStudentId) return;
+    var waiting = GradeState.draftsReturned(cid, aid, _returnShownIds(cid));
+    if (!waiting.length) return _refreshReturns();
+    _askReturn(cid, waiting, button, function () {
+      if (activeCourse !== cid || _grader) return;
+      _returnDrafts(cid, aid, _returnShownIds(cid));
+      _afterPageReturn();
+      var card = document.getElementById('ac-' + aid);
+      var next = card && card.querySelector('.assess-header-actions button');
+      if (!next) next = document.querySelector('.assess-to-return-btn, .assess-search-input');
+      if (next) next.focus({ preventScroll: true });
+    });
+  }
+
+  /* Return under one student's grader on the page. It returns the grade
+     on screen, so it is one click. On pair or group work a partner's draft
+     goes with it: then it asks first and names everyone. */
+  function _returnOne(aid, sid, button) {
+    var cid = activeCourse;
+    if (!_holdsGrades(cid)) return;
+    var waiting = GradeState.draftsReturned(cid, aid, [sid]);
+    if (!waiting.length) return _refreshReturns();
+    var done = function () {
+      if (activeCourse !== cid || _grader) return;
+      _returnDrafts(cid, aid, [sid]);
+      _afterPageReturn();
+      // The button is gone: the student's grader keeps the keys.
+      var card = document.getElementById('ac-' + aid);
+      var box = card && card.querySelector('.grader-inline');
+      var to = box && box.querySelector('.grdt-crit, .grdl-card, .grdp-input, .cmp-btn');
+      if (to && !box.contains(document.activeElement)) to.focus({ preventScroll: true });
+    };
+    if (waiting.length > 1) return _askReturn(cid, waiting, button, done);
+    done();
+  }
+
+  /* ── Show and Return N Graded in the dialog (S1-F2) ─────────
+     A bar under the dialog's title, in a class that holds grades, when the
+     dialog steps through more than one student: Show (To Return 3,
+     Returned 14, All 28) and Return 3 Graded. The counts are students, as
+     the gradebook's and the phone's are. To Return is the drafts among the
+     dialog's students; Return N Graded also counts a partner a search has
+     hidden, as the gradebook's column does. Show is what ← → step
+     through: the student on screen stays until a step, and when the last
+     one it lists is gone it goes back to All. */
+  var _SHOW_LABELS = { toreturn: 'To Return', returned: 'Returned', all: 'All' };
+
+  // The dialog's stops, in order: a group or a student each.
+  function _graderStops(cid, a) {
+    var steps = _graderSteps(cid, a);
+    if (steps)
+      return steps.map(function (u) {
+        return { focus: u.source || u.sid, ids: _unitIds(u) };
+      });
+    return _grader.studentIds.map(function (sid) {
+      return { focus: sid, ids: [sid] };
+    });
+  }
+  // True when Show lists the stop: it has a draft, or its grade is given.
+  function _stopShown(cid, aid, stop, show) {
+    var draft = GradeState.draftsIn(cid, aid, stop.ids).length > 0;
+    if (show === 'toreturn') return draft;
+    if (show === 'returned')
+      return (
+        !draft &&
+        stop.ids.some(function (id) {
+          return GradeState.stateOf(cid, id, aid) === GradeState.RETURNED;
+        })
+      );
+    return true;
+  }
+  function _stopIndex(stops, sid) {
+    for (var i = 0; i < stops.length; i++) if (stops[i].ids.indexOf(sid) >= 0) return i;
+    return -1;
+  }
+  // The next stop Show lists from the one on screen, or null.
+  function _nextShownStop(cid, a, dir) {
+    var stops = _graderStops(cid, a);
+    var at = _stopIndex(stops, focusStudentId);
+    for (var i = at < 0 && dir < 0 ? stops.length - 1 : at + dir; i >= 0 && i < stops.length; i += dir)
+      if (_stopShown(cid, a.id, stops[i], _grader.show)) return stops[i];
+    return null;
+  }
+  function _graderShowOn() {
+    return !!_grader && (_grader.show === 'toreturn' || _grader.show === 'returned');
+  }
+
+  // ← → while Show is on To Return or Returned. False when it is on All.
+  function _graderStepShown(dir) {
+    if (!_graderShowOn()) return false;
+    var cid = activeCourse;
+    var a = _assessmentById(cid, _grader.aid);
+    if (!a || !_holdsGrades(cid)) return false;
+    var next = _nextShownStop(cid, a, dir);
+    if (!next) return true;
+    _grader.menuSid = null;
+    focusStudentId = next.focus;
+    render();
+    return true;
+  }
+
+  /* The bar's counts: students, among those the dialog steps through. */
+  function _graderShowCounts(cid, a) {
+    var ids = _grader.studentIds;
+    return {
+      toreturn: GradeState.draftsIn(cid, a.id, ids).length,
+      returned: ids.filter(function (sid) {
+        return GradeState.stateOf(cid, sid, a.id) === GradeState.RETURNED;
+      }).length,
+      all: ids.length,
+    };
+  }
+
+  // html-safe: fixed labels and numbers; the names in the title go through esc
+  function _graderShowHtml(cid, a, counts) {
+    var show = _grader.show || 'all';
+    var waiting = GradeState.draftsReturned(cid, a.id, _grader.studentIds);
+    var label = GradeState.returnNGraded(waiting.length);
+    return (
+      '<div class="seg seg-sm grader-show-seg" role="group" aria-label="Show">' +
+      ['toreturn', 'returned', 'all']
+        .map(function (key) {
+          return (
+            '<button type="button" class="seg-btn"' +
+            segAttr(show === key) +
+            ' data-grader="show" data-show="' +
+            key +
+            '"' +
+            (counts[key] ? '' : ' disabled') +
+            '>' +
+            _SHOW_LABELS[key] +
+            ' <span class="grader-show-n">' +
+            counts[key] +
+            '</span></button>'
+          );
+        })
+        .join('') +
+      '</div>' +
+      (waiting.length
+        ? '<button type="button" class="grader-return-all" data-grader="returnAll" title="' +
+          esc(GradeState.draftsSentence(cid, waiting)) +
+          '">' +
+          esc(label) +
+          '</button>'
+        : '')
+    );
+  }
+
+  /* The bar is made only in a class that holds grades, under the
+     dialog's title bar, and redrawn only when it changes. True when it
+     drew the whole dialog again: what Show listed has run out. */
+  function _refreshGraderShow(dialog, cid, a) {
+    var box = dialog.querySelector('.grader-show');
+    var on = _holdsGrades(cid) && !isDibelsScored(a) && _grader.studentIds.length > 1;
+    if (!on) {
+      if (box) box.remove();
+      _grader.show = 'all';
+      _grader.showHtml = null;
+      return false;
+    }
+    var counts = _graderShowCounts(cid, a);
+    if (_graderShowOn() && !counts[_grader.show]) {
+      _grader.show = 'all';
+      render();
+      return true;
+    }
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'grader-show';
+      dialog.querySelector('.grader-toolbar').insertAdjacentElement('afterend', box);
+      _grader.showHtml = null;
+    }
+    var html = _graderShowHtml(cid, a, counts);
+    if (_grader.showHtml !== html) {
+      _grader.showHtml = html;
+      // html-safe: built by _graderShowHtml
+      box.innerHTML = html;
+    }
+    // Previous and Next follow what Show lists.
+    if (_graderShowOn()) {
+      dialog.querySelector('[data-grader="prev"]').disabled = !_nextShownStop(cid, a, -1);
+      dialog.querySelector('[data-grader="next"]').disabled = !_nextShownStop(cid, a, 1);
+    }
+    return false;
+  }
+
+  /* A press on To Return, Returned or All. When the student on screen is
+     not one it lists, the first one it lists opens. */
+  function _graderSetShow(show) {
+    if (!_grader || !_SHOW_LABELS[show]) return;
+    var cid = activeCourse;
+    var a = _assessmentById(cid, _grader.aid);
+    if (!a || !_holdsGrades(cid)) return;
+    _grader.show = show;
+    if (_graderShowOn()) {
+      var stops = _graderStops(cid, a);
+      var at = _stopIndex(stops, focusStudentId);
+      if (at < 0 || !_stopShown(cid, a.id, stops[at], show)) {
+        var first = stops.find(function (stop) {
+          return _stopShown(cid, a.id, stop, show);
+        });
+        if (first) {
+          _grader.menuSid = null;
+          focusStudentId = first.focus;
+          _graderToTop();
+        }
+      }
+    }
+    render();
+    var pressed = _grader && _grader.overlay.querySelector('.grader-show [data-show="' + _grader.show + '"]');
+    if (pressed) pressed.focus({ preventScroll: true });
+  }
+
+  /* Return N Graded in the dialog: every draft among the dialog's
+     students, and their partners'. It asks first, unless the only drafts
+     are the grade on screen, which the dialog's own Return returns in one
+     click. */
+  function _graderReturnAll(button) {
+    if (!_grader) return;
+    var cid = activeCourse;
+    var a = _assessmentById(cid, _grader.aid);
+    if (!a || !_holdsGrades(cid)) return;
+    var ids = _grader.studentIds;
+    var waiting = GradeState.draftsReturned(cid, a.id, ids);
+    if (!waiting.length) return _refreshGraderChrome();
+    var overlay = _grader.overlay;
+    var done = function () {
+      if (!_grader || _grader.overlay !== overlay || activeCourse !== cid) return;
+      _returnDrafts(cid, a.id, ids);
+      _refreshGraderChrome();
+      // The button is gone: the dialog keeps the keys.
+      var dialog = _grader && _grader.overlay.querySelector('.grader-dialog');
+      if (dialog && !_grader.overlay.contains(document.activeElement)) dialog.focus({ preventScroll: true });
+    };
+    var onScreen = _graderReturnIds(focusStudentId, _graderGroupView(cid, a, focusStudentId));
+    var justThese = waiting.every(function (sid) {
+      return onScreen.indexOf(sid) >= 0;
+    });
+    if (justThese) return done();
+    _askReturn(cid, waiting, button, done);
   }
 
   /* ── Note for the Report ──────────────────────────────────
@@ -12997,6 +13608,7 @@ window.PageAssignments = (function () {
     filterCategories = [];
     assessSearch = '';
     showUngraded = false;
+    _toReturnOnly = false;
     _filterMenuOpen = false;
     rubricViewStates = {};
     _showingNewForm = false;
@@ -13092,6 +13704,12 @@ window.PageAssignments = (function () {
     _addDocListener('scroll', _afTipScroll, true);
     ['click', 'change', 'keyup', 'focusout'].forEach(function (type) {
       _addDocListener(type, _statusLocksAfterEvent);
+    });
+    // Most grading here saves without a redraw: the Draft marks and the
+    // counts to return follow each event (S1-F2). Nothing runs in a class
+    // that holds no grades.
+    ['click', 'change', 'keyup', 'focusout'].forEach(function (type) {
+      _addDocListener(type, _returnsAfterEvent);
     });
 
     render();
