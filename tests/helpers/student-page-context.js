@@ -10,9 +10,24 @@
  * the context a moment later, in the order added. `net.fail(src)` returning
  * true makes that fetch fail instead.
  *
- * openStudentPage() returns { ctx, T, root(), calls, replies, fetched, net,
- * start, click, type, choose, submit, tick, settle, run, watchGlobals }.
- * fetch is a stand-in that records every call and answers from `replies`.
+ * openStudentPage() returns { ctx, T, root(), calls, replies, probes, fetched,
+ * net, store, start, click, type, choose, submit, tick, settle, run,
+ * watchGlobals }.
+ * fetch is a stand-in for the student-submit function. It records every
+ * call and answers from `replies`, with one exception. Since S0-W1 the page
+ * puts every typed or scanned code to the function's `card` route before it
+ * opens it as a slip. The stand-in answers that question as the real
+ * function answers a slip's code or one nobody holds, { ok: false, error:
+ * 'not_found' }, and records it in `probes`, so `calls` and `replies` stay
+ * what they were: the slip routes' own. In Demo Mode nothing may be asked
+ * at all, so there a `card` question lands in `calls` like any other and
+ * fails the test that counts them.
+ * A test of the card's own routes sets `server`, a function from a request
+ * body to a reply: it then answers everything, and every call is in `calls`.
+ * `store` is what the page has kept in localStorage and `tab` what it has
+ * kept in sessionStorage; openStudentPage({ store }) opens the page on a
+ * device that already holds something (the same device, opened again).
+ * `addresses` is each address the page has put in the bar (replaceState).
  *
  * watchGlobals(files) finds every global name those files read that the
  * page does not define (a reader the teacher's apps get from
@@ -53,19 +68,23 @@ export function freeNames(file) {
   return [...read].filter(name => !declared.has(name));
 }
 
-export function openStudentPage() {
+export function openStudentPage(opts = {}) {
   // The scripts load before #app exists, so the page doesn't start itself.
   const { document, window } = parseHTML('<!doctype html><html><head></head><body></body></html>');
   const calls = [];
   const replies = [];
+  const probes = [];
   const fetched = [];
   const net = { fail: () => false };
+  const out = { server: null };
   let pending = 0;
-  const store = {};
-  const storage = () => ({
-    getItem: k => (k in store ? store[k] : null),
-    setItem: (k, v) => (store[k] = String(v)),
-    removeItem: k => delete store[k],
+  const store = opts.store || {};
+  const addresses = [];
+  const tab = {};
+  const storage = kept => ({
+    getItem: k => (k in kept ? kept[k] : null),
+    setItem: (k, v) => (kept[k] = String(v)),
+    removeItem: k => delete kept[k],
   });
   const sandbox = {
     document,
@@ -77,15 +96,31 @@ export function openStudentPage() {
     clearInterval() {},
     __ENV: { SUPABASE_URL: 'https://x.supabase.co' },
     scrollTo() {},
-    history: { replaceState() {} },
+    history: { replaceState: (state, title, address) => addresses.push(address) },
     location: { pathname: '/s/', hash: '' },
-    localStorage: storage(),
-    sessionStorage: storage(),
+    localStorage: storage(store),
+    sessionStorage: storage(tab),
     fetch: async (url, init) => {
       const body = JSON.parse(init.body);
+      const answer = r => ({ json: async () => JSON.parse(JSON.stringify(r)) });
+      if (out.server) {
+        calls.push({ url, body, init });
+        // The function takes a moment (it hashes the caller's address);
+        // settle() waits until every call has been answered.
+        pending += 1;
+        try {
+          return answer(await out.server(body));
+        } finally {
+          setTimeout(() => (pending -= 1), 0);
+        }
+      }
+      const demo = !!(out.T && out.T.state() && out.T.state().demo);
+      if (body.route === 'card' && !demo) {
+        probes.push({ url, body, init });
+        return answer({ ok: false, error: 'not_found' });
+      }
       calls.push({ url, body });
-      const r = replies.length ? replies.shift() : { ok: true };
-      return { json: async () => JSON.parse(JSON.stringify(r)) };
+      return answer(replies.length ? replies.shift() : { ok: true });
     },
   };
   sandbox.window = sandbox;
@@ -111,6 +146,7 @@ export function openStudentPage() {
   document.body.appendChild(app);
   const run = code => vm.runInContext(code, ctx);
   const T = run('StudentPage._test');
+  out.T = T;
   const root = () => document.getElementById('app');
   const find = sel => {
     const el = root().querySelector(sel);
@@ -125,15 +161,19 @@ export function openStudentPage() {
     } while (pending > 0);
     await tick();
   };
-  return {
+  return Object.assign(out, {
     ctx,
     T,
     run,
     root,
     calls,
     replies,
+    probes,
     fetched,
     net,
+    store,
+    addresses,
+    tab,
     tick,
     settle,
     watchGlobals: files => {
@@ -195,5 +235,38 @@ export function openStudentPage() {
       find(sel).dispatchEvent(new window.Event('submit', { bubbles: true }));
       await settle();
     },
+  });
+}
+
+/**
+ * A `page` reply written with each grade as the score tables' rows
+ * ({ score, tag_scores, rubric_scores }, what get_assessment_detail gives a
+ * teacher) as the server sends it: each grade a copy, { v, value, modifier,
+ * comment, tags, criteria, checks } (migrations/2026110902_grade_return.sql,
+ * 3). Everything else in the reply is left as written.
+ */
+export function asServerSends(reply) {
+  const level = (r, criterion) =>
+    Object.assign(
+      { value: r.value, modifier: r.modifier || 0, comment: r.comment || null },
+      criterion ? { beyond: r.beyond || null } : {},
+    );
+  const copy = rows => {
+    if (!rows) return rows;
+    const score = rows.score || {};
+    return {
+      v: 1,
+      value: score.value == null ? null : score.value,
+      modifier: score.value == null ? 0 : score.modifier || 0,
+      comment: score.comment || null,
+      tags: Object.fromEntries((rows.tag_scores || []).map(r => [r.tag_id, level(r, false)])),
+      criteria: Object.fromEntries((rows.rubric_scores || []).map(r => [r.criterion_id, level(r, true)])),
+      checks: [],
+    };
   };
+  return Object.assign({}, reply, {
+    assessments: (reply.assessments || []).map(a =>
+      'grade' in a ? Object.assign({}, a, { grade: copy(a.grade) }) : a,
+    ),
+  });
 }

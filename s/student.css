@@ -660,6 +660,24 @@ button {
   margin: 0;
 }
 
+/* The page's header: the class on the left, Done on the right, both in
+   reach as the list scrolls. */
+.sp-head-page {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sp-head-words {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sp-done {
+  flex: none;
+  padding: 0 18px;
+}
 .sp-page {
   gap: 10px;
 }

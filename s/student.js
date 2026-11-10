@@ -8,6 +8,12 @@
    sits after # so it never reaches a server log. Answers in progress stay
    in this tab's sessionStorage and are cleared once sent.
 
+   A code is a slip's or a student card's, and the two look alike, so the
+   server tells: the code is put to the function's `card` route first
+   (app.js) and, when that says it is no card, to `open` as a slip. The
+   card route does not count a slip's code as a guess; asking `open` first
+   would count every card scan against the slips' limits.
+
    Demo Mode (#demo for the November Reflection, #demo-about for About Me)
    builds the same screens from shared/questionnaire-templates.js and never
    calls the function.
@@ -48,6 +54,14 @@ var StudentPage = (function () {
     card_not_found: "That code didn't work. Check the letters and numbers on your card.",
     wrong_card_password: "That password doesn't match. Check the password on your card.",
     card_locked: 'This card is locked after too many wrong tries. Ask your teacher to unlock it.',
+    // A card that won't open says why (Colin, Nov 9).
+    card_closed: 'Your teacher has turned the student page off for this class. Ask your teacher.',
+    card_expired: "This card's last day has passed. Ask your teacher for a new card.",
+    card_reprint: 'This card needs to be printed again. Ask your teacher for a new card.',
+    card_stopped: 'This card has been replaced. Ask your teacher for your new card.',
+    card_gone: "Your page for this class can't be opened any more. Ask your teacher.",
+    card_network: "Couldn't reach FullVision. Check your internet and try again.",
+    signed_out: 'You are signed out. Scan or type your card to open your page again.',
   };
   var MONTHS = [
     'January',
@@ -82,6 +96,8 @@ var StudentPage = (function () {
       bday: { m: '', d: '', y: '' }, // the pickers as chosen
       report: null, // the report as the teacher sent it
       page: null, // a card's page for one class, as student-data.js reads it
+      heading: '', // the loading screen's title while a card's page opens again
+      again: false, // a card's page couldn't be reached: offer Try Again
     };
   }
 
@@ -161,12 +177,12 @@ var StudentPage = (function () {
 
   // The desktop's loading screen with lines for students
   // (shared/loading-screen.js); paint() starts the lines turning.
-  function renderLoading() {
+  function renderLoading(state) {
     var body = window.FVLoading
       ? window.FVLoading.html('student', 'Opening your page', true)
       : '<p class="sp-lead sp-msg-calm" role="status">Opening your page\u2026</p>';
     return (
-      header('Student Questions', 'FullVision') +
+      header((state && state.heading) || 'Student Questions', 'FullVision') +
       '<main class="sp-main sp-main-center sp-main-middle">' +
       body +
       '</main>'
@@ -548,7 +564,16 @@ var StudentPage = (function () {
     return ' ' + n + ' tries left.';
   }
 
-  function openCode(code) {
+  /* A typed or scanned code. It is put to the card's screens first
+     (app.js's `card`, which asks the function's `card` route) and, when
+     they say it is no card, opened as a slip, as it always was.
+     `card(code)` gives a promise of true (a card: its screen is drawn),
+     false (not a card), or 'locked' (this address has made too many wrong
+     tries on cards; a slip may still open).
+     `from` is 'card' when the code was typed on one of the card's screens:
+     a code that opens nothing is then answered there, in the card's words
+     (app.js's `refused`). */
+  function openCode(code, from) {
     var c = cleanCode(code);
     S.typed = prettyCode(c);
     if (!CODE_RE.test(c)) {
@@ -561,7 +586,21 @@ var StudentPage = (function () {
     S.message = '';
     S.screen = 'loading';
     paint();
+    var cards = files.filter(function (f) {
+      return !!f.card;
+    })[0];
+    return (cards ? cards.card(c) : Promise.resolve(false)).then(function (said) {
+      if (said === true) return undefined;
+      return openSlip(c, said === 'locked', from === 'card' ? cards : null);
+    });
+  }
+
+  function openSlip(c, cardsLocked, cards) {
     return call({ route: 'open', code: c }).then(function (res) {
+      // No card and no slip, from an address the card route has locked.
+      if (cardsLocked && res && !res.ok && res.error === 'not_found') res = { ok: false, error: 'locked' };
+      // Typed on a card's screen and it opened nothing: that screen answers.
+      if (cards && !(res && res.ok) && cards.refused(res)) return;
       if (res && res.ok && res.kind === 'report') {
         S.data = res;
         S.screen = 'rcheck';
@@ -595,7 +634,9 @@ var StudentPage = (function () {
      A student card (app.js) reads the same fields and gets the same
      messages, and does its own asking and its own next step:
        card = { send(ident) → a promise of the reply, ok(reply),
-                messageScreen: the screen a refusal shows on }. */
+                messageScreen: the screen a refusal shows on,
+                message(reply) → the card's words for a refusal,
+                stops(reply) → whether that refusal ends the check }. */
   function verifyIdentity(card) {
     var by = S.data.check;
     var paper = paperOf(S.data);
@@ -651,6 +692,11 @@ var StudentPage = (function () {
       if (e === 'wrong_identity') {
         var wrong = by !== 'password' ? 'wrong_identity' : card ? 'wrong_card_password' : 'wrong_password';
         S.message = MESSAGES[wrong] + triesLeftText(res.tries_left, paper);
+      } else if (card && card.message) {
+        // A card's refusals have the card's own words. One the function
+        // gave stops the check; a call that never arrived can be tried again.
+        S.message = card.message(res);
+        if (card.stops(res)) S.screen = card.messageScreen;
       } else {
         S.message = messageFor(res);
         if (e !== 'network' && e !== 'busy') S.screen = card ? card.messageScreen : 'message';
@@ -879,6 +925,7 @@ var StudentPage = (function () {
       return CODE_RE.test(c);
     },
     reset: reset,
+    openCode: openCode,
     slipParts: slipParts,
     identityFields: identityFields,
     birthdayPickers: birthdayPickers,

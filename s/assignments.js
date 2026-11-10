@@ -16,6 +16,17 @@
    this screen opens; the fetch can fail) a returned piece shows when it
    came back and no result, and the list says the results didn't load.
 
+   One list, two sources: the server's `page` reply for a real card and
+   Demo Mode's reply built on the device both go through
+   StudentData.fromServer and then through this file, so the two cannot
+   show a piece differently.
+
+   A returned grade that was changed and returned again is marked Updated
+   until the student has opened it. In this build the list is where a
+   result is read, so a piece counts as opened once its result has been
+   drawn here: `opened` names those pieces and app.js tells the server
+   (`seen`).
+
    app.js opens this screen after Is This You? and draws the frame around
    it. This file adds its screen with StudentPage.addScreens. */
 (function () {
@@ -70,17 +81,48 @@
       view.result = cell.mark === 'complete' ? 'Complete' : 'Incomplete';
     }
     if (a.status === 'LATE') bits.push('Late');
+    if (a.updated) bits.push('Updated');
     view.sub = bits.join(SEP);
     return view;
   }
 
-  // Newest first, by due date, or the date with none.
+  // When the teacher made a piece, in milliseconds, or null when the
+  // server has not said.
+  function madeAt(a) {
+    var t = a.created_at ? Date.parse(a.created_at) : NaN;
+    return isFinite(t) ? t : null;
+  }
+
+  /* Newest first, by due date, or the date with none. Two pieces with the
+     same date: the one made later is the later one (Colin, Nov 10), so it
+     is listed first; two made at the same instant fall to their ids. Where
+     the server has not said when a piece was made, the two stay in the
+     order they came in, as before. */
   function inOrder(assessments) {
     return assessments.slice().sort(function (x, y) {
       var a = x.dueDate || x.date || '';
       var b = y.dueDate || y.date || '';
-      return a < b ? 1 : a > b ? -1 : 0;
+      if (a !== b) return a < b ? 1 : -1;
+      var m = madeAt(x);
+      var n = madeAt(y);
+      if (m == null || n == null) return 0;
+      if (m !== n) return m < n ? 1 : -1;
+      return x.id < y.id ? 1 : x.id > y.id ? -1 : 0;
     });
+  }
+
+  /* The returned pieces whose result is on the list now and that the
+     student has not opened since they last came back: their ids. None while
+     calc.js is not in, since no result is drawn then. */
+  function opened(page) {
+    if (!page || !gradesAreIn()) return [];
+    return page.assessments
+      .filter(function (a) {
+        return a.unseen && rowView(page, a).result !== '';
+      })
+      .map(function (a) {
+        return a.id;
+      });
   }
 
   function rowHtml(view) {
@@ -140,11 +182,13 @@
     );
   }
 
+  StudentPage.opened = opened;
+
   StudentPage.addScreens({
     file: 'assignments',
     render: { assignments: renderAssignments },
     // The screen reads the state it is handed; it keeps none of its own.
     share: function () {},
-    test: { rowView: rowView, listHtml: listHtml },
+    test: { rowView: rowView, listHtml: listHtml, inOrder: inOrder, opened: opened },
   });
 })();
