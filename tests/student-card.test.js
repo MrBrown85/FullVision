@@ -591,11 +591,17 @@ describe('student-data.js: the one adapter', () => {
       mod: 1,
     });
     expect(page.run('JSON.stringify(getScores("other"))')).toBe('{}');
-    expect(page.run('getAssignmentStatus("c1", "e1", "a3")')).toBe('EXC');
-    expect(page.run('getAssignmentStatus("c1", "someone-else", "a3")')).toBeNull();
-    expect(page.run('getPointsScore("c1", "e1", "a6")')).toBe(0);
+    expect(page.run('getAssignmentStatuses("c1")')).toEqual({ 'e1:a3': 'EXC', 'e1:a7': 'LATE' });
+    expect(page.run('JSON.stringify(getAssignmentStatuses("other"))')).toBe('{}');
+    expect(page.run('getRubricById("c1", "nope")')).toBeUndefined();
+    expect(page.run('getGradingScale("c1") === DEFAULT_GRADING_SCALE')).toBe(true);
+    // calc.js's own reader, fed by those: a status, a points score that is 0.
+    expect(page.run('_scoreRead.status("c1", "e1", "a3")')).toBe('EXC');
+    expect(page.run('_scoreRead.status("c1", "someone-else", "a3")')).toBeNull();
+    expect(page.run('_scoreRead.pointsScore("c1", "e1", "a6")')).toBe(0);
     page.run('StudentData.use')(null);
     expect(page.run('JSON.stringify(getScores("c1"))')).toBe('{}');
+    expect(page.run('JSON.stringify(getAssignmentStatuses("c1"))')).toBe('{}');
     expect(page.run('Object.keys(COURSES).length')).toBe(0);
   });
 
@@ -604,6 +610,265 @@ describe('student-data.js: the one adapter', () => {
     expect(page.T.state().page.student.id).toBe(SID);
     expect(page.run('Object.keys(COURSES)')).toEqual([CID]);
   });
+});
+
+/* calc.js is another agent's file and changes under this page (S0-T1 moved
+   every score read behind one reader; S0-F1 adds a returned-only set). The
+   teacher's apps would not notice a new read: shared/data.js defines
+   everything. The student page has only s/student-data.js, so a read it
+   lacks throws, or, behind a `typeof` guard, quietly changes a result. */
+describe('calc.js on the student page reads only what student-data.js gives it', () => {
+  // The files whose reads are watched: the math, its helpers, and the page's own.
+  const WATCHED = ['shared/calc.js', 'shared/constants.js', 's/student-data.js', 's/assignments.js', 's/app.js'];
+  const at = '2026-11-03T20:00:00Z';
+  const level = (tag_id, value, modifier) => ({ tag_id, value, modifier: modifier || 0, comment: null });
+  // Every kind of piece the list can show, in a class of the given style.
+  const everyKind = (system, scale) => ({
+    ok: true,
+    v: 1,
+    student: { enrollment_id: 'e1', first_name: 'Sam' },
+    course: { id: 'c1', name: 'Socials 10', block: 'C', grading_system: system, grading_scale: scale || null },
+    rubrics: [
+      {
+        id: 'r1',
+        criteria: [
+          {
+            id: 'k1',
+            name: 'Evidence',
+            weight: 2,
+            level_1_value: 1,
+            level_2_value: 2,
+            level_3_value: 3,
+            level_4_value: 4,
+          },
+          {
+            id: 'k2',
+            name: 'Voice',
+            weight: 1,
+            level_1_value: 2,
+            level_2_value: 4,
+            level_3_value: 6,
+            level_4_value: 10,
+          },
+        ],
+      },
+    ],
+    assessments: [
+      {
+        id: 'comp',
+        title: 'Competency Work',
+        date: '2026-10-01',
+        tag_ids: ['t1', 't2'],
+        returned_at: at,
+        grade: { score: { value: null, comment: 'Good.' }, tag_scores: [level('t1', 3, 1), level('t2', 2, -1)] },
+      },
+      {
+        id: 'unlinked',
+        title: 'Unlinked Work',
+        date: '2026-10-02',
+        tag_ids: [],
+        returned_at: at,
+        grade: { score: { value: 4, comment: '' }, tag_scores: [] },
+      },
+      {
+        id: 'rubric',
+        title: 'Rubric Work',
+        date: '2026-10-03',
+        tag_ids: ['t1'],
+        rubric_id: 'r1',
+        returned_at: at,
+        grade: {
+          score: { value: null, comment: '' },
+          rubric_scores: [
+            { criterion_id: 'k1', value: 3, modifier: 0 },
+            { criterion_id: 'k2', value: 2, modifier: 1 },
+          ],
+        },
+      },
+      {
+        id: 'points',
+        title: 'Points Work',
+        date: '2026-10-04',
+        score_mode: 'points',
+        max_points: 20,
+        weight: 2,
+        tag_ids: ['t1'],
+        returned_at: at,
+        grade: { score: { value: 17.5, comment: '' } },
+      },
+      {
+        id: 'done',
+        title: 'Complete Work',
+        date: '2026-10-05',
+        score_mode: 'complete',
+        returned_at: at,
+        grade: { score: { value: 1, comment: '' } },
+      },
+      {
+        id: 'notdone',
+        title: 'Incomplete Work',
+        date: '2026-10-06',
+        score_mode: 'complete',
+        returned_at: at,
+        grade: { score: { value: 0, comment: '' } },
+      },
+      {
+        id: 'missing',
+        title: 'Missing Points',
+        date: '2026-10-07',
+        score_mode: 'points',
+        max_points: 10,
+        status: 'NS',
+      },
+      // Missing on work that was returned earlier: the status stands in for the result.
+      {
+        id: 'missing2',
+        title: 'Missing Competency',
+        date: '2026-10-08',
+        tag_ids: ['t1'],
+        status: 'NS',
+        returned_at: at,
+        grade: { score: { value: null, comment: '' }, tag_scores: [level('t1', 2)] },
+      },
+      {
+        id: 'excused',
+        title: 'Excused Work',
+        date: '2026-10-09',
+        due_date: '2026-10-10',
+        tag_ids: ['t1'],
+        status: 'EXC',
+      },
+      {
+        id: 'excused2',
+        title: 'Excused Rubric',
+        date: '2026-10-11',
+        rubric_id: 'r1',
+        status: 'EXC',
+        returned_at: at,
+        grade: { score: { value: null, comment: '' }, rubric_scores: [{ criterion_id: 'k1', value: 4 }] },
+      },
+      {
+        id: 'late',
+        title: 'Late Work',
+        date: '2026-10-12',
+        tag_ids: ['t2'],
+        status: 'LATE',
+        returned_at: at,
+        grade: { score: { value: null, comment: '' }, tag_scores: [level('t2', 3)] },
+      },
+      {
+        id: 'late2',
+        title: 'Late And Waiting',
+        date: '2026-10-13',
+        due_date: '2026-10-14',
+        tag_ids: ['t1'],
+        status: 'LATE',
+      },
+      {
+        id: 'latepts',
+        title: 'Late Points',
+        date: '2026-10-15',
+        score_mode: 'points',
+        max_points: 5,
+        status: 'LATE',
+        returned_at: at,
+        grade: { score: { value: 0, comment: '' } },
+      },
+      {
+        id: 'noted',
+        title: 'Comment Only',
+        date: '2026-10-16',
+        tag_ids: ['t1'],
+        returned_at: at,
+        grade: { score: { value: null, comment: 'See me.' }, tag_scores: [] },
+      },
+      { id: 'todo', title: 'Not Graded', date: '2026-10-17', due_date: '2026-10-20', tag_ids: ['t1'] },
+    ],
+  });
+  const OWN_SCALE = {
+    boundaries: [
+      { min: 90, proficiency: 4 },
+      { min: 70, proficiency: 3 },
+      { min: 50, proficiency: 2 },
+      { min: 0, proficiency: 1 },
+    ],
+    percents: { 4: 95, 3: 80, 2: 60, 1: 40 },
+  };
+
+  async function watched() {
+    const page = openStudentPage();
+    page.T.whenGradesAreIn();
+    await page.settle();
+    const reached = page.watchGlobals(WATCHED);
+    const used = page.spyGlobals(page.run('StudentData.readers'));
+    const list = reply => {
+      const read = page.run('StudentData.fromServer')(reply);
+      page.run('StudentData.use')(read);
+      const html = page.T.render({ screen: 'assignments', page: read, demo: false });
+      return Object.fromEntries(read.assessments.map(a => [a.id, page.T.rowView(read, a)]).concat([['html', html]]));
+    };
+    return { page, reached, used, list };
+  }
+
+  it('the watch sees a read of a name the page lacks, guarded or not', async () => {
+    const { page, reached } = await watched();
+    expect(page.run('typeof getStudents === "function" ? 1 : 0')).toBe(0);
+    expect(() => page.run('getAssessments("c1")')).toThrow();
+    expect([...reached].sort()).toEqual(['getAssessments', 'getStudents']);
+  });
+
+  it.each(['proficiency', 'letter', 'both'])(
+    'a %s class: every kind of piece is listed with no read the page lacks and no reader unused',
+    async system => {
+      const { page, reached, used, list } = await watched();
+      const demo = list(page.T.demoPage(system));
+      const own = list(everyKind(system, OWN_SCALE));
+      // Last, so the class in use below is the one on the default scale.
+      const kinds = list(everyKind(system));
+
+      // One name is reached and not given, on purpose: constants.js asks
+      // (typeof getSectionForTag) whether the class's competency list is
+      // here, to leave out a competency removed from the class. The page
+      // carries no competency list; `tag_ids` arrives holding only the
+      // competencies still on the class. Anything else here is a reader
+      // s/student-data.js must add (getReturnedScores, when S0-F1 lands).
+      expect([...reached]).toEqual(['getSectionForTag']);
+      // And student-data.js defines nothing that nothing reads.
+      expect(page.run('StudentData.readers')).toEqual([
+        'getScores',
+        'getAssignmentStatuses',
+        'getRubricById',
+        'getGradingScale',
+      ]);
+      expect([...used].sort()).toEqual([...page.run('StudentData.readers')].sort());
+
+      // The list really did work each kind out.
+      expect(demo.html).toContain('Energy Transfer Investigation');
+      expect(kinds.comp.result).toBe(page.run('formatLevel("c1", ' + (10 / 3 + 5 / 3) / 2 + ')'));
+      expect(kinds.unlinked.result).toBe(page.run('formatLevel("c1", 4)'));
+      expect(kinds.rubric.kind).toBe('back');
+      expect(kinds.rubric.result).not.toBe('');
+      expect(kinds.points.result).toBe('17.5 / 20');
+      expect(kinds.done.result).toBe('Complete');
+      expect(kinds.notdone.result).toBe('Incomplete');
+      expect(kinds.missing).toMatchObject({ kind: 'missing', result: '' });
+      expect(kinds.missing2).toMatchObject({ kind: 'missing', result: '' });
+      expect(kinds.excused).toMatchObject({ kind: 'excused', result: '' });
+      expect(kinds.excused2).toMatchObject({ kind: 'excused', result: '' });
+      expect(kinds.late.result).toBe(page.run('formatLevel("c1", 3)'));
+      expect(kinds.late.sub).toMatch(/ · Late$/);
+      expect(kinds.late2).toMatchObject({ kind: 'due', result: '' });
+      expect(kinds.late2.sub).toMatch(/^Late · Due /);
+      expect(kinds.latepts.result).toBe('0 / 5');
+      expect(kinds.noted).toMatchObject({ kind: 'back', result: '' });
+      expect(kinds.todo).toMatchObject({ kind: 'due', result: '' });
+      // The class's own Counts As percents reach calc.js through getGradingScale.
+      if (system !== 'proficiency') {
+        expect(own.unlinked.result).toContain('95%');
+        expect(kinds.unlinked.result).toContain('100%');
+      }
+    },
+  );
 });
 
 describe('student card: slips still open as before', () => {

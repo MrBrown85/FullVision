@@ -11,13 +11,22 @@
  * true makes that fetch fail instead.
  *
  * openStudentPage() returns { ctx, T, root(), calls, replies, fetched, net,
- * start, click, type, choose, submit, tick, settle, run }. fetch is a
- * stand-in that records every call and answers from `replies`.
+ * start, click, type, choose, submit, tick, settle, run, watchGlobals }.
+ * fetch is a stand-in that records every call and answers from `replies`.
+ *
+ * watchGlobals(files) finds every global name those files read that the
+ * page does not define (a reader the teacher's apps get from
+ * shared/data.js, say) and returns a Set that fills with each such name as
+ * the page's code reaches for it, behind a `typeof` guard or not.
+ * spyGlobals(names) returns a Set that fills with each of those globals as
+ * the page's code reads it.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
+import { parse } from 'acorn';
+import { simple } from 'acorn-walk';
 import { parseHTML } from 'linkedom';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -26,6 +35,22 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 export function studentPageScripts() {
   const html = readFileSync(resolve(ROOT, 's/index.html'), 'utf8');
   return [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m => 's/' + m[1]).map(p => p.replace('s/../', ''));
+}
+
+/** Every name a script reads that it does not declare itself, at any depth. */
+export function freeNames(file) {
+  const ast = parse(readFileSync(resolve(ROOT, file), 'utf8'), { ecmaVersion: 'latest', sourceType: 'script' });
+  const read = new Set();
+  const declared = new Set();
+  const named = node => node.id && declared.add(node.id.name);
+  simple(ast, {
+    Identifier: node => read.add(node.name),
+    VariablePattern: node => declared.add(node.name),
+    FunctionDeclaration: named,
+    FunctionExpression: named,
+    ClassDeclaration: named,
+  });
+  return [...read].filter(name => !declared.has(name));
 }
 
 export function openStudentPage() {
@@ -111,6 +136,42 @@ export function openStudentPage() {
     net,
     tick,
     settle,
+    watchGlobals: files => {
+      const reached = new Set();
+      const defined = name => {
+        try {
+          return run('typeof ' + name) !== 'undefined';
+        } catch (e) {
+          return true; // a keyword-like name (arguments, undefined): not a global to supply
+        }
+      };
+      [...new Set(files.flatMap(freeNames))]
+        .filter(name => !defined(name))
+        .forEach(name =>
+          Object.defineProperty(sandbox, name, {
+            configurable: true,
+            get() {
+              reached.add(name);
+              return undefined;
+            },
+          }),
+        );
+      return reached;
+    },
+    spyGlobals: names => {
+      const used = new Set();
+      names.forEach(name => {
+        const value = sandbox[name];
+        Object.defineProperty(sandbox, name, {
+          configurable: true,
+          get() {
+            used.add(name);
+            return value;
+          },
+        });
+      });
+      return used;
+    },
     start: async hash => {
       T.start(root(), hash);
       await settle();

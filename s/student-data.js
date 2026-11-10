@@ -24,6 +24,7 @@ var StudentData = (function () {
   var G = typeof window !== 'undefined' ? window : globalThis;
   var page = null;
   var byStudent = null; // { student id: [score entries] }, as getScores gives the teacher's apps
+  var statuses = {}; // { 'student id:assessment id': status }, as getAssignmentStatuses does
 
   function str(v) {
     return v == null ? '' : String(v);
@@ -176,10 +177,14 @@ var StudentData = (function () {
   function use(p) {
     page = p || null;
     byStudent = null;
+    statuses = {};
     Object.keys(G.COURSES).forEach(function (id) {
       delete G.COURSES[id];
     });
     if (!page) return;
+    page.assessments.forEach(function (a) {
+      if (a.status) statuses[page.student.id + ':' + a.id] = a.status;
+    });
     G.COURSES[page.course.id] = {
       id: page.course.id,
       name: page.course.name,
@@ -193,57 +198,50 @@ var StudentData = (function () {
   }
 
   /* ── What calc.js and constants.js read ─────────────────────────
-     The same names shared/data.js gives the teacher's apps, answered from
-     the page. Read-only: the student page writes no grade. */
+     The names shared/data.js gives the teacher's apps, answered from the
+     page. Read-only: the student page writes no grade.
+
+     calc.js reads every score and status through one reader of its own
+     (_scoreRead): getScores for the scores, and from them the points,
+     Complete or Incomplete and the comment; getAssignmentStatuses for
+     Missing, Excused and Late. The rest are the class's settings. These are
+     all the list needs and nothing calls any other:
+     tests/student-card.test.js fails when calc.js or constants.js reaches
+     for a name this page lacks, and when a reader here goes unused.
+
+     Every score on this page is a returned one. When calc.js gains its
+     returned-only set (S0-F1, getReturnedScores) it is this same
+     getScores. */
   G.COURSES = {};
 
-  G.getCourseConfig = function (cid) {
-    return isThis(cid) && page.course.gradingScale ? { gradingScale: page.course.gradingScale } : {};
+  var READERS = {
+    // Every score entry in the class: { student id: [entry] }.
+    getScores: function (cid) {
+      return isThis(cid) ? entries() : {};
+    },
+    // Every status in the class: { 'student id:assessment id': 'NS' | 'EXC' | 'LATE' }.
+    getAssignmentStatuses: function (cid) {
+      return isThis(cid) ? statuses : {};
+    },
+    getRubricById: function (cid, rubricId) {
+      if (!isThis(cid)) return undefined;
+      return page.rubrics.filter(function (r) {
+        return r.id === rubricId;
+      })[0];
+    },
+    // The class's own Counts As percents and points bands, or the defaults.
+    getGradingScale: function (cid) {
+      return (isThis(cid) && page.course.gradingScale) || DEFAULT_GRADING_SCALE;
+    },
   };
-
-  G.getGradingScale = function (cid) {
-    return G.getCourseConfig(cid).gradingScale || DEFAULT_GRADING_SCALE;
-  };
-
-  G.getScores = function (cid) {
-    return isThis(cid) ? entries() : {};
-  };
-
-  G.getAssignmentStatus = function (cid, sid, aid) {
-    if (!isThis(cid) || sid !== page.student.id) return null;
-    var a = page.assessments.filter(function (x) {
-      return x.id === aid;
-    })[0];
-    return (a && a.status) || null;
-  };
-
-  G.getRubricById = function (cid, rubricId) {
-    if (!isThis(cid)) return undefined;
-    return page.rubrics.filter(function (r) {
-      return r.id === rubricId;
-    })[0];
-  };
-
-  // A piece's points, or null with no score. A 0 is a score.
-  G.getPointsScore = function (cid, sid, aid) {
-    var entry = (G.getScores(cid)[sid] || []).filter(function (e) {
-      return e.assessmentId === aid && e.score != null && e.score !== '';
-    })[0];
-    return entry ? Number(entry.score) : null;
-  };
-
-  // 'complete', 'incomplete', or null when unmarked.
-  G.getCompletionMark = function (cid, sid, aid) {
-    var entry = (G.getScores(cid)[sid] || []).filter(function (e) {
-      return e.assessmentId === aid;
-    })[0];
-    if (!entry || entry.score == null) return null;
-    return Number(entry.score) > 0 ? 'complete' : 'incomplete';
-  };
+  Object.keys(READERS).forEach(function (name) {
+    G[name] = READERS[name];
+  });
 
   return {
     fromServer: fromServer,
     use: use,
+    readers: Object.keys(READERS),
     page: function () {
       return page;
     },
