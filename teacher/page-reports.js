@@ -16,9 +16,131 @@ window.PageReports = (function () {
    REPORTS PAGE — Logic
    ══════════════════════════════════════════════════════════════ */
 
+  /* ── The tabs ────────────────────────────────────────────────────
+     Reports hosts the tabs in this list, in the order the bar shows them.
+     A new tab is one more entry; nothing else on the page names a tab to
+     decide what to draw.
+       id, label, title   its name in the address (?tab=) and on its button,
+                          the button's words and its tooltip
+       hidden             true keeps an unfinished tab off the bar and out
+                          of the address: no button, and ?tab= can't open it
+       show(on)           shows its own toolbar controls when it opens;
+                          hides them and puts back what it changed when
+                          another tab opens
+       render(cid, output)  draws it into #report-output
+       teardown()         clears what it left behind when the page closes
+     and, only where a tab needs one: address() (what it adds to the
+     address), longForm() (its comment box, for a sign-in that expires
+     mid-sentence), print(), key(e), resize() and pickStudent(sid) (a click
+     on the roster). The first tab that isn't hidden is the one Reports
+     opens on. */
+  var TABS = [
+    {
+      id: 'questionnaire',
+      label: 'Term Questionnaire',
+      title: 'Write and approve each student’s report comment.',
+      hidden: false,
+      show: _showQuestionnaireTab,
+      render: _renderQuestionnaireTab,
+      teardown: _teardownQuestionnaireTab,
+      address: function () {
+        var st = RQ.getTqStudents()[RQ.tqStudentIndex];
+        return st ? '&student=' + encodeURIComponent(st.id) : '';
+      },
+      longForm: function () {
+        return {
+          kind: 'term-rating',
+          getDraftText: function () {
+            var box = document.getElementById('tq-narrative');
+            return box ? box.value || '' : '';
+          },
+        };
+      },
+      /* ⌘ Return and the arrow keys on the questionnaire. */
+      key: function (e) {
+        RQ.handleKey(e);
+      },
+      // The questionnaire's comment box refits its height to the new width.
+      resize: function () {
+        RQ.fitBox();
+      },
+      pickStudent: function (sid) {
+        tqSelectStudent(sid);
+      },
+    },
+    {
+      id: 'progress',
+      label: 'Progress Reports',
+      title: 'Build and print the class’s report cards.',
+      hidden: false,
+      show: _showProgressTab,
+      render: _renderProgressTab,
+      teardown: _teardownProgressTab,
+      // A chosen copy prints as it is; the live reports save a copy, then print.
+      print: function () {
+        if (viewingIssue) _printIssue();
+        else openIssueDialog();
+      },
+      resize: function () {
+        clearTimeout(_resizeTimer);
+        _resizeTimer = setTimeout(renderReportPreview, 150);
+      },
+      pickStudent: function (sid) {
+        selectedStudentIds = [sid];
+        populateStudentSelect();
+        renderReports();
+      },
+    },
+  ];
+
+  function _shownTabs(tabs) {
+    return tabs.filter(function (t) {
+      return !t.hidden;
+    });
+  }
+
+  /* The tab an id opens: that tab when it is on the bar, else the first
+     tab on the bar. A hidden tab's id opens nothing of its own. */
+  function _tabFor(tabs, id) {
+    var shown = _shownTabs(tabs);
+    return (
+      shown.find(function (t) {
+        return t.id === id;
+      }) || shown[0]
+    );
+  }
+
+  /* The bar's buttons, one for each tab that isn't hidden. The first is
+     drawn selected; switchTab moves the selection when the page opens. */
+  // html-safe: fixed markup around each tab's id, tooltip and label from the TABS list, all through esc
+  function _tabBarHtml(tabs) {
+    return _shownTabs(tabs)
+      .map(function (t, i) {
+        return (
+          '<button class="seg-btn report-seg-btn' +
+          (i === 0 ? ' active' : '') +
+          '" data-action="switchTab" data-tab="' +
+          esc(t.id) +
+          '" role="tab" aria-selected="' +
+          (i === 0 ? 'true' : 'false') +
+          '" title="' +
+          esc(t.title) +
+          '">' +
+          esc(t.label) +
+          '</button>'
+        );
+      })
+      .join('\n        ');
+  }
+
   var activeCourse;
-  var activeTab = 'questionnaire';
+  var activeTab = _tabFor(TABS).id;
   var phonesView = false; // Progress Reports › Sent to Phones (teacher/phone-reports.js)
+
+  // The open tab's entry.
+  function _tab() {
+    return _tabFor(TABS, activeTab);
+  }
 
   /* ══════════════════════════════════════════════════════════════
    REPORT BUILDER — Config, presets, persistence
@@ -96,36 +218,45 @@ window.PageReports = (function () {
   function switchTab(tab) {
     // A comment typed in the last moment is saved before the page changes.
     RQ.tqSaveCurrentIfNeeded();
-    activeTab = tab;
+    activeTab = _tabFor(TABS, tab).id;
     viewingIssue = null;
-    segSelect(document.querySelector('.report-seg-btn[data-tab="' + tab + '"]'));
+    segSelect(document.querySelector('.report-seg-btn[data-tab="' + activeTab + '"]'));
     // Show/hide contextual toolbar elements
-    document.getElementById('student-picker').style.display = tab === 'progress' ? '' : 'none';
-    document.querySelectorAll('.tq-only').forEach(function (el) {
-      el.style.display = tab === 'questionnaire' ? '' : 'none';
+    TABS.forEach(function (t) {
+      if (t.show) t.show(t.id === activeTab);
     });
-    if (tab !== 'questionnaire') RQ.restoreRoster();
-    var out = document.getElementById('report-output');
-    if (out) out.classList.toggle('qn-output', tab === 'questionnaire');
-    // Show Print button only on progress reports and class summary
-    const tbPrint = document.getElementById('tb-print-btn');
-    if (tbPrint) tbPrint.style.display = tab === 'questionnaire' ? 'none' : '';
-    const tbSave = document.getElementById('tb-save-template');
-    if (tbSave) tbSave.style.display = tab === 'progress' ? '' : 'none';
-    const copySel = document.getElementById('report-copy');
-    if (copySel && tab !== 'progress') copySel.style.display = 'none';
-    if (tab === 'progress') _syncSidesButtons();
-    _syncProgressToolbar();
-    const tbRail = document.getElementById('tb-rail-btn');
-    if (tbRail) tbRail.style.display = tab === 'progress' ? '' : 'none';
-    if (tab !== 'progress') phonesView = false;
-    _syncPhonesButton();
-    const stepper = document.getElementById('report-stepper');
-    if (stepper) stepper.style.display = tab === 'progress' ? '' : 'none';
-    if (tab !== 'progress') _restoreSidebarBadges();
     var layout = document.getElementById('page-layout');
     if (layout) layout.classList.toggle('sidebar-hidden', !_sidebarVisible);
     renderReports();
+  }
+
+  function _showQuestionnaireTab(on) {
+    document.querySelectorAll('.tq-only').forEach(function (el) {
+      el.style.display = on ? '' : 'none';
+    });
+    if (!on) RQ.restoreRoster();
+    var out = document.getElementById('report-output');
+    if (out) out.classList.toggle('qn-output', on);
+  }
+
+  function _showProgressTab(on) {
+    document.getElementById('student-picker').style.display = on ? '' : 'none';
+    // Print Reports is this tab's button.
+    const tbPrint = document.getElementById('tb-print-btn');
+    if (tbPrint) tbPrint.style.display = on ? '' : 'none';
+    const tbSave = document.getElementById('tb-save-template');
+    if (tbSave) tbSave.style.display = on ? '' : 'none';
+    const copySel = document.getElementById('report-copy');
+    if (copySel && !on) copySel.style.display = 'none';
+    if (on) _syncSidesButtons();
+    _syncProgressToolbar();
+    const tbRail = document.getElementById('tb-rail-btn');
+    if (tbRail) tbRail.style.display = on ? '' : 'none';
+    if (!on) phonesView = false;
+    _syncPhonesButton();
+    const stepper = document.getElementById('report-stepper');
+    if (stepper) stepper.style.display = on ? '' : 'none';
+    if (!on) _restoreSidebarBadges();
   }
 
   function _syncPhonesButton() {
@@ -236,15 +367,10 @@ window.PageReports = (function () {
   }
 
   function _syncLongFormAuthContext() {
-    if (activeTab === 'questionnaire') {
+    var longForm = _tab().longForm;
+    if (longForm) {
       if (typeof setLongFormAuthContext === 'function') {
-        setLongFormAuthContext({
-          kind: 'term-rating',
-          getDraftText: function () {
-            var box = document.getElementById('tq-narrative');
-            return box ? box.value || '' : '';
-          },
-        });
+        setLongFormAuthContext(longForm());
       }
       return;
     }
@@ -335,10 +461,8 @@ window.PageReports = (function () {
   function _syncUrl() {
     if (!window.Router || typeof Router.setUrl !== 'function' || !activeCourse) return;
     var url = '/reports?course=' + encodeURIComponent(activeCourse) + '&tab=' + encodeURIComponent(activeTab);
-    if (activeTab === 'questionnaire') {
-      var st = RQ.getTqStudents()[RQ.tqStudentIndex];
-      if (st) url += '&student=' + encodeURIComponent(st.id);
-    }
+    var t = _tab();
+    if (t.address) url += t.address();
     Router.setUrl(url);
   }
 
@@ -348,34 +472,38 @@ window.PageReports = (function () {
     _applyReportTerm();
     _syncUrl();
 
-    if (activeTab === 'questionnaire') {
-      // The sentence bank loads the first time Reports needs it.
-      if (typeof COMMENT_BANK === 'undefined') {
-        output.innerHTML =
-          '<div class="empty-state"><div class="empty-state-text">Loading the sentence bank…</div></div>';
-        CommentBank.loadBank().then(function (ok) {
-          if (activeTab !== 'questionnaire') return;
-          if (ok) renderReports();
-          else
-            output.innerHTML =
-              '<div class="empty-state"><div class="empty-state-text">The sentence bank didn’t load. Check your connection, then open Reports again.</div></div>';
-        });
-        return;
-      }
-      output.innerHTML = renderTermQuestionnaire(cid);
-      _syncLongFormAuthContext();
-      RQ.afterRender();
+    var t = _tab();
+    // A tab with no comment box of its own lets go of the last tab's.
+    if (!t.longForm) _syncLongFormAuthContext();
+    t.render(cid, output);
+  }
+
+  function _renderQuestionnaireTab(cid, output) {
+    // The sentence bank loads the first time Reports needs it.
+    if (typeof COMMENT_BANK === 'undefined') {
+      output.innerHTML =
+        '<div class="empty-state"><div class="empty-state-text">Loading the sentence bank…</div></div>';
+      CommentBank.loadBank().then(function (ok) {
+        if (activeTab !== 'questionnaire') return;
+        if (ok) renderReports();
+        else
+          output.innerHTML =
+            '<div class="empty-state"><div class="empty-state-text">The sentence bank didn’t load. Check your connection, then open Reports again.</div></div>';
+      });
       return;
     }
-
+    output.innerHTML = renderTermQuestionnaire(cid);
     _syncLongFormAuthContext();
+    RQ.afterRender();
+  }
 
+  function _renderProgressTab(cid, output) {
     // Feedback Pages print Tag Rubrics in the curriculum bank's wording, which
     // loads the first time a class with bank competencies needs it; draw now
     // and again once it is here.
     if (window.RubricPrint && RubricPrint.classUsesBankLevels && RubricPrint.classUsesBankLevels(cid)) {
       RubricPrint.loadBankLevels().then(function (ok) {
-        if (ok && activeTab !== 'questionnaire' && activeCourse === cid) renderReports();
+        if (ok && activeTab === 'progress' && activeCourse === cid) renderReports();
       });
     }
 
@@ -1985,9 +2113,10 @@ window.PageReports = (function () {
         tqNextStudent();
       },
       printReports: function () {
-        // A chosen copy prints as it is; the live reports save a copy, then print.
-        if (viewingIssue) _printIssue();
-        else if (activeTab === 'progress') openIssueDialog();
+        // The button shows only on Progress Reports; a tab with no print of
+        // its own prints the page as it stands, as it always has.
+        var t = _tab();
+        if (t.print) t.print();
         else _printNow();
       },
       setPaper: function () {
@@ -2266,9 +2395,10 @@ window.PageReports = (function () {
     else if (e.target && e.target.id === 'tq-obs-search') RQ.tqObsSearch(e.target.value);
   }
 
-  /* ⌘ Return and the arrow keys on the questionnaire. */
-  function _handleQuestionnaireKey(e) {
-    if (activeTab === 'questionnaire') RQ.handleKey(e);
+  /* A key press goes to the open tab, when it listens for keys. */
+  function _handleTabKey(e) {
+    var t = _tab();
+    if (t.key) t.key(e);
   }
 
   function _handleReportPeriodChange() {
@@ -2313,11 +2443,8 @@ window.PageReports = (function () {
 
   var _resizeTimer = null;
   function _handleResize() {
-    // The questionnaire's comment box refits its height to the new width.
-    if (activeTab === 'questionnaire') return RQ.fitBox();
-    if (activeTab !== 'progress') return;
-    clearTimeout(_resizeTimer);
-    _resizeTimer = setTimeout(renderReportPreview, 150);
+    var t = _tab();
+    if (t.resize) t.resize();
   }
 
   function _handleSidebarClick(e) {
@@ -2328,13 +2455,8 @@ window.PageReports = (function () {
     var match = href.match(/id=([^&]+)/);
     if (!match) return;
     var sid = match[1];
-    if (activeTab === 'progress') {
-      selectedStudentIds = [sid];
-      populateStudentSelect();
-      renderReports();
-    } else {
-      tqSelectStudent(sid);
-    }
+    var t = _tab();
+    if (t.pickStudent) t.pickStudent(sid);
   }
 
   /* -- Late policy contenteditable handlers (replaces inline onblur/onfocus) -- */
@@ -2366,7 +2488,7 @@ window.PageReports = (function () {
   function init(params) {
     activeCourse = params.course || getActiveCourse();
     setActiveCourse(activeCourse);
-    activeTab = params.tab || 'questionnaire';
+    activeTab = _tabFor(TABS, params.tab).id;
     selectedStudentIds = null;
 
     reportConfig = _loadReportConfig(activeCourse);
@@ -2386,7 +2508,7 @@ window.PageReports = (function () {
     initSidebarToggle();
 
     // Render the toolbar + output container into main
-    // html-safe: TOOLBAR_HTML is a literal string at the foot of this file
+    // html-safe: TOOLBAR_HTML is literal markup at the foot of this file, around _tabBarHtml, which is checked
     document.getElementById('main').innerHTML = TOOLBAR_HTML;
 
     reportPaper = _loadPaper(activeCourse);
@@ -2431,13 +2553,20 @@ window.PageReports = (function () {
     _addDocListener('pointerdown', _hidePeek);
     _addDocListener('change', _handleStudioChange);
     window.addEventListener('resize', _handleResize);
-    _addDocListener('keydown', _handleQuestionnaireKey);
+    _addDocListener('keydown', _handleTabKey);
     _addDocListener('input', _handleNarrativeInput);
     _addDocListener('focusin', _handleLatePolicyFocus);
     _addDocListener('focusout', _handleLatePolicyBlur);
   }
 
-  function destroy() {
+  function _teardownQuestionnaireTab() {
+    // Save any unsaved narrative
+    if (RQ.tqNarrativeDirty) tqSaveCurrentIfNeeded();
+    RQ.restoreRoster();
+    if (typeof clearLongFormAuthContext === 'function') clearLongFormAuthContext('term-rating');
+  }
+
+  function _teardownProgressTab() {
     _closeSaveTemplate();
     _hidePeek();
     if (_studioKeys) {
@@ -2448,14 +2577,18 @@ window.PageReports = (function () {
       _studioDrag.destroy();
       _studioDrag = null;
     }
-    // Save any unsaved narrative
-    if (RQ.tqNarrativeDirty) tqSaveCurrentIfNeeded();
     var paperStyle = document.getElementById(PAPER_STYLE_ID);
     if (paperStyle) paperStyle.remove();
     if (typeof ReportSheets !== 'undefined') ReportSheets.clearPageStyle();
     _restoreSidebarBadges();
-    RQ.restoreRoster();
-    if (typeof clearLongFormAuthContext === 'function') clearLongFormAuthContext('term-rating');
+    closeIssueDialog();
+    viewingIssue = null;
+  }
+
+  function destroy() {
+    TABS.forEach(function (t) {
+      if (t.teardown) t.teardown();
+    });
 
     _listeners.forEach(function (l) {
       document.removeEventListener(l.type, l.handler, l.options);
@@ -2473,8 +2606,6 @@ window.PageReports = (function () {
     if (reportPeriodEl) reportPeriodEl.removeEventListener('change', _handleReportPeriodChange);
     var copyEl = document.getElementById('report-copy');
     if (copyEl) copyEl.removeEventListener('change', _handleCopyChange);
-    closeIssueDialog();
-    viewingIssue = null;
     var sidebarEl = document.getElementById('sidebar-mount');
     if (sidebarEl) sidebarEl.removeEventListener('click', _handleSidebarClick);
 
@@ -2483,7 +2614,9 @@ window.PageReports = (function () {
 
   /* -- Toolbar HTML (rendered into main on init) ---------- */
   var TOOLBAR_HTML =
-    '<div class="page-toolbar report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        <button class="seg-btn report-seg-btn active" data-action="switchTab" data-tab="questionnaire" role="tab" aria-selected="true" title="Write and approve each student’s report comment.">Term Questionnaire</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="progress" role="tab" aria-selected="false" title="Build and print the class’s report cards.">Progress Reports</button>\n      </div>\n      <div class="report-stepper" id="report-stepper" style="display:none">\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="-1" title="Previous student" aria-label="Previous student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="1" title="Next student" aria-label="Next student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <select id="report-period" class="term-select" aria-label="Report" title="The report you are working on. Each report keeps its own comments and attendance."></select>\n      <select id="report-copy" class="term-select" aria-label="Copy" style="display:none"></select>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <span class="qn-ready tq-only" id="tq-ready" style="display:none"></span>\n        <button type="button" class="tb-icon-btn tq-only" id="tq-edit-student-btn" style="display:none" data-action="tqEditStudent" aria-label="Edit Student" title="Edit Student: name, pronouns, designations and contacts"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7.5" r="3.5"></circle><path d="M2.5 19 c0.6-3.6 3.3-5.5 6.5-5.5 c1.2 0 2.3 0.25 3.2 0.75"></path><path d="M14.2 19.3 l0.4-2.3 l4.6-4.6 a1.35 1.35 0 0 1 1.9 1.9 l-4.6 4.6 z"></path></svg></button>\n        <button type="button" class="tb-icon-btn tq-only" id="tq-info-btn" style="display:none" data-action="tqInfo" aria-haspopup="dialog" aria-label="Where this information comes from" title="Where this information comes from"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="11" cy="11" r="9.25"></circle><path d="M8.4 8.6 a2.7 2.7 0 1 1 3.6 2.5 c-0.6 0.25 -1 0.8 -1 1.5 v0.6" stroke-linecap="round"></path><circle cx="11" cy="15.6" r="0.6" fill="currentColor"></circle></svg></button>\n        <button type="button" class="tb-action-btn tq-only" id="tq-approve-next" style="display:none" data-action="tqApproveNext" title="Saves this comment to the report card and opens the next student. \u2318 Return">Approve and Next \u203A</button>\n        <button class="tb-toggle-btn" id="tb-save-template" style="display:none" data-action="openSaveTemplate">Save as Template</button>\n        <button class="tb-toggle-btn" id="tb-phones-btn" style="display:none" data-action="togglePhones" aria-pressed="false">Sent to Phones</button>\n        <button class="tb-toggle-btn" id="tb-rail-btn" style="display:none" data-action="toggleRail" aria-pressed="false" aria-controls="studio-palette">Blocks</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
+    '<div class="page-toolbar report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        ' +
+    _tabBarHtml(TABS) +
+    '\n      </div>\n      <div class="report-stepper" id="report-stepper" style="display:none">\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="-1" title="Previous student" aria-label="Previous student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="1" title="Next student" aria-label="Next student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <select id="report-period" class="term-select" aria-label="Report" title="The report you are working on. Each report keeps its own comments and attendance."></select>\n      <select id="report-copy" class="term-select" aria-label="Copy" style="display:none"></select>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <span class="qn-ready tq-only" id="tq-ready" style="display:none"></span>\n        <button type="button" class="tb-icon-btn tq-only" id="tq-edit-student-btn" style="display:none" data-action="tqEditStudent" aria-label="Edit Student" title="Edit Student: name, pronouns, designations and contacts"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7.5" r="3.5"></circle><path d="M2.5 19 c0.6-3.6 3.3-5.5 6.5-5.5 c1.2 0 2.3 0.25 3.2 0.75"></path><path d="M14.2 19.3 l0.4-2.3 l4.6-4.6 a1.35 1.35 0 0 1 1.9 1.9 l-4.6 4.6 z"></path></svg></button>\n        <button type="button" class="tb-icon-btn tq-only" id="tq-info-btn" style="display:none" data-action="tqInfo" aria-haspopup="dialog" aria-label="Where this information comes from" title="Where this information comes from"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="11" cy="11" r="9.25"></circle><path d="M8.4 8.6 a2.7 2.7 0 1 1 3.6 2.5 c-0.6 0.25 -1 0.8 -1 1.5 v0.6" stroke-linecap="round"></path><circle cx="11" cy="15.6" r="0.6" fill="currentColor"></circle></svg></button>\n        <button type="button" class="tb-action-btn tq-only" id="tq-approve-next" style="display:none" data-action="tqApproveNext" title="Saves this comment to the report card and opens the next student. \u2318 Return">Approve and Next \u203A</button>\n        <button class="tb-toggle-btn" id="tb-save-template" style="display:none" data-action="openSaveTemplate">Save as Template</button>\n        <button class="tb-toggle-btn" id="tb-phones-btn" style="display:none" data-action="togglePhones" aria-pressed="false">Sent to Phones</button>\n        <button class="tb-toggle-btn" id="tb-rail-btn" style="display:none" data-action="toggleRail" aria-pressed="false" aria-controls="studio-palette">Blocks</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
 
   /* -- Public API ----------------------------------------- */
   return {
@@ -2493,6 +2626,11 @@ window.PageReports = (function () {
     // A redraw from elsewhere (Sent to Phones) only while the page is up.
     renderReports: function () {
       if (document.getElementById('report-output')) renderReports();
+    },
+    _helpers: {
+      tabs: TABS,
+      tabFor: _tabFor,
+      tabBarHtml: _tabBarHtml,
     },
   };
 })();
