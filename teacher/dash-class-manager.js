@@ -6549,13 +6549,23 @@ window.DashClassManager = (function () {
     st.rows.forEach(function (r, i) {
       r.display_order = i;
     });
+    // With other changes not yet saved (a row deleted or added here, a
+    // weight typed), the new order goes up with Save Categories, which
+    // numbers the whole list. reorder_categories numbers only the rows it
+    // is sent: sent without a row deleted on screen, it would leave that
+    // row tied with another on the server, in an order this form cannot
+    // know, and the next save would take it for a change made elsewhere.
+    var unsaved =
+      st.dirty ||
+      st.rows.some(function (r) {
+        return !r.id;
+      });
+    if (unsaved) st.dirty = true;
     renderClassManager();
-    if (!window.v2 || !window.v2.reorderCategories) return Promise.resolve();
-    var ids = st.rows
-      .map(function (r) {
-        return r.id;
-      })
-      .filter(Boolean);
+    if (unsaved || !window.v2 || !window.v2.reorderCategories) return Promise.resolve();
+    var ids = st.rows.map(function (r) {
+      return r.id;
+    });
     function undo() {
       // Only if the list on screen is still the dragged one.
       if (st.rows.length !== before.length || st.rows.some(r => before.indexOf(r) < 0)) return;

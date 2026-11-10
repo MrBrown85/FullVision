@@ -13,9 +13,15 @@
  *   save_categories      migrations/20261029_category_calc_mode.sql: the
  *                        list replaces the class's categories; weights must
  *                        total 100; a category with work in it can't go.
- *   reorder_categories   the ids given take their place in the list, in the
- *                        order given (its body is not in this repository:
- *                        only that much is assumed).
+ *   reorder_categories   the live body, read from production on Nov 10 (it
+ *                        is not in this repository):
+ *                          update category set display_order = sub.idx - 1,
+ *                            updated_at = now()
+ *                          from unnest(p_ids) with ordinality as sub(id, idx)
+ *                          where category.id = sub.id;
+ *                        Only the rows listed are numbered; a row left out
+ *                        keeps its display_order, so it can tie with one
+ *                        that was listed.
  *   list_categories, list_teacher_courses, bootstrap_teacher, get_class_bundle
  *   and get_gradebook    reads of the same rows.
  *
@@ -197,11 +203,15 @@ export function classSettingsServer(start) {
     },
     reorder_categories(p) {
       const ids = clone(p.p_ids) || [];
-      const at = c => (ids.indexOf(c.id) < 0 ? ids.length + c.display_order : ids.indexOf(c.id));
+      server.categories.forEach(c => {
+        const at = ids.indexOf(c.id);
+        if (at >= 0) c.display_order = at;
+      });
+      // Reads come back by display_order; rows that tie stay as they were.
       server.categories = server.categories
-        .slice()
-        .sort((a, b) => at(a) - at(b))
-        .map((c, i) => Object.assign({}, c, { display_order: i }));
+        .map((c, i) => ({ c, i }))
+        .sort((a, b) => a.c.display_order - b.c.display_order || a.i - b.i)
+        .map(x => x.c);
       server.version += 1;
       return ok(null);
     },

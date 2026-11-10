@@ -12,7 +12,18 @@
  *
  * Entry shape:
  *   { id, created_at, owner, key, endpoint, payload, attempts, last_error, last_code, next_at, blocked_on, sent_at,
- *     no_retry }
+ *     guard, no_retry, until_reload, reloaded }
+ *
+ * Guard: what the sender needs to check before a write that waited may go
+ *   (a category list is sent only over the list it was made for). Kept with
+ *   the entry, so it is still there after a reload; handed to the sender
+ *   with every attempt, with how many attempts came before.
+ *
+ * Discarded: a write the sender decides must never go (error.noRetry) is
+ *   kept in the failed list without a last try. When it also names a class
+ *   (error.untilReload), no later write clears it and no page load drops it
+ *   until that class has been read again from the server (markReloaded):
+ *   the sync dot stays red until what is on screen is the server's.
  *
  * Tabs: every tab shares the queue, but only one tab — the owner — sends.
  *   The owner holds the Web Lock fv-sync-queue-v1 for as long as it is open;
@@ -415,7 +426,8 @@
   function _pruneDead(dead, newer) {
     return dead
       .map(function (e) {
-        return _without(newer, e);
+        // A discarded write stays until its class has been read again.
+        return e.until_reload ? e : _without(newer, e);
       })
       .filter(Boolean);
   }
@@ -847,6 +859,7 @@
       last_error: null,
     };
     if (opts && Array.isArray(opts.blockedOn) && opts.blockedOn.length) entry.blocked_on = opts.blockedOn.slice();
+    if (opts && opts.guard && typeof opts.guard === 'object') entry.guard = opts.guard;
     // A replacement doesn't grow the queue, so a full queue still takes it.
     var at = _coalesceIndex(q.entries, entry);
     var replaced = at >= 0 ? q.entries[at] : null;
@@ -919,7 +932,13 @@
     opts = opts || {};
     payload = payload || {};
     var id = opts.id || payload.p_idempotency_key || _uuid4();
-    var queued = enqueue(endpoint, payload, { id: id, key: opts.key, blockedOn: opts.blockedOn, noFlush: true });
+    var queued = enqueue(endpoint, payload, {
+      id: id,
+      key: opts.key,
+      blockedOn: opts.blockedOn,
+      guard: opts.guard,
+      noFlush: true,
+    });
     if (!queued.ok) {
       var refused = Promise.resolve({
         data: null,
@@ -951,9 +970,14 @@
       // cached result instead of creating a duplicate row.
       var payload = _withIdemKey(entry.endpoint, entry.payload, entry.id);
       // The sender is told when this is the one more try after a reload.
-      var options = entry.last_try
-        ? Object.assign({}, _sendOptions[entry.id], { lastTry: true })
-        : _sendOptions[entry.id];
+      // And what the entry itself says of the write: its guard, and how many
+      // attempts came before this one.
+      var options = _sendOptions[entry.id];
+      if (entry.last_try || entry.guard || entry.attempts) {
+        options = Object.assign({}, options, { attempts: entry.attempts || 0 });
+        if (entry.last_try) options.lastTry = true;
+        if (entry.guard) options.guard = entry.guard;
+      }
       var res = await _sendNow(entry.endpoint, payload, options);
       return res || { data: null, error: null };
     } catch (e) {
@@ -1062,8 +1086,10 @@
     // The last try after a reload is dropped instead. A write the sender
     // says must never go again (error.noRetry) gets no last try either.
     if (res && res.error && res.error.noRetry) entry.no_retry = true;
+    if (res && res.error && res.error.noRetry && res.error.untilReload) entry.until_reload = res.error.untilReload;
     var dead = _pruneDead(_readDead(), entry);
-    if (entry.last_try) _reportDropped(entry);
+    // (A discarded write stays even on its last try: see Discarded, above.)
+    if (entry.last_try && !entry.until_reload) _reportDropped(entry);
     else dead.push(entry);
     _writeDead(dead);
     _writeQueue(_removeEntry(entry.id));
@@ -1447,6 +1473,12 @@
         keep.push(entry);
         return;
       }
+      // Discarded, and its class not yet read again from the server: it
+      // stays, and so does the red dot.
+      if (entry.until_reload && !entry.reloaded) {
+        keep.push(entry);
+        return;
+      }
       var target = _target(entry.endpoint, entry.payload);
       var drop = !target || entry.last_try || entry.no_retry || entry.blocked_on || q.entries.length >= MAX_ENTRIES;
       // What a queued write sets is newer: only the rest is retried.
@@ -1471,6 +1503,22 @@
       return;
     }
     _writeDead(keep);
+  }
+
+  /* A class has been read again from the server: the writes discarded for
+     it (until_reload) may go with the next page load. Returns how many. */
+  function markReloaded(classId) {
+    if (!classId) return 0;
+    var dead = _readDead();
+    var n = 0;
+    dead.forEach(function (e) {
+      if (e.until_reload === classId && !e.reloaded) {
+        e.reloaded = true;
+        n++;
+      }
+    });
+    if (n) _writeDead(dead);
+    return n;
   }
 
   function dismissDeadLetter(id) {
@@ -1536,6 +1584,7 @@
     dropBlockedOn: dropBlockedOn,
     deadLetter: deadLetter,
     dismissDeadLetter: dismissDeadLetter,
+    markReloaded: markReloaded,
     resume: resume,
     clear: clear,
     claim: claim,

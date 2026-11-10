@@ -4258,6 +4258,8 @@ async function _doInitData(cid) {
     if (_plainObject(olderRow)) {
       _applyBundleCourseConfig(cid, {}, olderRow);
       _applyBundleCourseRow(cid, olderRow);
+      var olderLoad = _refreshState[cid];
+      if (!(olderLoad && olderLoad.skipped)) _classReadFromServer(cid);
     }
     await _hydrateCanonicalDetails(cid);
     await loadStudentProfileSummaries(cid);
@@ -4479,6 +4481,7 @@ function _bundleToCache(cid, bundle) {
       dirty: false,
       settings: _SAVED_SETTINGS,
     });
+    _classReadFromServer(cid);
   }
 }
 
@@ -4851,6 +4854,20 @@ function _unsentCourseChangesByClass() {
   return byClass;
 }
 
+// Does a settings save from an older build still wait in the outbox for this class?
+function _oldSettingsSaveWaits(cid) {
+  var q = typeof window !== 'undefined' ? window.v2Queue : null;
+  if (!cid || !q || typeof q.queued !== 'function') return false;
+  try {
+    return (q.queued('update_course') || []).some(function (entry) {
+      var p = (entry && entry.payload) || {};
+      return p.p_course_id === cid && _isOldSettingsPatch(p.p_patch);
+    });
+  } catch (e) {
+    return false;
+  }
+}
+
 // What updateCourse counts its edits under (_localWrites): the class's own row.
 var _COURSE_ROW_FIELD = 'courseRow';
 /* The class's own row into the class list (COURSES), as list_teacher_courses
@@ -4897,12 +4914,20 @@ function _applyBundleCourseConfig(cid, row, courseRow) {
   var hasCourseRow = !!courseRow && typeof courseRow === 'object';
   var unsent = _unsentCourseChanges(cid);
   if (hasCourseRow) courseRow = Object.assign({}, courseRow, unsent);
+  // A setting only this device has is sent up, unless a save of this
+  // class's settings was discarded (or an older one still waits to be
+  // weighed): then nothing of that save may reach the server, and the
+  // server's "never set" stands here too.
+  var sendUp = !(_classMeta(cid) || {}).noSendUp && !_oldSettingsSaveWaits(cid);
   Object.keys(_COURSE_CONFIG_COLUMNS).forEach(function (field) {
     var column = _COURSE_CONFIG_COLUMNS[field];
     var onServer = column in unsent ? unsent[column] : row[column];
     if (onServer == null && hasCourseRow) onServer = courseRow[column];
     if (onServer && typeof onServer === 'object') config[field] = _cloneValue(onServer);
-    else if (config[field] != null) missing[column] = config[field];
+    else if (config[field] != null) {
+      if (sendUp) missing[column] = config[field];
+      else delete config[field];
+    }
   });
   // The calculation method and decay weight come on the course row. The
   // server never holds null for the method; a null weight is the default.
@@ -4919,7 +4944,10 @@ function _applyBundleCourseConfig(cid, row, courseRow) {
   // never chose, so it follows its grade level.
   if (courseRow && typeof courseRow === 'object' && 'round_percent' in courseRow) {
     if (typeof courseRow.round_percent === 'boolean') config.roundPercent = courseRow.round_percent;
-    else if (typeof config.roundPercent === 'boolean') missing.round_percent = config.roundPercent;
+    else if (typeof config.roundPercent === 'boolean') {
+      if (sendUp) missing.round_percent = config.roundPercent;
+      else delete config.roundPercent;
+    }
   }
   // "Count Only the Most Recent N" comes on the course row too. Null there is
   // All Scores, a choice, so the server's value always wins.
@@ -4967,6 +4995,11 @@ function _applyBundleCourseConfig(cid, row, courseRow) {
   // that left them alone for a newer change here is run again.
   if (hasSwitch && _cache.courseConfigs[cid] === config) {
     _setServerStudentPage(cid, courseRow.student_page_enabled === true);
+  }
+  // The server's settings are this device's now: the lock a discarded save
+  // left comes off.
+  if (_cache.courseConfigs[cid] === config && (_classMeta(cid) || {}).noSendUp) {
+    _saveClassMeta(cid, { noSendUp: false });
   }
 
   if (!Object.keys(missing).length || !_writesEnabled() || !_isUuid(cid)) return;
@@ -9334,59 +9367,100 @@ function _sendableCoursePatch(params, options) {
     delete clean[FV_SETTINGS_CHANGED_ONLY];
     return { params: Object.assign({}, params, { p_patch: clean }) };
   }
-  var wholeCopy = _WHOLE_COPY_ONLY_COLUMNS.some(function (col) {
-    return col in patch;
-  });
-  return wholeCopy ? _oldSettingsWrite(params, options || {}) : { params: params };
+  return _isOldSettingsPatch(patch) ? _oldSettingsWrite(params, options || {}) : { params: params };
 }
-/* The answer that ends an old settings write unsent. Not a network error,
-   so the outbox does not retry it: it goes to the failed list, which is
-   what turns the sync dot red (rule 5: the dot only). noRetry: it gets no
-   last try on the next page load either, and is dropped then with a
-   report. */
-var _OLD_SETTINGS_REFUSED = 'FV409';
-function _oldSettingsRefused() {
+function _isOldSettingsPatch(patch) {
+  return (
+    _plainObject(patch) &&
+    !patch[FV_SETTINGS_CHANGED_ONLY] &&
+    _WHOLE_COPY_ONLY_COLUMNS.some(function (col) {
+      return col in patch;
+    })
+  );
+}
+
+/* A save that waited is not to be sent, and never will be: it was made by
+   an older build that could not say what the teacher changed, or for a
+   list that is no longer the server's. Sending it could put an old value
+   back over a change made on another computer, with no sign.
+
+   - Sentry is told (the kind of write only: never its content).
+   - The class is read again from the server, so the screen shows what the
+     server holds and the teacher can make the change again.
+   - Nothing of the save may reach the server by another route: a class
+     load sends up a setting only this device has, and until this class has
+     loaded once more it must not (noSendUp, _applyBundleCourseConfig).
+   - The answer is not a network error, so the outbox does not retry it: it
+     goes to the failed list, which turns the sync dot red (rule 5: the dot
+     only). noRetry: it gets no last try. untilReload: no later write and
+     no page load clears it until this class has been read again
+     (_classReadFromServer), so the dot is red for as long as the screen
+     may still show the change that was not saved. */
+var _WRITE_DISCARDED = 'FV409';
+function _discardWrite(cid, what) {
+  console.warn(what);
+  try {
+    if (window.Sentry && typeof window.Sentry.captureMessage === 'function') {
+      window.Sentry.captureMessage(what, 'warning');
+    }
+  } catch (e) {
+    /* reporting is best effort */
+  }
+  try {
+    if (_isUuid(cid)) _saveClassMeta(cid, { noSendUp: true });
+  } catch (e) {
+    /* the flag is a second lock: the class is read again either way */
+  }
+  _convergeOnServer(cid);
   return {
     data: null,
-    error: { message: 'class settings changed on another device', code: _OLD_SETTINGS_REFUSED, noRetry: true },
+    error: {
+      message: 'an older save that could not be checked was not sent',
+      code: _WRITE_DISCARDED,
+      noRetry: true,
+      untilReload: cid || undefined,
+    },
   };
 }
+/* The class has been read from the server and what it sent is on screen:
+   the saves discarded for it may leave the failed list with the next page
+   load (the outbox's markReloaded). */
+function _classReadFromServer(cid) {
+  var q = typeof window !== 'undefined' ? window.v2Queue : null;
+  if (!cid || !q || typeof q.markReloaded !== 'function') return;
+  try {
+    if (q.markReloaded(cid)) _updateSyncIndicator();
+  } catch (e) {
+    /* the next load says it again */
+  }
+}
+
 // update_course leaves these columns alone when the patch gives them null.
-var _NULL_CHANGES_NOTHING = { grading_system: true, calc_method: true, timezone: true, level_order: true };
-/* A whole-copy settings write from an earlier build, checked before it goes.
-   Its settings are compared with the server's row for the class:
-   - none differ: there is nothing to send;
-   - exactly one differs: that is the teacher's change, and it alone goes;
-   - two or more differ: the class's settings changed on another device
-     since this one loaded them, and which of the keys is this device's own
-     change cannot be known. None of them is sent: one old value put back
-     could move every grade in the class. The write goes to the failed
-     list, Sentry hears of it, and the class is read again from the server,
-     so the teacher sees the setting as it is and can change it again.
-   Anything in the patch that is not one of these settings is sent as it is.
-   A write already given up on once (the outbox's last try after a reload)
-   is never weighed a second time: by then the teacher may have made the
-   change again, and the one key left differing would be the old one.
-   If the class cannot be read (offline), the write waits and is tried again. */
-async function _oldSettingsWrite(params, options) {
+var _NULL_CHANGES_NOTHING = {
+  name: true,
+  grade_level: true,
+  grading_system: true,
+  calc_method: true,
+  timezone: true,
+  level_order: true,
+};
+var OLD_SETTINGS_NOT_SENT = 'An older settings save that could not be checked was not sent';
+/* A whole-copy settings write from an earlier build, weighed before it
+   goes (Colin, 2026-11-10: discard on any difference). Every key it names
+   is compared with the class's row on the server:
+   - nothing differs: there is nothing to send, and it is dropped;
+   - anything differs: it is never sent (_discardWrite). One key differing
+     could be the teacher's own change, or an old value this device kept
+     while another computer changed it: the two cannot be told apart, and
+     the second would revert that change with no sign. So a change made
+     offline on the older app and still waiting when this build opens is
+     lost; the setting shows as the server has it and the teacher sets it
+     again.
+   If the class cannot be read (offline), the write waits and is weighed
+   when it can be. */
+async function _oldSettingsWrite(params) {
   var cid = params.p_course_id;
   var patch = params.p_patch;
-  var settings = [];
-  var rest = {};
-  Object.keys(patch).forEach(function (col) {
-    if (_COURSE_SETTING_FIELDS[col]) settings.push(col);
-    else rest[col] = patch[col];
-  });
-  function send(keep) {
-    var out = Object.assign({}, rest);
-    keep.forEach(function (col) {
-      out[col] = patch[col];
-    });
-    if (!Object.keys(out).length) return null;
-    return { params: Object.assign({}, params, { p_patch: out }) };
-  }
-  if (options.lastTry) return send([]) || { answer: _oldSettingsRefused() };
-
   var res;
   try {
     res = await _callRpcWithAuthGuard(
@@ -9402,24 +9476,14 @@ async function _oldSettingsWrite(params, options) {
   }
   var bundle = _rpcObject(res.data) || {};
   var row = bundle.gradebook && bundle.gradebook.course;
-  var differ = _plainObject(row)
-    ? settings.filter(function (col) {
-        if (patch[col] == null && _NULL_CHANGES_NOTHING[col]) return false;
-        return !(col in row) || !_sameSetting(patch[col], row[col]);
-      })
-    : settings.concat(settings); // no row to compare with: nothing can be told apart
-  if (differ.length <= 1) return send(differ) || { answer: { data: null, error: null } };
-
-  console.warn('update_course from an earlier build not sent: the class’s settings changed on another device');
-  try {
-    if (window.Sentry && typeof window.Sentry.captureMessage === 'function') {
-      window.Sentry.captureMessage('Old settings save not sent: the class changed on another device', 'warning');
-    }
-  } catch (e) {
-    /* reporting is best effort */
-  }
-  _convergeOnServer(cid);
-  return send([]) || { answer: _oldSettingsRefused() };
+  var differs =
+    !_plainObject(row) ||
+    Object.keys(patch).some(function (col) {
+      if (patch[col] == null && _NULL_CHANGES_NOTHING[col]) return false;
+      return !(col in row) || !_sameSetting(patch[col], row[col]);
+    });
+  if (!differs) return { answer: { data: null, error: null } };
+  return { answer: _discardWrite(cid, OLD_SETTINGS_NOT_SENT) };
 }
 
 /* These columns of a settings save never left this device: the baseline

@@ -869,7 +869,12 @@ describe('an update_course written to the outbox by the code before this fix', (
     expect(server.course.calc_method).toBe('highest');
   });
 
-  it('still saves the one change it was made for when nothing else changed on the server', async () => {
+  // Until Nov 10 this test read "still saves the one change it was made for
+  // when nothing else changed on the server". Colin's ruling that day:
+  // discard on any difference. One key differing could be the teacher's own
+  // change or an old value this device had kept; the two cannot be told
+  // apart, and sending the second reverts another computer with no sign.
+  it('is not sent even when the one change it was made for is all that differs: the teacher sets it again', async () => {
     await openApp();
     await laptopHolds(byName('Calculation Method'));
     await goOffline();
@@ -878,10 +883,15 @@ describe('an update_course written to the outbox by the code before this fix', (
     _outbox();
     window.v2Queue.push('update_course', { p_course_id: CID, p_patch: clone(WHOLE_COPY) });
     await settle();
+    server.sent.length = 0;
     await openApp();
     await goOnline();
-    expect(server.course.round_percent).toBe(true);
+    expect(server.patches()).toEqual([]);
+    expect(server.course.round_percent).toBe(null);
     expect(server.course.calc_method).toBe('mostRecent');
+    // The laptop shows the setting as not set, as the server has it.
+    expect((getCourseConfig(CID) || {}).roundPercent).toBeUndefined();
+    expect(getSyncDotState().status).toBe('error');
   });
 });
 
@@ -895,6 +905,7 @@ describe('an old whole-copy update_course is weighed against the server’s row 
     window.v2Queue.push('update_course', { p_course_id: CID, p_patch: clone(patch) });
     await settle();
   }
+  const NOT_SENT = ['An older settings save that could not be checked was not sent', 'warning'];
   let told;
   let sentry;
   beforeEach(() => {
@@ -907,6 +918,19 @@ describe('an old whole-copy update_course is weighed against the server’s row 
   });
   afterEach(() => {
     window.Sentry = sentry;
+  });
+
+  it('nothing differs: nothing is sent, and nothing is wrong', async () => {
+    await openApp();
+    await laptopHolds(byName('Calculation Method'));
+    await oldCodeQueues({ calc_method: 'mostRecent', level_order: 'desc' }, {});
+    server.sent.length = 0;
+    await openApp();
+    await goOnline();
+    expect(server.patches()).toEqual([]);
+    expect(window.v2Queue.stats()).toMatchObject({ queued: 0, deadLettered: 0 });
+    expect(getSyncDotState().status).toBe('idle');
+    expect(told).toEqual([]);
   });
 
   it('two settings differ: neither is sent, the sync dot and Sentry say so, and the laptop shows the server’s', async () => {
@@ -924,59 +948,137 @@ describe('an old whole-copy update_course is weighed against the server’s row 
     expect(server.course.level_order).toBe('desc');
     // Rule 5: the sync dot, and nothing else.
     expect(getSyncDotState()).toEqual({ status: 'error', title: "Some changes couldn't be saved" });
-    expect(told).toEqual([['Old settings save not sent: the class changed on another device', 'warning']]);
+    // What Sentry hears is true of one computer too: nothing says "another device".
+    expect(told).toEqual([NOT_SENT]);
     // The class was read again: this device shows what the server holds.
     expect(byName('Calculation Method').held()).toBe('highest');
     expect(byName('Rubric Levels').held()).toBe('desc');
     expect(window.v2Queue.stats().queued).toBe(0);
-
-    // The next page does not try it again: it is dropped, and the dot clears.
-    told.length = 0;
-    await openApp();
-    expect(server.patches()).toEqual([]);
-    expect(window.v2Queue.stats().deadLettered).toBe(0);
-    expect(getSyncDotState().status).toBe('idle');
-    expect(told).toEqual([['Outbox dropped update_course (FV409)', 'warning']]);
   });
 
-  it('no setting differs: nothing is sent, and nothing is wrong', async () => {
-    await openApp();
-    await laptopHolds(byName('Calculation Method'));
-    await oldCodeQueues({ calc_method: 'mostRecent', level_order: 'desc' }, {});
-    server.sent.length = 0;
-    await openApp();
-    await goOnline();
-    expect(server.patches()).toEqual([]);
-    expect(window.v2Queue.stats()).toMatchObject({ queued: 0, deadLettered: 0 });
-    expect(getSyncDotState().status).toBe('idle');
-    expect(told).toEqual([]);
-  });
-
-  it('one setting differs: that key alone goes', async () => {
+  it('one setting differs, a genuine change made offline on the old app: it is not sent either, and shows as the server has it', async () => {
+    // The cost of the ruling, and why: this key could as well be an old
+    // value the device had kept while another computer changed it.
     await openApp();
     await laptopHolds(byName('Calculation Method'));
     await oldCodeQueues({ calc_method: 'mostRecent', level_order: 'asc' }, { levelOrder: 'asc' });
     server.sent.length = 0;
     await openApp();
     await goOnline();
+    expect(server.patches()).toEqual([]);
+    expect(server.course.level_order).toBe('desc');
+    expect(byName('Rubric Levels').held()).toBe('desc');
+    expect(getSyncDotState().status).toBe('error');
+    expect(told).toEqual([NOT_SENT]);
+    // The teacher sets it again, and that goes.
+    act('cmSetLevelOrder', { value: 'asc' });
+    await quiet();
     expect(server.patches()).toEqual([{ level_order: 'asc' }]);
-    expect(told).toEqual([]);
   });
 
-  it('what is not a setting in it is still sent when the settings are not', async () => {
+  it('one old value the device had kept, and no change of its own: not sent (the case one-key-differs cannot be told from)', async () => {
+    await openApp();
+    await laptopHolds(byName('Calculation Method')); // Most Recent, chosen here long ago
+    await oldCodeQueues({ calc_method: 'mostRecent', level_order: 'desc' }, {}); // a save that changed nothing
+    schoolSets(byName('Calculation Method')); // Highest
+    server.sent.length = 0;
+    await openApp();
+    await goOnline();
+    expect(server.patches()).toEqual([]);
+    expect(server.course.calc_method).toBe('highest');
+  });
+
+  it('nothing of a discarded save reaches the server by another route: not what is not a setting, not a later load', async () => {
     await openApp();
     await laptopHolds(byName('Calculation Method'));
+    // The old save of the BC grading scale, a setting the server has never
+    // held for this class. A class load sends up such a setting when only
+    // this device has it; after a discard it must not.
+    const scale = BC_SCALE();
     await oldCodeQueues(
-      { name: 'History 12 (Block C)', calc_method: 'mostRecent', level_order: 'asc' },
-      { levelOrder: 'asc' },
+      { name: 'History 12 (Block C)', calc_method: 'mostRecent', grading_scale: clone(scale), round_percent: true },
+      { gradingScale: clone(scale), roundPercent: true },
     );
     schoolSets(byName('Calculation Method'));
     server.sent.length = 0;
     await openApp();
     await goOnline();
-    expect(server.patches()).toEqual([{ name: 'History 12 (Block C)' }]);
-    expect(server.course.calc_method).toBe('highest');
-    expect(server.course.level_order).toBe('desc');
+    await hearOfChange();
+    expect(server.sent).toEqual([]);
+    expect(server.course.grading_scale).toBe(null);
+    expect(server.course.round_percent).toBe(null);
+    expect(server.course.name).toBe('History 12');
+    // And this device shows them as the server has them: not set.
+    const cc = getCourseConfig(CID) || {};
+    expect(cc.gradingScale).toBeUndefined();
+    expect(cc.roundPercent).toBeUndefined();
+    // Not by a later save of something else, either.
+    act('cmSetLevelOrder', { value: 'asc' });
+    await quiet();
+    expect(server.patches()).toEqual([{ level_order: 'asc' }]);
+    // Nor on the next page.
+    await openApp();
+    await hearOfChange();
+    expect(server.patches()).toEqual([{ level_order: 'asc' }]);
+    expect(server.course.grading_scale).toBe(null);
+  });
+
+  it('a class load that comes while the old save still waits sends nothing of it up', async () => {
+    await openApp();
+    const scale = BC_SCALE();
+    await oldCodeQueues({ grading_scale: clone(scale), level_order: 'desc' }, { gradingScale: clone(scale) });
+    server.sent.length = 0;
+    // The row arrives while the write is still in the outbox.
+    _applyBundleCourseConfig(CID, { grading_scale: null, category_weights: null }, clone(server.course));
+    await settle();
+    expect(window.v2Queue.queued('update_course').length).toBe(1);
+    await goOnline();
+    expect(server.sent).toEqual([]);
+    expect(server.course.grading_scale).toBe(null);
+  });
+
+  it('the red dot stays through later saves, until the class has been read again and the app opened again', async () => {
+    await openApp();
+    await oldCodeQueues({ grading_scale: BC_SCALE(), level_order: 'desc' }, { gradingScale: BC_SCALE() });
+    const send = server.fake.rpc;
+    const classReads = allow => {
+      let reads = 0;
+      server.fake.rpc = function (name, params) {
+        if (name === 'get_class_bundle' && ++reads > allow) {
+          return Promise.resolve({ data: null, error: { message: 'network: failed to fetch' } });
+        }
+        return send(name, params);
+      };
+    };
+    // The next page. The old save is weighed (one read of the class) and
+    // discarded; after that the class cannot be read again for a while.
+    classReads(1);
+    server.sent.length = 0;
+    await openApp();
+    expect(told).toEqual([NOT_SENT]);
+    expect(getSyncDotState().status).toBe('error');
+    // A later settings save for the class lands. It used to clear the
+    // failed save, and the red dot with it, in the same second.
+    act('cmSetRoundPercent', { value: 'whole' });
+    await quiet();
+    expect(server.patches()).toEqual([{ round_percent: true }]);
+    expect(getSyncDotState().status).toBe('error');
+    // A page load before the class has been read again: still red.
+    classReads(0);
+    await openApp();
+    expect(window.v2Queue.stats().deadLettered).toBe(1);
+    expect(getSyncDotState().status).toBe('error');
+    // The class is read again: the screen shows the server's. Red for the
+    // rest of this page, so it is seen; gone with the next.
+    server.fake.rpc = send;
+    await openApp();
+    expect((getCourseConfig(CID) || {}).gradingScale).toBeUndefined();
+    expect(getSyncDotState().status).toBe('error');
+    await openApp();
+    expect(window.v2Queue.stats().deadLettered).toBe(0);
+    expect(getSyncDotState().status).toBe('idle');
+    expect(server.course.grading_scale).toBe(null);
+    expect(server.patches()).toEqual([{ round_percent: true }]);
   });
 
   it('waits when the class cannot be read, and is weighed once it can', async () => {
@@ -988,11 +1090,13 @@ describe('an old whole-copy update_course is weighed against the server’s row 
     await window.v2Queue.flush();
     await settle();
     expect(window.v2Queue.stats()).toMatchObject({ queued: 1, deadLettered: 0 });
+    expect(told).toEqual([]);
     await goOnline();
-    expect(server.patches()).toEqual([{ level_order: 'asc' }]);
+    expect(server.patches()).toEqual([]);
+    expect(told).toEqual([NOT_SENT]);
   });
 
-  it('one the server had already refused under the old code is not weighed on its one more try: no setting of it goes', async () => {
+  it('one the server had already refused under the old code is weighed the same way on its one more try', async () => {
     await openApp();
     await laptopHolds(byName('Calculation Method'));
     closeApp();
@@ -1018,8 +1122,11 @@ describe('an old whole-copy update_course is weighed against the server’s row 
     await goOnline();
     expect(server.patches()).toEqual([]);
     expect(server.course.level_order).toBe('desc');
+    expect(told).toEqual([NOT_SENT]);
+    expect(getSyncDotState().status).toBe('error');
+    await openApp();
     expect(window.v2Queue.stats()).toMatchObject({ queued: 0, deadLettered: 0 });
-    expect(told).toEqual([['Outbox dropped update_course (FV409)', 'warning']]);
+    expect(getSyncDotState().status).toBe('idle');
   });
 });
 
@@ -1277,6 +1384,63 @@ describe('categories: the server’s list is read before the whole list is saved
       ['Assignments', 55],
     ]);
     expect(draft().notice).toBe(null);
+  });
+
+  it('a row deleted on screen, another dragged, then Save: the drag waits for Save, and nothing is taken for a change elsewhere', async () => {
+    // reorder_categories numbers only the rows it is sent. Sent without the
+    // row deleted on screen, it would leave that row tied with another on
+    // the server, in an order this form cannot know.
+    server.fromAnotherDevice('save_categories', {
+      p_course_id: CID,
+      p_categories: [
+        { id: CAT_ASSIGNMENTS, name: 'Assignments', weight: 50 },
+        { id: CAT_TESTS, name: 'Tests', weight: 30 },
+        { name: 'Projects', weight: 20 },
+      ],
+    });
+    await openApp();
+    server.fake.calls.length = 0;
+    act('cmCatDelete', { idx: '1' }); // Tests: no work in it
+    await DashClassManager.reorderCategory(1, 0); // Projects above Assignments
+    await quiet();
+    expect(server.fake.calls.map(c => c.name)).toEqual([]);
+    expect(draft().rows.map(r => r.name)).toEqual(['Projects', 'Assignments']);
+    expect(draft().dirty).toBe(true);
+
+    input('cmCatWeightLive', { idx: '0' }, 20);
+    input('cmCatWeightLive', { idx: '1' }, 80);
+    act('cmCatSave');
+    await quiet();
+    expect(draft().notice).toBe(null);
+    expect(server.fake.calls.map(c => c.name)).toEqual(['list_categories', 'save_categories']);
+    expect(server.categories.map(c => [c.name, c.weight])).toEqual([
+      ['Projects', 20],
+      ['Assignments', 80],
+    ]);
+  });
+
+  it('a list whose rows tie on the server (an older partial reorder) is not taken for a change elsewhere', async () => {
+    server.fromAnotherDevice('save_categories', {
+      p_course_id: CID,
+      p_categories: [
+        { id: CAT_ASSIGNMENTS, name: 'Assignments', weight: 50 },
+        { id: CAT_TESTS, name: 'Tests', weight: 30 },
+        { name: 'Projects', weight: 20 },
+      ],
+    });
+    const projects = server.categories[2].id;
+    server.fromAnotherDevice('reorder_categories', { p_ids: [projects, CAT_ASSIGNMENTS] });
+    expect(server.categories.map(c => [c.name, c.display_order])).toEqual([
+      ['Projects', 0],
+      ['Assignments', 1],
+      ['Tests', 1],
+    ]);
+    await openApp();
+    input('cmCatNameLive', { idx: '2' }, 'Quizzes');
+    act('cmCatSave');
+    await quiet();
+    expect(draft().notice).toBe(null);
+    expect(server.categories.map(c => c.name)).toEqual(['Projects', 'Assignments', 'Quizzes']);
   });
 
   it('a drag to reorder with no connection: the row goes back, and nothing is queued', async () => {

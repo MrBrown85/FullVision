@@ -508,11 +508,19 @@ describe('every caller of saveCourseConfig and update_course', () => {
   it('whoever asks, an update_course never leaves with either beside another setting', async () => {
     await openClass();
     fake.calls.length = 0;
+    // Writes of this build say they carry only what changed (_changed_only):
+    // since Nov 10 one that does not, naming a setting only a whole copy
+    // ever carried, is an older build's and is never sent when anything in
+    // it differs from the server (tests/stale-settings-revert.test.js). So
+    // the two here carry the mark; they carried none before.
     await _callRpcWithAuthGuard('update_course', {
       p_course_id: CID,
-      p_patch: { level_order: 'asc', return_grades: 'on_save', student_page_enabled: false },
+      p_patch: { level_order: 'asc', return_grades: 'on_save', student_page_enabled: false, _changed_only: true },
     });
-    await _writeRpc('update_course', { p_course_id: CID, p_patch: { round_percent: true, return_grades: null } });
+    await _writeRpc('update_course', {
+      p_course_id: CID,
+      p_patch: { round_percent: true, return_grades: null, _changed_only: true },
+    });
     expect(patches()).toEqual([{ level_order: 'asc' }, { round_percent: true }]);
   });
 
