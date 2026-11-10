@@ -1,12 +1,12 @@
 /**
- * Same-date work in assignment-list order, on the Demo class (S0-F1d, rule
- * A): a named example for the pull request.
+ * On the same date, the piece made later counts later, on the Demo class
+ * (S0-F1e): a named example for the pull request.
  *
  * The Demo class has no two pieces on one date, so this test adds a pair to
  * a copy of it in memory (the Demo seed is not changed): two pieces dated
- * Nov 6, both on the competency PA5, listed in the Assignments list as
- *   1. Body Systems Exit Ticket   (Cece Adeyemi: Extending, 4)
- *   2. Body Systems Reflection    (Cece: Developing, 2)
+ * Nov 6, both on the competency PA5,
+ *   Body Systems Exit Ticket   made at 9:05   (Cece Adeyemi: Extending, 4)
+ *   Body Systems Reflection    made at 9:20   (Cece: Developing, 2)
  * and graded in both orders.
  *
  * The Demo class uses the Average method, as every class on the live
@@ -33,17 +33,21 @@ describe('Science 8 (a copy): Cece’s two PA5 pieces dated the same day', () =>
     cid = loadDemoClass();
     setActiveTerm(cid, null);
     cece = getStudents(cid).find(s => s.firstName === 'Cece').id;
-    const make = (id, title) => ({
+    const make = (id, title, created) => ({
       id,
       title,
+      created,
       scoreMode: 'proficiency',
       tagIds: [TAG],
       date: DAY,
       categoryId: 'sci8-cat-checks',
       category_id: 'sci8-cat-checks',
     });
-    // Made in this order, never dragged: Exit Ticket above Reflection.
-    getAssessments(cid).push(make('ticket', 'Body Systems Exit Ticket'), make('reflection', 'Body Systems Reflection'));
+    // The Exit Ticket was made first, the Reflection fifteen minutes later.
+    getAssessments(cid).push(
+      make('ticket', 'Body Systems Exit Ticket', '2026-11-06T17:05:00.000Z'),
+      make('reflection', 'Body Systems Reflection', '2026-11-06T17:20:00.000Z'),
+    );
     earlier = getScores(cid)[cece].slice();
     clearProfCache();
   });
@@ -66,7 +70,7 @@ describe('Science 8 (a copy): Cece’s two PA5 pieces dated the same day', () =>
     getCourseConfig(cid).calcMethod = method;
     clearProfCache();
   };
-  // The rule before S0-F1d: by date, a tie going to whichever sits later in the score list.
+  // The rule before S0-F1e: by date, a tie going to whichever sits later in the score list.
   const lastInScoreList = () =>
     getScores(cid)
       [cece].filter(e => e.tagId === TAG && e.score > 0)
@@ -111,13 +115,13 @@ describe('Science 8 (a copy): Cece’s two PA5 pieces dated the same day', () =>
     expect(getTagProficiency(cid, cece, TAG)).toBe(2);
     expect(formatLevel(cid, getTagProficiency(cid, cece, TAG))).toBe('2.0');
     graded([reflection(), ticket()]);
-    // Before S0-F1d this read 4.0, Extending: the Exit Ticket's entry is last in the list.
+    // Before S0-F1e this read 4.0, Extending: the Exit Ticket's entry is last in the list.
     expect(lastInScoreList()).toBe('ticket');
     expect(getTagProficiency(cid, cece, TAG)).toBe(2);
     setMethod('average');
   });
 
-  it('dragging the Reflection above the Exit Ticket makes the Exit Ticket the later one', () => {
+  it('dragging the Reflection above the Exit Ticket on the Assignments page changes nothing', () => {
     getAssessments(cid).forEach((a, i) => (a.display_order = i + 1));
     const all = getAssessments(cid);
     const t = all.find(a => a.id === 'ticket');
@@ -125,10 +129,29 @@ describe('Science 8 (a copy): Cece’s two PA5 pieces dated the same day', () =>
     [t.display_order, r.display_order] = [r.display_order, t.display_order];
     setMethod('mostRecent');
     graded([ticket(), reflection()]);
+    expect(getTagProficiency(cid, cece, TAG)).toBe(2);
+    graded([reflection(), ticket()]);
+    expect(getTagProficiency(cid, cece, TAG)).toBe(2);
+    expect(latest()).toBe('reflection');
+    setMethod('average');
+  });
+
+  it('with no time known for either piece, their ids decide, the same whichever was entered last', () => {
+    // As a class loaded before the server sends when each piece was made.
+    const all = getAssessments(cid);
+    const t = all.find(a => a.id === 'ticket');
+    const r = all.find(a => a.id === 'reflection');
+    const times = [t.created, r.created];
+    delete t.created;
+    delete r.created;
+    setMethod('mostRecent');
+    // 'reflection' sorts before 'ticket', so the Exit Ticket counts later.
+    graded([ticket(), reflection()]);
     expect(getTagProficiency(cid, cece, TAG)).toBe(4);
     graded([reflection(), ticket()]);
     expect(getTagProficiency(cid, cece, TAG)).toBe(4);
     expect(latest()).toBe('ticket');
+    [t.created, r.created] = times;
     setMethod('average');
   });
 });

@@ -2,6 +2,40 @@
 window.ReportBlocks = (function () {
   'use strict';
 
+  /* ── The report's set of scores ──────────────────────────────
+     Every block is drawn in the set of scores Progress Reports use
+     (teacher/report-scores.js). Each function named here runs inside
+     ReportScores.withReportScores every time it is called, from a click, a
+     timer or another module alike, so no block reads a grade outside it.
+     A block drawn for another surface (a phone copy) takes that one's set. */
+  const _inReportScores = fn => ReportScores.scoped('progress', fn);
+  renderReportBlock = _inReportScores(renderReportBlock);
+  focusArea = _inReportScores(focusArea);
+  renderBlockHeader = _inReportScores(renderBlockHeader);
+  renderBlockAcademicSummary = _inReportScores(renderBlockAcademicSummary);
+  renderBlockLearnerDimensions = _inReportScores(renderBlockLearnerDimensions);
+  renderBlockTeacherNarrative = _inReportScores(renderBlockTeacherNarrative);
+  renderBlockCompetencyTable = _inReportScores(renderBlockCompetencyTable);
+  renderBlockObservations = _inReportScores(renderBlockObservations);
+  renderBlockSectionOutcomes = _inReportScores(renderBlockSectionOutcomes);
+  renderBlockNextSteps = _inReportScores(renderBlockNextSteps);
+  renderBlockProgress = _inReportScores(renderBlockProgress);
+  renderBlockProficiency = _inReportScores(renderBlockProficiency);
+  renderBlockLegend = _inReportScores(renderBlockLegend);
+  renderBlockParentResponse = _inReportScores(renderBlockParentResponse);
+  renderBlockStudentReflectionLearning = _inReportScores(renderBlockStudentReflectionLearning);
+  renderBlockStudentReflectionHabits = _inReportScores(renderBlockStudentReflectionHabits);
+  renderBlockSectionChart = _inReportScores(renderBlockSectionChart);
+  renderBlockScoreDistribution = _inReportScores(renderBlockScoreDistribution);
+  renderBlockGradeTable = _inReportScores(renderBlockGradeTable);
+  renderBlockCoreCompetencies = _inReportScores(renderBlockCoreCompetencies);
+  renderBlockSupportHome = _inReportScores(renderBlockSupportHome);
+  renderBlockTermGlance = _inReportScores(renderBlockTermGlance);
+  renderBlockGrowth = _inReportScores(renderBlockGrowth);
+  renderBlockMissingWork = _inReportScores(renderBlockMissingWork);
+  renderBlockAttendance = _inReportScores(renderBlockAttendance);
+  renderBlockSelfAssessment = _inReportScores(renderBlockSelfAssessment);
+
   /* ── Report context ──────────────────────────────────────────
      Block renderers are pure: they take the report's term as an argument
      and never read the page. The one place that reads the term picker is
@@ -125,7 +159,7 @@ window.ReportBlocks = (function () {
      grading scale (18/20 is Extending, not level 18), a + or − is counted in
      (3+ = 3.33), and excused work is left out. Same as the proficiency calc. */
   function _levelScores(cid, sid) {
-    const tagIds = [...new Set((getScores(cid)[sid] || []).map(s => s.tagId))];
+    const tagIds = [...new Set(ReportScores.entries(cid, sid).map(s => s.tagId))];
     return tagIds.flatMap(tagId => getTagScores(cid, sid, tagId));
   }
 
@@ -516,7 +550,7 @@ window.ReportBlocks = (function () {
   function renderBlockSectionOutcomes(cid, student) {
     const sections = getSections(cid);
     const assessments = getAssessments(cid);
-    const allScores = getScores(cid)[student.id] || [];
+    const allScores = ReportScores.entries(cid, student.id);
     let html = `<div class="report-block-box">
     <div class="report-block-title">Learning Outcomes</div>
     <div style="font-size:0.62rem;color:var(--text-3);margin:-2px 0 6px">Competency levels: ${esc(describeCalcMethod(cid))}</div>`;
@@ -651,7 +685,9 @@ window.ReportBlocks = (function () {
      mark per assessment. Each mark is the competency's on the piece, as the
      gradebook shows it: rubric criteria that disagree give the lowest
      (Colin, 2026-11-03). Progress in One Area, Next Steps and Ways to
-     Support at Home read it. */
+     Support at Home read it. Pieces with the same date are in the order the
+     grades count them in (calc.js samePieceDateOrder: the one made later is
+     later), so "Latest" here is the piece the grade treats as latest. */
   function _sectionWork(cid, sid, sec) {
     const byId = {};
     getAssessments(cid).forEach(a => (byId[a.id] = a));
@@ -669,7 +705,7 @@ window.ReportBlocks = (function () {
         d: typeof _assessmentDate === 'function' ? _assessmentDate(byId[id]) : byId[id].date || '',
         score: best[id],
       }))
-      .sort((x, y) => (x.d || '').localeCompare(y.d || ''));
+      .sort((x, y) => (x.d || '').localeCompare(y.d || '') || samePieceDateOrder(cid, x.a.id, y.a.id));
   }
   /* "Chemical Reactions Lab, Oct 12 · 3.3 / 4 Proficient" */
   /* A mark as the class reads it: "3.3 / 4 Proficient", "83%" for a
@@ -964,9 +1000,11 @@ window.ReportBlocks = (function () {
   /* The previous term's levels and the start-of-term levels are read by
      Proficiency and by every Focus Area block for the same student in one
      render; they are kept until the current task ends (scores can't change
-     inside it). */
+     inside it). The key holds the set of scores in use, so a level read
+     from returned grades is never given to a report on all work. */
   let _passCache = null;
   function _pass(key, make) {
+    key = ReportScores.setInUse() + '#' + key;
     if (!_passCache) {
       _passCache = {};
       Promise.resolve().then(() => (_passCache = null));
@@ -1466,7 +1504,9 @@ window.ReportBlocks = (function () {
         .sort((a, b) => b.avg - a.avg);
       // Missing: assessments with tags in this section labelled Missing.
       const missingAssess = assessments.filter(
-        a => (a.tagIds || []).some(tid => secTagIds.has(tid)) && getAssignmentStatus(cid, student.id, a.id) === 'NS',
+        a =>
+          (a.tagIds || []).some(tid => secTagIds.has(tid)) &&
+          ReportScores.getAssignmentStatus(cid, student.id, a.id) === 'NS',
       );
 
       // 4-dot proficiency indicator
@@ -1560,7 +1600,7 @@ window.ReportBlocks = (function () {
 
   /* ── Score Distribution & Assignment Highlights ── */
   function renderBlockScoreDistribution(cid, student) {
-    const allScores = getScores(cid)[student.id] || [];
+    const allScores = ReportScores.entries(cid, student.id);
     const assessments = getAssessments(cid);
     const scored = _levelScores(cid, student.id).filter(s => s.score > 0);
     if (scored.length === 0) return '';
@@ -1613,7 +1653,7 @@ window.ReportBlocks = (function () {
       .slice(0, 3);
 
     // Missing assignments: work labelled Missing.
-    const missing = assessments.filter(a => getAssignmentStatus(cid, student.id, a.id) === 'NS');
+    const missing = assessments.filter(a => ReportScores.getAssignmentStatus(cid, student.id, a.id) === 'NS');
 
     // Proficient+ percentage for circle gauge
     const profPlus = counts[3] + counts[4];
