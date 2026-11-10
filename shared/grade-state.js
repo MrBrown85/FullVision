@@ -40,7 +40,17 @@
  *
  * A CLASS: { student_page, return_grades }. It holds grades when the student
  * page is on and Return Grades is When I Return Them ('on_return'). Any
- * other class returns every save at once.
+ * other class returns every save at once. A class that stops holding grades
+ * (As Soon As I Save is chosen, or the student page is turned off) returns
+ * every waiting draft as part of that change (afterSettingChange).
+ *
+ * MISSING WINS AT ONCE (Colin, 2026-11-09). A piece marked Missing gives the
+ * student no grade and counts as Missing straight away, with no Return, even
+ * when a grade was returned for it before: it is not a draft, and the
+ * returned set of scores holds nothing for it. Taking Missing off before
+ * any Return brings the returned grade back. Excused needs no such rule
+ * (grade math leaves an Excused piece out of every number in both sets) and
+ * Late is only a label: the score under it counts as it would without it.
  *
  * shared/data.js applies afterWrite on every score write and afterReturn on
  * Return, and keeps the rows beside the scores. What lands here later: the
@@ -242,18 +252,45 @@ window.GradeState = (function () {
     return _kept(Object.assign({}, row, { seen_at: now }));
   }
 
-  /* 'draft', 'returned' or 'none', from the row and the working copy. */
-  function stateOfRow(row, working) {
+  /* The class's settings went from `was` to `now`. A class that stops
+     holding grades returns every waiting draft as part of the change, so
+     nothing is left waiting where nothing can be returned. `rows` is
+     { assessmentId: { studentId: row } }; `workingOf(sid, aid)` gives a
+     cell's working copy. Returns the rows to keep: the same object when
+     nothing changed. */
+  function afterSettingChange(was, now, rows, workingOf, at) {
+    if (!holds(was) || holds(now)) return rows;
+    var out = rows;
+    Object.keys(rows || {}).forEach(function (aid) {
+      Object.keys(rows[aid] || {}).forEach(function (sid) {
+        var row = rows[aid][sid];
+        if (!row || !row.is_draft) return;
+        if (out === rows) out = Object.assign({}, rows);
+        if (out[aid] === rows[aid]) out[aid] = Object.assign({}, rows[aid]);
+        var kept = afterReturn(row, workingOf(sid, aid), at);
+        if (kept) out[aid][sid] = kept;
+        else delete out[aid][sid];
+        if (!Object.keys(out[aid]).length) delete out[aid];
+      });
+    });
+    return out;
+  }
+
+  /* 'draft', 'returned' or 'none', from the row, the working copy and the
+     piece's status. Missing wins at once: a Missing piece is neither. */
+  function stateOfRow(row, working, status) {
+    if (status === 'NS') return NONE;
     if (row && row.is_draft) return DRAFT;
     if (row && row.returned_at) return RETURNED;
     // No row: a grade that is here was here before the rule was kept.
     return !row && copyOf(working) ? RETURNED : NONE;
   }
 
-  /* The grade the student is given: nothing when it was never returned, the
-     returned copy while a draft sits on a returned grade, the working copy
-     otherwise. A draft is never in it. */
-  function studentCopy(row, working) {
+  /* The grade the student is given: nothing when it was never returned or
+     the piece is Missing, the returned copy while a draft sits on a
+     returned grade, the working copy otherwise. A draft is never in it. */
+  function studentCopy(row, working, status) {
+    if (status === 'NS') return null;
     if (row && row.is_draft) return row.returned_copy ? copyOf(row.returned_copy) : null;
     return stateOfRow(row, working) === RETURNED ? copyOf(working) : null;
   }
@@ -262,13 +299,17 @@ window.GradeState = (function () {
      What grade math reads in returned-only mode (plan 1.3), in the shape of
      the working scores, { studentId: [entry] }: the working entries where
      nothing is a draft, the returned copy where a draft sits on a returned
-     grade, nothing where a grade was never returned.
+     grade, nothing where a grade was never returned. Missing wins at once:
+     a returned grade under a draft is left out while the piece is Missing,
+     so its old level stops counting everywhere without a Return.
      `rows` is { assessmentId: { studentId: row } }. `entriesOf(sid, aid,
      copy, own)` turns a copy into score entries; `own` is the student's
-     working entries for that assessment. */
-  function returnedScores(working, rows, entriesOf) {
+     working entries for that assessment. `statuses` is
+     { 'studentId:assessmentId': 'NS' | 'EXC' | 'LATE' }. */
+  function returnedScores(working, rows, entriesOf, statuses) {
     working = working || {};
     rows = rows || {};
+    statuses = statuses || {};
     var rowOf = function (sid, aid) {
       return (rows[aid] || {})[sid] || null;
     };
@@ -287,7 +328,7 @@ window.GradeState = (function () {
         if (placed[aid]) return;
         placed[aid] = true;
         var copy = rowOf(sid, aid).returned_copy;
-        if (!copy) return;
+        if (!copy || statuses[sid + ':' + aid] === 'NS') return;
         var mine = own.filter(function (e) {
           return e && e.assessmentId === aid;
         });
@@ -314,13 +355,13 @@ window.GradeState = (function () {
 
   /* The state `sid`'s piece of work on `aid` is in: 'draft', 'returned', or
      null while it has no grade returned and none waiting. A status alone is
-     not a grade. In a class that keeps no rows (the student page is off),
-     a piece is Returned once it has a score or feedback. */
+     not a grade, and a Missing piece is never a draft. A piece with nothing
+     waiting is Returned once it has a score or feedback: every save that
+     is not held is returned at once. */
   function stateOf(cid, sid, aid) {
     var row = typeof getGradeReturn === 'function' ? getGradeReturn(cid, sid, aid) : null;
-    if (row && row.is_draft) return DRAFT;
-    if (row && row.returned_at) return RETURNED;
-    return !row && hasScoreOrFeedback(cid, sid, aid) ? RETURNED : null;
+    if (row && row.is_draft) return getAssignmentStatus(cid, sid, aid) === 'NS' ? null : DRAFT;
+    return hasScoreOrFeedback(cid, sid, aid) ? RETURNED : null;
   }
 
   /* A grade was saved for student `sid` on assessment `aid`; `what` names
@@ -343,6 +384,7 @@ window.GradeState = (function () {
     afterWrite: afterWrite,
     afterReturn: afterReturn,
     afterSeen: afterSeen,
+    afterSettingChange: afterSettingChange,
     stateOfRow: stateOfRow,
     studentCopy: studentCopy,
     returnedScores: returnedScores,

@@ -8931,7 +8931,11 @@ function getCourseConfig(cid) {
   }
 }
 function saveCourseConfig(cid, obj) {
+  // Draft and Returned: how grades were returned before this save, from the
+  // saved copy (a caller may have changed the cached settings in place).
+  var held = getReturnSettings(cid, _safeParseLS('gb-courseconfig-' + cid, null));
   _saveCourseField('courseConfigs', cid, obj);
+  _returnSettingsSaved(cid, held);
   if (_writesEnabled() && _isUuid(cid)) {
     // v2: policy fields live on the course row. save_course_policy is gone;
     // remap the legacy courseConfig blob onto a update_course jsonb patch.
@@ -10064,9 +10068,10 @@ var _returnedSets = {}; // cid → { working, set }: the returned set for one wo
 /* The class's two settings, as the rule reads them: { student_page,
    return_grades }. return_grades is 'on_return' (When I Return Them),
    'on_save' (As Soon As I Save) or null for no choice made, which works as
-   on_save. */
-function getReturnSettings(cid) {
-  var cfg = getCourseConfig(cid) || {};
+   on_save. `saved` reads them from a copy of the class's settings in place
+   of the ones in the cache. */
+function getReturnSettings(cid, saved) {
+  var cfg = saved || getCourseConfig(cid) || {};
   var choice = cfg.return_grades;
   return {
     // Seam 1 (S0-W1): take `&& !_writesEnabled()` away.
@@ -10093,6 +10098,28 @@ function setStudentPageSwitch(cid, on, returnGrades) {
   } else delete cfg.student_page_enabled;
   saveCourseConfig(cid, cfg);
   return true;
+}
+
+/* The class's settings were saved; they were `was`. A class that stops
+   holding grades (As Soon As I Save is chosen, or the student page is
+   turned off) returns every waiting draft as part of the change. */
+function _returnSettingsSaved(cid, was) {
+  if (!GradeState.holds(was)) return;
+  var rows = getGradeReturns(cid);
+  var cells = _gradeCells(getScores(cid), getRubricChecks(cid));
+  var out = GradeState.afterSettingChange(
+    was,
+    getReturnSettings(cid),
+    rows,
+    function (sid, aid) {
+      var a = _assessmentById(cid, aid);
+      var cell = (cells[aid] || {})[sid];
+      return a && cell ? _gradeOf(a, cell.entries, cell.checks) : null;
+    },
+    new Date().toISOString(),
+  );
+  // Seam 2 (S0-W1): these returns go to the server with the setting.
+  if (out !== rows) _saveGradeReturns(cid, out);
 }
 
 /* A class's rows. A class with none saved has none: nothing is put in the
@@ -10260,8 +10287,9 @@ function _gradeCopyEntries(cid, sid, aid, copy, own) {
    getScores: the working entries where nothing is a draft, the returned
    copy where a draft sits on a returned grade, nothing where a grade was
    never returned. Statuses are not here: Missing, Excused and Late are the
-   same in both sets. With no draft in the class this is getScores' own
-   object. Built once for each working copy; any save of the class's data
+   same in both sets. Missing wins at once: a returned grade under a draft
+   is left out while the piece is Missing (GradeState.returnedScores). With
+   no draft in the class this is getScores' own object. Built once for each working copy; any save of the class's data
    has it built again. */
 function getReturnedScores(cid) {
   var working = getScores(cid) || {};
@@ -10274,9 +10302,14 @@ function getReturnedScores(cid) {
     });
   });
   var set = anyDraft
-    ? GradeState.returnedScores(working, rows, function (sid, aid, copy, own) {
-        return _gradeCopyEntries(cid, sid, aid, copy, own);
-      })
+    ? GradeState.returnedScores(
+        working,
+        rows,
+        function (sid, aid, copy, own) {
+          return _gradeCopyEntries(cid, sid, aid, copy, own);
+        },
+        getAssignmentStatuses(cid),
+      )
     : working;
   _returnedSets[cid] = { working: working, set: set };
   return set;

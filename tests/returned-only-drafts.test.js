@@ -13,7 +13,8 @@
  * 3. A status counts at once in both sets, also on a piece whose grade is a
  *    draft: Late shows, Excused leaves the piece out, Missing counts.
  * 4. A returned grade that was cleared still counts as it was returned,
- *    until the clear is returned.
+ *    until the clear is returned. Missing wins at once: marked Missing, the
+ *    piece stops counting as it was returned, with no Return.
  *
  * The situations are the ones in tests/fixtures/grade-state-cases.json
  * (Batch A): "A new grade is a draft until it is returned", "A change to a
@@ -311,7 +312,7 @@ describe('History 12 (Letter): drafts and statuses', () => {
     expect(returnedOnly(cid)).toEqual(cleared);
   });
 
-  it('Missing after a returned grade was cleared: the % counts 0 at once; the competency keeps the returned level until the clear is returned (question 2 for Colin)', () => {
+  it('Missing after a returned grade was cleared: Missing wins at once in every number; taking it off brings the returned grade back (Colin, 2026-11-09)', () => {
     const cid = ctx.cid;
     const noor = student(cid, 'Noor');
     const poster = piece(cid, 'What Does the Poster Show, and What Does It Hide?');
@@ -327,10 +328,12 @@ describe('History 12 (Letter): drafts and statuses', () => {
     expect(returned[noor].shown.percent).toBe(all[noor].shown.percent);
     expect(returned[noor].shown.letter).toBe(all[noor].shown.letter);
     expect(returned[noor].levels.workPercent[poster.id]).toBe(0);
-    // Competency levels: all-work has no evidence from the piece; returned-only
-    // still has the returned 3, so its levels are the ones from before.
+    // Competency levels: neither set has evidence from the piece any more.
+    // The returned 3 stopped counting when the piece was marked Missing.
     expect(all[noor].levels.competencies).not.toEqual(before[noor].levels.competencies);
-    expect(returned[noor].levels.competencies).toEqual(before[noor].levels.competencies);
-    expect(returned[noor].levels.overall).toBe(before[noor].levels.overall);
+    expect(returned).toEqual(all);
+    // Missing taken off before any Return: the returned grade is back.
+    delete getAssignmentStatuses(cid)[noor + ':' + poster.id];
+    expect(returnedOnly(cid)).toEqual(before);
   });
 });

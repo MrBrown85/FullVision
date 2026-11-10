@@ -150,6 +150,15 @@ describe('Grader: each action passes through to one data.js writer', () => {
       [CID, { s1: [] }, { s1: [{ score: 3 }] }],
       [CID, null, null, 'undo'],
     ],
+    // Return (S0-F2): one student, then several.
+    ['returnGrades', [CID, 'essay', 's1'], 'returnGrades', [CID, 'essay', ['s1']], [CID, 's1', 'essay', 'return']],
+    [
+      'returnGrades',
+      [CID, 'essay', ['s1', 's2']],
+      'returnGrades',
+      [CID, 'essay', ['s1', 's2']],
+      [CID, null, 'essay', 'return'],
+    ],
   ];
 
   it.each(cases)('%s%j', (action, args, writer, writerArgs, heardArgs) => {
@@ -162,7 +171,9 @@ describe('Grader: each action passes through to one data.js writer', () => {
   });
 
   it('covers every action Grader has', () => {
-    expect(Object.keys(Grader).sort()).toEqual([...new Set(cases.map(c => c[0]))].sort());
+    // lastState is not an action: it reads what the last one left.
+    const actions = Object.keys(Grader).filter(name => name !== 'lastState');
+    expect(actions.sort()).toEqual([...new Set(cases.map(c => c[0]))].sort());
   });
 
   it('a level with no + or − given passes none on, as a tick’s suggested level does', () => {

@@ -9,6 +9,9 @@
  *   grade as it was returned;
  * - a draft never returned: nothing.
  * Statuses are not here. Missing, Excused and Late are never drafts.
+ * Missing wins at once (Colin, 2026-11-09): while a piece is Missing, a
+ * returned grade under a draft is left out, so its old level stops counting
+ * everywhere without a Return.
  *
  * The app's own builder (shared/data.js, S0-F2) is held to the same tests,
  * so this one stays small. Rows are in the shape list_course_grade_returns
@@ -44,8 +47,10 @@ export function returnedScores(cid, working, gradeReturns) {
       if (placed[aid]) return;
       placed[aid] = true;
       const copy = rowOf(sid, aid).returned_copy;
-      // Never returned: nothing. Returned before: the grade as it was returned.
-      if (copy) entriesFromCopy(cid, sid, aid, copy).forEach(e => list.push(e));
+      // Never returned: nothing. Returned before: the grade as it was returned,
+      // unless the piece is Missing now.
+      if (copy && getAssignmentStatus(cid, sid, aid) !== 'NS')
+        entriesFromCopy(cid, sid, aid, copy).forEach(e => list.push(e));
     };
     ((working || {})[sid] || []).forEach(entry => {
       const row = entry ? rowOf(sid, entry.assessmentId) : null;

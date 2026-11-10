@@ -468,6 +468,8 @@ describe('the score set is in the cache key', () => {
     const beforePct = getCourseLetterData(CID, 's1').R;
     expect(before).toBe(3);
     // The returned set, reading other scores, with no cache clear between.
+    // shared/data.js has its own builder since S0-F2; it is put back after.
+    const real = globalThis.getReturnedScores;
     globalThis.getReturnedScores = () => scoresAt(1);
     try {
       _scoreSet = 'returned';
@@ -478,7 +480,7 @@ describe('the score set is in the cache key', () => {
       expect(getTagProficiency(CID, 's1', TAG)).toBe(before);
       expect(getCourseLetterData(CID, 's1').R).toBe(beforePct);
     } finally {
-      delete globalThis.getReturnedScores;
+      globalThis.getReturnedScores = real;
     }
   });
 });

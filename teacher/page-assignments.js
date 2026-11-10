@@ -12603,12 +12603,13 @@ window.PageAssignments = (function () {
   function _graderReturnHtml(cid, a, sid, view) {
     var klass = getReturnSettings(cid);
     if (!klass.student_page) return '';
+    // A Missing piece is never a draft (GradeState.stateOf).
     var waiting = _graderReturnIds(sid, view)
+      .filter(function (id) {
+        return GradeState.stateOf(cid, id, a.id) === GradeState.DRAFT;
+      })
       .map(function (id) {
         return getGradeReturn(cid, id, a.id);
-      })
-      .filter(function (row) {
-        return row && row.is_draft;
       });
     // As Soon As I Save: nothing waits, so there is nothing to return.
     if (!waiting.length && !GradeState.holds(klass)) return '';
