@@ -13342,7 +13342,10 @@ window.PageAssignments = (function () {
     // (CommentBank.bestPieceSkillOf).
     var skill = '';
     if (!String(input.value || '').trim() && CommentBank.bestPieceSkillOf) {
-      var f = CommentBank.facts(cid, st);
+      // The grader is the teacher's own screen: all work, whatever the questionnaire's set (S2-F2).
+      var f = ReportScores.withReportScores('grader', function () {
+        return CommentBank.facts(cid, st);
+      });
       var w = (f.work || []).find(function (x) {
         return x.id === a.id;
       });
