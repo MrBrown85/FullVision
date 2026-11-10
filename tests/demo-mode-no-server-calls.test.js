@@ -271,16 +271,33 @@ describe('Demo Mode sends nothing for Draft and Returned', () => {
     },
   );
 
+  it.each([false, true])(
+    'the two settings’ own writer and the count of drafts (signed in behind it: %s)',
+    async signedIn => {
+      _useSupabase = signedIn;
+      expect(saveReturnSettings(CID, { student_page_enabled: true }).now).toEqual({ ok: true });
+      expect(saveReturnSettings(CID, { return_grades: 'on_return' }).now).toEqual({ ok: true });
+      Grader.setLevel(CID, 's1', 'essay', 't1', 3, 0);
+      expect(draftsWaitingToReturn(CID).now).toEqual({ count: 1 });
+      expect(saveReturnSettings(CID, { return_grades: 'on_save' }).now).toEqual({ ok: true });
+      expect(GradeState.stateOf(CID, 's1', 'essay')).toBe('returned');
+      expect(draftsWaitingToReturn(CID).now).toEqual({ count: 0 });
+      expect(saveReturnSettings(CID, { student_page_enabled: false }).now).toEqual({ ok: true });
+      await tick();
+      expect(calls).toEqual([]);
+      expect(localStorage.getItem('fv-sync-queue-v1')).toBe(null);
+    },
+  );
+
   it('the rule and the grader name no server function', () => {
     ['shared/grade-state.js', 'shared/grader.js'].forEach(file => {
       const src = readFileSync(new URL('../' + file, import.meta.url), 'utf-8');
       expect(src, file).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|sendBeacon|_writeRpc|\.rpc\(|getSupabase/);
     });
-    // Until S0-W1 nothing the client sent named the server's return or its
-    // list of rows. Now shared/data.js sends both, for a signed-in teacher
-    // only (tests/grade-return-server.test.js); no other file names them, and
-    // nothing asks the server for a count of drafts: the screens count the
-    // rows the class holds.
+    // Until S0-W1 nothing the client sent named the server's return, its
+    // list of rows or its count of drafts. Now shared/data.js sends all
+    // three, for a signed-in teacher only (tests/grade-return-server.test.js);
+    // no other file names them.
     ['shared/grade-state.js', 'shared/grader.js', 'teacher/page-assignments.js'].forEach(file => {
       const src = readFileSync(new URL('../' + file, import.meta.url), 'utf-8');
       expect(src, file).not.toMatch(/['"`](return_grades|list_course_grade_returns|course_draft_count)['"`]\s*,/);
@@ -288,7 +305,7 @@ describe('Demo Mode sends nothing for Draft and Returned', () => {
     });
     ['shared/data.js'].forEach(file => {
       const src = readFileSync(new URL('../' + file, import.meta.url), 'utf-8');
-      expect(src, file).not.toMatch(/['"`]course_draft_count['"`]\s*,/);
+      // Each through the guarded calls, never as a bare { rpc: … } op.
       expect(src, file).not.toMatch(/rpc:\s*['"`](return_grades|list_course_grade_returns|course_draft_count)/);
     });
   });

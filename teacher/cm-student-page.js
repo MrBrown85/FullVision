@@ -29,8 +29,7 @@
 
    RETURN GRADES is the class's return_grades setting: 'on_return' (When I
    Return Them), 'on_save' (As Soon As I Save), or no choice made, which
-   works as As Soon As I Save. It is saved through saveCourseConfig and
-   nowhere else; shared/data.js runs the rule that goes with the change.
+   works as As Soon As I Save.
 
    - No choice made (a class from before the setting): When I Return Them is
      the first choice offered, neither is marked as chosen, and a line says
@@ -52,9 +51,23 @@
    address afterwards), and holds until the page is reloaded without it.
    Opened that way, a class whose student page is off has the tab too, with
    the switch alone on it. Turning the switch off is leaving When I Return
-   Them: with grades waiting it asks first, in the same words. It is saved
-   through saveCourseConfig, like Return Grades, and a class turned on with
-   no Return Grades choice made keeps none until its teacher picks. */
+   Them: with grades waiting it asks first, in the same words.
+
+   BOTH ARE SAVED through saveReturnSettings (shared/data.js), the one
+   writer of the two settings, and through nothing else: a change of either
+   sends that one setting, never this device's copy of the other. In Demo
+   Mode every change is made at once. For a signed-in teacher:
+
+   - A change that starts the class holding grades (the switch turned on;
+     When I Return Them chosen) is asked of the server first and shows here
+     only when the server has answered. Offline or refused, a line under the
+     control says it could not be changed, and nothing has changed.
+   - A change that stops it (As Soon As I Save; the switch off) first asks
+     the server how many grades wait (the count on this device can be
+     short: draftsWaitingToReturn says why). If that cannot be read the
+     change is not made, and a line says so: a class never returns its
+     drafts without the teacher having been asked about the true number.
+     Then it is made here at once and sent. */
 var CmStudentPage = (function () {
   'use strict';
 
@@ -96,10 +109,118 @@ var CmStudentPage = (function () {
     return box ? box.dataset.cid : null;
   }
 
-  // The tab's one writer: Return Grades and the build switch are both class
-  // settings, saved and sent as every class setting is.
-  function _save(cid, cfg) {
-    saveCourseConfig(cid, cfg);
+  /* ── Changing one of the two settings ──────────────────────── */
+
+  var COULD_NOT_CHANGE = 'Could not change this. Check the connection and try again.';
+  var COULD_NOT_COUNT = 'Could not check for grades waiting to be returned. Check the connection and try again.';
+
+  // What the tab is in the middle of, by class: { busy: { row, want }, note: { row, text } }.
+  var _state = {};
+  function _st(cid) {
+    return _state[cid] || (_state[cid] = { busy: null, note: null });
+  }
+
+  function _focus(id) {
+    var el = typeof document !== 'undefined' && id ? document.getElementById(id) : null;
+    if (el && typeof el.focus === 'function') el.focus({ preventScroll: true });
+  }
+
+  // The line under a row: what it is waiting on, or why it did not change.
+  function _lineFor(cid, row) {
+    var st = _st(cid);
+    if (st.busy && st.busy.row === row) {
+      return '<div class="cm-hint sp-note" id="sp-' + row + '-note" role="status">Changing…</div>';
+    }
+    if (st.note && st.note.row === row) {
+      return '<div class="cm-hint sp-note" id="sp-' + row + '-note" role="status">' + esc(st.note.text) + '</div>';
+    }
+    return '';
+  }
+
+  // Still this tab's to change? The class may have lost the tab while a
+  // question was up or the server was answering.
+  function _mayChange(cid, row) {
+    if (!isShown(cid)) return false;
+    return row === 'switch' ? _buildFlag : _settings(cid).student_page === true;
+  }
+
+  /* The tab's one writer. `change` is what saveReturnSettings takes: the
+     one setting the click changes. Made at once (Demo Mode, and a change
+     that stops the class holding), the tab is redrawn with it. Asked of
+     the server first, the row says Changing… until it answers. */
+  function _make(cid, row, change, focusId) {
+    if (!_mayChange(cid, row)) return;
+    var st = _st(cid);
+    var done = function (out) {
+      st.busy = null;
+      st.note = out && out.ok ? null : { row: row, text: COULD_NOT_CHANGE };
+      _rerender();
+      _focus(focusId);
+    };
+    var asked = saveReturnSettings(cid, change);
+    if (asked.now) {
+      done(asked.now);
+      return;
+    }
+    st.busy = { row: row, want: change };
+    st.note = null;
+    _rerender();
+    asked.then(done, function () {
+      done({ ok: false });
+    });
+  }
+
+  // The question asked before a class stops holding grades with `n`
+  // waiting. The message is ruling 8's.
+  function _leaveQuestion(n) {
+    return n === 1
+      ? {
+          title: 'Return 1 Grade Now?',
+          message: '1 grade is waiting as a draft. Changing this returns it to the student now.',
+        }
+      : {
+          title: 'Return ' + n + ' Grades Now?',
+          message: n + ' grades are waiting as drafts. Changing this returns them to students now.',
+        };
+  }
+
+  /* A change that stops the class holding grades: how many wait is found
+     first (draftsWaitingToReturn: this device's count in Demo Mode, the
+     server's for a signed-in teacher). With any waiting the tab asks; with
+     the number not known the change is not made. */
+  function _askThenMake(cid, row, change, focusId) {
+    if (!_mayChange(cid, row)) return;
+    var st = _st(cid);
+    var counted = function (out) {
+      st.busy = null;
+      var n = out ? out.count : null;
+      if (n == null) {
+        st.note = { row: row, text: COULD_NOT_COUNT };
+        _rerender();
+        _focus(focusId);
+        return;
+      }
+      st.note = null;
+      if (!n) {
+        _make(cid, row, change, focusId);
+        return;
+      }
+      var q = _leaveQuestion(n);
+      showConfirm(q.title, q.message, 'Return and Change', 'primary', function () {
+        _make(cid, row, change, focusId);
+      });
+    };
+    var asked = draftsWaitingToReturn(cid);
+    if (asked.now) {
+      counted(asked.now);
+      return;
+    }
+    st.busy = { row: row, want: null };
+    st.note = null;
+    _rerender();
+    asked.then(counted, function () {
+      counted(null);
+    });
   }
 
   /* ── Return Grades ─────────────────────────────────────────── */
@@ -132,6 +253,7 @@ var CmStudentPage = (function () {
         );
       }).join('') +
       '</div>' +
+      _lineFor(cid, 'return') +
       (chosen
         ? ''
         : '<div class="cm-hint" id="sp-return-unset">' +
@@ -144,48 +266,16 @@ var CmStudentPage = (function () {
     );
   }
 
-  // The question asked before a class leaves When I Return Them with `n`
-  // grades waiting. The message is ruling 8's.
-  function _leaveQuestion(n) {
-    return n === 1
-      ? {
-          title: 'Return 1 Grade Now?',
-          message: '1 grade is waiting as a draft. Changing this returns it to the student now.',
-        }
-      : {
-          title: 'Return ' + n + ' Grades Now?',
-          message: n + ' grades are waiting as drafts. Changing this returns them to students now.',
-        };
-  }
-
-  function _saveReturnGrades(cid, value) {
-    if (!isShown(cid) || _settings(cid).student_page !== true) return;
-    var cfg = Object.assign({}, getCourseConfig(cid));
-    cfg.return_grades = value;
-    // It returns what waits when the class stops holding grades.
-    _save(cid, cfg);
-    _rerender();
-    // The redraw made the chosen button a new element.
-    var again = typeof document !== 'undefined' ? document.getElementById('sp-return-' + value) : null;
-    if (again && typeof again.focus === 'function') again.focus({ preventScroll: true });
-  }
-
   function _chooseReturnGrades(cid, value) {
-    if (!isShown(cid) || _settings(cid).student_page !== true) return;
+    if (!_mayChange(cid, 'return') || _st(cid).busy) return;
     var known = RETURN_CHOICES.some(function (c) {
       return c.value === value;
     });
-    var now = _settings(cid);
-    if (!known || now.return_grades === value) return;
-    var waiting = GradeState.holds(now) && value !== 'on_return' ? GradeState.draftsWaiting(cid) : 0;
-    if (!waiting) {
-      _saveReturnGrades(cid, value);
-      return;
-    }
-    var q = _leaveQuestion(waiting);
-    showConfirm(q.title, q.message, 'Return and Change', 'primary', function () {
-      _saveReturnGrades(cid, value);
-    });
+    if (!known || _settings(cid).return_grades === value) return;
+    var change = { return_grades: value };
+    // The redraw makes the chosen button a new element: the focus goes back to it.
+    if (value === 'on_return') _make(cid, 'return', change, 'sp-return-' + value);
+    else _askThenMake(cid, 'return', change, 'sp-return-' + value);
   }
 
   /* ── The build switch ──────────────────────────────────────── */
@@ -194,6 +284,10 @@ var CmStudentPage = (function () {
   // Settings' own switch row (Folders Count as One).
   function _buildSwitchCard(cid) {
     var on = _settings(cid).student_page;
+    var busy = _st(cid).busy;
+    var waiting = !!busy && busy.row === 'switch';
+    // While the server is asked to turn it on, the switch shows what was asked.
+    var shown = waiting && busy.want && busy.want.student_page_enabled === true ? true : on;
     return (
       '<div class="cm-section sp-build" data-cid="' +
       esc(cid) +
@@ -208,41 +302,32 @@ var CmStudentPage = (function () {
       ) +
       '</span></span>' +
       '<span class="gpd-switch"><input type="checkbox" role="switch" id="sp-build-switch" data-action-change="spBuildSwitch"' +
-      (on ? ' checked' : '') +
+      (shown ? ' checked' : '') +
+      (waiting ? ' disabled' : '') +
       '><span class="gpd-switch-ui" aria-hidden="true"></span></span>' +
       '</div>' +
+      _lineFor(cid, 'switch') +
       '</div>'
     );
   }
 
-  function _saveBuildSwitch(cid, on) {
-    if (!_buildFlag || !isShown(cid)) return;
-    var cfg = Object.assign({}, getCourseConfig(cid));
-    if (on) cfg.student_page_enabled = true;
-    else delete cfg.student_page_enabled;
-    // Off returns what waits.
-    _save(cid, cfg);
-    _rerender();
-    var again = typeof document !== 'undefined' ? document.getElementById('sp-build-switch') : null;
-    if (again && typeof again.focus === 'function') again.focus({ preventScroll: true });
-  }
-
   function _turnBuildSwitch(cid, el) {
-    if (!_buildFlag || !isShown(cid)) return;
-    var now = _settings(cid);
+    if (!_mayChange(cid, 'switch')) return;
     var on = !!(el && el.checked);
-    if (on === now.student_page) return;
-    var waiting = !on && GradeState.holds(now) ? GradeState.draftsWaiting(cid) : 0;
-    if (!waiting) {
-      _saveBuildSwitch(cid, on);
+    if (_st(cid).busy) {
+      // One thing at a time: the switch stays as it was drawn.
+      if (el) el.checked = !on;
       return;
     }
-    // Still on until the teacher answers; Cancel leaves it so.
+    if (on === _settings(cid).student_page) return;
+    if (on) {
+      _make(cid, 'switch', { student_page_enabled: true }, 'sp-build-switch');
+      return;
+    }
+    // Still on until the count is known and the teacher has answered;
+    // Cancel leaves it so.
     el.checked = true;
-    var q = _leaveQuestion(waiting);
-    showConfirm(q.title, q.message, 'Return and Change', 'primary', function () {
-      _saveBuildSwitch(cid, false);
-    });
+    _askThenMake(cid, 'switch', { student_page_enabled: false }, 'sp-build-switch');
   }
 
   /* ── The panel ─────────────────────────────────────────────── */
@@ -287,9 +372,10 @@ var CmStudentPage = (function () {
     return false;
   }
 
-  // Put the tab back as the address has it (tests).
+  // Put the tab back as the address has it, with nothing under way (tests).
   function _reset() {
     _buildFlag = _addressHasBuildFlag();
+    _state = {};
   }
   // Tests: as if the app had been opened at the build address, or not.
   function _setBuildFlag(on) {

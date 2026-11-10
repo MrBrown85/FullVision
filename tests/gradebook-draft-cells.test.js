@@ -31,7 +31,17 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount, showCompetencies } from './helpers/gradebook-dom.js';
-import { U, signIn, seedClass, clearClass, click, fire, key, confirmOk } from './helpers/pin-save-paths.js';
+import {
+  U,
+  signIn,
+  seedClass,
+  clearClass,
+  click,
+  fire,
+  key,
+  confirmOk,
+  serverSaysStudentPageOn,
+} from './helpers/pin-save-paths.js';
 
 const SNAPSHOT = join(new URL('.', import.meta.url).pathname, 'fixtures', 'gradebook-switch-off.json');
 const UPDATE = process.env.UPDATE_GRADEBOOK_SNAPSHOT === '1';
@@ -281,10 +291,21 @@ describe('with the build switch off the gradebook is what it was', () => {
     Object.keys(before).forEach(name => expect(now[name] === before[name], name).toBe(true));
   });
 
-  // Until S0-W1 a signed-in teacher's switch read off whatever the device
-  // held, and this test said so with both settings on. The switch is the
-  // server's now (the class's own setting, loaded with it), so the proof is
-  // the one above, signed in: every class that does not hold grades.
+  // As before S0-W1: the two settings on this device alone are not the
+  // server's word (shared/data.js _serverSaysStudentPage), and draw nothing.
+  it('byte for byte for a signed-in teacher, even with both settings on this device', () => {
+    const session = signIn();
+    try {
+      const now = walk({ student_page_enabled: true, return_grades: 'on_return' });
+      expect(Object.keys(now)).toEqual(Object.keys(before));
+      Object.keys(before).forEach(name => expect(now[name] === before[name], name).toBe(true));
+    } finally {
+      session.signOut();
+    }
+  });
+
+  // And once the server has said the page is on (S0-W1), every class that
+  // still does not hold grades.
   it.each([
     ['a class with neither setting', {}],
     ['a class set to When I Return Them whose student page is off', { return_grades: 'on_return' }],
@@ -296,6 +317,7 @@ describe('with the build switch off the gradebook is what it was', () => {
     ['a class whose student page is on with no choice made', { student_page_enabled: true }],
   ])('byte for byte for a signed-in teacher, in %s', (_, config) => {
     const session = signIn();
+    if (config.student_page_enabled === true) serverSaysStudentPageOn(CID);
     try {
       const now = walk(config);
       expect(Object.keys(now)).toEqual(Object.keys(before));
@@ -308,12 +330,14 @@ describe('with the build switch off the gradebook is what it was', () => {
         );
       }
     } finally {
+      serverSaysStudentPageOn(CID, false);
       session.signOut();
     }
   });
 
-  it('and the check can tell: a signed-in class that holds grades is drawn its drafts (S0-W1)', () => {
+  it('and the check can tell: a signed-in class the server says holds grades is drawn its drafts (S0-W1)', () => {
     const session = signIn();
+    serverSaysStudentPageOn(CID);
     try {
       const now = walk({ student_page_enabled: true, return_grades: 'on_return' });
       expect(Object.keys(now)).toEqual(Object.keys(before));
@@ -321,6 +345,7 @@ describe('with the build switch off the gradebook is what it was', () => {
       expect(now[name]).not.toBe(before[name]);
       expect(now[name]).toMatch(/gb-draft/);
     } finally {
+      serverSaysStudentPageOn(CID, false);
       session.signOut();
     }
   });

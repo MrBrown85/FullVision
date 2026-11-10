@@ -10,16 +10,17 @@
  * - With the build switch off nothing is kept: no row, no localStorage key.
  * - The rows move with a re-keyed id and go with a deleted class or
  *   assessment.
- * - A signed-in teacher's switch is the server's (S0-W1): with it off
- *   nothing is kept and neither setting is sent; with it on the rule runs
- *   and both settings go up in update_course. The server side of the rows
- *   and of Return is in tests/grade-return-server.test.js.
+ * - A signed-in teacher's switch is the server's (S0-W1): the two settings
+ *   on this device alone turn nothing on, and saveCourseConfig sends
+ *   neither. Once the server has said the page is on the rule runs. The
+ *   server side of the settings, the rows and Return is in
+ *   tests/grade-return-server.test.js.
  */
 import './setup.js';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { U, signIn, seedClass, clearClass, settle } from './helpers/pin-save-paths.js';
+import { U, signIn, seedClass, clearClass, settle, serverSaysStudentPageOn } from './helpers/pin-save-paths.js';
 
 const CID = 'c-held';
 const ESSAY = { id: 'essay', title: 'Essay', date: '2026-10-10', type: 'summative', tagIds: ['t1', 't2'] };
@@ -721,15 +722,11 @@ describe('the build switch', () => {
       clearClass(LIVE);
     });
 
-    // Until S0-W1 a signed-in teacher's switch read off whatever this device
-    // held, and neither setting was sent. Now the switch is the server's.
-    it('with the switch off: reads off, keeps no row, returns nothing, and sends what it always did', async () => {
-      seedClass(LIVE, {
-        students: [{ id: U(11), firstName: 'Jordan', lastName: 'Test' }],
-        assessments: [{ id: U(31), title: 'Essay', date: '2026-10-10', type: 'summative', tagIds: [U(51)] }],
-        // A Return Grades choice, as every class made since Batch A has, and the page off.
-        courseConfigs: { return_grades: 'on_return' },
-      });
+    // As before S0-W1: the two settings on this device alone are not the
+    // server's word, and turn nothing on. (The console switch is gone from
+    // this test: for a signed-in teacher it now asks the server, which
+    // tests/grade-return-server.test.js covers.)
+    it('reads off, keeps no row, and cannot be turned on by what this device holds', async () => {
       expect(getReturnSettings(LIVE).student_page).toBe(false);
       upsertScore(LIVE, U(11), U(31), U(51), 3, '2026-10-10', 'summative', '', 0);
       await settle();
@@ -737,37 +734,46 @@ describe('the build switch', () => {
       expect(getGradeReturns(LIVE)).toEqual({});
       expect(localStorage.getItem('gb-grade-returns-' + LIVE)).toBe(null);
       expect(returnGrades(LIVE, U(31), [U(11)]).returned).toBe(0);
-      saveCourseConfig(LIVE, Object.assign({}, getCourseConfig(LIVE), { calcMethod: 'mostRecent' }));
-      await settle();
-      // The score and the setting went up as they always have, and nothing else did.
-      const sent = session.sent();
-      expect(sent.map(c => c[0])).toEqual(['upsert_tag_score', 'update_course']);
-      expect(sent[1][1].p_patch).toEqual({ calc_method: 'mostRecent' });
-      expect(JSON.stringify(sent)).not.toMatch(/student_page|return_grades/);
-    });
-
-    it('with the switch on: reads on, and a save waits as a draft on this device at once', async () => {
-      expect(getReturnSettings(LIVE)).toEqual({ student_page: true, return_grades: 'on_return' });
-      upsertScore(LIVE, U(11), U(31), U(51), 3, '2026-10-10', 'summative', '', 0);
-      expect(GradeState.stateOf(LIVE, U(11), U(31))).toBe('draft');
-      expect(getGradeReturn(LIVE, U(11), U(31))).toEqual({ is_draft: true });
-      await settle();
-      // The score goes up as it always has. The server's triggers make it a draft there.
+      // The score went up as it always has, and nothing else did.
       expect(session.sent().map(c => c[0])).toEqual(['upsert_tag_score']);
     });
 
-    it('saveCourseConfig sends both settings with any save while the switch is on', async () => {
+    it('saveCourseConfig sends neither setting to the server', async () => {
       saveCourseConfig(
         LIVE,
         Object.assign({}, getCourseConfig(LIVE), { calcMethod: 'mostRecent', return_grades: 'on_save' }),
       );
       await settle();
-      const sent = session.sent().filter(c => !/^(list|get)_/.test(c[0]));
+      const sent = session.sent();
       expect(sent.map(c => c[0])).toEqual(['update_course']);
-      expect(sent[0][1].p_patch).toEqual({
-        calc_method: 'mostRecent',
-        student_page_enabled: true,
-        return_grades: 'on_save',
+      expect(sent[0][1].p_patch).toEqual({ calc_method: 'mostRecent' });
+      expect(JSON.stringify(sent)).not.toMatch(/student_page|return_grades/);
+    });
+
+    describe('once the server has said the class’s student page is on', () => {
+      beforeEach(() => serverSaysStudentPageOn(LIVE));
+      afterEach(() => serverSaysStudentPageOn(LIVE, false));
+
+      it('reads on, and a save waits as a draft on this device at once', async () => {
+        expect(getReturnSettings(LIVE)).toEqual({ student_page: true, return_grades: 'on_return' });
+        upsertScore(LIVE, U(11), U(31), U(51), 3, '2026-10-10', 'summative', '', 0);
+        expect(GradeState.stateOf(LIVE, U(11), U(31))).toBe('draft');
+        expect(getGradeReturn(LIVE, U(11), U(31))).toEqual({ is_draft: true });
+        await settle();
+        // The score goes up as it always has. The server's triggers make it a draft there.
+        expect(session.sent().map(c => c[0])).toEqual(['upsert_tag_score']);
+      });
+
+      it('saveCourseConfig still sends neither setting, and cannot change either', async () => {
+        saveCourseConfig(
+          LIVE,
+          Object.assign({}, getCourseConfig(LIVE), { calcMethod: 'mostRecent', return_grades: 'on_save' }),
+        );
+        expect(getReturnSettings(LIVE)).toEqual({ student_page: true, return_grades: 'on_return' });
+        await settle();
+        const sent = session.sent().filter(c => !/^(list|get)_/.test(c[0]));
+        expect(sent.map(c => c[0])).toEqual(['update_course']);
+        expect(sent[0][1].p_patch).toEqual({ calc_method: 'mostRecent' });
       });
     });
   });

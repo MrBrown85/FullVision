@@ -8,15 +8,18 @@
  *   that carries ?build=student-page.
  * - Opened that way, a class whose student page is off has the Student Page
  *   tab too, with the switch alone on it.
- * - Turning it on is one class setting saved (and, signed in, sent). The
- *   class's Return Grades choice is left as it is.
+ * - Turning it on changes that one setting. In Demo Mode at once; signed
+ *   in, the server is asked first and the class is on only when it has
+ *   answered. The class's Return Grades choice is left as it is, and is
+ *   not sent.
  * - Turning it off is leaving When I Return Them: with grades waiting it
  *   asks first, in the words Class Settings already uses (DECISIONS,
- *   Student page build rulings 8); Cancel changes nothing.
+ *   Student page build rulings 8); Cancel changes nothing. Signed in, the
+ *   number is the server's, and with no number it is not turned off.
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { U, signIn, seedClass, clearClass, settle } from './helpers/pin-save-paths.js';
+import { U, signIn, seedClass, clearClass, settle, serverSaysStudentPageOn } from './helpers/pin-save-paths.js';
 
 const CID = 'c-build';
 const LIVE = U(1);
@@ -53,7 +56,7 @@ describe('Class Settings: the student page’s build switch', () => {
   // The switch as drawn: null when it is not, else whether it is on.
   function switchDrawn() {
     const m = html().match(
-      /<input type="checkbox" role="switch" id="sp-build-switch" data-action-change="spBuildSwitch"( checked)?>/,
+      /<input type="checkbox" role="switch" id="sp-build-switch" data-action-change="spBuildSwitch"( checked)?(?: disabled)?>/,
     );
     return m ? !!m[1] : null;
   }
@@ -306,44 +309,120 @@ describe('Class Settings: the student page’s build switch', () => {
       beforeEach(() => {
         session = signIn();
       });
-      afterEach(() => session.signOut());
+      afterEach(() => {
+        serverSaysStudentPageOn(LIVE, false);
+        session.signOut();
+      });
       const writes = () => session.sent().filter(c => !/^(list|get)_/.test(c[0]));
+      const note = () => (html().match(/id="sp-switch-note" role="status">([^<]*)</) || [])[1] || null;
+      const disabled = () => /id="sp-build-switch"[^>]* disabled>/.test(html());
 
-      it('turned on: one update_course carrying the switch and the choice the class holds', async () => {
+      it('turned on: the server is asked first, for the switch alone; it shows on only when the server has answered', async () => {
         seed(LIVE, { levelOrder: 'asc', return_grades: 'on_return' });
+        let answer;
+        session.fake.on('update_course', () => new Promise(r => (answer = () => r({ data: null, error: null }))));
         open(LIVE);
         expect(switchDrawn()).toBe(false);
         flip(LIVE, true);
-        expect(getReturnSettings(LIVE)).toEqual({ student_page: true, return_grades: 'on_return' });
         await settle();
-        expect(writes()).toEqual([
-          [
-            'update_course',
-            {
-              p_course_id: LIVE,
-              p_patch: { level_order: 'asc', student_page_enabled: true, return_grades: 'on_return' },
-            },
-          ],
-        ]);
+        // Asked, and waiting: the class is not on yet.
+        expect(getReturnSettings(LIVE).student_page).toBe(false);
+        expect(note()).toBe('Changing…');
+        expect(switchDrawn()).toBe(true); // drawn as asked for, and not to be pressed again
+        expect(disabled()).toBe(true);
+        expect(html()).not.toContain('sp-card');
+        // Only the switch: never this device's copy of Return Grades or of any other setting.
+        expect(writes()).toEqual([['update_course', { p_course_id: LIVE, p_patch: { student_page_enabled: true } }]]);
+        answer();
+        await settle();
+        expect(getReturnSettings(LIVE)).toEqual({ student_page: true, return_grades: 'on_return' });
+        expect(switchDrawn()).toBe(true);
+        expect(disabled()).toBe(false);
+        expect(note()).toBe(null);
+        expect(html()).toContain('sp-card');
       });
 
-      it('turned off with grades waiting: asked, then one update_course and no return', async () => {
+      it('offline or refused, it is not turned on, and the card says so', async () => {
+        seed(LIVE, { levelOrder: 'asc', return_grades: 'on_return' });
+        session.fake.on('update_course', () => ({ data: null, error: { message: 'network: failed to fetch' } }));
+        open(LIVE);
+        const before = stored(LIVE);
+        flip(LIVE, true);
+        await settle();
+        expect(stored(LIVE)).toBe(before);
+        expect(getReturnSettings(LIVE).student_page).toBe(false);
+        expect(switchDrawn()).toBe(false);
+        expect(note()).toBe('Could not change this. Check the connection and try again.');
+        expect(html()).not.toContain('sp-card');
+        // Offline it does not even ask.
+        const online = Object.getOwnPropertyDescriptor(navigator, 'onLine');
+        Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+        try {
+          session.since();
+          flip(LIVE, true);
+          await settle();
+          expect(session.since()).toEqual([]);
+          expect(getReturnSettings(LIVE).student_page).toBe(false);
+          expect(note()).toBe('Could not change this. Check the connection and try again.');
+        } finally {
+          if (online) Object.defineProperty(navigator, 'onLine', online);
+          else Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => true });
+        }
+      });
+
+      it('turned off: the server’s count is asked first; with grades waiting it asks, then sends the switch alone and no return', async () => {
         seed(LIVE, HELD);
+        serverSaysStudentPageOn(LIVE);
         Grader.setLevel(LIVE, U(11), U(31), U(51), 3, 0);
         await settle();
+        // The server counts a withdrawn student's draft too: two, where this device shows one.
+        expect(GradeState.draftsWaiting(LIVE)).toBe(1);
+        session.fake.on('course_draft_count', () => ({ data: 2, error: null }));
         open(LIVE);
         session.since();
-        flip(LIVE, false);
-        expect(confirms.length).toBe(1);
-        expect(confirms[0].title).toBe('Return 1 Grade Now?');
+        const { el } = flip(LIVE, false);
+        // Still on while the count is fetched and the question is up.
+        expect(el.checked).toBe(true);
         await settle();
-        expect(session.since().filter(c => !/^(list|get)_/.test(c[0]))).toEqual([]);
+        expect(confirms.length).toBe(1);
+        expect(confirms[0]).toMatchObject({
+          title: 'Return 2 Grades Now?',
+          message: '2 grades are waiting as drafts. Changing this returns them to students now.',
+          okLabel: 'Return and Change',
+        });
+        expect(getReturnSettings(LIVE).student_page).toBe(true);
+        expect(session.since().filter(c => !/^(list|get)_/.test(c[0]))).toEqual([
+          ['course_draft_count', { p_course_id: LIVE }],
+        ]);
         confirms[0].onConfirm();
+        expect(getReturnSettings(LIVE).student_page).toBe(false);
         expect(getGradeReturn(LIVE, U(11), U(31)).is_draft).toBe(false);
         await settle();
         const sent = session.since().filter(c => !/^(list|get)_/.test(c[0]));
         expect(sent).toEqual([['update_course', { p_course_id: LIVE, p_patch: { student_page_enabled: false } }]]);
-        expect(JSON.stringify(sent)).not.toContain('return_grades');
+      });
+
+      it('turned off when the count cannot be read: it stays on, and the card says so', async () => {
+        seed(LIVE, HELD);
+        serverSaysStudentPageOn(LIVE);
+        session.fake.on('course_draft_count', () => ({ data: null, error: { message: 'network: failed to fetch' } }));
+        open(LIVE);
+        const before = stored(LIVE);
+        flip(LIVE, false);
+        await settle();
+        expect(confirms).toEqual([]);
+        expect(stored(LIVE)).toBe(before);
+        expect(getReturnSettings(LIVE).student_page).toBe(true);
+        expect(switchDrawn()).toBe(true);
+        expect(note()).toBe('Could not check for grades waiting to be returned. Check the connection and try again.');
+        expect(writes().map(c => c[0])).toEqual(['course_draft_count']);
+      });
+
+      it('the two settings on this device alone do not show the switch as on', () => {
+        seed(LIVE, HELD);
+        open(LIVE);
+        expect(switchDrawn()).toBe(false);
+        expect(html()).not.toContain('sp-card');
       });
     });
   });
