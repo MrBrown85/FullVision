@@ -6445,7 +6445,7 @@ window.PageAssignments = (function () {
     saveAssessments(activeCourse, assessments);
     var move = _scoreMoveAfterSave;
     _scoreMoveAfterSave = null;
-    if (move && move.aid === aid && after.rubricId === move.rubricId) moveRubricScores(activeCourse, aid, move);
+    if (move && move.aid === aid && after.rubricId === move.rubricId) Grader.moveToRubric(activeCourse, aid, move);
     var carried = _carryOverallToCompetencies(activeCourse, before, after);
     openAssessIds.add(aid);
     hideNewForm();
@@ -6485,7 +6485,7 @@ window.PageAssignments = (function () {
           return e.assessmentId === after.id && e.tagId === tid;
         });
         if (scored) return;
-        upsertScore(cid, sid, after.id, tid, overall.score, overall.date, overall.type, '', overall.mod);
+        Grader.carryOverall(cid, sid, after.id, tid, overall);
         copied++;
       });
     });
@@ -6536,7 +6536,7 @@ window.PageAssignments = (function () {
             return s.assessmentId !== aid;
           });
         });
-        saveScores(cid, scores);
+        Grader.deleteAssessmentScores(cid, aid, scores);
         var statuses = getAssignmentStatuses(cid);
         var statusChanged = false;
         Object.keys(statuses).forEach(function (k) {
@@ -6545,7 +6545,7 @@ window.PageAssignments = (function () {
             statusChanged = true;
           }
         });
-        if (statusChanged) saveAssignmentStatuses(cid, statuses);
+        if (statusChanged) Grader.deleteAssessmentStatuses(cid, aid, statuses);
         // P6.5: dispatch delete_observation RPC for each linked observation
         // before clearing LS. Replaces a bare saveQuickObs call that left
         // server rows orphaned with stale assignmentContext.assessmentId.
@@ -10942,7 +10942,7 @@ window.PageAssignments = (function () {
         _toggleGroupMenu(el);
       },
       groupGradeSeparately: function () {
-        setGradedSeparately(activeCourse, el.dataset.aid, el.dataset.sid, true);
+        Grader.gradeSeparately(activeCourse, el.dataset.aid, el.dataset.sid);
         refreshSidebarGrades();
         render();
       },

@@ -202,6 +202,27 @@ window.Grader = (function () {
     return _saved(cid, sid, aid, 'undo', setAssignmentStatus(cid, sid, aid, null));
   }
 
+  /* An Overall level carried onto a competency ticked later, in the edit
+     form: `overall` is the student's Overall entry on the work. Its level,
+     + or −, date and type go under `key`; its comment does not. setLevel
+     would date and type the copy from the work. */
+  function carryOverall(cid, sid, aid, key, overall) {
+    return _saved(
+      cid,
+      sid,
+      aid,
+      'level',
+      upsertScore(cid, sid, aid, key, overall.score, overall.date, overall.type, '', overall.mod),
+    );
+  }
+
+  /* Edit a Copy on scored work: the work's scores and ticks follow it to
+     the copy's criteria and boxes. `maps` is { rubricId, criteria, checks },
+     each old id to its new one. */
+  function moveToRubric(cid, aid, maps) {
+    return _saved(cid, null, aid, 'move', moveRubricScores(cid, aid, maps));
+  }
+
   /* ── The phone's Grade tab (S1-T2) ──────────────────────────────────
      The phone's points, marks, statuses, ticks, comments and group
      actions go through the actions above. Its levels and its Undo pass
@@ -296,6 +317,8 @@ window.Grader = (function () {
     deleteAssessmentStatuses: deleteAssessmentStatuses,
     // The Assignments page (S1-T3)
     undoMissing: undoMissing,
+    carryOverall: carryOverall,
+    moveToRubric: moveToRubric,
     // The phone's Grade tab (S1-T2)
     setLevelOnPhone: setLevelOnPhone,
     setPlusMinusOnPhone: setPlusMinusOnPhone,

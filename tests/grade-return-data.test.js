@@ -1616,6 +1616,38 @@ const GRADER_SCENARIOS = {
     expect(storedRows()).toBe(before);
     if (on) expect(['s1', 's2', 's3'].map(sid => state(sid, 'essay'))).toEqual(['returned', 'draft', null]);
   },
+  carryOverall(on) {
+    // An Overall level copied onto a competency is a level like any other.
+    Grader.carryOverall(CID, 's1', 'essay', 't1', { score: 3, date: '2026-10-08', type: 'formative' });
+    if (on) expect(state('s1', 'essay')).toBe('draft');
+    give('essay', 's1');
+    if (on) expect(state('s1', 'essay')).toBe('returned');
+    Grader.carryOverall(CID, 's1', 'essay', 't2', { score: 2, mod: 1, date: '2026-10-08', type: 'formative' });
+    if (on) expect(state('s1', 'essay')).toBe('draft');
+    if (on) expect(row('s1', 'essay').returned_copy).toEqual(three);
+  },
+  moveToRubric(on) {
+    // Edit a Copy on scored work: each grade keeps its state.
+    level('s1', 'lab', 'c1', 3);
+    setRubricCheck(CID, 's1', 'lab', 'k1', true);
+    give('lab', 's1');
+    level('s1', 'lab', 'c1', 2); // s1: a draft on a returned grade
+    level('s2', 'lab', 'c2', 4); // s2: a draft never returned
+    level('s3', 'lab', 'c1', 3);
+    give('lab', 's3'); // s3: returned
+    const states = () => ['s1', 's2', 's3'].map(sid => state(sid, 'lab'));
+    const before = states();
+    Grader.moveToRubric(CID, 'lab', {
+      rubricId: 'rub2',
+      criteria: { c1: 'c1b', c2: 'c2b' },
+      checks: { k1: 'k1b', k2: 'k2b' },
+    });
+    expect(getScores(CID).s1.map(e => e.tagId)).toEqual(['c1b']);
+    if (!on) return;
+    expect(states()).toEqual(before);
+    expect(Object.keys(row('s1', 'lab').returned_copy.criteria)).toEqual(['c1b']);
+    expect(row('s1', 'lab').returned_copy.checks).toEqual(['k1b']);
+  },
 };
 
 describe('the grader’s gradebook, phone and Assignments page actions follow the rule through the writers they call', () => {

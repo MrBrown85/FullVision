@@ -292,6 +292,21 @@ describe('Grader: each action passes through to one data.js writer', () => {
       [CID, 's1', 'essay', null],
       [CID, 's1', 'essay', 'undo'],
     ],
+    [
+      // The Overall entry's own date and type, and no comment.
+      'carryOverall',
+      [CID, 's1', 'essay', 't1', { score: 3, mod: 1, date: '2026-10-08', type: 'formative', note: 'Thoughtful' }],
+      'upsertScore',
+      [CID, 's1', 'essay', 't1', 3, '2026-10-08', 'formative', '', 1],
+      [CID, 's1', 'essay', 'level'],
+    ],
+    [
+      'moveToRubric',
+      [CID, 'lab', { rubricId: 'rub2', criteria: { c1: 'c1b' }, checks: { k1: 'k1b' } }],
+      'moveRubricScores',
+      [CID, 'lab', { rubricId: 'rub2', criteria: { c1: 'c1b' }, checks: { k1: 'k1b' } }],
+      [CID, null, 'lab', 'move'],
+    ],
     // The phone's Grade tab (S1-T2). More on these three below.
     [
       'setLevelOnPhone',
