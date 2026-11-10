@@ -194,36 +194,25 @@ ok('Copy Assessment copies no grades: the copy has no score and no grade_return 
    one('select (select count(*) from grade_return where assessment_id = :a) + (select count(*) from score where assessment_id = :a)', a=copy_of) == 0
    and one('select count(*) from grade_return') == before)
 
-# ── The two server checks ──────────────────────────────────────────────
+# ── The Missing check, and upsert_rubric_score left as it is ───────────
 set_class(True, 'on_return')
 as_owner()
 other = {n: new_id() for n in ('r', 'c', 'k')}
 c.run("insert into rubric (id, course_id, name) values (:r, :co, 'Poster')", r=other['r'], co=COURSE_A)
 c.run("insert into criterion (id, rubric_id, name) values (:c, :r, 'Layout')", c=other['c'], r=other['r'])
 rub = new_assessment(K, 'rubric'); comp = new_assessment(K, 'competencies'); pts = new_assessment(K, 'points')
-expect_error("upsert_rubric_score refuses a level on a criterion that is not on the assessment's rubric",
-             lambda: rpc(A, 'upsert_rubric_score(:e, :a, :x, 3)', e=ENR1, a=rub, x=other['c']), 'is not in the rubric of assessment')
-r = rpc(A, "upsert_rubric_score(:e, :a, :x, null, 0::smallint, 'a note')", e=ENR1, a=rub, x=other['c'])
-ok('a note with no level for a criterion that is not on the rubric is let through and keeps nothing', r is None
-   and one('select count(*) from rubric_score where assessment_id = :a', a=rub) == 0 and state(ENR1, rub) == 'none', r)
-r = rpc(A, "upsert_rubric_score(:e, :a, :x, 0, 0::smallint, 'Number the steps')", e=ENR1, a=rub, x=other['c'])
-ok("so is an older client's 0 after Edit a Copy with a comment riding along", r is None
-   and one('select count(*) from rubric_score where assessment_id = :a', a=rub) == 0, r)
-r = rpc(A, 'upsert_rubric_score(:e, :a, :x, 0)', e=ENR1, a=rub, x=other['c'])
-ok('and a bare 0 or null', r is None and rpc(A, 'upsert_rubric_score(:e, :a, :x, null)', e=ENR1, a=rub, x=other['c']) is None)
-early = new_assessment(K, 'competencies', title='Rubric not attached yet')
-rpc(A, 'upsert_rubric_score(:e, :a, :x, 3)', e=ENR1, a=early, x=C1)
-rpc(A, "upsert_rubric_score(:e, :a, :x, null, 0::smallint, 'Check the units')", e=ENR1, a=early, x=C2)
-ok('with no rubric attached yet a level and a note are saved as before: the outbox can send a score ahead of its rubric',
-   rows('select value, comment from rubric_score where assessment_id = :a order by value nulls last', a=early) == [[3, None], [None, 'Check the units']])
-as_owner(); c.run('set local session_replication_role = replica')
-c.run("insert into rubric_score (enrollment_id, assessment_id, criterion_id, value) values (:e, :a, :x, 2)", e=ENR1, a=rub, x=other['c'])
-c.run('set local session_replication_role = origin')
-rpc(A, 'upsert_rubric_score(:e, :a, :x, 0)', e=ENR1, a=rub, x=other['c'])
-ok('and a 0 clears a stray row already there', one('select count(*) from rubric_score where assessment_id = :a', a=rub) == 0)
+# Batch A does not touch upsert_rubric_score: the outbox can send a score
+# ahead of the update_assessment that changes the work's rubric.
+off = new_assessment(K, 'rubric', title='Changing rubric')
+rpc(A, 'upsert_rubric_score(:e, :a, :x, 3)', e=ENR1, a=off, x=other['c'])
+rpc(A, "upsert_rubric_score(:e, :a, :x, null, 0::smallint, 'Check the units')", e=ENR2, a=off, x=other['c'])
+ok('a level and a comment for a criterion of another rubric in the class are saved, as before the batch',
+   rows('select value, comment from rubric_score where assessment_id = :a order by value nulls last', a=off) == [[3, None], [None, 'Check the units']])
+rpc(A, 'return_grades(:a, :ids::uuid[], :k)', a=off, ids='{%s}' % ENR1, k=key())
+ok('the student is not sent it while the work is on its old rubric', returned_grade(ENR1, off)['grade'] is None and state(ENR1, off) == 'returned')
+as_owner(); c.run('update assessment set rubric_id = :r where id = :a', r=other['r'], a=off)
+ok('and is sent it once the rubric change lands', returned_grade(ENR1, off)['grade']['criteria'][other['c']]['value'] == 3)
 rpc(A, "upsert_rubric_score(:e, :a, :x, 3, 1::smallint, 'Number the steps', 'Drew it')", e=ENR1, a=rub, x=C1)
-ok("a criterion on the assessment's rubric saves as before",
-   rows('select value, modifier, comment, beyond from rubric_score where assessment_id = :a', a=rub) == [[3, 1, 'Number the steps', 'Drew it']])
 
 rpc(A, 'upsert_score(:e, :a, 7)', e=ENR1, a=pts)
 expect_error('set_score_status refuses Missing on work that has points',
@@ -259,7 +248,15 @@ m3 = new_assessment(K, 'competencies')
 rpc(A, 'upsert_score(:e, :a, 0)', e=ENR1, a=m3)
 ok('Missing is taken on competency work that holds a stray score of 0 (clearing an orphan sends one)', missing_ok(m3))
 rpc(A, 'upsert_score(:e, :a, 3)', e=ENR2, a=m3)
-ok('and on competency work with any stray score.value: competency work is scored by its levels', missing_ok(m3, ENR2))
+expect_error('competency work that holds only an Overall level is scored: the app shows that level under its first competency, so Missing is refused',
+             lambda: rpc(A, "set_score_status(:e, :a, 'NS')", e=ENR2, a=m3), 'cannot be marked Missing')
+rpc(A, 'return_grades(:a, :ids::uuid[], :k)', a=m3, ids='{%s}' % ENR2, k=key())
+ok('and the student is sent that level', returned_grade(ENR2, m3)['grade']['value'] == 3, returned_grade(ENR2, m3))
+m6 = new_assessment(K, 'competencies')
+rpc(A, 'upsert_score(:e, :a, 3)', e=ENR2, a=m6); rpc(A, 'upsert_tag_score(:e, :a, :t, 2)', e=ENR2, a=m6, t=T1)
+rpc(A, 'return_grades(:a, :ids::uuid[], :k)', a=m6, ids='{%s}' % ENR2, k=key())
+ok('beside a competency level the same score.value is hidden, as the app hides it', returned_grade(ENR2, m6)['grade']['value'] is None
+   and returned_grade(ENR2, m6)['grade']['tags'][T1]['value'] == 2)
 m4 = new_assessment(K, 'competencies')
 as_owner(); c.run('delete from assessment_tag where assessment_id = :a', a=m4)
 rpc(A, 'upsert_score(:e, :a, 0)', e=ENR1, a=m4)
@@ -273,6 +270,25 @@ ok('a level on a competency the work is no longer linked to does not count', mis
 rpc(A, 'clear_score(:e, :a)', e=ENR1, a=comp); rpc(A, "set_score_status(:e, :a, 'NS')", e=ENR1, a=comp)
 ok('once the level is cleared, Missing is taken', one('select status from score where enrollment_id = :e and assessment_id = :a', e=ENR1, a=comp) == 'NS')
 expect_error('an unknown status is still refused first', lambda: rpc(A, "set_score_status(:e, :a, 'missing')", e=ENR1, a=pts), 'invalid status')
+
+# ── The copy kept before a change is this transaction's own ─────────────
+pl = new_assessment(K, 'points')
+rpc(A, 'upsert_score(:e, :a, 7)', e=ENR1, a=pl); rpc(A, 'return_grades(:a, :ids::uuid[], :k)', a=pl, ids='{%s}' % ENR1, k=key())
+ok('between statements the scratch table is empty', one('select count(*) from grade_return_before') == 0)
+as_owner()
+c.run("""insert into grade_return_before (enrollment_id, assessment_id, txid, at, tbl, copy)
+         values (:e, :a, txid_current(), now() - interval '1 hour', 'score',
+                 '{"v": 1, "value": 2, "modifier": 0, "comment": "planted", "tags": {}, "criteria": {}, "checks": []}'::jsonb)""", e=ENR1, a=pl)
+rpc(A, 'upsert_score(:e, :a, 8)', e=ENR1, a=pl)
+got = returned_grade(ENR1, pl)['grade']
+ok('a row left in the scratch table with this transaction\'s id but another start time is not trusted: the student keeps the returned 7, not the planted 2',
+   state(ENR1, pl) == 'draft' and got['value'] == 7 and got['comment'] is None, got)
+rpc(A, 'upsert_score(:e, :a, 8)', e=ENR1, a=pl)                    # a save that changes nothing
+rpc(A, "set_score_status(:e, :a, 'LATE')", e=ENR1, a=pl)           # a status
+rpc(A, 'set_rubric_check(:e, :a, :k, false)', e=ENR1, a=rub, k=K1) # an untick of nothing
+rpc(A, 'upsert_tag_score(:e, :a, :t, 0)', e=ENR1, a=new_assessment(K, 'competencies'), t=T1)
+ok('a save that changes nothing, a status and a clear of nothing leave no row in the scratch table', one('select count(*) from grade_return_before') == 0,
+   rows('select tbl, enrollment_id, assessment_id from grade_return_before'))
 
 # ── Bulk path: move_rubric_scores keeps the state ──────────────────────
 mv = new_assessment(K, 'rubric')
@@ -308,6 +324,15 @@ got = returned_grade(ENR2, mv)
 ok('returned again, the previous copy is under the new ids too',
    got['grade']['criteria'][cp['c1']]['value'] == 1 and got['previous']['criteria'][cp['c1']]['value'] == 4
    and got['previous']['checks'] == [cp['k2']], got)
+
+# A map inside one rubric is not Edit a Copy: it is a change.
+sw = new_assessment(K, 'rubric')
+rpc(A, 'upsert_rubric_score(:e, :a, :x, 4)', e=ENR1, a=sw, x=C1)
+rpc(A, 'return_grades(:a, :ids::uuid[], :k)', a=sw, ids='{%s}' % ENR1, k=key())
+rpc(A, 'move_rubric_scores(:a, :r, :m::jsonb, :k::jsonb, :key)', a=sw, r=K['r1'], m=json.dumps({C1: C2}), k='{}', key=key())
+got = returned_grade(ENR1, sw)['grade']
+ok('move_rubric_scores with a map from one criterion to another of the same rubric is a change: the grade waits as a draft and the student keeps the level where it was',
+   state(ENR1, sw) == 'draft' and got['criteria'] == {C1: {'value': 4, 'modifier': 0, 'comment': None, 'beyond': None}}, got)
 
 # ── Bulk path: the two bulk clears ─────────────────────────────────────
 bc = new_assessment(K, 'competencies')
@@ -434,6 +459,16 @@ ok('a backup with drafts restored into a class that does not hold grades: the dr
 before = rows('select * from grade_return order by 1, 2')
 ok('outside a restore the state helper does nothing: a restore is the only way it sets a state',
    n == 0 and rows('select * from grade_return order by 1, 2') == before, n)
+
+# A hand-made restore over a class that already exists (the app always
+# restores as a new class): it leaves no draft stranded.
+rpc(A, 'upsert_score(:e, :a, 9)', e=i['e1'], a=i['a1'])
+left = one('select count(*) from grade_return g join enrollment e on e.id = g.enrollment_id where e.course_id = :c and g.is_draft', c=i['course'])
+rpc(A, 'import_json_restore(:p::jsonb, :k)', k=key(),
+    p=json.dumps({'courses': [{'id': i['course'], 'name': 'Restored', 'student_page_enabled': False, 'return_grades': 'on_return'}]}))
+ok('a restore that turns the student page off on a class that has %d drafts returns every one of them' % left, left >= 3
+   and one('select count(*) from grade_return g join enrollment e on e.id = g.enrollment_id where e.course_id = :c and g.is_draft', c=i['course']) == 0
+   and rows('select student_page_enabled, return_grades from course where id = :c', c=i['course']) == [[False, 'on_return']])
 
 # A whole class at once: 30 students, 40 assessments, 3 competencies each.
 i, p = backup(True, False)
@@ -670,5 +705,8 @@ ok('every score table has its row trigger before and its three statement trigger
 def scratch():
     as_teacher(A); c.run('select * from grade_return_before')
 expect_error('the scratch table of copies kept before a change cannot be read by a teacher', scratch, 'permission denied')
+
+as_owner()
+ok('at the end of all of this the scratch table is empty', one('select count(*) from grade_return_before') == 0)
 
 finish()

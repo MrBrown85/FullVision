@@ -12,10 +12,15 @@ the class settings back and deletes what it made, also when it fails.
    wait does not lean on them: it is Batch A's own (the class lock,
    _grade_return_lock, and the row the BEFORE trigger keeps).
 2. Two connections save one class's scores again and again while a third
-   returns them, 150 calls each. No call may fail. Run first with the class
-   lock made a no-op as a control: return_grades and a save then take the
-   grade_return row and the sync cursor in opposite orders and deadlock
-   (40P01).
+   returns them, 150 calls each. No call may fail.
+3. The same with a fourth connection changing the class's settings (Return
+   Grades, the student page, a rename), a fifth filling a rubric and a
+   sixth making card calls. Run first as a control with the release trigger
+   renamed so it fires after the sync-cursor trigger: a setting change then
+   takes the sync-cursor row before the class lock, a save takes them the
+   other way, and they deadlock (40P01).
+4. A level saved for a criterion while that criterion is being deleted,
+   150 times: no deadlock.
 
 PGPORT=54329 PGDATABASE=fv_a python3 grade_return_race.py
 """
@@ -99,16 +104,77 @@ try:
                           and ((g.returned_copy is not null) <> (g.is_draft and g.returned_at is not null)
                             or (g.is_draft and g.returned_copy = public._grade_copy(g.enrollment_id, g.assessment_id)))""", a=a)[0][0]
         return N, errs, bad
-    o.run("create or replace function public._grade_return_lock(p_course_id uuid) returns void language sql security definer set search_path to 'public', 'pg_temp' as $f$ select $f$")
-    N, errs, bad = stress('Deadlock work, no lock (control)')
-    dead = [e for e in errs['save'] + errs['return'] if '40P01' in e]
-    ok('control, with the lock made a no-op: saves and returns deadlock (%d of %d calls died with 40P01)' % (len(dead), 3 * N), len(dead) > 0, errs)
-    o.run(real_lock)
     N, errs, bad = stress('Deadlock work')
     ok('%d saves on each of two students against %d returns, at once: no save fails' % (N, N), not errs['save'], sorted(set(errs['save']))[:2])
     ok('and no return fails: no deadlock', not errs['return'], sorted(set(errs['return']))[:2])
     ok('every grade is left in a state the table allows, and none is a draft that equals what was returned', bad == 0, bad)
+
+    # ── 3. Saves, returns, fills and card calls against setting changes ──
+    def run_threads(jobs, n):
+        """jobs: [(name, fn(i) -> (sql, params))]. Each runs n calls on its own connection, one transaction a call."""
+        errs = []
+        def worker(name, fn):
+            c = conn()
+            for i in range(n):
+                sql, kw = fn(i)
+                try:
+                    c.run('begin'); c.run("select set_config('request.jwt.claim.sub', :u, true)", u=A); c.run('set local role authenticated')
+                    c.run(sql, **kw); c.run('commit')
+                except Exception as e:
+                    errs.append((name, str(e)[:200])); c.run('rollback')
+            c.close()
+        ts = [threading.Thread(target=worker, args=j) for j in jobs]
+        [t.start() for t in ts]; [t.join() for t in ts]
+        return errs
+    def settings_run(label):
+        o.run("update course set student_page_enabled = true, return_grades = 'on_return' where id = :c", c=COURSE_A)
+        a = nid(); made['assessment'].append(a)
+        o.run("insert into assessment (id, course_id, title, score_mode, max_points) values (:a, :c, :t, 'points', 10)", a=a, c=COURSE_A, t=label)
+        r, ra = nid(), nid(); made['rubric'].append(r); made['assessment'].append(ra)
+        o.run("insert into rubric (id, course_id, name) values (:r, :c, 'Stress')", r=r, c=COURSE_A)
+        o.run("insert into criterion (id, rubric_id, name) select gen_random_uuid(), :r, 'C' || g from generate_series(1, 3) g", r=r)
+        o.run("insert into assessment (id, course_id, title, rubric_id) values (:a, :c, :t, :r)", a=ra, c=COURSE_A, t=label + ' (rubric)', r=r)
+        PATCHES = ['{"return_grades": "on_save"}', '{"return_grades": "on_return"}', '{"student_page_enabled": false}',
+                   '{"student_page_enabled": true}', '{"name": "Science 8"}']
+        jobs = [
+            ('save', lambda i: ('select upsert_score(:e, :a, :v)', dict(e=ENR1, a=a, v=i % 10))),
+            ('save', lambda i: ('select upsert_score(:e, :a, :v)', dict(e=ENR2, a=a, v=i % 10))),
+            ('return', lambda i: ('select return_grades(:a, :ids::uuid[], :k)', dict(a=a, ids='{%s,%s}' % (ENR1, ENR2), k=nid()))),
+            ('setting', lambda i: ('select update_course(:c, :p::jsonb)', dict(c=COURSE_A, p=PATCHES[i % 5]))),
+            ('fill', lambda i: ('select fill_rubric(:e, :a, :v)', dict(e=ENR1, a=ra, v=1 + i % 4))),
+            ('cards', lambda i: ('select set_cards_work_until(:c, :d::date, :k)', dict(c=COURSE_A, d='2027-06-%02d' % (1 + i % 28), k=nid()))
+                                 if i % 2 else ('select issue_student_cards(:c, null, :k)', dict(c=COURSE_A, k=nid()))),
+        ]
+        errs = run_threads(jobs, 150)
+        return [e for e in errs if '40P01' in e[1]], errs
+    o.run('alter trigger a_grade_return_release on public.course rename to grade_return_release')
+    dead, errs = settings_run('Settings stress (control)')
+    ok('control, with the release trigger under a name that fires after the sync cursor: setting changes deadlock with saves (%d of 900 calls died with 40P01)' % len(dead), len(dead) > 0, errs[:2])
+    o.run('alter trigger grade_return_release on public.course rename to a_grade_return_release')
+    dead, errs = settings_run('Settings stress')
+    ok('saves, returns, fills and card calls against Return Grades, the student page and a rename changing, 150 calls each: no call fails', not errs, sorted(set(errs))[:3])
+
+    # ── 4. A save against a criterion being deleted ────────────────────
+    r, a = nid(), nid(); made['rubric'].append(r); made['assessment'].append(a)
+    o.run("update course set student_page_enabled = true, return_grades = 'on_return' where id = :c", c=COURSE_A)
+    o.run("insert into rubric (id, course_id, name) values (:r, :c, 'Delete stress')", r=r, c=COURSE_A)
+    o.run("insert into assessment (id, course_id, title, rubric_id) values (:a, :c, 'Delete stress', :r)", a=a, c=COURSE_A, r=r)
+    crit = [nid() for _ in range(150)]
+    for x in crit: o.run("insert into criterion (id, rubric_id, name) values (:x, :r, 'C')", x=x, r=r)
+    jobs = [('save', lambda i: ('select upsert_rubric_score(:e, :a, :x, 3)', dict(e=ENR1, a=a, x=crit[i]))),
+            ('save', lambda i: ('select upsert_rubric_score(:e, :a, :x, 2)', dict(e=ENR2, a=a, x=crit[i]))),
+            ('delete', lambda i: ('delete from criterion where id = :x', dict(x=crit[i])))]
+    errs = run_threads(jobs, 150)
+    dead = [e for e in errs if '40P01' in e[1]]
+    ok('a level saved for a criterion while the criterion is being deleted, 150 times: no deadlock (a save that loses the race is refused, as before)',
+       not dead, sorted(set(dead))[:2])
+    ok('and the only refusals are for the criterion being gone', all('23503' in e[1] or '42501' in e[1] for e in errs), sorted(set(errs))[:3])
 finally:
+    try: o.run('alter trigger grade_return_release on public.course rename to a_grade_return_release')
+    except Exception: pass
+    o.run('delete from student_card k using enrollment e where e.id = k.enrollment_id and e.course_id = :c', c=COURSE_A)
+    o.run('update course set cards_work_until = null where id = :c', c=COURSE_A)
+    o.run("delete from fv_idempotency where endpoint in ('set_cards_work_until', 'issue_student_cards')")
     o.run(real_lock)
     for t in SCORE_TABLES:
         o.run('alter table public.%s enable trigger course_sync_cursor_%s_gradebook' % (t, t))

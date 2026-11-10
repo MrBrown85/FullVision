@@ -127,6 +127,13 @@
 --    screen asks first; course_draft_count(p_course_id) tells it how many.
 --    Turning the page back on leaves them returned.
 --
+--    Lock order, everywhere: the class lock first, then rows. A save, a
+--    return, a setting change (its trigger is named a_... so it fires before
+--    the sync-cursor trigger on course) and a delete of a criterion,
+--    checkbox, competency or rubric (a statement trigger before each, which
+--    locks each of the caller's classes) all take the class lock before
+--    they hold anything a save waits on.
+--
 --    Two saves at once: the BEFORE trigger and return_grades take one lock
 --    per class (_grade_return_lock, an advisory lock held to the end of the
 --    transaction) before they read a grade, so the second waits and sees
@@ -149,21 +156,17 @@
 --    course_draft_count(p_course_id): how many grades in the class are
 --    waiting as drafts.
 --
--- 6. Two server checks on existing RPCs, each patched in place from the live
---    body (the migration stops if the live body is not the one it was
---    written against). Each refuses only what is certainly wrong: a refused
---    write is a dead letter in a teacher's outbox, with only the sync dot to
---    say so.
---      upsert_rubric_score refuses a real level (1 to 4) for a criterion
---        that is not on the rubric the assessment has (errcode 22023), as
---        set_rubric_check refuses a checkbox. Everything else is taken:
---          the assessment has no rubric yet: saved as before. The outbox can
---            send a score ahead of the update_assessment that attaches its
---            rubric.
---          no level (0 or null) for a criterion that is not on the rubric,
---            with or without a comment: nothing is kept, any stray row is
---            cleared, and the call returns null. Clients already in
---            teachers' browsers send these after Edit a Copy.
+-- 6. One server check on an existing RPC, patched in place from the live body
+--    (the migration stops if the live body is not the one it was written
+--    against). It refuses only what is certainly wrong: a refused write is a
+--    dead letter in a teacher's outbox, with only the sync dot to say so.
+--    (The plan's other check, upsert_rubric_score refusing a criterion that
+--    is not on the work's rubric, is NOT here: upsert_rubric_score is left
+--    exactly as live. The outbox can send a score ahead of the
+--    update_assessment that changes the rubric, so the check would refuse
+--    real grades. It waits until the client sends the rubric change first.
+--    Meanwhile 2026110901 keeps a criterion to its own class and students
+--    are not sent a level that is off the work's rubric.)
 --      set_score_status refuses Missing on work that has a score (errcode
 --        22023), unless it is already marked Missing. "Has a score" is what
 --        the app shows as one, the rule of canSetAssignmentStatus in
@@ -174,10 +177,12 @@
 --          points or Complete       score.value; a 0 is a score
 --          competencies linked      their levels (competencies still on the
 --                                   class)
---          none of those            the Overall level; a 0 is no score
+--          no level row at all      the Overall level (score.value), which
+--                                   the app shows as Overall or under the
+--                                   work's first competency; a 0 is no score
 --        Rows the app hides do not count: a criterion level left from a
 --        rubric the work no longer uses, a competency level on points work,
---        a score.value on competency or rubric work. Excused and Late are
+--        a score.value on rubric work or beside competency levels. Excused and Late are
 --        not checked, and comments do not count as a score.
 --        Rows of that hidden kind on gradebook-prod, counted 2026-11-09: 0
 --        competency levels on points or rubric work, 0 criterion levels off
@@ -258,7 +263,6 @@ begin
     -- already carry the patch (a second run).
     for _f in
         select * from (values
-            ('public.upsert_rubric_score(uuid,uuid,uuid,integer,smallint,text,text)', '969a701836ca6c50a92327e66efa0055', 'is not in the rubric of assessment'),
             ('public.set_score_status(uuid,uuid,text)', '785597b37ce5d5fdb9b9c19f97c89fca', 'cannot be marked Missing'),
             ('public.update_course(uuid,jsonb)', '8aacf4f24b0b7133352379e89978776b', 'student_page_enabled'),
             ('public.move_rubric_scores(uuid,uuid,jsonb,jsonb,uuid)', '92f7ff4b840c1dd9fe473f8ecdee29b5', 'fv.moving_rubric'),
@@ -409,11 +413,18 @@ create or replace function public._grade_copy_in_use(p_copy jsonb, p_assessment_
 as $function$
     select case when p_copy is null then null else (
         select _grade_copy_of(
-            -- score.value: points and marks (a 0 is a score), or the Overall
-            -- level of work with no rubric and no competency (a 0 is none).
+            -- score.value: points and marks (a 0 is a score); or, on work
+            -- scored by level with no rubric, the Overall level when the
+            -- grade holds no competency or criterion row at all (a 0 is
+            -- none). The app shows that level under the work's first
+            -- competency, or as Overall when it has none (shared/data.js,
+            -- "fallbackTag").
             case when a.rubric_id is not null then null
                  when a.score_mode in ('points', 'complete') then (p_copy->>'value')::numeric
-                 when a.score_mode = 'proficiency' and not u.has_tags then nullif((p_copy->>'value')::numeric, 0)
+                 when a.score_mode = 'proficiency'
+                      and coalesce(p_copy->'tags', '{}'::jsonb) = '{}'::jsonb
+                      and coalesce(p_copy->'criteria', '{}'::jsonb) = '{}'::jsonb
+                 then nullif((p_copy->>'value')::numeric, 0)
             end,
             (p_copy->>'modifier')::int,
             p_copy->>'comment',
@@ -438,11 +449,6 @@ as $function$
                  where exists (select 1 from criterion_check ck join criterion c on c.id = ck.criterion_id
                                 where ck.id::text = k and c.rubric_id = a.rubric_id)) end)
           from assessment a
-         cross join lateral (
-             select exists (select 1 from assessment_tag x
-                              join tag t on t.id = x.tag_id
-                              join section s on s.id = t.section_id
-                             where x.assessment_id = a.id and s.course_id = a.course_id and s.removed_at is null) as has_tags) u
          where a.id = p_assessment_id) end;
 $function$;
 revoke all on function public._grade_copy_in_use(jsonb, uuid) from public, anon, authenticated;
@@ -475,14 +481,20 @@ grant execute on function fv_private.work_is_scored(uuid, uuid) to authenticated
 -- follows. It is what makes the rule independent of the order things
 -- happen in: deleting a criterion removes its levels and its ticks through
 -- two cascades whose order Postgres does not promise, and the copy the
--- student keeps must be the grade as it was before either. A row is deleted
--- when it is used; one left by a write that changed nothing is overwritten
--- by the next transaction and goes with its student or assessment. Nobody
--- can read or write this table but the triggers.
+-- student keeps must be the grade as it was before either. A row belongs
+-- to one transaction: it is trusted only when both its transaction id and
+-- its transaction start time are the current ones (ids alone repeat after a
+-- dump and restore). It is deleted when it is used, and whatever a
+-- statement kept and did not use (a save that changed nothing) is deleted
+-- when that statement ends, so the table is empty between transactions.
+-- It is in public, with no access for any API role, because the trigger
+-- functions that use it are; nobody can read or write it but them.
 create table if not exists public.grade_return_before (
     enrollment_id uuid   not null references public.enrollment(id) on delete cascade,
     assessment_id uuid   not null references public.assessment(id) on delete cascade,
-    txid          bigint not null,
+    txid          bigint      not null,
+    at            timestamptz not null,
+    tbl           text        not null,
     copy          jsonb,
     primary key (enrollment_id, assessment_id)
 );
@@ -503,6 +515,43 @@ create or replace function public._grade_return_lock(p_course_id uuid)
 as $function$
     select pg_advisory_xact_lock(hashtextextended('fv.grade_return:' || p_course_id::text, 0));
 $function$;
+
+-- Deleting a criterion, a checkbox, a competency or a rubric takes its
+-- levels and ticks with it, and each of those takes the class lock. A save
+-- for the same criterion takes the class lock first and then waits on the
+-- criterion's row, so the delete must take the class lock before it holds
+-- that row, or the two deadlock. A row trigger is too late (Postgres locks
+-- the row before it fires one), so a statement trigger does it, before any
+-- row is touched. It cannot know which class the statement is about, so it
+-- takes the lock of each of the caller's classes, in id order: a teacher has
+-- a handful, and these deletes are rare and short. With no teacher signed
+-- in (the owner's own maintenance, the nightly purge) it takes none.
+create or replace function public._grade_return_lock_mine()
+ returns trigger
+ language plpgsql
+ security definer
+ set search_path to 'public', 'pg_temp'
+as $function$
+begin
+    if (select auth.uid()) is not null and coalesce(current_setting('fv.restoring', true), '') <> 'on' then
+        perform _grade_return_lock(c.id)
+           from (select id from course where teacher_id = (select auth.uid()) order by id) c;
+    end if;
+    return null;
+end;
+$function$;
+revoke all on function public._grade_return_lock_mine() from public, anon, authenticated;
+do $locks$
+declare
+    _t text;
+begin
+    foreach _t in array array['rubric', 'criterion', 'criterion_check', 'tag'] loop
+        execute format('drop trigger if exists grade_return_lock on public.%I', _t);
+        execute format('create trigger grade_return_lock before delete on public.%I '
+                       'for each statement execute function public._grade_return_lock_mine()', _t);
+    end loop;
+end
+$locks$;
 
 -- Before a row of a score table changes: keep the cell's copy as it is now,
 -- the first time this transaction touches the cell. tg_argv[0] is the part
@@ -540,7 +589,8 @@ begin
           from (values (_o), (_n)) v(r) where r is not null
     loop
         continue when exists (select 1 from grade_return_before b
-                               where b.enrollment_id = _cell.e and b.assessment_id = _cell.a and b.txid = txid_current());
+                               where b.enrollment_id = _cell.e and b.assessment_id = _cell.a
+                                 and b.txid = txid_current() and b.at = transaction_timestamp());
         -- Inside a delete of the assessment, the student or the class: the
         -- cell is going, and grade_return's own cascade takes its row.
         select e.course_id into _course from enrollment e where e.id = _cell.e;
@@ -548,9 +598,10 @@ begin
         perform _grade_return_lock(_course);
         -- A statement of its own, after the lock: it reads the cell as the
         -- last save to this class left it.
-        insert into grade_return_before (enrollment_id, assessment_id, txid, copy)
-        values (_cell.e, _cell.a, txid_current(), _grade_copy(_cell.e, _cell.a))
-        on conflict (enrollment_id, assessment_id) do update set txid = excluded.txid, copy = excluded.copy;
+        insert into grade_return_before (enrollment_id, assessment_id, txid, at, tbl, copy)
+        values (_cell.e, _cell.a, txid_current(), transaction_timestamp(), tg_table_name, _grade_copy(_cell.e, _cell.a))
+        on conflict (enrollment_id, assessment_id) do update
+           set txid = excluded.txid, at = excluded.at, tbl = excluded.tbl, copy = excluded.copy;
     end loop;
     return coalesce(new, old);
 end;
@@ -660,7 +711,6 @@ as $function$
 declare
     _cells jsonb := '[]'::jsonb;
     _more  jsonb;
-    _c     record;
     _b     grade_return_before%rowtype;
 begin
     if current_setting('fv.restoring', true) = 'on' then return null; end if;
@@ -676,18 +726,26 @@ begin
         _cells := _cells || _more;
     end if;
 
-    for _c in
-        select distinct (x->>0)::uuid as e, (x->>1)::uuid as a
-          from jsonb_array_elements(_cells) x
-         order by 1, 2
-    loop
+    -- Every copy this transaction kept for a cell this statement touched,
+    -- and every copy this table's BEFORE trigger kept whether or not a row
+    -- changed (upsert_score's insert meeting a row that is already there
+    -- keeps one and touches nothing). Each is used once and deleted, so
+    -- nothing is left for a later statement or a later transaction. One
+    -- statement can fire two of these triggers (INSERT ... ON CONFLICT DO
+    -- UPDATE fires the insert's and the update's); the first to run settles
+    -- the cell and the second finds nothing to do.
+    for _b in
         delete from grade_return_before b
-         where b.enrollment_id = _c.e and b.assessment_id = _c.a and b.txid = txid_current()
-        returning * into _b;
-        continue when not found;
-        continue when not exists (select 1 from assessment where id = _c.a)
-                   or not exists (select 1 from enrollment where id = _c.e);
-        perform _grade_return_apply(_c.e, _c.a, _b.copy, _grade_copy(_c.e, _c.a));
+         where b.txid = txid_current() and b.at = transaction_timestamp()
+           and (b.tbl = tg_table_name
+                or exists (select 1 from jsonb_array_elements(_cells) x
+                            where (x->>0)::uuid = b.enrollment_id and (x->>1)::uuid = b.assessment_id))
+        returning *
+    loop
+        continue when not exists (select 1 from assessment where id = _b.assessment_id)
+                   or not exists (select 1 from enrollment where id = _b.enrollment_id);
+        perform _grade_return_apply(_b.enrollment_id, _b.assessment_id, _b.copy,
+                                    _grade_copy(_b.enrollment_id, _b.assessment_id));
     end loop;
     return null;
 end;
@@ -750,7 +808,7 @@ begin
                       case when tg_argv[0] = 'checks' then _map else _none end,
                       case when tg_argv[0] = 'tags' then _map else _none end)
      where b.enrollment_id = new.enrollment_id and b.assessment_id = new.assessment_id
-       and b.txid = txid_current() and b.copy is not null;
+       and b.txid = txid_current() and b.at = transaction_timestamp() and b.copy is not null;
     return null;
 end;
 $function$;
@@ -893,8 +951,14 @@ begin
 end;
 $function$;
 revoke all on function public._grade_return_release() from public, anon, authenticated;
+-- The name carries the lock order. Triggers fire in name order, and
+-- course_sync_cursor_course_gradebook locks the class's sync-cursor row. A
+-- save takes the class lock first and that row second, so this trigger must
+-- take the class lock before that one fires, or a setting change and a save
+-- deadlock: hence the leading a_.
 drop trigger if exists grade_return_release on public.course;
-create trigger grade_return_release
+drop trigger if exists a_grade_return_release on public.course;
+create trigger a_grade_return_release
     after update of student_page_enabled, return_grades on public.course
     for each row
     when ((old.student_page_enabled and old.return_grades is not distinct from 'on_return')
@@ -990,7 +1054,7 @@ $function$;
 revoke all on function public.course_draft_count(uuid) from public, anon;
 grant execute on function public.course_draft_count(uuid) to authenticated, service_role;
 
--- ── 6. Two server checks, update_course, move_rubric_scores, the restore ────
+-- ── 6. The Missing check, update_course, move_rubric_scores, the restore ────
 -- Each function is patched in place from its live definition. _was is
 -- md5(pg_get_functiondef) of the body this was written against, read from
 -- gradebook-prod on 2026-11-09; anything else stops the migration, unless
@@ -999,37 +1063,6 @@ do $patch$
 declare
     _edits text[][] := array[
       -- function, md5 of the live definition, a line only the patch adds, text to find, replacement
-      array['public.upsert_rubric_score(uuid,uuid,uuid,integer,smallint,text,text)',
-            '969a701836ca6c50a92327e66efa0055',
-            'is not in the rubric of assessment',
-$s$    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
-
-    if p_value is null or p_value = 0 then
-        -- No level: keep the row only for its notes.$s$,
-$s$    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
-
-    -- A level must be for a criterion on the assessment's rubric, as
-    -- set_rubric_check checks its checkbox. Only what is certainly wrong is
-    -- refused: the assessment has a rubric, the criterion is not on it, and
-    -- the call sets a real level. With no rubric attached yet the call is
-    -- taken as before (a score can arrive ahead of the rubric it belongs
-    -- to). A call with no level for a criterion that is not on the rubric
-    -- (an older client's 0 after Edit a Copy, with or without a comment)
-    -- keeps nothing and clears any stray row.
-    if exists (select 1 from assessment a where a.id = p_assessment_id and a.rubric_id is not null)
-       and not exists (select 1 from criterion c join assessment a on a.rubric_id = c.rubric_id
-                        where c.id = p_criterion_id and a.id = p_assessment_id) then
-        if p_value is not null and p_value <> 0 then
-            raise exception 'criterion % is not in the rubric of assessment %', p_criterion_id, p_assessment_id
-                using errcode = '22023';
-        end if;
-        delete from rubric_score
-         where enrollment_id = p_enrollment_id and assessment_id = p_assessment_id and criterion_id = p_criterion_id;
-        return null;
-    end if;
-
-    if p_value is null or p_value = 0 then
-        -- No level: keep the row only for its notes.$s$],
       array['public.set_score_status(uuid,uuid,text)',
             '785597b37ce5d5fdb9b9c19f97c89fca',
             'cannot be marked Missing',
@@ -1071,8 +1104,17 @@ $s$    update rubric_score rs
        set criterion_id = m.value::uuid, updated_at = now()$s$,
 $s$    -- Draft and Returned: the updates below point scores at the copy's
     -- criteria and checkboxes. They are a rubric move, not a change to any
-    -- grade, and the triggers read this flag to know it.
-    perform set_config('fv.moving_rubric', 'on', true);
+    -- grade, and the triggers read this flag to know it. Only a move to
+    -- another rubric is one: a map that starts from a criterion or checkbox
+    -- of the target rubric itself swaps levels inside one rubric, and that
+    -- is a change like any other.
+    perform set_config('fv.moving_rubric',
+        case when exists (select 1 from jsonb_each_text(coalesce(p_criterion_map, '{}')) m
+                            join criterion c on c.id::text = m.key where c.rubric_id = p_rubric_id)
+               or exists (select 1 from jsonb_each_text(coalesce(p_check_map, '{}')) m
+                            join criterion_check ck on ck.id::text = m.key
+                            join criterion c on c.id = ck.criterion_id where c.rubric_id = p_rubric_id)
+             then '' else 'on' end, true);
 
     update rubric_score rs
        set criterion_id = m.value::uuid, updated_at = now()$s$],
@@ -1174,6 +1216,14 @@ begin
         return 0;
     end if;
 
+    -- A restore always makes a new class in the app. A hand-made one that
+    -- names a class the teacher already has waits for any save to it.
+    perform _grade_return_lock(c.id) from course c
+      where c.teacher_id = (select auth.uid())
+        and c.id::text in (select r->>'id' from jsonb_array_elements(
+                case when jsonb_typeof(p_payload->'courses') = 'array' then p_payload->'courses' else '[]'::jsonb end) r)
+      order by c.id;
+
     -- Every restored student and assessment that now has a grade: Returned.
     insert into grade_return (enrollment_id, assessment_id, is_draft, returned_at)
     select c.enrollment_id, c.assessment_id, false, _at
@@ -1224,16 +1274,20 @@ begin
            set is_draft = excluded.is_draft, returned_at = excluded.returned_at, returned_copy = excluded.returned_copy,
                previous_copy = excluded.previous_copy, updated_at = excluded.updated_at, seen_at = excluded.seen_at;
         get diagnostics _n = row_count;
-        -- A draft waits only in a class that holds grades: in any other,
-        -- the restored drafts are returned, as when a class leaves When I
-        -- Return Them.
-        perform _grade_return_one(g.enrollment_id, g.assessment_id, _at)
-           from grade_return g
-          where g.is_draft and fv_owns_enrollment(g.enrollment_id)
-            and g.enrollment_id in (select nullif(r->>'enrollment_id', '')::uuid
-                                      from jsonb_array_elements(p_payload->'grade_returns') r)
-            and not _grade_return_holds(g.enrollment_id);
     end if;
+
+    -- A draft waits only in a class that holds grades. In a restored class
+    -- that does not, every draft is returned, as when a class leaves When I
+    -- Return Them: the ones the backup named, and any the class already had
+    -- (the course trigger stood aside during the restore).
+    perform _grade_return_one(g.enrollment_id, g.assessment_id, _at)
+       from grade_return g
+       join enrollment e on e.id = g.enrollment_id
+       join course c on c.id = e.course_id
+      where g.is_draft and c.teacher_id = (select auth.uid())
+        and c.id::text in (select r->>'id' from jsonb_array_elements(
+                case when jsonb_typeof(p_payload->'courses') = 'array' then p_payload->'courses' else '[]'::jsonb end) r)
+        and not (c.student_page_enabled and c.return_grades is not distinct from 'on_return');
     return _n;
 end;
 $function$;
