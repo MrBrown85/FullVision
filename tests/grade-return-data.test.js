@@ -1603,9 +1603,64 @@ const GRADER_SCENARIOS = {
     Grader.undoOnPhone(CID, 's2', 'essay', structuredClone(getScores(CID)), empty);
     if (on) expect(row('s2', 'essay')).toBe(null);
   },
+  // The Assignments page (S1-T3).
+  undoMissing(on) {
+    level('s1', 'essay', 't1', 3);
+    give('essay', 's1');
+    level('s2', 'essay', 't1', 2);
+    setAssignmentStatus(CID, 's3', 'essay', 'NS');
+    const before = storedRows();
+    Grader.undoMissing(CID, 's3', 'essay');
+    // A status is never a draft, and nobody's grade moved.
+    expect(getAssignmentStatus(CID, 's3', 'essay')).toBe(null);
+    expect(storedRows()).toBe(before);
+    if (on) expect(['s1', 's2', 's3'].map(sid => state(sid, 'essay'))).toEqual(['returned', 'draft', null]);
+  },
+  carryOverall(on) {
+    // An Overall level copied onto a competency is a level like any other.
+    Grader.carryOverall(CID, 's1', 'essay', 't1', { score: 3, date: '2026-10-08', type: 'formative' });
+    if (on) expect(state('s1', 'essay')).toBe('draft');
+    give('essay', 's1');
+    if (on) expect(state('s1', 'essay')).toBe('returned');
+    Grader.carryOverall(CID, 's1', 'essay', 't2', { score: 2, mod: 1, date: '2026-10-08', type: 'formative' });
+    if (on) expect(state('s1', 'essay')).toBe('draft');
+    if (on) expect(row('s1', 'essay').returned_copy).toEqual(three);
+  },
+  moveToRubric(on) {
+    // Edit a Copy on scored work: each grade keeps its state.
+    level('s1', 'lab', 'c1', 3);
+    setRubricCheck(CID, 's1', 'lab', 'k1', true);
+    give('lab', 's1');
+    level('s1', 'lab', 'c1', 2); // s1: a draft on a returned grade
+    level('s2', 'lab', 'c2', 4); // s2: a draft never returned
+    level('s3', 'lab', 'c1', 3);
+    give('lab', 's3'); // s3: returned
+    const states = () => ['s1', 's2', 's3'].map(sid => state(sid, 'lab'));
+    const before = states();
+    Grader.moveToRubric(CID, 'lab', {
+      rubricId: 'rub2',
+      criteria: { c1: 'c1b', c2: 'c2b' },
+      checks: { k1: 'k1b', k2: 'k2b' },
+    });
+    expect(getScores(CID).s1.map(e => e.tagId)).toEqual(['c1b']);
+    if (!on) return;
+    expect(states()).toEqual(before);
+    expect(Object.keys(row('s1', 'lab').returned_copy.criteria)).toEqual(['c1b']);
+    expect(row('s1', 'lab').returned_copy.checks).toEqual(['k1b']);
+  },
+  setReportNote(on) {
+    // A Note for the Report never makes a draft.
+    level('s1', 'essay', 't1', 3);
+    give('essay', 's1');
+    const before = JSON.stringify(row('s1', 'essay'));
+    Grader.setReportNote(CID, 's1', 'essay', 'explained her method');
+    expect(getScoreReportNote(CID, 's1', 'essay')).toBe('explained her method');
+    if (on) expect(state('s1', 'essay')).toBe('returned');
+    if (on) expect(JSON.stringify(row('s1', 'essay'))).toBe(before);
+  },
 };
 
-describe('the grader’s gradebook and phone actions follow the rule through the writers they call', () => {
+describe('the grader’s gradebook, phone and Assignments page actions follow the rule through the writers they call', () => {
   it('every action here is one Grader has, and with the dialog’s it is all of them', () => {
     const names = Object.keys(GRADER_SCENARIOS);
     expect(names.filter(name => typeof Grader[name] !== 'function')).toEqual([]);

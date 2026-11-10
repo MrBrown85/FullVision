@@ -178,8 +178,10 @@ describe('the fills undo through restoreScoreCells', () => {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const src = readFileSync(resolve(root, 'teacher/page-assignments.js'), 'utf-8');
 
+  // Through Grader.undo since S1-T3; tests/grader.test.js holds that undo
+  // calls restoreScoreCells with the same arguments.
   it('no Undo puts back a whole copy of the class', () => {
     expect(src).not.toContain('saveScores(cid, prevScores)');
-    expect(src.split('restoreScoreCells(cid, prevScores, filled)').length - 1).toBe(4);
+    expect(src.split('Grader.undo(cid, prevScores, filled)').length - 1).toBe(4);
   });
 });
