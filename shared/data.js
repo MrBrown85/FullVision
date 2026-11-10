@@ -4405,7 +4405,13 @@ function _bundleToCache(cid, bundle) {
 // (_savedCopyUsable), so only those classes are downloaded again in full.
 // 5 (2026-11-03): rubrics carry tagIds, the competencies the whole rubric
 // scores. A schema 4 copy is still used: none existed before.
-var _BUNDLE_SCHEMA = 5;
+// 6 (2026-11-10): assessments carry created_at, when the piece was made,
+// which orders same-date work (calc.js _sameDatePieceOrder). No older copy
+// is used as it is: the server answers "not modified" for a class that has
+// not changed, so an older copy would never get the times, and its
+// same-date work would sit in another order than on a device that fetched
+// the class fresh. Each class is downloaded in full once instead.
+var _BUNDLE_SCHEMA = 6;
 var _SAVED_COPY_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 var _classFresh = {}; // cid → the server confirmed or replaced this copy since it was shown
 var _dirtyMarked = {}; // cid → the saved copy has been flagged as holding local edits
@@ -4430,15 +4436,10 @@ function _saveClassMeta(cid, patch) {
 function _savedCopyUsable(cid) {
   var meta = _classMeta(cid);
   if (!meta || !meta.owner || meta.owner !== _teacherId) return false;
-  // A copy from schema 4 differs only in having no whole-rubric competencies,
-  // which none had. One from schema 3 differs only in keeping rubric scores
-  // under competencies; one with none of those is used as it is.
-  if (
-    meta.schema !== _BUNDLE_SCHEMA &&
-    meta.schema !== 4 &&
-    !(meta.schema === 3 && !_savedCopyHasLegacyRubricKeys(cid))
-  )
-    return false;
+  // Only a copy this code saved (see _BUNDLE_SCHEMA). An older one stays in
+  // the browser: it is what shows if the download fails, and what is kept
+  // while writes wait to be sent (_initClassData).
+  if (meta.schema !== _BUNDLE_SCHEMA) return false;
   if (Date.now() - (meta.lastOpenedAt || meta.savedAt || 0) > _SAVED_COPY_MAX_AGE_MS) return false;
   return _hasLocalCopy(cid);
 }
