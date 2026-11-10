@@ -306,10 +306,20 @@ describe('Class Settings: the student page’s build switch', () => {
 
     describe('for a signed-in teacher', () => {
       let session;
+      /* After an ask of the server that fails, shared/data.js reads the
+         class again (_convergeOnServer; tests/grade-return-server.test.js
+         walks it against a server that has a class to send). This file's
+         recording client has none, so the read is noted here, not made. */
+      let readAgain;
+      let realConverge;
       beforeEach(() => {
         session = signIn();
+        readAgain = [];
+        realConverge = globalThis._convergeOnServer;
+        globalThis._convergeOnServer = cid => readAgain.push(cid);
       });
       afterEach(() => {
+        globalThis._convergeOnServer = realConverge;
         serverSaysStudentPageOn(LIVE, false);
         session.signOut();
       });
@@ -354,6 +364,23 @@ describe('Class Settings: the student page’s build switch', () => {
         expect(switchDrawn()).toBe(false);
         expect(note()).toBe('Could not change this. Check the connection and try again.');
         expect(html()).not.toContain('sp-card');
+        // Asked and not answered well: the class is read again from the server.
+        expect(readAgain).toEqual([LIVE]);
+        // The server had made the change after all (only its answer was
+        // lost): once the read has brought it, the line goes.
+        serverSaysStudentPageOn(LIVE);
+        _cache.courseConfigs[LIVE] = Object.assign({}, getCourseConfig(LIVE), { student_page_enabled: true });
+        DashClassManager.renderClassManager();
+        expect(switchDrawn()).toBe(true);
+        expect(note()).toBe(null);
+        serverSaysStudentPageOn(LIVE, false);
+        seed(LIVE, { levelOrder: 'asc', return_grades: 'on_return' });
+        readAgain.length = 0;
+        open(LIVE);
+        flip(LIVE, true);
+        await settle();
+        expect(note()).toBe('Could not change this. Check the connection and try again.');
+        readAgain.length = 0;
         // Offline it does not even ask.
         const online = Object.getOwnPropertyDescriptor(navigator, 'onLine');
         Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
@@ -364,6 +391,8 @@ describe('Class Settings: the student page’s build switch', () => {
           expect(session.since()).toEqual([]);
           expect(getReturnSettings(LIVE).student_page).toBe(false);
           expect(note()).toBe('Could not change this. Check the connection and try again.');
+          // Nothing was asked, so there is nothing to read again.
+          expect(readAgain).toEqual([]);
         } finally {
           if (online) Object.defineProperty(navigator, 'onLine', online);
           else Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => true });
@@ -421,6 +450,113 @@ describe('Class Settings: the student page’s build switch', () => {
         expect(switchDrawn()).toBe(true);
         expect(note()).toBe('Could not check for grades waiting to be returned. Check the connection and try again.');
         expect(writes().map(c => c[0])).toEqual(['course_draft_count']);
+      });
+
+      describe('an answer that arrives after the teacher has moved on', () => {
+        // Verify pass on PR 999, finding 1. The page the teacher went to.
+        const ELSEWHERE = '<div id="gradebook">THE GRADEBOOK</div>';
+        const leaveClassSettings = () => {
+          try {
+            DashClassManager.closeClassManager();
+          } catch (e) {
+            /* the harness has no page behind Class Settings to draw */
+          }
+          expect(DashClassManager.classManagerOpen).toBe(false);
+          mounts.main.innerHTML = ELSEWHERE;
+        };
+
+        it('the switch: Class Settings is not drawn over the page, and the change is still made', async () => {
+          seed(LIVE, { levelOrder: 'asc', return_grades: 'on_return' });
+          let answer;
+          session.fake.on('update_course', () => new Promise(r => (answer = () => r({ data: null, error: null }))));
+          open(LIVE);
+          flip(LIVE, true);
+          await settle();
+          expect(note()).toBe('Changing…');
+          leaveClassSettings();
+          answer();
+          await settle();
+          expect(mounts.main.innerHTML).toBe(ELSEWHERE);
+          expect(getReturnSettings(LIVE).student_page).toBe(true);
+        });
+
+        it('a refusal: nothing is drawn either, and the line is there when Class Settings is opened again', async () => {
+          seed(LIVE, { levelOrder: 'asc', return_grades: 'on_return' });
+          let answer;
+          session.fake.on(
+            'update_course',
+            () => new Promise(r => (answer = () => r({ data: null, error: { code: '22023', message: 'invalid' } }))),
+          );
+          open(LIVE);
+          flip(LIVE, true);
+          await settle();
+          leaveClassSettings();
+          answer();
+          await settle();
+          expect(mounts.main.innerHTML).toBe(ELSEWHERE);
+          open(LIVE);
+          expect(switchDrawn()).toBe(false);
+          expect(note()).toBe('Could not change this. Check the connection and try again.');
+        });
+
+        it('the count, turning off: no question goes up over the other page, and nothing is changed or returned', async () => {
+          seed(LIVE, HELD);
+          serverSaysStudentPageOn(LIVE);
+          Grader.setLevel(LIVE, U(11), U(31), U(51), 3, 0);
+          await settle();
+          let answer;
+          session.fake.on('course_draft_count', () => new Promise(r => (answer = () => r({ data: 3, error: null }))));
+          open(LIVE);
+          session.since();
+          flip(LIVE, false);
+          await settle();
+          leaveClassSettings();
+          answer();
+          await settle();
+          expect(confirms).toEqual([]);
+          expect(mounts.main.innerHTML).toBe(ELSEWHERE);
+          expect(getReturnSettings(LIVE).student_page).toBe(true);
+          expect(getGradeReturn(LIVE, U(11), U(31)).is_draft).toBe(true);
+          expect(session.since().filter(c => !/^(list|get)_/.test(c[0]))).toEqual([
+            ['course_draft_count', { p_course_id: LIVE }],
+          ]);
+          // Opened again, the switch is as it was and can be pressed: nothing is left "Changing…".
+          open(LIVE);
+          expect(switchDrawn()).toBe(true);
+          expect(disabled()).toBe(false);
+          expect(note()).toBe(null);
+        });
+
+        it('the count, with another class opened in Class Settings meanwhile: no question about the first', async () => {
+          seed(LIVE, HELD);
+          seed(CID, {});
+          serverSaysStudentPageOn(LIVE);
+          let answer;
+          session.fake.on('course_draft_count', () => new Promise(r => (answer = () => r({ data: 3, error: null }))));
+          open(LIVE);
+          flip(LIVE, false);
+          await settle();
+          DashClassManager.handleAction('cmSelectClass', { tagName: 'BUTTON', dataset: { cid: CID } });
+          answer();
+          await settle();
+          expect(confirms).toEqual([]);
+          expect(getReturnSettings(LIVE).student_page).toBe(true);
+          expect(DashClassManager.classManagerOpen).toBe(true);
+        });
+
+        it('with Class Settings still open on the class, the question is asked as before', async () => {
+          seed(LIVE, HELD);
+          serverSaysStudentPageOn(LIVE);
+          let answer;
+          session.fake.on('course_draft_count', () => new Promise(r => (answer = () => r({ data: 3, error: null }))));
+          open(LIVE);
+          flip(LIVE, false);
+          await settle();
+          answer();
+          await settle();
+          expect(confirms.length).toBe(1);
+          expect(confirms[0].title).toBe('Return 3 Grades Now?');
+        });
       });
 
       it('the two settings on this device alone do not show the switch as on', () => {

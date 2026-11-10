@@ -93,15 +93,29 @@ var CmStudentPage = (function () {
   // Whether this class has the tab: with its student page on, or, at the
   // build address, any class (to turn it on).
   function isShown(cid) {
+    // Class Settings asks this of the class it is on, each time it draws.
+    _classOnScreen = cid || null;
     var s = _settings(cid);
     if (!s) return false;
     return s.student_page === true || (_buildFlag && typeof COURSES !== 'undefined' && !!COURSES[cid]);
   }
 
+  // The class Class Settings last asked this tab about: the one it is on.
+  var _classOnScreen = null;
+
   function _rerender() {
-    if (typeof DashClassManager !== 'undefined' && DashClassManager.renderClassManager) {
-      DashClassManager.renderClassManager();
-    }
+    if (typeof DashClassManager === 'undefined' || !DashClassManager.renderClassManager) return;
+    // An answer that comes after Class Settings has closed draws nothing:
+    // drawing it would put Class Settings back over the page the teacher
+    // went to.
+    if (DashClassManager.classManagerOpen) DashClassManager.renderClassManager();
+  }
+
+  // True while Class Settings is open on this class.
+  function _stillHere(cid) {
+    return (
+      typeof DashClassManager !== 'undefined' && DashClassManager.classManagerOpen === true && _classOnScreen === cid
+    );
   }
 
   function _cid(el) {
@@ -125,9 +139,22 @@ var CmStudentPage = (function () {
     if (el && typeof el.focus === 'function') el.focus({ preventScroll: true });
   }
 
+  // True when the class already has what a change asked for.
+  function _inEffect(cid, change) {
+    var now = _settings(cid);
+    if (!now || !change) return false;
+    if ('student_page_enabled' in change && now.student_page !== change.student_page_enabled) return false;
+    if ('return_grades' in change && now.return_grades !== change.return_grades) return false;
+    return true;
+  }
+
   // The line under a row: what it is waiting on, or why it did not change.
   function _lineFor(cid, row) {
     var st = _st(cid);
+    // "Could not change this" goes once the class has the change after all
+    // (the server made it and only its answer was lost; the class has been
+    // read again since).
+    if (st.note && st.note.want && _inEffect(cid, st.note.want)) st.note = null;
     if (st.busy && st.busy.row === row) {
       return '<div class="cm-hint sp-note" id="sp-' + row + '-note" role="status">Changing…</div>';
     }
@@ -153,9 +180,9 @@ var CmStudentPage = (function () {
     var st = _st(cid);
     var done = function (out) {
       st.busy = null;
-      st.note = out && out.ok ? null : { row: row, text: COULD_NOT_CHANGE };
+      st.note = out && out.ok ? null : { row: row, text: COULD_NOT_CHANGE, want: change };
       _rerender();
-      _focus(focusId);
+      if (_stillHere(cid)) _focus(focusId);
     };
     var asked = saveReturnSettings(cid, change);
     if (asked.now) {
@@ -194,6 +221,13 @@ var CmStudentPage = (function () {
     var waited = false;
     var counted = function (out) {
       st.busy = null;
+      // The count took a moment and the teacher has closed Class Settings,
+      // or opened another class in it: the question is not put up over
+      // whatever is on screen now. Nothing was changed; nothing is returned.
+      if (waited && !_stillHere(cid)) {
+        st.note = null;
+        return;
+      }
       var n = out ? out.count : null;
       if (n == null) {
         st.note = { row: row, text: COULD_NOT_COUNT };
@@ -385,6 +419,7 @@ var CmStudentPage = (function () {
   function _reset() {
     _buildFlag = _addressHasBuildFlag();
     _state = {};
+    _classOnScreen = null;
   }
   // Tests: as if the app had been opened at the build address, or not.
   function _setBuildFlag(on) {

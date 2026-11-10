@@ -605,8 +605,22 @@ describe('Class Settings › Student Page: Return Grades', () => {
     });
 
     describe('once the server has said its student page is on', () => {
-      beforeEach(() => serverSaysStudentPageOn(REAL));
-      afterEach(() => serverSaysStudentPageOn(REAL, false));
+      /* After an ask of the server that fails, shared/data.js reads the
+         class again (_convergeOnServer; tests/grade-return-server.test.js
+         walks it against a server that has a class to send). This file's
+         recording client has none, so the read is noted here, not made. */
+      var readAgain;
+      var realConverge;
+      beforeEach(() => {
+        serverSaysStudentPageOn(REAL);
+        readAgain = [];
+        realConverge = globalThis._convergeOnServer;
+        globalThis._convergeOnServer = cid => readAgain.push(cid);
+      });
+      afterEach(() => {
+        globalThis._convergeOnServer = realConverge;
+        serverSaysStudentPageOn(REAL, false);
+      });
       // The server's count of the grades that wait.
       const serverCounts = n => session.fake.on('course_draft_count', () => ({ data: n, error: null }));
       const note = row =>
@@ -678,6 +692,8 @@ describe('Class Settings › Student Page: Return Grades', () => {
           'Could not check for grades waiting to be returned. Check the connection and try again.',
         );
         expect(writes().map(c => c[0])).toEqual(['course_draft_count']);
+        // Asked and not answered: the class is read again from the server.
+        expect(readAgain).toEqual([REAL]);
       });
 
       it('When I Return Them is asked of the server first, and shows only when it has answered', async () => {
@@ -711,12 +727,57 @@ describe('Class Settings › Student Page: Return Grades', () => {
         expect(stored('courseconfig', REAL)).toBe(before);
         expect(checked()).toEqual(['on_save']);
         expect(note('return')).toBe('Could not change this. Check the connection and try again.');
+        // The server may have made the change and only its answer been lost:
+        // the class is read again.
+        expect(readAgain).toEqual([REAL]);
         // Tried again with the connection back, the line goes.
         session.fake.on('update_course', () => ({ data: null, error: null }));
         choose('on_return', REAL);
         await settle();
         expect(checked()).toEqual(['on_return']);
         expect(note('return')).toBe(null);
+      });
+
+      // Verify pass on PR 999, finding 1: an answer that comes after
+      // Class Settings was closed draws nothing and asks nothing.
+      it('the count arrives after Class Settings was closed: no question over the other page, nothing changed', async () => {
+        var answer;
+        session.fake.on('course_draft_count', () => new Promise(r => (answer = () => r({ data: 3, error: null }))));
+        open('student-page', REAL);
+        choose('on_save', REAL);
+        await settle();
+        try {
+          DashClassManager.closeClassManager();
+        } catch (e) {
+          /* the harness has no page behind Class Settings to draw */
+        }
+        expect(DashClassManager.classManagerOpen).toBe(false);
+        mounts.main.innerHTML = '<div id="gradebook">THE GRADEBOOK</div>';
+        answer();
+        await settle();
+        expect(confirms).toEqual([]);
+        expect(mounts.main.innerHTML).toBe('<div id="gradebook">THE GRADEBOOK</div>');
+        expect(getReturnSettings(REAL).return_grades).toBe('on_return');
+        expect(writes().map(c => c[0])).toEqual(['course_draft_count']);
+      });
+
+      it('the server’s answer to When I Return Them arrives after Class Settings was closed: nothing is drawn', async () => {
+        seed(REAL, { levelOrder: 'asc', student_page_enabled: true, return_grades: 'on_save' });
+        var answer;
+        session.fake.on('update_course', () => new Promise(r => (answer = () => r({ data: null, error: null }))));
+        open('student-page', REAL);
+        choose('on_return', REAL);
+        await settle();
+        try {
+          DashClassManager.closeClassManager();
+        } catch (e) {
+          /* as above */
+        }
+        mounts.main.innerHTML = '<div id="gradebook">THE GRADEBOOK</div>';
+        answer();
+        await settle();
+        expect(mounts.main.innerHTML).toBe('<div id="gradebook">THE GRADEBOOK</div>');
+        expect(getReturnSettings(REAL).return_grades).toBe('on_return');
       });
 
       it('and any class setting saved beside it carries neither of the two', async () => {
