@@ -74,6 +74,7 @@ const PRECACHE_URLS = [
   '/teacher/qr-slips.js',
   '/teacher/export-all.js',
   '/teacher/cm-questionnaires.js',
+  '/teacher/cm-student-page.js',
   '/teacher/student-voice.js',
   '/teacher/learner-profile.js',
   '/shared/phone-report-view.js',

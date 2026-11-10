@@ -28,6 +28,147 @@ function standIn(name, answer) {
   return { calls, restore: () => (globalThis[name] = real) };
 }
 
+/* ── S1-T1: the gradebook's and Class Results' actions ──────────────────
+   The same check for the actions the gradebook and Class Results brought
+   (shared/grader.js, "The gradebook and Class Results"). Some call two
+   writers, so a row lists them in order:
+   [action, its arguments, [[writer, its arguments], …], what GradeState
+   hears]. The action gives back the answer of the writer marked `true`.
+   What they end up saving and sending is pinned from the gradebook itself
+   (tests/pin-gradebook-writes.test.js). */
+const LAB = { id: 'lab', title: 'Lab', tagIds: ['t1'] };
+const BEFORE = { s1: [{ assessmentId: 'lab', tagId: 't1', score: 3 }] };
+const AFTER = { s1: [] };
+const STATUSES = { 's2:lab': 'NS' };
+const GRADEBOOK_CASES = [
+  [
+    'typeLevel',
+    [CID, 's1', 'essay', 't1', 3, '2026-11-09', 'summative', ''],
+    [['upsertScore', [CID, 's1', 'essay', 't1', 3, '2026-11-09', 'summative', ''], true]],
+    [CID, 's1', 'essay', 'level'],
+  ],
+  [
+    // A cleared cell, with no date given.
+    'typeLevel',
+    [CID, 's1', 'essay', 't1', 0, undefined, 'formative', ''],
+    [['upsertScore', [CID, 's1', 'essay', 't1', 0, undefined, 'formative', ''], true]],
+    [CID, 's1', 'essay', 'level'],
+  ],
+  [
+    'typePlusMinus',
+    [CID, 's1', 'essay', 't1', 3, '2026-10-10', 'summative', 'Solid work.', -1],
+    [['upsertScore', [CID, 's1', 'essay', 't1', 3, '2026-10-10', 'summative', 'Solid work.', -1], true]],
+    [CID, 's1', 'essay', 'plusMinus'],
+  ],
+  [
+    'clearScore',
+    [CID, BEFORE, 's1', LAB, ['t1']],
+    [
+      ['clearScoreEntries', [CID, BEFORE, 's1', LAB, ['t1']]],
+      ['saveScores', [CID, BEFORE], true],
+    ],
+    [CID, 's1', 'lab', 'clear'],
+  ],
+  ['clearScoreOnServer', [CID, 's1', 'lab'], [['clearScore', ['s1', 'lab'], true]], [CID, 's1', 'lab', 'clear']],
+  [
+    'undoCell',
+    [CID, 's1', 'lab', BEFORE, AFTER],
+    [
+      ['saveScores', [CID, AFTER], true],
+      ['persistScoreDiffToCanonical', [CID, BEFORE, AFTER]],
+    ],
+    [CID, 's1', 'lab', 'undo'],
+  ],
+  [
+    'markBlankCells',
+    [CID, 'lab', STATUSES],
+    [['saveAssignmentStatuses', [CID, STATUSES], true]],
+    [CID, null, 'lab', 'status'],
+  ],
+  [
+    'undoMarkBlankCells',
+    [CID, 'lab', STATUSES],
+    [['saveAssignmentStatuses', [CID, STATUSES], true]],
+    [CID, null, 'lab', 'undo'],
+  ],
+  ['deleteAssessmentScores', [CID, 'lab', AFTER], [['saveScores', [CID, AFTER], true]], [CID, null, 'lab', 'delete']],
+  [
+    'deleteAssessmentStatuses',
+    [CID, 'lab', STATUSES],
+    [['saveAssignmentStatuses', [CID, STATUSES], true]],
+    [CID, null, 'lab', 'delete'],
+  ],
+];
+
+describe('Grader: the gradebook’s and Class Results’ actions pass through to data.js', () => {
+  const ANSWER = { from: 'the writer' };
+  let stands = [];
+  let realAfterSave = null;
+
+  afterEach(() => {
+    stands.forEach(s => s.restore());
+    stands = [];
+    if (realAfterSave) GradeState.afterSave = realAfterSave;
+    realAfterSave = null;
+  });
+
+  it.each(GRADEBOOK_CASES)('%s%j', (action, args, writers, heardArgs) => {
+    // One list for the writers and GradeState, to hold their order.
+    const log = [];
+    writers.forEach(([name, , answers]) => {
+      const real = globalThis[name];
+      globalThis[name] = function () {
+        log.push([name, Array.from(arguments)]);
+        return answers ? ANSWER : { from: 'another writer' };
+      };
+      stands.push({ restore: () => (globalThis[name] = real) });
+    });
+    realAfterSave = GradeState.afterSave;
+    GradeState.afterSave = function () {
+      log.push(['GradeState.afterSave', Array.from(arguments)]);
+      return realAfterSave.apply(null, arguments);
+    };
+
+    const out = Grader[action].apply(null, args);
+
+    // The writers in order, with the very lists the screen passed, and
+    // GradeState told once, after them.
+    expect(log.map(row => row[0])).toEqual(writers.map(w => w[0]).concat('GradeState.afterSave'));
+    writers.forEach(([, writerArgs], i) => {
+      expect(log[i][1]).toEqual(writerArgs);
+      log[i][1].forEach(arg => {
+        if (arg && typeof arg === 'object') expect(args.includes(arg)).toBe(true);
+      });
+    });
+    expect(log[log.length - 1][1]).toEqual(heardArgs);
+    expect(out).toBe(ANSWER);
+  });
+
+  it('with the real writers, Clear Score keeps the Overall Comment and Undo puts the level back', () => {
+    saveAssessments(CID, [LAB]);
+    saveScores(CID, {});
+    Grader.typeLevel(CID, 's1', 'lab', 't1', 3, '2026-10-10', 'summative', '');
+    Grader.setOverallComment(CID, 's1', 'lab', 'Solid work.');
+    const before = structuredClone(getScores(CID));
+
+    const scores = getScores(CID);
+    Grader.clearScore(CID, scores, 's1', LAB, ['t1']);
+    expect(getScores(CID).s1.map(e => [e.score, e.note])).toEqual([[0, 'Solid work.']]);
+
+    const cleared = structuredClone(getScores(CID));
+    Grader.undoCell(CID, 's1', 'lab', cleared, before);
+    expect(getScores(CID).s1.map(e => [e.score, e.note])).toEqual([[3, 'Solid work.']]);
+  });
+
+  it('with the real writers, Mark Blank Cells and its undo save the status list', () => {
+    saveAssignmentStatuses(CID, {});
+    expect(Grader.markBlankCells(CID, 'lab', { 's2:lab': 'NS' })).toBe(true);
+    expect(getAssignmentStatus(CID, 's2', 'lab')).toBe('NS');
+    expect(Grader.undoMarkBlankCells(CID, 'lab', {})).toBe(true);
+    expect(getAssignmentStatus(CID, 's2', 'lab')).toBe(null);
+  });
+});
+
 describe('Grader: each action passes through to one data.js writer', () => {
   let stand = null;
   let heard = null;
@@ -143,6 +284,28 @@ describe('Grader: each action passes through to one data.js writer', () => {
       [CID, 'talk', 's1', false],
       [CID, 's1', 'talk', 'backToGroupGrade'],
     ],
+    // The phone's Grade tab (S1-T2). More on these three below.
+    [
+      'setLevelOnPhone',
+      [CID, 's1', 'essay', 't1', 3, 0],
+      'upsertScore',
+      [CID, 's1', 'essay', 't1', 3, '2026-10-10', 'summative', '', 0],
+      [CID, 's1', 'essay', 'level'],
+    ],
+    [
+      'setPlusMinusOnPhone',
+      [CID, 's1', 'essay', 't1', 3, -1, 'Clear thesis'],
+      'upsertScore',
+      [CID, 's1', 'essay', 't1', 3, '2026-10-10', 'summative', 'Clear thesis', -1],
+      [CID, 's1', 'essay', 'plusMinus'],
+    ],
+    [
+      'undoOnPhone',
+      [CID, 's1', 'essay', { s1: [{ score: 3 }] }, { s1: [] }],
+      'saveScores',
+      [CID, { s1: [] }],
+      [CID, 's1', 'essay', 'undo'],
+    ],
     [
       'undo',
       [CID, { s1: [] }, { s1: [{ score: 3 }] }],
@@ -162,7 +325,8 @@ describe('Grader: each action passes through to one data.js writer', () => {
   });
 
   it('covers every action Grader has', () => {
-    expect(Object.keys(Grader).sort()).toEqual([...new Set(cases.map(c => c[0]))].sort());
+    const covered = cases.concat(GRADEBOOK_CASES).map(c => c[0]);
+    expect(Object.keys(Grader).sort()).toEqual([...new Set(covered)].sort());
   });
 
   it('a level with no + or − given passes none on, as a tick’s suggested level does', () => {
@@ -190,6 +354,78 @@ describe('Grader: each action passes through to one data.js writer', () => {
     ]);
     Grader.setLevel(CID, 's1', 'essay', 't1', 0, 0);
     expect(getScores(CID).s1.map(e => [e.score, e.mod])).toEqual([[0, undefined]]);
+  });
+});
+
+/* The phone's Grade tab (S1-T2): its levels and its Undo have actions of
+   their own, which pass data.js what the phone passed before the move.
+   What they end up saving and sending is pinned from the screen
+   (tests/pin-phone-grade-writes.test.js). */
+describe('Grader: the phone’s level and Undo actions', () => {
+  let stands = [];
+  const stand = (name, answer) => {
+    const s = standIn(name, answer);
+    stands.push(s);
+    return s;
+  };
+  beforeEach(() => saveAssessments(CID, [ESSAY, UNDATED]));
+  afterEach(() => {
+    stands.forEach(s => s.restore());
+    stands = [];
+  });
+
+  it('a level with no + or − given passes none on, and no comment', () => {
+    const upsert = stand('upsertScore', true);
+    Grader.setLevelOnPhone(CID, 's1', 'essay', 't1', 3);
+    expect(upsert.calls).toEqual([[CID, 's1', 'essay', 't1', 3, '2026-10-10', 'summative', '', undefined]]);
+  });
+
+  it('on work with no date, or on work that is gone, a level and a + or − are dated today', () => {
+    const upsert = stand('upsertScore', true);
+    const today = courseToday(CID);
+    Grader.setLevelOnPhone(CID, 's1', 'undated', 't1', 2, 0);
+    Grader.setPlusMinusOnPhone(CID, 's1', 'undated', 't1', 2, 1, '');
+    Grader.setLevelOnPhone(CID, 's1', 'gone', 't1', 2, 0);
+    expect(upsert.calls).toEqual([
+      [CID, 's1', 'undated', 't1', 2, today, 'formative', '', 0],
+      [CID, 's1', 'undated', 't1', 2, today, 'formative', '', 1],
+      [CID, 's1', 'gone', 't1', 2, today, 'summative', '', 0],
+    ]);
+  });
+
+  it('with the real writer, a changed level on undated work moves the entry’s date to today', () => {
+    saveScores(CID, {
+      s1: [
+        { id: 's1:undated:t1', assessmentId: 'undated', tagId: 't1', score: 2, date: '2026-09-01', type: 'formative' },
+      ],
+    });
+    Grader.setLevelOnPhone(CID, 's1', 'undated', 't1', 3);
+    expect(getScores(CID).s1.map(e => [e.score, e.date])).toEqual([[3, courseToday(CID)]]);
+    // The desktop's action leaves the date alone.
+    Grader.setLevel(CID, 's1', 'undated', 't1', 4, 0);
+    getScores(CID).s1[0].date = '2026-09-01';
+    Grader.setLevel(CID, 's1', 'undated', 't1', 2, 0);
+    expect(getScores(CID).s1.map(e => [e.score, e.date])).toEqual([[2, '2026-09-01']]);
+  });
+
+  it('Undo saves the list, then sends what changed between the two lists, and answers what the save did', () => {
+    const before = { s1: [{ score: 3 }] };
+    const after = { s1: [] };
+    const calls = [];
+    const real = { saveScores, persistScoreDiffToCanonical };
+    globalThis.saveScores = (...args) => (calls.push(['saveScores', ...args]), 'saved');
+    globalThis.persistScoreDiffToCanonical = (...args) => {
+      calls.push(['persistScoreDiffToCanonical', ...args]);
+    };
+    try {
+      expect(Grader.undoOnPhone(CID, 's1', 'essay', before, after)).toBe('saved');
+    } finally {
+      Object.assign(globalThis, real);
+    }
+    expect(calls).toEqual([
+      ['saveScores', CID, after],
+      ['persistScoreDiffToCanonical', CID, before, after],
+    ]);
   });
 });
 
