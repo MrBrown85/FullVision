@@ -938,12 +938,11 @@ def main():
     s = Session(seeded=False)
     s.run('create role m5b_applier nologin'); s.run('create role m5b_other nologin')
     s.run('grant usage on schema public, student_submit, fv_private, auth to m5b_applier')
-    for fn, _was, _becomes in SIXTEEN: s.run('alter function %s owner to m5b_applier' % fn)
-    ok('the header\'s "before the apply" query still finds nothing when another role owns all sixteen', s.rows(header_query('precheck')) == [])
     s.run('alter function public.rls_auto_enable() owner to m5b_other')
     listed = s.rows(header_query('precheck'))
-    ok('... and lists a function of the sixteen that the role owning fv_owns_course does not own, with both owners',
-       len(listed) == 1 and listed[0][0] == 'public.rls_auto_enable()' and listed[0][6:8] == ['m5b_applier', 'm5b_other'], [r[:8] for r in listed])
+    ok('the header\'s "before the apply" query lists a function of the sixteen that postgres does not own, with the owner it expected and the one it found',
+       len(listed) == 1 and listed[0][0] == 'public.rls_auto_enable()' and listed[0][6:8] == ['postgres', 'm5b_other'], [r[:8] for r in listed])
+    for fn, _was, _becomes in SIXTEEN[:-1]: s.run('alter function %s owner to m5b_applier' % fn)
     before = settings(s)
     def as_applier():
         s.c.run('savepoint owned'); s.c.run('set local role m5b_applier')

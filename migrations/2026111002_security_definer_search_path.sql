@@ -139,60 +139,59 @@
 -- prints), and any other SECURITY DEFINER function without pg_temp. No rows:
 -- everything is as tested.
 --
--- It was run on gradebook-prod on 2026-11-10, after S0-M4 was applied, and
--- returned one row: rls_auto_enable, tested until then from a stand-in. Its
--- live body is now the one tested and the one fingerprinted below, so all
--- sixteen are the live definitions, byte for byte, and no other SECURITY
--- DEFINER function in the three schemas lacked pg_temp. Run it again before
--- applying: it should return nothing.
+-- It was run on gradebook-prod on 2026-11-10, after S0-M4 was applied and
+-- before Batch A, and returned one row: rls_auto_enable, tested until then
+-- from a stand-in. Its live body is now the one tested and the one
+-- fingerprinted below, so all sixteen were the live definitions, byte for
+-- byte, and no other SECURITY DEFINER function in the three schemas lacked
+-- pg_temp. Batch A has been applied since (Nov 10) and the query now checks
+-- owners too: run it again before applying. It should return nothing.
 --
 -- A row whose only difference is the md5 does not stop this file (it
 -- replaces no body); it means that function has changed since it was
 -- tested. The exception is get_class_bundle, which the file does check.
 --
 -- Owners. ALTER FUNCTION is refused unless the role applying the file owns
--- the function (or is a member of the role that does). The repo's own
--- migrations made fifteen of the sixteen, so those belong to the role that
--- applies migrations; rls_auto_enable came with the Supabase project and is
--- the one that might not. The query takes the owner of fv_owns_course as the
--- applying role and lists any of the sixteen owned by another (live_owner).
--- If it lists one, do not apply. The file would run its checks, reach that
--- function's ALTER, and stop there with "must be owner of function ..." and
--- nothing changed (search_path.py does this with a function owned by
--- another role). The ways on from there are for the owner to choose: apply
--- the file as a role that owns all sixteen; or have it rewritten without
--- that function, which also means its last check must excuse it.
+-- the function (or is a member of the role that does). On Supabase the SQL
+-- editor and apply_migration both run as postgres, and the repo's own
+-- migrations made fifteen of the sixteen, so those should be postgres's;
+-- rls_auto_enable came with the Supabase project and is the one that might
+-- not be. The query expects postgres as the owner of each and lists any
+-- owned by another role (live_owner). If it lists one, do not apply. The
+-- file would run its checks, reach that function's ALTER, and stop there
+-- with "must be owner of function ..." and nothing changed (search_path.py
+-- does this with a function owned by another role). The ways on from there
+-- are for the owner to choose: apply the file as a role that owns all
+-- sixteen; or have it rewritten without that function, which also means its
+-- last check must excuse it.
 --
 -- precheck:
---   with v(fn, setting, md5) as (values
---       ('public._fv_release_orphan_teacher_email()',                    'search_path=public',     '845a373f326ad7067193bf36960e3185'),
---       ('public._fv_teacher_sign_in_deleted()',                         'search_path=public',     'e303a42f8cd1f9a1859483a84f074cbe'),
---       ('public._score_audit_diff(uuid,numeric,numeric,text,text)',     'search_path=public',     '97b29bd4079fc3326b70b29f55bdeeda'),
---       ('public._term_rating_audit_field(uuid,text,text,text)',         'search_path=public',     'f29ec6599566b90f276ea8fb9e32a4b9'),
---       ('public._touch_course_sync_cursor(uuid,text)',                  'search_path=public',     'ddf717ce0125ec2c0ebb5a45ad0a6c03'),
---       ('public._touch_course_sync_cursor_from_trigger()',              'search_path=public',     '706bc29fddc40bf689d719d3883e7cd7'),
---       ('public._touch_teacher_sync_cursor_from_trigger()',             'search_path=public',     '388d425e8dddc9517759e98c8cc91f0c'),
---       ('public.fv_idem_check(uuid,text)',                              'search_path=public',     '83e3c5590eee5fcb5c2cd8690fe42aa7'),
---       ('public.fv_idem_store(uuid,text,jsonb)',                        'search_path=public',     'afcca752df1bae8350db6f636e4aaa09'),
---       ('public.fv_owns_assessment(uuid)',                              'search_path=public',     '852322ca22024d49dcc4f88a6863a4cf'),
---       ('public.fv_owns_course(uuid)',                                  'search_path=public',     '61fa41c6c4e94a1e27b606e454262baf'),
---       ('public.fv_owns_enrollment(uuid)',                              'search_path=public',     '9c1d01d07ad0e2402784a2257e13aecb'),
---       ('public.fv_owns_term_rating(uuid)',                             'search_path=public',     '1d3c31d45026472c3d3055a6b8718ea6'),
---       ('public.fv_retention_cleanup()',                                'search_path=public',     '3133ad798bfe7c82d9d203abc3826a94'),
---       ('public.get_class_bundle(uuid,bigint)',                         'search_path=""',         '845b42513d1f556dc941a1cc11cf9567'),
---       ('public.rls_auto_enable()',                                     'search_path=pg_catalog', '846ec2fbff751d24b890656d63c3a9bf')
---   ), applier as (
---     select proowner from pg_proc where oid = to_regprocedure('public.fv_owns_course(uuid)')
+--   with v(fn, setting, md5, owner) as (values
+--       ('public._fv_release_orphan_teacher_email()',                     'search_path=public',      '845a373f326ad7067193bf36960e3185', 'postgres'),
+--       ('public._fv_teacher_sign_in_deleted()',                          'search_path=public',      'e303a42f8cd1f9a1859483a84f074cbe', 'postgres'),
+--       ('public._score_audit_diff(uuid,numeric,numeric,text,text)',      'search_path=public',      '97b29bd4079fc3326b70b29f55bdeeda', 'postgres'),
+--       ('public._term_rating_audit_field(uuid,text,text,text)',          'search_path=public',      'f29ec6599566b90f276ea8fb9e32a4b9', 'postgres'),
+--       ('public._touch_course_sync_cursor(uuid,text)',                   'search_path=public',      'ddf717ce0125ec2c0ebb5a45ad0a6c03', 'postgres'),
+--       ('public._touch_course_sync_cursor_from_trigger()',               'search_path=public',      '706bc29fddc40bf689d719d3883e7cd7', 'postgres'),
+--       ('public._touch_teacher_sync_cursor_from_trigger()',              'search_path=public',      '388d425e8dddc9517759e98c8cc91f0c', 'postgres'),
+--       ('public.fv_idem_check(uuid,text)',                               'search_path=public',      '83e3c5590eee5fcb5c2cd8690fe42aa7', 'postgres'),
+--       ('public.fv_idem_store(uuid,text,jsonb)',                         'search_path=public',      'afcca752df1bae8350db6f636e4aaa09', 'postgres'),
+--       ('public.fv_owns_assessment(uuid)',                               'search_path=public',      '852322ca22024d49dcc4f88a6863a4cf', 'postgres'),
+--       ('public.fv_owns_course(uuid)',                                   'search_path=public',      '61fa41c6c4e94a1e27b606e454262baf', 'postgres'),
+--       ('public.fv_owns_enrollment(uuid)',                               'search_path=public',      '9c1d01d07ad0e2402784a2257e13aecb', 'postgres'),
+--       ('public.fv_owns_term_rating(uuid)',                              'search_path=public',      '1d3c31d45026472c3d3055a6b8718ea6', 'postgres'),
+--       ('public.fv_retention_cleanup()',                                 'search_path=public',      '3133ad798bfe7c82d9d203abc3826a94', 'postgres'),
+--       ('public.get_class_bundle(uuid,bigint)',                          'search_path=""',          '845b42513d1f556dc941a1cc11cf9567', 'postgres'),
+--       ('public.rls_auto_enable()',                                      'search_path=pg_catalog',  '846ec2fbff751d24b890656d63c3a9bf', 'postgres')
 --   )
 --   select v.fn, v.setting as tested_setting, array_to_string(p.proconfig, '; ') as live_setting,
 --          p.prosecdef as live_security_definer, v.md5 as tested_md5,
---          md5(pg_get_functiondef(p.oid)) as live_md5,
---          (select proowner::regrole::text from applier) as owner_of_fv_owns_course,
+--          md5(pg_get_functiondef(p.oid)) as live_md5, v.owner as expected_owner,
 --          p.proowner::regrole::text as live_owner, pg_get_functiondef(p.oid) as live_definition
 --     from v left join pg_proc p on p.oid = to_regprocedure(v.fn)
 --    where p.oid is null or not p.prosecdef or p.proconfig is distinct from array[v.setting]
 --       or md5(pg_get_functiondef(p.oid)) <> v.md5
---       or p.proowner is distinct from (select proowner from applier)
+--       or p.proowner::regrole::text <> v.owner
 --   union all
 --   select n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')',
 --          'not one of the sixteen', array_to_string(p.proconfig, '; '), p.prosecdef, null,

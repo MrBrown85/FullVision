@@ -365,8 +365,8 @@ in a transaction that is rolled back.
 - **Who applies it.** ALTER FUNCTION needs the function's owner. Applied by a
   role that owns fifteen of the sixteen and not `rls_auto_enable`, the file
   stops at that ALTER ("must be owner of function") with nothing changed;
-  the header's "Before the apply" query lists such a function with both
-  owners. Applied by a role that owns all sixteen and is not a superuser, it
+  the header's "Before the apply" query expects `postgres` as the owner of
+  each and lists one that is not, with the owner it found. Applied by a role that owns all sixteen and is not a superuser, it
   applies. (The two roles are made and rolled back inside the check.)
 - **S0-M4b (PR 989) on either side.** S0-M4b then this file, and this file
   then S0-M4b: both apply and can be run again, no SECURITY DEFINER function
@@ -387,7 +387,7 @@ in a transaction that is rolled back.
   three schemas went back to `m5_pre`'s and forward again.
 
 Result on 2026-11-10, PostgreSQL 17.11 (production's version) and 18.6:
-**349 of 349 on each**, the two outputs identical line for line, fingerprints
+**348 of 348 on each**, the two outputs identical line for line, fingerprints
 included.
 
 The other suites, on `m5_pre` and on `m5_post`, checks compared line by line
