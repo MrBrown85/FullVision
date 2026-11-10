@@ -27,21 +27,74 @@ var _courseLetterCache = {};
    and nowhere else in it (tests/calc-score-reader.test.js fails on a direct
    read). No calculation asks the data layer for a score itself.
 
-   _scoreSet names the set of scores in use. Today there is one, 'all': the
-   teacher's working copy, every score the data layer holds. The student
-   page build adds the scores a student has been given back
-   (docs/plans/student-page-build-plan.md 1.3, S0-F1): that PR changes what
-   scores() and statuses() give for its set, and nothing below this block.
-   The set is part of every cache key (_ck), so two sets never share a
-   cached number. */
+   _scoreSet names the set of scores in use
+   (docs/plans/student-page-build-plan.md 1.2 and 1.3):
+   - 'all': the teacher's working copy, every score the data layer holds.
+     Every calculation uses it unless it is run inside withReturnedOnly.
+   - 'returned': only what students have been given. For each student and
+     piece of work: the working copy where nothing is a draft, the grade as
+     it was last returned where a draft sits on a returned grade, and
+     nothing where a grade was never returned.
+   The two sets differ only in what scores() gives. Everything below this
+   block is the same calculation for both. The set is part of every cache
+   key (_ck), so the two never share a cached number. */
 var _scoreSet = 'all';
+
+/** Run `fn` with returned grades only, and give back what it returns: every
+ * grade worked out inside it leaves drafts out. The set in use before is put
+ * back when `fn` ends, also when it throws, the way readAsOfTerm puts the
+ * report in view back. Calls can sit inside each other. `fn` must finish at
+ * once: one that returns a promise would do the rest of its work with every
+ * score, drafts included, so that is refused. */
+function withReturnedOnly(fn) {
+  var was = _scoreSet;
+  var result;
+  _scoreSet = 'returned';
+  try {
+    result = fn();
+  } finally {
+    _scoreSet = was;
+  }
+  if (result && typeof result.then === 'function') {
+    throw new Error(
+      'withReturnedOnly was given work that does not finish at once (it returned a promise). ' +
+        'The rest of that work would count drafts. Work the grades out first, then wait.',
+    );
+  }
+  return result;
+}
 
 var _scoreRead = {
   // Every student's score entries in the class: { [studentId]: [entry] }.
   scores: function (cid) {
-    return getScores(cid);
+    if (_scoreSet === 'all') return getScores(cid);
+    /* Returned only. The data layer builds that set (getReturnedScores), in
+       the shape above, from the working copy and each grade's returned
+       copy; this file works no draft rule out itself. When the set cannot
+       be had (an unknown set, no builder loaded, a builder that gives
+       nothing) this stops with an error. It never falls back to every
+       score: that would show a draft to a family. */
+    if (_scoreSet !== 'returned') {
+      throw new Error('calc.js has no set of scores called "' + _scoreSet + '". No grade was worked out.');
+    }
+    if (typeof getReturnedScores !== 'function') {
+      throw new Error(
+        'Returned grades were asked for, but nothing loaded here can give them. ' +
+          'No grade was worked out, so no draft is shown.',
+      );
+    }
+    var returned = getReturnedScores(cid);
+    if (!returned || typeof returned !== 'object') {
+      throw new Error(
+        'Returned grades were asked for, but none came back for this class. ' +
+          'No grade was worked out, so no draft is shown.',
+      );
+    }
+    return returned;
   },
-  // Every status in the class: { 'studentId:assessmentId': 'NS' | 'EXC' | 'LATE' }.
+  /* Every status in the class: { 'studentId:assessmentId': 'NS' | 'EXC' | 'LATE' }.
+     The same in both sets: Missing, Excused and Late are never drafts. They
+     show and count as soon as they are set (plan 1.2; Colin's answer 7). */
   statuses: function (cid) {
     return getAssignmentStatuses(cid);
   },
@@ -71,7 +124,8 @@ var _scoreRead = {
     });
     return entry ? String(entry.note) : '';
   },
-  // One window's DIBELS numbers, or null. A reading record, never a grade.
+  /* One window's DIBELS numbers, or null. A reading record, never a grade,
+     and it has no Draft or Returned state: the same in both sets. */
   dibels: function (cid, sid, aid, period) {
     return getDibelsScore(cid, sid, aid, period);
   },
@@ -125,7 +179,7 @@ function _termKey(cid) {
 }
 
 /* Cache key prefix for a class: the class id, the active term and the score
-   set in use ('c1#all', 'c1@2#all'). */
+   set in use ('c1#all', 'c1@2#all', 'c1@2#returned'). */
 function _ck(cid) {
   return cid + _termKey(cid) + '#' + _scoreSet;
 }
@@ -3646,6 +3700,7 @@ function classSpreadRangeText(cid, assessment, spread) {
 
 /* ── Namespace ──────────────────────────────────────────────── */
 window.Calc = {
+  withReturnedOnly,
   medianOf,
   classColumnSpread,
   classColumnLevelCounts,
