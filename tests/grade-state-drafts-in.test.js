@@ -5,8 +5,9 @@
  * so the gradebook, the graders and the phone count from one place.
  *
  * It is stateOf, the function the desktop grader dialog reads for its Draft
- * row, asked for each student; a DIBELS benchmark, which the dialog never
- * offers to return, has none.
+ * row, asked for each student: the same test of a cell as
+ * GradeState.draftsWaiting (S1-F4), the class's whole count. So the lengths
+ * over every student and assessment add up to draftsWaiting(cid).
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -104,9 +105,36 @@ describe('GradeState.draftsIn', () => {
     expect(drafts('essay')).toEqual(['s3']);
   });
 
-  it('a DIBELS benchmark has none, and neither does work that is not in the class', () => {
+  it('over every student and assessment the lengths add up to draftsWaiting', () => {
+    const total = () => [ESSAY, QUIZ, TALK, BENCH].reduce((n, a) => n + drafts(a.id).length, 0);
+    expect(total()).toBe(0);
+    expect(GradeState.draftsWaiting(CID)).toBe(0);
+    level('s1', 'essay', 3);
+    level('s2', 'essay', 2);
+    setPointsScore(CID, 's3', 'quiz', 7);
+    level('s1', 'talk', 4); // the pair: two drafts
+    applyAssignmentStatus(CID, 's4', 'quiz', 'LATE');
+    expect(total()).toBe(5);
+    expect(GradeState.draftsWaiting(CID)).toBe(5);
+    // A grade under Missing shows no Draft mark and is in neither count.
+    const statuses = getAssignmentStatuses(CID);
+    statuses['s2:essay'] = 'NS';
+    saveAssignmentStatuses(CID, statuses);
+    expect(total()).toBe(4);
+    expect(GradeState.draftsWaiting(CID)).toBe(4);
+    Grader.returnGrades(CID, 'talk', drafts('talk'));
+    expect(total()).toBe(2);
+    expect(GradeState.draftsWaiting(CID)).toBe(2);
+    // An Overall Comment on a DIBELS benchmark is a draft to stateOf, so
+    // both count it (the grader dialog draws no Draft row for a benchmark).
     saveScoreComment(CID, 's1', 'bench', 'Read with expression.');
-    expect(drafts('bench')).toEqual([]);
+    expect(GradeState.stateOf(CID, 's1', 'bench')).toBe('draft');
+    expect(drafts('bench')).toEqual(['s1']);
+    expect(total()).toBe(3);
+    expect(GradeState.draftsWaiting(CID)).toBe(3);
+  });
+
+  it('work that is not in the class has none', () => {
     expect(drafts('no-such-work')).toEqual([]);
   });
 

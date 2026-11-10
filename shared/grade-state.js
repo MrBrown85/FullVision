@@ -477,16 +477,12 @@ window.GradeState = (function () {
     return hasScoreOrFeedback(cid, sid, aid) || getRubricCheckIds(cid, sid, aid).length ? RETURNED : null;
   }
 
-  /* The students in `studentIds` whose piece on `aid` is a draft (stateOf),
-     in the order given: who a Return N Graded returns, and its N. A
-     screen's To Return count for a piece of work is the length of this, so
-     the gradebook, the graders and the phone cannot disagree. A DIBELS
-     benchmark is never returned, so it has none. (S1-F1) */
+  /* The students in `studentIds` whose piece on `aid` is a draft, in the
+     order given: who a Return N Graded returns, and its N. It is
+     draftsWaiting's test of a cell (what a screen shows as Draft, stateOf)
+     asked for one piece of work, so over a class's students and assessments
+     the lengths add up to draftsWaiting(cid). (S1-F1) */
   function draftsIn(cid, aid, studentIds) {
-    var a = (getAssessments(cid) || []).find(function (x) {
-      return x && x.id === aid;
-    });
-    if (!a || isDibelsScored(a)) return [];
     return (studentIds || []).filter(function (sid) {
       return stateOf(cid, sid, aid) === DRAFT;
     });

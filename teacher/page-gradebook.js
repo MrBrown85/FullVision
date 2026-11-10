@@ -819,8 +819,9 @@ window.PageGradebook = (function () {
      (tests/gradebook-draft-cells.test.js).
 
      Every count is GradeState.draftsIn, which asks GradeState.stateOf, as
-     the grader dialog does: Missing and Excused pieces are never drafts,
-     and a DIBELS benchmark is never returned. Nothing here changes a
+     the grader dialog and GradeState.draftsWaiting (Class Settings' count)
+     do: a Missing or Excused piece is never a draft, and the columns'
+     counts over a whole class add up to draftsWaiting. Nothing here changes a
      number: every grade, average and roll-up in the gradebook is worked
      out from all work, drafts included (the plan, 1.3). */
   var DRAFT_KEY_TEXT = 'Draft: graded, not returned';
