@@ -133,7 +133,7 @@ describe('calculations use the modified value', () => {
       getScores: () => ({
         stu1: [{ score: 3, mod: 1, tagId: 't1', assessmentId: 'a1', date: '2026-01-01', type: 'summative' }],
       }),
-      getAssessments: () => [{ id: 'a1', type: 'summative' }],
+      getAssessments: () => [{ id: 'a1', type: 'summative', tagIds: ['t1'] }],
       getAssignmentStatuses: () => ({}),
       getGradingScale: () => DEFAULT_GRADING_SCALE,
     });
