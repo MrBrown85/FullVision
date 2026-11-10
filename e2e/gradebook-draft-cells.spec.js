@@ -166,7 +166,28 @@ test('draft cells are dashed, counted and returned from their column; the filter
   const headerGive = page.locator('.gb-return-drafts[data-aid="e2e-draft"]');
   await expect(headerGive).toHaveText('Return 2 Graded');
   await expect(headerGive).toBeInViewport({ ratio: 1 });
-  expect(await headerGive.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  // None of its words is cut off, and it sits inside its own header, in
+  // this machine's font and in a much wider one (it wraps to a second line).
+  const whole = () =>
+    headerGive.evaluate(el => {
+      const box = el.getBoundingClientRect();
+      const head = el.closest('.gb-grid-assess-group').getBoundingClientRect();
+      const style = getComputedStyle(el);
+      return {
+        cut: el.scrollWidth > el.clientWidth || el.scrollHeight > el.clientHeight,
+        clipped: style.overflow !== 'visible' || style.textOverflow === 'ellipsis',
+        inside: box.left >= head.left && box.right <= head.right && box.top >= head.top && box.bottom <= head.bottom,
+      };
+    });
+  expect(await whole()).toEqual({ cut: false, clipped: false, inside: true });
+  await headerGive.evaluate(el => {
+    el.style.letterSpacing = '2px';
+  });
+  expect(await whole()).toEqual({ cut: false, clipped: false, inside: true });
+  await expect(headerGive).toBeInViewport({ ratio: 1 });
+  await headerGive.evaluate(el => {
+    el.style.letterSpacing = '';
+  });
   await expect(page.locator('#gb-data td.gb-score.gb-draft')).toHaveCount(2);
   expect(
     await page
