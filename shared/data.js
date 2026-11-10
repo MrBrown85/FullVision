@@ -8166,6 +8166,9 @@ function _persistCategoriesToCanonical(cid, prev, arr, copy) {
       // Re-keys the rows and the assessments that point at them (already
       // done when the outbox reported success).
       if (entryId) _onCreateLanded(entryId, res && res.data);
+      // The server holds this list now: a "not copied" line for the class
+      // would no longer be true.
+      _clearCategoriesNotCopied(cid);
     });
   });
   _categorySaveQueue[cid] = _trackPendingSync(
@@ -10120,7 +10123,10 @@ async function _categoryWriteNow(cid, name, params, opened, tried) {
           CATEGORY_WRITE_ASK_MS,
           'the category save',
         );
-        if (res && !res.error) return { ok: true, ids: Array.isArray(res.data) ? res.data : [] };
+        if (res && !res.error) {
+          if (name === 'save_categories') _clearCategoriesNotCopied(cid);
+          return { ok: true, ids: Array.isArray(res.data) ? res.data : [] };
+        }
         if (_noAnswerFromServer(res)) return { ok: false, why: 'offline', unknown: true };
         return { ok: false, why: 'refused', error: res.error };
       } catch (e) {
@@ -10230,6 +10236,14 @@ function saveCategoryDraft(cid, draft) {
 }
 /* Copy Grading Setup did not copy this class's categories: say so when the
    class is next opened in Class Settings. */
+/* A list of categories reached the server for this class: the note above
+   says nothing true any more. */
+function _clearCategoriesNotCopied(cid) {
+  var draft = getCategoryDraft(cid);
+  if (!draft || !draft.note) return;
+  delete draft.note;
+  saveCategoryDraft(cid, draft);
+}
 function noteCategoriesNotCopied(cid, note) {
   var draft = getCategoryDraft(cid) || {};
   draft.note = {

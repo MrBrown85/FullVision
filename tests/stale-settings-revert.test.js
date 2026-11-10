@@ -1515,6 +1515,98 @@ describe('categories: the server’s list is read before the whole list is saved
     expect(sentNames()).toEqual([]);
   });
 
+  it('Discard My Changes with nothing sent reads nothing and puts back the opened list, as before', async () => {
+    await openApp();
+    await goOffline();
+    input('cmCatWeightLive', { idx: '0' }, 70);
+    input('cmCatWeightLive', { idx: '1' }, 30);
+    act('cmCatSave');
+    await settle();
+    await goOnline();
+    server.fake.calls.length = 0;
+    act('cmCatNoticeDone');
+    await quiet();
+    expect(listed()).toBe(0);
+    expect(draft().notice).toBe(null);
+    expect(draft().rows.map(r => r.weight)).toEqual([60, 40]);
+  });
+
+  /* Save Categories of 50/30/20 with a new row: it reaches the server and
+     its answer is lost. */
+  async function saveWithAnswerLost() {
+    const send = server.fake.rpc;
+    let lose = true;
+    server.fake.rpc = function (name, params) {
+      const res = send(name, params);
+      if (name !== 'save_categories' || !lose) return res;
+      lose = false;
+      return Promise.resolve(res).then(() => ({ data: null, error: { message: 'network: failed to fetch' } }));
+    };
+    act('cmCatAdd');
+    input('cmCatNameLive', { idx: '2' }, 'Projects');
+    input('cmCatWeightLive', { idx: '0' }, 50);
+    input('cmCatWeightLive', { idx: '1' }, 30);
+    input('cmCatWeightLive', { idx: '2' }, 20);
+    act('cmCatSave');
+    await quiet();
+    server.fake.rpc = send;
+    expect(draft().notice).toBe(OFFLINE);
+  }
+  const ON_SERVER = [
+    ['Assignments', 50],
+    ['Tests', 30],
+    ['Projects', 20],
+  ];
+  const LANDED = 'Your earlier save had reached the server after all. These are the current ones.';
+  const formRows = () => draft().rows.map(r => [r.name, r.weight]);
+
+  it('Discard My Changes after a lost answer, online: the form shows the server’s list, and says only what is true', async () => {
+    await openApp();
+    await saveWithAnswerLost();
+    act('cmCatNoticeDone');
+    await quiet();
+    expect(formRows()).toEqual(ON_SERVER);
+    expect(draft().rows.map(r => r.id)).toEqual(server.categories.map(c => c.id));
+    expect(draft().notice).toBe(LANDED);
+    expect(draft().action).toBe('Dismiss');
+    expect(draft().dirty).toBe(false);
+    expect(getCategories(CID).map(c => c.weight)).toEqual([50, 30, 20]);
+    expect(kept()).toBe(null);
+    act('cmCatNoticeDone');
+    expect(draft().notice).toBe(null);
+  });
+
+  it('Discard My Changes after a lost answer, another device changed the list meanwhile: the current ones, with the approved line', async () => {
+    await openApp();
+    await saveWithAnswerLost();
+    server.fromAnotherDevice('save_categories', {
+      p_course_id: CID,
+      p_categories: server.categories.map((c, i) => ({ id: c.id, name: c.name, weight: [40, 40, 20][i] })),
+    });
+    act('cmCatNoticeDone');
+    await quiet();
+    expect(draft().rows.map(r => r.weight)).toEqual([40, 40, 20]);
+    expect(draft().notice).toBe(CHANGED);
+  });
+
+  it('Discard My Changes after a lost answer, with no connection: the opened list, then the server’s once it is read', async () => {
+    await openApp();
+    await saveWithAnswerLost();
+    await goOffline();
+    act('cmCatNoticeDone');
+    await settle();
+    expect(formRows()).toEqual([
+      ['Assignments', 60],
+      ['Tests', 40],
+    ]);
+    await goOnline();
+    gradingTabHtml(); // Class Settings draws again: the categories are read
+    await quiet();
+    await settle();
+    expect(formRows()).toEqual(ON_SERVER);
+    expect(draft().notice).toBe(LANDED);
+  });
+
   it('the connection goes between the read and the save: nothing waits to go out later over a change made elsewhere', async () => {
     await openApp();
     const send = server.fake.rpc;
@@ -1954,6 +2046,39 @@ describe('categories: the server’s list is read before the whole list is saved
     expect(draft().notice).toBe(
       'The categories were not copied from History 11: there was no connection. Everything else was copied.',
     );
+  });
+
+  it('a copy not sent, then copied again and saved: the class no longer says it was not copied', async () => {
+    await openApp();
+    anotherClass();
+    const send = server.fake.rpc;
+    server.fake.rpc = function (name, params) {
+      const res = send(name, params);
+      if (name === 'list_categories') server.reachable = false;
+      return res;
+    };
+    const first = GradingSetupCopy.planSetup(SRC, CID, { categories: true });
+    const done = GradingSetupCopy.applySetup(first, {});
+    for (let i = 0; i < 6; i++) await settle();
+    server.fake.rpc = send;
+    schoolAddsProjects();
+    await goOnline();
+    await done.catch(() => {});
+    await quiet();
+    expect(kept().note).toBeTruthy();
+    // The teacher copies again; this time it goes.
+    anotherClass();
+    const again = GradingSetupCopy.planSetup(SRC, CID, { categories: true });
+    await GradingSetupCopy.applySetup(again, {});
+    await quiet();
+    expect(again.categoriesNotCopied).toBeUndefined();
+    expect(server.categories.map(c => [c.name, c.weight])).toEqual([
+      ['Assignments', 50],
+      ['Tests', 50],
+    ]);
+    await openApp();
+    expect(draft().notice).toBe(null);
+    expect(kept()).toBe(null);
   });
 
   it('Copy Grading Setup whose list had to wait and was then not sent: the class says so when next opened, as when it is not copied at once', async () => {
