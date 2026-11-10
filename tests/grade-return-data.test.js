@@ -54,6 +54,7 @@ const RUBRIC = {
     { id: 'c2', name: 'Safety', tagIds: ['t1'], levels: {}, checks: [{ id: 'k2', level: 3, label: 'Wears goggles' }] },
   ],
 };
+const NOTES = { id: 'notes', title: 'Field Notes', type: 'summative', tagIds: ['t1'] }; // no date
 const STUDENTS = ['s1', 's2', 's3', 's4'].map((id, i) => ({
   id,
   firstName: ['Jordan', 'Avery', 'Noor', 'Lena'][i],
@@ -81,7 +82,7 @@ function seed(config) {
   clearClass(CID);
   seedClass(CID, {
     students: STUDENTS,
-    assessments: [ESSAY, QUIZ, DONE, LAB, TALK].map(a => structuredClone(a)),
+    assessments: [ESSAY, QUIZ, DONE, LAB, TALK, NOTES].map(a => structuredClone(a)),
     rubrics: [structuredClone(RUBRIC)],
     courseConfigs: config || {},
   });
@@ -1560,9 +1561,50 @@ const GRADER_SCENARIOS = {
     expect(storedRows()).toBe(before);
     if (on) expect(state('s1', 'essay')).toBe('draft');
   },
+  // The phone's Grade tab (S1-T2).
+  setLevelOnPhone(on) {
+    Grader.setLevelOnPhone(CID, 's1', 'essay', 't1', 3, 0);
+    if (on) expect(state('s1', 'essay')).toBe('draft');
+    give('essay', 's1');
+    // A level change on a returned grade waits as a draft.
+    Grader.setLevelOnPhone(CID, 's1', 'essay', 't1', 4, 0);
+    if (on) expect(state('s1', 'essay')).toBe('draft');
+    if (on) expect(row('s1', 'essay').returned_copy).toEqual(three);
+    Grader.setLevelOnPhone(CID, 's1', 'essay', 't1', 3, 0);
+    if (on) expect(state('s1', 'essay')).toBe('returned');
+  },
+  setPlusMinusOnPhone(on) {
+    Grader.setLevelOnPhone(CID, 's1', 'essay', 't1', 3, 0);
+    saveScoreComment(CID, 's1', 'essay', 'Careful work.');
+    give('essay', 's1');
+    // The phone passes the Overall Comment along with a competency's + or −.
+    Grader.setPlusMinusOnPhone(CID, 's1', 'essay', 't1', 3, 1, 'Careful work.');
+    if (on) expect(state('s1', 'essay')).toBe('draft');
+    if (on) expect(row('s1', 'essay').returned_copy).toMatchObject({ comment: 'Careful work.', tags: three.tags });
+    Grader.setPlusMinusOnPhone(CID, 's1', 'essay', 't1', 3, 0, 'Careful work.');
+    if (on) expect(state('s1', 'essay')).toBe('returned');
+  },
+  undoOnPhone(on) {
+    Grader.setLevelOnPhone(CID, 's1', 'essay', 't1', 3, 0);
+    give('essay', 's1');
+    const was = structuredClone(getScores(CID));
+    Grader.setLevelOnPhone(CID, 's1', 'essay', 't1', 1, 0);
+    if (on) expect(state('s1', 'essay')).toBe('draft');
+    // The phone's Undo saves its own list with the old entries put back:
+    // what was returned, so Returned again, not a draft.
+    const changed = structuredClone(getScores(CID));
+    Grader.undoOnPhone(CID, 's1', 'essay', changed, structuredClone(was));
+    if (on) expect(state('s1', 'essay')).toBe('returned');
+    if (on) expect(row('s1', 'essay').returned_copy).toBeUndefined();
+    // Undo of a draft never returned, back to nothing: nothing is left.
+    const empty = structuredClone(getScores(CID));
+    Grader.setLevelOnPhone(CID, 's2', 'essay', 't1', 2, 0);
+    Grader.undoOnPhone(CID, 's2', 'essay', structuredClone(getScores(CID)), empty);
+    if (on) expect(row('s2', 'essay')).toBe(null);
+  },
 };
 
-describe('the grader’s gradebook actions follow the rule through the writers they call', () => {
+describe('the grader’s gradebook and phone actions follow the rule through the writers they call', () => {
   it('every action here is one Grader has, and with the dialog’s it is all of them', () => {
     const names = Object.keys(GRADER_SCENARIOS);
     expect(names.filter(name => typeof Grader[name] !== 'function')).toEqual([]);
@@ -1599,5 +1641,37 @@ describe('the grader’s gradebook actions follow the rule through the writers t
     expect(getGradeReturns(CID)).toEqual({});
     expect(_cache.gradeReturns[CID]).toBeUndefined();
     expect(Object.keys(localStorage._store).filter(k => k.indexOf('grade-returns') >= 0)).toEqual([]);
+  });
+});
+
+/* The phone dates undated work today on every level change (setLevelOnPhone
+   passes the class's today where the piece has no date). A copy of a grade
+   holds no date, so a returned grade under a draft takes the date its
+   working entry has now. calc.js orders evidence by date first, so this is
+   recorded here as it is. */
+describe('undated work changed on the phone after it was returned', () => {
+  it('the working entry is dated the day of the change, and the returned grade in the set takes that date with it', () => {
+    held();
+    Grader.setLevelOnPhone(CID, 's1', 'notes', 't1', 3, 0);
+    give('notes', 's1');
+    expect(getScores(CID).s1.map(e => [e.score, e.date])).toEqual([[3, '2026-11-09']]);
+    expect(getReturnedScores(CID).s1.map(e => [e.score, e.date])).toEqual([[3, '2026-11-09']]);
+
+    vi.setSystemTime(new Date('2026-11-12T18:00:00.000Z'));
+    Grader.setLevelOnPhone(CID, 's1', 'notes', 't1', 4, 0);
+    expect(state('s1', 'notes')).toBe('draft');
+    expect(getScores(CID).s1.map(e => [e.score, e.date])).toEqual([[4, '2026-11-12']]);
+    // The returned level, with the working entry's new date: the copy keeps no date of its own.
+    expect(row('s1', 'notes').returned_copy).toEqual(three);
+    expect(getReturnedScores(CID).s1.map(e => [e.score, e.date])).toEqual([[3, '2026-11-12']]);
+
+    // The desktop dialog passes no date for undated work, so it does not move it.
+    seed({ student_page_enabled: true, return_grades: 'on_return' });
+    vi.setSystemTime(new Date('2026-11-09T18:00:00.000Z'));
+    Grader.setLevel(CID, 's1', 'notes', 't1', 3, 0);
+    give('notes', 's1');
+    vi.setSystemTime(new Date('2026-11-12T18:00:00.000Z'));
+    Grader.setLevel(CID, 's1', 'notes', 't1', 4, 0);
+    expect(getReturnedScores(CID).s1.map(e => [e.score, e.date])).toEqual([[3, '2026-11-09']]);
   });
 });
