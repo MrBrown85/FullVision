@@ -683,7 +683,8 @@ ok('the log still has no answer, name or IP column', cols == ['id', 'at', 'route
 outcomes = set(x[0] for x in c.run("select distinct outcome from student_submit.attempt where route = 'card'"))
 ok('it records card outcomes', {'ok', 'not_found', 'bad_format', 'wrong_identity', 'verified', 'card_locked'} <= outcomes, outcomes)
 ok('nothing about the student is in it',
-   one("select count(*) from student_submit.attempt where row_to_json(attempt)::text ilike any(array['%CeCe%', '%2012-05%', '%1002%', '%' || :p || '%'])", p=code1.replace('-', '')) == 0)
+   # the three text columns: the row's own number and its ids are not student data and can hold any digits
+   one("select count(*) from student_submit.attempt where concat_ws(' ', route, outcome, ip_hash) ilike any(array['%CeCe%', '%2012-05%', '%1002%', '%' || :p || '%'])", p=code1.replace('-', '')) == 0)
 
 # ── One reader ──────────────────────────────────────────────────────────
 src = {r[0]: r[1] for r in rows("""select p.proname, p.prosrc from pg_proc p join pg_namespace n on n.oid = p.pronamespace

@@ -98,6 +98,7 @@ fill_time(); t_before = min(fill_time() for _ in range(3))
 
 slip_before = {r[0]: r[1] for r in rows("""select p.proname, pg_get_functiondef(p.oid) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                                            where n.nspname = 'public' and p.proname in ('_issue_access_code', '_issue_report_code')""")}
+open_before = one("select pg_get_functiondef('student_submit.open(text,text)'::regprocedure)")
 before = score_fingerprint()
 counts = rows('select (select count(*) from score), (select count(*) from tag_score), (select count(*) from rubric_score), (select count(*) from rubric_check_score)')[0]
 
@@ -168,6 +169,10 @@ ok('seven functions carry a patch', all(mark in got[fn] for fn, mark in (
     ('update_course', 'student_page_enabled'), ('move_rubric_scores', 'fv.moving_rubric'),
     ('import_json_restore', 'restore_grade_returns'), ('duplicate_course', 'courses_count_equally, return_grades'),
     ('_issue_access_code', 'live student card'), ('_issue_report_code', 'live student card'))))
+open_after = one("select pg_get_functiondef('student_submit.open(text,text)'::regprocedure)")
+ok("a slip's open() is its old body with one number changed: 60 unknown codes per address became 300",
+   open_after != open_before and open_after.replace("interval '15 minutes') >= 300 then", "interval '15 minutes') >= 60 then") == open_before
+   and open_after.count('>= 500 then') == 1 and open_after.count('>= 20 then') == 1 and open_after.count('>= 200 then') == 1)
 # Each patch is the live body with only the added lines: take them out again and it is the live function.
 PATCHES = {r[0]: r[1] for r in rows("""select p.proname, pg_get_functiondef(p.oid) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                                         where n.nspname = 'public' and p.proname in ('_issue_access_code', '_issue_report_code')""")}
@@ -205,5 +210,10 @@ expect_error("the same-class file stops at its first check when a score row name
 def out_of_order():
     c.run(statements(MIGRATIONS[3])[2])
 expect_error('the sessions file stops at its first check when the two before it are not applied', out_of_order, 'Nothing was changed')
+c.run('rollback'); c.run('begin')
+apply(MIGRATIONS[1]); apply(MIGRATIONS[2])
+as_owner(); c.run(open_before.replace("perform _log('open', 'locked', p_ip_hash);", "perform _log('open', 'locked' , p_ip_hash);", 1))
+expect_error("and at its first check when a slip's open() is not the body it was written against", out_of_order,
+             'student_submit.open(text,text) is not the definition this migration was written against')
 
 finish()

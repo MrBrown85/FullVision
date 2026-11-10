@@ -286,11 +286,17 @@ What each covers:
   criterion while it is being deleted, 150 times: no deadlock.
 
 Result on 2026-11-09 (Postgres 18.6, local; production is 17):
-`batch_a_apply.py` 80 of 80, `grade_return.py` 282 of 282, `student_page.py`
+`batch_a_apply.py` 82 of 82, `grade_return.py` 282 of 282, `student_page.py`
 216 of 216, `score_rpcs.py` 234 of 234 (176 of 176 without Batch A),
 `grade_return_race.py` 9 of 9 (three runs). With Batch A loaded the earlier suites pass
 as before: `student_submit.py` 79 of 79, `questionnaire_identity.py` 47 of
 47, `phone_reports.py` 37 of 37, `questionnaires.py` 42 of 42.
+
+File 04 also raises the slip route's per-address limit from 60 unknown codes
+in 15 minutes to 300, as for cards (one number in `student_submit.open`,
+patched in place). `student_submit.py` reads which is loaded: its two checks
+on that limit run with 299 misses and miss number 300 on a Batch A database,
+and with 59 and 60 on one without.
 
 Timing: a rubric fill for 30 students with 5 criteria (30 `fill_rubric`
 calls, 150 rows) took about 15 ms before the batch, 20 ms with the

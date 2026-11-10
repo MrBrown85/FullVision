@@ -151,6 +151,18 @@
 -- no migration for them. Opening a questionnaire or a phone report from the
 -- card's session (S4-F4) is NOT here.
 --
+-- One existing function is patched in place, one number in it: a slip's
+-- open() locks an address out after 300 unknown codes in 15 minutes, where
+-- it was 60 (Colin, Nov 9: "raise slips to 300 too"). A code typed where a
+-- card goes and not found is tried as a slip next, so a class's typos count
+-- on the slip route as well, and the two limits now match. Nothing else
+-- about open() changes: the everyone-is-busy stop (500 unknown codes in ten
+-- minutes), the per-slip limits (20 opens of a questionnaire slip, 200 of a
+-- report slip) and the identity-try limits are as they were, and verify,
+-- check and submit are not touched. The file stops, with nothing changed,
+-- if open() is not the body in the repo
+-- (20261101_questionnaire_slip_fixes.sql).
+--
 -- Functions this file leaves callable through the API: none. Every function
 -- here is for service_role, over the edge function's own connection.
 --
@@ -177,6 +189,13 @@ begin
     end if;
     perform 'public._grade_copy_in_use(jsonb,uuid)'::regprocedure, 'public._fv_timezone(text)'::regprocedure,
             'student_submit._log(text,text,text,uuid,uuid)'::regprocedure, 'student_submit._norm(text)'::regprocedure;
+    -- open() must be the body in the repo (md5 of pg_get_functiondef), or
+    -- already carry the new limit (a second run).
+    if position($s$interval '15 minutes') >= 300 then$s$ in pg_get_functiondef('student_submit.open(text,text)'::regprocedure)) = 0
+       and md5(pg_get_functiondef('student_submit.open(text,text)'::regprocedure)) <> '91123d2f5a0d964be66b62ee8f91c047' then
+        raise exception 'student_submit.open(text,text) is not the definition this migration was written against (md5 %, expected %). Nothing was changed.',
+            md5(pg_get_functiondef('student_submit.open(text,text)'::regprocedure)), '91123d2f5a0d964be66b62ee8f91c047';
+    end if;
 end
 $guard$;
 
@@ -206,6 +225,23 @@ revoke all on student_submit.device_session, student_submit.device_session_enrol
 alter table student_submit.attempt drop constraint if exists attempt_route_check;
 alter table student_submit.attempt add constraint attempt_route_check
     check (route = any (array['open'::text, 'submit'::text, 'card'::text]));
+
+-- ── A slip's open(): 300 unknown codes per address, as for cards ────────────
+do $patch$
+declare
+    _def text := pg_get_functiondef('student_submit.open(text,text)'::regprocedure);
+    _old constant text := $s$           and at > now() - interval '15 minutes') >= 60 then$s$;
+    _new constant text := $s$           and at > now() - interval '15 minutes') >= 300 then$s$;
+begin
+    if position(_new in _def) > 0 then
+        return;  -- a second run
+    end if;
+    if (length(_def) - length(replace(_def, _old, ''))) / length(_old) <> 1 then
+        raise exception 'student_submit.open: the per-address limit was not found';
+    end if;
+    execute replace(_def, _old, _new);
+end
+$patch$;
 
 -- ── The one reader ──────────────────────────────────────────────────────────
 create or replace function student_submit._returned_grade(p_enrollment_id uuid, p_assessment_id uuid)
