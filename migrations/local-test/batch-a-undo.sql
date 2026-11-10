@@ -33,16 +33,17 @@
 -- With teachers working. It takes one table at a time, each in its own
 -- transaction: it waits at most 200 ms for the table, and if it cannot have
 -- it, lets go and tries again, so it never holds two tables and never
--- outwaits Postgres's deadlock check (one second). Measured on PostgreSQL
--- 17.11 with four connections saving in a loop (batch_a_undo_load.py):
+-- outwaits Postgres's deadlock check (one second). Measured with four
+-- connections saving in a loop (batch_a_undo_load.py), twice on PostgreSQL
+-- 17.11 and twice on 18.6, the same every time:
 --   a class at work (about 30 saves a second)   160 of 160 runs finished,
 --       no save failed, the slowest save waited 0.4 s;
---   flat out (about 500 saves a second)          80 of 80 runs finished,
+--   flat out (500 to 800 saves a second)         80 of 80 runs finished,
 --       no save failed, the slowest save waited 0.3 s.
 -- (As first written, in one transaction, the same test killed 4 saves in
--- 160 runs at the first speed, and at the second finished 29 of 80 runs and
--- killed 229 saves.) A save can wait a few tenths of a second behind it;
--- none is refused. If one table cannot be had in 40 tries it stops there
+-- one of its four runs at the first speed, and at the second finished 20 to
+-- 33 of 80 runs and killed 220 to 330 saves.) A save can wait a few tenths
+-- of a second behind it; none is refused. If one table cannot be had in 40 tries it stops there
 -- and says which; run PART 1 again and it carries on from that table.
 --
 -- DESTROYS: nothing.
@@ -116,10 +117,10 @@
 --
 -- One transaction, on purpose: all or nothing. It holds locks on the score
 -- tables until it commits, so it is for a quiet moment, not a busy one.
--- Measured the same way: with a class at work 10 of 10 runs finished and no
--- save failed (saves waited up to 0.4 s); flat out, 9 of 10 finished, the
--- tenth was stopped by a deadlock with nothing changed, and 5 saves were
--- killed. If it stops, run it again.
+-- Measured the same way, four times: with a class at work 10 of 10 runs
+-- finished each time and no save failed (saves waited up to 0.4 s); flat
+-- out, 9 or 10 of 10 finished (one was stopped by a deadlock, with nothing
+-- changed) and between 1 and 5 saves were killed. If it stops, run it again.
 --
 -- With S0-M4b (2026110905, PR 989) applied, PART 2 stops before it changes
 -- anything and says so: run S0-M4b's undo first

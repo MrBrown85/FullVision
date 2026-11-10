@@ -744,24 +744,22 @@ with the same results.
 
 `batch_a_undo_load.py`: four connections saving in a loop (points, a rubric
 fill, one criterion, a comment), PART 1 run against them again and again,
-the saves paused between runs while file 02 puts the triggers back. On
-17.11, 160 runs with a class at work and 80 flat out:
+the saves paused between runs while file 02 puts the triggers back: 160
+runs with a class at work and 80 flat out. Run twice on 17.11 and twice on
+18.6 (the second time on each with S0-M5 on top):
 
-| PART 1                            | Saves a second | Runs finished | Saves that failed   | Slowest save |
-| --------------------------------- | -------------- | ------------- | ------------------- | ------------ |
-| as first written, a class at work | about 30       | 160 of 160    | 4 (killed, 40P01)   | 2.4 s        |
-| as it is now, a class at work     | about 30       | 160 of 160    | none                | 0.4 s        |
-| as first written, flat out        | about 60       | 29 of 80      | 229 (killed, 40P01) | 4.0 s        |
-| as it is now, flat out            | about 520      | 80 of 80      | none                | 0.3 s        |
-
-On 18.6 the same run: as first written, 160 of 160 with a class at work
-and no save failed, 20 of 80 flat out with 223 saves killed; as it is now,
-160 of 160 and 80 of 80, no save failed, slowest save 0.3 s.
+| PART 1                            | Saves a second | Runs finished, of 160 or 80 | Saves that failed          | Slowest save |
+| --------------------------------- | -------------- | --------------------------- | -------------------------- | ------------ |
+| as first written, a class at work | about 30       | 160 every time              | none three times, 4 once   | up to 2.4 s  |
+| as it is now, a class at work     | about 30       | 160 every time              | none                       | up to 0.4 s  |
+| as first written, flat out        | 30 to 75       | 20, 22, 29, 33              | 223, 229, 277, 331 (40P01) | 4 s and over |
+| as it is now, flat out            | 520 to 810     | 80 every time               | none                       | up to 0.3 s  |
 
 PART 2 is one transaction on purpose and holds the score tables until it
-commits: with a class at work 10 of 10 runs finished and no save failed;
-flat out 9 of 10 finished (the tenth was stopped by a deadlock, nothing
-changed) and 5 saves were killed. It is for a quiet moment.
+commits: with a class at work 10 of 10 runs finished every time and no save
+failed; flat out 9 or 10 of 10 finished (one was stopped by a deadlock,
+nothing changed) and between 1 and 5 saves were killed. It is for a quiet
+moment.
 
 Not verified: pg_cron and Supabase's real migration record (stand-ins
 here); the edge function and the app against a database after PART 2;
