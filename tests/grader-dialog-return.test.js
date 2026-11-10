@@ -220,7 +220,9 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.useRealTimers();
-  if (typeof dismissUndoToast === 'function') dismissUndoToast();
+  // A test that closed its pages has no document left to take a toast off.
+  const page = window.PageAssignments;
+  if (typeof dismissUndoToast === 'function' && page && page.graderOpen && page.graderOpen()) dismissUndoToast();
   closePages();
   clearClass(CID);
   localStorage.clear();
@@ -229,7 +231,7 @@ afterEach(() => {
 describe('with the build switch off the dialog is what it was', () => {
   if (UPDATE) {
     it('writes the snapshot (run on the code from before the change)', async () => {
-      writeFileSync(SNAPSHOT, JSON.stringify(await walk(), null, 1) + '\n');
+      writeFileSync(SNAPSHOT, JSON.stringify(await walk(), null, 2) + '\n');
     });
     return;
   }
