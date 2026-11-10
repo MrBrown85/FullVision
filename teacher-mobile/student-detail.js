@@ -871,6 +871,9 @@ window.MStudentDetail = (function () {
 
   return {
     renderDetail: renderDetail,
+    // One assessment's score as this screen's list shows it; the card's To
+    // Return list shows the same (teacher-mobile/card-widgets.js).
+    cellText: _cellText,
     selectTab: selectTab,
     scrollActiveTab: scrollActiveTab,
     refreshEvidence: refreshEvidence,

@@ -213,6 +213,56 @@ window.MComponents = (function () {
     }, 350);
   }
 
+  /* ── Confirm sheet ─────────────────────────────────────────────
+     A question in a sheet, as Back to Group Grade asks: a title, one line
+     that says what will happen, the action and Cancel. It is a dialog to a
+     screen reader, the focus starts on Cancel and Tab stays inside. Escape,
+     the handle and a tap outside cancel (shell.js and presentSheet), and
+     Cancel gives the focus back to `from`, the control that asked. `onOk`
+     runs when the action is pressed. (S1-F3) */
+  // html-safe: title, message and okLabel go through _esc.
+  function confirmSheet(title, message, okLabel, onOk, from) {
+    var done = false;
+    presentSheet(
+      '<div class="m-group-sheet m-confirm-sheet" role="dialog" aria-modal="true" aria-labelledby="m-confirm-title" aria-describedby="m-confirm-text">' +
+        '<div class="m-group-sheet-title is-question" id="m-confirm-title">' +
+        _esc(title) +
+        '</div>' +
+        '<p class="m-group-sheet-text" id="m-confirm-text">' +
+        _esc(message) +
+        '</p>' +
+        '<button type="button" class="m-group-sheet-btn m-confirm-ok">' +
+        _esc(okLabel) +
+        '</button>' +
+        '<button type="button" class="m-group-sheet-btn m-group-sheet-cancel" data-action="m-sheet-cancel">Cancel</button>' +
+        '</div>',
+      {
+        half: true,
+        onClose: function () {
+          if (!done && from && from.isConnected && typeof from.focus === 'function')
+            from.focus({ preventScroll: true });
+        },
+      },
+    );
+    var box = document.querySelector('#m-sheet-container .m-confirm-sheet');
+    if (!box) return;
+    var ok = box.querySelector('.m-confirm-ok');
+    var cancel = box.querySelector('.m-group-sheet-cancel');
+    ok.onclick = function () {
+      if (done) return;
+      done = true;
+      dismissSheet();
+      onOk();
+    };
+    // Tab and Shift+Tab go between the two buttons and nowhere else.
+    box.onkeydown = function (e) {
+      if (e.key !== 'Tab') return;
+      e.preventDefault();
+      (document.activeElement === cancel ? ok : cancel).focus();
+    };
+    cancel.focus({ preventScroll: true });
+  }
+
   /* ── Toast ──────────────────────────────────────────────────── */
   var _toastTimer = null;
 
@@ -357,6 +407,7 @@ window.MComponents = (function () {
     largeTitleHTML: largeTitleHTML,
     presentSheet: presentSheet,
     dismissSheet: dismissSheet,
+    confirmSheet: confirmSheet,
     showToast: showToast,
     hideToast: hideToast,
     setupScrollTitle: setupScrollTitle,
