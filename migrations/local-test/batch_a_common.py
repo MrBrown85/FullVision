@@ -105,9 +105,13 @@ def score_fingerprint():
                           || coalesce((select string_agg(x::text, '|' order by x::text) from rubric_score x), '')
                           || coalesce((select string_agg(x::text, '|' order by x::text) from rubric_check_score x), ''))""")
 
-def live_md5():
-    want = {}
+def live_md5(before_s0_m5=False):
+    """name -> md5 of the live function. before_s0_m5: as the four that S0-M5 changed were before it (the file's marked lines)."""
+    want = {}; before = {}
     for line in open(os.path.join(HERE, 'live-function-md5.txt')):
-        if line.strip() and not line.startswith('#') and len(line.split()) == 3:   # a fourth word: grade_return_race.py's
+        if line.startswith('#before-s0-m5 '):
+            _mark, name, md5, _length = line.split(); before[name] = md5
+        elif line.strip() and not line.startswith('#') and len(line.split()) == 3:   # a fourth word: grade_return_race.py's
             name, md5, _length = line.split(); want[name] = md5
+    if before_s0_m5: want.update(before)
     return want
