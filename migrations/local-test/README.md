@@ -211,26 +211,31 @@ and a statement that has already run word for word is not run again.
 
 Where each of the sixteen comes from:
 
-| Function                                                          | Loaded by                 | Copied from                                                              | Proven live                                   |
-| ----------------------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------ | --------------------------------------------- |
-| `fv_owns_course`, `fv_owns_enrollment`, `fv_owns_assessment`      | `score-prelude.sql`       | `20261012_course_soft_delete.sql`                                        | yes: `live-function-md5.txt`                  |
-| `get_class_bundle`                                                | `bundle-prelude.sql`      | `20261019_withdraw_students.sql` and 17 later patches, then S0-M4's file | yes, before S0-M4: `build` stops if it is not |
-| `_touch_course_sync_cursor`                                       | `score-prelude.sql`       | `20261103_import_json_restore_full_class.sql`                            | no                                            |
-| `_touch_course_sync_cursor_from_trigger`                          | `score-prelude.sql`       | `20261015_course_sync_version.sql`                                       | no                                            |
-| `_score_audit_diff`                                               | `score-prelude.sql`       | `20261102_audit_helpers_owner_check.sql`                                 | no                                            |
-| `fv_owns_term_rating`                                             | `bundle-prelude.sql`      | `20261012_course_soft_delete.sql`                                        | no                                            |
-| `fv_idem_check`                                                   | `search-path-prelude.sql` | `20261016_idempotency_key_lock.sql`                                      | no                                            |
-| `fv_idem_store`                                                   | `search-path-prelude.sql` | `20260423_write_path_idempotency.sql`                                    | no                                            |
-| `_fv_teacher_sign_in_deleted`, `_fv_release_orphan_teacher_email` | `search-path-prelude.sql` | `20261108_teacher_outlives_sign_in.sql`                                  | no                                            |
-| `_term_rating_audit_field`                                        | `search-path-prelude.sql` | `20261102_audit_helpers_owner_check.sql`                                 | no                                            |
-| `_touch_teacher_sync_cursor_from_trigger`                         | `search-path-prelude.sql` | `20261022_teacher_sentence_starters.sql`                                 | no                                            |
-| `fv_retention_cleanup`                                            | `search-path-prelude.sql` | `20261012_course_soft_delete.sql`                                        | no                                            |
-| `rls_auto_enable`                                                 | `search-path-prelude.sql` | **nothing: the repo has no definition.** A stand-in in Supabase's form   | no                                            |
+| Function                                                          | Loaded by                 | Copied from                                                                                                |
+| ----------------------------------------------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `fv_owns_course`, `fv_owns_enrollment`, `fv_owns_assessment`      | `score-prelude.sql`       | `20261012_course_soft_delete.sql`                                                                          |
+| `get_class_bundle`                                                | `bundle-prelude.sql`      | `20261019_withdraw_students.sql` and 17 later patches, then S0-M4's file                                   |
+| `_touch_course_sync_cursor`                                       | `score-prelude.sql`       | `20261103_import_json_restore_full_class.sql`                                                              |
+| `_touch_course_sync_cursor_from_trigger`                          | `score-prelude.sql`       | `20261015_course_sync_version.sql`                                                                         |
+| `_score_audit_diff`                                               | `score-prelude.sql`       | `20261102_audit_helpers_owner_check.sql`                                                                   |
+| `fv_owns_term_rating`                                             | `bundle-prelude.sql`      | `20261012_course_soft_delete.sql`                                                                          |
+| `fv_idem_check`                                                   | `search-path-prelude.sql` | `20261016_idempotency_key_lock.sql`                                                                        |
+| `fv_idem_store`                                                   | `search-path-prelude.sql` | `20260423_write_path_idempotency.sql`                                                                      |
+| `_fv_teacher_sign_in_deleted`, `_fv_release_orphan_teacher_email` | `search-path-prelude.sql` | `20261108_teacher_outlives_sign_in.sql`                                                                    |
+| `_term_rating_audit_field`                                        | `search-path-prelude.sql` | `20261102_audit_helpers_owner_check.sql`                                                                   |
+| `_touch_teacher_sync_cursor_from_trigger`                         | `search-path-prelude.sql` | `20261022_teacher_sentence_starters.sql`                                                                   |
+| `fv_retention_cleanup`                                            | `search-path-prelude.sql` | `20261012_course_soft_delete.sql`                                                                          |
+| `rls_auto_enable`                                                 | `search-path-prelude.sql` | **no migration: the repo has none.** The live definition, as `pg_get_functiondef` printed it on 2026-11-10 |
 
-"No" means the function is what the repo's migrations say the database runs,
-with no live fingerprint to check it against. The migration's header has one
-read-only query ("Before the apply") with the sixteen fingerprints tested
-here; it lists every function whose live definition differs, and prints it.
+**All sixteen are the live functions, byte for byte.** The migration's header
+has one read-only query ("Before the apply") carrying the fingerprint of each
+as loaded here; it lists every function whose live definition differs, and
+prints it. It was run on `gradebook-prod` on 2026-11-10, after S0-M4 was
+applied, and returned one row: `rls_auto_enable`, tested until then from a
+stand-in. Its live body (md5 `846ec2fbff751d24b890656d63c3a9bf`, 1223) is
+what `search-path-prelude.sql` loads now, and `search_path.py` checks that
+fingerprint. The other fifteen matched, and no other SECURITY DEFINER function
+in the three schemas lacked `pg_temp`.
 `search-path-prelude.sql` also adds `auth.users`, `auth.jwt()`,
 `term_rating_audit` (the snapshot's lines), the sentence-starter trigger the
 table files leave out, and the event trigger that runs `rls_auto_enable`.
@@ -271,10 +276,28 @@ in a transaction that is rolled back.
   with its schema and were never fooled that way (38 tables shadowed, same
   bundle); what was open in them is type names: a temporary table called
   `jsonb`, `text`, `uuid` or `record` made the call fail before, and does
-  nothing after (13 cases across eight functions, and `record` for the
-  `rls_auto_enable` stand-in). The four ownership helpers,
+  nothing after (13 cases across eight functions). The four ownership helpers,
   `_score_audit_diff`, `_term_rating_audit_field` and
   `_fv_teacher_sign_in_deleted` name no type.
+- **`rls_auto_enable`, the live body.** It is an event trigger's function
+  and runs after every CREATE TABLE in the session, a temporary table's own
+  included. Its one table is written `pg_catalog.pg_class` (a temporary
+  `pg_class` changes nothing, before or after) and the functions it calls
+  are never looked up in `pg_temp`. Its two declared types were open. With
+  a temporary table called `name` in the session, a new table in public was
+  left **without row security while the function logged that it had enabled
+  it**; with one called `record`, every later CREATE TABLE in the session
+  failed. After, neither does anything. Only a session that can make tables
+  in public could be caught by the first; no migration in the repo makes a
+  temporary table with either name. For a later migration that makes a
+  table it does what it did: the 123 calls include CREATE TABLE, CREATE
+  TABLE AS, SELECT INTO, a quoted name, a partitioned table and its
+  partition in public (row security on), a table in `student_submit` and
+  temporary ones (off), equal before and after. The harness's `ensure_rls`
+  fires on the three table-making commands; the live trigger's filter was
+  not read, so one check has it fire on every command: the file's own ALTERs
+  then run it sixteen times, the file applies, and a table made afterwards
+  in the same transaction gets row security.
 - **Nothing else changes.** Each function's row in `pg_proc`, column for
   column: only `proconfig` differs (body, owner, grants, volatility,
   SECURITY DEFINER, parallel, arguments, result, the same; same oid). Each
@@ -307,7 +330,7 @@ in a transaction that is rolled back.
   three schemas went back to `m5_pre`'s and forward again.
 
 Result on 2026-11-10, PostgreSQL 17.11 (production's version) and 18.6:
-**329 of 329 on each**, the two outputs identical line for line, fingerprints
+**339 of 339 on each**, the two outputs identical line for line, fingerprints
 included.
 
 The other suites, on `m5_pre` and on `m5_post`, checks compared line by line
@@ -321,14 +344,16 @@ with `live-function-md5.txt` as it will be after each apply:
 | `questionnaire_identity.py` | 47 of 47              | 47 of 47   |
 | `phone_reports.py`          | 37 of 37              | 37 of 37   |
 | `questionnaires.py`         | 42 of 42              | 42 of 42   |
-| `grade_return.py`           | 279 of 280            | 279 of 280 |
+| `grade_return.py`           | 280 of 280            | 280 of 280 |
 | `student_page.py`           | 216 of 216            | 216 of 216 |
 
 `score_rpcs.py` has one check more than Batch A's 234 because this database
-loads `get_class_bundle`. `grade_return.py`'s one failure is the same both
-times and is this harness, not the migration: its count of what Batch A lets
-a signed-in teacher run finds `_fv_release_orphan_teacher_email`, which
-`search-path-prelude.sql` loads. With the fingerprint file as it is today,
+loads `get_class_bundle`; every other count is Batch A's own.
+(`grade_return.py` counts every function named `_fv_` that a signed-in
+teacher may run, so `search-path-prelude.sql` does not grant
+`_fv_release_orphan_teacher_email` to `authenticated`; `search_path.py`
+grants it, as its migration does, inside its own transactions.) With the
+fingerprint file as it is today,
 `score_rpcs.py` on `m5_post` fails four checks, by design: the three
 ownership helpers and the bundle are no longer the fingerprints on file.
 
@@ -365,15 +390,12 @@ and `harness.sql`.
 | `fv_owns_term_rating(uuid)`                             | `1d3c31d45026472c3d3055a6b8718ea6` 448   | `000876617e013acb95c56932b42d1f02` 459   |
 | `fv_retention_cleanup()`                                | `3133ad798bfe7c82d9d203abc3826a94` 2088  | `a8da46d6664ba5956f4215ba3b2ada39` 2099  |
 | `get_class_bundle(uuid,bigint)` (on file, as `119165…`) | `845b42513d1f556dc941a1cc11cf9567` 22591 | `116294a41f043458e3ddec694520cf0d` 22612 |
-| `rls_auto_enable()` (the stand-in)                      | `0c00ede752467f212930d33e186904c5` 1132  | `834a32aa5b2e8f0fff52abb93719e2bc` 1143  |
+| `rls_auto_enable()`                                     | `846ec2fbff751d24b890656d63c3a9bf` 1223  | `37475132a56d7604318a225ce900ae7f` 1234  |
 
-`get_class_bundle`'s "before" is with S0-M4 applied; today it is
-`119165287207814181c5875d81451147` (22538). The twelve not proven live, and
-`rls_auto_enable` above all, are what this harness has: the header's "After
-the apply" query lists any whose live fingerprint is not the one here.
+`get_class_bundle`'s "before" is with S0-M4 applied; before S0-M4 it was
+`119165287207814181c5875d81451147` (22538). Every "before" value was
+confirmed on `gradebook-prod` on 2026-11-10 (live is PostgreSQL 17.6).
 
-Not verified: `rls_auto_enable`'s real body (the stand-in is Supabase's
-published form; the migration changes its setting whatever the body is);
-anything about `gradebook-prod` beyond the facts read on Nov 10 (twenty
-SECURITY DEFINER functions in `public`, these sixteen without `pg_temp`, with
-these settings).
+Not verified: which commands the live `ensure_rls` event trigger fires on
+(tested both ways, above); whether the API roles can make a table in public
+on `gradebook-prod` (here they cannot).

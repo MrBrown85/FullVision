@@ -6,10 +6,10 @@
 -- from the migration named above it: the one that last defined it.
 -- Load after bundle-tables.sql (term_rating_audit points at term_rating).
 --
--- Not proven live: live-function-md5.txt has no line for any function in
--- this file, so each is what the repo says the database runs. The
--- migration's header has one read-only query that lists every one of the
--- sixteen whose live definition is not the one tested here.
+-- All of them are the live functions: the migration's "Before the apply"
+-- query, which carries the fingerprint of each as loaded here, was run
+-- read-only on gradebook-prod on 2026-11-10 and found no difference
+-- (rls_auto_enable was a stand-in then, and is now the live body it printed).
 
 set check_function_bodies = off;
 
@@ -121,8 +121,10 @@ begin
 end;
 $function$;
 
-revoke all on function public._fv_release_orphan_teacher_email() from public, anon;
-grant execute on function public._fv_release_orphan_teacher_email() to authenticated;
+-- The migration also grants it to authenticated. search_path.py does that in
+-- its own transaction, not here: Batch A's grade_return.py counts every
+-- function named _fv_ that a signed-in teacher may run, and expects its own.
+revoke all on function public._fv_release_orphan_teacher_email() from public, anon, authenticated;
 
 -- ── The term rating's change history ────────────────────────────────────────
 -- The table is docs/schema.generated.sql's, line for line.
@@ -261,43 +263,43 @@ end; $function$;
 
 revoke execute on function public.fv_retention_cleanup() from public, anon, authenticated;
 
--- ── rls_auto_enable: A STAND-IN ─────────────────────────────────────────────
--- The repo has no definition of it: docs/schema.generated.sql has its
--- signature only, and the function came with the Supabase project ("enable
--- row level security on every new table in public"). This is the form
--- Supabase publishes for it, with the live header (SECURITY DEFINER,
--- search_path pg_catalog). The migration changes its setting whatever its
--- body is; the tests here show a body of this shape keeps working.
-create or replace function public.rls_auto_enable()
- returns event_trigger
- language plpgsql
- security definer
- set search_path to 'pg_catalog'
-as $function$
-declare
+-- ── rls_auto_enable ─────────────────────────────────────────────────────────
+-- The repo has no migration for it: it came with the Supabase project ("turn
+-- row security on for every new table in public"). This is the live
+-- definition, exactly as pg_get_functiondef printed it on gradebook-prod on
+-- 2026-11-10 (read by the orchestrator; md5 846ec2fbff751d24b890656d63c3a9bf,
+-- length 1223, which search_path.py checks). Live, it is the function of the
+-- event trigger ensure_rls, on ddl_command_end.
+CREATE OR REPLACE FUNCTION public.rls_auto_enable()
+ RETURNS event_trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog'
+AS $function$
+DECLARE
   cmd record;
-begin
-  for cmd in
-    select *
-    from pg_event_trigger_ddl_commands()
-    where command_tag in ('CREATE TABLE', 'CREATE TABLE AS', 'SELECT INTO')
-      and object_type in ('table', 'partitioned table')
-  loop
-    if cmd.schema_name is not null and cmd.schema_name in ('public')
-       and cmd.schema_name not in ('pg_catalog', 'information_schema')
-       and cmd.schema_name not like 'pg_toast%' and cmd.schema_name not like 'pg_temp%' then
-      begin
-        execute format('alter table if exists %s enable row level security', cmd.object_identity);
-        raise log 'rls_auto_enable: enabled RLS on %', cmd.object_identity;
-      exception
-        when others then
-          raise log 'rls_auto_enable: failed to enable RLS on %', cmd.object_identity;
-      end;
-    else
-      raise log 'rls_auto_enable: skip % (either system schema or not in enforced list: %.)', cmd.object_identity, cmd.schema_name;
-    end if;
-  end loop;
-end;
+  tbl name;
+BEGIN
+  FOR cmd IN
+    SELECT *
+    FROM pg_event_trigger_ddl_commands()
+    WHERE command_tag IN ('CREATE TABLE', 'CREATE TABLE AS', 'SELECT INTO')
+      AND object_type IN ('table','partitioned table')
+  LOOP
+     IF cmd.schema_name IS NOT NULL AND cmd.schema_name IN ('public') AND cmd.schema_name NOT IN ('pg_catalog','information_schema') AND cmd.schema_name NOT LIKE 'pg_toast%' AND cmd.schema_name NOT LIKE 'pg_temp%' THEN
+      BEGIN
+        SELECT c.relname INTO tbl FROM pg_catalog.pg_class c WHERE c.oid = cmd.objid;
+        EXECUTE format('alter table if exists %I.%I enable row level security', cmd.schema_name, tbl);
+        RAISE LOG 'rls_auto_enable: enabled RLS on %', cmd.object_identity;
+      EXCEPTION
+        WHEN OTHERS THEN
+          RAISE LOG 'rls_auto_enable: failed to enable RLS on %', cmd.object_identity;
+      END;
+     ELSE
+        RAISE LOG 'rls_auto_enable: skip % (either system schema or not in enforced list: %.)', cmd.object_identity, cmd.schema_name;
+     END IF;
+  END LOOP;
+END;
 $function$;
 
 create event trigger ensure_rls on ddl_command_end

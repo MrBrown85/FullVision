@@ -56,9 +56,24 @@
 -- With an empty list Postgres looks in pg_temp, then pg_catalog. Naming both,
 -- in the other order, is the same list with the trap removed: nothing the
 -- function names moves, since everything it uses is in pg_catalog or written
--- with its schema. rls_auto_enable (Supabase's "turn row security on for
--- every new table in public"; the repo has no copy of its body) already
--- names pg_catalog; pg_temp goes after it.
+-- with its schema.
+--
+-- rls_auto_enable is Supabase's "turn row security on for every new table
+-- in public": the function of the event trigger ensure_rls, which runs after
+-- every CREATE TABLE. The repo has no migration for it; its live body was
+-- read on 2026-11-10. It already names pg_catalog, and pg_temp goes after
+-- it. Its one table is written pg_catalog.pg_class, and the functions it
+-- calls (pg_event_trigger_ddl_commands, format) are never looked up in
+-- pg_temp, so for a later migration that makes a table it does exactly what
+-- it did (tested: CREATE TABLE, CREATE TABLE AS, SELECT INTO, a quoted name,
+-- a partitioned table; in public, in another schema, temporary). What was
+-- open is the two type names in its declarations, record and name, in the
+-- session that makes the table: with a temporary table called `name`, a new
+-- table in public was left WITHOUT row security while the function logged
+-- that it had enabled it; with one called `record`, every CREATE TABLE in
+-- that session failed. Only a session that can make tables in public could
+-- be caught by the first, and FullVision's migrations make no temporary
+-- table with either name. With pg_temp last, neither does anything.
 --
 -- ── What it does to existing rows ───────────────────────────────────────────
 -- Nothing. No table, column, row, trigger or policy changes, and no class's
@@ -111,18 +126,22 @@
 -- committed; it gives up after five seconds, with nothing changed.
 --
 -- ── Before the apply (read-only) ────────────────────────────────────────────
--- Fifteen of the sixteen were tested as the repo's migrations define them,
--- and rls_auto_enable as a stand-in: only fv_owns_course, fv_owns_enrollment,
--- fv_owns_assessment and get_class_bundle are known to be the live
--- definitions byte for byte. This lists every function that is NOT as it was
--- tested (missing, not SECURITY DEFINER, another setting, or another
--- definition, which it prints), and any other SECURITY DEFINER function
--- without pg_temp. No rows: everything is as tested. A row whose only
--- difference is the md5 does not stop this file (it replaces no body); it
--- means that function was tested from a copy that is not the live one. The
--- exception is get_class_bundle, which the file does check. It has two md5s
--- here, so the query can be run on either side of S0-M4: today's, and with
--- S0-M4 applied.
+-- This lists every function that is NOT as it was tested (missing, not
+-- SECURITY DEFINER, another setting, or another definition, which it
+-- prints), and any other SECURITY DEFINER function without pg_temp. No rows:
+-- everything is as tested.
+--
+-- It was run on gradebook-prod on 2026-11-10, after S0-M4 was applied, and
+-- returned one row: rls_auto_enable, tested until then from a stand-in. Its
+-- live body is now the one tested and the one fingerprinted below, so all
+-- sixteen are the live definitions, byte for byte, and no other SECURITY
+-- DEFINER function in the three schemas lacked pg_temp. Run it again before
+-- applying: it should return nothing.
+--
+-- A row whose only difference is the md5 does not stop this file (it
+-- replaces no body); it means that function has changed since it was
+-- tested. The exception is get_class_bundle, which the file does check. It
+-- has two md5s here: as it was before S0-M4, and with S0-M4 applied.
 --
 -- precheck:
 --   with v(fn, setting, md5) as (values
@@ -141,7 +160,7 @@
 --       ('public.fv_owns_term_rating(uuid)',                             'search_path=public',     '1d3c31d45026472c3d3055a6b8718ea6'),
 --       ('public.fv_retention_cleanup()',                                'search_path=public',     '3133ad798bfe7c82d9d203abc3826a94'),
 --       ('public.get_class_bundle(uuid,bigint)',                         'search_path=""',         '119165287207814181c5875d81451147 845b42513d1f556dc941a1cc11cf9567'),
---       ('public.rls_auto_enable()',                                     'search_path=pg_catalog', '0c00ede752467f212930d33e186904c5')
+--       ('public.rls_auto_enable()',                                     'search_path=pg_catalog', '846ec2fbff751d24b890656d63c3a9bf')
 --   )
 --   select v.fn, v.setting as tested_setting, array_to_string(p.proconfig, '; ') as live_setting,
 --          p.prosecdef as live_security_definer, v.md5 as tested_md5,
@@ -185,7 +204,7 @@
 --       ('public.fv_owns_term_rating(uuid)',                             'search_path=public, pg_temp',     '000876617e013acb95c56932b42d1f02'),
 --       ('public.fv_retention_cleanup()',                                'search_path=public, pg_temp',     'a8da46d6664ba5956f4215ba3b2ada39'),
 --       ('public.get_class_bundle(uuid,bigint)',                         'search_path=pg_catalog, pg_temp', '116294a41f043458e3ddec694520cf0d'),
---       ('public.rls_auto_enable()',                                     'search_path=pg_catalog, pg_temp', '834a32aa5b2e8f0fff52abb93719e2bc')
+--       ('public.rls_auto_enable()',                                     'search_path=pg_catalog, pg_temp', '37475132a56d7604318a225ce900ae7f')
 --     ) as v(fn, setting, md5)
 --     left join pg_proc p on p.oid = to_regprocedure(v.fn)
 --    where p.oid is null or p.proconfig is distinct from array[v.setting]

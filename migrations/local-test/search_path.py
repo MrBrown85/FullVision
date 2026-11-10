@@ -52,6 +52,7 @@ BUILD = ['harness.sql', 'score-prelude.sql', 'score-tables.sql', 'student-submit
          'class-writers-prelude.sql', 'bundle-prelude.sql', 'bundle-tables.sql', 'search-path-prelude.sql',
          *BATCH_A, S0_M4]
 LIVE_BUNDLE_MD5 = '119165287207814181c5875d81451147'   # live-function-md5.txt, before S0-M4
+LIVE_RLS_MD5 = '846ec2fbff751d24b890656d63c3a9bf'      # rls_auto_enable, read from gradebook-prod on 2026-11-10
 
 def source(rel):
     """(text, where it came from) for a path relative to this folder."""
@@ -250,6 +251,8 @@ def seed(s):
     deleted sign-in, a class and a teacher past the 30 days, and history old
     enough to purge."""
     s.owner(); c = s.c
+    # As 20261108_teacher_outlives_sign_in.sql grants it (search-path-prelude.sql says why not there).
+    c.run('grant execute on function public._fv_release_orphan_teacher_email() to authenticated')
     c.run("insert into auth.users (id, email) values (:a, 'a@example.com'), (:b, 'b@example.com')", a=A, b=B)
     c.run("""insert into teacher (id, email, display_name, deleted_at) values
              (:o, 'orphan@example.com', 'Left behind', null), (:g, 'gone@example.com', 'Gone', now() - interval '40 days')""", o=ORPHAN, g=GONE)
@@ -385,11 +388,18 @@ def behaviour(s):
                 s.rows('select id from student order by 1'), s.one('select count(*) from score_audit'), s.one('select count(*) from term_rating_audit')]
     out['the purge, run by the owner: its report and what is left'] = fresh(purge)
     def new_tables():
+        # What a later migration might run: each way of making a table.
         s.owner(); s.run('create table public.m5_probe (x int)'); s.run('create table student_submit.m5_probe (x int)')
+        s.run('create table public.m5_probe_as as select 1 as x'); s.run('select 1 as x into public.m5_probe_into')
+        s.run('create table public."m5 Probe, quoted" (x int)')
+        s.run('create table public.m5_probe_parted (x int) partition by range (x)')
+        s.run('create table public.m5_probe_part partition of public.m5_probe_parted for values from (0) to (10)')
+        s.run('create temp table m5_probe_temp (x int)')
         s.become(A); s.run('create temp table m5_scratch (x int)')
-        return s.rows("""select n.nspname, c.relrowsecurity from pg_class c join pg_namespace n on n.oid = c.relnamespace
-                          where c.relname = 'm5_probe' order by 1""")
-    out['a new table in public, one in student_submit and a temporary one: which have row security'] = fresh(new_tables)
+        return s.rows("""select case when n.nspname like 'pg_temp%' then 'pg_temp' else n.nspname::text end, c.relname::text, c.relrowsecurity
+                           from pg_class c join pg_namespace n on n.oid = c.relnamespace
+                          where (c.relname like 'm5_probe%' or c.relname like 'm5 Probe%' or c.relname = 'm5_scratch') and c.relkind in ('r', 'p') order by 1, 2""")
+    out['new tables, each way a migration can make one: which have row security'] = fresh(new_tables)
     return out
 
 def catalog(s):
@@ -586,11 +596,21 @@ def trick_release(s):
     return {'the real row left behind is released': s.one('select deleted_at is not null from public.teacher where id = :o', o=ORPHAN),
             'the temporary row is released': s.one('select deleted_at is not null from pg_temp.teacher where id = :d', d=DECOY)}
 
-def trick_rls(s):
+def trick_rls(s, type_name='record', columns='x int'):
+    """rls_auto_enable names two types, record and name, and one table,
+    pg_catalog.pg_class, with its schema. It runs whenever the session makes
+    a table, so the temporary table's own CREATE runs it too."""
     s.become(B)
-    out = {'Teacher B makes a temporary table called record': code(s.attempt('as is', 'create temp table record (x int)'))}
-    out['then the owner makes a table in public'] = code(s.attempt('owner', 'create table public.m5_probe (x int)'))
+    out = {'Teacher B makes the temporary table': code(s.attempt('as is', 'create temp table %s (%s)' % (type_name, columns)))}
+    out['then Teacher B makes another temporary table'] = code(s.attempt('as is', 'create temp table m5_scratch (x int)'))
+    out['then the owner, in that session, makes a table in public'] = code(s.attempt('owner', 'create table public.m5_probe (x int)'))
     out['and it has row security'] = s.one("select relrowsecurity from pg_class where oid = to_regclass('public.m5_probe')")
+    return out
+def trick_rls_name(s): return trick_rls(s, 'name', 'x text')
+def trick_rls_pg_class(s):
+    s.become(B); s.run('create temp table pg_class (like pg_catalog.pg_class)')
+    out = {'the owner, in that session, makes a table in public': code(s.attempt('owner', 'create table public.m5_probe (x int)'))}
+    out['and it has row security'] = s.one("select relrowsecurity from pg_catalog.pg_class where oid = to_regclass('public.m5_probe')")
     return out
 
 def both(scenario, *args):
@@ -667,6 +687,8 @@ def main():
     bundle = s.one("select pg_get_functiondef('public.get_class_bundle(uuid,bigint)'::regprocedure)")
     ok('get_class_bundle is the live function with S0-M4\'s one key added, and nothing else',
        md5(bundle.replace(",\n                       'created_at', asm.created_at", '')) == live['get_class_bundle'])
+    ok('rls_auto_enable is the live function, byte for byte (md5 %s, read from gradebook-prod on 2026-11-10)' % LIVE_RLS_MD5,
+       s.one("select md5(pg_get_functiondef('public.rls_auto_enable()'::regprocedure))") == LIVE_RLS_MD5)
     ok('the header\'s "before the apply" query finds nothing: every one of the sixteen is as it was tested', s.rows(header_query('precheck')) == [],
        [r[:6] for r in s.rows(header_query('precheck'))])
     ok('the header\'s "after the apply" query lists all sixteen as not done yet', len(s.rows(header_query('postcheck'))) == 16)
@@ -728,8 +750,11 @@ def main():
     ok('before: the purge removes the teacher and the class past 30 days, the student left with no class, and history past 2 years',
        purged[0] == {'teachers_purged': 1, 'courses_purged': 1, 'students_purged': 1, 'score_audit_purged': 1, 'term_rating_audit_purged': 1}
        and [GONE] not in purged[1] and [COURSE_OLD] not in purged[2] and [STU_OLD] not in purged[3], purged)
-    ok('before: a new table in public gets row security, one in student_submit does not',
-       b['a new table in public, one in student_submit and a temporary one: which have row security'] == [['public', True], ['student_submit', False]])
+    made = {(r[0], r[1]): r[2] for r in b['new tables, each way a migration can make one: which have row security']}
+    ok('before: every new table in public gets row security (CREATE TABLE, CREATE TABLE AS, SELECT INTO, a quoted name, a partitioned table and its partition); one in student_submit and temporary ones do not',
+       made == {('public', 'm5_probe'): True, ('public', 'm5_probe_as'): True, ('public', 'm5_probe_into'): True, ('public', 'm5 Probe, quoted'): True,
+                ('public', 'm5_probe_parted'): True, ('public', 'm5_probe_part'): True, ('student_submit', 'm5_probe'): False,
+                ('pg_temp', 'm5_probe_temp'): False, ('pg_temp', 'm5_scratch'): False}, made)
     for what in before:
         ok('the same before and after: ' + what, before[what] == after.get(what), (before[what], after.get(what)))
 
@@ -850,15 +875,39 @@ def main():
     trick('the cursor functions, every table they name shadowed', trick_cursor_tables, {
         'versions in the real table': ({COURSE_A: [102, None], COURSE_A2: [101, None], COURSE_B: [100, None]},) * 2,
         'rows in the temporary course_sync_cursor': (0, 0)})
-    trick('rls_auto_enable (the stand-in)', trick_rls, {
-        'Teacher B makes a temporary table called record': ('42703', 'ok'), 'then the owner makes a table in public': ('42809', 'ok'),
-        'and it has row security': (None, True)})
+    # rls_auto_enable runs on every CREATE TABLE in the session, the temporary
+    # table's own included. `record`: every later CREATE TABLE in the session
+    # failed. `name`: the session's new table in public was left WITHOUT row
+    # security, and the function logged that it had enabled it.
+    trick('rls_auto_enable, a session with a temporary table called record', trick_rls, {
+        'Teacher B makes the temporary table': ('42703', 'ok'), 'then Teacher B makes another temporary table': ('42809', 'ok'),
+        'then the owner, in that session, makes a table in public': ('42809', 'ok'), 'and it has row security': (None, True)})
+    trick('rls_auto_enable, a session with a temporary table called name', trick_rls_name, {
+        'Teacher B makes the temporary table': ('ok', 'ok'), 'then Teacher B makes another temporary table': ('ok', 'ok'),
+        'then the owner, in that session, makes a table in public': ('ok', 'ok'), 'and it has row security': (False, True)})
+    trick('rls_auto_enable, a session with a temporary pg_class (it names pg_catalog.pg_class with its schema)', trick_rls_pg_class, {
+        'the owner, in that session, makes a table in public': ('ok', 'ok'), 'and it has row security': (True, True)})
     for t in TYPE_TRICKS:
         before, after = both(trick_type, *t)
         ok('%s, a temporary table called %s: without the migration the call fails, with it it works as if the table were not there' % (t[0], t[1]),
            before['made'] == 'ok' and before['call'] != 'ok' and after == {'made': 'ok', 'call': 'ok', 'worked': True, 'message': ''}, (before, after))
 
     # ── The apply path ──────────────────────────────────────────────────────
+    # rls_auto_enable is an event trigger's function. The harness's trigger
+    # fires on the three ways of making a table; the live one's filter was
+    # not read, so here it fires on every command, this file's own ALTERs
+    # included.
+    s = Session(seeded=False)
+    s.run('drop event trigger ensure_rls')
+    s.run('create event trigger ensure_rls on ddl_command_end execute function public.rls_auto_enable()')
+    got = 'applied'
+    try: s.apply()
+    except pg.DatabaseError as e: got = e.args[0].get('M')
+    ok('with ensure_rls firing on every command, this file\'s ALTERs included, the file applies', got == 'applied' and s.rows(WITHOUT_PG_TEMP) == [], got)
+    made = code(s.attempt('owner', 'create table public.m5_probe (x int)'))
+    ok('... and a table made in public afterwards, in the same transaction, gets row security',
+       made == 'ok' and s.one("select relrowsecurity from pg_class where oid = to_regclass('public.m5_probe')") is True, made)
+    s.close()
     refused('a function is missing', ['drop function public.fv_retention_cleanup()'], 'public.fv_retention_cleanup() does not exist with these arguments')
     refused('a function has other arguments',
             ['drop function public.fv_idem_store(uuid, text, jsonb)',
