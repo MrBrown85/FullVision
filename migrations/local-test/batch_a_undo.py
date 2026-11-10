@@ -3,8 +3,13 @@ database is what it was.
 
     python3 batch_a_undo.py build    load an EMPTY database with everything
                                      but Batch A's four files (README.md,
-                                     "Batch A": the same list)
+                                     "Batch A": the same list, and the rest
+                                     of S0-M5's sixteen functions)
     python3 batch_a_undo.py          the proof
+
+Live has Batch A and then S0-M5 (search_path, 2026111002) on top of it, so
+that is what every scenario undoes: "applied" below means the four files
+and then S0-M5's.
 
 The database named by PGDATABASE is only ever a template: every scenario
 runs on a copy of it (named <PGDATABASE>_<scenario>, made and dropped
@@ -60,6 +65,17 @@ FILES = ['2026110901_score_rows_same_class.sql', '2026110902_grade_return.sql', 
 RECORD = ['score_rows_same_class', 'grade_return', 'student_card', 'student_sessions_page']   # as apply_migration names them
 S0_M4B = '2026110905_grade_return_limits.sql'
 S0_M4B_REF = 'origin/s0-m4b-grade-return-limits'          # until PR 989 is merged
+S0_M5 = '2026111002_security_definer_search_path.sql'     # applied to gradebook-prod after Batch A, on Nov 10
+S0_M5_UNDO = 'local-test/s0-m5-undo.sql'
+S0_M5_REF = 'origin/s0-m5-search-path-pg-temp'            # until PR 991 is merged
+SIXTEEN = {'_fv_release_orphan_teacher_email', '_fv_teacher_sign_in_deleted', '_score_audit_diff', '_term_rating_audit_field',
+           '_touch_course_sync_cursor', '_touch_course_sync_cursor_from_trigger', '_touch_teacher_sync_cursor_from_trigger',
+           'fv_idem_check', 'fv_idem_store', 'fv_owns_assessment', 'fv_owns_course', 'fv_owns_enrollment', 'fv_owns_term_rating',
+           'fv_retention_cleanup', 'get_class_bundle', 'rls_auto_enable'}
+# The four of the sixteen with a line in live-function-md5.txt, as S0-M5 left them. Until that file is
+# brought up to date (after PR 991 merges), the suites run here get a copy of it with these in.
+AFTER_S0_M5 = {'fv_owns_assessment': '9f4c680c35f9f3ac32e8290824707673 389', 'fv_owns_course': 'e3afeca06043a6e907e6f4ae777c85da 345',
+               'fv_owns_enrollment': '728526648388367393162be706f7f9ea 389', 'get_class_bundle': '116294a41f043458e3ddec694520cf0d 22612'}
 # The list under "Batch A" in README.md.
 BASE = ['harness.sql', 'score-prelude.sql', 'score-tables.sql', 'bundle-prelude.sql', 'bundle-tables.sql',
         '../2026111001_assessment_created_at_in_bundle.sql', 'student-submit-prelude.sql',
@@ -93,6 +109,12 @@ def message(e):
 def bare(st):
     """A statement without its comment lines."""
     return '\n'.join(l for l in st.splitlines() if not l.strip().startswith('--')).strip()
+
+def text_of(name, ref=None):
+    """A file under migrations/, from this checkout or, until its PR is merged, from its branch."""
+    path = os.path.join(HERE, '..', name)
+    if os.path.exists(path): return open(path).read()
+    return subprocess.run(['git', '-C', ROOT, 'show', '%s:migrations/%s' % (ref, name)], capture_output=True, text=True, check=True).stdout
 
 def sections(text=None):
     """{'PART 1': [statements], 'PART 1B': [...], 'PART 2': [...]} of the undo script."""
@@ -144,22 +166,44 @@ class Db:
             self.c.run('rollback'); return 'STOPPED: ' + message(e)
     def part(self, name): return self.statements(PARTS[name])
     def file(self, name, ref=None):
-        path = os.path.join(HERE, '..', name)
-        if os.path.exists(path): text = open(path).read()
-        else: text = subprocess.run(['git', '-C', ROOT, 'show', '%s:migrations/%s' % (ref, name)], capture_output=True, text=True, check=True).stdout
-        return self.statements(split(text))
-    def apply(self, n=4):
-        """The first n of Batch A's files, and their lines in the migration record, as apply_migration writes them."""
+        return self.statements(split(text_of(name, ref)))
+    def apply(self, n=4, s0_m5=True):
+        """The first n of Batch A's files and, after all four, S0-M5's, as live has them; and their
+        lines in the migration record, as apply_migration writes them."""
         for i, f in enumerate(FILES[:n]):
             r = self.file(f)
             if r != 'ok': return r
-            self.c.run("insert into supabase_migrations.schema_migrations (version, name) values (:v, :n)", v='2026111017000%d' % i, n=RECORD[i])
+            self.c.run("insert into supabase_migrations.schema_migrations (version, name) values (:v, :n)", v='2026111015280%d' % i, n=RECORD[i])
+        if n == 4 and s0_m5:
+            r = self.file(S0_M5, S0_M5_REF)
+            if r != 'ok': return r
+            self.c.run("insert into supabase_migrations.schema_migrations (version, name) values ('20261110153700', 'security_definer_search_path') on conflict do nothing")
         return 'ok'
+    def s0_m5_out(self):
+        """S0-M5's own undo, and its line out of the record."""
+        r = self.file(S0_M5_UNDO, S0_M5_REF)
+        self.c.run("delete from supabase_migrations.schema_migrations where name = 'security_definer_search_path'")
+        return r
     def suite(self, script):
-        """Another script of this folder, on this copy: its last line."""
-        env = dict(os.environ, PGDATABASE=self.name)
-        r = subprocess.run([sys.executable, os.path.join(HERE, script)], capture_output=True, text=True, env=env, cwd=HERE)
-        return (r.stdout.strip().splitlines() or [r.stderr.strip()[-200:]])[-1]
+        """Another script of this folder, on this copy: its last line. It runs from a copy of the
+        folder whose live-function-md5.txt has the four fingerprints S0-M5 changed."""
+        import shutil, tempfile
+        tmp = tempfile.mkdtemp(prefix='undo-suite-')
+        try:
+            shutil.copytree(HERE, os.path.join(tmp, 'migrations', 'local-test'), ignore=shutil.ignore_patterns('__pycache__'))
+            for extra in ('docs/schema.generated.sql', 'scripts/schema-snapshot.sql', 'tests/fixtures/grade-state-cases.json'):
+                if os.path.exists(os.path.join(ROOT, extra)):
+                    os.makedirs(os.path.dirname(os.path.join(tmp, extra)), exist_ok=True); shutil.copy(os.path.join(ROOT, extra), os.path.join(tmp, extra))
+            here = os.path.join(tmp, 'migrations', 'local-test'); md5s = os.path.join(here, 'live-function-md5.txt')
+            lines = [('%s %s' % (l.split()[0], AFTER_S0_M5[l.split()[0]]) if l.split() and l.split()[0] in AFTER_S0_M5 and not l.startswith('#') else l.rstrip('\n'))
+                     for l in open(md5s)]
+            open(md5s, 'w').write('\n'.join(lines) + '\n')
+            env = dict(os.environ, PGDATABASE=self.name)
+            r = subprocess.run([sys.executable, os.path.join(here, script)], capture_output=True, text=True, env=env, cwd=here)
+            self.failures = [l[5:].split(' :: ')[0] for l in r.stdout.splitlines() if l.startswith('FAIL ')]
+            return (r.stdout.strip().splitlines() or [r.stderr.strip()[-200:]])[-1]
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
     def close(self):
         self.c.close(); admin('drop database if exists "%s" with (force)' % self.name)
 
@@ -168,9 +212,9 @@ def build():
     if c.run("select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public'")[0][0]:
         sys.exit('this database is not empty: build needs a new one')
     roles = {r[0] for r in c.run('select rolname from pg_roles')}
-    for rel in BASE:
+    for rel in BASE + ['search-path-prelude.sql']:      # the rest of S0-M5's sixteen functions
         n = 0
-        for st in split(open(os.path.join(HERE, rel)).read()):
+        for st in split(text_of('local-test/' + rel, S0_M5_REF)):
             words = st.split('\n')[-1].split()
             if rel == 'harness.sql' and words[:2] == ['create', 'role'] and words[2] in roles: continue   # roles belong to the whole server
             try: c.run(st)
@@ -255,6 +299,16 @@ def dropped_only(cat0, cat, n):
     """Nothing differs but n dropped-column slots on course."""
     gone, new = trace(cat0, cat)
     return gone == [] and new == ['dropped columns public.course | %d' % n]
+def s0_m5_and(cat0, cat, also):
+    """Nothing differs but S0-M5 (the sixteen functions' definition and settings lines, and its line in
+    the migration record) and the lines given."""
+    gone, new = trace(cat0, cat)
+    fn = lambda l: l.split(' | ')[0].split('(')[0].split('.')[-1]
+    sixteen = lambda lines: sorted(fn(l) for l in lines if l.startswith(('function ', 'function more ')))
+    rest = sorted(l for l in new if not l.startswith(('function ', 'function more ')))
+    return (sixteen(gone) == sorted(list(SIXTEEN) * 2) and sixteen(new) == sorted(list(SIXTEEN) * 2)
+            and [l for l in gone if not l.startswith(('function ', 'function more '))] == []
+            and rest == sorted(also + ['migration record 20261110153700 | security_definer_search_path']))
 
 # ── main ────────────────────────────────────────────────────────────────────
 def scen_main():
@@ -270,7 +324,9 @@ def scen_main():
     ok('before: the four functions of the seven that have a live fingerprint on file carry it', all(md5(f) == LIVE[n] for n, f in SEVEN.items()))
 
     # ── Batch A in, and used ───────────────────────────────────────────
-    ok('the four files apply', d.apply() == 'ok' and d.one(TRIGGERS) == 18)
+    ok('the four files apply, and S0-M5 on top of them, as on live', d.apply() == 'ok' and d.one(TRIGGERS) == 18
+       and d.one("select count(*) from pg_proc p where p.prosecdef and p.pronamespace::regnamespace::text in ('public', 'student_submit', 'fv_private') "
+                 "and not exists (select 1 from unnest(coalesce(p.proconfig, '{}')) s where s ~ 'pg_temp$')") == 0)
     cat1 = catalog(d.c)
     ok('applying them changes no row of any table that was there (%d tables, compared with before Batch A)' % len(rows0),
        row_checksums(d.c, cols0) == rows0, sorted(t for t in rows0 if row_checksums(d.c, {t: cols0[t]})[t] != rows0[t]))
@@ -380,16 +436,19 @@ def scen_main():
     d.run("create table public.undo_attempt as select * from student_submit.attempt where route <> 'card'")
     kept = d.run("select count(*), coalesce(md5(string_agg(x::text, '|' order by x::text)), '') from public.undo_attempt x")[0]
     d.run('drop table public.undo_attempt')
-    ok('PART 2 runs', d.part('PART 2') == 'ok')
+    sixteen_lines = lambda lines: [l for l in lines if l.startswith(('function ', 'function more ')) and l.split(' | ')[0].split('(')[0].split('.')[-1] in SIXTEEN]
+    m5_before = sixteen_lines(catalog(d.c))
+    ok('PART 2 runs, with S0-M5 applied on top of Batch A', d.part('PART 2') == 'ok')
     cat2 = catalog(d.c)
-    gone, new = trace(cat0, cat2)
-    ok('PART 2: the catalog is the one from before Batch A, line by line (%d lines), but for two things it says it leaves' % len(cat0),
-       gone == [] and sorted(new) == sorted(['dropped columns public.course | 3'] + ['migration record 2026111017000%d | %s' % (i, n) for i, n in enumerate(RECORD)]),
-       (gone[:6], new[:8]))
+    ok('PART 2: the catalog is the one from before Batch A, line by line (%d lines), but for S0-M5, which it leaves, and two things it says it leaves' % len(cat0),
+       s0_m5_and(cat0, cat2, ['dropped columns public.course | 3'] + ['migration record 2026111015280%d | %s' % (i, n) for i, n in enumerate(RECORD)]),
+       trace(cat0, cat2))
+    ok('PART 2 leaves S0-M5 exactly as it was: the sixteen functions are line for line what they were just before it, pg_temp last',
+       sixteen_lines(cat2) == m5_before and len(m5_before) == 32)
     ok('PART 2 leaves the migration record alone: it still lists the four files as applied', d.one("select count(*) from supabase_migrations.schema_migrations where name = any (cast(:n as text[]))", n=RECORD) == 4)
     d.run(record_statement())
-    ok('the optional statement in the header takes those four rows out of the record and no other (three earlier rows stay)',
-       dropped_only(cat0, catalog(d.c), 3) and d.one('select count(*) from supabase_migrations.schema_migrations') == 3, trace(cat0, catalog(d.c)))
+    ok('the optional statement in the header takes those four rows out of the record and no other (three earlier rows and S0-M5\'s stay)',
+       s0_m5_and(cat0, catalog(d.c), ['dropped columns public.course | 3']) and d.one('select count(*) from supabase_migrations.schema_migrations') == 4, trace(cat0, catalog(d.c)))
     ok('what is left: three dropped-column slots on course, where the three class settings were (they hold nothing and nothing reads them)',
        d.one("select count(*) from pg_attribute where attrelid = 'public.course'::regclass and attisdropped") == 3)
     sums_after = row_checksums(d.c, cols0)
@@ -416,17 +475,22 @@ def scen_main():
     ok('PART 1 and PART 1B run after it change nothing either', d.part('PART 1') == 'ok' and d.part('PART 1B') == 'ok' and catalog(d.c) == cat_after)
 
     # ── The suites from before Batch A ─────────────────────────────────
-    # score_rpcs.py makes 176 checks on the score-only database and 183 on this one, which also loads the
-    # five functions Batch A patches or copies, and get_class_bundle and get_gradebook, and compares each with
-    # its live fingerprint.
-    for script, want in (('score_rpcs.py', '183 passed, 0 failed'), ('student_submit.py', '79 passed, 0 failed'),
+    # score_rpcs.py makes 183 checks on this database (the score-only one has fewer: this one also loads
+    # the functions Batch A patches or copies and the two bundle functions, each compared with its live
+    # fingerprint). One of them now fails, and should: it compares the score tables with
+    # docs/schema.generated.sql, which describes the live database WITH Batch A, and Batch A has just been
+    # taken out. It is the schema snapshot check the header says must be regenerated after PART 2.
+    r = d.suite('score_rpcs.py')
+    ok('after the undo, score_rpcs.py: 182 of its 183 checks pass as before Batch A; the one that does not is the comparison with the schema snapshot, which still describes the database with Batch A',
+       r == '182 passed, 1 failed' and d.failures == ['every score table matches the live snapshot: columns, constraints, indexes, triggers, policies'], (r, d.failures))
+    for script, want in (('student_submit.py', '79 passed, 0 failed'),
                          ('questionnaire_identity.py', '47 passed, 0 failed'), ('phone_reports.py', '37 passed, 0 failed'),
                          ('questionnaires.py', '42 passed, 0 failed')):
         r = d.suite(script)
         ok('after the undo, %s passes as before Batch A: %s' % (script, want.split(',')[0]), r == want, r)
 
     # ── Batch A goes in again ──────────────────────────────────────────
-    ok('the four files apply again', d.apply() == 'ok')
+    ok('the four files apply again, with S0-M5 still in place, and S0-M5 can be run again after them', d.apply() == 'ok')
     cat3 = [l for l in catalog(d.c) if not l.startswith(('dropped columns ', 'depends '))]
     first = [l for l in cat1 if not l.startswith('depends ')]
     ok('and give the same database as the first time (the three class settings are new columns again, so their position differs, and the three old slots remain)',
@@ -444,11 +508,21 @@ def scen_main():
 def scen_apply_only():
     d = Db('applyonly'); seed(d)
     cat0, rows0, cols0 = before(d)
-    ok('apply-only: the four files, then PART 2 with nothing done in between', d.apply() == 'ok' and d.part('PART 2') == 'ok')
+    ok('apply-only: the four files and S0-M5, then PART 2 with nothing done in between', d.apply() == 'ok' and d.part('PART 2') == 'ok')
     d.run(record_statement())
     ok('apply-only: every row of every table is what it was before Batch A (%d tables; the backfill and its undoing included)' % len(rows0),
        row_checksums(d.c, cols0) == rows0 and table_columns(d.c) == cols0, sorted(t for t in rows0 if row_checksums(d.c, {t: cols0[t]})[t] != rows0[t]))
-    ok('apply-only: and the catalog is the one from before but for the three dropped-column slots', dropped_only(cat0, catalog(d.c), 3), trace(cat0, catalog(d.c)))
+    ok('apply-only: the catalog is the one from before but for S0-M5, left in place, and the three dropped-column slots',
+       s0_m5_and(cat0, catalog(d.c), ['dropped columns public.course | 3']), trace(cat0, catalog(d.c)))
+    ok('apply-only: S0-M5 can stay, or go afterwards: its own undo then runs, and the catalog is the one from before both but for the three slots',
+       d.s0_m5_out() == 'ok' and dropped_only(cat0, catalog(d.c), 3), trace(cat0, catalog(d.c)))
+    d.close()
+    # The other order: S0-M5 out first, then Batch A.
+    d = Db('applyonly'); seed(d)
+    cat0, rows0, cols0 = before(d)
+    ok('apply-only, the other order: S0-M5\'s undo first, then PART 2: both run, and the result is the same',
+       d.apply() == 'ok' and d.s0_m5_out() == 'ok' and d.part('PART 2') == 'ok' and d.run(record_statement()) is not False
+       and dropped_only(cat0, catalog(d.c), 3) and row_checksums(d.c, cols0) == rows0, trace(cat0, catalog(d.c)))
     d.close()
 
 # ── partial ─────────────────────────────────────────────────────────────────
@@ -559,8 +633,9 @@ def scen_s0_m4b():
     # The whole way back: S0-M4b's own undo (from its branch), then PART 2.
     theirs = d.file('local-test/s0-m4b-undo.sql', S0_M4B_REF)
     back = d.part('PART 2'); d.run(record_statement())
-    ok('s0-m4b: after S0-M4b\'s own undo, PART 2 runs, and the catalog is the one from before Batch A but for the three dropped-column slots; no row of any table differs',
-       theirs == 'ok' and back == 'ok' and dropped_only(cat0, catalog(d.c), 3) and row_checksums(d.c, cols0) == rows0, (theirs, back, trace(cat0, catalog(d.c))))
+    ok('s0-m4b: after S0-M4b\'s own undo, PART 2 runs, and the catalog is the one from before Batch A but for S0-M5 (left in place) and the three dropped-column slots; no row of any table differs',
+       theirs == 'ok' and back == 'ok' and s0_m5_and(cat0, catalog(d.c), ['dropped columns public.course | 3']) and row_checksums(d.c, cols0) == rows0,
+       (theirs, back, trace(cat0, catalog(d.c))))
     d.close()
 
 # ── notices: the catalog sees each kind of thing ────────────────────────────

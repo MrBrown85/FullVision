@@ -607,9 +607,10 @@ writes `score-tables.sql` byte for byte.
 ## Batch A: the way back (2026-11-10)
 
 `batch-a-undo.sql` undoes Batch A (`../2026110901` to `../2026110904`), which
-was applied to `gradebook-prod` on Nov 10. It is **not a migration** and is
-kept here, not in `migrations/`, so CI's drift check does not wait for it to
-be applied. Its header is the operator's page: what each part does, what
+was applied to `gradebook-prod` on Nov 10; S0-M5 (`../2026111002`) was
+applied after it the same day, and the script is written and proved for a
+database with both. It is **not a migration** and is kept here, not in
+`migrations/`, so CI's drift check does not wait for it to be applied. Its header is the operator's page: what each part does, what
 students see after it, what still runs, what it leaves. In short:
 
 - **PART 1, the fast stop:** drops Batch A's 18 triggers and nothing else,
@@ -645,7 +646,7 @@ PGPORT=54331 PGDATABASE=fv_undo python3 batch_a_undo_load.py    # PART 1 against
 ```
 
 What it compares. `catalog.py` lists everything the database holds outside
-the system schemas, one line each (2,029 lines here): schemas, functions
+the system schemas, one line each (2,089 lines here): schemas, functions
 (md5 of the definition, owner, grants, and separately language, volatility,
 SECURITY DEFINER, settings, argument defaults, comment), tables, views and
 their definitions, rules, columns, dropped-column slots, constraints,
@@ -655,6 +656,9 @@ shape of `pg_depend`, and, where they exist, pg_cron's jobs and the
 migration record. The `notices` scenario makes one of each of 14 kinds and
 checks the catalog sees it. Roles are left out: they belong to the whole
 server. Rows are a checksum of every row of every table, columns by name.
+Until `live-function-md5.txt` carries the fingerprints S0-M5 left (the PR
+after PR 991 merges), the other suites the proof runs get a copy of this
+folder whose file has those four lines.
 The harness has no pg_cron and no Supabase migration record; the proof
 makes a stand-in record (three earlier rows, then one per file as it is
 applied), and the catalog's cron lines are tested against a stand-in table
@@ -662,7 +666,8 @@ only.
 
 The scenarios:
 
-- **main.** Catalog and rows before anything; the four files; a teacher and
+- **main.** Catalog and rows before anything; the four files and S0-M5,
+  "applied" from here on; a teacher and
   a student use it (returned grades, drafts, a draft on a returned grade, a
   rubric piece, cards, two signed-in phones, in a When I Return Them class
   and an As Soon As I Save one). Applying the files changes no row of any
@@ -682,21 +687,30 @@ The scenarios:
     seven tables locked by another session.
   - After **PART 1B**: the five policies are the ones from before.
   - After **PART 2**: the catalog is the one from before Batch A, line for
-    line, but for two things: **three dropped-column slots on `course`**
-    (where the three class settings were; a dropped column keeps its slot,
-    which holds nothing and which nothing reads) and the migration record's
-    four rows, which the header's optional statement then removes, and no
-    other. Rows: compared with just before PART 2, nothing changed but the
+    line, but for S0-M5, which it leaves (the sixteen functions are line for
+    line what they were just before PART 2, `pg_temp` last), and two things
+    of its own: **three dropped-column slots on `course`** (where the three
+    class settings were; a dropped column keeps its slot, which holds
+    nothing and which nothing reads) and the migration record's four rows,
+    which the header's optional statement then removes, and no other. Rows: compared with just before PART 2, nothing changed but the
     sign-in log, which lost its card rows and nothing else; compared with
     **before Batch A**, the only tables that differ are the eleven the
     teacher's own saves, new pieces, rubric move and restore wrote in
-    between. The suites from before Batch A pass (`score_rpcs.py` 183 on
-    this database, `student_submit.py` 79, `questionnaire_identity.py` 47,
-    `phone_reports.py` 37, `questionnaires.py` 42). Every part run again
-    changes nothing. The four files apply again and give the same database
-    as the first time, every grade Returned (the backfill).
-- **apply-only.** The four files, then PART 2, nothing in between: every
-  row of every table (54) is what it was before Batch A.
+    between. The suites from before Batch A pass (`student_submit.py` 79,
+    `questionnaire_identity.py` 47, `phone_reports.py` 37,
+    `questionnaires.py` 42), and `score_rpcs.py` passes 182 of its 183
+    checks on this database: the one that fails compares the score tables
+    with `docs/schema.generated.sql`, which describes the live database
+    with Batch A in it. That is the snapshot the header says to regenerate
+    after PART 2. Every part run again changes nothing. The four files
+    apply again, with S0-M5 still in place, and give the same database as
+    the first time, every grade Returned (the backfill).
+- **apply-only.** The four files and S0-M5, then PART 2, nothing in
+  between: every row of every table (56) is what it was before Batch A, and
+  the catalog is the one from before but for S0-M5 and the three slots.
+  **S0-M5 can stay.** If it is to go as well, its own undo
+  (`s0-m5-undo.sql`) runs after PART 2 or before it: both orders end in the
+  catalog from before both, but for the three slots.
 - **partial.** Only file 01, files 01 and 02, files 01 to 03 applied: PART
   1, 1B and 2 in turn, and PART 2 alone, each take it back out (no row
   differs; the catalog is the one from before but for the dropped slots of
@@ -718,13 +732,14 @@ The scenarios:
   S0-M4b's three triggers and lists them; PART 2 stops before it changes
   anything, says to run S0-M4b's undo first and names what it found; after
   S0-M4b's own undo (`s0-m4b-undo.sql`, read from its branch), PART 2 runs
-  and the database is the one from before Batch A. (The first check here
+  and the database is the one from before Batch A, with S0-M5 still in
+  place. (The first check here
   looked for one of S0-M4b's function names, which that PR then changed:
   PART 2 ran straight through on top of it. It now looks for anything that
   names `grade_return` and is not Batch A's.)
 
-Result on 2026-11-10: **82 of 82 on PostgreSQL 17.11 (port 54331), which is
-what production runs, and 82 of 82 on 18.6 (port 54329)**, the same checks
+Result on 2026-11-10: **85 of 85 on PostgreSQL 17.11 (port 54331), which is
+what production runs, and 85 of 85 on 18.6 (port 54329)**, the same checks
 with the same results.
 
 `batch_a_undo_load.py`: four connections saving in a loop (points, a rubric

@@ -1,6 +1,7 @@
 -- BATCH A, UNDONE. Not a migration: the way back from Batch A
 -- (migrations/2026110901 to 2026110904, PR 966), which was applied to
--- gradebook-prod on 2026-11-10.
+-- gradebook-prod on 2026-11-10. Written for the database as it is now:
+-- Batch A, and S0-M5 (2026111002) applied after it.
 --
 -- It lives under migrations/local-test/ on purpose: CI's drift check treats
 -- every file in migrations/ as something to be applied, and this is only to
@@ -128,6 +129,17 @@
 -- or table named grade_return_..., or a function that names grade_return
 -- and is not one of the 54 Batch A made or patched. It lists what it found.
 --
+-- S0-M5 (2026111002, pg_temp last in search_path; applied to gradebook-prod
+-- after Batch A, on 2026-11-10): LEAVE IT. No part of this script touches
+-- any of its sixteen functions, and none of them is one Batch A made or
+-- patched. PART 2 runs with S0-M5 applied and leaves all sixteen exactly as
+-- they are (tested on 17.11 and 18.6), and Batch A's four files apply again
+-- with it in place. If S0-M5 is to come out as well, its own undo
+-- (migrations/local-test/s0-m5-undo.sql) can be run before PART 2 or after
+-- it: both orders were tested and end in the same database. (What cannot be
+-- done while Batch A is out is to apply S0-M5's file afresh: it checks that
+-- Batch A is in.)
+--
 -- DESTROYS, for good:
 --   grade_return            which grades are Draft and which Returned, when
 --                           each was returned, what each student was shown
@@ -173,9 +185,10 @@
 --   pg_cron. Batch A schedules nothing. (S0-M4b does; its undo unschedules.)
 --
 -- After PART 2 the four files apply again cleanly. batch_a_undo.py proves
--- all of the above on PostgreSQL 17.11 and 18.6: the whole catalog compared
--- line by line (catalog.py says what that covers), and every table's rows,
--- with the state before Batch A.
+-- all of the above on PostgreSQL 17.11 and 18.6, on databases with Batch A
+-- and then S0-M5 applied: the whole catalog compared line by line
+-- (catalog.py says what that covers), and every table's rows, with the
+-- state before Batch A.
 --
 -- The statements of PART 1B and PART 2 were GENERATED from the four files
 -- and from the difference between a database without them and with them
