@@ -24,10 +24,23 @@ spec = importlib.util.spec_from_file_location('run', os.path.join(HERE, 'run.py'
 run = importlib.util.module_from_spec(spec); spec.loader.exec_module(run)
 MIGRATIONS = ['2026110901_score_rows_same_class.sql', '2026110902_grade_return.sql',
               '2026110903_student_card.sql', '2026110904_student_sessions_page.sql']
+def statements(name):
+    return run.split(open(os.path.join(HERE, '..', name)).read())
 def apply(name):
+    # Each file is its own transaction (begin ... commit). Here the script's
+    # one transaction stands in for it, so everything can be rolled back.
     as_owner()
-    for st in run.split(open(os.path.join(HERE, '..', name)).read()):
-        c.run(st)
+    for st in statements(name):
+        if st.split('\n')[-1].strip().lower() not in ('begin', 'commit'):
+            c.run(st)
+def last_line(st): return st.split('\n')[-1].strip().lower()
+
+for m in MIGRATIONS:
+    sts = statements(m)
+    ok('%s is one transaction: begin first, commit last' % m, last_line(sts[0]) == 'begin' and last_line(sts[-1]) == 'commit')
+    ok("%s sets a lock timeout, then runs its checks before it creates or changes anything" % m,
+       sts[1].strip().lower().endswith("set local lock_timeout = '5s'") and '$guard$' in sts[2]
+       and not any(w in ' '.join(sts[:2]).lower() for w in ('create table', 'alter table', 'create or replace')), sts[1][-60:])
 
 ok('this database does not have Batch A yet', one("select to_regclass('public.grade_return') is null"))
 
@@ -83,6 +96,8 @@ def fill_time():
     return took * 1000
 fill_time(); t_before = min(fill_time() for _ in range(3))
 
+slip_before = {r[0]: r[1] for r in rows("""select p.proname, pg_get_functiondef(p.oid) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                                           where n.nspname = 'public' and p.proname in ('_issue_access_code', '_issue_report_code')""")}
 before = score_fingerprint()
 counts = rows('select (select count(*) from score), (select count(*) from tag_score), (select count(*) from rubric_score), (select count(*) from rubric_check_score)')[0]
 
@@ -148,19 +163,47 @@ ok('and no function: each patch went in once',
 # ── The patches start from the live bodies, and only from them ─────────
 got = {r[0]: r[1] for r in rows("""select p.proname, pg_get_functiondef(p.oid) from pg_proc p
                                     join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public'""")}
-ok('five functions carry the patch', all(mark in got[fn] for fn, mark in (
+ok('eight functions carry a patch', all(mark in got[fn] for fn, mark in (
     ('upsert_rubric_score', 'is not in the rubric of assessment'), ('set_score_status', 'cannot be marked Missing'),
-    ('update_course', 'student_page_enabled'), ('move_rubric_scores', '_grade_return_remap'),
-    ('import_json_restore', '_restore_grade_returns'))))
-ok('create_course, duplicate_course, duplicate_assessment and the other score RPCs are still the live bodies',
+    ('update_course', 'student_page_enabled'), ('move_rubric_scores', 'fv.moving_rubric'),
+    ('import_json_restore', 'restore_grade_returns'), ('duplicate_course', 'courses_count_equally, return_grades'),
+    ('_issue_access_code', 'live student card'), ('_issue_report_code', 'live student card'))))
+# Each patch is the live body with only the added lines: take them out again and it is the live function.
+PATCHES = {r[0]: r[1] for r in rows("""select p.proname, pg_get_functiondef(p.oid) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                                        where n.nspname = 'public' and p.proname in ('_issue_access_code', '_issue_report_code')""")}
+ok('the two slip functions are their old bodies plus two lines',
+   all(d.replace("""salt))
+            -- nor the code of a live student card (2026110903_student_card)
+            or exists (select 1 from student_card where stopped_at is null and code = _code);""", 'salt));') == slip_before[n] for n, d in PATCHES.items()))
+ok('create_course, duplicate_assessment and the other score RPCs are still the live bodies',
    all(md5 == want[name] for name, md5 in rows("""select p.proname, md5(pg_get_functiondef(p.oid)) from pg_proc p
            join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public'""")
-       if name in want and name not in ('upsert_rubric_score', 'set_score_status', 'update_course', 'move_rubric_scores', 'import_json_restore')))
+       if name in want and name not in ('upsert_rubric_score', 'set_score_status', 'update_course', 'move_rubric_scores', 'import_json_restore', 'duplicate_course')))
 c.run('rollback'); c.run('begin')
 as_owner()
 live_def = one("select pg_get_functiondef('public.set_score_status(uuid,uuid,text)'::regprocedure)")
 c.run(live_def.replace("raise exception 'invalid status %', p_status", "raise exception 'not a status %', p_status"))
-expect_error('the migration stops on a function that is not the one it was written against', lambda: apply(MIGRATIONS[1]),
+def guarded():
+    # Statement by statement, with no transaction to save it: the third
+    # statement is the check, and it must be what stops the file.
+    sts = statements(MIGRATIONS[1])
+    c.run(sts[1].split('\n')[-1]); c.run(sts[2])
+expect_error('the migration stops at its first check on a function that is not the one it was written against', guarded,
              'is not the definition this migration was written against')
+ok('and nothing of it exists: no table, no column, no trigger', one("select to_regclass('public.grade_return') is null and to_regclass('public.grade_return_before') is null")
+   and one("select count(*) from information_schema.columns where table_name = 'course' and column_name in ('student_page_enabled', 'return_grades')") == 0
+   and one("select count(*) from pg_trigger where tgname like 'grade_return%'") == 0)
+c.run('rollback'); c.run('begin'); as_owner()
+c.run("insert into assessment (id, course_id, title) values ('77777777-0000-0000-0000-000000000001', :c, 'Other class work')", c=COURSE_B)
+c.run("set local session_replication_role = replica")
+c.run("insert into score (enrollment_id, assessment_id, value) values (:e, '77777777-0000-0000-0000-000000000001', 3)", e=ENR1)
+c.run("set local session_replication_role = origin")
+def first_file():
+    sts = statements(MIGRATIONS[0])
+    c.run(sts[2])
+expect_error("the same-class file stops at its first check when a score row names another class's assessment", first_file, 'Nothing was changed')
+def out_of_order():
+    c.run(statements(MIGRATIONS[3])[2])
+expect_error('the sessions file stops at its first check when the two before it are not applied', out_of_order, 'Nothing was changed')
 
 finish()

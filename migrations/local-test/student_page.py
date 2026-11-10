@@ -249,6 +249,21 @@ got = result(tok, ENR1, a_pts)
 ok('returned again: the new grade, the one before it, and when it changed',
    got['grade']['value'] == 9 and got['grade']['comment'] == 'Recounted' and got['previous']['value'] == 7 and got['updated_at'] is not None, got)
 ok("another student's page shows none of it", result(tok2, ENR2, a_pts)['grade'] is None)
+rpc(A, 'clear_score(:e, :a)', e=ENR1, a=a_pts)
+ok('the returned grade is cleared, not yet returned: the student still has it', result(tok, ENR1, a_pts)['grade']['value'] == 9)
+rpc(A, "set_score_status(:e, :a, 'NS')", e=ENR1, a=a_pts)
+got = result(tok, ENR1, a_pts)
+ok('Missing wins at once: the piece is Missing with no result, though the old grade is still the returned copy',
+   got['status'] == 'NS' and got['grade'] is None and got['previous'] is None
+   and one('select returned_copy from grade_return where enrollment_id = :e and assessment_id = :a', e=ENR1, a=a_pts)['value'] == 9, got)
+rpc(A, "set_score_status(:e, :a, 'EXC')", e=ENR1, a=a_pts)
+ok('Excused the same', result(tok, ENR1, a_pts)['status'] == 'EXC' and result(tok, ENR1, a_pts)['grade'] is None)
+rpc(A, "set_score_status(:e, :a, 'LATE')", e=ENR1, a=a_pts)
+ok('Late hides nothing', result(tok, ENR1, a_pts)['status'] == 'LATE' and result(tok, ENR1, a_pts)['grade']['value'] == 9)
+rpc(A, 'set_score_status(:e, :a, null)', e=ENR1, a=a_pts)
+ok('with the mark taken off before any Return, the returned grade is sent again', result(tok, ENR1, a_pts)['grade']['value'] == 9)
+rpc(A, 'upsert_score(:e, :a, 9)', e=ENR1, a=a_pts); rpc(A, "save_score_comment(:e, :a, 'Recounted')", e=ENR1, a=a_pts)
+ok('and putting the grade back as it was is no draft', state(ENR1, a_pts) == 'returned')
 ok('a class that is not in the session: not found', page(tok, ENR2) == {'ok': False, 'error': 'not_found'} and page(tok2, ENR1) == {'ok': False, 'error': 'not_found'})
 ok('an unknown or malformed token: signed out', page('f' * 64, ENR1) == {'ok': False, 'error': 'signed_out'} and page('nope', ENR1) == {'ok': False, 'error': 'signed_out'})
 
@@ -361,6 +376,7 @@ bad = []; drafts_seen = 0; returns = 0; steps = 0
 for n in range(300):
     kind = rng.choice(list(work)); a = work[kind]
     before = working_copy(ENR1, a); was = state(ENR1, a)
+    waiting = [a2 for a2 in work.values() if state(ENR1, a2) == 'draft']
     act = rng.choice(['save', 'save', 'save', 'save', 'comment', 'clear', 'return', 'return', 'status', 'note', 'setting', 'seen', 'again'])
     sp()
     try:
@@ -388,7 +404,16 @@ for n in range(300):
         elif act == 'note':
             rpc(A, 'save_score_report_note(:e, :a, :t, :k)', e=ENR1, a=a, t=rng.choice(['', 'a note']), k=key())
         elif act == 'setting':
-            holds = rng.random() < 0.7; set_class(True, 'on_return' if holds else rng.choice(['on_save', None]))
+            held = holds
+            holds = rng.random() < 0.7
+            if holds: set_class(True, 'on_return')
+            elif rng.random() < 0.3: set_class(False, 'on_return')       # the student page turned off...
+            else: set_class(True, rng.choice(['on_save', None]))
+            if held and not holds:
+                # Leaving When I Return Them returns everything that was waiting.
+                for a2 in waiting: last[a2] = working_copy(ENR1, a2); returns += 1
+            if not one('select student_page_enabled from course where id = :c', c=COURSE_A):
+                set_class(True, 'on_save'); holds = False                # ...and on again, so page can be read
         elif act == 'seen':
             svc("student_submit.seen(:t, :e, :ids::uuid[], 'ip-1')", t=tok, e=ENR1, ids='{%s}' % a)
         c.run('release savepoint sp')
@@ -405,13 +430,15 @@ for n in range(300):
     steps += 1
     shown = {x['id']: x for x in page(tok, ENR1)['assessments']}
     for kind2, a2 in work.items():
-        if shown[a2]['grade'] != last[a2]:
-            bad.append((n, act, kind2, shown[a2]['grade'], last[a2]))
+        # Missing and Excused win at once: no result while either is on the piece.
+        hidden = one('select status from score where enrollment_id = :e and assessment_id = :a', e=ENR1, a=a2) in ('NS', 'EXC')
+        if shown[a2]['grade'] != (None if hidden else last[a2]):
+            bad.append((n, act, kind2, shown[a2]['grade'], last[a2], hidden))
         if state(ENR1, a2) == 'draft':
             drafts_seen += 1
-            if shown[a2]['grade'] == working_copy(ENR1, a2):
+            if shown[a2]['grade'] is not None and shown[a2]['grade'] == working_copy(ENR1, a2):
                 bad.append((n, act, kind2, 'a draft came back'))
-ok('for %d random saves, edits, clears, returns and setting changes, page always gave the grade at the last return' % steps, not bad, bad[:3])
+ok('for %d random saves, edits, clears, returns and setting changes, page always gave the grade at the last return (and nothing while Missing or Excused)' % steps, not bad, bad[:3])
 ok('the run really held drafts (%d checks while one was waiting) and returned grades (%d returns)' % (drafts_seen, returns), drafts_seen > 100 and returns > 10, (drafts_seen, returns))
 ok('and never left a returned copy off a draft, or a draft that equals what was returned',
    one("""select count(*) from grade_return g where (g.returned_copy is not null) <> (g.is_draft and g.returned_at is not null)
@@ -447,6 +474,50 @@ ok('they are logged as slips, not as unknown codes',
    and one("select count(*) from student_submit.attempt where route = 'card' and ip_hash = 'ip-school' and outcome in ('not_found', 'bad_format', 'ambiguous')") == 0)
 ok("the slip still opens with open(), as before", svc("student_submit.open(:c, 'ip-school')", c=slip).get('kind') == 'questionnaire')
 ok("verify_card does not take a slip's code", verify(slip, birthday='2012-05-15', ip='ip-school') == {'ok': False, 'error': 'not_found'})
+back()
+
+# ── A new slip never reads like a live card, nor a new card like a live slip ──
+sp()
+q = rpc(A, "upsert_questionnaire(:c, 'core_reflection', 'A Reflection', 'core-8-1', p_report_period => 1, p_opens_on => (:d::date - 1), p_closes_on => (:d::date + 7), p_idempotency_key => :k)",
+        c=COURSE_A, d=today, k=key())
+as_owner()
+live_def = one("select pg_get_functiondef('public._new_access_code()'::regprocedure)")
+c.run('create sequence public.draws')
+# The draw is rigged: the first code out is a live card's, the second is free.
+c.run("""create or replace function public._new_access_code() returns text language sql volatile
+         as $f$ select case nextval('public.draws') when 1 then '%s' else 'ZZZ-ZZ2' end $f$""" % code1)
+c.run('grant usage on sequence public.draws to authenticated')
+slips = rpc(A, 'issue_access_codes(:q, :ids::uuid[], :k)', q=q['id'], ids='{%s}' % ENR1, k=key())
+ok("a new slip whose first draw is a live card's code draws again", slips[0]['code'] == 'ZZZ-ZZ2', slips)
+as_owner(); c.run("select setval('public.draws', 1, false)")
+c.run("""create or replace function public._new_access_code() returns text language sql volatile
+         as $f$ select case nextval('public.draws') when 1 then 'ZZZ-ZZ2' else 'ZZZ-ZZ3' end $f$""")
+as_owner(); e9 = new_id(); c.run('insert into enrollment (id, student_id, course_id) values (:e, :s, :c)', e=e9, s=STU2, c=COURSE_A2)
+made = rpc(A, 'issue_student_cards(:c, :ids::uuid[], :k)', c=COURSE_A2, ids='{%s}' % e9, k=key())
+ok("a new card whose first draw is a live slip's code draws again", [x['code'] for x in made['cards'] if x['enrollment_id'] == e9] == ['ZZZ-ZZ3'], made['cards'])
+back()
+
+# ── When a student record is merged or moved (relink_student) ───────────
+# relink_student is not loaded here; these are its two effects on an enrollment.
+sp(); as_owner()
+real = new_id()
+c.run("insert into student (id, teacher_id, first_name, date_of_birth) values (:s, :t, 'Marcus', '2011-03-04')", s=real, t=A)
+rpc(A, 'upsert_score(:e, :a, 5)', e=ENR2, a=a_pts)
+kept_rows = rows('select assessment_id, is_draft from grade_return where enrollment_id = :e', e=ENR2)
+as_owner(); c.run('update enrollment set student_id = :s where id = :e', s=real, e=ENR2)
+r = card(code2)
+ok("an enrollment moved to the real student record keeps its card, and Is This You? asks for that record's birthday",
+   r.get('ok') is True and r['student'] == {'first_name': 'Marcus'} and r['check'] == 'identity' and r['also_password'] is True, r)
+ok("the real record's birthday opens it, the old record's details do not, and the card's own password still does",
+   verify(code2, birthday='2011-03-04').get('ok') is True and verify(code2, birthday='2012-05-15').get('error') == 'wrong_identity'
+   and verify(code2, password=pw).get('ok') is True)
+ok('its returned grades stay with the enrollment', rows('select assessment_id, is_draft from grade_return where enrollment_id = :e', e=ENR2) == kept_rows and kept_rows)
+back()
+sp(); as_owner()
+c.run('delete from enrollment where id = :e', e=ENR2)
+ok('a duplicate enrollment that is deleted takes its card, its sessions and its returned grades with it',
+   one('select (select count(*) from student_card where enrollment_id = :e) + (select count(*) from grade_return where enrollment_id = :e) + (select count(*) from student_submit.device_session_enrollment where enrollment_id = :e)', e=ENR2) == 0
+   and card(code2) == {'ok': False, 'error': 'not_found'})
 back()
 
 # ── A card password outlives a birthday added later ─────────────────────

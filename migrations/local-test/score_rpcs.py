@@ -92,7 +92,7 @@ for line in open(os.path.join(HERE, 'live-function-md5.txt')):
 got = {r[0]: r[1] for r in c.run("""select p.proname, md5(pg_get_functiondef(p.oid)) from pg_proc p
                                      join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public'""")}
 for name in sorted(n for n in want if n in got and n not in PATCHED
-                   and not (BATCH_A and n in ('update_course', 'import_json_restore'))):
+                   and not (BATCH_A and n in ('update_course', 'import_json_restore', 'duplicate_course'))):
     ok('%s is the live function, byte for byte' % name, got[name] == want[name], got[name])
 for name in PATCHED:
     ok('%s carries Batch A\'s patch (batch_a_apply.py shows it started as the live body)' % name, got[name] != want[name])
@@ -270,8 +270,9 @@ expect_error('a criterion level above 4 is refused by the table', lambda: rpc(A,
 if BATCH_A:
     expect_error("refused: a criterion that is not on the assessment's rubric",
                  lambda: rpc(A, 'upsert_rubric_score(:e, :a, :x, 3)', e=ENR2, a=RUB, x=CX), 'is not in the rubric of assessment')
-    expect_error('refused: a criterion on an assessment with no rubric',
-                 lambda: rpc(A, 'upsert_rubric_score(:e, :a, :x, 2)', e=ENR2, a=PLAIN, x=C1), 'is not in the rubric of assessment')
+    rpc(A, 'upsert_rubric_score(:e, :a, :x, 2)', e=ENR2, a=PLAIN, x=C1)
+    ok('still accepted: a criterion on an assessment with no rubric yet (the outbox can send a score ahead of its rubric)',
+       crit_row(ENR2, PLAIN, C1) == [2, 0, None, None], crit_row(ENR2, PLAIN, C1))
     expect_error("refused: Teacher B's criterion on Teacher A's student",
                  lambda: rpc(A, 'upsert_rubric_score(:e, :a, :x, 2)', e=ENR2, a=RUB, x=ids['b_crit']), 'is not in the rubric of assessment')
     ok('a 0 for a criterion that is not on the rubric is still taken, and writes nothing',
@@ -426,10 +427,7 @@ rpc(A, "upsert_rubric_score(:e, :a, :x, 3, 1::smallint, 'Number the steps', 'Dre
 rpc(A, 'upsert_rubric_score(:e, :a, :x, 2)', e=ENR1, a=RUB, x=C2)
 rpc(A, 'upsert_rubric_score(:e, :a, :x, 4)', e=ENR2, a=RUB, x=C1)
 rpc(A, 'set_rubric_check(:e, :a, :k, true)', e=ENR1, a=RUB, k=K1)
-if BATCH_A:   # another assessment's row on the old criterion; the RPC no longer takes one where there is no rubric
-    as_owner(); c.run('insert into rubric_score (enrollment_id, assessment_id, criterion_id, value) values (:e, :a, :x, 1)', e=ENR1, a=PLAIN, x=C1)
-else:
-    rpc(A, 'upsert_rubric_score(:e, :a, :x, 1)', e=ENR1, a=PLAIN, x=C1)
+rpc(A, 'upsert_rubric_score(:e, :a, :x, 1)', e=ENR1, a=PLAIN, x=C1)   # another assessment's row on the old criterion
 cmap = '{"%s": "%s", "%s": "%s"}' % (C1, cp['c1'], C2, cp['c2']); kmap = '{"%s": "%s"}' % (K1, cp['k1'])
 mk = key()
 expect_error("move_rubric_scores refuses a rubric from another class",
