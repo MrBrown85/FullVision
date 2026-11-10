@@ -1872,8 +1872,6 @@ function getTagScores(cid, studentId, tagId) {
   const everyIds = termActive ? _everyAssessmentIds(cid) : null;
   const filtered = [];
   studentScores.forEach(s => {
-    // Only what the piece measures now is evidence (_pieceMeasures).
-    if (!_pieceMeasures(cid, s.assessmentId, s.tagId)) return;
     let entry = s;
     if (s.tagId !== tagId) {
       const crit = criteria[s.tagId];
@@ -1897,6 +1895,8 @@ function getTagScores(cid, studentId, tagId) {
         entry = { ...s, tagId: tagId, criterionId: s.tagId, criterionName: crit.name };
       }
     }
+    // Only what the piece measures now is evidence (_pieceMeasures).
+    if (!_pieceMeasures(cid, s.assessmentId, s.tagId)) return;
     // As of a report, a score drops out only when its assessment is dated
     // after the report's end. A score whose assessment is gone stays, as it
     // does in the year so far, so the gradebook and the report agree.

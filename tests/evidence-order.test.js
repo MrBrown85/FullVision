@@ -247,6 +247,10 @@ describe('what "the assignment list" is', () => {
     orders([score('A', 1, { date: '2026-10-09' }), score('B', 4), score('C', 2)]).forEach(order => {
       graded(order);
       expect(level()).toBe(1); // A is dated later than B and C
+      expect(getTagScores(CID, 'sam', 'T1').map(e => e.assessmentId)).toEqual(['B', 'C', 'A']);
+      // The last two are C (2) then A (1): down.
+      expect(getSectionTrend(CID, 'sam', 'S1')).toBe('down');
+      expect(sectionCountedEvidence(CID, 'sam', 'S1').map(e => e.assessmentId)).toEqual(['B', 'C', 'A']);
     });
   });
 
@@ -303,6 +307,61 @@ describe('the scores of one piece count in the order the piece lists them', () =
     });
     expect(new Set(got).size).toBe(1);
     expect(got[0]).toBeCloseTo((3 + 1 / 3 + 2 - 1 / 3) / 2, 12);
+  });
+
+  it('a piece on three competencies: the very same number in all six score-list orders', () => {
+    // 3+, 1− and 2+ add up differently, in the last decimal place, in different orders.
+    seed([piece('essay', { tagIds: ['T1', 'T2', 'T3'] })], 'average');
+    _cache.learningMaps[CID].sections.push({
+      id: 'S3',
+      subject: 'SUB',
+      name: 'Report',
+      tags: [{ id: 'T3', label: 'Report' }],
+    });
+    const entries = [
+      { assessmentId: 'essay', tagId: 'T1', score: 3, mod: 1, date: DAY },
+      { assessmentId: 'essay', tagId: 'T2', score: 1, mod: -1, date: DAY },
+      { assessmentId: 'essay', tagId: 'T3', score: 2, mod: 1, date: DAY },
+    ];
+    const sums = orders(entries).map(order => order.reduce((t, e) => t + scoreModValue(e), 0));
+    // The plain sums really do differ by order; the piece's level must not.
+    expect(new Set(sums).size).toBeGreaterThan(1);
+    const got = orders(entries).map(order => {
+      graded(order);
+      return getAssessmentOverallScore(CID, 'sam', 'essay');
+    });
+    expect(new Set(got).size).toBe(1);
+    expect(got[0]).toBe((scoreModValue(entries[0]) + scoreModValue(entries[1]) + scoreModValue(entries[2])) / 3);
+  });
+});
+
+describe('a section with two competencies', () => {
+  afterEach(drop);
+
+  it('the trend follows the assignment list across its competencies, not their order in the section', () => {
+    // One section holding T1 then T2. First in the list: a piece on T2
+    // scored 4. Second: a piece on T1 scored 1. Same date.
+    seed([piece('first', { tagIds: ['T2'] }), piece('second', { tagIds: ['T1'] })], 'mostRecent');
+    _cache.learningMaps[CID].sections = [
+      {
+        id: 'S1',
+        subject: 'SUB',
+        name: 'Inquiry',
+        tags: [
+          { id: 'T1', label: 'Ask' },
+          { id: 'T2', label: 'Plan' },
+        ],
+      },
+    ];
+    const first = { assessmentId: 'first', tagId: 'T2', score: 4, date: DAY };
+    const second = { assessmentId: 'second', tagId: 'T1', score: 1, date: DAY };
+    orders([first, second]).forEach(order => {
+      graded(order);
+      expect(sectionCountedEvidence(CID, 'sam', 'S1').map(e => e.assessmentId)).toEqual(['first', 'second']);
+      // The most recent is the second piece's 1, after the first piece's 4.
+      expect(getSectionTrend(CID, 'sam', 'S1')).toBe('down');
+      expect(evidenceChange(sectionCountedEvidence(CID, 'sam', 'S1'))).toMatchObject({ first: 4, last: 1, dir: -1 });
+    });
   });
 });
 

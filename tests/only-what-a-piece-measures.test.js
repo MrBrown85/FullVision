@@ -238,6 +238,8 @@ describe('an Overall level on competency work', () => {
     seed([essay(), lab()], () => essayAndLab().concat([on('essay', 'overall', 1)]));
     const now = expectLeftOut(e => e.tagId === 'overall');
     expect(now.sam.pieces[0]).toBe(3.5);
+    // A column for the Overall score on this piece counts nobody.
+    expect(classColumnAverage(CID, STUDENTS, { assessment: piece('essay'), tagIds: ['overall'] })).toBeNull();
   });
 
   it('filed under the piece’s first competency, as a reload files it, it is that competency’s level', () => {
@@ -256,6 +258,10 @@ describe('an Overall level on competency work', () => {
     expect(now.sam.pieces).toEqual([3, 2]);
     expect(now.sam.ask).toBe(0);
     expect(returnedNumbers()).toEqual(now);
+    expect(classColumnAverage(CID, STUDENTS, { assessment: piece('essay'), tagIds: ['overall'] })).toEqual({
+      avg: 3,
+      count: 2,
+    });
   });
 });
 
