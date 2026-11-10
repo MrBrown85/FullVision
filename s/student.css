@@ -681,6 +681,9 @@ button {
 .sp-page {
   gap: 10px;
 }
+.sp-page-title:focus {
+  outline: none;
+}
 .sp-page-title {
   margin: 4px 4px 2px;
   font-size: 22px;

@@ -178,7 +178,8 @@
   function renderAssignments(state) {
     return StudentPage.pageFrame(
       state,
-      '<h1 class="sp-page-title">Assignments</h1>' + noResultsHtml(state) + listHtml(state.page),
+      // The page's first words, where the keyboard and a screen reader start (app.js moves there).
+      '<h1 class="sp-page-title" tabindex="-1">Assignments</h1>' + noResultsHtml(state) + listHtml(state.page),
     );
   }
 

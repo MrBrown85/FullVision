@@ -601,6 +601,8 @@ var StudentPage = (function () {
       if (cardsLocked && res && !res.ok && res.error === 'not_found') res = { ok: false, error: 'locked' };
       // Typed on a card's screen and it opened nothing: that screen answers.
       if (cards && !(res && res.ok) && cards.refused(res)) return;
+      // A slip typed on a card's screen: the tab is named for the slip's page again.
+      if (cards && typeof document !== 'undefined') document.title = 'Student Questions — FullVision';
       if (res && res.ok && res.kind === 'report') {
         S.data = res;
         S.screen = 'rcheck';
@@ -809,6 +811,14 @@ var StudentPage = (function () {
       e.preventDefault();
       var add = e.target.parentNode.querySelector('[data-act="other-add"]');
       if (add) add.click();
+    }
+    // Enter in a card's Is This You? box answers it, as Yes, That's Me does.
+    if (e.key === 'Enter' && e.target && e.target.id === 'sp-ident') {
+      var yes = root.querySelector('[data-act="card-yes"]');
+      if (yes && !yes.disabled) {
+        e.preventDefault();
+        yes.click();
+      }
     }
   }
 

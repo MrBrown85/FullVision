@@ -899,7 +899,7 @@
         S.again = false;
         S.screen = 'assignments';
         setTitle();
-        paint();
+        paint('.sp-page-title');
         window.scrollTo(0, 0);
         watch();
         tellSeen();
