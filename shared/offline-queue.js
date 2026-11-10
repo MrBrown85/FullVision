@@ -329,13 +329,15 @@
     // (shared/data.js FV_SETTINGS_CHANGED_ONLY). One without the mark is
     // from an earlier build, or is the student page's two settings: it is
     // replaced whole, as it always was.
-    if (entry.endpoint === 'update_course' && !p[CHANGED_ONLY]) return null;
+    if (MARKED_ONLY[entry.endpoint] && !p[CHANGED_ONLY]) return null;
     return Object.keys(p).filter(function (k) {
       return k !== CHANGED_ONLY;
     });
   }
-  // The param that holds the fields, for each write that sends only those.
+  // The param that holds the fields, for each write that sends only those;
+  // and the ones that do so only when their fields carry the mark.
   var FIELDS_PARAM = { save_term_rating: 'p_payload', update_course: 'p_patch' };
+  var MARKED_ONLY = { update_course: true };
   var CHANGED_ONLY = '_changed_only';
 
   /* What is left of an older failed write once a newer write to the same
@@ -949,7 +951,9 @@
       // cached result instead of creating a duplicate row.
       var payload = _withIdemKey(entry.endpoint, entry.payload, entry.id);
       // The sender is told when this is the one more try after a reload.
-      var options = entry.last_try ? Object.assign({}, _sendOptions[entry.id], { lastTry: true }) : _sendOptions[entry.id];
+      var options = entry.last_try
+        ? Object.assign({}, _sendOptions[entry.id], { lastTry: true })
+        : _sendOptions[entry.id];
       var res = await _sendNow(entry.endpoint, payload, options);
       return res || { data: null, error: null };
     } catch (e) {
@@ -1444,8 +1448,7 @@
         return;
       }
       var target = _target(entry.endpoint, entry.payload);
-      var drop =
-        !target || entry.last_try || entry.no_retry || entry.blocked_on || q.entries.length >= MAX_ENTRIES;
+      var drop = !target || entry.last_try || entry.no_retry || entry.blocked_on || q.entries.length >= MAX_ENTRIES;
       // What a queued write sets is newer: only the rest is retried.
       var rest = entry;
       for (var i = 0; !drop && i < queued.length; i++) {

@@ -4817,9 +4817,14 @@ function _unsentCourseChanges(cid) {
       if (col !== FV_SETTINGS_CHANGED_ONLY) out[col] = p.p_patch[col];
     });
   });
+  // Only the server's word turns the student page on or sets Return Grades.
+  delete out.student_page_enabled;
+  delete out.return_grades;
   return out;
 }
 
+// What updateCourse counts its edits under (_localWrites): the class's own row.
+var _COURSE_ROW_FIELD = 'courseRow';
 /* The class's own row into the class list (COURSES), as list_teacher_courses
    fills it when the app opens (_canonicalCoursesToBlob). A class load used
    to leave these as they were, so a grading style, late work policy, name
@@ -4827,6 +4832,9 @@ function _unsentCourseChanges(cid) {
    and opened again. */
 function _applyBundleCourseRow(cid, courseRow) {
   if (!_plainObject(courseRow) || !COURSES || !COURSES[cid]) return;
+  // Changed here while this load was on its way (updateCourse): the row is
+  // from before that change, so it is left and the load runs again.
+  if (_refreshMustSkip(cid, _COURSE_ROW_FIELD)) return;
   var row = Object.assign({}, courseRow, _unsentCourseChanges(cid));
   var course = COURSES[cid];
   var before = JSON.stringify(course);
@@ -5288,7 +5296,7 @@ function _sendUpCurriculumTags(rows, prev) {
     var mine = prev && prev[r.id] && prev[r.id].curriculumTags;
     if (!Array.isArray(mine) || !mine.length) return;
     _trackPendingSync(
-      _writeRpc('update_course', { p_course_id: r.id, p_patch: _changedOnly({ curriculum_tags: mine.slice() }) }).then(
+      _writeRpc('update_course', { p_course_id: r.id, p_patch: { curriculum_tags: mine.slice() } }).then(
         function (res) {
           if (res.error) console.warn('update_course (curriculum link upload) failed:', res.error);
         },
@@ -6678,6 +6686,11 @@ function updateCourse(id, updates) {
   if (!COURSES[id]) return;
   Object.assign(COURSES[id], updates);
   _safeLSSet('gb-courses', JSON.stringify(COURSES));
+  // A class load on its way must not put the older row back over this
+  // (_applyBundleCourseRow). The counter only: the class list is not part
+  // of the class's saved copy, so that copy is not marked as edited.
+  var edits = _localWrites[id] || (_localWrites[id] = { at: 0, fields: {} });
+  edits.fields[_COURSE_ROW_FIELD] = (edits.fields[_COURSE_ROW_FIELD] || 0) + 1;
   // The grade level sets the course %'s rounding (whole for 10–12), and the
   // method and grading style are read from the course too: no cached grade
   // may outlive them.
@@ -9167,8 +9180,25 @@ function _changedOnly(patch) {
   return patch;
 }
 
-// The same value, whatever order an object's keys are in (jsonb reorders them).
+/* What a setting is when this device's copy does not name it: how the app
+   reads it then (getFoldersCountAsOne and the rest), and what a class load
+   leaves out of the copy when the server holds it. A save that sets one of
+   these to the same thing has changed nothing. */
+var _SETTING_WHEN_ABSENT = {
+  folders_count_as_one: true,
+  courses_count_equally: false,
+  recent_score_limit: null,
+  level_order: 'desc',
+};
+
+// The same value, whatever order an object's keys are in (jsonb reorders
+// them), and whether a number came as a number or as text.
 function _sameSetting(a, b) {
+  if (typeof a !== typeof b && a != null && b != null && isFinite(Number(a)) && isFinite(Number(b))) {
+    if (typeof a !== 'object' && typeof b !== 'object' && typeof a !== 'boolean' && typeof b !== 'boolean') {
+      return Number(a) === Number(b);
+    }
+  }
   return _settingText(a) === _settingText(b);
 }
 function _settingText(v) {
@@ -9217,6 +9247,11 @@ function saveCourseConfig(cid, obj) {
     if (sb && obj) {
       const all = _courseSettingsPatch(obj);
       const was = _courseSettingsPatch(before);
+      if (_plainObject(before)) {
+        Object.keys(_SETTING_WHEN_ABSENT).forEach(function (col) {
+          if (!(col in was)) was[col] = _SETTING_WHEN_ABSENT[col];
+        });
+      }
       const patch = {};
       Object.keys(all).forEach(function (col) {
         if (!(col in was) || !_sameSetting(all[col], was[col])) patch[col] = all[col];
@@ -9254,7 +9289,7 @@ function saveCourseConfig(cid, obj) {
    build that sent a device's whole copy of the settings with every save.
    Which of its keys the teacher meant to change was never recorded, so it
    is compared with the class's row on the server now (_oldSettingsWrite). */
-async function _sendableCoursePatch(params, options) {
+function _sendableCoursePatch(params, options) {
   var patch = params && params.p_patch;
   if (!_plainObject(patch)) return { params: params };
   if (patch[FV_SETTINGS_CHANGED_ONLY]) {
@@ -13354,8 +13389,11 @@ async function _callRpcWithAuthGuard(name, params, options) {
   // Class settings: a write from this build goes as it is; one a build from
   // before it queued (a device's whole copy) is checked against the server
   // first, and may be cut down or not sent at all.
+  // Only the check of an old write waits (it reads the class): a write from
+  // this build goes out in the same turn it always did.
   if (name === 'update_course') {
-    var checked = await _sendableCoursePatch(params, options);
+    var checked = _sendableCoursePatch(params, options);
+    if (checked && typeof checked.then === 'function') checked = await checked;
     if (checked.answer) return checked.answer;
     params = checked.params;
   }
