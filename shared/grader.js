@@ -107,6 +107,60 @@ window.Grader = (function () {
     return _saved(cid, sid, aid, 'backToGroupGrade', setGradedSeparately(cid, aid, sid, false));
   }
 
+  /* ── The phone's Grade tab (S1-T2) ──────────────────────────────────
+     The phone's points, marks, statuses, ticks, comments and group
+     actions go through the actions above. Its levels and its Undo pass
+     data.js something different from the desktop's, so they have actions
+     of their own here, kept as the phone had them: the move changed
+     nothing that is saved or sent (tests/pin-phone-grade-writes.test.js).
+     Each says how it differs. Making them the same changes what a
+     teacher's tap saves, so that is a decision, not tidying. */
+
+  /* A level under one score key, as the phone dates and notes it. Work
+     with no date of its own is dated today, on every change of the level;
+     _writeLevel passes no date for it, so data.js dates a first level today
+     and leaves a later one's date alone. */
+  function _writeLevelOnPhone(cid, sid, aid, key, level, note, mod) {
+    var assess = getAssessments(cid).find(function (a) {
+      return a.id === aid;
+    });
+    return upsertScore(
+      cid,
+      sid,
+      aid,
+      key,
+      level,
+      (assess && assess.date) || courseToday(cid),
+      scoreTypeFor(assess),
+      note,
+      mod,
+    );
+  }
+
+  /* A level, 1 to 4, under `key`. 0 clears it. */
+  function setLevelOnPhone(cid, sid, aid, key, level, mod) {
+    return _saved(cid, sid, aid, 'level', _writeLevelOnPhone(cid, sid, aid, key, level, '', mod));
+  }
+
+  /* + or − on the level `key` holds. `note` is the Overall Comment the
+     phone passes with a competency's + or − ('' on a rubric criterion):
+     data.js sends a comment it is given again, which setPlusMinus never
+     does. */
+  function setPlusMinusOnPhone(cid, sid, aid, key, level, mod, note) {
+    return _saved(cid, sid, aid, 'plusMinus', _writeLevelOnPhone(cid, sid, aid, key, level, note, mod));
+  }
+
+  /* The phone's Undo. The phone works out the class's scores with the
+     undone cells as they were (`after`; `before` is a copy from before it
+     did) and saves that list, then sends what changed between the two.
+     undo, below, hands both copies to data.js, which puts back only the
+     cells that still hold what was undone. */
+  function undoOnPhone(cid, sid, aid, before, after) {
+    var out = saveScores(cid, after);
+    persistScoreDiffToCanonical(cid, before, after);
+    return _saved(cid, sid, aid, 'undo', out);
+  }
+
   /* Undo: put back the cells that changed between `before` and `after`
      (copies of the class's scores) and still hold what `after` has. */
   function undo(cid, before, after) {
@@ -127,6 +181,10 @@ window.Grader = (function () {
     setDibels: setDibels,
     gradeSeparately: gradeSeparately,
     backToGroupGrade: backToGroupGrade,
+    // The phone's Grade tab (S1-T2)
+    setLevelOnPhone: setLevelOnPhone,
+    setPlusMinusOnPhone: setPlusMinusOnPhone,
+    undoOnPhone: undoOnPhone,
     undo: undo,
   };
 })();
