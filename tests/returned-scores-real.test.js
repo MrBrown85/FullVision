@@ -432,7 +432,10 @@ describe.each(CLASSES)('%s', (name, load) => {
         globalThis.getReturnedScores = real;
         clearProfCache();
       }
-    });
+      // It works every number of the Demo class out twice. About a second on a
+      // laptop, but it has passed the default five on a busy CI runner (main,
+      // 2026-11-10), so it gets room: the test is slow, not wrong.
+    }, 30000);
 
     it('entry for entry: every grade returned, then one changed, is the getScores of before the change', () => {
       const cid = ctx.cid;
