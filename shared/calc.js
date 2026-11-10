@@ -20,8 +20,7 @@ var _sectionByIdCache = {}; // cid → Map<sectionId, section>      — avoids r
 var _assessmentOverallCache = {};
 var _categoryAvgCache = {};
 var _courseLetterCache = {};
-var _pieceIndexCache = {}; // cid → { rank, keys }: each piece's place in the assignment list and what it measures
-var _orderedEntriesCache = {}; // class, term, set and student → the student's score entries in counting order
+var _pieceIndexCache = {}; // cid → { keys }: what each piece of work measures now
 
 /* ── The score set and its reader ──────────────────────────────
    Every score, status, points score, Complete/Incomplete mark, Overall
@@ -298,7 +297,6 @@ function clearProfCache() {
   _categoryAvgCache = {};
   _courseLetterCache = {};
   _pieceIndexCache = {};
-  _orderedEntriesCache = {};
 }
 
 /** Get or build assessment weights map for a course. */
@@ -340,41 +338,22 @@ function _getSectionById(cid, sectionId) {
   return _sectionByIdCache[cid].get(sectionId);
 }
 
-/* ── What each piece of work measures, and the order work counts in ──
-   Two rules read the class's pieces of work the same way, so they share one
-   index, built once per class and thrown away by clearProfCache.
+/* ── What each piece of work measures ─────────────────────────────
+   Built once per class and thrown away by clearProfCache.
 
    keys: what each piece measures now, as its score keys (scoreTagIds, the
    list the gradebook cell is drawn from): on competency work the
    competencies linked to it that are still on the class; on rubric work the
    criteria of the rubric it has now; on points and Complete/Incomplete work
    its linked competencies; and the one Overall key when it has none of
-   these.
-
-   rank: each piece's place in the class's assignment list, for telling
-   same-date work apart. The Assignments page lists by display_order (a
-   teacher's drag sets 1..n; 0 is never placed, and sits first), then for
-   pieces with the same date by the order they are stored in, which is the
-   order they were made (the server sends display_order, created_at, id). */
+   these. */
 function _pieceIndex(cid) {
   if (_pieceIndexCache[cid]) return _pieceIndexCache[cid];
-  var all = (getAssessments(cid) || []).filter(Boolean);
-  var rank = new Map();
-  all
-    .map(function (a, i) {
-      return { id: a.id, placed: Number(a.display_order || 0) || 0, stored: i };
-    })
-    .sort(function (x, y) {
-      return x.placed - y.placed || x.stored - y.stored;
-    })
-    .forEach(function (x, n) {
-      rank.set(x.id, n);
-    });
   var keys = new Map();
-  all.forEach(function (a) {
+  (getAssessments(cid) || []).filter(Boolean).forEach(function (a) {
     keys.set(a.id, scoreTagIds(a, cid));
   });
-  _pieceIndexCache[cid] = { rank: rank, keys: keys };
+  _pieceIndexCache[cid] = { keys: keys };
   return _pieceIndexCache[cid];
 }
 
@@ -390,53 +369,6 @@ function _pieceMeasures(cid, assessmentId, key) {
   if (!keys) return true;
   if (isUnlinkedTag(key)) return isUnlinkedTag(keys[0]);
   return keys.indexOf(key) >= 0;
-}
-
-/* The order evidence counts in: by date; work with the same date in the
-   order it sits in the class's assignment list (_pieceIndex's rank),
-   whatever order it was graded in (Colin, 2026-11-09: "Order in the
-   assignment list"); and the scores of one piece in the order the piece
-   lists what it measures (its competencies, or its rubric's criteria).
-   Never by where an entry sits in the student's score list: re-entering a
-   score moves it to the end of that list, and Most Recent, Mode's tie and
-   Decaying Average must not move with it. Two entries under the same key of
-   one piece are one score stored twice; they keep the order given. */
-function _evidenceCompare(cid) {
-  var index = _pieceIndex(cid);
-  function place(entry) {
-    var keys = index.keys.get(entry.assessmentId) || [];
-    var at = keys.indexOf(entry.criterionId || entry.tagId);
-    return at < 0 ? keys.length : at;
-  }
-  return function (a, b) {
-    var byDate = (a.date || '').localeCompare(b.date || '');
-    if (byDate) return byDate;
-    if (a.assessmentId !== b.assessmentId) {
-      var ra = index.rank.get(a.assessmentId);
-      var rb = index.rank.get(b.assessmentId);
-      // A piece no longer in the class sorts after those that are, by its id.
-      if (ra == null && rb == null) return String(a.assessmentId) < String(b.assessmentId) ? -1 : 1;
-      if (ra == null) return 1;
-      if (rb == null) return -1;
-      return ra - rb;
-    }
-    var byPlace = place(a) - place(b);
-    if (byPlace) return byPlace;
-    var ka = String(a.criterionId || a.tagId || '');
-    var kb = String(b.criterionId || b.tagId || '');
-    return ka < kb ? -1 : ka > kb ? 1 : 0;
-  };
-}
-
-/* One student's score entries in counting order (_evidenceCompare), from
-   the set of scores in use. Everything that turns entries into evidence
-   reads them here, so no result depends on the order of the score list. */
-function _orderedEntries(cid, studentId) {
-  var key = _ck(cid) + ':' + studentId;
-  if (_orderedEntriesCache[key]) return _orderedEntriesCache[key];
-  var ordered = (_scoreRead.scores(cid)[studentId] || []).slice().sort(_evidenceCompare(cid));
-  _orderedEntriesCache[key] = ordered;
-  return ordered;
 }
 
 /** Convert a raw point score to a proficiency level using percentage boundaries.
@@ -695,7 +627,7 @@ function getAssessmentOverallScore(cid, studentId, assessmentId) {
     return 0;
   }
 
-  var entries = _orderedEntries(cid, studentId).filter(function (entry) {
+  var entries = (_scoreRead.scores(cid)[studentId] || []).filter(function (entry) {
     return entry.assessmentId === assessmentId;
   });
   var rubricResult = getRubricAssessmentScore(cid, assessment, entries);
@@ -1857,8 +1789,8 @@ function getTagScores(cid, studentId, tagId) {
   var cacheKey = _ck(cid) + ':' + studentId + ':' + tagId;
   if (_tagScoresCache[cacheKey]) return _tagScoresCache[cacheKey];
 
-  // In counting order, so the evidence below comes out in it too.
-  const studentScores = _orderedEntries(cid, studentId);
+  const allScores = _scoreRead.scores(cid);
+  const studentScores = allScores[studentId] || [];
   const statuses = _scoreRead.statuses(cid);
   // Use Map for O(1) lookup instead of O(n) find() per score entry
   const assessMap = _getAssessMap(cid);
@@ -2313,7 +2245,7 @@ function getSectionTrend(cid, studentId, sectionId) {
       .forEach(s => allScores.push(s));
   });
   if (allScores.length < 2) return 'flat';
-  allScores.sort(_evidenceCompare(cid));
+  allScores.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   const recent = allScores[allScores.length - 1].score;
   const prev = allScores[allScores.length - 2].score;
   if (recent > prev) return 'up';
@@ -2363,7 +2295,7 @@ function sectionCountedEvidence(cid, studentId, sectionId) {
         out.push(s);
       });
   });
-  return out.sort(_evidenceCompare(cid));
+  return out;
 }
 
 /** Count the number of scored evidence entries across all tags in a section.
@@ -2505,7 +2437,7 @@ function getSectionGrowthData(cid, studentId, sectionId) {
   // Sort allScores once by date, then use a running pointer — O(n) instead of O(n²).
   // For each date, advance the pointer to include all scores up to that date,
   // accumulating them into a per-tag Map so grouping is also O(1) per score.
-  allScores.sort(_evidenceCompare(cid));
+  allScores.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   const runningByTag = new Map(section.tags.map(t => [t.id, []]));
   let ri = 0;
 
