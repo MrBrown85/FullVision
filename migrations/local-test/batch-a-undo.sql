@@ -50,18 +50,19 @@
 -- gradebook-prod, read 2026-11-10; it refuses to run if that is 400 ms or
 -- less). Measured with six connections saving in a loop (points, a rubric
 -- fill, one criterion, a comment, a clear, a change to the class itself;
--- batch_a_undo_load.py), three runs here on PostgreSQL 17.11 and one on
--- 18.6, and three by the independent reviewer:
+-- batch_a_undo_load.py), four runs here on PostgreSQL 17.11 and two on
+-- 18.6 (the last of each with S0-M4b applied, so with its trigger
+-- function), and three by the independent reviewer:
 --   a class at work (each connection saving about four times a second):
 --       every run finished and no save failed. PART 1 took about 10 ms, at
 --       most 0.5 s; the slowest save waited 0.4 s.
---   flat out (400 to 500 saves a second while it ran): every run finished
+--   flat out (100 to 600 saves a second while it ran): every run finished
 --       and no save failed, but it is not quick. PART 1 took about a second
 --       as a rule and up to 8 s, and the slowest save waited anything from
 --       0.3 s to 4.6 s.
 -- So no save is refused; under heavy load one can wait seconds. (As first
--- written, in one transaction, the same test flat out finished 5 to 11 of
--- 20 runs and killed 106 to 146 saves.) If one table cannot be had in 40
+-- written, in one transaction, the same test flat out finished 2 to 11 of
+-- 20 runs and killed 72 to 146 saves.) If one table cannot be had in 40
 -- tries it stops there and says which; run PART 1 again and it carries on
 -- from that table.
 --
@@ -192,9 +193,11 @@
 --
 -- One transaction, on purpose: all or nothing. It holds locks on the score
 -- tables until it commits, so it is for a quiet moment, not a busy one.
--- Measured the same way. With a class at work 10 of 10 runs finished every
--- time; in three sets of ten no save failed, and in the fourth (on 18.6) 7
--- saves were killed by deadlocks. Flat out it is the wrong tool: between 0
+-- Measured the same way, six sets of ten runs (the last two after S0-M4b's
+-- undo, which was run with the saves paused). With a class at work 8 to 10
+-- of 10 runs finished; in the four sets on 17.11 no save failed, and in the
+-- two on 18.6 saves were killed by deadlocks (7, and 17). Flat out it is
+-- the wrong tool: between 0
 -- and 6 of 10 runs finished (the others were stopped by a deadlock or the
 -- lock timeout, with nothing changed), 34 to 77 saves were killed in each
 -- set of ten, and a save caught in flight can fail once with "column does

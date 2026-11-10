@@ -931,24 +931,42 @@ never found anything to do. `npm test`: " + sys.argv[2] + ".
 ## Batch A: the way back (2026-11-10)
 
 `batch-a-undo.sql` undoes Batch A (`../2026110901` to `../2026110904`), which
-was applied to `gradebook-prod` on Nov 10; S0-M5 (`../2026111002`) was
-applied after it the same day, and the script is written and proved for a
-database with both. It is **not a migration** and is kept here, not in
-`migrations/`, so CI's drift check does not wait for it to be applied. Its header is the operator's page: what each part does, what
-students see after it, what still runs, what it leaves. In short:
+was applied to `gradebook-prod` on Nov 10. S0-M5 (`../2026111002`) and then
+S0-M4b (`../2026110905`) were applied after it the same day, and the script
+is written and proved for the database as that leaves it. It is **not a
+migration** and is kept here, not in `migrations/`, so CI's drift check does
+not wait for it to be applied. Its header is the operator's page: what each
+part does, what students see after it, what still runs, what it leaves.
+
+S0-M4b stands on Batch A and has its own undo, `s0-m4b-undo.sql`. PART 1 and
+PART 1B here run as they are and touch nothing of S0-M4b; PART 1A needs
+S0-M4b's fast stop first; PART 2 needs the whole of S0-M4b's undo first.
+Each refuses without it. S0-M5 is left alone throughout. In short:
 
 - **PART 1, the fast stop:** drops Batch A's 18 triggers and nothing else,
   one table at a time (`course` first), each in its own transaction that
   waits at most 200 ms for its table and tries again, so it never holds two
   tables and a save is never the one Postgres kills. An ordinary save then
-  no longer touches `grade_return`. Batch A's functions and file 01's
-  policies all stay and still run. In a class with the Student Page on,
-  students are then shown some grades early and not shown others (the
-  header lists the cases).
+  no longer touches `grade_return`. Batch A's functions, file 01's policies
+  and all of S0-M4b stay and still run: its three triggers (PART 1's last
+  query lists them) and its nightly repair, which brings `grade_return` up
+  to date once a day. Between a save and the next repair, in a class with
+  the Student Page on, students are shown some grades early and not shown
+  others (the header lists the cases).
 - **PART 1A, the Student Page off:** for every class that has it on, and it
   answers with the list. It refuses, with nothing changed, while any of
-  Batch A's triggers is left: with `grade_return_release` still on `course`,
-  turning the page off returns every waiting draft to the students.
+  Batch A's triggers is left (with `grade_return_release` still on `course`,
+  turning the page off returns every waiting draft to the students), and
+  while S0-M4b's repair still runs by itself, its nightly job or its
+  `grade_return_mode` trigger (the repair settles a grade saved since PART 1
+  as a save would in the class as it is then, and with the page off that is
+  Returned: shown when the page comes back on). So: both fast stops, then
+  PART 1A.
+- **Back on after PART 1:** the classes on again if PART 1A turned them off,
+  `call public.grade_return_repair_nightly();`, file 02 again, then
+  `2026110905` again (file 02 puts five functions back as Batch A made
+  them, without S0-M4b's changes). The database is then line for line what
+  live is now, and nothing a teacher was holding has been shown.
 - **PART 1B:** the five score-table policies as they were before file 01.
   Only for a save refused by row security.
 - **PART 2, the full removal:** everything the four files made or changed,
@@ -958,8 +976,10 @@ students see after it, what still runs, what it leaves. In short:
   rows and the three class settings. It stops, with nothing changed and the
   whole list, if anything else depends on what Batch A made, sits on one of
   its tables, or is a function or cron job whose text names one of its
-  objects (S0-M4b, PR 989, is such a thing: run that file's own undo first).
-  The header carries the same check as one read-only query. It does not
+  objects. S0-M4b is such a thing and is applied: PART 2 says so, apart from
+  anything else it finds, and S0-M4b's own undo goes first.
+  The header carries the same check as one read-only query, whose first
+  row says whether S0-M4b is on top. It does not
   touch the migration record; the header has the one optional statement for
   that.
 
@@ -972,7 +992,7 @@ the script), so it can be run again and again.
 ```bash
 PGPORT=54331 PGDATABASE=fv_undo python3 batch_a_undo.py build   # an empty database: everything but the four files
 PGPORT=54331 PGDATABASE=fv_undo python3 batch_a_undo.py         # the proof
-PGPORT=54331 PGDATABASE=fv_undo python3 batch_a_undo.py partial s0-m4b   # or only some scenarios
+PGPORT=54331 PGDATABASE=fv_undo python3 batch_a_undo.py partial repair   # or only some scenarios
 PGPORT=54331 PGDATABASE=fv_undo python3 batch_a_undo_load.py    # PART 1 against looping saves, about three minutes
 ```
 
@@ -987,92 +1007,126 @@ shape of `pg_depend`, and, where they exist, pg_cron's jobs and the
 migration record. The `notices` scenario makes one of each of 14 kinds and
 checks the catalog sees it. Roles are left out: they belong to the whole
 server. Rows are a checksum of every row of every table, columns by name.
-`live-function-md5.txt` now records the sixteen fingerprints S0-M5 left
-(lines marked `after-s0-m5`); its plain lines stay what the harness builds,
-the definitions before S0-M5. The proof's databases have S0-M5 applied, so
-the other suites it runs get a copy of this folder whose file has the
-marked fingerprints on the plain lines.
-The harness has no pg_cron and no Supabase migration record; the proof
-makes a stand-in record (three earlier rows, then one per file as it is
-applied), and the catalog's cron lines are tested against a stand-in table
-only.
+`live-function-md5.txt` records the sixteen fingerprints S0-M5 left (lines
+marked `after-s0-m5`).
+The harness has no pg_cron and no Supabase migration record. The proof makes
+a stand-in for each: `cron.job` with `cron.schedule` and `cron.unschedule`
+by job name, which is all S0-M4b and its undo use, holding one unrelated
+job; and a migration record with three earlier rows, then one per file as
+it is applied.
 
-The scenarios:
+The scenarios ("applied" means the four files, then S0-M5, then S0-M4b, as
+on live):
 
-- **main.** Catalog and rows before anything; the four files and S0-M5,
-  "applied" from here on; a teacher and
-  a student use it (returned grades, drafts, a draft on a returned grade, a
-  rubric piece, cards, two signed-in phones, in a When I Return Them class
-  and an As Soon As I Save one). Applying the files changes no row of any
-  table that was there.
-  - After **PART 1**: the 18 triggers are gone and no other catalog line
-    differs. What the student is shown, case by case: a Returned 7 changed
-    to 3 is shown at once; a first grade on a new piece is not shown, in
-    either kind of class; a draft stays hidden; a draft on a returned grade
-    stays as returned. Return Grades on that first grade answers
-    "returned: 0" and shows the student nothing; the teacher's draft count
-    and Returned list answer from what was there at the stop. With the
-    Student Page turned off by PART 1A, the
-    page and a card scan are refused; on again, students see what they saw.
-    What still runs: file 01's policies, Return Grades, a rubric move
-    (still rewrites the returned copy), a restore (still writes
+- **main.** Catalog and rows before anything; everything applied (Batch A's
+  18 triggers, S0-M4b's three, its nightly job); a teacher and a student
+  use it (returned grades, drafts, a draft on a returned grade, a rubric
+  piece, cards, two signed-in phones, in a When I Return Them class and an
+  As Soon As I Save one). Applying the files changes no row of any table
+  that was there.
+  - After **PART 1**: Batch A's 18 triggers are gone and no other catalog
+    line differs; its last query lists S0-M4b's three and says whose they
+    are. What the student is shown, case by case: a Returned 7 changed to 3
+    is shown at once; a first grade on a new piece is not shown, in either
+    kind of class; a draft stays hidden; a draft on a returned grade stays
+    as returned. Return Grades on that first grade answers "returned: 0"
+    and shows the student nothing; the teacher's draft count and Returned
+    list answer from what was there at the stop.
+  - **PART 1A** after PART 1 alone is refused, naming S0-M4b's nightly job
+    and its trigger, and turns nothing off. S0-M4b's fast stop then runs
+    (job unscheduled, three triggers gone; PART 1's last query lists
+    nothing), and PART 1A turns the two classes off: the page and a card
+    scan are refused, no draft is returned; on again, students see what
+    they saw.
+  - What still runs after PART 1: file 01's policies, Return Grades, a
+    rubric move (still rewrites the returned copy), a restore (still writes
     `grade_return`), Duplicate Class (still copies the setting), the cards
-    and the student's functions; a class leaving
-    When I Return Them no longer returns what was waiting; a deleted piece
-    leaves its row behind. `score_rpcs.py` passes as with Batch A loaded
-    (236 of 236). A second run takes no lock: it goes through with all
-    seven tables locked by another session.
+    and the student's functions; a class leaving When I Return Them no
+    longer returns what was waiting; a deleted piece leaves its row behind.
+    `score_rpcs.py` passes as with Batch A loaded (236 of 236). A second
+    run takes no lock: it goes through with all seven tables locked by
+    another session.
   - After **PART 1B**: the five policies are the ones from before.
+  - **PART 2** with S0-M4b on top stops before it changes anything (catalog
+    and rows compared): it says S0-M4b is applied and to run its undo
+    first, names what it found of it and nothing else; the pre-check says
+    the same in its first row and lists nothing more. S0-M4b's own undo
+    then runs and changes no row of any table from before Batch A.
   - After **PART 2**: the catalog is the one from before Batch A, line for
     line, but for S0-M5, which it leaves (the sixteen functions are line for
     line what they were just before PART 2, `pg_temp` last), and two things
     of its own: **three dropped-column slots on `course`** (where the three
     class settings were; a dropped column keeps its slot, which holds
     nothing and which nothing reads) and the migration record's four rows,
-    which the header's optional statement then removes, and no other. Rows: compared with just before PART 2, nothing changed but the
-    sign-in log, which lost its card rows and nothing else; compared with
-    **before Batch A**, the only tables that differ are the eleven the
-    teacher's own saves, new pieces, rubric move and restore wrote in
-    between. The suites from before Batch A pass (`student_submit.py` 79,
-    `questionnaire_identity.py` 47, `phone_reports.py` 37,
-    `questionnaires.py` 42), and `score_rpcs.py` passes 182 of its 183
-    checks on this database: the one that fails compares the score tables
-    with `docs/schema.generated.sql`, which describes the live database
-    with Batch A in it. That is the snapshot the header says to regenerate
-    after PART 2. Every part run again changes nothing. The four files
-    apply again, with S0-M5 still in place, and give the same database as
-    the first time, every grade Returned (the backfill).
-- **apply-only.** The four files and S0-M5, then PART 2, nothing in
-  between: every row of every table (56) is what it was before Batch A, and
-  the catalog is the one from before but for S0-M5 and the three slots.
-  **S0-M5 can stay.** If it is to go as well, its own undo
-  (`s0-m5-undo.sql`) runs after PART 2 or before it: both orders end in the
-  catalog from before both, but for the three slots.
+    which the header's optional statement then removes, and no other. Rows:
+    compared with just before PART 2, nothing changed but the sign-in log,
+    which lost its card rows and nothing else; compared with **before Batch
+    A**, the only tables that differ are the eleven the teacher's own saves,
+    new pieces, rubric move and restore wrote in between. The suites from
+    before Batch A pass (`student_submit.py` 79, `questionnaire_identity.py`
+    47, `phone_reports.py` 37, `questionnaires.py` 42), and `score_rpcs.py`
+    passes 182 of its 183 checks on this database: the one that fails
+    compares the score tables with `docs/schema.generated.sql`, which
+    describes the live database with Batch A in it. That is the snapshot
+    the header says to regenerate after PART 2. Every part run again
+    changes nothing. Everything applies again, S0-M4b included, and gives
+    the same database as the first time, every grade Returned (the
+    backfill).
+- **apply-only.** Everything applied; PART 2 stops for S0-M4b; S0-M4b's
+  undo, then PART 2, nothing in between: every row of every table (56) is
+  what it was before Batch A, and the catalog is the one from before but
+  for S0-M5 and the three slots. **S0-M5 can stay.** If it is to go as
+  well, its own undo (`s0-m5-undo.sql`) runs after PART 2 or before the
+  other two: both orders end in the catalog from before all three, but for
+  the three slots.
 - **partial.** Only file 01, files 01 and 02, files 01 to 03 applied: PART
   1, 1B and 2 in turn, and PART 2 alone, each take it back out (no row
   differs; the catalog is the one from before but for the dropped slots of
   the columns that had been added).
-- **back-on.** PART 1, saves while it is off, then file 02 again: 18
-  triggers; every `grade_return` row holds the grade as the score tables
-  have it; the first grade saved in between is made Returned and the
-  student sees it; the drafts are still drafts; a row left by a piece
-  deleted in between is cleared; a change to a Returned grade waits as a
-  draft again.
-- **half-way.** PART 1 stopped after each of its first six tables, then run
-  again from the top: it finishes. With one table held by another session
-  for good it tries 40 times (about twelve seconds), stops with a message
-  naming the table, keeps what it had done, and finishes when run again.
-  Sent as one message, the way a paste into the SQL editor arrives, it is
-  still seven transactions: stopped at the fourth table, the first three
-  stay done.
+- **repair.** What S0-M4b's repair does after PART 1 (its job is still
+  scheduled; the proof calls it by hand). Before it: the changed Returned
+  grade is shown, the first grades are not. After it, in the When I Return
+  Them class: the changed grade is a draft and the student is back to the
+  grade they were given; the first grade is a Draft, still hidden, and
+  Return Grades now returns it; the drafts stay hidden. In the As Soon As I
+  Save class the first grade is Returned and shown. The draft count moves,
+  every working copy is up to date, the row a deleted piece left is gone;
+  a class that left When I Return Them keeps its drafts. And why PART 1A is
+  guarded: with the page turned off by a plain UPDATE and the repair run
+  while it is off, a first grade and a changed draft the teacher never
+  returned are made Returned, and shown when the page comes back on.
+- **back-on.** Both fast stops and PART 1A, saves while it is off, then the
+  way back on: the classes on, the repair, file 02, `2026110905`. All 21
+  triggers and the job are back; the catalog is line for line the one from
+  just after everything was applied; every `grade_return` row holds the
+  grade as the score tables have it; the row a deleted piece left is gone;
+  the student sees nothing the teacher did not return (the first grade
+  saved in between is a Draft, and Return Grades returns it); a change to a
+  Returned grade waits as a draft again. The same without the repair first:
+  the catalog is the same, but file 02's backfill makes that first grade
+  Returned and the student sees it at once.
+- **half-way.** PART 1 stopped after each of its first six tables. At each
+  point every kind of save goes through (points, a rubric criterion, a
+  rubric fill, a comment, a clear, a class setting), by S0-M4b's trigger
+  function where a trigger is left, and nothing a teacher is holding is
+  shown, before S0-M4b's repair and after it is run at that point. Run
+  again from the top, PART 1 finishes. With one table held by another
+  session for good it tries 40 times (about twelve seconds), stops with a
+  message naming the table, keeps what it had done, and finishes when run
+  again. Sent as one message, the way a paste into the SQL editor arrives,
+  it is still seven transactions: stopped at the fourth table, the first
+  three stay done.
 - **page-off.** With Batch A whole, a plain UPDATE turning the page off
   returns every waiting draft (3 of 3). PART 1A, run before PART 1 and
   after each of its first six tables, refuses each time, names the triggers
   left and changes nothing; its UPDATE pasted alone turns no class off
   either. Because `course` goes first, from PART 1's first table on even a
-  plain UPDATE returns no draft. After the whole of PART 1 it turns the two
-  classes off and lists them; no draft is returned and no row of
-  `grade_return` changes.
+  plain UPDATE returns no draft. After the whole of PART 1 it still
+  refuses, for S0-M4b's repair: with the job and the trigger, with the
+  trigger alone (the UPDATE pasted alone turns nothing off in either case),
+  with the job alone; a job switched off does not stop it. After S0-M4b's
+  fast stop it turns the two classes off and lists them; no draft is
+  returned and no row of `grade_return` changes.
 - **fooled.** Fourteen things a later migration might build on Batch A, one
   at a time: a function that reads `student_card`, one that calls
   `return_grades`, one that reads `course.student_page_enabled`, a trigger
@@ -1081,27 +1135,28 @@ The scenarios:
   over the class setting, a SQL-standard function, a policy on another
   table, a foreign key to `student_card`, an index on a class setting, a
   column and an index added to Batch A's tables, another function in
-  `fv_private`, a cron job. For each, PART 2 stops before it changes
-  anything and names it, and the header's pre-check lists the same. A
+  `fv_private`, a cron job. For each, with S0-M4b on top and again with it
+  undone, PART 2 stops before it changes anything and names it, apart from
+  what it says of S0-M4b, and the header's pre-check lists the same. A
   function that only mentions Batch A in a comment, or uses the words page,
   done, seen and card for its own things, does not stop it; with the
   fourteen gone PART 2 runs and a save still works.
-- **s0-m4b.** With PR 989's file on top: PART 1 drops Batch A's 18, leaves
-  S0-M4b's three triggers and lists them; PART 2 stops before it changes
-  anything, says to run S0-M4b's undo first and names what it found; after
-  S0-M4b's own undo (`s0-m4b-undo.sql`, read from its branch), PART 2 runs
-  and the database is the one from before Batch A, with S0-M5 still in
-  place.
+- **without.** A database without S0-M4b (never applied, or already
+  undone): PART 1 lists nothing, PART 1A runs straight after it, the
+  pre-check says S0-M4b is not on top, PART 2 runs.
 
-Result on 2026-11-10: **116 of 116 on PostgreSQL 17.11 (port 54331), which is what
-production runs, and 116 of 116 on 18.6 (port 54329)**, the same checks with the
+Result on 2026-11-10: **158 of 158 on PostgreSQL 17.11 (port 54331), which is what
+production runs, and 158 of 158 on 18.6 (port 54329)**, the same checks with the
 same results.
 
 `batch_a_undo_load.py`: six connections saving in a loop (points, a rubric
 fill, one criterion, a comment, a clear, a change to the class itself: the
 reviewer's mix), PART 1 run against them again and again, the saves paused
-between runs while file 02 puts the triggers back. Three runs on 17.11 and
-one on 18.6; the reviewer's own three runs are in the last column.
+between runs while file 02 and then `2026110905` put everything back. The
+table is three runs on 17.11 and one on 18.6 from before S0-M4b was
+applied; the reviewer's own three runs are in the last column. The run on
+each version with S0-M4b applied (so with its trigger function) is below
+the table.
 
 | PART 1                            | Runs finished             | Saves that failed         | PART 1 took                | Slowest save here | Reviewer's runs                                                      |
 | --------------------------------- | ------------------------- | ------------------------- | -------------------------- | ----------------- | -------------------------------------------------------------------- |
@@ -1118,16 +1173,24 @@ The 18.6 run agrees: as it is now, every run finished and no save failed
 at either speed (slowest save 1.3 s flat out, PART 1 up to 3.7 s); as first
 written, 5 of 20 flat out and 75 saves killed.
 
+With S0-M4b applied, one run on each version: as it is now, every run
+finished and no save failed at either speed (a class at work: 8 ms; flat
+out: 0.6 s as a rule and 3.1 s at most on 17.11, 1.4 s and 4.8 s on 18.6;
+slowest save 0.3 s and 1.1 s). As first written, flat out: 2 and 4 of 20,
+72 and 102 saves killed.
+
 PART 2 is one transaction on purpose and holds the score tables until it
-commits. With a class at work 10 of 10 runs finished every time; no save
-failed in the three sets on 17.11, and on 18.6 seven saves were killed by
-deadlocks in the one set. Flat out it is the wrong tool: 0, 3, 3 and 3 of
-10 runs finished here (4 and 6 for the reviewer; the others were stopped by
-a deadlock or the lock timeout, nothing changed), 50 to 77 saves were
-killed in each set of ten (34 and 42 for the reviewer), and six times a
-save caught in flight failed with "column does not exist". It is for a
-moment when nobody is saving.
+commits. Six sets of ten runs here, the last two after S0-M4b's undo (run
+with the saves paused). With a class at work 10 of 10 runs finished in the
+first four sets, 9 of 10 and 8 of 10 in the last two; no save failed in the
+four sets on 17.11, and in the two on 18.6 saves were killed by deadlocks
+(7, and 17). Flat out it is the wrong tool: 0, 3, 3, 3, 3 and 2 of 10 runs
+finished here (4 and 6 for the reviewer; the others were stopped by a
+deadlock or the lock timeout, nothing changed), 42 to 77 saves were killed
+in each set of ten (34 and 42 for the reviewer), and eight times a save
+caught in flight failed with "column does not exist". It is for a moment
+when nobody is saving.
 
 Not verified: pg_cron and Supabase's real migration record (stand-ins
-here); the edge function and the app against a database after PART 2;
+here); S0-M4b's own undo against looping saves (its own tests' business); the edge function and the app against a database after PART 2;
 anything on `gradebook-prod` itself.

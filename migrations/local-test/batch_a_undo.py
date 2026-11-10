@@ -684,8 +684,10 @@ def scen_back_on():
         d = Db('backon'); seed(d); tag = 'back-on' if repair else 'back-on, without the repair first'
         applied = d.apply(); k = use(d); as_live = catalog(d.c)
         new_piece, = pieces(d, 'Undo new')
-        stops = [d.part('PART 1'), d.their_fast_stop(), d.part('PART 1A')]; off = [str(r[0]) for r in d.rows]
-        ok('%s: everything applied and in use; PART 1, S0-M4b\'s fast stop and PART 1A' % tag,
+        # The two fast stops in either order: this one first, then S0-M4b's first.
+        stops = [d.part('PART 1'), d.their_fast_stop()] if repair else [d.their_fast_stop(), d.part('PART 1')]
+        stops.append(d.part('PART 1A')); off = [str(r[0]) for r in d.rows]
+        ok('%s: everything applied and in use; %s, then PART 1A' % (tag, 'PART 1, then S0-M4b\'s fast stop' if repair else 'S0-M4b\'s fast stop first, then PART 1'),
            applied == 'ok' and stops == ['ok'] * 3 and d.run(LEFT) == [] and d.one(JOB) == 0 and sorted(off) == sorted([COURSE, COURSE2]), stops)
         d.teacher('upsert_score(:e, :a, 3)', e=ENR1, a=k['quiz']); d.teacher('upsert_score(:e, :a, 5)', e=ENR1, a=k['lab'])
         d.teacher('upsert_score(:e, :a, 18)', e=ENR1, a=k['essay']); d.teacher('upsert_score(:e, :a, 8)', e=ENR1, a=new_piece)
