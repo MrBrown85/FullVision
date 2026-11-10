@@ -280,6 +280,29 @@ Context: the first night of the build ([`plans/student-page-build-plan.md`](plan
 
 Still open: the blurry-photo threshold, which needs real classroom photos; and the privacy page's wording, which must change before cards go live (codes are no longer stored only as hashes or used once; students can read returned grades; FullVision records when a student opened a piece of feedback).
 
+## Student page build rulings (2026-11-10)
+
+Context: the second day of the build. The math and screen reviews, and the first migration batch's last review rounds, raised more points. Colin ruled on each, one at a time. From this day each decision goes to him with what the people who set the practice would say (Beck, Fowler, Humble and Forsgren, Nygard and Kleppmann on building and databases; OWASP and the privacy commissioner's office on student data; Guskey, O'Connor, Wiliam and the Ministry's reporting policy on grades; Krug and Nielsen on screens) and a recommendation: the council advises, Colin decides. He also asked that the stronger fix be built now rather than deferred; applying anything to the database still waits for his OK.
+
+**What counts in a grade**
+
+1. **Missing wins everywhere.** A piece marked Missing counts no level on any screen, the gradebook included. Extends the evening rulings' 13 from returned grades to all work (PR 979). Undo must not put a level back under a Missing mark; that fix is owed.
+2. **Only what a piece measures now counts.** A level stored for a competency or a rubric criterion that is no longer on the piece counts nowhere. The stored score stays, so putting the competency back restores it (PR 979). On Nov 9 no live class held such a level: of 697 competency levels, none was on a competency its piece had dropped, and no rubric level was off its rubric. Owed in S1: a warning at the moment of removal ("3 students have a level for Plan on this piece. Removing it stops those levels counting."). The grade-scans skill, which writes grades from scanned work, gets the same check and refuses before writing anything.
+3. **When two pieces share a date, the one made later counts later.** Most Recent and Decaying Average need an order, and before this the order was whichever piece was graded last. Colin first chose the order of the assignment list; the live data showed that order disagrees with what the page shows once folders or dragging are involved (22 of the 39 same-date groups in live classes span two folders), so he replaced it. Pieces made at the same instant fall to a fixed order by id. The class load now sends when each piece was made (`migrations/2026111001_assessment_created_at_in_bundle.sql`, applied Nov 10; PR 986). Every live class uses Average, where order does not matter, so no grade moved.
+4. **Undated work is dated once, then left alone.** On work with no date, a student's level is dated the day it is first entered and keeps that date when the level changes later. The desktop grading dialog already does this; the phone and the gradebook's Scores view re-date it to today on every change and will be brought into line. Without this a draft change could move a returned grade's place in the order. Not built yet; its own PR, with Colin's review.
+
+**Teacher screens**
+
+5. **The phone gets an Undo** after a clear, behaving as the desktop's does. Built in S1, after the desktop's Undo fix in 1.
+6. **The rubric handout prints returned grades only, and asks** when the piece is still a draft: Return It, Then Print; Print Without It; Cancel. Built in S2.
+
+**The database**
+
+7. **The first migration batch (PR 966) is applied as verified,** with its three known limits closed in a small migration straight behind it (PR 989) rather than by reopening a batch that four review rounds had proven. One exception: its four ownership helpers are rewritten before applying. Production runs PostgreSQL 17, which plans a SQL-language function again on every statement; with the helpers written that way the batch took a 30-student rubric fill from about 23 ms to about 100 ms. Written in PL/pgSQL they cost what a save costs today.
+8. **Three stronger measures are built now, each its own migration:** every security-definer function in `public` names `pg_temp` last in its search path (PR 991); score rows carry their class, so a score filed under another class's student is refused from any writer; and the class's sync row is taken once at commit, which ends nine ways two of today's saves can block each other. None is applied without Colin.
+9. **A card's code and password stay readable by the class's teacher.** The privacy page must say so, and Colin puts it to his district's privacy officer.
+10. **When a student opens a returned piece is recorded for the student's own page only.** It is what marks a grade Updated (evening rulings 9). It is not shown to teachers, is kept as long as the grade, and goes on the privacy page.
+
 ## Phone-report birthday tries (2026-11-03)
 
 The Nov 3 bug sweep found that a phone-report slip has no lifetime limit on wrong birthdays: five in a session or ten on one code in 15 minutes lock it for now (`student_submit.check`, `migrations/20261025_phone_reports.sql`), and scanning the code again starts a new session. Questionnaire slips lock for good after five wrong tries (Student voice 2).
