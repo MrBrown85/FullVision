@@ -1744,6 +1744,8 @@ var _SERVER_STATE_FIELDS = {
   scores: true,
   statuses: true,
   rubrics: true,
+  // The class's settings: saveCourseConfig sends only what differs from it.
+  courseConfigs: true,
 };
 var _serverState = {}; // field → cid → value
 
@@ -4235,6 +4237,13 @@ async function _doInitData(cid) {
     }
     _clearLoadError(cid);
     _v2GradebookToCache(cid, gbRes.data || {});
+    // The class's settings too: get_gradebook's `course` is the whole course
+    // row, as the bundle's is. This load used to take none of them.
+    var olderRow = (_rpcObject(gbRes.data) || {}).course;
+    if (_plainObject(olderRow)) {
+      _applyBundleCourseConfig(cid, {}, olderRow);
+      _applyBundleCourseRow(cid, olderRow);
+    }
     await _hydrateCanonicalDetails(cid);
     await loadStudentProfileSummaries(cid);
     if (_serverKeepsRows(cid)) await _loadServerGradeReturns(cid, true);
@@ -4432,6 +4441,7 @@ function _bundleToCache(cid, bundle) {
     );
   }
   _applyBundleCourseConfig(cid, bundle.course_config, bundle.gradebook && bundle.gradebook.course);
+  _applyBundleCourseRow(cid, bundle.gradebook && bundle.gradebook.course);
   _applyBundleCurriculumTags(cid, bundle.gradebook && bundle.gradebook.course);
   // After the class settings: it works out and caches levels, and on a first
   // load this device has none of the settings yet.
@@ -4783,18 +4793,92 @@ function _applyBundleCurriculumTags(cid, courseRow) {
   _safeLSSet('gb-courses', JSON.stringify(COURSES));
 }
 
+/* What this device has changed on a class's row and the server has not
+   yet taken: the patches of its queued update_course writes, later over
+   earlier. A load lays them back over the server's row, so a change made
+   here is never shown undone by a load that ran before it was sent. Only
+   writes that say they carry what the teacher changed and nothing else
+   (FV_SETTINGS_CHANGED_ONLY): not a whole copy an earlier build queued, and
+   not the student page's two settings, which have their own rules. */
+function _unsentCourseChanges(cid) {
+  var out = {};
+  var q = typeof window !== 'undefined' ? window.v2Queue : null;
+  if (!cid || !q || typeof q.queued !== 'function') return out;
+  var entries;
+  try {
+    entries = q.queued('update_course') || [];
+  } catch (e) {
+    return out;
+  }
+  entries.forEach(function (entry) {
+    var p = (entry && entry.payload) || {};
+    if (p.p_course_id !== cid || !_plainObject(p.p_patch) || !p.p_patch[FV_SETTINGS_CHANGED_ONLY]) return;
+    Object.keys(p.p_patch).forEach(function (col) {
+      if (col !== FV_SETTINGS_CHANGED_ONLY) out[col] = p.p_patch[col];
+    });
+  });
+  return out;
+}
+
+/* The class's own row into the class list (COURSES), as list_teacher_courses
+   fills it when the app opens (_canonicalCoursesToBlob). A class load used
+   to leave these as they were, so a grading style, late work policy, name
+   or method changed on another device showed only after the app was closed
+   and opened again. */
+function _applyBundleCourseRow(cid, courseRow) {
+  if (!_plainObject(courseRow) || !COURSES || !COURSES[cid]) return;
+  var row = Object.assign({}, courseRow, _unsentCourseChanges(cid));
+  var course = COURSES[cid];
+  var before = JSON.stringify(course);
+  if ('name' in row) course.name = row.name || 'Untitled Class';
+  if ('description' in row) course.description = row.description || '';
+  if ('grade_level' in row) course.gradeLevel = row.grade_level || '';
+  if ('color' in row) course.color = row.color || '';
+  if ('grading_system' in row) course.gradingSystem = row.grading_system || null;
+  if ('calc_method' in row) course.calcMethod = row.calc_method || null;
+  if ('decay_weight' in row) course.decayWeight = row.decay_weight;
+  if ('timezone' in row) course.timezone = row.timezone || null;
+  if ('late_work_policy' in row) course.lateWorkPolicy = row.late_work_policy || null;
+  if ('block' in row) course.block = row.block || '';
+  if (JSON.stringify(course) === before) return;
+  _safeLSSet('gb-courses', JSON.stringify(COURSES));
+  if (typeof clearProfCache === 'function') clearProfCache();
+}
+
+/* The class's settings from the server replace this device's copy: the
+   server's is the one true copy, and this one a working cache. Every
+   setting the course row carries is taken from it, the calculation method
+   and decay weight included: those two used to stay as this device last
+   had them, so it went on grading with its own (shared/calc.js reads the
+   settings copy first) and put them back on the server with its next save.
+   A change this device has queued and not yet sent is laid over the row
+   first (_unsentCourseChanges); one made while the load runs is kept by
+   _persistLoadedField, and the load runs again. */
 function _applyBundleCourseConfig(cid, row, courseRow) {
   if (!row || typeof row !== 'object') return;
   var config = Object.assign({}, getCourseConfig(cid) || {});
   var missing = {};
   var hasCourseRow = !!courseRow && typeof courseRow === 'object';
+  var unsent = _unsentCourseChanges(cid);
+  if (hasCourseRow) courseRow = Object.assign({}, courseRow, unsent);
   Object.keys(_COURSE_CONFIG_COLUMNS).forEach(function (field) {
     var column = _COURSE_CONFIG_COLUMNS[field];
-    var onServer = row[column];
+    var onServer = column in unsent ? unsent[column] : row[column];
     if (onServer == null && hasCourseRow) onServer = courseRow[column];
     if (onServer && typeof onServer === 'object') config[field] = _cloneValue(onServer);
     else if (config[field] != null) missing[column] = config[field];
   });
+  // The calculation method and decay weight come on the course row. The
+  // server never holds null for the method; a null weight is the default.
+  if (hasCourseRow && 'calc_method' in courseRow) {
+    if (typeof courseRow.calc_method === 'string' && courseRow.calc_method) config.calcMethod = courseRow.calc_method;
+    else delete config.calcMethod;
+  }
+  if (hasCourseRow && 'decay_weight' in courseRow) {
+    if (courseRow.decay_weight != null && isFinite(Number(courseRow.decay_weight))) {
+      config.decayWeight = Number(courseRow.decay_weight);
+    } else delete config.decayWeight;
+  }
   // "Round to a whole %" comes on the course row. Null there means the class
   // never chose, so it follows its grade level.
   if (courseRow && typeof courseRow === 'object' && 'round_percent' in courseRow) {
@@ -4850,6 +4934,7 @@ function _applyBundleCourseConfig(cid, row, courseRow) {
   }
 
   if (!Object.keys(missing).length || !_writesEnabled() || !_isUuid(cid)) return;
+  missing[FV_SETTINGS_CHANGED_ONLY] = true;
   _trackPendingSync(
     _writeRpc('update_course', { p_course_id: cid, p_patch: missing }).then(function (res) {
       if (res.error) console.warn('update_course (course config upload) failed:', res.error);
@@ -5171,6 +5256,9 @@ function _canonicalCoursesToBlob(rows, prev) {
   (rows || []).forEach(function (r) {
     if (!r || !r.id) return;
     var mine = prev && prev[r.id] && Array.isArray(prev[r.id].curriculumTags) ? prev[r.id].curriculumTags : [];
+    // A change made on this device and not yet sent (a name or grading
+    // style changed offline) stays: the server's row is from before it.
+    r = Object.assign({}, r, _unsentCourseChanges(r.id));
     out[r.id] = {
       id: r.id,
       name: r.name || 'Untitled Class',
@@ -5200,7 +5288,7 @@ function _sendUpCurriculumTags(rows, prev) {
     var mine = prev && prev[r.id] && prev[r.id].curriculumTags;
     if (!Array.isArray(mine) || !mine.length) return;
     _trackPendingSync(
-      _writeRpc('update_course', { p_course_id: r.id, p_patch: { curriculum_tags: mine.slice() } }).then(
+      _writeRpc('update_course', { p_course_id: r.id, p_patch: _changedOnly({ curriculum_tags: mine.slice() }) }).then(
         function (res) {
           if (res.error) console.warn('update_course (curriculum link upload) failed:', res.error);
         },
@@ -6616,7 +6704,7 @@ function updateCourse(id, updates) {
         patch.curriculum_tags = Array.isArray(updates.curriculumTags) ? updates.curriculumTags.slice() : null;
       if (Object.keys(patch).length > 0 && _isUuid(id)) {
         _trackPendingSync(
-          _writeRpc('update_course', { p_course_id: id, p_patch: patch }).then(function (res) {
+          _writeRpc('update_course', { p_course_id: id, p_patch: _changedOnly(patch) }).then(function (res) {
             if (res.error) console.warn('update_course RPC failed:', res.error);
           }),
         );
@@ -9016,6 +9104,101 @@ function getCourseConfig(cid) {
     return {};
   }
 }
+/* A class's settings as update_course takes them: the patch a copy of the
+   settings would send. Never the student page's switch or Return Grades
+   (saveReturnSettings is their one writer). */
+function _courseSettingsPatch(obj) {
+  const patch = {};
+  if (!obj || typeof obj !== 'object') return patch;
+  if (obj.gradingSystem != null) patch.grading_system = obj.gradingSystem;
+  if (obj.calcMethod != null) patch.calc_method = obj.calcMethod;
+  if (obj.decayWeight != null) patch.decay_weight = obj.decayWeight;
+  if (obj.timezone != null) patch.timezone = obj.timezone;
+  if (obj.lateWorkPolicy != null) patch.late_work_policy = obj.lateWorkPolicy;
+  if (obj.gradingScale != null) patch.grading_scale = obj.gradingScale;
+  if (obj.categoryWeights != null) patch.category_weights = obj.categoryWeights;
+  if (typeof obj.roundPercent === 'boolean') patch.round_percent = obj.roundPercent;
+  // Null is a choice here (All Scores), so it is sent too.
+  if (obj.recentScoreLimit !== undefined) patch.recent_score_limit = obj.recentScoreLimit || null;
+  if (obj.levelOrder === 'asc' || obj.levelOrder === 'desc') patch.level_order = obj.levelOrder;
+  if (typeof obj.foldersCountAsOne === 'boolean') patch.folders_count_as_one = obj.foldersCountAsOne;
+  if (typeof obj.coursesCountEqually === 'boolean') patch.courses_count_equally = obj.coursesCountEqually;
+  if (Array.isArray(obj.reportingTerms)) patch.reporting_terms = obj.reportingTerms;
+  return patch;
+}
+/* Which setting each of those columns is in the settings copy. */
+var _COURSE_SETTING_FIELDS = {
+  grading_system: 'gradingSystem',
+  calc_method: 'calcMethod',
+  decay_weight: 'decayWeight',
+  timezone: 'timezone',
+  late_work_policy: 'lateWorkPolicy',
+  grading_scale: 'gradingScale',
+  category_weights: 'categoryWeights',
+  round_percent: 'roundPercent',
+  recent_score_limit: 'recentScoreLimit',
+  level_order: 'levelOrder',
+  folders_count_as_one: 'foldersCountAsOne',
+  courses_count_equally: 'coursesCountEqually',
+  reporting_terms: 'reportingTerms',
+};
+/* The columns only a whole copy of the settings ever carried: updateCourse
+   never sends them. An update_course naming one of them without
+   FV_SETTINGS_CHANGED_ONLY was queued by a build from before a save sent
+   only what changed (_oldSettingsWrite). */
+var _WHOLE_COPY_ONLY_COLUMNS = [
+  'grading_scale',
+  'category_weights',
+  'round_percent',
+  'recent_score_limit',
+  'level_order',
+  'folders_count_as_one',
+  'courses_count_equally',
+  'reporting_terms',
+];
+/* Set in the patch of every settings write this build queues: "these keys
+   are the ones the teacher changed, and nothing else". It stays with the
+   queued write, so it is known after a reload, and is taken out as the
+   write is sent (_sendableCoursePatch). The server reads only the columns
+   it knows, so one that slipped through would change nothing. */
+var FV_SETTINGS_CHANGED_ONLY = '_changed_only';
+function _changedOnly(patch) {
+  patch[FV_SETTINGS_CHANGED_ONLY] = true;
+  return patch;
+}
+
+// The same value, whatever order an object's keys are in (jsonb reorders them).
+function _sameSetting(a, b) {
+  return _settingText(a) === _settingText(b);
+}
+function _settingText(v) {
+  if (v === undefined) return 'undefined';
+  if (v === null || typeof v !== 'object') return JSON.stringify(v);
+  if (Array.isArray(v)) return '[' + v.map(_settingText).join(',') + ']';
+  return (
+    '{' +
+    Object.keys(v)
+      .filter(function (k) {
+        return v[k] !== undefined;
+      })
+      .sort()
+      .map(function (k) {
+        return JSON.stringify(k) + ':' + _settingText(v[k]);
+      })
+      .join(',') +
+    '}'
+  );
+}
+
+/* Save a class's settings. The server's copy is the one true copy; this
+   device's is a working cache that gives way to it on every load
+   (_applyBundleCourseConfig). So a save sends ONLY what this save changed:
+   the settings that differ from the copy this page loaded or last saved
+   (the server-state baseline, a clone, since callers change the cached
+   object in place; before a first load, the copy saved in localStorage).
+   It used to send the device's whole copy, and a device that had loaded the
+   class before a change made elsewhere put the old values back. A save that
+   changes nothing sends nothing. */
 function saveCourseConfig(cid, obj) {
   // Draft and Returned: the student page's switch and Return Grades are not
   // this function's to change or send for a signed-in teacher
@@ -9023,38 +9206,162 @@ function saveCourseConfig(cid, obj) {
   // them, whatever copy of the settings the caller has.
   if (_writesEnabled()) obj = _keepReturnSettings(cid, obj);
   var held = _returnSettingsBefore(cid); // did the class hold grades before this save (Demo Mode)
+  var before = _hasServerState('courseConfigs', cid)
+    ? _serverState.courseConfigs[cid]
+    : _safeParseLS('gb-courseconfig-' + cid, null);
   _saveCourseField('courseConfigs', cid, obj);
   if (_writesEnabled() && _isUuid(cid)) {
     // v2: policy fields live on the course row. save_course_policy is gone;
     // remap the legacy courseConfig blob onto a update_course jsonb patch.
     const sb = getSupabase();
     if (sb && obj) {
+      const all = _courseSettingsPatch(obj);
+      const was = _courseSettingsPatch(before);
       const patch = {};
-      if (obj.gradingSystem != null) patch.grading_system = obj.gradingSystem;
-      if (obj.calcMethod != null) patch.calc_method = obj.calcMethod;
-      if (obj.decayWeight != null) patch.decay_weight = obj.decayWeight;
-      if (obj.timezone != null) patch.timezone = obj.timezone;
-      if (obj.lateWorkPolicy != null) patch.late_work_policy = obj.lateWorkPolicy;
-      if (obj.gradingScale != null) patch.grading_scale = obj.gradingScale;
-      if (obj.categoryWeights != null) patch.category_weights = obj.categoryWeights;
-      if (typeof obj.roundPercent === 'boolean') patch.round_percent = obj.roundPercent;
-      // Null is a choice here (All Scores), so it is sent too.
-      if (obj.recentScoreLimit !== undefined) patch.recent_score_limit = obj.recentScoreLimit || null;
-      if (obj.levelOrder === 'asc' || obj.levelOrder === 'desc') patch.level_order = obj.levelOrder;
-      if (typeof obj.foldersCountAsOne === 'boolean') patch.folders_count_as_one = obj.foldersCountAsOne;
-      if (typeof obj.coursesCountEqually === 'boolean') patch.courses_count_equally = obj.coursesCountEqually;
-      if (Array.isArray(obj.reportingTerms)) patch.reporting_terms = obj.reportingTerms;
-      // Never the student page's switch or Return Grades: see above.
-      if (Object.keys(patch).length > 0) {
+      Object.keys(all).forEach(function (col) {
+        if (!(col in was) || !_sameSetting(all[col], was[col])) patch[col] = all[col];
+      });
+      // From here this page takes the server to have what it was just sent.
+      _rememberServerState('courseConfigs', cid, obj);
+      const sent = Object.keys(patch);
+      if (sent.length > 0) {
+        patch[FV_SETTINGS_CHANGED_ONLY] = true;
         _trackPendingSync(
           _writeRpc('update_course', { p_course_id: cid, p_patch: patch }).then(function (res) {
-            if (res.error) console.warn('update_course (saveCourseConfig) failed:', res.error);
+            if (!res.error) return;
+            console.warn('update_course (saveCourseConfig) failed:', res.error);
+            // Never queued (the outbox had no room): the server does not
+            // have these, so the next save of the class's settings sends
+            // them again. A write the server itself rejects is not sent
+            // again with every later save: the outbox tries it once more on
+            // the next page load, and the next class load shows what the
+            // server holds.
+            if (res.error.refused) _settingsNotSent(cid, sent, before);
           }),
         );
       }
     }
   }
   _returnSettingsSaved(cid, held);
+}
+/* An update_course on its way out. Answers { params } to send, or
+   { answer } when nothing is to be sent and the caller hears that instead.
+
+   A write this build queued carries FV_SETTINGS_CHANGED_ONLY: the mark is
+   taken out and the rest goes as it is.
+
+   One without the mark that names a whole-copy-only column was queued by a
+   build that sent a device's whole copy of the settings with every save.
+   Which of its keys the teacher meant to change was never recorded, so it
+   is compared with the class's row on the server now (_oldSettingsWrite). */
+async function _sendableCoursePatch(params, options) {
+  var patch = params && params.p_patch;
+  if (!_plainObject(patch)) return { params: params };
+  if (patch[FV_SETTINGS_CHANGED_ONLY]) {
+    var clean = Object.assign({}, patch);
+    delete clean[FV_SETTINGS_CHANGED_ONLY];
+    return { params: Object.assign({}, params, { p_patch: clean }) };
+  }
+  var wholeCopy = _WHOLE_COPY_ONLY_COLUMNS.some(function (col) {
+    return col in patch;
+  });
+  return wholeCopy ? _oldSettingsWrite(params, options || {}) : { params: params };
+}
+/* The answer that ends an old settings write unsent. Not a network error,
+   so the outbox does not retry it: it goes to the failed list, which is
+   what turns the sync dot red (rule 5: the dot only). noRetry: it gets no
+   last try on the next page load either, and is dropped then with a
+   report. */
+var _OLD_SETTINGS_REFUSED = 'FV409';
+function _oldSettingsRefused() {
+  return {
+    data: null,
+    error: { message: 'class settings changed on another device', code: _OLD_SETTINGS_REFUSED, noRetry: true },
+  };
+}
+// update_course leaves these columns alone when the patch gives them null.
+var _NULL_CHANGES_NOTHING = { grading_system: true, calc_method: true, timezone: true, level_order: true };
+/* A whole-copy settings write from an earlier build, checked before it goes.
+   Its settings are compared with the server's row for the class:
+   - none differ: there is nothing to send;
+   - exactly one differs: that is the teacher's change, and it alone goes;
+   - two or more differ: the class's settings changed on another device
+     since this one loaded them, and which of the keys is this device's own
+     change cannot be known. None of them is sent: one old value put back
+     could move every grade in the class. The write goes to the failed
+     list, Sentry hears of it, and the class is read again from the server,
+     so the teacher sees the setting as it is and can change it again.
+   Anything in the patch that is not one of these settings is sent as it is.
+   A write already given up on once (the outbox's last try after a reload)
+   is never weighed a second time: by then the teacher may have made the
+   change again, and the one key left differing would be the old one.
+   If the class cannot be read (offline), the write waits and is tried again. */
+async function _oldSettingsWrite(params, options) {
+  var cid = params.p_course_id;
+  var patch = params.p_patch;
+  var settings = [];
+  var rest = {};
+  Object.keys(patch).forEach(function (col) {
+    if (_COURSE_SETTING_FIELDS[col]) settings.push(col);
+    else rest[col] = patch[col];
+  });
+  function send(keep) {
+    var out = Object.assign({}, rest);
+    keep.forEach(function (col) {
+      out[col] = patch[col];
+    });
+    if (!Object.keys(out).length) return null;
+    return { params: Object.assign({}, params, { p_patch: out }) };
+  }
+  if (options.lastTry) return send([]) || { answer: _oldSettingsRefused() };
+
+  var res;
+  try {
+    res = await _callRpcWithAuthGuard(
+      'get_class_bundle',
+      { p_course_id: cid, p_if_version: null },
+      { suppressSessionExpiredModal: true },
+    );
+  } catch (e) {
+    res = { data: null, error: { message: 'network: the class could not be read' } };
+  }
+  if (!res || res.error) {
+    return { answer: { data: null, error: (res && res.error) || { message: 'network: the class could not be read' } } };
+  }
+  var bundle = _rpcObject(res.data) || {};
+  var row = bundle.gradebook && bundle.gradebook.course;
+  var differ = _plainObject(row)
+    ? settings.filter(function (col) {
+        if (patch[col] == null && _NULL_CHANGES_NOTHING[col]) return false;
+        return !(col in row) || !_sameSetting(patch[col], row[col]);
+      })
+    : settings.concat(settings); // no row to compare with: nothing can be told apart
+  if (differ.length <= 1) return send(differ) || { answer: { data: null, error: null } };
+
+  console.warn('update_course from an earlier build not sent: the class’s settings changed on another device');
+  try {
+    if (window.Sentry && typeof window.Sentry.captureMessage === 'function') {
+      window.Sentry.captureMessage('Old settings save not sent: the class changed on another device', 'warning');
+    }
+  } catch (e) {
+    /* reporting is best effort */
+  }
+  _convergeOnServer(cid);
+  return send([]) || { answer: _oldSettingsRefused() };
+}
+
+/* These columns of a settings save never left this device: the baseline
+   says again what it said before the save, so they still count as changed. */
+function _settingsNotSent(cid, columns, before) {
+  if (!_hasServerState('courseConfigs', cid)) return;
+  var base = _serverState.courseConfigs[cid];
+  if (!_plainObject(base)) return;
+  columns.forEach(function (col) {
+    var field = _COURSE_SETTING_FIELDS[col];
+    if (!field) return;
+    if (_plainObject(before) && field in before) base[field] = _cloneValue(before[field]);
+    else delete base[field];
+  });
 }
 function getStudents(cid) {
   if (_cache.students[cid] !== undefined) return _cache.students[cid];
@@ -13044,6 +13351,14 @@ async function _callRpcWithAuthGuard(name, params, options) {
   // Draft and Returned: no update_course carries the student page's switch
   // or Return Grades beside another setting, whoever queued it.
   params = _onlyOwnReturnSettings(name, params);
+  // Class settings: a write from this build goes as it is; one a build from
+  // before it queued (a device's whole copy) is checked against the server
+  // first, and may be cut down or not sent at all.
+  if (name === 'update_course') {
+    var checked = await _sendableCoursePatch(params, options);
+    if (checked.answer) return checked.answer;
+    params = checked.params;
+  }
 
   // Before either retry below can fire, so every attempt at this write carries
   // the same key and the server returns the first result instead of inserting

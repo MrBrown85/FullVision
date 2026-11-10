@@ -11,7 +11,8 @@
  *   fv-sync-owner-v1          — { tab, at }: which tab sends (fallback only, see Tabs)
  *
  * Entry shape:
- *   { id, created_at, owner, key, endpoint, payload, attempts, last_error, last_code, next_at, blocked_on, sent_at }
+ *   { id, created_at, owner, key, endpoint, payload, attempts, last_error, last_code, next_at, blocked_on, sent_at,
+ *     no_retry }
  *
  * Tabs: every tab shares the queue, but only one tab — the owner — sends.
  *   The owner holds the Web Lock fv-sync-queue-v1 for as long as it is open;
@@ -317,13 +318,25 @@
   }
 
   /* The fields a write sets on its target, for writes that send only the
-     fields that changed (save_term_rating's p_payload); null when a write
-     sets the whole record. */
+     fields that changed (save_term_rating's p_payload, update_course's
+     p_patch); null when a write sets the whole record. */
   function _fields(entry) {
-    if (!entry || entry.endpoint !== 'save_term_rating') return null;
-    var p = entry.payload && entry.payload.p_payload;
-    return p && typeof p === 'object' ? Object.keys(p) : [];
+    var param = entry && FIELDS_PARAM[entry.endpoint];
+    if (!param) return null;
+    var p = entry.payload && entry.payload[param];
+    if (!p || typeof p !== 'object') return [];
+    // A class-settings write sets only the fields it names once it says so
+    // (shared/data.js FV_SETTINGS_CHANGED_ONLY). One without the mark is
+    // from an earlier build, or is the student page's two settings: it is
+    // replaced whole, as it always was.
+    if (entry.endpoint === 'update_course' && !p[CHANGED_ONLY]) return null;
+    return Object.keys(p).filter(function (k) {
+      return k !== CHANGED_ONLY;
+    });
   }
+  // The param that holds the fields, for each write that sends only those.
+  var FIELDS_PARAM = { save_term_rating: 'p_payload', update_course: 'p_patch' };
+  var CHANGED_ONLY = '_changed_only';
 
   /* What is left of an older failed write once a newer write to the same
      target is queued or lands: the older one itself when the targets differ,
@@ -336,7 +349,8 @@
     var target = _target(newer.endpoint, newer.payload);
     if (!target || _target(older.endpoint, older.payload) !== target) return older;
     var mine = _replacedFields(newer);
-    if (!mine) return null;
+    // Either one sets its whole record: nothing of the older is left.
+    if (!mine || !_fields(older)) return null;
     return _withoutKeys(older, mine);
   }
 
@@ -362,11 +376,16 @@
     });
     if (!left.length) return null;
     if (left.length === theirs.length) return entry;
+    var param = FIELDS_PARAM[entry.endpoint];
+    var whole = entry.payload[param];
     var wire = {};
     left.forEach(function (k) {
-      wire[k] = entry.payload.p_payload[k];
+      wire[k] = whole[k];
     });
-    return Object.assign({}, entry, { payload: Object.assign({}, entry.payload, { p_payload: wire }) });
+    if (whole[CHANGED_ONLY]) wire[CHANGED_ONLY] = whole[CHANGED_ONLY];
+    var payload = Object.assign({}, entry.payload);
+    payload[param] = wire;
+    return Object.assign({}, entry, { payload: payload });
   }
 
   /* A new narrative queued for a term rating takes the approval out of the
@@ -929,7 +948,9 @@
       // a blip (server committed, client missed the 200) replays to the
       // cached result instead of creating a duplicate row.
       var payload = _withIdemKey(entry.endpoint, entry.payload, entry.id);
-      var res = await _sendNow(entry.endpoint, payload, _sendOptions[entry.id]);
+      // The sender is told when this is the one more try after a reload.
+      var options = entry.last_try ? Object.assign({}, _sendOptions[entry.id], { lastTry: true }) : _sendOptions[entry.id];
+      var res = await _sendNow(entry.endpoint, payload, options);
       return res || { data: null, error: null };
     } catch (e) {
       return { data: null, error: { message: e && e.message ? e.message : String(e) } };
@@ -1034,7 +1055,9 @@
     }
 
     // One failed write per target: a newer failure replaces an older one.
-    // The last try after a reload is dropped instead.
+    // The last try after a reload is dropped instead. A write the sender
+    // says must never go again (error.noRetry) gets no last try either.
+    if (res && res.error && res.error.noRetry) entry.no_retry = true;
     var dead = _pruneDead(_readDead(), entry);
     if (entry.last_try) _reportDropped(entry);
     else dead.push(entry);
@@ -1289,6 +1312,21 @@
     });
   }
 
+  /* This teacher's writes to one endpoint still waiting to be sent, oldest
+     first, in flight included: copies of { id, payload }. A load reads them
+     to lay an unsent change back over what the server sent
+     (shared/data.js _unsentCourseChanges). */
+  function queued(endpoint) {
+    var owner = currentOwner();
+    return _readQueue()
+      .entries.filter(function (e) {
+        return e.endpoint === endpoint && !_isForeign(e, owner);
+      })
+      .map(function (e) {
+        return { id: e.id, payload: JSON.parse(JSON.stringify(e.payload || {})) };
+      });
+  }
+
   /* Let the caller change queued payloads, for example to put a server id
      where a local id was. fn(entry) returns { payload, blockedOn } or null
      to leave the entry alone. Entries in flight are skipped. A key that was
@@ -1406,7 +1444,8 @@
         return;
       }
       var target = _target(entry.endpoint, entry.payload);
-      var drop = !target || entry.last_try || entry.blocked_on || q.entries.length >= MAX_ENTRIES;
+      var drop =
+        !target || entry.last_try || entry.no_retry || entry.blocked_on || q.entries.length >= MAX_ENTRIES;
       // What a queued write sets is newer: only the rest is retried.
       var rest = entry;
       for (var i = 0; !drop && i < queued.length; i++) {
@@ -1488,6 +1527,7 @@
     flush: flush,
     stats: stats,
     has: has,
+    queued: queued,
     rewrite: rewrite,
     remove: remove,
     dropBlockedOn: dropBlockedOn,
