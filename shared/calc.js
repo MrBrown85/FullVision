@@ -20,7 +20,7 @@ var _sectionByIdCache = {}; // cid → Map<sectionId, section>      — avoids r
 var _assessmentOverallCache = {};
 var _categoryAvgCache = {};
 var _courseLetterCache = {};
-var _pieceIndexCache = {}; // cid → Map<assessmentId, { keys, points, fed }>: what each piece of work measures now
+var _pieceIndexCache = {}; // cid → Map<assessmentId, { keys, fed }>: what each piece of work measures now
 
 /* ── The score set and its reader ──────────────────────────────
    Every score, status, points score, Complete/Incomplete mark, Overall
@@ -346,7 +346,6 @@ function _getSectionById(cid, sectionId) {
    to it that are still on the class; on rubric work the criteria of the
    rubric it has now; on points and Complete/Incomplete work its linked
    competencies; and the one Overall key when it has none of these.
-   points: whether it is scored in points or Complete/Incomplete.
    fed: on rubric work, the competencies its rubric's criteria feed. */
 function _pieceIndex(cid) {
   if (_pieceIndexCache[cid]) return _pieceIndexCache[cid];
@@ -359,7 +358,7 @@ function _pieceIndex(cid) {
         (fed = fed || {})[t] = true;
       });
     });
-    pieces.set(a.id, { keys: scoreTagIds(a, cid), points: isPointsScored(a), fed: fed });
+    pieces.set(a.id, { keys: scoreTagIds(a, cid), fed: fed });
   });
   _pieceIndexCache[cid] = pieces;
   return pieces;

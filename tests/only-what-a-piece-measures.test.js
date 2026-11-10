@@ -515,6 +515,17 @@ describe('work switched to points or Complete/Incomplete', () => {
     });
   });
 
+  it('scores left under two competencies the piece lists neither of: the same one is read either way round', () => {
+    [
+      [on('essay', ASK, 8), on('essay', PLAN, 5)],
+      [on('essay', PLAN, 5), on('essay', ASK, 8)],
+    ].forEach(order => {
+      seed([pointsEssay({ tagIds: [] }), lab()], () => order.concat([on('lab', PLAN, 2)]));
+      expect(numbers().sam.cells[0]).toBe('8');
+      expect(numbers().sam.piecePercents[0]).toBe(80);
+    });
+  });
+
   it('FLAGGED, unchanged: competency work switched to points, its competency kept, reads the level as points until a points score is entered', () => {
     // The Essay was scored Ask 3, then switched to points out of 10 with Ask
     // still on it. The 3 sits under the key a points score would use, so the
@@ -587,6 +598,7 @@ describe('what the rule leaves alone', () => {
     seed([essay(), lab()], () => [on('essay', 'overall', 3), on('lab', PLAN, 2)]);
     expect(assessmentCellValue(CID, 'sam', piece('essay')).kind).toBe('none');
     expect(getAssessmentOverallScore(CID, 'sam', 'essay')).toBeNull();
+    expect(classColumnAverage(CID, STUDENTS, { assessment: piece('essay'), tagIds: ['overall'] })).toBeNull();
   });
 });
 
