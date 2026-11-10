@@ -367,8 +367,21 @@ window.ClassResults = (function () {
       '<div class="cr-head-btns">' +
       '<button type="button" class="cr-btn cr-btn-primary" data-cr="grade">Grade This Assessment</button>' +
       '<button type="button" class="cr-btn" data-cr="edit">Edit Assessment Details</button>' +
+      _printButton(cid, a) +
       '</div></div>'
     );
+  }
+
+  /* The same print the grader offers (RubricPrint): Print Rubrics on rubric
+     and competency-level work, Print Scores on points and Complete/Incomplete
+     work with no rubric, none on DIBELS (its class sheet prints from the
+     Assignments page). */
+  // html-safe: fixed labels
+  function _printButton(cid, a) {
+    if (!window.RubricPrint || isDibelsScored(a)) return '';
+    var hasRubric = a.rubricId && getRubricById(cid, a.rubricId);
+    var label = !hasRubric && isPointsScored(a) ? 'Print Scores' : 'Print Rubrics';
+    return '<button type="button" class="cr-btn" data-cr="print">' + label + '</button>';
   }
 
   function _stat(label, value, color) {
@@ -1747,6 +1760,8 @@ window.ClassResults = (function () {
     } else if (what === 'edit') {
       if (window.Router)
         Router.navigate('/assignments?course=' + encodeURIComponent(cid) + '&edit=' + encodeURIComponent(aid));
+    } else if (what === 'print') {
+      if (window.RubricPrint) RubricPrint.open(cid, aid);
     } else if (what === 'pick') {
       var key = el.getAttribute('data-key');
       _state.sel = _state.sel && _state.sel.key === key ? null : _pick(key);
