@@ -45,7 +45,7 @@ for m in MIGRATIONS:
 ok('this database does not have Batch A yet', one("select to_regclass('public.grade_return') is null"))
 
 # ── Every function is the live one before the batch touches it ─────────
-want = live_md5()
+want = live_md5(before_s0_m5=True)   # this database is from before Batch A, and so from before S0-M5, which came after it
 got = {r[0]: r[1] for r in rows("""select p.proname, md5(pg_get_functiondef(p.oid)) from pg_proc p
                                     join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public'""")}
 for name in sorted(want):   # get_class_bundle and get_gradebook too: loaded with S0-M4 applied, as live has them

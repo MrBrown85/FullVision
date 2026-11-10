@@ -366,6 +366,27 @@ create table grade_return (
 );
 -- RLS: select only, fv_owns_enrollment(enrollment_id).
 
+-- 2026110905_grade_return_limits (S0-M4b; not applied when this was written):
+-- _grade_return_repair_class(course) settles every cell of a class that has a
+-- grade or a row by the rule a save follows (_grade_return_settle), and
+-- removes rows whose student or assessment is gone; the procedure
+-- grade_return_repair_nightly() runs it class by class, committing after
+-- each, once a day (pg_cron job fv_grade_return_repair_daily, 10:47 UTC). A
+-- trigger after TRUNCATE on enrollment and assessment removes orphan rows.
+-- A DIBELS piece (assessment.score_mode = 'dibels') has no Draft or Returned:
+-- its rows are dormant, read and written by nothing, and are settled by
+-- trigger grade_return_mode when its scoring is changed from DIBELS.
+-- list_course_grade_returns sends no seen_at; student_submit.page sends each
+-- assessment's created_at.
+create table grade_return_repair_log (                              -- what a night's repair could not do; owner only
+  id         bigint      generated always as identity primary key,
+  at         timestamptz not null default now(),
+  course_id  uuid,                                                  -- the class whose repair failed; null for the step after the last class
+  sqlstate   text        not null,
+  message    text        not null
+);
+-- RLS on, no policy; no grant to anon, authenticated or service_role.
+
 -- Schema fv_private (2026110902_grade_return): helpers that SECURITY INVOKER
 -- RPCs call, so signed-in teachers can run them, kept out of the API (the API
 -- serves schema public only): restore_grade_returns (import_json_restore),

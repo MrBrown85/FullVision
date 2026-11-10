@@ -71,12 +71,12 @@ def build_class(course=COURSE_A):
     return k
 
 def new_assessment(k, work, course=COURSE_A, title=None, date_assigned=None):
-    """An assessment of one of the cases' kinds: competencies, rubric or points."""
+    """An assessment of one of the cases' kinds: competencies, rubric, points or dibels."""
     as_owner()
     a = new_id()
     c.run("""insert into assessment (id, course_id, title, score_mode, max_points, rubric_id, date_assigned)
              values (:a, :c, :t, :m, :p, :r, :d)""",
-          a=a, c=course, t=title or (work.capitalize() + ' work'), m='points' if work == 'points' else 'proficiency',
+          a=a, c=course, t=title or (work.capitalize() + ' work'), m=work if work in ('points', 'dibels') else 'proficiency',
           p=10 if work == 'points' else None, r=k['r1'] if work == 'rubric' else None, d=date_assigned)
     if work == 'competencies':
         c.run('insert into assessment_tag (assessment_id, tag_id) values (:a, :t1), (:a, :t2)', a=a, t1=k['t1'], t2=k['t2'])
@@ -105,9 +105,13 @@ def score_fingerprint():
                           || coalesce((select string_agg(x::text, '|' order by x::text) from rubric_score x), '')
                           || coalesce((select string_agg(x::text, '|' order by x::text) from rubric_check_score x), ''))""")
 
-def live_md5():
-    want = {}
+def live_md5(before_s0_m5=False):
+    """name -> md5 of the live function. before_s0_m5: as the four that S0-M5 changed were before it (the file's marked lines)."""
+    want = {}; before = {}
     for line in open(os.path.join(HERE, 'live-function-md5.txt')):
-        if line.strip() and not line.startswith('#') and len(line.split()) == 3:   # a fourth word: grade_return_race.py's
+        if line.startswith('#before-s0-m5 '):
+            _mark, name, md5, _length = line.split(); before[name] = md5
+        elif line.strip() and not line.startswith('#') and len(line.split()) == 3:   # a fourth word: grade_return_race.py's
             name, md5, _length = line.split(); want[name] = md5
+    if before_s0_m5: want.update(before)
     return want

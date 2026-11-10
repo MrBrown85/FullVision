@@ -61,6 +61,8 @@ table public.assessment (rls on)
   CREATE INDEX assessment_rubric_idx ON public.assessment USING btree (rubric_id)
   CREATE TRIGGER course_sync_cursor_assessment_gradebook AFTER INSERT OR DELETE OR UPDATE ON public.assessment FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('gradebook', 'course')
   CREATE TRIGGER grade_return_gone AFTER DELETE ON public.assessment FOR EACH ROW EXECUTE FUNCTION public._grade_return_gone()
+  CREATE TRIGGER grade_return_mode AFTER UPDATE OF score_mode ON public.assessment FOR EACH ROW WHEN (((old.score_mode = 'dibels'::text) AND (new.score_mode IS DISTINCT FROM 'dibels'::text))) EXECUTE FUNCTION public._grade_return_mode_changed()
+  CREATE TRIGGER grade_return_truncate AFTER TRUNCATE ON public.assessment FOR EACH STATEMENT EXECUTE FUNCTION public._grade_return_truncated()
   policy assessment_via_course for all to public using (public.fv_owns_course(course_id)) with check (public.fv_owns_course(course_id))
 table public.assessment_tag (rls on)
   assessment_id uuid not null
@@ -351,6 +353,7 @@ table public.enrollment (rls on)
   CREATE INDEX enrollment_student_idx ON public.enrollment USING btree (student_id)
   CREATE TRIGGER course_sync_cursor_enrollment_gradebook AFTER INSERT OR DELETE OR UPDATE ON public.enrollment FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('gradebook', 'course')
   CREATE TRIGGER grade_return_gone AFTER DELETE ON public.enrollment FOR EACH ROW EXECUTE FUNCTION public._grade_return_gone()
+  CREATE TRIGGER grade_return_truncate AFTER TRUNCATE ON public.enrollment FOR EACH STATEMENT EXECUTE FUNCTION public._grade_return_truncated()
   policy enrollment_via_course for all to public using (public.fv_owns_course(course_id)) with check (public.fv_owns_course(course_id))
 table public.fv_idempotency (rls on)
   key uuid not null
@@ -398,6 +401,14 @@ table public.grade_return (rls on)
   CREATE INDEX grade_return_assessment_idx ON public.grade_return USING btree (assessment_id)
   CREATE UNIQUE INDEX grade_return_pkey ON public.grade_return USING btree (enrollment_id, assessment_id)
   policy grade_return_read for select to public using (public.fv_owns_enrollment(enrollment_id))
+table public.grade_return_repair_log (rls on)
+  id bigint not null
+  at timestamp with time zone not null default now()
+  course_id uuid
+  sqlstate text not null
+  message text not null
+  constraint grade_return_repair_log_pkey PRIMARY KEY (id)
+  CREATE UNIQUE INDEX grade_return_repair_log_pkey ON public.grade_return_repair_log USING btree (id)
 table public.guardian (rls on)
   id uuid not null default gen_random_uuid()
   student_id uuid not null
@@ -1275,10 +1286,15 @@ function public._grade_return_gone() returns trigger security definer
 function public._grade_return_holds(p_enrollment_id uuid) returns boolean security definer
 function public._grade_return_lock(p_course_id uuid) returns void security definer
 function public._grade_return_lock_first(p_course_id uuid) returns void security definer
+function public._grade_return_mode_changed() returns trigger security definer
 function public._grade_return_on_change() returns trigger security definer
 function public._grade_return_one(p_enrollment_id uuid, p_assessment_id uuid, p_at timestamp with time zone) returns boolean security definer
 function public._grade_return_release() returns trigger security definer
+function public._grade_return_repair_class(p_course_id uuid) returns jsonb security definer
+function public._grade_return_repair_lost() returns integer security definer
 function public._grade_return_repoint() returns trigger security definer
+function public._grade_return_settle(p_enrollment_id uuid, p_assessment_id uuid) returns integer security definer
+function public._grade_return_truncated() returns trigger security definer
 function public._issue_access_code(p_enrollment_id uuid, p_questionnaire_id uuid, p_expires_at timestamp with time zone) returns text security definer
 function public._issue_report_code(p_enrollment_id uuid, p_report_id uuid, p_expires_at timestamp with time zone) returns text security definer
 function public._issue_student_card(p_enrollment_id uuid, p_not_password text) returns uuid security definer

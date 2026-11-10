@@ -54,6 +54,12 @@ baseline, the deadlocks the live functions have between themselves today.
 
 PGPORT=54329 PGDATABASE=fv_a python3 grade_return_race.py
 RACE_CALLS=300 RACE_ONLY=upsert_section,delete_tag RACE_JSON=/tmp/out.json ...
+
+With 2026110905 (S0-M4b) loaded there is one more row, a points piece whose
+scoring flips to DIBELS and back, and RACE_REPAIR=nightly (the procedure the
+nightly job calls) or RACE_REPAIR=class (the one-class repair) keeps that
+repair running beside every run. The repair must never fail and, because
+every write here goes through the triggers, must never find anything to do.
 """
 import json, os, random, re, sys, threading, time, uuid
 if os.environ.get('PG8000_PATH'): sys.path.insert(0, os.environ['PG8000_PATH'])
@@ -85,6 +91,10 @@ nid = lambda: str(uuid.uuid4())
 arr = lambda ids: '{%s}' % ','.join(ids)
 o = conn()
 BATCH_A = o.run("select to_regclass('public.grade_return') is not null")[0][0]
+LIMITS = o.run("select to_regprocedure('public._grade_return_repair_class(uuid)') is not null")[0][0]   # 2026110905 is loaded
+REPAIR = os.environ.get('RACE_REPAIR', '') if LIMITS else ''
+REPAIR_DID = {}      # what the looping repair said it did, summed
+REPAIR_DEAD = {}     # run -> its errors
 START = o.run('select clock_timestamp()')[0][0]
 KEEP = {t: [r[0] for r in o.run('select id from %s where course_id = :c' % t, c=COURSE_A)]
         for t in ('assessment', 'rubric', 'subject', 'competency_group', 'section', 'enrollment')}
@@ -235,6 +245,7 @@ class World:
         o.run('delete from tag t using section x where x.id = t.section_id and x.id = :x and not (t.id = any (:k::uuid[]))', x=self.sect, k=arr(self.tags))
         if BATCH_A:
             o.run("update course set student_page_enabled = true, return_grades = 'on_return', name = 'Science 8' where id = :c", c=COURSE_A)
+        o.run("update assessment set score_mode = 'points' where id = :a and score_mode <> 'points'", a=self.P)
         o.run('update section set removed_at = null where id = :x', x=self.sect)
         o.run('update enrollment set withdrawn_at = null where id = any (:e::uuid[])', e=arr(self.hot))
         o.run('update assessment set rubric_id = :r where id = :a and rubric_id is distinct from :r', r=self.r1, a=self.Rb)
@@ -332,6 +343,9 @@ def scenarios():
         if which == 3: return 'update_assessment(:a, :p::jsonb)', dict(a=W.Rb, p=json.dumps({'rubric_id': None}))
         return 'update_assessment(:a, :p::jsonb)', dict(a=W.Rb, p=json.dumps({'rubric_id': W.r1}))
     add('update_assessment', update_assessment)
+    if LIMITS:
+        add('update_assessment to DIBELS and back', lambda i, rng, st: ('update_assessment(:a, :p::jsonb)',
+                                                                     dict(a=W.P, p=json.dumps({'score_mode': 'dibels' if i % 2 == 0 else 'points'}))))
     add('save_assessment_tags', lambda i, rng, st: ('save_assessment_tags(:a, :t::uuid[])', dict(a=W.C, t=arr(W.tags[:1 + i % 3]))))
     add('duplicate_assessment', lambda i, rng, st: ('duplicate_assessment(:a, :k)', dict(a=[W.P, W.C, W.Rb][i % 3], k=nid())))
     def del_assessment_setup():
@@ -493,7 +507,14 @@ def run(xs, savers, returners, seed):
         c = conn(role); errors = {}; first = {}; waits = {}; i = 0
         while (i < n) if n else not done.is_set():
             sql, kw = call(i)
-            try: c.run('select ' + sql, **kw)
+            try:
+                res = c.run(sql if sql.startswith('call ') else 'select ' + sql, **kw)
+                if name == 'repair' and res and isinstance(res[0][0], dict):
+                    with lock:
+                        REPAIR_DID['calls'] = REPAIR_DID.get('calls', 0) + 1
+                        for k_, v_ in res[0][0].items(): REPAIR_DID[k_] = REPAIR_DID.get(k_, 0) + v_
+                elif name == 'repair':
+                    with lock: REPAIR_DID['calls'] = REPAIR_DID.get('calls', 0) + 1
             except Exception as err:
                 k = code_of(err); errors[k] = errors.get(k, 0) + 1
                 info = err.args[0] if err.args and isinstance(err.args[0], dict) else {}
@@ -517,11 +538,21 @@ def run(xs, savers, returners, seed):
     for n_ in range(returners):
         rng = random.Random(seed * 1000 + 700 + n_)
         threads.append(threading.Thread(target=worker, args=('returns', 'teacher', (lambda i, rng=rng: return_call(rng)), None)))
+    if REPAIR == 'class':
+        threads.append(threading.Thread(target=worker, args=('repair', None, (lambda i: ('public._grade_return_repair_class(:c)', dict(c=COURSE_A))), None)))
+    elif REPAIR == 'nightly':
+        threads.append(threading.Thread(target=worker, args=('repair', None, (lambda i: ('call public.grade_return_repair_nightly()', {})), None)))
     [t.start() for t in threads + xthreads]; [t.join() for t in xthreads]; done.set(); [t.join() for t in threads]
     return stats
 
 CHECKS = {
-    'drift': """select count(*) from grade_return g where g.working_copy is distinct from public._grade_copy(g.enrollment_id, g.assessment_id)""",
+    'drift': """select count(*) from grade_return g join assessment a on a.id = g.assessment_id
+                 where a.score_mode <> 'dibels' and g.working_copy is distinct from public._grade_copy(g.enrollment_id, g.assessment_id)""",
+    'missing': """select count(*) from (select enrollment_id, assessment_id from score union select enrollment_id, assessment_id from tag_score
+                    union select enrollment_id, assessment_id from rubric_score union select enrollment_id, assessment_id from rubric_check_score) x
+                  join assessment a on a.id = x.assessment_id and a.score_mode <> 'dibels'
+                 where public._grade_copy(x.enrollment_id, x.assessment_id) is not null
+                   and not exists (select 1 from grade_return g where g.enrollment_id = x.enrollment_id and g.assessment_id = x.assessment_id)""",
     'state': """select count(*) from grade_return g
                  where (g.returned_copy is not null) <> (g.is_draft and g.returned_at is not null)
                     or (g.is_draft and g.returned_copy = g.working_copy) or (g.is_draft and g.returned_at is null and g.working_copy is null)""",
@@ -542,6 +573,8 @@ def record(x, versus, stats, checks):
             if k != '40P01': refused[k] = refused.get(k, 0) + v
         for k, v in s['waits'].items(): waits[k] = waits.get(k, 0) + v
         for k, v in s['first'].items(): first.setdefault(k, v)
+    if stats.get('repair', {}).get('errors'):
+        REPAIR_DEAD[x + ' / ' + versus] = (stats['repair']['errors'], stats['repair']['first'])
     r = {'x': x, 'versus': versus, 'calls': sum(s['calls'] for s in stats.values()), 'x_calls': {n: s['calls'] for n, s in stats.items()}, 'dead': dead,
          'dead_by': {n: s['errors']['40P01'] for n, s in stats.items() if s['errors'].get('40P01')}, 'dead_waiting_on': waits,
          'refused': refused, 'first': first, 'checks': checks}
@@ -636,6 +669,13 @@ finally:
 
 print('\n'.join('PASS ' + p for p in passed))
 print('class writers: %d of %d are the live functions' % (sum(1 for n in WRITERS if LOADED.get(n) == LIVE.get(n)), len(WRITERS)))
+if REPAIR:
+    ok('the repair looping beside every run (%s) never failed: %d calls' % (REPAIR, REPAIR_DID.get('calls', 0)),
+       not REPAIR_DEAD and REPAIR_DID.get('calls', 0) > 0, REPAIR_DEAD)
+    ok('and never found anything to do: every write here went through the triggers', not any(v for k, v in REPAIR_DID.items() if k != 'calls'), REPAIR_DID)
+    ok("and its log is empty", o.run('select count(*) from public.grade_return_repair_log')[0][0] == 0,
+       o.run('select course_id, sqlstate, message from public.grade_return_repair_log limit 3'))
+    print('the repair (%s): %s' % (REPAIR, REPAIR_DID))
 print('%-34s %-18s %7s %9s  %s' % ('RPC', 'against', 'calls', 'deadlocks', 'refused (SQLSTATE: calls)'))
 for r in results:
     print('%-34s %-18s %7d %9d  %s%s' % (r['x'][:34], r['versus'], r['calls'], r['dead'], ', '.join('%s: %d' % kv for kv in sorted(r['refused'].items())) or '-',
