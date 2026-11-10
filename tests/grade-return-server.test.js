@@ -642,6 +642,166 @@ describe('starting to hold grades waits for the server’s word', () => {
     expect(getReturnSettings(CID).return_grades).toBe('on_save');
   });
 
+  describe('when the server’s answer is lost or never comes', () => {
+    // Verify pass on PR 999, finding 2. The server makes the change; the
+    // device is told "could not change this"; without a read of the class
+    // it would stay on As Soon As I Save while the server holds every grade.
+    const lost = () =>
+      fake.on('update_course', p => {
+        Object.assign(course, p.p_patch);
+        version += 1;
+        return { data: null, error: { message: 'network: failed to fetch' } };
+      });
+
+    it('lost: the class is read again whole, and the device ends where the server is (reviewer’s case B2)', async () => {
+      course = { student_page_enabled: true, return_grades: 'on_save' };
+      await openClass();
+      rows = null;
+      serverJudges();
+      lost();
+      fake.calls.length = 0;
+      const out = await saveReturnSettings(CID, { return_grades: 'on_return' });
+      expect(out.ok).toBe(false);
+      await quiet();
+      // Not "has it changed?": the class itself, then its rows.
+      expect(callsTo('get_class_bundle').map(p => p.p_if_version)).toEqual([null]);
+      expect(callsTo('list_course_grade_returns').length).toBe(1);
+      expect(getReturnSettings(CID)).toEqual({ student_page: true, return_grades: 'on_return' });
+      // A grade saved next is a draft on both.
+      level(NOOR, CAUSES, SIGNIFICANCE, 2);
+      expect(state(NOOR, CAUSES)).toBe('draft');
+      await quiet();
+      expect(serverCell[NOOR]).toBe('draft');
+    });
+
+    it('lost, and the read of the class fails too: it is retried like any failed load, until the device agrees', async () => {
+      course = { student_page_enabled: true, return_grades: 'on_save' };
+      await openClass();
+      lost();
+      let loads = 0;
+      fake.on('get_class_bundle', () => {
+        loads += 1;
+        return loads < 3
+          ? { data: null, error: { message: 'network: failed to fetch' } }
+          : { data: serverClass(), error: null };
+      });
+      expect((await saveReturnSettings(CID, { return_grades: 'on_return' })).ok).toBe(false);
+      await quiet();
+      expect(courseLoadFailed(CID)).toBe(true);
+      expect(getSyncDotState().status).toBe('error');
+      expect(toasts).toEqual([]);
+      expect(getReturnSettings(CID).return_grades).toBe('on_save');
+      await retryActiveCourseLoad();
+      await quiet();
+      await retryActiveCourseLoad();
+      await quiet();
+      expect(loads).toBe(3);
+      expect(courseLoadFailed(CID)).toBe(false);
+      expect(getReturnSettings(CID).return_grades).toBe('on_return');
+    });
+
+    it('lost, and the page closed: the saved copy is not trusted the next time the class opens', async () => {
+      course = { student_page_enabled: true, return_grades: 'on_save' };
+      await openClass();
+      lost();
+      fake.on('get_class_bundle', () => ({ data: null, error: { message: 'network: failed to fetch' } }));
+      await saveReturnSettings(CID, { return_grades: 'on_return' });
+      await quiet();
+      // A new session, the connection back.
+      forgetMemory();
+      fake.on('get_class_bundle', p =>
+        p.p_if_version === version
+          ? { data: { not_modified: true, version }, error: null }
+          : { data: serverClass(), error: null },
+      );
+      fake.calls.length = 0;
+      await initData(CID);
+      await quiet();
+      expect(callsTo('get_class_bundle').map(p => p.p_if_version)).toEqual([null]);
+      expect(getReturnSettings(CID).return_grades).toBe('on_return');
+    });
+
+    it('the switch, lost: the page comes on here once the class has been read', async () => {
+      course = { student_page_enabled: false, return_grades: 'on_return' };
+      await openClass();
+      lost();
+      expect((await setStudentPageSwitch(CID, true)).ok).toBe(false);
+      await quiet();
+      expect(getReturnSettings(CID)).toEqual({ student_page: true, return_grades: 'on_return' });
+      expect(callsTo('list_course_grade_returns').length).toBe(1);
+    });
+
+    it('never answered: it gives up, says it could not be changed, and reads the class again', async () => {
+      course = { student_page_enabled: true, return_grades: 'on_save' };
+      await openClass();
+      const wait = RETURN_SETTINGS_ASK_MS;
+      RETURN_SETTINGS_ASK_MS = 60;
+      try {
+        fake.on('update_course', p => {
+          Object.assign(course, p.p_patch);
+          version += 1;
+          return new Promise(() => {}); // committed; the answer never comes
+        });
+        fake.calls.length = 0;
+        const out = await saveReturnSettings(CID, { return_grades: 'on_return' });
+        expect(out.ok).toBe(false);
+        await quiet();
+        expect(callsTo('get_class_bundle').map(p => p.p_if_version)).toEqual([null]);
+        expect(getReturnSettings(CID).return_grades).toBe('on_return');
+      } finally {
+        RETURN_SETTINGS_ASK_MS = wait;
+      }
+    });
+
+    it('realtime’s word of a change asked for directly is not taken for this page’s own echo', async () => {
+      course = { student_page_enabled: true, return_grades: 'on_save' };
+      await openClass();
+      const mine = window.__fvClientId;
+      window.__fvClientId = 'this-page';
+      try {
+        const before = _classVersion[CID];
+        _echoNeedsReload = false; // as after a load: nothing sent since
+        // A write this page made and already holds: its echo needs no reload.
+        expect(_isOwnChangeEcho(CID, { last_client: 'this-page' }, before + 1)).toBe(true);
+        let answer;
+        fake.on('update_course', () => new Promise(r => (answer = () => r({ data: null, error: null }))));
+        const asked = saveReturnSettings(CID, { return_grades: 'on_return' });
+        await settle();
+        // The server has made the change this page asked for and has not
+        // yet made itself: the class is read, not waved through.
+        expect(_isOwnChangeEcho(CID, { last_client: 'this-page' }, before + 1)).toBe(false);
+        answer();
+        await asked;
+        await quiet();
+      } finally {
+        window.__fvClientId = mine;
+      }
+    });
+
+    it('refused outright (nothing changed on the server): the read finds the class as it was', async () => {
+      course = { student_page_enabled: true, return_grades: 'on_save' };
+      await openClass();
+      fake.on('update_course', () => ({ data: null, error: { code: '22023', message: 'invalid' } }));
+      fake.calls.length = 0;
+      expect((await saveReturnSettings(CID, { return_grades: 'on_return' })).ok).toBe(false);
+      await quiet();
+      expect(callsTo('get_class_bundle').length).toBe(1);
+      expect(getReturnSettings(CID).return_grades).toBe('on_save');
+      expect(courseLoadFailed(CID)).toBe(false);
+    });
+
+    it('offline, or with writes that will not go, nothing was asked, so nothing is read', async () => {
+      course = { student_page_enabled: true, return_grades: 'on_save' };
+      await openClass();
+      fake.calls.length = 0;
+      setOnline(false);
+      expect((await saveReturnSettings(CID, { return_grades: 'on_return' })).ok).toBe(false);
+      await settle();
+      expect(fake.calls).toEqual([]);
+      expect(courseLoadFailed(CID)).toBe(false);
+    });
+  });
+
   it('the switch, for a class already on When I Return Them, offline: not made (reviewer’s case A2)', async () => {
     course = { student_page_enabled: false, return_grades: 'on_return' };
     await openClass();
@@ -805,6 +965,34 @@ describe('how many grades wait, for the question before a class stops holding th
     await openClass();
     arrange();
     expect(await draftsWaitingToReturn(CID)).toEqual({ count: null });
+  });
+
+  it('a count that was asked for and not answered: the class is read again, as after any failed ask', async () => {
+    await openClass();
+    fake.on('course_draft_count', () => ({ data: null, error: { message: 'network: failed to fetch' } }));
+    fake.calls.length = 0;
+    expect(await draftsWaitingToReturn(CID)).toEqual({ count: null });
+    await quiet();
+    expect(callsTo('get_class_bundle').map(p => p.p_if_version)).toEqual([null]);
+    // Offline nothing is asked, and nothing is read.
+    fake.calls.length = 0;
+    setOnline(false);
+    expect(await draftsWaitingToReturn(CID)).toEqual({ count: null });
+    await settle();
+    expect(fake.calls).toEqual([]);
+  });
+
+  it('a count that never comes gives up', async () => {
+    await openClass();
+    const wait = RETURN_SETTINGS_ASK_MS;
+    RETURN_SETTINGS_ASK_MS = 60;
+    try {
+      fake.on('course_draft_count', () => new Promise(() => {}));
+      expect(await draftsWaitingToReturn(CID)).toEqual({ count: null });
+    } finally {
+      RETURN_SETTINGS_ASK_MS = wait;
+      await quiet();
+    }
   });
 
   it('in Demo Mode it is the device’s own count, at once', () => {
@@ -978,6 +1166,41 @@ describe('the class’s rows are the server’s', () => {
     await quiet();
     expect(courseLoadFailed(CID)).toBe(false);
     expect(getReturnedScores(CID)).toBe(getScores(CID));
+  });
+
+  it('a read that keeps failing is retried at the class load’s own pace: 15 s, 30 s, 1 min, then every 2 min', async () => {
+    await openClass();
+    fake.on('list_course_grade_returns', () => ({ data: null, error: { message: 'network: failed to fetch' } }));
+    _gradeReturnsStale[CID] = true;
+    const waits = [];
+    const realTimeout = globalThis.setTimeout;
+    // The retry timer as it is set, fired at once in place of the wait.
+    const fire = async () => {
+      expect(_loadRetryTimer).not.toBe(null);
+      clearTimeout(_loadRetryTimer);
+      _loadRetryTimer = null;
+      await _handleExternalCourseUpdate(CID, 'gradebook');
+      await quiet();
+    };
+    globalThis.setTimeout = function (fn, ms) {
+      if (ms >= 15000) waits.push(ms);
+      return realTimeout.apply(this, arguments);
+    };
+    try {
+      await _handleExternalCourseUpdate(CID, 'gradebook');
+      await quiet();
+      for (let i = 0; i < 4; i++) await fire();
+      // The class itself answers each time; only its rows fail. The pace
+      // is still the failed load's, not 15 s for ever.
+      expect(waits).toEqual([15000, 30000, 60000, 120000, 120000]);
+      expect(courseLoadFailed(CID)).toBe(true);
+      fake.on('list_course_grade_returns', () => ({ data: structuredClone(serverRows()), error: null }));
+      await fire();
+      expect(courseLoadFailed(CID)).toBe(false);
+      expect(_loadRetryTimer).toBe(null);
+    } finally {
+      globalThis.setTimeout = realTimeout;
+    }
   });
 
   it('an unchanged class is not asked for its rows twice in a session, but is on the first check of a new one', async () => {

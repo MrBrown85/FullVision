@@ -4179,17 +4179,31 @@ async function _doInitData(cid) {
       } else {
         var bundle = _rpcObject(bundleRes.data) || {};
         if (bundle.not_modified) {
-          _clearLoadError(cid);
+          if (!_serverKeepsRows(cid)) {
+            _clearLoadError(cid);
+            _classFresh[cid] = true;
+            _markLoadSynced();
+            return;
+          }
+          // Draft and Returned: the class's rows too, if this session has
+          // not read them. The load has worked only when they have: until
+          // then a load that failed stays failed, so its retries keep
+          // backing off (15 s, 30 s, 1 min, then every 2 min).
           _classFresh[cid] = true;
-          _markLoadSynced();
-          // Draft and Returned: the class's rows, if this session has not read them.
-          if (_serverKeepsRows(cid)) await _loadServerGradeReturns(cid, false);
+          if ((await _loadServerGradeReturns(cid, false)) !== false) {
+            _clearLoadError(cid);
+            _markLoadSynced();
+          }
           return;
         }
+        var rowsToo = false;
         try {
           _bundleToCache(cid, bundle);
-          _clearLoadError(cid);
-          _markLoadSynced();
+          rowsToo = _serverKeepsRows(cid);
+          if (!rowsToo) {
+            _clearLoadError(cid);
+            _markLoadSynced();
+          }
         } catch (e) {
           // A payload this code can't read must not leave the class half
           // applied with no word to the teacher.
@@ -4200,8 +4214,11 @@ async function _doInitData(cid) {
         }
         // Draft and Returned: the rows that go with the scores just loaded.
         // After the scores, never before: rows older than the scores could
-        // read a draft as returned.
-        if (_serverKeepsRows(cid)) await _loadServerGradeReturns(cid, true);
+        // read a draft as returned. The load has worked when they are in.
+        if (rowsToo && (await _loadServerGradeReturns(cid, true)) !== false) {
+          _clearLoadError(cid);
+          _markLoadSynced();
+        }
         return;
       }
     }
@@ -10175,7 +10192,10 @@ function restoreScoreCells(cid, before, after) {
       student or the whole piece of work (shared/offline-queue.js).
    7. A write of any of these that the server refuses leaves this device
       and the server apart: the class's settings and rows are read again,
-      and that read is retried until it works (_convergeOnServer).
+      and that read is retried until it works (_convergeOnServer). The same
+      after an ask of the server that fails or is not answered (a change
+      that starts holding, the count of drafts): the server may have made
+      the change and only the answer been lost.
    A signed-in class that holds grades has rows that are NOT LOADED until
    _loadGradeReturns has run for it this session, which is not the same as
    none: getReturnedScores throws, so no draft is ever counted as returned.
@@ -10187,6 +10207,7 @@ var _gradeReturnsStale = {}; // cid → true when the rows must be read again wh
 var _movingClass = false; // a class is being moved to its server id: its scores are replayed, not graded
 var _serverStudentPage = {}; // cid → what the server last said of the class's switch (see _serverSaysStudentPage)
 var START_HOLDING_WAIT_MS = 3000; // how long a change that needs the server waits for unsent writes to go first
+var RETURN_SETTINGS_ASK_MS = 15000; // how long an ask of the server (a change that starts holding, the count) waits for its answer
 
 /* Whether the server has said this class's student page is on. Kept apart
    from the class's settings object, which backups, Duplicate Class and any
@@ -10427,6 +10448,7 @@ function saveReturnSettings(cid, change) {
   return _settledNow({ ok: true });
 }
 async function _startHolding(cid, patch, turningOn) {
+  var asked = false;
   try {
     if (_isOffline()) return { ok: false, error: { message: 'offline' } };
     // A grade saved before this must not reach the server after it.
@@ -10434,12 +10456,29 @@ async function _startHolding(cid, patch, turningOn) {
       return { ok: false, error: { message: 'changes are still waiting to be sent' } };
     }
     if (_isOffline()) return { ok: false, error: { message: 'offline' } };
-    var res = await _callRpcWithAuthGuard(
-      'update_course',
-      { p_course_id: cid, p_patch: patch },
-      { suppressSessionExpiredModal: true },
+    /* From here the server may make the change whatever this device hears
+       back: an answer can be lost on the way, or never come. So:
+       - realtime's word of the change is not this page's own echo (the
+         change is not made here yet): it has the class read;
+       - an answer that is an error, or does not come in time, is not taken
+         as "nothing happened": the class is read again from the server,
+         settings and rows, and that read is retried until it works
+         (_convergeOnServer). The device ends where the server is. */
+    asked = true;
+    _echoNeedsReload = true;
+    var res = await _withTimeout(
+      _callRpcWithAuthGuard(
+        'update_course',
+        { p_course_id: cid, p_patch: patch },
+        { suppressSessionExpiredModal: true },
+      ),
+      RETURN_SETTINGS_ASK_MS,
+      'the change of the class’s setting',
     );
-    if (!res || res.error) return { ok: false, error: (res && res.error) || { message: 'no answer' } };
+    if (!res || res.error) {
+      _convergeOnServer(cid);
+      return { ok: false, error: (res && res.error) || { message: 'no answer' } };
+    }
     // getSupabase() gone or a Demo session answers with no error and no call.
     if (!_useSupabase || !_writesEnabled()) return { ok: false, error: { message: 'signed out' } };
     // The server holds the class's grades from here. So does this device.
@@ -10453,6 +10492,7 @@ async function _startHolding(cid, patch, turningOn) {
     return { ok: true };
   } catch (e) {
     _gradeStateFailed('asking the server to hold the class’s grades', e);
+    if (asked) _convergeOnServer(cid);
     return { ok: false, error: e };
   }
 }
@@ -10488,14 +10528,20 @@ function draftsWaitingToReturn(cid) {
   return (async function () {
     try {
       if (!(await _unsentWritesGone(START_HOLDING_WAIT_MS)) || _isOffline()) return { count: null };
-      var res = await _callRpcWithAuthGuard(
-        'course_draft_count',
-        { p_course_id: cid },
-        { suppressSessionExpiredModal: true },
+      var res = await _withTimeout(
+        _callRpcWithAuthGuard('course_draft_count', { p_course_id: cid }, { suppressSessionExpiredModal: true }),
+        RETURN_SETTINGS_ASK_MS,
+        'the count of drafts',
       );
       var n = res && !res.error && res.data != null ? Number(res.data) : NaN;
-      return { count: isFinite(n) && n >= 0 ? Math.floor(n) : null };
+      if (isFinite(n) && n >= 0) return { count: Math.floor(n) };
+      // Asked, and no number came back: something is wrong between this
+      // device and the server. The class is read again, as after any failed
+      // ask, so what the screen shows next is the server's.
+      _convergeOnServer(cid);
+      return { count: null };
     } catch (e) {
+      _convergeOnServer(cid);
       return { count: null };
     }
   })();
@@ -10747,15 +10793,16 @@ async function _fetchGradeReturns(cid) {
    rows too. `fresh` is false when the server answered that the class has
    not changed: its rows are then read only if this session has not read
    them yet. A failed read is a failed load: the saved copy stays, the sync
-   dot says so and the load is tried again. Rows left out because of a
-   change made here have the refresh run again (_refreshMustSkip's way). */
+   dot says so and the load is tried again; it answers false then. Rows
+   left out because of a change made here have the refresh run again
+   (_refreshMustSkip's way). */
 async function _loadServerGradeReturns(cid, fresh) {
   if (!_serverKeepsRows(cid)) return;
   if (!fresh && _gradeReturnsLoadedFor[cid] === true && !_gradeReturnsStale[cid]) return;
   var got = await _fetchGradeReturns(cid);
   if (got.error) {
     _courseLoadFailed(cid, got.error);
-    return;
+    return false;
   }
   var st = _refreshState[cid];
   if (got.skipped) {
