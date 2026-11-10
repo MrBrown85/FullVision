@@ -171,7 +171,8 @@ PGPORT=54329 PGDATABASE=fv_score python3 score_rpcs.py
 
 Result on 2026-11-09 (Postgres 18.6, local; production is 17): 176 of 176.
 Against a database with Batch A loaded (below) the same script finds it and
-expects the one gap Batch A closes to be refused: 234 of 234.
+expects the one gap Batch A closes to be refused: 236 of 236 (234 before
+that database also held `get_class_bundle` and `get_gradebook`).
 
 Checks named "today:" pin a gap as it is. Batch A closes one and its
 database flips those checks to "refused": row security on the score tables
@@ -209,8 +210,11 @@ Four migrations, tested here only (no Supabase branch, never
 
 Three more files build what they need on top of the score paths:
 
-- `batch-a-tables.sql`: seven more tables from the live snapshot
-  (`python3 make-score-tables.py batch-a`).
+- `batch-a-tables.sql`: two more tables from the live snapshot,
+  `teacher_preference` and `dibels_score`
+  (`python3 make-score-tables.py batch-a`). It held seven until S0-M4 was
+  merged; the other five are in `bundle-tables.sql` (below), which now
+  loads first.
 - `batch-a-prelude.sql`: `update_course`, `import_json_restore`,
   `create_course`, `duplicate_course` and `duplicate_assessment`. No one
   migration holds any of them whole; each is the migration that last wrote
@@ -236,10 +240,16 @@ Three more files build what they need on top of the score paths:
   functions.**
 
 Two databases, one without the four migrations (for `batch_a_apply.py`,
-which applies them itself) and one with:
+which applies them itself) and one with. Both start from the live database
+as it is now, which since 2026-11-10 has S0-M4 applied (see "The bundle
+sends created_at" below): they load `get_class_bundle` and `get_gradebook`
+as they were before it and then that migration, so the two come out as the
+live functions of today and `live-function-md5.txt` holds those
+fingerprints.
 
 ```bash
-BASE="harness.sql score-prelude.sql score-tables.sql student-submit-prelude.sql \
+BASE="harness.sql score-prelude.sql score-tables.sql bundle-prelude.sql bundle-tables.sql \
+  ../2026111001_assessment_created_at_in_bundle.sql student-submit-prelude.sql \
   ../20261025_questionnaires_tables_and_functions.sql ../20261025_questionnaires_templates.sql \
   ../20261025_student_submit.sql ../20261025_student_submit_phone.sql \
   ../20261025_student_submit_token_80.sql ../20261025_phone_reports.sql \
@@ -317,12 +327,16 @@ What each covers:
   student and assessment still there, and no draft may be left in a class
   that does not hold grades.
 
-Result on 2026-11-09 (Postgres 18.6, local; production is 17):
-`batch_a_apply.py` 82 of 82, `grade_return.py` 280 of 280, `student_page.py`
-216 of 216, `score_rpcs.py` 234 of 234 (176 of 176 without Batch A),
-`grade_return_race.py` 414 of 414; each three times (435 of 435 since the 21 fingerprint checks were added, run once). With Batch A loaded the earlier suites pass
-as before: `student_submit.py` 79 of 79, `questionnaire_identity.py` 47 of
-47, `phone_reports.py` 37 of 37, `questionnaires.py` 42 of 42.
+Result on 2026-11-10, on Postgres 17.11 (what production runs) and on 18.6,
+the same on both: `batch_a_apply.py` 84 of 84, `grade_return.py` 280 of 280,
+`student_page.py` 216 of 216, `score_rpcs.py` 236 of 236 (176 of 176 without
+Batch A), `grade_return_race.py` 435 of 435. With Batch A loaded the earlier
+suites pass as before: `student_submit.py` 79 of 79,
+`questionnaire_identity.py` 47 of 47, `phone_reports.py` 37 of 37,
+`questionnaires.py` 42 of 42. (Before S0-M4 was applied live and the two
+bundle functions joined these databases, `batch_a_apply.py` was 82 of 82
+and `score_rpcs.py` 234 of 234: the two more checks in each are that
+`get_class_bundle` and `get_gradebook` are the live functions.)
 
 File 04 also raises the slip route's per-address limit from 60 unknown codes
 in 15 minutes to 300, as for cards (one number in `student_submit.open`,
@@ -522,11 +536,14 @@ Two more files build what it needs on top of the score paths:
   migration holds either whole. Each is the migration that last wrote it in
   full, then every later in-place patch run as its migration wrote it, in
   file order, and printed with `pg_get_functiondef` (the file's header lists
-  them: 17 patches for the bundle, 3 for `get_gradebook`). The bundle comes
-  out as the live function, byte for byte (`live-function-md5.txt`).
-  `get_gradebook` comes out as md5 `2876cd40c373b8a59bff4464008c8601`, length
-  6816, which the orchestrator confirmed against `gradebook-prod` on Nov 10;
-  it is in `live-function-md5.txt` too. Also
+  them: 17 patches for the bundle, 3 for `get_gradebook`). Both come out as
+  the live functions were before S0-M4 (md5 `119165287207814181c5875d81451147`,
+  length 22538, and `2876cd40c373b8a59bff4464008c8601`, length 6816; the
+  orchestrator confirmed both against `gradebook-prod` on Nov 10 before the
+  migration was applied), which is what the migration's own check expects.
+  S0-M4 was applied the same day, so `live-function-md5.txt` now holds the
+  two as they are after it, and a harness that wants today's live functions
+  loads this file and then the migration. Also
   `fv_owns_term_rating`, and four stand-ins for the server's old grade
   calculation that `get_gradebook` calls for its cells (`fv_assessment_overall`
   and three more): they have the live signatures and return nothing, because
@@ -550,8 +567,12 @@ volatility and `search_path` are unchanged and each body is the old one plus
 the one key; no row changes and no class's sync version moves; a browser
 sending the version it holds is still told `not_modified`; a second run
 changes nothing; and a body that is not the expected one stops the file at
-its first check with nothing changed.
+its first check with nothing changed. It starts from the two functions as
+the migration's check expects them and, after the migration, compares both
+with the live fingerprints of today.
 
-Result on 2026-11-10 (Postgres 18.6, local; production is 17): 40 of 40.
-`score_rpcs.py` is unchanged at 175 of 175, and `make-score-tables.py` still
+Result on 2026-11-10, on Postgres 17.11 and on 18.6: 39 of 39 (40 while the
+fingerprint file still held the functions from before the migration; four
+checks on the starting point became two, and one on the result was added).
+On a database with the score paths alone `score_rpcs.py` is unchanged, and `make-score-tables.py` still
 writes `score-tables.sql` byte for byte.
