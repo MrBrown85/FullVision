@@ -78,7 +78,7 @@ Shared runtime modules load before desktop or mobile page modules, in this order
 10. `shared/offline-queue.js`
 11. `shared/auto-update.js`
 12. `shared/calc.js`
-13. `shared/grade-state.js` (the Draft and Returned rule; today every save is returned at once)
+13. `shared/grade-state.js` (the Draft and Returned rule; a class whose student page is off returns every save at once)
 14. `shared/grader.js` (`Grader`, the one module a screen writes a grade through)
 15. `shared/rubric-draft.js`
 16. `shared/rubric-checks.js`
@@ -192,6 +192,16 @@ Desktop UI currently exposes queue and offline state through:
 - the sync dot (green saved, yellow syncing, red a problem; the tooltip says which). No count or popover (removed Oct 2026: the number next to the teacher's name confused people).
 
 The queue is the active retry mechanism for flows that opt into queued dispatch.
+
+### Draft and Returned, and student cards
+
+Behind a per-class build switch (`course.student_page_enabled`, off for every class until its teacher turns it on; `docs/plans/student-page-build-plan.md`). With the switch off none of this runs and nothing here is asked of the server.
+
+- **The two settings** (`student_page_enabled`, `return_grades`) are columns on `course`. They reach the client on the course row inside `get_class_bundle` and are saved through `saveCourseConfig`'s `update_course`, like every class setting. The switch is offered only in Class Settings › Student Page when the app is opened at an address carrying `?build=student-page` (`teacher/cm-student-page.js`).
+- **The rows** (one per student per assessment: Draft or Returned, and what the student was last given) are kept by database triggers (`grade_return`). The client reads them with `list_course_grade_returns` after the class loads, after a change from another device, and once its own writes have landed, into the `gradeReturns` cache Demo Mode also uses. Between a save and that read the row is the one `shared/grade-state.js` works out: the same rule as the triggers, held to them by `tests/fixtures/grade-state-cases.json`. Rows read from before a newer local change are never applied.
+- **Return** (`Grader.returnGrades`) is optimistic on the device and goes to the server as `return_grades`, one call for each student, through the outbox under the cell's key (`cell:<student>:<assessment>`), so it follows that cell's score writes. Leaving When I Return Them sends only the setting; the server returns what waits by a trigger and the device does the same to its rows.
+- **Student cards** (`teacher/student-cards.js`): `issue_student_cards` and `list_student_cards` are asked for online with the teacher waiting, as slip codes are; `mark_student_cards_printed` goes through the outbox. A signed-in teacher's card codes are held in memory only. Cards print on the questionnaire slips' sheet (`QrSlips.printSheet`).
+- **Demo Mode** runs all of it on the device (`gb-grade-returns-<cid>`, `gb-student-cards-<cid>`) and sends nothing.
 
 ### Cross-tab behavior
 

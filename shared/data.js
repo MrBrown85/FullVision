@@ -11041,7 +11041,8 @@ function listStudentCards(cid) {
 
 /* Make a card for every student in the class who has none (or for those of
    `studentIds` who have none). A student who has a card keeps it. Answers
-   { issued, cards }: how many were made, and every card asked for. */
+   { issued, cards }: how many were made, and every card in the class, as
+   listStudentCards gives them. */
 function issueStudentCards(cid, studentIds) {
   if (!cid || !_gradesKept(cid)) return _cardsAnswer(null);
   var only = Array.isArray(studentIds) && studentIds.length ? studentIds : null;
@@ -11075,10 +11076,7 @@ function issueStudentCards(cid, studentIds) {
       made++;
     });
     if (made) _saveDemoStudentCards(cid, kept);
-    var listed = _demoCardsListed(cid).filter(function (c) {
-      return !only || only.indexOf(c.enrollment_id) >= 0;
-    });
-    return _cardsAnswer({ issued: made, cards: listed });
+    return _cardsAnswer({ issued: made, cards: _demoCardsListed(cid) });
   }
   if (!_useSupabase || !_isUuid(cid)) return _cardsAnswer(null);
   var ids = only ? only.filter(_isUuid) : null;
