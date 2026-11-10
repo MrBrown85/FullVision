@@ -82,10 +82,12 @@ describe('No score writer works out the type on its own', () => {
     expect(src).not.toMatch(/\(assessment && assessment\.type\) \|\| 'summative'/);
   });
 
+  // Through Grader.setStatus since S1-T2; tests/grader.test.js holds that
+  // setStatus calls applyAssignmentStatus with the same arguments.
   it('the phone status toggle calls applyAssignmentStatus', () => {
     const src = readFileSync(new URL('../teacher-mobile/tab-grade.js', import.meta.url), 'utf-8');
     const fn = src.slice(src.indexOf('function setStatus('), src.indexOf('function undoLastScore('));
-    expect(fn).toContain('applyAssignmentStatus(cid, sid, aid, newStatus)');
+    expect(fn).toContain('Grader.setStatus(cid, sid, aid, newStatus)');
     expect(fn).not.toContain('upsertScore(');
   });
 

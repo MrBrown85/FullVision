@@ -64,7 +64,7 @@ const CAPS = {
   'teacher/page-gradebook.js': 0,
   'teacher/class-results.js': 0,
   // S1-T2 (phone Grade tab).
-  'teacher-mobile/tab-grade.js': 16,
+  'teacher-mobile/tab-grade.js': 0,
 };
 
 function sources() {
