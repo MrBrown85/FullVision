@@ -5940,6 +5940,74 @@ window.DashClassManager = (function () {
     return _cmCategoryState[cid];
   }
 
+  /* The list as the server gave it or last took it: what this form was
+     opened with. Before anything is saved over the class's whole list, the
+     server's list is read again and compared with this
+     (categoriesStillCurrent in shared/data.js). A copy, since the rows on
+     screen change as the teacher types. */
+  function _cmCatRemember(st, rows) {
+    st.opened = (rows || []).map(function (r, i) {
+      return {
+        id: r.id,
+        name: r.name || '',
+        weight: Number(r.weight) || 0,
+        display_order: i,
+        calc_mode: categoryCalcMode(r),
+      };
+    });
+  }
+
+  // The one line shown above the categories when a save was not made.
+  var CM_CAT_NOTICES = {
+    changed: 'The categories changed on another device, so nothing was saved. These are the current ones.',
+    offline: 'Categories need a connection to save. Nothing was saved. Try again when you are online.',
+  };
+
+  /* Resolves true when the class's categories may be saved over: the
+     server's list is the one this form was opened with (or no server holds
+     the class). Otherwise nothing is to be saved: changed on another
+     device, the form shows the server's list and says so; not readable, it
+     says a connection is needed and keeps what the teacher typed. `undo`
+     puts the rows back first (a drag that is not to stay). */
+  function _cmCatStillCurrent(cid, undo) {
+    var st = _cmCatState(cid);
+    if (typeof categoriesStillCurrent !== 'function') return Promise.resolve(true);
+    return Promise.resolve(categoriesStillCurrent(cid, st.opened || [])).then(function (res) {
+      if (!res || res.ok) return true;
+      if (res.why === 'changed') {
+        st.rows = (res.rows || []).map(function (r, i) {
+          return {
+            id: r.id,
+            name: r.name || '',
+            weight: Number(r.weight) || 0,
+            display_order: i,
+            calc_mode: categoryCalcMode(r),
+          };
+        });
+        _cmCatRemember(st, st.rows);
+        st.dirty = false;
+        st.moving = null;
+        st.notice = 'changed';
+      } else {
+        if (undo) undo();
+        st.notice = 'offline';
+      }
+      renderClassManager();
+      return false;
+    });
+  }
+
+  /* One save of the list at a time, in the order asked: each one's check
+     reads the list the one before it left. */
+  function _cmCatInTurn(cid, fn) {
+    var st = _cmCatState(cid);
+    var next = Promise.resolve(st.saving).then(fn, fn);
+    st.saving = next.catch(function (e) {
+      console.warn('Category save failed:', e);
+    });
+    return st.saving;
+  }
+
   // Push the class-manager's private category state into the shared
   // _cache.categories that getCategories / getCategoryById / page-assignments /
   // page-gradebook / shared/calc.js all read from. Without this, a category
@@ -5977,6 +6045,7 @@ window.DashClassManager = (function () {
         calc_mode: categoryCalcMode(c),
       };
     });
+    _cmCatRemember(st, st.rows);
   }
 
   function _cmLoadCategories(cid) {
@@ -6007,6 +6076,7 @@ window.DashClassManager = (function () {
             .sort(function (a, b) {
               return a.display_order - b.display_order;
             });
+          _cmCatRemember(st, st.rows);
           _cmMirrorCategoriesToCache(cid);
           renderClassManager();
         }
@@ -6081,6 +6151,9 @@ window.DashClassManager = (function () {
     var html =
       '<div class="cm-field cm-cat-field">' +
       '<label class="cm-label">Categories</label>' +
+      (CM_CAT_NOTICES[st.notice]
+        ? '<div class="cm-cat-notice" role="status">' + esc(CM_CAT_NOTICES[st.notice]) + '</div>'
+        : '') +
       '<div class="cm-cat-list">';
     if (rows.length === 0) {
       html +=
@@ -6404,26 +6477,35 @@ window.DashClassManager = (function () {
 
   function _cmCatSaveRows(cid, rows) {
     var st = _cmCatState(cid);
-    var pending = typeof _assessmentSaveQueue !== 'undefined' && _assessmentSaveQueue[cid];
-    return Promise.resolve(pending)
-      .then(function () {
-        return window.v2.saveCategories(cid, rows);
-      })
-      .then(function (res) {
-        if (res && res.error) {
-          if (typeof showSyncToast === 'function')
-            showSyncToast('Categories not saved: ' + (res.error.message || 'server error'), 'error');
-          return;
-        }
-        var ids = (res && Array.isArray(res.data) && res.data) || [];
-        rows.forEach(function (r, i) {
-          // Without a server (Demo Mode) a new row keeps a local id.
-          r.id = ids[i] || r.id || uid();
-        });
-        st.dirty = false;
-        _cmMirrorCategoriesToCache(cid);
-        renderClassManager();
+    return _cmCatInTurn(cid, function () {
+      // The server's list first: one changed on another device since this
+      // form was opened is not saved over (_cmCatStillCurrent).
+      return _cmCatStillCurrent(cid).then(function (current) {
+        if (!current) return;
+        var pending = typeof _assessmentSaveQueue !== 'undefined' && _assessmentSaveQueue[cid];
+        return Promise.resolve(pending)
+          .then(function () {
+            return window.v2.saveCategories(cid, rows);
+          })
+          .then(function (res) {
+            if (res && res.error) {
+              if (typeof showSyncToast === 'function')
+                showSyncToast('Categories not saved: ' + (res.error.message || 'server error'), 'error');
+              return;
+            }
+            var ids = (res && Array.isArray(res.data) && res.data) || [];
+            rows.forEach(function (r, i) {
+              // Without a server (Demo Mode) a new row keeps a local id.
+              r.id = ids[i] || r.id || uid();
+            });
+            st.dirty = false;
+            st.notice = null;
+            _cmCatRemember(st, rows);
+            _cmMirrorCategoriesToCache(cid);
+            renderClassManager();
+          });
       });
+    });
   }
 
   // Grading setup copied to or from another class (teacher/grading-setup-copy.js).
@@ -6440,15 +6522,70 @@ window.DashClassManager = (function () {
     window.GradingSetupCopy.openDialog(
       cid,
       Object.assign({}, opts, {
-        onDone: function (cids) {
+        onDone: function (cids, categoriesNotCopied) {
           (cids || []).forEach(function (c) {
             delete _cmCategoryState[c];
             delete _cmTermState[c];
+            // Categories left as they were (changed on another device, or
+            // no connection): the line stays above them here.
+            var why = categoriesNotCopied && categoriesNotCopied[c];
+            if (why) _cmCatState(c).notice = why === 'changed' ? 'changed' : 'offline';
           });
           renderClassManager();
         },
       }),
     );
+  }
+
+  /* A row dragged to a new place. It moves on screen at once; the new order
+     is sent once the server's list is known to be the one this form was
+     opened with (_cmCatStillCurrent). If it cannot be read, the row goes
+     back where it was. */
+  function _cmCatReorder(cid, fromIdx, toIdx) {
+    var st = _cmCatState(cid);
+    var before = st.rows.slice();
+    var moved = st.rows.splice(fromIdx, 1)[0];
+    st.rows.splice(toIdx, 0, moved);
+    st.rows.forEach(function (r, i) {
+      r.display_order = i;
+    });
+    renderClassManager();
+    if (!window.v2 || !window.v2.reorderCategories) return Promise.resolve();
+    var ids = st.rows
+      .map(function (r) {
+        return r.id;
+      })
+      .filter(Boolean);
+    function undo() {
+      // Only if the list on screen is still the dragged one.
+      if (st.rows.length !== before.length || st.rows.some(r => before.indexOf(r) < 0)) return;
+      st.rows = before;
+      st.rows.forEach(function (r, i) {
+        r.display_order = i;
+      });
+    }
+    return _cmCatInTurn(cid, function () {
+      return _cmCatStillCurrent(cid, undo).then(function (current) {
+        if (!current) return;
+        return Promise.resolve(window.v2.reorderCategories(ids)).then(function (res) {
+          if (res && res.error) return;
+          // The server holds the same rows as before, in the new order; a
+          // row not sent (deleted here and not yet saved) stays after them.
+          var opened = st.opened || [];
+          var sent = ids
+            .map(function (id) {
+              return opened.find(function (r) {
+                return r.id === id;
+              });
+            })
+            .filter(Boolean);
+          var rest = opened.filter(function (r) {
+            return ids.indexOf(r.id) < 0;
+          });
+          if (sent.length) _cmCatRemember(st, sent.concat(rest));
+        });
+      });
+    });
   }
 
   // Drag-reorder using delegated document listeners. Drop on another row → move.
@@ -6485,21 +6622,8 @@ window.DashClassManager = (function () {
         _cmCatDragId = null;
         return;
       }
-      var moved = st.rows.splice(fromIdx, 1)[0];
-      st.rows.splice(toIdx, 0, moved);
-      st.rows.forEach(function (r, i) {
-        r.display_order = i;
-      });
       _cmCatDragId = null;
-      renderClassManager();
-      if (window.v2 && window.v2.reorderCategories) {
-        var ids = st.rows
-          .map(function (r) {
-            return r.id;
-          })
-          .filter(Boolean);
-        window.v2.reorderCategories(ids);
-      }
+      _cmCatReorder(cmSelectedCourse, fromIdx, toIdx);
     });
     _addDocListener('dragend', function () {
       document.querySelectorAll('.cm-cat-row.dragging').forEach(function (el) {
@@ -10792,6 +10916,14 @@ window.DashClassManager = (function () {
     reportingTermsDraft: function (cid) {
       var st = _cmTermRows(cid || cmSelectedCourse);
       return { rows: st.rows.slice(), dirty: st.dirty, error: _cmTermError(cid || cmSelectedCourse) };
+    },
+    // The categories as Class Settings holds them, and a drag's move.
+    categoriesDraft: function (cid) {
+      var st = _cmCatState(cid || cmSelectedCourse);
+      return { rows: st.rows.slice(), dirty: !!st.dirty, notice: CM_CAT_NOTICES[st.notice] || null };
+    },
+    reorderCategory: function (fromIdx, toIdx) {
+      return cmSelectedCourse ? _cmCatReorder(cmSelectedCourse, fromIdx, toIdx) : Promise.resolve();
     },
     handleInput: handleInput,
     handleChange: handleChange,

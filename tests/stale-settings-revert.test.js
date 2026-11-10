@@ -761,15 +761,17 @@ describe('an update_course written to the outbox by the code before this fix', (
     level_order: 'desc',
   };
 
-  it('is what main queues (so the entry below is a true copy of one)', async () => {
+  it('is what main queued (so the entry below is a true copy of one); the same save now queues the one key', async () => {
     await openApp();
     await laptopHolds(byName('Calculation Method'));
     server.sent.length = 0;
     act('cmSetRoundPercent', { value: 'whole' });
     await quiet();
-    // On main this is the whole copy. After the fix it is the one key, and
-    // this test says so: change the expectation then, and keep WHOLE_COPY.
-    expect(server.patches()).toEqual([WHOLE_COPY]);
+    // On main this was the whole copy: expect(server.patches()).toEqual([WHOLE_COPY])
+    // passed there (commit bf757b81). With the fix it is the one key the
+    // teacher changed, as this test said it would be.
+    expect(server.patches()).toEqual([{ round_percent: true }]);
+    expect(Object.keys(WHOLE_COPY)).toContain('round_percent');
   });
 
   it('does not put back a method changed at school since', async () => {

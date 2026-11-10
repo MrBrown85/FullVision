@@ -242,6 +242,11 @@ window.GradingSetupCopy = (function () {
       uncategorized: same ? 0 : uncategorized,
       lines: lines,
       same: same,
+      // The target's list this plan was worked out from: the copy is made
+      // only if the server still holds it (_categoriesCurrent).
+      opened: dst.map(function (d, i) {
+        return { id: d.id, name: d.name, weight: d.weight, displayOrder: i, calcMode: categoryCalcMode(d) };
+      }),
     };
   }
 
@@ -360,6 +365,19 @@ window.GradingSetupCopy = (function () {
     });
   }
 
+  /* The copy replaces the target's whole list. If that list changed on
+     another device after the plan was worked out, the plan is for a list
+     that is gone: copying it would delete a category added there. So the
+     server's list is read first (categoriesStillCurrent in shared/data.js).
+     Resolves null to go ahead, else 'changed' or 'offline': the categories
+     are then left as they are. */
+  function _categoriesCurrent(dstCid, cats) {
+    if (typeof categoriesStillCurrent !== 'function') return Promise.resolve(null);
+    return Promise.resolve(categoriesStillCurrent(dstCid, cats.opened || [])).then(function (res) {
+      return !res || res.ok ? null : res.why || 'offline';
+    });
+  }
+
   /* moves: { [removedCategoryId]: rowIndex, uncategorized: rowIndex | null }.
      The server refuses to delete a category that still has assessments, so
      a removed category that has some stays at 0% until its work has moved:
@@ -464,11 +482,50 @@ window.GradingSetupCopy = (function () {
     if (Object.keys(courseUpdates).length) updateCourse(dstCid, courseUpdates);
     if (ccChanged) saveCourseConfig(dstCid, cc);
     if (keys.reportingTerms) saveReportingTerms(dstCid, getReportingTerms(srcCid));
-    var done = keys.categories && plan.categories ? _applyCategories(dstCid, plan.categories, moves) : null;
+    var done =
+      keys.categories && plan.categories
+        ? _categoriesCurrent(dstCid, plan.categories).then(function (why) {
+            // Not copied: plan.categoriesNotCopied says why ('changed' on
+            // another device, or 'offline').
+            if (why) plan.categoriesNotCopied = why;
+            else return _applyCategories(dstCid, plan.categories, moves);
+          })
+        : null;
     return Promise.resolve(done).then(function () {
       if (typeof clearProfCache === 'function') clearProfCache();
       return plan;
     });
+  }
+
+  /* What the teacher is told after a copy. Categories left alone because
+     they changed on another device, or could not be checked, are named. */
+  function copiedMessage(changing) {
+    var names = function (plans) {
+      return plans
+        .map(function (p) {
+          return p.dstName;
+        })
+        .join(', ');
+    };
+    var changed = changing.filter(function (p) {
+      return p.categoriesNotCopied === 'changed';
+    });
+    var offline = changing.filter(function (p) {
+      return p.categoriesNotCopied && p.categoriesNotCopied !== 'changed';
+    });
+    if (!changed.length && !offline.length) return 'Copied the grading setup to ' + names(changing) + '.';
+    var parts = [];
+    if (changed.length)
+      parts.push('The categories in ' + names(changed) + ' changed on another device, so they were not copied.');
+    if (offline.length)
+      parts.push('Categories need a connection to copy, so the categories in ' + names(offline) + ' were not copied.');
+    var more = changing.some(function (p) {
+      return p.changes.some(function (c) {
+        return c.key !== 'categories' || !p.categoriesNotCopied;
+      });
+    });
+    if (more) parts.push('Everything else was copied.');
+    return parts.join(' ');
   }
 
   /* ── Dialogs ───────────────────────────────────────────────── */
@@ -793,21 +850,19 @@ window.GradingSetupCopy = (function () {
             return p.changes.length ? applySetup(p, movesByPlan[i]) : null;
           }),
         ).then(function () {
-          _toast(
-            'Copied the grading setup to ' +
-              changing
-                .map(function (p) {
-                  return p.dstName;
-                })
-                .join(', ') +
-              '.',
-          );
-          if (onDone)
+          _toast(copiedMessage(changing));
+          if (onDone) {
+            var notCopied = {};
+            changing.forEach(function (p) {
+              if (p.categoriesNotCopied) notCopied[p.dstCid] = p.categoriesNotCopied;
+            });
             onDone(
               changing.map(function (p) {
                 return p.dstCid;
               }),
+              notCopied,
             );
+          }
         });
         return true;
       },
@@ -820,6 +875,7 @@ window.GradingSetupCopy = (function () {
     planCategories: planCategories,
     planSetup: planSetup,
     applySetup: applySetup,
+    copiedMessage: copiedMessage,
     openDialog: openDialog,
     review: review,
   };

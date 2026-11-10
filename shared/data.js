@@ -9739,6 +9739,76 @@ function adoptCategoriesFromServer(cid, rows) {
   _persistLoadedField(cid, 'categories', rows || []);
   if (typeof clearProfCache === 'function') clearProfCache();
 }
+/* A list of categories as one text: each row's id, name, weight and
+   Calculation, in list order. Takes cache rows (displayOrder, calcMode) or
+   server and Class Settings rows (display_order, calc_mode). */
+function _categoryListText(rows) {
+  var list = (rows || []).filter(Boolean).map(function (r, i) {
+    var order = r.displayOrder != null ? r.displayOrder : r.display_order;
+    return { row: r, at: i, order: order != null && isFinite(Number(order)) ? Number(order) : i };
+  });
+  list.sort(function (a, b) {
+    return a.order - b.order || a.at - b.at;
+  });
+  return JSON.stringify(
+    list.map(function (x) {
+      var r = x.row;
+      return [r.id || null, String(r.name || '').trim(), Number(r.weight) || 0, categoryCalcMode(r)];
+    }),
+  );
+}
+/* Before a whole list of categories is saved over a class the server has
+   (Save Categories, a drag to reorder, Copy Grading Setup): is the server's
+   list still the one this screen was opened with? save_categories replaces
+   the class's list, so a list opened before a change made on another device
+   would delete a category added there and put old weights back.
+
+   `opened` is the list the screen was filled from. Answers a promise of
+     { ok: true }                          the same list: save
+     { ok: true, local: true }             no server holds this class (Demo
+                                           Mode, a class not created yet)
+     { ok: false, why: 'changed', rows }   it changed on another device;
+                                           rows is the server's list now
+     { ok: false, why: 'offline' }         it could not be read: do not save
+   On 'changed' the cache takes the server's list, so grades follow it at
+   once. This is the one read a save makes before it sends, and only a
+   category save makes it. Never throws. */
+function categoriesStillCurrent(cid, opened) {
+  if (!cid || !_writesEnabled() || !_isUuid(cid)) return Promise.resolve({ ok: true, local: true });
+  var check = (async function () {
+    try {
+      if (_isOffline() || !window.v2 || typeof window.v2.listCategories !== 'function') {
+        return { ok: false, why: 'offline' };
+      }
+      // A list this device is still sending is part of what it opened with.
+      await _categorySaveQueue[cid];
+      if (_isOffline()) return { ok: false, why: 'offline' };
+      var res = await window.v2.listCategories(cid);
+      if (!res || res.error || !Array.isArray(res.data)) return { ok: false, why: 'offline' };
+      var rows = res.data
+        .map(function (r, i) {
+          return {
+            id: r.id,
+            name: r.name || '',
+            weight: Number(r.weight) || 0,
+            displayOrder: r.display_order != null ? Number(r.display_order) : i,
+            calcMode: categoryCalcMode(r),
+          };
+        })
+        .sort(function (a, b) {
+          return a.displayOrder - b.displayOrder;
+        });
+      if (_categoryListText(rows) === _categoryListText(opened)) return { ok: true };
+      adoptCategoriesFromServer(cid, rows);
+      return { ok: false, why: 'changed', rows: rows };
+    } catch (e) {
+      console.warn('The categories could not be checked before saving:', e);
+      return { ok: false, why: 'offline' };
+    }
+  })();
+  // Part of a save: the sync dot and sign-out wait for it.
+  return _trackPendingSync(check);
+}
 function getCategoryById(cid, categoryId) {
   if (!categoryId) return null;
   return (

@@ -3497,6 +3497,17 @@ a.dash-ins-name:hover {
 .cm-cat-field {
   margin-top: 14px;
 }
+/* A save that was not made: the list changed on another device, or could
+   not be checked (dash-class-manager.js CM_CAT_NOTICES). */
+.cm-cat-notice {
+  margin: 2px 0 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: var(--text-sm);
+  line-height: 1.35;
+}
 .cm-cat-list {
   display: flex;
   flex-direction: column;

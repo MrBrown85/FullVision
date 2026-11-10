@@ -145,11 +145,13 @@ describe('Rubric Levels sync', () => {
   it('sends level_order with update_course', async () => {
     await initData(CID);
     var cc = getCourseConfig(CID);
-    // Loaded from the bundle: the server's value comes back unchanged.
+    // Loaded from the bundle and not changed here: a save of another
+    // setting leaves it out (tests/stale-settings-revert.test.js). It used
+    // to go with every save, which put an old value back.
     cc.calcMethod = 'mostRecent';
     saveCourseConfig(CID, cc);
     await settle();
-    expect(server.patches[server.patches.length - 1].level_order).toBe('desc');
+    expect(server.patches[server.patches.length - 1]).toEqual({ calc_method: 'mostRecent' });
 
     cc.levelOrder = 'asc';
     saveCourseConfig(CID, cc);
