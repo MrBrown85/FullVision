@@ -5990,6 +5990,8 @@ window.DashClassManager = (function () {
       'Categories need a connection to save. Your changes are kept on this computer. Save again when you are online.',
     offlineOrder: 'Categories need a connection to save. Nothing was saved. Try again when you are online.',
     kept: 'Your unsaved category changes were kept on this computer. Save Categories to send them.',
+    // After Discard My Changes: a save whose answer never came had landed.
+    landed: 'Your earlier save had reached the server after all. These are the current ones.',
     // Online, but other changes from this computer had not gone yet.
     waiting:
       'Other changes from this computer are still being sent, so nothing was saved. Your changes are kept on this computer. Save again in a moment.',
@@ -6192,6 +6194,47 @@ window.DashClassManager = (function () {
     st.notice = null;
     st.typed = null;
     renderClassManager();
+    // A save's answer never came: the opened list may not be the server's
+    // any more. The form shows what the server holds, read now, or once it
+    // can be read (_cmCatFollowServer).
+    if (discard && st.tried) _cmCatFollowServer(cid);
+  }
+
+  /* After Discard My Changes with a save whose answer never came: read the
+     server's list and show it. If it is the list that save sent, the save
+     had landed ('landed'); if it is neither that nor the opened list, it
+     changed on another device ('changed'). With no connection, or with new
+     edits typed meanwhile, it waits for the next time Class Settings draws
+     the categories (st.followServer). */
+  function _cmCatFollowServer(cid) {
+    var st = _cmCatState(cid);
+    st.followServer = false;
+    if (!st.tried || typeof _readServerCategories !== 'function') return Promise.resolve();
+    if (typeof _isOffline === 'function' && _isOffline()) {
+      st.followServer = true;
+      return Promise.resolve();
+    }
+    var same = function (a, b) {
+      return typeof _categoryListsMatch === 'function' && _categoryListsMatch(a, b);
+    };
+    return _cmCatInTurn(cid, function () {
+      if (!st.tried) return;
+      var tried = st.tried.snap;
+      return Promise.resolve(_readServerCategories(cid)).then(function (rows) {
+        if (!rows || st.dirty || !st.tried) {
+          if (st.tried) st.followServer = true;
+          return;
+        }
+        st.tried = null;
+        if (same(rows, st.opened || [])) return; // it never landed: the form is right
+        st.rows = _cmCatRowsFrom(rows);
+        _cmCatRemember(st, st.rows);
+        st.typed = null;
+        st.notice = { kind: same(rows, tried) ? 'landed' : 'changed' };
+        _cmMirrorCategoriesToCache(cid);
+        renderClassManager();
+      });
+    });
   }
 
   /* One save of the list at a time, in the order asked: each one's check
@@ -6345,6 +6388,14 @@ window.DashClassManager = (function () {
       setTimeout(function () {
         _cmLoadCategories(cid);
       }, 0);
+    // Discarded with a save's answer outstanding and no connection then:
+    // the server's list is read now.
+    if (st.loaded && st.followServer && !st.dirty) {
+      st.followServer = false;
+      setTimeout(function () {
+        _cmCatFollowServer(cid);
+      }, 0);
+    }
 
     var rows = st.rows || [];
     var html =

@@ -1601,8 +1601,8 @@ describe('categories: the server’s list is read before the whole list is saved
     ]);
     await goOnline();
     gradingTabHtml(); // Class Settings draws again: the categories are read
+    await new Promise(r => setTimeout(r, 20));
     await quiet();
-    await settle();
     expect(formRows()).toEqual(ON_SERVER);
     expect(draft().notice).toBe(LANDED);
   });
