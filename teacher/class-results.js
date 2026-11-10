@@ -372,16 +372,11 @@ window.ClassResults = (function () {
     );
   }
 
-  /* The same print the grader offers (RubricPrint): Print Rubrics on rubric
-     and competency-level work, Print Scores on points and Complete/Incomplete
-     work with no rubric, none on DIBELS (its class sheet prints from the
-     Assignments page). */
-  // html-safe: fixed labels
+  // The same print the grader offers (RubricPrint): none on DIBELS.
+  // html-safe: printLabel is a fixed label
   function _printButton(cid, a) {
-    if (!window.RubricPrint || isDibelsScored(a)) return '';
-    var hasRubric = a.rubricId && getRubricById(cid, a.rubricId);
-    var label = !hasRubric && isPointsScored(a) ? 'Print Scores' : 'Print Rubrics';
-    return '<button type="button" class="cr-btn" data-cr="print">' + label + '</button>';
+    var label = window.RubricPrint ? RubricPrint.printLabel(cid, a) : '';
+    return label ? '<button type="button" class="cr-btn" data-cr="print">' + label + '</button>' : '';
   }
 
   function _stat(label, value, color) {

@@ -13,7 +13,9 @@
  *    only this file added:
  *      UPDATE_GRADEBOOK_SNAPSHOT=1 npx vitest run tests/gradebook-draft-cells.test.js
  *    Run that only on code from before a change the gradebook is meant to
- *    keep out; never to make a failing comparison pass.
+ *    keep out; never to make a failing comparison pass. Since then it was
+ *    rewritten once for a change meant to show: Print Rubrics in the column
+ *    menu (Nov 10), the one difference between the two files.
  * 2. With the switch on and When I Return Them: the dashed mark on every
  *    kind of work in both views, the words a screen reader hears, the key,
  *    the count on the "N to return" filter and on each column's Return N
