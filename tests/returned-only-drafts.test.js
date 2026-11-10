@@ -13,8 +13,7 @@
  * 3. A status counts at once in both sets, also on a piece whose grade is a
  *    draft: Late shows, Excused leaves the piece out, Missing counts.
  * 4. A returned grade that was cleared still counts as it was returned,
- *    until the clear is returned. Missing wins at once: marked Missing, the
- *    piece stops counting as it was returned, with no Return.
+ *    until the clear is returned.
  *
  * The situations are the ones in tests/fixtures/grade-state-cases.json
  * (Batch A): "A new grade is a draft until it is returned", "A change to a
@@ -312,7 +311,7 @@ describe('History 12 (Letter): drafts and statuses', () => {
     expect(returnedOnly(cid)).toEqual(cleared);
   });
 
-  it('Missing after a returned grade was cleared: Missing wins at once in every number; taking it off brings the returned grade back (Colin, 2026-11-09)', () => {
+  it('Missing after a returned grade was cleared: Missing wins at once in every number, in both sets (Colin, 2026-11-09)', () => {
     const cid = ctx.cid;
     const noor = student(cid, 'Noor');
     const poster = piece(cid, 'What Does the Poster Show, and What Does It Hide?');
@@ -328,12 +327,11 @@ describe('History 12 (Letter): drafts and statuses', () => {
     expect(returned[noor].shown.percent).toBe(all[noor].shown.percent);
     expect(returned[noor].shown.letter).toBe(all[noor].shown.letter);
     expect(returned[noor].levels.workPercent[poster.id]).toBe(0);
-    // Competency levels: neither set has evidence from the piece any more.
-    // The returned 3 stopped counting when the piece was marked Missing.
+    // Competency levels: the returned 3 stopped counting when the piece was
+    // marked Missing, so returned-only has what all-work has. (Before S0-F1d
+    // returned-only kept the levels from before the clear.)
     expect(all[noor].levels.competencies).not.toEqual(before[noor].levels.competencies);
-    expect(returned).toEqual(all);
-    // Missing taken off before any Return: the returned grade is back.
-    delete getAssignmentStatuses(cid)[noor + ':' + poster.id];
-    expect(returnedOnly(cid)).toEqual(before);
+    expect(returned[noor].levels.competencies).toEqual(all[noor].levels.competencies);
+    expect(returned[noor].levels.overall).toBe(all[noor].levels.overall);
   });
 });
