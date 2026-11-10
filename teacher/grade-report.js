@@ -23,6 +23,19 @@
 window.GradeReport = (function () {
   'use strict';
 
+  /* The Quick Report is drawn in the set of scores Progress Reports use
+     (teacher/report-scores.js): each function named here runs inside
+     ReportScores.withReportScores every time it is called, so its rows,
+     its summary and its Feedback Pages read no grade outside it. */
+  var _inReportScores = function (fn) {
+    return ReportScores.scoped('progress', fn);
+  };
+  rows = _inReportScores(rows);
+  categorySummary = _inReportScores(categorySummary);
+  feedbackItems = _inReportScores(feedbackItems);
+  extraCards = _inReportScores(extraCards);
+  layoutStudent = _inReportScores(layoutStudent);
+
   var PX_PER_IN = 96;
   var GAP = 12;
   var ROW_W = 720;

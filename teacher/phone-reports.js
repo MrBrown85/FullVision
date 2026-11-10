@@ -15,6 +15,13 @@
 var PhoneReports = (function () {
   'use strict';
 
+  /* A phone copy is built in the set of scores Sent to Phones uses
+     (teacher/report-scores.js): snapshot runs inside
+     ReportScores.withReportScores every time it is called, on Send and on
+     Update Issued Copy alike, so every grade in a copy is read there. A
+     copy already sent is the record of what was sent, kept as it is. */
+  snapshot = ReportScores.scoped('phones', snapshot);
+
   var _byCourse = {}; // cid -> [report], newest first
   var _loading = {};
   var _filter = 'all'; // all | unopened

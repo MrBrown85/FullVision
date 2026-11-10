@@ -4053,6 +4053,7 @@ function _v2GradebookToCache(cid, payload) {
       due_date: _dateOnly(a.due_date),
       assigned_at: _dateOnly(a.date_assigned),
       display_order: Number(a.display_order || 0),
+      created_at: a.created_at || undefined, // when the piece was made (calc.js _pieceMadeAt); sent once the bundle has it
     };
     var collabMode = a.collab_mode || a.collabMode;
     var collabConfig = a.collab_config || a.collabConfig || {};
