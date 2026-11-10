@@ -457,6 +457,8 @@
           title: w.title,
           date: w.date,
           due_date: w.due_date || null,
+          // When the teacher made it: the morning of its date.
+          created_at: w.date + 'T16:00:00+00:00',
           score_mode: w.score_mode || 'proficiency',
           max_points: w.max_points || null,
           weight: 1,

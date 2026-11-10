@@ -927,6 +927,83 @@ describe('"opened" means the row was on screen in a visible tab', () => {
   });
 });
 
+/* A DIBELS benchmark is a reading record, not work a student gets back
+   (Colin, Nov 9, ruling 15). Since S0-M4b the server lists the piece with
+   no grade, reads no row for it and marks none seen. The page leaves it
+   off the Assignments list, as it has since PR 965. */
+describe('a DIBELS benchmark on a student’s page', () => {
+  const dibels = more =>
+    Object.assign(
+      {
+        id: id(400),
+        title: 'Fall Reading Benchmark',
+        date: '2026-10-05',
+        due_date: null,
+        created_at: '2026-10-01T16:00:00+00:00',
+        score_mode: 'dibels',
+        max_points: null,
+        weight: 1,
+        rubric_id: null,
+        tag_ids: [],
+        status: null,
+        returned_at: null,
+        updated_at: null,
+        seen_at: null,
+        grade: null,
+        previous: null,
+      },
+      more,
+    );
+  const copy = part =>
+    Object.assign({ v: 1, value: null, modifier: 0, comment: null, tags: {}, criteria: {}, checks: [] }, part);
+
+  it.each([
+    ['as the server sends it', {}],
+    // What the server no longer sends for one; the page does not lean on that.
+    [
+      'with a grade, a change and a status the server should not have sent',
+      {
+        status: 'LATE',
+        returned_at: '2026-11-03T20:00:00+00:00',
+        updated_at: '2026-11-04T20:00:00+00:00',
+        grade: copy({ value: 41, comment: 'Words correct per minute' }),
+        previous: copy({ value: 38 }),
+      },
+    ],
+  ])('%s: no row, no result, no Updated, and never told to the server as opened', async (name, more) => {
+    const page0 = samplePage(TODAY);
+    page0.assessments.push(dibels(more));
+    const dev = school({ card: { page: page0 } });
+    const page = await signIn(dev);
+    expect(page.root().querySelectorAll('.sp-row')).toHaveLength(9);
+    expect(text(page)).not.toMatch(/Reading Benchmark|41|Words correct/);
+    expect(Object.keys(rowSubs(page))).not.toContain('Fall Reading Benchmark');
+    const held = page.T.state().page;
+    expect(held.assessments.map(a => a.id)).not.toContain(id(400));
+    expect(held.grades[id(400)]).toBeUndefined();
+    expect(JSON.stringify(held)).not.toMatch(/Benchmark|Words correct/);
+    expect(JSON.stringify(page.run('getScores("class")'))).not.toContain(id(400));
+    // Every row on screen, and Updated only where it was before.
+    await scrollThroughAll(page);
+    const seen = page.calls.filter(c => c.body.route === 'seen');
+    expect(seen).toHaveLength(1);
+    expect(seen[0].body.assessment_ids).not.toContain(id(400));
+    expect(
+      Object.entries(rowSubs(page))
+        .filter(([, sub]) => /Updated/.test(sub))
+        .map(([t]) => t),
+    ).toEqual(['Lab Safety Contract']);
+  });
+
+  it('a class with nothing but a benchmark reads as a class with no assignments yet', async () => {
+    const dev = school({ card: { page: Object.assign(samplePage(TODAY), { assessments: [dibels()] }) } });
+    const page = await signIn(dev);
+    expect(text(page)).toContain('No assignments yet.');
+    await scrollThroughAll(page);
+    expect(routes(page)).toEqual(['card', 'verify', 'page']);
+  });
+});
+
 describe('Is This You? says a wrong answer where a screen reader will read it', () => {
   it('the fields point at the message, and are marked wrong', async () => {
     const dev = school();

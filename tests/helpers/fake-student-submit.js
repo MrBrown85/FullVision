@@ -72,6 +72,8 @@ export function samplePage(today, system) {
         title,
         date: day(today, date),
         due_date: due == null ? null : day(today, due),
+        // When the teacher made it (sent since S0-M4b): the morning of its date.
+        created_at: day(today, date) + 'T16:04:11.482913+00:00',
         score_mode: 'proficiency',
         max_points: null,
         weight: 1,

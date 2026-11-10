@@ -9,28 +9,50 @@
  * whose output they send) and checks, level by level, that the phone is
  * given exactly those: none dropped, none added.
  *
- * One key is allowed ahead of the SQL, by name: an assessment's created_at,
- * which migration S0-M4b makes page() send. When that file lands, add it
- * to the list of SQL files below and take the key out of AHEAD_OF_THE_SQL.
+ * The SQL is Batch A's (2026110902, 2026110904) as S0-M4b left it
+ * (2026110905, applied Nov 10). S0-M4b does not restate a function: it
+ * finds a piece of text in the live one, once, and replaces it. The same
+ * edits are read out of that file and made here, the same way, so what is
+ * checked is the function as it stands. One of them makes page() send
+ * each assessment's created_at.
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CARD_ROUTES, cardReply } from '../supabase/functions/student-submit/card-routes.ts';
 
+const read = f => readFileSync(new URL('../' + f, import.meta.url), 'utf8');
 const SQL = ['migrations/2026110902_grade_return.sql', 'migrations/2026110904_student_sessions_page.sql']
-  .map(f => readFileSync(new URL('../' + f, import.meta.url), 'utf8'))
+  .map(read)
   .join('\n');
 
-// Allowed by the edge function before the database sends it.
-const AHEAD_OF_THE_SQL = { assessment: ['created_at'] };
+/* S0-M4b's edits to Batch A's functions: [function, text to find exactly
+   once, replacement], as its `_edits` array lists them. */
+const PATCHES = (() => {
+  const file = read('migrations/2026110905_grade_return_limits.sql');
+  const from = file.indexOf('_edits text[][] := array[');
+  const list = file.slice(from, file.indexOf('_def  text;', from));
+  return [...list.matchAll(/array\['([\w.]+)\([^']*\)',\s*\$s\$([\s\S]*?)\$s\$,\s*\$s\$([\s\S]*?)\$s\$\]/g)].map(m => ({
+    fn: m[1],
+    find: m[2],
+    put: m[3],
+  }));
+})();
 
-/** The body of the last definition of a function in the SQL files. */
+// Allowed by the edge function before the database sends it: nothing, since S0-M4b.
+const AHEAD_OF_THE_SQL = { assessment: [] };
+
+/** The body of a function as it stands: its last definition, then S0-M4b's edits to it. */
 function body(name) {
   const at = SQL.lastIndexOf('create or replace function ' + name + '(');
   expect(at, name).toBeGreaterThan(-1);
   const open = SQL.indexOf('$function$', at);
+  let text = SQL.slice(open, SQL.indexOf('$function$;', open));
+  for (const patch of PATCHES.filter(x => x.fn === name)) {
+    expect(text.split(patch.find).length - 1, name + ': ' + patch.find.slice(0, 40)).toBe(1);
+    text = text.replace(patch.find, () => patch.put);
+  }
   // Without its comments: one can sit between two keys, and can hold a comma or an apostrophe.
-  return SQL.slice(open, SQL.indexOf('$function$;', open)).replace(/--.*$/gm, '');
+  return text.replace(/--.*$/gm, '');
 }
 
 /** The arguments of one call, split at its own commas. `from` is just past the opening bracket. */
@@ -109,8 +131,19 @@ const SENT = {
     'checks',
   ],
   check: ['id', 'level', 'label'],
-  // page() builds the first nine and joins _returned_grade's six to them.
-  assessment: ['id', 'title', 'date', 'due_date', 'score_mode', 'max_points', 'weight', 'rubric_id', 'tag_ids'],
+  // page() builds the first ten and joins _returned_grade's six to them.
+  assessment: [
+    'id',
+    'title',
+    'date',
+    'due_date',
+    'score_mode',
+    'max_points',
+    'weight',
+    'rubric_id',
+    'created_at',
+    'tag_ids',
+  ],
   returned: ['status', 'returned_at', 'updated_at', 'seen_at', 'grade', 'previous'],
   copy: ['v', 'value', 'modifier', 'comment', 'tags', 'criteria', 'checks'],
   level: ['value', 'modifier', 'comment'],
@@ -118,6 +151,29 @@ const SENT = {
 };
 
 describe('the lists below are the keys the applied SQL sends', () => {
+  it('S0-M4b’s edits were read: eight functions, and page() gains created_at', () => {
+    expect([...new Set(PATCHES.map(x => x.fn))].sort()).toEqual([
+      'fv_private.restore_grade_returns',
+      'public._grade_return_on_change',
+      'public.course_draft_count',
+      'public.list_course_grade_returns',
+      'public.return_grades',
+      'student_submit._returned_grade',
+      'student_submit.page',
+      'student_submit.seen',
+    ]);
+    expect(PATCHES.filter(x => x.fn === 'student_submit.page')).toEqual([
+      {
+        fn: 'student_submit.page',
+        find: "'rubric_id', a.rubric_id,",
+        put: "'rubric_id', a.rubric_id, 'created_at', a.created_at,",
+      },
+    ]);
+    // A DIBELS piece's rows are not read for a student, and are not marked seen.
+    expect(body('student_submit._returned_grade')).toContain("a.score_mode = 'dibels'");
+    expect(body('student_submit.seen')).toContain("a.score_mode <> 'dibels'");
+  });
+
   it('card, verify_card, page and the helpers they send build these objects and no others', () => {
     has('student_submit.card', SENT.card);
     has('student_submit.card', SENT.person);
@@ -243,6 +299,7 @@ const FULL = {
           max_points: 10,
           weight: 2,
           rubric_id: U(5),
+          created_at: AT,
           tag_ids: [U(2)],
         }),
         ...fill(SENT.returned, {
@@ -275,7 +332,7 @@ describe('the phone is given exactly what the SQL sends', () => {
     expect(cardReply(CARD_ROUTES.page, FULL.page)).toEqual(FULL.page);
   });
 
-  it('a key at any level that the SQL does not send is left behind, but for created_at on an assessment', () => {
+  it('a key at any level that the SQL does not send is left behind: created_at passes on an assessment and nowhere else', () => {
     // The same reply with one made-up key beside every real one, at every level.
     const extra = v => {
       if (Array.isArray(v)) return v.map(extra);
