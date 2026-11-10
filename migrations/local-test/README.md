@@ -873,9 +873,11 @@ shape of `pg_depend`, and, where they exist, pg_cron's jobs and the
 migration record. The `notices` scenario makes one of each of 14 kinds and
 checks the catalog sees it. Roles are left out: they belong to the whole
 server. Rows are a checksum of every row of every table, columns by name.
-Until `live-function-md5.txt` carries the fingerprints S0-M5 left (the PR
-after PR 991 merges), the other suites the proof runs get a copy of this
-folder whose file has those four lines.
+`live-function-md5.txt` now records the sixteen fingerprints S0-M5 left
+(lines marked `after-s0-m5`); its plain lines stay what the harness builds,
+the definitions before S0-M5. The proof's databases have S0-M5 applied, so
+the other suites it runs get a copy of this folder whose file has the
+marked fingerprints on the plain lines.
 The harness has no pg_cron and no Supabase migration record; the proof
 makes a stand-in record (three earlier rows, then one per file as it is
 applied), and the catalog's cron lines are tested against a stand-in table

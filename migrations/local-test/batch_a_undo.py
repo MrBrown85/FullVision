@@ -67,15 +67,16 @@ S0_M4B = '2026110905_grade_return_limits.sql'
 S0_M4B_REF = 'origin/s0-m4b-grade-return-limits'          # until PR 989 is merged
 S0_M5 = '2026111002_security_definer_search_path.sql'     # applied to gradebook-prod after Batch A, on Nov 10
 S0_M5_UNDO = 'local-test/s0-m5-undo.sql'
-S0_M5_REF = 'origin/s0-m5-search-path-pg-temp'            # until PR 991 is merged
+S0_M5_REF = None                                          # merged (PR 991): its files are in this checkout
 SIXTEEN = {'_fv_release_orphan_teacher_email', '_fv_teacher_sign_in_deleted', '_score_audit_diff', '_term_rating_audit_field',
            '_touch_course_sync_cursor', '_touch_course_sync_cursor_from_trigger', '_touch_teacher_sync_cursor_from_trigger',
            'fv_idem_check', 'fv_idem_store', 'fv_owns_assessment', 'fv_owns_course', 'fv_owns_enrollment', 'fv_owns_term_rating',
            'fv_retention_cleanup', 'get_class_bundle', 'rls_auto_enable'}
-# The four of the sixteen with a line in live-function-md5.txt, as S0-M5 left them. Until that file is
-# brought up to date (after PR 991 merges), the suites run here get a copy of it with these in.
-AFTER_S0_M5 = {'fv_owns_assessment': '9f4c680c35f9f3ac32e8290824707673 389', 'fv_owns_course': 'e3afeca06043a6e907e6f4ae777c85da 345',
-               'fv_owns_enrollment': '728526648388367393162be706f7f9ea 389', 'get_class_bundle': '116294a41f043458e3ddec694520cf0d 22612'}
+# live-function-md5.txt keeps the harness's (pre-S0-M5) fingerprints on its plain lines and the live
+# ones on lines marked after-s0-m5. The databases here have S0-M5 applied, so the suites run on them
+# get a copy of that file with the marked fingerprints on the plain lines.
+AFTER_S0_M5 = {l.split()[0]: ' '.join(l.split()[1:3]) for l in open(os.path.join(HERE, 'live-function-md5.txt'))
+               if len(l.split()) == 4 and l.split()[3] == 'after-s0-m5' and not l.startswith('#')}
 # The list under "Batch A" in README.md.
 BASE = ['harness.sql', 'score-prelude.sql', 'score-tables.sql', 'bundle-prelude.sql', 'bundle-tables.sql',
         '../2026111001_assessment_created_at_in_bundle.sql', 'student-submit-prelude.sql',
@@ -186,7 +187,7 @@ class Db:
         return r
     def suite(self, script):
         """Another script of this folder, on this copy: its last line. It runs from a copy of the
-        folder whose live-function-md5.txt has the four fingerprints S0-M5 changed."""
+        folder whose live-function-md5.txt has, on its plain lines, the fingerprints S0-M5 left."""
         import shutil, tempfile
         tmp = tempfile.mkdtemp(prefix='undo-suite-')
         try:
@@ -195,8 +196,8 @@ class Db:
                 if os.path.exists(os.path.join(ROOT, extra)):
                     os.makedirs(os.path.dirname(os.path.join(tmp, extra)), exist_ok=True); shutil.copy(os.path.join(ROOT, extra), os.path.join(tmp, extra))
             here = os.path.join(tmp, 'migrations', 'local-test'); md5s = os.path.join(here, 'live-function-md5.txt')
-            lines = [('%s %s' % (l.split()[0], AFTER_S0_M5[l.split()[0]]) if l.split() and l.split()[0] in AFTER_S0_M5 and not l.startswith('#') else l.rstrip('\n'))
-                     for l in open(md5s)]
+            lines = [('%s %s' % (l.split()[0], AFTER_S0_M5[l.split()[0]]) if len(l.split()) == 3 and l.split()[0] in AFTER_S0_M5 and not l.startswith('#')
+                      else l.rstrip('\n')) for l in open(md5s)]
             open(md5s, 'w').write('\n'.join(lines) + '\n')
             env = dict(os.environ, PGDATABASE=self.name)
             r = subprocess.run([sys.executable, os.path.join(here, script)], capture_output=True, text=True, env=env, cwd=here)
