@@ -171,9 +171,7 @@ describe('Grader: each action passes through to one data.js writer', () => {
   });
 
   it('covers every action Grader has', () => {
-    // lastState is not an action: it reads what the last one left.
-    const actions = Object.keys(Grader).filter(name => name !== 'lastState');
-    expect(actions.sort()).toEqual([...new Set(cases.map(c => c[0]))].sort());
+    expect(Object.keys(Grader).sort()).toEqual([...new Set(cases.map(c => c[0]))].sort());
   });
 
   it('a level with no + or − given passes none on, as a tick’s suggested level does', () => {

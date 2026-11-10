@@ -73,7 +73,11 @@ const _cache = {
   rubrics: {}, // keyed by cid
   rubricChecks: {}, // keyed by cid — ticked Advanced Rubric checkboxes { 'sid:aid': [checkId, …] }
   rubricPrints: {}, // keyed by cid — printed rubric handouts { 'sid:aid': { at: ISO, hash } }
-  gradeReturns: {}, // keyed by cid — Draft and Returned rows { aid: { sid: row } } (getGradeReturns)
+  // keyed by cid — Draft and Returned rows { aid: { sid: row } } (getGradeReturns).
+  // Never assign a class's rows here: _saveGradeReturns (a change on this
+  // device) and _loadGradeReturns (rows from the server) are the only ways
+  // in. Both drop the returned set and calc.js's cached numbers.
+  gradeReturns: {},
   dibels: {}, // keyed by cid — DIBELS raw scores { 'sid:aid': { boy|moy|eoy: { orfWrc, orfErrors, mazeCorrect, mazeIncorrect } } }
   flags: {}, // keyed by cid
   goals: {}, // keyed by cid
@@ -10325,8 +10329,19 @@ function _returnedEntries(entries, list) {
 /* Return: `studentIds` (one id or a list) are given their grade on `aid`.
    Only drafts are returned; the rest are skipped. A class that does not
    hold grades has none to return. Answers as the server's return will:
-   { returned, enrollment_ids, returned_at }. */
+   { returned, enrollment_ids, returned_at }. If the rule fails, the failure
+   is reported and the answer is that nothing was returned. */
 function returnGrades(cid, aid, studentIds) {
+  var nothing = { returned: 0, enrollment_ids: [], returned_at: null };
+  try {
+    return _returnGrades(cid, aid, studentIds) || nothing;
+  } catch (e) {
+    // Like the other hooks: reported, never thrown at a screen. Nothing was returned.
+    _gradeStateFailed('returning grades', e);
+    return nothing;
+  }
+}
+function _returnGrades(cid, aid, studentIds) {
   var ids = Array.isArray(studentIds) ? studentIds : studentIds ? [studentIds] : [];
   var done = [];
   var at = new Date().toISOString();

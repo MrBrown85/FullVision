@@ -5,9 +5,9 @@
  * what the teacher does. Each is a pass-through: it calls the
  * shared/data.js writer the screen called before, with the same arguments,
  * and returns what the writer returns. data.js runs the Draft and Returned
- * rule on the write (shared/grade-state.js); the action then asks GradeState
- * what state the piece is in and keeps the answer for the screen
- * (lastState). The other rules that go with the actions (locks, the points
+ * rule on the write (shared/grade-state.js), and a screen reads the state a
+ * piece is in from GradeState.stateOf. The other rules that go with the
+ * actions (locks, the points
  * limit, the To Grade and To Return counts) move in behind them in later
  * PRs, with Return for Revision and Return N Graded.
  *
@@ -27,20 +27,11 @@
 window.Grader = (function () {
   'use strict';
 
-  var _last = null;
-
-  /* Every action ends here: GradeState says what state the piece is in
-     after the save, and the writer's answer goes back to the screen. */
+  /* Every action ends here: GradeState hears of the save, and the writer's
+     answer goes back to the screen. */
   function _saved(cid, sid, aid, what, out) {
-    _last = { cid: cid, sid: sid, aid: aid, what: what, state: GradeState.afterSave(cid, sid, aid, what) };
+    GradeState.afterSave(cid, sid, aid, what);
     return out;
-  }
-
-  /* What the last action left: { cid, sid, aid, what, state }, where state
-     is 'draft', 'returned', or null for a piece with no grade returned and
-     none waiting. null before any action. */
-  function lastState() {
-    return _last;
   }
 
   /* A level under one score key (a competency, a rubric criterion or
@@ -147,6 +138,5 @@ window.Grader = (function () {
     backToGroupGrade: backToGroupGrade,
     undo: undo,
     returnGrades: returnTo,
-    lastState: lastState,
   };
 })();

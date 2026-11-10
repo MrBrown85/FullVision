@@ -455,14 +455,37 @@ describe('Return', () => {
     expect(row('s1', 'essay')).toMatchObject({ is_draft: true, returned_copy: three });
   });
 
-  it('Grader.returnGrades returns them and reports the state', () => {
+  it('Grader.returnGrades returns them, and GradeState says where each piece stands', () => {
     Grader.setLevel(CID, 's1', 'essay', 't1', 3, 0);
-    expect(Grader.lastState()).toEqual({ cid: CID, sid: 's1', aid: 'essay', what: 'level', state: 'draft' });
+    expect(GradeState.afterSave(CID, 's1', 'essay', 'level')).toBe('draft');
     expect(Grader.returnGrades(CID, 'essay', 's1').returned).toBe(1);
-    expect(Grader.lastState()).toEqual({ cid: CID, sid: 's1', aid: 'essay', what: 'return', state: 'returned' });
+    expect(GradeState.stateOf(CID, 's1', 'essay')).toBe('returned');
     // A status is never a draft: Missing work has no state.
     Grader.setStatus(CID, 's2', 'essay', 'NS');
-    expect(Grader.lastState().state).toBe(null);
+    expect(GradeState.afterSave(CID, 's2', 'essay', 'status')).toBe(null);
+  });
+
+  it('with the rule throwing, Return throws nothing: the failure is reported and nothing is returned', () => {
+    level('s1', 'essay', 't1', 3);
+    const real = GradeState.afterReturn;
+    const sentry = window.Sentry;
+    const reported = [];
+    window.Sentry = { captureException: e => reported.push(e) };
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
+    GradeState.afterReturn = () => {
+      throw new Error('the rule broke');
+    };
+    try {
+      expect(returnGrades(CID, 'essay', ['s1'])).toEqual({ returned: 0, enrollment_ids: [], returned_at: null });
+      expect(Grader.returnGrades(CID, 'essay', ['s1']).returned).toBe(0);
+    } finally {
+      GradeState.afterReturn = real;
+      window.Sentry = sentry;
+      quiet.mockRestore();
+    }
+    expect(reported.length).toBe(2);
+    expect(state('s1', 'essay')).toBe('draft');
+    expect(returnGrades(CID, 'essay', ['s1']).returned).toBe(1);
   });
 
   it('drops the cached numbers, so returned-only grades are worked out again', () => {
@@ -1266,6 +1289,49 @@ describe('review: rows from the server, and leftovers', () => {
       expect(getGradeReturns(LIVE)).toEqual({});
     } finally {
       globalThis.clearProfCache = realClear;
+    }
+  });
+
+  it('5. rows loaded through the setter change the returned-only number calc.js had cached', () => {
+    session.signOut();
+    try {
+      const M = 'c-loaded';
+      seedClass(M, {
+        students: STUDENTS,
+        assessments: [{ id: 'essay', title: 'Essay', date: '2026-10-10', type: 'summative', tagIds: ['ask'] }],
+        learningMaps: {
+          subjects: [],
+          sections: [{ id: 'sec1', name: 'Ask', tags: [{ id: 'ask', label: 'Ask', text: 'Ask questions' }] }],
+          _customized: true,
+          _version: 1,
+          _flatVersion: 2,
+        },
+        scores: {
+          s1: [
+            {
+              id: 'e1',
+              assessmentId: 'essay',
+              tagId: 'ask',
+              score: 3,
+              date: '2026-10-10',
+              type: 'summative',
+              note: '',
+            },
+          ],
+        },
+        courseConfigs: { student_page_enabled: true, return_grades: 'on_return' },
+      });
+      // No cache clear between the reads: only the setter's own.
+      const read = () => withReturnedOnly(() => getTagProficiency(M, 's1', 'ask'));
+      clearProfCache();
+      expect(read()).toBe(3);
+      _loadGradeReturns(M, { essay: { s1: { is_draft: true } } });
+      expect(read()).toBe(0);
+      _loadGradeReturns(M, {});
+      expect(read()).toBe(3);
+      clearClass(M);
+    } finally {
+      session = signIn();
     }
   });
 
