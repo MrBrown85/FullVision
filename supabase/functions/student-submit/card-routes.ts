@@ -191,9 +191,10 @@ function verified(r: Json): Json {
 
 // ── The routes ──────────────────────────────────────────────────────────────
 // What card() can say about a code that will not open. A guessed code is
-// not_found; so is a reissued card, a withdrawn student and a deleted class.
-// locked is the per-address limit. There is no everyone-is-busy stop on a
-// card's routes (Colin, Nov 9); a slip's open keeps its own.
+// not_found; so is a slip's code, a reissued card, a withdrawn student and
+// a deleted class. card_locked is five wrong tries in a row or fifteen in 7
+// days. locked is the per-address limit. There is no everyone-is-busy stop
+// on a card's routes (Colin, Nov 9); a slip's open keeps its own.
 const CARD_ERRORS = ['not_found', 'closed', 'card_locked', 'card_expired', 'reprint', 'locked'];
 const SESSION_ERRORS = ['signed_out', 'not_found', 'card_stopped', 'card_expired', 'closed'];
 
@@ -214,8 +215,8 @@ function verifyParams(body: Json, who: Identity | null, needsSession: boolean): 
 
 export const CARD_ROUTES: Record<string, CardRoute> = {
   /* Code in; first name, class and which identity check out. Nothing opens
-     yet. For a live questionnaire or report slip's code the database answers
-     kind 'slip' and nothing else: the page then sends that code to open. */
+     yet. A slip's code is not_found here, as any unknown code is, so this
+     route says nothing about slips; the page then sends the code to open. */
   card: {
     sql: 'select student_submit.card($1::text, $2::text) as r',
     params: body => {
@@ -223,16 +224,13 @@ export const CARD_ROUTES: Record<string, CardRoute> = {
       return c ? [c] : null;
     },
     errors: CARD_ERRORS,
-    reply: r =>
-      r.kind === 'slip'
-        ? { ok: true, kind: 'slip' }
-        : {
-            ok: true,
-            ...pick(r, ['kind']),
-            student: person(r.student),
-            course: klass(r.course),
-            ...pick(r, ['check', 'also_password']),
-          },
+    reply: r => ({
+      ok: true,
+      ...pick(r, ['kind']),
+      student: person(r.student),
+      course: klass(r.course),
+      ...pick(r, ['check', 'also_password']),
+    }),
   },
 
   /* The card's identity check from the start screen. The phone sends the

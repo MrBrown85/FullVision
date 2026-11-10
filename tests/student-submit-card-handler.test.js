@@ -174,8 +174,7 @@ function setup(answers, overrides) {
     !sessions[token] ? 'signed_out' : sessions[token].includes(enrollment) ? null : 'not_found';
   const sql = Object.assign(
     {
-      card: code =>
-        code === CODE ? clone(CARD_OK) : code === SLIP ? { ok: true, kind: 'slip' } : { ok: false, error: 'not_found' },
+      card: code => (code === CODE ? clone(CARD_OK) : { ok: false, error: 'not_found' }),
       // `add` is p_add, read from the statement: it is not a parameter.
       verify_card(code, birthday, number, password, session, hash, add) {
         if (code !== CODE) return { ok: false, error: 'not_found' };
@@ -304,26 +303,21 @@ describe('student-submit: the card route', () => {
     expect(await res.json()).toEqual(CARD_OK);
   });
 
-  it("answers a live slip's code with kind slip and nothing else, so the page sends it to open", async () => {
+  it("answers a slip's code as not_found, like any guess, and says nothing about slips", async () => {
     const { handle, calls, logs, slip } = setup();
+    const guess = await (await handle(post({ route: 'card', code: 'ZZZ-ZZZ' }))).json();
     const res = await handle(post({ route: 'card', code: SLIP }));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, kind: 'slip' });
-    expect(logs).toEqual([{ route: 'card', outcome: 'ok', ms: expect.any(Number) }]);
-    // The function does not open the slip itself: one statement, and open is the page's next request.
-    expect(calls).toHaveLength(1);
+    expect(await res.json()).toEqual(guess);
+    expect(guess).toEqual({ ok: false, error: 'not_found' });
+    expect(logs.map(l => l.outcome)).toEqual(['not_found', 'not_found']);
+    // The function does not try open itself: one statement each, and open is the page's next request.
+    expect(calls).toHaveLength(2);
     expect(slip).toEqual([]);
 
-    const dirty = setup({
-      card: () => ({
-        ok: true,
-        kind: 'slip',
-        student: { first_name: 'Cece' },
-        token: 'e'.repeat(64),
-        check: 'identity',
-      }),
-    });
-    expect(await (await dirty.handle(post({ route: 'card', code: SLIP }))).json()).toEqual({ ok: true, kind: 'slip' });
+    // Whatever else the database put beside the refusal stays behind.
+    const dirty = setup({ card: () => ({ ok: false, error: 'not_found', kind: 'slip', questionnaire_id: QUIZ }) });
+    expect(await (await dirty.handle(post({ route: 'card', code: SLIP }))).json()).toEqual(guess);
   });
 
   it.each(['not_found', 'closed', 'card_locked', 'card_expired', 'reprint', 'locked'])(
@@ -503,6 +497,18 @@ describe('student-submit: verify for a card', () => {
       'wrong_identity',
       'card_locked',
     ]);
+  });
+
+  it('passes on the tries left as the database counts them, by whichever lock is nearer', async () => {
+    // Fourteen wrong tries this week already: the slow lock is one try away, on a card with none in a row.
+    const replies = [
+      { ok: false, error: 'wrong_identity', tries_left: 1, wrong_tries: 1, wrong_tries_7d: 14 },
+      { ok: false, error: 'card_locked', wrong_tries_7d: 15 },
+    ];
+    const { handle } = setup({ verify_card: () => replies.shift() });
+    const wrong = { route: 'verify', code: CODE, birthday: '2012-05-16' };
+    expect(await (await handle(post(wrong))).json()).toEqual({ ok: false, error: 'wrong_identity', tries_left: 1 });
+    expect(await (await handle(post(wrong))).json()).toEqual({ ok: false, error: 'card_locked' });
   });
 
   it.each(['not_found', 'closed', 'card_locked', 'card_expired', 'reprint', 'locked'])(
