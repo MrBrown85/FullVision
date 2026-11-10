@@ -11,6 +11,15 @@ import { test, expect } from '@playwright/test';
 async function demoWithNewPiece(page) {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  // The sample class is seeded a moment after the dashboard opens.
+  await page.waitForFunction(
+    () => {
+      var cid = typeof getActiveCourse === 'function' && getActiveCourse();
+      return !!cid && getStudents(cid).length > 0 && getAllTags(cid).length > 0;
+    },
+    null,
+    { timeout: 15000 },
+  );
   return page.evaluate(() => {
     var cid = getActiveCourse();
     var student = sortStudents(getStudents(cid), 'lastName')[0];
