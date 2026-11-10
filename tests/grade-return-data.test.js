@@ -1459,3 +1459,145 @@ describe('review: a tick is part of a grade for the state a screen shows', () =>
     expect(state('s2', 'lab')).toBe('returned');
   });
 });
+
+/* ── The grader's own actions for the gradebook (S1-T1) ──────────
+   The gradebook and Class Results write through shared/grader.js now. Each
+   of those actions calls a data.js writer, where the rule runs, so each
+   leaves the right state with nothing added to it. */
+const GRADER_SCENARIOS = {
+  typeLevel(on) {
+    Grader.typeLevel(CID, 's1', 'essay', 't1', 3, '2026-10-10', 'summative', '');
+    if (on) expect(state('s1', 'essay')).toBe('draft');
+    give('essay', 's1');
+    Grader.typeLevel(CID, 's1', 'essay', 't1', 4, '2026-10-10', 'summative', '');
+    if (on) expect(state('s1', 'essay')).toBe('draft');
+    if (on) expect(row('s1', 'essay').returned_copy).toEqual(three);
+    // A cleared cell is a 0: put back to what was returned, it is not a draft.
+    Grader.typeLevel(CID, 's1', 'essay', 't1', 3, '2026-10-10', 'summative', '');
+    if (on) expect(state('s1', 'essay')).toBe('returned');
+  },
+  typePlusMinus(on) {
+    level('s1', 'essay', 't1', 3);
+    give('essay', 's1');
+    Grader.typePlusMinus(CID, 's1', 'essay', 't1', 3, '2026-10-10', 'summative', '', 1);
+    if (on) expect(state('s1', 'essay')).toBe('draft');
+    if (on) expect(row('s1', 'essay').returned_copy).toEqual(three);
+    Grader.typePlusMinus(CID, 's1', 'essay', 't1', 3, '2026-10-10', 'summative', '', 0);
+    if (on) expect(state('s1', 'essay')).toBe('returned');
+  },
+  clearScore(on) {
+    level('s1', 'essay', 't1', 3);
+    give('essay', 's1');
+    Grader.clearScore(CID, getScores(CID), 's1', ESSAY, ['t1', 't2']);
+    if (on) expect(state('s1', 'essay')).toBe('draft');
+    if (on) expect(row('s1', 'essay').returned_copy).toEqual(three);
+    give('essay', 's1');
+    if (on) expect(row('s1', 'essay')).toBe(null);
+    // A draft never returned, cleared, leaves nothing.
+    level('s2', 'essay', 't1', 2);
+    Grader.clearScore(CID, getScores(CID), 's2', ESSAY, ['t1', 't2']);
+    if (on) expect(row('s2', 'essay')).toBe(null);
+  },
+  clearScoreOnServer(on) {
+    // The server's half of Clear Score: nothing changes on this device.
+    level('s1', 'essay', 't1', 3);
+    const before = storedRows();
+    Grader.clearScoreOnServer(CID, 's1', 'essay');
+    expect(storedRows()).toBe(before);
+    if (on) expect(state('s1', 'essay')).toBe('draft');
+  },
+  undoCell(on) {
+    level('s1', 'essay', 't1', 3);
+    give('essay', 's1');
+    const was = structuredClone(getScores(CID));
+    Grader.clearScore(CID, getScores(CID), 's1', ESSAY, ['t1', 't2']);
+    if (on) expect(state('s1', 'essay')).toBe('draft');
+    // Undo puts the cell's old entries back: what was returned, so not a draft.
+    const cleared = structuredClone(getScores(CID));
+    Grader.undoCell(CID, 's1', 'essay', cleared, structuredClone(was));
+    if (on) expect(state('s1', 'essay')).toBe('returned');
+    if (on) expect(row('s1', 'essay').returned_copy).toBeUndefined();
+  },
+  markBlankCells(on) {
+    level('s1', 'essay', 't1', 3);
+    give('essay', 's1');
+    level('s2', 'essay', 't1', 2);
+    const before = storedRows();
+    Grader.markBlankCells(CID, 'essay', { 's3:essay': 'NS', 's4:essay': 'NS' });
+    // A status is never a draft, and nobody's grade moved.
+    expect(storedRows()).toBe(before);
+    if (on) expect(['s1', 's2', 's3'].map(sid => state(sid, 'essay'))).toEqual(['returned', 'draft', null]);
+  },
+  undoMarkBlankCells(on) {
+    level('s1', 'essay', 't1', 3);
+    Grader.markBlankCells(CID, 'essay', { 's3:essay': 'EXC' });
+    const before = storedRows();
+    Grader.undoMarkBlankCells(CID, 'essay', {});
+    expect(storedRows()).toBe(before);
+    if (on) expect(state('s1', 'essay')).toBe('draft');
+  },
+  deleteAssessmentScores(on) {
+    // Deleting an assessment: its scores go, then the assessment, and its rows with them.
+    level('s1', 'essay', 't1', 3);
+    give('essay', 's1');
+    level('s2', 'essay', 't1', 2);
+    level('s1', 'lab', 'c1', 3);
+    const scores = getScores(CID);
+    Object.keys(scores).forEach(sid => (scores[sid] = scores[sid].filter(e => e.assessmentId !== 'essay')));
+    Grader.deleteAssessmentScores(CID, 'essay', scores);
+    saveAssessments(
+      CID,
+      getAssessments(CID).filter(a => a.id !== 'essay'),
+    );
+    if (on) expect(Object.keys(getGradeReturns(CID))).toEqual(['lab']);
+    if (on) expect(state('s1', 'lab')).toBe('draft');
+  },
+  deleteAssessmentStatuses(on) {
+    level('s1', 'essay', 't1', 3);
+    setAssignmentStatus(CID, 's1', 'essay', 'LATE');
+    const before = storedRows();
+    Grader.deleteAssessmentStatuses(CID, 'essay', {});
+    expect(storedRows()).toBe(before);
+    if (on) expect(state('s1', 'essay')).toBe('draft');
+  },
+};
+
+describe('the grader’s gradebook actions follow the rule through the writers they call', () => {
+  it('every action here is one Grader has, and with the dialog’s it is all of them', () => {
+    const names = Object.keys(GRADER_SCENARIOS);
+    expect(names.filter(name => typeof Grader[name] !== 'function')).toEqual([]);
+    // The dialog's actions each call one writer walked above, by name.
+    const dialog = [
+      'setLevel',
+      'setPlusMinus',
+      'setPoints',
+      'setMark',
+      'setStatus',
+      'setTick',
+      'setCriterionComment',
+      'setWentBeyond',
+      'setCompetencyComment',
+      'setOverallComment',
+      'setDibels',
+      'gradeSeparately',
+      'backToGroupGrade',
+      'undo',
+      'returnGrades',
+    ];
+    expect(Object.keys(Grader).sort()).toEqual(names.concat(dialog).sort());
+  });
+
+  it.each(Object.keys(GRADER_SCENARIOS))('Grader.%s, in a class that holds grades', name => {
+    held();
+    GRADER_SCENARIOS[name](true);
+    expect(JSON.parse(storedRows() || '{}')).toEqual(getGradeReturns(CID));
+  });
+
+  it.each(Object.keys(GRADER_SCENARIOS))('Grader.%s, with the switch off: no row and no localStorage key', name => {
+    seed({ return_grades: 'on_return' });
+    GRADER_SCENARIOS[name](false);
+    expect(getGradeReturns(CID)).toEqual({});
+    expect(_cache.gradeReturns[CID]).toBeUndefined();
+    expect(Object.keys(localStorage._store).filter(k => k.indexOf('grade-returns') >= 0)).toEqual([]);
+  });
+});
