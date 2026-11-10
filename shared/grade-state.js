@@ -44,13 +44,20 @@
  * (As Soon As I Save is chosen, or the student page is turned off) returns
  * every waiting draft as part of that change (afterSettingChange).
  *
- * MISSING WINS AT ONCE (Colin, 2026-11-09). A piece marked Missing gives the
- * student no grade and counts as Missing straight away, with no Return, even
- * when a grade was returned for it before: it is not a draft, and the
- * returned set of scores holds nothing for it. Taking Missing off before
- * any Return brings the returned grade back. Excused needs no such rule
- * (grade math leaves an Excused piece out of every number in both sets) and
- * Late is only a label: the score under it counts as it would without it.
+ * WHAT A STUDENT IS GIVEN is read from the row and the working copy, never
+ * stored (studentCopy, and returnedScores for grade math):
+ * - A draft is never in it. While a draft sits on a returned grade it is
+ *   the returned copy; with nothing waiting, the working copy.
+ * - Only the part the work is scored by now (partInUse). A stored copy is
+ *   complete: it may hold a level on a rubric the work no longer uses, or a
+ *   competency since deleted. Those drop off at once, with no Return.
+ * - Missing and Excused win at once (Colin, 2026-11-09). While a piece is
+ *   Missing or Excused the student is given no grade, even one returned
+ *   before, and the returned set of scores holds nothing from its returned
+ *   copy. Take the mark off before any Return and the returned grade is
+ *   back. Late is only a label and hides nothing. The row itself does not
+ *   change: a draft under Missing is still a draft there, though a screen
+ *   shows the status, not Draft (stateOf).
  *
  * shared/data.js applies afterWrite on every score write and afterReturn on
  * Return, and keeps the rows beside the scores. What lands here later: the
@@ -276,40 +283,143 @@ window.GradeState = (function () {
     return out;
   }
 
-  /* 'draft', 'returned' or 'none', from the row, the working copy and the
-     piece's status. Missing wins at once: a Missing piece is neither. */
-  function stateOfRow(row, working, status) {
-    if (status === 'NS') return NONE;
+  /* Edit a Copy: the work moved to a copy of its rubric, whose criteria
+     and checkboxes have new ids (`criteria` and `checks`, old id to new).
+     The grade keeps its state; the ids inside the copies the row keeps
+     follow. Also how a re-keyed id reaches a kept copy (`tags`). Returns
+     the same row when it holds none of the ids. */
+  function afterMove(row, criteria, checks, tags) {
+    if (!row) return row || null;
+    var out = row;
+    ['returned_copy', 'previous_copy'].forEach(function (field) {
+      var moved = _movedCopy(row[field], criteria, checks, tags);
+      if (moved === row[field]) return;
+      if (out === row) out = Object.assign({}, row);
+      out[field] = moved;
+    });
+    return out;
+  }
+  // A copy with its ids re-pointed; the same object when none is in it.
+  function _movedCopy(copy, criteria, checks, tags) {
+    if (!copy) return copy;
+    var changed = false;
+    var renamed = function (rows, map) {
+      var next = {};
+      Object.keys(rows || {}).forEach(function (id) {
+        var to = map && map[id] !== undefined ? map[id] : id;
+        if (to !== id) changed = true;
+        next[to] = rows[id];
+      });
+      return next;
+    };
+    var next = Object.assign({}, copy, {
+      tags: renamed(copy.tags, tags),
+      criteria: renamed(copy.criteria, criteria),
+      checks: (copy.checks || []).map(function (id) {
+        var to = checks && checks[id] !== undefined ? checks[id] : id;
+        if (to !== id) changed = true;
+        return to;
+      }),
+    });
+    return changed ? copyOf(next) : copy;
+  }
+
+  /* 'draft', 'returned' or 'none', from the row and the working copy. */
+  function stateOfRow(row, working) {
     if (row && row.is_draft) return DRAFT;
     if (row && row.returned_at) return RETURNED;
     // No row: a grade that is here was here before the rule was kept.
     return !row && copyOf(working) ? RETURNED : NONE;
   }
 
+  /* The part of a copy the work is scored by now. `scoring` is
+     { kind, tags, criteria, checks }:
+       'rubric'        the levels and ticks of the rubric's own criteria
+                       and checkboxes (`criteria`, `checks`: their ids)
+       'points'        the score (also Complete/Incomplete); a 0 is a score
+       'competencies'  the levels of the linked competencies still on the
+                       class (`tags`: their ids)
+       'overall'       the one Overall level; a 0 is none
+     The Overall Comment is always in it. null with nothing left; the whole
+     copy when no scoring is given. */
+  function partInUse(copy, scoring) {
+    copy = copyOf(copy);
+    if (!copy || !scoring) return copy;
+    var kind = scoring.kind;
+    var only = function (rows, ids) {
+      var out = {};
+      (ids || []).forEach(function (id) {
+        if (rows[id]) out[id] = rows[id];
+      });
+      return out;
+    };
+    return copyOf({
+      value: kind === 'points' ? copy.value : kind === 'overall' ? copy.value || null : null,
+      modifier: copy.modifier,
+      comment: copy.comment,
+      tags: kind === 'competencies' ? only(copy.tags, scoring.tags) : {},
+      criteria: kind === 'rubric' ? only(copy.criteria, scoring.criteria) : {},
+      checks:
+        kind === 'rubric'
+          ? copy.checks.filter(function (id) {
+              return (scoring.checks || []).indexOf(id) >= 0;
+            })
+          : [],
+    });
+  }
+
+  // Missing and Excused: the student is given no grade while either is on.
+  function _hidesGrade(status) {
+    return status === 'NS' || status === 'EXC';
+  }
+
   /* The grade the student is given: nothing when it was never returned or
-     the piece is Missing, the returned copy while a draft sits on a
-     returned grade, the working copy otherwise. A draft is never in it. */
-  function studentCopy(row, working, status) {
-    if (status === 'NS') return null;
-    if (row && row.is_draft) return row.returned_copy ? copyOf(row.returned_copy) : null;
-    return stateOfRow(row, working) === RETURNED ? copyOf(working) : null;
+     the piece is Missing or Excused; the returned copy while a draft sits
+     on a returned grade; the working copy otherwise. Only the part the
+     work is scored by now (`scoring`, see partInUse). A draft is never in
+     it. */
+  function studentCopy(row, working, status, scoring) {
+    if (_hidesGrade(status)) return null;
+    if (row && row.is_draft) return partInUse(row.returned_copy, scoring);
+    return stateOfRow(row, working) === RETURNED ? partInUse(working, scoring) : null;
+  }
+
+  /* The grade the student had before the newest return, read the same way,
+     or null. */
+  function studentPrevious(row, status, scoring) {
+    if (_hidesGrade(status) || !row) return null;
+    return partInUse(row.previous_copy, scoring);
   }
 
   /* ── The returned set of scores ────────────────────────────────
      What grade math reads in returned-only mode (plan 1.3), in the shape of
      the working scores, { studentId: [entry] }: the working entries where
      nothing is a draft, the returned copy where a draft sits on a returned
-     grade, nothing where a grade was never returned. Missing wins at once:
-     a returned grade under a draft is left out while the piece is Missing,
-     so its old level stops counting everywhere without a Return.
+     grade, nothing where a grade was never returned. Missing and Excused
+     win at once: a returned grade under a draft is left out while the
+     piece is either, so its old level stops counting everywhere without a
+     Return. (The part in use is the caller's to apply in `entriesOf`: it
+     knows how the work is scored.)
+
+     Where an entry sits matters: grade math breaks a tie between two
+     pieces of the same date by their order. A returned copy sits where the
+     working entries it stands for sit. One with no working entry left (a
+     returned grade, cleared) sits by its assessment's place in the class's
+     list, `order`: before the first entry of a later assessment.
+
      `rows` is { assessmentId: { studentId: row } }. `entriesOf(sid, aid,
      copy, own)` turns a copy into score entries; `own` is the student's
      working entries for that assessment. `statuses` is
-     { 'studentId:assessmentId': 'NS' | 'EXC' | 'LATE' }. */
-  function returnedScores(working, rows, entriesOf, statuses) {
+     { 'studentId:assessmentId': 'NS' | 'EXC' | 'LATE' }. `order` is the
+     class's assessment ids, in order. */
+  function returnedScores(working, rows, entriesOf, statuses, order) {
     working = working || {};
     rows = rows || {};
     statuses = statuses || {};
+    var rank = {};
+    (order || []).forEach(function (aid, i) {
+      rank[aid] = i;
+    });
     var rowOf = function (sid, aid) {
       return (rows[aid] || {})[sid] || null;
     };
@@ -324,27 +434,40 @@ window.GradeState = (function () {
       var own = working[sid] || [];
       var list = [];
       var placed = {};
-      var place = function (aid) {
-        if (placed[aid]) return;
+      // The returned copy of a draft, as entries: none when it was never
+      // returned, or the piece is Missing or Excused.
+      var returnedOf = function (aid) {
         placed[aid] = true;
         var copy = rowOf(sid, aid).returned_copy;
-        if (!copy || statuses[sid + ':' + aid] === 'NS') return;
+        if (!copy || _hidesGrade(statuses[sid + ':' + aid])) return [];
         var mine = own.filter(function (e) {
           return e && e.assessmentId === aid;
         });
-        entriesOf(sid, aid, copy, mine).forEach(function (e) {
-          list.push(e);
-        });
+        return entriesOf(sid, aid, copy, mine);
       };
       own.forEach(function (entry) {
         var row = entry ? rowOf(sid, entry.assessmentId) : null;
-        if (row && row.is_draft) place(entry.assessmentId);
-        else list.push(entry);
+        if (!row || !row.is_draft) return list.push(entry);
+        if (placed[entry.assessmentId]) return;
+        returnedOf(entry.assessmentId).forEach(function (e) {
+          list.push(e);
+        });
       });
       // A returned grade cleared since has no working entry; it still counts.
       Object.keys(rows).forEach(function (aid) {
         var row = rowOf(sid, aid);
-        if (row && row.is_draft) place(aid);
+        if (!row || !row.is_draft || placed[aid]) return;
+        var back = returnedOf(aid);
+        var at = list.length;
+        if (rank[aid] !== undefined) {
+          for (var i = 0; i < list.length; i++) {
+            if (rank[list[i].assessmentId] > rank[aid]) {
+              at = i;
+              break;
+            }
+          }
+        }
+        Array.prototype.splice.apply(list, [at, 0].concat(back));
       });
       out[sid] = list;
     });
@@ -354,13 +477,14 @@ window.GradeState = (function () {
   /* ── For the screens ───────────────────────────────────────── */
 
   /* The state `sid`'s piece of work on `aid` is in: 'draft', 'returned', or
-     null while it has no grade returned and none waiting. A status alone is
-     not a grade, and a Missing piece is never a draft. A piece with nothing
-     waiting is Returned once it has a score or feedback: every save that
-     is not held is returned at once. */
+     null while it has no grade returned and none waiting. This is what a
+     screen shows: a status alone is not a grade, and a Missing or Excused
+     piece shows its status, never Draft. A piece with nothing waiting is
+     Returned once it has a score or feedback: every save that is not held
+     is returned at once. */
   function stateOf(cid, sid, aid) {
     var row = typeof getGradeReturn === 'function' ? getGradeReturn(cid, sid, aid) : null;
-    if (row && row.is_draft) return getAssignmentStatus(cid, sid, aid) === 'NS' ? null : DRAFT;
+    if (row && row.is_draft) return _hidesGrade(getAssignmentStatus(cid, sid, aid)) ? null : DRAFT;
     return hasScoreOrFeedback(cid, sid, aid) ? RETURNED : null;
   }
 
@@ -385,6 +509,9 @@ window.GradeState = (function () {
     afterReturn: afterReturn,
     afterSeen: afterSeen,
     afterSettingChange: afterSettingChange,
+    afterMove: afterMove,
+    partInUse: partInUse,
+    studentPrevious: studentPrevious,
     stateOfRow: stateOfRow,
     studentCopy: studentCopy,
     returnedScores: returnedScores,

@@ -16,14 +16,19 @@
       "clear": "Clear Score.",
       "return": "The teacher returns this grade.",
       "seen": "The student opens this piece.",
-      "class": "The class settings change: student_page, return_grades."
+      "class": "The class settings change: student_page, return_grades.",
+      "move_rubric": "Edit a Copy on rubric work: it moves to a copy of its rubric. c1 becomes c3, c2 becomes c4, k1 becomes k3, k2 becomes k4.",
+      "delete": "The teacher deletes a criterion, a competency or a checkbox from the class: what (criterion, tag or check) and id.",
+      "student (on any step)": "Which student the step is about: s1 (the default) or s2. A return step may list students instead."
     },
     "expect": {
       "state": "draft: the working copy holds something the student has not been given. returned: nothing is waiting and the student has a grade. none: no grade is returned and none is waiting.",
-      "student": "The grade the student is given, as a copy, or null for nothing. A draft is never in it.",
+      "student": "The grade the student is given, as a copy, or null for nothing. A draft is never in it; nothing is given while the piece is Missing or Excused; and only what the work is scored by now is in it (a deleted criterion, competency or checkbox is gone at once).",
       "status": "The status the student sees. It is never a draft.",
       "previous": "The grade the student had before the newest return, as a copy, or null.",
-      "updated": "True when the student page marks the grade Updated."
+      "updated": "True when the student page marks the grade Updated.",
+      "for": "Optional. Which student the check is about: s1 (the default) or s2.",
+      "returned_at": "Optional. Whether the date the grade was last returned is unchanged or changed since the check before it in the same case."
     },
     "copy": "A grade as JSON: v (always 1), value, modifier and comment from the score row (the Overall level, points or mark, its + or -, and the Overall Comment), tags (competency id to value, modifier, comment), criteria (criterion id to value, modifier, comment, beyond) and checks (ticked checkbox ids, sorted). A blank comment is null. A grade with nothing in it is null, not an empty copy."
   },
@@ -1276,7 +1281,7 @@
       ]
     },
     {
-      "name": "Switching to As Soon As I Save leaves a draft a draft until it is saved again or returned",
+      "name": "Switching to As Soon As I Save returns a waiting draft with the change",
       "class": {
         "student_page": true,
         "return_grades": "on_return"
@@ -1289,14 +1294,37 @@
           "value": 3
         },
         {
+          "expect": {
+            "state": "draft",
+            "student": null,
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        },
+        {
           "do": "class",
           "student_page": true,
           "return_grades": "on_save"
         },
         {
           "expect": {
-            "state": "draft",
-            "student": null,
+            "state": "returned",
+            "student": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {
+                "t1": {
+                  "value": 3,
+                  "modifier": 0,
+                  "comment": null
+                }
+              },
+              "criteria": {},
+              "checks": []
+            },
             "status": null,
             "previous": null,
             "updated": false
@@ -1333,7 +1361,7 @@
       ]
     },
     {
-      "name": "Switching to As Soon As I Save: the next save returns a waiting change, marked Updated",
+      "name": "Switching to As Soon As I Save returns a waiting change to a returned grade, marked Updated",
       "class": {
         "student_page": true,
         "return_grades": "on_return"
@@ -1352,11 +1380,6 @@
           "value": 8
         },
         {
-          "do": "class",
-          "student_page": true,
-          "return_grades": "on_save"
-        },
-        {
           "expect": {
             "state": "draft",
             "student": {
@@ -1371,6 +1394,36 @@
             "status": null,
             "previous": null,
             "updated": false
+          }
+        },
+        {
+          "do": "class",
+          "student_page": true,
+          "return_grades": "on_save"
+        },
+        {
+          "expect": {
+            "state": "returned",
+            "student": {
+              "v": 1,
+              "value": 8,
+              "modifier": 0,
+              "comment": null,
+              "tags": {},
+              "criteria": {},
+              "checks": []
+            },
+            "status": null,
+            "previous": {
+              "v": 1,
+              "value": 7,
+              "modifier": 0,
+              "comment": null,
+              "tags": {},
+              "criteria": {},
+              "checks": []
+            },
+            "updated": true
           }
         },
         {
@@ -1400,6 +1453,1363 @@
               "checks": []
             },
             "updated": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "Turning the student page off returns what was waiting, and turning it on again leaves it returned",
+      "class": {
+        "student_page": true,
+        "return_grades": "on_return"
+      },
+      "work": "competencies",
+      "steps": [
+        {
+          "do": "level",
+          "tag": "t1",
+          "value": 3
+        },
+        {
+          "expect": {
+            "state": "draft",
+            "student": null,
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        },
+        {
+          "do": "class",
+          "student_page": false,
+          "return_grades": "on_return"
+        },
+        {
+          "expect": {
+            "state": "returned",
+            "student": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {
+                "t1": {
+                  "value": 3,
+                  "modifier": 0,
+                  "comment": null
+                }
+              },
+              "criteria": {},
+              "checks": []
+            },
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        },
+        {
+          "do": "class",
+          "student_page": true,
+          "return_grades": "on_return"
+        },
+        {
+          "expect": {
+            "state": "returned",
+            "student": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {
+                "t1": {
+                  "value": 3,
+                  "modifier": 0,
+                  "comment": null
+                }
+              },
+              "criteria": {},
+              "checks": []
+            },
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Clear Score keeps the Overall Comment, the ticks and the status",
+      "class": {
+        "student_page": true,
+        "return_grades": "on_return"
+      },
+      "work": "rubric",
+      "steps": [
+        {
+          "do": "criterion",
+          "criterion": "c1",
+          "value": 3
+        },
+        {
+          "do": "tick",
+          "check": "k1",
+          "on": true
+        },
+        {
+          "do": "comment",
+          "text": "Good"
+        },
+        {
+          "do": "status",
+          "status": "LATE"
+        },
+        {
+          "do": "return"
+        },
+        {
+          "expect": {
+            "state": "returned",
+            "student": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": "Good",
+              "tags": {},
+              "criteria": {
+                "c1": {
+                  "value": 3,
+                  "modifier": 0,
+                  "comment": null,
+                  "beyond": null
+                }
+              },
+              "checks": ["k1"]
+            },
+            "status": "LATE",
+            "previous": null,
+            "updated": false
+          }
+        },
+        {
+          "do": "clear"
+        },
+        {
+          "expect": {
+            "state": "draft",
+            "student": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": "Good",
+              "tags": {},
+              "criteria": {
+                "c1": {
+                  "value": 3,
+                  "modifier": 0,
+                  "comment": null,
+                  "beyond": null
+                }
+              },
+              "checks": ["k1"]
+            },
+            "status": "LATE",
+            "previous": null,
+            "updated": false
+          }
+        },
+        {
+          "do": "return"
+        },
+        {
+          "expect": {
+            "state": "returned",
+            "student": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": "Good",
+              "tags": {},
+              "criteria": {},
+              "checks": ["k1"]
+            },
+            "status": "LATE",
+            "previous": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": "Good",
+              "tags": {},
+              "criteria": {
+                "c1": {
+                  "value": 3,
+                  "modifier": 0,
+                  "comment": null,
+                  "beyond": null
+                }
+              },
+              "checks": ["k1"]
+            },
+            "updated": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "A level cleared while its comment stays",
+      "class": {
+        "student_page": true,
+        "return_grades": "on_return"
+      },
+      "work": "competencies",
+      "steps": [
+        {
+          "do": "level",
+          "tag": "t1",
+          "value": 3,
+          "comment": "Say why"
+        },
+        {
+          "do": "return"
+        },
+        {
+          "do": "level",
+          "tag": "t1",
+          "value": 0
+        },
+        {
+          "expect": {
+            "state": "draft",
+            "student": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {
+                "t1": {
+                  "value": 3,
+                  "modifier": 0,
+                  "comment": "Say why"
+                }
+              },
+              "criteria": {},
+              "checks": []
+            },
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        },
+        {
+          "do": "return"
+        },
+        {
+          "expect": {
+            "state": "returned",
+            "student": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {
+                "t1": {
+                  "value": null,
+                  "modifier": 0,
+                  "comment": "Say why"
+                }
+              },
+              "criteria": {},
+              "checks": []
+            },
+            "status": null,
+            "previous": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {
+                "t1": {
+                  "value": 3,
+                  "modifier": 0,
+                  "comment": "Say why"
+                }
+              },
+              "criteria": {},
+              "checks": []
+            },
+            "updated": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "Points of 0 are a grade",
+      "class": {
+        "student_page": true,
+        "return_grades": "on_return"
+      },
+      "work": "points",
+      "steps": [
+        {
+          "do": "score",
+          "value": 0
+        },
+        {
+          "expect": {
+            "state": "draft",
+            "student": null,
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        },
+        {
+          "do": "return"
+        },
+        {
+          "expect": {
+            "state": "returned",
+            "student": {
+              "v": 1,
+              "value": 0,
+              "modifier": 0,
+              "comment": null,
+              "tags": {},
+              "criteria": {},
+              "checks": []
+            },
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "An Overall Comment alone is a draft",
+      "class": {
+        "student_page": true,
+        "return_grades": "on_return"
+      },
+      "work": "competencies",
+      "steps": [
+        {
+          "do": "comment",
+          "text": "See me"
+        },
+        {
+          "expect": {
+            "state": "draft",
+            "student": null,
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        },
+        {
+          "do": "return"
+        },
+        {
+          "expect": {
+            "state": "returned",
+            "student": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": "See me",
+              "tags": {},
+              "criteria": {},
+              "checks": []
+            },
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "A tick alone is a draft",
+      "class": {
+        "student_page": true,
+        "return_grades": "on_return"
+      },
+      "work": "rubric",
+      "steps": [
+        {
+          "do": "tick",
+          "check": "k1",
+          "on": true
+        },
+        {
+          "expect": {
+            "state": "draft",
+            "student": null,
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        },
+        {
+          "do": "return"
+        },
+        {
+          "expect": {
+            "state": "returned",
+            "student": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {},
+              "criteria": {},
+              "checks": ["k1"]
+            },
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "A criterion note alone, with no level, is a draft",
+      "class": {
+        "student_page": true,
+        "return_grades": "on_return"
+      },
+      "work": "rubric",
+      "steps": [
+        {
+          "do": "criterion",
+          "criterion": "c1",
+          "value": 0,
+          "comment": "Check the units"
+        },
+        {
+          "expect": {
+            "state": "draft",
+            "student": null,
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        },
+        {
+          "do": "return"
+        },
+        {
+          "expect": {
+            "state": "returned",
+            "student": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {},
+              "criteria": {
+                "c1": {
+                  "value": null,
+                  "modifier": 0,
+                  "comment": "Check the units",
+                  "beyond": null
+                }
+              },
+              "checks": []
+            },
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "A comment of only spaces is blank: no draft",
+      "class": {
+        "student_page": true,
+        "return_grades": "on_return"
+      },
+      "work": "competencies",
+      "steps": [
+        {
+          "do": "comment",
+          "text": "   "
+        },
+        {
+          "expect": {
+            "state": "none",
+            "student": null,
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "A + or - alone is a change",
+      "class": {
+        "student_page": true,
+        "return_grades": "on_return"
+      },
+      "work": "competencies",
+      "steps": [
+        {
+          "do": "level",
+          "tag": "t1",
+          "value": 3
+        },
+        {
+          "do": "return"
+        },
+        {
+          "do": "level",
+          "tag": "t1",
+          "value": 3,
+          "modifier": 1
+        },
+        {
+          "expect": {
+            "state": "draft",
+            "student": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {
+                "t1": {
+                  "value": 3,
+                  "modifier": 0,
+                  "comment": null
+                }
+              },
+              "criteria": {},
+              "checks": []
+            },
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        },
+        {
+          "do": "return"
+        },
+        {
+          "expect": {
+            "state": "returned",
+            "student": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {
+                "t1": {
+                  "value": 3,
+                  "modifier": 1,
+                  "comment": null
+                }
+              },
+              "criteria": {},
+              "checks": []
+            },
+            "status": null,
+            "previous": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {
+                "t1": {
+                  "value": 3,
+                  "modifier": 0,
+                  "comment": null
+                }
+              },
+              "criteria": {},
+              "checks": []
+            },
+            "updated": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "Updated stays after the student opens the piece",
+      "class": {
+        "student_page": true,
+        "return_grades": "on_return"
+      },
+      "work": "competencies",
+      "steps": [
+        {
+          "do": "level",
+          "tag": "t1",
+          "value": 3
+        },
+        {
+          "do": "return"
+        },
+        {
+          "do": "level",
+          "tag": "t1",
+          "value": 4
+        },
+        {
+          "do": "return"
+        },
+        {
+          "do": "seen"
+        },
+        {
+          "expect": {
+            "state": "returned",
+            "student": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {
+                "t1": {
+                  "value": 4,
+                  "modifier": 0,
+                  "comment": null
+                }
+              },
+              "criteria": {},
+              "checks": []
+            },
+            "status": null,
+            "previous": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {
+                "t1": {
+                  "value": 3,
+                  "modifier": 0,
+                  "comment": null
+                }
+              },
+              "criteria": {},
+              "checks": []
+            },
+            "updated": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "As Soon As I Save: a second change after a second look is Updated from what they last saw",
+      "class": {
+        "student_page": true,
+        "return_grades": "on_save"
+      },
+      "work": "competencies",
+      "steps": [
+        {
+          "do": "level",
+          "tag": "t1",
+          "value": 3
+        },
+        {
+          "do": "seen"
+        },
+        {
+          "do": "level",
+          "tag": "t1",
+          "value": 4
+        },
+        {
+          "do": "seen"
+        },
+        {
+          "do": "level",
+          "tag": "t1",
+          "value": 2
+        },
+        {
+          "expect": {
+            "state": "returned",
+            "student": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {
+                "t1": {
+                  "value": 2,
+                  "modifier": 0,
+                  "comment": null
+                }
+              },
+              "criteria": {},
+              "checks": []
+            },
+            "status": null,
+            "previous": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {
+                "t1": {
+                  "value": 4,
+                  "modifier": 0,
+                  "comment": null
+                }
+              },
+              "criteria": {},
+              "checks": []
+            },
+            "updated": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "Return in an As Soon As I Save class changes nothing",
+      "class": {
+        "student_page": true,
+        "return_grades": "on_save"
+      },
+      "work": "competencies",
+      "steps": [
+        {
+          "do": "level",
+          "tag": "t1",
+          "value": 3
+        },
+        {
+          "do": "return"
+        },
+        {
+          "expect": {
+            "state": "returned",
+            "student": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {
+                "t1": {
+                  "value": 3,
+                  "modifier": 0,
+                  "comment": null
+                }
+              },
+              "criteria": {},
+              "checks": []
+            },
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Edit a Copy moves a returned grade to the copy rubric and it stays Returned; a change after that waits",
+      "class": {
+        "student_page": true,
+        "return_grades": "on_return"
+      },
+      "work": "rubric",
+      "steps": [
+        {
+          "do": "criterion",
+          "criterion": "c1",
+          "value": 3,
+          "comment": "Number the steps"
+        },
+        {
+          "do": "criterion",
+          "criterion": "c2",
+          "value": 2
+        },
+        {
+          "do": "tick",
+          "check": "k1",
+          "on": true
+        },
+        {
+          "do": "return"
+        },
+        {
+          "do": "move_rubric"
+        },
+        {
+          "expect": {
+            "state": "returned",
+            "student": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {},
+              "criteria": {
+                "c3": {
+                  "value": 3,
+                  "modifier": 0,
+                  "comment": "Number the steps",
+                  "beyond": null
+                },
+                "c4": {
+                  "value": 2,
+                  "modifier": 0,
+                  "comment": null,
+                  "beyond": null
+                }
+              },
+              "checks": ["k3"]
+            },
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        },
+        {
+          "do": "criterion",
+          "criterion": "c3",
+          "value": 4
+        },
+        {
+          "expect": {
+            "state": "draft",
+            "student": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {},
+              "criteria": {
+                "c3": {
+                  "value": 3,
+                  "modifier": 0,
+                  "comment": "Number the steps",
+                  "beyond": null
+                },
+                "c4": {
+                  "value": 2,
+                  "modifier": 0,
+                  "comment": null,
+                  "beyond": null
+                }
+              },
+              "checks": ["k3"]
+            },
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Deleting a criterion: the grade waits as a draft, and the student page drops the criterion at once",
+      "class": {
+        "student_page": true,
+        "return_grades": "on_return"
+      },
+      "work": "rubric",
+      "steps": [
+        {
+          "do": "criterion",
+          "criterion": "c1",
+          "value": 3
+        },
+        {
+          "do": "criterion",
+          "criterion": "c2",
+          "value": 2
+        },
+        {
+          "do": "tick",
+          "check": "k1",
+          "on": true
+        },
+        {
+          "do": "return"
+        },
+        {
+          "do": "delete",
+          "what": "criterion",
+          "id": "c1"
+        },
+        {
+          "expect": {
+            "state": "draft",
+            "student": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {},
+              "criteria": {
+                "c2": {
+                  "value": 2,
+                  "modifier": 0,
+                  "comment": null,
+                  "beyond": null
+                }
+              },
+              "checks": []
+            },
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        },
+        {
+          "do": "return"
+        },
+        {
+          "expect": {
+            "state": "returned",
+            "student": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {},
+              "criteria": {
+                "c2": {
+                  "value": 2,
+                  "modifier": 0,
+                  "comment": null,
+                  "beyond": null
+                }
+              },
+              "checks": []
+            },
+            "status": null,
+            "previous": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {},
+              "criteria": {
+                "c2": {
+                  "value": 2,
+                  "modifier": 0,
+                  "comment": null,
+                  "beyond": null
+                }
+              },
+              "checks": []
+            },
+            "updated": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "Deleting a competency: the grade waits as a draft, and the student page drops the competency at once",
+      "class": {
+        "student_page": true,
+        "return_grades": "on_return"
+      },
+      "work": "competencies",
+      "steps": [
+        {
+          "do": "level",
+          "tag": "t1",
+          "value": 3
+        },
+        {
+          "do": "level",
+          "tag": "t2",
+          "value": 2
+        },
+        {
+          "do": "return"
+        },
+        {
+          "do": "delete",
+          "what": "tag",
+          "id": "t1"
+        },
+        {
+          "expect": {
+            "state": "draft",
+            "student": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {
+                "t2": {
+                  "value": 2,
+                  "modifier": 0,
+                  "comment": null
+                }
+              },
+              "criteria": {},
+              "checks": []
+            },
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Deleting a checkbox: the grade waits as a draft, and the student page drops the tick at once",
+      "class": {
+        "student_page": true,
+        "return_grades": "on_return"
+      },
+      "work": "rubric",
+      "steps": [
+        {
+          "do": "criterion",
+          "criterion": "c1",
+          "value": 3
+        },
+        {
+          "do": "tick",
+          "check": "k1",
+          "on": true
+        },
+        {
+          "do": "return"
+        },
+        {
+          "do": "delete",
+          "what": "check",
+          "id": "k1"
+        },
+        {
+          "expect": {
+            "state": "draft",
+            "student": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {},
+              "criteria": {
+                "c1": {
+                  "value": 3,
+                  "modifier": 0,
+                  "comment": null,
+                  "beyond": null
+                }
+              },
+              "checks": []
+            },
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Two students returned in one action",
+      "class": {
+        "student_page": true,
+        "return_grades": "on_return"
+      },
+      "work": "points",
+      "steps": [
+        {
+          "do": "score",
+          "value": 6
+        },
+        {
+          "do": "score",
+          "value": 9,
+          "student": "s2"
+        },
+        {
+          "do": "return",
+          "students": ["s1", "s2"]
+        },
+        {
+          "expect": {
+            "state": "returned",
+            "student": {
+              "v": 1,
+              "value": 6,
+              "modifier": 0,
+              "comment": null,
+              "tags": {},
+              "criteria": {},
+              "checks": []
+            },
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        },
+        {
+          "expect": {
+            "for": "s2",
+            "state": "returned",
+            "student": {
+              "v": 1,
+              "value": 9,
+              "modifier": 0,
+              "comment": null,
+              "tags": {},
+              "criteria": {},
+              "checks": []
+            },
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "The returned date holds while a draft waits, and moves when it is returned",
+      "class": {
+        "student_page": true,
+        "return_grades": "on_return"
+      },
+      "work": "competencies",
+      "steps": [
+        {
+          "do": "level",
+          "tag": "t1",
+          "value": 3
+        },
+        {
+          "do": "return"
+        },
+        {
+          "expect": {
+            "state": "returned",
+            "student": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {
+                "t1": {
+                  "value": 3,
+                  "modifier": 0,
+                  "comment": null
+                }
+              },
+              "criteria": {},
+              "checks": []
+            },
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        },
+        {
+          "do": "level",
+          "tag": "t1",
+          "value": 4
+        },
+        {
+          "expect": {
+            "state": "draft",
+            "student": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {
+                "t1": {
+                  "value": 3,
+                  "modifier": 0,
+                  "comment": null
+                }
+              },
+              "criteria": {},
+              "checks": []
+            },
+            "status": null,
+            "previous": null,
+            "updated": false,
+            "returned_at": "unchanged"
+          }
+        },
+        {
+          "do": "return"
+        },
+        {
+          "expect": {
+            "state": "returned",
+            "student": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {
+                "t1": {
+                  "value": 4,
+                  "modifier": 0,
+                  "comment": null
+                }
+              },
+              "criteria": {},
+              "checks": []
+            },
+            "status": null,
+            "previous": {
+              "v": 1,
+              "value": null,
+              "modifier": 0,
+              "comment": null,
+              "tags": {
+                "t1": {
+                  "value": 3,
+                  "modifier": 0,
+                  "comment": null
+                }
+              },
+              "criteria": {},
+              "checks": []
+            },
+            "updated": true,
+            "returned_at": "changed"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Missing wins at once: a returned grade that is cleared and marked Missing shows no result, and comes back if Missing is taken off",
+      "class": {
+        "student_page": true,
+        "return_grades": "on_return"
+      },
+      "work": "points",
+      "steps": [
+        {
+          "do": "score",
+          "value": 7
+        },
+        {
+          "do": "return"
+        },
+        {
+          "do": "clear"
+        },
+        {
+          "expect": {
+            "state": "draft",
+            "student": {
+              "v": 1,
+              "value": 7,
+              "modifier": 0,
+              "comment": null,
+              "tags": {},
+              "criteria": {},
+              "checks": []
+            },
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        },
+        {
+          "do": "status",
+          "status": "NS"
+        },
+        {
+          "expect": {
+            "state": "draft",
+            "student": null,
+            "status": "NS",
+            "previous": null,
+            "updated": false
+          }
+        },
+        {
+          "do": "status",
+          "status": null
+        },
+        {
+          "expect": {
+            "state": "draft",
+            "student": {
+              "v": 1,
+              "value": 7,
+              "modifier": 0,
+              "comment": null,
+              "tags": {},
+              "criteria": {},
+              "checks": []
+            },
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        },
+        {
+          "do": "status",
+          "status": "NS"
+        },
+        {
+          "do": "return"
+        },
+        {
+          "expect": {
+            "state": "none",
+            "student": null,
+            "status": "NS",
+            "previous": null,
+            "updated": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Excused wins at once too: no result shows while a piece is Excused, and the returned grade comes back when it is taken off",
+      "class": {
+        "student_page": true,
+        "return_grades": "on_return"
+      },
+      "work": "points",
+      "steps": [
+        {
+          "do": "score",
+          "value": 7
+        },
+        {
+          "do": "return"
+        },
+        {
+          "do": "status",
+          "status": "EXC"
+        },
+        {
+          "expect": {
+            "state": "returned",
+            "student": null,
+            "status": "EXC",
+            "previous": null,
+            "updated": false
+          }
+        },
+        {
+          "do": "status",
+          "status": null
+        },
+        {
+          "expect": {
+            "state": "returned",
+            "student": {
+              "v": 1,
+              "value": 7,
+              "modifier": 0,
+              "comment": null,
+              "tags": {},
+              "criteria": {},
+              "checks": []
+            },
+            "status": null,
+            "previous": null,
+            "updated": false
           }
         }
       ]

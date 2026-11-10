@@ -14,10 +14,16 @@
  *    cleared one counts until the clear is returned; Missing wins at once;
  *    Excused leaves the piece out of both sets; Late keeps the score.
  * 3. The app's builder against the reference builder calc.js was tested
- *    with (tests/helpers/returned-scores.js), with a few drafts. They
- *    differ in one place, on purpose: points work this device keeps once
- *    per competency comes back shaped that way.
- * 4. It is cheap: built once for a working copy, and again after a save.
+ *    with (tests/helpers/returned-scores.js), with a few drafts: the same
+ *    levels, comments and order. The app's goes further in two ways the
+ *    S0-F1 review asked for: a returned grade comes back as the entries
+ *    getScores held (the reference reads points work kept under several
+ *    competencies back under one), and a class that holds grades whose
+ *    rows are not loaded throws (tests/grade-return-data.test.js).
+ * 4. Entry for entry: with every grade in the class returned and one then
+ *    changed, the returned set is the getScores of before the change, for
+ *    a piece of every assessment in turn.
+ * 5. It is cheap: built once for a working copy, and again after a save.
  *
  * Science 8 is loaded first: Demo Mode only seeds its class when no other
  * class is loaded. The clock is frozen as in the golden test.
@@ -60,6 +66,16 @@ function grades(cid) {
 const allWork = cid => (clearProfCache(), grades(cid));
 const returnedOnly = cid => (clearProfCache(), withReturnedOnly(() => grades(cid)));
 const entriesOn = (cid, sid, aid) => (getScores(cid)[sid] || []).filter(e => e.assessmentId === aid);
+// What grade math and the screens read of each entry, in order.
+const read = set =>
+  Object.fromEntries(
+    Object.keys(set).map(sid => [
+      sid,
+      set[sid].map(e =>
+        [e.assessmentId, e.tagId, e.score, e.mod || 0, e.note || '', e.critNote || '', e.critBeyond || ''].join(' | '),
+      ),
+    ]),
+  );
 const graded = (cid, sid, a) => entriesOn(cid, sid, a.id).some(e => isScoreEntered(a, e));
 
 // Rows set by hand, as the reference builder's tests set them.
@@ -114,12 +130,15 @@ describe.each(CLASSES)('%s', (name, load) => {
     // 1. The invariant, recorded before anything else touches the class.
     const real = globalThis.getReturnedScores;
     const realBuild = GradeState.returnedScores;
+    const settings = structuredClone(getCourseConfig(cid));
     globalThis.getReturnedScores = id => (seen.reads++, real(id));
     GradeState.returnedScores = (...args) => (seen.builds++, realBuild(...args));
     try {
       record.allWork[name] = recordClass(cid).record;
       expect(seen.reads).toBe(0);
       record.noRows[name] = withReturnedOnly(() => recordClass(cid)).record;
+      // Every grade with a returned row, in a class that holds grades.
+      setStudentPageSwitch(cid, true);
       setRows(cid, everyGradeReturned(cid));
       record.everyRowReturned[name] = withReturnedOnly(() => recordClass(cid)).record;
       seen.same = real(cid) === getScores(cid);
@@ -127,6 +146,7 @@ describe.each(CLASSES)('%s', (name, load) => {
       globalThis.getReturnedScores = real;
       GradeState.returnedScores = realBuild;
       setRows(cid, undefined);
+      saveCourseConfig(cid, settings);
     }
 
     setActiveTerm(cid, null);
@@ -309,6 +329,7 @@ describe.each(CLASSES)('%s', (name, load) => {
 
     it('agrees with the reference builder on a class with a few drafts', () => {
       const cid = ctx.cid;
+      hold();
       const rows = {};
       const set = (aid, sid, row) => ((rows[aid] = rows[aid] || {})[sid] = row);
       const used = {};
@@ -331,18 +352,65 @@ describe.each(CLASSES)('%s', (name, load) => {
       }
       setRows(cid, rows);
       const real = getReturnedScores(cid);
-      expect(real).toEqual(referenceSet(cid, getScores(cid), rows));
-      expect(real).not.toEqual(getScores(cid));
+      expect(read(real)).toEqual(read(referenceSet(cid, getScores(cid), rows)));
+      expect(read(real)).not.toEqual(read(getScores(cid)));
+      // The cleared piece is back in its assessment's place, not at the end.
+      const mine = real[cleared.sid].map(e => e.assessmentId);
+      const order = getAssessments(cid).map(a => a.id);
+      expect(mine.indexOf(cleared.a.id)).toBeGreaterThanOrEqual(0);
+      expect(mine.slice().sort((x, y) => order.indexOf(x) - order.indexOf(y))).toEqual(mine);
       // With a returned row for every other grade, as the backfill leaves a class.
       const full = everyGradeReturned(cid);
       Object.keys(rows).forEach(aid => (full[aid] = Object.assign({}, full[aid], rows[aid])));
       setRows(cid, full);
-      expect(getReturnedScores(cid)).toEqual(referenceSet(cid, getScores(cid), full));
-      // Missing on the cleared piece: both leave it out.
-      getAssignmentStatuses(cid)[cleared.sid + ':' + cleared.a.id] = 'NS';
-      setRows(cid, full);
-      expect(getReturnedScores(cid)).toEqual(referenceSet(cid, getScores(cid), full));
-      expect(getReturnedScores(cid)[cleared.sid].filter(e => e.assessmentId === cleared.a.id)).toEqual([]);
+      expect(read(getReturnedScores(cid))).toEqual(read(referenceSet(cid, getScores(cid), full)));
+      // Missing, then Excused, on the cleared piece: both leave it out.
+      ['NS', 'EXC'].forEach(status => {
+        getAssignmentStatuses(cid)[cleared.sid + ':' + cleared.a.id] = status;
+        setRows(cid, full);
+        expect(read(getReturnedScores(cid))).toEqual(read(referenceSet(cid, getScores(cid), full)));
+        expect(getReturnedScores(cid)[cleared.sid].filter(e => e.assessmentId === cleared.a.id)).toEqual([]);
+      });
+    });
+
+    it('entry for entry: every grade returned, then one changed, is the getScores of before the change', () => {
+      const cid = ctx.cid;
+      const tried = [];
+      getAssessments(cid).forEach(a => {
+        if (isDibelsScored(a)) return;
+        const s = getStudents(cid).find(st => graded(cid, st.id, a) && !getAssignmentStatus(cid, st.id, a.id));
+        if (!s) return;
+        // Every grade has a returned row, as the backfill leaves a class.
+        hold();
+        setRows(cid, everyGradeReturned(cid));
+        const before = structuredClone(getScores(cid));
+        lower(cid, s.id, a);
+        expect(getGradeReturn(cid, s.id, a.id).is_draft, a.title).toBe(true);
+        expect(getScores(cid), a.title).not.toEqual(before);
+        expect(getReturnedScores(cid), a.title).toEqual(before);
+        // Put back as loaded for the next piece.
+        _cache.scores[cid] = structuredClone(loaded.scores);
+        localStorage.setItem('gb-scores-' + cid, JSON.stringify(loaded.scores));
+        tried.push(a.id);
+      });
+      expect(tried.length).toBeGreaterThan(5);
+    });
+
+    it('every grade returned, then a unit test kept under several competencies changed: the golden values are the ones before', () => {
+      const cid = ctx.cid;
+      const several = x => isPoints(x) && scoreTagIds(x).length > 1;
+      if (!getAssessments(cid).some(several)) return expect(name).toBe('eval-history-12');
+      const { a, sid } = find(cid, several);
+      hold();
+      setRows(cid, everyGradeReturned(cid));
+      setPointsScore(cid, sid, a.id, 0);
+      expect(getGradeReturn(cid, sid, a.id).is_draft).toBe(true);
+      // Every view, grading style and switch the golden file records.
+      const now = withReturnedOnly(() => recordClass(cid)).record;
+      expect(differences(canonical(record.allWork[name], ''), canonical(now, ''))).toEqual([]);
+      expect(
+        differences(canonical(record.allWork[name], ''), canonical(recordClass(cid).record, '')).length,
+      ).toBeGreaterThan(0);
     });
 
     it('points work kept once per competency comes back as the entries getScores holds (the Demo class)', () => {
@@ -361,9 +429,18 @@ describe.each(CLASSES)('%s', (name, load) => {
       const back = getReturnedScores(cid)[sid].filter(e => e.assessmentId === a.id);
       expect(back.map(e => [e.tagId, e.score])).toEqual(own.map(e => [e.tagId, points]));
       expect(returnedOnly(cid)).toEqual(before);
-      // The reference builder reads it back as one entry: the one place they differ.
+      // The reference builder reads it back as one entry: where they differ.
       const reference = referenceSet(cid, getScores(cid), getGradeReturns(cid))[sid];
       expect(reference.filter(e => e.assessmentId === a.id).length).toBe(1);
+      // Cleared, with nothing of the student's own to shape it by, it is
+      // carried as the class's other scores on the piece are.
+      setPointsScore(cid, sid, a.id, null);
+      expect(
+        getReturnedScores(cid)
+          [sid].filter(e => e.assessmentId === a.id)
+          .map(e => [e.tagId, e.score]),
+      ).toEqual(own.map(e => [e.tagId, points]));
+      expect(returnedOnly(cid)).toEqual(before);
     });
   });
 });

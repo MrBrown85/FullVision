@@ -9,9 +9,13 @@
  *   grade as it was returned;
  * - a draft never returned: nothing.
  * Statuses are not here. Missing, Excused and Late are never drafts.
- * Missing wins at once (Colin, 2026-11-09): while a piece is Missing, a
- * returned grade under a draft is left out, so its old level stops counting
- * everywhere without a Return.
+ * Missing and Excused win at once (Colin, 2026-11-09): while a piece is
+ * either, a returned grade under a draft is left out, so its old level stops
+ * counting everywhere without a Return.
+ * Where an entry sits matters (grade math breaks a tie between two pieces
+ * of the same date by their order): a returned copy sits where its working
+ * entries sit, and one with no working entry left (a returned grade,
+ * cleared) by its assessment's place in the class's list.
  *
  * The app's own builder (shared/data.js, S0-F2) is held to the same tests,
  * so this one stays small. Rows are in the shape list_course_grade_returns
@@ -37,31 +41,35 @@ export function entriesFromCopy(cid, sid, aid, copy) {
 export function returnedScores(cid, working, gradeReturns) {
   const rows = gradeReturns || {};
   const rowOf = (sid, aid) => (rows[aid] || {})[sid] || null;
+  const rank = {};
+  getAssessments(cid).forEach((a, i) => (rank[a.id] = i));
   const sids = new Set(Object.keys(working || {}));
   Object.keys(rows).forEach(aid => Object.keys(rows[aid]).forEach(sid => sids.add(sid)));
   const out = {};
   sids.forEach(sid => {
     const list = [];
     const placed = {};
-    const place = aid => {
-      if (placed[aid]) return;
+    // Never returned: nothing. Returned before: the grade as it was returned,
+    // unless the piece is Missing or Excused now.
+    const returnedOf = aid => {
       placed[aid] = true;
       const copy = rowOf(sid, aid).returned_copy;
-      // Never returned: nothing. Returned before: the grade as it was returned,
-      // unless the piece is Missing now.
-      if (copy && getAssignmentStatus(cid, sid, aid) !== 'NS')
-        entriesFromCopy(cid, sid, aid, copy).forEach(e => list.push(e));
+      const status = getAssignmentStatus(cid, sid, aid);
+      return copy && status !== 'NS' && status !== 'EXC' ? entriesFromCopy(cid, sid, aid, copy) : [];
     };
     ((working || {})[sid] || []).forEach(entry => {
       const row = entry ? rowOf(sid, entry.assessmentId) : null;
-      if (row && row.is_draft) place(entry.assessmentId);
       // Nothing is a draft: the working copy.
-      else list.push(entry);
+      if (!row || !row.is_draft) list.push(entry);
+      else if (!placed[entry.assessmentId]) list.push(...returnedOf(entry.assessmentId));
     });
-    // A returned grade cleared since has no working entry; it still counts.
+    // A returned grade cleared since has no working entry; it still counts,
+    // in its assessment's place: before the first entry of a later one.
     Object.keys(rows).forEach(aid => {
       const row = rowOf(sid, aid);
-      if (row && row.is_draft) place(aid);
+      if (!row || !row.is_draft || placed[aid]) return;
+      const later = list.findIndex(e => rank[e.assessmentId] > rank[aid]);
+      list.splice(later < 0 ? list.length : later, 0, ...returnedOf(aid));
     });
     out[sid] = list;
   });
