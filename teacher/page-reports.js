@@ -24,6 +24,7 @@ window.PageReports = (function () {
   _measureBlockSizes = _inReportScores(_measureBlockSizes);
   _classSummary = _inReportScores(_classSummary);
   _blockHtml = _inReportScores(_blockHtml);
+  _draftsInPrint = _inReportScores(_draftsInPrint);
   function _reportSet() {
     return ReportScores.reportScoreSet('progress');
   }
@@ -1263,10 +1264,49 @@ window.PageReports = (function () {
     }
   }
 
+  /* The drafts a print of these students would leave out, on the work the
+     report counts (the year to date as of the report's term), or null
+     when the class does not hold grades or none is a draft
+     (teacher/drafts-before-print.js). */
+  function _draftsInPrint(ids) {
+    var cid = activeCourse;
+    if (!DraftsBeforePrint.holds(cid)) return null;
+    var aids = (getAssessments(cid) || [])
+      .filter(function (a) {
+        return assessmentInYearToDate(cid, a);
+      })
+      .map(function (a) {
+        return a.id;
+      });
+    return DraftsBeforePrint.find(cid, aids, ids);
+  }
+
+  /* Print in the dialog. In a class that holds grades, when a student in
+     the print has a draft the report would show, it asks first (S2-F1):
+     Return Them, Then Print returns exactly those drafts and prints with
+     them in; Print Without Them prints the returned grades; Cancel goes
+     back to the dialog and does nothing. */
   function _issueFromDialog(overlay) {
     var c = _issueState && _issueState.counts;
     if (!c) return;
     var who = (overlay.querySelector('input[name="issue-who"]:checked') || {}).value || 'all';
+    var found = _draftsInPrint(who === 'changed' ? c.changed : c.ids);
+    if (!found) return _issueAndPrint(c, who);
+    DraftsBeforePrint.ask(found, 'reports', function (choice) {
+      if (choice === 'cancel') return;
+      if (choice === 'return') {
+        DraftsBeforePrint.returnAll(found);
+        // Drawn again from the grades now returned, so what prints and the copy kept hold them.
+        renderReportPreview();
+        var now = _issueCounts();
+        if (who === 'changed') now.changed = c.changed;
+        c = now;
+      }
+      _issueAndPrint(c, who);
+    });
+  }
+
+  function _issueAndPrint(c, who) {
     var doPrint = true;
     closeIssueDialog(true);
     var ids = who === 'changed' ? c.changed : c.ids;

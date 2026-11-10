@@ -3284,6 +3284,71 @@ body.offline-active #app-dock {
 .confirm-ok.primary:hover {
   filter: brightness(0.85);
 }
+/* Asked before printing grades a class holds as drafts (teacher/drafts-before-print.js). */
+.drafts-print-card {
+  max-width: 480px;
+}
+.drafts-print-list {
+  list-style: none;
+  margin: 4px 0 12px;
+  padding: 0;
+  max-height: 40vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.drafts-print-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--font-base);
+  font-size: var(--text-md);
+  line-height: 1.4;
+}
+.drafts-print-piece {
+  font-weight: 600;
+  color: var(--text);
+}
+.drafts-print-who {
+  color: var(--text-2);
+}
+.drafts-print-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.drafts-print-actions button {
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  font-weight: 600;
+  min-height: 40px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+}
+.drafts-print-give {
+  background: var(--active);
+  color: #fff;
+}
+.drafts-print-give:hover {
+  filter: brightness(0.85);
+}
+.drafts-print-without {
+  background: var(--active-light);
+  color: var(--active);
+}
+.drafts-print-without:hover {
+  filter: brightness(0.95);
+}
+.drafts-print-cancel {
+  background: transparent;
+  color: var(--text-2);
+}
+.drafts-print-cancel:hover {
+  background: var(--active-light);
+}
 @keyframes fade-in {
   from {
     opacity: 0;

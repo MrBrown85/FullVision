@@ -1739,8 +1739,51 @@
     _redraw(overlay, 'input[data-pick="' + sid + '"]');
   }
 
+  /* The students this print could hold once their grades are returned:
+     the ones picked; everyone; with Not Printed Yet, everyone not printed
+     (a student whose only grade is a draft has nothing printed); with
+     Changed Since Printed, everyone printed before. Their drafts on the
+     piece are what Print asks about. */
+  function _mayPrint(cid, aid, opts) {
+    var students = _rosterOrder(cid);
+    if (opts.students === 'pick') {
+      var picked = opts.picked || [];
+      students = students.filter(function (s) {
+        return picked.indexOf(s.id) >= 0;
+      });
+    } else if (opts.students === 'unprinted' || opts.students === 'changed') {
+      var kinds = opts.students === 'unprinted' ? ['unprinted', 'unscored'] : ['changed', 'printed'];
+      students = students.filter(function (s) {
+        return kinds.indexOf(printState(cid, aid, s.id).kind) >= 0;
+      });
+    }
+    return students.map(function (s) {
+      return s.id;
+    });
+  }
+
+  /* Print in the dialog. In a class that holds grades the handout shows
+     returned grades only; when a student in the print has a draft on the
+     piece it asks first (DECISIONS, "Student page build rulings
+     (2026-11-10)" 6; teacher/drafts-before-print.js): Return It, Then
+     Print returns exactly those drafts and prints with them in; Print
+     Without It prints the returned grades; Cancel goes back to this
+     dialog and does nothing. */
   function _printFromDialog() {
     if (!_state) return;
+    var cid = _state.cid,
+      aid = _state.aid,
+      opts = _state.opts;
+    var found = aid && opts.mode === 'completed' ? DraftsBeforePrint.find(cid, [aid], _mayPrint(cid, aid, opts)) : null;
+    if (!found) return _printAndMark();
+    DraftsBeforePrint.ask(found, 'handout', function (choice) {
+      if (choice === 'cancel' || !_state) return;
+      if (choice === 'return') DraftsBeforePrint.returnAll(found);
+      _printAndMark();
+    });
+  }
+
+  function _printAndMark() {
     var cid = _state.cid,
       aid = _state.aid,
       opts = _state.opts,

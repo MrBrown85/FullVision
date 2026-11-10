@@ -17,7 +17,8 @@ window.ReportPreview = (function () {
         : allStudents.filter(function (s) {
             return opts.selectedStudentIds.includes(s.id);
           });
-    var allScoresObj = getScores(cid);
+    // The set the report is drawn from: a class whose every grade is still a draft has no report data yet.
+    var allScoresObj = ReportScores.getScores(cid);
     var hasAnyScores = Object.values(allScoresObj).some(function (arr) {
       return (
         Array.isArray(arr) &&

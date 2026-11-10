@@ -165,17 +165,11 @@ function aroundTheSeam(source) {
   return found;
 }
 
-/* The reads left outside the seam, each with its reason. Anything else,
-   or one more of these, fails.
-
-   teacher/report-preview.js: asks whether the class has any score at all,
-   to choose between the reports and "No report data yet". It prints no
-   grade. The file was outside S2-T1's files; it is drawn inside
-   withReportScores by page-reports.js, and moving this one read to
-   ReportScores.getScores is a one-line change for S2-F1. */
-const LEFT_OUTSIDE = {
-  'teacher/report-preview.js': { getScores: 1 },
-};
+/* The reads left outside the seam, each with its reason. Anything else
+   fails. None is left: S2-F1 moved the last one (teacher/report-preview.js,
+   whether the class has any score at all, for "No report data yet") to
+   ReportScores.getScores. */
+const LEFT_OUTSIDE = {};
 
 /* The functions each file runs inside withReportScores, by surface: the
    lines `name = _inReportScores(name)` or `name = ReportScores.scoped(…)`
@@ -278,6 +272,7 @@ const DOORS = {
       '_measureBlockSizes',
       '_classSummary',
       '_blockHtml',
+      '_draftsInPrint',
     ],
   },
   'teacher/comment-bank.js': { surface: 'questionnaire', names: ['facts', 'compsOf', 'markedCounts'] },
