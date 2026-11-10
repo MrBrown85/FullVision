@@ -676,6 +676,26 @@
     if (token) ask('done', { session: token });
   }
 
+  /* Done on the server, told once however many tabs have the page open.
+     Two tabs that go idle do so at the same moment, and each would tell the
+     server. The browser's own lock decides between them: the first tab to
+     ask for the session's lock tells the server and keeps the lock, and
+     the others, finding it taken, say nothing. A browser without locks
+     tells the server from each tab, which the server takes as one. */
+  function endOnce(token) {
+    var locks = !S.demo && typeof navigator !== 'undefined' && navigator.locks;
+    if (!token || !locks || typeof locks.request !== 'function') {
+      endOnServer(token);
+      return;
+    }
+    locks.request('fv-s-done-' + token, { ifAvailable: true }, function (lock) {
+      if (!lock) return undefined;
+      endOnServer(token);
+      // Kept for as long as this tab lives.
+      return new Promise(function () {});
+    });
+  }
+
   /* A card was recognised: whoever was signed in on this device is signed
      out now, on the server and on the device, before anything about the
      card is drawn. It makes no difference whether the card will open: one
@@ -724,7 +744,7 @@
     var s = session;
     var stored = s && s.kept ? readStored() : null;
     var others = !!(stored && stored.token !== s.token);
-    if (s && (!s.kept || (stored && !others))) endOnServer(s.token);
+    if (s && (!s.kept || (stored && !others))) endOnce(s.token);
     leave(message, others ? false : undefined);
   }
 
@@ -807,7 +827,13 @@
   }
   function uncover() {
     checkSession();
-    if (typeof document !== 'undefined') document.documentElement.classList.remove('sp-away');
+    if (typeof document === 'undefined') return;
+    // Still a tab nobody is looking at (the page finished loading in the background).
+    if (document.visibilityState === 'hidden') {
+      cover();
+      return;
+    }
+    document.documentElement.classList.remove('sp-away');
   }
 
   /* ── What the student has opened ───────────────────────────── */
@@ -1196,7 +1222,7 @@
     var why = over(stored);
     if (why) {
       // Idle ends it as Done does: the server is told first.
-      if (why === 'idle') endOnServer(stored.token);
+      if (why === 'idle') endOnce(stored.token);
       leave(MESSAGES.signed_out);
       return true;
     }

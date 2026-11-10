@@ -1266,7 +1266,10 @@ describe('the page sends nothing anywhere else', () => {
     expect(html).toContain('<meta name="referrer" content="no-referrer" />');
     for (const f of ['s/app.js', 's/assignments.js', 's/student-data.js']) {
       const src = read(f);
-      expect(src, f).not.toMatch(/Sentry|sendBeacon|navigator\.|document\.cookie|indexedDB|sessionStorage/);
+      // The one thing asked of `navigator` is the browser's lock that keeps Done to one tab.
+      expect(src.replace(/navigator\.locks\b/g, ''), f).not.toMatch(
+        /Sentry|sendBeacon|navigator\.|document\.cookie|indexedDB|sessionStorage/,
+      );
       expect(src, f).not.toMatch(/https?:\/\//);
     }
     // One key in localStorage, written in one place.

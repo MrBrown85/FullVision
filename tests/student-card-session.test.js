@@ -457,6 +457,10 @@ describe('a session’s end is checked before the list can be drawn again', () =
     expect(covered()).toBe(false);
     page.hide();
     expect(covered()).toBe(true);
+    // Nothing uncovers it while it is still hidden.
+    page.fire('pageshow');
+    page.fire('focus');
+    expect(covered()).toBe(true);
     page.show();
     expect(covered()).toBe(false);
     expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
@@ -467,7 +471,9 @@ describe('a session’s end is checked before the list can be drawn again', () =
     async how => {
       const dev = school({ lasts: 10 * MIN });
       const page = await signIn(dev);
-      page.hide();
+      // The tab is hidden, or (pageshow) the page is left and kept for Back.
+      if (how === 'pageshow') page.fire('pagehide');
+      else page.hide();
       page.advance(11 * MIN); // the timer could not run
       // What is on the page at the moment it is uncovered.
       let atUncover = null;
@@ -481,7 +487,8 @@ describe('a session’s end is checked before the list can be drawn again', () =
       else page.fire(how);
       expect(page.root().querySelector('.sp-row')).toBeNull();
       expect(page.root().querySelector('.sp-msg').textContent).toBe(SIGNED_OUT);
-      if (how !== 'focus') expect(atUncover).toBe(0);
+      if (how === 'focus') page.show();
+      expect(atUncover).toBe(0);
       expect(dev.store).toEqual({});
     },
   );
@@ -598,7 +605,8 @@ describe('fifteen minutes with no activity ends the session, as Done does', () =
         expect(frames).toEqual([0, 0]);
         expect(routes(page)).toEqual(['done']);
       } else {
-        page.hide();
+        if (how === 'pageshow') page.fire('pagehide');
+        else page.hide();
         page.advance(16 * MIN); // the lid was closed: no timer ran
         let atUncover = null;
         const html = page.ctx.document.documentElement;
