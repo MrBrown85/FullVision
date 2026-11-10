@@ -22,9 +22,13 @@
  * Each case below holds the same thing: with the left-over entry in the
  * data, every number is exactly what it is with that entry deleted.
  *
- * Two things this rule does not reach are pinned at the end and marked
- * FLAGGED: calc.js cannot see them from the score entries alone, and they
- * are left exactly as they were.
+ * Work switched to points or Complete/Incomplete has its own section: a
+ * criterion level left behind is never read as the points score or the
+ * mark, and which entry is the score does not depend on the order entries
+ * are stored in.
+ *
+ * States this rule cannot settle from the score entries alone are pinned
+ * and marked FLAGGED; each needs the data layer.
  */
 import './setup.js';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -210,12 +214,23 @@ describe('a competency taken off a piece', () => {
     expect(numbers()).toEqual(linked);
   });
 
-  it('taking every competency off: the levels stop counting, and an Overall score would', () => {
+  it('taking every competency off: the levels stop counting, and an Overall level beside them does not count either', () => {
+    // The server gives a student an Overall level only when the grade holds
+    // no competency or criterion level at all, and a reload does not load
+    // one beside competency rows. So it is not counted here.
     seed([essay({ tagIds: [] }), lab()], () => essayAndLab().concat([on('essay', 'overall', 1)]));
-    const now = expectLeftOut(e => e.assessmentId === 'essay' && e.tagId !== 'overall');
-    expect(now.sam.pieces[0]).toBe(1); // the Overall level is what the piece holds now
+    const now = expectLeftOut(e => e.assessmentId === 'essay');
+    expect(now.sam.pieces[0]).toBeNull();
+    expect(now.sam.cells[0]).toBe('\u2014');
     expect(now.sam.ask).toBe(0);
     expect(now.sam.plan).toBe(2);
+    expect(classColumnAverage(CID, STUDENTS, { assessment: piece('essay'), tagIds: ['overall'] })).toBeNull();
+    // The same numbers as a reload leaves: the competency rows, and no Overall entry.
+    const reloaded = without(e => e.assessmentId === 'essay' && e.tagId === 'overall');
+    expect(now).toEqual(reloaded.all);
+    // A left-over level that was cleared (0) is no level: the Overall counts.
+    seed([essay({ tagIds: [] }), lab()], () => [on('essay', ASK, 0), on('essay', 'overall', 1), on('lab', PLAN, 2)]);
+    expect(numbers().sam.pieces[0]).toBe(1);
   });
 });
 
@@ -262,6 +277,16 @@ describe('an Overall level on competency work', () => {
       avg: 3,
       count: 2,
     });
+  });
+
+  it('the older blank key for an Overall level is read as Overall', () => {
+    // Scores loaded before the Overall key had a name sit under ''.
+    seed([essay({ tagIds: [] }), lab()], () => [on('essay', '', 3), on('lab', PLAN, 2)]);
+    expect(numbers().sam.pieces).toEqual([3, 2]);
+    expect(returnedNumbers().sam.pieces).toEqual([3, 2]);
+    // Beside competency levels it counts no more than 'overall' does.
+    seed([essay(), lab()], () => essayAndLab().concat([on('essay', '', 1)]));
+    expect(expectLeftOut(e => e.tagId === '').sam.pieces[0]).toBe(3.5);
   });
 });
 
@@ -318,6 +343,56 @@ describe('rubric work', () => {
     expect(now.sam.pieces[0]).toBe(3);
   });
 
+  it('a rubric put on work already scored by competency: the competency levels are the same before and after a reload', () => {
+    // Scored Ask 3 and Plan 4 by competency; then given R1, whose criteria
+    // feed Ask and Plan. The data layer moves each such level onto the
+    // criterion that feeds its competency, but only when it next reads the
+    // scores afresh (a reload). Until then they sit under the competencies.
+    seed([essay(), lab()], essayAndLab, { rubrics: [R1()] });
+    numbers(); // the data layer has looked at these scores once, with no rubric on the piece
+    piece('essay').rubricId = 'R1';
+    const before = numbers();
+    expect(getScores(CID).sam.map(e => e.tagId)).toEqual([ASK, PLAN, PLAN]);
+
+    // A reload: the scores are read afresh and the levels moved.
+    _cache.scores[CID] = structuredClone(_cache.scores[CID]);
+    const after = numbers();
+    expect(
+      getScores(CID)
+        .sam.map(e => e.tagId)
+        .sort(),
+    ).toEqual([PLAN, 'r1-ask', 'r1-plan'].sort());
+
+    // No competency level, section or overall moves across the reload.
+    ['sam', 'kai'].forEach(sid => {
+      expect([before[sid].ask, before[sid].plan, before[sid].overall]).toEqual([
+        after[sid].ask,
+        after[sid].plan,
+        after[sid].overall,
+      ]);
+      expect(before[sid].planEvidence).toBe(after[sid].planEvidence);
+    });
+    expect(before.sam.plan).toBe(3); // the Essay's 4 and the Lab's 2
+    expect(returnedNumbers()).toEqual(after);
+  });
+
+  it('FLAGGED, unchanged: that piece’s own level and % appear only after the reload', () => {
+    // Before the data layer moves the levels, the rubric has no criterion
+    // scored, so the piece has no level and is not in the course %. After,
+    // it has one. calc.js cannot make these agree without redoing the data
+    // layer's move; the data layer should make the move when a piece is
+    // given a rubric. Main does the same.
+    seed([essay(), lab()], essayAndLab, { rubrics: [R1()] });
+    numbers();
+    piece('essay').rubricId = 'R1';
+    const before = numbers();
+    _cache.scores[CID] = structuredClone(_cache.scores[CID]);
+    const after = numbers();
+    expect(before.sam.pieces[0]).toBeNull();
+    expect(after.sam.pieces[0]).toBe(3.5);
+    expect(before.sam.percent).not.toBe(after.sam.percent);
+  });
+
   it('the rubric taken off again: its criteria’s levels count nowhere; the competency levels do', () => {
     seed(
       [essay(), lab()],
@@ -329,6 +404,145 @@ describe('rubric work', () => {
     const now = expectLeftOut(e => e.tagId === 'r1-ask');
     expect(now.sam.pieces[0]).toBe(3.5);
     expect(now.sam.ask).toBe(3);
+  });
+});
+
+describe('work switched to points or Complete/Incomplete', () => {
+  afterEach(drop);
+  const R1 = () => ({
+    id: 'R1',
+    name: 'R1',
+    tagIds: [],
+    criteria: [
+      { id: 'r1-ask', name: 'Question', tagIds: [ASK] },
+      { id: 'r1-plan', name: 'Method', tagIds: [PLAN] },
+    ],
+  });
+  const pointsEssay = extra => essay(Object.assign({ scoreMode: 'points', maxPoints: 10 }, extra));
+  // The Essay's rubric levels from before it was switched: 3 and 4.
+  const leftOver = () => [on('essay', 'r1-ask', 3), on('essay', 'r1-plan', 4)];
+  // A points score as the app stores it: under each competency the piece lists.
+  const typed = n => [on('essay', ASK, n), on('essay', PLAN, n)];
+  const isLeftOver = e => e.tagId === 'r1-ask' || e.tagId === 'r1-plan';
+
+  it('rubric work switched to points: the criterion levels left behind are not a points score', () => {
+    seed([pointsEssay(), lab()], () => leftOver().concat([on('lab', PLAN, 2)]), { rubrics: [R1()] });
+    const now = expectLeftOut(isLeftOver);
+    expect(now.sam.cells[0]).toBe('\u2014');
+    expect(now.sam.pieces[0]).toBeNull();
+    expect(now.sam.piecePercents[0]).toBeNull();
+    expect(_scoreRead.pointsScore(CID, 'sam', piece('essay'))).toBeNull();
+    expect(now.sam.percent).toBe(50); // the Lab alone, 2 of 4
+  });
+
+  const RUBRIC_LEFT = { 'off the piece': {}, 'still on the piece (another tool wrote it)': { rubricId: 'R1' } };
+  it.each(Object.keys(RUBRIC_LEFT))(
+    'then 9 is typed in, the rubric %s: the cell is 9 and the piece counts 90 percent, whichever way round the entries are stored',
+    name => {
+      const extra = RUBRIC_LEFT[name];
+      const seen = [leftOver().concat(typed(9)), typed(9).concat(leftOver())].map(order => {
+        seed([pointsEssay(extra), lab()], () => order.concat([on('lab', PLAN, 2)]), { rubrics: [R1()] });
+        const now = expectLeftOut(isLeftOver);
+        expect(now.sam.cells[0]).toBe('9');
+        expect(now.sam.piecePercents[0]).toBe(90);
+        expect(now.sam.pieces[0]).toBe(4); // 90% is Extending
+        expect(_scoreRead.pointsScore(CID, 'sam', piece('essay'))).toBe(9);
+        return now;
+      });
+      expect(seen[1]).toEqual(seen[0]);
+      expect(seen[0].sam.percent).toBe(78.6); // 9 of 10 and 2 of 4
+    },
+  );
+
+  it('Complete/Incomplete: a criterion level left behind is not a mark, before or after one is given', () => {
+    const check = () => essay({ scoreMode: 'complete', maxPoints: 1, tagIds: [] });
+    seed([check(), lab()], () => leftOver().concat([on('lab', PLAN, 2)]), { rubrics: [R1()] });
+    expect(_scoreRead.completionMark(CID, 'sam', piece('essay'))).toBeNull();
+    expect(expectLeftOut(isLeftOver).sam.cells[0]).toBe('\u2014');
+    const mark = () => [on('essay', 'overall', 0)]; // Incomplete
+    const seen = [leftOver().concat(mark()), mark().concat(leftOver())].map(order => {
+      seed([check(), lab()], () => order.concat([on('lab', PLAN, 2)]), { rubrics: [R1()] });
+      expect(_scoreRead.completionMark(CID, 'sam', piece('essay'))).toBe('incomplete');
+      return expectLeftOut(isLeftOver);
+    });
+    expect(seen[1]).toEqual(seen[0]);
+    expect(seen[0].sam.piecePercents[0]).toBe(0);
+  });
+
+  it('a points score kept under a competency the piece has since been moved off still reads; a newer one wins either way round', () => {
+    // Scored 8 while linked to Plan; the piece is linked to Ask now. The 8
+    // is the piece's one score (the server holds it as such), so it shows.
+    seed([pointsEssay({ tagIds: [ASK] }), lab()], () => [on('essay', PLAN, 8), on('lab', PLAN, 2)]);
+    const moved = numbers();
+    expect(moved.sam.cells[0]).toBe('8');
+    expect(moved.sam.piecePercents[0]).toBe(80);
+    expect(moved.sam.pieces[0]).toBe(3);
+    // It is not evidence for Plan, which the piece no longer measures.
+    expect(moved.sam.planPieces).toEqual(['lab']);
+    // Scored again at 9 under Ask: the score under what the piece lists wins.
+    [
+      [on('essay', PLAN, 8), on('essay', ASK, 9)],
+      [on('essay', ASK, 9), on('essay', PLAN, 8)],
+    ].forEach(order => {
+      seed([pointsEssay({ tagIds: [ASK] }), lab()], () => order.concat([on('lab', PLAN, 2)]));
+      const now = numbers();
+      expect(now.sam.cells[0]).toBe('9');
+      expect(now.sam.piecePercents[0]).toBe(90);
+      expect(now.sam.pieces[0]).toBe(4);
+    });
+  });
+
+  it('a points score kept as Overall on a piece since given competencies still reads; one under them wins either way round', () => {
+    seed([pointsEssay(), lab()], () => [on('essay', 'overall', 8), on('lab', PLAN, 2)]);
+    expect(numbers().sam.cells[0]).toBe('8');
+    [[on('essay', 'overall', 8)].concat(typed(9)), typed(9).concat([on('essay', 'overall', 8)])].forEach(order => {
+      seed([pointsEssay(), lab()], () => order.concat([on('lab', PLAN, 2)]));
+      expect(numbers().sam.cells[0]).toBe('9');
+      expect(numbers().sam.piecePercents[0]).toBe(90);
+    });
+  });
+
+  it('two competencies holding different numbers: the first the piece lists is the score, either way round', () => {
+    [
+      [on('essay', ASK, 9), on('essay', PLAN, 5)],
+      [on('essay', PLAN, 5), on('essay', ASK, 9)],
+    ].forEach(order => {
+      seed([pointsEssay(), lab()], () => order.concat([on('lab', PLAN, 2)]));
+      const now = numbers();
+      expect(now.sam.cells[0]).toBe('9');
+      expect(now.sam.piecePercents[0]).toBe(90);
+      expect(now.sam.pieces[0]).toBe(4);
+    });
+  });
+
+  it('FLAGGED, unchanged: competency work switched to points, its competency kept, reads the level as points until a points score is entered', () => {
+    // The Essay was scored Ask 3, then switched to points out of 10 with Ask
+    // still on it. The 3 sits under the key a points score would use, so the
+    // entries do not say which it is; the data layer would have to. Entering
+    // a points score overwrites it. No class has this today (the live
+    // database holds no competency level on points work).
+    seed([pointsEssay({ tagIds: [ASK] }), lab()], () => [on('essay', ASK, 3), on('lab', PLAN, 2)]);
+    expect(assessmentCellValue(CID, 'sam', piece('essay')).text).toBe('3');
+    expect(getAssessmentGroupPercentage(CID, 'sam', [piece('essay')]).pct).toBe(30);
+    // Switched back to competency work, the level is a level again.
+    Object.assign(piece('essay'), { scoreMode: 'proficiency', maxPoints: undefined });
+    clearProfCache();
+    expect(getAssessmentOverallScore(CID, 'sam', 'essay')).toBe(3);
+    expect(getTagProficiency(CID, 'sam', ASK)).toBe(3);
+  });
+
+  it('FLAGGED, left reading: a level under a competency since taken off, on work switched to points with no score yet, reads as points', () => {
+    // It cannot be told from a points score kept under a competency the
+    // piece was moved off (the test above), which must show. A points score
+    // entered under what the piece lists now takes over at once.
+    seed([pointsEssay({ tagIds: [ASK] }), lab()], () => [on('essay', PLAN, 4), on('lab', PLAN, 2)]);
+    expect(assessmentCellValue(CID, 'sam', piece('essay')).text).toBe('4');
+    seed([pointsEssay({ tagIds: [ASK] }), lab()], () => [
+      on('essay', PLAN, 4),
+      on('essay', ASK, 7),
+      on('lab', PLAN, 2),
+    ]);
+    expect(assessmentCellValue(CID, 'sam', piece('essay')).text).toBe('7');
   });
 });
 
@@ -346,25 +560,6 @@ describe('what the rule leaves alone', () => {
     _cache.learningMaps[CID].sections = [];
     clearProfCache();
     expect(getAssessmentOverallScore(CID, 'sam', 'essay')).toBe(3.5);
-  });
-
-  it('FLAGGED, unchanged: on points work calc.js cannot tell a level left from before from the points score', () => {
-    // The Essay was scored Ask 3, then switched to points out of 10. Until a
-    // points score is entered (which overwrites it), the stored 3 is read as
-    // 3 points. The score entries do not say which they are; the data layer
-    // would have to. No class has this today (the live database holds no
-    // competency level on points work).
-    seed([essay({ scoreMode: 'points', maxPoints: 10, tagIds: [ASK] }), lab()], () => [
-      on('essay', ASK, 3),
-      on('lab', PLAN, 2),
-    ]);
-    expect(assessmentCellValue(CID, 'sam', piece('essay')).text).toBe('3');
-    expect(getAssessmentGroupPercentage(CID, 'sam', [piece('essay')]).pct).toBe(30);
-    // Switched back to competency work, the level is a level again.
-    Object.assign(piece('essay'), { scoreMode: 'proficiency', maxPoints: undefined });
-    clearProfCache();
-    expect(getAssessmentOverallScore(CID, 'sam', 'essay')).toBe(3);
-    expect(getTagProficiency(CID, 'sam', ASK)).toBe(3);
   });
 
   it('points work: its score counts toward the competencies it is linked to now, and no others', () => {
