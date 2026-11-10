@@ -88,6 +88,11 @@ c.run('begin')
 live = {}
 for line in open(os.path.join(HERE, 'live-function-md5.txt')):
     if line.strip() and not line.startswith('#'): live[line.split()[0]] = line.split()[1]
+# S0-M5 (2026111002), applied after this migration, changed get_class_bundle's settings and so its
+# fingerprint. What this migration leaves is the live function as it was until then: the file's
+# "before-s0-m5" line.
+for line in open(os.path.join(HERE, 'live-function-md5.txt')):
+    if line.startswith('#before-s0-m5 get_class_bundle '): live['get_class_bundle'] = line.split()[2]
 guard = dict(re.findall(r"\('public\.(\w+)\([^']*\)',\s+'([0-9a-f]{32})'", open(MIGRATION).read()))
 # The migration is applied on the live database now (2026-11-10), so
 # live-function-md5.txt holds the definitions AFTER it. This script still
@@ -162,7 +167,7 @@ c.run('savepoint clean')
 
 # ── The migration ──────────────────────────────────────────────────────
 apply()
-ok('after the migration both are the live functions of today, byte for byte',
+ok('after the migration both are the live functions as this migration left them (get_gradebook is that today; get_class_bundle was until S0-M5), byte for byte',
    md5(BUNDLE) == live['get_class_bundle'] and md5(GRADEBOOK) == live['get_gradebook'], (md5(BUNDLE), md5(GRADEBOOK)))
 after = {name: call(who, sql, c=cid) for name, who, sql, cid in CALLS}
 bundle1, gb1 = after[CALLS[0][0]], after[CALLS[1][0]]

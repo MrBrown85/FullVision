@@ -54,6 +54,23 @@ fv_retention_cleanup a8da46d6664ba5956f4215ba3b2ada39 2099 after-s0-m5
 get_class_bundle 116294a41f043458e3ddec694520cf0d 22612 after-s0-m5
 rls_auto_enable 37475132a56d7604318a225ce900ae7f 1234 after-s0-m5
 # function md5 length
+# 2026111002_security_definer_search_path.sql (S0-M5) was APPLIED to
+# gradebook-prod on 2026-11-10 at 15:37 UTC, after Batch A (15:28 to 15:33
+# UTC). It changes the settings of sixteen functions and so their
+# fingerprints. Four of them are listed below, and the lines below hold them
+# as they are AFTER it (confirmed against the live database the same day):
+# fv_owns_assessment, fv_owns_course, fv_owns_enrollment, get_class_bundle.
+# What they were before it, which is what a database from before Batch A
+# holds and what batch_a_apply.py starts from, is on the four lines marked
+# "before-s0-m5" (batch_a_common.live_md5 reads them when asked):
+#before-s0-m5 fv_owns_assessment 852322ca22024d49dcc4f88a6863a4cf 378
+#before-s0-m5 fv_owns_course 61fa41c6c4e94a1e27b606e454262baf 334
+#before-s0-m5 fv_owns_enrollment 9c1d01d07ad0e2402784a2257e13aecb 378
+#before-s0-m5 get_class_bundle 845b42513d1f556dc941a1cc11cf9567 22591
+# The four functions Batch A patched in place (duplicate_course,
+# import_json_restore, move_rubric_scores, update_course) are still listed
+# as they were BEFORE Batch A: batch_a_apply.py checks the batch starts from
+# them, and score_rpcs.py checks a database with Batch A no longer has them.
 clear_column_scores 2eef90e77ca6c84c36832bdd18bb53e5 746
 clear_row_scores 326e27cf74efda1aba93850f4b64baed 1136
 clear_score d8feb239565496f518c02803df0097a8 1166
@@ -61,10 +78,10 @@ create_course 4ff682abea55af06136dfdfca5dc9a59 1972
 duplicate_assessment 248a2de149b71e8d99f4fa27a569e7a7 1862
 duplicate_course 528aacf8cb9581682178b1914a32fc20 6689
 fill_rubric 59c53fb566c6d47fbf0030586a18113c 837
-fv_owns_assessment 852322ca22024d49dcc4f88a6863a4cf 378
-fv_owns_course 61fa41c6c4e94a1e27b606e454262baf 334
-fv_owns_enrollment 9c1d01d07ad0e2402784a2257e13aecb 378
-get_class_bundle 845b42513d1f556dc941a1cc11cf9567 22591
+fv_owns_assessment 9f4c680c35f9f3ac32e8290824707673 389
+fv_owns_course e3afeca06043a6e907e6f4ae777c85da 345
+fv_owns_enrollment 728526648388367393162be706f7f9ea 389
+get_class_bundle 116294a41f043458e3ddec694520cf0d 22612
 get_gradebook beec0fae104cd7f4a0e96364130f267d 6859
 import_json_restore 58e48ae4f7ebcc05489b489a4f8906df 36519
 move_rubric_scores 92f7ff4b840c1dd9fe473f8ecdee29b5 3216
