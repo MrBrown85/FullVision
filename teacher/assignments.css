@@ -6417,15 +6417,24 @@ button.grader-member-name {
 }
 
 /* ── Draft and Returned in the dialog (S0-F2) ────────────────
-   Return and where the grade stands, under the grading: Return on the
-   left, the Draft mark and its line on the right; "Returned Nov 3" once
-   the grade is given. In the grading cards' lane (16px in). */
+   Return and where the grade stands, in a row above the footer that does
+   not scroll away: Return on the left, the Draft mark and its line on the
+   right; "Returned Nov 3" once the grade is given. In the grading cards'
+   lane. The level-wording bar moves up to sit above the row. */
 .grader-return {
-  margin: 0 16px;
-  min-height: 34px;
+  flex-shrink: 0;
+  min-height: 56px;
+  box-sizing: border-box;
+  padding: 6px 44px;
   display: flex;
   align-items: center;
   gap: 8px;
+  background: var(--surface);
+  box-shadow: 0 -0.5px 0 var(--divider-heavy);
+  color: var(--text);
+}
+.grader-dialog.has-return .grdl-wording-bar {
+  bottom: 120px;
 }
 .grader-return-btn {
   height: 34px;
@@ -6453,8 +6462,8 @@ button.grader-member-name {
   border-radius: 17px;
   display: inline-flex;
   align-items: center;
-  background: #eef7ef;
-  color: #1b5e20;
+  background: var(--score-3-bg);
+  color: var(--score-3-text);
   font-size: var(--text-base);
   font-weight: 600;
 }
@@ -6478,8 +6487,8 @@ button.grader-member-name {
   height: 24px;
   padding: 0 10px;
   border-radius: 12px;
-  border: 1.5px dashed #548c5a;
-  color: #2e5e33;
+  border: 1.5px dashed var(--score-3);
+  color: var(--score-3-text);
   font-size: var(--text-sm);
   font-weight: 700;
 }

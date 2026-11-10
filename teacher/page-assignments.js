@@ -12587,13 +12587,14 @@ window.PageAssignments = (function () {
 
   /* ── Draft and Returned (S0-F2) ───────────────────────────
      In a class whose student page is on (the build switch) and that returns
-     grades When I Return Them, a row under the grading says where the
-     grade stands: Return with the Draft mark and "Saved. Not returned
+     grades When I Return Them, a row above the dialog's footer, which
+     never scrolls away, says where the grade stands: Return with the Draft mark and "Saved. Not returned
      yet." while it waits, "Returned Nov 3" once it is given. A change to
      a returned grade adds the one line about what the student still sees.
      A status alone is not a grade, so Missing, Excused and Late show no
-     draft. With the switch off the row is never made and the dialog is as
-     it was. Group work is returned to every member still graded with the
+     draft, and a piece with a status and nothing in shows no row. A DIBELS
+     benchmark is not returned: no row. With the switch off the row is
+     never made and the dialog is as it was. Group work is returned to every member still graded with the
      group. */
   function _graderReturnIds(sid, view) {
     return view && view.linked ? view.linked.slice() : [sid];
@@ -12602,8 +12603,8 @@ window.PageAssignments = (function () {
   // html-safe: fixed labels; the name and the date go through esc
   function _graderReturnHtml(cid, a, sid, view) {
     var klass = getReturnSettings(cid);
-    if (!klass.student_page) return '';
-    // A Missing piece is never a draft (GradeState.stateOf).
+    if (!klass.student_page || isDibelsScored(a)) return '';
+    // A Missing or Excused piece is never a draft (GradeState.stateOf).
     var waiting = _graderReturnIds(sid, view)
       .filter(function (id) {
         return GradeState.stateOf(cid, id, a.id) === GradeState.DRAFT;
@@ -12615,8 +12616,11 @@ window.PageAssignments = (function () {
     if (!waiting.length && !GradeState.holds(klass)) return '';
     var row = getGradeReturn(cid, sid, a.id);
     if (!waiting.length) {
-      if (GradeState.stateOf(cid, sid, a.id) !== GradeState.RETURNED)
+      if (GradeState.stateOf(cid, sid, a.id) !== GradeState.RETURNED) {
+        // Missing, Excused or Late with nothing in: there is nothing to return.
+        if (getAssignmentStatus(cid, sid, a.id)) return '';
         return '<button type="button" class="grader-return-btn" data-grader="return" disabled>Return</button>';
+      }
       var on = row && row.returned_at ? formatShortDate(row.returned_at) : '';
       return '<span class="grader-returned">' + esc(on ? 'Returned ' + on : 'Returned') + '</span>';
     }
@@ -12643,20 +12647,26 @@ window.PageAssignments = (function () {
     );
   }
 
-  /* The row is made only when there is something to say, under the
-     grading and the Note for the Report, and redrawn only when it changes:
-     a button swapped out under the mouse loses its click. */
+  /* The row is made only when there is something to say, between the
+     scrolling part of the dialog and its footer, so Return is in view
+     however long the grading is. It is redrawn only when it changes: a
+     button swapped out under the mouse loses its click. */
   function _refreshGraderReturn(dialog, cid, a, sid, view) {
     var html = _graderReturnHtml(cid, a, sid, view);
     var box = dialog.querySelector('.grader-return');
     if (!html) {
-      if (box) box.remove();
+      if (box) {
+        box.remove();
+        dialog.classList.remove('has-return');
+      }
       return;
     }
     if (!box) {
       box = document.createElement('div');
       box.className = 'grader-return';
-      dialog.querySelector('.grader-report-note').insertAdjacentElement('afterend', box);
+      dialog.querySelector('.grader-foot').insertAdjacentElement('beforebegin', box);
+      // The level-wording bar sits above the row, not over it.
+      dialog.classList.add('has-return');
       _grader.returnHtml = null;
     }
     if (_grader.returnHtml === html) return;

@@ -30,6 +30,7 @@ import {
   seedClass,
   clearClass,
   click,
+  fire,
   typeAndLeave,
   openGrader,
   closePages,
@@ -280,7 +281,7 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them', () =>
   const text = selector => (at(selector) ? at(selector).textContent : null);
   const today = () => formatShortDate('2026-11-09T18:00:00.000Z');
 
-  it('a save shows the Draft mark, "Saved. Not returned yet." and Return, under the Note for the Report', async () => {
+  it('a save shows the Draft mark, "Saved. Not returned yet." and Return, in a row above the footer that does not scroll', async () => {
     open(ESSAY, BEN);
     await settled();
     // Nothing to return yet.
@@ -293,8 +294,10 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them', () =>
     expect(text('[data-grader="return"]')).toBe('Return');
     expect(at('[data-grader="return"]').disabled).toBe(false);
     expect(at('.grader-draft-still')).toBe(null);
-    expect(row().previousElementSibling.className).toBe('grader-report-note');
-    expect(row().parentNode.className).toBe('grader-scroll');
+    expect(row().nextElementSibling.className).toBe('grader-foot');
+    expect(row().previousElementSibling.className).toBe('grader-scroll');
+    expect(at('.grader-scroll .grader-return')).toBe(null);
+    expect(row().parentNode.className).toContain('has-return');
   });
 
   it('Return makes it Returned, with the date; a change after that says what the student still sees', async () => {
@@ -368,9 +371,35 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them', () =>
     click(statusButton(status));
     await settled();
     expect(getAssignmentStatus(CID, BEN, ESSAY)).toBe(status);
-    expect(at('.grader-draft')).toBe(null);
     expect(html()).not.toMatch(/Not returned yet/);
-    expect(at('[data-grader="return"]').disabled).toBe(true);
+    // Nothing in and a status on: there is nothing to return, so no row at all.
+    expect(row()).toBe(null);
+    expect(at('.grader-dialog').className).not.toContain('has-return');
+  });
+
+  it('work with only a tick is a grade: Draft, then Returned', async () => {
+    open(LAB, BEN);
+    const box = at('[data-action="graderTick"][data-checkid="' + GOGGLES + '"]');
+    box.checked = true;
+    box.setAttribute('checked', '');
+    click(box);
+    fire(box, 'change');
+    await settled();
+    expect(getRubricCheckIds(CID, BEN, LAB)).toEqual([GOGGLES]);
+    expect(text('.grader-draft-mark')).toBe('Draft');
+    click(at('[data-grader="return"]'));
+    await settled();
+    expect(text('.grader-returned')).toBe('Returned ' + today());
+  });
+
+  it('a DIBELS benchmark is not returned: no row', async () => {
+    open(ESSAY, BEN, {
+      assessments: [{ id: ESSAY, title: 'Reading Benchmark', scoreMode: 'dibels', tagIds: [], date: '2026-10-10' }],
+    });
+    await settled();
+    expect(isDibelsScored(getAssessments(CID)[0])).toBe(true);
+    expect(row()).toBe(null);
+    expect(at('[data-grader="return"]')).toBe(null);
   });
 
   it('Late on a draft: the grade still waits', async () => {

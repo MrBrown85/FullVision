@@ -118,3 +118,45 @@ test('with the switch off the dialog has no draft line and no Return button', as
   // Nothing is kept for the class.
   expect(await page.evaluate(cid => localStorage.getItem('gb-grade-returns-' + cid), at.cid)).toBeNull();
 });
+
+// The row sits above the dialog's footer, outside the part that scrolls: on a
+// long rubric piece Return and the Draft line are in view with no scrolling.
+test('Return and the Draft line are in view without scrolling on a rubric piece at 1280×720', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await demoWithNewPiece(page);
+  const at = await page.evaluate(() => {
+    var cid = getActiveCourse();
+    setStudentPageSwitch(cid, true);
+    var a = getAssessments(cid).find(x => x.rubricId && !isPointsScored(x) && getRubricById(cid, x.rubricId));
+    var student = sortStudents(getStudents(cid), 'lastName').find(s =>
+      (getScores(cid)[s.id] || []).some(e => e.assessmentId === a.id && Number(e.score) > 0),
+    );
+    var entry = getScores(cid)[student.id].find(e => e.assessmentId === a.id && Number(e.score) > 0);
+    return { cid: cid, sid: student.id, aid: a.id, crit: entry.tagId, to: Number(entry.score) === 1 ? 2 : 1 };
+  });
+  await page.goto('/gradebook');
+  await page.waitForSelector('#dock-mount nav', { timeout: 10000 });
+  const cell = page.locator('.gb-scores-cell[data-sid="' + at.sid + '"][data-aid="' + at.aid + '"]');
+  await cell.scrollIntoViewIfNeeded();
+  await cell.click();
+  const dialog = page.locator('#grader-overlay .grader-dialog');
+  await expect(dialog).toBeVisible();
+  // The grading is longer than the dialog: it scrolls.
+  expect(await dialog.locator('.grader-scroll').evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
+  await expect(dialog.locator('.grader-returned')).toBeInViewport({ ratio: 1 });
+
+  // A level on the first criterion, with the dialog scrolled to its top.
+  await dialog
+    .locator('[data-action="graderLevel"][data-critid="' + at.crit + '"][data-level="' + at.to + '"]')
+    .first()
+    .click();
+  await page.mouse.move(640, 5);
+  await expect(dialog.locator('.grader-draft-mark')).toHaveText('Draft');
+  await expect(dialog.locator('.grader-return [data-grader="return"]')).toBeInViewport({ ratio: 1 });
+  await expect(dialog.locator('.grader-draft-mark')).toBeInViewport({ ratio: 1 });
+  await expect(dialog.locator('.grader-draft-still')).toBeInViewport({ ratio: 1 });
+  // It is not inside the part that scrolls.
+  await expect(dialog.locator('.grader-scroll .grader-return')).toHaveCount(0);
+  await dialog.locator('.grader-return [data-grader="return"]').click();
+  await expect(dialog.locator('.grader-returned')).toBeInViewport({ ratio: 1 });
+});
