@@ -57,7 +57,16 @@ export function signIn() {
 /* A class in the cache and in localStorage, as a loaded class is. Fields
    left out start empty. It also tells data.js the server holds these
    scores and statuses, as a load does (_persistLoadedField), so a later
-   whole-list save sends only what changed. */
+   whole-list save sends only what changed.
+
+   And it tells data.js the class is loaded (_classLoads), as a load does.
+   teacher/router.js, which tests/setup.js loads, starts loading the
+   teacher's other classes 1.5 s later (preloadClasses). A pin's class is
+   often not the one data.js calls open, and signIn()'s recording client
+   holds no classes. So when that timer came due inside a pin that was
+   waiting (on a slow or busy machine), the class was fetched from the
+   client and emptied, and the pin failed now and then.
+   tests/pin-helper-seeded-class-is-loaded.test.js holds this. */
 export function seedClass(cid, data) {
   const fields = {
     students: [],
@@ -77,6 +86,7 @@ export function seedClass(cid, data) {
   });
   _rememberServerState('scores', cid, fields.scores);
   _rememberServerState('statuses', cid, fields.statuses);
+  _classLoads[cid] = true;
   if (typeof clearProfCache === 'function') clearProfCache();
 }
 
@@ -85,6 +95,7 @@ export function clearClass(cid) {
     if (_cache[field] && typeof _cache[field] === 'object' && cid in _cache[field]) delete _cache[field][cid];
   });
   delete COURSES[cid];
+  delete _classLoads[cid];
 }
 
 /* One student's score entries (on one assessment when `aid` is given),
