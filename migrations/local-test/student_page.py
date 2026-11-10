@@ -215,9 +215,10 @@ ok('an assignment dated tomorrow is not listed', 'Pop Quiz' not in titles, title
 ok('an assessment with no assigned date is on the list as soon as it exists (Colin, Nov 9)',
    one('select date_assigned is null from assessment where id = :a', a=a_comp) and 'Density Lab' in titles)
 row = {x['id']: x for x in p['assessments']}
+# created_at is there once 2026110905 (S0-M4b) is applied, and not before.
 ok('an assignment carries its dates, kind, competencies and rubric',
-   set(row[a_comp]) == {'id', 'title', 'date', 'due_date', 'score_mode', 'max_points', 'weight', 'rubric_id', 'tag_ids',
-                        'status', 'returned_at', 'updated_at', 'seen_at', 'grade', 'previous'}
+   set(row[a_comp]) - {'created_at'} == {'id', 'title', 'date', 'due_date', 'score_mode', 'max_points', 'weight', 'rubric_id', 'tag_ids',
+                                         'status', 'returned_at', 'updated_at', 'seen_at', 'grade', 'previous'}
    and sorted(row[a_comp]['tag_ids']) == sorted([T1, T2]) and row[a_rub]['rubric_id'] == K['r1'], row[a_comp])
 ok("the rubric comes with its criteria, their level values and checkboxes",
    [r['id'] for r in p['rubrics']] == [K['r1']] and [x['name'] for x in p['rubrics'][0]['criteria']] == ['Method', 'Conclusion']
