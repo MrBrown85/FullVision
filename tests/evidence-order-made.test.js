@@ -137,14 +137,18 @@ afterAll(() => {
 describe('what the loader keeps of when a piece was made', () => {
   it('the server’s created_at, when the bundle sends it', () => {
     const cid = load(sameDateClass(MADE));
-    expect(_pieceOrderFacts(cid)).toEqual(MADE.map((t, i) => ({ id: id(300 + i), made: Date.parse(t) })));
+    expect(_pieceOrderFacts(cid)).toEqual(
+      MADE.map((t, i) => ({ id: id(300 + i), made: Date.parse(t), here: false, stored: i })),
+    );
     expect(_pieceOrderFacts(cid)[1].made).toBe(Date.UTC(2026, 8, 2, 16, 0, 0, 120));
     getAssessments(cid).forEach((a, i) => expect(a.created_at, a.title).toBe(MADE[i]));
   });
 
   it('nothing, when the bundle does not send it (today’s bundle)', () => {
     const cid = load(sameDateClass());
-    expect(_pieceOrderFacts(cid)).toEqual(MADE.map((t, i) => ({ id: id(300 + i), made: null })));
+    expect(_pieceOrderFacts(cid)).toEqual(
+      MADE.map((t, i) => ({ id: id(300 + i), made: null, here: false, stored: i })),
+    );
     getAssessments(cid).forEach(a => {
       expect(a.created, a.title).toBeUndefined();
       expect(a.created_at, a.title).toBeUndefined();
@@ -173,7 +177,12 @@ describe('what the loader keeps of when a piece was made', () => {
     };
     getAssessments(cid).push(made);
     clearProfCache();
-    expect(_pieceOrderFacts(cid).find(f => f.id === made.id).made).toBe(Date.parse(FROZEN_AT));
+    expect(_pieceOrderFacts(cid).find(f => f.id === made.id)).toEqual({
+      id: made.id,
+      made: Date.parse(FROZEN_AT),
+      here: true,
+      stored: 7,
+    });
     // The local id is not the server's: 's', the time in milliseconds, then random characters.
     expect(made.id).toMatch(/^s\d{13}[a-z0-9]+$/);
   });
@@ -374,11 +383,71 @@ describe('a piece made on this device, before and after the next load', () => {
       expect(lastTwo(cid)).toEqual(['Quiz A', 'Quiz B']);
     });
 
-    it('made in the same instant: the ids decide, so the order can change once, at the first load, and then stays', () => {
+    /* What Priya's grades come to, with no id in it: the order her work
+       counts in, her level under each method, her trend and growth line. */
+    const withoutIds = cid => {
+      const priya = sidOf(cid, 'Priya');
+      const config = getCourseConfig(cid);
+      const own = config.calcMethod;
+      const levels = ['average', 'mostRecent', 'highest', 'median', 'mode', 'decayingAvg'].map(method => {
+        config.calcMethod = method;
+        clearProfCache();
+        return [getTagProficiency(cid, priya, CHANGE), getOverallProficiency(cid, priya)];
+      });
+      config.calcMethod = own;
+      clearProfCache();
+      return JSON.stringify([
+        countedTitles(cid, 'Priya'),
+        levels,
+        getSectionTrend(cid, priya, CHANGE_SECTION),
+        getSectionGrowthData(cid, priya, CHANGE_SECTION),
+        getAssessments(cid).map(a => (earlierInCategory(cid, a, 9) || []).map(x => x.assessment.title)),
+      ]);
+    };
+
+    it('made in the same instant: they count in the order made, and a save landing (the id changing) moves no value', () => {
+      const LOCAL_A = 's1700000000000bb';
+      const LOCAL_B = 's1700000000000aa'; // sorts before Quiz A's, though Quiz B was made second
+      const land = { A: [LOCAL_A, SERVER_A], B: [LOCAL_B, SERVER_B] }; // SERVER_B sorts before SERVER_A too
+      // The two saves landing in either order, and one alone.
+      [['A'], ['B'], ['A', 'B'], ['B', 'A']].forEach(landing => {
+        const cid = load(sameDateClass(MADE));
+        makeOnDevice(cid, { id: LOCAL_A, created: iso(NOW) }, { id: LOCAL_B, created: iso(NOW) });
+        expect(lastTwo(cid)).toEqual(['Quiz A', 'Quiz B']);
+        expect(mostRecent(cid, 'Priya')).toBe(1);
+        const before = withoutIds(cid);
+        landing.forEach(which => {
+          // The data layer's own re-key: the piece and its scores take the server's id.
+          _rekey(cid, 'assessment', land[which][0], land[which][1]);
+          clearProfCache();
+          expect(getAssessments(cid).filter(a => a.id === land[which][1])).toHaveLength(1);
+          expect(getScores(cid)[sidOf(cid, 'Priya')].filter(e => e.assessmentId === land[which][0])).toEqual([]);
+          expect(withoutIds(cid), landing.join(' then ') + ', after ' + which).toBe(before);
+        });
+      });
+    });
+
+    it('made apart in time: a save landing moves no value either', () => {
+      const cid = load(sameDateClass(MADE));
+      makeOnDevice(
+        cid,
+        { id: 's1700000000000bb', created: iso(NOW) },
+        { id: 's1700000000000aa', created: iso(NOW + 5) },
+      );
+      const before = withoutIds(cid);
+      _rekey(cid, 'assessment', 's1700000000000aa', SERVER_B);
+      clearProfCache();
+      expect(withoutIds(cid)).toBe(before);
+      _rekey(cid, 'assessment', 's1700000000000bb', SERVER_A);
+      clearProfCache();
+      expect(withoutIds(cid)).toBe(before);
+    });
+
+    it('made in the same instant and saved in the same instant: at the next load the server’s ids decide, so the order can change once, and then stays', () => {
       const bundle = sameDateClass(MADE);
       const cid = load(bundle);
-      // Before the load: the device's ids (random after the time). Here Quiz A's sorts first.
-      makeOnDevice(cid, { id: 's1700000000000aa', created: iso(NOW) }, { id: 's1700000000000bb', created: iso(NOW) });
+      // Before the load: the order made (their place in the class's list), whatever their ids.
+      makeOnDevice(cid, { id: 's1700000000000bb', created: iso(NOW) }, { id: 's1700000000000aa', created: iso(NOW) });
       expect(lastTwo(cid)).toEqual(['Quiz A', 'Quiz B']);
       expect(mostRecent(cid, 'Priya')).toBe(1);
 
