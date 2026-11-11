@@ -87,14 +87,15 @@ begin
             -- FINGERPRINTS-BEGIN c2relied (written by migrations/local-test/batch_c_fingerprints.py)
             ('public._grade_copy(uuid,uuid)',                                '3a8e0dfbc873176692a1160150a8d43b', '3a8e0dfbc873176692a1160150a8d43b'),
             ('public._markup_give(uuid,uuid)',                               'f0f07a1b879ff038e2f0afe020233c29', 'f0f07a1b879ff038e2f0afe020233c29'),
-            ('public.return_for_revision(uuid,uuid,jsonb,uuid)',             'f66c0fdd60dd969203a345125280d760', 'f66c0fdd60dd969203a345125280d760'),
+            ('public._revision_settle(uuid,uuid)',                           '9b673ebf31a9be20552c38a7ec46d6f7', '9b673ebf31a9be20552c38a7ec46d6f7'),
+            ('public.return_for_revision(uuid,uuid,jsonb,uuid)',             '51ca91fa2896de5617bd53a03a68fea4', '51ca91fa2896de5617bd53a03a68fea4'),
             ('public.cancel_revision(uuid,uuid)',                            '03f508a459eb621f868b699a0ea3f076', '03f508a459eb621f868b699a0ea3f076'),
             ('public._grade_return_apply(uuid,uuid,jsonb,jsonb)',            '89899f9dbc1569f7f1cc4216e252eb32', '89899f9dbc1569f7f1cc4216e252eb32'),
             ('public._grade_return_one(uuid,uuid,timestamp with time zone)', '99e3165d005b5b2020ec40dcf307c689', '99e3165d005b5b2020ec40dcf307c689'),
             ('public._revision_hide_available()',                            'cd50f4c6493a73b3c42ae51f7580f970', 'a4b4e942de351d6849702b96f25c7356'),
             ('public._revision_hide_grade(uuid)',                            '247080f6572bb45951cef807a2b849bd', 'a4c3f002d3bb2fc01e58ec5b8dab8ecb'),
             ('public._revision_unhide_grade(uuid)',                          '26d2861325edf27f95d090ebd590eb0f', 'cbbc6fd7654c2b8677c7d210b5e15cc4'),
-            ('public._markup_on_return()',                                   'absent', '86761bf5b10476cc72b0fea25387c46e')
+            ('public._markup_on_return()',                                   'absent', 'ef080a7b6bc3614bec1ca5533e30051f')
             -- FINGERPRINTS-END
         ) as v(fn, first_run, later_run)
     loop
@@ -238,8 +239,9 @@ create or replace function public._markup_on_return()
  set search_path to 'public', 'pg_temp'
 as $function$
 declare
-    _r   revision_request%rowtype;
-    _now jsonb;
+    _r    revision_request%rowtype;
+    _open boolean;
+    _now  jsonb;
 begin
     -- Take Back giving a hidden grade back (_revision_unhide_grade) is not
     -- a Return: no mark is given, and its hide has already ended.
@@ -260,7 +262,8 @@ begin
     select * into _r from revision_request
      where assessment_id = new.assessment_id and enrollment_id = new.enrollment_id and state = 'open'
        for update;
-    if found and _r.grade_hidden then
+    _open := found;
+    if _open and _r.grade_hidden then
         update revision_request
            set grade_hidden = false, hide_ended_at = clock_timestamp(), hide_ended_by = 'returned', updated_at = now()
          where id = _r.id;
@@ -279,6 +282,10 @@ begin
                    updated_at = (_r.hidden_state->>'updated_at')::timestamptz
              where enrollment_id = new.enrollment_id and assessment_id = new.assessment_id;
         end if;
+    end if;
+    -- The revision's grade returned: the request is done, for good.
+    if _open then
+        perform _revision_settle(new.enrollment_id, new.assessment_id);
     end if;
     return null;
 end;
@@ -308,7 +315,7 @@ begin
             ('public._revision_hide_available()',   'a4b4e942de351d6849702b96f25c7356'),
             ('public._revision_hide_grade(uuid)',   'a4c3f002d3bb2fc01e58ec5b8dab8ecb'),
             ('public._revision_unhide_grade(uuid)', 'cbbc6fd7654c2b8677c7d210b5e15cc4'),
-            ('public._markup_on_return()',          '86761bf5b10476cc72b0fea25387c46e')
+            ('public._markup_on_return()',          'ef080a7b6bc3614bec1ca5533e30051f')
             -- FINGERPRINTS-END
         ) as v(fn, becomes)
     loop

@@ -71,7 +71,7 @@ def build():
 C1_FUNCTIONS = [
     'public._work_feedback_gone()', 'public._work_feedback_truncated()', 'public._markup_check(jsonb)',
     'public._markup_give(uuid,uuid)', 'public._revision_hide_available()', 'public._revision_hide_grade(uuid)',
-    'public._revision_unhide_grade(uuid)', 'public._piece_latest(uuid,uuid)', 'public._revision_state(uuid)',
+    'public._revision_unhide_grade(uuid)', 'public._piece_latest(uuid,uuid)', 'public._revision_state(uuid)', 'public._revision_settle(uuid,uuid)',
     'public._revision_json(uuid)', 'public._reflection_json(uuid)',
     'public.set_course_feedback_options(uuid,jsonb,uuid)', 'public.save_markup(uuid,jsonb,integer,uuid)',
     'public.list_assessment_markup(uuid)', 'public.return_work(uuid,uuid[],uuid)',
@@ -117,7 +117,7 @@ C1_RELIED = ['public.fv_owns_course(uuid)', 'public.fv_owns_enrollment(uuid)', '
              # fixes are in first (the apply order is Batch B's two files, the fixes, then C1)
              'public.finish_work_upload(uuid,jsonb,uuid)', 'student_submit.send_finish(text,uuid,uuid,jsonb,text)',
              'student_submit.unsend(text,uuid,uuid,text)']
-C2_RELIED = ['public._grade_copy(uuid,uuid)', 'public._markup_give(uuid,uuid)', 'public.return_for_revision(uuid,uuid,jsonb,uuid)',
+C2_RELIED = ['public._grade_copy(uuid,uuid)', 'public._markup_give(uuid,uuid)', 'public._revision_settle(uuid,uuid)', 'public.return_for_revision(uuid,uuid,jsonb,uuid)',
              'public.cancel_revision(uuid,uuid)', 'public._grade_return_apply(uuid,uuid,jsonb,jsonb)',
              'public._grade_return_one(uuid,uuid,timestamp with time zone)']
 
