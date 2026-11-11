@@ -2419,8 +2419,8 @@ with Batch B, the fixes, C1 and C2 at `a682b559`):
   file], `BATCH_B_WITH_FIXES=1`): 562 of 563 without (C1's grade-reader
   inventory); 559 with. Two are ruling 107 itself ("the work stays, as the
   teacher's ... the student can no longer change it" and "the teacher added
-  the student's work while their pages were going up: ... already_sent").
-  The third was `score_rpcs.py` failing once more in its run _before_ any of
+  the student's work while their pages were going up: ... already*sent").
+  The third was `score_rpcs.py` failing once more in its run \_before* any of
   these files is applied (234 against 235); the `suites` scenario run again
   with the file: 14 of 14.
 - `submissions_fixes.py` (same hook): 137 of 154 without, 136 with. The hook
