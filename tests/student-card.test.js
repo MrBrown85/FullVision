@@ -58,6 +58,8 @@ describe('the student page fetches calc.js only when a grade is about to show', 
       's/assignments.js',
       // Sending work (S5-F2); it fetches shared/photo-shrink.js only when a send opens.
       's/send.js',
+      // The teacher's Mark Up on returned work (S9-F3), Demo Mode's answers until Batch C.
+      's/feedback.js',
     ]);
     const page = openStudentPage();
     expect(page.run(GRADES_IN)).toBe('undefined undefined undefined');
