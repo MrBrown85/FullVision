@@ -564,15 +564,17 @@
   }
 
   /* `feedback`, once the class's `work` has answered that it takes work
-     (s/send.js's loadWork; Mark Up is a part of Send Work). A class that
-     takes none, or a function without the route, is sent nothing more and
-     the page stays as it was drawn. */
+     (s/send.js's loadWork; Mark Up is a part of Send Work) or that it has
+     Reflect on Feedback on (Batch E, E1). A class with neither, or a
+     function without the route, is sent nothing more and the page stays as
+     it was drawn. */
   function loadFeedback() {
     var state = S;
     if (!state || state.demo || !state.page) return Promise.resolve();
     var student = state.page.student.id;
     var work = state.realWork;
-    if (!work || work.student !== student) return Promise.resolve();
+    var takesWork = !!(work && work.student === student);
+    if (!takesWork && state.reflectOn !== student) return Promise.resolve();
     return StudentPage.whileCurrent(answerOf('feedback', { enrollment_id: student })).then(function (res) {
       if (S !== state || !state.page || state.page.student.id !== student) return;
       var on = !!(res && res.ok === true && Array.isArray(res.assessments) && worthKeeping(res));

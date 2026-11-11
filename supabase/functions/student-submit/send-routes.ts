@@ -325,8 +325,10 @@ export const good = (r: unknown): r is Json => isObject(r) && r.ok === true;
 function work(r: Json): Json {
   return {
     ok: true,
-    // reflect_on_feedback (E1): the page asks feedback when Send Work or Reflect on Feedback is on.
-    ...pick(r, ['v', 'send_work', 'reflect_on_feedback']),
+    ...pick(r, ['v', 'send_work']),
+    // reflect_on_feedback (Batch E, E1): the page asks feedback when Send Work or Reflect on Feedback is on.
+    // True or false only; absent where the database is from before Batch E.
+    ...('reflect_on_feedback' in r ? { reflect_on_feedback: r.reflect_on_feedback === true } : {}),
     assessments: list(r.assessments).map(a => {
       const x = isObject(a) ? a : {};
       return {

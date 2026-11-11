@@ -148,7 +148,7 @@ window.GradeState = (function () {
     return !!klass && klass.student_page === true && klass.return_grades === 'on_return';
   }
 
-  var _FIELDS = ['returned_at', 'returned_copy', 'previous_copy', 'updated_at', 'seen_at'];
+  var _FIELDS = ['returned_at', 'returned_copy', 'previous_copy', 'updated_at', 'seen_at', 'held_note', 'held_note_at'];
 
   // The row as it is kept: nulls left out, and no row at all when it says
   // nothing.
@@ -236,6 +236,28 @@ window.GradeState = (function () {
     return _kept(g);
   }
 
+  /* The Note for the Report waits with its grade (Batch E, E3; DECISIONS,
+     rulings of 2026-11-10, night, 2). While a regrade of a returned grade is
+     open (a draft on a grade with a returned date), the first change to the
+     note keeps the note the returned grade went out with, `before`, beside
+     that returned date. The server does the same in save_score_report_note.
+     Returns the row to keep. */
+  function afterNote(row, before) {
+    if (!row || !row.is_draft || !row.returned_at || row.held_note_at === row.returned_at) return row || null;
+    var g = Object.assign({}, row, { held_note_at: row.returned_at });
+    if (before) g.held_note = String(before);
+    else delete g.held_note;
+    return _kept(g);
+  }
+  /* The note a report prints while a regrade is open: { held: true, note }
+     (note '' when the returned grade had none), or { held: false } when the
+     working note is the one to print. A held note counts only for the
+     returned date it was kept with: a Return ends it. */
+  function heldNote(row) {
+    if (!row || !row.is_draft || !row.returned_at || row.held_note_at !== row.returned_at) return { held: false };
+    return { held: true, note: row.held_note ? String(row.held_note) : '' };
+  }
+
   /* The teacher returns the grade, whose working copy is `working`. Only a
      draft is returned. The copy the student had moves to previous_copy. A
      draft with nothing left (a returned grade, cleared) returns as no
@@ -244,6 +266,8 @@ window.GradeState = (function () {
     if (!row || !row.is_draft) return row || null;
     var g = Object.assign({}, row);
     g.is_draft = false;
+    // A held Note for the Report (E3) ends with the Return: the note on the work prints from now on.
+    g.held_note = g.held_note_at = null;
     if (!copyOf(working)) {
       g.returned_at = g.returned_copy = g.previous_copy = g.updated_at = null;
     } else {
@@ -647,6 +671,8 @@ window.GradeState = (function () {
     holds: holds,
     afterWrite: afterWrite,
     afterReturn: afterReturn,
+    afterNote: afterNote,
+    heldNote: heldNote,
     afterSeen: afterSeen,
     afterSettingChange: afterSettingChange,
     afterMove: afterMove,

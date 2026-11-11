@@ -53,6 +53,10 @@ function routes(world) {
   return {
     seen,
     answer(body) {
+      // A class with Send Work off: `work` as Batch E sends it, saying whether Reflect on Feedback is on.
+      if (body.route === 'work' && world.workOff) {
+        return { ok: true, v: 1, send_work: false, reflect_on_feedback: world.workOff.reflect, assessments: [] };
+      }
       if (!['feedback', 'reflect', 'reply', 'answer-seen', 'markup'].includes(body.route)) return null;
       seen.push(body);
       if (world.off) return { ok: false, error: 'bad_request' };
@@ -125,6 +129,23 @@ describe('a class that takes no work is sent no `feedback`', () => {
     expect(bodies(off, 'feedback')).toHaveLength(1);
     expect(off.root().innerHTML).toBe(none.root().innerHTML);
     expect(viewOf(off).reflectOn).toBe(false);
+  });
+});
+
+describe('Batch E, E1: `work` says whether Reflect on Feedback is on', () => {
+  it('Send Work off and Reflect on: `feedback` is asked once, and Reflect on Feedback shows', async () => {
+    const world = { reflect: true, assessments: [], workOff: { reflect: true } };
+    const page = await signIn(school(world, undefined));
+    expect(bodies(page, 'feedback')).toHaveLength(1);
+    expect(bodies(page, 'feedback')[0].enrollment_id).toBe(CECE);
+    expect(viewOf(page).reflectOn).toBe(true);
+  });
+
+  it('both off: no new read, and the page is drawn exactly as before', async () => {
+    const off = await signIn(school({ reflect: false, assessments: [], workOff: { reflect: false } }, undefined));
+    const before = await signIn(school({ reflect: false, assessments: [] }, undefined));
+    expect(bodies(off, 'feedback')).toEqual([]);
+    expect(off.root().innerHTML).toBe(before.root().innerHTML);
   });
 });
 

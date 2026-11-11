@@ -27,6 +27,8 @@ import { SEND_ROUTES, makeRemoval, makeSendRoutes } from './send-routes.ts';
 // Batch C's routes (Mark Up, Reflect, Revisions, group work): feedback-routes.ts and revision-routes.ts.
 import { FEEDBACK_ROUTES, makeFeedbackRoutes } from './feedback-routes.ts';
 import { REVISION_ROUTES, makeRevisionRoutes } from './revision-routes.ts';
+// Batch E's: questionnaires and phone reports from a card (forms-routes.ts).
+import { FORM_ROUTES, makeFormRoutes } from './forms-routes.ts';
 
 export type Db = {
   open: (code: string, ipHash: string) => Promise<Record<string, unknown>>;
@@ -216,6 +218,7 @@ export function makeHandler(opts: Options) {
     defer: opts.defer || null,
   });
   const feedbackRoute = makeFeedbackRoutes({ db: opts.db });
+  const formRoute = makeFormRoutes({ db: opts.db });
   const revisionRoute = makeRevisionRoutes({ db: opts.db, store: opts.store || null, log, removal });
   const sendRoute = makeSendRoutes({
     removal,
@@ -273,7 +276,9 @@ export function makeHandler(opts: Options) {
             ? feedbackRoute
             : Object.hasOwn(REVISION_ROUTES, route)
               ? revisionRoute
-              : null;
+              : Object.hasOwn(FORM_ROUTES, route)
+                ? formRoute
+                : null;
     let result: Record<string, unknown>;
     try {
       const hash = await ipHash(req, opts.ipKey);

@@ -653,6 +653,8 @@
     var student = S.page.student.id;
     return askRoute('work', {}).then(function (res) {
       if (!S || !S.page || S.page.student.id !== student) return;
+      // Whether the class has Reflect on Feedback on (Batch E, E1): s/feedback.js asks `feedback` then too.
+      S.reflectOn = res && res.ok === true && res.reflect_on_feedback === true ? student : null;
       var on = !!(res && res.ok === true && res.send_work === true);
       var had = !!(S.realWork && S.realWork.student === student);
       S.realWork = on ? { student: student, reply: res } : null;

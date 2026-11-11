@@ -6168,6 +6168,15 @@ function saveScoreReportNote(cid, sid, aid, text) {
   });
   if (!entries.length) return false;
   if (getScoreReportNote(cid, sid, aid) === note) return true;
+  // Batch E, E3: a regrade of a returned grade is open: the note it went out with is kept first.
+  var gradeRow = getGradeReturn(cid, sid, aid);
+  var heldRow = gradeRow ? GradeState.afterNote(gradeRow, getScoreReportNote(cid, sid, aid)) : null;
+  if (heldRow && heldRow !== gradeRow) {
+    var rows = Object.assign({}, getGradeReturns(cid));
+    rows[aid] = Object.assign({}, rows[aid]);
+    rows[aid][sid] = heldRow;
+    _saveGradeReturns(cid, rows);
+  }
   entries.forEach(function (e) {
     if (note) e.reportNote = note;
     else delete e.reportNote;
@@ -11642,6 +11651,11 @@ function _serverGradeRows(list) {
       });
       if (r.updated_at != null) row.updated_at = r.updated_at;
       if (r.seen_at != null) row.seen_at = r.seen_at;
+      // Batch E, E3: the Note for the Report the returned grade went out with, while a regrade is open.
+      if (typeof r.held_note_at === 'string') {
+        row.held_note_at = r.held_note_at;
+        if (typeof r.held_note === 'string' && r.held_note) row.held_note = r.held_note;
+      }
       of[sid] = row;
     });
     if (Object.keys(of).length) out[aid] = of;
@@ -11679,6 +11693,8 @@ function _gradeRowsLook(rows) {
                 copy(r.returned_copy),
                 copy(r.previous_copy),
                 day(r.updated_at),
+                // Batch E, E3: a report prints the held note while it counts.
+                GradeState.heldNote(r).held ? GradeState.heldNote(r).note : null,
               ];
             }),
         ];

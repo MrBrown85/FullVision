@@ -375,6 +375,35 @@ def scen_e2():
     finally:
         d.close()
 
+# ── edge: the four new routes' statements, as forms-routes.ts writes them ──
+def edge_statements():
+    text = open(os.path.join(HERE, '..', '..', 'supabase', 'functions', 'student-submit', 'forms-routes.ts')).read()
+    block = text[text.index('export const SQL = {'):]
+    block = block[:block.index('};')]
+    return {n: ''.join(re.findall(r"'([^']*)'", b)) for n, b in re.findall(r"(\w+):\s*((?:'[^']*'\s*)+)", block)}
+def as_edge(d, sql, *params):
+    named = re.sub(r'\$(\d+)', lambda m: ':p' + m.group(1), sql)
+    kw = {'p%d' % (i + 1): (None if v is None else str(v)) for i, v in enumerate(list(params) + ['ab' * 32])}
+    return d._as('service_role', None, named, kw)[0][0]
+
+@scenario('edge', without=False)
+def scen_edge():
+    st = edge_statements()
+    ok("forms-routes.ts names the four statements", sorted(st) == ['answer', 'form', 'forms', 'report'], st)
+    d, k, t1, t2 = world('edge')
+    try:
+        q = questionnaire(d); issue(d, q['id'], ENR1)
+        f = as_edge(d, st['forms'], t1, ENR1)
+        ok('forms, as the edge sends it', f.get('ok') and [x['id'] for x in f['questionnaires']] == [q['id']], f)
+        fm = as_edge(d, st['form'], t1, ENR1, q['id'])
+        ok('form, as the edge sends it', fm.get('ok') and fm['parts'][0]['id'] == q['id'], fm)
+        a = as_edge(d, st['answer'], t1, ENR1, q['id'], json.dumps({text_q(q): 'From the card.'}))
+        ok('answer, as the edge sends it (the answers as JSON text)', a.get('ok') is True, a)
+        r = as_edge(d, st['report'], t1, ENR1, nid())
+        ok('report, as the edge sends it', r == {'ok': False, 'error': 'not_found'}, r)
+    finally:
+        d.close()
+
 # ── e3 ──────────────────────────────────────────────────────────────────────
 def note(d, e, a, text, uid=A): return d.rpc('save_score_report_note(:e, :a, :n, :k)', uid, e=e, a=a, n=text, k=nid())
 def row(d, a, e):
