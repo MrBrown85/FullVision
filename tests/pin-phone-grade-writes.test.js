@@ -331,39 +331,17 @@ describe('pin: the phone Grade tab’s writes', () => {
     on(sid, '[data-action="m-grade-score"][data-tid="' + tid + '"][data-score="' + n + '"]');
   const plusMinus = (sid, tid, mod) =>
     on(sid, '.m-score-mods[data-tid="' + tid + '"] [data-action="m-grade-mod"][data-mod="' + mod + '"]');
-  /* The Lab's Advanced Rubric shows one criterion at a time (the board
-     "Phone Grader, Advanced Rubric"): its pager is stepped to the criterion
-     before its controls are used, and a box's level group opened. Only how
-     the test reaches a control moved; what a tap writes is the pin. */
-  function showCrit(sid, crit) {
-    const ids = getRubricById(CID, LAB_RUBRIC).criteria.map(c => c.id);
-    for (let i = 0; i < ids.length; i++) {
-      const pager = on(sid, '.m-crit-pager');
-      if (!pager) return;
-      const at = ids.indexOf(pager.getAttribute('data-critid'));
-      const want = ids.indexOf(crit);
-      if (at === want || want < 0) return;
-      MGrade.pageCriterion(CID, sid, LAB, want > at ? 1 : -1);
-    }
+  const critLevel = (sid, crit, n) =>
+    on(sid, '[data-action="m-grade-crit"][data-critid="' + crit + '"][data-score="' + n + '"]');
+  const critPlusMinus = (sid, crit, mod) =>
+    on(sid, '.m-score-mods[data-critid="' + crit + '"] [data-action="m-grade-mod"][data-mod="' + mod + '"]');
+  const checklist = (sid, crit) => on(sid, '[data-action="m-grade-checks"][data-critid="' + crit + '"]');
+  // The tab remembers which checklists are open, from one test to the next.
+  function openChecklist(sid, crit) {
+    if (checklist(sid, crit).getAttribute('aria-expanded') !== 'true') tap(checklist(sid, crit));
   }
-  const critLevel = (sid, crit, n) => (
-    showCrit(sid, crit),
-    on(sid, '[data-action="m-grade-crit"][data-critid="' + crit + '"][data-score="' + n + '"]')
-  );
-  const critPlusMinus = (sid, crit, mod) => (
-    showCrit(sid, crit),
-    on(sid, '.m-score-mods[data-critid="' + crit + '"] [data-action="m-grade-mod"][data-mod="' + mod + '"]')
-  );
-  const openChecklist = (sid, crit) => showCrit(sid, crit);
-  function box(sid, id) {
-    const crit = getRubricById(CID, LAB_RUBRIC).criteria.find(c => (c.checks || []).some(k => k.id === id));
-    showCrit(sid, crit.id);
-    const lv = crit.checks.find(k => k.id === id).level;
-    const head = on(sid, '.m-check-group-head[data-level="' + lv + '"]');
-    if (head.getAttribute('aria-expanded') !== 'true') MGrade.toggleCritGroup(CID, sid, LAB, crit.id, lv);
-    return on(sid, '[data-action="m-grade-tick"][data-checkid="' + id + '"]');
-  }
-  const critComment = (sid, crit) => (showCrit(sid, crit), on(sid, '.m-crit-comment[data-critid="' + crit + '"]'));
+  const box = (sid, id) => on(sid, '[data-action="m-grade-tick"][data-checkid="' + id + '"]');
+  const critComment = (sid, crit) => on(sid, '.m-crit-comment[data-critid="' + crit + '"]');
   const overall = (sid, aid) => document.getElementById('m-overall-' + sid + '-' + aid);
   const points = (sid, aid) => document.getElementById('m-pts-' + sid + '-' + aid);
   const step = (sid, which) => on(sid, '[data-action="m-grade-points-' + which + '"]');
