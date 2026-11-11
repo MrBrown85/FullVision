@@ -5,7 +5,7 @@ gradebook-prod will be once Batch B is applied (batch_c_common.build).
     PGDATABASE=<template> BATCH_B_DIR=<Batch B's migrations/> python3 batch_c.py            every scenario
     PGDATABASE=...                                            python3 batch_c.py teacher    only those named
 
-Scenarios: apply1 teacher markup started contract gone reflect revision group grants race apply2 hide given closes only_me hide_round1 round2
+Scenarios: apply1 teacher markup started contract gone reflect revision group grants race apply2 hide given closes only_me hide_round1 round2 put_back
 """
 import threading, time
 from batch_c_common import *
@@ -1564,9 +1564,87 @@ def round2():
     finally:
         d.close()
 
+# ── put_back: a grade put back is not a Return (the second review's new (a) 1) ──
+def put_back():
+    """A returned grade changed and changed back, or a comment typed and deleted, with no Return pressed:
+    nothing is given and no request closes (C1 alone and with C2), in a class that holds grades; in one that
+    returns at once each save is a Return."""
+    ways = [('the grade changed and changed back', lambda d, a: (d.score(ENR1, a, 7), d.score(ENR1, a, 6))),
+            ('a comment typed and deleted', lambda d, a: (d.rpc("save_score_comment(:e, :a, 'x')", e=ENR1, a=a),
+                                                          d.rpc("save_score_comment(:e, :a, null)", e=ENR1, a=a)))]
+    def row(d, a): return d.all('select is_draft, returned_at, returned_copy, previous_copy, updated_at from grade_return where enrollment_id = :e and assessment_id = :a', e=ENR1, a=a)
+    for c2 in (False, True):
+        tag = ' (C1 and C2)' if c2 else ' (C1 alone)'
+        for label, do in ways:
+            for revision in (False, True):
+                rtag = ', a revision in' if revision else ''
+                # a class that holds grades, marks waiting
+                d = scenario_db('putback', with_c2=c2)
+                try:
+                    k = seed(d); a = k['lab']
+                    tok = d.session(ENR1); sub, files = d.send(tok, ENR1, a, 1)
+                    d.score(ENR1, a, 6); d.return_work(a, [ENR1])
+                    rid = None
+                    if revision:
+                        rid = d.rfr(a, ENR1, {'what_to_fix': 'Fix'})['request']['id']
+                        s, f = d.revise(tok, ENR1, a); assert f['ok'], f
+                        fid = d.one('select f.id from submission_file f join submission s on s.id = f.submission_id where s.id = :s', s=s['submission_id'])
+                    else:
+                        fid = files[0]
+                    w = d.save_markup(fid, marks('not ready to send')); assert w['waiting'] is True, w
+                    if revision:   # marks on the revision's pages make it grading; erase to keep it sent, mark the first version
+                        d.save_markup(fid, marks()); w = d.save_markup(files[0], marks('not ready to send')); fid = files[0]
+                    g0 = row(d, a)
+                    do(d, a)
+                    m = d.marks(tok, ENR1, a)
+                    lm = [x for x in d.rpc('list_assessment_markup(:a)', a=a) if x['file_id'] == fid][0]
+                    ok('put_back%s, holds grades, %s%s: the grade row is as it was' % (tag, label, rtag), row(d, a) == g0, (row(d, a), g0))
+                    ok('put_back%s, holds grades, %s%s: the waiting marks are not given' % (tag, label, rtag),
+                       m['files'] == [] and d.one('select count(*) from markup where file_id = :f and given_rev = working_rev', f=fid) == 0, m)
+                    ok('put_back%s, holds grades, %s%s: the teacher is still told they wait' % (tag, label, rtag), lm['waiting'] is True, lm)
+                    if revision:
+                        st = (d.one('select state from revision_request where id = :r', r=rid), piece(d.feedback(tok, ENR1), a)['revision']['state'],
+                              d.rpc('list_course_feedback(:c)', c=COURSE_A)['revisions'][0]['state'])
+                        ok('put_back%s, holds grades, %s%s: the request stays open, the revision in, to both sides' % (tag, label, rtag),
+                           st == ('open', 'sent', 'sent'), st)
+                    # then Return, with nothing to return but the marks
+                    r = d.return_work(a, [ENR1])
+                    ok('put_back%s, holds grades, %s%s: Return then gives them' % (tag, label, rtag),
+                       r['marks_given'] == 1 and len(d.marks(tok, ENR1, a)['files']) == 1, r)
+                    # new marks, a changed grade, and the released app's Return: with C2 the marks go with it
+                    d.save_markup(fid, marks('second')); d.score(ENR1, a, 8)
+                    d.rpc('return_grades(:a, :e, :k)', a=a, e=[ENR1], k=nid())
+                    given = d.one('select given_rev = working_rev from markup where file_id = :f', f=fid)
+                    ok('put_back%s, holds grades, %s%s: a Return of a changed grade by return_grades %s' % (tag, label, rtag, 'gives them' if c2 else 'does not give them (C1 alone)'),
+                       given is c2, given)
+                    if revision:
+                        ok('put_back%s, holds grades, %s%s: and a changed grade returned returns the revision' % (tag, label, rtag),
+                           piece(d.feedback(tok, ENR1), a)['revision']['state'] == 'returned'
+                           and (not c2 or d.one('select state from revision_request where id = :r', r=rid) == 'done'))
+                finally:
+                    d.close()
+            # a class that returns at once: each save that changes the grade is a Return (review (b) 3, as built)
+            d = scenario_db('putback', with_c2=c2)
+            try:
+                k = seed(d, on_return=False); a = k['lab']
+                tok = d.session(ENR1); d.send(tok, ENR1, a, 1)
+                d.score(ENR1, a, 6)
+                rid = d.rfr(a, ENR1, {'what_to_fix': 'Fix'})['request']['id']
+                s, f = d.revise(tok, ENR1, a); assert f['ok'], f
+                r0 = d.one('select returned_at from grade_return where enrollment_id = :e and assessment_id = :a', e=ENR1, a=a)
+                do(d, a)
+                r1 = d.one('select returned_at from grade_return where enrollment_id = :e and assessment_id = :a', e=ENR1, a=a)
+                ok('put_back%s, returns at once, %s, a revision in: each save is a Return (a new returned date)' % (tag, label), r1 != r0 and r1 is not None)
+                ok('put_back%s, returns at once, %s, a revision in: the revision reads returned to both sides' % (tag, label),
+                   piece(d.feedback(tok, ENR1), a)['revision']['state'] == 'returned'
+                   and d.rpc('list_course_feedback(:c)', c=COURSE_A)['revisions'][0]['state'] == 'returned'
+                   and (not c2 or d.one('select state from revision_request where id = :r', r=rid) == 'done'))
+            finally:
+                d.close()
+
 SCENARIOS = {'apply1': apply1, 'teacher': teacher, 'markup': markup, 'started': started, 'contract': contract, 'gone': gone, 'reflect': reflect, 'revision': revision, 'group': group,
              'grants': grants, 'race': race, 'apply2': apply2, 'hide': hide, 'given': given,
-             'closes': closes, 'only_me': only_me, 'hide_round1': hide_round1, 'round2': round2}
+             'closes': closes, 'only_me': only_me, 'hide_round1': hide_round1, 'round2': round2, 'put_back': put_back}
 if __name__ == '__main__':
     for name in (sys.argv[1:] or list(SCENARIOS)):
         try: SCENARIOS[name]()
