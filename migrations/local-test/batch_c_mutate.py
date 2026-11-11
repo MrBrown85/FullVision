@@ -49,8 +49,9 @@ CHANGES = [
     ("student markup: every student's marks on the piece", C1,
      "         where m.assessment_id = _a.id and m.given is not null\n           and m.enrollment_id = any (coalesce(_group_members(_a.id, p_enrollment_id), array[p_enrollment_id]))), '[]'::jsonb));",
      "         where m.assessment_id = _a.id and m.given is not null), '[]'::jsonb));", 'markup group'),
-    ("feedback: marks are counted before they are given", C1,
-     "                           where m.assessment_id = a.id and m.given is not null", "                           where m.assessment_id = a.id", 'markup'),
+    ("feedback: the teacher's working marks are counted", C1,
+     "                           where m.assessment_id = a.id and m.given is not null\n                             and m.enrollment_id = any (coalesce(_group_members(a.id, p_enrollment_id), array[p_enrollment_id]))\n                             and jsonb_array_length(coalesce(m.given->'marks', '[]'::jsonb)) > 0",
+     "                           where m.assessment_id = a.id and m.working is not null\n                             and m.enrollment_id = any (coalesce(_group_members(a.id, p_enrollment_id), array[p_enrollment_id]))\n                             and jsonb_array_length(coalesce(m.working->'marks', '[]'::jsonb)) > 0", 'markup'),
     ("reflect: Reflect on Feedback off is not asked", C1,
      "    if not _course.reflect_on_feedback then\n        return jsonb_build_object('ok', false, 'error', 'reflect_off');\n    end if;", "", 'reflect'),
     ("reflect: work never returned can be reflected on", C1,
@@ -102,13 +103,15 @@ CHANGES = [
     ("a deleted assessment leaves its reflections", C1,
      "        delete from revision_request where assessment_id = old.id;\n        delete from feedback_reflection where assessment_id = old.id;",
      "        delete from revision_request where assessment_id = old.id;", 'reflect'),
-    ("a student function is left runnable by signed-in teachers", C1,
-     "revoke all on function student_submit.reflect(text, uuid, uuid, jsonb, text) from public, anon, authenticated;\n", "", 'grants'),
-    ("a teacher RPC is left runnable by anon", C1,
-     "revoke all on function public.save_markup(uuid, jsonb, integer, uuid) from public, anon;\n", "", 'grants teacher'),
+    ("a student function is granted to signed-in teachers", C1,
+     "grant execute on function student_submit.reflect(text, uuid, uuid, jsonb, text) to service_role;", "grant execute on function student_submit.reflect(text, uuid, uuid, jsonb, text) to service_role, authenticated;", 'grants'),
+    ("a teacher RPC is granted to anon", C1,
+     "grant execute on function public.save_markup(uuid, jsonb, integer, uuid) to authenticated, service_role;", "grant execute on function public.save_markup(uuid, jsonb, integer, uuid) to authenticated, service_role, anon;", 'grants teacher'),
     ("a helper is left runnable by the service role", C1,
      "revoke all on function public._markup_give(uuid, uuid) from public, anon, authenticated, service_role;\n", "", 'grants'),
-    ("row security left off on markup", C1, "alter table public.markup enable row level security;\n", "", 'grants'),
+    ("markup readable by signed-in teachers", C1,
+     "revoke all on table public.markup, public.revision_request, public.feedback_reflection from public, anon, authenticated;",
+     "revoke all on table public.markup, public.revision_request, public.feedback_reflection from public, anon, authenticated;\ngrant select on public.markup to authenticated;", 'grants'),
     ("reflect without pg_temp in its search path", C1,
      " returns jsonb\n language plpgsql\n security definer\n set search_path to 'public', 'student_submit', 'pg_temp'\nas $function$\ndeclare\n    _in     jsonb;\n    _course course%rowtype;\n    _a      assessment%rowtype;",
      " returns jsonb\n language plpgsql\n security definer\n set search_path to 'public', 'student_submit'\nas $function$\ndeclare\n    _in     jsonb;\n    _course course%rowtype;\n    _a      assessment%rowtype;", 'grants'),
@@ -147,10 +150,12 @@ CHANGES = [
     ("C2: no trigger on a new row", C2,
      "create or replace trigger markup_given_on_insert after insert on public.grade_return\n    for each row when (new.returned_at is not null and not new.is_draft)\n    execute function public._markup_on_return();\n", "", C2S),
     ("C2: the update trigger watches only is_draft", C2, "after update of returned_at, is_draft on public.grade_return", "after update of is_draft on public.grade_return", C2S),
-    ("C2: a hide helper left runnable", C2, "revoke all on function public._revision_hide_grade(uuid) from public, anon, authenticated, service_role;\n", "", C2S),
+    ("C2: a hide helper granted to signed-in teachers", C2, "revoke all on function public._revision_hide_grade(uuid) from public, anon, authenticated, service_role;\n",
+     "revoke all on function public._revision_hide_grade(uuid) from public, anon, authenticated, service_role;\ngrant execute on function public._revision_hide_grade(uuid) to authenticated;\n", C2S),
     ("C2: the trigger function left runnable", C2, "revoke all on function public._markup_on_return() from public, anon, authenticated, service_role;\n", "", C2S),
-    ("C2: hide when nothing was returned", C2, "    if not found or _g.returned_at is null then\n        return false;\n    end if;\n    -- What the student sees now",
-     "    if not found then\n        return false;\n    end if;\n    -- What the student sees now", C2S),
+    ("C2: Take Back does not give updated_at back", C2,
+     "           set is_draft = false, returned_at = (_h->>'returned_at')::timestamptz,\n               updated_at = (_h->>'updated_at')::timestamptz, returned_copy = null",
+     "           set is_draft = false, returned_at = (_h->>'returned_at')::timestamptz,\n               updated_at = null, returned_copy = null", C2S),
 ]
 
 def run(i, desc, rel, old, new, scen):
@@ -168,8 +173,10 @@ def run(i, desc, rel, old, new, scen):
     fails = [l[5:] for l in r.stdout.splitlines() if l.startswith('FAIL ')]
     if not fails: return '%2d  MISSED: %s' % (i, desc)
     first = fails[0].split(' :: ')[0]
-    by_file = 'ran to the end' in first and 'STOPPED' in fails[0] or "AssertionError: STOPPED" in fails[0]
-    return '%2d  caught (%d checks%s): %s  [first: %s]' % (i, len(fails), ', the file refused to apply' if by_file else '', desc, first[:110])
+    by_file = 'AssertionError: STOPPED' in fails[0]
+    broke = first.endswith('ran to the end') and not by_file
+    how = ', the file refused to apply' if by_file else (', the scenario stopped on an answer it did not expect' if broke else '')
+    return '%2d  caught (%d checks%s): %s  [first: %s]' % (i, len(fails), how, desc, first[:110])
 
 if __name__ == '__main__':
     pick = [int(x) for x in sys.argv[1:]] or range(1, len(CHANGES) + 1)

@@ -446,6 +446,7 @@ def revision():
         s, f = d.revise(t1, ENR1, k['lab'], 1, 'I added the third reason.')
         ok('revision: handed in as version 2', f['ok'] and f['version'] == 2, f)
         ok('revision: the finish again is a replay', d.rev_finish(t1, ENR1, s['submission_id'], s['files'])['replayed'] is True)
+        ok('revision: another student cannot finish it', d.rev_finish(t2, ENR2, s['submission_id'], s['files'])['error'] == 'not_found')
         v1 = d.one('select count(*) from submission where assessment_id = :a and enrollment_id = :e and state = :s and version = 1', a=k['lab'], e=ENR1, s='sent')
         ok('revision: version 1 stays, with its pages', v1 == 1 and d.one('select count(*) from submission_file where submission_id = :s', s=sub) == 2)
         st = piece(d.feedback(t1, ENR1), k['lab'])['revision']
@@ -718,8 +719,10 @@ def hide():
     try:
         k = seed(d); t1 = d.session(ENR1); t2 = d.session(ENR2, '2012-06-16')
         sub, files = d.send(t1, ENR1, k['lab'], 1)
-        d.score(ENR1, k['lab'], 6); d.return_work(k['lab'], [ENR1])
-        d.score(ENR2, k['lab'], 4); d.return_work(k['lab'], [ENR2])
+        # each grade returned, then changed and returned again, so each has an updated_at
+        d.score(ENR1, k['lab'], 5); d.return_work(k['lab'], [ENR1]); d.score(ENR1, k['lab'], 6); d.return_work(k['lab'], [ENR1])
+        d.score(ENR2, k['lab'], 3); d.return_work(k['lab'], [ENR2]); d.score(ENR2, k['lab'], 4); d.return_work(k['lab'], [ENR2])
+        ok('hide: both grades carry an updated_at before the hide', all(gr(d, e, k['lab'])[0][4] is not None for e in (ENR1, ENR2)))
         d.page(t1, ENR1); d.service("student_submit.seen(:t, :e, :a, 'ip-1')", t=t1, e=ENR1, a=[k['lab']])
         g_before = gr(d, ENR1, k['lab']); others = d.all('select * from grade_return where not (enrollment_id = :e and assessment_id = :a) order by 1, 2', e=ENR1, a=k['lab'])
         scores = d.all('select * from score order by id')
