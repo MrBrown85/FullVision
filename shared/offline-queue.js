@@ -165,9 +165,11 @@
     // Return for one student (return_grades names its students as a list) is
     // a write to that student's cell: it goes after the score writes queued
     // for the cell and before any made after it. shared/data.js sends one
-    // student to a call for this.
+    // student to a call for this. Return with Mark Up (return_work) is the
+    // same, and so are a student's Mark Up saves (shared/data.js gives each
+    // the cell's key), so the marks a Return gives are the ones saved before it.
     if (
-      endpoint === 'return_grades' &&
+      (endpoint === 'return_grades' || endpoint === 'return_work') &&
       payload.p_assessment_id &&
       Array.isArray(payload.p_enrollment_ids) &&
       payload.p_enrollment_ids.length === 1
@@ -241,7 +243,7 @@
      (another student's score or Return on the same work) holds nothing. */
   function _returnOf(entry) {
     var p = entry.payload || {};
-    if (entry.endpoint !== 'return_grades' || !p.p_assessment_id) return null;
+    if ((entry.endpoint !== 'return_grades' && entry.endpoint !== 'return_work') || !p.p_assessment_id) return null;
     var ids = {};
     ids[p.p_assessment_id] = true;
     (Array.isArray(p.p_enrollment_ids) ? p.p_enrollment_ids : []).forEach(function (sid) {
@@ -286,6 +288,8 @@
     save_score_comment: true,
     save_score_report_note: true,
     set_rubric_printed: true,
+    // Mark Up: a save replaces the page's whole set of marks (_carryKept keeps the first one's base rev).
+    save_markup: true,
   };
 
   /* Params a cell write may leave null to mean "keep the saved one": the
@@ -298,6 +302,13 @@
     upsert_rubric_score: ['p_comment', 'p_beyond'],
   };
   function _carryKept(entry, replaced) {
+    // A Mark Up save names the rev its screen last read. Two saves in a row
+    // go as one, and the one is as good as the first: it must be checked
+    // against the rev the first was, since the second's only exists once the
+    // first has landed.
+    if (entry.endpoint === 'save_markup') {
+      return Object.assign({}, entry.payload, { p_base_rev: replaced.payload ? replaced.payload.p_base_rev : null });
+    }
     var kept = KEEP_WHEN_NULL[entry.endpoint];
     if (!kept) return entry.payload;
     var payload = Object.assign({}, entry.payload);
@@ -913,6 +924,9 @@
       if (assessment && _isBarrier(e) && _assessmentOf(e) === assessment) return -1;
       if (e.key !== entry.key) continue;
       if (_isInFlight(e) || e.endpoint !== entry.endpoint || e.owner !== entry.owner) return -1;
+      // A Mark Up save already tried may have landed with its answer lost: the
+      // next save's base rev is then the one after it, so the two stay apart.
+      if (entry.endpoint === 'save_markup' && e.attempts > 0) return -1;
       if (_target(e.endpoint, e.payload) !== target) return -1;
       if (!_sameSet(e.blocked_on, entry.blocked_on)) return -1;
       return i;
@@ -1355,7 +1369,7 @@
         return e.endpoint === endpoint && !_isForeign(e, owner);
       })
       .map(function (e) {
-        return { id: e.id, payload: JSON.parse(JSON.stringify(e.payload || {})) };
+        return { id: e.id, created_at: e.created_at, payload: JSON.parse(JSON.stringify(e.payload || {})) };
       });
   }
 

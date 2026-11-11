@@ -4,7 +4,7 @@
  * student's photos show in the grader from storage (a signed link, shown
  * from a blob: address); Add Work for a student with nothing in uploads to
  * the paths the server named and hands them in; a grade and Return go as
- * they always have (return_grades).
+ * they always have, as return_work (return_grades and Mark Up's marks).
  *
  * helpers.js `mockAuth` answers the class load. This file adds Batch B's
  * teacher RPCs and Storage, with what they hold in localStorage under
@@ -222,7 +222,7 @@ async function server(page) {
         write(s);
         return real(name, params);
       }
-      if (name === 'return_grades') {
+      if (name === 'return_grades' || name === 'return_work') {
         log(name, params);
         const at = new Date().toISOString();
         (params.p_enrollment_ids || []).forEach(sid => {
@@ -307,8 +307,10 @@ test('Send Work on, a student’s photos in the grader, Add Work, a grade and Re
   await expect(dialog.locator('.grader-draft-mark')).toHaveText('Draft');
   await dialog.locator('.grader-return [data-grader="return"]').click();
   await expect(dialog.locator('.grader-returned')).toHaveText(/^Returned /);
-  await expect.poll(async () => (await calls(page, 'return_grades')).length).toBe(1);
-  expect((await calls(page, 'return_grades'))[0].p_enrollment_ids).toEqual([ALICE]);
+  // Return in a class with Send Work on is return_work (S9-W1): return_grades, and the marks.
+  await expect.poll(async () => (await calls(page, 'return_work')).length).toBe(1);
+  expect((await calls(page, 'return_work'))[0].p_enrollment_ids).toEqual([ALICE]);
+  expect(await calls(page, 'return_grades')).toEqual([]);
   await dialog.locator('.grader-done').click();
 
   // Bob sent nothing: Add Work, a real photo, to the paths the server named.
