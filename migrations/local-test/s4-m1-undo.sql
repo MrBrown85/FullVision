@@ -21,6 +21,13 @@
 -- was never applied to, and a database where a later migration has replaced
 -- either function (that migration's own undo goes first).
 --
+-- ── Order, among the undo scripts ───────────────────────────────────────────
+-- This one goes before S0-M4b's (s0-m4b-undo.sql, PART 2) and Batch A's
+-- (batch-a-undo.sql, PART 2): S0-M4b's puts page back as Batch A made it and
+-- refuses while page is S4-M1's. It does not matter whether Batch B is
+-- applied, and S3-M1's and Batch B's undo scripts do not touch these two
+-- functions.
+--
 -- ── What a student sees ─────────────────────────────────────────────────────
 -- The reply loses the keys S4-M1 added (the contract lists them:
 -- migrations/local-test/s4-m1-contract.md). Every other key is as it is with

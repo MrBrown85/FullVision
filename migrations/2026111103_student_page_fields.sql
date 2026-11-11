@@ -11,7 +11,8 @@
 -- grades.
 --
 -- TWO FUNCTIONS ARE REPLACED, and nothing else is made, dropped or changed:
--- no table, column, row, trigger, policy or grant.
+-- no table, column, row, trigger or policy. Who may run the two is said
+-- again, as it was.
 --   student_submit.page(text, uuid, text)
 --   student_submit._session_classes(uuid)   (the `classes` list that page and
 --                                            verify_card both send)
@@ -42,10 +43,11 @@
 --                             null when no percent would be true. See below.
 --   assessments[].core_competencies
 --                             [{ id, name }] for assessment.core_competency_ids,
---                             each once, in the Ministry's order (the order of
+--                             each once, in the Ministry's order: the order of
 --                             CORE_COMPETENCIES in shared/constants.js, whose
---                             labels the names are; tests/student-page-fields
---                             .test.js fails if the two lists differ).
+--                             labels the names are
+--                             (tests/student-page-fields.test.js fails if the
+--                             two lists differ).
 --   classes[].to_do           how many pieces wait for the student in that
 --                             class. See below. verify_card's `classes` is
 --                             the same list and gains it too.
@@ -148,8 +150,8 @@
 -- No table is changed. _session_classes is an SQL function, and making one
 -- reads the definitions of the tables it names (device_session_enrollment,
 -- student_card, enrollment, student, course, assessment): a shared lock on
--- each for an instant, which waits only for something that holds a table
--- whole, such as another migration. A save, a card scan or a page being
+-- each until the file commits, an instant later, which waits only for
+-- something that holds a table whole, such as another migration. A save, a card scan or a page being
 -- read does not hold it up and is not held up. If one of those tables is
 -- held whole for more than five seconds the file gives up with nothing
 -- applied: run it again. A page being read while the file commits gets the
