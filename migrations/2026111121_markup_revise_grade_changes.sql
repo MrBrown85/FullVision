@@ -94,7 +94,7 @@ begin
             ('public._revision_hide_available()',                            'cd50f4c6493a73b3c42ae51f7580f970', 'a4b4e942de351d6849702b96f25c7356'),
             ('public._revision_hide_grade(uuid)',                            '247080f6572bb45951cef807a2b849bd', 'a4c3f002d3bb2fc01e58ec5b8dab8ecb'),
             ('public._revision_unhide_grade(uuid)',                          '26d2861325edf27f95d090ebd590eb0f', '12dd830d953d13db1617e40a27f35133'),
-            ('public._markup_on_return()',                                   'absent', '7aee1528f49c74565268dd37d191afd0')
+            ('public._markup_on_return()',                                   'absent', 'dcdf19c36ff69743f479df9b5ba46bff')
             -- FINGERPRINTS-END
         ) as v(fn, first_run, later_run)
     loop
@@ -222,15 +222,38 @@ $function$;
 -- After a grade_return row is written so that a grade is returned (a row
 -- made returned, or a row whose returned_at changes while it is not a
 -- draft), the student is given the marks on that piece. grade_return is
--- written only under the class's lock, so markup is too.
+-- written only under the class's lock, so markup and revision_request are
+-- too. The same moment ends a hide on the piece: a Return of any kind
+-- (Return, Return N Graded, the class leaving When I Return Them, a
+-- restore) has given the student a grade for it.
 create or replace function public._markup_on_return()
  returns trigger
  language plpgsql
  security definer
  set search_path to 'public', 'pg_temp'
 as $function$
+declare
+    _r revision_request%rowtype;
 begin
     perform _markup_give(new.enrollment_id, new.assessment_id);
+    -- A restore (fv.restoring) first marks every restored grade Returned,
+    -- then writes the backup's own state over it: a hide is not ended by
+    -- that passing step. (The app restores as a new class, where there is
+    -- no request.)
+    if current_setting('fv.restoring', true) = 'on' then
+        return null;
+    end if;
+    -- A hide on the piece ends here, for good. (The partial index
+    -- revision_request_one_open finds it; a class with no request reads
+    -- one empty index page.)
+    select * into _r from revision_request
+     where assessment_id = new.assessment_id and enrollment_id = new.enrollment_id and state = 'open'
+       for update;
+    if found and _r.grade_hidden then
+        update revision_request
+           set grade_hidden = false, hide_ended_at = clock_timestamp(), hide_ended_by = 'returned', updated_at = now()
+         where id = _r.id;
+    end if;
     return null;
 end;
 $function$;
@@ -259,7 +282,7 @@ begin
             ('public._revision_hide_available()',   'a4b4e942de351d6849702b96f25c7356'),
             ('public._revision_hide_grade(uuid)',   'a4c3f002d3bb2fc01e58ec5b8dab8ecb'),
             ('public._revision_unhide_grade(uuid)', '12dd830d953d13db1617e40a27f35133'),
-            ('public._markup_on_return()',          '7aee1528f49c74565268dd37d191afd0')
+            ('public._markup_on_return()',          'dcdf19c36ff69743f479df9b5ba46bff')
             -- FINGERPRINTS-END
         ) as v(fn, becomes)
     loop

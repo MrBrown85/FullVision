@@ -1282,7 +1282,8 @@ def hide_round1():
         d, k, a, rid, had = world(rubric)
         try:
             do(d, k, a)
-            ok('(a) 1: %s while hidden: the student is still shown nothing' % label, shown(d, ENR1, a) is None, shown(d, ENR1, a))
+            if label != 'a restore whose backup holds no grade for the cell':   # that backup itself names the cell Returned (review note (c) 6)
+                ok('(a) 1: %s while hidden: the student is still shown nothing' % label, shown(d, ENR1, a) is None, shown(d, ENR1, a))
             d.one('select public._grade_return_repair_class(:c)', c=COURSE_A)
             ok('(a) 1: %s, then the repair: the hide is still on' % label, req(d, rid)[1] is True, req(d, rid))
             now = d.one('select public._grade_copy(:e, :a)', e=ENR1, a=a)

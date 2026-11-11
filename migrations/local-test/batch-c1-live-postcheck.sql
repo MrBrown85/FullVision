@@ -24,7 +24,7 @@ with made(fn, becomes, or_c2) as (values
     ('public.answer_reflection(uuid,text,uuid,boolean)',                   'b384f9b1c729f42733db290a0f4ddae5', 'b384f9b1c729f42733db290a0f4ddae5'),
     ('public.list_course_feedback(uuid)',                                  '7fbe6b367a0c28fd4dd2b894f0dc7711', '7fbe6b367a0c28fd4dd2b894f0dc7711'),
     ('student_submit._group_members(uuid,uuid)',                           'b38b1af6f2dc142c94ce1cca454fd0fb', 'b38b1af6f2dc142c94ce1cca454fd0fb'),
-    ('student_submit.feedback(text,uuid,text)',                            'c45a01cc31eab1111dc89994008ba4d4', 'c45a01cc31eab1111dc89994008ba4d4'),
+    ('student_submit.feedback(text,uuid,text)',                            '9130797a14e8810566a6c1d761b2961c', '9130797a14e8810566a6c1d761b2961c'),
     ('student_submit.markup(text,uuid,uuid,text)',                         '6cc78118aa4e98252514826aabf957a9', '6cc78118aa4e98252514826aabf957a9'),
     ('student_submit.reflect(text,uuid,uuid,jsonb,text)',                  '7a4e2ab29d369ef159dce65e1e1e8f77', '7a4e2ab29d369ef159dce65e1e1e8f77'),
     ('student_submit.reply(text,uuid,uuid,jsonb,text)',                    '51e8f1db4f92885e8e310b255fa7aa70', '51e8f1db4f92885e8e310b255fa7aa70'),
