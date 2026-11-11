@@ -446,6 +446,30 @@ describe('with work waiting', () => {
     expect(badge.textContent).toBe(String(MGradePhotos.classToGrade(CID)));
     expect(MGradePhotos.classToGrade(CID)).toBeGreaterThan(0);
   });
+
+  it('on the student card the To Grade list is a widget: on by default, under the name, and the editor turns it off', () => {
+    const card = () => {
+      const data = {
+        sections: [],
+        assessments: [],
+        statuses: {},
+        termId: 'term-1',
+        widgetConfig: getCardWidgetConfig(),
+      };
+      const holder = document.createElement('div');
+      // html-safe: assembleCard escapes every widget's text; a test page
+      holder.innerHTML = MCardWidgets.assembleCard(name('st2'), CID, data);
+      return holder;
+    };
+    const on = card();
+    const list = on.querySelector('.m-scard-widgets > .m-scard-tograde');
+    expect(list).not.toBeNull();
+    expect(on.querySelector('.m-scard-widgets').firstElementChild).toBe(list);
+    MCardWidgetEditor.toggleWidget('toGrade');
+    expect(card().querySelector('.m-scard-tograde')).toBeNull();
+    MCardWidgetEditor.toggleWidget('toGrade');
+    expect(card().querySelector('.m-scard-tograde')).not.toBeNull();
+  });
 });
 
 describe('the phone loads Add Work', () => {
