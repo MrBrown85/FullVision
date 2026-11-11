@@ -865,10 +865,15 @@ create table student_submit.device_session_enrollment (
 -- through the student-submit edge function: student_submit.work, send_start,
 -- send_finish, replace, unsend, file_links. A student acts only through a
 -- live session of their own card, for their own enrollment, on an assessment
--- set to take work, while it is open, twenty sends an hour; Unsend and
--- Replace only until grading starts (student_submit._grading_started: a
--- draft or a returned grade exists). None of these functions reads or writes
--- a grade. The contract: migrations/local-test/batch-b-contract.md.
+-- set to take work, while it is open (asked when the send starts and again
+-- when it is handed in), twenty sends an hour; Unsend and Replace only until
+-- grading starts (student_submit._grading_started: a draft or a returned
+-- grade exists), and only the pages the student added. A started send holds
+-- its place two hours from its first start (_work_hold), then is expired and
+-- dropped. One class may hold 10,000 pages and 5 GB (_work_class_max_pages,
+-- _work_class_max_bytes). The teacher's Add Work and Handed In on Paper work
+-- whatever Send Work and Students Send say. None of these functions reads or
+-- writes a grade. The contract: migrations/local-test/batch-b-contract.md.
 create table submission (
   id            uuid        primary key default gen_random_uuid(),
   course_id     uuid        not null,                               -- no foreign key (see above); a trigger checks the student and the assessment are both in it
@@ -882,14 +887,14 @@ create table submission (
   on_paper      boolean     not null default false,                 -- Handed In on Paper: no pages
   note          text,                                               -- the student's note, 1000 characters at most
   followed_plan text,                                               -- Did You Do It?: yes | partly | no, the student's own word
-  is_late       boolean     not null default false,                 -- started after the due date, by the class's own calendar
+  is_late       boolean     not null default false,                 -- handed in after the due date, by the class's own calendar (judged at the finish)
   card_id       uuid,                                               -- the card whose session sent it; history only
   request_id    uuid,                                               -- the sender's own id for the call that made the row (a repeat returns the same row)
-  created_at    timestamptz not null default now(),
-  links_at      timestamptz not null default now(),                 -- when its paths were last handed out for upload links; a send not finished two hours later is expired
+  created_at    timestamptz not null default now(),                 -- when it was first started; an unfinished send holds its place two hours from then, whatever is asked of it afterwards
   sent_at       timestamptz,                                        -- there exactly when state is sent
   updated_at    timestamptz not null default now()
   -- unique (assessment_id, enrollment_id, version) where state = 'sent'; unique (assessment_id, enrollment_id, sent_by) where state = 'sending'
+  -- indexes on (enrollment_id), (course_id), (assessment_id) (what the trigger on assessment deletes by), (target_id) where not null
 );
 create table submission_file (
   id            uuid        primary key default gen_random_uuid(),
@@ -901,8 +906,11 @@ create table submission_file (
   width         integer, height integer,
   sha256        text,                                               -- of the page as stored, given when it is handed in; for the same-photo note
   rotation      smallint    not null default 0,                     -- 0 | 90 | 180 | 270; the file itself is never changed
+  added_by      text        not null,                               -- student | teacher: who added the page. A student's Unsend or Replace removes only the student's own
+  declared_bytes       integer not null,                            -- the sizes its sender said the page and its thumbnail would be (2 MB where nothing was said):
+  declared_thumb_bytes integer not null,                            -- what an unfinished page counts for against the class's limit; a larger file is refused at the finish
   created_at    timestamptz not null default now(),
-  link_dies_at  timestamptz not null                                -- the last upload link made for the page has stopped working by then (2 h 10 min after its paths were last handed out)
+  link_dies_at  timestamptz not null                                -- the last upload link that can be made for the page has stopped working by then (4 h 10 min after its send was first started)
 );
 -- SQL cannot delete a file: only the Storage API can. Every file whose page
 -- row goes (Unsend, Replace, a teacher's delete, an assessment or a student
@@ -914,7 +922,7 @@ create table submission_file_removal (
   bucket       text        not null,
   path         text        not null,                                -- unique with bucket
   course_id    uuid,                                                -- the path's first folder; the class itself may be gone
-  reason       text        not null,                                -- unsend | replace | teacher | abandoned | page_removed | row_deleted
+  reason       text        not null,                                -- unsend | replace | teacher | abandoned | expired | page_removed | row_deleted
   queued_at    timestamptz not null default now(),
   link_dies_at timestamptz not null,                                -- until then whoever holds the upload link could put the file back
   tries        integer     not null default 0,
@@ -929,10 +937,13 @@ create table student_submit.send_log (
   at timestamptz not null default now()
 );
 -- Storage (2026111102_student_work_storage): one bucket, student-photos,
--- private, 2 MB a file, image/jpeg only. Four policies on storage.objects:
--- a signed-in teacher reads files under a class they own
--- (fv_student_photos_read) and writes exactly the paths of an upload they
--- started and have not finished (fv_student_photos_upload); two restrictive
+-- private, 2 MB a file, image/jpeg only, versioning DISABLED (no old version
+-- of a file is kept). Four policies on storage.objects: a signed-in teacher
+-- reads a page that still has its row, in a class they own, and is handed in
+-- or part of an upload they started (fv_student_photos_read; so not a
+-- student's unfinished send, and not a file waiting to be deleted), and
+-- writes exactly the paths of an upload they started and have not finished,
+-- for the two hours it holds its place (fv_student_photos_upload); two restrictive
 -- policies (fv_student_photos_teachers_only, fv_student_photos_fence) keep
 -- the bucket to that whatever other policy is added. A student's upload
 -- goes through a signed link the edge function makes for one path the
