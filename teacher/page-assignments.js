@@ -2761,9 +2761,16 @@ window.PageAssignments = (function () {
     html +=
       '<div class="af-field">' +
       '<label class="af-label" for="af-desc">Description</label>' +
-      '<textarea class="af-textarea" id="af-desc" rows="1" placeholder="Describe the assignment, expectations, and criteria\u2026">' +
+      '<textarea class="af-textarea" id="af-desc" rows="1"' +
+      (_studentPageOn(cid) ? ' aria-describedby="af-desc-hint"' : '') +
+      ' placeholder="Describe the assignment, expectations, and criteria\u2026">' +
       esc(description) +
       '</textarea>' +
+      // A student reads the Description on their page once the class's
+      // Student Page is on (S4-W1; Colin's ruling 111 and his words).
+      (_studentPageOn(cid)
+        ? '<p class="af-category-hint" id="af-desc-hint">Students see this on their page.</p>'
+        : '') +
       '</div>';
 
     // Which classes this assessment goes to (Teams' "Assign to"), right
@@ -13441,6 +13448,12 @@ window.PageAssignments = (function () {
      words are GradeState's (draftsReturned, draftsSentence, returnQuestion,
      returnNGraded), so the three screens say the same. Every return goes
      through Grader.returnGrades. Nothing here changes a number. */
+  // True when the class's Student Page is on (the build switch, as the
+  // server holds it for a signed-in teacher): its students read the page.
+  function _studentPageOn(cid) {
+    return !!cid && typeof getReturnSettings === 'function' && getReturnSettings(cid).student_page === true;
+  }
+
   function _holdsGrades(cid) {
     if (!cid || typeof getReturnSettings !== 'function') return false;
     var klass = getReturnSettings(cid);
