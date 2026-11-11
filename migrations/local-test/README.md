@@ -1908,3 +1908,77 @@ tried for real in the owner's test class after the apply:
 - the edge routes themselves (`S5-F4`), which are not written yet: every
   requirement in `batch-b-contract.md`, "What the edge function must do";
 - anything on `gradebook-prod` itself.
+
+## Batch B review fixes (2026111104, 2026-11-11)
+
+`../2026111104_student_work_review_fixes.sql` applies after Batch B's two
+files and fixes the two faults its second review found (section (b), items 5
+and 6). It replaces `public.finish_work_upload`, `student_submit.send_finish`
+and `student_submit.unsend`, each Batch B's body with lines added, and
+nothing else. Tested here only (never `gradebook-prod`).
+
+- **Ruling 88 (30 pages).** The 30 was asked only when a send or an upload
+  started. A teacher's Add as More Pages finished while the student's
+  Replace was still uploading made the Replace's finish hand in 30 new pages
+  plus the teacher's 29. Now the 30 is asked again at both finishes, and the
+  one finishing second is told `too_many_pages` with `room`. It is not
+  dropped: it can be finished with fewer pages or started again.
+- **Ruling 92 (a student's Unsend or Replace removes only their own
+  pages).** The teacher's Add as More Pages, uploaded and not yet finished,
+  pointed at the student's work, and `_submission_target_gone` dropped it
+  when an Unsend or a Replace deleted that row. Now a finished Replace moves
+  it to the new work first, and an Unsend that leaves no work makes it a new
+  upload of the teacher's first. A teacher's unfinished Replace Them is left
+  as Batch B has it.
+
+`submissions_fixes.py` uses the same template as Batch B's scripts:
+
+```bash
+PGPORT=54341 PGDATABASE=bb python3 submissions_common.py build      # as for Batch B
+PGPORT=54341 PGDATABASE=bb python3 submissions_fixes.py             # every scenario, about a minute
+PGPORT=54341 PGDATABASE=bb python3 submissions_fixes.py mutate      # wrong versions of the two fixes, about eight minutes
+PGPORT=54341 PGDATABASE=bb python3 submissions_fixes.py fingerprints check
+PGPORT=54341 PGDATABASE=bb BATCH_B_WITH_FIXES=1 python3 submissions.py          # Batch B's suite with the fixes applied
+PGPORT=54341 PGDATABASE=bb BATCH_B_WITH_FIXES=1 python3 submissions_mutate.py   # and its 103 changes
+```
+
+Scenarios: `faults` (the review's probes B and C, then each order a send,
+a Replace, an Unsend and an Add can finish in: what the student and the
+teacher are told, what is handed in, what is queued, the two hours, the
+storage policy, the answer not remembered); `faults-without` (the same
+cases on Batch B alone: every check marked as the fault must fail there,
+and every other check must still hold); `race` and `race-without` (the same
+interleavings on connections of their own, the first holding the class);
+`fuzz` and `fuzz-without` (1,000 seeded random steps of sends, Replaces,
+Unsends and Adds on one student's piece; after every step no work handed in
+has more than 30 pages and no file the teacher uploaded is queued by a
+student's Unsend or Replace); `apply` (shape, lists, each guard, a lock it
+cannot get, the apply on a database in use, a second run, Batch B's files
+run again, file 1 alone, the read-only pre-check and post-check and the
+damage each notices); `undo` (`batch-b-fixes-undo.sql`).
+
+`BATCH_B_WITH_FIXES=1` makes `submissions_common.py` apply the fixes after
+the two files for every Batch B scenario but `submissions.py apply`, which
+is the two files' own apply and second run: with the fixes in, a second run
+of the first file stops at its first check by design (shown in
+`submissions_fixes.py apply`). In `submissions_mutate.py` each change is then
+made to the fixes' copy of a function too, where it holds the same text.
+
+**The order out.** Batch B's undo PART 2 and a second run of its first file
+(PART 1B's way back) both refuse while the fixes are applied, because they
+check Batch B's own fingerprints. Run `batch-b-fixes-undo.sql` first. PART 1
+and PART 1B run either way.
+
+Result on 2026-11-11, PostgreSQL 17.11: `submissions_fixes.py` 188 of 188
+(the review's probes B and C both fail on Batch B alone and pass with the
+file; without it the random run put more than 30 pages in a submission 20
+times and queued a teacher's file by a student's action 369 times, with it 0
+and 0); its 14 wrong versions of the two fixes, 14 noticed. With the fixes
+applied: `submissions.py` 563 of 563; `submissions_mutate.py` 103 of 103 noticed (17 of them made in the
+fixes' copy too; change 65 matches text the fix put lines into, so its
+equivalent is given in `IN_FIXES` and it was run again on its own after
+that).
+`submissions_undo.py` 60 of 60 on Batch B alone and 60 of 60 after the fixes
+and their undo; with the fixes still applied 28 of 60, every failure being
+PART 2 or the first file's second run refusing on Batch B's fingerprints, as
+designed.
