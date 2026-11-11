@@ -634,6 +634,51 @@ test('New Codes for This Class: a part-failed run names who still has their old 
   expect(errors).toEqual([]);
 });
 
+/* Print New Card when the reply is lost and its recovery is lost too: the
+   server stopped the old card and made one nobody printed. The screen says
+   so, from the list read afterwards, and Make and Print prints it. */
+test('Print New Card: an old card stopped and the new one not printed is said, and Make and Print prints it', async ({
+  page,
+}) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  // 1: Make and Print. 2: Bob's new card, its reply lost. 3: the replay. 4 and 5: the ask again, never arriving.
+  const cards = await serverWithStudentPage(
+    page,
+    { course: { student_page_enabled: true, return_grades: 'on_return' } },
+    { lose: (post, n) => n === 2, fail: (post, n) => n === 4 || n === 5 },
+  );
+  await page.goto('/dashboard?manage=student-page');
+  const card = page.locator('.sc-card');
+  await catchPrints(page);
+  await card.getByRole('button', { name: 'Make and Print 3 Cards' }).click();
+  await expect.poll(async () => (await sheets(page)).length).toBe(1);
+  await expect(card.locator('.sc-status', { hasText: /^Printed / })).toHaveCount(3);
+  const bobs = cards.fake.live(BOB).id;
+  await card.getByRole('button', { name: 'Print a New Card for Bob Baker' }).click();
+  await page
+    .getByRole('dialog', { name: 'Print a New Card for Bob?' })
+    .getByRole('button', { name: 'Print New Card' })
+    .click();
+  await expect(card.locator('.sc-note .sc-note-line')).toHaveText([
+    "Bob's old card has stopped, but the new one didn't print. Press Make and Print 1 Card to print it.",
+  ]);
+  expect(cards.fake.db.state.cards.find(k => k.id === bobs).stopped).toBe(true);
+  await expect(card.locator('.sc-status').nth(1)).toHaveText('Not Printed');
+  expect((await sheets(page)).length).toBe(1);
+  if (process.env.S3F2_SHOTS) {
+    await page.waitForTimeout(400);
+    await card.screenshot({ path: process.env.S3F2_SHOTS + '/s3f2-stopped-not-printed.png' });
+  }
+  await card.getByRole('button', { name: 'Make and Print 1 Card' }).click();
+  await expect.poll(async () => (await sheets(page)).length).toBe(2);
+  expect((await sheets(page))[1].names).toEqual(['Bob Baker']);
+  await expect(card.locator('.sc-note .sc-note-line')).toHaveText([
+    '1 card went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
+  ]);
+  expect(errors).toEqual([]);
+});
+
 test('Make and Print offline says so and makes nothing; an answer after Class Settings closes prints nothing', async ({
   page,
 }) => {

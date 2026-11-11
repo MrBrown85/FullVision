@@ -12274,8 +12274,8 @@ _dropOldCardCodes();
 /* Cards this browser has sent to the printer: card id → { at, cid }. Ids,
    class ids and times only. Kept on this device (gb-cards-printed-here,
    wiped at sign-out with every gb- key) until the server's list shows the
-   card printed, or the card is no longer in its class's list (it was
-   replaced).
+   card printed, or a list read that began after the note was made no longer
+   shows the card (it was replaced).
 
    A list read from the server is overlaid with these and with every mark
    still waiting in the outbox, so a read never erases a write still on its
@@ -12287,27 +12287,30 @@ _dropOldCardCodes();
    reload): the cards went to the printer, so after a reload they still
    show Printed here, and Print New Card asks before replacing one. Such a
    mark is sent once more, through the outbox, the first time this page
-   reads a list that still shows the card Not Printed. */
+   reads a list that still shows the card Not Printed.
+
+   Every tab of the app shares the one stored copy: each change reads it,
+   changes it and writes it back at once (_changePrintedHere), so one
+   tab's notes never overwrite another's. */
 var _CARDS_PRINTED_KEY = 'gb-cards-printed-here';
-var _cardsPrintedHere = null;
 var _cardsPrintSending = {}; // card id → true while its mark is on its way from this page
 var _cardsPrintResent = {}; // card id → true once its mark has been sent again from this page
+// The stored notes, read fresh.
 function _printedHere() {
-  if (_cardsPrintedHere) return _cardsPrintedHere;
   var kept = _safeParseLS(_CARDS_PRINTED_KEY, {});
-  _cardsPrintedHere = {};
+  var out = {};
   if (kept && typeof kept === 'object' && !Array.isArray(kept)) {
     Object.keys(kept).forEach(function (id) {
       var e = kept[id];
-      if (_isUuid(id) && e && typeof e.at === 'string' && typeof e.cid === 'string') {
-        _cardsPrintedHere[id] = { at: e.at, cid: e.cid };
-      }
+      if (_isUuid(id) && e && typeof e.at === 'string' && typeof e.cid === 'string') out[id] = { at: e.at, cid: e.cid };
     });
   }
-  return _cardsPrintedHere;
+  return out;
 }
-function _savePrintedHere() {
+// Read the stored notes, let `change` change them (it answers true when it did), and write them back at once.
+function _changePrintedHere(change) {
   var here = _printedHere();
+  if (!change(here)) return;
   if (Object.keys(here).length) {
     _safeLSSet(_CARDS_PRINTED_KEY, JSON.stringify(here));
     return;
@@ -12340,13 +12343,7 @@ function _cardsPrintedQueued() {
 }
 // Tests: forget this device's marks and unlocks, as a fresh page on a fresh device would.
 function _forgetCardsPrintedHere() {
-  _cardsPrintedHere = {};
-  _cardsPrintSending = {};
-  _cardsPrintResent = {};
-  _cardsUnlockedHere = {};
-  _cardsUnlockedAllHere = {};
-  _cardsWorkUntilHere = {};
-  _cardsWorkUntilServer = {};
+  _reloadCardsPrintedHere();
   try {
     localStorage.removeItem(_CARDS_PRINTED_KEY);
   } catch (e) {
@@ -12355,7 +12352,6 @@ function _forgetCardsPrintedHere() {
 }
 // Tests: a reload. What the page held goes; what the device keeps stays.
 function _reloadCardsPrintedHere() {
-  _cardsPrintedHere = null;
   _cardsPrintSending = {};
   _cardsPrintResent = {};
   _cardsUnlockedHere = {};
@@ -12381,19 +12377,18 @@ function _sendCardsPrinted(ids) {
     }),
   );
 }
-function _withPendingPrints(cid, cards) {
+/* `asked` is when the read began (ISO time): a note made after that is
+   newer than the list, so the list not showing its card says nothing. */
+function _withPendingPrints(cid, cards, asked) {
   var here = _printedHere();
   var queued = _cardsPrintedQueued();
   var listed = {};
-  var changed = false;
+  var gone = [];
   var again = [];
   var out = cards.map(function (c) {
     listed[c.id] = true;
     if (c.printed_at) {
-      if (here[c.id]) {
-        delete here[c.id];
-        changed = true;
-      }
+      if (here[c.id]) gone.push(c.id);
       return c;
     }
     var mine = here[c.id];
@@ -12403,14 +12398,23 @@ function _withPendingPrints(cid, cards) {
     if (mine && !queued[c.id] && !_cardsPrintSending[c.id] && !_cardsPrintResent[c.id]) again.push(c.id);
     return c;
   });
-  // A card printed here that its class no longer lists was replaced: there is nothing left to mark.
+  // A card printed here that its class no longer lists, in a read begun after the note, was replaced.
   Object.keys(here).forEach(function (id) {
-    if (here[id].cid === cid && !listed[id]) {
-      delete here[id];
-      changed = true;
-    }
+    if (here[id].cid === cid && !listed[id] && asked && here[id].at < asked) gone.push(id);
   });
-  if (changed) _savePrintedHere();
+  if (gone.length) {
+    _changePrintedHere(function (now) {
+      var changed = false;
+      gone.forEach(function (id) {
+        // Only the note this read judged: one another tab has written since is left alone.
+        if (now[id] && here[id] && now[id].at === here[id].at) {
+          delete now[id];
+          changed = true;
+        }
+      });
+      return changed;
+    });
+  }
   if (again.length) {
     again.forEach(function (id) {
       _cardsPrintResent[id] = true;
@@ -12420,43 +12424,37 @@ function _withPendingPrints(cid, cards) {
   return out;
 }
 
-/* Cards unlocked from this page whose unlock the server may not have yet:
-   card id → when (Unlock), and class id → when (Unlock All). With every
-   unlock still waiting in the outbox, a list read is overlaid with these,
-   so a card unlocked here does not show Locked again because the server
-   has not heard yet. A card locked again after the unlock shows Locked. An
-   unlock the server refuses is forgotten at once, and the list then shows
-   what the server has. */
+/* Cards unlocked from this page whose unlock the server has not answered
+   yet: card id → true (Unlock), and class id → true (Unlock All). While
+   one is on its way, here or still waiting in the outbox, a list read shows
+   the card unlocked, whatever the server's list says: the server has not
+   heard yet. Once the server has answered, the list shows what it has:
+   no comparison of this computer's clock with the server's. An unlock the
+   server refuses is forgotten at once. */
 var _cardsUnlockedHere = {};
 var _cardsUnlockedAllHere = {};
 function _withPendingUnlocks(cid, cards) {
   var one = {};
   Object.keys(_cardsUnlockedHere).forEach(function (id) {
-    one[id] = _cardsUnlockedHere[id];
+    one[id] = true;
   });
   _queuedCardWrites('unlock_student_card').forEach(function (entry) {
-    var id = entry.payload.p_card_id;
-    if (id && !one[id]) one[id] = entry.created_at || new Date().toISOString();
+    if (entry.payload.p_card_id) one[entry.payload.p_card_id] = true;
   });
-  var all = _cardsUnlockedAllHere[cid] || '';
+  var all = !!_cardsUnlockedAllHere[cid];
   _queuedCardWrites('unlock_all_student_cards').forEach(function (entry) {
-    var at = entry.created_at || new Date().toISOString();
-    if (entry.payload.p_course_id === cid && at > all) all = at;
+    if (entry.payload.p_course_id === cid) all = true;
   });
-  var overlaid = false;
-  var out = cards.map(function (c) {
-    var at = one[c.id] && one[c.id] > all ? one[c.id] : all;
-    if (c.locked_at && at && Date.parse(c.locked_at) <= Date.parse(at)) {
+  return cards.map(function (c) {
+    if (c.locked_at && (all || one[c.id])) {
       c.locked_at = null;
       c.wrong_tries = 0;
       c.wrong_tries_7d = 0;
-      overlaid = true;
-    } else delete _cardsUnlockedHere[c.id];
+    }
     return c;
   });
-  if (!overlaid) delete _cardsUnlockedAllHere[cid];
-  return out;
 }
+
 /* The class's last reporting date when that is still ahead, else the next
    June 30: the day a card made on this device works until, as the server
    works it out for its own. */
@@ -12513,6 +12511,8 @@ function listStudentCards(cid) {
   if (!cid || !_gradesKept(cid)) return _cardsAnswer(null);
   if (!_writesEnabled()) return _cardsAnswer(_demoCardsListed(cid));
   if (!_useSupabase || !_isUuid(cid)) return _cardsAnswer(null);
+  // When this read began: a printed note made after it is newer than the list (_withPendingPrints).
+  var asked = new Date().toISOString();
   return _callRpcWithAuthGuard('list_student_cards', { p_course_id: cid }, { suppressSessionExpiredModal: true }).then(
     function (res) {
       if (res && res.error && !res.error.handledSessionExpired) console.warn('list_student_cards failed:', res.error);
@@ -12523,7 +12523,7 @@ function listStudentCards(cid) {
               cid,
               _withPendingUnlocks(
                 cid,
-                _withPendingPrints(cid, _rpcRows(res.data).map(_cardWithoutCode).filter(Boolean)),
+                _withPendingPrints(cid, _rpcRows(res.data).map(_cardWithoutCode).filter(Boolean), asked),
               ),
             )
           : null,
@@ -12749,11 +12749,12 @@ function markStudentCardsPrinted(cid, cardIds) {
   }
   ids = ids.filter(_isUuid);
   if (!_useSupabase || !_isUuid(cid) || !ids.length) return _cardsAnswer(null);
-  var here = _printedHere();
-  ids.forEach(function (id) {
-    here[id] = { at: at, cid: cid };
+  _changePrintedHere(function (here) {
+    ids.forEach(function (id) {
+      here[id] = { at: at, cid: cid };
+    });
+    return true;
   });
-  _savePrintedHere();
   _sendCardsPrinted(ids);
   return _cardsAnswer({ printed: ids.length, printed_at: at });
 }
@@ -12764,12 +12765,15 @@ function markStudentCardsPrinted(cid, cardIds) {
    outbox, so a failure shows on the sync dot and nowhere else. `onFailed`,
    if given, is called when the server refuses it for good, after this
    page has forgotten it: the caller reads the list again. */
-function _unlockSent(name, params, forget, onFailed) {
+/* `sent` is the write (each RPC is named at its own call, so the database
+   drift check sees it). Once the server has answered, either way, this
+   page forgets the unlock: the server's list is the truth from then on. */
+function _unlockSent(name, sent, forget, onFailed) {
   _trackPendingSync(
-    Promise.resolve(_writeRpc(name, params)).then(function (res) {
+    Promise.resolve(sent).then(function (res) {
+      forget();
       if (!res || !res.error) return;
       if (!res.error.handledSessionExpired) console.warn(name + ' failed:', res.error);
-      forget();
       if (typeof onFailed === 'function') onFailed(res.error);
     }),
   );
@@ -12794,7 +12798,7 @@ function unlockStudentCard(cid, cardId, onFailed) {
   _cardsUnlockedHere[cardId] = at;
   _unlockSent(
     'unlock_student_card',
-    { p_card_id: cardId, p_idempotency_key: _newEntryId() },
+    _writeRpc('unlock_student_card', { p_card_id: cardId, p_idempotency_key: _newEntryId() }),
     function () {
       if (_cardsUnlockedHere[cardId] === at) delete _cardsUnlockedHere[cardId];
     },
@@ -12822,7 +12826,7 @@ function unlockAllStudentCards(cid, onFailed) {
   _cardsUnlockedAllHere[cid] = at;
   _unlockSent(
     'unlock_all_student_cards',
-    { p_course_id: cid, p_idempotency_key: _newEntryId() },
+    _writeRpc('unlock_all_student_cards', { p_course_id: cid, p_idempotency_key: _newEntryId() }),
     function () {
       if (_cardsUnlockedAllHere[cid] === at) delete _cardsUnlockedAllHere[cid];
     },
