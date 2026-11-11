@@ -318,15 +318,107 @@ describe('a signed-in holding class whose rows have not loaded', () => {
     expect(() => (html = RubricPrint.markHtml(LIVE, U(31), U(11)))).not.toThrow();
     expect(html).not.toContain('Printed');
     expect(() => RubricBank.deleteImpact(LIVE, 'no-such-rubric')).not.toThrow();
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(ReportScores.ready(LIVE)).toBe(false);
+    onAPage(doc => {
+      expect(() => RubricPrint.open(LIVE, U(31))).not.toThrow();
+      expect(doc.getElementById('rubric-print-overlay')).toBe(null);
+      // Loaded: it opens.
+      _loadGradeReturns(LIVE, {});
+      expect(ReportScores.ready(LIVE)).toBe(true);
+      RubricPrint.open(LIVE, U(31));
+      expect(doc.getElementById('rubric-print-overlay')).not.toBe(null);
+      RubricPrint.close();
+    });
+  });
+});
+
+/* The handout's Printed and Changed Since Printed marks (the second
+   review). They compare what the handout would print now with what was
+   printed; while a holding class's rows are not loaded there is no mark,
+   no timer is left running, and nothing touches another class's marks. */
+describe('the Printed marks', { timeout: 120000 }, () => {
+  let cid, lab, crit, roster;
+  beforeAll(() => {
+    cid = freshClass(null);
+    lab = getAssessments(cid).find(a => a.rubricId);
+    crit = getRubricById(cid, lab.rubricId).criteria[0];
+    roster = getStudents(cid).filter(s => RubricPrint.isStudentScored(cid, lab.id, s.id));
+  });
+  const kind = sid => {
+    const h = RubricPrint.markHtml(cid, lab.id, sid);
+    return /Changed Since Printed/.test(h) ? 'changed' : /Printed/.test(h) ? 'printed' : 'none';
+  };
+
+  it('a print recorded before this change (an all-work fingerprint) is compared sanely', () => {
+    const at = '2026-11-01T12:00:00.000Z';
+    const old = sid => ({ sid, hash: RubricPrint.fingerprint(cid, lab.id, sid), at });
+    setRubricPrints(
+      cid,
+      lab.id,
+      roster.map(s => old(s.id)),
+    );
+    const count = () => {
+      const c = { printed: 0, changed: 0, none: 0 };
+      roster.forEach(s => c[kind(s.id)]++);
+      return c;
+    };
+    expect(count().printed).toBe(roster.length);
+    saveCourseConfig(cid, Object.assign({}, getCourseConfig(cid), HELD));
+    expect(count().printed).toBe(roster.length);
+    // A draft on a printed, returned grade: a level, a comment and a tick. It is not "changed" until returned.
+    const s0 = roster[0].id;
+    const e = (getScores(cid)[s0] || []).find(x => x.assessmentId === lab.id && x.tagId === crit.id);
+    Grader.setLevel(cid, s0, lab.id, crit.id, (Number(e.score) % 4) + 1, 0);
+    Grader.setOverallComment(cid, s0, lab.id, 'a new draft comment');
+    const ticks = getRubricCheckIds(cid, s0, lab.id);
+    const all = (getRubricById(cid, lab.rubricId).criteria || []).flatMap(c => (c.checks || []).map(x => x.id));
+    const add = all.find(id => ticks.indexOf(id) < 0);
+    if (add) Grader.setTick(cid, s0, lab.id, add, true);
+    expect(kind(s0)).toBe('printed');
+    Grader.returnGrades(cid, lab.id, [s0]);
+    expect(kind(s0)).toBe('changed');
+    // A print main made with a draft in it (main printed drafts): changed until the draft is returned.
+    const s1 = roster[1].id;
+    const e1 = (getScores(cid)[s1] || []).find(x => x.assessmentId === lab.id && x.tagId === crit.id);
+    Grader.setLevel(cid, s1, lab.id, crit.id, (Number(e1.score) % 4) + 1, 0);
+    setRubricPrints(cid, lab.id, [old(s1)]);
+    expect(kind(s1)).toBe('changed');
+    Grader.returnGrades(cid, lab.id, [s1]);
+    expect(kind(s1)).toBe('printed');
+  });
+
+  it('not loaded: no mark, no timer left running, and another class’s marks are left alone', () => {
+    const sid = roster[2].id;
+    RubricPrint.markPrinted(cid, lab.id, [sid]);
+    const real = window.getReturnedScores;
+    vi.useFakeTimers();
     try {
       onAPage(doc => {
-        expect(() => RubricPrint.open(LIVE, U(31))).not.toThrow();
-        expect(doc.getElementById('rubric-print-overlay')).toBe(null);
+        const host = doc.createElement('div');
+        host.innerHTML = RubricPrint.markHtml(cid, lab.id, sid);
+        doc.body.appendChild(host);
+        expect(host.textContent).toContain('Printed');
+        window.getReturnedScores = () => {
+          throw new Error('which of its grades are returned has not loaded');
+        };
+        clearProfCache();
+        const t0 = vi.getTimerCount();
+        for (let i = 0; i < 200; i++) expect(RubricPrint.markHtml(cid, lab.id, sid)).not.toContain('Printed');
+        RubricPrint.refreshMarks(cid);
+        expect(host.querySelector('[data-rp-mark-sid]').hidden).toBe(true);
+        expect(vi.getTimerCount() - t0).toBe(0);
+        // The teacher switches class: the other class's marks are on screen, drawn Printed.
+        host.innerHTML =
+          '<span class="rp-mark" data-rp-mark-sid="other-student" data-rp-mark-aid="other-piece">Printed Oct 30</span>';
+        const other = host.querySelector('[data-rp-mark-sid]');
+        vi.advanceTimersByTime(60000);
+        expect(other.hidden).toBe(false);
+        expect(other.textContent).toBe('Printed Oct 30');
+        host.remove();
       });
-      expect(warn).toHaveBeenCalled();
     } finally {
-      warn.mockRestore();
+      vi.useRealTimers();
+      window.getReturnedScores = real;
     }
   });
 });

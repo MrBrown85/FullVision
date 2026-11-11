@@ -158,6 +158,52 @@ test.describe('a Return that does not return every draft it named', () => {
     expect(await waiting(page)).toBe(1);
   });
 
+  test('a Return that fails part-way: Print Without Them then prints the grades that did return', async ({ page }) => {
+    await demo(page);
+    const sid = await draftOn(page, 'sci8q2');
+    await page.evaluate(id => {
+      // A second draft for the same student, on a later piece.
+      var p = getPointsScore('sci8', id, 'sci8q8');
+      Grader.setPoints('sci8', id, 'sci8q8', p > 1 ? p - 1 : p + 1);
+    }, sid);
+    expect(await waiting(page)).toBe(2);
+    await openProgress(page);
+    // The first Return goes through, the second fails.
+    await page.evaluate(() => {
+      var real = GradeState.afterReturn;
+      var n = 0;
+      GradeState.afterReturn = function () {
+        n++;
+        if (n === 2) throw new Error('the rule failed (a test)');
+        return real.apply(this, arguments);
+      };
+    });
+    await printReports(page);
+    await question(page).getByRole('button', { name: 'Return Them, Then Print' }).click();
+    await expect(printDialog(page).locator('.drafts-print-failed')).toHaveText(FAILED);
+    expect(await waiting(page)).toBe(1);
+    // Print again: one grade is left to ask about; print without it.
+    await printDialog(page).locator('[data-issue="go"]').click();
+    await expect(question(page).locator('.confirm-title')).toHaveText('1 Grade Isn’t Returned Yet');
+    await question(page).getByRole('button', { name: 'Print Without Them' }).click();
+    await expect.poll(() => prints(page)).toBe(1);
+    // The saved copy holds the Periodic Table Quiz as it was just returned.
+    const row = await page.evaluate(async id => {
+      const e = ReportIssues.latest('sci8');
+      const full = await ReportIssues.load(e.id, 'sci8');
+      const html = ((full.students || []).find(x => x.sid === id) || {}).html || '';
+      const i = html.indexOf('Periodic Table Quiz');
+      return {
+        printed: html
+          .slice(i, i + 400)
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/\s+/g, ' '),
+        now: String(getPointsScore('sci8', id, 'sci8q2')),
+      };
+    }, sid);
+    expect(row.printed).toContain(' ' + row.now + ' ');
+  });
+
   test('Print Rubrics: nothing prints or is marked printed, and the dialog stays open and says so', async ({
     page,
   }) => {
@@ -290,12 +336,13 @@ test('the Assignments page draws while the Draft and Returned rows have not load
   await expect(mark).toBeAttached();
   await expect(mark).toBeHidden();
   expect(errors).toEqual([]);
-  // The rows load: the mark is drawn again without a redraw of the page.
+  // The rows load: the data layer redraws the page, and the mark with it.
   await page.evaluate(() => {
     window.getReturnedScores = window.__real;
-    clearProfCache();
+    _invalidateAndRerender();
   });
-  await expect(mark).toBeVisible({ timeout: 5000 });
-  await expect(mark).toContainText('Printed');
+  const again = page.locator('#ac-sci8a4 [data-rp-mark-sid="' + sid + '"]').first();
+  await expect(again).toBeVisible({ timeout: 5000 });
+  await expect(again).toContainText('Printed');
   expect(errors).toEqual([]);
 });
