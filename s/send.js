@@ -190,6 +190,7 @@
       replace: !!replace,
       pages: [], // { key, blob, thumb, hash, url, thumbUrl, blurry, from, sent }
       note: '',
+      followed: '', // Did You Do It? (S10-F2): '' | yes | partly | no (Batch B's followed_plan)
       step: 'check', // check | blurry | sending | notsent | pagefailed | expired | sent
       message: '',
       busy: false,
@@ -423,6 +424,8 @@
       at: new Date(now).toISOString(),
       late: !!due && today() > due,
       note: send.note.slice(0, NOTE_MAX),
+      // The student's word on their plan, as send_start takes it (p_followed_plan): null when not asked or not answered.
+      followedPlan: p && p.plan && FOLLOWED[send.followed] ? send.followed : null,
       pages: send.pages.map(function (pg) {
         return { url: pg.url, thumbUrl: pg.thumbUrl };
       }),
@@ -605,6 +608,40 @@
     );
   }
 
+  /* Your Plan From Last Time and Did You Do It? on Check and Send (S10-F2,
+     the board "Check and Send, Did You Follow Your Plan?"), when the piece
+     carries the student's plan. The answer is the student's word ("Followed
+     it" is the student's, Nov 8, decision 11): Yes, Partly or Not This
+     Time, or none. */
+  var FOLLOWED = { yes: 'Yes', partly: 'Partly', no: 'Not This Time' };
+  function planAskHtml(send, p) {
+    if (!p.plan || !p.plan.text) return '';
+    return (
+      '<section class="sp-send-plan" aria-labelledby="sp-send-plan-title"><h2 class="sp-plan-title" id="sp-send-plan-title">Your Plan From Last Time</h2><p class="sp-plan-words">' +
+      esc(p.plan.text) +
+      '</p><h3 class="sp-send-plan-ask" id="sp-send-plan-ask">Did You Do It?</h3><div class="sp-seg sp-seg-3" role="radiogroup" aria-label="Did you follow your plan?">' +
+      Object.keys(FOLLOWED)
+        .map(function (k) {
+          var on = send.followed === k;
+          return (
+            '<button type="button" class="sp-seg-btn' +
+            (on ? ' sp-seg-on' : '') +
+            '" role="radio" aria-checked="' +
+            on +
+            '" tabindex="' +
+            (on || (!send.followed && k === 'yes') ? '0' : '-1') +
+            '" data-act="send-followed" data-value="' +
+            k +
+            '">' +
+            esc(FOLLOWED[k]) +
+            '</button>'
+          );
+        })
+        .join('') +
+      '</div></section>'
+    );
+  }
+
   // Check and Send, and Sending Late (the boards): the pages, Add Page or File, the note, Send.
   function checkHtml(send, p, teacher) {
     var n = send.pages.length;
@@ -637,6 +674,7 @@
                 : 'Take a photo of each page.',
             ) +
             '</p></div>') +
+      planAskHtml(send, p) +
       '<label class="sp-send-note-label" for="sp-send-note">' +
       esc('Note for ' + (teacher || 'Your Teacher')) +
       '</label><textarea id="sp-send-note" class="sp-send-note" maxlength="' +
@@ -840,6 +878,12 @@
         return StudentPage.paint('#sp-send-title');
       }
       return go(true);
+    }
+    if (act === 'send-followed') {
+      var v = attr('data-value');
+      if (!FOLLOWED[v] || S.send.busy) return;
+      S.send.followed = v;
+      return StudentPage.paint('[data-act="send-followed"][data-value="' + v + '"]');
     }
     if (act === 'send-blur-keep') {
       S.send.step = 'check';

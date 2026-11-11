@@ -41,6 +41,7 @@ const PRECACHE_URLS = [
   '/s/page-view.js',
   '/s/send.js',
   '/s/feedback.js',
+  '/s/reflect.js',
   '/s/page-view.css',
   '/shared/loading-screen.js',
   '/shared/loading-screen.css',
