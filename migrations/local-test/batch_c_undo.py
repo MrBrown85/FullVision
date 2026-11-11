@@ -43,6 +43,45 @@ def undo2():
     finally:
         d.close()
 
+def undo2_two():
+    """(a) 4: one request whose hide ended long ago (it held a 5) and one hiding the grade now (it holds a 7),
+    in both id orders: the undo gives back the 7, the grade of the hide that is on now."""
+    for first in ('old request first', 'new request first'):
+        d = scenario_db('undo2two', with_c2=True)
+        try:
+            k = seed(d); lab = k['lab']; t1 = d.session(ENR1)
+            d.send(t1, ENR1, lab)
+            d.score(ENR1, lab, 5); d.return_work(lab, [ENR1])
+            r1 = d.rfr(lab, ENR1, {'what_to_fix': 'Fix', 'keep_grade': False})['request']['id']
+            d.revise(t1, ENR1, lab); d.score(ENR1, lab, 7); d.return_work(lab, [ENR1])
+            ok('undo2 (a) 4 (%s): the revision\'s grade returned: the student has the 7' % first, shown(d, ENR1, lab) == 7)
+            r2 = d.rfr(lab, ENR1, {'what_to_fix': 'Once more', 'keep_grade': False})
+            ok('undo2 (a) 4 (%s): a second request hides the 7' % first, r2['result'] == 'made' and r2['hidden'] and shown(d, ENR1, lab) is None, r2)
+            r2 = r2['request']['id']
+            lo, hi = '00000000-0000-4000-8000-000000000001', 'ffffffff-0000-4000-8000-000000000001'
+            d.run('update revision_request set id = :n where id = :o', n=lo if first == 'old request first' else hi, o=r1)
+            d.run('update revision_request set id = :n where id = :o', n=hi if first == 'old request first' else lo, o=r2)
+            u = d.undo2()
+            ok('undo2 (a) 4 (%s): the undo gives back the grade of the hide that is on now (the 7)' % first,
+               u == 'ok' and shown(d, ENR1, lab) == 7, (u, shown(d, ENR1, lab)))
+        finally:
+            d.close()
+
+def undo2_marks():
+    """(a) 3 for the undo: a hidden grade given back carries no mark drawn while it was hidden."""
+    d = scenario_db('undo2marks', with_c2=True)
+    try:
+        k = seed(d); lab = k['lab']; t1 = d.session(ENR1)
+        sub, files = d.send(t1, ENR1, lab)
+        d.score(ENR1, lab, 6); d.return_work(lab, [ENR1])
+        d.rfr(lab, ENR1, {'what_to_fix': 'Fix', 'keep_grade': False})
+        d.save_markup(files[0], marks('HIDDEN-TIME-NOTE'))
+        ok('undo2 (a) 3: the undo runs', d.undo2() == 'ok')
+        ok('undo2 (a) 3: the grade is given back', shown(d, ENR1, lab) == 6)
+        ok('undo2 (a) 3: without the mark drawn while it was hidden', 'HIDDEN-TIME-NOTE' not in json.dumps(d.marks(t1, ENR1, lab)))
+    finally:
+        d.close()
+
 def undo1():
     d = CDb('undo1')
     try:
@@ -98,7 +137,7 @@ def undo1():
         d.close()
 
 if __name__ == '__main__':
-    for fn in (undo2, undo1):
+    for fn in (undo2, undo2_two, undo2_marks, undo1):
         try: fn()
         except Exception as e:
             import traceback; ok(fn.__name__ + ': ran to the end', False, traceback.format_exc()[-1500:])
