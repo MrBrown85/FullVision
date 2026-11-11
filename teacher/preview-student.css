@@ -275,18 +275,117 @@
 .sp-preview {
   display: flex;
   flex-direction: column;
+  gap: 8px;
 }
-.sp-preview > .cm-grade-title {
-  margin-bottom: 14px;
+.sp-preview > .cm-grade-title,
+.sp-preview > .cm-hint {
+  margin: 0;
 }
 .sp-preview-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 12px;
-  margin-top: 12px;
 }
 .sp-preview-select {
   flex: 1 1 220px;
   max-width: 320px;
+  color: var(--text);
+  background-color: var(--surface);
+}
+
+/* ── Class Settings › Student Page (teacher/cm-student-page.js; board
+   "Teacher: Class Settings, Student Page") ── */
+/* Two columns: the Student Page card with the full Student Cards list under
+   it, and beside them the cards in short (teacher/student-cards.js,
+   summaryHtml) and Preview as Student. One column when there is no room.
+   The tab is as wide as Grading's, to make room for the second column. */
+.cm-tab-panel-student-page {
+  max-width: 1200px;
+}
+.sp-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 18px;
+  align-items: start;
+}
+.sp-main,
+.sp-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+@media (max-width: 1100px) {
+  .sp-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.sp-card > .sp-intro {
+  margin: -10px 0 14px;
+}
+/* A switch that is on is green here, as on the board and the phone. */
+.sp-card .gpd-switch input:checked + .gpd-switch-ui {
+  background: var(--score-3);
+}
+/* What students would see, in a grey panel, with See What They'd See as a link after it. */
+.sp-learning-panel {
+  align-self: stretch;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg);
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+.sp-link-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--link);
+  cursor: pointer;
+}
+.sp-link-btn:hover {
+  text-decoration: underline;
+}
+.sp-link-btn:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.sp-tint-btn {
+  background: var(--active-light);
+  color: var(--link);
+  font-weight: 600;
+}
+.sp-tint-btn:hover {
+  filter: brightness(0.96);
+}
+/* The Student Cards summary: counts, the last day, Manage Cards. */
+.sc-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sc-summary .cm-grade-title,
+.sc-summary .cm-hint {
+  margin: 0;
+}
+.sc-summary-count {
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  color: var(--text);
+}
+.sc-summary-btn {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+.sc-card #sc-title:focus {
+  outline: none;
+}
+.sc-card #sc-title:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
 }

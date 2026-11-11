@@ -195,6 +195,33 @@ describe('the door in Class Settings › Student Page', () => {
   });
 });
 
+describe('Class Settings › Student Page: the board’s two columns', () => {
+  it('the intro line; Student Page and the full card list on the left; the cards in short and Preview on the right', () => {
+    openSettings();
+    expect(text(doc.querySelector('.sp-card .sp-intro'))).toBe(
+      'What students can do when they open their page with their card. Each one is off until you turn it on.',
+    );
+    const main = doc.querySelector('.sp-layout > .sp-main');
+    const aside = doc.querySelector('.sp-layout > .sp-aside');
+    expect([...main.children].map(c => c.className.split(' ')[1])).toEqual(['sp-card', 'sc-card']);
+    expect([...aside.children].map(c => c.className.split(' ')[1])).toEqual(['sc-summary', 'sp-preview']);
+    const sum = aside.querySelector('.sc-summary');
+    expect(text(sum.querySelector('.cm-grade-title'))).toBe('Student Cards');
+    expect(text(sum.querySelector('button'))).toBe('Manage Cards');
+    // The last row says where questionnaires and reports are set up.
+    const rows = [...doc.querySelectorAll('.sp-card .sp-row-title')].map(text);
+    expect(rows[rows.length - 1]).toBe('Questionnaires and Reports');
+  });
+
+  it('Manage Cards takes the focus to the full Student Cards list', () => {
+    openSettings();
+    const button = doc.querySelector('.sc-summary button');
+    expect(DashClassManager.handleAction('spCardsManage', button)).toBe(true);
+    expect(doc.activeElement).toBe(doc.getElementById('sc-title'));
+    expect(doc.activeElement.closest('.sc-card')).toBeTruthy();
+  });
+});
+
 describe('the preview', () => {
   function openJordan() {
     openSettings();
