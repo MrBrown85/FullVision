@@ -44,6 +44,14 @@ window.StudentView = (function () {
     var n = Number(v);
     return isFinite(n) ? n : null;
   }
+  // Text as sent, or '' for anything that is not text (a new key of the wrong type shows nothing).
+  function text(v) {
+    return typeof v === 'string' ? v : '';
+  }
+  // Text, or null when there is none (the server sends an empty name or Description as null).
+  function textOrNull(v) {
+    return v != null && String(v) !== '' ? String(v) : null;
+  }
   // A time as the server writes it, in milliseconds, or null (as s/student-data.js reads it).
   function when(v) {
     var t = v ? Date.parse(String(v).replace(/(\.\d{3})\d+/, '$1')) : NaN;
@@ -139,7 +147,32 @@ window.StudentView = (function () {
     return GradeState.partInUse(GradeState.copyOf(_gradeOf(a, entries, checks)), scoring);
   }
 
-  function rubricReply(rubric) {
+  /* What a category counts toward the course grade, as the server states it
+     (migrations/local-test/s4-m1-contract.md, "category_percent"): the
+     category's weight where "counts N% of your grade" is true as the class
+     is set up, 0 where its work counts toward nothing, null where no percent
+     would be true. The class's setup, never this student's arithmetic. */
+  function categoryPercent(cid, a, category) {
+    if (!category || isDibelsScored(a)) return null;
+    if (Number(category.weight) === 0) return 0;
+    var total = ((typeof getCategories === 'function' && getCategories(cid)) || []).reduce(function (sum, c) {
+      return sum + Number((c && c.weight) || 0);
+    }, 0);
+    return courseGradeMode(cid) !== 'proficiency' && Math.abs(total - 100) < 1e-9 ? Number(category.weight) : null;
+  }
+
+  // A piece's Core Competencies, each once, in the Ministry's order, by their names.
+  function coreCompetenciesOf(a) {
+    var ids = typeof _coreCompetencyIdsOf === 'function' ? _coreCompetencyIdsOf(a.coreCompetencyIds) : [];
+    return ids
+      .map(function (id) {
+        var cc = typeof getCoreCompetency === 'function' ? getCoreCompetency(id) : null;
+        return cc ? { id: str(id), name: str(cc.label) } : null;
+      })
+      .filter(Boolean);
+  }
+
+  function rubricReply(rubric, tags) {
     var out = {
       id: str(rubric.id),
       name: str(rubric.name || rubric.title),
@@ -154,6 +187,13 @@ window.StudentView = (function () {
         [1, 2, 3, 4].forEach(function (l) {
           row['level_' + l + '_descriptor'] = str(levels[l]);
         });
+        // The competencies this row counts toward, only those still on the class, by id.
+        row.tag_ids = (Array.isArray(c.tagIds) ? c.tagIds : [])
+          .map(str)
+          .filter(function (id, i, all) {
+            return !!tags[id] && all.indexOf(id) === i;
+          })
+          .sort();
         row.checks = (c.checks || [])
           .filter(function (k) {
             return k && k.id;
@@ -191,7 +231,16 @@ window.StudentView = (function () {
 
     var tags = {};
     (getAllTags(cid) || []).forEach(function (t) {
-      if (t && t.id) tags[t.id] = { label: str(t.label), code: str(t.code) };
+      if (!t || !t.id) return;
+      // Its I Can statements as the class has them: in order, not trimmed, blanks kept (as the server sends them).
+      var iCan = t.i_can_statements || t.iCanStatements;
+      tags[t.id] = {
+        label: str(t.label),
+        code: str(t.code),
+        i_can: (Array.isArray(iCan) ? iCan : []).filter(function (s) {
+          return typeof s === 'string';
+        }),
+      };
     });
 
     // An assessment is listed once its date has come; one with no date as soon as it exists.
@@ -221,7 +270,9 @@ window.StudentView = (function () {
       .filter(function (r) {
         return r && rubricIds[r.id];
       })
-      .map(rubricReply)
+      .map(function (r) {
+        return rubricReply(r, tags);
+      })
       .sort(function (x, y) {
         return x.id < y.id ? -1 : x.id > y.id ? 1 : 0;
       });
@@ -243,6 +294,10 @@ window.StudentView = (function () {
       var tagIds = (a.tagIds || a.tag_ids || []).filter(function (id) {
         return !!tags[id];
       });
+      var moduleId = a.moduleId || a.module_id;
+      var unit = moduleId && typeof getModuleById === 'function' ? getModuleById(cid, moduleId) : null;
+      var categoryId = a.categoryId || a.category_id;
+      var category = categoryId && typeof getCategoryById === 'function' ? getCategoryById(cid, categoryId) : null;
       return {
         id: str(a.id),
         title: str(a.title),
@@ -254,6 +309,11 @@ window.StudentView = (function () {
         weight: num(a.weight),
         rubric_id: a.rubricId || a.rubric_id || null,
         tag_ids: tagIds.slice().sort(),
+        description: textOrNull(a.description),
+        module_name: unit && unit.name != null ? str(unit.name) : null,
+        category_name: category && category.name != null ? str(category.name) : null,
+        category_percent: categoryPercent(cid, a, category),
+        core_competencies: coreCompetenciesOf(a),
         status: status,
         returned_at: returnedAt,
         updated_at: (row && row.updated_at) || null,
@@ -274,6 +334,8 @@ window.StudentView = (function () {
         grading_system: courseGradeMode(cid),
         // The class's own Counts As percents and points bands, or the defaults (calc.js reads them).
         grading_scale: getGradingScale(cid) || null,
+        // The teacher's name as they signed up with it (bootstrap_teacher's display_name), as the server sends it.
+        teacher_name: textOrNull(((typeof getConfig === 'function' && getConfig()) || {}).displayName),
       },
       tags: tags,
       rubrics: rubrics,
@@ -354,7 +416,8 @@ window.StudentView = (function () {
      asks (its descriptor, and on an Advanced Rubric its boxes not ticked);
      the Proficient wording (a Single-Point Rubric's goal); and each of the
      four levels for The Whole Rubric, the one given marked. */
-  function rubricView(rubric, grade) {
+  function rubricView(rubric, grade, tags) {
+    tags = tags || {};
     var criteria = (grade && grade.criteria) || {};
     var ticked = {};
     ((grade && grade.checks) || []).forEach(function (id) {
@@ -368,6 +431,15 @@ window.StudentView = (function () {
         var part = criteria[c.id] || null;
         var row = levelRow(c.id, c.name, part);
         row.beyond = str(part && part.beyond);
+        // The competencies this row counts toward, by name ("Counts toward Perspective").
+        row.toward = list(c.tag_ids)
+          .map(str)
+          .filter(function (id, i, all) {
+            return all.indexOf(id) === i && tags[id] && tags[id].label;
+          })
+          .map(function (id) {
+            return str(tags[id].label);
+          });
         row.descriptors = [1, 2, 3, 4].map(function (l) {
           return str(c['level_' + l + '_descriptor']);
         });
@@ -429,15 +501,61 @@ window.StudentView = (function () {
     });
   }
 
-  // What a piece is graded on: its competencies by name, in the reply's order.
-  function gradedOn(row, tags) {
-    return (row.tag_ids || [])
-      .filter(function (id) {
-        return tags[id] && tags[id].label;
+  // A list from a reply, or none when what came is not a list.
+  function list(v) {
+    return Array.isArray(v) ? v : [];
+  }
+
+  // A competency's I Can lines as the page shows them: text only, blanks left out.
+  function iCanOf(tag) {
+    return list(tag && tag.i_can)
+      .map(function (s) {
+        return text(s).trim();
+      })
+      .filter(Boolean);
+  }
+
+  /* What a piece is graded on: its competencies by name, in the reply's
+     order, then those its rubric's rows count toward; each once, with its
+     I Can lines (none until the server sends them). */
+  function gradedOn(row, tags, rubric) {
+    var ids = list(row.tag_ids).slice();
+    if (rubric) {
+      list(rubric.criteria).forEach(function (c) {
+        Array.prototype.push.apply(ids, list(c && c.tag_ids));
+      });
+    }
+    return ids
+      .map(str)
+      .filter(function (id, i, all) {
+        return all.indexOf(id) === i && tags[id] && tags[id].label;
       })
       .map(function (id) {
-        return { id: str(id), name: str(tags[id].label) };
+        return { id: id, name: str(tags[id].label), iCan: iCanOf(tags[id]) };
       });
+  }
+
+  /* What the reply says about a piece beyond its grade (S4-M1; each is
+     left out while the server does not send it, and a value of the wrong
+     type is read as none): its unit, its category and what that counts
+     toward the grade, the teacher's Description, its Core Competencies. */
+  function aboutOf(row) {
+    var percent = row.category_percent;
+    var name = text(row.category_name);
+    return {
+      unit: text(row.module_name),
+      category: name
+        ? { name: name, percent: typeof percent === 'number' && isFinite(percent) && percent >= 0 ? percent : null }
+        : null,
+      description: text(row.description),
+      coreCompetencies: list(row.core_competencies)
+        .filter(function (c) {
+          return c && typeof c === 'object' && text(c.id) && text(c.name);
+        })
+        .map(function (c) {
+          return { id: c.id, name: c.name };
+        }),
+    };
   }
 
   /* The plain data the student page draws, from a `page` reply (the
@@ -502,12 +620,13 @@ window.StudentView = (function () {
         comment: '',
         competencies: [],
         rubric: null,
-        gradedOn: gradedOn(row, tags),
+        gradedOn: gradedOn(row, tags, row.rubric_id ? rubrics[row.rubric_id] : null),
         created_at: str(row.created_at),
       };
+      Object.assign(piece, aboutOf(row));
       // Work not back yet shows its rubric's words (See the Rubric), with no level.
       if (!grade && !hidden && row.rubric_id && rubrics[row.rubric_id]) {
-        piece.rubric = rubricView(rubrics[row.rubric_id], null);
+        piece.rubric = rubricView(rubrics[row.rubric_id], null, tags);
       }
       if (grade) {
         var returned = when(row.returned_at);
@@ -518,7 +637,7 @@ window.StudentView = (function () {
         piece.result = resultOf(cid, row, typeof cellOf === 'function' ? cellOf(piece.id) : null);
         piece.comment = str(grade.comment);
         if (row.rubric_id && rubrics[row.rubric_id]) {
-          piece.rubric = rubricView(rubrics[row.rubric_id], grade);
+          piece.rubric = rubricView(rubrics[row.rubric_id], grade, tags);
         } else if (row.score_mode !== 'points' && row.score_mode !== 'complete') {
           var parts = grade.tags || {};
           var ids = row.tag_ids || [];
@@ -561,6 +680,8 @@ window.StudentView = (function () {
           course.grading_system === 'letter' || course.grading_system === 'both'
             ? course.grading_system
             : 'proficiency',
+        // The teacher's name as the server sends it ('' until it does): shown as sent, never made into "Mr.".
+        teacherName: text(course.teacher_name),
       },
       counts: { toDo: count('due'), sent: 0, back: count('back'), missing: count('missing') },
       work: work,

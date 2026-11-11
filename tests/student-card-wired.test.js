@@ -1166,6 +1166,29 @@ describe('two pieces with the same date: the one made later counts later', () =>
   });
 });
 
+/* The nine keys S4-M1 added to the page (migrations/local-test/
+   s4-m1-contract.md). The database sends them; the function's allow-list
+   passes them once its lists name them (PR 1050), and drops them until
+   then. Demo Mode sends them, as the database does. */
+const S4M1 = {
+  course: ['teacher_name'],
+  classes: ['to_do'],
+  tags: ['i_can'],
+  criteria: ['tag_ids'],
+  assessments: ['description', 'module_name', 'category_name', 'category_percent', 'core_competencies'],
+};
+// A reply with the nine keys taken out: what the function passes while its lists do not name them.
+function withoutS4M1(reply) {
+  const out = JSON.parse(JSON.stringify(reply));
+  const drop = (obj, keys) => obj && keys.forEach(k => delete obj[k]);
+  drop(out.course, S4M1.course);
+  (out.classes || []).forEach(c => drop(c, S4M1.classes));
+  Object.values(out.tags || {}).forEach(t => drop(t, S4M1.tags));
+  (out.rubrics || []).forEach(r => (r.criteria || []).forEach(c => drop(c, S4M1.criteria)));
+  (out.assessments || []).forEach(a => drop(a, S4M1.assessments));
+  return out;
+}
+
 /* Demo Mode and a real card are drawn by the same code from the same shape
    of reply. Demo Mode's reply for the sample class, sent through the
    function's allow-list as a real reply is, must draw the same list. */
@@ -1201,11 +1224,13 @@ describe('Demo Mode and a real card cannot drift', () => {
 
     // The sample class's reply before anything was opened (the walk above has opened its own).
     const sent = realIds(openStudentPage().T.demoPage(system));
-    // The allow-list drops nothing the list reads: only the class id Demo Mode adds.
+    // The allow-list drops nothing the list reads: only the class id Demo Mode adds, and the
+    // nine S4-M1 keys all together while the function's lists do not name them (none, once they do).
     const passed = cardReply(CARD_ROUTES.page, sent);
     const dropped = JSON.parse(JSON.stringify(sent));
     delete dropped.course.id;
-    expect(passed).toEqual(dropped);
+    expect([dropped, withoutS4M1(dropped)]).toContainEqual(passed);
+    expect(withoutS4M1(dropped)).not.toEqual(dropped);
 
     const dev = school({ card: { page: sent } });
     const real = await signIn(dev);
@@ -1237,7 +1262,10 @@ describe('Demo Mode and a real card cannot drift', () => {
     const contract = reply.assessments.find(a => a.id === 'demo-contract');
     expect(Date.parse(contract.seen_at)).toBeGreaterThan(Date.parse(contract.updated_at));
     expect(Object.keys(reply).sort()).toEqual(Object.keys(samplePage(TODAY)).sort());
-    expect(Object.keys(contract).sort()).toEqual(Object.keys(samplePage(TODAY).assessments[0]).sort());
+    // The database's shape since S4-M1: every key the page had, and the five new ones on each piece.
+    expect(Object.keys(contract).sort()).toEqual(
+      Object.keys(samplePage(TODAY).assessments[0]).concat(S4M1.assessments).sort(),
+    );
     expect(Object.keys(contract.grade).sort()).toEqual([
       'checks',
       'comment',
