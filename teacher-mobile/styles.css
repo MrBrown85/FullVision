@@ -2214,14 +2214,15 @@ body.fv-switching-course::after {
 .m-score-btn.m-level-btn {
   flex: 1 1 0;
   min-width: 0;
-  max-width: 84px;
   width: auto;
   height: auto;
-  min-height: 56px;
+  min-height: 52px;
   padding: 6px 2px;
-  border-radius: 14px;
+  border-width: 1.5px;
+  border-radius: 10px;
   flex-direction: column;
   gap: 2px;
+  color: var(--text);
 }
 .m-level-fig {
   font-size: 19px;
@@ -2231,76 +2232,91 @@ body.fv-switching-course::after {
 .m-level-word {
   max-width: 100%;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.2;
   letter-spacing: -0.01em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--text-2);
+}
+.m-score-btn.m-level-btn.m-score-active {
+  color: #fff;
+}
+.m-score-btn.m-level-btn.m-score-active .m-level-word {
+  font-weight: 700;
+  color: inherit;
 }
 .m-score-btns:has(.m-level-btn) {
   gap: 6px;
 }
-/* The chosen level's tick sits on the top corner, clear of its word. */
+/* The board fills the chosen level; it carries no tick. */
 .m-score-btn.m-level-btn.m-score-active::after {
-  top: -5px;
-  bottom: auto;
-  right: -5px;
+  content: none;
 }
 @media (max-width: 359px) {
   .m-score-btn.m-level-btn {
     padding: 6px 0;
-    border-width: 2px;
   }
   .m-level-word {
     font-size: 9.5px;
     letter-spacing: -0.02em;
   }
 }
-/* "Suggested: Proficient" over a criterion's levels, from its ticks. */
+/* "Suggested: Proficient" over a criterion's levels, from its ticks, in
+   the level's colour. */
 .m-crit-suggested {
   margin: -2px 0 8px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-2);
-  text-align: center;
+}
+.m-crit-suggested.l1 {
+  color: var(--score-1-text);
+}
+.m-crit-suggested.l2 {
+  color: var(--score-2-text);
+}
+.m-crit-suggested.l3 {
+  color: var(--score-3-text);
+}
+.m-crit-suggested.l4 {
+  color: var(--score-4-text);
 }
 
-/* Fine-tune: − Minus and + Plus under the levels */
+/* Fine-tune: − Minus and + Plus under the levels; an applied one is amber. */
 .m-score-mods {
   display: flex;
-  gap: 8px;
-  justify-content: center;
-  margin-top: 10px;
+  gap: 6px;
+  margin-top: 8px;
 }
 .m-mod-btn {
   flex: 1 1 0;
-  max-width: 140px;
-  height: 36px;
-  border-radius: 18px;
-  border: 2px solid var(--border);
+  height: 44px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
   background: var(--surface);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
 .m-mod-sign {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
 }
 .m-mod-btn.m-mod-active {
-  background: var(--text);
-  border-color: transparent;
-  color: var(--surface);
+  background: var(--score-2-bg);
+  border-color: var(--score-2);
+  color: var(--score-2-text);
 }
 .m-mod-btn:disabled {
-  opacity: 0.35;
+  opacity: 0.4;
   cursor: default;
 }
 
@@ -4723,7 +4739,6 @@ body.fv-switching-course::after {
 }
 .m-mod-btn {
   height: 44px;
-  border-radius: 22px;
 }
 .m-wdg-editor-drag {
   display: flex;

@@ -2772,7 +2772,11 @@ window.MGrade = (function () {
       var suggested =
         advanced && !open ? RubricChecks.suggestedLevel(crit, getRubricCheckIds(cid, st.id, assessment.id)) : 0;
       var suggestedLine = suggested
-        ? '<div class="m-crit-suggested">' + MC.esc('Suggested: ' + scoreLevelText(suggested)) + '</div>'
+        ? '<div class="m-crit-suggested l' +
+          suggested +
+          '">' +
+          MC.esc('Suggested: ' + scoreLevelText(suggested)) +
+          '</div>'
         : '';
       return (
         '<div class="m-score-group m-crit-group" data-critid="' +
