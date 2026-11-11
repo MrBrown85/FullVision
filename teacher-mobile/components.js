@@ -372,7 +372,7 @@ window.MComponents = (function () {
 
   /* ── Proficiency color (CSS var resolved) ──────────────────── */
   function profBg(level) {
-    return PROF_COLORS[Math.round(level)] || PROF_COLORS[0];
+    return PROF_COLORS[roundLevel(level)] || PROF_COLORS[0];
   }
 
   /* ── Offline detection ─────────────────────────────────────── */

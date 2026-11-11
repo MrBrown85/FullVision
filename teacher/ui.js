@@ -1552,7 +1552,7 @@ function renderStudentHeader(cid, sid, opts) {
   const inTerm = typeof assessmentInYearToDate === 'function';
   const assessments = getAssessments(cid).filter(a => !inTerm || assessmentInYearToDate(cid, a));
   const overall = getOverallProficiency(cid, sid);
-  const overallRounded = Math.round(overall);
+  const overallRounded = roundLevel(overall);
   const profColor = PROF_COLORS[overallRounded] || PROF_COLORS[0];
 
   // Missing / Excused / Late work
@@ -2112,7 +2112,7 @@ function _focusRosterRow(sid, tries) {
 
 /* ── Proficiency badge HTML ─────────────────────────────────── */
 function profBadge(score, size) {
-  const s = Math.round(score);
+  const s = roundLevel(score);
   const sz = size || 'sm';
   return `<span class="prof-badge prof-${s} prof-${sz}">${s || '\u2014'}</span>`;
 }

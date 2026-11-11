@@ -2249,7 +2249,7 @@ window.MGrade = (function () {
             // In the class's Rubric Levels order, like the desktop card.
             levelOrderFor(cid).forEach(function (level) {
               var active =
-                current !== null && Math.round(current) === level
+                current !== null && roundLevel(current) === level
                   ? ' m-score-active' + (currentMixed ? ' m-score-mixed' : '')
                   : '';
               btns +=
@@ -3381,7 +3381,7 @@ window.MGrade = (function () {
         var lastScore = prev.length ? prev[prev.length - 1].score : null;
         btns.forEach(function (btn) {
           var lvl = parseInt(btn.getAttribute('data-score'));
-          btn.classList.toggle('m-score-active', lastScore !== null && Math.round(lastScore) === lvl);
+          btn.classList.toggle('m-score-active', lastScore !== null && roundLevel(lastScore) === lvl);
         });
       }
       _syncModBtns(entry.cid, entry.sid, entry.aid, entry.tid);

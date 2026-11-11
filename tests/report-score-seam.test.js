@@ -713,6 +713,12 @@ const NO_SCORE = new Set([
   // The report's term: which one is in view, and putting one in view (the Reports page).
   'getActiveTerm',
   'setActiveTerm',
+  // A level, %, or points figure it is given, as calc.js prints and reads it.
+  'printedLevel',
+  'roundLevel',
+  'wholePercent',
+  'oneDecimal',
+  'nearestScoreLevelName',
 ]);
 
 // Each drawing of the class takes a few seconds; a slow runner gets a minute.

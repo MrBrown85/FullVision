@@ -4757,7 +4757,8 @@ function _fillOverrideCalculated(cid) {
       var o = overrides[sid][sectionId];
       if (!o || o.calculated != null) return;
       try {
-        o.calculated = Math.round(getSectionProficiencyRaw(cid, sid, sectionId) * 10) / 10;
+        // As calc.js saves it (setSectionOverride): the printed figure.
+        o.calculated = printedLevel(getSectionProficiencyRaw(cid, sid, sectionId));
         changed = true;
       } catch (e) {
         console.warn('Could not work out the calculated level for an override:', e);

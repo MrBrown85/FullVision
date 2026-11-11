@@ -508,8 +508,8 @@
     if (col.complete || (col.outOf != null && as !== 'proficiency')) {
       var stats = getClassPointsAverage(cid, students, a);
       if (!stats) return '—';
-      if (col.complete || as === 'percent') return Math.round(stats.pct) + '%';
-      return formatPoints(Math.round(stats.avg * 10) / 10);
+      if (col.complete || as === 'percent') return wholePercent(stats.pct) + '%';
+      return formatPoints(oneDecimal(stats.avg));
     }
     // Proficiency work, or points work printed as a proficiency: calc.js's
     // one column rule, the same as the gradebook's Class Average.

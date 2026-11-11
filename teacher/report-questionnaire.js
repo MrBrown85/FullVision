@@ -1337,7 +1337,7 @@ window.ReportQuestionnaire = (function () {
 
   /* A competency's colour step for .qn-level, 1 to 4. */
   function _levelStep(v) {
-    return Math.max(1, Math.min(4, Math.round(v)));
+    return Math.max(1, Math.min(4, roundLevel(v)));
   }
   /* "5 pieces", "1 piece": a competency's scored pieces. */
   function _pieces(c) {

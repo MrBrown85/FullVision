@@ -288,7 +288,7 @@ window.DashObservations = (function () {
       count: count,
       gap: count === 0,
       text: formatLevel(cid, v),
-      level: v > 0 ? Math.max(1, Math.min(4, Math.round(v))) : 0,
+      level: v > 0 ? Math.max(1, Math.min(4, roundLevel(v))) : 0,
     };
   }
 

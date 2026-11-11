@@ -48,6 +48,12 @@ async function watch(page) {
       'levelWord',
       'getActiveTerm',
       'setActiveTerm',
+      // A level, %, or points figure it is given, as calc.js prints and reads it.
+      'printedLevel',
+      'roundLevel',
+      'wholePercent',
+      'oneDecimal',
+      'nearestScoreLevelName',
     ];
     Object.keys(Calc)
       .filter(name => typeof window[name] === 'function' && NO_SCORE.indexOf(name) < 0)
