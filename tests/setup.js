@@ -226,6 +226,7 @@ load('shared/grader.js');
 load('shared/rubric-draft.js');
 load('shared/rubric-checks.js');
 load('shared/core-self.js');
+load('shared/student-view.js');
 load('teacher/ui.js');
 load('teacher/report-scores.js');
 load('teacher/drafts-before-print.js');
