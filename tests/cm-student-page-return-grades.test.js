@@ -205,16 +205,15 @@ describe('Class Settings › Student Page: Return Grades', () => {
       );
     });
 
-    it('draws no other row of the board yet', () => {
+    it('draws no other row of the board yet, but the last one, Questionnaires and Reports', () => {
       open();
-      [
-        'Send Work',
-        'Keep Photos Until',
-        'Reflect on Feedback',
-        'Show My Learning',
-        'Questionnaires and Reports',
-      ].forEach(label => expect(html(), label).not.toContain(label));
+      ['Send Work', 'Keep Photos Until', 'Reflect on Feedback', 'Show My Learning'].forEach(label =>
+        expect(html(), label).not.toContain(label),
+      );
       expect((html().match(/class="sp-row"/g) || []).length).toBe(1);
+      expect(html()).toContain(
+        '<div class="sp-row-title">Questionnaires and Reports</div><div class="cm-hint">Open with the same card. Set them up on the Questionnaires tab and in Reports.</div>',
+      );
       // Student Cards came with S0-W1, in a card of its own under this one
       // (tests/student-cards.test.js), not as a row of it.
       expect((html().match(/class="cm-section sp-card"/g) || []).length).toBe(1);

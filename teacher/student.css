@@ -4853,3 +4853,173 @@ button.stu-bd-row:focus-visible {
   text-align: left;
   white-space: normal;
 }
+
+/* Grades tab (redesign R4, behind the build switch): how the course grade
+   is built, Group By, and the Overview's open-in-place rows. */
+.stu-gr {
+  --gr-att: #c2410c;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding-top: 16px;
+}
+.stu-gr-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px;
+}
+.stu-gr-head-text {
+  flex: 1 1 320px;
+}
+.stu-gr-title {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.15;
+  font-weight: 700;
+  color: var(--text);
+}
+.stu-gr-lede {
+  margin: 8px 0 0;
+  font-size: var(--text-md);
+  color: var(--text-2);
+}
+.stu-gr-open {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--border-2);
+  border-radius: 8px;
+  color: var(--link);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.stu-gr-course {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 24px 40px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.stu-gr-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.stu-gr-course-v {
+  margin-top: 6px;
+}
+.stu-gr-course-v .stu-level {
+  font-size: 22px;
+  font-weight: 800;
+  padding: 4px 12px;
+  border-radius: 4px;
+}
+.stu-gr-bar {
+  flex: 1 1 480px;
+  min-width: 0;
+  display: flex;
+  gap: 16px;
+}
+.stu-gr-seg {
+  min-width: 0;
+}
+.stu-gr-track {
+  height: 16px;
+  border-radius: 4px;
+  background: var(--seg-track, var(--border));
+  overflow: hidden;
+}
+.stu-gr-fill {
+  height: 100%;
+}
+.stu-gr-seg-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0 8px;
+  margin-top: 8px;
+  font-size: var(--text-md);
+}
+.stu-gr-seg-name {
+  font-weight: 600;
+  color: var(--text);
+}
+.stu-gr-seg-v {
+  font-weight: 700;
+  color: var(--text);
+}
+.stu-gr-seg-w {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.stu-gr-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+.stu-gr-count {
+  font-weight: 400;
+}
+.stu-gr-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.stu-gr-group {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.stu-gr-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  background: var(--bg);
+}
+.stu-gr-group-name {
+  margin: 0;
+  font-size: 1.1875rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.stu-gr-group-meta {
+  margin-top: 2px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.stu-gr-miss {
+  color: var(--gr-att);
+}
+.stu-gr-group .stu-ov-rows {
+  border: 0;
+  border-radius: 0;
+}
+.stu-gr-rubric {
+  padding: 16px;
+}
+.stu-gr-none {
+  padding: 16px;
+  font-size: var(--text-md);
+  color: var(--text-2);
+}
+@media (pointer: coarse) {
+  .stu-gr-open,
+  .stu-gr-controls .seg-btn {
+    min-height: 44px;
+  }
+}
+@media (prefers-color-scheme: dark) {
+  .stu-gr {
+    --gr-att: #ff9f45;
+  }
+}

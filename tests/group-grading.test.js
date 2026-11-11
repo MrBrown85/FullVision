@@ -172,12 +172,20 @@ describe('the grader on a group', () => {
     );
   });
 
-  it('without Send Work the members card is as it was', () => {
+  it('without Send Work the members card is the same board card, after the criteria', () => {
     const overlay = openGrader(() => seed({ sendWork: false }), CID, PIECE, S[0]);
     const card = overlay.querySelector('.grader-members');
-    expect(card.querySelector('.grader-members-title').textContent).toBe('Group Members');
-    expect(card.querySelector('.grader-members-hint')).toBeNull();
-    expect(card.querySelector('.grader-member-same')).toBeNull();
-    expect(overlay.querySelector('.grader-change-one-btn')).toBeNull();
+    expect(card.querySelector('.grader-members-title').textContent).toBe('Students in This Group');
+    expect(card.querySelector('.grader-members-hint').textContent).toBe(
+      'One grade for all three. Change one student only when their part was different.',
+    );
+    expect(card.querySelectorAll('.grader-member-same')).toHaveLength(3);
+    expect(overlay.querySelector('.grader-change-one-btn')).not.toBeNull();
+    // Criteria, then Students in This Group, then the Overall Comment.
+    const order = [...overlay.querySelectorAll('.grdl-card[data-tag], .grader-members, .grdt-overall')].map(el =>
+      el.className.split(' ').pop(),
+    );
+    expect(order).toEqual(['grdl-card', 'grader-members', 'grdt-overall']);
+    expect(overlay.querySelector('.grader-work')).toBeNull();
   });
 });

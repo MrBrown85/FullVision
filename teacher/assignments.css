@@ -6063,13 +6063,12 @@ body:has(#page-layout.sidebar-hidden) .rsg-descriptor-bar {
 .grader-status-btn.is-late {
   background: var(--score-2);
 }
-/* Group work (Group grading): the members card, one tile per member with
-   their own Missing | Excused | Late and a ⋯ menu; a member graded
-   separately shows their grade and Back to Group Grade instead. The card
-   sits in the dialog's lane like the Overall Comment and Note for the
-   Report cards. */
+/* Group work (Group grading): Students in This Group (TGroupGrade), after
+   the criteria. One row per member: the name, "Same as group" (or what was
+   changed for them) at the right, their own Missing | Excused | Late and a
+   ⋯ menu; a member graded separately shows their grade and Back to Group
+   Grade instead. The card sits in the lane like the criteria cards. */
 .grader-members {
-  margin: 0 16px;
   background: var(--surface);
   border-radius: 16px;
   padding: 14px 16px 16px;
@@ -6083,38 +6082,43 @@ body:has(#page-layout.sidebar-hidden) .rsg-descriptor-bar {
   display: none;
 }
 .grader-members-title {
-  margin: 0 0 12px;
+  margin: 0 0 6px;
   font-size: var(--text-md);
   font-weight: 700;
   color: var(--text);
 }
 .grader-members-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
 }
 .grader-member {
   position: relative;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 10px 12px;
-  border-radius: 12px;
-  background: rgba(118, 118, 128, 0.08);
-}
-.grader-member-top {
-  align-self: stretch;
-  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  min-height: 28px;
+  gap: 6px 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--divider-subtle);
 }
 .grader-member-name {
+  flex: 0 1 auto;
+  min-width: 0;
   font-size: var(--text-base);
   font-weight: 600;
   color: var(--text);
+}
+.grader-member > .grader-member-same,
+.grader-member > .grader-member-separate {
+  flex: 1 1 auto;
+  margin: 0;
+  text-align: right;
+}
+.grader-member-changes {
+  flex: 1 0 100%;
+  text-align: right;
+}
+.grader-member-changes .grader-member-same {
+  margin: 0;
 }
 button.grader-member-name {
   padding: 0;
@@ -6145,8 +6149,8 @@ button.grader-member-name {
 }
 .grader-member-menu {
   position: absolute;
-  top: 44px;
-  right: 6px;
+  top: calc(100% - 4px);
+  right: 0;
   z-index: 5;
   min-width: 200px;
   padding: 5px;
@@ -6181,9 +6185,9 @@ button.grader-member-name {
 }
 .grader-member-separate {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
   font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text);
@@ -9281,6 +9285,127 @@ button.grader-member-name {
   content: 'EXT';
 }
 
+/* The scoring column beside the work (half the dialog, or 380px in Focus
+   on Work): every row puts its label over its control, as on the boards,
+   so nothing is squeezed into a side column or runs past the edge. */
+.grader-panel-col .grdl-card,
+.grader-panel-col .grdp-card {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+}
+.grader-panel-col .grdp-card {
+  padding: 16px;
+}
+.grader-panel-col .grdl-seg {
+  min-width: 0;
+}
+.grader-panel-col .grdl-level {
+  min-width: 0;
+  padding: 0 8px;
+}
+.grader-panel-col .grdt-note-row,
+.grader-panel-col .grader-report-note {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+.grader-panel-col .grdt-note-label {
+  padding: 0;
+}
+/* The Overall Comment is a text box here, as on the boards. */
+.grader-panel-col .grdt-overall .grdt-note {
+  height: calc(3 * 1.4em + 16px);
+}
+/* Rubric tiles: the name and codes over the four tiles, so each tile has a
+   quarter of the column rather than a quarter of what is left beside the
+   name; the chosen tile keeps its level's name whole, − | + going under it
+   when the tile is too narrow for both. */
+.grader-panel-col .grdt-legend,
+.grader-panel-col .grdt-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.grader-panel-col .grdt-legend > span:first-child {
+  display: none;
+}
+.grader-panel-col .grdt-crit-side {
+  grid-column: 1 / -1;
+  padding: 0 2px;
+}
+.grader-panel-col .grdt-tile-head {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+.grader-panel-col .grdt-chosen-label {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+/* Points: the box, "/ 10" and the percent on their own line. */
+.grader-panel-col .grdp-entry {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.grader-panel-col .grdp-pct {
+  margin-left: auto;
+}
+/* Single-point: name and codes, the Proficient Standard box, the levels,
+   then Work On and Went Beyond, one under the next. */
+.grader-panel-col .grsp-legend {
+  display: none;
+}
+.grader-panel-col .grdt-crit.grsp-crit {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+.grader-panel-col .grsp-standard {
+  order: -1;
+  padding: 0;
+  align-items: stretch;
+  text-align: left;
+}
+.grader-panel-col .grsp-standard .grdt-codes {
+  justify-content: flex-start;
+}
+.grader-panel-col .grsp-words {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(118, 118, 128, 0.08);
+  font-size: var(--text-sm);
+}
+.grader-panel-col .grsp-words::before {
+  content: 'Proficient Standard';
+  display: block;
+  margin-bottom: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--score-3);
+}
+.grader-panel-col .grsp-controls,
+.grader-panel-col .grsp-controls .grdl-seg {
+  justify-content: stretch;
+  width: 100%;
+}
+.grader-panel-col .grsp-controls .grdl-level,
+.grader-panel-col .grsp-controls .grdl-pick {
+  flex: 1 1 0;
+}
+.grader-panel-col .grsp-standard .grdt-not-scored {
+  align-self: flex-start;
+}
+.grader-panel-col .grsp-note {
+  padding: 0;
+  background: none;
+}
+.grader-panel-col .grsp-note .grdt-note,
+.grader-panel-col .grsp-note .grdt-note:focus,
+.grader-panel-col .grsp-note .grdt-note.has-text {
+  flex: none;
+  min-height: 44px;
+}
+
 /* ── Work to grade on the Assignments page and in the gradebook (S6-F4).
    The gradebook's marks live here with the rest of this slice's styles. */
 .assess-to-grade {
@@ -9376,11 +9501,21 @@ button.grader-member-name {
 .markup-pin.is-pending circle {
   fill: var(--active);
 }
+/* The Mark Up screen (the board "Teacher: Mark Up"): dark, like a photo
+   editor, in light and dark mode alike, so the page stands out; the notes
+   panel follows the theme. */
 .markup-overlay {
+  --mk-dark: #1c1c1e;
+  --mk-chip: rgba(255, 255, 255, 0.1);
+  --mk-chip-hover: rgba(255, 255, 255, 0.18);
+  --mk-ink: #f2f2f7;
+  --mk-ink-2: #aeaeb2;
+  --mk-line: rgba(255, 255, 255, 0.16);
   position: fixed;
   inset: 0;
   z-index: 4000;
-  background: var(--bg, #f2f2f7);
+  background: var(--mk-dark);
+  color: var(--mk-ink);
   display: flex;
 }
 .markup-screen {
@@ -9392,10 +9527,12 @@ button.grader-member-name {
 .markup-bar {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 10px 20px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--divider, #e5e5ea);
+  gap: 12px;
+  min-height: 64px;
+  padding: 8px 20px;
+  box-sizing: border-box;
+  background: var(--mk-dark);
+  box-shadow: inset 0 -1px 0 var(--mk-line);
   flex-wrap: wrap;
 }
 .markup-heading {
@@ -9403,73 +9540,87 @@ button.grader-member-name {
 }
 .markup-title {
   margin: 0;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
+  color: var(--mk-ink);
 }
 .markup-sub {
   margin: 2px 0 0;
-  font-size: 13px;
-  color: var(--text-2);
+  font-size: 12px;
+  color: var(--mk-ink-2);
 }
 .markup-tools {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   flex-wrap: wrap;
-  margin: 0 auto;
+  margin-left: auto;
 }
+/* Each tool a chip with its icon and name; the one in use is white. */
 .markup-tool {
   display: inline-flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  min-width: 56px;
-  height: 48px;
-  padding: 4px 8px;
-  border: 1px solid transparent;
+  gap: 6px;
+  height: 40px;
+  padding: 0 12px;
+  border: none;
   border-radius: 10px;
-  background: none;
-  color: var(--text);
+  background: var(--mk-chip);
+  color: var(--mk-ink);
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
 }
-.markup-tool:hover:not(:disabled) {
-  background: var(--surface-2, #f2f2f4);
+.markup-tool svg {
+  width: 17px;
+  height: 17px;
 }
-.markup-tool[aria-pressed='true'] {
-  background: var(--active);
-  color: #fff;
+.markup-tool:hover:not(:disabled) {
+  background: var(--mk-chip-hover);
+}
+.markup-tool[aria-pressed='true'],
+.markup-tool[aria-pressed='true']:hover {
+  background: #fff;
+  color: #1d1d1f;
+}
+.markup-tool:focus-visible,
+.markup-color:focus-visible {
+  outline: 2px solid #64a8ff;
+  outline-offset: 2px;
 }
 .markup-tool:disabled {
-  opacity: 0.35;
+  opacity: 0.4;
   cursor: default;
 }
 .markup-icon {
-  min-width: 40px;
+  width: 40px;
+  padding: 0;
 }
 .markup-sep {
   width: 1px;
   height: 28px;
-  background: var(--divider-heavy, #d1d1d6);
+  background: var(--mk-line);
   margin: 0 6px;
 }
 .markup-colors {
   display: inline-flex;
-  gap: 6px;
+  align-items: center;
+  gap: 10px;
 }
 .markup-color {
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  border: 2px solid var(--surface);
-  box-shadow: 0 0 0 1px var(--divider-heavy, #d1d1d6);
+  border: none;
   cursor: pointer;
   padding: 0;
 }
 .markup-color[aria-pressed='true'] {
-  box-shadow: 0 0 0 2px var(--text);
+  box-shadow:
+    0 0 0 3px var(--mk-dark),
+    0 0 0 5px #fff;
 }
 .markup-color-red {
   background: #d93025;
@@ -9480,18 +9631,26 @@ button.grader-member-name {
 .markup-color-blue {
   background: #1a73e8;
 }
+.btn.markup-done {
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 20px;
+  font-size: 15px;
+  font-weight: 600;
+}
 .markup-body {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr) 340px;
 }
 .markup-stage {
   overflow: auto;
-  padding: 20px;
+  padding: 24px;
   display: flex;
   justify-content: center;
   align-items: flex-start;
+  background: var(--mk-dark);
 }
 .markup-surface {
   position: relative;
@@ -9522,25 +9681,106 @@ button.grader-member-name {
 .markup-img {
   display: block;
   max-width: 100%;
-  max-height: calc(100vh - 200px);
+  max-height: calc(100vh - 112px);
   background: #fff;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
 }
 .markup-layer-host {
   position: absolute;
   inset: 0;
   pointer-events: none;
 }
+/* A note's words beside its pin, in the pin's colour (notes are red). The
+   callout's number lies on the pin, so the pin itself is not drawn; a pin
+   for a note being written still is. */
+.markup-overlay .markup-layer .markup-pin:not(.is-pending) {
+  display: none;
+}
+.markup-callouts {
+  position: absolute;
+  inset: 0;
+}
+.markup-callout {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+.markup-callout-box {
+  --mk-unturn: 0deg;
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  max-width: 320px;
+  padding: 4px 9px 4px 4px;
+  border-radius: 13px;
+  background: #fff3f2;
+  color: #a50e0e;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
+  transform-origin: 0 0;
+  /* The number's centre on the pin, then upright on a turned page. */
+  transform: rotate(var(--mk-unturn)) translate(-15px, -50%);
+}
+.markup-callout.is-left .markup-callout-box {
+  flex-direction: row-reverse;
+  padding: 4px 4px 4px 9px;
+  transform: rotate(var(--mk-unturn)) translate(calc(-100% + 15px), -50%);
+}
+.markup-stage.turn-90 .markup-callout-box {
+  --mk-unturn: -90deg;
+}
+.markup-stage.turn-180 .markup-callout-box {
+  --mk-unturn: -180deg;
+}
+.markup-stage.turn-270 .markup-callout-box {
+  --mk-unturn: -270deg;
+}
+.markup-callout-n {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #d93025;
+  color: #fff;
+  font-size: 12px;
+}
+/* A long note shows its first three lines here; the list has it all. */
+.markup-callout-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
 .markup-side {
-  background: var(--surface);
-  border-left: 1px solid var(--divider, #e5e5ea);
-  padding: 16px;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  padding: 20px;
+  background: var(--bg);
+  border-left: 1px solid var(--divider);
+  color: var(--text);
 }
 .markup-side-title {
-  margin: 0 0 10px;
-  font-size: 15px;
+  margin: 0;
+  font-size: 16px;
   font-weight: 700;
+}
+.markup-notes {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 .markup-note-list {
   list-style: none;
@@ -9552,9 +9792,13 @@ button.grader-member-name {
 }
 .markup-note {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) 24px;
-  gap: 8px;
+  grid-template-columns: 22px minmax(0, 1fr) 22px;
+  gap: 10px;
   align-items: start;
+  padding: 10px 8px 10px 12px;
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--divider);
 }
 .markup-note-n {
   width: 22px;
@@ -9603,24 +9847,23 @@ button.grader-member-name {
   padding: 8px;
   border-radius: 8px;
   border: 1px solid var(--divider-heavy, #d1d1d6);
+  background: var(--surface);
+  color: var(--text);
   resize: vertical;
 }
 .markup-note-actions {
   display: flex;
   gap: 8px;
 }
-.markup-foot {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 10px 20px;
-  background: var(--surface);
-  border-top: 1px solid var(--divider, #e5e5ea);
-}
+/* Who sees the marks, in a blue box at the foot of the panel. */
 .markup-sees {
   margin: 0;
-  font-size: 13px;
-  color: var(--text-2);
+  padding: 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--active) 12%, var(--surface));
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.4;
 }
 .markup-msg {
   margin: 0;
@@ -9631,12 +9874,14 @@ button.grader-member-name {
   display: none;
 }
 .markup-pages {
-  margin-left: auto;
-  display: inline-flex;
+  display: flex;
   gap: 8px;
 }
 .markup-pages[hidden] {
   display: none;
+}
+.markup-page {
+  flex: 1;
 }
 .markup-note-list + .markup-notes-hint {
   margin-top: 12px;
@@ -9644,17 +9889,17 @@ button.grader-member-name {
 
 /* ── Group work in the grader (S12-F2): Students in This Group ───────── */
 .grader-members-hint {
-  margin: -4px 0 10px;
+  margin: 0 0 8px;
   font-size: 13px;
   color: var(--text-2);
 }
 .grader-member-same {
-  margin: 2px 0 4px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-2);
 }
+/* What was changed for one member: amber, as on the board. */
 .grader-member-same.is-changed {
-  color: var(--text);
+  color: var(--score-2-dark);
   font-weight: 600;
 }
 .grader-change-one {

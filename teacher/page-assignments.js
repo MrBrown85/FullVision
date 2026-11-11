@@ -12596,8 +12596,13 @@ window.PageAssignments = (function () {
 
   // The grading controls for `st`.
   function _drawGraderPanel(panel, cid, a, st) {
+    var body = panel.querySelector('.grader-body');
+    // Students in This Group may sit among the criteria: keep it out of
+    // the redraw (_placeGroupMembers puts it back).
+    var members = panel.querySelector('.grader-members');
+    if (members && body.contains(members)) body.parentNode.insertBefore(members, body);
     // html-safe: a.id is our id; _graderHtml is reviewed
-    panel.querySelector('.grader-body').innerHTML =
+    body.innerHTML =
       '<div class="assess-card open active" id="ac-' +
       a.id +
       '"><div class="assess-body">' +
@@ -12938,10 +12943,13 @@ window.PageAssignments = (function () {
   }
   var _COUNT_WORDS = ['', 'one', 'two', 'three', 'four', 'five', 'six'];
 
+  /* One member as a row of Students in This Group (TGroupGrade): the
+     name, "Same as group" (or what was changed for them) at the right,
+     their own Missing | Excused | Late, and ⋯ (Grade Separately) or Back
+     to Group Grade. */
   // html-safe: names go through esc(); ids are ours; labels are constants
   function _graderMemberHtml(cid, a, st, menuSid, source) {
     var sid = st.id;
-    var inWork = !!(_grader && _grader.workShell);
     var name = esc(displayNameWithLast(st));
     var status = getAssignmentStatus(cid, sid, a.id);
     var statusHtml =
@@ -12952,38 +12960,44 @@ window.PageAssignments = (function () {
       '</div>';
     if (isGradedSeparately(a, sid)) {
       var grade = _graderGrade(cid, a, sid);
+      var changes = _memberChanges(cid, a, sid, source);
       return (
         '<div class="grader-member is-separate">' +
-        '<div class="grader-member-top"><button type="button" class="grader-member-name is-link" data-grader="open-member" data-sid="' +
+        '<button type="button" class="grader-member-name is-link" data-grader="open-member" data-sid="' +
         sid +
         '">' +
         name +
-        '</button></div>' +
+        '</button>' +
         '<div class="grader-member-separate">Graded Separately<span class="grader-grade' +
         (grade.tone ? ' tone-' + grade.tone : '') +
         '">' +
         esc(grade.text) +
         '</span></div>' +
-        (inWork
-          ? _memberChanges(cid, a, sid, source)
-              .map(function (line) {
-                return '<p class="grader-member-same is-changed">' + esc(line) + '</p>';
-              })
-              .join('')
-          : '') +
         statusHtml +
         '<button type="button" class="grader-member-back" data-grader="rejoin" data-sid="' +
         sid +
         '">Back to Group Grade</button>' +
+        (changes.length
+          ? '<div class="grader-member-changes">' +
+            changes
+              .map(function (line) {
+                return '<p class="grader-member-same is-changed">' + esc(line) + '</p>';
+              })
+              .join('') +
+            '</div>'
+          : '') +
         '</div>'
       );
     }
     var open = menuSid === sid;
     return (
       '<div class="grader-member">' +
-      '<div class="grader-member-top"><span class="grader-member-name">' +
+      '<span class="grader-member-name">' +
       name +
-      '</span><button type="button" class="grader-member-more" data-grader="member-menu" data-sid="' +
+      '</span>' +
+      '<p class="grader-member-same">Same as group</p>' +
+      statusHtml +
+      '<button type="button" class="grader-member-more" data-grader="member-menu" data-sid="' +
       sid +
       '" aria-label="More for ' +
       name +
@@ -12991,9 +13005,7 @@ window.PageAssignments = (function () {
       open +
       '">' +
       _GRADER_MORE_ICON +
-      '</button></div>' +
-      (inWork ? '<p class="grader-member-same">Same as group</p>' : '') +
-      statusHtml +
+      '</button>' +
       '<div class="grader-member-menu" role="menu"' +
       (open ? '' : ' hidden') +
       '><button type="button" role="menuitem" data-grader="separate" data-sid="' +
@@ -13001,6 +13013,22 @@ window.PageAssignments = (function () {
       '">Grade Separately</button></div>' +
       '</div>'
     );
+  }
+
+  /* Students in This Group sits after the criteria and before the Overall
+     Comment, as on the board; with no group it goes back above the
+     scoring, where _drawGraderPanel keeps it while the scoring is redrawn. */
+  function _placeGroupMembers(panel, card, inGroup) {
+    var body = panel.querySelector('.grader-body');
+    if (!body) return;
+    var overall = inGroup ? body.querySelector('.grdt-overall') : null;
+    if (overall) {
+      if (card.nextElementSibling !== overall) overall.parentNode.insertBefore(card, overall);
+    } else if (inGroup) {
+      if (card.previousElementSibling !== body) body.parentNode.insertBefore(card, body.nextSibling);
+    } else if (card.nextElementSibling !== body) {
+      body.parentNode.insertBefore(card, body);
+    }
   }
 
   // The members card (group view) and the Graded Separately From line (a
@@ -13013,29 +13041,20 @@ window.PageAssignments = (function () {
       getStudents(cid).forEach(function (s) {
         byId[s.id] = s;
       });
-      var inWork = !!_grader.workShell;
       var n = view.members.length;
-      // With the work beside the scoring (S12-F2): the board's Students in
-      // This Group, and Change One Student (Grade Separately, then open them).
+      // The board's Students in This Group (TGroupGrade), with or without
+      // the work beside the scoring: one grade for all, and Change One
+      // Student (Grade Separately, then open them).
       html =
         '<h2 class="grader-members-title" id="grader-members-title">' +
-        (inWork
-          ? view.group.kind === 'pair'
-            ? 'Students in This Pair'
-            : 'Students in This Group'
-          : view.group.kind === 'pair'
-            ? 'Pair Members'
-            : 'Group Members') +
+        (view.group.kind === 'pair' ? 'Students in This Pair' : 'Students in This Group') +
         '</h2>' +
-        (inWork
-          ? '<p class="grader-members-hint">' +
-            esc(
-              'One grade for all ' +
-                (_COUNT_WORDS[n] || n) +
-                '. Change one student only when their part was different.',
-            ) +
-            '</p>'
-          : '') +
+        '<p class="grader-members-hint">' +
+        esc(
+          (n === 2 ? 'One grade for both' : 'One grade for all ' + (_COUNT_WORDS[n] || n)) +
+            '. Change one student only when their part was different.',
+        ) +
+        '</p>' +
         '<div class="grader-members-grid">' +
         view.members
           .map(function (m) {
@@ -13043,34 +13062,32 @@ window.PageAssignments = (function () {
           })
           .join('') +
         '</div>';
-      if (inWork) {
-        var changeable = view.linked.filter(function (m) {
-          return byId[m];
-        });
-        var openChange = _grader.menuSid === 'change-one';
-        html +=
-          '<div class="grader-change-one">' +
-          '<button type="button" class="grader-change-one-btn" data-grader="member-menu" data-sid="change-one" aria-haspopup="menu" aria-expanded="' +
-          openChange +
-          '"' +
-          (changeable.length > 1 ? '' : ' disabled') +
-          '>Change One Student</button>' +
-          '<div class="grader-member-menu" role="menu"' +
-          (openChange ? '' : ' hidden') +
-          '>' +
-          changeable
-            .map(function (m) {
-              return (
-                '<button type="button" role="menuitem" data-grader="change-one" data-sid="' +
-                m +
-                '">' +
-                esc(displayNameWithLast(byId[m])) +
-                '</button>'
-              );
-            })
-            .join('') +
-          '</div></div>';
-      }
+      var changeable = view.linked.filter(function (m) {
+        return byId[m];
+      });
+      var openChange = _grader.menuSid === 'change-one';
+      html +=
+        '<div class="grader-change-one">' +
+        '<button type="button" class="grader-change-one-btn" data-grader="member-menu" data-sid="change-one" aria-haspopup="menu" aria-expanded="' +
+        openChange +
+        '"' +
+        (changeable.length > 1 ? '' : ' disabled') +
+        '>Change One Student</button>' +
+        '<div class="grader-member-menu" role="menu"' +
+        (openChange ? '' : ' hidden') +
+        '>' +
+        changeable
+          .map(function (m) {
+            return (
+              '<button type="button" role="menuitem" data-grader="change-one" data-sid="' +
+              m +
+              '">' +
+              esc(displayNameWithLast(byId[m])) +
+              '</button>'
+            );
+          })
+          .join('') +
+        '</div></div>';
     }
     if (_grader.membersHtml !== html) {
       // html-safe: built by _graderMemberHtml, names escaped there
@@ -13078,6 +13095,7 @@ window.PageAssignments = (function () {
       _grader.membersHtml = html;
     }
     card.hidden = !view;
+    _placeGroupMembers(dialog, card, !!view);
     var line = dialog.querySelector('.grader-separate-line');
     var group = !view && isGradedSeparately(a, sid) ? getCollabGroupOf(a, sid) : null;
     var lineHtml = group
