@@ -432,6 +432,7 @@ describe('a card that won’t open says why', () => {
     const dev = school();
     const page = await signIn(dev);
     await page.click('[data-act="card-done"]');
+    await page.click('[data-act="card-restart"]');
     page.calls.length = 0;
     page.type('#sp-code', 'ABC-234');
     await page.submit('form[data-form="card"]');
@@ -468,6 +469,7 @@ describe('a card that won’t open says why', () => {
     });
     const page = await signIn(dev);
     await page.click('[data-act="card-done"]');
+    await page.click('[data-act="card-restart"]');
     page.type('#sp-code', 'K7M-4QX');
     await page.submit('form[data-form="card"]');
     expect(page.root().querySelector('[data-act="start"]')).toBeTruthy();
@@ -617,8 +619,9 @@ describe('the session: one token, kept until midnight, Done or fifteen idle minu
     expect(dev.fn.state.sessions).toEqual({});
     expect(dev.store).toEqual({});
     expect(page.tab).toEqual({});
-    // Back at the card's first screen, with no line: the student asked for it.
-    expect(page.root().querySelector('form[data-form="card"]')).toBeTruthy();
+    // After Done, with nothing of the student on it (the artboard's "After Done").
+    expect(page.root().querySelector('.sp-big').textContent).toBe('You’re signed out');
+    expect(text(page)).toContain('This phone no longer has your card.');
     expect(page.root().querySelector('.sp-msg')).toBeNull();
     const html = page.root().innerHTML;
     for (const left of ['Cece', 'Science 8', 'Assignments', 'P3R', 'Extending', 'Quiz', '0123456']) {
@@ -648,7 +651,7 @@ describe('the session: one token, kept until midnight, Done or fifteen idle minu
     await page.click('[data-act="card-done"]');
     expect(dev.store).toEqual({});
     expect(page.root().querySelector('.sp-row')).toBeNull();
-    expect(page.root().querySelector('form[data-form="card"]')).toBeTruthy();
+    expect(page.root().querySelector('.sp-signed-out')).toBeTruthy();
   });
 
   it('at its midnight an open page is taken down and the token is gone', async () => {
@@ -720,7 +723,7 @@ describe('the session: one token, kept until midnight, Done or fifteen idle minu
     await again.click('[data-act="card-yes"]');
     await again.click('[data-act="card-done"]');
     expect(again.calls[again.calls.length - 1].body.route).toBe('done');
-    expect(again.root().querySelector('form[data-form="card"]')).toBeTruthy();
+    expect(again.root().querySelector('.sp-signed-out')).toBeTruthy();
   });
 
   it('the server’s times are read whatever their precision', async () => {
@@ -1241,8 +1244,10 @@ describe('Demo Mode and a real card cannot drift', () => {
       'v',
       'value',
     ]);
-    // Done starts the sample again and keeps nothing.
+    // Done shows After Done, and Scan a Card starts the sample again; nothing is kept.
     await demo.click('[data-act="card-done"]');
+    expect(demo.root().querySelector('.sp-big').textContent).toBe('You’re signed out');
+    await demo.click('[data-act="card-restart"]');
     expect(demo.root().querySelector('form[data-form="card"]')).toBeTruthy();
     expect(demo.root().querySelector('#sp-code').getAttribute('value')).toBe('P3R8-WDK4');
     expect(demo.calls).toEqual([]);
@@ -1276,8 +1281,10 @@ describe('the page sends nothing anywhere else', () => {
     expect(html).toContain('<meta name="referrer" content="no-referrer" />');
     for (const f of ['s/app.js', 's/assignments.js', 's/student-data.js']) {
       const src = read(f);
-      // The one thing asked of `navigator` is the browser's lock that keeps Done to one tab.
-      expect(src.replace(/navigator\.locks\b/g, ''), f).not.toMatch(
+      // The two things asked of `navigator`: the browser's lock that keeps Done
+      // to one tab, and on a Chromebook the camera (Scan the Code With the
+      // Camera), whose picture is read on the device and never sent.
+      expect(src.replace(/navigator\.(locks|mediaDevices)\b/g, ''), f).not.toMatch(
         /Sentry|sendBeacon|navigator\.|document\.cookie|indexedDB|sessionStorage/,
       );
       expect(src, f).not.toMatch(/https?:\/\//);
