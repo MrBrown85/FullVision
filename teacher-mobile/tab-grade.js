@@ -1520,6 +1520,11 @@ window.MGrade = (function () {
         _onlyIds = null;
         _student = null;
       }
+      // A grading screen opened afresh starts each card on its first criterion.
+      if (!(opts && opts.keep)) {
+        _critPage = {};
+        _openGroups = {};
+      }
       if (opts && opts.student) {
         // The student's pieces: the list given (a piece shown after another),
         // or their To Grade list now. A piece no longer on it opens as usual.
@@ -1666,6 +1671,25 @@ window.MGrade = (function () {
     // { state, act }: the line that says where the grade stands, and the button.
     // html-safe: fixed labels; the name and the date go through MC.esc
     function _returnBarParts(cid, a, unit, last) {
+      var parts = _returnBarOwn(cid, a, unit, last);
+      // An Advanced Rubric shown a criterion at a time (S7-F2): on to the
+      // next criterion first; the line still says where the grade stands.
+      var nextCrit = parts.act || parts.state ? _pagerNext(cid, a, unit) : null;
+      if (!nextCrit) return parts;
+      return {
+        state: parts.state,
+        act:
+          '<button type="button" class="m-grade-return-btn m-crit-next-btn" data-action="m-crit-page" data-dir="1" data-sid="' +
+          unit.st.id +
+          '" data-aid="' +
+          a.id +
+          '">' +
+          MC.esc('Next: ' + (nextCrit.name || 'Criterion')) +
+          '</button>',
+      };
+    }
+
+    function _returnBarOwn(cid, a, unit, last) {
       var none = { state: '', act: '' };
       if (!unit || isDibelsScored(a)) return none;
       var sid = unit.st.id;
@@ -1931,7 +1955,9 @@ window.MGrade = (function () {
       }
       // A rubric of the assessment's own is scored by criterion (Tags | Rubric).
       var rubric = _rubricViewOn(cid, assessment) ? _ownRubric(cid, assessment) : null;
-      if (rubric) {
+      var pager = _pagerRubric(cid, assessment);
+      if (pager) tagGroups = _criterionPagerHtml(cid, st, assessment, pager);
+      else if (rubric) {
         tagGroups = (rubric.criteria || [])
           .map(function (crit) {
             return _criterionGroupHtml(cid, st, assessment, rubric, crit);
@@ -2323,10 +2349,197 @@ window.MGrade = (function () {
       return html + '</div>';
     }
 
-    /* One criterion: its name, the four levels, ± and, on an Advanced
-       Rubric, the Checks button and its open checklist. */
-    function _criterionGroupHtml(cid, st, assessment, rubric, crit) {
+    /* ── The Advanced Rubric, one criterion at a time (S7-F2) ──────
+       With the build switch and Send Work on, an Advanced Rubric's card
+       shows one criterion with a pager (previous, next, "Criterion 1 of 2"),
+       its levels, its boxes in a group per level (each with its count, the
+       chosen or suggested level's open), ± and Comment. The bar's button is
+       "Next: <criterion>" until the last criterion, then Return and Next.
+       Which criterion and which groups are open are kept per student and
+       piece while the phone is open. */
+    var _critPage = {};
+    var _openGroups = {};
+
+    // A level's name, for a group of boxes and the ± row: a word, not a grade.
+    function _levelName(lv) {
+      return PROF_LABELS[lv] || '';
+    }
+
+    function _pagerRubric(cid, assessment) {
+      if (!window.MGradePhotos || !MGradePhotos.on(cid)) return null;
+      var rubric = _rubricViewOn(cid, assessment) ? _ownRubric(cid, assessment) : null;
+      return _isAdvanced(rubric) && (rubric.criteria || []).length ? rubric : null;
+    }
+
+    function _pageOf(sid, aid, n) {
+      var i = _critPage[sid + ':' + aid] || 0;
+      return i >= 0 && i < n ? i : 0;
+    }
+
+    // The criterion after the one on this card, while there is one.
+    function _pagerNext(cid, a, unit) {
+      if (!unit || !a) return null;
+      var rubric = _pagerRubric(cid, a);
+      if (!rubric) return null;
+      var crits = rubric.criteria;
+      var i = _pageOf(unit.st.id, a.id, crits.length);
+      return i < crits.length - 1 ? crits[i + 1] : null;
+    }
+
+    // Which level's group is open: the teacher's choice, else the chosen level's, else the suggested one's.
+    function _openLevel(cid, sid, aid, crit, state) {
+      var key = sid + ':' + aid + ':' + crit.id;
+      if (key in _openGroups) return _openGroups[key];
+      if (state.level && !state.mixed) return state.level;
+      return RubricChecks.suggestedLevel(crit, getRubricCheckIds(cid, sid, aid)) || 0;
+    }
+
+    // html-safe: names, labels and box text go through MC.esc; ids are ours; levels are numbers
+    function _criterionPagerHtml(cid, st, assessment, rubric) {
+      var crits = rubric.criteria;
+      var idx = _pageOf(st.id, assessment.id, crits.length);
+      var crit = crits[idx];
+      var name = crit.name || 'Criterion';
       var state = _critState(cid, st.id, assessment.id, crit);
+      var ticked = getRubricCheckIds(cid, st.id, assessment.id);
+      var openLv = _openLevel(cid, st.id, assessment.id, crit, state);
+      var ids = '" data-sid="' + st.id + '" data-aid="' + assessment.id + '"';
+      var arrow = function (dir, label, path) {
+        var off = dir < 0 ? idx === 0 : idx >= crits.length - 1;
+        return (
+          '<button type="button" class="m-crit-pager-btn" data-action="m-crit-page" data-dir="' +
+          dir +
+          ids +
+          ' aria-label="' +
+          label +
+          '"' +
+          (off ? ' disabled' : '') +
+          '><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' +
+          path +
+          '"/></svg></button>'
+        );
+      };
+      var dots = crits
+        .map(function (c, i) {
+          return '<span class="m-crit-pager-dot' + (i === idx ? ' is-on' : '') + '"></span>';
+        })
+        .join('');
+      var groups = '';
+      levelOrderFor(cid).forEach(function (lv) {
+        var boxes = RubricChecks.checksAt(crit, lv);
+        if (!boxes.length) return;
+        var n = boxes.filter(function (b) {
+          return ticked.indexOf(b.id) >= 0;
+        }).length;
+        var open = openLv === lv;
+        groups +=
+          '<div class="m-check-group' +
+          (open ? ' is-open' : '') +
+          '"><button type="button" class="m-check-group-head" data-action="m-crit-group" data-level="' +
+          lv +
+          ids +
+          ' data-critid="' +
+          crit.id +
+          '" aria-expanded="' +
+          open +
+          '"><span class="m-check-group-name l' +
+          lv +
+          '">' +
+          _levelName(lv) +
+          '</span><span class="m-check-group-count">' +
+          n +
+          ' of ' +
+          boxes.length +
+          '</span></button>';
+        if (open) {
+          boxes.forEach(function (check) {
+            groups +=
+              '<label class="m-check"><input type="checkbox" data-action="m-grade-tick' +
+              ids +
+              ' data-critid="' +
+              crit.id +
+              '" data-checkid="' +
+              check.id +
+              '"' +
+              (ticked.indexOf(check.id) >= 0 ? ' checked' : '') +
+              '><span>' +
+              MC.esc(check.label) +
+              '</span></label>';
+          });
+        }
+        groups += '</div>';
+      });
+      return (
+        '<div class="m-score-group m-crit-group m-crit-pager" data-critid="' +
+        crit.id +
+        '"><div class="m-crit-pager-head">' +
+        arrow(-1, 'Previous criterion', 'M15 18l-6-6 6-6') +
+        '<div class="m-crit-pager-mid"><div class="m-crit-name">' +
+        MC.esc(name) +
+        '</div><div class="m-crit-pager-dots" role="img" aria-label="Criterion ' +
+        (idx + 1) +
+        ' of ' +
+        crits.length +
+        '">' +
+        dots +
+        '</div></div>' +
+        arrow(1, 'Next criterion', 'M9 18l6-6-6-6') +
+        '</div>' +
+        '<div class="m-score-btns" role="radiogroup" aria-label="Level for ' +
+        MC.esc(name) +
+        '">' +
+        _critLevelBtnsHtml(cid, st, assessment, crit, state) +
+        '</div>' +
+        (groups ? '<div class="m-check-groups">' + groups + '</div>' : '') +
+        '<div class="m-score-mods" data-sid="' +
+        st.id +
+        '" data-aid="' +
+        assessment.id +
+        '" data-critid="' +
+        crit.id +
+        '" role="group" aria-label="Fine-tune ' +
+        MC.esc(state.level && !state.mixed ? _levelName(state.level) : name) +
+        '">' +
+        _modBtnsHtml(state.mixed ? 0 : state.level, state.mod) +
+        '</div>' +
+        '<div class="m-crit-pager-tools">' +
+        _critCommentBtnHtml(cid, st.id, assessment.id, crit) +
+        '</div>' +
+        _critCommentHtml(cid, st.id, assessment.id, crit) +
+        '</div>'
+      );
+    }
+
+    // Previous or next criterion on a student's card.
+    function pageCriterion(cid, sid, aid, dir) {
+      var a = _assessmentById(cid, aid);
+      var rubric = a && _pagerRubric(cid, a);
+      if (!rubric) return;
+      var n = rubric.criteria.length;
+      var next = _pageOf(sid, aid, n) + (dir < 0 ? -1 : 1);
+      if (next < 0 || next >= n) return;
+      _saveTyped(cid, sid);
+      _critPage[sid + ':' + aid] = next;
+      _refreshCard(cid, sid, aid);
+      _syncReturnBar();
+      var card = document.querySelector('.m-swiper-card[data-sid="' + sid + '"]');
+      var head = card && card.querySelector('.m-crit-pager .m-crit-name');
+      if (head && head.scrollIntoView) head.scrollIntoView({ block: 'nearest' });
+    }
+
+    // A level's group of boxes opened or closed (one open at a time).
+    function toggleCritGroup(cid, sid, aid, critId, level) {
+      var found = _findCriterion(cid, aid, critId);
+      if (!found) return;
+      var key = sid + ':' + aid + ':' + critId;
+      var state = _critState(cid, sid, aid, found.crit);
+      _openGroups[key] = _openLevel(cid, sid, aid, found.crit, state) === level ? 0 : level;
+      _refreshCard(cid, sid, aid);
+    }
+
+    // A criterion's four level buttons.
+    // html-safe: levels are numbers, labels constants, ids ours
+    function _critLevelBtnsHtml(cid, st, assessment, crit, state) {
       var btns = '';
       levelOrderFor(cid).forEach(function (level) {
         btns +=
@@ -2349,6 +2562,14 @@ window.MGrade = (function () {
           level +
           '</button>';
       });
+      return btns;
+    }
+
+    /* One criterion: its name, the four levels, ± and, on an Advanced
+       Rubric, the Checks button and its open checklist. */
+    function _criterionGroupHtml(cid, st, assessment, rubric, crit) {
+      var state = _critState(cid, st.id, assessment.id, crit);
+      var btns = _critLevelBtnsHtml(cid, st, assessment, crit, state);
       var advanced = _isAdvanced(rubric) && RubricChecks.hasChecks(crit);
       var open = advanced && !!_openChecks[st.id + ':' + assessment.id + ':' + crit.id];
       var checksBtn = '';
@@ -3357,6 +3578,8 @@ window.MGrade = (function () {
       backToGroup: backToGroup,
       returnAndNext: returnAndNext,
       showStudentPiece: showStudentPiece,
+      pageCriterion: pageCriterion,
+      toggleCritGroup: toggleCritGroup,
       studentWork: function () {
         return _student ? { sid: _student.sid, aids: _student.aids.slice(), kinds: _student.kinds.slice() } : null;
       },
@@ -3429,6 +3652,8 @@ window.MGrade = (function () {
     askReturnAll: List.askReturnAll,
     returnAndNext: Speed.returnAndNext,
     showStudentPiece: Speed.showStudentPiece,
+    pageCriterion: Speed.pageCriterion,
+    toggleCritGroup: Speed.toggleCritGroup,
     studentWork: Speed.studentWork,
     jumpToFirstDraft: Speed.jumpToFirstDraft,
     studentDrafts: List.studentDrafts,

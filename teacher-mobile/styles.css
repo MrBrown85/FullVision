@@ -4440,6 +4440,110 @@ body.fv-switching-course::after {
   accent-color: var(--active);
 }
 
+/* The Advanced Rubric a criterion at a time (S7-F2): the pager, a group of
+   boxes per level with its count, then ± and Comment. */
+.m-crit-pager-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.m-crit-pager-mid {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+.m-crit-pager-mid .m-crit-name {
+  font-size: 17px;
+}
+.m-crit-pager-dots {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 6px;
+}
+.m-crit-pager-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border);
+}
+.m-crit-pager-dot.is-on {
+  background: var(--active);
+}
+.m-crit-pager-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--link);
+  -webkit-tap-highlight-color: transparent;
+}
+.m-crit-pager-btn:disabled {
+  color: var(--text-3);
+  opacity: 0.5;
+}
+.m-check-groups {
+  margin-top: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  overflow: hidden;
+}
+.m-check-group + .m-check-group {
+  border-top: 1px solid var(--border);
+}
+.m-check-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 14px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-check-group-name.l4 {
+  color: var(--score-4-text);
+}
+.m-check-group-name.l3 {
+  color: var(--score-3-text);
+}
+.m-check-group-name.l2 {
+  color: var(--score-2-text);
+}
+.m-check-group-name.l1 {
+  color: var(--score-1-text);
+}
+.m-check-group-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+.m-check-group.is-open .m-check {
+  padding: 0 14px;
+}
+.m-check-group.is-open {
+  padding-bottom: 6px;
+}
+.m-crit-pager-tools {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 10px;
+}
+.m-crit-pager .m-crit-comment {
+  margin-top: 10px;
+}
+
 /* Group work (Group grading): a group's card names the group and lists its
    members, each with their own M | EXC | LATE and a ⋯ button; a member
    graded separately has a line and Back to Group Grade under their name. */

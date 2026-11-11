@@ -280,3 +280,36 @@ test('Reset Demo Data deletes the photos a teacher added on the phone', async ({
   });
   expect(left).toEqual({ queued: 0, rows: 0 });
 });
+
+test('the Advanced Rubric a criterion at a time: pager, groups of boxes, Next: criterion', async ({ page }) => {
+  await openPhone(page, { clear: ['st2'] });
+  const crits = await page.evaluate(
+    LAB => getRubricById('sci8', getAssessments('sci8').find(a => a.id === LAB).rubricId).criteria.map(c => c.name),
+    LAB,
+  );
+  await openLab(page);
+  await page.locator('#m-thumb-strip .m-thumb[data-sid="st2"]').click();
+  const card = page.locator('.m-swiper-card[data-sid="st2"]');
+  const pager = card.locator('.m-crit-pager');
+  await expect(pager).toHaveCount(1);
+  await expect(pager.locator('.m-crit-name')).toHaveText(crits[0]);
+  await expect(pager.getByRole('img', { name: 'Criterion 1 of ' + crits.length })).toBeVisible();
+  await expect(pager.getByRole('button', { name: 'Previous criterion' })).toBeDisabled();
+  await expect(pager.getByRole('radiogroup', { name: 'Level for ' + crits[0] })).toBeVisible();
+  const bar = page.locator('#m-grade-return');
+  // Nothing graded yet: no Next, as Return and Next is not offered either.
+  const group = pager.locator('.m-check-group-head').first();
+  await group.click();
+  await expect(card.locator('.m-crit-pager .m-check-group-head').first()).toHaveAttribute('aria-expanded', 'true');
+  await card.locator('.m-crit-pager .m-check-group.is-open input[type="checkbox"]').first().check();
+  await expect(card.locator('.m-crit-pager .m-check-group-head').first().locator('.m-check-group-count')).toHaveText(
+    /^1 of \d+$/,
+  );
+  await expect(bar.locator('.m-crit-next-btn')).toHaveText('Next: ' + crits[1]);
+  await shot(page, 'S7-F2-advanced-rubric');
+  await bar.locator('.m-crit-next-btn').click();
+  await expect(card.locator('.m-crit-pager .m-crit-name')).toHaveText(crits[1]);
+  await expect(card.getByRole('img', { name: 'Criterion 2 of ' + crits.length })).toBeVisible();
+  await card.getByRole('button', { name: 'Previous criterion' }).click();
+  await expect(card.locator('.m-crit-pager .m-crit-name')).toHaveText(crits[0]);
+});

@@ -1593,6 +1593,28 @@
         return;
       }
 
+      // The Advanced Rubric a criterion at a time (S7-F2): the pager, Next:
+      // <criterion> on the bar, and a level's group of boxes.
+      if (action === 'm-crit-page') {
+        MGrade.pageCriterion(
+          _cid,
+          target.getAttribute('data-sid'),
+          target.getAttribute('data-aid'),
+          parseInt(target.getAttribute('data-dir'), 10),
+        );
+        return;
+      }
+      if (action === 'm-crit-group') {
+        MGrade.toggleCritGroup(
+          _cid,
+          target.getAttribute('data-sid'),
+          target.getAttribute('data-aid'),
+          target.getAttribute('data-critid'),
+          parseInt(target.getAttribute('data-level'), 10),
+        );
+        return;
+      }
+
       if (action === 'm-grade-crit-comment') {
         MGrade.openCritComment(target);
         return;
