@@ -45,7 +45,7 @@ function categoryPercent(cid, assessment) {
   const total = categories.reduce((sum, c) => sum + Number(c.weight || 0), 0);
   if (!category || isDibelsScored(assessment)) return null;
   if (Number(category.weight) === 0) return 0;
-  return courseGradeMode(cid) !== 'proficiency' && total === 100 ? Number(category.weight) : null;
+  return courseGradeMode(cid) !== 'proficiency' && Math.abs(total - 100) < 1e-9 ? Number(category.weight) : null;
 }
 
 describe('S4-M1: category_percent says what calc.js does', () => {

@@ -61,10 +61,12 @@ var percent =
     ? null
     : Number(category.weight) === 0
       ? 0
-      : courseGradeMode(cid) !== 'proficiency' && total === 100
+      : courseGradeMode(cid) !== 'proficiency' && Math.abs(total - 100) < 1e-9
         ? Number(category.weight)
         : null;
 ```
+
+The database adds the weights as exact decimals. A browser adds them as floats, so it allows the same tiny difference the class manager's own check allows (`Math.abs(sum - 100) < 1e-9`).
 
 ### `to_do`
 
