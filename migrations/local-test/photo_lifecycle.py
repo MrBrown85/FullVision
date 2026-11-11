@@ -1022,7 +1022,8 @@ MUTANTS = [
     ('the job never remembers the days it looked at', 'set checked_through = greatest(photo_keep_check.checked_through, excluded.checked_through),',
      'set checked_through = photo_keep_check.checked_through,', 'keep'),
     ('unfinished sends are deleted too', DEL, DEL.replace(" and s.state = 'sent'", ''), 'keep'),
-    ('every page goes, whenever it was sent', DEL, DEL.replace(' and f.created_at < _cutoff\n', '\n'), 'keep'),
+    # Not a mutant: taking out 'f.created_at < _cutoff' alone changes nothing, because a page made after the cutoff is on
+    # work handed in after it, which the ruling-106 test keeps anyway (checked: keep 36 of 36 with it out).
     ('another class is touched', DEL, DEL.replace(' and s.course_id = p_course_id', ''), 'keep'),
     ('Mark Up is not kept', "         where s.course_id = p_course_id and s.state = 'sent' and f.created_at < _cutoff\n           -- handed in after the day",
      "         where false\n           -- handed in after the day", 'keep'),

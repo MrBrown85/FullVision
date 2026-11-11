@@ -2453,28 +2453,37 @@ last check stops the file with nothing changed if not).
 
 One file, `../2026111140_photo_lifecycle.sql`. **It deletes photos on a
 schedule** (project rule 2). **Apply order:** after Batch B, the fixes, C1, C2
-and the send rules, all on live. It replaces no function and changes no
-existing trigger, policy or grant: it adds `markup_kept`, `photo_keep_check`
-and `photo_check_log`, eight functions, the procedure
-`photo_lifecycle_nightly()` and two pg_cron jobs (`fv_photo_lifecycle_daily`
-at 10:27 UTC, `fv_photo_removal` every ten minutes). Its guard needs pg_cron,
-pg_net and Vault; `photo-lifecycle-stand-in.sql` stands in for the three here
-(nothing is scheduled or sent; the tests call what a job would).
+and the send rules, all on live. It replaces one function,
+`student_submit._grading_started` (C1's, plus one condition: kept marks count
+as grading started), changes no existing trigger, policy or grant, and adds
+`markup_kept`, `photo_keep_check` and `photo_check_log`, nine functions, the
+procedure `photo_lifecycle_nightly()` and two pg_cron jobs
+(`fv_photo_lifecycle_daily` at 10:27 UTC, `fv_photo_removal` every ten
+minutes). Its guard needs pg_cron, pg_net and Vault;
+`photo-lifecycle-stand-in.sql` stands in for the three here (nothing is
+scheduled or sent; the tests call what a job would).
 
 - **Keep Photos Until.** `_keep_photos_day` is the screen's `keepPhotosDate`
-  (`teacher/cm-student-page.js`), checked against it in Node for every day of
-  two school years. Photos are kept through the day and deleted the night
-  after: each page of handed-in work made before midnight after the day, in the
-  class's zone. The submission row, grades, comments and the rest stay; Mark Up
-  is copied to `markup_kept` first. A missed night is caught up
-  (`photo_keep_check`); a class's first night looks at yesterday only.
+  (`teacher/cm-student-page.js`, changed in the same PR so that End of Term
+  with no term end ahead is June 30), checked against it in Node for every day
+  of two school years. Photos are kept through the day and deleted the night
+  after: each page of work handed in by midnight after the day, in the class's
+  zone. A page whose send started in its two-hour hold before midnight, on work
+  handed in or added to after it, stays (ruling 106). The submission row,
+  grades, comments and the rest stay; Mark Up is copied to `markup_kept` first.
+  Missed nights are caught up only under the choice and terms the job last
+  judged with (`photo_keep_check`); otherwise, and on a class's first night,
+  only yesterday is judged. A class in the trash is skipped.
 - **Strays.** A layout-shaped file with no page row, over 24 hours old, is
-  queued (`stray`); other names are reported only. A page row whose file is
-  missing is reported (`missing_file`) and never changed.
+  queued (`stray`), in every class with work or a folder in the bucket, by a
+  name range on storage's `(bucket_id, name)` index; other names are reported
+  only. A page row whose file is missing is reported (`missing_file`) and never
+  changed.
 - **The timer.** `photo_removal_call()` posts `{route: 'scheduled-sweep',
 secret}` through pg_net to the edge function when a file is due, reading the
-  address and secret from Vault (`fv_photo_sweep_url`,
-  `fv_photo_sweep_secret`). The route is in
+  address (this project's own, exactly) and secret from Vault
+  (`fv_photo_sweep_url`, `fv_photo_sweep_secret`). Files due for 6 hours are
+  logged as `error` (once an hour) and fail the nightly run. The route is in
   `supabase/functions/student-submit/send-routes.ts` and is tested in
   `tests/student-submit-scheduled-sweep.test.js`.
 
@@ -2491,17 +2500,25 @@ Scenarios: `keepday`, `keep`, `strays`, `expired` (these three also run
 record, the 30-day class purge, the 30-day teacher purge, a `clear_data()`
 stand-in and TRUNCATE each queue every file of what they remove, and kept Mark
 Up goes with its work; no change was needed), `timer`, `nightly`, `apply`,
-`undo`.
+`undo`, and `review`: the independent review's probes (`batch-d-review.md`)
+kept as tests: M1 for real across midnight (a student's send and the teacher's
+Add Work and Add as More Pages), M2 (a switch and a term edit during missed
+nights), M3 (stuck files logged and failing the run), M4 (a stray in a class
+with no work), the stray scan with 200,000 other files in the bucket, two
+nightly runs at once, kept marks locking Replace and Unsend, End of Term after
+the last term, a class in the trash, and the pre-check's per-class list. Run
+against the file as it was before the review (`75ee95fd`,
+`PHOTO_LIFECYCLE_FILE=...`), 14 of `review`'s 30 checks fail.
 
 Results (2026-11-11, PostgreSQL 17.11, embedded-postgres, file md5
-`21664659d9bf91a0fe8e2d0666c1280a`): `photo_lifecycle.py` 209 of 209, of which
-37 ran on the base without the file and 17 of those are the checks the file
-must change (each failed there, as required); `mutate` 29 wrong versions, 29
-noticed (a 30th, taking out the stray check's "already waiting" test, was found
-to change nothing, since the insert's `ON CONFLICT ... WHERE done` leaves a
-waiting row alone, and was dropped); `fingerprints check` every list current.
-The PostgreSQL time zone data used keeps British Columbia on one clock all year
-(10:27 UTC is 3:27 there in January and July) and Alberta likewise.
+`240245baeab9650ba0edfc5f7c8ad792`): `photo_lifecycle.py` 242 of 242, of which 37 ran on the base without
+the file and 17 of those are the checks the file must change (each failed
+there, as required); `mutate` 41 wrong versions, 41 noticed (a 42nd, taking out `f.created_at < _cutoff` alone, changes nothing, since a page made after the cutoff is on work handed in after it, which the ruling-106 test keeps anyway, and was dropped); `fingerprints check` every list current.
+Taking out the stray check's "already waiting" test alone changes nothing (the
+insert's `ON CONFLICT ... WHERE done` leaves a waiting row alone), so it is not
+a mutant. The PostgreSQL time zone data used keeps British Columbia on one
+clock all year (10:27 UTC is 3:27 there in January and July) and Alberta
+likewise.
 
 Not verified here: pg_cron, pg_net and Vault themselves (stand-ins only: no job
 runs and no request is sent); the deployed edge function; gradebook-prod.
