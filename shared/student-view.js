@@ -584,6 +584,8 @@ window.StudentView = (function () {
                         bar },
               comment, competencies: [ row ], gradedOn: [ { id, name } ],
               updatedAt (when updated), and on a row that moved, was,
+              marks: null | { pages, notes } (the teacher's Mark Up given
+              on returned work, from the `feedback` reply),
               rubric: null | { id, name, style, rows: [ row + beyond,
               descriptors, checks, levelName, descriptor, shown, next,
               goal, whole ] } }
@@ -634,11 +636,57 @@ window.StudentView = (function () {
     };
   }
 
+  /* What the `feedback` reply says of the teacher's Mark Up on one piece
+     (S9-F3; migrations/local-test/batch-c-contract.md, `feedback`): how
+     many of the student's pages carry the marks they were given, and how
+     many of those marks are notes ("2 pages · 3 notes on your work"). The
+     server sends it only for work returned with marks, and none for a
+     piece set not to show them or with Missing or Excused on it; build()
+     also gives it only to a piece that came back with a grade. Anything of
+     the wrong shape reads as none. */
+  function marksOf(m) {
+    if (!m || typeof m !== 'object') return null;
+    var whole = function (v) {
+      return typeof v === 'number' && isFinite(v) && v >= 0 ? Math.floor(v) : -1;
+    };
+    var pages = whole(m.pages);
+    var notes = whole(m.notes);
+    return pages >= 1 && notes >= 0 ? { pages: pages, notes: notes } : null;
+  }
+
+  // The `feedback` reply's pieces by id (Mark Up only, for now), or none for a reply that is not one.
+  function marksBy(feedback) {
+    var out = {};
+    if (!feedback || typeof feedback !== 'object' || feedback.ok !== true) return out;
+    list(feedback.assessments).forEach(function (entry) {
+      if (!entry || typeof entry.id !== 'string') return;
+      var m = marksOf(entry.marks);
+      if (m) out[entry.id] = m;
+    });
+    return out;
+  }
+
+  /* The `feedback` reply for one student from the teacher's cache, in the
+     contract's shape, for Preview as Student: the marks the student was
+     given on each piece, as the data layer's getStudentMarkCounts counts
+     them (the given copy only, none while the piece hides its Mark Up or
+     Missing or Excused is on it). Before that reader exists, none. */
+  function feedbackReply(cid, sid, page) {
+    var counts = typeof getStudentMarkCounts === 'function' ? getStudentMarkCounts : null;
+    var assessments = [];
+    list(page && page.assessments).forEach(function (row) {
+      var m = counts && row && row.id ? counts(cid, sid, row.id) : null;
+      if (m) assessments.push({ id: str(row.id), marks: { pages: m.pages, notes: m.notes } });
+    });
+    return { ok: true, v: 1, assessments: assessments };
+  }
+
   /* work: the `work` reply for this class (sending, S5-F2), or nothing.
      With Send Work off, or no reply, no piece says anything of sending and
      the page is as it was. */
-  function build(page, cid, cellOf, work) {
+  function build(page, cid, cellOf, work, feedback) {
     page = page || {};
+    var marked = marksBy(feedback);
     var sending = {};
     if (work && typeof work === 'object' && work.send_work === true) {
       list(work.assessments).forEach(function (entry) {
@@ -676,6 +724,8 @@ window.StudentView = (function () {
         rubric: null,
         gradedOn: gradedOn(row, tags, row.rubric_id ? rubrics[row.rubric_id] : null),
         created_at: str(row.created_at),
+        // The teacher's Mark Up on the student's pages (S9-F3): only on work that came back with a grade.
+        marks: null,
       };
       Object.assign(piece, aboutOf(row));
       // Sending: what this piece takes, and what is in. Work sent and not back yet is Sent.
@@ -696,6 +746,7 @@ window.StudentView = (function () {
         piece.unseen = !(seen != null && seen >= Math.max(returned || 0, changed || 0));
         piece.result = resultOf(cid, row, typeof cellOf === 'function' ? cellOf(piece.id) : null);
         piece.comment = str(grade.comment);
+        piece.marks = marked[piece.id] || null;
         if (row.rubric_id && rubrics[row.rubric_id]) {
           piece.rubric = rubricView(rubrics[row.rubric_id], grade, tags);
         } else if (row.score_mode !== 'points' && row.score_mode !== 'complete') {
@@ -1052,22 +1103,29 @@ window.StudentView = (function () {
     var showLearning = !!(opts && opts.learning) || learningOn(cid);
     var page = reply(cid, sid);
     if (!page) return { ready: false };
+    var feedback = feedbackReply(cid, sid, page);
     var view = withReturnedOnly(function () {
-      var v = build(page, cid, function (aid) {
-        var a = pieceOf(cid, aid);
-        return a ? assessmentCellValue(cid, sid, a) : null;
-      });
+      var v = build(
+        page,
+        cid,
+        function (aid) {
+          var a = pieceOf(cid, aid);
+          return a ? assessmentCellValue(cid, sid, a) : null;
+        },
+        null,
+        feedback,
+      );
       v.learning = showLearning ? learning(cid, sid, v) : null;
       return v;
     });
-    return { ready: true, reply: page, view: view };
+    return { ready: true, reply: page, feedback: feedback, view: view };
   }
 
   /* The student page: the view of the server's reply, once
      s/student-data.js holds it (StudentData.use(StudentData.fromServer(
      reply))). Results come from calc.js on that page's own readers; with
      calc.js not loaded they are blank. */
-  function fromPage(serverReply, studentPage, work) {
+  function fromPage(serverReply, studentPage, work, feedback) {
     var p = studentPage;
     var cid = p && p.course ? p.course.id : '';
     var sid = p && p.student ? p.student.id : '';
@@ -1083,6 +1141,7 @@ window.StudentView = (function () {
         return a ? assessmentCellValue(cid, sid, a) : null;
       },
       work,
+      feedback,
     );
   }
 
@@ -1092,6 +1151,7 @@ window.StudentView = (function () {
     build: build,
     fromCache: fromCache,
     fromPage: fromPage,
+    feedbackReply: feedbackReply,
     learningOn: learningOn,
   };
 })();

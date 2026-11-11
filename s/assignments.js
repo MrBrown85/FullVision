@@ -57,7 +57,9 @@
     try {
       // What the class takes and what is in (s/send.js; Demo Mode's until the `work` route exists).
       var work = typeof StudentPage.workOf === 'function' ? StudentPage.workOf(state) : null;
-      return StudentView.fromPage(reply, state.page, work);
+      // The teacher's Mark Up, and later reflections (s/feedback.js; Demo Mode's until the server sends `feedback`).
+      var feedback = typeof StudentPage.feedbackOf === 'function' ? StudentPage.feedbackOf(state) : null;
+      return StudentView.fromPage(reply, state.page, work, feedback);
     } catch (e) {
       return null;
     }
@@ -75,6 +77,10 @@
       feedback: state.feedback,
       whole: state.whole,
       levels: state.levels,
+      work: state.work,
+      workPage: state.workPage,
+      marksOff: state.marksOff,
+      workPages: state.workPages,
       form: state.form,
       sheet: state.sheet,
       sending: state.sending,
