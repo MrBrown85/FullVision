@@ -299,8 +299,17 @@
   line-height: 1.5;
 }
 
-/* Evidence panel: timeline, capture strip, tabs, cards (student-evidence.js) */
+/* Observations tab: capture strip, timeline, Seen in Class, notes by month
+   (student-evidence.js). Redesign rules: square chips, chips filter; blue
+   for selection, orange for attention (gaps, competencies not seen yet),
+   observation-type colours on observations only. */
 .ev-panel {
+  --ev-att-bg: #fff1e6;
+  --ev-att-line: #fed7aa;
+  --ev-att-text: #9a3412;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -308,79 +317,263 @@
   margin-top: 16px;
 }
 .ev-title {
-  font-size: var(--text-lg);
-  font-weight: 600;
+  font-size: 28px;
+  line-height: 1.15;
+  font-weight: 700;
   color: var(--text);
-  margin: 0 0 10px;
+  margin: 0;
 }
-.ev-toolbar {
+.ev-lede {
+  margin: 8px 0 0;
+  font-size: var(--text-md);
+  color: var(--text-2);
+}
+.ev-sec-head {
   display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 16px;
+  margin-bottom: 8px;
+}
+.ev-notes-head {
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 4px;
 }
-.ev-tabs {
-  flex-wrap: wrap;
+.ev-h3 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
 }
-.ev-tab-count {
+.ev-grow {
+  flex: 1 1 auto;
+}
+.ev-hint {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.ev-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ev-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border-2);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
   font-weight: 600;
+  cursor: pointer;
+}
+.ev-chip:hover {
+  background: var(--hover-bg, rgba(0, 0, 0, 0.04));
+}
+.ev-chip:focus-visible,
+.ev-link:focus-visible,
+.ev-comp-clear:focus-visible,
+.obs-card-reveal:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 1px;
+}
+.ev-chip-count {
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
-  margin-left: 2px;
+}
+.ev-chip[aria-pressed='true'] {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--active) 14%, transparent);
+  color: var(--link);
+}
+.ev-type-chip[data-ev-type='strength'][aria-pressed='true'] {
+  background: color-mix(in srgb, var(--score-3) 14%, transparent);
+  color: var(--score-3);
+}
+.ev-type-chip[data-ev-type='concern'][aria-pressed='true'] {
+  background: color-mix(in srgb, var(--score-2) 16%, transparent);
+  color: var(--score-2);
+}
+.ev-type-chip[data-ev-type='note'][aria-pressed='true'] {
+  background: color-mix(in srgb, var(--obs-note) 24%, transparent);
+  color: var(--obs-note-text);
+}
+.ev-seen-chip {
+  font-weight: 400;
+  background: var(--bg, var(--surface));
+  border-color: var(--border);
+}
+.ev-seen-chip .ev-chip-count {
+  font-weight: 700;
+}
+/* Not seen yet: an orange dashed outline, quiet enough for a long map. */
+.ev-seen-chip.is-none {
+  border: 1px dashed var(--ev-att-text);
+  background: transparent;
+  color: var(--ev-att-text);
+}
+.ev-seen-chip[aria-pressed='true'] {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--active) 14%, transparent);
+  color: var(--link);
+  font-weight: 600;
+}
+.ev-seen-note {
+  margin: 8px 0 0;
+  font-size: var(--text-md);
+  color: var(--text);
+}
+.ev-seen[hidden] {
+  display: none;
+}
+.ev-comp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 2px 2px 9px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--active) 8%, transparent);
+  color: var(--link);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.ev-comp-clear {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--link);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.ev-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
 }
 .ev-search.note-search-input {
   width: auto;
-  flex: 0 1 240px;
+  flex: 0 1 220px;
   margin-bottom: 0;
 }
 .ev-list {
-  max-height: 560px;
+  max-height: 640px;
   overflow-y: auto;
-  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
   -webkit-overflow-scrolling: touch;
 }
+.ev-list > .notes-empty {
+  padding: 20px 24px;
+}
+.ev-month-title {
+  margin: 0;
+  padding: 8px 16px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text-2);
+  background: var(--bg, var(--surface));
+  border-top: 1px solid var(--border);
+}
+.ev-month:first-child .ev-month-title {
+  border-top: 0;
+}
+/* Cards sit as rows in the bordered list. */
 .ev-list .obs-card {
   cursor: default;
+  margin: 0;
+  padding: 14px 16px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+}
+.ev-list .ev-month-title + .obs-card {
+  border-top: 0;
 }
 .ev-list .obs-card.ev-card-hit {
   box-shadow: 0 0 0 2px var(--active);
   background: var(--active-light);
 }
-.ev-group-title {
-  font-size: var(--text-sm);
-  font-weight: 600;
+.obs-card-veiled {
   color: var(--text-2);
-  margin: 12px 0 6px;
 }
-.ev-group:first-child .ev-group-title {
-  margin-top: 0;
+.obs-card-reveal {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ev-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  text-align: center;
+}
+.ev-foot-lock {
+  display: inline-flex;
 }
 
 /* Timeline strip */
 .ev-timeline {
   position: relative;
-  margin-bottom: 10px;
 }
-.ev-tl-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  margin-bottom: 4px;
+.ev-tl-box {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 16px 12px;
 }
 .ev-tl-range {
   font-size: var(--text-sm);
-  font-weight: 600;
   color: var(--text-2);
+}
+.ev-tl-gapline {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--ev-att-text);
 }
 .ev-tl-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 10px;
-  font-size: var(--text-xs);
-  color: var(--text-3);
+  gap: 6px 16px;
+  margin-top: 8px;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.ev-tl-gapkey {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ev-tl-gapkey::before {
+  content: '';
+  width: 20px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--ev-att-bg);
+  border-bottom: 2px dashed var(--ev-att-text);
+  box-sizing: border-box;
+}
+.ev-tl-dates {
+  margin: 8px 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-2);
 }
 .ev-tl-key {
   display: inline-flex;
@@ -457,16 +650,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-bottom: 2px dashed var(--score-2);
-  background: color-mix(in srgb, var(--score-2) 7%, transparent);
+  border-bottom: 2px dashed var(--ev-att-text);
+  background: var(--ev-att-bg);
   border-radius: 4px 4px 0 0;
   overflow: hidden;
   box-sizing: border-box;
 }
 .ev-tl-gap-label {
   font-size: var(--text-2xs);
-  font-weight: 500;
-  color: var(--text-2);
+  font-weight: 600;
+  color: var(--ev-att-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -556,6 +749,24 @@
   }
   .ev-search.note-search-input {
     flex: 1 1 100%;
+  }
+}
+@media (pointer: coarse) {
+  .ev-chip,
+  .ev-link,
+  .obs-card-reveal {
+    min-height: 44px;
+  }
+  .ev-comp-clear {
+    width: 44px;
+    height: 44px;
+  }
+}
+@media (prefers-color-scheme: dark) {
+  .ev-panel {
+    --ev-att-bg: rgba(255, 149, 0, 0.18);
+    --ev-att-line: rgba(255, 149, 0, 0.35);
+    --ev-att-text: #ffb86b;
   }
 }
 
@@ -1668,12 +1879,8 @@ button.ced-obs-row {
 }
 .stu-panel .ev-panel {
   border: none;
-  padding: 12px 0 0;
+  padding: 16px 0 0;
   background: none;
-}
-/* The tab names the panel. */
-.stu-panel .ev-head {
-  display: none;
 }
 .stu-panel-note {
   padding: 12px 0 6px;
