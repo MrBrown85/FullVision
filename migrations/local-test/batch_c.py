@@ -6,6 +6,7 @@ gradebook-prod will be once Batch B is applied (batch_c_common.build).
     PGDATABASE=...                                            python3 batch_c.py teacher    only those named
 
 Scenarios: apply1 teacher markup started contract gone reflect revision group grants race apply2 given closes only_me round2 put_back hide_out same_rows
+revision_deleted
 """
 import threading, time
 from batch_c_common import *
@@ -1527,9 +1528,78 @@ def same_rows():
     ok('same_rows: C2 differs only in marks given and requests closed', len(q1) == len(q2) and [x[:2] for x in q1] == [x[:2] for x in q2]
        and all(x == y or (x[2] == 'open' and y[2] == 'done') for x, y in zip(q1, q2)), (q1, q2))
 
+# ── Review round 3 (batch-c-review-3.md) ───────────────────────────────────
+def rstates(d, tok, a, rid):
+    """A request as it is stored, as the student is told, and as the teacher is told."""
+    p = piece(d.feedback(tok, ENR1), a)
+    return (d.one('select state from revision_request where id = :r', r=rid), p['revision']['state'] if p and p.get('revision') else None,
+            [x for x in d.rpc('list_course_feedback(:c)', c=COURSE_A)['revisions'] if x['id'] == rid][0]['state'])
+
+def revision_deleted():
+    """F1: the teacher deletes a student's waiting revision. The request is open again to both sides and stays open
+    through a Return of a changed grade (in a class that returns at once, through a save); the student can send a
+    revision again, and the next Return of a changed grade returns that one. A teacher's Replace of the revision keeps
+    it the revision in."""
+    for c2 in (False, True):
+        tag = ' (C1 and C2)' if c2 else ' (C1 alone)'
+        for how in ('return_work', 'return_grades', 'a class that returns at once'):
+            def give_back(d, a):
+                if how == 'return_work': d.return_work(a, [ENR1])
+                elif how == 'return_grades': d.rpc('return_grades(:a, :e, :k)', a=a, e=[ENR1], k=nid())
+            d = scenario_db('revdel', with_c2=c2)
+            try:
+                k = seed(d, on_return=how != 'a class that returns at once'); a = k['lab']
+                tok = d.session(ENR1); d.send(tok, ENR1, a)
+                d.score(ENR1, a, 6); d.return_work(a, [ENR1])
+                rid = d.rfr(a, ENR1, {'what_to_fix': 'Fix'})['request']['id']
+                s, f = d.revise(tok, ENR1, a); assert f['ok'], f
+                ok('revision_deleted%s, %s: the revision is in' % (tag, how), rstates(d, tok, a, rid) == ('open', 'sent', 'sent'), rstates(d, tok, a, rid))
+                x = d.rpc('delete_submission(:s, :k)', s=f['submission_id'], k=nid())
+                ok('revision_deleted%s, %s: the teacher deletes it: open again to both sides, stored open' % (tag, how),
+                   x['deleted'] is True and rstates(d, tok, a, rid) == ('open', 'open', 'open'), (x, rstates(d, tok, a, rid)))
+                fp = fingerprint_rows(d)
+                d.score(ENR1, a, 7); give_back(d, a)
+                ok('revision_deleted%s, %s: then a changed grade returned: the request stays open to both sides, stored open' % (tag, how),
+                   rstates(d, tok, a, rid) == ('open', 'open', 'open'), rstates(d, tok, a, rid))
+                ok('revision_deleted%s, %s: and that Return returned the grade' % (tag, how), fingerprint_rows(d) != fp
+                   and shown(d, ENR1, a) == 7, shown(d, ENR1, a))
+                s2, f2 = d.revise(tok, ENR1, a)
+                ok('revision_deleted%s, %s: the student can send a revision again, as version 2' % (tag, how),
+                   s2.get('ok') is True and f2 is not None and f2.get('ok') is True and f2.get('version') == 2, (s2, f2))
+                ok('revision_deleted%s, %s: which is in, not returned, to both sides' % (tag, how),
+                   rstates(d, tok, a, rid) == ('open', 'sent', 'sent'), rstates(d, tok, a, rid))
+                d.score(ENR1, a, 8); give_back(d, a)
+                st = rstates(d, tok, a, rid)
+                ok('revision_deleted%s, %s: the next changed grade returned returns it, to both sides' % (tag, how),
+                   st[1:] == ('returned', 'returned') and (st[0] == 'done' if (c2 or how == 'return_work') else True), st)
+            finally:
+                d.close()
+        # the teacher's own photos in place of the student's revision (Batch B's Replace Them)
+        d = scenario_db('revdel', with_c2=c2)
+        try:
+            k = seed(d); a = k['lab']
+            tok = d.session(ENR1); d.send(tok, ENR1, a)
+            d.score(ENR1, a, 6); d.return_work(a, [ENR1])
+            rid = d.rfr(a, ENR1, {'what_to_fix': 'Fix'})['request']['id']
+            s, f = d.revise(tok, ENR1, a); assert f['ok'], f
+            up = d.rpc('start_work_upload(:a, :e, :p::jsonb, :m, :k)', a=a, e=ENR1, p=json.dumps([{'width': 1500, 'height': 2000}]), m='replace', k=nid())
+            d.upload(up['files'])
+            fin = d.rpc('finish_work_upload(:s, :f::jsonb, :k)', s=up['submission_id'],
+                        f=json.dumps([{'file_id': x['file_id'], 'sha256': HASH} for x in up['files']]), k=nid())
+            ok('revision_deleted%s: the teacher replaces the revision\'s photos with their own: still the revision in (version 2), sent' % tag,
+               fin['result'] == 'sent' and fin['submission']['version'] == 2 and rstates(d, tok, a, rid) == ('open', 'sent', 'sent'),
+               (fin, rstates(d, tok, a, rid)))
+            d.score(ENR1, a, 7); d.rpc('return_grades(:a, :e, :k)', a=a, e=[ENR1], k=nid())
+            st = rstates(d, tok, a, rid)
+            ok('revision_deleted%s: and a changed grade returned by return_grades returns it' % tag,
+               st[1:] == ('returned', 'returned') and (st[0] == 'done' if c2 else True), st)
+        finally:
+            d.close()
+
 SCENARIOS = {'apply1': apply1, 'teacher': teacher, 'markup': markup, 'started': started, 'contract': contract, 'gone': gone, 'reflect': reflect, 'revision': revision, 'group': group,
              'grants': grants, 'race': race, 'apply2': apply2, 'given': given,
-             'closes': closes, 'only_me': only_me, 'round2': round2, 'put_back': put_back, 'hide_out': hide_out, 'same_rows': same_rows}
+             'closes': closes, 'only_me': only_me, 'round2': round2, 'put_back': put_back, 'hide_out': hide_out, 'same_rows': same_rows,
+             'revision_deleted': revision_deleted}
 if __name__ == '__main__':
     for name in (sys.argv[1:] or list(SCENARIOS)):
         try: SCENARIOS[name]()
