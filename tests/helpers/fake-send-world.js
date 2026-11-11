@@ -84,7 +84,7 @@ export function fakeWorld() {
   const sessions = { [CECE_PHONE]: [CECE], [OMAR_PHONE]: [OMAR], [LIAM_PHONE]: [LIAM] };
   const subs = new Map(); // id -> submission
   const queue = []; // { id, bucket, path, done }
-  const objects = new Map(); // path -> { bytes, type }
+  const objects = new Map(); // path -> { bytes, type, cache }
   const override = {}; // name -> (params) => answer
   let queueId = 0;
 
@@ -447,7 +447,8 @@ export function fakeWorld() {
     async overwrite(path, bytes) {
       storeCalls.push(['overwrite', path, bytes.length]);
       if (!objects.has(path)) throw new Error('storage overwrite 404');
-      objects.set(path, { bytes, type: 'image/jpeg' });
+      // storage-rest.ts sends Cache-Control: private, no-store with every overwrite (its own test proves it).
+      objects.set(path, { bytes, type: 'image/jpeg', cache: 'private, no-store' });
     },
     async remove(paths) {
       storeCalls.push(['remove', paths]);
@@ -456,16 +457,17 @@ export function fakeWorld() {
   };
 
   /* What a phone does with an upload link: one file, once, JPEG-typed and
-     2 MB at most (the bucket's own limits). Returns the status Storage
+     2 MB at most (the bucket's own limits), with whatever cache-control the
+     phone chose (Storage keeps it as sent). Returns the status Storage
      would answer. */
-  function phoneUpload(url, bytes, type = 'image/jpeg') {
+  function phoneUpload(url, bytes, type = 'image/jpeg', cache = 'max-age=3600') {
     const token = new URL(url).searchParams.get('token');
     const path = tokens.get(token);
     if (!path) return 403;
     if (objects.has(path)) return 409;
     if (bytes.length > 2097152) return 413;
     if (type !== 'image/jpeg') return 415;
-    objects.set(path, { bytes, type });
+    objects.set(path, { bytes, type, cache });
     return 200;
   }
 

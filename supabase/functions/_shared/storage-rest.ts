@@ -6,10 +6,24 @@
 //                  with upsert: no x-upsert header is sent when it is made,
 //                  so a second upload to a path that holds a file is refused.
 //   signDownloads  links that let each named file be read for `seconds`.
+//                  Storage's sign request takes only expiresIn and paths,
+//                  and the link's GET only its token and `download`: there
+//                  is no way to ask for a response that is not cacheable.
+//                  Storage answers a signed GET with Expires set to the
+//                  link's end and no Cache-Control from the stored file
+//                  (supabase/storage, src/storage/renderer/renderer.ts:
+//                  with `expires` set, only no-transform is passed on). So a
+//                  copy cached from a link can live at most to the link's
+//                  end, 300 seconds; whether Supabase's CDN keeps one at all
+//                  is a live check.
 //   read           the file's bytes, stopping at `maxBytes` + 1: a larger
 //                  file is never read whole, it is answered 'too_large'.
-//   overwrite      a file that is already there, replaced (a page with its
-//                  location data cut out), typed image/jpeg.
+//   overwrite      a file that is already there, replaced by the bytes the
+//                  check passed, typed image/jpeg, with Cache-Control
+//                  "private, no-store" (Storage keeps a binary upload's
+//                  cache-control header as sent; without one it stores
+//                  "no-cache"). So no stored file keeps a cache header the
+//                  phone chose.
 //   remove         files deleted, by their exact names.
 // The bucket is fixed here and is never taken from a caller. Nothing lists
 // the bucket (the contract: listing it is slow and nothing needs it).
@@ -170,7 +184,7 @@ export function storageRest(fetcher: typeof fetch, supabaseUrl: string, serviceK
     async overwrite(path, bytes) {
       const res = await fetcher(`${api}/object/${object(path)}`, {
         method: 'PUT',
-        headers: { ...auth, 'Content-Type': 'image/jpeg', 'x-upsert': 'true', 'Cache-Control': 'no-store' },
+        headers: { ...auth, 'Content-Type': 'image/jpeg', 'x-upsert': 'true', 'Cache-Control': 'private, no-store' },
         body: bytes,
       });
       await json(res, 'overwrite');

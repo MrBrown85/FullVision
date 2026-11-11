@@ -506,15 +506,12 @@ export function makeSendRoutes(opts: SendOptions) {
       if (thumb.state !== 'good') return { id: f.id, state: thumb.state };
       // Another file is bad or missing: this one will not be handed in now, so nothing is written.
       if (stop || lookOnly) return { id: f.id, state: 'skipped' };
-      // Location data left in a file is cut out, and the file stored without it, before it is hashed.
-      if (page.check.stripped) {
-        await store.overwrite(f.path, page.check.clean);
-        stripped++;
-      }
-      if (thumb.check.stripped) {
-        await store.overwrite(f.thumb, thumb.check.clean);
-        stripped++;
-      }
+      // Each file is stored again as it passed the check (review M3): location data cut out, typed
+      // image/jpeg, Cache-Control private, no-store, so no stored file keeps a cache header the phone chose.
+      // The hash is of these bytes, the page as stored.
+      await store.overwrite(f.path, page.check.clean);
+      await store.overwrite(f.thumb, thumb.check.clean);
+      stripped += Number(page.check.stripped) + Number(thumb.check.stripped);
       return { id: f.id, state: 'good', sha256: await sha256Hex(page.check.clean) };
     });
     if (stripped) log({ route: 'send-finish', stripped });

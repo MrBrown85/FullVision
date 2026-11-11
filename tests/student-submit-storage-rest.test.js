@@ -179,7 +179,7 @@ describe('storageRest', () => {
     }
   });
 
-  it('overwrite: PUT to the path, typed image/jpeg, replacing the file there', async () => {
+  it('overwrite: PUT to the path, typed image/jpeg, private, no-store (Storage keeps the header as sent), replacing the file there', async () => {
     const f = fakeFetch(() => json(200, { Key: 'x' }));
     const bytes = Uint8Array.from([1, 2]);
     await storageRest(f.fetcher, URL_, KEY).overwrite(THUMB, bytes);
@@ -191,7 +191,7 @@ describe('storageRest', () => {
         apikey: KEY,
         'Content-Type': 'image/jpeg',
         'x-upsert': 'true',
-        'Cache-Control': 'no-store',
+        'Cache-Control': 'private, no-store',
       },
       body: bytes,
     });

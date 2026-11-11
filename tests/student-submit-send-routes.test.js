@@ -815,9 +815,10 @@ describe('send-finish', () => {
     const sub = t.world.subs.get(s.submission_id);
     const stored = t.world.objects.get(sub.files[0].path).bytes;
     expect(stored).toEqual(PAGE_JPEG);
-    // Every thumbnail had segments to cut: overwritten too. The second page had none: left alone.
+    // Every file is stored again as checked (review M3); three of the four had something to cut.
     const written = t.world.storeCalls.filter(c => c[0] === 'overwrite').map(c => c[1]);
-    expect(written.sort()).toEqual([sub.files[0].path, sub.files[0].thumb_path, sub.files[1].thumb_path].sort());
+    expect(written.sort()).toEqual(sub.files.flatMap(f => [f.path, f.thumb_path]).sort());
+    expect(t.world.objects.get(sub.files[1].path).bytes).toEqual(PAGE2_JPEG);
     for (const f of sub.files) {
       const thumb = t.world.objects.get(f.thumb_path).bytes;
       expect(Buffer.from(thumb).includes(Buffer.from('Exif'))).toBe(false);
@@ -826,6 +827,44 @@ describe('send-finish', () => {
     const [, params] = t.world.calls.find(c => c[0] === 'send_finish');
     expect(JSON.parse(params[3])[0].sha256).toBe(sha(stored));
     expect(t.logs).toContainEqual({ route: 'send-finish', stripped: 3 });
+  });
+
+  it('every page and thumbnail handed in is stored again as checked, private, no-store, whatever the phone chose (review M3)', async () => {
+    const t = setup();
+    const r0 = await t.send(startBody());
+    const files = [
+      [PAGE_JPEG, THUMB_JPEG],
+      [PAGE2_JPEG, THUMB2_JPEG],
+    ];
+    r0.body.files.forEach((f, i) => {
+      expect(t.world.phoneUpload(f.upload_url, files[i][0], 'image/jpeg', 'public, max-age=31536000')).toBe(200);
+      expect(t.world.phoneUpload(f.thumb_upload_url, files[i][1], 'image/jpeg', 'public, max-age=31536000')).toBe(200);
+    });
+    const r = await t.send(finishBody(r0.body));
+    expect(r.body.ok).toBe(true);
+    const sub = t.world.subs.get(r0.body.submission_id);
+    const paths = sub.files.flatMap(f => [f.path, f.thumb_path]);
+    expect(
+      t.world.storeCalls
+        .filter(c => c[0] === 'overwrite')
+        .map(c => c[1])
+        .sort(),
+    ).toEqual([...paths].sort());
+    for (const p of paths) expect(t.world.objects.get(p).cache, p).toBe('private, no-store');
+    // The hash handed in is of the page as stored.
+    const [, params] = t.world.calls.find(c => c[0] === 'send_finish');
+    JSON.parse(params[3]).forEach((h, i) => expect(h.sha256).toBe(sha(t.world.objects.get(sub.files[i].path).bytes)));
+    // Each is written after its check: never a file that failed it, never before it was read.
+    const order = t.world.storeCalls.filter(c => c[0] === 'read' || c[0] === 'overwrite').map(c => c[0] + ' ' + c[1]);
+    for (const p of paths) expect(order.indexOf('read ' + p)).toBeLessThan(order.indexOf('overwrite ' + p));
+  });
+
+  it('a file that fails its check is never stored again', async () => {
+    const t = setup();
+    const s = await started(t, {}, [[PAGE_JPEG, PAGE_JPEG]]);
+    t.world.objects.delete(t.world.subs.get(s.submission_id).files[1].path);
+    expect((await t.send(finishBody(s, { files: [s.files[0].file_id] }))).body.error).toBe('bad_file');
+    expect(t.world.storeCalls.filter(c => c[0] === 'overwrite')).toEqual([]);
   });
 
   it('Remove the Page: only the pages named are read and handed in, in the order named', async () => {
