@@ -201,6 +201,7 @@ test.describe('a real card: the keyboard alone', () => {
     await page.keyboard.press('Shift+Tab');
     await expect(page.getByRole('button', { name: 'All assignments' })).toBeFocused();
     await page.keyboard.press('Shift+Tab');
+    // The class's name (Your Classes) comes before Done.
     await expect(page.getByRole('button', { name: 'Done' })).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page.getByRole('heading', { name: 'You’re signed out' })).toBeFocused();
