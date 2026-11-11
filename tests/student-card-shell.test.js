@@ -7,9 +7,10 @@
  * in Demo Mode and against the student-submit function's real handler over a
  * stand-in database. No test waits on real time.
  */
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { openStudentPage } from './helpers/student-page-context.js';
-import { WORK, fakeStudentSubmit, sampleCard } from './helpers/fake-student-submit.js';
+import { WORK, fakeStudentSubmit, sampleCard, samplePage } from './helpers/fake-student-submit.js';
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
@@ -47,8 +48,12 @@ async function real(card) {
 describe('the four tabs', () => {
   it('Assignments, My Learning, Questionnaires and Reports, the first one current', async () => {
     const page = await demo();
-    const tabs = [...page.root().querySelectorAll('.sp-tabs .sp-tab')];
-    expect(page.root().querySelector('.sp-tabs').tagName).toBe('NAV');
+    // Drawn twice: in the header for a Chromebook, along the bottom for a phone; page-view.css shows one.
+    expect(page.root().querySelector('.sp-tabs-top').tagName).toBe('NAV');
+    expect(page.root().querySelector('.sp-tabs-top').innerHTML.replace('sp-tabs-top', '')).toBe(
+      page.root().querySelector('.sp-tabs-bottom').innerHTML.replace('sp-tabs-bottom', ''),
+    );
+    const tabs = [...page.root().querySelectorAll('.sp-tabs-bottom .sp-tab')];
     expect(tabs.map(t => t.textContent)).toEqual(['Assignments', 'My Learning', 'Questionnaires', 'Reports']);
     expect(tabs.map(t => t.getAttribute('aria-current'))).toEqual(['page', null, null, null]);
   });
@@ -225,7 +230,7 @@ describe('the page draws from student-view.js, and never throws into a draw', ()
 describe('the frame', () => {
   it('the class’s name with its block, Done, and the list button, as the board draws them', async () => {
     const { page } = await real();
-    const head = page.root().querySelector('.sp-head-page');
+    const head = page.root().querySelector('.sp-view .sp-head');
     expect(head.querySelector('.sp-head-title').textContent).toBe('Science 8');
     expect(head.querySelector('.sp-pill').textContent).toBe('Block B');
     expect(head.querySelector('[data-act="card-done"]').textContent).toBe('Done');
@@ -244,5 +249,33 @@ describe('the frame', () => {
     expect(page.root().querySelector('.sp-tab[aria-current="page"]').getAttribute('data-tab')).toBe('assignments');
     expect(pressed(page)).toBe('To Do 2');
     expect(page.calls).toEqual([]);
+  });
+});
+
+describe('Preview as Student draws what the student page draws', () => {
+  /* The teacher's preview (teacher/preview-student.js, loaded here by
+     tests/setup.js) and the student page (its own context) are each handed
+     the same view, and draw the same HTML. */
+  it.each(['proficiency', 'letter', 'both'])('a %s class: the same HTML, character for character', async system => {
+    const { page } = await real({ page: samplePage(TODAY, system) });
+    page.showAll();
+    const view = JSON.parse(JSON.stringify(page.T.viewOf(page.T.state())));
+    const student = page.root().querySelector('.sp-view').outerHTML;
+    const preview = globalThis.PreviewStudent.drawPage(view);
+    // Read back through the same parser as the student page's, so both are written out alike.
+    const box = page.root().ownerDocument.createElement('div');
+    box.innerHTML = preview;
+    expect(box.innerHTML).toBe(student);
+    expect(preview).toContain('Cell Structure Quiz');
+    expect(preview).toContain('8 / 10');
+  });
+
+  it('the preview’s drawing is s/page-view.js’s: no second copy', () => {
+    const src = readFileSync(new URL('../teacher/preview-student.js', import.meta.url), 'utf8');
+    const body = src.slice(src.indexOf('function drawPage('), src.indexOf('/* ── The two lists'));
+    expect(body).toContain('StudentPageView.html(');
+    expect(readFileSync(new URL('../teacher/app.html', import.meta.url), 'utf8')).toContain(
+      '<script src="/s/page-view.js"></script>',
+    );
   });
 });

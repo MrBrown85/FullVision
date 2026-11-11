@@ -392,88 +392,8 @@
   /* The frame every tab of the page sits in: the class and Done, which
      stay in reach as the page scrolls, then the tab's own body.
      assignments.js draws the first tab. */
-  var CHEVRON =
-    '<svg class="sp-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6"/></svg>';
   var PLUS =
     '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>';
-
-  /* The class's name is the way to Switching Classes: pressed, it opens
-     Your Classes, every class this device's session has opened, and Add
-     Another Card. */
-  /* The page's frame (S4-F1; the artboard's "To Do Card" on a phone and
-     "Page on a Chromebook"): the class's name with its block, Done and the
-     All Assignments button in a header that stays in reach, the tab's own
-     body, and the four tabs. On a phone the tabs sit along the bottom; on a
-     Chromebook in the middle of the header. */
-  var TABS = [
-    {
-      id: 'assignments',
-      label: 'Assignments',
-      icon: '<rect x="4" y="5" width="16" height="14" rx="3"/><path d="M8 10h8M8 14h5"/>',
-    },
-    { id: 'learning', label: 'My Learning', icon: '<path d="M4 20h4v-6H4zM10 20h4V9h-4zM16 20h4V4h-4z"/>' },
-    {
-      id: 'questionnaires',
-      label: 'Questionnaires',
-      icon: '<circle cx="12" cy="12" r="8"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5M12 16.5v.01"/>',
-    },
-    { id: 'reports', label: 'Reports', icon: '<path d="M7 3h7l4 4v14H7z"/><path d="M10 12h5M10 16h5"/>' },
-  ];
-  var MENU =
-    '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
-
-  function tabBarHtml(state) {
-    var on = state.tab || 'assignments';
-    return (
-      '<nav class="sp-tabs" aria-label="Your Page">' +
-      TABS.map(function (t) {
-        return (
-          '<button type="button" class="sp-tab' +
-          (t.id === on ? ' sp-tab-on' : '') +
-          '" data-act="tab" data-tab="' +
-          t.id +
-          '"' +
-          (t.id === on ? ' aria-current="page"' : '') +
-          '><svg class="sp-tab-icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
-          t.icon +
-          '</svg><span>' +
-          esc(t.label) +
-          '</span></button>'
-        );
-      }).join('') +
-      '</nav>'
-    );
-  }
-
-  function pageFrame(state, body) {
-    var course = (state.page && state.page.course) || {};
-    var block = String(course.block || '').trim();
-    return (
-      '<header class="sp-head sp-head-page">' +
-      '<button type="button" class="sp-head-switch" data-act="classes-open" aria-haspopup="dialog" aria-expanded="' +
-      (state.sheet ? 'true' : 'false') +
-      '"><span class="sp-head-title">' +
-      esc(course.name || '') +
-      '</span>' +
-      (block ? '<span class="sp-pill">' + esc(blockLabel(block)) + '</span>' : '') +
-      CHEVRON +
-      '</button>' +
-      '<span class="sp-head-gap"></span>' +
-      '<button type="button" class="sp-btn sp-btn-quiet sp-btn-small sp-done" data-act="card-done">Done</button>' +
-      '<button type="button" class="sp-head-icon" data-act="all-open" aria-label="All assignments"' +
-      (state.all && (state.tab || 'assignments') === 'assignments' ? ' aria-pressed="true"' : '') +
-      '>' +
-      MENU +
-      '</button>' +
-      '</header>' +
-      '<main class="sp-main sp-page">' +
-      body +
-      demoNote(state, 'This is Demo Mode. Cece and her results are samples.') +
-      '</main>' +
-      tabBarHtml(state) +
-      (state.sheet ? classesSheet(state.page) : '')
-    );
-  }
 
   /* Your Classes (the artboard's "Switching Classes"): the classes this
      device's session has opened, the one showing ticked, then Add Another
@@ -1324,7 +1244,7 @@
     var head = document.querySelector('.sp-head');
     var under = (head && head.offsetHeight) || 0;
     // On a phone the tabs sit over the bottom of the list: a row under them is not on screen either.
-    var bar = document.querySelector('.sp-tabs');
+    var bar = document.querySelector('.sp-tabs-bottom');
     var rect = bar && typeof bar.getBoundingClientRect === 'function' ? bar.getBoundingClientRect() : null;
     var over =
       rect && typeof window.innerHeight === 'number' && rect.top > window.innerHeight / 2 ? bar.offsetHeight || 0 : 0;
@@ -1612,7 +1532,8 @@
       if (!has(TAB_IDS, tab)) return;
       S.tab = tab;
       S.all = false;
-      focus = '.sp-tab-on';
+      // The focus stays on the tab pressed, in the bar it was pressed in.
+      focus = (el.closest && el.closest('.sp-tabs-top') ? '.sp-tabs-top' : '.sp-tabs-bottom') + ' .sp-tab-on';
     } else if (act === 'segment') {
       var seg = el.getAttribute('data-segment') || '';
       if (!has(SEGMENT_IDS, seg)) return;
@@ -1673,6 +1594,12 @@
       '../shared/student-view.js',
       function () {
         return typeof StudentView !== 'undefined';
+      },
+    ],
+    [
+      'page-view.js',
+      function () {
+        return typeof StudentPageView !== 'undefined';
       },
     ],
   ];
@@ -2023,7 +1950,7 @@
     });
   }
 
-  StudentPage.pageFrame = pageFrame;
+  StudentPage.classesSheet = classesSheet;
 
   StudentPage.addScreens({
     file: 'app',

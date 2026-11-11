@@ -55,13 +55,13 @@ test('Preview as Student: the page from returned grades, Phone and Chromebook, a
   await open.click();
   const dialog = page.getByRole('dialog', { name: 'Previewing as ' + at.name });
   await expect(dialog).toBeVisible();
-  const row = dialog.locator('.ps-row', { hasText: at.title });
-  await expect(row.locator('.ps-row-result')).toHaveText(at.returned);
+  const row = dialog.locator('.sp-row', { hasText: at.title });
+  await expect(row.locator('.sp-row-result')).toHaveText(at.returned);
   await expect(dialog.getByRole('radio', { name: 'Phone' })).toHaveAttribute('aria-checked', 'true');
 
   await dialog.getByRole('radio', { name: 'Chromebook' }).click();
   await expect(dialog.locator('.ps-device-chromebook')).toBeVisible();
-  await expect(row.locator('.ps-row-result')).toHaveText(at.returned);
+  await expect(row.locator('.sp-row-result')).toHaveText(at.returned);
 
   await dialog.getByRole('button', { name: 'Back to Class Settings' }).click();
   await expect(dialog).toHaveCount(0);

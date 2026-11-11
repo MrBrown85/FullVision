@@ -216,9 +216,9 @@ describe('the preview', () => {
   it('draws the page StudentView builds: returned grades only, worded by calc.js', () => {
     const el = openJordan();
     const { view } = StudentView.fromCache(CID, S1);
-    const rows = [...el.querySelectorAll('.ps-row')].map(r => ({
-      title: text(r.querySelector('.ps-row-title')),
-      result: text(r.querySelector('.ps-row-result')),
+    const rows = [...el.querySelectorAll('.sp-row')].map(r => ({
+      title: text(r.querySelector('.sp-row-title')),
+      result: text(r.querySelector('.sp-row-result')),
     }));
     expect(rows).toEqual(view.work.map(p => ({ title: p.title, result: p.result.text })));
     expect(rows.find(r => r.title === 'Draft Poster').result).toBe('');
@@ -228,7 +228,8 @@ describe('the preview', () => {
     expect(rows.find(r => r.title === 'Changed Reflection').result).toBe(returned);
     expect(assessmentCellValue(CID, S1, reflect).text).not.toBe(returned);
     expect(el.innerHTML).not.toMatch(SECRET);
-    expect(text(el.querySelector('.ps-page-class'))).toBe('Socials 10 · Block C');
+    expect(text(el.querySelector('.sp-head-title'))).toBe('Socials 10');
+    expect(text(el.querySelector('.sp-pill'))).toBe('Block C');
   });
 
   it('lists what Jordan sees and doesn’t see, in the board’s words', () => {
@@ -278,7 +279,7 @@ describe('the preview', () => {
     expect(el.querySelector('.ps-device-phone')).toBeNull();
     expect(el.querySelector('[data-ps-device="chromebook"]').getAttribute('aria-checked')).toBe('true');
     // The same page in either.
-    expect(el.querySelectorAll('.ps-row').length).toBe(4);
+    expect(el.querySelectorAll('.sp-row').length).toBe(4);
   });
 
   it('Back to Class Settings and Escape close it, and the focus goes back to Open Preview', () => {
@@ -341,13 +342,13 @@ describe('a signed-in class whose Draft and Returned rows have not loaded', () =
     expect(PreviewStudent.open(CID, S1, null)).toBe(true);
     const el = overlay();
     expect(text(el.querySelector('.ps-waiting'))).toBe('Loading this class…');
-    expect(el.querySelectorAll('.ps-row').length).toBe(0);
+    expect(el.querySelectorAll('.sp-row').length).toBe(0);
     expect(el.innerHTML).not.toMatch(SECRET);
     // No draft count is said while the rows are not known.
     expect(text(el.querySelectorAll('.ps-item-line')[1])).toBe('Drafts never reach the student page.');
     _loadGradeReturns(CID, structuredClone(_cache.gradeReturns[CID] || {}));
     CmStudentPage.render(CID);
-    expect(overlay().querySelectorAll('.ps-row').length).toBe(4);
+    expect(overlay().querySelectorAll('.sp-row').length).toBe(4);
     expect(overlay().innerHTML).not.toMatch(SECRET);
   });
 });

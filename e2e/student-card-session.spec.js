@@ -604,7 +604,7 @@ test.describe('"opened" means the row was on screen', () => {
     page.evaluate(() => {
       const top = document.querySelector('.sp-head').getBoundingClientRect().bottom;
       // On a phone the tabs sit over the bottom of the screen.
-      const tabs = document.querySelector('.sp-tabs').getBoundingClientRect();
+      const tabs = document.querySelector('.sp-tabs-bottom').getBoundingClientRect();
       const bottom = tabs.top > window.innerHeight / 2 ? tabs.top : window.innerHeight;
       return [...document.querySelectorAll('.sp-row')]
         .filter(el => {
