@@ -54,7 +54,8 @@ describe('the cards of To Do', () => {
       'Immune System Quick Check',
     ]);
     expect(tags(card(page, 'Science Fair Proposal'))[0]).toMatch(/^Due \S+ \S+ \d+$/);
-    expect(tags(card(page, 'Immune System Quick Check'))[0]).toBe('Missing');
+    // The due pill on the unit's line, then Missing under the title (the To Do Card board).
+    expect(tags(card(page, 'Immune System Quick Check'))).toContain('Missing');
     // Work still to do shows no result and no comment.
     cards(page).forEach(c => {
       expect(c.querySelector('.sp-piece-rows')).toBeNull();
@@ -178,6 +179,24 @@ describe('All Assignments: search, filters, and a row opens its card', () => {
     expect(listed(page)).toHaveLength(9);
   });
 
+  it('grouped as the board: work to hand in under This Week, the rest under its unit', async () => {
+    const page = await demo();
+    await page.click('[data-act="all-open"]');
+    const root = page.root();
+    const heads = [...root.querySelectorAll('.sp-list-head')].map(h => h.textContent);
+    const view = viewOf(page);
+    const units = [];
+    view.work.forEach(p => {
+      if (p.kind !== 'due' && p.kind !== 'missing' && p.unit && units.indexOf(p.unit) < 0) units.push(p.unit);
+    });
+    expect(heads).toEqual(['This Week'].concat(units));
+    const lists = [...root.querySelectorAll('.sp-list')];
+    const titles = l => [...l.querySelectorAll('.sp-row-title')].map(el => el.textContent);
+    expect(titles(lists[0])).toEqual(view.work.filter(p => p.kind === 'due' || p.kind === 'missing').map(p => p.title));
+    // Every piece is listed once.
+    expect(lists.flatMap(titles).sort()).toEqual(view.work.map(p => p.title).sort());
+  });
+
   it('search narrows by the title’s words, any case; nothing found says so', async () => {
     const page = await demo();
     await page.click('[data-act="all-open"]');
@@ -278,6 +297,10 @@ describe('what the server also tells, in Demo Mode (S4-W1)', () => {
       'I can plan a fair test and carry it out safely.',
     ]);
     expect(text('.sp-core-name')).toEqual(['Creative Thinking', 'Critical & Reflective Thinking']);
+    // The To Do Card board: the unit and the due pill share the first line; the category is a pill.
+    expect(fair.querySelector('.sp-piece-head .sp-piece-unit')).not.toBeNull();
+    expect(fair.querySelector('.sp-piece-head .sp-flag-due').textContent).toMatch(/^Due /);
+    expect(text('.sp-category-pill')).toEqual(['Projects']);
   });
 
   it('a returned card: no teacher’s name over the comment, though the sample sends one (ruling 112)', async () => {

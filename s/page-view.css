@@ -2423,3 +2423,333 @@
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
+
+/* ── The boards' cards and lists (board drift fixes, Nov 11) ───────── */
+
+/* A card's first line: the unit, and the due pill at the right (To Do Card). */
+.sp-view .sp-piece-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.sp-view .sp-piece-head .sp-piece-unit {
+  flex: 1;
+  min-width: 0;
+}
+.sp-view .sp-piece-head .sp-flag {
+  flex: none;
+}
+.sp-view .sp-piece-title + .sp-piece-tags {
+  margin-top: -4px;
+}
+.sp-view .sp-flag {
+  gap: 5px;
+}
+.sp-view .sp-pill-icon {
+  flex: none;
+  display: block;
+}
+.sp-view .sp-flag-closed {
+  background: var(--sp-fill);
+  color: #3a3a3c;
+}
+
+/* The category as a blue pill; the Core Competency as a label and an outlined pill. */
+.sp-view .sp-piece-category {
+  margin: -4px 0 0;
+}
+.sp-view .sp-category-pill {
+  display: inline-flex;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(0, 122, 255, 0.1);
+  color: var(--sp-blue-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+.sp-view .sp-core {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 0;
+  background: none;
+}
+.sp-view .sp-core .sp-core-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sp-text);
+}
+.sp-view .sp-core-name {
+  display: inline-flex;
+  padding: 3px 10px;
+  border: 1.5px solid var(--sp-blue);
+  border-radius: 999px;
+  color: var(--sp-blue-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* A grey row with a lock (Closed; Sent, Being Graded). */
+.sp-view .sp-lock-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--sp-bg);
+  color: var(--sp-text);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.sp-view .sp-lock-row .sp-pill-icon {
+  color: #3a3a3c;
+}
+
+/* A rubric criterion's competency under its name (Returned Work). */
+.sp-view .sp-piece-row-sub {
+  display: block;
+  font-size: 13px;
+  color: var(--sp-text-2);
+}
+
+/* A button with an icon before its words. */
+.sp-view .sp-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* Your Plan From Last Time: amber, apart from What You're Graded On (SDeckPlan). */
+.sp-view .sp-plan {
+  border-left: 0;
+  background: #fff4e0;
+}
+.sp-view .sp-plan-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #8a4b00;
+}
+
+/* Needs Revision: the teacher's words in a blue-tinted block; Revise By is the amber pill under the title. */
+.sp-view .sp-flag-revise {
+  background: #fff1db;
+  color: #8a4b00;
+}
+.sp-view .sp-revise {
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border-left: 0;
+  border-radius: 0;
+  background: none;
+  flex: 1;
+}
+.sp-view .sp-revise-said {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #e8f1ff;
+}
+.sp-view .sp-revise-who {
+  color: var(--sp-blue-text);
+}
+.sp-view .sp-revise-first,
+.sp-view .sp-revise-crit-title {
+  color: #58585d;
+}
+.sp-view .sp-revise-crit-name {
+  border-color: rgba(0, 122, 255, 0.25);
+}
+
+/* To Do orange; Missing and Needs Revision brown; Sent blue; Back green (All Assignments). */
+.sp-view .sp-dot-due {
+  background: #e08a00;
+}
+.sp-view .sp-dot-missing,
+.sp-view .sp-dot-revise {
+  background: #9a4a0a;
+}
+
+/* All Assignments' groups: This Week, then each unit. */
+.sp-view .sp-list-head {
+  margin: 14px 4px 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sp-text-2);
+}
+.sp-view .sp-list + .sp-list {
+  margin-top: 12px;
+}
+
+/* What the Levels Mean: open until closed; on a Chromebook always open, the chips in a row. */
+.sp-view .sp-fb-levels-shut .sp-fb-levels-list {
+  display: none;
+}
+
+/* Before and After: one card with the versions, the rows and Your Result,
+   the old result muted; Asked and Did in one card under it. */
+.sp-view .sp-ba-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sp-view .sp-ba-card,
+.sp-view .sp-ba-saids {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--sp-card);
+  box-shadow: var(--sp-shadow);
+}
+.sp-view .sp-ba-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sp-text-2);
+}
+.sp-view .sp-ba-card .sp-ba-rows {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+}
+.sp-view .sp-ba-panel {
+  border-top: 1px solid var(--sp-fill);
+}
+.sp-view .sp-ba-card .sp-ba-result {
+  border-top: 1px solid var(--sp-fill);
+}
+.sp-view .sp-ba-old {
+  font-size: 15px;
+  color: var(--sp-text-2);
+  font-variant-numeric: tabular-nums;
+}
+.sp-view .sp-ba-new {
+  font-size: 19px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.sp-view .sp-ink-1 {
+  color: #8a1c1c;
+}
+.sp-view .sp-ink-2 {
+  color: #92400e;
+}
+.sp-view .sp-ink-3 {
+  color: var(--sp-green);
+}
+.sp-view .sp-ink-4 {
+  color: #1e40af;
+}
+.sp-view .sp-ba-saids .sp-ba-said {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+}
+.sp-view .sp-ba-saids .sp-ba-said-title {
+  color: #8a4b00;
+}
+.sp-view .sp-ba-saids .sp-ba-did .sp-ba-said-title {
+  color: var(--sp-blue-text);
+}
+.sp-view .sp-ba-version:last-child .sp-ba-photo {
+  border: 2px solid var(--sp-blue);
+}
+.sp-view .sp-ba-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+@container sp-view (min-width: 760px) {
+  .sp-view .sp-fb-levels-btn {
+    display: none;
+  }
+  .sp-view .sp-fb-levels {
+    padding: 12px 16px;
+  }
+  .sp-view .sp-fb-levels .sp-fb-levels-list {
+    display: block;
+  }
+  .sp-view .sp-fb-levels .sp-fb-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+  }
+  .sp-view .sp-fb-levels .sp-fb-legend-chip {
+    width: auto;
+  }
+  .sp-view .sp-fb-levels .sp-fb-fine {
+    margin: 6px 0 0;
+  }
+  /* Before and After: the versions on the left, the change beside them, all above the fold. */
+  .sp-view .sp-ba-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    grid-template-areas: 'versions title' 'versions rows' 'versions said';
+    grid-template-rows: auto auto 1fr;
+    gap: 12px 16px;
+    align-items: start;
+  }
+  .sp-view .sp-ba-card {
+    display: contents;
+  }
+  .sp-view .sp-ba-title {
+    grid-area: title;
+  }
+  .sp-view .sp-ba-versions {
+    grid-area: versions;
+  }
+  .sp-view .sp-ba-panel {
+    grid-area: rows;
+    border-top: 0;
+  }
+  .sp-view .sp-ba-panel {
+    padding: 4px 16px;
+    border-radius: 14px;
+    background: var(--sp-card);
+    box-shadow: var(--sp-shadow);
+  }
+  .sp-view .sp-ba-saids {
+    grid-area: said;
+    padding: 0;
+    background: none;
+    box-shadow: none;
+  }
+  .sp-view .sp-ba-saids .sp-ba-said {
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: #fff4e0;
+  }
+  .sp-view .sp-ba-saids .sp-ba-did {
+    background: #e8f1ff;
+  }
+  .sp-view .sp-ba-actions {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+  .sp-view .sp-ba-actions .sp-btn-big {
+    padding: 0 24px;
+  }
+}
+.sp-view .sp-piece-row-label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+/* The student's pages on a card sit at the left, small (the Sent and Needs Revision boards). */
+.sp-view .sp-piece-card .sp-send-thumbs {
+  justify-content: flex-start;
+}

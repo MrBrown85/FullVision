@@ -77,10 +77,11 @@ function dateOptions(html) {
   );
 }
 
-/* The data-val of the active date range option. */
+/* The data-val of the chosen date chip; null on all time, which is no chip
+   (the filter that applies as you tap: a chip tapped again lets go). */
 function activeDateOption(html) {
   const m = html.match(
-    /m-seg-btn m-seg-active" data-action="m-grade-filter-seg" data-kind="dateRange" data-val="([^"]*)"/,
+    /m-filter-pill m-filter-active" data-action="m-grade-filter-seg" data-kind="dateRange" data-val="([^"]*)"/,
   );
   return m ? m[1] : null;
 }
@@ -134,7 +135,7 @@ describe('date range options', () => {
     mockDataLayer({});
     MGrade.renderPicker(CID);
     const html = sheetHtml();
-    expect(dateOptions(html)).toEqual(['all', 'week', '30d', 'term:1', 'term:2']);
+    expect(dateOptions(html)).toEqual(['week', '30d', 'term:1', 'term:2']);
     expect(html).toContain('>Term 1</button>');
     expect(html).toContain('>Term 2</button>');
     expect(html).not.toContain('Last term');
@@ -144,7 +145,7 @@ describe('date range options', () => {
     mockDataLayer({ getReportingTerms: () => [] });
     MGrade.renderPicker(CID);
     const html = sheetHtml();
-    expect(dateOptions(html)).toEqual(['all', 'week', '30d']);
+    expect(dateOptions(html)).toEqual(['week', '30d']);
     expect(html).not.toContain('Last term');
     expect(html).not.toContain('data-val="term"');
   });
@@ -210,7 +211,7 @@ describe('filtering by term', () => {
     try {
       MGrade.openFilterSheet(CID);
       MGrade.onFilterSegChange('dateRange', 'term:1');
-      MGrade.applyFilterSheet(CID);
+      MGrade.doneFilterSheet();
       const saved = JSON.parse(localStorage.getItem('gb-grade-filters-' + CID));
       expect(saved.dateRange).toBe('term:1');
       MGrade.filterAssessments(CID, 'all');
@@ -231,7 +232,7 @@ describe('saved filter fallback', () => {
     // No active filter: the badge stays hidden.
     const badge = html.match(/<span class="m-grade-filter-badge"([^>]*)>/);
     expect(badge[1]).toContain('hidden');
-    expect(activeDateOption(sheetHtml())).toBe('all');
+    expect(activeDateOption(sheetHtml())).toBe(null);
     const fake = fakeCells();
     try {
       MGrade.filterAssessments(CID, 'all');
@@ -245,7 +246,7 @@ describe('saved filter fallback', () => {
     mockDataLayer({ getReportingTerms: () => [TERMS[0]] });
     saveFilters({ dateRange: 'term:2' });
     MGrade.renderPicker(CID);
-    expect(activeDateOption(sheetHtml())).toBe('all');
+    expect(activeDateOption(sheetHtml())).toBe(null);
   });
 
   it('keeps the other saved filters when the date range falls back', () => {
@@ -264,17 +265,9 @@ describe('filter sheet casing', () => {
     mockDataLayer({});
     MGrade.renderPicker(CID);
     const html = sheetHtml();
-    [
-      'Filter Assessments',
-      'All Time',
-      'This Week',
-      'Last 30 Days',
-      'Has Ungraded',
-      'Fully Graded',
-      'Clear All',
-    ].forEach(label => expect(html).toContain('>' + label + '<'));
-    expect(html).not.toMatch(
-      />(Filter assessments|All time|This week|Last 30 days|Has ungraded|Fully graded|Clear all)</,
+    ['Filter', 'This Week', 'Last 30 Days', 'Needs Grading', 'All Graded', 'Clear All', 'Done'].forEach(label =>
+      expect(html).toContain('>' + label + '<'),
     );
+    expect(html).not.toMatch(/>(This week|Last 30 days|Needs grading|All graded|Clear all)</);
   });
 });
