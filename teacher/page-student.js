@@ -601,7 +601,7 @@ window.PageStudent = (function () {
   /* A level as the class shows it, with its proficiency word unless the
      class is Letter, tinted by its level. */
   function _levelPill(cid, v) {
-    var lvl = v > 0 ? Math.round(v) : 0;
+    var lvl = v > 0 ? roundLevel(v) : 0;
     var word = typeof levelWord === 'function' ? levelWord(cid, v) : '';
     return (
       '<span class="stu-level stu-level-' +
@@ -704,7 +704,7 @@ window.PageStudent = (function () {
       var lo = Math.min.apply(null, profs);
       var hi = Math.max.apply(null, profs);
       var atProf = profs.filter(function (v) {
-        return Math.round(v) >= 3;
+        return roundLevel(v) >= 3;
       }).length;
       out.comps = {
         stat:
@@ -1338,7 +1338,7 @@ window.PageStudent = (function () {
     var entries = _compEntries(cid, sec);
     var bars = entries
       .map(function (e) {
-        var lvl = e.level != null ? e.level : Math.round(e.score);
+        var lvl = e.level != null ? e.level : roundLevel(e.score);
         var a = ctx.assessMap[e.assessmentId];
         return (
           '<span class="stu-bar" style="height:' +
@@ -1452,7 +1452,7 @@ window.PageStudent = (function () {
   var _bankAsked = false;
   function _compNowHtml(cid, tag, sp) {
     if (!(sp > 0) || !window.CompetencyWording) return '';
-    var l = CompetencyWording.lines(tag, Math.max(1, Math.min(4, Math.round(sp))));
+    var l = CompetencyWording.lines(tag, Math.max(1, Math.min(4, roundLevel(sp))));
     if (!l || (!l.descriptor && !l.next)) return '';
     if (!l.ready && !_bankAsked && window.RubricPrint && RubricPrint.loadBankLevels) {
       _bankAsked = true;
@@ -1512,7 +1512,7 @@ window.PageStudent = (function () {
     if (rows.length < 2) return '';
     var html = '<div class="stu-comp-where"><div class="stu-comp-where-title">Where It Shows</div>';
     rows.forEach(function (r) {
-      var lvl = Math.max(1, Math.min(4, Math.round(r.v)));
+      var lvl = Math.max(1, Math.min(4, roundLevel(r.v)));
       html +=
         '<div class="stu-comp-where-row"><span><strong>' +
         esc(r.name) +

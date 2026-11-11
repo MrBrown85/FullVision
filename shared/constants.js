@@ -449,7 +449,9 @@ function parsePointsInput(text, max, saved) {
 function pointsPctHtml(v, max, digits) {
   if (v == null || !(max > 0)) return '';
   var pct = (v / max) * 100;
-  var html = (digits ? pct.toFixed(digits) : String(Math.round(pct))) + '%';
+  // As calc.js prints a %: on paper, a half rounding up (57.5% is 58%).
+  var html =
+    (digits === 1 ? oneDecimal(pct).toFixed(1) : digits ? pct.toFixed(digits) : String(wholePercent(pct))) + '%';
   return v > max ? html + '<span class="gb-pts-bonus">bonus</span>' : html;
 }
 

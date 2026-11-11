@@ -15,7 +15,7 @@ window.MStudentDetail = (function () {
 
   function _renderSectionCard(cid, sid, sec) {
     var prof = getSectionProficiency(cid, sid, sec.id);
-    var profRounded = Math.round(prof);
+    var profRounded = roundLevel(prof);
     // The arrow and the Improving / Dropped line read the same change: the
     // counted evidence's first and last levels (calc.js evidenceChange).
     var change = evidenceChange(sectionCountedEvidence(cid, sid, sec.id));
@@ -63,7 +63,7 @@ window.MStudentDetail = (function () {
           '<div class="m-sec-tl-date">' +
           shortDate +
           ' · ' +
-          PROF_LABELS[Math.round(s.score)] +
+          PROF_LABELS[roundLevel(s.score)] +
           '</div>' +
           '</div>' +
           '</div>';
@@ -170,7 +170,7 @@ window.MStudentDetail = (function () {
     _nowCid = cid;
     var tag = sec && sec.tags ? sec.tags[0] : null;
     if (!(prof > 0) || !tag || !window.CompetencyWording) return '';
-    var l = CompetencyWording.lines(tag, Math.max(1, Math.min(4, Math.round(prof))));
+    var l = CompetencyWording.lines(tag, Math.max(1, Math.min(4, roundLevel(prof))));
     if (!l || (!l.descriptor && !l.next)) return '';
     if (!l.ready && !_bankAsked) {
       _bankAsked = true;
@@ -501,7 +501,7 @@ window.MStudentDetail = (function () {
     var color = MC.avatarColor(st.id);
     var initials = MC.avatarInitials(st);
     var overall = getOverallProficiency(cid, sid);
-    var rounded = Math.round(overall);
+    var rounded = roundLevel(overall);
     // The overall grade as the class is set to grade (level, letter, or both).
     var grade = studentGradeSummary(cid, sid);
     var gradeText = grade.text || '—';
@@ -544,7 +544,7 @@ window.MStudentDetail = (function () {
 
     // The assessed competencies below Proficient, weakest first.
     var focusAreas = getFocusAreas(cid, sid, 3).filter(function (f) {
-      return f.prof > 0 && f.prof < 3;
+      return f.prof > 0 && printedLevel(f.prof) < 3;
     });
     var focusHTML = '';
     if (focusAreas.length) {
@@ -561,7 +561,7 @@ window.MStudentDetail = (function () {
           MC.esc(label) +
           '</span>' +
           '<span class="m-focus-prof" style="color:' +
-          MC.profBg(Math.round(f.prof)) +
+          MC.profBg(roundLevel(f.prof)) +
           '">' +
           formatLevel(cid, f.prof, 'No evidence') +
           '</span>' +
@@ -575,7 +575,7 @@ window.MStudentDetail = (function () {
       grouped.groups.forEach(function (gi) {
         if (!gi.sections.length) return;
         var groupProf = getGroupProficiency(cid, sid, gi.group.id);
-        var groupRounded = Math.round(groupProf);
+        var groupRounded = roundLevel(groupProf);
         var groupNote = folderAverageNote(cid, gi.group);
         sectionCards +=
           '<div class="m-group-header">' +
@@ -779,7 +779,7 @@ window.MStudentDetail = (function () {
         return v > 0;
       });
     var atProf = profs.filter(function (v) {
-      return Math.round(v) >= 3;
+      return roundLevel(v) >= 3;
     }).length;
     var tabs = [
       {

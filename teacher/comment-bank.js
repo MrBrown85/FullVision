@@ -1956,12 +1956,15 @@ window.CommentBank = (function () {
   /* "a", "a and b", "a, b and c" (no serial comma); a name given twice once. */
   var list = R.list;
 
-  /* A level rounded as it prints (3.07 and 3.1 are the same figure). */
+  /* A level rounded as it prints (3.07 and 3.1 are the same figure;
+     calc.js printedLevel). */
   function tenths(v) {
-    return Math.round(Number(v) * 10);
+    return Math.round(printedLevel(Number(v)) * 10);
   }
+  /* The word a level reads as, as the gradebook prints it (calc.js
+     roundLevel: 2.47 prints 2.5 and is Proficient). */
   function word(v) {
-    return v > 0 ? PROF_LABELS[Math.max(1, Math.min(4, Math.round(v)))] || '' : '';
+    return v > 0 ? PROF_LABELS[Math.max(1, Math.min(4, roundLevel(v)))] || '' : '';
   }
 
   /* Whether the student is on the IE path with work that has no mark yet:
@@ -2853,13 +2856,13 @@ window.CommentBank = (function () {
      out, never its level as a %. */
   function workMark(f, w) {
     if (!w) return '';
-    if (f.grade && f.grade.mode === 'letter' && w.pct != null) return Math.round(w.pct) + '%';
+    if (f.grade && f.grade.mode === 'letter' && w.pct != null) return wholePercent(w.pct) + '%';
     return f.levelText(w.v);
   }
 
   function evidenceOf(f) {
     if (!f.work.length) return '';
-    return f.overall >= 2.5 ? EVIDENCE.solid : EVIDENCE.growing;
+    return roundLevel(f.overall) >= 3 ? EVIDENCE.solid : EVIDENCE.growing;
   }
 
   /* ── The grade sentence ────────────────────────────────────────────── */
@@ -3346,10 +3349,10 @@ window.CommentBank = (function () {
       // the report prints (c.level: a teacher's override where there is one).
       var from = word(c.start);
       var to = word(c.now);
-      if (!from || !to || to !== word(c.level) || !(Math.round(c.now) > Math.round(c.start)) || !improvedComp(c))
+      if (!from || !to || to !== word(c.level) || !(roundLevel(c.now) > roundLevel(c.start)) || !improvedComp(c))
         return;
       if (R.wordCount(e.phrase) > 9) return;
-      var gain = Math.round(c.now) - Math.round(c.start);
+      var gain = roundLevel(c.now) - roundLevel(c.start);
       if (!pick || gain > pick.gain) pick = { comp: c, key: e.key, from: from, to: to, skill: e.phrase, gain: gain };
     });
     return pick;
@@ -3387,7 +3390,7 @@ window.CommentBank = (function () {
       var sc = (c.scores || []).find(function (x) {
         return x.id === w.id;
       });
-      if (!sc || !(Math.round(Number(sc.v)) >= 3) || isSensitive(c)) return;
+      if (!sc || !(roundLevel(Number(sc.v)) >= 3) || isSensitive(c)) return;
       var sk = skillFor(f, c);
       var key = sk ? sk.key : 'label:' + c.id;
       if (taken[key]) return;
@@ -3499,7 +3502,7 @@ window.CommentBank = (function () {
     var piece = _pieceSkill(f);
     var pick = null;
     (f.comps || []).forEach(function (c) {
-      if (!(Math.round(c.level) >= 3) || c === step || (piece && piece.comp === c) || (hi && hi.comp === c)) return;
+      if (!(roundLevel(c.level) >= 3) || c === step || (piece && piece.comp === c) || (hi && hi.comp === c)) return;
       var named = _namedComp(f, c);
       // Never the skill another sentence names, by its key.
       if (!named || (piece && named.key === piece.key) || (hi && named.key === hi.key)) return;
@@ -3952,7 +3955,7 @@ window.CommentBank = (function () {
   }
   function setStrengthCompOf(f) {
     var ok = function (c) {
-      return !!c && !!c.bankId && !!setEntry(c.bankId) && !isSensitive(c) && Math.round(c.level) >= 3;
+      return !!c && !!c.bankId && !!setEntry(c.bankId) && !isSensitive(c) && roundLevel(c.level) >= 3;
     };
     var first = strengthSkills(f)[0];
     if (first && ok(first.comp)) return first.comp;
@@ -3981,7 +3984,7 @@ window.CommentBank = (function () {
       // line (Colin, Nov 4).
       var only = e.sensitive;
       var label = String(c.name || '');
-      if (Math.round(c.level) >= 3)
+      if (roundLevel(c.level) >= 3)
         e.strength.forEach(function (t, i) {
           out.push({
             id: 'set:' + tag + ':s' + i,
@@ -4406,7 +4409,7 @@ window.CommentBank = (function () {
       var e = c.bankId ? setEntry(c.bankId) : null;
       if (!e) return;
       var k = 'comp:' + c.id;
-      if (Math.round(c.level) >= 3) {
+      if (roundLevel(c.level) >= 3) {
         setSlots['sets_' + c.id] = e.key;
         factsOf['sets_' + c.id] = [k];
       }
@@ -5521,9 +5524,9 @@ window.CommentBank = (function () {
       growing: Object.keys(habits).filter(function (k) {
         return habits[k] === 1 || habits[k] === 2;
       }).length,
-      good: letterMode ? ['A', 'B', 'C+'].indexOf(g.letter) >= 0 : level >= 2.5,
-      high: letterMode ? g.letter === 'A' || g.letter === 'B' : level >= 3,
-      low: letterMode ? g.letter === 'C' || g.letter === 'C-' : level > 0 && level < 2.5,
+      good: letterMode ? ['A', 'B', 'C+'].indexOf(g.letter) >= 0 : roundLevel(level) >= 3,
+      high: letterMode ? g.letter === 'A' || g.letter === 'B' : printedLevel(level) >= 3,
+      low: letterMode ? g.letter === 'C' || g.letter === 'C-' : level > 0 && roundLevel(level) < 3,
       joinedLate: joinedLate,
     };
   }
@@ -7141,7 +7144,7 @@ window.CommentBank = (function () {
     // not a sensitive one, and at Proficient or above now.
     setStrength: function (pv, f) {
       return _setClaim(pv, f, 'sets_', function (c, e) {
-        return Math.round(c.level) >= 3 ? e.key : null;
+        return roundLevel(c.level) >= 3 ? e.key : null;
       });
     },
     // Its next-step sentence: the same set, at the level the competency is

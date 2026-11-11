@@ -1682,11 +1682,25 @@ function rubricCriterionLevel(cid, studentId, assessment, criterion) {
    comes from. */
 function nearestScoreLevel(value) {
   if (!(value > 0)) return { level: 0, text: '' };
-  // The nearest step to the printed figure; a tie (2.5) goes up.
+  var near = _nearestStep(value);
+  return { level: near.level, text: formatScoreLevel(near.level, near.mod) };
+}
+
+/* The nearest step to the printed figure, as { level, mod }; a tie (2.5)
+   goes up. */
+function _nearestStep(value) {
   var steps = Math.round(_onPaper(printedLevel(value) / SCORE_MOD_STEP));
   var level = Math.max(1, Math.min(4, Math.round(steps * SCORE_MOD_STEP)));
   var mod = Math.round((steps * SCORE_MOD_STEP - level) / SCORE_MOD_STEP);
-  return { level: level, text: formatScoreLevel(level, mod) };
+  return { level: level, mod: mod };
+}
+
+/* The same step as the grader names it, "Proficient +" (constants.js
+   scoreLevelText); '' with none. */
+function nearestScoreLevelName(value) {
+  if (!(value > 0)) return '';
+  var near = _nearestStep(value);
+  return scoreLevelText(near.level, near.mod);
 }
 
 /* Whether a class shows its course % as a whole number (86%) rather than
@@ -1743,12 +1757,25 @@ function _wholePercent(p) {
   return _roundPercent(p, 0);
 }
 
+/* The same, for pages outside calc.js that print a % they have worked out
+   (a class average, a piece's points %): a % on paper rounded as shown, so
+   an exact 57.5% prints 58% there as it does here. */
+function wholePercent(p) {
+  return _wholePercent(p);
+}
+
 /* A level, % or points to one decimal, on paper, a half rounding up: an
    exact 1.65 is 1.7 however the computer came to it (as 1.65 or as
    1.6499999999999999). Every one-decimal figure calc.js prints, and every
    change between two, comes from this, so equal values print the same. */
 function _oneDecimal(v) {
   return _roundPercent(v, 1);
+}
+
+/* The same, for pages outside calc.js that print a % or a points average
+   they have worked out to one decimal, so it prints as calc.js prints it. */
+function oneDecimal(v) {
+  return _oneDecimal(v);
 }
 
 /* The same as text: "1.7", "2.0". */
@@ -4318,6 +4345,10 @@ window.Calc = {
   getCourseLetterData,
   courseGradeMode,
   formatLevel,
+  printedLevel,
+  roundLevel,
+  wholePercent,
+  oneDecimal,
   assessmentCellValue,
   levelWord,
   studentGradeBadges,
@@ -4360,6 +4391,7 @@ window.Calc = {
   categoryCourseShares,
   rubricCriterionLevel,
   nearestScoreLevel,
+  nearestScoreLevelName,
   calcProficiency,
   getTagScores,
   getTagProficiency,

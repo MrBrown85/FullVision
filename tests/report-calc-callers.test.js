@@ -32,7 +32,18 @@ const FILES = readdirSync(resolve(ROOT, 'teacher'))
   .sort();
 
 // calc.js functions that read no score (as tests/report-score-seam.test.js lists them).
-const NO_SCORE = new Set(['courseGradeMode', 'formatLevel', 'levelWord', 'getActiveTerm', 'setActiveTerm']);
+const NO_SCORE = new Set([
+  'courseGradeMode',
+  'formatLevel',
+  'levelWord',
+  'getActiveTerm',
+  'setActiveTerm',
+  'printedLevel',
+  'roundLevel',
+  'wholePercent',
+  'oneDecimal',
+  'nearestScoreLevelName',
+]);
 const CALC = new Set(Object.keys(Calc).filter(name => !NO_SCORE.has(name)));
 
 /* { functionName: [calc functions it calls] } for one file. A call outside

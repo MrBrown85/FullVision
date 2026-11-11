@@ -455,7 +455,7 @@ window.DashOverview = (function () {
   }
 
   function _lvl(value) {
-    return value > 0 ? Math.max(1, Math.min(4, Math.round(value))) : 0;
+    return value > 0 ? Math.max(1, Math.min(4, roundLevel(value))) : 0;
   }
 
   function _colTitle(col) {

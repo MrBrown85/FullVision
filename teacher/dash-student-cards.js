@@ -171,7 +171,7 @@ window.DashStudentCards = (function () {
       '" data-student-tab="comps">';
     cols.forEach(function (col) {
       var value = _colValue(cid, sid, col);
-      var r = value > 0 ? Math.max(1, Math.min(4, Math.round(value))) : 0;
+      var r = value > 0 ? Math.max(1, Math.min(4, roundLevel(value))) : 0;
       var lines = stripTipLines(cid, sid, col, value, secById);
       var label = lines[0] + ': ' + lines.slice(1).join('. ');
       // The level's colours (and a text colour that reads on it in each
@@ -220,7 +220,7 @@ window.DashStudentCards = (function () {
   function footerRightHtml(cid, sid, focusCol) {
     if (focusCol) {
       var value = _colValue(cid, sid, focusCol);
-      var r = value > 0 ? Math.max(1, Math.min(4, Math.round(value))) : 0;
+      var r = value > 0 ? Math.max(1, Math.min(4, roundLevel(value))) : 0;
       return (
         '<span class="dash-card-focus"' +
         (r ? ' style="color:var(--score-' + r + '-text)"' : '') +
