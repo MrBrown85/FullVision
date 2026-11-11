@@ -42,15 +42,24 @@ table public.assessment (rls on)
   updated_at timestamp with time zone not null default now()
   copy_group uuid
   core_competency_ids text[] not null default '{}'::text[]
+  students_send text not null default 'nothing'::text
+  after_due text not null default 'keep'::text
+  accept_until date
+  group_work text not null default 'each'::text
+  students_see_markup boolean not null default true
+  constraint assessment_accept_until_check CHECK (((after_due = 'until'::text) = (accept_until IS NOT NULL)))
+  constraint assessment_after_due_check CHECK ((after_due = ANY (ARRAY['keep'::text, 'until'::text, 'stop'::text])))
   constraint assessment_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.category(id) ON DELETE SET NULL
   constraint assessment_collab_mode_check CHECK ((collab_mode = ANY (ARRAY['none'::text, 'pairs'::text, 'groups'::text])))
   constraint assessment_core_competency_ids_check CHECK ((core_competency_ids <@ ARRAY['COM'::text, 'COL'::text, 'CT'::text, 'CRT'::text, 'PPI'::text, 'PAR'::text, 'SAR'::text]))
   constraint assessment_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.course(id) ON DELETE CASCADE
+  constraint assessment_group_work_check CHECK ((group_work = ANY (ARRAY['each'::text, 'group'::text])))
   constraint assessment_max_points_check CHECK (((max_points IS NULL) OR (max_points > (0)::numeric)))
   constraint assessment_module_id_fkey FOREIGN KEY (module_id) REFERENCES public.module(id) ON DELETE SET NULL
   constraint assessment_pkey PRIMARY KEY (id)
   constraint assessment_rubric_id_fkey FOREIGN KEY (rubric_id) REFERENCES public.rubric(id) ON DELETE SET NULL
   constraint assessment_score_mode_check CHECK ((score_mode = ANY (ARRAY['proficiency'::text, 'points'::text, 'complete'::text, 'dibels'::text])))
+  constraint assessment_students_send_check CHECK ((students_send = ANY (ARRAY['nothing'::text, 'photos'::text, 'photos_files'::text])))
   constraint assessment_weight_check CHECK ((weight >= (0)::numeric))
   CREATE INDEX assessment_category_idx ON public.assessment USING btree (category_id)
   CREATE INDEX assessment_copy_group_idx ON public.assessment USING btree (copy_group) WHERE (copy_group IS NOT NULL)
@@ -63,6 +72,8 @@ table public.assessment (rls on)
   CREATE TRIGGER grade_return_gone AFTER DELETE ON public.assessment FOR EACH ROW EXECUTE FUNCTION public._grade_return_gone()
   CREATE TRIGGER grade_return_mode AFTER UPDATE OF score_mode ON public.assessment FOR EACH ROW WHEN (((old.score_mode = 'dibels'::text) AND (new.score_mode IS DISTINCT FROM 'dibels'::text))) EXECUTE FUNCTION public._grade_return_mode_changed()
   CREATE TRIGGER grade_return_truncate AFTER TRUNCATE ON public.assessment FOR EACH STATEMENT EXECUTE FUNCTION public._grade_return_truncated()
+  CREATE TRIGGER submission_gone AFTER DELETE ON public.assessment FOR EACH ROW EXECUTE FUNCTION public._submission_gone()
+  CREATE TRIGGER submission_truncate AFTER TRUNCATE ON public.assessment FOR EACH STATEMENT EXECUTE FUNCTION public._submission_truncated()
   policy assessment_via_course for all to public using (public.fv_owns_course(course_id)) with check (public.fv_owns_course(course_id))
 table public.assessment_tag (rls on)
   assessment_id uuid not null
@@ -206,6 +217,8 @@ table public.course (rls on)
   student_page_enabled boolean not null default false
   return_grades text default 'on_return'::text
   cards_work_until date
+  send_work boolean not null default false
+  keep_photos_until text not null default 'end_of_year'::text
   constraint course_block_len CHECK (((block IS NULL) OR ((char_length(block) >= 1) AND (char_length(block) <= 24))))
   constraint course_calc_method_check CHECK ((calc_method = ANY (ARRAY['average'::text, 'median'::text, 'mostRecent'::text, 'highest'::text, 'mode'::text, 'decayingAvg'::text])))
   constraint course_category_weights_is_object CHECK (((category_weights IS NULL) OR (jsonb_typeof(category_weights) = 'object'::text)))
@@ -213,6 +226,7 @@ table public.course (rls on)
   constraint course_decay_weight_check CHECK (((decay_weight IS NULL) OR ((decay_weight >= (0)::numeric) AND (decay_weight <= (1)::numeric))))
   constraint course_grading_scale_is_object CHECK (((grading_scale IS NULL) OR (jsonb_typeof(grading_scale) = 'object'::text)))
   constraint course_grading_system_check CHECK ((grading_system = ANY (ARRAY['proficiency'::text, 'letter'::text, 'both'::text])))
+  constraint course_keep_photos_until_check CHECK ((keep_photos_until = ANY (ARRAY['end_of_year'::text, 'end_of_term'::text])))
   constraint course_level_order_check CHECK ((level_order = ANY (ARRAY['asc'::text, 'desc'::text])))
   constraint course_pkey PRIMARY KEY (id)
   constraint course_recent_score_limit_range CHECK (((recent_score_limit IS NULL) OR ((recent_score_limit >= 1) AND (recent_score_limit <= 20))))
@@ -354,6 +368,8 @@ table public.enrollment (rls on)
   CREATE TRIGGER course_sync_cursor_enrollment_gradebook AFTER INSERT OR DELETE OR UPDATE ON public.enrollment FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('gradebook', 'course')
   CREATE TRIGGER grade_return_gone AFTER DELETE ON public.enrollment FOR EACH ROW EXECUTE FUNCTION public._grade_return_gone()
   CREATE TRIGGER grade_return_truncate AFTER TRUNCATE ON public.enrollment FOR EACH STATEMENT EXECUTE FUNCTION public._grade_return_truncated()
+  CREATE TRIGGER submission_gone AFTER DELETE ON public.enrollment FOR EACH ROW EXECUTE FUNCTION public._submission_gone()
+  CREATE TRIGGER submission_truncate AFTER TRUNCATE ON public.enrollment FOR EACH STATEMENT EXECUTE FUNCTION public._submission_truncated()
   policy enrollment_via_course for all to public using (public.fv_owns_course(course_id)) with check (public.fv_owns_course(course_id))
 table public.fv_idempotency (rls on)
   key uuid not null
@@ -1026,6 +1042,98 @@ table public.subject (rls on)
   CREATE UNIQUE INDEX subject_pkey ON public.subject USING btree (id)
   CREATE TRIGGER course_sync_cursor_subject_gradebook AFTER INSERT OR DELETE OR UPDATE ON public.subject FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('gradebook', 'course')
   policy subject_via_course for all to public using (public.fv_owns_course(course_id)) with check (public.fv_owns_course(course_id))
+table public.submission (rls on)
+  id uuid not null default gen_random_uuid()
+  course_id uuid not null
+  assessment_id uuid not null
+  enrollment_id uuid not null
+  version smallint not null default 1
+  state text not null
+  intent text not null default 'new'::text
+  target_id uuid
+  sent_by text not null
+  on_paper boolean not null default false
+  note text
+  followed_plan text
+  is_late boolean not null default false
+  card_id uuid
+  request_id uuid
+  created_at timestamp with time zone not null default now()
+  sent_at timestamp with time zone
+  updated_at timestamp with time zone not null default now()
+  constraint submission_followed_plan_check CHECK ((followed_plan = ANY (ARRAY['yes'::text, 'partly'::text, 'no'::text])))
+  constraint submission_intent_check CHECK ((intent = ANY (ARRAY['new'::text, 'replace'::text, 'add'::text])))
+  constraint submission_note_check CHECK ((char_length(note) <= 1000))
+  constraint submission_paper_is_teachers CHECK (((NOT on_paper) OR ((sent_by = 'teacher'::text) AND (state = 'sent'::text))))
+  constraint submission_pkey PRIMARY KEY (id)
+  constraint submission_sent_by_check CHECK ((sent_by = ANY (ARRAY['student'::text, 'teacher'::text])))
+  constraint submission_sent_has_time CHECK (((state = 'sent'::text) = (sent_at IS NOT NULL)))
+  constraint submission_sent_is_plain CHECK (((state = 'sending'::text) OR ((intent = 'new'::text) AND (target_id IS NULL))))
+  constraint submission_state_check CHECK ((state = ANY (ARRAY['sending'::text, 'sent'::text])))
+  constraint submission_target_with_intent CHECK (((intent = 'new'::text) = (target_id IS NULL)))
+  constraint submission_version_check CHECK ((version >= 1))
+  CREATE INDEX submission_assessment_idx ON public.submission USING btree (assessment_id)
+  CREATE INDEX submission_course_idx ON public.submission USING btree (course_id)
+  CREATE INDEX submission_enrollment_idx ON public.submission USING btree (enrollment_id)
+  CREATE UNIQUE INDEX submission_one_sending ON public.submission USING btree (assessment_id, enrollment_id, sent_by) WHERE (state = 'sending'::text)
+  CREATE UNIQUE INDEX submission_one_sent ON public.submission USING btree (assessment_id, enrollment_id, version) WHERE (state = 'sent'::text)
+  CREATE UNIQUE INDEX submission_pkey ON public.submission USING btree (id)
+  CREATE INDEX submission_target_idx ON public.submission USING btree (target_id) WHERE (target_id IS NOT NULL)
+  CREATE TRIGGER submission_same_class BEFORE INSERT OR UPDATE ON public.submission FOR EACH ROW EXECUTE FUNCTION public._submission_same_class()
+  CREATE TRIGGER submission_target_gone AFTER DELETE ON public.submission FOR EACH ROW EXECUTE FUNCTION public._submission_target_gone()
+table public.submission_file (rls on)
+  id uuid not null default gen_random_uuid()
+  submission_id uuid not null
+  page smallint not null
+  path text not null
+  thumb_path text not null
+  bytes integer
+  thumb_bytes integer
+  width integer
+  height integer
+  sha256 text
+  rotation smallint not null default 0
+  added_by text not null
+  declared_bytes integer not null
+  declared_thumb_bytes integer not null
+  created_at timestamp with time zone not null default now()
+  link_dies_at timestamp with time zone not null
+  constraint submission_file_added_by_check CHECK ((added_by = ANY (ARRAY['student'::text, 'teacher'::text])))
+  constraint submission_file_declared_bytes_check CHECK (((declared_bytes >= 1) AND (declared_bytes <= 2097152)))
+  constraint submission_file_declared_thumb_bytes_check CHECK (((declared_thumb_bytes >= 1) AND (declared_thumb_bytes <= 2097152)))
+  constraint submission_file_height_check CHECK (((height >= 1) AND (height <= 20000)))
+  constraint submission_file_page_check CHECK ((page >= 1))
+  constraint submission_file_page_key UNIQUE (submission_id, page) DEFERRABLE
+  constraint submission_file_path_is_own CHECK (((path ~~ (('%/'::text || (id)::text) || '.jpg'::text)) AND (thumb_path = ("left"(path, (length(path) - 4)) || '-thumb.jpg'::text))))
+  constraint submission_file_path_key UNIQUE (path)
+  constraint submission_file_pkey PRIMARY KEY (id)
+  constraint submission_file_rotation_check CHECK ((rotation = ANY (ARRAY[0, 90, 180, 270])))
+  constraint submission_file_sha256_check CHECK ((sha256 ~ '^[0-9a-f]{64}$'::text))
+  constraint submission_file_submission_id_fkey FOREIGN KEY (submission_id) REFERENCES public.submission(id) ON DELETE CASCADE
+  constraint submission_file_thumb_path_key UNIQUE (thumb_path)
+  constraint submission_file_width_check CHECK (((width >= 1) AND (width <= 20000)))
+  CREATE UNIQUE INDEX submission_file_page_key ON public.submission_file USING btree (submission_id, page)
+  CREATE UNIQUE INDEX submission_file_path_key ON public.submission_file USING btree (path)
+  CREATE UNIQUE INDEX submission_file_pkey ON public.submission_file USING btree (id)
+  CREATE UNIQUE INDEX submission_file_thumb_path_key ON public.submission_file USING btree (thumb_path)
+  CREATE TRIGGER submission_file_removed AFTER DELETE ON public.submission_file FOR EACH ROW EXECUTE FUNCTION public._submission_file_removed()
+table public.submission_file_removal (rls on)
+  id bigint not null
+  bucket text not null
+  path text not null
+  course_id uuid
+  reason text not null
+  queued_at timestamp with time zone not null default now()
+  link_dies_at timestamp with time zone not null
+  tries integer not null default 0
+  last_try_at timestamp with time zone
+  removed_at timestamp with time zone
+  done boolean not null default false
+  constraint submission_file_removal_path_key UNIQUE (bucket, path)
+  constraint submission_file_removal_pkey PRIMARY KEY (id)
+  CREATE UNIQUE INDEX submission_file_removal_path_key ON public.submission_file_removal USING btree (bucket, path)
+  CREATE UNIQUE INDEX submission_file_removal_pkey ON public.submission_file_removal USING btree (id)
+  CREATE INDEX submission_file_removal_todo ON public.submission_file_removal USING btree (queued_at) WHERE (NOT done)
 table public.support_report (rls on)
   id uuid not null default gen_random_uuid()
   teacher_id uuid not null default auth.uid()
@@ -1265,6 +1373,14 @@ table student_submit.device_session_enrollment (rls on)
   CREATE INDEX device_session_enrollment_card ON student_submit.device_session_enrollment USING btree (card_id)
   CREATE INDEX device_session_enrollment_enrollment ON student_submit.device_session_enrollment USING btree (enrollment_id)
   CREATE UNIQUE INDEX device_session_enrollment_pkey ON student_submit.device_session_enrollment USING btree (session_id, enrollment_id)
+table student_submit.send_log (rls on)
+  id bigint not null
+  card_id uuid not null
+  at timestamp with time zone not null default now()
+  constraint send_log_pkey PRIMARY KEY (id)
+  CREATE INDEX send_log_at ON student_submit.send_log USING btree (at)
+  CREATE INDEX send_log_card_at ON student_submit.send_log USING btree (card_id, at)
+  CREATE UNIQUE INDEX send_log_pkey ON student_submit.send_log USING btree (id)
 table student_submit.session (rls on)
   id uuid not null default gen_random_uuid()
   token_hash text not null
@@ -1282,6 +1398,7 @@ table student_submit.session (rls on)
   CREATE UNIQUE INDEX session_pkey ON student_submit.session USING btree (id)
   CREATE UNIQUE INDEX session_token_hash_key ON student_submit.session USING btree (token_hash)
 function public._access_code_hash(p_code text, p_salt text) returns text
+function public._assessment_work_json(p_assessment_id uuid) returns jsonb security definer
 function public._cards_work_until(p_course_id uuid) returns date security definer
 function public._fv_date(p text) returns date
 function public._fv_release_orphan_teacher_email() returns void security definer
@@ -1316,10 +1433,30 @@ function public._report_preset_defaults(p_preset text) returns jsonb
 function public._score_audit_diff(p_score_id uuid, p_old_value numeric, p_new_value numeric, p_old_status text, p_new_status text) returns void security definer
 function public._slip_password(p_enrollment_id uuid) returns text security definer
 function public._student_card_json(p_card_id uuid) returns jsonb security definer
+function public._submission_file_removed() returns trigger security definer
+function public._submission_gone() returns trigger security definer
+function public._submission_json(p_submission_id uuid) returns jsonb security definer
+function public._submission_same_class() returns trigger security definer
+function public._submission_target_gone() returns trigger security definer
+function public._submission_truncated() returns trigger security definer
 function public._term_rating_audit_field(p_tr_id uuid, p_field text, p_old text, p_new text) returns void security definer
 function public._touch_course_sync_cursor(p_course_id uuid, p_bucket text) returns void security definer
 function public._touch_course_sync_cursor_from_trigger() returns trigger security definer
 function public._touch_teacher_sync_cursor_from_trigger() returns trigger security definer
+function public._work_begin(p_course_id uuid, p_assessment_id uuid, p_enrollment_id uuid, p_sent_by text, p_intent text, p_target_id uuid, p_pages jsonb, p_note text, p_followed_plan text, p_is_late boolean, p_card_id uuid, p_request_id uuid) returns uuid security definer
+function public._work_bucket() returns text
+function public._work_check_files(p_files jsonb) returns void
+function public._work_check_pages(p_pages jsonb) returns void
+function public._work_class_full(p_course_id uuid, p_pages jsonb) returns jsonb security definer
+function public._work_class_max_bytes() returns bigint
+function public._work_class_max_pages() returns integer
+function public._work_drop_expired(p_course_id uuid) returns integer security definer
+function public._work_files_state(p_submission_id uuid, p_files jsonb) returns jsonb security definer
+function public._work_hold() returns interval
+function public._work_max_bytes() returns bigint
+function public._work_object(p_path text) returns TABLE(bytes bigint, mimetype text) security definer
+function public._work_settle_files(p_submission_id uuid, p_files jsonb) returns integer security definer
+function public._work_upload_json(p_submission_id uuid) returns jsonb security definer
 function public.apply_report_preset(p_course_id uuid, p_preset text) returns void
 function public.archive_course(p_course_id uuid, p_archived boolean) returns void
 function public.bootstrap_teacher(p_email text, p_display_name text) returns jsonb
@@ -1357,11 +1494,13 @@ function public.delete_report_template(p_id uuid, p_idempotency_key uuid) return
 function public.delete_rubric(p_id uuid) returns void
 function public.delete_section(p_id uuid) returns void
 function public.delete_subject(p_id uuid) returns void
+function public.delete_submission(p_submission_id uuid, p_idempotency_key uuid) returns jsonb security definer
 function public.delete_tag(p_id uuid) returns void
 function public.delete_withdrawn_student(p_enrollment_id uuid, p_idempotency_key uuid) returns jsonb
 function public.duplicate_assessment(p_src_id uuid, p_idempotency_key uuid) returns uuid
 function public.duplicate_course(p_src_id uuid, p_idempotency_key uuid) returns uuid
 function public.fill_rubric(p_enrollment_id uuid, p_assessment_id uuid, p_value integer, p_modifier smallint) returns integer
+function public.finish_work_upload(p_submission_id uuid, p_files jsonb, p_idempotency_key uuid) returns jsonb security definer
 function public.fv_assessment_overall(p_enrollment_id uuid, p_assessment_id uuid) returns public.score_result
 function public.fv_check_category_weight_sum() returns trigger
 function public.fv_check_reporting_terms(p jsonb) returns boolean
@@ -1409,6 +1548,7 @@ function public.list_course_guardians(p_course_id uuid) returns jsonb
 function public.list_course_questionnaires(p_course_id uuid) returns jsonb
 function public.list_course_responses(p_course_id uuid) returns jsonb
 function public.list_course_student_profiles(p_course_id uuid) returns TABLE(student jsonb, enrollment jsonb, overall_proficiency numeric, letter jsonb, counts jsonb, goals jsonb, reflections jsonb, section_overrides jsonb, is_flagged boolean, recent_observations jsonb)
+function public.list_course_submissions(p_course_id uuid) returns jsonb security definer
 function public.list_course_term_attendance(p_course_id uuid) returns jsonb
 function public.list_phone_reports(p_course_id uuid) returns jsonb
 function public.list_questionnaire_templates() returns jsonb
@@ -1418,6 +1558,7 @@ function public.list_report_templates() returns jsonb
 function public.list_rubric_copies(p_copy_group uuid) returns TABLE(rubric_id uuid, course_id uuid, course_name text, name text)
 function public.list_student_cards(p_course_id uuid) returns jsonb security definer
 function public.list_teacher_courses() returns TABLE(id uuid, name text, grade_level text, description text, color text, is_archived boolean, display_order integer, grading_system text, calc_method text, decay_weight numeric, timezone text, late_work_policy text, created_at timestamp with time zone, updated_at timestamp with time zone, block text, curriculum_tags text[])
+function public.mark_handed_in_paper(p_assessment_id uuid, p_enrollment_ids uuid[], p_idempotency_key uuid) returns jsonb security definer
 function public.mark_student_cards_printed(p_card_ids uuid[], p_idempotency_key uuid) returns jsonb security definer
 function public.move_rubric_scores(p_assessment_id uuid, p_rubric_id uuid, p_criterion_map jsonb, p_check_map jsonb, p_idempotency_key uuid) returns jsonb
 function public.reenrol_student(p_enrollment_id uuid, p_idempotency_key uuid) returns jsonb
@@ -1434,6 +1575,7 @@ function public.restore_section(p_id uuid, p_idempotency_key uuid) returns jsonb
 function public.restore_teacher() returns void
 function public.return_grades(p_assessment_id uuid, p_enrollment_ids uuid[], p_idempotency_key uuid) returns jsonb security definer
 function public.rls_auto_enable() returns event_trigger security definer
+function public.rotate_submission_page(p_file_id uuid, p_rotation integer, p_idempotency_key uuid) returns jsonb security definer
 function public.save_assessment_tags(p_id uuid, p_tag_ids uuid[]) returns void
 function public.save_categories(p_course_id uuid, p_categories jsonb) returns uuid[]
 function public.save_collab(p_id uuid, p_mode text, p_config jsonb) returns void
@@ -1446,12 +1588,15 @@ function public.save_score_report_note(p_enrollment_id uuid, p_assessment_id uui
 function public.save_teacher_preferences(p_patch jsonb) returns void
 function public.save_term_attendance(p_enrollment_id uuid, p_term integer, p_absences integer, p_lates integer) returns uuid
 function public.save_term_rating(p_enrollment_id uuid, p_term integer, p_payload jsonb) returns uuid
+function public.set_assessment_student_work(p_assessment_id uuid, p_patch jsonb, p_idempotency_key uuid) returns jsonb security definer
 function public.set_cards_work_until(p_course_id uuid, p_date date, p_idempotency_key uuid) returns jsonb security definer
+function public.set_course_send_work(p_course_id uuid, p_patch jsonb, p_idempotency_key uuid) returns jsonb security definer
 function public.set_questionnaire_on(p_id uuid, p_is_on boolean, p_idempotency_key uuid) returns jsonb
 function public.set_rubric_check(p_enrollment_id uuid, p_assessment_id uuid, p_check_id uuid, p_on boolean) returns boolean
 function public.set_rubric_printed(p_enrollment_id uuid, p_assessment_id uuid, p_hash text, p_printed_at timestamp with time zone, p_idempotency_key uuid) returns boolean
 function public.set_score_status(p_enrollment_id uuid, p_assessment_id uuid, p_status text) returns uuid
 function public.soft_delete_teacher() returns void
+function public.start_work_upload(p_assessment_id uuid, p_enrollment_id uuid, p_pages jsonb, p_mode text, p_idempotency_key uuid) returns jsonb security definer
 function public.submit_support_report(p_page text, p_message text, p_browser text, p_app_version text, p_idempotency_key uuid) returns uuid security definer
 function public.toggle_report_block(p_course_id uuid, p_block_key text, p_enabled boolean) returns void
 function public.unlock_all_student_cards(p_course_id uuid, p_idempotency_key uuid) returns jsonb security definer
@@ -1489,6 +1634,7 @@ function student_submit._card_refusal(p_card_id uuid) returns text security defi
 function student_submit._clean_answer(p_kind text, p_options jsonb, p_core_ids text[], p_value jsonb) returns jsonb security definer
 function student_submit._closed_reason(p_q public.questionnaire, p_tz text) returns text security definer
 function student_submit._device_session(p_token text) returns student_submit.device_session security definer
+function student_submit._grading_started(p_enrollment_id uuid, p_assessment_id uuid) returns boolean security definer
 function student_submit._log(p_route text, p_outcome text, p_ip_hash text, p_code_id uuid, p_course_id uuid) returns void security definer
 function student_submit._midnight(p_tz text) returns timestamp with time zone
 function student_submit._norm(p text) returns text
@@ -1496,15 +1642,26 @@ function student_submit._part(p_id uuid) returns jsonb security definer
 function student_submit._payload(p_code_id uuid) returns jsonb security definer
 function student_submit._preview(p_code_id uuid) returns jsonb security definer
 function student_submit._returned_grade(p_enrollment_id uuid, p_assessment_id uuid) returns jsonb security definer
+function student_submit._send_begin(p_intent text, p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_pages jsonb, p_note text, p_followed_plan text, p_request_id uuid) returns jsonb security definer
+function student_submit._send_session(p_session_token text, p_enrollment_id uuid) returns jsonb security definer
 function student_submit._session_class(p_session_token text, p_enrollment_id uuid) returns jsonb security definer
 function student_submit._session_classes(p_session_id uuid) returns jsonb security definer
+function student_submit._work_window(p_assessment_id uuid) returns jsonb security definer
 function student_submit.card(p_code_hmac text, p_key_id text, p_ip_hash text) returns jsonb security definer
 function student_submit.check(p_token text, p_birthday text, p_ip_hash text) returns jsonb security definer
 function student_submit.done(p_session_token text, p_ip_hash text) returns jsonb security definer
+function student_submit.file_links(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) returns jsonb security definer
 function student_submit.issue_cards(p_teacher_id uuid, p_course_id uuid, p_items jsonb, p_key_id text, p_idempotency_key uuid) returns jsonb security definer
 function student_submit.open(p_code text, p_ip_hash text) returns jsonb security definer
 function student_submit.page(p_session_token text, p_enrollment_id uuid, p_ip_hash text) returns jsonb security definer
+function student_submit.removal_batch(p_limit integer) returns jsonb security definer
+function student_submit.removal_done(p_ids bigint[]) returns jsonb security definer
+function student_submit.replace(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_pages jsonb, p_note text, p_followed_plan text, p_request_id uuid, p_ip_hash text) returns jsonb security definer
 function student_submit.seen(p_session_token text, p_enrollment_id uuid, p_assessment_ids uuid[], p_ip_hash text) returns jsonb security definer
+function student_submit.send_finish(p_session_token text, p_enrollment_id uuid, p_submission_id uuid, p_files jsonb, p_ip_hash text) returns jsonb security definer
+function student_submit.send_start(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_pages jsonb, p_note text, p_followed_plan text, p_request_id uuid, p_ip_hash text) returns jsonb security definer
 function student_submit.submit(p_token text, p_answers jsonb, p_ip_hash text) returns jsonb security definer
+function student_submit.unsend(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) returns jsonb security definer
 function student_submit.verify(p_token text, p_birthday text, p_student_number text, p_password text, p_ip_hash text) returns jsonb security definer
 function student_submit.verify_card(p_code_hmac text, p_key_id text, p_birthday text, p_student_number text, p_password_hmac text, p_session_token text, p_ip_hash text, p_add boolean) returns jsonb security definer
+function student_submit.work(p_session_token text, p_enrollment_id uuid, p_ip_hash text) returns jsonb security definer
