@@ -2109,3 +2109,105 @@ fails is listed, with the same suite on the same base without Batch C:
   suite passes clean, where `grade_return.py`'s inventory of what a
   signed-in teacher can run now lists Batch B's and Batch C's functions.
   Every key and refusal of `page` is as before.
+
+## Batch B send rules: rulings 106 and 107 (2026-11-11)
+
+One file, `../2026111130_student_send_rules.sql`, applied after Batch B's two
+files, the fixes file (`2026111104`) and Batch C's two files. It replaces
+`student_submit._send_begin`, `send_finish` and `work`, each from its body
+after those files, and nothing else:
+
+- **Ruling 106.** A send started while the piece was open can be finished
+  within its two hours after the piece's last day has ended, and is Late.
+  `send_finish` asks the piece's dates as they are now about the day the send
+  first started (`created_at`, in the class's time zone): a send started on
+  the last day passes; one the teacher closed under it (the last day moved to
+  before that day) does not. `_send_begin` still refuses a start after the
+  last day, so a row exists only for a send started while open.
+- **Ruling 107.** When the work in is the teacher's (Add Work, or what an
+  Unsend left) and not on paper, `send_start` starts a send; at the finish the
+  student's pages come first and the teacher's follow, by the rule a Replace
+  follows. Grading started, 30 pages, a revision open and Handed In on Paper
+  are asked as for a Replace. `work().sent.can_send` says so.
+
+The base is `batch_c_common.py`'s (Batch B and the fixes from `BATCH_B_DIR`,
+see the Batch C section above); `send_rules.py` applies C1 and C2 to it:
+
+```bash
+export BATCH_B_DIR=/tmp/bb/migrations                            # as in the Batch C section
+PGPORT=54611 PGDATABASE=sr python3 batch_c_common.py build        # an empty database: live with Batch B and the fixes
+PGPORT=54611 PGDATABASE=sr python3 send_rules.py                  # every scenario, about four minutes
+PGPORT=54611 PGDATABASE=sr python3 send_rules.py mutate           # wrong versions of the file, about five minutes
+PGPORT=54611 PGDATABASE=sr python3 send_rules.py fingerprints check
+```
+
+`send_rules.py`, by scenario:
+
+- **rule106**: the midnight edge, in a zone where it is just past midnight
+  (a first start at 23:59:59 on the last day is taken and Late; 00:00:00 and
+  00:00:01 are refused); the same row in a class one hour east is refused;
+  the calling connection's time zone makes no difference; Until a date, and
+  Until before the due date; a Replace across midnight; Send Work off,
+  nothing taken, withdrawn, a locked card, grading and missing pages after the
+  last day; a replay of the start; 1 h 59 taken, 2 h 0 min 1 s expired.
+- **rule107**: after an Unsend that kept the teacher's pages: `can_send`,
+  the start and its replay, nobody can open the unfinished pages, the finish
+  (pages in order with their files, the work as a student's own send,
+  nothing of the teacher's queued), links, the teacher's list, a later Unsend
+  and a send again, a Replace; Add Work; 28 + 3 refused, room 2; on paper; a
+  draft; a mark and its erasing; a revision open; a revision's pages after the
+  request was taken back; the student's own work; a version 2; `replace` and
+  `unsend` still `cannot_change`; Send Work off; closed; another student; two
+  hours; Late.
+- **interleave**: fifteen orders of a student's send or Replace with the
+  teacher's Add Work, Add as More Pages, Replace Them, delete, Handed In on
+  Paper, a grade and a mark, each followed by: never over 30 pages, and Batch
+  B's invariants hold.
+- **race**: the same on two connections, the second seen to wait.
+- **fuzz**: 1,000 random steps: never over 30, no student step queues a page
+  the teacher handed in, never stuck behind the teacher's pages.
+- **apply**, **undo**: as the fixes file's suite (shape, every guard, a lock
+  it cannot get, the apply on a database in use with no row changed and only
+  the three bodies changed, a second run, the files before it run again, what
+  the two checks notice; the undo back to the fingerprints, pg_proc column for
+  column, and the order out).
+
+`rule106`, `rule107`, `interleave` and `race` also run `-without` (on the
+base): every check marked as changed by the file must fail there and every
+other must hold.
+
+Results (2026-11-11, PostgreSQL 17.11): `send_rules.py` 266 of 266;
+`mutate` 27 wrong versions, 27 noticed (the first run missed two, the
+student's own work not excluded at the start and the version kept; a check
+was added for each).
+
+The earlier suites with this file applied (scratch copies of the suites with
+one hook each, not in any branch; each number beside the same suite on the
+same base without this file):
+
+- `batch_c.py` (the file applied after every C1 apply): 491 of 491 without;
+  485 with. The 6 are structural, where `apply1` and `apply2` look at what C1
+  alone changes: "no existing catalog line changes", "every existing function
+  but `_grading_started` keeps its fingerprint", "exactly the 31 functions of
+  C1 are new", C1's "a second run applies" and "a second run after a function
+  was replaced stops" (C1's guard lists the fixes' `send_finish` and stops on
+  this file's), and "C1 run again after C2 applies". Every behaviour check
+  passes.
+- `submissions.py` (Batch B, the fixes, C1 and C2 in): 562 of 563 without
+  (the one is C1's: "only `_returned_grade` names a score table"); 560 with.
+  The 2 more are ruling 107 itself: "the work stays, as the teacher's ... the
+  student can no longer change it" and "the teacher added the student's work
+  while their pages were going up: ... already_sent".
+- `submissions_fixes.py` (its fixed scenarios with C1, C2 and this file):
+  188 of 188 without; 187 with. The one is ruling 107: "probe C, 8: ... a new
+  send already_sent".
+
+The order out: `send-rules-undo.sql` before the undo of Batch C, of the fixes
+or of Batch B. Batch C's undo PART 2 does not check this file's functions and
+drops `revision_request`, which `work`, `_send_begin` and `send_finish` read:
+with this file in, the student's page then fails (proved, and rolled back, in
+the undo scenario).
+
+Not verified here: anything on gradebook-prod; the edge routes and the Demo
+screens; PostgreSQL 17.6 printing these bodies with the same fingerprints (the
+last check stops the file with nothing changed if not).
