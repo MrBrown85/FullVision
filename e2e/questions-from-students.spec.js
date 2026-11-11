@@ -91,11 +91,12 @@ test('a question shows in three places and one answer clears all three', async (
   await refl.locator('.rf-answer').click();
   await expect(dialog).toBeVisible();
 
-  // Answered (the grader's Send Answer, S10-F3, sends through answerReflection).
-  await page.evaluate(async cid => {
-    const r = getQuestionsWaiting(cid)[0];
-    await answerReflection(cid, r.id, 'The onion cells sit in rows, like bricks.', 'e2e-answer-1');
-  }, cid);
+  // Answered with the grader's Send Answer (S10-F3).
+  const reflect = dialog.locator('.grader-reflect');
+  await reflect.locator('.grader-reflect-input').fill('The onion cells sit in rows, like bricks.');
+  await reflect.locator('[data-grader="reflect-send"]').click();
+  await expect(reflect.locator('.grader-reflect-input')).toHaveCount(0);
+  expect(await page.evaluate(cid => getQuestionsWaiting(cid).length, cid)).toBe(0);
   await dialog.locator('[data-grader="close"]').click();
   await expect(refl.locator('.rf-answer')).toHaveCount(0);
   await expect(refl.locator('.rf-you')).toContainText('The onion cells sit in rows, like bricks.');
