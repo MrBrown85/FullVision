@@ -798,7 +798,8 @@ window.StudentView = (function () {
          categories: [ { id, name, weight, text, level } ],
          strongest: skill | null, missing: [ piece ], work: [ piece ]
          (returned pieces with a result, newest first),
-         groups: [ { subject, folder, skills: [ skill ] } ] }
+         groups: [ { subject, folder, skills: [ skill ] } ],
+         steps: [ { level, name, code } ], Emerging to Extending }
        skill: { id, name, level, text, code, iCan: [ text ], pieces:
          [ { id, title, date, value, level, text, code } ] }
      Nothing in it is another student's or the class's: no average, no
@@ -849,6 +850,10 @@ window.StudentView = (function () {
         missing: missing,
         work: work,
         groups: groups,
+        // The four steps of a skill's ladder, Emerging to Extending, named by constants.js and calc.js.
+        steps: [1, 2, 3, 4].map(function (l) {
+          return { level: l, name: levelName(l), code: levelCode(l) };
+        }),
       };
     });
   }

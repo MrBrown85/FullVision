@@ -32,7 +32,7 @@
          noResults: the results didn't load (say so, with Try Again),
          sending: Try Again is under way, waiting: the view is not here yet,
          note: a line under the body (Demo Mode's), sheet: Your Classes is
-         open }. */
+         open, skill: the id of the skill One Skill is open on }. */
 window.StudentPageView = (function () {
   'use strict';
 
@@ -241,6 +241,11 @@ window.StudentPageView = (function () {
         return '<span class="sp-flag sp-flag-' + x[0] + '">' + esc(x[1]) + '</span>';
       })
       .join('');
+  }
+
+  // An id as it may sit inside a selector's quotes.
+  function cssId(id) {
+    return String(id).replace(/["\\]/g, '');
   }
 
   // A safe element id for a piece's heading.
@@ -1113,11 +1118,411 @@ window.StudentPageView = (function () {
     );
   }
 
+  /* ── My Learning (the artboard's "My Learning" boards for each grading
+     style, "One Skill" with its First Piece and Top Step forms, "Nothing
+     Marked Yet", "Skills Across Two Courses", "Points-Only Class" and "My
+     Learning on a Chromebook"; S13-F2 and F3). Drawn only from
+     view.learning, which shared/student-view.js builds from calc.js on
+     returned work when the class shows My Learning. Every level, letter
+     and % is the view's text. ───────────────────────────────── */
+
+  // A skill's level as its row shows it: its words and code, or Not Yet.
+  function skillLevelHtml(s) {
+    if (!s.text) return '<span class="sp-ml-level sp-ml-none">Not Yet</span>';
+    return (
+      '<span class="sp-ml-level"><span class="sp-ml-word">' +
+      esc(s.text) +
+      '</span>' +
+      (s.code ? chipHtml(s.code, s.level) : '') +
+      '</span>'
+    );
+  }
+
+  /* The four steps, Emerging to Extending, with You on the one reached.
+     `label` names the ladder for a screen reader; `named` writes each
+     step's name and code under it (One Skill). */
+  function ladderHtml(steps, at, label, named) {
+    return (
+      '<div class="sp-ml-ladder" role="img" aria-label="' +
+      esc(label) +
+      '">' +
+      steps
+        .map(function (st) {
+          var on = st.level === at;
+          return (
+            '<span class="sp-ml-step' +
+            (on ? ' sp-ml-step-on' : '') +
+            '"><span class="sp-ml-bar sp-lv-' +
+            (st.level <= at ? lvClass(st.level) : 0) +
+            '">' +
+            (on ? '<span class="sp-ml-you">You</span>' : '') +
+            '</span>' +
+            (named
+              ? '<span class="sp-ml-step-name">' +
+                esc(st.name) +
+                '</span><span class="sp-ml-step-code">' +
+                esc(st.code) +
+                '</span>'
+              : '') +
+            '</span>'
+          );
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+
+  function stepName(l, at) {
+    var st = (l.steps || [])[at - 1];
+    return st ? st.name : '';
+  }
+
+  // The grade at the top: "You're at Proficient" with its ladder, or the letter and %.
+  function overallHtml(l) {
+    var o = l.overall;
+    if (o.letter && l.mode !== 'proficiency') {
+      var ie = o.letter.grade === 'IE';
+      return (
+        '<section class="sp-ml-card sp-ml-overall sp-ml-overall-letter"><span class="sp-ml-letter sp-lv-' +
+        lvClass(o.level) +
+        '" role="img" aria-label="' +
+        esc(ie ? 'IE, In Progress' : o.letter.grade) +
+        '">' +
+        esc(o.letter.grade) +
+        '</span><span class="sp-ml-letter-side">' +
+        (ie ? '<span class="sp-ml-ie">In Progress</span>' : '') +
+        '<span class="sp-ml-pct">' +
+        esc(o.letter.pct) +
+        '</span></span></section>'
+      );
+    }
+    if (!o.word) return '';
+    return (
+      '<section class="sp-ml-card sp-ml-overall"><p class="sp-ml-at"><span class="sp-ml-at-lead">You’re at</span>' +
+      '<span class="sp-ml-at-word">' +
+      esc(o.word) +
+      '</span></p>' +
+      ladderHtml(l.steps, o.level, 'Step ' + o.level + ' of 4: ' + stepName(l, o.level), false) +
+      '</section>'
+    );
+  }
+
+  function strongestHtml(l) {
+    var s = l.strongest;
+    if (!s || l.mode === 'letter') return '';
+    return (
+      '<section class="sp-ml-card"><h2 class="sp-ml-card-title">Your Strongest</h2><ul class="sp-ml-rows">' +
+      skillRowHtml(s) +
+      '</ul></section>'
+    );
+  }
+
+  /* Missing work: each piece, oldest first, opening its card. A Letter or
+     Both class counts Missing as 0 in the course %, so it says so; a
+     Proficiency class leaves Missing work out of a level, so it does not. */
+  function missingHtml(l) {
+    var n = l.missing.length;
+    if (!n) return '';
+    var zero = l.mode !== 'proficiency';
+    return (
+      '<section class="sp-ml-card sp-ml-missing"><h2 class="sp-ml-card-title sp-ml-missing-title">' +
+      esc(n + ' Missing') +
+      '</h2>' +
+      (zero
+        ? '<p class="sp-ml-line">' +
+          esc(n === 1 ? 'It counts as 0 until it’s in.' : 'Each counts as 0 until it’s in.') +
+          '</p>'
+        : '') +
+      '<ul class="sp-ml-rows">' +
+      l.missing
+        .map(function (p) {
+          return (
+            '<li><button type="button" class="sp-ml-row" data-act="open-piece" data-piece="' +
+            esc(p.id) +
+            '"><span class="sp-row-text"><span class="sp-row-title">' +
+            esc(p.title) +
+            '</span>' +
+            (p.dueDate ? '<span class="sp-row-sub">' + esc('Due ' + fmtDate(p.dueDate, DAY)) + '</span>' : '') +
+            '</span>' +
+            NEXT_ARROW +
+            '</button></li>'
+          );
+        })
+        .join('') +
+      '</ul></section>'
+    );
+  }
+
+  // What Makes Up Your Grade: each category, what it counts, the student's letter and %.
+  function categoriesHtml(l) {
+    if (!l.categories.length) return '';
+    return (
+      '<section class="sp-ml-card"><h2 class="sp-ml-card-title">What Makes Up Your Grade</h2><ul class="sp-ml-rows">' +
+      l.categories
+        .map(function (c) {
+          return (
+            '<li class="sp-ml-row sp-ml-row-still"><span class="sp-row-text"><span class="sp-row-title">' +
+            esc(c.name) +
+            '</span>' +
+            (c.weight != null ? '<span class="sp-row-sub">' + esc('Counts ' + c.weight + '%') + '</span>' : '') +
+            '</span>' +
+            chipHtml(c.text, c.level) +
+            '</li>'
+          );
+        })
+        .join('') +
+      '</ul></section>'
+    );
+  }
+
+  function skillRowHtml(s) {
+    return (
+      '<li><button type="button" class="sp-ml-row" data-act="skill" data-skill="' +
+      esc(s.id) +
+      '"><span class="sp-ml-skill-name">' +
+      esc(s.name) +
+      '</span>' +
+      skillLevelHtml(s) +
+      NEXT_ARROW +
+      '</button></li>'
+    );
+  }
+
+  /* Your Skills: in their folders (the first open), under each course's
+     name when there are two. */
+  function skillsHtml(l) {
+    var firstFolder = true;
+    var lastSubject = '';
+    var body = l.groups
+      .map(function (g) {
+        var head = '';
+        if (g.subject && g.subject !== lastSubject) {
+          head = '<h3 class="sp-ml-subject">' + esc(g.subject) + '</h3>';
+          lastSubject = g.subject;
+        }
+        var rows = '<ul class="sp-ml-rows">' + g.skills.map(skillRowHtml).join('') + '</ul>';
+        if (!g.folder) return head + rows;
+        var open = firstFolder;
+        firstFolder = false;
+        var n = g.skills.length;
+        return (
+          head +
+          '<details class="sp-ml-folder"' +
+          (open ? ' open' : '') +
+          '><summary class="sp-ml-folder-head"><span class="sp-ml-folder-name">' +
+          esc(g.folder) +
+          '</span><span class="sp-ml-folder-count">' +
+          esc(n + (n === 1 ? ' skill' : ' skills')) +
+          '</span></summary>' +
+          rows +
+          '</details>'
+        );
+      })
+      .join('');
+    return (
+      '<section class="sp-ml-card sp-ml-skills"><h2 class="sp-ml-card-title">Your Skills</h2>' + body + '</section>'
+    );
+  }
+
+  /* Your Work: a list of pieces with what each got. A returned piece of the
+     page (a points class: "31 / 40" and its %), or a skill's mark on a
+     piece (One Skill: "Proficient +" and its code). */
+  function workHtml(pieces) {
+    if (!pieces.length) return '';
+    return (
+      '<section class="sp-ml-card"><h2 class="sp-ml-card-title">Your Work</h2><ul class="sp-ml-rows">' +
+      pieces
+        .map(function (p) {
+          var r = p.result;
+          var day = p.date || p.dueDate;
+          var level = r
+            ? r.kind === 'points'
+              ? '<span class="sp-ml-word">' + esc(r.text) + '</span>' + chipHtml(r.percent, r.level)
+              : chipHtml(r.text, r.level)
+            : '<span class="sp-ml-word">' + esc(p.text) + '</span>' + (p.code ? chipHtml(p.code, p.level) : '');
+          return (
+            '<li class="sp-ml-row sp-ml-row-still"><span class="sp-row-text"><span class="sp-row-title">' +
+            esc(p.title) +
+            '</span>' +
+            (day ? '<span class="sp-row-sub">' + esc(fmtDate(day, DAY)) + '</span>' : '') +
+            '</span><span class="sp-ml-level">' +
+            level +
+            '</span></li>'
+          );
+        })
+        .join('') +
+      '</ul></section>'
+    );
+  }
+
+  // Nothing Marked Yet.
+  function nothingYetHtml() {
+    return (
+      '<div class="sp-ml-empty"><h1 class="sp-page-title" tabindex="-1">Nothing Marked Yet</h1>' +
+      '<p class="sp-lead">Your learning shows here once your teacher marks your first piece of work.</p>' +
+      '<button type="button" class="sp-btn sp-btn-tint sp-btn-pill" data-act="tab" data-tab="assignments">See Your Assignments</button></div>'
+    );
+  }
+
+  function skillIn(l, id) {
+    var found = null;
+    l.groups.forEach(function (g) {
+      g.skills.forEach(function (s) {
+        if (!found && s.id === id) found = s;
+      });
+    });
+    return found;
+  }
+
+  /* How It's Going: the last four pieces, oldest on the left, each placed
+     at its mark (a + or − a third of a step), the four steps up the side.
+     Shown from the second piece on. */
+  var CHART = { w: 300, h: 128, left: 40 };
+  function chartY(v) {
+    return Math.round(8 + ((4 - Math.max(1, Math.min(4, Number(v) || 1))) / 3) * (CHART.h - 16));
+  }
+  function chartX(i, n) {
+    return Math.round(CHART.left + 14 + (i * (CHART.w - CHART.left - 28)) / Math.max(1, n - 1));
+  }
+  var HOW_MANY = { 2: 'two', 3: 'three', 4: 'four' };
+  function goingHtml(l, s) {
+    var pts = s.pieces.slice(0, 4).reverse();
+    if (pts.length < 2) return '';
+    var label =
+      'Your last ' +
+      HOW_MANY[pts.length] +
+      ' pieces: ' +
+      pts
+        .map(function (p) {
+          return p.text;
+        })
+        .join(', ');
+    var grid = l.steps
+      .map(function (st) {
+        var y = chartY(st.level);
+        return (
+          '<line x1="' +
+          CHART.left +
+          '" x2="' +
+          CHART.w +
+          '" y1="' +
+          y +
+          '" y2="' +
+          y +
+          '" class="sp-ml-grid"/><text x="0" y="' +
+          (y + 4) +
+          '" class="sp-ml-axis">' +
+          esc(st.code) +
+          '</text>'
+        );
+      })
+      .join('');
+    var path = pts
+      .map(function (p, i) {
+        return (i ? 'L' : 'M') + chartX(i, pts.length) + ' ' + chartY(p.value);
+      })
+      .join(' ');
+    var dots = pts
+      .map(function (p, i) {
+        return (
+          '<circle cx="' +
+          chartX(i, pts.length) +
+          '" cy="' +
+          chartY(p.value) +
+          '" r="5" class="sp-ml-dot sp-ml-dot-' +
+          lvClass(p.level) +
+          '"/>'
+        );
+      })
+      .join('');
+    return (
+      '<section class="sp-ml-card"><h2 class="sp-ml-card-title">How It’s Going</h2><svg class="sp-ml-chart" viewBox="0 0 ' +
+      CHART.w +
+      ' ' +
+      CHART.h +
+      '" role="img" aria-label="' +
+      esc(label) +
+      '">' +
+      grid +
+      '<path d="' +
+      path +
+      '" class="sp-ml-path"/>' +
+      dots +
+      '</svg><div class="sp-ml-dates" aria-hidden="true">' +
+      pts
+        .map(function (p) {
+          return '<span>' + esc(fmtDate(p.date, DAY)) + '</span>';
+        })
+        .join('') +
+      '</div></section>'
+    );
+  }
+
+  // One Skill: its I Can lines, the ladder (or its % in a Letter class), How It's Going, Your Work.
+  function skillHtml(l, s) {
+    var levels = l.mode !== 'letter';
+    var where = '';
+    if (levels && s.level) {
+      where =
+        '<section class="sp-ml-card">' +
+        ladderHtml(l.steps, s.level, 'You are at ' + stepName(l, s.level) + ', step ' + s.level + ' of 4', true) +
+        '</section>';
+    } else if (s.text) {
+      where = '<section class="sp-ml-card"><ul class="sp-ml-rows">' + skillRowHtml(s) + '</ul></section>';
+    }
+    return (
+      '<div class="sp-ml sp-ml-one"><button type="button" class="sp-fb-back" data-act="skill-close">' +
+      BACK_ARROW +
+      'My Learning</button><h1 class="sp-page-title" id="sp-ml-skill-title" tabindex="-1">' +
+      esc(s.name) +
+      '</h1>' +
+      (s.iCan.length
+        ? '<ul class="sp-ml-ican">' +
+          s.iCan
+            .map(function (t) {
+              return '<li>' + esc(t) + '</li>';
+            })
+            .join('') +
+          '</ul>'
+        : '') +
+      where +
+      (levels && s.level === 4 ? '<p class="sp-ml-card sp-ml-top">You’ve Reached the Top Step</p>' : '') +
+      (levels ? goingHtml(l, s) : '') +
+      (s.pieces.length ? workHtml(s.pieces) : '<p class="sp-lead sp-empty">Nothing marked on this skill yet.</p>') +
+      '</div>'
+    );
+  }
+
+  function learningBody(view, ui) {
+    var l = view.learning;
+    if (l.empty) return nothingYetHtml();
+    var s = ui.skill ? skillIn(l, ui.skill) : null;
+    if (s) return skillHtml(l, s);
+    var anySkill = l.groups.some(function (g) {
+      return g.skills.some(function (k) {
+        return !!k.text;
+      });
+    });
+    // A Letter class whose work is marked by points alone shows its work, not its skills.
+    var showWork = l.mode === 'letter' && !anySkill;
+    return (
+      '<div class="sp-ml"><h1 class="sp-page-title sp-ml-title" tabindex="-1">My Learning</h1><div class="sp-ml-cols"><div class="sp-ml-col">' +
+      overallHtml(l) +
+      strongestHtml(l) +
+      missingHtml(l) +
+      categoriesHtml(l) +
+      '</div><div class="sp-ml-col">' +
+      (showWork ? workHtml(l.work) : skillsHtml(l)) +
+      '</div></div></div>'
+    );
+  }
+
   function bodyHtml(view, ui) {
     if (ui.waiting || !view) return '<p class="sp-lead sp-empty" role="status">' + esc(WAITING) + '</p>';
     var tab = TAB_BODIES[ui.tab] ? ui.tab : 'assignments';
     if (tab === 'questionnaires' && (view.questionnaires || []).length) return questionnairesBody(view, ui);
     if (tab === 'reports' && (view.reports || []).length) return reportsBody(view, ui);
+    if (tab === 'learning' && view.learning) return learningBody(view, ui);
     if (tab !== 'assignments') {
       return (
         '<h1 class="sp-page-title" tabindex="-1">' +
@@ -1260,11 +1665,25 @@ window.StudentPageView = (function () {
       next.feedback = '';
       next.whole = false;
     }
+    if (act === 'skill') {
+      var l = view && view.learning;
+      var sk = l && skillIn(l, attr('data-skill'));
+      if (!sk) return null;
+      next.tab = 'learning';
+      next.skill = sk.id;
+      return { ui: next, focus: '#sp-ml-skill-title' };
+    }
+    if (act === 'skill-close') {
+      var was = next.skill;
+      next.skill = '';
+      return { ui: next, focus: was ? '[data-act="skill"][data-skill="' + cssId(was) + '"]' : '.sp-ml-title' };
+    }
     if (act === 'tab') {
       if (!has(TAB_IDS, attr('data-tab'))) return null;
       next.tab = attr('data-tab');
       next.all = false;
       next.form = '';
+      next.skill = '';
       var top = el.closest && el.closest('.sp-tabs-top');
       return { ui: next, focus: (top ? '.sp-tabs-top' : '.sp-tabs-bottom') + ' .sp-tab-on' };
     }
