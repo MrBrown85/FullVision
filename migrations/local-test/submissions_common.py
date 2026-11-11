@@ -30,6 +30,10 @@ import card_codes_common as cc
 
 M1 = '../2026111101_student_work_submissions.sql'
 M2 = '../2026111102_student_work_storage.sql'
+# submissions_mutate.py runs the suite against a changed copy of either file.
+M1_USED = os.environ.get('BATCH_B_M1') or M1
+M2_USED = os.environ.get('BATCH_B_M2') or M2
+MUTATED = M1_USED != M1 or M2_USED != M2
 UNDO_B = 'batch-b-undo.sql'
 BUCKET = 'student-photos'
 LIVE_NOW = cc.LIVE + ['../2026111003_card_codes_keyed.sql', 'storage-stand-in.sql']
@@ -135,8 +139,8 @@ class WorkDb(Db):
     def __init__(self, tag, template=None):
         super().__init__(tag, template); self.storage = Storage(self)
     def apply_b(self):
-        r = self.file(M1)
-        return r if r != 'ok' else self.file(M2)
+        r = self.file(M1_USED)
+        return r if r != 'ok' else self.file(M2_USED)
     def undo_b(self): return self.file(UNDO_B)
     # ── the teacher's browser ──
     def rpc(self, sql, uid=A, **kw): return self.teacher(sql, uid, **kw)
@@ -241,6 +245,20 @@ MARK = re.compile(r'(-- FINGERPRINTS-BEGIN[^\n]*\n)(.*?)(\n[ \t]*-- FINGERPRINTS
 def fingerprint_lists(text):
     """The lists of (function, md5) a file carries between its markers."""
     return [re.findall(r"\('([^']+)',\s*'([0-9a-f]{32}|absent|none)'\)", m.group(2)) for m in MARK.finditer(text)]
+
+def applied_template():
+    """A copy of the template with Batch B's two files applied, for scenarios to copy: its name."""
+    name = '%s_%s' % (cc.BASE_DB, 'm' if MUTATED else 'b')
+    admin('drop database if exists "%s" with (force)' % name)
+    admin('create database "%s" template "%s"' % (name, cc.BASE_DB))
+    c = connect(name)
+    for rel in (M1_USED, M2_USED):
+        for st in split(text_of(rel)):
+            try: c.run(st)
+            except Exception as e:
+                c.close(); return None, 'STOPPED in %s: %s' % (os.path.basename(rel), message(e))
+    c.close()
+    return name, 'ok'
 
 if __name__ == '__main__':
     if sys.argv[1:] == ['build']: build()

@@ -96,7 +96,7 @@ begin
             ('public.set_assessment_student_work(uuid,jsonb,uuid)',                                 'c58c518c44d32262b3713753b7aaac1f'),
             ('public.list_course_submissions(uuid)',                                                '8703f5ddc09b3c8dc92aa70878b5d7b1'),
             ('public.start_work_upload(uuid,uuid,jsonb,text,uuid)',                                 '16d9cfa88f6c5ebcbb7bb6915013c592'),
-            ('public.finish_work_upload(uuid,jsonb,uuid)',                                          '8f3f34823742a0ad54bf503f3836475b'),
+            ('public.finish_work_upload(uuid,jsonb,uuid)',                                          'd62a6e550d7535f123f58b17cfe838f2'),
             ('public.mark_handed_in_paper(uuid,uuid[],uuid)',                                       '1a966bceb2e46eb59107e2753e731bd4'),
             ('public.delete_submission(uuid,uuid)',                                                 '7da38ac3304aaf2f9639877b3fd0f81a'),
             ('public.rotate_submission_page(uuid,integer,uuid)',                                    'e684b853403b25a1706d29f02a581d5c'),
@@ -110,7 +110,7 @@ begin
             ('student_submit.work(text,uuid,text)',                                                 '72233e7985f93eb6a150c1822ed69d14'),
             ('student_submit.send_start(text,uuid,uuid,jsonb,text,text,uuid,text)',                 'e1ccea79acc7dedcbbe10da2a4548643'),
             ('student_submit.replace(text,uuid,uuid,jsonb,text,text,uuid,text)',                    '1dad4dba0d66dcd87820b72485ecb28c'),
-            ('student_submit.send_finish(text,uuid,uuid,jsonb,text)',                               'b581dd08e76953d8636e81b24ca1d704'),
+            ('student_submit.send_finish(text,uuid,uuid,jsonb,text)',                               '1b9663c49c49714ec7de2f43e872b0cd'),
             ('student_submit.unsend(text,uuid,uuid,text)',                                          '719b3aef45f8946343138924b84a03e9'),
             ('student_submit.file_links(text,uuid,uuid,text)',                                      '99ef3b9e89574fae0a230c4464998baf'),
             ('student_submit.removal_batch(integer)',                                               '964eef99a747dc7180d4ad61bd19b1db'),
@@ -992,6 +992,9 @@ begin
         _result := _target.id;
     else
         if _sub.intent = 'replace' then
+            -- Let go of what it replaces first: an unfinished upload goes
+            -- with its target, and this one is about to take its place.
+            update submission set intent = 'new', target_id = null where id = _sub.id;
             perform set_config('fv.work_removal_reason', 'replace', true);
             delete from submission where id = _target.id;
             perform set_config('fv.work_removal_reason', '', true);
@@ -1487,6 +1490,9 @@ begin
             perform set_config('fv.work_removal_reason', '', true);
             return jsonb_build_object('ok', false, 'error', 'grading_started');
         end if;
+        -- Let go of what it replaces first: an unfinished send goes with
+        -- its target, and this one is about to take its place.
+        update submission set intent = 'new', target_id = null where id = _sub.id;
         perform set_config('fv.work_removal_reason', 'replace', true);
         delete from submission where id = _target.id;
         perform set_config('fv.work_removal_reason', '', true);
@@ -1777,7 +1783,7 @@ begin
             ('public.set_assessment_student_work(uuid,jsonb,uuid)',                                 'c58c518c44d32262b3713753b7aaac1f'),
             ('public.list_course_submissions(uuid)',                                                '8703f5ddc09b3c8dc92aa70878b5d7b1'),
             ('public.start_work_upload(uuid,uuid,jsonb,text,uuid)',                                 '16d9cfa88f6c5ebcbb7bb6915013c592'),
-            ('public.finish_work_upload(uuid,jsonb,uuid)',                                          '8f3f34823742a0ad54bf503f3836475b'),
+            ('public.finish_work_upload(uuid,jsonb,uuid)',                                          'd62a6e550d7535f123f58b17cfe838f2'),
             ('public.mark_handed_in_paper(uuid,uuid[],uuid)',                                       '1a966bceb2e46eb59107e2753e731bd4'),
             ('public.delete_submission(uuid,uuid)',                                                 '7da38ac3304aaf2f9639877b3fd0f81a'),
             ('public.rotate_submission_page(uuid,integer,uuid)',                                    'e684b853403b25a1706d29f02a581d5c'),
@@ -1791,7 +1797,7 @@ begin
             ('student_submit.work(text,uuid,text)',                                                 '72233e7985f93eb6a150c1822ed69d14'),
             ('student_submit.send_start(text,uuid,uuid,jsonb,text,text,uuid,text)',                 'e1ccea79acc7dedcbbe10da2a4548643'),
             ('student_submit.replace(text,uuid,uuid,jsonb,text,text,uuid,text)',                    '1dad4dba0d66dcd87820b72485ecb28c'),
-            ('student_submit.send_finish(text,uuid,uuid,jsonb,text)',                               'b581dd08e76953d8636e81b24ca1d704'),
+            ('student_submit.send_finish(text,uuid,uuid,jsonb,text)',                               '1b9663c49c49714ec7de2f43e872b0cd'),
             ('student_submit.unsend(text,uuid,uuid,text)',                                          '719b3aef45f8946343138924b84a03e9'),
             ('student_submit.file_links(text,uuid,uuid,text)',                                      '99ef3b9e89574fae0a230c4464998baf'),
             ('student_submit.removal_batch(integer)',                                               '964eef99a747dc7180d4ad61bd19b1db'),
