@@ -695,23 +695,42 @@ const OBS_SENTIMENTS = {
   note: { label: 'Note', color: 'var(--obs-note)', tint: 'rgba(242,194,0,0.14)', border: '#f2c200' },
 };
 
+/* An observation saved from a student's reflection on feedback (Save as
+   Observation in the grader, S10-F3) holds the student's own words, and a
+   reflection stays between the student and the teacher: it is never
+   quoted into a report (Colin's ruling 110, "Keep private"). It is marked
+   where it is saved by its context, 'reflection' (observation.context_type,
+   which takes any text and is sent and read back with the observation; no
+   context the teacher picks is called that). The mark holds whatever the
+   teacher later makes its type; choosing another context in the edit
+   screens replaces it. */
+const REFLECTION_OBS_CONTEXT = 'reflection';
+function isReflectionObservation(ob) {
+  return !!ob && ob.context === REFLECTION_OBS_CONTEXT;
+}
 /* Concern and Note observations are private: they can be about a vacation,
    a meeting with parents or a worry, so they never print or go home on any
-   report, and the screens that list them say "Private" (Colin, Oct 29). */
+   report, and the screens that list them say "Private" (Colin, Oct 29). An
+   observation from a reflection is private whatever its type (above). */
 const PRIVATE_OBS_SENTIMENTS = ['concern', 'note'];
 function isPrivateObservation(ob) {
-  return !!ob && PRIVATE_OBS_SENTIMENTS.indexOf(ob.sentiment) >= 0;
+  return !!ob && (isReflectionObservation(ob) || PRIVATE_OBS_SENTIMENTS.indexOf(ob.sentiment) >= 0);
 }
 /* The small "Private" label every observation list shows on a private one
    (styled in teacher/obs-capture.css, which the desktop and phone apps
-   both load). '' for any other observation. */
+   both load); on one from a reflection it says why it is not offered to a
+   report. '' for any other observation. */
 function obsPrivateLabelHtml(ob) {
   if (!isPrivateObservation(ob)) return '';
-  return (
-    '<span class="obs-private" title="Private: never printed or sent home">' +
-    (typeof LINE_ICONS !== 'undefined' ? LINE_ICONS.lock : '') +
-    'Private</span>'
-  );
+  var lock = typeof LINE_ICONS !== 'undefined' ? LINE_ICONS.lock : '';
+  if (isReflectionObservation(ob)) {
+    return (
+      '<span class="obs-private obs-from-reflection" title="Private: never printed or sent home">' +
+      lock +
+      'From a reflection. Not used in reports.</span>'
+    );
+  }
+  return '<span class="obs-private" title="Private: never printed or sent home">' + lock + 'Private</span>';
 }
 
 const OBS_CONTEXTS = {

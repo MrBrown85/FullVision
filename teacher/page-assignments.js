@@ -14928,11 +14928,16 @@ window.PageAssignments = (function () {
   }
 
   /* Save as Observation: the student's plan and what went well, quoted,
-     as a Note on them linked to the piece. Once only. */
+     as a Note on them linked to the piece. Once only. Its context marks it
+     as from a reflection (REFLECTION_OBS_CONTEXT, shared/constants.js), so
+     no report or comment ever offers or prints it (Colin's ruling 110). */
   function _graderSaveReflection(cid, a, sid, r) {
     var text = _reflectObservationText(a, r);
     if (!text || _reflectSaved(cid, sid, a, r)) return;
-    var ok = addQuickOb(cid, sid, text, [], 'note', null, { assessmentId: a.id, assessmentTitle: a.title || '' });
+    var ok = addQuickOb(cid, sid, text, [], 'note', REFLECTION_OBS_CONTEXT, {
+      assessmentId: a.id,
+      assessmentTitle: a.title || '',
+    });
     _grader.reflectMsg =
       ok === false ? { id: r.id, text: 'The observation couldn’t be kept on this computer. Try again.' } : null;
     render();
