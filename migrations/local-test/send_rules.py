@@ -18,7 +18,7 @@ here on top, in the apply order:
     PGDATABASE=sr python3 send_rules.py             every scenario below
     PGDATABASE=sr python3 send_rules.py rule106 ... or some
     PGDATABASE=sr python3 send_rules.py fingerprints [check]   write (or check) the lists the four files carry
-    PGDATABASE=sr python3 send_rules.py mutate [n ...]          wrong versions of the file: are they noticed?
+    PGDATABASE=sr python3 send_rules.py mutate [n ...]          wrong versions of the file and the undo: are they noticed?
 
   rule106, rule107  Each rule, case by case. Checks marked "differs" must
                     fail without the file: rule106-without and
@@ -44,7 +44,10 @@ here on top, in the apply order:
                     read-only pre-check and post-check and what each notices.
   undo              send-rules-undo.sql: the three back, by fingerprint and
                     pg_proc column for column; nothing else changes; work in
-                    progress; the order out with the undo files before it.
+                    progress; the order out with the undo files before it;
+                    and (review F1) Batch C's undo run first: the student's
+                    page fails until this undo runs, which it now does,
+                    leaving Batch B and the fixes as they were.
 
 The database named by PGDATABASE is only a template: every scenario runs on
 a copy.
@@ -52,7 +55,7 @@ a copy.
 import difflib, random, threading, time
 from contextlib import suppress
 class Skip(Exception): pass
-from submissions_common import WorkDb, Side, attempt, seed_work, Storage
+from submissions_common import WorkDb, Side, attempt, seed_work, Storage, UNDO_FIXES
 from batch_c_common import *
 import batch_c_common as bc
 from submissions import sound, queued
@@ -61,6 +64,7 @@ FILE = '../2026111130_student_send_rules.sql'
 FILE_USED = os.environ.get('SEND_RULES_FILE') or FILE
 MUTATED = FILE_USED != FILE
 UNDO = 'send-rules-undo.sql'
+UNDO_USED = os.environ.get('SEND_RULES_UNDO') or UNDO   # cmd_mutate runs the undo scenario against a changed copy
 PRE = 'send-rules-live-precheck.sql'
 POST = 'send-rules-live-postcheck.sql'
 LIST_FILES = [FILE, UNDO, PRE, POST]
@@ -160,6 +164,10 @@ def snap(x):
     return (x.all('select id::text, state, intent, target_id::text, version, sent_by, is_late from submission order by id'),
             x.all('select id::text, submission_id::text, page, added_by from submission_file order by id'),
             x.all('select id::text, state, revision_in_at::text, closed_at::text from revision_request order by id'), queued(x))
+def photo_piece(x, title='Another Lab'):
+    a = nid()
+    x.run("insert into assessment (id, course_id, title, score_mode, max_points, students_send) values (:a, :c, :t, 'points', 10, 'photos')", a=a, c=COURSE_A, t=title)
+    return a
 def card_of(x, e): return x.one('select id::text from student_card where enrollment_id = :e and stopped_at is null', e=e)
 def draft(x, a, e=ENR1, v=5): return x.rpc('upsert_score(:e, :a, :v)', e=e, a=a, v=v)
 def fresh(d):
@@ -1118,6 +1126,7 @@ def scen_apply():
 
 # ════════════════════════════════════════════════════════════════════════════
 def scen_undo():
+    UNDO = UNDO_USED
     US = split(text_at(UNDO))
     d, k, t1, t2 = world('undo', False)
     try:
@@ -1127,7 +1136,8 @@ def scen_undo():
         ut = text_at(UNDO)
         ok("its three bodies are the ones before the file, character for character (_send_begin and work Batch B's, send_finish the fixes file's)",
            all(body_of(ORIGINAL[m](), m) in ut for m in ORIGINAL))
-        ok("its lists are the file's", dict(lists_of(ut)) == dict(lists_of(text_at(FILE))))
+        ok("its lists are the file's three and send_paths, and only those: it checks no function the three rely on, so Batch C in or out does not stop it (review F1)",
+           dict(lists_of(ut)) == {n: l for n, l in lists_of(text_at(FILE)) if n in ('replaces', 'new')} and 'revision_request' not in bare(US[2]), [n for n, _ in lists_of(ut)])
         cat_b = catalog(d.c); p_b = procs(d)
         r = d.file(UNDO)
         ok('run where the file was never applied: it applies and changes nothing', r == 'ok' and catalog(d.c) == cat_b, r)
@@ -1154,9 +1164,20 @@ def scen_undo():
         cat3 = catalog(d.c)
         ok('the undo a second time: runs, changes nothing', d.file(UNDO) == 'ok' and catalog(d.c) == cat3)
         ok('the file applies again after the undo, and its post-check is silent', d.file(FILE) == 'ok' and read_only(d, POST_Q) == [])
-        for fn in ('student_submit._work_window(uuid)', REPLACED[1]):
-            good, said = stopped_at_guard(d, [retouched(d, fn)], fn, US)
-            ok('the undo stops at its check, nothing changed, when %s has another body' % fn.split('(')[0], good, said)
+        good, said = stopped_at_guard(d, [retouched(d, REPLACED[1])], REPLACED[1], US)
+        ok('the undo stops at its check, nothing changed, when send_finish has another body (neither the file\'s nor the one before)', good, said)
+        good, said = stopped_at_guard(d, [retouched(d, NEW[0])], NEW[0], US)
+        ok('the undo stops at its check, nothing changed, when send_paths has another body', good, said)
+        d.begin()
+        try:
+            d.run(retouched(d, 'student_submit._work_window(uuid)'))
+            ran = [st for st in US if last(st) not in ('begin', 'commit')]
+            for st in ran: d.run(st)
+            ok('the undo runs when a function the three call has another body (it checks only its own four)', fingerprints(d, REPLACED) == {x[0]: x[1] for x in dict(lists_of(ut))['replaces']})
+        except Exception as e:
+            ok('the undo runs when a function the three call has another body (it checks only its own four)', False, message(e)[:300])
+        finally:
+            d.rollback()
         # ── The order out ───────────────────────────────────────────────
         d.run("delete from submission"); d.run("delete from submission_file_removal")
         cat4 = catalog(d.c)
@@ -1170,14 +1191,53 @@ def scen_undo():
         finally:
             d.rollback()
         ok('(that was rolled back)', catalog(d.c) == cat4)
-        good, said = stopped_at_guard(d, [st for st in split(text_at(UNDO_C2)) if last(st) not in ('begin', 'commit')], 'public._markup_on_return()', US)
-        ok("after C2's undo, this undo stops at its check, naming C2's function, nothing changed: run it first", good, said)
-        ok('(that was rolled back too)', catalog(d.c) == cat4)
         r0 = d.file(UNDO); r = d.file(UNDO_C2); r1 = d.file(UNDO_C1)
         w = d.work(t1, ENR1)
         ok("the order out: this undo, then C2's, then C1's: each runs, and the student's page works on Batch B and the fixes alone", (r0, r, r1) == ('ok', 'ok', 'ok') and g(w, 'ok') is True, (r0, r[:120], r1[:120], w))
+        s, f = d.send(t1, ENR1, photo_piece(d), 1)
+        r2 = d.file(UNDO_FIXES)
+        ok("and then the fixes' undo runs, and a send still goes through", g(f, 'ok') is True and r2 == 'ok', (f, r2[:200]))
     finally:
         d.close()
+    undo_after_c(UNDO)
+
+def undo_after_c(UNDO):
+    """Review F1: Batch C's undo run while the file is in, then this undo. The student's page must work again, and the
+    database be Batch B and the fixes, as if neither Batch C nor the file had been applied."""
+    d, k, t1, t2 = world('undo_c', False)
+    base = WorkDb('sr_undo_base')
+    try:
+        ok('(F1) the file applies', d.file(FILE) == 'ok')
+        a = k['takes']
+        u, t, old = teacher_left(d, t1, a, 1, 2)
+        s, f = d.send(t1, ENR1, a, 1)
+        s2 = d.send_start(t2, ENR2, photo_piece(d), 1); d.upload(s2['files'])
+        r = d.file(UNDO_C2); r1 = d.file(UNDO_C1)
+        e = refused(d, lambda: d.work(t1, ENR1))
+        ok("(F1) with the file in, Batch C's undo (C2's, then C1's) runs, and then the student's page fails, naming revision_request",
+           (r, r1) == ('ok', 'ok') and e is not None and 'revision_request' in e[0], (r[:200], r1[:200], e))
+        cols = table_columns(d.c); rows1 = row_checksums(d.c, cols)
+        r = d.file(UNDO)
+        ok('(F1) this undo then runs (it was refused before: it asked for revision_request and Batch C\'s functions)', r == 'ok', r[:300])
+        ok('(F1) the three carry their fingerprints from before the file, and send_paths is gone',
+           fingerprints(d, REPLACED) == {x[0]: x[1] for x in dict(lists_of(text_at(UNDO)))['replaces']} and d.one("select to_regprocedure('student_submit.send_paths(text,uuid,uuid,text)')") is None)
+        ok('(F1) no row of any table changed', row_checksums(d.c, cols) == rows1)
+        ok("(F1) every function is as on Batch B and the fixes alone (neither Batch C nor the file applied), pg_proc column for column but the oid",
+           {f: v[1:] for f, v in procs(d).items()} == {f: v[1:] for f, v in procs(base).items()},
+           sorted(set(procs(d).items()) ^ set(procs(base).items()))[:4])
+        w = d.work(t1, ENR1)
+        ok("(F1) the student's page works again: the work handed in under the file (the student's page, then the teacher's 2) as it is",
+           g(w, 'ok') is True and g(piece(d, t1, ENR1, a), 'sent', 'pages') == 3 and who(d, s['submission_id']) == ['student', 'teacher', 'teacher'], w)
+        f2 = d.send_finish(t2, ENR2, s2['submission_id'], s2['files'])
+        ok('(F1) a send started under the file is finished after both undos', g(f2, 'ok') is True, f2)
+        s3, f3 = d.send(t1, ENR1, photo_piece(d, 'A Third Lab'), 1)
+        ok('(F1) and a new send goes through', g(f3, 'ok') is True and sound(d) == '', (f3, sound(d)))
+        r = d.file(UNDO)
+        ok('(F1) this undo a second time: runs, changes nothing', r == 'ok' and fingerprints(d, REPLACED) == fingerprints(base, REPLACED), r[:200])
+        r = d.file(UNDO_FIXES)
+        ok("(F1) then the fixes' undo runs, as in the documented order", r == 'ok', r[:200])
+    finally:
+        base.close(); d.close()
 
 # ════════════════════════════════════════════════════════════════════════════
 def write_lists(text, lists):
@@ -1266,22 +1326,34 @@ MUTANTS = [
     ('paths: runnable by signed-in teachers', "grant execute on function student_submit.send_paths(text, uuid, uuid, text) to service_role;", "grant execute on function student_submit.send_paths(text, uuid, uuid, text) to service_role, authenticated;"),
 ]
 
+# Wrong versions of the undo (review F1), run against the undo scenario.
+UNDO_MUTANTS = [
+    ("F1 undo: refuses without revision_request (the reviewed version)", "    _md5 text;\nbegin\n    -- The three this file replaces:",
+     "    _md5 text;\nbegin\n    if to_regclass('public.revision_request') is null then\n        raise exception 'Batch C is not applied. Nothing was changed.';\n    end if;\n    -- The three this file replaces:"),
+    ("F1 undo: refuses once C2's trigger function is gone (as the reviewed relied list did)", "    end loop;\nend\n$guard$;",
+     "    end loop;\n    if to_regprocedure('public._markup_on_return()') is null then\n        raise exception 'C2 is not applied. Nothing was changed.';\n    end if;\nend\n$guard$;"),
+    ("F1 undo: runs over one of the three that is neither the file's nor the one before", "        if _md5 <> _f.before and _md5 <> _f.becomes then", "        if false then"),
+    ("F1 undo: drops a send_paths that is not the file's", "        if _md5 <> 'absent' and _md5 <> _f.becomes then", "        if false then"),
+]
+
 def cmd_mutate(wanted):
     import subprocess, tempfile
-    tmp = tempfile.mkdtemp(prefix='send-rules-mutate-'); text = text_at(FILE); unnoticed = []
-    for n, (label, old, new) in enumerate(MUTANTS, 1):
+    tmp = tempfile.mkdtemp(prefix='send-rules-mutate-'); unnoticed = []
+    every = [(FILE, 'SEND_RULES_FILE', ['rule106', 'rule107', 'interleave', 'paths'], m) for m in MUTANTS] + [(UNDO, 'SEND_RULES_UNDO', ['undo'], m) for m in UNDO_MUTANTS]
+    for n, (rel, env, scens, (label, old, new)) in enumerate(every, 1):
         if wanted and n not in wanted: continue
+        text = text_at(rel)
         if text.count(old) != 1:
             print('%2d  CANNOT MAKE THIS CHANGE (its text is in the file %d times): %s' % (n, text.count(old), label)); unnoticed.append(n); continue
         path = os.path.join(tmp, 'm%d.sql' % n); open(path, 'w').write(text.replace(old, new))
-        r = subprocess.run([sys.executable, os.path.join(HERE, 'send_rules.py'), 'rule106', 'rule107', 'interleave', 'paths'], capture_output=True, text=True, cwd=HERE,
-                           env=dict(os.environ, SEND_RULES_FILE=path))
+        r = subprocess.run([sys.executable, os.path.join(HERE, 'send_rules.py')] + scens, capture_output=True, text=True, cwd=HERE,
+                           env=dict(os.environ, **{env: path}))
         fails = [l[5:].split(' :: ')[0] for l in r.stdout.splitlines() if l.startswith('FAIL ')]
         if fails: print('%2d  noticed by %3d checks  %s\n      first: %s' % (n, len(fails), label, fails[0][:170]))
         elif r.returncode != 0: print('%2d  noticed: the suite stopped  %s\n      %s' % (n, label, (r.stderr.strip().splitlines() or ['?'])[-1][:170]))
         else: print('%2d  NOT NOTICED  %s' % (n, label)); unnoticed.append(n)
         sys.stdout.flush()
-    print('%d changes, %d not noticed%s' % (len(wanted) or len(MUTANTS), len(unnoticed), ': ' + ', '.join(map(str, unnoticed)) if unnoticed else ''))
+    print('%d changes, %d not noticed%s' % (len(wanted) or len(every), len(unnoticed), ': ' + ', '.join(map(str, unnoticed)) if unnoticed else ''))
     return 1 if unnoticed else 0
 
 PRE_Q = split(text_at(PRE))[0] if os.path.exists(os.path.join(HERE, PRE)) else None

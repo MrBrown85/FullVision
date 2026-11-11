@@ -12,8 +12,8 @@
 --   student_submit.send_paths(text, uuid, uuid, text)
 -- and changes nothing else: no row, no table, no grant (CREATE OR REPLACE
 -- keeps the owner and the grants). Its last step proves each of the three
--- carries its fingerprint from before 2026111130 again and the functions
--- they rely on are untouched. Afterwards rulings 106 and 107 are undone: a
+-- carries its fingerprint from before 2026111130 again and send_paths is
+-- gone. Afterwards rulings 106 and 107 are undone: a
 -- send that crosses the piece's last day is refused (work_closed), and a
 -- student behind the teacher's pages is told already_sent.
 --
@@ -25,20 +25,24 @@
 -- after the undo it is answered already_sent and its pages are dropped, as
 -- before the file.
 --
--- WHEN IT IS NEEDED BEFORE AN EARLIER WAY BACK. Run this file first, before
--- the undo of Batch C (batch-c2-undo.sql, then batch-c1-undo.sql), of the
--- fixes file (batch-b-fixes-undo.sql) or of Batch B. Batch C's undo does not
+-- BEFORE OR AFTER BATCH C'S UNDO: either. The bodies it restores (Batch
+-- B's _send_begin and work, the fixes file's send_finish) never read
+-- revision_request or anything Batch C adds, and every function they call
+-- is there with or without Batch C. So it runs with Batch C in, and also
+-- after batch-c2-undo.sql and batch-c1-undo.sql have run (which do not
 -- check this file's functions: C1's PART 2 drops revision_request, which
--- work, _send_begin and send_finish read, so the student's page would fail.
--- The undo of the fixes file, Batch B's undo PART 2, and running 2026111104,
--- 2026111120 or 2026111101 again each check fingerprints of functions this
--- file replaces, and refuse while it is applied. And this file checks C2's
--- trigger function and C1's revision functions, so it refuses once C2's
--- undo has run.
+-- 2026111130's three read, so until this undo runs the student's page
+-- fails; running this undo then puts the page right). The usual order out
+-- is still this file first, then Batch C's undo, then the fixes', then
+-- Batch B's: the undo of the fixes file, Batch B's undo PART 2, and running
+-- 2026111104, 2026111120 or 2026111101 again each check fingerprints of
+-- functions this file replaces, and refuse while it is applied.
 --
 -- It stops, with nothing changed, unless each of the three is as
 -- 2026111130 leaves it or as it was before (then it changes nothing), and
--- each function they rely on is as it was. One transaction: all or none.
+-- send_paths is absent or as 2026111130 leaves it. It checks nothing else,
+-- so it does not stop on Batch C being in or out. One transaction: all or
+-- none.
 begin;
 set local lock_timeout = '5s';
 
@@ -47,9 +51,6 @@ declare
     _f   record;
     _md5 text;
 begin
-    if to_regclass('public.submission') is null or to_regclass('public.revision_request') is null then
-        raise exception 'Batch B and Batch C are not both applied (public.submission, public.revision_request): there is nothing to undo. Nothing was changed.';
-    end if;
     -- The three this file replaces: as the files before it leave them, or
     -- as this file leaves them (a second run, which changes nothing).
     for _f in
@@ -78,46 +79,6 @@ begin
         _md5 := coalesce(md5(pg_get_functiondef(to_regprocedure(_f.fn))), 'absent');
         if _md5 <> 'absent' and _md5 <> _f.becomes then
             raise exception '% is not as 2026111130 leaves it (found %): something else made it, and this undo would drop it. Nothing was changed.', _f.fn, _md5;
-        end if;
-    end loop;
-    -- What the new lines rely on, as the files before this one leave it.
-    for _f in
-        select * from (values
-            -- FINGERPRINTS-BEGIN relied (written by migrations/local-test/send_rules.py)
-            ('student_submit._work_window(uuid)',                                                   '767795b7835e3c4d6cb628c76df8e6eb'),
-            ('student_submit._grading_started(uuid,uuid)',                                          '13622bbca72904fdf877ce6b336dc6b4'),
-            ('student_submit._send_session(text,uuid)',                                             'c39242f54850eeeada19945ac8123644'),
-            ('student_submit._session_class(text,uuid)',                                            '1ae94981ff32f804d12079a24bd7b41a'),
-            ('student_submit.send_start(text,uuid,uuid,jsonb,text,text,uuid,text)',                 'e1ccea79acc7dedcbbe10da2a4548643'),
-            ('student_submit.replace(text,uuid,uuid,jsonb,text,text,uuid,text)',                    '1dad4dba0d66dcd87820b72485ecb28c'),
-            ('student_submit.unsend(text,uuid,uuid,text)',                                          '68665f35e1678f1bba64d30c082409d8'),
-            ('public.finish_work_upload(uuid,jsonb,uuid)',                                          'c8c5c26be1758ec2e07fe73a68731159'),
-            ('public._fv_timezone(text)',                                                           '8dbcb5716f155e2441f47416a0b28527'),
-            ('public._grade_return_lock_first(uuid)',                                               '4d85813e08aaeb108cda95d85f3d66e4'),
-            ('public._work_hold()',                                                                 'e0479f5f0ab703fd3cd77f677ec34eb2'),
-            ('public._work_bucket()',                                                               '3f13f4e2c303b5a53caea4925abc8350'),
-            ('public._work_check_pages(jsonb)',                                                     '8269b2b9c84377619778ca9154f39652'),
-            ('public._work_check_files(jsonb)',                                                     'a3dfe8ce7a7f4eeb82e51d9e02c671c7'),
-            ('public._work_begin(uuid,uuid,uuid,text,text,uuid,jsonb,text,text,boolean,uuid,uuid)', '658a51b97817bfa115aa8dc048003c26'),
-            ('public._work_drop_expired(uuid)',                                                     '417711d4dadba3966d0358baee0214f0'),
-            ('public._work_class_full(uuid,jsonb)',                                                 '5ba6a4c79d6862b3b9543be420bca532'),
-            ('public._work_files_state(uuid,jsonb)',                                                '8fe968ca61404cfb4c8706d722c9c9a8'),
-            ('public._work_settle_files(uuid,jsonb)',                                               '215b8fe4cc3eada5c45e8c86c847ef19'),
-            ('public._work_upload_json(uuid)',                                                      '63982ca7888b11ce9b80e962f674c98a'),
-            ('public._submission_target_gone()',                                                    'f4f03a728aa0937ff0d89d9e5b62cc67'),
-            ('public._revision_state(uuid)',                                                        '894bb53b0ad066e21f36c3a8038d5c6c'),
-            ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)',                  '43ca2e50ff067a4fb51762367895ee84'),
-            ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',                           'a04e2d62a76b00a7f6ad03a76a0ede74'),
-            ('public._revision_gone()',                                                             '13b5fb325c563a0475437829446ef089'),
-            ('public._markup_on_return()',                                                          'ce8ceaa830617aa9caf935b161d7e379'),
-            ('public._markup_on_release()',                                                         'a7e8838702d000c42621d72bf8621dfb')
-            -- FINGERPRINTS-END
-        ) as v(fn, md5)
-    loop
-        _md5 := coalesce(md5(pg_get_functiondef(to_regprocedure(_f.fn))), 'absent');
-        if _md5 <> _f.md5 then
-            raise exception '% is not the definition this migration was written against (found %, expected %). Nothing was changed.',
-                _f.fn, _md5, _f.md5;
         end if;
     end loop;
 end
@@ -507,44 +468,6 @@ begin
         _md5 := coalesce(md5(pg_get_functiondef(to_regprocedure(_f.fn))), 'absent');
         if _md5 <> _f.before then
             raise exception '% is not as it was before 2026111130 (found %, expected %). Nothing was changed.', _f.fn, _md5, _f.before;
-        end if;
-    end loop;
-    for _f in
-        select * from (values
-            -- FINGERPRINTS-BEGIN relied (written by migrations/local-test/send_rules.py)
-            ('student_submit._work_window(uuid)',                                                   '767795b7835e3c4d6cb628c76df8e6eb'),
-            ('student_submit._grading_started(uuid,uuid)',                                          '13622bbca72904fdf877ce6b336dc6b4'),
-            ('student_submit._send_session(text,uuid)',                                             'c39242f54850eeeada19945ac8123644'),
-            ('student_submit._session_class(text,uuid)',                                            '1ae94981ff32f804d12079a24bd7b41a'),
-            ('student_submit.send_start(text,uuid,uuid,jsonb,text,text,uuid,text)',                 'e1ccea79acc7dedcbbe10da2a4548643'),
-            ('student_submit.replace(text,uuid,uuid,jsonb,text,text,uuid,text)',                    '1dad4dba0d66dcd87820b72485ecb28c'),
-            ('student_submit.unsend(text,uuid,uuid,text)',                                          '68665f35e1678f1bba64d30c082409d8'),
-            ('public.finish_work_upload(uuid,jsonb,uuid)',                                          'c8c5c26be1758ec2e07fe73a68731159'),
-            ('public._fv_timezone(text)',                                                           '8dbcb5716f155e2441f47416a0b28527'),
-            ('public._grade_return_lock_first(uuid)',                                               '4d85813e08aaeb108cda95d85f3d66e4'),
-            ('public._work_hold()',                                                                 'e0479f5f0ab703fd3cd77f677ec34eb2'),
-            ('public._work_bucket()',                                                               '3f13f4e2c303b5a53caea4925abc8350'),
-            ('public._work_check_pages(jsonb)',                                                     '8269b2b9c84377619778ca9154f39652'),
-            ('public._work_check_files(jsonb)',                                                     'a3dfe8ce7a7f4eeb82e51d9e02c671c7'),
-            ('public._work_begin(uuid,uuid,uuid,text,text,uuid,jsonb,text,text,boolean,uuid,uuid)', '658a51b97817bfa115aa8dc048003c26'),
-            ('public._work_drop_expired(uuid)',                                                     '417711d4dadba3966d0358baee0214f0'),
-            ('public._work_class_full(uuid,jsonb)',                                                 '5ba6a4c79d6862b3b9543be420bca532'),
-            ('public._work_files_state(uuid,jsonb)',                                                '8fe968ca61404cfb4c8706d722c9c9a8'),
-            ('public._work_settle_files(uuid,jsonb)',                                               '215b8fe4cc3eada5c45e8c86c847ef19'),
-            ('public._work_upload_json(uuid)',                                                      '63982ca7888b11ce9b80e962f674c98a'),
-            ('public._submission_target_gone()',                                                    'f4f03a728aa0937ff0d89d9e5b62cc67'),
-            ('public._revision_state(uuid)',                                                        '894bb53b0ad066e21f36c3a8038d5c6c'),
-            ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)',                  '43ca2e50ff067a4fb51762367895ee84'),
-            ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',                           'a04e2d62a76b00a7f6ad03a76a0ede74'),
-            ('public._revision_gone()',                                                             '13b5fb325c563a0475437829446ef089'),
-            ('public._markup_on_return()',                                                          'ce8ceaa830617aa9caf935b161d7e379'),
-            ('public._markup_on_release()',                                                         'a7e8838702d000c42621d72bf8621dfb')
-            -- FINGERPRINTS-END
-        ) as v(fn, md5)
-    loop
-        _md5 := coalesce(md5(pg_get_functiondef(to_regprocedure(_f.fn))), 'absent');
-        if _md5 <> _f.md5 then
-            raise exception '% changed while this undo ran (found %, expected %). Nothing was changed.', _f.fn, _md5, _f.md5;
         end if;
     end loop;
     if to_regprocedure('student_submit.send_paths(text,uuid,uuid,text)') is not null then

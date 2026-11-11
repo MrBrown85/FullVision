@@ -177,9 +177,14 @@
 -- ── Taking it back out ──────────────────────────────────────────────────────
 -- migrations/local-test/send-rules-undo.sql (not a migration; proved by
 -- migrations/local-test/send_rules.py) puts the three functions back to the
--- bodies they had before this file, checked by fingerprint, and changes
--- nothing else. Run it before the undo of Batch C, of the fixes or of
--- Batch B: each checks the fingerprints of functions this file replaces.
+-- bodies they had before this file, checked by fingerprint, drops
+-- send_paths, and changes nothing else. It checks only those four, so it
+-- runs with Batch C in or after Batch C's undo. Batch C's undo checks none
+-- of this file's functions and drops revision_request, which the three
+-- read: run in that order, the student's page fails until this undo runs.
+-- So the order out is this undo first, then Batch C's, then the fixes',
+-- then Batch B's (the fixes' undo and Batch B's PART 2 check fingerprints
+-- of functions this file replaces, and refuse while it is applied).
 -- Work handed in under this file stays as it is (a student's work holding
 -- the teacher's pages is a shape a Replace already makes).
 --
