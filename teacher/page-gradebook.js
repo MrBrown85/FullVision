@@ -3442,11 +3442,20 @@ window.PageGradebook = (function () {
         var title = assess && assess.title ? assess.title : 'this assessment';
         // A linked copy in another class stays; say so, as Assignments does.
         var copyNote = window.AssessmentCopy && assess ? AssessmentCopy.deleteNote(activeCourse, assess) : '';
+        // Photos students sent for it go too (S8-F1, Colin's ruling 102).
+        var sentPhotos = _studentsWithSentPhotos(activeCourse, aid);
         showConfirm(
           'Delete “' + title + '”?',
-          'All scores, statuses, and observations linked to this assessment will be removed.' +
-            copyNote +
-            ' You can undo this for a few seconds.',
+          sentPhotos
+            ? 'All scores, statuses, and observations linked to this assessment will be removed, and the photos ' +
+                sentPhotos +
+                (sentPhotos === 1 ? ' student' : ' students') +
+                ' sent for it.' +
+                copyNote +
+                " You can undo this for a few seconds. After that, deleted photos can't come back."
+            : 'All scores, statuses, and observations linked to this assessment will be removed.' +
+                copyNote +
+                ' You can undo this for a few seconds.',
           'Delete',
           'danger',
           function () {
@@ -3456,6 +3465,22 @@ window.PageGradebook = (function () {
       }
       _dismissContextMenu();
     });
+  }
+
+  /* S8-F1: how many students have photos sent for `aid`, which Delete
+     Assessment deletes with it. Counted from the read side in shared/data.js
+     (getCourseSubmissions), students not pages: a submission with at least one
+     page, whoever sent it. 0, and the dialog reads as it always has, while the
+     class's build switch or Send Work is off or nothing has been sent. */
+  function _studentsWithSentPhotos(cid, aid) {
+    if (typeof getCourseSubmissions !== 'function' || typeof getCourseSendWork !== 'function') return 0;
+    if (typeof getReturnSettings !== 'function' || !getReturnSettings(cid).student_page) return 0;
+    if (!getCourseSendWork(cid).send_work) return 0;
+    var who = {};
+    (getCourseSubmissions(cid).submissions || []).forEach(function (s) {
+      if (s && s.assessment_id === aid && Array.isArray(s.files) && s.files.length) who[s.enrollment_id] = true;
+    });
+    return Object.keys(who).length;
   }
 
   /* Delete Assignment hides the column and offers Undo (the toast's button or

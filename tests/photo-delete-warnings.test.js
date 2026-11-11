@@ -161,6 +161,45 @@ describe('Gradebook: Delete Assessment', () => {
       expect(deleteAssessDialog(QUIZ).message).toBe(TODAY_ASSESS);
     });
   });
+
+  describe('names the photos when students have sent work for it', () => {
+    it('counts students, not pages or versions, and a paper copy is no photo', () => {
+      mount(() => seed(), { course: CID });
+      const d = deleteAssessDialog(LAB);
+      expect(d.title).toBe('Delete “Cell Lab”?');
+      expect(d.message).toBe(
+        "All scores, statuses, and observations linked to this assessment will be removed, and the photos 2 students sent for it. You can undo this for a few seconds. After that, deleted photos can't come back.",
+      );
+    });
+
+    it('one student', () => {
+      mount(() => seed({ sent: [sub(BEN, LAB, 3)] }), { course: CID });
+      expect(deleteAssessDialog(LAB).message).toBe(
+        "All scores, statuses, and observations linked to this assessment will be removed, and the photos 1 student sent for it. You can undo this for a few seconds. After that, deleted photos can't come back.",
+      );
+    });
+
+    it('a linked copy in another class is still named, between the two sentences', () => {
+      mount(() => seed(), { course: CID });
+      const note = AssessmentCopy.deleteNote;
+      AssessmentCopy.deleteNote = () => ' It is also in Science 8 B; that copy stays.';
+      try {
+        expect(deleteAssessDialog(LAB).message).toBe(
+          "All scores, statuses, and observations linked to this assessment will be removed, and the photos 2 students sent for it. It is also in Science 8 B; that copy stays. You can undo this for a few seconds. After that, deleted photos can't come back.",
+        );
+      } finally {
+        AssessmentCopy.deleteNote = note;
+      }
+    });
+
+    it('Delete still waits for its few seconds, as the words say', () => {
+      mount(() => seed(), { course: CID });
+      deleteAssessDialog(LAB);
+      confirmOk();
+      expect(toastText()).toBe('Deleted “Cell Lab”');
+      expect(getAssessments(CID).map(a => a.id)).toEqual([LAB, QUIZ]);
+    });
+  });
 });
 
 /* ── Class Settings: deleting a withdrawn student, and Delete Class ──── */
@@ -222,6 +261,44 @@ describe('Class Settings', () => {
       deleteWithdrawn(CARA);
       expect(message()).toBe(TODAY_STUDENT);
       expect(keepCopy()).toBe('Keep a copy firstA CSV of Cara Chen’s scores and observations in Science 8.');
+    });
+  });
+
+  describe('name the photos when there are some', () => {
+    it('Delete Permanently, and beside Download Records', () => {
+      open();
+      deleteWithdrawn(AVA);
+      expect(dialog().querySelector('.confirm-title').textContent).toBe('Delete Ava Adams Permanently?');
+      expect(message()).toBe(
+        'Their scores, observations, goals, reflections, reports and photos of their work in this class are deleted. This cannot be undone.',
+      );
+      expect(keepCopy()).toBe(
+        'Keep a copy firstA CSV of Ava Adams’s scores and observations in Science 8.Photos of their work are not in this file.',
+      );
+      expect(dialog().querySelector('#cm-keep-copy-btn').textContent).toBe('Download Records');
+    });
+
+    it('a student whose only photos were added by the teacher', () => {
+      open();
+      deleteWithdrawn(BEN);
+      expect(message()).toMatch(/reports and photos of their work in this class are deleted/);
+      expect(keepCopy()).toMatch(/Photos of their work are not in this file\.$/);
+    });
+
+    it('Delete Class', () => {
+      open();
+      DashClassManager.handleAction('cmDeleteCourse', { dataset: { cid: CID } });
+      expect(dialog().querySelector('.confirm-title').textContent).toBe('Delete Class');
+      expect(message()).toBe(
+        "Permanently delete Science 8 with all its students, assessments, scores and photos of student work? It disappears now and is erased for good after 30 days. Deleted photos can't come back.",
+      );
+    });
+
+    it('Delete Class names photos sent for any piece, by a student since withdrawn too', () => {
+      open({ sent: [sub(CARA, QUIZ, 1)] });
+      withdrawStudent(CID, CARA);
+      DashClassManager.handleAction('cmDeleteCourse', { dataset: { cid: CID } });
+      expect(message()).toMatch(/scores and photos of student work\?/);
     });
   });
 });
