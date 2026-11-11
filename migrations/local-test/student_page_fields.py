@@ -480,6 +480,18 @@ def scen_apply():
            '2 descriptions (both in classes with the page on), 6 pieces in a category of which 4 would carry a percent, no class off 100, 4 in a module, '
            '1 with Core Competencies, 2 competencies with an I Can statement and 1 without, 2 rubric rows linked, no link across classes, 2 phones signed in',
            counts == [[3, 0, 2, 2, 6, 4, 0, 4, 1, 2, 1, 2, 0, 2]], counts)
+        # The columns and types the pre-check expects are the live snapshot's (docs/schema.generated.sql, which CI
+        # compares with gradebook-prod), and the columns are the ones the file's own check names.
+        listed = re.findall(r"\('(\w+)', '(\w+)', '([a-z\[\] ]+)'\)", PRE1.split('columns(tbl, col, type) as (values')[1].split(')\nselect')[0])
+        snapshot = open(os.path.join(HERE, '..', '..', 'docs', 'schema.generated.sql')).read()
+        def live_type(tbl, col):
+            block = snapshot.split('\ntable public.%s ' % tbl)[1].split('\ntable ')[0]
+            m = re.search(r'^  %s (.+?)(?: not null| default |$)' % re.escape(col), block, re.M)
+            return m.group(1) if m else None
+        guarded = re.findall(r"\('(\w+)', '(\w+)'\)", TEXT.split('from (values (')[1].split(') as x(tbl, col)')[0].join(['(', '']))
+        ok('apply: the %d columns the pre-check lists are the ones the file itself checks for, each with the type the snapshot of the live database gives it' % len(listed),
+           len(listed) == 20 and sorted((t, c) for t, c, _ in listed) == sorted(guarded) and all(live_type(t, c) == ty for t, c, ty in listed),
+           [(t, c, ty, live_type(t, c)) for t, c, ty in listed if live_type(t, c) != ty] or (sorted(guarded), sorted((t, c) for t, c, _ in listed)))
         both_new = sorted(['function ' + PAGE, 'function ' + CLASSES])
         ok('apply: before the apply the post-check lists the two functions and nothing else', sorted(r[0] for r in d.all(POST)) == both_new, d.all(POST))
 

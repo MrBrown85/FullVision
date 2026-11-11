@@ -169,8 +169,9 @@
 --
 -- One transaction: the file opens with begin and ends with commit, so it is
 -- all or nothing whether it is pasted into the SQL editor or sent through
--- apply_migration. Every check that can stop it runs first, before anything
--- is changed.
+-- apply_migration. The checks of what it meets run first, before anything
+-- is changed; its last step checks what it leaves, and if that fails
+-- everything above it is undone.
 begin;
 
 -- Give up after five seconds rather than queue behind a long transaction.
@@ -288,8 +289,9 @@ $function$;
 
 -- ── page ────────────────────────────────────────────────────────────────────
 -- As 2026110904 made it and 2026110905 left it (created_at), with the keys
--- the header lists. The lines that list the pieces, order them and read
--- each grade are the same lines.
+-- the header lists. The lines that choose the pieces, order them and read
+-- each grade are the same lines; a left join to each piece's category sits
+-- beside them.
 create or replace function student_submit.page(p_session_token text, p_enrollment_id uuid, p_ip_hash text)
  returns jsonb
  language plpgsql
@@ -397,8 +399,8 @@ end;
 $function$;
 
 -- Service role only for page, as before; the helper for its owner alone. A
--- replaced function keeps the grants it had: these say so again and change
--- nothing.
+-- replaced function keeps the grants it had, so where those are as they
+-- should be these three lines change nothing.
 revoke all on function student_submit._session_classes(uuid) from public, anon, authenticated;
 revoke all on function student_submit.page(text, uuid, text) from public, anon, authenticated;
 grant execute on function student_submit.page(text, uuid, text) to service_role;

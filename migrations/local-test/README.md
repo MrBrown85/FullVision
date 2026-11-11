@@ -1288,8 +1288,10 @@ owner.
   nothing listed before, the counts right, the two functions listed by the
   post-check before the apply and nothing after it; and each notices what
   it should (a function changed, a column missing or of another type, a
-  grant, a lost `pg_temp`). Each of the file's checks stops it at the check
-  with nothing changed: each of the four functions with one space more in
+  grant, a lost `pg_temp`). The twenty columns the pre-check lists are the
+  ones the file itself checks for, each with the type
+  `docs/schema.generated.sql` gives it. Each of the file's checks stops it
+  at the check with nothing changed: each of the four functions with one space more in
   its body; `page` missing; Batch A, S0-M4b, S0-M5 or S3-M1 missing; each of
   five columns the new lines read renamed (`page` is PL/pgSQL, which would
   otherwise fail only when a student opened their page). **What it waits
@@ -1411,8 +1413,8 @@ day S3-M1 was applied. That is expected; `s4-m1-live-postcheck.sql` is the
 one to run.
 
 Result on 2026-11-11, on PostgreSQL 17.11 (what production runs), from a
-clean clone on a database built from empty: `student_page_fields.py` 258 of
-258 (with Batch B's files named by `BATCH_B_DIR`; 239 of 239 and one
+clean clone on a database built from empty: `student_page_fields.py` 259 of
+259 (with Batch B's files named by `BATCH_B_DIR`; 240 of 240 and one
 `SKIPPED` line without them); `student_page_fields_undo.py` 28 of 28;
 `student_page_fields_mutate.py` 33 of 33 noticed. `npm test` gains
 `tests/student-page-fields.test.js` (8 tests: the Core Competency names

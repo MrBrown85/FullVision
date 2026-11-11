@@ -14,8 +14,9 @@
 --                  applying.
 -- The fingerprints are md5(pg_get_functiondef(...)) from the local harness
 -- on PostgreSQL 17.11, built as gradebook-prod is: Batch A, S0-M4b, S0-M5
--- and S3-M1. The column types are the harness's, which come from
--- docs/schema.generated.sql (the snapshot of the live database).
+-- and S3-M1. The column types are the harness's, and student_page_fields.py
+-- checks each against docs/schema.generated.sql (the snapshot of the live
+-- database, which CI compares with it).
 -- With Batch B applied first (2026111101 and 2026111102) the answer is the
 -- same: Batch B replaces none of these functions and changes none of these
 -- columns.
