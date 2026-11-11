@@ -1054,19 +1054,15 @@ window.DashClassManager = (function () {
     if (reenrolStudent(cmSelectedCourse, sid)) renderClassManager();
   }
 
-  /* S8-F1: who in class `cid` has photos of their work sent, { sid: true },
-     from the read side in shared/data.js (getCourseSubmissions): a submission
-     with at least one page. Empty, so every delete reads as it always has,
-     while the class's build switch is off or nothing has been sent. Send
-     Work is not asked: photos sent before it was turned off still go. */
+  /* S8-F1: who in class `cid` has photos of their work sent, { sid: true }
+     (CmStudentPage.studentsWithPhotos, the one question). Empty, so every
+     delete reads as it always has, while the class's build switch is off or
+     nothing has been sent. Send Work is not asked: photos sent before it was
+     turned off still go. */
   function _cmStudentsWithPhotos(cid) {
-    var who = {};
-    if (typeof getCourseSubmissions !== 'function') return who;
-    if (typeof getReturnSettings !== 'function' || !getReturnSettings(cid).student_page) return who;
-    (getCourseSubmissions(cid).submissions || []).forEach(function (s) {
-      if (s && Array.isArray(s.files) && s.files.length) who[s.enrollment_id] = true;
-    });
-    return who;
+    return typeof CmStudentPage !== 'undefined' && CmStudentPage.studentsWithPhotos
+      ? CmStudentPage.studentsWithPhotos(cid)
+      : {};
   }
 
   /* The second step: only a withdrawn student can be deleted, and the
