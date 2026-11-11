@@ -353,7 +353,25 @@ window.Grader = (function () {
     if (state === GradeState.RETURNED) return 'returned';
     if (!workOn(cid, _piece(cid, aid))) return null;
     if (getStudentSubmission(cid, sid, aid)) return studentWorkGradingStarted(cid, sid, aid) ? null : 'tograde';
-    return getAssignmentStatus(cid, sid, aid) === 'EXC' ? null : 'notin';
+    var status = getAssignmentStatus(cid, sid, aid);
+    // One per Group (S12-F2): a group-mate's work is the group's. A member
+    // marked Missing or Excused is left out, as group grading leaves them.
+    if (_groupIn(cid, sid, aid)) {
+      if (status === 'NS' || status === 'EXC') return null;
+      return studentWorkGradingStarted(cid, sid, aid) ? null : 'tograde';
+    }
+    return status === 'EXC' ? null : 'notin';
+  }
+
+  // Work is in for `sid` through their group on a One per Group piece.
+  function _groupIn(cid, sid, aid) {
+    return typeof groupWorkIn === 'function' && groupWorkIn(cid, sid, aid);
+  }
+  // The submissions that make up `sid`'s work: the group's, or their own.
+  function _workOf(cid, sid, aid) {
+    if (typeof getGroupSubmissions === 'function') return getGroupSubmissions(cid, sid, aid);
+    var own = getStudentSubmission(cid, sid, aid);
+    return own ? [own] : [];
   }
 
   /* The four counts and All for `aid`, over `studentIds` (the whole class,
@@ -389,9 +407,10 @@ window.Grader = (function () {
     // When the longest-waiting work to grade came in (an ISO time), or null.
     var oldest = null;
     lists.tograde.forEach(function (sid) {
-      var sub = getStudentSubmission(cid, sid, aid);
-      var at = sub && (sub.sent_at || sub.created_at);
-      if (at && (!oldest || at < oldest)) oldest = at;
+      _workOf(cid, sid, aid).forEach(function (sub) {
+        var at = sub && (sub.sent_at || sub.created_at);
+        if (at && (!oldest || at < oldest)) oldest = at;
+      });
     });
     return {
       tograde: tograde,
@@ -454,10 +473,11 @@ window.Grader = (function () {
      taken twice is not one. In the order given (the class's last-name
      order when left out). */
   function samePhotoAs(cid, aid, sid, studentIds) {
-    var mine = getStudentSubmission(cid, sid, aid);
     var hashes = {};
-    ((mine && mine.files) || []).forEach(function (f) {
-      if (f && f.sha256) hashes[f.sha256] = true;
+    _workOf(cid, sid, aid).forEach(function (mine) {
+      ((mine && mine.files) || []).forEach(function (f) {
+        if (f && f.sha256) hashes[f.sha256] = true;
+      });
     });
     if (!Object.keys(hashes).length) return [];
     var ids = studentIds
@@ -465,8 +485,14 @@ window.Grader = (function () {
       : sortStudents(getStudents(cid) || [], 'lastName').map(function (s) {
           return s.id;
         });
+    // The group's own pages are the same photos by design (S12-F2).
+    var mates = {};
+    var group = typeof getStudentWorkGroup === 'function' ? getStudentWorkGroup(cid, sid, aid) : null;
+    ((group && group.members) || []).forEach(function (m) {
+      mates[m] = true;
+    });
     return ids.filter(function (other) {
-      if (other === sid) return false;
+      if (other === sid || mates[other]) return false;
       var sub = getStudentSubmission(cid, other, aid);
       return ((sub && sub.files) || []).some(function (f) {
         return f && f.sha256 && hashes[f.sha256];

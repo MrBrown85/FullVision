@@ -12239,7 +12239,12 @@ window.PageAssignments = (function () {
     });
     // A click anywhere but the open ⋯ menu closes it.
     overlay.addEventListener('mousedown', function (e) {
-      if (!_grader || !_grader.menuSid || e.target.closest('.grader-member-menu, .grader-member-more')) return;
+      if (
+        !_grader ||
+        !_grader.menuSid ||
+        e.target.closest('.grader-member-menu, .grader-member-more, .grader-change-one-btn')
+      )
+        return;
       _grader.menuSid = null;
       _refreshGraderChrome();
     });
@@ -12845,6 +12850,14 @@ window.PageAssignments = (function () {
       _grader.menuSid = null;
       focusStudentId = sid;
       render();
+    } else if (what === 'change-one') {
+      // Change One Student (S12-F2): they keep the group's grade as their
+      // own from here, and their grader opens to change it.
+      _grader.menuSid = null;
+      if (!isGradedSeparately(a, sid)) Grader.gradeSeparately(cid, aid, sid);
+      focusStudentId = sid;
+      refreshSidebarGrades();
+      render();
     }
   }
 
@@ -12871,9 +12884,47 @@ window.PageAssignments = (function () {
     );
   }
 
+  /* Students in This Group (S12-F2): what is different for a member
+     graded on their own, criterion by criterion, against the group's
+     grade ("Roles on the Manor: Emerging · changed for Leo"). Levels are
+     named through scoreLevelText. */
+  function _memberChanges(cid, a, sid, source) {
+    if (!source || source === sid) return [];
+    var levelsOf = function (id) {
+      var out = {};
+      (getScores(cid)[id] || []).forEach(function (e) {
+        if (e && e.assessmentId === a.id && e.tagId && e.tagId !== 'overall') out[e.tagId] = e;
+      });
+      return out;
+    };
+    var mine = levelsOf(sid);
+    var theirs = levelsOf(source);
+    var names = {};
+    var rubric = a.rubricId ? getRubricById(cid, a.rubricId) : null;
+    ((rubric && rubric.criteria) || []).forEach(function (c) {
+      rubricCriterionScoreKeys(c).forEach(function (k) {
+        names[k] = c.name || c.title || '';
+      });
+    });
+    var first = displayNameFirst(_workStudent(cid, sid) || {});
+    var out = [];
+    Object.keys(mine).forEach(function (k) {
+      var m = mine[k];
+      var t = theirs[k];
+      if (t && t.score === m.score && (t.mod || 0) === (m.mod || 0)) return;
+      var name = names[k] || (getTagById(cid, k) || {}).label || '';
+      var level = scoreLevelText(m.score, m.mod);
+      if (!name || !level) return;
+      out.push(name + ': ' + level + ' · changed for ' + first);
+    });
+    return out;
+  }
+  var _COUNT_WORDS = ['', 'one', 'two', 'three', 'four', 'five', 'six'];
+
   // html-safe: names go through esc(); ids are ours; labels are constants
-  function _graderMemberHtml(cid, a, st, menuSid) {
+  function _graderMemberHtml(cid, a, st, menuSid, source) {
     var sid = st.id;
+    var inWork = !!(_grader && _grader.workShell);
     var name = esc(displayNameWithLast(st));
     var status = getAssignmentStatus(cid, sid, a.id);
     var statusHtml =
@@ -12896,6 +12947,13 @@ window.PageAssignments = (function () {
         '">' +
         esc(grade.text) +
         '</span></div>' +
+        (inWork
+          ? _memberChanges(cid, a, sid, source)
+              .map(function (line) {
+                return '<p class="grader-member-same is-changed">' + esc(line) + '</p>';
+              })
+              .join('')
+          : '') +
         statusHtml +
         '<button type="button" class="grader-member-back" data-grader="rejoin" data-sid="' +
         sid +
@@ -12917,6 +12975,7 @@ window.PageAssignments = (function () {
       '">' +
       _GRADER_MORE_ICON +
       '</button></div>' +
+      (inWork ? '<p class="grader-member-same">Same as group</p>' : '') +
       statusHtml +
       '<div class="grader-member-menu" role="menu"' +
       (open ? '' : ' hidden') +
@@ -12937,16 +12996,64 @@ window.PageAssignments = (function () {
       getStudents(cid).forEach(function (s) {
         byId[s.id] = s;
       });
+      var inWork = !!_grader.workShell;
+      var n = view.members.length;
+      // With the work beside the scoring (S12-F2): the board's Students in
+      // This Group, and Change One Student (Grade Separately, then open them).
       html =
         '<h2 class="grader-members-title" id="grader-members-title">' +
-        (view.group.kind === 'pair' ? 'Pair Members' : 'Group Members') +
-        '</h2><div class="grader-members-grid">' +
+        (inWork
+          ? view.group.kind === 'pair'
+            ? 'Students in This Pair'
+            : 'Students in This Group'
+          : view.group.kind === 'pair'
+            ? 'Pair Members'
+            : 'Group Members') +
+        '</h2>' +
+        (inWork
+          ? '<p class="grader-members-hint">' +
+            esc(
+              'One grade for all ' +
+                (_COUNT_WORDS[n] || n) +
+                '. Change one student only when their part was different.',
+            ) +
+            '</p>'
+          : '') +
+        '<div class="grader-members-grid">' +
         view.members
           .map(function (m) {
-            return _graderMemberHtml(cid, a, byId[m], _grader.menuSid);
+            return _graderMemberHtml(cid, a, byId[m], _grader.menuSid, view.source);
           })
           .join('') +
         '</div>';
+      if (inWork) {
+        var changeable = view.linked.filter(function (m) {
+          return byId[m];
+        });
+        var openChange = _grader.menuSid === 'change-one';
+        html +=
+          '<div class="grader-change-one">' +
+          '<button type="button" class="grader-change-one-btn" data-grader="member-menu" data-sid="change-one" aria-haspopup="menu" aria-expanded="' +
+          openChange +
+          '"' +
+          (changeable.length > 1 ? '' : ' disabled') +
+          '>Change One Student</button>' +
+          '<div class="grader-member-menu" role="menu"' +
+          (openChange ? '' : ' hidden') +
+          '>' +
+          changeable
+            .map(function (m) {
+              return (
+                '<button type="button" role="menuitem" data-grader="change-one" data-sid="' +
+                m +
+                '">' +
+                esc(displayNameWithLast(byId[m])) +
+                '</button>'
+              );
+            })
+            .join('') +
+          '</div></div>';
+      }
     }
     if (_grader.membersHtml !== html) {
       // html-safe: built by _graderMemberHtml, names escaped there
@@ -13111,7 +13218,7 @@ window.PageAssignments = (function () {
   // html-safe: names go through esc; ids are ours
   function _inlineWorkHtml(cid, a, sid) {
     if (!GraderWork.workOn(cid, a)) return '';
-    var sub = getStudentSubmission(cid, sid, a.id);
+    var sub = _workSubOf(cid, sid, a.id);
     var st = _workStudent(cid, sid);
     var html = '<span class="grader-inline-work">' + esc(_workLineText(cid, a, sid, sub)) + '</span>';
     GraderWork.samePhotoAs(cid, a.id, sid).forEach(function (other) {
@@ -13926,8 +14033,52 @@ window.PageAssignments = (function () {
     return n + (n === 1 ? ' photo' : ' photos');
   }
 
+  /* The work the grader shows for `sid` (S12-F2): on a One per Group
+     piece the group's, whoever sent it (getGroupWorkFiles), as one
+     submission-like answer { group: true, sender, sent_at, note, noteBy,
+     files, own }; otherwise the student's own submission, as before. */
+  function _workSubOf(cid, sid, aid) {
+    var own = getStudentSubmission(cid, sid, aid);
+    var group = typeof getStudentWorkGroup === 'function' ? getStudentWorkGroup(cid, sid, aid) : null;
+    if (!group) return own;
+    var subs = getGroupSubmissions(cid, sid, aid);
+    if (!subs.length) return null;
+    var first = subs.slice().sort(function (x, y) {
+      return String(x.sent_at || x.created_at) < String(y.sent_at || y.created_at) ? -1 : 1;
+    })[0];
+    var noted = subs.find(function (x) {
+      return x.note;
+    });
+    return {
+      group: true,
+      sender: first.enrollment_id,
+      sent_by: first.sent_by,
+      sent_at: first.sent_at,
+      created_at: first.created_at,
+      on_paper: subs.every(function (x) {
+        return x.on_paper;
+      }),
+      note: noted ? noted.note : null,
+      noteBy: noted ? noted.enrollment_id : null,
+      files: getGroupWorkFiles(cid, sid, aid),
+      own: own,
+    };
+  }
+
   /* The line under the name: what came in, or that nothing has. */
   function _workLineText(cid, a, sid, sub) {
+    if (sub && sub.group && !sub.on_paper) {
+      // "Sent by Priya S. for the group, Nov 3 · 4 photos"
+      var by = sub.sent_by === 'teacher' ? null : _workStudent(cid, sub.sender);
+      var day =
+        sub.sent_at || sub.created_at ? formatShortDate(String(sub.sent_at || sub.created_at).slice(0, 10)) : '';
+      return (
+        (by ? 'Sent by ' + _workShortName(by) + ' for the group' : 'Added by you for the group') +
+        (day ? ', ' + day : '') +
+        ' · ' +
+        _workPhotos((sub.files || []).length)
+      );
+    }
     if (sub) {
       if (sub.on_paper) return 'Handed in on paper';
       var when = _workWhen(sub.sent_at || sub.created_at);
@@ -13955,7 +14106,7 @@ window.PageAssignments = (function () {
      whose work waits (up to five, then "+2"). Redrawn only when it changes. */
   // html-safe: names go through esc; ids are ours; labels are fixed words
   function _workLineHtml(cid, a, sid) {
-    var sub = getStudentSubmission(cid, sid, a.id);
+    var sub = _workSubOf(cid, sid, a.id);
     var html = '<span class="grader-work-what">' + esc(_workLineText(cid, a, sid, sub)) + '</span>';
     GraderWork.samePhotoAs(cid, a.id, sid, _grader.studentIds).forEach(function (other) {
       var st = _workStudent(cid, other);
@@ -13970,6 +14121,54 @@ window.PageAssignments = (function () {
         '</button>';
     });
     var waiting = GraderWork.workCounts(cid, a.id, _grader.studentIds).ids.tograde;
+    // Group work (S12-F2): one button a group, "Groups to grade".
+    var units = waiting.length ? _graderUnits(cid, a) : null;
+    if (units) {
+      var on = _graderGroupView(cid, a, sid);
+      var shownUnits = units.filter(function (u) {
+        return _unitIds(u).some(function (id) {
+          return waiting.indexOf(id) >= 0;
+        });
+      });
+      var firstUnits = shownUnits.slice(0, 5);
+      var moreUnits = shownUnits.length - firstUnits.length;
+      return (
+        html +
+        '<span class="grader-work-strip" role="group" aria-label="Groups to grade">' +
+        firstUnits
+          .map(function (u) {
+            var to = u.source || u.sid;
+            var here = on ? !!u.linked && u.linked.indexOf(sid) >= 0 : u.sid === sid;
+            var st = u.linked ? null : _workStudent(cid, u.sid);
+            var name = u.linked ? collabGroupLabel(u.group) : st ? displayNameWithLast(st) : '';
+            var face = u.linked ? String(u.group.index + 1) : st ? initials(st) : '';
+            return (
+              '<button type="button" class="grader-work-who' +
+              (here ? ' is-on' : '') +
+              '" data-grader="work-open" data-sid="' +
+              to +
+              '" aria-label="' +
+              esc(name) +
+              '" title="' +
+              esc(name) +
+              '"' +
+              (here ? ' aria-current="true"' : '') +
+              '>' +
+              esc(face) +
+              '</button>'
+            );
+          })
+          .join('') +
+        (moreUnits
+          ? '<button type="button" class="grader-work-who grader-work-more" data-grader="show" data-show="tograde" aria-label="' +
+            moreUnits +
+            ' more to grade">+' +
+            moreUnits +
+            '</button>'
+          : '') +
+        '</span>'
+      );
+    }
     if (waiting.length) {
       var shown = waiting.slice(0, 5);
       var more = waiting.length - shown.length;
@@ -14022,7 +14221,7 @@ window.PageAssignments = (function () {
   // html-safe: names and the note go through esc; ids are ours; labels are fixed words
   function _workPaneHtml(cid, a, st, view) {
     var w = _grader.work;
-    var sub = getStudentSubmission(cid, st.id, a.id);
+    var sub = _workSubOf(cid, st.id, a.id);
     var first = view ? view.label : displayNameFirst(st);
     var files = (sub && sub.files) || [];
     if (!sub) return _addWorkHtml(cid, a, st, first);
@@ -14086,13 +14285,20 @@ window.PageAssignments = (function () {
       esc('Page ' + (at + 1) + ' of ' + (a.title || 'the work')) +
       '"></div></div>';
     if (sub.note) {
+      var noteBy = sub.group ? _workStudent(cid, sub.noteBy) : null;
       html +=
         '<div class="grader-work-note"><h3 class="grader-work-note-title">' +
-        esc(first + '’s Note, Sent With the Work') +
+        esc(
+          sub.group
+            ? (noteBy ? displayNameFirst(noteBy) : 'The group') + '’s Note, Sent for the Group'
+            : first + '’s Note, Sent With the Work',
+        ) +
         '</h3><p>' +
         esc(sub.note) +
         '</p></div>';
     }
+    // Delete Work deletes one student's own work; a group's is not offered here.
+    if (sub.group) return html;
     return (
       html +
       '<div class="grader-work-foot"><button type="button" class="grader-work-delete" data-grader="work-delete">Delete Work</button></div>'
@@ -14152,7 +14358,7 @@ window.PageAssignments = (function () {
       _grader.work.shownKey = null;
     }
     var img = pane.querySelector('.grader-work-img');
-    var sub = getStudentSubmission(cid, st.id, a.id);
+    var sub = _workSubOf(cid, st.id, a.id);
     var files = (sub && sub.files) || [];
     var file = files[Math.min(Math.max(_grader.work.page, 0), files.length - 1)];
     if (!img || !file) return _graderReleasePage(_grader);
@@ -14223,7 +14429,7 @@ window.PageAssignments = (function () {
     var el = _grader.overlay.querySelector('.grader-work-surface');
     if (!el) return null;
     var a = _assessmentById(activeCourse, _grader.aid);
-    var sub = a && getStudentSubmission(activeCourse, focusStudentId, a.id);
+    var sub = a && _workSubOf(activeCourse, focusStudentId, a.id);
     var file =
       sub &&
       (sub.files || []).find(function (f) {
@@ -14277,7 +14483,7 @@ window.PageAssignments = (function () {
       w.fit = btn.dataset.fit === 'width' ? 'width' : 'page';
       again = '[data-grader="work-fit"][data-fit="' + w.fit + '"]';
     } else if (what === 'work-rotate') {
-      var sub = getStudentSubmission(cid, sid, a.id);
+      var sub = _workSubOf(cid, sid, a.id);
       var file = sub && (sub.files || [])[w.page];
       if (file) w.turns[file.id] = ((w.turns[file.id] || 0) + 90) % 360;
       again = '[data-grader="work-rotate"]';
