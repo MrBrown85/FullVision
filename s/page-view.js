@@ -24,10 +24,11 @@
          segment: 'todo' | 'sent' | 'back', pick: the id of the card
          showing, all: true for All Assignments, search and filter: All
          Assignments' search words and filter ('all' | 'todo' | 'sent' |
-         'back'),
+         'back' | 'new' | 'revise'),
          feedback: the id of the piece Your Feedback is open on, whole:
          true for its The Whole Rubric (also for work not back yet, from
-         See the Rubric), levels: What the Levels Mean is open,
+         See the Rubric), compare: true for its Before and After (a
+         returned revision, S11-F2), levels: What the Levels Mean is open,
          form: the questionnaire or report picked on a Chromebook,
          noResults: the results didn't load (say so, with Try Again),
          sending: Try Again is under way, waiting: the view is not here yet,
@@ -86,6 +87,12 @@ window.StudentPageView = (function () {
   function rowView(p) {
     var due = p.dueDate ? 'Due ' + fmtDate(p.dueDate, DUE_DAY) : p.date ? fmtDate(p.date, DAY) : '';
     var view = { kind: p.kind, title: p.title, sub: due, result: '' };
+    // A revision asked for (S11-F2): "Needs Revision · due Nov 10" (the board's).
+    if (p.kind === 'revise') {
+      var by = p.revision && p.revision.reviseBy;
+      view.sub = ['Needs Revision', by ? 'due ' + fmtDate(by, DAY) : ''].filter(Boolean).join(SEP);
+      return view;
+    }
     if (p.kind === 'missing' || p.kind === 'excused') {
       view.sub = [p.kind === 'missing' ? 'Missing' : 'Excused', due].filter(Boolean).join(SEP);
       return view;
@@ -114,7 +121,7 @@ window.StudentPageView = (function () {
 
   // A piece's kind as a class name: one of the five, whatever the view held.
   function kindOf(p) {
-    return /^(due|sent|back|missing|excused)$/.test(p.kind) ? p.kind : 'due';
+    return /^(due|revise|sent|back|missing|excused)$/.test(p.kind) ? p.kind : 'due';
   }
 
   // "1 photo", "3 photos"; nothing for none.
@@ -125,8 +132,9 @@ window.StudentPageView = (function () {
 
   /* ── To Do, Sent and Back ──────────────────────────────────── */
 
-  /* To Do is what is still to hand in: work not back yet, and work marked
-     Missing. Sent is work sent and waiting for its grade (S5-F2).
+  /* To Do is what is still to hand in: work not back yet, work marked
+     Missing, and work returned for revision (S11-F2). Sent is work sent and
+     waiting for its grade (S5-F2).
      Back is work that came back. */
   var SEGMENTS = [
     { id: 'todo', label: 'To Do' },
@@ -135,7 +143,7 @@ window.StudentPageView = (function () {
   ];
   function inSegment(view, id) {
     return view.work.filter(function (p) {
-      if (id === 'todo') return p.kind === 'due' || p.kind === 'missing';
+      if (id === 'todo') return p.kind === 'due' || p.kind === 'missing' || p.kind === 'revise';
       if (id === 'back') return p.kind === 'back';
       return id === 'sent' && p.kind === 'sent';
     });
@@ -271,13 +279,17 @@ window.StudentPageView = (function () {
     if (p.kind === 'back' && p.updated) out.push(['updated', 'Updated ' + fmtDate(p.updatedAt || p.returnedAt, DAY)]);
     else if (p.kind === 'back') out.push(['back', 'Returned ' + fmtDate(p.returnedAt, DAY)]);
     else if (p.kind === 'missing') out.push(['missing', 'Missing']);
-    else if (p.kind === 'sent') {
+    else if (p.kind === 'revise') {
+      // "Revise by Tue, Nov 10" (the Needs Revision board).
+      var by = p.revision && p.revision.reviseBy;
+      out.push(['revise', by ? 'Revise by ' + fmtDate(by, DUE_DAY) : 'Needs Revision']);
+    } else if (p.kind === 'sent') {
       var at = (p.send && p.send.sent && p.send.sent.at) || (p.group && p.group.sentAt) || '';
       out.push(['sent', at ? 'Sent ' + fmtDate(at, DAY) : 'Sent']);
     }
     // One per Group (S12-F1, the board's "Group" tag).
     if (p.group) out.push(['quiet', 'Group']);
-    if (p.kind !== 'back' && p.kind !== 'sent' && due) out.push(['due', due]);
+    if (p.kind !== 'back' && p.kind !== 'sent' && p.kind !== 'revise' && due) out.push(['due', due]);
     if (p.late) out.push(['quiet', 'Late']);
     return out
       .map(function (x) {
@@ -329,9 +341,12 @@ window.StudentPageView = (function () {
     );
   }
 
-  // A returned piece with a result opens Your Feedback.
+  /* A returned piece with a result opens Your Feedback; so does work
+     returned for revision with its grade kept, and a revision sent while
+     its new grade is not back (the grade the student was given, S11-F2). */
   function hasFeedback(p) {
-    return !!(p && p.kind === 'back' && p.result && p.result.text);
+    if (!p || !p.result || !p.result.text) return false;
+    return p.kind === 'back' || (!!p.revision && (p.kind === 'revise' || p.kind === 'sent'));
   }
 
   /* One card. A returned piece not opened since it came back carries its
@@ -449,6 +464,125 @@ window.StudentPageView = (function () {
     );
   }
 
+  /* ── Revisions (S11-F2; the artboard's "Student: Needs Revision",
+     "Before and After a Revision" and "Before and After on a Chromebook")
+     ── The page never names the teacher (Colin's ruling 112): the board's
+     "Mr. Brown" is "Your Teacher". */
+
+  /* What to Fix, the criteria to revise and the first version's pages,
+     with Send My Revision while the piece takes work. On the card and on
+     Your Feedback. */
+  function reviseBlockHtml(p, where) {
+    var r = p.revision;
+    if (!r || p.kind !== 'revise') return '';
+    var takes = p.send && p.send.takes;
+    return (
+      '<section class="sp-revise sp-revise-' +
+      where +
+      '" aria-label="Needs Revision"><p class="sp-revise-who">Your Teacher</p><p class="sp-revise-fix">' +
+      esc(r.whatToFix) +
+      '</p>' +
+      (r.criteria.length
+        ? '<p class="sp-revise-crit"><span class="sp-revise-crit-title">Revise</span>' +
+          r.criteria
+            .map(function (name) {
+              return '<span class="sp-revise-crit-name">' + esc(name) + '</span>';
+            })
+            .join('') +
+          '</p>'
+        : '') +
+      (r.firstThumbs.length
+        ? '<p class="sp-revise-first">Your First Version</p>' + thumbsHtml(r.firstThumbs, 'First version, page')
+        : '') +
+      (takes
+        ? '<button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="revise-open" data-piece="' +
+          esc(p.id) +
+          '">Send My Revision</button>'
+        : '') +
+      '</section>'
+    );
+  }
+
+  // A returned revision's card opens Before and After.
+  function hasCompare(p) {
+    return !!(p && p.kind === 'back' && p.revision && p.revision.state === 'returned' && p.revision.before);
+  }
+
+  // One version's first page and when it was sent, on Before and After.
+  function versionHtml(thumbs, label, sentAt) {
+    return (
+      '<figure class="sp-ba-version">' +
+      (thumbs.length
+        ? '<img class="sp-ba-photo" src="' + esc(thumbs[0]) + '" alt="' + esc(label + ', page 1') + '">'
+        : '<span class="sp-ba-photo sp-ba-photo-none" aria-hidden="true"></span>') +
+      '<figcaption><span class="sp-ba-label">' +
+      esc(label) +
+      '</span>' +
+      (sentAt ? '<span class="sp-ba-sent">' + esc('Sent ' + fmtDate(sentAt, DAY)) + '</span>' : '') +
+      '</figcaption></figure>'
+    );
+  }
+
+  // One line of Before and After: a level then and now, or "No change".
+  function baRowHtml(name, before, beforeLevel, after, level, same) {
+    return (
+      '<li class="sp-ba-row"><span class="sp-ba-name">' +
+      esc(name) +
+      '</span><span class="sp-ba-move">' +
+      (same
+        ? '<span class="sp-ba-same">No change</span>'
+        : before
+          ? '<span class="sp-ba-was">' + chipHtml(before, beforeLevel) + '</span>' + TO_ARROW
+          : '') +
+      chipHtml(after, level) +
+      '</span></li>'
+    );
+  }
+
+  /* Before and After: the two versions, each row's level then and now,
+     Your Result then and now, what the teacher asked and what the student
+     did, then See Your Feedback and Reflect on Feedback. */
+  function compareHtml(view, p) {
+    var r = p.revision;
+    var b = r.before;
+    var sub = [view.course && view.course.name, 'Revision returned ' + fmtDate(p.returnedAt, DAY)]
+      .filter(Boolean)
+      .join(SEP);
+    return (
+      '<section class="sp-feedback sp-ba" aria-labelledby="sp-fb-title">' +
+      feedbackHead('Assignments', 'feedback-close', p.title, sub, p.unseen ? p.id : '', 'sp-fb-title') +
+      '<h2 class="sp-fb-section sp-ba-title">Before and After</h2>' +
+      '<div class="sp-ba-versions">' +
+      versionHtml(r.firstThumbs, 'First Version', r.firstSentAt) +
+      versionHtml(r.thumbs, 'Your Revision', r.sentAt) +
+      '</div><ul class="sp-ba-rows">' +
+      b.rows
+        .map(function (row) {
+          return baRowHtml(row.name, row.before, row.beforeLevel, row.after, row.level, row.same);
+        })
+        .join('') +
+      '</ul>' +
+      (b.result.text && p.result.text
+        ? '<ul class="sp-ba-rows sp-ba-result">' +
+          baRowHtml('Your Result', b.result.text, b.result.level, p.result.text, p.result.level, false) +
+          '</ul>'
+        : '') +
+      '<div class="sp-ba-said"><h3 class="sp-ba-said-title">Your Teacher Asked</h3><p class="sp-ba-words">' +
+      esc(r.whatToFix) +
+      '</p></div>' +
+      (r.note
+        ? '<div class="sp-ba-said sp-ba-did"><h3 class="sp-ba-said-title">You Did</h3><p class="sp-ba-words">' +
+          esc(r.note) +
+          '</p></div>'
+        : '') +
+      '<button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="feedback" data-piece="' +
+      esc(p.id) +
+      '">See Your Feedback</button>' +
+      reflectButtonHtml(view, p) +
+      '</section>'
+    );
+  }
+
   // The teacher's comment on a returned card.
   function cardCommentHtml(p) {
     if (!p.comment) return '';
@@ -484,6 +618,12 @@ window.StudentPageView = (function () {
       (p.kind === 'back' ? cardCommentHtml(p) : '') +
       (p.kind === 'sent' ? (p.group ? groupBlockHtml(p) : sentBlockHtml(p)) : '') +
       (todo ? gradedOnHtml(p) + coreHtml(p) + (p.group ? groupBlockHtml(p) : sendBlockHtml(p)) : '') +
+      reviseBlockHtml(p, 'card') +
+      (hasCompare(p)
+        ? '<button type="button" class="sp-btn sp-btn-tint sp-btn-big" data-act="compare" data-piece="' +
+          esc(p.id) +
+          '">Before and After</button>'
+        : '') +
       (hasFeedback(p)
         ? '<button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="feedback" data-piece="' +
           esc(p.id) +
@@ -584,6 +724,7 @@ window.StudentPageView = (function () {
     var p = pieceIn(view.work, ui.feedback);
     if (!p || p.id !== ui.feedback) return null;
     if (ui.whole) return p.rubric && segmentOf(p) ? p : null;
+    if (ui.compare) return hasCompare(p) ? p : null;
     return hasFeedback(p) ? p : null;
   }
 
@@ -773,9 +914,11 @@ window.StudentPageView = (function () {
 
   // The piece's class and when it came back: "Science 8 · Returned Nov 3".
   function feedbackSub(view, p) {
-    return [view.course && view.course.name, p.kind === 'back' ? 'Returned ' + fmtDate(p.returnedAt, DAY) : '']
-      .filter(Boolean)
-      .join(SEP);
+    var when = p.kind === 'back' ? 'Returned ' + fmtDate(p.returnedAt, DAY) : '';
+    if (p.kind === 'revise' && p.revision) {
+      when = p.revision.reviseBy ? 'Revise by ' + fmtDate(p.revision.reviseBy, DUE_DAY) : 'Needs Revision';
+    }
+    return [view.course && view.course.name, when].filter(Boolean).join(SEP);
   }
 
   /* The top of Your Feedback and The Whole Rubric: the way back (on a
@@ -834,6 +977,7 @@ window.StudentPageView = (function () {
         p.unseen ? p.id : '',
         'sp-fb-title',
       ) +
+      reviseBlockHtml(p, 'fb') +
       seeWorkHtml(p) +
       '<div class="sp-fb-top' +
       (p.comment ? ' sp-fb-top-two' : '') +
@@ -867,7 +1011,7 @@ window.StudentPageView = (function () {
      screens themselves are the student page's (s/reflect.js); in Preview
      as Student the button is shown and opens nothing. */
   function reflectButtonHtml(view, p) {
-    if (!view || !view.reflectOn || !hasFeedback(p)) return '';
+    if (!view || !view.reflectOn || !hasFeedback(p) || p.kind !== 'back') return '';
     var r = p.reflection;
     var open =
       '<button type="button" class="sp-btn sp-btn-tint sp-btn-big sp-fb-reflect" data-act="reflect-open" data-piece="' +
@@ -1183,7 +1327,13 @@ window.StudentPageView = (function () {
       noResultsHtml(ui, view) +
       '<div class="sp-split sp-split-feedback">' +
       sideHtml(pieces, p) +
-      (ui.whole ? wholeHtml(view, p) : workOpen(ui, p) ? seeWorkPaneHtml(view, ui, p) : feedbackHtml(view, ui, p)) +
+      (ui.whole
+        ? wholeHtml(view, p)
+        : ui.compare
+          ? compareHtml(view, p)
+          : workOpen(ui, p)
+            ? seeWorkPaneHtml(view, ui, p)
+            : feedbackHtml(view, ui, p)) +
       '</div>'
     );
   }
@@ -1215,6 +1365,8 @@ window.StudentPageView = (function () {
     { id: 'sent', label: 'Sent' },
     { id: 'back', label: 'Back' },
   ];
+  // Needs Revision (the All Assignments board's), shown while a piece of the class has a revision (S11-F2).
+  var REVISE_FILTER = { id: 'revise', label: 'Needs Revision' };
 
   /* What Changed Since You Last Looked (the artboard's board): the pieces
      back or updated that the student has not opened since. */
@@ -1236,11 +1388,17 @@ window.StudentPageView = (function () {
     var back = changes.filter(function (c) {
       return c.why === 'back';
     }).length;
-    var updated = changes.length - back;
+    var revise = changes.filter(function (c) {
+      return c.why === 'revise';
+    }).length;
+    var updated = changes.length - back - revise;
     var bits = [];
     if (back) bits.push(back === 1 ? '1 piece came back' : back + ' pieces came back');
     if (updated) bits.push(updated === 1 ? '1 result was updated' : updated + ' results were updated');
-    var line = bits.join(' and ') + '.';
+    // The board's "…asked for 1 revision.", with no name (S11-F2).
+    if (revise) bits.push('your teacher asked for ' + (revise === 1 ? '1 revision' : revise + ' revisions'));
+    var line =
+      (bits.length > 2 ? bits.slice(0, -1).join(', ') + ' and ' + bits[bits.length - 1] : bits.join(' and ')) + '.';
     return (
       '<div class="sp-since"><p class="sp-since-title">' +
       esc(changes.length === 1 ? '1 Thing Since You Last Looked' : changes.length + ' Things Since You Last Looked') +
@@ -1261,6 +1419,8 @@ window.StudentPageView = (function () {
     return view.work.filter(function (p) {
       if (filter === 'new') {
         if (!changed[p.id]) return false;
+      } else if (filter === 'revise') {
+        if (p.kind !== 'revise') return false;
       } else if (filter !== 'all' && segmentOf(p) !== filter) return false;
       var title = String(p.title || '').toLowerCase();
       return words.every(function (w) {
@@ -1275,7 +1435,7 @@ window.StudentPageView = (function () {
       ? 'back'
       : p.kind === 'sent'
         ? 'sent'
-        : p.kind === 'due' || p.kind === 'missing'
+        : p.kind === 'due' || p.kind === 'missing' || p.kind === 'revise'
           ? 'todo'
           : '';
   }
@@ -1288,6 +1448,7 @@ window.StudentPageView = (function () {
   /* One row of All Assignments. It opens the piece's card; Excused work has
      no card, so its row opens nothing. */
   function allRowHtml(p, why) {
+    var by = p.revision && p.revision.reviseBy;
     var v = rowView(p);
     var inner =
       '<span class="sp-dot sp-dot-' +
@@ -1298,6 +1459,12 @@ window.StudentPageView = (function () {
       (v.sub ? '<span class="sp-row-sub">' + esc(v.sub) + '</span>' : '') +
       // A piece back since the student last looked says so (the board's "Returned").
       (why === 'back' ? '<span class="sp-row-flags"><span class="sp-row-flag">Returned</span></span>' : '') +
+      // A revision asked for since the student last looked (the board's "Revise by Nov 10").
+      (why === 'revise' && by
+        ? '<span class="sp-row-flags"><span class="sp-row-flag sp-row-flag-revise">' +
+          esc('Revise by ' + fmtDate(by, DAY)) +
+          '</span></span>'
+        : '') +
       '</span>' +
       (v.result ? '<span class="sp-row-result">' + esc(v.result) + '</span>' : '');
     return (
@@ -1319,8 +1486,11 @@ window.StudentPageView = (function () {
   function allBody(ui, view) {
     var changed = changedIds(view);
     var news = (view.changes || []).length;
-    // New with nothing new (it was all opened) shows everything.
-    var filter = ui.filter === 'new' && !news ? 'all' : ui.filter || 'all';
+    var revising = view.work.some(function (p) {
+      return !!p.revision;
+    });
+    // New with nothing new (it was all opened) shows everything; so does Needs Revision with no revision.
+    var filter = (ui.filter === 'new' && !news) || (ui.filter === 'revise' && !revising) ? 'all' : ui.filter || 'all';
     var shown = matching(view, Object.assign({}, ui, { filter: filter }));
     return (
       '<div class="sp-all-head"><button type="button" class="sp-head-icon" data-act="all-close" aria-label="Back to cards">' +
@@ -1331,7 +1501,7 @@ window.StudentPageView = (function () {
       esc(ui.search || '') +
       '">' +
       '<div class="sp-filters" role="group" aria-label="Show">' +
-      FILTERS.concat(news ? [{ id: 'new', label: 'New ' + news }] : [])
+      FILTERS.concat(news ? [{ id: 'new', label: 'New ' + news }] : [], revising ? [REVISE_FILTER] : [])
         .map(function (f) {
           var on = f.id === filter;
           return (
@@ -2099,7 +2269,7 @@ window.StudentPageView = (function () {
 
   var TAB_IDS = { assignments: 1, learning: 1, questionnaires: 1, reports: 1 };
   var SEGMENT_IDS = { todo: 1, sent: 1, back: 1 };
-  var FILTER_IDS = { all: 1, todo: 1, sent: 1, back: 1, new: 1 };
+  var FILTER_IDS = { all: 1, todo: 1, sent: 1, back: 1, new: 1, revise: 1 };
   var FEEDBACK_ACTS = {
     feedback: 1,
     whole: 1,
@@ -2111,6 +2281,7 @@ window.StudentPageView = (function () {
     'work-close': 1,
     'work-page': 1,
     'work-marks': 1,
+    compare: 1,
   };
   function has(map, key) {
     return typeof key === 'string' && Object.prototype.hasOwnProperty.call(map, key);
@@ -2132,6 +2303,8 @@ window.StudentPageView = (function () {
       next.feedback = '';
       next.whole = false;
     }
+    // Before and After goes with any press but its own (S11-F2).
+    if (act !== 'compare') next.compare = false;
     // See Your Work goes with any press but its own.
     if (!/^work/.test(act)) {
       next.work = '';
@@ -2213,6 +2386,19 @@ window.StudentPageView = (function () {
       if (!has(FILTER_IDS, attr('data-filter'))) return null;
       next.filter = attr('data-filter');
       return { ui: next, focus: '.sp-filter-on' };
+    }
+    if (act === 'compare') {
+      var bid = attr('data-piece');
+      var c = view && pieceIn(view.work, bid);
+      if (!c || c.id !== bid || !hasCompare(c)) return null;
+      next.tab = 'assignments';
+      next.all = false;
+      next.feedback = c.id;
+      next.whole = false;
+      next.compare = true;
+      next.segment = segmentOf(c);
+      next.pick = c.id;
+      return { ui: next, focus: '#sp-fb-title' };
     }
     if (act === 'feedback' || act === 'whole') {
       var fid = attr('data-piece');
