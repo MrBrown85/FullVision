@@ -119,6 +119,9 @@ function _mobileStubElement(id) {
 });
 
 // Load mobile modules in dependency order
+// Photos: shrinking and the queue that keeps them (Add Work).
+load('shared/photo-shrink.js');
+load('shared/photo-queue.js');
 load('teacher-mobile/components.js');
 load('teacher-mobile/card-stack.js');
 load('teacher-mobile/card-widgets.js');

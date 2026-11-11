@@ -16528,6 +16528,10 @@ function clearCardWidgetConfig() {
      Comment for that student. A Late, Missing or Excused mark alone is not.
    studentWorkPageUrl(cid, file, which)  a Promise of an address an <img>
      can show for one page ('page') or its thumbnail ('thumb'), or null.
+     Shipped sample files only; openStudentWorkPage also shows a photo
+     still in the photo queue.
+   addStudentWorkPages, replaceStudentWorkPages, markStudentWorkOnPaper,
+   openStudentWorkPage   work a teacher adds (below, "Work a teacher adds").
 
    A client student id is the server's enrollment id, so enrollment_id is
    the student's id here. Every answer is a copy: changing it changes
@@ -16638,6 +16642,13 @@ function _studentWorkSubmissions(cid) {
       var out = _studentWorkCopy(s);
       out.files = (Array.isArray(out.files) ? out.files : []).slice().sort(function (x, y) {
         return (x.page || 0) - (y.page || 0);
+      });
+      // Who added each page (the contract's added_by); the sample's pages
+      // were all added by whoever sent the work.
+      out.files.forEach(function (f) {
+        if (f && f.added_by !== 'teacher' && f.added_by !== 'student') {
+          f.added_by = out.sent_by === 'teacher' ? 'teacher' : 'student';
+        }
       });
       return out;
     });
@@ -16755,6 +16766,331 @@ function studentWorkPageUrl(cid, file, which) {
   // A sample page is a file name in assets/sample-work, nothing more.
   if (!/^[a-z0-9-]+\.jpg$/.test(name)) return Promise.resolve(null);
   return Promise.resolve(_STUDENT_WORK_DEMO_DIR + name);
+}
+
+/* ── Work a teacher adds (S6-F2, S7-F3) ─────────────────────────────────
+   Add Work, Add as More Pages, Replace Them and Handed In on Paper, in the
+   shapes of the contract's start_work_upload + finish_work_upload and
+   mark_handed_in_paper, so the wiring PR (S5-W1/S6-W1/S7-W1) can point
+   them at the server without a screen changing.
+
+   pages are PhotoShrink.prepare's, in order: [{ blob, thumb, hash, width,
+   height, … }]. Each page waits in the photo queue (shared/photo-queue.js,
+   IndexedDB) under its own local id. In Demo Mode it stays there for good:
+   the queue never sends in Demo Mode, and the work is recorded on this
+   device as handed in. A page still in the queue has the path
+   "photo-queue:<id>" (its thumbnail "photo-queue:<id>:thumb"), which only
+   openStudentWorkPage turns into an address.
+
+   Signed in, these do nothing yet and answer { result: 'not_available' }:
+   the server side (Batch B) is not applied, so no RPC and no edge route is
+   called. Every answer is a Promise; none rejects. */
+var _STUDENT_WORK_QUEUE_PATH = /^photo-queue:(p[a-z0-9]+)(:thumb)?$/;
+var _teacherWorkChain = {}; // cid → the last teacher-work write's promise, so two never interleave
+
+function _teacherWorkId() {
+  return 'w' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function _studentWorkWrite(cid, stored) {
+  var raw = JSON.stringify(stored);
+  _safeLSSet('gb-student-work-' + cid, raw);
+  _studentWork[cid] = { raw: raw, value: stored };
+}
+
+// A copy of the class's stored work to change, or an empty one.
+function _studentWorkDraft(cid) {
+  var stored = _studentWorkCopy(_studentWorkStored(cid));
+  if (!_plainObject(stored)) stored = {};
+  return {
+    course: Object.assign({ send_work: false, keep_photos_until: 'end_of_year' }, stored.course || {}),
+    assessments: Array.isArray(stored.assessments) ? stored.assessments : [],
+    submissions: Array.isArray(stored.submissions) ? stored.submissions : [],
+  };
+}
+
+function _teacherWorkInClass(cid, sid, aid) {
+  var hasPiece = (getAssessments(cid) || []).some(function (a) {
+    return a && a.id === aid;
+  });
+  var hasStudent = (getStudents(cid) || []).some(function (s) {
+    return s && s.id === sid;
+  });
+  return hasPiece && hasStudent;
+}
+
+// The newest handed-in submission for one student and piece in a draft.
+function _teacherWorkSent(draft, sid, aid) {
+  var found = draft.submissions
+    .filter(function (s) {
+      return s && s.state === 'sent' && s.enrollment_id === sid && s.assessment_id === aid;
+    })
+    .sort(function (x, y) {
+      return (y.version || 1) - (x.version || 1);
+    });
+  return found[0] || null;
+}
+
+function _teacherWorkPagesOk(pages) {
+  return (
+    Array.isArray(pages) &&
+    pages.length > 0 &&
+    pages.every(function (p) {
+      return p && p.blob && p.thumb && p.blob.size > 0 && p.thumb.size > 0;
+    })
+  );
+}
+
+// One write at a time per class: each waits for the one before it.
+function _teacherWorkQueued(cid, work) {
+  var before = _teacherWorkChain[cid] || Promise.resolve();
+  var run = before.then(work, work).then(null, function () {
+    return { result: 'store_failed' };
+  });
+  _teacherWorkChain[cid] = run;
+  return run;
+}
+
+function _queuePagesOf(sub) {
+  return ((sub && sub.files) || [])
+    .map(function (f) {
+      var m = f && typeof f.path === 'string' ? _STUDENT_WORK_QUEUE_PATH.exec(f.path) : null;
+      return m && !m[2] ? m[1] : null;
+    })
+    .filter(Boolean);
+}
+
+/* Put pages in the photo queue for one submission. → { ok, ids } or the
+   queue's refusal as an answer. */
+function _teacherWorkQueuePages(cid, sid, aid, subId, pages) {
+  var q = window.PhotoQueue;
+  if (!q || typeof q.add !== 'function') return Promise.resolve({ ok: false, answer: { result: 'no_photo_store' } });
+  return q.add({ course: cid, assessment: aid, enrollment: sid, submission: subId }, pages).then(function (res) {
+    if (res && res.ok) return res;
+    var reason = res && (res.reason === 'storage_full' || res.reason === 'invalid') ? res.reason : 'store_failed';
+    return { ok: false, answer: { result: reason } };
+  });
+}
+
+function _teacherWorkForget(ids) {
+  var q = window.PhotoQueue;
+  if (!q || typeof q.remove !== 'function' || !ids.length) return Promise.resolve();
+  return Promise.all(
+    ids.map(function (id) {
+      return q.remove(id).then(null, function () {});
+    }),
+  );
+}
+
+function _teacherWorkFiles(queued, pages, firstPage) {
+  return queued.map(function (qid, i) {
+    var p = pages[i];
+    return {
+      id: qid,
+      page: firstPage + i,
+      path: 'photo-queue:' + qid,
+      thumb_path: 'photo-queue:' + qid + ':thumb',
+      bytes: p.blob.size,
+      thumb_bytes: p.thumb.size,
+      width: p.width || null,
+      height: p.height || null,
+      rotation: 0,
+      sha256: p.hash || null,
+      added_by: 'teacher',
+    };
+  });
+}
+
+/* What a teacher's Add Work would be answered, before or after the photos
+   are kept (another write may have changed the piece meanwhile). null: go. */
+function _teacherWorkCheck(cid, sid, aid, pages, mode) {
+  if (!_teacherWorkInClass(cid, sid, aid)) return { result: 'not_found' };
+  var sent = _teacherWorkSent(_studentWorkDraft(cid), sid, aid);
+  if (mode === 'new' && sent) return { result: 'already_sent', submission: getStudentSubmission(cid, sid, aid) };
+  if (mode !== 'new' && !sent) return { result: 'nothing_sent' };
+  if (mode === 'add' && sent.on_paper) return { result: 'on_paper', submission: getStudentSubmission(cid, sid, aid) };
+  var have = mode === 'add' ? (sent.files || []).length : 0;
+  if (have + pages.length > STUDENT_WORK_MAX_PAGES)
+    return { result: 'too_many_pages', room: STUDENT_WORK_MAX_PAGES - have };
+  return null;
+}
+
+function _teacherWork(cid, sid, aid, pages, mode) {
+  if (!cid || !_isDemoSession()) return Promise.resolve({ result: 'not_available' });
+  if (!_teacherWorkPagesOk(pages)) return Promise.resolve({ result: 'invalid' });
+  return _teacherWorkQueued(cid, function () {
+    var refused = _teacherWorkCheck(cid, sid, aid, pages, mode);
+    if (refused) return refused;
+    var target = _teacherWorkSent(_studentWorkDraft(cid), sid, aid);
+    var subId = mode === 'add' ? target.id : _teacherWorkId();
+    return _teacherWorkQueuePages(cid, sid, aid, subId, pages).then(function (kept) {
+      if (!kept.ok) return kept.answer;
+      // Asked again now the photos are kept: the piece may have changed.
+      var late = _teacherWorkCheck(cid, sid, aid, pages, mode);
+      var draft = _studentWorkDraft(cid);
+      var now = _teacherWorkSent(draft, sid, aid);
+      if (!late && mode !== 'new' && (!now || now.id !== target.id)) late = { result: 'nothing_sent' };
+      if (late || !_isDemoSession()) {
+        return _teacherWorkForget(kept.ids).then(function () {
+          return late || { result: 'not_available' };
+        });
+      }
+      var stamp = new Date().toISOString();
+      var dropped = [];
+      if (mode === 'add') {
+        var last = (now.files || []).reduce(function (n, f) {
+          return Math.max(n, (f && f.page) || 0);
+        }, 0);
+        now.files = (now.files || []).concat(_teacherWorkFiles(kept.ids, pages, last + 1));
+        now.updated_at = stamp;
+      } else {
+        // Replace Them: every page of what is in goes, the student's among them.
+        if (now) {
+          dropped = _queuePagesOf(now);
+          draft.submissions = draft.submissions.filter(function (s) {
+            return s !== now;
+          });
+        }
+        draft.submissions.push({
+          id: subId,
+          assessment_id: aid,
+          enrollment_id: sid,
+          version: (now && now.version) || 1,
+          state: 'sent',
+          sent_by: 'teacher',
+          on_paper: false,
+          is_late: false,
+          note: null,
+          followed_plan: null,
+          created_at: stamp,
+          sent_at: stamp,
+          files: _teacherWorkFiles(kept.ids, pages, 1),
+        });
+      }
+      _studentWorkWrite(cid, draft);
+      return _teacherWorkForget(dropped).then(function () {
+        return { result: 'sent', submission: getStudentSubmission(cid, sid, aid) };
+      });
+    });
+  });
+}
+
+/* Add Work for one student with nothing in (mode 'new', the default), or
+   Add as More Pages to what is in (mode 'add'). See the block above. */
+function addStudentWorkPages(cid, sid, aid, pages, opts) {
+  var mode = opts && opts.mode === 'add' ? 'add' : 'new';
+  return _teacherWork(cid, sid, aid, pages, mode);
+}
+
+/* Replace Them: the new pages take the place of every page that is in. */
+function replaceStudentWorkPages(cid, sid, aid, pages) {
+  return _teacherWork(cid, sid, aid, pages, 'replace');
+}
+
+/* Handed In on Paper for these students. A student who already has work
+   in, or is not in the class, is passed over. */
+function markStudentWorkOnPaper(cid, aid, sids) {
+  if (!cid || !_isDemoSession()) return Promise.resolve({ result: 'not_available', marked: 0, submissions: [] });
+  return _teacherWorkQueued(cid, function () {
+    var draft = _studentWorkDraft(cid);
+    var made = [];
+    (Array.isArray(sids) ? sids : []).forEach(function (sid) {
+      // A student named twice has work in by the second time.
+      if (typeof sid !== 'string' || !_teacherWorkInClass(cid, sid, aid) || _teacherWorkSent(draft, sid, aid)) return;
+      var stamp = new Date().toISOString();
+      var sub = {
+        id: _teacherWorkId(),
+        assessment_id: aid,
+        enrollment_id: sid,
+        version: 1,
+        state: 'sent',
+        sent_by: 'teacher',
+        on_paper: true,
+        is_late: false,
+        note: null,
+        followed_plan: null,
+        created_at: stamp,
+        sent_at: stamp,
+        files: [],
+      };
+      draft.submissions.push(sub);
+      made.push(sid);
+    });
+    if (made.length) _studentWorkWrite(cid, draft);
+    return {
+      result: 'sent',
+      marked: made.length,
+      submissions: made.map(function (sid) {
+        return getStudentSubmission(cid, sid, aid);
+      }),
+    };
+  });
+}
+
+/* An address an <img> can show for one page ('page') or its thumbnail
+   ('thumb'), whether it is a shipped sample file or a photo still in the
+   photo queue: a Promise of { url, release } or null. Call release() when
+   the picture leaves the screen (a queued photo's address holds its bytes
+   in memory until then); calling it twice is harmless. A caller whose
+   screen changed before the answer came should release it unused. */
+function openStudentWorkPage(cid, file, which) {
+  var name = file && (which === 'thumb' ? file.thumb_path : file.path);
+  if (!name || typeof name !== 'string' || !_studentWorkStored(cid)) return Promise.resolve(null);
+  var m = _STUDENT_WORK_QUEUE_PATH.exec(name);
+  if (!m) {
+    return studentWorkPageUrl(cid, file, which).then(function (url) {
+      return url ? { url: url, release: function () {} } : null;
+    });
+  }
+  if ((which === 'thumb') !== !!m[2]) return Promise.resolve(null);
+  var q = window.PhotoQueue;
+  if (!q || typeof q.blobs !== 'function' || typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
+    return Promise.resolve(null);
+  }
+  return Promise.resolve()
+    .then(function () {
+      return q.blobs(m[1]);
+    })
+    .then(
+      function (found) {
+        var blob = found && (m[2] ? found.thumb : found.photo);
+        if (!blob) return null;
+        var url = URL.createObjectURL(blob);
+        var released = false;
+        return {
+          url: url,
+          release: function () {
+            if (released) return;
+            released = true;
+            URL.revokeObjectURL(url);
+          },
+        };
+      },
+      function () {
+        return null;
+      },
+    );
+}
+
+/* A student or assessment made offline gets its server id: the photos
+   waiting for it take the new id too, so they upload to its real folder
+   (kanban f2). The queue refuses anything that is not a server id. */
+function _studentWorkRekeyed(e) {
+  var d = e && e.detail;
+  var q = window.PhotoQueue;
+  if (!d || (d.kind !== 'assessment' && d.kind !== 'student') || !q || typeof q.rekey !== 'function') {
+    return Promise.resolve(null);
+  }
+  return Promise.resolve()
+    .then(function () {
+      return q.rekey(d.from, d.to);
+    })
+    .then(null, function () {
+      return null;
+    });
+}
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  document.addEventListener('fv:id-rekeyed', _studentWorkRekeyed);
 }
 
 /* ── Namespace ──────────────────────────────────────────────── */
@@ -16885,6 +17221,10 @@ window.GB = {
   studentWorkGradingStarted,
   studentWorkPageUrl,
   saveDemoStudentWork,
+  addStudentWorkPages,
+  replaceStudentWorkPages,
+  markStudentWorkOnPaper,
+  openStudentWorkPage,
   returnGrades,
   listStudentCards,
   makeStudentCards,

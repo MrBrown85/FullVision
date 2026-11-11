@@ -28,6 +28,8 @@ const PRECACHE_URLS = [
   '/shared/reporting-term-presets.js',
   '/shared/data.js',
   '/shared/offline-queue.js',
+  '/shared/photo-shrink.js',
+  '/shared/photo-queue.js',
   '/shared/auto-update.js',
   '/shared/calc.js',
   '/shared/grade-state.js',
