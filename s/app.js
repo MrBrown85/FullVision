@@ -423,9 +423,9 @@
             esc(c.name) +
             '</span>' +
             (c.block ? '<span class="sp-class-sub">' + esc(blockLabel(c.block)) + '</span>' : '') +
+            '</span>' +
             // How many pieces wait there ("3 to do"), once the server says; nothing at 0 or when it does not.
             (c.toDo > 0 ? '<span class="sp-class-todo">' + esc(c.toDo + ' to do') + '</span>' : '') +
-            '</span>' +
             (on ? '<span class="sp-class-tick">' + CHECK_MARK + '</span>' : '') +
             '</button></li>'
           );
