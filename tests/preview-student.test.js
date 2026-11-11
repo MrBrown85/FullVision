@@ -47,13 +47,13 @@ const cell = w => ({
 let doc;
 let stub;
 
-function seed(config, gradingSystem) {
+function seed(config, gradingSystem, noComments) {
   localStorage.clear();
   clearClass(CID);
   const assessments = structuredClone(ASSESSMENTS);
   const cells = {
     [S1]: {
-      essay: cell({ comment: 'Well done.', tags: { t1: lv(3) } }),
+      essay: cell({ comment: noComments ? null : 'Well done.', tags: { t1: lv(3) } }),
       poster: cell({ comment: 'DRAFT-SECRET poster', tags: { t1: lv(1) } }),
       reflect: cell({ comment: 'DRAFT-SECRET reflection', tags: { t1: lv(1) } }),
       quiz: cell({ value: 8 }),
@@ -75,7 +75,7 @@ function seed(config, gradingSystem) {
         [S1]: {
           is_draft: true,
           returned_at: '2026-11-01T18:00:00Z',
-          returned_copy: copy({ comment: 'Good start.', tags: { t1: lv(3) } }),
+          returned_copy: copy({ comment: noComments ? null : 'Good start.', tags: { t1: lv(3) } }),
         },
       },
       quiz: { [S1]: { is_draft: false, returned_at: '2026-11-04T18:00:00Z' } },
@@ -280,7 +280,10 @@ describe('the preview', () => {
     expect(cards).toEqual([
       {
         title: 'Jordan Sees',
-        items: [['Your Result', 'Each returned piece, in this class’s grading style (Both).']],
+        items: [
+          ['Your Result', 'Each returned piece, in this class’s grading style (Both).'],
+          ['Your comment and criterion comments', 'Word for word, as you wrote them.'],
+        ],
       },
       {
         title: 'Jordan Doesn’t See',
@@ -291,9 +294,27 @@ describe('the preview', () => {
           ],
           ['Other students', 'No class average, no one else’s work.'],
           ['Your private notes', 'Observations marked Private stay with you.'],
+          ['My Learning', 'Off for this class. Turn it on in Class Settings › Student Page.'],
         ],
       },
     ]);
+  });
+
+  it('leaves out the comments row when nothing returned has a comment', () => {
+    seed(undefined, undefined, true);
+    const titles = [...openJordan().querySelectorAll('.ps-item-title')].map(text);
+    expect(titles).not.toContain('Your comment and criterion comments');
+  });
+
+  it('with My Learning on (or opened from See What They’d See) it is a Sees row, not a Doesn’t See row', () => {
+    const el = openJordan();
+    PreviewStudent.close();
+    expect(el.isConnected).toBe(false);
+    PreviewStudent.open(CID, S1, null, null, { learning: true });
+    const right = text(overlay().querySelector('.ps-side-right'));
+    const left = text(overlay().querySelector('.ps-side-left'));
+    expect(right).not.toContain('My Learning');
+    expect(left).toContain('My Learning');
   });
 
   it.each([
