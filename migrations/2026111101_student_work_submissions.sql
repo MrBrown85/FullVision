@@ -55,12 +55,14 @@
 --      most); followed_plan ('yes', 'partly', 'no': Did You Do It?, the
 --      student's own word); is_late; version (always 1 here; a revision is
 --      Batch C); card_id (the card that sent it); request_id; created_at,
+--      links_at (when its paths were last handed out for upload links),
 --      sent_at, updated_at.
 --      One handed in per student per assessment per version; one unfinished
 --      send per student per assessment from each side.
 --    public.submission_file: one page. page, path, thumb_path, bytes and
 --      thumb_bytes (as storage recorded them), width, height, sha256,
---      rotation. The file's name is the row's own id.
+--      rotation, link_dies_at (by when the last upload link made for it has
+--      stopped working). The file's name is the row's own id.
 --    public.submission_file_removal: every file to delete from storage, and
 --      the ones already deleted (section 4).
 --    student_submit.send_log: one row each time a card is given upload
@@ -89,8 +91,8 @@
 --        storage's own table no longer has the file;
 --      a file removed while its upload link could still be used is offered
 --        once more after the link has died (2 hours 10 minutes after the
---        page's row was made), so a file put back through an old link goes
---        too.
+--        page's paths were last handed out: a link lasts two hours), so a
+--        file put back through an old link goes too.
 --    A path enters the queue only when its page row is gone, and a new page
 --    can never be given an old path (its name is its own new id), so the
 --    worker cannot delete a file that a page still has. Who runs the worker:
@@ -349,7 +351,7 @@ begin
             ('public._submission_json(uuid)',                                                       '2d20f60def0f309725f16b7b86477fab'),
             ('public._assessment_work_json(uuid)',                                                  'e281660216f4186fe3f374eeacaf2fe6'),
             ('public._submission_same_class()',                                                     '301c53b36722954a92211ea582b7842a'),
-            ('public._submission_file_removed()',                                                   '6baa9df0a3f31f3f7a55bb7771c4e8a9'),
+            ('public._submission_file_removed()',                                                   'edc99e4c04baefcf83b9ce3c94723023'),
             ('public._submission_target_gone()',                                                    'f4f03a728aa0937ff0d89d9e5b62cc67'),
             ('public._submission_gone()',                                                           '606be06c71d963805c12f23208b5c304'),
             ('public._submission_truncated()',                                                      '9abaa6530a1e7f7215951d9952675de0'),
@@ -367,11 +369,11 @@ begin
             ('student_submit._grading_started(uuid,uuid)',                                          '720b9f044b853b5c57b04bec7f59010c'),
             ('student_submit._send_session(text,uuid)',                                             'c39242f54850eeeada19945ac8123644'),
             ('student_submit._work_window(uuid)',                                                   '767795b7835e3c4d6cb628c76df8e6eb'),
-            ('student_submit._send_begin(text,text,uuid,uuid,jsonb,text,text,uuid)',                '751249a78b6c05e4927d17805e5423fa'),
+            ('student_submit._send_begin(text,text,uuid,uuid,jsonb,text,text,uuid)',                '247b8c12e04333451ae7821a2344a30e'),
             ('student_submit.work(text,uuid,text)',                                                 '72233e7985f93eb6a150c1822ed69d14'),
             ('student_submit.send_start(text,uuid,uuid,jsonb,text,text,uuid,text)',                 'e1ccea79acc7dedcbbe10da2a4548643'),
             ('student_submit.replace(text,uuid,uuid,jsonb,text,text,uuid,text)',                    '1dad4dba0d66dcd87820b72485ecb28c'),
-            ('student_submit.send_finish(text,uuid,uuid,jsonb,text)',                               '1b9663c49c49714ec7de2f43e872b0cd'),
+            ('student_submit.send_finish(text,uuid,uuid,jsonb,text)',                               'c20e5a7beae5343f50b968368dfae8c6'),
             ('student_submit.unsend(text,uuid,uuid,text)',                                          '719b3aef45f8946343138924b84a03e9'),
             ('student_submit.file_links(text,uuid,uuid,text)',                                      '99ef3b9e89574fae0a230c4464998baf'),
             ('student_submit.removal_batch(integer)',                                               '964eef99a747dc7180d4ad61bd19b1db'),
@@ -485,6 +487,9 @@ create table if not exists public.submission (
     card_id       uuid,       -- the card whose session sent it; history only
     request_id    uuid,       -- the sender's own id for the call that made the row
     created_at    timestamptz not null default now(),
+    -- When its paths were last handed out to be given upload links (a student's
+    -- send only: each send_start or replace, and each repeat of one).
+    links_at      timestamptz not null default now(),
     sent_at       timestamptz,
     updated_at    timestamptz not null default now(),
     constraint submission_sent_has_time check ((state = 'sent') = (sent_at is not null)),
@@ -518,6 +523,9 @@ create table if not exists public.submission_file (
     sha256        text        constraint submission_file_sha256_check check (sha256 ~ '^[0-9a-f]{64}$'),
     rotation      smallint    not null default 0 constraint submission_file_rotation_check check (rotation in (0, 90, 180, 270)),
     created_at    timestamptz not null default now(),
+    -- The last upload link made for this page stops working before this time:
+    -- two hours after its paths were last handed out, and ten minutes more.
+    link_dies_at  timestamptz not null default (now() + interval '2 hours 10 minutes'),
     -- The file's name is the row's own id, so two rows can never share a
     -- file and a new row can never be given the name of a file that is
     -- waiting to be deleted.
@@ -640,7 +648,7 @@ declare
     _why text := coalesce(nullif(current_setting('fv.work_removal_reason', true), ''), 'row_deleted');
 begin
     insert into submission_file_removal (bucket, path, course_id, reason, link_dies_at)
-    select _work_bucket(), p, fv_private.work_path_course(p), _why, old.created_at + interval '2 hours 10 minutes'
+    select _work_bucket(), p, fv_private.work_path_course(p), _why, old.link_dies_at
       from unnest(array[old.path, old.thumb_path]) p
     on conflict (bucket, path) do nothing;
     return null;
@@ -1598,6 +1606,12 @@ begin
     select * into _sub from submission
      where assessment_id = _a.id and enrollment_id = p_enrollment_id and sent_by = 'student' and request_id = p_request_id;
     if found then
+        if _sub.state = 'sending' then
+            -- Its paths are about to be given fresh upload links, good for two
+            -- hours from now: the send, and each page, is given that long again.
+            update submission set links_at = now() where id = _sub.id;
+            update submission_file set link_dies_at = now() + interval '2 hours 10 minutes' where submission_id = _sub.id;
+        end if;
         return jsonb_build_object('ok', true, 'replayed', true, 'submission_id', _sub.id, 'state', _sub.state,
                                   'bucket', public._work_bucket(), 'late', _sub.is_late,
                                   'files', case when _sub.state = 'sending' then public._work_upload_json(_sub.id) else '[]'::jsonb end);
@@ -1731,7 +1745,7 @@ begin
         return jsonb_build_object('ok', false, 'error', 'not_taking_work');
     end if;
     -- Its upload links have stopped working: start again.
-    if _sub.created_at < now() - interval '2 hours' then
+    if _sub.links_at < now() - interval '2 hours' then
         return jsonb_build_object('ok', false, 'error', 'expired');
     end if;
     if exists (select 1 from jsonb_array_elements(p_files) x
@@ -2050,7 +2064,7 @@ begin
             ('public._submission_json(uuid)',                                                       '2d20f60def0f309725f16b7b86477fab'),
             ('public._assessment_work_json(uuid)',                                                  'e281660216f4186fe3f374eeacaf2fe6'),
             ('public._submission_same_class()',                                                     '301c53b36722954a92211ea582b7842a'),
-            ('public._submission_file_removed()',                                                   '6baa9df0a3f31f3f7a55bb7771c4e8a9'),
+            ('public._submission_file_removed()',                                                   'edc99e4c04baefcf83b9ce3c94723023'),
             ('public._submission_target_gone()',                                                    'f4f03a728aa0937ff0d89d9e5b62cc67'),
             ('public._submission_gone()',                                                           '606be06c71d963805c12f23208b5c304'),
             ('public._submission_truncated()',                                                      '9abaa6530a1e7f7215951d9952675de0'),
@@ -2068,11 +2082,11 @@ begin
             ('student_submit._grading_started(uuid,uuid)',                                          '720b9f044b853b5c57b04bec7f59010c'),
             ('student_submit._send_session(text,uuid)',                                             'c39242f54850eeeada19945ac8123644'),
             ('student_submit._work_window(uuid)',                                                   '767795b7835e3c4d6cb628c76df8e6eb'),
-            ('student_submit._send_begin(text,text,uuid,uuid,jsonb,text,text,uuid)',                '751249a78b6c05e4927d17805e5423fa'),
+            ('student_submit._send_begin(text,text,uuid,uuid,jsonb,text,text,uuid)',                '247b8c12e04333451ae7821a2344a30e'),
             ('student_submit.work(text,uuid,text)',                                                 '72233e7985f93eb6a150c1822ed69d14'),
             ('student_submit.send_start(text,uuid,uuid,jsonb,text,text,uuid,text)',                 'e1ccea79acc7dedcbbe10da2a4548643'),
             ('student_submit.replace(text,uuid,uuid,jsonb,text,text,uuid,text)',                    '1dad4dba0d66dcd87820b72485ecb28c'),
-            ('student_submit.send_finish(text,uuid,uuid,jsonb,text)',                               '1b9663c49c49714ec7de2f43e872b0cd'),
+            ('student_submit.send_finish(text,uuid,uuid,jsonb,text)',                               'c20e5a7beae5343f50b968368dfae8c6'),
             ('student_submit.unsend(text,uuid,uuid,text)',                                          '719b3aef45f8946343138924b84a03e9'),
             ('student_submit.file_links(text,uuid,uuid,text)',                                      '99ef3b9e89574fae0a230c4464998baf'),
             ('student_submit.removal_batch(integer)',                                               '964eef99a747dc7180d4ad61bd19b1db'),

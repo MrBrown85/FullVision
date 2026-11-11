@@ -886,6 +886,7 @@ create table submission (
   card_id       uuid,                                               -- the card whose session sent it; history only
   request_id    uuid,                                               -- the sender's own id for the call that made the row (a repeat returns the same row)
   created_at    timestamptz not null default now(),
+  links_at      timestamptz not null default now(),                 -- when its paths were last handed out for upload links; a send not finished two hours later is expired
   sent_at       timestamptz,                                        -- there exactly when state is sent
   updated_at    timestamptz not null default now()
   -- unique (assessment_id, enrollment_id, version) where state = 'sent'; unique (assessment_id, enrollment_id, sent_by) where state = 'sending'
@@ -900,7 +901,8 @@ create table submission_file (
   width         integer, height integer,
   sha256        text,                                               -- of the page as stored, given when it is handed in; for the same-photo note
   rotation      smallint    not null default 0,                     -- 0 | 90 | 180 | 270; the file itself is never changed
-  created_at    timestamptz not null default now()
+  created_at    timestamptz not null default now(),
+  link_dies_at  timestamptz not null                                -- the last upload link made for the page has stopped working by then (2 h 10 min after its paths were last handed out)
 );
 -- SQL cannot delete a file: only the Storage API can. Every file whose page
 -- row goes (Unsend, Replace, a teacher's delete, an assessment or a student

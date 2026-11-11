@@ -457,6 +457,12 @@ def scen_student():
             ok('the same request id again (the reply was lost): the same submission and the same paths, marked replayed; nothing new is made or counted',
                again['replayed'] is True and (again['submission_id'], again['files']) == (s['submission_id'], s['files'])
                and d.one('select count(*) from submission') == 1 and d.one('select count(*) from student_submit.send_log') == 1, again)
+            d.run("update submission set links_at = now() - interval '90 minutes' where id = :s", s=s['submission_id'])
+            d.run("update submission_file set link_dies_at = link_dies_at - interval '90 minutes' where submission_id = :s", s=s['submission_id'])
+            d.send_start(tok, ENR1, a, pages=3, request=req)
+            ok('a repeat hands the paths out again for fresh links, so the send and each of its pages are given their two hours (and ten minutes) again',
+               d.one('select links_at = now() from submission where id = :s', s=s['submission_id'])
+               and d.one("select bool_and(link_dies_at = now() + interval '2 hours 10 minutes') from submission_file where submission_id = :s", s=s['submission_id']))
             w = d.work(tok, ENR1)['assessments'][0]
             ok('work shows it as a send of the student\'s that is not finished, and nothing sent yet',
                w['sent'] is None and w['sending'] is not None and (w['sending']['submission_id'], w['sending']['intent'], w['sending']['pages']) == (s['submission_id'], 'new', 3), w)
@@ -506,6 +512,8 @@ def scen_student():
             ok('unsend: the submission and its pages are gone', r == {'ok': True, 'unsent': True, 'cancelled': False, 'pages': 3} and d.one('select count(*) from submission') == 0
                and d.one('select count(*) from submission_file') == 0, r)
             ok('all six files are queued for deletion, as unsent, in the same transaction', queued(d, 'unsend') == paths and len(paths) == 6, queued(d))
+            ok('each queued file carries the time its page\'s last upload link dies: two hours and ten minutes after the paths were last handed out',
+               d.one("select bool_and(link_dies_at = now() + interval '2 hours 10 minutes') from submission_file_removal"))
             ok('the database deleted no file itself: storage still holds all six until the worker removes them', d.storage.names() == paths)
             ok('unsend again: ok, nothing was sent, and that is not an error', d.unsend(tok, ENR1, a) == {'ok': True, 'unsent': False, 'cancelled': False, 'pages': 0})
             ok('the piece is back to nothing sent, and can be sent again', d.work(tok, ENR1)['assessments'][0]['sent'] is None and d.send_start(tok, ENR1, a)['ok'] is True)
@@ -521,10 +529,11 @@ def scen_student():
             ok('finishing with pages 3 and 1 only, in that order: two pages handed in, in the order given',
                r['ok'] and r['pages'] == 2 and d.all('select id, page from submission_file order by page') == [[s['files'][2]['file_id'], 1], [s['files'][0]['file_id'], 2]], r)
             ok('the page left out is deleted and its two files are queued', queued(d, 'page_removed') == sorted([s['files'][1]['path'], s['files'][1]['thumb_path']]))
-            e = refused(d, lambda: d.send_finish(tok, ENR1, d.send_start(tok2, ENR2, a)['submission_id'], [s['files'][0]]))
-            ok("a finish naming another student's submission is not_found", err(d.send_finish(tok, ENR1, d.one("select id from submission where enrollment_id = :e", e=ENR2), [s['files'][0]])) == 'not_found')
-            s2 = d.one("select id from submission where enrollment_id = :e", e=ENR2)
-            e = refused(d, lambda: d.send_finish(tok2, ENR2, s2, [s['files'][0]]))
+            other = d.send_start(tok2, ENR2, a); d.upload(other['files'])
+            r = attempt(lambda: d.send_finish(tok, ENR1, other['submission_id'], other['files']))
+            ok("a finish that names another student's send, with that send's own pages all uploaded, is not_found, and that send is left unfinished",
+               isinstance(r, dict) and err(r) == 'not_found' and d.one('select state from submission where id = :s', s=other['submission_id']) == 'sending', r)
+            e = refused(d, lambda: d.send_finish(tok2, ENR2, other['submission_id'], [s['files'][0]]))
             ok("a finish naming a page of another student's submission fails (22023)", e is not None and e[1] == '22023', e)
 
         # ── Starting again; an expired send ─────────────────────────────
@@ -536,7 +545,7 @@ def scen_student():
                s2['ok'] and s2['submission_id'] != s1['submission_id'] and d.one('select count(*) from submission') == 1
                and queued(d, 'abandoned') == sorted(p for f in s1['files'] for p in (f['path'], f['thumb_path'])), queued(d))
             ok('finishing the dropped one: not_found', err(d.send_finish(tok, ENR1, s1['submission_id'], s1['files'])) == 'not_found')
-            d.run("update submission set created_at = now() - interval '2 hours 1 minute' where id = :s", s=s2['submission_id'])
+            d.run("update submission set links_at = now() - interval '2 hours 1 minute' where id = :s", s=s2['submission_id'])
             d.upload(s2['files'])
             ok('a send whose upload links have stopped working cannot be finished: expired', err(d.send_finish(tok, ENR1, s2['submission_id'], s2['files'])) == 'expired')
             ok('unsend drops a send that is not finished, whatever else', d.unsend(tok, ENR1, a) == {'ok': True, 'unsent': False, 'cancelled': True, 'pages': 0}
@@ -698,8 +707,8 @@ def scen_student():
         ok('exactly one of them names grade_return, and it reads its two state columns only',
            [n for n in new_fns if 'grade_return' in code_only(src[n]).replace('_grade_return_lock', '')] == ['_grading_started']
            and re.findall(r'\bg\.(\w+)', code_only(src['_grading_started'])) == ['is_draft', 'returned_at', 'enrollment_id', 'assessment_id'], src['_grading_started'])
-        ok('none of them writes to any table but the submissions and the send count (no insert, update or delete names another)',
-           all(set(re.findall(r'(?:insert\s+into|(?<!for )update|delete\s+from)\s+([a-z_.]+)', code_only(src[n]))) <= {'submission', 'send_log', 'submission_file_removal'} for n in new_fns),
+        ok('none of them writes to any table but the submissions, their pages, the send count and the removal queue (no insert, update or delete names another)',
+           all(set(re.findall(r'(?:insert\s+into|(?<!for )update|delete\s+from)\s+([a-z_.]+)', code_only(src[n]))) <= {'submission', 'submission_file', 'send_log', 'submission_file_removal'} for n in new_fns),
            {n: set(re.findall(r'(?:insert\s+into|(?<!for )update|delete\s+from)\s+([a-z_.]+)', code_only(src[n]))) for n in new_fns})
         pub = {r[0]: r[1] for r in d.all("""select p.oid::regprocedure::text, p.prosrc from pg_proc p where p.oid = any(:f::regprocedure[])""",
                                          f=[s for s in B_FUNCTIONS if not s.startswith('student_submit.')])}

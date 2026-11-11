@@ -182,7 +182,7 @@ begin
             ('public._submission_json(uuid)',                                                       '2d20f60def0f309725f16b7b86477fab'),
             ('public._assessment_work_json(uuid)',                                                  'e281660216f4186fe3f374eeacaf2fe6'),
             ('public._submission_same_class()',                                                     '301c53b36722954a92211ea582b7842a'),
-            ('public._submission_file_removed()',                                                   '6baa9df0a3f31f3f7a55bb7771c4e8a9'),
+            ('public._submission_file_removed()',                                                   'edc99e4c04baefcf83b9ce3c94723023'),
             ('public._submission_target_gone()',                                                    'f4f03a728aa0937ff0d89d9e5b62cc67'),
             ('public._submission_gone()',                                                           '606be06c71d963805c12f23208b5c304'),
             ('public._submission_truncated()',                                                      '9abaa6530a1e7f7215951d9952675de0'),
@@ -200,11 +200,11 @@ begin
             ('student_submit._grading_started(uuid,uuid)',                                          '720b9f044b853b5c57b04bec7f59010c'),
             ('student_submit._send_session(text,uuid)',                                             'c39242f54850eeeada19945ac8123644'),
             ('student_submit._work_window(uuid)',                                                   '767795b7835e3c4d6cb628c76df8e6eb'),
-            ('student_submit._send_begin(text,text,uuid,uuid,jsonb,text,text,uuid)',                '751249a78b6c05e4927d17805e5423fa'),
+            ('student_submit._send_begin(text,text,uuid,uuid,jsonb,text,text,uuid)',                '247b8c12e04333451ae7821a2344a30e'),
             ('student_submit.work(text,uuid,text)',                                                 '72233e7985f93eb6a150c1822ed69d14'),
             ('student_submit.send_start(text,uuid,uuid,jsonb,text,text,uuid,text)',                 'e1ccea79acc7dedcbbe10da2a4548643'),
             ('student_submit.replace(text,uuid,uuid,jsonb,text,text,uuid,text)',                    '1dad4dba0d66dcd87820b72485ecb28c'),
-            ('student_submit.send_finish(text,uuid,uuid,jsonb,text)',                               '1b9663c49c49714ec7de2f43e872b0cd'),
+            ('student_submit.send_finish(text,uuid,uuid,jsonb,text)',                               'c20e5a7beae5343f50b968368dfae8c6'),
             ('student_submit.unsend(text,uuid,uuid,text)',                                          '719b3aef45f8946343138924b84a03e9'),
             ('student_submit.file_links(text,uuid,uuid,text)',                                      '99ef3b9e89574fae0a230c4464998baf'),
             ('student_submit.removal_batch(integer)',                                               '964eef99a747dc7180d4ad61bd19b1db'),
@@ -237,8 +237,8 @@ begin
                          'public.submission_file_removal'::regclass, 'student_submit.send_log'::regclass)
          group by c.oid
         having string_agg(a.attname, ', ' order by a.attnum) not in (
-            'id, course_id, assessment_id, enrollment_id, version, state, intent, target_id, sent_by, on_paper, note, followed_plan, is_late, card_id, request_id, created_at, sent_at, updated_at',
-            'id, submission_id, page, path, thumb_path, bytes, thumb_bytes, width, height, sha256, rotation, created_at',
+            'id, course_id, assessment_id, enrollment_id, version, state, intent, target_id, sent_by, on_paper, note, followed_plan, is_late, card_id, request_id, created_at, links_at, sent_at, updated_at',
+            'id, submission_id, page, path, thumb_path, bytes, thumb_bytes, width, height, sha256, rotation, created_at, link_dies_at',
             'id, bucket, path, course_id, reason, queued_at, link_dies_at, tries, last_try_at, removed_at, done',
             'id, card_id, at')
         union all
