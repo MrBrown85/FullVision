@@ -27,7 +27,7 @@ describe('ReportSheets.pack: room for the name line', () => {
     ]);
   });
 
-  it('a row too tall to fit under the line goes after the report instead of running past the foot', () => {
+  it('a row too tall to fit under the line goes after the report instead of running past the foot; a table goes on', () => {
     // H - 10 fits a bare side but not one with the line: it would have been
     // placed at y = 28 on a Continued side and cut off in print.
     const r = P([[[c('header', 81)], [c('reflection', H - 10)]]]);
@@ -38,14 +38,15 @@ describe('ReportSheets.pack: room for the name line', () => {
     expect(r.after).toEqual(['reflection']);
     expect(r.sides[1].rows[0].h).toBe(H - TOP);
     expect(r.over).toBe(true);
-    // A table that tall is cut at its rows under the line, and nothing is over.
+    // A table that tall starts under the letterhead and goes on under the
+    // line on the next side, cut at its rows, and nothing is over.
     const rows = Array.from({ length: 31 }, () => 30);
     const t = P([[[c('header', 81)], [c('grades', 60 + 31 * 30, { rows, chrome: 60 })]]]);
-    expect(t.sides.map(s => s.kind)).toEqual(['side', 'after', 'after']);
-    t.sides.slice(1).forEach(s => {
-      expect(s.rows[0].y).toBe(TOP);
-      expect(s.rows[0].y + s.rows[0].h).toBeLessThanOrEqual(H);
-    });
+    expect(t.sides.map(s => s.kind)).toEqual(['side', 'continued']);
+    expect(t.sides[0].rows[1].cells[0].part).toEqual({ start: 0, end: 28 });
+    expect(t.sides[1].rows[0].y).toBe(TOP);
+    expect(t.sides[1].rows[0].cells[0].part).toEqual({ start: 28, end: 31 });
+    t.sides.forEach(s => s.rows.forEach(r => expect(r.y + r.h).toBeLessThanOrEqual(H)));
     expect(t.over).toBe(false);
   });
 
