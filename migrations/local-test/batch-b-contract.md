@@ -12,7 +12,7 @@ If you must depart from anything here, add a dated line under "Changes" at the b
 - A card can start 20 sends an hour (send-start and replace both count; a refusal and a repeat of the same request do not).
 - Nothing is handed in until every page and every thumbnail is in storage. The database checks this itself, in storage's own table.
 - **A started send holds its place for two hours from its first start.** It can be finished until then and not after. Asking again with the same request id does not give it longer. After two hours it answers `expired`, and its files are queued for deletion. The same holds for the teacher's Add Work.
-- Whether a piece is open, and whether the work is late, is judged by the class's own date (its time zone) when the send **starts and again when it is handed in**. A send started on the last day and finished the day after is refused. One started before the due date and finished after it is Late.
+- Whether a piece is open, and whether the work is late, is judged by the class's own date (its time zone) when the send **starts and again when it is handed in**. **A send started while the piece was open can be finished within its two hours after the last day has ended, and is Late** (ruling 106, 2026111130): the finish asks whether the day the send started, in the class's time zone, is not after the piece's last day as it is set now. A send the teacher closed under it (the last day moved to before the day it started) is refused. One started before the due date and finished after it is Late.
 - **A page keeps who added it.** A student's Unsend or Replace removes only the pages the student added. Pages the teacher added stay.
 - Unsend and Replace: only the student's own send, only while the piece is open, only until grading starts. **Grading has started** when the piece holds a draft or a returned grade for that student (a level, points, a tick, or an Overall Comment). A Late, Missing or Excused mark alone is not grading.
 - **One class may hold 10,000 pages and 5 GB**, pages handed in and not yet handed in together. A start that would pass either is refused.
@@ -104,7 +104,8 @@ What the page shows about sending. Read-only.
         "note": "I was away Thursday.",
         "pages": 2,
         "grading": false,
-        "can_change": true
+        "can_change": true,
+        "can_send": false
       },
       "sending": null
     }
@@ -115,8 +116,8 @@ What the page shows about sending. Read-only.
 - Lists each assessment that is on the student's page (its date has come, or it has none) and either takes work or has work in. Same order as `page`.
 - `students_send`: `nothing`, `photos` or `photos_files`. The last means the page may also offer a PDF.
 - `open`: work can be sent right now (Send Work on, the piece takes work, today is not past its last day). `closes_on`: the last day, or null. `late_now`: work handed in now would be marked late.
-- `sent`: null, or what is handed in. `sent_by` is `student` or `teacher` (Add Work, Handed In on Paper, or work left with only the teacher's pages after an Unsend). `pages` counts every page, the teacher's among them. `grading`: grading has started. `can_change`: Unsend and Replace would be accepted now.
-- `sending`: null, or a send of this student's that is not finished and still holds its place: `{ submission_id, intent: "new" | "replace", started_at, finish_by, pages }`. Null again once its two hours are up.
+- `sent`: null, or what is handed in. `sent_by` is `student` or `teacher` (Add Work, Handed In on Paper, or work left with only the teacher's pages after an Unsend). `pages` counts every page, the teacher's among them. `grading`: grading has started. `can_change`: Unsend and Replace would be accepted now. `can_send` (2026111130, ruling 107): what is in is the teacher's, not on paper, grading has not started, no revision is open and the piece is open, so `send_start` would be accepted now; the student's new pages will join the teacher's (theirs first). `pages` then counts the teacher's pages, and a send may add `30 - pages`.
+- `sending`: null, or a send of this student's that is not finished and still holds its place: `{ submission_id, intent: "new" | "replace", started_at, finish_by, pages }`. Null again once its two hours are up. **It can be finished even when `open` is false** (the last day ended while it went up): show Finish Sending until `finish_by`; the finish answers if it cannot be taken.
 - A draft on a piece with nothing sent shows nowhere: `sent` is null and nothing else differs.
 
 ### `send_start(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_pages jsonb, p_note text, p_followed_plan text, p_request_id uuid, p_ip_hash text)`
@@ -160,11 +161,11 @@ Make the rows and name the paths. `replace` is for a piece the student has alrea
 | `not_taking_work`                | Students Send is Nothing                                                                                                                                                               |
 | `expired`                        | this request id is a send started more than two hours ago and never finished. It is gone. Start again with a new request id                                                            |
 | `work_closed`, with `closed_on`  | today is past the last day                                                                                                                                                             |
-| `already_sent`                   | `send_start` only: work is already handed in for the piece                                                                                                                             |
+| `already_sent`                   | `send_start` only: the student's own work is handed in for the piece (Replace is the way), or work Handed In on Paper, or a revision is open. Not for the teacher's pages (2026111130) |
 | `nothing_sent`                   | `replace` only                                                                                                                                                                         |
 | `cannot_change`                  | `replace` only: what is in was added by the teacher                                                                                                                                    |
-| `grading_started`                | `replace` only                                                                                                                                                                         |
-| `too_many_pages`, with `room`    | `replace` only: the teacher added pages to this work, they stay, and with them the new pages would pass 30. `room` says how many new pages fit                                         |
+| `grading_started`                | `replace`, and `send_start` onto the teacher's pages (2026111130)                                                                                                                      |
+| `too_many_pages`, with `room`    | `replace`, and `send_start` onto the teacher's pages: they stay, and with them the new pages would pass 30. `room` says how many new pages fit                                         |
 | `too_many`, with `retry_after_s` | twenty sends in the last hour for this card                                                                                                                                            |
 | `class_full`                     | the class holds all it may (10,000 pages or 5 GB). Nothing is made. The teacher is the one who can make room                                                                           |
 | RAISES `22023`                   | no request id, no assessment, pages not a list of 1 to 30 objects, a bad width, height, bytes or thumb_bytes, a note over 1000 characters, a `followed_plan` that is none of the three |
@@ -247,6 +248,16 @@ Nothing handed in answers an empty list.
 ```
 
 `removal_batch` hands out files to delete: the ones never tried first, newest first, then the ones tried longest ago; 1 to 1000 at a time. `removal_done` is believed only for a file storage's own table no longer has. A file removed while an upload link for it could still be alive (up to 4 hours 10 minutes after its send was first started) is offered once more after that, in case it was put back; only then is the queue finished with it. A removal that fails is tried again on the next run: the queue keeps it.
+
+### Since 2026111130 (rulings 106 and 107)
+
+What `send_start` and `send_finish` answer differently. Nothing else changes.
+
+- **A send that crosses the last day.** `send_finish` answers `work_closed` only when the day the send was first started (the class's time zone) is after the piece's last day as it is set now. A send started on the last day and finished after midnight, within its two hours, is taken, with `late: true`. Every other answer is as before, in the same order (`expired` first, then `not_found`, `send_off`, `not_taking_work`, `work_closed`, `missing_pages`, `bad_file`, then the Replace's answers). Work finished after the piece's last day is always Late, whatever the due date.
+- **A send onto the teacher's pages.** When what is in is the teacher's (Add Work, or what an Unsend left) and not on paper, `send_start` starts a send as for a piece with nothing in (`intent: "new"`), after asking `grading_started` and `too_many_pages` (with the teacher's pages). `send_finish` then hands it in with the student's pages first and the teacher's after, each keeping its file id and its `added_by: "teacher"`; `pages` counts all of them. The work is the student's: `sent_by: "student"`, their note and plan, Late as judged at the finish. A later Unsend removes only the student's pages again (`kept` is the teacher's), and the student can send again.
+- The finish decides what it joins: the teacher's work as it is at the finish. If the teacher deleted it meanwhile, the send is handed in on its own; if the teacher used Replace Them meanwhile, it joins the new pages; if the work is now on paper, the answer is `already_sent` and the send is dropped (as before). A send started when nothing was in, finished after the teacher's Add Work was handed in, now joins it (it was `already_sent`).
+- `send_finish`'s answers for a send onto the teacher's pages are the Replace's: `grading_started` (grading started or a page was marked while the pages went up: the send is dropped, the teacher's work stays) and `too_many_pages` with `room` (the teacher added pages meanwhile: nothing is dropped; finish naming `room` pages or start again).
+- `replace` of the teacher's work still answers `cannot_change`, and `unsend` of it `cannot_change`: the call is `send_start`.
 
 ## The routes of `student-submit`
 
@@ -391,3 +402,4 @@ For good; no second copy is kept anywhere.
 ## Changes
 
 - 2026-11-10, after the first review, before anything was built on this: a started send holds its place two hours from its first start and a repeat no longer extends it (`finish_by`; `expired` from `send_start` too); open and late are asked again at the finish (`work_closed` from `send_finish`; `late` is as at the finish); a page keeps who added it (`added_by`, `kept`, `too_many_pages` on `replace`); a class's limit (`class_full`, `bytes` and `thumb_bytes` in `p_pages`); a teacher reads only handed-in work and their own uploads; the requirements on the edge function, the `sweep` route and the 300-second download link.
+- 2026-11-11, `2026111130` (rulings 106 and 107, not applied): a send started while the piece was open finishes after its last day, Late; a student can send onto the teacher's pages (`send_start` no longer `already_sent` for them; `grading_started` and `too_many_pages` from `send_start`; `work().sent.can_send`). See "Since 2026111130".
