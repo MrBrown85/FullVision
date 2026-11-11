@@ -1391,7 +1391,7 @@ competency listed; a percent given where none is true; a draft coming
 back; the list or its order changed; `v` changed), gives each its own
 fingerprints so the file does not refuse itself for that alone, and runs
 the suite. All 33 are noticed: 31 by a check of what the functions do
-(from 1 check to 77), and two by the file itself, which refuses to apply
+(from 1 check to 81), and two by the file itself, which refuses to apply
 them (`page` without `pg_temp`; `page` granted to signed-in teachers).
 
 `s4-m1-undo.sql` (not a migration) and its proof,
