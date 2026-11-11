@@ -2732,6 +2732,99 @@ window.MGrade = (function () {
       fresh.scrollTop = top;
     }
 
+    /* ── Grade From Paper: Set Logan To (S7-F3 follow-up) ──────────
+       The not-in card's Set Logan To opens a sheet of the four levels, in
+       the class's order. A level sets every criterion (or competency) the
+       student has no level for and records the work as handed in on paper:
+       GraderWork.setToFromPaper in shared/grader.js, the desktop's rule.
+       The toast's Undo puts the levels back, as on the desktop. */
+    function _onScreen(cid, aid, sid) {
+      return (
+        _swiperCid === cid &&
+        _swiperAid === aid &&
+        !!document.getElementById('m-screen-grade-swiper') &&
+        !!document.querySelector('#m-swiper .m-swiper-card[data-sid="' + sid + '"]')
+      );
+    }
+
+    // html-safe: the name and title go through MC.esc; ids are ours; levels are numbers
+    function openSetTo(cid, aid, sid) {
+      var a = getAssessments(cid).find(function (x) {
+        return x.id === aid;
+      });
+      var st = getStudents(cid).find(function (s) {
+        return s.id === sid;
+      });
+      if (!a || !st || !MGradePhotos.takes(cid, a) || !MGradePhotos.paperLevels(cid, a)) return;
+      if (isScoreLocked(cid, sid, aid) || !_onScreen(cid, aid, sid)) return;
+      var title = 'Set ' + (displayNameFirst(st) || displayName(st)) + ' To';
+      MC.presentSheet(
+        '<div class="m-tg-menu m-setto-menu" role="dialog" aria-label="' +
+          MC.esc(title) +
+          '"><div class="m-tg-menu-head"><div class="m-tg-menu-name">' +
+          MC.esc(title) +
+          '</div><div class="m-tg-menu-sub">' +
+          MC.esc(a.title) +
+          '</div></div>' +
+          levelOrderFor(cid)
+            .map(function (lv) {
+              return (
+                '<button type="button" class="m-tg-menu-item m-setto-item" data-action="m-work-setto" data-level="' +
+                lv +
+                '" data-sid="' +
+                sid +
+                '" data-aid="' +
+                aid +
+                '"><span class="m-setto-dot" data-score="' +
+                lv +
+                '" aria-hidden="true">' +
+                lv +
+                '</span><span class="m-tg-menu-title">' +
+                MC.esc(_levelName(lv)) +
+                '</span></button>'
+              );
+            })
+            .join('') +
+          '<button type="button" class="m-tg-menu-cancel" data-action="m-sheet-cancel">Cancel</button>' +
+          '</div>',
+        { half: true },
+      );
+    }
+
+    function setToFromPaper(cid, aid, sid, level) {
+      MC.dismissSheet();
+      // The grader moved on (another piece, another screen) while the sheet was up.
+      if (!_onScreen(cid, aid, sid)) return null;
+      var before = structuredClone(getScores(cid));
+      var done = GraderWork.setToFromPaper(cid, aid, sid, level);
+      var after = structuredClone(getScores(cid));
+      clearProfCache();
+      _refreshCard(cid, sid, aid);
+      _updateThumbGraded(cid, aid);
+      _syncReturnBar();
+      // Once the paper mark is kept, the card says Handed in on paper.
+      done.paper.then(function () {
+        if (_onScreen(cid, aid, sid)) _redrawSwiper(cid, aid);
+      });
+      if (done.set) {
+        var st = getStudents(cid).find(function (s) {
+          return s.id === sid;
+        });
+        MC.showToast((st ? displayNameFirst(st) || displayName(st) : 'Student') + ' set to ' + _levelName(level), {
+          onUndo: function () {
+            Grader.undo(cid, before, after);
+            clearProfCache();
+            if (_onScreen(cid, aid, sid)) {
+              _refreshCard(cid, sid, aid);
+              _updateThumbGraded(cid, aid);
+              _syncReturnBar();
+            }
+          },
+        });
+      }
+      return done;
+    }
+
     /* Write one level (and ±) under every key of a criterion, undoable as one. */
     function _writeCriterion(cid, sid, found, level, mod, plusMinus) {
       _writeKeys(cid, sid, found.assessment, rubricCriterionScoreKeys(found.crit), level, mod, plusMinus);
@@ -3580,6 +3673,8 @@ window.MGrade = (function () {
       showStudentPiece: showStudentPiece,
       pageCriterion: pageCriterion,
       toggleCritGroup: toggleCritGroup,
+      openSetTo: openSetTo,
+      setToFromPaper: setToFromPaper,
       studentWork: function () {
         return _student ? { sid: _student.sid, aids: _student.aids.slice(), kinds: _student.kinds.slice() } : null;
       },
@@ -3654,6 +3749,8 @@ window.MGrade = (function () {
     showStudentPiece: Speed.showStudentPiece,
     pageCriterion: Speed.pageCriterion,
     toggleCritGroup: Speed.toggleCritGroup,
+    openSetTo: Speed.openSetTo,
+    setToFromPaper: Speed.setToFromPaper,
     studentWork: Speed.studentWork,
     jumpToFirstDraft: Speed.jumpToFirstDraft,
     studentDrafts: List.studentDrafts,
