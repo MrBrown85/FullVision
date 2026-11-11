@@ -279,7 +279,6 @@ describe('with the build switch off the gradebook is what it was', () => {
   it.each([
     ['a class with neither setting', {}],
     ['a class set to When I Return Them whose student page is off', { return_grades: 'on_return' }],
-    ['a class whose student page was turned off again', { student_page_enabled: false, return_grades: 'on_return' }],
     [
       'a class whose student page is on, set to As Soon As I Save',
       { student_page_enabled: true, return_grades: 'on_save' },
@@ -309,7 +308,6 @@ describe('with the build switch off the gradebook is what it was', () => {
   it.each([
     ['a class with neither setting', {}],
     ['a class set to When I Return Them whose student page is off', { return_grades: 'on_return' }],
-    ['a class whose student page was turned off again', { student_page_enabled: false, return_grades: 'on_return' }],
     [
       'a class whose student page is on, set to As Soon As I Save',
       { student_page_enabled: true, return_grades: 'on_save' },

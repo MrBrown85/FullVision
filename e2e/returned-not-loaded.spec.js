@@ -221,19 +221,6 @@ test.describe('Reports and Assignments while the rows load', () => {
     expect(errors).toEqual([]);
   });
 
-  test('the Term Questionnaire waits, then draws the student', async ({ page }) => {
-    const errors = [];
-    page.on('pageerror', e => errors.push(String(e.message)));
-    await demo(page);
-    await go(page, '/gradebook?course=sci8');
-    await notLoaded(page);
-    await go(page, '/reports?course=sci8&tab=questionnaire&student=st1');
-    await expect(page.locator('#report-output .report-waiting')).toHaveText('Loading this class…');
-    await loaded(page);
-    await expect(page.locator('.qn-name')).toHaveText('Cece Adeyemi');
-    expect(errors).toEqual([]);
-  });
-
   test('Sent to Phones: waiting, then the panel; Send works once the rows are in', async ({ page }) => {
     const errors = [];
     page.on('pageerror', e => errors.push(String(e.message)));

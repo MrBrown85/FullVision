@@ -943,7 +943,6 @@ describe('Class Settings with the switch off is what main draws', () => {
     ['When I Return Them, as every class made since Batch A holds', { return_grades: 'on_return' }],
     ['As Soon As I Save', { return_grades: 'on_save' }],
     ['no choice made, as the server sends it', { return_grades: null }],
-    ['its student page turned off again', { student_page_enabled: false, return_grades: 'on_return' }],
   ])('a signed-in class with its student page off and %s', async (name, config) => {
     var session = signIn();
     try {

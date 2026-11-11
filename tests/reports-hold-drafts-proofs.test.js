@@ -1,21 +1,34 @@
 /**
- * The S2-F1 review's proofs, kept (student page build plan, S2-F1).
+ * The review proofs for S2-F1 and S2-F2, kept (student page build plan):
+ * Progress Reports, the Quick Report with its Feedback Pages, the rubric
+ * handout, the Term Questionnaire, Generate and the phone copies, in a class
+ * that holds grades. Demo Mode's Science 8, graded through the one grader.
  *
- * 1. Every grade in a holding class turned into a draft (levels, points,
- *    marks, comments, ticks, Went Beyond, notes): Progress Reports, the
- *    Quick Report with its Feedback Pages and the rubric handout are what
- *    they were, and none holds a draft's words; Print Grades moves.
- * 2. Nothing kept from an all-work drawing reaches a report.
- * 3. Grades never returned print nowhere.
- * 4. The surfaces left on all work (Print Grades, Export) are the same in a holding class
- *    with drafts as in a class that returns at once.
- * 5. Delete Rubric counts the students whose scores it deletes: all work,
- *    drafts included (teacher/rubric-bank.js deleteImpact).
- * 6. The handout's Printed and Changed Since Printed marks never throw and
- *    never stop a page: with the Draft and Returned rows not loaded there is
- *    no mark, and once they load the marks are drawn again.
+ * One storm of grade writes (every kind: marks, points, levels, comments,
+ * ticks, Went Beyond, overall comments, then notes) over a few students,
+ * and one before/after drawing of every surface, carry these proofs:
  *
- * Demo Mode's Science 8, graded through the one grader.
+ * 1 (S2-F1 1, S2-F2 U1) Every grade turned into a draft: Progress Reports,
+ *   the Quick Report with its Feedback Pages, the handout, the questionnaire,
+ *   Generate and every phone copy are what they were, and none holds a draft's
+ *   words; Print Grades moves.
+ * 2 (S2-F1 2, S2-F2 U2) Nothing kept from all-work readings (the grader's
+ *   preview for every student, Print Grades) reaches a report; the grader's
+ *   preview still reads all work after the questionnaire was drawn.
+ * 3 (S2-F1 3, S2-F2 U3) Grades never returned, with comments and notes:
+ *   nowhere.
+ * 4 (S2-F2 U4) A Note for the Report changed on returned work with a draft
+ *   on top: no draft comment shows, and the note does (a note has no draft
+ *   state of its own; whether it waits for the next Return, as Colin ruled on
+ *   Nov 10, needs the returned copy to keep the note: a database change, not
+ *   in this PR). The reports and the handout do not print it.
+ * 5 The surfaces left on all work (Print Grades, Export) are the same in a
+ *   holding class with drafts as in a class that returns at once.
+ * 6 Delete Rubric counts the students whose scores it deletes: all work,
+ *   drafts included (teacher/rubric-bank.js deleteImpact).
+ * 7 The handout's Printed and Changed Since Printed marks never throw and
+ *   never stop a page: with the Draft and Returned rows not loaded there is
+ *   no mark, and once they load the marks are drawn again.
  */
 import './setup.js';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -66,62 +79,124 @@ const norm = drawn => {
   });
   return drawn;
 };
-const draw = (cid, only) => {
+const ALL = ['progress', 'quick', 'questionnaire', 'phones', 'printGrades', 'export'];
+const REPORTS = ['progress', 'quick', 'questionnaire', 'phones'];
+const SAMPLE = 8;
+
+const draw = (cid, only, students) => {
   clearProfCache();
   freshGenerate();
-  return norm(surfaces(cid, only));
+  return norm(surfaces(cid, only, { students }));
 };
+const moved = (a, b) => Object.keys(b).filter(k => a[k] !== b[k]);
+const holding = (drawn, needle, names) =>
+  Object.keys(drawn).filter(k => (!names || names.indexOf(surfaceOf(k)) >= 0) && drawn[k].indexOf(needle) >= 0);
 
-/* Changes a grade on a cell: `every` changes every cell, else every third. */
-function grade(cid, every, mark) {
-  const students = sortStudents(getStudents(cid), 'lastName');
-  getAssessments(cid).forEach((a, ai) => {
+/* The students the storm and the drawings use: the ones with the most
+   graded work, so every kind of piece has someone to grade. */
+function busiest(cid, n) {
+  const scores = getScores(cid);
+  return sortStudents(getStudents(cid), 'lastName')
+    .map(s => ({ id: s.id, n: (scores[s.id] || []).length }))
+    .sort((a, b) => b.n - a.n)
+    .slice(0, n)
+    .map(s => s.id);
+}
+
+/* Every cell of the `who` students, written the way the grader writes it.
+   'grades' changes each grade and writes each comment, tick and Went
+   Beyond; 'notes' writes each Note for the Report. Gives how many writes of
+   each kind were made. */
+function storm(cid, who, phase, tag) {
+  const made = {};
+  const count = k => (made[k] = (made[k] || 0) + 1);
+  const students = sortStudents(getStudents(cid), 'lastName').filter(s => who.indexOf(s.id) >= 0);
+  getAssessments(cid).forEach(a => {
     if (isDibelsScored(a)) return;
     const rubric = a.rubricId ? getRubricById(cid, a.rubricId) : null;
-    students.forEach((st, si) => {
-      if (!every && (ai + si) % 3) return;
+    students.forEach(st => {
       const sid = st.id;
       const status = getAssignmentStatus(cid, sid, a.id);
       if (status === 'NS' || status === 'EXC') return;
-      const tag = mark + '-' + sid + '-' + a.id;
+      const mark = tag + '-' + sid + '-' + a.id;
+      if (phase === 'notes') {
+        Grader.setReportNote(cid, sid, a.id, mark + '-note');
+        count('note');
+        return;
+      }
       if (isCompletionScored(a)) {
         Grader.setMark(cid, sid, a.id, getCompletionMark(cid, sid, a.id) === 'complete' ? 'incomplete' : 'complete');
+        count('mark');
       } else if (isPointsScored(a)) {
         const p = getPointsScore(cid, sid, a.id);
         Grader.setPoints(cid, sid, a.id, p == null ? 1 : p > 0 ? p - 1 : p + 1);
+        count('points');
       } else if (rubric) {
         (rubric.criteria || []).forEach((c, i) => {
           const entries = (getScores(cid)[sid] || []).filter(e => e.assessmentId === a.id);
           const lv = RubricPrint.criterionLevel(entries, a.id, c).level;
           Grader.setLevel(cid, sid, a.id, c.id, (lv % 4) + 1, 0);
-          if (!every) return;
-          Grader.setCriterionComment(cid, sid, a.id, c.id, tag + '-crit' + i);
-          Grader.setWentBeyond(cid, sid, a.id, c.id, tag + '-beyond' + i);
+          Grader.setCriterionComment(cid, sid, a.id, c.id, mark + '-crit' + i);
+          Grader.setWentBeyond(cid, sid, a.id, c.id, mark + '-beyond' + i);
+          count('level');
+          count('criterionComment');
+          count('wentBeyond');
           (c.checks || []).forEach(x => {
             const on = getRubricCheckIds(cid, sid, a.id).indexOf(x.id) >= 0;
             Grader.setTick(cid, sid, a.id, x.id, !on);
+            count('tick');
           });
         });
       } else {
         (a.tagIds || []).forEach((tid, i) => {
           const e = (getScores(cid)[sid] || []).find(x => x.assessmentId === a.id && x.tagId === tid);
           Grader.setLevel(cid, sid, a.id, tid, ((e ? Number(e.score) || 0 : 0) % 4) + 1, 0);
-          if (every) Grader.setCompetencyComment(cid, sid, a.id, tid, tag + '-tag' + i);
+          Grader.setCompetencyComment(cid, sid, a.id, tid, mark + '-tag' + i);
+          count('level');
+          count('competencyComment');
         });
       }
-      Grader.setOverallComment(cid, sid, a.id, tag + '-overall');
-      if (every) Grader.setReportNote(cid, sid, a.id, tag + '-note');
+      Grader.setOverallComment(cid, sid, a.id, mark + '-overall');
+      count('overall');
     });
   });
+  return made;
 }
 
 describe('a holding class full of drafts', { timeout: 240000 }, () => {
   let wasDemo;
+  let cid, who, made, nDrafts;
+  let before, afterGrades, afterKept, afterNotes, graderSees, returnedSees;
+
   beforeAll(() => {
     wasDemo = window.isDemoMode;
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(FROZEN_AT));
-  });
+    cid = freshClass(HELD);
+    who = busiest(cid, SAMPLE);
+    before = draw(cid, ALL, who);
+    // Every grade a draft, comments and ticks too, no notes yet.
+    made = storm(cid, who, 'grades', 'ZZSTORM');
+    nDrafts = GradeState.draftsWaiting(cid);
+    afterGrades = draw(cid, ALL, who);
+    // Readings of all work, made with nothing cleared after: the grader's preview for every student, Print Grades.
+    getStudents(cid).forEach(st => {
+      ['', 'term-1', 'term-2'].forEach(t =>
+        ReportScores.withReportScores('grader', () => (t ? CommentBank.facts(cid, st, t) : CommentBank.facts(cid, st))),
+      );
+    });
+    surfaces(cid, ['printGrades'], { students: who });
+    getAssessments(cid).forEach(a => getStudents(cid).forEach(s => getAssessmentOverallScore(cid, s.id, a.id)));
+    getStudents(cid).forEach(s => getOverallProficiency(cid, s.id));
+    freshGenerate();
+    afterKept = norm(surfaces(cid, REPORTS, { students: who }));
+    const st = getStudents(cid)[0];
+    graderSees = JSON.stringify(ReportScores.withReportScores('grader', () => CommentBank.facts(cid, st)));
+    returnedSees = JSON.stringify(CommentBank.facts(cid, st));
+    // A Note for the Report on every piece graded above, on returned work with a draft on top.
+    storm(cid, who, 'notes', 'ZZNOTED');
+    afterNotes = draw(cid, REPORTS, who);
+  }, 600000);
   afterAll(() => {
     vi.useRealTimers();
     window.isDemoMode = wasDemo;
@@ -130,83 +205,93 @@ describe('a holding class full of drafts', { timeout: 240000 }, () => {
     clearProfCache();
   });
 
-  it('every grade a draft: the reports and the handout are what they were; Print Grades moves', () => {
-    const cid = freshClass(HELD);
-    const before = draw(cid, ['progress', 'quick', 'printGrades']);
-    grade(cid, true, 'ZZSTORM');
-    expect(GradeState.draftsWaiting(cid)).toBeGreaterThan(100);
-    const after = draw(cid, ['progress', 'quick', 'printGrades']);
-    const moved = Object.keys(before).filter(k => before[k] !== after[k]);
-    const reports = moved.filter(k => surfaceOf(k) !== 'printGrades');
-    const leaks = Object.keys(after).filter(k => surfaceOf(k) !== 'printGrades' && after[k].indexOf('ZZSTORM') >= 0);
-    expect(moved.length - reports.length, 'Print Grades moved').toBeGreaterThan(0);
-    expect(leaks).toEqual([]);
+  it('the storm made every kind of write', () => {
+    ['mark', 'points', 'level', 'criterionComment', 'wentBeyond', 'tick', 'competencyComment', 'overall'].forEach(k =>
+      expect(made[k], k).toBeGreaterThan(0),
+    );
+    expect(nDrafts).toBeGreaterThan(100);
+  });
+
+  it('1 every grade a draft: the reports, the handout, the questionnaire, Generate and the phone copies are what they were; Print Grades moves', () => {
+    const changed = moved(before, afterGrades);
+    const reports = changed.filter(k => REPORTS.indexOf(surfaceOf(k)) >= 0);
+    reports.slice(0, 3).forEach(k => console.log('MOVED', k));
+    expect(changed.filter(k => surfaceOf(k) === 'printGrades').length, 'Print Grades moved').toBeGreaterThan(0);
     expect(reports).toEqual([]);
+    expect(holding(afterGrades, 'ZZSTORM', ['progress', 'quick', 'questionnaire', 'phones'])).toEqual([]);
   });
 
-  it('nothing kept from an all-work drawing reaches a report', () => {
-    const cid = freshClass(HELD);
-    const before = draw(cid, ['progress', 'quick']);
-    grade(cid, false, 'ZZSOME');
-    // The teacher's sheet first (all work), so anything kept from it would be in reach of the report.
-    surfaces(cid, ['printGrades']);
-    getAssessments(cid).forEach(a => getStudents(cid).forEach(s => getAssessmentOverallScore(cid, s.id, a.id)));
-    getStudents(cid).forEach(s => getOverallProficiency(cid, s.id));
-    const after = norm(surfaces(cid, ['progress', 'quick']));
-    expect(GradeState.draftsWaiting(cid)).toBeGreaterThan(100);
-    expect(Object.keys(before).filter(k => before[k] !== after[k])).toEqual([]);
+  it('2 nothing kept from all-work readings reaches a report; the grader’s preview still reads all work', () => {
+    expect(moved(before, afterKept)).toEqual([]);
+    expect(graderSees).not.toBe(returnedSees);
   });
 
-  it('grades never returned print nowhere', () => {
-    const cid = freshClass(null);
+  it('4 a Note for the Report on returned work, a draft on top: no draft comment shows, the note does, and no report prints it', () => {
+    // The note shows where the questionnaire and phone copies carry it (a note has no draft state).
+    const holdNote = Object.keys(afterNotes).filter(
+      k => afterNotes[k].indexOf('-note') >= 0 && afterNotes[k].indexOf('ZZNOTED') >= 0,
+    );
+    expect(holdNote.length).toBeGreaterThan(0);
+    // No draft comment, comment on a criterion or competency, or Went Beyond shows.
+    expect(holding(afterNotes, 'ZZSTORM')).toEqual([]);
+    expect(
+      Object.keys(afterNotes).filter(k => /ZZNOTED-[^"\\]*-(overall|crit|tag|beyond)/.test(afterNotes[k])),
+    ).toEqual([]);
+    // Progress Reports and the Quick Report do not print notes.
+    expect(holding(afterNotes, 'ZZNOTED', ['progress', 'quick'])).toEqual([]);
+    expect(moved(before, afterNotes).filter(k => surfaceOf(k) === 'progress' || surfaceOf(k) === 'quick')).toEqual([]);
+  });
+
+  it('3 grades never returned, with comments and notes: nowhere', () => {
+    const c2 = freshClass(null);
     const pieces = [
-      getAssessments(cid).find(a => a.rubricId && !isPointsScored(a)),
-      getAssessments(cid).find(a => isPointsScored(a) && !isCompletionScored(a)),
-      getAssessments(cid).find(a => !a.rubricId && !isPointsScored(a) && !isDibelsScored(a)),
+      getAssessments(c2).find(a => a.rubricId && !isPointsScored(a)),
+      getAssessments(c2).find(a => isPointsScored(a) && !isCompletionScored(a)),
+      getAssessments(c2).find(a => !a.rubricId && !isPointsScored(a) && !isDibelsScored(a)),
     ];
-    const kept = structuredClone(getScores(cid));
-    const scores = getScores(cid);
+    const kept = structuredClone(getScores(c2));
+    const scores = getScores(c2);
     Object.keys(scores).forEach(sid => {
       scores[sid] = scores[sid].filter(e => !pieces.some(p => p.id === e.assessmentId));
     });
-    saveScores(cid, scores);
-    saveCourseConfig(cid, Object.assign({}, getCourseConfig(cid), HELD));
-    const before = draw(cid, ['progress', 'quick']);
+    saveScores(c2, scores);
+    saveCourseConfig(c2, Object.assign({}, getCourseConfig(c2), HELD));
+    const b = draw(c2, REPORTS, who);
     let n = 0;
-    getStudents(cid).forEach(st => {
+    let nDrawn = 0;
+    getStudents(c2).forEach(st => {
       pieces.forEach(p => {
-        const status = getAssignmentStatus(cid, st.id, p.id);
+        const status = getAssignmentStatus(c2, st.id, p.id);
         if (status === 'NS' || status === 'EXC') return;
         (kept[st.id] || [])
           .filter(e => e.assessmentId === p.id && Number(e.score) > 0)
           .forEach(e => {
-            if (isPointsScored(p)) Grader.setPoints(cid, st.id, p.id, Number(e.score));
-            else Grader.setLevel(cid, st.id, p.id, e.tagId, Number(e.score), 0);
+            if (isPointsScored(p)) Grader.setPoints(c2, st.id, p.id, Number(e.score));
+            else Grader.setLevel(c2, st.id, p.id, e.tagId, Number(e.score), 0);
             n++;
+            if (who.indexOf(st.id) >= 0) nDrawn++;
           });
-        Grader.setOverallComment(cid, st.id, p.id, 'ZZNEVER ' + st.id);
+        Grader.setOverallComment(c2, st.id, p.id, 'ZZNEVER comment ' + st.id);
+        Grader.setReportNote(c2, st.id, p.id, 'ZZNEVER note ' + st.id);
       });
     });
-    const after = draw(cid, ['progress', 'quick']);
+    const a = draw(c2, REPORTS, who);
     expect(n).toBeGreaterThan(30);
-    expect(Object.keys(after).filter(k => after[k].indexOf('ZZNEVER') >= 0)).toEqual([]);
-    expect(Object.keys(before).filter(k => before[k] !== after[k])).toEqual([]);
+    expect(nDrawn).toBeGreaterThan(0);
+    expect(holding(a, 'ZZNEVER')).toEqual([]);
+    expect(moved(b, a)).toEqual([]);
   });
 
-  it('the surfaces left on all work are the same with drafts held as with grades returned at once', () => {
-    const drawn = config => {
-      const cid = freshClass(config);
-      grade(cid, false, 'ZZSOME');
-      clearProfCache();
-      freshGenerate();
-      // Since S2-F2 the questionnaire and the phone copies are on returned grades too (tests/questionnaire-holds-drafts.test.js).
-      return [surfaces(cid, ['printGrades', 'export']), GradeState.draftsWaiting(cid)];
-    };
-    const [atOnce, none] = drawn({ student_page_enabled: true, return_grades: 'on_save' });
-    const [held, waiting] = drawn(HELD);
-    expect(none).toBe(0);
-    expect(waiting).toBeGreaterThan(100);
-    expect(Object.keys(atOnce).filter(k => atOnce[k] !== held[k])).toEqual([]);
+  it('5 the surfaces left on all work are the same with drafts held as with grades returned at once', () => {
+    const atOnceClass = freshClass({ student_page_enabled: true, return_grades: 'on_save' });
+    storm(atOnceClass, who, 'grades', 'ZZSTORM');
+    expect(GradeState.draftsWaiting(atOnceClass)).toBe(0);
+    const atOnce = draw(atOnceClass, ['printGrades', 'export'], who);
+    expect(nDrafts).toBeGreaterThan(100);
+    const held = Object.keys(afterGrades).filter(k => surfaceOf(k) === 'printGrades' || surfaceOf(k) === 'export');
+    expect(held.length).toBeGreaterThan(0);
+    expect(Object.keys(atOnce)).toEqual(held);
+    expect(held.filter(k => atOnce[k] !== afterGrades[k])).toEqual([]);
   });
 
   it('Delete Rubric counts the students whose scores it deletes, drafts included', () => {

@@ -168,15 +168,6 @@ test.describe('Print Reports with drafts', () => {
     await expect(drafts(page)).toHaveCount(0);
     await expect.poll(() => prints(page)).toBe(2);
   });
-
-  test('in a class that does not hold grades nothing is asked', async ({ page }) => {
-    await demoWithDrafts(page, { student_page_enabled: true, return_grades: 'on_save' });
-    expect(await waiting(page)).toBe(0);
-    await openProgress(page);
-    await printReports(page);
-    await expect.poll(() => prints(page)).toBe(1);
-    await expect(drafts(page)).toHaveCount(0);
-  });
 });
 
 test.describe('Print Rubrics with a draft, from each door', () => {

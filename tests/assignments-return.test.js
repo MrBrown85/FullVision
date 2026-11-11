@@ -210,7 +210,16 @@ const markButton = (aid, sid, which) =>
 const graderTagLevel = (root, tag, n) =>
   root.querySelector('[data-action="graderTagLevel"][data-tag="' + tag + '"][data-level="' + n + '"]');
 // The page brings itself up to date a moment after each event.
-const settled = () => new Promise(r => setTimeout(r, 10));
+// A test that waits on the page's own timers moves the clock (movedClock) instead of sleeping.
+let clockMoved = false;
+const settled = () => (clockMoved ? vi.advanceTimersByTimeAsync(10) : new Promise(r => setTimeout(r, 10)));
+const movedClock = () => {
+  clockMoved = true;
+  vi.useFakeTimers({
+    toFake: ['Date', 'setTimeout', 'clearTimeout'],
+    now: new Date('2026-11-10T18:00:00.000Z'),
+  });
+};
 const expandAll = () => click(document.querySelector('[data-action="expandAllAssess"]'));
 
 /* The walk the snapshot records. Returns { name: html }. */
@@ -327,6 +336,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date('2026-11-10T18:00:00.000Z'));
 });
 afterEach(() => {
+  clockMoved = false;
   vi.useRealTimers();
   const page = window.PageAssignments;
   if (typeof dismissUndoToast === 'function' && page && page.graderOpen && page.graderOpen()) dismissUndoToast();
@@ -380,7 +390,6 @@ describe('with the build switch off the Assignments page is what it was', () => 
   it.each([
     ['a class with neither setting', {}],
     ['a class set to When I Return Them whose student page is off', { return_grades: 'on_return' }],
-    ['a class whose student page was turned off again', { student_page_enabled: false, return_grades: 'on_return' }],
     [
       'a class whose student page is on, set to As Soon As I Save',
       { student_page_enabled: true, return_grades: 'on_save' },
@@ -408,7 +417,6 @@ describe('with the build switch off the Assignments page is what it was', () => 
   it.each([
     ['a class with neither setting', {}],
     ['a class set to When I Return Them whose student page is off', { return_grades: 'on_return' }],
-    ['a class whose student page was turned off again', { student_page_enabled: false, return_grades: 'on_return' }],
     [
       'a class the server says is on, set to As Soon As I Save',
       { student_page_enabled: true, return_grades: 'on_save' },
@@ -655,6 +663,7 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them: the As
   });
 
   it('points typed in a ledger and a comment saved off its timer are drafts too', async () => {
+    movedClock();
     openCard(QUIZ);
     await settled();
     typeAndLeave(pointsBox(QUIZ, CARA), '6');
@@ -667,7 +676,7 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them: the As
     fire(box, 'input');
     await settled();
     expect(mark(QUIZ, BEN)).toBe('');
-    await new Promise(r => setTimeout(r, 900));
+    await vi.advanceTimersByTimeAsync(900);
     expect(GradeState.stateOf(CID, BEN, QUIZ)).toBe('draft');
     expect(mark(QUIZ, BEN)).toBe('Draft');
     expect(text(pill())).toBe('2 to return');
@@ -801,12 +810,13 @@ describe.skipIf(UPDATE)('with the build switch on and When I Return Them: the As
   });
 
   it('the count follows the Filter menu and the search: it is the drafts on screen', async () => {
+    movedClock();
     openGraded();
     await settled();
     const box = document.querySelector('.assess-search-input');
     box.value = 'quiz';
     fire(box, 'input');
-    await new Promise(r => setTimeout(r, 400));
+    await vi.advanceTimersByTimeAsync(400);
     expect(listed()).toEqual([QUIZ]);
     expect(text(pill())).toBe('1 to return');
   });

@@ -170,3 +170,31 @@ test('About Me turned off links straight to Class Settings › Questionnaires', 
   await expect(page).toHaveURL(/\/dashboard\?manage=questionnaires$/);
   await expect(page.locator('[role=tab][aria-selected=true]')).toContainText('Questionnaires');
 });
+
+// The profile reads Cece's answers from the seeded class. How each section
+// draws them is pinned in tests/learner-profile.test.js; this checks the page
+// is wired to them, that the older profile stays below, and the jump link.
+test("Cece's answers reach the profile, the older profile stays below, and a jump link scrolls", async ({ page }) => {
+  await openStudent(page, 'Cece');
+  const card = page.locator('.id-card');
+  await expect(card.locator('.id-say strong')).toHaveText('SEE');
+  await expect(page.locator('.id-private-text')).toContainText('My grandma is staying with us');
+  await expect(page.locator('#lp-about')).toContainText('I ask a lot of questions');
+  await expect(page.locator('#lp-goals .st').first()).toHaveText('Working On It');
+  await expect(page.locator('#lp-refl .stu-core-step.on')).toHaveText(['Growing', 'Confident']);
+  await expect(page.locator('#lp-dispositions .stu-profile-group h3')).toHaveText([
+    'Learning Dispositions',
+    'Relational and Identity',
+  ]);
+  await expect(page.locator('#lp-core .stu-core-table')).toBeVisible();
+
+  await card.getByRole('link', { name: /Reflections/ }).click();
+  await expect(page.locator('#lp-refl')).toBeInViewport();
+});
+
+test('a student with no answers gets no private note and a "No answers yet" tab', async ({ page }) => {
+  await openStudent(page, 'Liam');
+  await expect(page.locator('#lp-about')).toContainText('Liam hasn’t answered About Me yet.');
+  await expect(page.locator('.id-private')).toHaveCount(0);
+  await expect(page.locator('#stu-tab-profile .stu-tab-sub')).toHaveText('No answers yet');
+});
