@@ -95,7 +95,7 @@ begin
             ('public.set_course_send_work(uuid,jsonb,uuid)',                                        '694863746b03f4be25263a5107f5b02e'),
             ('public.set_assessment_student_work(uuid,jsonb,uuid)',                                 'c58c518c44d32262b3713753b7aaac1f'),
             ('public.list_course_submissions(uuid)',                                                '8703f5ddc09b3c8dc92aa70878b5d7b1'),
-            ('public.start_work_upload(uuid,uuid,jsonb,text,uuid)',                                 '16d9cfa88f6c5ebcbb7bb6915013c592'),
+            ('public.start_work_upload(uuid,uuid,jsonb,text,uuid)',                                 'ef4590b75c38b428fcdb81b92a2407f3'),
             ('public.finish_work_upload(uuid,jsonb,uuid)',                                          'd62a6e550d7535f123f58b17cfe838f2'),
             ('public.mark_handed_in_paper(uuid,uuid[],uuid)',                                       '1a966bceb2e46eb59107e2753e731bd4'),
             ('public.delete_submission(uuid,uuid)',                                                 '7da38ac3304aaf2f9639877b3fd0f81a'),
@@ -869,6 +869,7 @@ declare
     _course uuid;
     _sent   submission%rowtype;
     _id     uuid;
+    _pages  int;
 begin
     if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
     if not fv_owns_assessment(p_assessment_id) then
@@ -905,11 +906,16 @@ begin
     if p_mode in ('add', 'replace') and _sent.id is null then
         return jsonb_build_object('result', 'nothing_sent');
     end if;
+    -- Two more things the screen cannot know for sure when it asks (another
+    -- device may have changed the piece): answers, not errors, and not
+    -- remembered.
     if p_mode = 'add' and _sent.on_paper then
-        raise exception 'pages cannot be added to work handed in on paper: replace it' using errcode = '22023';
+        -- nothing to add pages to: Replace Them is the way
+        return jsonb_build_object('result', 'on_paper', 'submission', _submission_json(_sent.id) - 'intent' - 'target_id');
     end if;
-    if p_mode = 'add' and (select count(*) from submission_file f where f.submission_id = _sent.id) + jsonb_array_length(p_pages) > 30 then
-        raise exception 'a submission holds 30 pages at most' using errcode = '22023';
+    _pages := (select count(*) from submission_file f where f.submission_id = _sent.id);
+    if p_mode = 'add' and _pages + jsonb_array_length(p_pages) > 30 then
+        return jsonb_build_object('result', 'too_many_pages', 'room', 30 - _pages);
     end if;
     -- An upload this teacher started for the piece and never finished goes.
     perform set_config('fv.work_removal_reason', 'abandoned', true);
@@ -1782,7 +1788,7 @@ begin
             ('public.set_course_send_work(uuid,jsonb,uuid)',                                        '694863746b03f4be25263a5107f5b02e'),
             ('public.set_assessment_student_work(uuid,jsonb,uuid)',                                 'c58c518c44d32262b3713753b7aaac1f'),
             ('public.list_course_submissions(uuid)',                                                '8703f5ddc09b3c8dc92aa70878b5d7b1'),
-            ('public.start_work_upload(uuid,uuid,jsonb,text,uuid)',                                 '16d9cfa88f6c5ebcbb7bb6915013c592'),
+            ('public.start_work_upload(uuid,uuid,jsonb,text,uuid)',                                 'ef4590b75c38b428fcdb81b92a2407f3'),
             ('public.finish_work_upload(uuid,jsonb,uuid)',                                          'd62a6e550d7535f123f58b17cfe838f2'),
             ('public.mark_handed_in_paper(uuid,uuid[],uuid)',                                       '1a966bceb2e46eb59107e2753e731bd4'),
             ('public.delete_submission(uuid,uuid)',                                                 '7da38ac3304aaf2f9639877b3fd0f81a'),

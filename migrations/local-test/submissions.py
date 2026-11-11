@@ -271,8 +271,8 @@ def scen_teacher():
             ok('finishing the dropped one: gone', d.rpc('finish_work_upload(:s, :f::jsonb, :k)', s=s1['submission_id'],
                                                          f=json.dumps([{'file_id': s1['files'][0]['file_id'], 'sha256': HASH}]), k=nid()) == {'result': 'gone'})
             d.teacher_upload(a, ENR2, 29)
-            e = refused(d, lambda: d.rpc('start_work_upload(:a, :e, :p::jsonb, :m, :k)', a=a, e=ENR2, p='[{}, {}]', m='add', k=nid()))
-            ok('adding two pages to a submission of 29 is refused: 30 at most (22023)', e is not None and e[1] == '22023', e)
+            r = d.rpc('start_work_upload(:a, :e, :p::jsonb, :m, :k)', a=a, e=ENR2, p='[{}, {}]', m='add', k=nid())
+            ok('adding two pages to a submission of 29: too_many_pages, room for one, nothing made (30 at most)', r == {'result': 'too_many_pages', 'room': 1}, r)
             ok('adding one is taken', d.rpc('start_work_upload(:a, :e, :p::jsonb, :m, :k)', a=a, e=ENR2, p='[{}]', m='add', k=nid())['result'] == 'ready')
 
         # ── Handed In on Paper ──────────────────────────────────────────
@@ -288,8 +288,8 @@ def scen_teacher():
             ok('it works on an assessment set to take nothing: the paper pile', d.rpc('mark_handed_in_paper(:a, :e, :k)', a=k['nothing'], e=[ENR1], k=nid())['marked'] == 1)
             e = refused(d, lambda: d.rpc('mark_handed_in_paper(:a, :e, :k)', uid=B, a=a, e=[ENR1], k=nid()))
             ok("another teacher's assessment: not found (P0002)", e is not None and e[1] == 'P0002', e)
-            e = refused(d, lambda: d.rpc('start_work_upload(:a, :e, :p::jsonb, :m, :k)', a=a, e=ENR2, p='[{}]', m='add', k=nid()))
-            ok('pages cannot be added to a paper hand-in (22023); Replace Them is the way', e is not None and e[1] == '22023', e)
+            r = d.rpc('start_work_upload(:a, :e, :p::jsonb, :m, :k)', a=a, e=ENR2, p='[{}]', m='add', k=nid())
+            ok('pages cannot be added to a paper hand-in: on_paper, nothing made; Replace Them is the way', r['result'] == 'on_paper' and r['submission']['on_paper'] is True and d.one('select count(*) from submission') == 3, r)
             rep, done = d.teacher_upload(a, ENR2, 1, mode='replace')
             ok('Replace Them on a paper hand-in puts photos in its place', done['result'] == 'sent' and done['submission']['on_paper'] is False and queued(d) == [], done)
             e = refused(d, lambda: d.run("insert into submission (course_id, assessment_id, enrollment_id, state, sent_by, on_paper, sent_at) values (:c, :a, :e, 'sent', 'student', true, now())",
@@ -951,7 +951,222 @@ def scen_storage():
     finally:
         d.close()
 
-SCENARIOS = {'teacher': scen_teacher, 'student': scen_student, 'storage': scen_storage}
+# ════════════════════════════════════════════════════════════════════════════
+def scen_race():
+    d, k = applied('race')
+    sides = []
+    def side():
+        x = Side(d); sides.append(x); return x
+    def second_waits(first, second):
+        """first() runs in an open transaction on its own connection; second() is then started on another.
+        Returns (did the second wait, the first's answer, the second's answer), the first committed in between."""
+        h = side(); h.begin(); a1 = attempt(lambda: first(h))
+        out = {}; o = side()
+        t = threading.Thread(target=lambda: out.setdefault('r', attempt(lambda: second(o)))); t.start(); time.sleep(0.6)
+        waited = t.is_alive(); h.commit(); t.join(15)
+        return waited, a1, out.get('r')
+    try:
+        a = k['takes']
+        tok, _ = d.session(ENR1); tok2, _ = d.session(ENR2, birthday='2012-06-16')
+        def clear():
+            """Back to an empty class: no work, no files, nothing queued, no grades."""
+            for st_ in ('delete from submission', 'delete from student_submit.send_log', 'delete from grade_return', 'delete from score'): d.run(st_)
+            d.storage.remove(d.storage.names()); d.run('delete from submission_file_removal')
+
+        # ── Two phones send for the same piece at once ──────────────────
+        waited, s1, s2 = second_waits(lambda x: x.send_start(tok, ENR1, a), lambda x: x.send_start(tok, ENR1, a))
+        ok("two sends started at once for one piece: the second waits for the first, then takes its place; one unfinished send, the first one's paths queued",
+           waited and s1['ok'] and s2['ok'] and d.all("select id from submission where state = 'sending'") == [[s2['submission_id']]]
+           and queued(d, 'abandoned') == sorted(p for f in s1['files'] for p in (f['path'], f['thumb_path'])), (waited, s1, s2))
+        d.upload(s1['files']); d.upload(s2['files'])
+        r1 = d.send_finish(tok, ENR1, s1['submission_id'], s1['files']); r2 = d.send_finish(tok, ENR1, s2['submission_id'], s2['files'])
+        ok("the first phone's finish is not_found; the second's hands the work in; one submission", (err(r1), r2['ok']) == ('not_found', True) and d.one('select count(*) from submission') == 1, (r1, r2))
+        clear()
+        # the same request twice at once
+        req = nid()
+        waited, s1, s2 = second_waits(lambda x: x.send_start(tok, ENR1, a, request=req), lambda x: x.send_start(tok, ENR1, a, request=req))
+        ok("the same request sent twice at once: the second waits and is given the first's answer; one row, counted once",
+           waited and s2['replayed'] is True and s2['submission_id'] == s1['submission_id'] and d.one('select count(*) from submission') == 1
+           and d.one('select count(*) from student_submit.send_log') == 1, (s1, s2))
+        # two finishes of one send at once
+        d.upload(s1['files'])
+        waited, f1, f2 = second_waits(lambda x: x.send_finish(tok, ENR1, s1['submission_id'], s1['files']), lambda x: x.send_finish(tok, ENR1, s1['submission_id'], s1['files']))
+        ok('two finishes of one send at once: the second waits, then is told it is already handed in', waited and f1['ok'] and f1['replayed'] is False and f2['replayed'] is True, (f1, f2))
+
+        # ── Unsend during a send ────────────────────────────────────────
+        waited, u, f = second_waits(lambda x: x.unsend(tok, ENR1, a), lambda x: x.send_start(tok, ENR1, a, replace=True))
+        ok('Unsend and Replace pressed at once on two phones, Unsend first: Replace waits, then finds nothing sent', waited and u['unsent'] is True and err(f) == 'nothing_sent', (u, f))
+        s = d.send_start(tok, ENR1, a); d.upload(s['files'])
+        waited, f, u = second_waits(lambda x: x.send_finish(tok, ENR1, s['submission_id'], s['files']), lambda x: x.unsend(tok, ENR1, a))
+        ok('Unsend while the send is being finished, the finish first: Unsend waits, then unsends what was just handed in; its files are queued',
+           waited and f['ok'] and u == {'ok': True, 'unsent': True, 'cancelled': False, 'pages': 1} and d.one('select count(*) from submission') == 0 and sound(d) == '', (f, u))
+        s = d.send_start(tok, ENR1, a); d.upload(s['files'])
+        waited, u, f = second_waits(lambda x: x.unsend(tok, ENR1, a), lambda x: x.send_finish(tok, ENR1, s['submission_id'], s['files']))
+        ok('the other way round, Unsend first: it drops the unfinished send; the finish waits, then is not_found; nothing is handed in',
+           waited and u['cancelled'] is True and err(f) == 'not_found' and d.one('select count(*) from submission') == 0 and sound(d) == '', (u, f))
+        clear()
+
+        # ── Unsend against a grade being saved ──────────────────────────
+        d.send(tok, ENR1, a)
+        waited, g, u = second_waits(lambda x: x.rpc('upsert_score(:e, :a, 7)', e=ENR1, a=a), lambda x: x.unsend(tok, ENR1, a))
+        ok("the teacher's first score is being saved when the student presses Unsend: Unsend waits for the save, then is refused (grading_started); the work stays",
+           waited and err(u) == 'grading_started' and d.one('select count(*) from submission') == 1 and queued(d, 'unsend') == [], (g, u))
+        clear()
+        d.send(tok, ENR1, a)
+        waited, u, g = second_waits(lambda x: x.unsend(tok, ENR1, a), lambda x: x.rpc('upsert_score(:e, :a, 7)', e=ENR1, a=a))
+        ok('the other way round, Unsend first: the save waits for it, then goes through as a save always does; the work is unsent and the grade is a draft',
+           waited and u['unsent'] is True and not str(g).startswith('ERROR') and d.one('select count(*) from submission') == 0
+           and d.one('select is_draft from grade_return where enrollment_id = :e and assessment_id = :a', e=ENR1, a=a) is True, (u, g))
+        clear()
+
+        # ── Replace during grading ──────────────────────────────────────
+        s0, _ = d.send(tok, ENR1, a, 2); old = live_paths(d)
+        r = d.send_start(tok, ENR1, a, replace=True); d.upload(r['files'])
+        waited, g, f = second_waits(lambda x: x.rpc('upsert_score(:e, :a, 7)', e=ENR1, a=a), lambda x: x.send_finish(tok, ENR1, r['submission_id'], r['files']))
+        ok("the new pages of a Replace are finished while the teacher's first score is being saved: the finish waits, then is refused (grading_started)",
+           waited and err(f) == 'grading_started', (g, f))
+        ok("what the teacher graded is still there, whole, and in storage; only the new page's files are queued",
+           d.all("select id, state from submission") == [[s0['submission_id'], 'sent']] and live_paths(d) == old and set(old) <= set(d.storage.names())
+           and queued(d, 'abandoned') == sorted([r['files'][0]['path'], r['files'][0]['thumb_path']]) and sound(d) == '', (queued(d), sound(d)))
+        clear()
+        s0, _ = d.send(tok, ENR1, a, 2)
+        r = d.send_start(tok, ENR1, a, replace=True); d.upload(r['files'])
+        waited, f, g = second_waits(lambda x: x.send_finish(tok, ENR1, r['submission_id'], r['files']), lambda x: x.rpc('upsert_score(:e, :a, 7)', e=ENR1, a=a))
+        ok('the other way round, the Replace first: the save waits for it, and the grade lands on the new pages', waited and f['ok'] and not str(g).startswith('ERROR')
+           and d.all("select id, state from submission") == [[r['submission_id'], 'sent']] and sound(d) == '', (f, g))
+        clear()
+
+        # ── The teacher adds work as the student sends ──────────────────
+        s = d.send_start(tok, ENR1, a); d.upload(s['files'])
+        t = d.rpc('start_work_upload(:a, :e, :p::jsonb, :m, :k)', a=a, e=ENR1, p='[{}]', m='new', k=nid())
+        for f_ in t['files']:
+            for p_ in (f_['path'], f_['thumb_path']): d.storage.put_as('authenticated', A, p_)
+        tf = json.dumps([{'file_id': t['files'][0]['file_id'], 'sha256': HASH}])
+        waited, f, g = second_waits(lambda x: x.send_finish(tok, ENR1, s['submission_id'], s['files']),
+                                    lambda x: x.rpc('finish_work_upload(:s, :f::jsonb, :k)', s=t['submission_id'], f=tf, k=nid()))
+        ok("the student's finish and the teacher's Add Work for the same piece at once: one is handed in, the other is told already_sent, never two",
+           waited and f['ok'] and g == {'result': 'already_sent'} and d.one("select count(*) from submission where state = 'sent'") == 1 and sound(d) == '', (f, g))
+        clear()
+
+        # ── A send against its assessment being deleted ─────────────────
+        def new_assessment():
+            x = nid(); d.run("insert into assessment (id, course_id, title, score_mode, max_points, students_send) values (:a, :c, 'Quick Check', 'points', 5, 'photos')", a=x, c=COURSE_A); return x
+        x = new_assessment()
+        waited, g, s = second_waits(lambda h: h.rpc('delete_assessment(:a)', a=x), lambda o: o.send_start(tok, ENR1, x))
+        ok('the teacher is deleting the assessment when a student starts a send to it: the send waits, then is not_found; no row is left behind',
+           waited and err(s) == 'not_found' and d.one('select count(*) from submission where assessment_id = :a', a=x) == 0, (g, s))
+        x = new_assessment()
+        waited, s, g = second_waits(lambda h: h.send_start(tok, ENR1, x), lambda o: o.rpc('delete_assessment(:a)', a=x))
+        ok('the other way round, the send first: the delete waits, then takes the unfinished send with it and queues its files',
+           waited and s['ok'] and not str(g).startswith('ERROR') and d.one('select count(*) from submission where assessment_id = :a', a=x) == 0
+           and set(p for f in s['files'] for p in (f['path'], f['thumb_path'])) <= set(queued(d)), (s, g))
+        bad = []
+        for n in range(30):
+            x = new_assessment(); out = {}
+            def student(o=side(), x=x, out=out):
+                s = attempt(lambda: o.send_start(tok, ENR1, x))
+                if isinstance(s, dict) and s.get('ok'):
+                    out['up'] = attempt(lambda: o.upload(s['files'])); out['fin'] = attempt(lambda: o.send_finish(tok, ENR1, s['submission_id'], s['files']))
+                out['start'] = s
+            def teacher(o=side(), x=x, out=out): out['del'] = attempt(lambda: o.rpc('delete_assessment(:a)', a=x))
+            ts = [threading.Thread(target=f) for f in ((student, teacher) if n % 2 else (teacher, student))]
+            for t_ in ts: t_.start()
+            for t_ in ts: t_.join(20)
+            errors = [v for v in out.values() if isinstance(v, str) and v.startswith('ERROR')]
+            if errors or d.one('select count(*) from submission where assessment_id = :a', a=x) or sound(d): bad.append((n, errors, sound(d)))
+            d.run('delete from student_submit.send_log')
+        ok('30 rounds of a whole send racing the delete of its assessment: no error, no deadlock, and never a submission left for an assessment that is gone', not bad, bad[:2])
+        clear()
+
+        # ── The hourly limit under a burst ──────────────────────────────
+        out = []
+        def burst(o): out.append(attempt(lambda: o.send_start(tok, ENR1, a)))
+        ts = [threading.Thread(target=burst, args=(side(),)) for _ in range(30)]
+        for t_ in ts: t_.start()
+        for t_ in ts: t_.join(30)
+        kinds = sorted('ok' if isinstance(v, dict) and v.get('ok') else (v.get('error') if isinstance(v, dict) else v) for v in out)
+        ok('30 send_starts at once from one card: exactly 20 are given links and 10 are told too_many; one unfinished send is left',
+           kinds == ['ok'] * 20 + ['too_many'] * 10 and d.one('select count(*) from student_submit.send_log') == 20 and d.one('select count(*) from submission') == 1, kinds)
+        clear()
+
+        # ── Everything at once ──────────────────────────────────────────
+        a2 = k['nothing']; d.run("update assessment set students_send = 'photos_files' where id = :a", a=a2)
+        stop = time.time() + 12; errors = []; counts = {}
+        def note(name, r):
+            counts[name] = counts.get(name, 0) + 1
+            if isinstance(r, str) and r.startswith(('ERROR', 'STORAGE')): errors.append((name, r))
+        def student_loop(tk, e, o):
+            n = 0
+            while time.time() < stop:
+                n += 1; x = a if n % 3 else a2
+                s = attempt(lambda: o.send_start(tk, e, x, pages=1 + n % 3, replace=(n % 5 == 0))); note('send_start', s)
+                if isinstance(s, dict) and s.get('ok'):
+                    note('upload', attempt(lambda: o.upload(s['files'])))
+                    note('send_finish', attempt(lambda: o.send_finish(tk, e, s['submission_id'], s['files'])))
+                if n % 2: note('unsend', attempt(lambda: o.unsend(tk, e, x)))
+                note('work', attempt(lambda: o.work(tk, e))); note('file_links', attempt(lambda: o.file_links(tk, e, x)))
+        def grade_loop(o):
+            n = 0
+            while time.time() < stop:
+                n += 1; e = (ENR1, ENR2)[n % 2]; x = (a, a2)[(n // 2) % 2]
+                note('upsert_score', attempt(lambda: o.rpc('upsert_score(:e, :a, :v)', e=e, a=x, v=n % 10)))
+                if n % 3 == 0: note('return_grades', attempt(lambda: o.rpc('return_grades(:a, :e, :k)', a=x, e=[ENR1, ENR2], k=nid())))
+                if n % 4 == 0: note('clear_score', attempt(lambda: o.rpc('clear_score(:e, :a)', e=e, a=x)))
+        def add_work_loop(o):
+            n = 0
+            while time.time() < stop:
+                n += 1; e = (ENR1, ENR2)[n % 2]; x = (a2, a)[n % 4 == 0]
+                note('teacher_upload', attempt(lambda: add_work(o, x, e, ('new', 'add', 'replace')[n % 3])))
+                if n % 5 == 0: note('mark_handed_in_paper', attempt(lambda: o.rpc('mark_handed_in_paper(:a, :e, :k)', a=x, e=[ENR1, ENR2], k=nid())))
+                if n % 4 == 0:
+                    sid = attempt(lambda: o.one("select id from submission where state = 'sent' order by random() limit 1"))
+                    if sid and not str(sid).startswith('ERROR'): note('delete_submission', attempt(lambda: o.rpc('delete_submission(:s, :k)', s=sid, k=nid())))
+                note('list_course_submissions', attempt(lambda: o.rpc('list_course_submissions(:c)', c=COURSE_A)))
+        def add_work(o, x, e, mode):
+            """Add Work as the browser does it. An upload can be dropped under it (the work it was adding to or replacing
+            was unsent or deleted meanwhile): storage then refuses the file (403) and the finish must answer gone."""
+            s = o.rpc('start_work_upload(:a, :e, :p::jsonb, :m, :k)', a=x, e=e, p='[{}]', m=mode, k=nid())
+            if s['result'] != 'ready': return s['result']
+            dropped = False
+            for f in s['files']:
+                for p in (f['path'], f['thumb_path']):
+                    try: o.storage.put_as('authenticated', A, p)
+                    except StorageError as ex:
+                        if ex.status != 403: raise
+                        dropped = True
+            r = o.rpc('finish_work_upload(:s, :f::jsonb, :k)', s=s['submission_id'], f=json.dumps([{'file_id': f['file_id'], 'sha256': HASH} for f in s['files']]), k=nid())
+            if dropped and r['result'] != 'gone': return 'ERROR storage refused a file of an upload that was still there: %s' % r['result']
+            return r['result']
+        def come_and_go_loop(o, o2):
+            while time.time() < stop:
+                x = attempt(lambda: (lambda i: (o.run("insert into assessment (id, course_id, title, score_mode, max_points, students_send) values (:a, :c, 'Quick Check', 'points', 5, 'photos')", a=i, c=COURSE_A), i)[1])(nid()))
+                s = attempt(lambda: o2.send_start(tok2, ENR2, x)); note('send_start (short-lived piece)', s)
+                note('delete_assessment', attempt(lambda: o.rpc('delete_assessment(:a)', a=x)))
+        def worker_loop(o):
+            while time.time() < stop:
+                note('drain', attempt(lambda: o.drain(50))); attempt(lambda: o.run('delete from student_submit.send_log')); time.sleep(0.05)
+        ts = [threading.Thread(target=student_loop, args=(tok, ENR1, side())), threading.Thread(target=student_loop, args=(tok2, ENR2, side())),
+              threading.Thread(target=grade_loop, args=(side(),)), threading.Thread(target=add_work_loop, args=(side(),)),
+              threading.Thread(target=come_and_go_loop, args=(side(), side())), threading.Thread(target=worker_loop, args=(side(),)), threading.Thread(target=worker_loop, args=(side(),))]
+        for t_ in ts: t_.start()
+        for t_ in ts: t_.join(60)
+        total = sum(counts.values())
+        ok('twelve seconds of everything at once in one class (two students sending, replacing and unsending; scores saved, cleared and returned; Add Work in its three modes, paper, deletes; '
+           'assessments made and deleted under a send; two removal workers): no error of any kind and no deadlock, in several hundred calls', not errors and total > 300, (errors[:3], counts))
+        print('# the mix made %d calls: %s' % (total, ', '.join('%s %d' % kv for kv in sorted(counts.items()))))
+        ok('afterwards every rule that must always hold, holds', sound(d) == '', sound(d))
+        ok("and Batch A's own bookkeeping is undisturbed: every grade_return row holds the grade as the score tables have it",
+           d.one('select count(*) from grade_return g where g.working_copy is distinct from public._grade_copy(g.enrollment_id, g.assessment_id)') == 0)
+        d.run("delete from submission where state = 'sending'")
+        d.run("update submission_file_removal set link_dies_at = now() - interval '1 minute'")
+        while d.drain()[0]['items']: pass
+        ok('with the unfinished sends dropped and the worker run to the end, storage holds exactly the files of the pages handed in',
+           d.storage.names() == live_paths(d) and d.one('select count(*) from submission_file_removal where not done') == 0, (len(d.storage.names()), len(live_paths(d))))
+    finally:
+        for x in sides: x.close()
+        d.close()
+
+SCENARIOS = {'teacher': scen_teacher, 'student': scen_student, 'storage': scen_storage, 'race': scen_race}
 if __name__ == '__main__':
     for name in (sys.argv[1:] or list(SCENARIOS)):
         SCENARIOS[name]()

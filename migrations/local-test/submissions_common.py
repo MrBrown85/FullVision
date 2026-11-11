@@ -188,6 +188,22 @@ class WorkDb(Db):
         return s, self.rpc('finish_work_upload(:s, :f::jsonb, :k)', uid, s=s['submission_id'],
                            f=json.dumps([{'file_id': f['file_id'], 'sha256': HASH} for f in s['files']]), k=nid())
 
+class Side(WorkDb):
+    """Another connection to a scenario's copy, with everything a WorkDb can do: one for each thing
+    that happens at the same time."""
+    def __init__(self, d):
+        self.name = d.name; self.c = d.other(); self.rows = []; self.in_tx = False; self.storage = Storage(self)
+    def commit(self): self.c.run('commit'); self.in_tx = False
+    def close(self):
+        try: self.c.close()
+        except Exception: pass
+
+def attempt(fn):
+    """What fn returns, or 'ERROR <SQLSTATE> <message>'."""
+    try: return fn()
+    except StorageError as e: return 'STORAGE %s' % e
+    except Exception as e: return 'ERROR %s %s' % (sqlstate(e), message(e)[:160])
+
 def seed_work(d, on_return=True):
     """Teacher A's class with the Student Page and Send Work on; Cece has a birthday. Three assessments:
     one that takes photos, one that takes nothing, one that takes photos in Teacher B's class.
