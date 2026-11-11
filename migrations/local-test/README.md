@@ -1880,6 +1880,18 @@ wrong versions of review round 1's fixes), each applied with its
 fingerprint lists stood aside and run against the behaviour scenarios.
 Results are in the pull request.
 
+Review round 1 (2026-11-11, PostgreSQL 17.11, from a clean clone): 650 of
+650, the undo 46 of 46, all 99 wrong versions noticed, every fingerprint
+list current. The earlier suites below were run again the way the
+independent review ran them (the fixes branch with this branch laid over
+it, one scratch hook): `submissions.py` 562 of 563 (the same one check),
+`submissions_fixes.py` 188 of 188, `student_page_fields.py` 248 of 259 with
+this round's files and 248 of 259 with the reviewed ones (`73ba899e`) in the
+same copy: the 11 are the hook's own (Batch B applied while that suite's
+`apply` scenario holds a save open, then its catalog counts), the
+score-table inventory, three `batchb` checks and `score_rpcs.py`'s live
+snapshot. Timings are in pull request 1043.
+
 The earlier suites with Batch C applied (2026-11-11; scratch copies of the
 suites, each with one hook that applies C1 and C2 after Batch B and its
 fixes; the hook is not in any branch). Every behaviour check passes; what
