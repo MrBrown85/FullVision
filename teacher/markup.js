@@ -2,8 +2,10 @@
  *
  * The board "Teacher: Mark Up": the teacher writes on a page of a student's
  * work with Pen, Highlight, Note, Tick, Cross and the Eraser, in red, green
- * or blue, with Undo and Redo, and the notes are listed beside the page
- * (Notes on This Page). It opens from the grader's work pane (Mark Up, on
+ * or blue, with Undo and Redo, on a dark screen with labelled tool chips.
+ * Each note's words sit on the page beside its pin, and the notes are listed
+ * beside the page (Notes on This Page), with who sees the marks and the page
+ * switcher under them. It opens from the grader's work pane (Mark Up, on
  * teacher/page-assignments.js) over everything, on the page that pane shows.
  *
  * Marks are data over the photo; the stored photo never changes. Each change
@@ -262,16 +264,14 @@ window.MarkUp = (function () {
       '<aside class="markup-side" aria-label="Notes on This Page">' +
       '<h3 class="markup-side-title">Notes on This Page</h3>' +
       '<div class="markup-notes"></div>' +
-      '</aside>' +
-      '</div>' +
-      '<footer class="markup-foot">' +
-      '<p class="markup-sees"></p>' +
       '<p class="markup-msg" role="status"></p>' +
+      '<p class="markup-sees"></p>' +
       '<span class="markup-pages">' +
       '<button type="button" class="btn btn-secondary markup-page" data-mk="page" data-dir="-1"></button>' +
       '<button type="button" class="btn btn-secondary markup-page" data-mk="page" data-dir="1"></button>' +
       '</span>' +
-      '</footer>' +
+      '</aside>' +
+      '</div>' +
       '</div>'
     );
   }
@@ -337,8 +337,49 @@ window.MarkUp = (function () {
     var host = s.overlay.querySelector('.markup-layer-host');
     var marks = live || s.hist.now();
     if (s.drag && s.drag.erased && s.drag.erased.length) marks = D.without(marks, s.drag.erased);
-    // html-safe: built by MarkupDraw.svgHtml, which escapes a note's words
-    host.innerHTML = D.svgHtml(marks, D.aspect(s.overlay.querySelector('.markup-img')), { pending: s.pending });
+    var file = _file(s);
+    var turn = (file && s.turn[file.id]) || 0;
+    // html-safe: built by MarkupDraw.svgHtml, which escapes a note's words, and _calloutsHtml, which escapes them through esc
+    host.innerHTML =
+      D.svgHtml(marks, D.aspect(s.overlay.querySelector('.markup-img')), { pending: s.pending }) +
+      _calloutsHtml(marks, turn);
+  }
+
+  /* Each note's words on the page beside its pin (the board's callouts),
+     in the pin's colour: the number sits on the pin and the words run
+     toward the middle of the page. On a turned page they stay upright.
+     The list beside the page says the same, so a screen reader hears it
+     once, there. */
+  // html-safe: a note's words go through esc; places and numbers are ours
+  function _calloutsHtml(marks, turn) {
+    var notes = D.notes(marks);
+    if (!notes.length) return '';
+    var t = (((turn || 0) % 360) + 360) % 360;
+    return (
+      '<div class="markup-callouts" aria-hidden="true">' +
+      notes
+        .map(function (n) {
+          var x = Math.min(1, Math.max(0, Number(n.x) || 0));
+          var y = Math.min(1, Math.max(0, Number(n.y) || 0));
+          // Where the pin falls across the screen, once the page is turned.
+          var across = t === 90 ? 1 - y : t === 180 ? 1 - x : t === 270 ? y : x;
+          return (
+            '<span class="markup-callout' +
+            (across > 0.6 ? ' is-left' : '') +
+            '" style="left:' +
+            Math.round(x * 10000) / 100 +
+            '%;top:' +
+            Math.round(y * 10000) / 100 +
+            '%"><span class="markup-callout-box"><span class="markup-callout-n">' +
+            n.n +
+            '</span><span class="markup-callout-text">' +
+            esc(n.text) +
+            '</span></span></span>'
+          );
+        })
+        .join('') +
+      '</div>'
+    );
   }
 
   // html-safe: a note's words go through esc; numbers are ours; labels are fixed words
