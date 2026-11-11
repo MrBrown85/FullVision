@@ -38,7 +38,9 @@
  * without running its timers, as a closed lid does; a timer the page set
  * for longer than a second never fires here, so a test moves the clock and
  * then sends the event that would wake the page, or runTicks(), which
- * fires each repeating timer the page has set, once.
+ * fires each repeating timer the page has set, once. runTimers() fires each
+ * one-shot timer the page has set that is due by the page's clock, as if it
+ * had run on time; a timer fires once, whichever way it comes.
  *
  * What is on screen. There is no layout here, so the page's
  * IntersectionObserver is a stand-in a test drives: onScreen(el => true or
@@ -102,6 +104,9 @@ export function openStudentPage(opts = {}) {
     removeItem: k => delete kept[k],
   });
   const ticking = [];
+  // One-shot timers the page has set and not yet run or cleared: handle → { fire, at }.
+  const timers = new Map();
+  let pageNow = () => Date.now(); // the page's own clock, once its context exists
   const win = new EventTarget();
   const observers = [];
   class FakeIntersectionObserver {
@@ -130,11 +135,19 @@ export function openStudentPage(opts = {}) {
     console,
     // A long timer (a session's end, fifteen idle minutes) must not hold the test run open.
     setTimeout: (fn, ms) => {
-      const t = setTimeout(fn, ms);
+      const fire = () => {
+        if (!timers.delete(t)) return;
+        fn();
+      };
+      const t = setTimeout(fire, ms);
       if (ms > 1000) t.unref();
+      timers.set(t, { fire, at: pageNow() + (Number(ms) || 0) });
       return t;
     },
-    clearTimeout,
+    clearTimeout: t => {
+      timers.delete(t);
+      clearTimeout(t);
+    },
     addEventListener: win.addEventListener.bind(win),
     removeEventListener: win.removeEventListener.bind(win),
     IntersectionObserver: opts.noObserver ? undefined : FakeIntersectionObserver,
@@ -190,6 +203,7 @@ export function openStudentPage(opts = {}) {
   };
   sandbox.window = sandbox;
   const ctx = vm.createContext(sandbox);
+  pageNow = () => vm.runInContext('Date.now()', ctx);
   const append = document.head.appendChild.bind(document.head);
   document.head.appendChild = el => {
     const src = el && el.tagName === 'SCRIPT' ? el.getAttribute('src') : null;
@@ -261,6 +275,12 @@ export function openStudentPage(opts = {}) {
           /* the loading screen's own timer, after its screen has gone */
         }
       });
+    },
+    runTimers: () => {
+      [...timers.values()]
+        .filter(x => x.at <= pageNow())
+        .sort((a, b) => a.at - b.at)
+        .forEach(x => x.fire());
     },
     advance: ms =>
       run('Date.now = (function (now, by) { return function () { return now() + by; }; })(Date.now, ' + ms + ')'),
