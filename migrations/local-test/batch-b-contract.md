@@ -17,17 +17,17 @@ If you must depart from anything here, add a dated line under "Changes" at the b
 
 ## Storage
 
-|                       |                                                                                                          |
-| --------------------- | -------------------------------------------------------------------------------------------------------- |
-| Bucket                | `student-photos`, private                                                                                |
-| Size limit            | 2,097,152 bytes a file (the browser's own limit is 2,000,000)                                            |
-| Type                  | `image/jpeg` only. The Storage service checks the upload's `Content-Type`, not its bytes                 |
-| Page path             | `<course id>/<assessment id>/<enrollment id>/<submission id>/<file id>.jpg`                              |
-| Thumbnail path        | the same with `-thumb.jpg`                                                                               |
-| Who names a path      | the database, in `send_start`, `replace` and `start_work_upload`. Nobody else. Every id is a server UUID |
-| A path never changes  | `<submission id>` is the submission the page was first made for; a page added later keeps its path       |
-| Upload link lifetime  | two hours (Supabase's, not ours). A send not finished within two hours of its start answers `expired`    |
-| Who can delete a file | the service key, through the Storage API, for paths the removal queue hands out. Nobody else, and no SQL |
+|                       |                                                                                                                             |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Bucket                | `student-photos`, private                                                                                                   |
+| Size limit            | 2,097,152 bytes a file (the browser's own limit is 2,000,000)                                                               |
+| Type                  | `image/jpeg` only. The Storage service checks the upload's `Content-Type`, not its bytes                                    |
+| Page path             | `<course id>/<assessment id>/<enrollment id>/<submission id>/<file id>.jpg`                                                 |
+| Thumbnail path        | the same with `-thumb.jpg`                                                                                                  |
+| Who names a path      | the database, in `send_start`, `replace` and `start_work_upload`. Nobody else. Every id is a server UUID                    |
+| A path never changes  | `<submission id>` is the submission the page was first made for; a page added later keeps its path                          |
+| Upload link lifetime  | two hours (Supabase's, not ours). A send not finished within two hours of its paths last being handed out answers `expired` |
+| Who can delete a file | the service key, through the Storage API, for paths the removal queue hands out. Nobody else, and no SQL                    |
 
 Policies on `storage.objects`, for this bucket: a signed-in teacher can **read** any file under a class they own, and **write** exactly the paths of an upload they started with `start_work_upload` and have not finished. Nothing lets a teacher's browser change, move or delete a file. Nobody who is not a signed-in teacher gets past row security. The service key passes row security.
 
@@ -85,7 +85,7 @@ Make the rows and name the paths. `replace` is for a piece the student has alrea
 
 - `p_pages`: a list of 1 to 30 objects, one per page in order, each `{ "width": 1500, "height": 2000 }` (whole numbers 1 to 20000, either may be left out).
 - `p_note`: null, or up to 1000 characters. `p_followed_plan`: null, `yes`, `partly` or `no`.
-- `p_request_id`: required. The same id again returns the same submission and paths with `"replayed": true`, makes nothing and counts nothing.
+- `p_request_id`: required. The same id again returns the same submission and paths with `"replayed": true`, makes nothing and counts nothing. Make fresh upload links for them: the send then has two hours from that moment. This is how a phone that lost its links (a reload) gets them back without starting over.
 
 ```json
 {
@@ -138,7 +138,7 @@ The same finish again answers the same with `"replayed": true`.
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `not_found`                     | no such send of this student's. A newer send took its place, or it was dropped                                                                                        |
 | `send_off`, `not_taking_work`   | the switch was turned off, or the piece set to take nothing, since it started                                                                                         |
-| `expired`                       | it started more than two hours ago: start again                                                                                                                       |
+| `expired`                       | its paths were last handed out more than two hours ago, so its upload links are dead: start again with a new request id                                               |
 | `missing_pages`, with `missing` | a page or its thumbnail is not in storage. `missing` lists the file ids. Nothing changes; call again when they are up                                                 |
 | `bad_file`, with `files`        | storage holds one of them over the size limit or not as `image/jpeg`                                                                                                  |
 | `already_sent`                  | the teacher added this student's work while the pages were going up. This send is dropped                                                                             |
