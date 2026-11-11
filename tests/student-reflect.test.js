@@ -184,6 +184,10 @@ describe('S10-F1: reflecting, on returned work only', () => {
       error: 'not_answered',
     });
     st.demoReflect = false;
+    expect(await ask('reply', { assessment_id: 'demo-energy', reply: { sense_now: 'yes' } })).toEqual({
+      ok: false,
+      error: 'not_found',
+    });
     expect(await ask('reflect', { assessment_id: 'demo-lab', reflection: yes })).toEqual({
       ok: false,
       error: 'reflect_off',
@@ -240,6 +244,26 @@ describe('answers that arrive late, or wrong', () => {
     await page.settle();
     expect(page.T.state().screen).toBe('assignments');
     expect(page.T.state().reflect).toBeNull();
+  });
+
+  it('a send that lands after the student went back and opened another piece leaves that one alone', async () => {
+    const page = await demo();
+    const h = held();
+    page.T.setFeedbackAnswer(() => h.promise);
+    await openReflect(page);
+    await page.click('[data-act="reflect-sense"][data-value="yes"]');
+    page.type('#sp-reflect-plan', 'A plan.');
+    await page.click('[data-act="reflect-send"]');
+    const first = page.T.state().reflect;
+    await page.click('[data-act="reflect-back"]');
+    await page.click('[data-act="reflect-open"]');
+    const second = page.T.state().reflect;
+    expect(second).not.toBe(first);
+    h.settle({ ok: false, error: 'reflect_off' });
+    await page.settle();
+    expect(first.message).toBe('');
+    expect(first.busy).toBe(true);
+    expect(q(page, '#sp-reflect-msg')).toBeNull();
   });
 
   it('a send that lands after Done draws nothing', async () => {
@@ -304,6 +328,17 @@ describe('S10-F2: the plan on the next piece, and Did You Do It?', () => {
     ]);
   });
 
+  it('the last plan is the newest one, whatever order the pieces come in', async () => {
+    const page = await demo();
+    const st = page.T.state();
+    page.T.demoReflections(st)['demo-quiz'] = {
+      makes_sense: 'yes',
+      plan: 'An older plan.',
+      sent_at: '2020-01-01T00:00:00Z',
+    };
+    expect(page.T.feedbackOf(st).last_plan).toMatchObject({ assessment_id: 'demo-kmt' });
+  });
+
   it('the view: the next piece due on or after the plan, never its own, none of the wrong shape', () => {
     const reply = {
       student: {},
@@ -320,6 +355,15 @@ describe('S10-F2: the plan on the next piece, and Did You Do It?', () => {
         { id: 'b', title: 'B', date: '2026-11-01', due_date: '2026-11-02' },
         { id: 'c', title: 'C', date: '2026-11-01', due_date: '2026-11-12' },
         { id: 'd', title: 'D', date: '2026-11-01', due_date: '2026-11-09' },
+        // Back already: a plan never goes on returned work.
+        {
+          id: 'e',
+          title: 'E',
+          date: '2026-11-01',
+          due_date: '2026-11-06',
+          returned_at: '2026-11-07T00:00:00Z',
+          grade: { v: 1, value: 2 },
+        },
       ],
     };
     const fb = lp => ({ ok: true, assessments: [], last_plan: lp });
@@ -399,6 +443,8 @@ describe('S10-F2: the plan on the next piece, and Did You Do It?', () => {
     expect(q(page, '.sp-send-plan')).toBeNull();
     await page.T.sendFiles([{}], -1);
     await page.settle();
+    // Even a word left on the send by hand is not kept for a piece with no plan.
+    page.T.state().send.followed = 'yes';
     await page.click('[data-act="send-go"]');
     expect(page.T.state().demoSent['demo-poster'].followedPlan).toBeNull();
   });
