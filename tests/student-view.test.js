@@ -1253,3 +1253,18 @@ describe('the parts the server now sends, drawn (S4-W1)', () => {
     expect(p.coreCompetencies).toEqual([{ id: 'COM', name: 'Communicating' }]);
   });
 });
+
+describe('fromCache’s learning option (Preview’s See What They’d See, S13-F1)', () => {
+  it('works My Learning out for this view only: the class’s switch is neither read as on nor changed', () => {
+    seed('proficiency');
+    const before = getCourseConfig;
+    expect(StudentView.learningOn(CID)).toBe(false);
+    expect(StudentView.fromCache(CID, S1).view.learning).toBeNull();
+    const shown = StudentView.fromCache(CID, S1, { learning: true });
+    expect(shown.view.learning).not.toBeNull();
+    expect(shown.view.learning.mode).toBe('proficiency');
+    expect(getCourseConfig).toBe(before);
+    expect(getCourseConfig(CID).show_my_learning).toBeUndefined();
+    expect(StudentView.fromCache(CID, S1).view.learning).toBeNull();
+  });
+});
