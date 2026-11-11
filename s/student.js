@@ -135,6 +135,8 @@ var StudentPage = (function () {
       workPages: null, // See Your Work: the pages fetched, { id, state, pages } (s/feedback.js)
       form: '', // Questionnaires and My Reports: the one picked on a Chromebook
       back: '', // a questionnaire or report opened from a card's page: the tab to go back to
+      realForms: null, // a real card: { student, questionnaires, reports }, the `forms` reply (app.js)
+      cardForm: null, // a questionnaire opened from a real card's page: { student, id } (app.js)
     };
   }
 
@@ -480,12 +482,37 @@ var StudentPage = (function () {
 
   /* ── Drafts (this tab only) ────────────────────────────────── */
 
+  /* A slip's draft is kept under its code. A questionnaire opened from a
+     card's page has no code of its own: its draft is kept by the student
+     and the questionnaire, all of a card's drafts under one key, and that
+     key goes at every sign-out (app.js), as everything else of the
+     student's does (ruling 138). */
+  var CARD_DRAFTS = 'fv-s-card-drafts';
+  function cardDrafts() {
+    try {
+      var all = JSON.parse(sessionStorage.getItem(CARD_DRAFTS) || 'null');
+      return all && typeof all === 'object' ? all : {};
+    } catch (e) {
+      return {};
+    }
+  }
+  function cardDraftId() {
+    return S.cardForm.student + ':' + S.cardForm.id;
+  }
   function draftKey() {
     return 'fv-s-draft-' + S.code;
   }
   function saveDraft() {
-    if (!S || S.demo || !S.code) return;
+    if (!S || S.demo) return;
     try {
+      if (S.cardForm) {
+        var all = cardDrafts();
+        all[cardDraftId()] = { answers: S.answers, part: S.part };
+        sessionStorage.setItem(CARD_DRAFTS, JSON.stringify(all));
+        return;
+      }
+      // A card's own code never names a draft.
+      if (!S.code || S.back) return;
       sessionStorage.setItem(draftKey(), JSON.stringify({ answers: S.answers, part: S.part }));
     } catch (e) {
       /* private mode: the answers stay on the page */
@@ -493,17 +520,32 @@ var StudentPage = (function () {
   }
   function loadDraft() {
     try {
-      var d = JSON.parse(sessionStorage.getItem(draftKey()) || 'null');
-      if (d && d.answers) S.answers = d.answers;
+      var d = S.cardForm ? cardDrafts()[cardDraftId()] : JSON.parse(sessionStorage.getItem(draftKey()) || 'null');
+      if (d && d.answers && typeof d.answers === 'object') S.answers = d.answers;
     } catch (e) {
       /* nothing saved */
     }
   }
   function clearDraft() {
     try {
+      if (S.cardForm) {
+        var all = cardDrafts();
+        delete all[cardDraftId()];
+        if (Object.keys(all).length) sessionStorage.setItem(CARD_DRAFTS, JSON.stringify(all));
+        else sessionStorage.removeItem(CARD_DRAFTS);
+        return;
+      }
       sessionStorage.removeItem(draftKey());
     } catch (e) {
       /* nothing to clear */
+    }
+  }
+  // Every card's draft in this tab, at sign-out.
+  function wipeCardDrafts() {
+    try {
+      sessionStorage.removeItem(CARD_DRAFTS);
+    } catch (e) {
+      /* nothing kept */
     }
   }
 
@@ -694,6 +736,7 @@ var StudentPage = (function () {
     }
     newTurn();
     S.code = c;
+    S.cardForm = null;
     S.from = from || '';
     S.message = '';
     S.sending = false;
@@ -1110,7 +1153,9 @@ var StudentPage = (function () {
     call: call,
     messageFor: messageFor,
     saveDraft: saveDraft,
+    loadDraft: loadDraft,
     clearDraft: clearDraft,
+    wipeCardDrafts: wipeCardDrafts,
     demoReport: demoReport,
     demoData: demoData,
     loadDemoTemplates: loadDemoTemplates,

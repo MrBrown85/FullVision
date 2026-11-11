@@ -49,7 +49,8 @@ REPLACES = ['student_submit.work(text,uuid,text)', 'student_submit.send_paths(te
             'student_submit.group_file_links(text,uuid,uuid,text)', 'student_submit.file_links(text,uuid,uuid,text)',
             'student_submit.reflect(text,uuid,uuid,jsonb,text)', 'student_submit.reply(text,uuid,uuid,jsonb,text)',
             'student_submit.answer_seen(text,uuid,uuid[],text)',
-            'public.save_score_report_note(uuid,uuid,text,uuid)', 'public.list_course_grade_returns(uuid)']
+            'public.save_score_report_note(uuid,uuid,text,uuid)', 'public.list_course_grade_returns(uuid)',
+            'student_submit.page(text,uuid,text)']
 NEW = ['student_submit._write_limit(uuid,text,integer)', 'fv_private.report_note_hold(uuid,uuid)',
        'student_submit._card_listed(uuid,uuid)', 'student_submit.forms(text,uuid,text)',
        'student_submit.form(text,uuid,uuid,text)', 'student_submit.answer(text,uuid,uuid,jsonb,text)',

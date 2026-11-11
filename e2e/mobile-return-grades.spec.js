@@ -4,9 +4,10 @@
  * card's To Return list. Demo Mode, Science 8, at 375 x 812.
  *
  * The build switch has no control yet, so it is turned on from the page as
- * the console would (setStudentPageSwitch). With it off the phone is what
- * it was: tests/phone-return.test.js compares the HTML byte for byte, and
- * the first tests here look at the live page.
+ * the console would (setStudentPageSwitch). The logic (switch off, nothing in,
+ * comments, pairs, the list's follow-through) is pinned in
+ * tests/phone-return.test.js; these keep the keyboard, double-tap, finger-size
+ * and contrast checks that need a real page.
  */
 import { test, expect } from '@playwright/test';
 import { findLowContrastText } from './contrast-check.js';
@@ -15,7 +16,6 @@ test.use({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true
 
 const QUIZ = 'sci8q12'; // Data Reading Quiz: points
 const CHECK = 'sci8a10'; // Mid-Year Lab Skills Check: two competencies
-const FAIR = 'sci8a20'; // Science Fair Proposal: a rubric
 
 /* Demo Mode on the phone. `before` changes the class while it is as it is
    today; `on` then turns the build switch on (When I Return Them, or `on`
@@ -93,34 +93,6 @@ const small = () =>
     })
     .map(e => e.outerHTML.slice(0, 80) + ' ' + Math.round(e.getBoundingClientRect().height));
 
-test.describe('with the build switch off', () => {
-  for (const [name, on] of [
-    ['a class as it is today', false],
-    ['a class whose student page is on, set to As Soon As I Save', 'on_save'],
-  ]) {
-    test(name + ': no bar, no To Return, no card list', async ({ page }) => {
-      const info = await openPhone(page, { on });
-      await expect(page.locator('.m-scard-return')).toHaveCount(0);
-      await openGrading(page, CHECK);
-      await expect(bar(page)).toHaveCount(0);
-      await expect(page.locator('#m-swiper')).not.toHaveClass(/m-has-return/);
-      // Grading makes no draft and draws nothing new.
-      await page.locator('.m-swiper-card').first().locator('.m-score-btn:not(.m-score-active)').first().click();
-      await expect(bar(page)).toHaveCount(0);
-      await expect(page.locator('.m-draft-mark')).toHaveCount(0);
-      expect(await stateOf(page, info.ids[0], CHECK)).toBe('returned');
-      expect(await waiting(page)).toBe(0);
-      await page.locator('[data-action="m-back"]').first().click();
-      await expect(page.locator('#m-screen-grade-picker .m-seg-btn')).toHaveText(['Recent', 'All']);
-      await expect(page.locator('#m-grade-to-return')).toHaveCount(0);
-      await page.locator('.m-tab-item[data-tab="students"]').click();
-      await expect(page.locator('.m-card-stack-item').first()).toBeVisible();
-      await expect(page.locator('.m-scard-return')).toHaveCount(0);
-      await expect(page.locator('#m-app')).not.toContainText('To Return');
-    });
-  }
-});
-
 test.describe('the grading screen', () => {
   test('a level makes a draft, and Return and Next returns it and moves on', async ({ page }) => {
     const info = await openPhone(page, { on: true });
@@ -166,29 +138,6 @@ test.describe('the grading screen', () => {
     await expect(bar(page)).toHaveText(/^Returned [A-Z][a-z]{2} \d{1,2}$/);
   });
 
-  test('with nothing in, Return and Next is greyed out; a status alone shows nothing', async ({ page }) => {
-    // Before the switch comes on: nobody has a grade on the check, and the
-    // second student is Excused.
-    await openPhone(page, {
-      on: true,
-      before: ({ cid, ids }) => {
-        const aid = 'sci8a10';
-        const sc = getScores(cid);
-        Object.keys(sc).forEach(id => (sc[id] = sc[id].filter(e => e.assessmentId !== aid)));
-        saveScores(cid, sc);
-        saveAssignmentStatuses(cid, { ...getAssignmentStatuses(cid), [ids[1] + ':' + aid]: 'EXC' });
-      },
-    });
-    await openGrading(page, CHECK);
-    await expect(returnNext(page)).toHaveText('Return and Next');
-    await expect(returnNext(page)).toBeDisabled();
-    await expect(bar(page).locator('.m-draft-mark')).toHaveCount(0);
-    await page.locator('#m-thumb-strip .m-thumb').nth(1).click();
-    await expect(returnNext(page)).toHaveCount(0);
-    await expect(bar(page)).toHaveText('');
-    await expect(bar(page)).toHaveClass(/is-empty/);
-  });
-
   test('two quick taps return one grade: the next card has to be on screen first', async ({ page }) => {
     const info = await openPhone(page, { on: true, drafts: true });
     await openGrading(page, QUIZ);
@@ -201,20 +150,6 @@ test.describe('the grading screen', () => {
     await returnNext(page).click();
     expect(await stateOf(page, info.ids[1], QUIZ)).toBe('returned');
     await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('3 of ');
-  });
-
-  test('a comment typed is returned with the grade, not left behind as a draft', async ({ page }) => {
-    const info = await openPhone(page, { on: true, drafts: true });
-    await openGrading(page, QUIZ);
-    const comment = page.locator('.m-swiper-card').first().locator('.m-overall-comment');
-    await comment.fill('Check question 4 again.');
-    // The button is pressed with the cursor still in the box.
-    await returnNext(page).dispatchEvent('click');
-    expect(await page.evaluate(([sid, aid]) => getScoreComment(getActiveCourse(), sid, aid), [info.ids[0], QUIZ])).toBe(
-      'Check question 4 again.',
-    );
-    await page.waitForTimeout(1200); // past the comment's own delayed save
-    expect(await stateOf(page, info.ids[0], QUIZ)).toBe('returned');
   });
 
   test('Return and Next is reached and pressed from the keyboard', async ({ page }) => {
@@ -326,38 +261,6 @@ test.describe('the Grade tab’s To Return list', () => {
     await expect(page.locator('.m-seg-btn[data-val="all"]')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#m-grade-list')).toBeVisible();
   });
-
-  test('a row opens the grading screen on the first draft, and the list follows what is returned there', async ({
-    page,
-  }) => {
-    const info = await openPhone(page, { on: true, drafts: true });
-    // The first student's quiz is returned already: the first draft is the second card.
-    await page.evaluate(([sid, aid]) => Grader.returnGrades(getActiveCourse(), aid, [sid]), [info.ids[0], QUIZ]);
-    await page.reload();
-    await openGradeTab(page);
-    await segment(page).click();
-    const quiz = page.locator('.m-to-return-row[data-aid="' + QUIZ + '"]');
-    await expect(quiz.locator('.m-draft-mark')).toHaveText('2 drafts');
-    await quiz.locator('.m-to-return-open').click();
-    await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
-    await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('2 of ');
-    await expect(bar(page).locator('.m-draft-mark')).toHaveText('Draft');
-    await page.waitForTimeout(500);
-    await returnNext(page).click();
-    expect(await stateOf(page, info.ids[1], QUIZ)).toBe('returned');
-    await slideDone(page);
-    await page.locator('[data-action="m-back"]').first().click();
-    // Still on To Return, with what is left.
-    await expect(segment(page)).toHaveClass(/m-seg-active/);
-    await expect(quiz.locator('.m-draft-mark')).toHaveText('1 draft');
-    await expect(quiz.locator('[data-action="m-grade-return-all"]')).toHaveText('Return 1');
-    await expect(segment(page)).toHaveText('To Return2');
-    // And still there after a visit to another tab.
-    await page.locator('.m-tab-item[data-tab="observe"]').click();
-    await page.locator('.m-tab-item[data-tab="grade"]').click();
-    await expect(segment(page)).toHaveClass(/m-seg-active/);
-    await expect(page.locator('#m-grade-to-return .m-to-return-row')).toHaveCount(2);
-  });
 });
 
 test.describe('the student card’s To Return list', () => {
@@ -407,46 +310,6 @@ test.describe('the student card’s To Return list', () => {
     await rows.nth(0).locator('[data-action="m-card-return"]').click();
     await expect(card.locator('.m-scard-return')).toHaveCount(0);
     expect(await waiting(page)).toBe(2);
-  });
-
-  test('on pair work Return asks first and names both partners', async ({ page }) => {
-    const info = await openPhone(page, {
-      on: true,
-      // An ungraded pair: Demo Mode's students each have their own grade
-      // here, and a pair made of two graded students is graded separately.
-      before: ({ cid, ids }) => {
-        const aid = 'sci8a10';
-        const sc = getScores(cid);
-        Object.keys(sc).forEach(id => (sc[id] = sc[id].filter(e => e.assessmentId !== aid)));
-        saveScores(cid, sc);
-        const list = getAssessments(cid);
-        const a = list.find(x => x.id === aid);
-        a.collaboration = 'pair';
-        a.pairs = [[ids[0], ids[1]]];
-        saveAssessments(cid, list);
-      },
-      // The pair's grade: it is both partners', and both wait.
-      after: ({ cid, ids }) => {
-        const a = getAssessments(cid).find(x => x.id === 'sci8a10');
-        Grader.setLevel(cid, ids[0], a.id, a.tagIds[0], 3, 0);
-      },
-    });
-    expect(await waiting(page)).toBe(2);
-    const card = page.locator('.m-card-stack-item[data-depth="0"]');
-    await card.locator('[data-action="m-card-return"]').click();
-    await expect(sheet(page).locator('#m-confirm-title')).toHaveText('Return 2 Grades Now?');
-    const [a, b] = info.names.slice(0, 2).sort();
-    await expect(sheet(page).locator('#m-confirm-text')).toHaveText(
-      '2 drafts: ' + a + ' and ' + b + ' can’t see them yet.',
-    );
-    await sheet(page).locator('[data-action="m-sheet-cancel"]').click();
-    await expect(sheet(page)).toHaveCount(0);
-    expect(await waiting(page)).toBe(2);
-    await card.locator('[data-action="m-card-return"]').click();
-    await sheet(page).locator('.m-confirm-ok').click();
-    await expect(card.locator('.m-scard-return')).toHaveCount(0);
-    expect(await waiting(page)).toBe(0);
-    expect(await stateOf(page, info.ids[1], CHECK)).toBe('returned');
   });
 });
 

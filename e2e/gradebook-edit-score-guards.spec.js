@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
 
-/* Right-click Edit Score and Clear Score (Nov 3 UI audit): a typed
-   proficiency is a whole 1–4 or nothing changes; rubric and
-   Complete/Incomplete work open the grader instead of a number box; a
-   points typo leaves the score; Clear Score takes an Advanced Rubric's
-   ticks with it and ⌘Z puts the score back. Demo Mode, Science 8. */
+/* Right-click Edit Score (Nov 3 UI audit): rubric and Complete/Incomplete
+   work open the grader instead of a number box. The whole 1 to 4 rule, the
+   points typo and Clear Score with its ticks and Cmd+Z are pinned in
+   tests/pin-gradebook-writes.test.js, tests/gradebook-typo-keeps-score.test.js
+   and tests/gradebook-clear-score-undo-ticks.test.js. Demo Mode, Science 8. */
 test.use({ viewport: { width: 1440, height: 900 } });
 
 async function openScores(page) {
@@ -45,27 +45,6 @@ const entries = (page, p) =>
     p,
   );
 
-test('a typed proficiency must be a whole 1 to 4', async ({ page }) => {
-  await openScores(page);
-  const p = await pick(page, 'level');
-  test.skip(!p, 'no plain proficiency work in the demo');
-  const before = await entries(page, p);
-  for (const bad of ['3.5', '9', '0.4']) {
-    await menu(page, p, 'editCell');
-    await cell(page, p).locator('.gb-scores-input').fill(bad);
-    await cell(page, p)
-      .locator('.gb-scores-input')
-      .evaluate(el => el.blur());
-    expect(await entries(page, p)).toBe(before);
-  }
-  await menu(page, p, 'editCell');
-  await cell(page, p).locator('.gb-scores-input').fill('2');
-  await cell(page, p)
-    .locator('.gb-scores-input')
-    .evaluate(el => el.blur());
-  await expect.poll(() => entries(page, p)).toMatch(/,2\]/);
-});
-
 test('rubric and Complete/Incomplete work open the grader, changing nothing', async ({ page }) => {
   await openScores(page);
   for (const kind of ['rubric', 'complete']) {
@@ -78,36 +57,4 @@ test('rubric and Complete/Incomplete work open the grader, changing nothing', as
     await page.keyboard.press('Escape');
     await expect.poll(() => page.evaluate(() => PageAssignments.graderOpen())).toBe(false);
   }
-});
-
-test('a points typo leaves the score', async ({ page }) => {
-  await openScores(page);
-  const p = await pick(page, 'points');
-  const before = await page.evaluate(({ aid, sid }) => getPointsScore('sci8', sid, aid), p);
-  await menu(page, p, 'editCell');
-  await cell(page, p)
-    .locator('.gb-scores-input')
-    .evaluate(el => {
-      el.type = 'text';
-      el.value = 'q';
-      el.blur();
-    });
-  expect(await page.evaluate(({ aid, sid }) => getPointsScore('sci8', sid, aid), p)).toBe(before);
-});
-
-test('Clear Score takes the ticks with it, and ⌘Z puts the score back', async ({ page }) => {
-  await openScores(page);
-  const p = await pick(page, 'advanced');
-  test.skip(!p, 'no Advanced Rubric work in the demo');
-  await page.evaluate(({ aid, sid }) => {
-    const r = getRubricById('sci8', getAssessments('sci8').find(a => a.id === aid).rubricId);
-    const check = r.criteria.flatMap(c => c.checks || [])[0];
-    if (check) setRubricCheck('sci8', sid, aid, check.id, true);
-  }, p);
-  const before = await entries(page, p);
-  await menu(page, p, 'clearCell');
-  expect(await entries(page, p)).toBe('[]');
-  expect(await page.evaluate(({ aid, sid }) => getRubricCheckIds('sci8', sid, aid).length, p)).toBe(0);
-  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+z' : 'Control+z');
-  await expect.poll(() => entries(page, p)).toBe(before);
 });

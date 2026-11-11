@@ -52,7 +52,8 @@ export async function serve(page, fn, opts = {}) {
     if (opts.delay && opts.delay[body.route]) await new Promise(r => setTimeout(r, opts.delay[body.route]));
     if (opts.fail && opts.fail(body)) return route.abort();
     // `answer` can stand in for the function on one request: { status, json }.
-    const { status, json } = (opts.answer && opts.answer(body)) || (await fn.respond(body));
+    // `answer` may also wait (it can ask the function itself first and change its answer).
+    const { status, json } = (opts.answer && (await opts.answer(body))) || (await fn.respond(body));
     return route.fulfill({
       status,
       headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' },

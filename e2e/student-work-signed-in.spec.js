@@ -287,7 +287,8 @@ test('Send Work on, a student’s photos in the grader, Add Work, a grade and Re
   await page.goto('/dashboard?manage=student-page');
   const send = page.getByRole('switch', { name: 'Send Work' });
   await expect(send).not.toBeChecked();
-  await page.locator('.sp-send .gpd-switch').click();
+  // Send Work's own row (Reflect on Feedback's row is drawn the same way beside it).
+  await page.locator('.sp-send:not(.sp-reflect) .gpd-switch').click();
   await expect(send).toBeChecked();
   await expect.poll(async () => (await calls(page, 'set_course_send_work')).length).toBe(1);
   expect((await calls(page, 'set_course_send_work'))[0].p_patch).toEqual({ send_work: true });

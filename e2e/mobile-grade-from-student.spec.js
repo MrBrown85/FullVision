@@ -161,3 +161,45 @@ test('Grade on a student page with a grading screen open on the Grade tab opens 
   }, sid);
   expect(stored).toBe(41);
 });
+
+// The grading bar always shows what is graded: its title at rest on the Grade list, "N of 27" following a
+// thumbnail tap, and the student page fading its title in on scroll.
+test('the grading bar shows the title and the student count, and follows a thumbnail tap', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/login.html');
+  await page.locator('#demo-mode-btn').click();
+  await page.waitForURL(/teacher-mobile\//);
+  await page.locator('.m-tab-item[data-tab="grade"]').click();
+
+  // The Grade list has no large title: its bar title shows at rest.
+  await expect(page.locator('#m-nav-bar-grade-picker .m-nav-bar-title-inline')).toHaveCSS('opacity', '1');
+
+  await page.locator('.m-seg-btn[data-action="m-grade-seg"][data-val="all"]').click();
+  await page.locator('#m-grade-list .m-cell', { hasText: 'Science Fair Proposal' }).click();
+  const title = page.locator('#m-nav-bar-grade-swiper .m-nav-bar-title-inline');
+  await expect(title).toHaveCSS('opacity', '1');
+  await expect(title).toContainText('Science Fair Proposal');
+  await expect(title.locator('div')).toHaveText('1 of 27');
+
+  await page.locator('#m-thumb-strip .m-thumb').nth(4).click();
+  await expect(title.locator('div')).toHaveText('5 of 27');
+  await expect(title).toHaveCSS('opacity', '1');
+});
+
+test('the student page keeps its bar title hidden at rest and fades it in on scroll', async ({ page }) => {
+  await page.goto('/login.html');
+  await page.locator('#demo-mode-btn').click();
+  await page.waitForURL(/teacher-mobile\//);
+  await page.locator('.m-tab-item[data-tab="students"]').click();
+  await page.locator('.m-card-stack-item[data-depth="0"] [data-action="m-student-detail"]').click();
+  const title = page.locator('#m-nav-bar-student-detail .m-nav-bar-title-inline');
+  await expect(title).toHaveCSS('opacity', '0');
+  // The scroll handler is bound once the page has slid in, so scroll until it fades in.
+  await expect(async () => {
+    await page.locator('#m-screen-student-detail .m-screen-content').evaluate(el => {
+      el.scrollTop = 200;
+      el.dispatchEvent(new Event('scroll'));
+    });
+    await expect(title).toHaveCSS('opacity', '1', { timeout: 500 });
+  }).toPass();
+});

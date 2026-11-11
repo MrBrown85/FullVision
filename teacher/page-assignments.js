@@ -3239,7 +3239,9 @@ window.PageAssignments = (function () {
           esc(until) +
           '"></div>'
         : '') +
-      (_formWorkDemo() ? _formWorkSegHtml('group_work', 'Group Work', WORK_GROUP, w.group_work) : '') +
+      (_formWorkDemo() || _formWorkLive()
+        ? _formWorkSegHtml('group_work', 'Group Work', WORK_GROUP, w.group_work)
+        : '') +
       (_formWorkDemo() || _formWorkLive()
         ? _formWorkSegHtml(
             'students_see_markup',
@@ -3286,11 +3288,11 @@ window.PageAssignments = (function () {
     _refreshFormWorkCard('#af-accept-until');
   }
 
-  // Group Work does something only in Demo Mode yet.
+  // Demo Mode.
   function _formWorkDemo() {
     return typeof isDemoMode === 'function' && isDemoMode();
   }
-  // Students See Your Mark Up works in a signed-in class the server keeps rows for too (S9-W1).
+  // Group Work and Students See Your Mark Up work in a signed-in class the server keeps rows for too (S9-W1, S12-W1).
   function _formWorkLive() {
     return typeof studentWorkLive === 'function' && studentWorkLive(activeCourse);
   }

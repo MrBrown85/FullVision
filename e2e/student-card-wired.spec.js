@@ -96,7 +96,7 @@ for (const size of [
       await contrast(page);
       await shot(page, size.name === 'a phone' ? '03-assignments' : 'chromebook-03-assignments');
 
-      await expect.poll(() => routes(posts)).toEqual(['card', 'verify', 'verify', 'page', 'work', 'seen']);
+      await expect.poll(() => routes(posts)).toEqual(['card', 'verify', 'verify', 'page', 'work', 'forms', 'seen']);
       expect(posts[2].body).toEqual({
         route: 'verify',
         code: 'P3R8WDK4',
@@ -113,7 +113,7 @@ for (const size of [
         expect(p.headers.referer).toBeUndefined();
       }
       // The handler took every one of them.
-      expect(fn.logs.map(l => l.outcome)).toEqual(['ok', 'wrong_identity', 'ok', 'ok', 'ok', 'ok']);
+      expect(fn.logs.map(l => l.outcome)).toEqual(['ok', 'wrong_identity', 'ok', 'ok', 'ok', 'ok', 'ok']);
 
       // On the device: the session's token, when it ends and the class it opens. Nothing else.
       const kept = await stored(page);
@@ -140,7 +140,7 @@ for (const size of [
       await expect(row(page, 'Cell Structure Quiz').locator('.sp-row-result')).toHaveText('8 / 10');
       // Opened last time: no longer marked, and nothing more to tell the server.
       await expect(row(page, 'Lab Safety Contract').locator('.sp-row-sub')).toHaveText(/^Back \S+ \d+$/);
-      await expect.poll(() => routes(posts)).toEqual(['page', 'work']);
+      await expect.poll(() => routes(posts)).toEqual(['page', 'work', 'forms']);
 
       // Done.
       await page.getByRole('button', { name: 'Done' }).click();
@@ -153,7 +153,7 @@ for (const size of [
       ).toBeVisible();
       expect(await page.locator('body').innerText()).not.toMatch(/Cece|Science 8|Assignments|Extending|Quiz/);
       expect((await stored(page)).local).toEqual({});
-      await expect.poll(() => routes(posts)).toEqual(['page', 'work', 'done']);
+      await expect.poll(() => routes(posts)).toEqual(['page', 'work', 'forms', 'done']);
       expect(fn.state.sessions).toEqual({});
       await fits(page);
       await named(page);
@@ -234,24 +234,29 @@ test.describe('a real card: what stops it, and what each one says', () => {
       'This card needs to be printed again. Ask your teacher for a new card.',
     ],
   ];
-  for (const [error, card, line] of WHY) {
-    test(`a card answered ${error} says why`, async ({ page }) => {
+  // The four answers on one page: each is a fresh card address and a fresh stand-in function.
+  test('a card the school answers closed, locked, expired or needing a reprint says why', async ({ page }) => {
+    for (const [error, card, line] of WHY) {
+      await page.goto('about:blank');
       const fn = school(card);
       const posts = await serve(page, fn);
       await page.goto('/s/#P3R8-WDK4');
-      await expect(page.getByRole('alert')).toHaveText(line);
+      await expect(page.getByRole('alert'), error).toHaveText(line);
       await expect(page).toHaveURL(/\/s\/$/);
       await expect(page.getByLabel('Student Number')).toHaveCount(0);
-      expect(routes(posts)).toEqual(['card']);
-      expect(fn.logs.map(l => l.outcome)).toEqual([error]);
+      expect(routes(posts), error).toEqual(['card']);
+      expect(
+        fn.logs.map(l => l.outcome),
+        error,
+      ).toEqual([error]);
       await fits(page);
       await named(page);
       await contrast(page);
       await shot(page, '10-' + error.replace('_', '-'));
       await page.getByRole('button', { name: 'Type a Different Code' }).tap();
       await expect(page.getByLabel('Card Code')).toBeVisible();
-    });
-  }
+    }
+  });
 
   test('the card’s password, a wrong one, and the lock after five', async ({ page }) => {
     const fn = school({ birthday: null, number: null, password: '4821' });
@@ -361,23 +366,26 @@ test.describe('a real card: what stops it, and what each one says', () => {
     ['closed', { closed: true }, 'The student page is turned off for this class. Ask your teacher.'],
     ['not_found', { withdrawn: true }, "Your page for this class can't be opened any more. Ask your teacher."],
   ];
-  for (const [error, change, line] of GONE) {
-    test(`the page answered ${error} says why and signs the device out`, async ({ page }) => {
+  test('the page answered stopped, expired, closed or not found says why and signs the device out', async ({
+    page,
+  }) => {
+    for (const [error, change, line] of GONE) {
+      await page.goto('about:blank');
       const fn = school();
       const posts = await serve(page, fn);
       await signIn(page);
       Object.assign(fn.state.cards.P3R8WDK4, change);
       posts.length = 0;
       await page.reload();
-      await expect(page.getByRole('alert')).toHaveText(line);
+      await expect(page.getByRole('alert'), error).toHaveText(line);
       await expect(page.locator('.sp-row')).toHaveCount(0);
       await expect(page.getByRole('button', { name: 'Try Again' })).toHaveCount(0);
-      await expect.poll(() => routes(posts)).toEqual(['page', 'done']);
-      expect((await stored(page)).local).toEqual({});
+      await expect.poll(() => routes(posts), error).toEqual(['page', 'done']);
+      expect((await stored(page)).local, error).toEqual({});
       await named(page);
       await shot(page, '13-page-' + error.replace('_', '-'));
-    });
-  }
+    }
+  });
 
   test('when calc.js can’t be fetched the real list opens without results, and tells the server nothing yet', async ({
     page,
@@ -392,12 +400,12 @@ test.describe('a real card: what stops it, and what each one says', () => {
     await expect(page.getByRole('status')).toHaveText('Your results didn’t load. Check your internet and try again.');
     await expect(page.locator('.sp-row')).toHaveCount(9);
     await expect(page.locator('.sp-row-result')).toHaveCount(0);
-    await expect.poll(() => routes(posts)).toEqual(['card', 'verify', 'page', 'work']);
+    await expect.poll(() => routes(posts)).toEqual(['card', 'verify', 'page', 'work', 'forms']);
     await shot(page, '14-results-did-not-load');
     await page.unroute('**/shared/calc.js');
     await page.getByRole('button', { name: 'Try Again' }).tap();
     await expect(row(page, 'Cell Structure Quiz').locator('.sp-row-result')).toHaveText('8 / 10');
-    await expect.poll(() => routes(posts)).toEqual(['card', 'verify', 'page', 'work', 'seen']);
+    await expect.poll(() => routes(posts)).toEqual(['card', 'verify', 'page', 'work', 'forms', 'seen']);
   });
 });
 

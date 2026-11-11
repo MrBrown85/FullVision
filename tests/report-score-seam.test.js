@@ -752,7 +752,7 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
     ticks = structuredClone(getRubricChecks(cid));
   });
 
-  afterEach(() => {
+  const reset = () => {
     loadSeam();
     delete globalThis.getReturnedScores;
     delete globalThis.getReturnedRubricCheckIds;
@@ -760,7 +760,8 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
     _cache.rubricChecks[cid] = structuredClone(ticks);
     _scoreSet = 'all';
     clearProfCache();
-  });
+  };
+  afterEach(reset);
 
   afterAll(() => {
     loadSeam(null, true);
@@ -847,21 +848,47 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
     expect(handout.inside).toBeGreaterThan(0);
   });
 
-  it('every score, status and tick read while a surface is drawn is made inside withReportScores', async () => {
+  /* One drawing of every surface with all three spies on: the reads, the
+     asks of calc.js, and the functions run inside withReportScores. */
+  let spied = null;
+  async function spiedDraw() {
+    if (spied) return spied;
     await settle();
+    // No cache is left to hide a read: and a grade calc.js already holds is still a grade asked for.
     clearProfCache();
     freshGenerate();
-    const reads = readsOutsideTheSeam(() => surfaces(cid, null, { handout: false }));
+    const real = ReportScores.withReportScores;
+    const later = [];
+    let runs = 0;
+    ReportScores.withReportScores = function (surface, fn) {
+      const result = real.call(this, surface, fn);
+      runs++;
+      if (result && typeof result.then === 'function') later.push(surface);
+      return result;
+    };
+    const found = {};
+    try {
+      found.reads = readsOutsideTheSeam(() => {
+        found.asked = gradesAskedOutsideTheSeam(() => surfaces(cid, null, { handout: false }));
+      });
+    } finally {
+      ReportScores.withReportScores = real;
+    }
+    found.later = later;
+    found.runs = runs;
+    spied = found;
+    return spied;
+  }
+
+  it('every score, status and tick read while a surface is drawn is made inside withReportScores', async () => {
+    const { reads } = await spiedDraw();
     expect(reads.outside).toEqual([]);
     // And there were reads to see: the reports were drawn from scores.
     expect(reads.inside).toBeGreaterThan(1000);
   });
 
   it('every grade a report file asks calc.js for while a surface is drawn is asked for inside withReportScores', async () => {
-    await settle();
-    freshGenerate();
-    // No clearProfCache: a grade calc.js already holds is still a grade asked for.
-    const asked = gradesAskedOutsideTheSeam(() => surfaces(cid, null, { handout: false }));
+    const { asked } = await spiedDraw();
     expect(asked.outside).toEqual([]);
     expect(asked.inside).toBeGreaterThan(1000);
     expect(asked.watched).toBeGreaterThan(60);
@@ -878,22 +905,7 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
   });
 
   it('no function run inside withReportScores leaves work for later (S2-F1 would refuse it)', async () => {
-    await settle();
-    clearProfCache();
-    const real = ReportScores.withReportScores;
-    const later = [];
-    let runs = 0;
-    ReportScores.withReportScores = function (surface, fn) {
-      const result = real.call(this, surface, fn);
-      runs++;
-      if (result && typeof result.then === 'function') later.push(surface);
-      return result;
-    };
-    try {
-      surfaces(cid, null, { handout: false });
-    } finally {
-      ReportScores.withReportScores = real;
-    }
+    const { later, runs } = await spiedDraw();
     expect(later).toEqual([]);
     expect(runs).toBeGreaterThan(1000);
   });
@@ -987,9 +999,13 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
     return { scores, checks, returned, returnedTicks, student, lab, tick: someCheck, other, quiz, check, lab2 };
   }
 
-  it('with the reports’ rows on returned, each report is the report of a class that has only the returned grades', async () => {
+  /* The class with drafts, drawn once for the tests below: on all work, with
+     the reports' rows on returned, and as a class whose working copy is the
+     returned grades. */
+  let drafts;
+  let drawn;
+  beforeAll(async () => {
     const c = classWithDrafts();
-
     // All work, as every surface is today.
     _cache.scores[cid] = structuredClone(c.scores);
     _cache.rubricChecks[cid] = structuredClone(c.checks);
@@ -1008,7 +1024,13 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
     _cache.scores[cid] = structuredClone(c.returned);
     _cache.rubricChecks[cid] = structuredClone(c.returnedTicks);
     const returnedClass = await draw();
+    drafts = c;
+    drawn = { allWork, onReturned, returnedClass };
+    reset();
+  }, 120000);
 
+  it('with the reports’ rows on returned, each report is the report of a class that has only the returned grades', () => {
+    const { allWork, onReturned, returnedClass } = drawn;
     const keys = Object.keys(allWork);
     expect(Object.keys(onReturned)).toEqual(keys);
     expect(Object.keys(returnedClass)).toEqual(keys);
@@ -1026,15 +1048,13 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
     expect(of(TEACHERS).filter(k => onReturned[k] !== returnedClass[k]).length).toBeGreaterThan(0);
   });
 
-  it('a draft’s comment, note and tick are nowhere in a report on returned grades, and still in the teacher’s own', async () => {
-    const c = classWithDrafts();
-    _cache.scores[cid] = structuredClone(c.scores);
-    _cache.rubricChecks[cid] = structuredClone(c.checks);
+  it('a draft’s comment, note and tick are nowhere in a report on returned grades, and still in the teacher’s own', () => {
+    const c = drafts;
     const holding = (drawn, names, needle) =>
       Object.keys(drawn).filter(k => names.indexOf(surfaceOf(k)) >= 0 && drawn[k].indexOf(needle) >= 0);
 
     // On all work the draft is on the reports: the test has something to find.
-    const allWork = await draw();
+    const { allWork, onReturned } = drawn;
     expect(holding(allWork, ['quick'], 'ZZDRAFT overall comment.').length).toBeGreaterThan(0);
     expect(holding(allWork, ['quick'], 'ZZDRAFT criterion comment.').length).toBeGreaterThan(0);
     expect(holding(allWork, ['questionnaire'], 'ZZDRAFT note for the report').length).toBeGreaterThan(0);
@@ -1053,10 +1073,6 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
     expect(ticksOn(allWork, c.student.id, c.lab.id)).toEqual([c.tick.id]);
     expect(ticksOn(allWork, c.other.id, c.lab2.id)).toEqual(c.checks[c.other.id + ':' + c.lab2.id].slice().sort());
 
-    loadSeam(REPORTS_ON_RETURNED);
-    globalThis.getReturnedScores = () => c.returned;
-    globalThis.getReturnedRubricCheckIds = (id, sid, aid) => (c.returnedTicks[sid + ':' + aid] || []).slice();
-    const onReturned = await draw();
     expect(holding(onReturned, REPORTS, 'ZZDRAFT')).toEqual([]);
     // The piece itself is not on the student's Feedback Pages: its grade was never returned.
     const feedback = JSON.parse(onReturned['year › quick › ' + c.student.id]).feedback;
@@ -1075,7 +1091,7 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
   });
 
   it('levels a render keeps are kept for one set: a block drawn on all work, then on returned grades in the same task', async () => {
-    const c = classWithDrafts();
+    const c = drafts;
     _cache.scores[cid] = structuredClone(c.scores);
     /* One student's first-term work was never returned: on all work they
        have a level at the last report, on returned grades they have none,
@@ -1123,7 +1139,7 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
   });
 
   it('a Note for the Report prints only once that piece’s grade has been returned (ruling 11)', () => {
-    const c = classWithDrafts();
+    const c = drafts;
     _cache.scores[cid] = structuredClone(c.scores);
     // A second note, on a piece of the same student's that was returned.
     const returnedPiece = c.returned[c.student.id].find(e => e.score > 0);
@@ -1140,7 +1156,7 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
   });
 
   it('on a class with nothing in draft, every reader gives on returned grades what the data layer gives', () => {
-    const c = classWithDrafts();
+    const c = drafts;
     _cache.scores[cid] = structuredClone(c.scores);
     _cache.rubricChecks[cid] = structuredClone(c.checks);
     globalThis.getReturnedScores = id => getScores(id);

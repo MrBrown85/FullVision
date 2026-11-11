@@ -116,7 +116,7 @@ function installServer() {
         given_at: r.given_at,
         waiting: waiting(r),
       })),
-      revisions: [],
+      revisions: structuredClone(fb.revisions),
       reflections: fb.reflect ? structuredClone(fb.reflections) : [],
     },
     error: null,
@@ -167,6 +167,49 @@ function installServer() {
     if (r.answer) return { data: { result: 'already_answered', reflection: r }, error: null };
     Object.assign(r, { answer: p.p_answer, answered_at: '2026-11-11T20:10:00Z', waiting: false });
     return { data: { result: 'answered', reflection: r }, error: null };
+  });
+  fake.on('return_for_revision', p => {
+    const open = fb.revisions.find(r => r.enrollment_id === p.p_enrollment_id && r.state === 'open');
+    if (open) return { data: { result: 'already_open', request: open }, error: null };
+    const row = {
+      id: 'f3000000-0000-4000-8000-00000000000' + (fb.revisions.length + 1),
+      assessment_id: p.p_assessment_id,
+      enrollment_id: p.p_enrollment_id,
+      what_to_fix: p.p_request.what_to_fix,
+      revise_by: p.p_request.revise_by,
+      criterion_ids: p.p_request.criterion_ids,
+      keep_grade: true,
+      grade_hidden: false,
+      first_submission_id: null,
+      first_version: 1,
+      first_grade: null,
+      first_returned_at: null,
+      created_at: '2026-11-11T20:20:00Z',
+      updated_at: '2026-11-11T20:20:00Z',
+      closed_at: null,
+      state: 'open',
+      revision_submission_id: null,
+      revision_version: null,
+      revision_sent_at: null,
+      revision_note: null,
+      revision_late: null,
+      revision_sent_by: null,
+    };
+    fb.revisions.push(row);
+    return { data: { result: 'made', request: row, returned: {}, hidden: false }, error: null };
+  });
+  fake.on('set_revision_request', p => {
+    const r = fb.revisions.find(x => x.id === p.p_request_id);
+    if (!r) return { data: null, error: { code: 'P0002', message: 'revision request not found' } };
+    if (r.state !== 'open') return { data: { result: 'not_open', request: r }, error: null };
+    Object.assign(r, p.p_patch);
+    return { data: { result: 'saved', request: r }, error: null };
+  });
+  fake.on('cancel_revision', p => {
+    const r = fb.revisions.find(x => x.id === p.p_request_id);
+    if (r.state !== 'open') return { data: { result: 'not_open', request: r }, error: null };
+    Object.assign(r, { state: 'cancelled', closed_at: '2026-11-11T20:30:00Z' });
+    return { data: { result: 'cancelled', request: r, unhidden: false }, error: null };
   });
   fake.on('set_course_feedback_options', p => {
     if ('reflect_on_feedback' in p.p_patch) fb.reflect = p.p_patch.reflect_on_feedback;
@@ -225,6 +268,7 @@ beforeEach(() => {
   gradeRows = {};
   fb = {
     reflect: true,
+    revisions: [],
     marks: {
       [PAGE1]: {
         file_id: PAGE1,
@@ -512,5 +556,90 @@ describe('Reflect on Feedback', () => {
     await settle();
     expect(callsTo('list_course_feedback').length).toBeGreaterThan(0);
     expect(getReflectOnFeedback(CID)).toBe(true);
+  });
+});
+
+describe('Return for Revision, its edit and Take Back (S7-W1)', () => {
+  const ask = { what_to_fix: 'Label the graph.', revise_by: '2026-11-20', criterion_ids: [], keep_grade: true };
+
+  it('shows only while Send Work is on; Return for Revision returns the work, then asks, with keys', async () => {
+    await openClass();
+    expect(revisionsOn(CID)).toBe(true);
+    const key = 'c0000000-0000-4000-8000-000000000007';
+    const done = returnForRevision(CID, NOOR, CAUSES, ask, key);
+    // Shown open at once, and the work is "revising".
+    expect(revisionWorkState(CID, NOOR, CAUSES)).toBe('revising');
+    const res = await done;
+    expect(res.result).toBe('made');
+    expect(res.request).toMatchObject({ what_to_fix: 'Label the graph.', state: 'open', enrollment_id: NOOR });
+    await quiet();
+    const [call] = callsTo('return_for_revision');
+    expect(call).toEqual({
+      p_assessment_id: CAUSES,
+      p_enrollment_id: NOOR,
+      p_request: { what_to_fix: 'Label the graph.', revise_by: '2026-11-20', criterion_ids: [], keep_grade: true },
+      p_idempotency_key: key,
+    });
+    // The work was returned first, as Return returns it: one student, one call, no return_grades.
+    expect(callsTo('return_work').map(p => p.p_enrollment_ids)).toEqual([[NOOR]]);
+    expect(callsTo('return_grades')).toEqual([]);
+    expect(getRevisionRequest(CID, NOOR, CAUSES)).toMatchObject({ state: 'open', what_to_fix: 'Label the graph.' });
+    expect(getCourseFeedback(CID).revisions).toHaveLength(1);
+    // Another press answers already_open and sends nothing more.
+    expect((await returnForRevision(CID, NOOR, CAUSES, ask, 'k-again')).result).toBe('already_open');
+    expect(callsTo('return_for_revision')).toHaveLength(1);
+  });
+
+  it('a class with Send Work off has no revisions, and its writers answer as before', async () => {
+    course.send_work = false;
+    work.course.send_work = false;
+    fb.reflect = false;
+    await openClass();
+    expect(revisionsOn(CID)).toBe(false);
+    expect(await returnForRevision(CID, NOOR, CAUSES, ask, 'k1')).toEqual({ result: 'revisions_off' });
+    expect(callsTo('return_for_revision')).toEqual([]);
+  });
+
+  it('Edit sends only what changed; Take Back cancels; both show at once and take the server’s answer', async () => {
+    await openClass();
+    await returnForRevision(CID, NOOR, CAUSES, ask, 'c0000000-0000-4000-8000-000000000006');
+    await quiet();
+    const id = getRevisionRequest(CID, NOOR, CAUSES).id;
+    const saved = setRevisionRequest(
+      CID,
+      id,
+      { what_to_fix: 'Label both axes.' },
+      'c0000000-0000-4000-8000-000000000005',
+    );
+    expect(getRevisionRequest(CID, NOOR, CAUSES).what_to_fix).toBe('Label both axes.');
+    expect((await saved).result).toBe('saved');
+    expect(callsTo('set_revision_request')[0]).toMatchObject({
+      p_request_id: id,
+      p_patch: { what_to_fix: 'Label both axes.' },
+    });
+    const back = cancelRevision(CID, id, 'c0000000-0000-4000-8000-000000000004');
+    expect(revisionWorkState(CID, NOOR, CAUSES)).toBeNull();
+    expect(await back).toMatchObject({ result: 'cancelled', unhidden: false });
+    expect(callsTo('cancel_revision')).toHaveLength(1);
+    expect(callsTo('cancel_revision')[0].p_idempotency_key).toBe('c0000000-0000-4000-8000-000000000004');
+    await quiet();
+    expect(getRevisionRequest(CID, NOOR, CAUSES)).toMatchObject({ state: 'cancelled' });
+  });
+
+  it('offline, a Return for Revision shows open at once and goes when the device is back', async () => {
+    await openClass();
+    _MARKUP_SAVE_WAIT_MS = 0;
+    setOnline(false);
+    const res = await returnForRevision(CID, NOOR, CAUSES, ask, 'c0000000-0000-4000-8000-000000000003');
+    expect(res.result).toBe('made');
+    expect(revisionWorkState(CID, NOOR, CAUSES)).toBe('revising');
+    // Not answered yet, so it has no server id to edit or take back.
+    const pending = getRevisionRequest(CID, NOOR, CAUSES).id;
+    expect(await cancelRevision(CID, pending, 'k-c')).toEqual({ result: 'failed' });
+    expect(getSyncDotState().status).toBe('error');
+    setOnline(true);
+    await quiet();
+    expect(callsTo('return_for_revision')).toHaveLength(1);
+    expect(getRevisionRequest(CID, NOOR, CAUSES).id).toMatch(UUID);
   });
 });

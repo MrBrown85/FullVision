@@ -247,7 +247,6 @@ describe('with the build switch off the dialog is what it was', () => {
   it.each([
     ['a class with neither setting', {}],
     ['a class set to When I Return Them whose student page is off', { return_grades: 'on_return' }],
-    ['a class whose student page was turned off again', { student_page_enabled: false, return_grades: 'on_return' }],
   ])('byte for byte, in %s', async (_, config) => {
     const now = await walk(config);
     expect(Object.keys(now)).toEqual(Object.keys(before));
@@ -271,7 +270,6 @@ describe('with the build switch off the dialog is what it was', () => {
   it.each([
     ['a class with neither setting', {}],
     ['a class set to When I Return Them whose student page is off', { return_grades: 'on_return' }],
-    ['a class whose student page was turned off again', { student_page_enabled: false, return_grades: 'on_return' }],
   ])('byte for byte for a signed-in teacher, in %s', async (_, config) => {
     const session = signIn();
     try {

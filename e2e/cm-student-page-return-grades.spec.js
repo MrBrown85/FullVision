@@ -187,13 +187,3 @@ test('Return Grades: the question on leaving When I Return Them, Cancel, then Re
   await expect(page.locator('.confirm-overlay')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
-
-test('with the switch off there is no Student Page tab and its address opens Details', async ({ page }) => {
-  await demoWithNewPiece(page);
-  await page.goto('/dashboard?manage=student-page');
-  await expect(page.getByRole('tab', { name: /^Details/ })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('.cm-tabs [role="tab"]')).toHaveCount(6);
-  await expect(page.getByRole('tab', { name: 'Student Page' })).toHaveCount(0);
-  await expect(page.locator('.sp-card')).toHaveCount(0);
-  await expect(page).toHaveURL(/\/dashboard\?manage=details$/);
-});

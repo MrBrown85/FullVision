@@ -1182,6 +1182,8 @@
 
   // `stored` false leaves another student's session, kept by another tab, where it is.
   function forget(stored) {
+    // A questionnaire's draft from a card's page goes too (student.js): it is this tab's student's.
+    StudentPage.wipeCardDrafts();
     session = null;
     adding = null;
     stopCamera();
@@ -1697,6 +1699,7 @@
     if (session.kept) keep(session);
     S.page = null;
     S.reply = null;
+    S.realForms = null;
     if (typeof StudentData !== 'undefined') StudentData.use(null);
     S.heading = TITLE;
     S.screen = 'loading';
@@ -1790,19 +1793,19 @@
     };
   }
 
-  /* Start, or See Your Report, from the card's page. A real card cannot
-     open either yet: the server has no route that opens a questionnaire or
-     a phone report from a card's session (S4-F4's pull request names what
-     is missing), and the server's page lists none, so these buttons show
-     only in Demo Mode. There they open the sample questionnaire and report
-     on the slip's own screens, with the student already known. */
+  /* Start, or See Your Report, from the card's page. Each opens on the
+     slip's own screens, with the student already known: in Demo Mode the
+     sample questionnaire and report, for a real card what `form` and
+     `report` answer (openRealForm). */
   function openForm(act, id) {
-    if (!S.demo || !S.page || S.screen !== 'assignments') return;
-    var forms = demoForms();
+    if (!S.page || S.screen !== 'assignments') return;
+    var forms = S.demo ? demoForms() : formsOf(S);
+    if (!forms) return;
     var known = (act === 'q-start' ? forms.questionnaires : forms.reports).some(function (x) {
-      return x.id === id;
+      return x && x.id === id;
     });
     if (!known) return;
+    if (!S.demo) return openRealForm(act, id);
     StudentPage.newTurn();
     stopWatchingRows();
     S.back = S.tab;
@@ -1834,6 +1837,193 @@
     });
   }
 
+  /* ── A real card's questionnaires and reports (S4-F4) ──────────
+     The routes of supabase/functions/student-submit/forms-routes.ts, through
+     askClass: `forms` once the page is up (the two tabs' lists), `form` and
+     `report` to open one, `answer` to send (questionnaire.js). What `forms`
+     answers is kept on the page's state with the student it is for, so
+     Done, another student or another class leaves nothing behind. A
+     function without these routes (bad_request) or a failed ask leaves the
+     page as it was drawn: both tabs say their empty line. */
+  var formsAsked = 0; // each `forms` ask, so an older answer never replaces a newer one
+  var formAsked = 0; // each `form` or `report` ask, so only the last one opens
+
+  function listOf(v) {
+    return Array.isArray(v) ? v : [];
+  }
+
+  // The `forms` lists for the page showing, or null.
+  function formsOf(state) {
+    var f = state && state.realForms;
+    return f && state.page && f.student === state.page.student.id
+      ? { questionnaires: f.questionnaires, reports: f.reports }
+      : null;
+  }
+
+  // The page drawn again where the student is, the focus kept on what had it.
+  function repaintPage() {
+    if (!S || S.screen !== 'assignments' || S.sendAsk) return;
+    var el = typeof document !== 'undefined' ? document.activeElement : null;
+    var sel = '';
+    if (el && el.getAttribute && el.getAttribute('data-act')) {
+      var form = el.getAttribute('data-form-id');
+      sel =
+        '[data-act="' +
+        String(el.getAttribute('data-act')).replace(/["\\]/g, '') +
+        '"]' +
+        (form ? '[data-form-id="' + String(form).replace(/["\\]/g, '') + '"]' : '');
+    } else if (el && el.classList && el.classList.contains('sp-page-title')) {
+      sel = '.sp-page-title';
+    }
+    paint();
+    var back = sel && typeof document !== 'undefined' ? document.querySelector('#app ' + sel) : null;
+    if (back && back.focus) back.focus({ preventScroll: true });
+  }
+
+  function loadForms() {
+    var state = S;
+    if (!state || state.demo || !state.page) return Promise.resolve();
+    var student = state.page.student.id;
+    var mine = ++formsAsked;
+    return askClass('forms', {}, student).then(function (res) {
+      if (S !== state || mine !== formsAsked || !state.page || state.page.student.id !== student) return;
+      if (!(res && res.ok === true && (Array.isArray(res.questionnaires) || Array.isArray(res.reports)))) return;
+      state.realForms = {
+        student: student,
+        questionnaires: listOf(res.questionnaires),
+        reports: listOf(res.reports),
+      };
+      repaintPage();
+    });
+  }
+
+  /* A questionnaire sent (or already in): its row reads Sent at once, and
+     `forms` is asked again for the server's own list. */
+  function formSent(form, res) {
+    var f = S && S.realForms;
+    if (f && form && f.student === form.student) {
+      f.questionnaires.forEach(function (q) {
+        if (q && q.id === form.id && q.state !== 'sent') {
+          q.state = 'sent';
+          q.sent_at =
+            (res && res.ok && typeof res.submitted_at === 'string' && res.submitted_at) || new Date().toISOString();
+        }
+      });
+    }
+    return loadForms();
+  }
+
+  /* What `form`, `answer` and `report` refuse with, in words. The slip's
+     words where they fit (MESSAGES); a card has no slip or link, so the
+     rest say it plainly. `answer` keeps the answers on screen, and says so. */
+  var FORM_WORDS = {
+    already_sent: 'You already sent your answers to these questions.',
+    not_found: 'These questions aren\u2019t open for you any more. Ask your teacher.',
+    report_closed: 'This report has closed. Your official report card is in MyEd.',
+    report_not_found: 'This report can\u2019t be opened any more. Ask your teacher.',
+    bad_request: 'Something went wrong. Try again later, or ask your teacher.',
+  };
+  var FORM_SLIP_WORDS = { closed: 1, not_open_yet: 1, invalid: 1, empty: 1 };
+  function formMessage(route, res) {
+    var e = res && res.ok === false && typeof res.error === 'string' ? res.error : 'network';
+    if (has(FORM_SLIP_WORDS, e)) return StudentPage.messageFor(res);
+    if (e === 'card_locked') return MESSAGES.card_locked;
+    if (e === 'too_many') {
+      var mins = Math.max(1, Math.ceil((Number(res.retry_after_s) || 60) / 60));
+      return 'You\u2019ve sent a lot this hour. Try again in ' + mins + ' ' + (mins === 1 ? 'minute' : 'minutes') + '.';
+    }
+    if (e === 'not_found' && route === 'report') return FORM_WORDS.report_not_found;
+    if (has(FORM_WORDS, e) && e !== 'report_not_found') return FORM_WORDS[e];
+    return route === 'answer' ? MESSAGES.network : MESSAGES.card_network;
+  }
+
+  /* A refusal that says the session or the class is over, as `page`
+     saying it. `form` and `answer` say `closed` of the questionnaire; only
+     `report` and `forms` say it of the class. */
+  function formSessionOver(route, res) {
+    var e = res && res.ok === false ? res.error : '';
+    return e === 'signed_out' || e === 'card_stopped' || e === 'card_expired' || (e === 'closed' && route === 'report');
+  }
+
+  // A questionnaire or report that would not open: why, and the way back to the page.
+  function renderFormMessage(state) {
+    return (
+      header(TITLE, (state.page && className(state.page.course)) || 'FullVision') +
+      '<main class="sp-main sp-main-center">' +
+      '<section class="sp-card sp-hello"><p class="sp-lead" role="alert">' +
+      esc(state.message) +
+      '</p></section>' +
+      '<button type="button" class="sp-btn sp-btn-primary" data-act="page-back">Back to Your Page</button>' +
+      '</main>'
+    );
+  }
+
+  /* Start, or See Your Report, for a real card: `form` or `report`, then
+     the slip's screens with what it answered. The page's other asks
+     (`work`, `feedback`) are left to land: nothing here starts a new turn. */
+  function openRealForm(act, id) {
+    var state = S;
+    var student = S.page.student.id;
+    var route = act === 'q-start' ? 'form' : 'report';
+    var mine = ++formAsked;
+    stopWatchingRows();
+    S.back = S.tab;
+    S.sheet = false;
+    S.message = '';
+    S.heading = TITLE;
+    S.screen = 'loading';
+    paint();
+    var body = route === 'form' ? { questionnaire_id: id } : { report_id: id };
+    return askClass(route, body, student).then(function (res) {
+      if (S !== state || mine !== formAsked || S.screen !== 'loading' || !S.back) return;
+      if (!S.page || S.page.student.id !== student) return;
+      if (formSessionOver(route, res)) return pageRefused(res);
+      var course = { name: S.page.course.name, block: S.page.course.block };
+      var who = { first_name: S.page.student.firstName };
+      if (route === 'report' && res && res.ok === true && res.report && typeof res.report === 'object') {
+        var listed = (formsOf(S) || { reports: [] }).reports.filter(function (r) {
+          return r && r.id === id;
+        })[0];
+        S.data = {
+          ok: true,
+          kind: 'report',
+          student: who,
+          course: course,
+          report: { title: String((listed && listed.title) || res.report.report || '') },
+        };
+        S.report = res.report;
+        // Opened: it is no longer New on My Reports.
+        if (listed && !listed.opened_at) listed.opened_at = new Date().toISOString();
+        S.screen = 'report';
+        paint('.pr-view h1, .pr-view h2');
+        return;
+      }
+      if (route === 'form' && res && res.ok === true && Array.isArray(res.parts) && res.parts.length) {
+        S.data = {
+          ok: true,
+          kind: 'questionnaire',
+          student: who,
+          course: course,
+          parts: res.parts,
+          context: res.context && typeof res.context === 'object' ? res.context : {},
+        };
+        S.cardForm = { student: student, id: id };
+        S.part = 0;
+        S.answers = {};
+        StudentPage.loadDraft();
+        S.screen = 'part';
+        paint('h1');
+        return;
+      }
+      var refused = res && res.ok === false ? res : { ok: false, error: 'network' };
+      S.message = formMessage(route, refused);
+      S.screen = 'formmessage';
+      paint('[data-act="page-back"]');
+      // The list may have changed under it (sent elsewhere, closed, taken back).
+      if (/^(already_sent|closed|not_found|report_closed)$/.test(refused.error)) loadForms();
+    });
+  }
+
   // Back to Your Page from a questionnaire sent or a report read: the tab it was opened from.
   function pageBack() {
     if (!S.back || !S.page) return;
@@ -1842,6 +2032,11 @@
     S.back = '';
     S.data = null;
     S.report = null;
+    S.cardForm = null;
+    S.answers = {};
+    S.part = 0;
+    S.message = '';
+    S.sending = false;
     S.screen = 'assignments';
     setTitle();
     paint('.sp-page-title');
@@ -2022,6 +2217,8 @@
       watchRows();
       // What the class takes, asked once the page is up (s/send.js): a class that takes no work stays as drawn.
       if (!S.demo && typeof StudentPage.pageOpened === 'function') StudentPage.pageOpened();
+      // Its questionnaires and phone reports (S4-F4): a function without the route leaves both tabs as drawn.
+      if (!S.demo) loadForms();
     });
   }
 
@@ -2044,6 +2241,17 @@
     reflect: 1,
     reply: 1,
     'answer-seen': 1,
+    // Questionnaires and phone reports from the card (S4-F4; supabase/functions/student-submit/forms-routes.ts).
+    forms: 1,
+    form: 1,
+    answer: 1,
+    report: 1,
+    // Revisions and group work (S11-W1, S12-W1; s/send.js and s/feedback.js).
+    'revise-start': 1,
+    'revise-finish': 1,
+    'revise-unsend': 1,
+    'group-work': 1,
+    'group-links': 1,
   };
   function askClass(route, body, enrollment) {
     if (S.demo || !session || !has(CLASS_ROUTES, route)) return Promise.resolve({ ok: false, error: 'signed_out' });
@@ -2169,7 +2377,11 @@
      first screen). */
   function resume() {
     var stored = readStored();
-    if (!stored) return false;
+    if (!stored) {
+      // No session on the device: a card's draft left in this tab (a tab reopened) is nobody's now.
+      StudentPage.wipeCardDrafts();
+      return false;
+    }
     setTitle();
     var why = over(stored);
     if (why) {
@@ -2325,6 +2537,10 @@
   StudentPage.demoForms = demoForms;
   StudentPage.pageBack = pageBack;
   StudentPage.askClass = askClass;
+  StudentPage.formsOf = formsOf;
+  StudentPage.formSent = formSent;
+  StudentPage.formMessage = formMessage;
+  StudentPage.formSessionOver = formSessionOver;
   // A send route that says the session or the class is over: as `page` saying it.
   StudentPage.sessionRefused = pageRefused;
 
@@ -2337,6 +2553,7 @@
       cardmessage: renderCardMessage,
       cardscan: renderCardScan,
       signedout: renderSignedOut,
+      formmessage: renderFormMessage,
     },
     click: onClick,
     submit: onSubmit,
@@ -2370,6 +2587,8 @@
       checkCard: checkCard,
       checkSession: checkSession,
       tellSeen: tellSeen,
+      loadForms: loadForms,
+      formsOf: formsOf,
       codeFrom: codeFrom,
       adding: function () {
         return adding;

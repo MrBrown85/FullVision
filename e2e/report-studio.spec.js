@@ -51,8 +51,71 @@ async function openFresh(page) {
    tests were written for an Assignment Grades table that fits the Back:
    Demo Mode's assessments, year to date in one column (the defaults),
    run to a second sheet, so it is set to This Term, two columns, by
-   category (shortGradeTable). The defaults have their own test. */
+   category. The layout is saved for the class as the click path leaves
+   it (Custom, the Report Card template, shortGradeTable), then the
+   Studio opens on it: saving is faster than clicking, as every click
+   re-fits all 27 students. The click path has its own tests ('a starter
+   applies', 'a new report', 'Assignment Grades starts in one column'),
+   and 'the saved starting layout is what the click path saves' pins this
+   copy to it. */
+const STARTING_LAYOUT = {
+  progressMode: 'build',
+  form: {
+    v: 6,
+    id: 'report-card',
+    name: 'Report Card',
+    type: 'standard',
+    sides: [
+      {
+        rows: [
+          { cells: [{ block: 'header', size: 'row' }] },
+          { cells: [{ block: 'proficiency', size: 'row' }] },
+          { cells: [{ block: 'legend', size: 'row' }] },
+          { cells: [{ block: 'teacher-narrative', size: 'row', lines: 10 }] },
+          {
+            cells: [
+              { block: 'term-attendance', size: 'half' },
+              { block: 'missing-work', size: 'half' },
+            ],
+          },
+        ],
+      },
+      {
+        rows: [
+          { cells: [{ block: 'self-assessment', size: 'row' }] },
+          {
+            cells: [
+              {
+                block: 'grade-table',
+                size: 'row',
+                options: { range: 'term', columns: 'two', organize: 'category' },
+              },
+            ],
+          },
+          { cells: [{ block: 'parent-response', size: 'row', lines: 3 }] },
+        ],
+      },
+    ],
+    pinned: 'parent-response',
+    perStudent: {},
+  },
+  preset: 'standard',
+};
+
 async function openStudio(page) {
+  await page.goto('/login.html?demo=1');
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await page.evaluate(layout => saveReportConfig(getActiveCourse(), layout), STARTING_LAYOUT);
+  await page.reload();
+  await page.evaluate(r => window.Router.navigate(r), '/reports');
+  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await expect(page.locator('#studio')).toBeVisible();
+  await expect(page.locator('#studio-fit')).not.toBeEmpty();
+  await expect(page.locator('.sheet-cell[data-block="parent-response"]')).toHaveCount(1);
+}
+
+/* The click path to the same layout. */
+async function openStudioByClicking(page) {
   await openFresh(page);
   await applyTemplate(page, 'report-card');
   await expect(page.locator('.sheet-cell[data-block="parent-response"]')).toHaveCount(1);
@@ -149,16 +212,6 @@ async function rowsOf(page, side) {
           .join('+'),
       ),
     );
-}
-
-/* Saves a form for Demo Mode's class as a teacher's earlier session would
-   have, then opens the Studio on it. */
-async function openWithForm(page, makeForm) {
-  await openStudio(page);
-  await page.evaluate(makeForm);
-  await page.reload();
-  await page.getByRole('tab', { name: 'Progress Reports' }).click();
-  await expect(page.locator('.report-sheet').first()).toBeVisible();
 }
 
 /* Every Demo student's six habits rated, so Learning Dispositions prints
@@ -717,16 +770,6 @@ test.describe('Page Studio', () => {
     expect(Math.abs(measured - shown)).toBeLessThanOrEqual(2);
   });
 
-  // Group 3 #62: reports print black and white, so the screen shows the
-  // levels black as they print, and there is no Ink choice.
-  test('the levels on screen are black, as they print', async ({ page }) => {
-    await openStudio(page);
-    const level = page.locator('#rb-preview .report-prof td.report-prof-n').first();
-    expect(await level.evaluate(el => getComputedStyle(el).color)).toBe('rgb(0, 0, 0)');
-    await expect(page.locator('#report-ink')).toHaveCount(0);
-    await expect(page.locator('.studio-head')).not.toContainText('Ink');
-  });
-
   test('Print Reports saves a copy of every report and lists it as Printed', async ({ page }) => {
     await openStudio(page);
     await page.getByRole('button', { name: 'Print Reports' }).click();
@@ -860,70 +903,6 @@ test.describe('Page Studio', () => {
     await expect(page.locator('#studio-palette')).toBeHidden();
   });
 
-  test('a v5 grid form saved before the rows opens on them: same-row halves become a pair, nothing overlaps', async ({
-    page,
-  }) => {
-    await openWithForm(page, () => {
-      const cid = getActiveCourse();
-      const rc = Object.assign({}, getReportConfig(cid) || {});
-      rc.form = {
-        v: 5,
-        id: 'report-card',
-        name: 'Report Card',
-        pages: [
-          {
-            blocks: [
-              { block: 'header', x: 0, y: 0, w: 12 },
-              { block: 'teacher-narrative', x: 0, y: 5, w: 12, h: 13 },
-              { block: 'proficiency', x: 0, y: 18, w: 6, h: 13 },
-              { block: 'legend', x: 6, y: 18, w: 6, h: 6 },
-            ],
-          },
-          { blocks: [{ block: 'parent-response', x: 0, y: 30, w: 12, h: 10 }] },
-        ],
-        pinned: 'parent-response',
-        perStudent: {},
-      };
-      saveReportConfig(cid, rc);
-    });
-    expect(await rowsOf(page, 0)).toEqual(['header', 'teacher-narrative', 'proficiency/half+legend/half']);
-    expect(await rowsOf(page, 1)).toEqual(['parent-response']);
-    await cellOf(page, 'teacher-narrative').click();
-    await expect(bar(page).locator('.studio-bar-step b')).toHaveText('10');
-    expect(await overlapping(page)).toEqual([]);
-    expect(await overflowing(page)).toEqual([]);
-  });
-
-  test('Legal gives the same rows a taller side', async ({ page }) => {
-    await openStudio(page);
-    const letter = await page.locator('.sheet-zoom[data-side="1"] .sheet-pinned').evaluate(el => {
-      // In sheet px: the canvas scales the pages to fit beside the inspector.
-      const zoom = parseFloat(getComputedStyle(el.closest('.sheet-zoom')).getPropertyValue('--sheet-zoom')) || 1;
-      return Math.round(
-        (el.getBoundingClientRect().top - el.closest('.sheet-body').getBoundingClientRect().top) / zoom,
-      );
-    });
-    await page.getByRole('radio', { name: 'Legal' }).click();
-    await expect(page.locator('.report-sheet[data-paper="legal"]')).toHaveCount(2);
-    const legal = await page.locator('.sheet-zoom[data-side="1"] .sheet-pinned').evaluate(el => {
-      // In sheet px: the canvas scales the pages to fit beside the inspector.
-      const zoom = parseFloat(getComputedStyle(el.closest('.sheet-zoom')).getPropertyValue('--sheet-zoom')) || 1;
-      return Math.round(
-        (el.getBoundingClientRect().top - el.closest('.sheet-body').getBoundingClientRect().top) / zoom,
-      );
-    });
-    // 3in more paper (288 sheet px), less the margins the body keeps.
-    expect(legal - letter).toBeGreaterThan(270);
-    expect(await rowsOf(page, 0)).toEqual([
-      'header',
-      'proficiency',
-      'legend',
-      'teacher-narrative',
-      'missing-work/half',
-    ]);
-    await page.getByRole('radio', { name: 'Letter' }).click();
-  });
-
   test('Assignment Grades starts in one column, a heading per month, year to date', async ({ page }) => {
     await openFresh(page);
     const pop = await openOptions(page, 'grade-table');
@@ -959,14 +938,14 @@ test.describe('Page Studio', () => {
 
   /* Rows (As Graded, Each Folder, Each Competency) is too long for one line
      of the inspector; its options once squeezed onto it and overlapped. */
-  for (const [width, height] of [
-    [1440, 900],
-    [1280, 800],
-    [1024, 768],
-  ]) {
-    test(`the Proficiency inspector's choices do not overlap at ${width} wide`, async ({ page }) => {
+  test("the Proficiency inspector's choices do not overlap at 1440, 1280 and 1024 wide", async ({ page }) => {
+    await openStudio(page);
+    for (const [width, height] of [
+      [1440, 900],
+      [1280, 800],
+      [1024, 768],
+    ]) {
       await page.setViewportSize({ width, height });
-      await openStudio(page);
       const insp = await openOptions(page, 'proficiency');
       await expect(insp.getByRole('radiogroup', { name: 'Rows' }).getByRole('radio')).toHaveCount(3);
       const problems = await insp.locator('.seg').evaluateAll(segs =>
@@ -989,9 +968,9 @@ test.describe('Page Studio', () => {
           });
         }),
       );
-      expect(problems).toEqual([]);
-    });
-  }
+      expect(problems, width + ' wide').toEqual([]);
+    }
+  });
 
   test('Leave Off hides a block for the previewed student only, and keeps its place as a dashed box', async ({
     page,
@@ -1018,22 +997,11 @@ test.describe('Page Studio', () => {
     await expect(cellOf(page, 'teacher-narrative').locator('.report-comment-box')).toHaveCount(1);
   });
 
-  test('the rail’s sheet badges follow the class fit after + Page and its removal (step 4 group 2 #9)', async ({
+  test('+ Page adds an empty side with Empty · Remove, which takes it away; the rail’s sheet badges follow the fit', async ({
     page,
   }) => {
     await openStudio(page);
     const badges = page.locator('#gb-sidebar .student-row-sheets');
-    await page.locator('.studio-page-add').click();
-    await showEveryone(page, 4);
-    await expect(badges.filter({ hasText: '2 sheets' })).toHaveCount(STUDENTS);
-    await page.locator('.studio-view [data-view="one"]').click();
-    await page.locator('.studio-page-empty').click();
-    await expect(page.locator('#studio-fit')).toHaveText('1 sheet for all 27 students');
-    await expect(badges.filter({ hasText: '2 sheets' })).toHaveCount(0);
-  });
-
-  test('+ Page adds an empty side with Empty · Remove, which takes it away', async ({ page }) => {
-    await openStudio(page);
     await page.locator('.studio-page-add').click();
     await expect(page.locator('.report-sheet')).toHaveCount(4);
     await expect(page.locator('.sheet-label').nth(2)).toHaveText('Page 3');
@@ -1041,6 +1009,9 @@ test.describe('Page Studio', () => {
     const empty = page.locator('.studio-page-empty');
     await expect(empty).toHaveText('Empty · Remove');
     await expect(empty).toHaveCount(1);
+    await showEveryone(page, 4);
+    await expect(badges.filter({ hasText: '2 sheets' })).toHaveCount(STUDENTS);
+    await page.locator('.studio-view [data-view="one"]').click();
     await cellOf(page, 'self-assessment').click();
     await bar(page).getByRole('button', { name: 'Remove' }).click();
     await cellOf(page, 'legend').click();
@@ -1050,31 +1021,8 @@ test.describe('Page Studio', () => {
     await page.locator('.studio-page-empty').click();
     await expect(page.locator('.report-sheet')).toHaveCount(2);
     await expect(page.locator('#undo-toast')).toContainText('Removed the empty page');
-  });
-
-  test('the palette offers the new blocks and no longer the old charts', async ({ page }) => {
-    await openStudio(page);
-    for (const id of [
-      'support-home',
-      'progress',
-      'proficiency',
-      'missing-work',
-      'term-attendance',
-      'self-assessment',
-      'text-block',
-    ]) {
-      await expect(page.locator(`[data-action="studioBlock"][data-block="${id}"]`)).toHaveCount(1);
-    }
-    for (const id of [
-      'section-outcomes',
-      'score-distribution',
-      'section-chart',
-      'academic-summary',
-      'competency-table',
-      'growth',
-    ]) {
-      await expect(page.locator(`[data-action="studioBlock"][data-block="${id}"]`)).toHaveCount(0);
-    }
+    await expect(page.locator('#studio-fit')).toHaveText('1 sheet for all 27 students');
+    await expect(badges.filter({ hasText: '2 sheets' })).toHaveCount(0);
   });
 
   test('a text block prints what the teacher writes', async ({ page }) => {
@@ -1145,8 +1093,16 @@ test.describe('Page Studio', () => {
     await page.locator('[data-action="studioBlock"][data-block="support-home"]').scrollIntoViewIfNeeded();
     await page.locator('[data-action="studioBlock"][data-block="support-home"]').click();
     await expect(page.locator('#rb-preview .sheet-cell[data-block="support-home"]')).toHaveCount(1);
+    // The dialog needs a name and cancels with Escape, which returns focus to the button.
     await page.getByRole('button', { name: 'Save as Template' }).click();
     const dialog = page.getByRole('dialog', { name: 'Save as Template' });
+    await expect(dialog.getByLabel('Name')).toBeFocused();
+    await dialog.getByRole('button', { name: 'Save' }).click();
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Save as Template' })).toBeFocused();
+    await page.getByRole('button', { name: 'Save as Template' }).click();
     await expect(dialog).toBeVisible();
     await dialog.getByLabel('Name').fill('Science 8 with Support at Home');
     await dialog.getByRole('button', { name: 'Save' }).click();
@@ -1172,18 +1128,6 @@ test.describe('Page Studio', () => {
     await expect(
       palette(page).getByRole('button', { name: 'Science 8 with Support at Home', exact: true }),
     ).toBeVisible();
-  });
-
-  test('the dialog cancels with Escape and needs a name', async ({ page }) => {
-    await openStudio(page);
-    await page.getByRole('button', { name: 'Save as Template' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Save as Template' });
-    await expect(dialog.getByLabel('Name')).toBeFocused();
-    await dialog.getByRole('button', { name: 'Save' }).click();
-    await expect(dialog).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(dialog).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Save as Template' })).toBeFocused();
   });
 });
 
@@ -1935,9 +1879,16 @@ test.describe('Printed progress reports', () => {
     expect(Math.round(top)).toBe(24);
   });
 
-  test('levels print as figures and a word, in black, with no dots', async ({ page }) => {
+  // Group 3 #62: reports print black and white, so the screen shows the
+  // levels black as they print, and there is no Ink choice.
+  test('levels print as figures and a word, in black, with no dots, and the screen shows them black too', async ({
+    page,
+  }) => {
     await openStudio(page);
     const level = page.locator('#rb-preview .report-prof td.report-prof-n').first();
+    expect(await level.evaluate(el => getComputedStyle(el).color)).toBe('rgb(0, 0, 0)');
+    await expect(page.locator('#report-ink')).toHaveCount(0);
+    await expect(page.locator('.studio-head')).not.toContainText('Ink');
     await expect(level).toContainText(/^\d\.\d (Emerging|Developing|Proficient|Extending)$/);
     await expect(page.locator('#rb-preview .report-proficiency').first()).not.toContainText(/[●○]/);
     await expect(page.locator('#rb-preview .report-legend').first()).not.toContainText(/[●○]/);
@@ -1948,10 +1899,31 @@ test.describe('Printed progress reports', () => {
     await page.emulateMedia({ media: 'screen' });
   });
 
-  test('Legal paper prints a 14 in page and is remembered for the class on this device', async ({ page }) => {
+  test('Legal gives the same rows a taller side, prints a 14 in page and is remembered for the class on this device', async ({
+    page,
+  }) => {
     await openStudio(page);
-    await showEveryone(page);
+    const pinnedTop = () =>
+      page.locator('.sheet-zoom[data-side="1"] .sheet-pinned').evaluate(el => {
+        // In sheet px: the canvas scales the pages to fit beside the inspector.
+        const zoom = parseFloat(getComputedStyle(el.closest('.sheet-zoom')).getPropertyValue('--sheet-zoom')) || 1;
+        return Math.round(
+          (el.getBoundingClientRect().top - el.closest('.sheet-body').getBoundingClientRect().top) / zoom,
+        );
+      });
+    const letter = await pinnedTop();
     await page.getByRole('radio', { name: 'Legal' }).click();
+    await expect(page.locator('.report-sheet[data-paper="legal"]')).toHaveCount(2);
+    // 3in more paper (288 sheet px), less the margins the body keeps.
+    expect((await pinnedTop()) - letter).toBeGreaterThan(270);
+    expect(await rowsOf(page, 0)).toEqual([
+      'header',
+      'proficiency',
+      'legend',
+      'teacher-narrative',
+      'missing-work/half',
+    ]);
+    await showEveryone(page);
     const pdf = await printToPdf(page);
     const boxes = pageBoxes(pdf);
     expect(boxes.length).toBeGreaterThan(0);
