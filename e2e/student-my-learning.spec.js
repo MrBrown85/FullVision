@@ -66,15 +66,20 @@ test('a Proficiency class: You’re at, Your Strongest, Your Skills, and One Ski
         .sort(function (a, b) {
           return b.pieces.length - a.pieces.length;
         })[0];
-      return { word: word, first: l.groups[0].skills[0], best: best };
+      return { word: word, first: l.groups[0].skills[0], best: best, next: l.next };
     },
     { cid: at.cid, sid: at.sid },
   );
   await expect(screen.locator('.sp-ml-at-word')).toHaveText(want.word);
   await expect(screen.getByRole('heading', { name: 'Your Skills' })).toBeVisible();
-  await expect(screen.locator('[data-act="skill"][data-skill="' + want.first.id + '"]').first()).toContainText(
+  await expect(screen.locator('.sp-ml-skills [data-act="skill"][data-skill="' + want.first.id + '"]')).toContainText(
     want.first.text || 'Not Yet',
   );
+  // Next Step: the comment bank's step for the skill Generate would name, opening that skill.
+  if (want.next) {
+    await expect(screen.locator('.sp-ml-next')).toContainText('Next Step: ' + want.next.name);
+    await expect(screen.locator('.sp-ml-next')).toContainText(want.next.text);
+  }
   await expect(
     dialog.getByText('Their level on each skill and their grade, only from work you’ve returned.'),
   ).toBeVisible();
@@ -123,8 +128,10 @@ test('a Letter class: the letter and %, What Makes Up Your Grade, skills as a %'
 test('a Both class: the letter and %, Your Strongest and the skills by level', async ({ page }) => {
   const { screen, errors } = await openPreview(page, 'both');
   await expect(screen.locator('.sp-ml-letter')).toBeVisible();
-  await expect(screen.getByRole('heading', { name: 'Your Strongest' })).toBeVisible();
-  await expect(screen.getByRole('heading', { name: 'What Makes Up Your Grade' })).toBeVisible();
+  await expect(screen.locator('.sp-ml-strongest')).toContainText('Your Strongest');
+  // The Letter and Skills board leads with the skills: no What Makes Up Your Grade.
+  await expect(screen.getByRole('heading', { name: 'What Makes Up Your Grade' })).toHaveCount(0);
+  await expect(screen.getByRole('heading', { name: 'Your Skills' })).toBeVisible();
   await shot(page, 'S13-F2-both-phone');
   expect(errors).toEqual([]);
 });

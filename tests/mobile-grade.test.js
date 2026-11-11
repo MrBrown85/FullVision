@@ -185,7 +185,7 @@ describe('MGrade.renderSwiper', () => {
     mockDataLayer({});
     const html = MGrade.renderSwiper(CID, 'a1');
     expect(html).toContain('role="radiogroup"');
-    expect(html).toContain('aria-label="Score for');
+    expect(html).toContain('aria-label="Level for');
   });
 
   it('marks active score button when student has existing score', () => {
