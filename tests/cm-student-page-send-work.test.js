@@ -202,8 +202,19 @@ describe('Class Settings › Student Page: Send Work', () => {
       expect(CmStudentPage.keepPhotosDate(CID, 'end_of_term')).toBe('2027-06-30');
     });
 
-    it("End of Term already past asks first, in Colin's words; Cancel changes nothing", () => {
-      terms(['2026-01-30']);
+    it('End of Term with every term ended keeps the photos to June 30, as End of Year, and asks nothing', () => {
+      terms(['2026-01-30', '2026-06-24']);
+      expect(CmStudentPage.keepPhotosDate(CID, 'end_of_term')).toBe('2027-06-30');
+      open();
+      turn(true);
+      keep('end_of_term');
+      expect(confirms).toEqual([]);
+      expect(html()).toContain('deleted on June 30.');
+    });
+
+    it("End of Term already past (in July) asks first, in Colin's words; Cancel changes nothing", () => {
+      vi.setSystemTime(new Date('2027-07-15T18:00:00.000Z'));
+      terms(['2027-01-29']);
       open();
       turn(true);
       keep('end_of_term');
@@ -211,7 +222,7 @@ describe('Class Settings › Student Page: Send Work', () => {
       const q = confirms[0];
       expect(q.title).toBe('Delete Photos Now?');
       expect(q.message).toBe(
-        'End of Term was Jan 30, so this deletes the photos of student work in ' +
+        'End of Term was Jun 30, so this deletes the photos of student work in ' +
           COURSES[CID].name +
           " tonight. Deleted photos can't come back.",
       );

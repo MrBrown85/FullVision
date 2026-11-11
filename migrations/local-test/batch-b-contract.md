@@ -426,7 +426,7 @@ For good; no second copy is kept anywhere.
 
 ## Changes
 
-- 2026-11-11, `2026111140` (Batch D, not applied): Keep Photos Until deletes each page row of a class's handed-in work made before midnight after the class's day (the submission row stays, with no pages, like work Handed In on Paper; `list_course_submissions` then lists it with no `files`, and `file_links` names none); a page's Mark Up is copied to `markup_kept` first. The queue gains the reasons `keep_photos_until`, `stray` and `expired` (nightly). The edge function gains `scheduled-sweep`. No function here changes.
+- 2026-11-11, `2026111140` (Batch D, not applied): Keep Photos Until deletes each page row of a class's work handed in by midnight after the class's day (a send started in its two hours before midnight and finished after stays) (the submission row stays, with no pages, like work Handed In on Paper; `list_course_submissions` then lists it with no `files`, and `file_links` names none); a page's Mark Up is copied to `markup_kept` first. The queue gains the reasons `keep_photos_until`, `stray` and `expired` (nightly). The edge function gains `scheduled-sweep`. One function here changes: `_grading_started` also counts kept marks (`markup_kept`), so `unsend` and `replace` answer `grading_started` for a piece whose marks were kept.
 
 - 2026-11-11, after the second review (2026111104, not yet applied): the 30 pages are asked again when a Replace or an Add as More Pages is finished (`too_many_pages`, with `room`, from `send_finish` and `finish_work_upload`); a student's Unsend or finished Replace no longer drops the teacher's unfinished Add as More Pages (it moves to the new work, or becomes the teacher's own new upload). Nothing else changes.
 

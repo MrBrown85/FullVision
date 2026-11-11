@@ -33,21 +33,26 @@ with relied(fn, md5) as (values
     ('student_submit._send_begin(text,text,uuid,uuid,jsonb,text,text,uuid)', '6cad6dd40eb1c33451a5dcf4f60e7624'),
     ('student_submit.work(text,uuid,text)',                                  '2ec445c5d5afadb7c3fc1699d9929e52'),
     ('student_submit.send_paths(text,uuid,uuid,text)',                       '2f36c08b8ace950b9c7eb905b320aa40'),
-    ('student_submit._grading_started(uuid,uuid)',                           '13622bbca72904fdf877ce6b336dc6b4'),
+    ('fv_private.work_path_course(text)',                                    '7fb0272243ceef1cb6b42658d27664e3'),
     ('public._revision_gone()',                                              '13b5fb325c563a0475437829446ef089'),
     ('public._markup_on_return()',                                           'ce8ceaa830617aa9caf935b161d7e379'),
     ('public._markup_on_release()',                                          'a7e8838702d000c42621d72bf8621dfb')
     -- FINGERPRINTS-END
+), replaces(fn, before, becomes) as (values
+    -- FINGERPRINTS-BEGIN replaces
+    ('student_submit._grading_started(uuid,uuid)', '13622bbca72904fdf877ce6b336dc6b4', '586a6a0b5910e6c153b72e73a5b672bc')
+    -- FINGERPRINTS-END
 ), new(fn, becomes) as (values
     -- FINGERPRINTS-BEGIN new
-    ('public._keep_photos_day(text,jsonb,date)',                 '568deb1608a96d645e698c767393c293'),
-    ('public._photo_keep_cutoff(uuid,timestamp with time zone)', 'fa6aac4df967a762d06e92471d28315a'),
-    ('public._photo_keep_class(uuid,timestamp with time zone)',  'e19b23b73cf9355855d2533dfaf510f7'),
-    ('public._photo_strays(uuid,timestamp with time zone)',      'bf8e6db4222384f840bafa491cd1d08a'),
+    ('public._keep_photos_day(text,jsonb,date)',                 'ad345bdd6eadab44296ed32ef7870be6'),
+    ('public._photo_keep_cutoff(uuid,timestamp with time zone)', '57f0aac3911eb4657447a951232bed4a'),
+    ('public._photo_keep_class(uuid,timestamp with time zone)',  'fb78dde9520f84f0f58faa1bebf98c23'),
+    ('public._photo_strays(uuid,timestamp with time zone)',      '21db626094c7be734d536357c91826c8'),
     ('public._photo_missing(uuid)',                              'd099b00a7d1a2997ee287dfdbb528c43'),
     ('public._photo_log(uuid,text,integer,jsonb)',               '53859922b32f0e4f2da95052edc130e2'),
+    ('public._photo_stuck()',                                    '8f35709beffa04b59f36840e2d4e2fa0'),
     ('public.photo_removal_due()',                               '3faf3499da0753407687386407c8b01f'),
-    ('public.photo_removal_call()',                              '73487154c0b63b16231b25f007031522')
+    ('public.photo_removal_call()',                              '08b22d449cc3312b31b975ee057fbc08')
     -- FINGERPRINTS-END
 ), want_jobs(jobname, schedule, command) as (values
     ('fv_photo_lifecycle_daily', '27 10 * * *', 'call public.photo_lifecycle_nightly()'),
@@ -65,7 +70,7 @@ with relied(fn, md5) as (values
              query_to_xml($q$select name as n from vault.secrets where name in ('fv_photo_sweep_url', 'fv_photo_sweep_secret')$q$, false, false, '')
            else '<table/>'::xml end)) r
 ), routines(sig) as (
-    select fn from new union all select 'public.photo_lifecycle_nightly()'
+    select fn from new union all select fn from replaces union all select 'public.photo_lifecycle_nightly()'
 )
 select 'function ' || fn as what, becomes as expected, coalesce(md5(pg_get_functiondef(to_regprocedure(fn))), 'absent') as found
   from new
@@ -74,6 +79,10 @@ union all
 select 'function ' || fn, md5, coalesce(md5(pg_get_functiondef(to_regprocedure(fn))), 'absent')
   from relied
  where coalesce(md5(pg_get_functiondef(to_regprocedure(fn))), 'absent') <> md5
+union all
+select 'function ' || fn, becomes, coalesce(md5(pg_get_functiondef(to_regprocedure(fn))), 'absent')
+  from replaces
+ where coalesce(md5(pg_get_functiondef(to_regprocedure(fn))), 'absent') <> becomes
 union all
 select 'procedure public.photo_lifecycle_nightly()', 'present', 'absent'
  where to_regprocedure('public.photo_lifecycle_nightly()') is null

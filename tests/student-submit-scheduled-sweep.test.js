@@ -207,10 +207,12 @@ describe('sweepSecret: the only shape PHOTO_SWEEP_SECRET may have', () => {
     expect(src).toMatch(/sweepSecret: photoSweepSecret/);
   });
 
-  it('the database sends exactly what this route reads (route and secret), to the Canada address', async () => {
+  it('the database sends exactly what this route reads (route and secret), to this project’s own Canada address', async () => {
     const sql = (await import('node:fs')).readFileSync('migrations/2026111140_photo_lifecycle.sql', 'utf8');
     expect(sql).toMatch(/jsonb_build_object\('route', 'scheduled-sweep', 'secret', _secret\)/);
-    expect(sql).toMatch(/forceFunctionRegion=ca-central-1\$'/);
+    expect(sql).toContain(
+      "_url <> 'https://novsfeqjhbleyyaztmlh.supabase.co/functions/v1/student-submit?forceFunctionRegion=ca-central-1'",
+    );
     expect(sql).toMatch(/_secret !~ '\^\[0-9a-f\]\{64\}\$'/);
   });
 });
