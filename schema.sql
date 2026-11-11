@@ -81,6 +81,9 @@ create table course (
   return_grades    text default 'on_return'                        -- 'on_return' When I Return Them | 'on_save' As Soon As I Save | null no choice made, works as on_save;
                    check (return_grades is null or return_grades in ('on_return', 'on_save')), -- classes from before 2026-11-09 are null (2026110902_grade_return)
   cards_work_until date,                                           -- last day the class's student cards work; null: the last reporting date (2026110903_student_card)
+  send_work        boolean not null default false,                 -- Send Work: off, no student of the class can send work (2026111101_student_work_submissions; not applied when this was written)
+  keep_photos_until text not null default 'end_of_year'            -- Keep Photos Until: 'end_of_year' | 'end_of_term'. Stored only; the job that acts on it is Batch D (2026111101)
+                   check (keep_photos_until in ('end_of_year', 'end_of_term')),
   deleted_at       timestamptz                                         -- soft-delete marker; hidden immediately, purged after 30d by fv_retention_cleanup (20261012_course_soft_delete)
 );
 
@@ -255,6 +258,12 @@ create table assessment (
   collab_config  jsonb,
   copy_group     uuid,                                              -- shared by an assessment and its copies in the teacher's other classes; null = never copied (20261018_assessment_copy_group)
   core_competency_ids text[]  not null default '{}',                -- BC Core Competency codes COM COL CT CRT PPI PAR SAR; check: only those (20261027_assessment_core_competencies)
+  -- The form's Student Work card (2026111101_student_work_submissions; not applied when this was written)
+  students_send  text        not null default 'nothing',            -- nothing | photos | photos_files (a PDF may be chosen too; it arrives as JPEG pages either way)
+  after_due      text        not null default 'keep',               -- keep (Keep Accepting) | until (accept_until is the last day) | stop (the due date is the last day)
+  accept_until   date,                                              -- there exactly when after_due is 'until' (check)
+  group_work     text        not null default 'each',               -- each | group. Stored only; one submission for a group is Batch C
+  students_see_markup boolean not null default true,                -- Stored only; Mark Up is Batch C
   display_order  integer     not null default 0,
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now()
@@ -850,6 +859,107 @@ create table student_submit.device_session_enrollment (
 );
 -- student_submit.attempt.route also takes 'card'; code_id then holds the card's id.
 
+-- Students send work (2026111101_student_work_submissions, Batch B; plan 1.6
+-- to 1.8; not applied when this was written). A submission is work handed in
+-- for one assessment by one student: by the student from their page, or by
+-- the teacher (Add Work, Handed In on Paper). A page is always a JPEG in the
+-- private bucket student-photos (2026111102_student_work_storage), with a
+-- thumbnail beside it.
+-- No foreign key to assessment, enrollment or course, on purpose, as
+-- grade_return has none: every change to a submission is made under the
+-- class's lock (its course_sync_cursor row), and triggers on assessment and
+-- enrollment delete the rows (submission_gone).
+-- Nobody reads these through the API (row security on, no policy, no grant).
+-- Teachers: set_course_send_work, set_assessment_student_work,
+-- list_course_submissions, start_work_upload, finish_work_upload,
+-- mark_handed_in_paper, delete_submission, rotate_submission_page. Students,
+-- through the student-submit edge function: student_submit.work, send_start,
+-- send_finish, replace, unsend, file_links. A student acts only through a
+-- live session of their own card, for their own enrollment, on an assessment
+-- set to take work, while it is open (asked when the send starts and again
+-- when it is handed in), twenty sends an hour; Unsend and Replace only until
+-- grading starts (student_submit._grading_started: a draft or a returned
+-- grade exists), and only the pages the student added. A started send holds
+-- its place two hours from its first start (_work_hold), then is expired and
+-- dropped. One class may hold 10,000 pages and 5 GB (_work_class_max_pages,
+-- _work_class_max_bytes). The teacher's Add Work and Handed In on Paper work
+-- whatever Send Work and Students Send say. None of these functions reads or
+-- writes a grade. The contract: migrations/local-test/batch-b-contract.md.
+create table submission (
+  id            uuid        primary key default gen_random_uuid(),
+  course_id     uuid        not null,                               -- no foreign key (see above); a trigger checks the student and the assessment are both in it
+  assessment_id uuid        not null,
+  enrollment_id uuid        not null,
+  version       smallint    not null default 1,                     -- always 1 until revisions (Batch C)
+  state         text        not null,                               -- sending (rows and upload links made, nothing handed in; only its sender sees it) | sent
+  intent        text        not null default 'new',                 -- what a sending row does when finished: new | replace | add (to target_id)
+  target_id     uuid,                                               -- the sent submission a sending row replaces or adds to
+  sent_by       text        not null,                               -- student | teacher
+  on_paper      boolean     not null default false,                 -- Handed In on Paper: no pages
+  note          text,                                               -- the student's note, 1000 characters at most
+  followed_plan text,                                               -- Did You Do It?: yes | partly | no, the student's own word
+  is_late       boolean     not null default false,                 -- handed in after the due date, by the class's own calendar (judged at the finish)
+  card_id       uuid,                                               -- the card whose session sent it; history only
+  request_id    uuid,                                               -- the sender's own id for the call that made the row (a repeat returns the same row)
+  created_at    timestamptz not null default now(),                 -- when it was first started; an unfinished send holds its place two hours from then, whatever is asked of it afterwards
+  sent_at       timestamptz,                                        -- there exactly when state is sent
+  updated_at    timestamptz not null default now()
+  -- unique (assessment_id, enrollment_id, version) where state = 'sent'; unique (assessment_id, enrollment_id, sent_by) where state = 'sending'
+  -- indexes on (enrollment_id), (course_id), (assessment_id) (what the trigger on assessment deletes by), (target_id) where not null
+);
+create table submission_file (
+  id            uuid        primary key default gen_random_uuid(),
+  submission_id uuid        not null references submission(id) on delete cascade,
+  page          smallint    not null,                               -- unique within the submission
+  path          text        not null unique,                        -- <course>/<assessment>/<enrollment>/<the submission it was first made for>/<this id>.jpg; never changes
+  thumb_path    text        not null unique,                        -- the same with -thumb.jpg
+  bytes         integer, thumb_bytes integer,                       -- as storage recorded them, read when the work is handed in
+  width         integer, height integer,
+  sha256        text,                                               -- of the page as stored, given when it is handed in; for the same-photo note
+  rotation      smallint    not null default 0,                     -- 0 | 90 | 180 | 270; the file itself is never changed
+  added_by      text        not null,                               -- student | teacher: who added the page. A student's Unsend or Replace removes only the student's own
+  declared_bytes       integer not null,                            -- the sizes its sender said the page and its thumbnail would be (2 MB where nothing was said):
+  declared_thumb_bytes integer not null,                            -- what an unfinished page counts for against the class's limit; a larger file is refused at the finish
+  created_at    timestamptz not null default now(),
+  link_dies_at  timestamptz not null                                -- the last upload link that can be made for the page has stopped working by then (4 h 10 min after its send was first started)
+);
+-- SQL cannot delete a file: only the Storage API can. Every file whose page
+-- row goes (Unsend, Replace, a teacher's delete, an assessment or a student
+-- deleted, a class purged) is written here by a trigger in the same
+-- transaction; a caller with the service key works it down
+-- (student_submit.removal_batch, removal_done). Owner only.
+create table submission_file_removal (
+  id           bigint      generated always as identity primary key,
+  bucket       text        not null,
+  path         text        not null,                                -- unique with bucket
+  course_id    uuid,                                                -- the path's first folder; the class itself may be gone
+  reason       text        not null,                                -- unsend | replace | teacher | abandoned | expired | page_removed | row_deleted
+  queued_at    timestamptz not null default now(),
+  link_dies_at timestamptz not null,                                -- until then whoever holds the upload link could put the file back
+  tries        integer     not null default 0,
+  last_try_at  timestamptz,
+  removed_at   timestamptz,                                         -- when storage was last seen without it
+  done         boolean     not null default false                   -- seen gone after its link died
+);
+-- One row each time a card is given upload links, for the limit of twenty an hour.
+create table student_submit.send_log (
+  id bigint generated always as identity primary key,
+  card_id uuid not null,
+  at timestamptz not null default now()
+);
+-- Storage (2026111102_student_work_storage): one bucket, student-photos,
+-- private, 2 MB a file, image/jpeg only, versioning DISABLED (no old version
+-- of a file is kept). Four policies on storage.objects: a signed-in teacher
+-- reads a page that still has its row, in a class they own, and is handed in
+-- or part of an upload they started (fv_student_photos_read; so not a
+-- student's unfinished send, and not a file waiting to be deleted), and
+-- writes exactly the paths of an upload they started and have not finished,
+-- for the two hours it holds its place (fv_student_photos_upload); two restrictive
+-- policies (fv_student_photos_teachers_only, fv_student_photos_fence) keep
+-- the bucket to that whatever other policy is added. A student's upload
+-- goes through a signed link the edge function makes for one path the
+-- database named. No policy lets anyone change or delete a file.
+
 -- Reports on students' phones (20261025_phone_reports). The teacher's copy of
 -- each student's report, fixed until updated; codes in student_access_code
 -- (phone_report_id) open it after a birthday check. Read-only: no reply
@@ -924,6 +1034,11 @@ create table support_report (
 -- `grade_return_gone`           after  delete (row) on enrollment, assessment → _grade_return_gone(): the class lock, then its grade_return rows go
 -- `grade_return_repoint`        after  update (row) on tag_score, rubric_score, rubric_check_score when its tag, criterion or check id changes → _grade_return_repoint(part, id column); acts only inside move_rubric_scores
 -- `grade_return_release`        after  update of student_page_enabled, return_grades on course, when the class stops holding grades → _grade_return_release()
+-- `submission_gone`             after  delete (row) on enrollment, assessment → _submission_gone(): the class lock, then its submissions go (2026111101)
+-- `submission_truncate`         after  truncate on enrollment, assessment → _submission_truncated(): submissions left without their student or assessment go
+-- `submission_same_class`       before insert or update on submission → _submission_same_class(): its student and assessment are both in its class, and never change
+-- `submission_target_gone`      after  delete (row) on submission → _submission_target_gone(): an unfinished send goes with the work it was to replace or add to
+-- `submission_file_removed`     after  delete (row) on submission_file → _submission_file_removed(): both files are queued in submission_file_removal
 -- `fv_teacher_sign_in_deleted`  after  delete on auth.users     → _fv_teacher_sign_in_deleted() (soft-deletes the teacher)
 
 -- ─── Publications ───────────────────────────────────────────────────────────
