@@ -737,6 +737,13 @@ window.WorkWall = (function () {
     _drawWall();
     var back = overlay.querySelector('.ww-back');
     _focus(back);
+    // A signed-in class's work, read again: the wall is drawn again if it changed (S6-W1).
+    var mine = _wall;
+    if (typeof refreshStudentWork === 'function') {
+      refreshStudentWork(cid, { force: true }).then(function (res) {
+        if (_wall === mine && res && res.changed) _drawWall();
+      });
+    }
     return true;
   }
 
