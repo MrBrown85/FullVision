@@ -30,6 +30,7 @@ const PRECACHE_URLS = [
   '/shared/offline-queue.js',
   '/shared/photo-shrink.js',
   '/shared/photo-queue.js',
+  '/shared/work-thumbs.js',
   '/shared/auto-update.js',
   '/shared/calc.js',
   '/shared/grade-state.js',
