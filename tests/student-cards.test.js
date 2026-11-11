@@ -187,6 +187,7 @@ afterEach(() => {
   globalThis.fetch = realFetch;
   delete window.__ENV;
   serverSaysStudentPageOn(LIVE, false);
+  _forgetCardsPrintedHere();
   clearClass(CID);
   clearClass(LIVE);
   StudentCards._reset();
@@ -284,6 +285,19 @@ describe('Demo Mode: the same contract, on this device', () => {
     expect(listed[0]).not.toHaveProperty('password');
     expect(listed[0].check).toBe('password');
     expect(everythingKept()).not.toMatch(/K7M-4QX|4821/);
+  });
+
+  it('when the app starts, codes an older build saved are erased for every class at once', () => {
+    const old = (id, code) => ({ ...todays(1, 's1'), id, code, check: 'password', password: '4821' });
+    localStorage.setItem('gb-student-cards-c-one', JSON.stringify([old('a', 'K7M-4QX')]));
+    localStorage.setItem('gb-student-cards-c-two', JSON.stringify([old('b', 'P3R-8WD')]));
+    _dropOldCardCodes();
+    expect(everythingKept()).not.toMatch(/K7M-4QX|P3R-8WD|4821/);
+    expect(storedCards('c-one').map(c => c.id)).toEqual(['a']);
+    expect(storedCards('c-two').map(c => c.id)).toEqual(['b']);
+    // shared/data.js does this as it loads.
+    const src = readFileSync(new URL('../shared/data.js', import.meta.url), 'utf-8');
+    expect(src).toMatch(/\n_dropOldCardCodes\(\);\n/);
   });
 
   it('the list is in roster order and leaves out a student no longer in the class', async () => {
@@ -420,6 +434,8 @@ describe('a signed-in teacher: making cards asks teacher-cards', () => {
       expect(post.body.course_id).toBe(LIVE);
       expect(post.body.request_id).toMatch(UUID);
       expect(post.body.items).toEqual(firsts([U(11), U(12), U(13)]));
+      // No cache anywhere keeps the reply, and no cookie goes with it.
+      expect(t.fetcher.inits.map(i => [i.method, i.cache, i.credentials])).toEqual([['POST', 'no-store', 'omit']]);
       // No RPC, nothing queued, nothing kept, nothing logged.
       expect(t.session.sent()).toEqual([]);
       expect(localStorage.getItem('fv-sync-queue-v1')).toBe(null);
@@ -1089,6 +1105,271 @@ describe('the printed card', () => {
     expect(html).not.toMatch(/<b>|A<B|1<2|<i>/);
     expect(html).toContain('&lt;b&gt;Jo&lt;/b&gt;');
     expect(html).toContain('Sci &amp; Tech');
+  });
+});
+
+/* What the independent review of Nov 10 found, each held by a test: Print
+   Again by the clock; a read never erasing a mark still on its way; the
+   screen there now drawn and read again after a late or unclean answer; a
+   list a minute old read again. */
+describe('after the review', () => {
+  beforeEach(() => catchPrints());
+
+  it.each([
+    ['ten minutes and a second', 10 * 60 * 1000 + 1000],
+    ['three hours', 3 * 60 * 60 * 1000],
+  ])('Print Again goes by the clock: after %s with the timer held back, it prints nothing', async (what, ms) => {
+    seedDemo();
+    await shown(CID);
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2026-11-10T18:00:00.000Z'));
+      await StudentCards.makeAndPrint(CID);
+      expect(sheets.length).toBe(1);
+      vi.setSystemTime(new Date(Date.parse('2026-11-10T18:00:00.000Z') + 9 * 60 * 1000));
+      expect(StudentCards.printAgain(CID)).toBe(3);
+      // The clock moves on; no timer has fired.
+      vi.setSystemTime(new Date(Date.parse('2026-11-10T18:00:00.000Z') + ms));
+      const box = parse(StudentCards.render(CID));
+      expect(buttons(box)).toEqual([]);
+      expect(noteOf(box)).toBe(null);
+      expect(StudentCards.printAgain(CID)).toBe(0);
+      expect(StudentCards._holding()).toBe(false);
+      expect(sheets.length).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('the one-second watch lets the codes go by the clock too', async () => {
+    seedDemo();
+    await shown(CID);
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+    try {
+      vi.setSystemTime(new Date('2026-11-10T18:00:00.000Z'));
+      await StudentCards.makeAndPrint(CID);
+      expect(StudentCards._holding(CID)).toBe(true);
+      const drawn = [];
+      DashClassManager.renderClassManager = () => drawn.push(1);
+      vi.setSystemTime(new Date('2026-11-10T21:00:00.000Z'));
+      vi.advanceTimersByTime(1000);
+      expect(drawn.length).toBe(1);
+      expect(StudentCards.printAgain(CID)).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a list read again before Mark Printed lands still shows the cards printed, and Make and Print leaves them', async () => {
+    const t = await signedIn();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2026-11-10T18:00:00.000Z'));
+      // Mark Printed is held back: the server never hears it.
+      t.session.fake.on('mark_student_cards_printed', () => new Promise(() => {}));
+      await shown(LIVE);
+      await StudentCards.makeAndPrint(LIVE);
+      expect(sheets.length).toBe(1);
+      const made = t.fn.db.state.cards.map(k => k.id);
+      // A minute later the list is drawn again, and read again from the server, which says Not Printed.
+      vi.setSystemTime(new Date('2026-11-10T18:01:30.000Z'));
+      const reads = () => t.session.sent().filter(c => c[0] === 'list_student_cards').length;
+      const before = reads();
+      await shown(LIVE);
+      expect(reads()).toBe(before + 1);
+      expect(t.fn.cardsListed().every(c => c.printed_at === null)).toBe(true);
+      const box = parse(StudentCards.render(LIVE));
+      expect(rowsOf(box).map(r => r[2].replace(/ .*/, ''))).toEqual(['Printed', 'Printed', 'Printed']);
+      expect(buttons(box).filter(b => /^Make and Print/.test(b))).toEqual([]);
+      // Nothing to press, nothing replaced.
+      expect(await StudentCards.makeAndPrint(LIVE)).toBe(0);
+      expect(t.fn.posts.length).toBe(1);
+      expect(t.fn.db.state.cards.map(k => k.id)).toEqual(made);
+    } finally {
+      vi.useRealTimers();
+      t.session.signOut();
+    }
+  });
+
+  it('the re-read after another tab changed one student keeps this tab’s printed cards printed', async () => {
+    const t = await signedIn();
+    try {
+      t.session.fake.on('mark_student_cards_printed', () => new Promise(() => {}));
+      await shown(LIVE);
+      // Another tab makes Cam's card first; this list does not know.
+      t.fn.db.state.cards.push({
+        id: U(950),
+        enrollment_id: U(13),
+        code_hmac: 'x',
+        pw_hmac: null,
+        seq: 1,
+        stopped: false,
+      });
+      await StudentCards.makeAndPrint(LIVE);
+      expect(sheets[0].names).toEqual(['Jordan Abel', 'Avery Byrne']);
+      await afterDraw();
+      const box = parse(StudentCards.render(LIVE));
+      expect(rowsOf(box).map(r => r[2].replace(/ .*/, ''))).toEqual(['Printed', 'Printed', 'Not']);
+      // Only the other tab's never-printed card is offered, by its own id.
+      expect(buttons(box)).toContain('Make and Print 1 Card');
+      await StudentCards.makeAndPrint(LIVE);
+      expect(t.fn.posts[1].body.items).toEqual([{ enrollment_id: U(13), replaces: U(950) }]);
+      expect(sheets[1].names).toEqual(['Cam Cole']);
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('a mark still waiting in the outbox from before a reload is laid over the list', async () => {
+    const t = await signedIn({ list: () => [after(1, U(11)), after(2, U(12))] });
+    try {
+      localStorage.setItem(
+        'fv-sync-queue-v1',
+        JSON.stringify({
+          entries: [
+            {
+              id: 'e1',
+              endpoint: 'mark_student_cards_printed',
+              payload: { p_card_ids: [U(901)] },
+              created_at: '2026-11-12T19:30:00.000Z',
+            },
+          ],
+        }),
+      );
+      const listed = (await listStudentCards(LIVE)).data;
+      expect(listed.map(c => c.printed_at)).toEqual(['2026-11-12T19:30:00.000Z', null]);
+    } finally {
+      localStorage.removeItem('fv-sync-queue-v1');
+      t.session.signOut();
+    }
+  });
+
+  it('a late answer after leaving and coming back: the screen is drawn as it is, button on, and the list read again', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    let release;
+    const gate = new Promise(r => (release = r));
+    const t = await signedIn({ fetch: { hold: () => gate } });
+    try {
+      await shown(LIVE);
+      const drawn = [];
+      DashClassManager.renderClassManager = () => drawn.push(1);
+      const pressed = StudentCards.makeAndPrint(LIVE);
+      await settle();
+      expect(noteOf(parse(StudentCards.render(LIVE)))).toBe('Making cards…');
+      onPage = null;
+      vi.advanceTimersByTime(1000);
+      onPage = LIVE;
+      const reads = () => t.session.sent().filter(c => c[0] === 'list_student_cards').length;
+      const before = reads();
+      const drawsBefore = drawn.length;
+      release();
+      expect(await pressed).toBe(0);
+      expect(drawn.length).toBeGreaterThan(drawsBefore);
+      await shown(LIVE);
+      expect(reads()).toBe(before + 1);
+      const box = parse(StudentCards.render(LIVE));
+      expect(noteOf(box)).toBe(null);
+      expect(box.querySelector('[data-action="spCardsMake"]').hasAttribute('disabled')).toBe(false);
+      expect(rowsOf(box).map(r => r[2])).toEqual(['Not Printed', 'Not Printed', 'Not Printed']);
+      expect(sheets).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+      t.session.signOut();
+    }
+  });
+
+  it('a lost reply made good: one press prints', async () => {
+    const t = await signedIn({ fetch: { lose: (post, n) => n === 1 } });
+    try {
+      await shown(LIVE);
+      expect(await StudentCards.makeAndPrint(LIVE)).toBe(3);
+      expect(sheets.length).toBe(1);
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('a lost reply whose recovery is lost too: the list is read again and the second press prints', async () => {
+    const t = await signedIn({ fetch: { lose: (post, n) => n === 1, fail: (post, n) => n === 3 || n === 4 } });
+    try {
+      await shown(LIVE);
+      expect(await StudentCards.makeAndPrint(LIVE)).toBe(0);
+      await afterDraw();
+      let box = parse(StudentCards.render(LIVE));
+      expect(noteOf(box)).toBe('Could not make the cards. Check the connection and try again.');
+      // The cards the server made are in the list now, unprinted: the second press replaces them by id.
+      expect(rowsOf(box).map(r => r[2])).toEqual(['Not Printed', 'Not Printed', 'Not Printed']);
+      const lost = [U(11), U(12), U(13)].map(sid => t.fn.live(sid).id);
+      expect(await StudentCards.makeAndPrint(LIVE)).toBe(3);
+      const last = t.fn.posts[t.fn.posts.length - 1].body.items;
+      expect(last.map(i => i.replaces)).toEqual(lost);
+      expect(sheets.length).toBe(1);
+      box = parse(StudentCards.render(LIVE));
+      expect(noteOf(box)).toMatch(/^3 cards went to the printer\./);
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('another tab’s change: the list is read again, and the second press works', async () => {
+    const t = await signedIn();
+    try {
+      await shown(LIVE);
+      // Another tab makes all three cards first; this list does not know.
+      [U(11), U(12), U(13)].forEach((sid, i) =>
+        t.fn.db.state.cards.push({
+          id: U(960 + i),
+          enrollment_id: sid,
+          code_hmac: 'y' + i,
+          pw_hmac: null,
+          seq: 1,
+          stopped: false,
+        }),
+      );
+      expect(await StudentCards.makeAndPrint(LIVE)).toBe(0);
+      await afterDraw();
+      expect(await StudentCards.makeAndPrint(LIVE)).toBe(3);
+      expect(t.fn.posts[1].body.items.map(i => i.replaces)).toEqual([U(960), U(961), U(962)]);
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('a refusal: the list is read again', async () => {
+    const t = await signedIn({ fetch: { answer: () => ({ status: 404, json: { ok: false, error: 'not_found' } }) } });
+    try {
+      await shown(LIVE);
+      const reads = () => t.session.sent().filter(c => c[0] === 'list_student_cards').length;
+      const before = reads();
+      await StudentCards.makeAndPrint(LIVE);
+      await afterDraw();
+      expect(reads()).toBe(before + 1);
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('a list a minute old is read again when shown; if that fails the old list stays, with Try Again', async () => {
+    const t = await signedIn({ list: () => [after(1, U(11))] });
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2026-11-10T18:00:00.000Z'));
+      await shown(LIVE);
+      vi.setSystemTime(new Date('2026-11-10T18:00:30.000Z'));
+      await shown(LIVE);
+      expect(t.session.sent().length).toBe(1);
+      vi.setSystemTime(new Date('2026-11-10T18:01:30.000Z'));
+      t.session.fake.on('list_student_cards', () => ({ data: null, error: { message: 'network: failed to fetch' } }));
+      await shown(LIVE);
+      expect(t.session.sent().length).toBe(2);
+      const box = parse(StudentCards.render(LIVE));
+      expect(noteOf(box)).toBe('Could not load the cards. Check the connection and try again.');
+      expect(rowsOf(box)[0]).toEqual(['Jordan Abel', 'Card 1 · Made Nov 10', 'Not Printed']);
+      expect(buttons(box)).toEqual(['Try Again', 'Make and Print 3 Cards']);
+    } finally {
+      vi.useRealTimers();
+      t.session.signOut();
+    }
   });
 });
 

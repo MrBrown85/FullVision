@@ -12250,6 +12250,66 @@ function _demoStudentCards(cid) {
 function _saveDemoStudentCards(cid, cards) {
   _safeLSSet('gb-student-cards-' + cid, JSON.stringify(cards.map(_cardWithoutCode).filter(Boolean)));
 }
+/* When the app starts: every class's cards an older build saved on this
+   device with their codes and passwords are kept without them, at once,
+   not only when that class's list is next read. */
+function _dropOldCardCodes() {
+  try {
+    var keys = [];
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k && k.indexOf('gb-student-cards-') === 0) keys.push(k);
+    }
+    keys.forEach(function (k) {
+      _demoStudentCards(k.slice('gb-student-cards-'.length));
+    });
+  } catch (e) {
+    /* nothing readable, nothing to drop */
+  }
+}
+_dropOldCardCodes();
+
+/* Cards this browser has marked printed whose mark the server may not have
+   yet: card id → when. Ids and times only. A list read from the server is
+   overlaid with these and with every mark still waiting in the outbox, so
+   a read never erases a write still on its way: a card printed here never
+   shows Not Printed, never counts toward Make and Print, and is never
+   replaced without the teacher asking. A mark is forgotten once the
+   server's list shows the card printed. */
+var _cardsPrintedHere = {};
+function _cardsPrintedPending() {
+  var out = {};
+  Object.keys(_cardsPrintedHere).forEach(function (id) {
+    out[id] = _cardsPrintedHere[id];
+  });
+  try {
+    var q = JSON.parse(localStorage.getItem('fv-sync-queue-v1') || '{}');
+    (q.entries || []).forEach(function (entry) {
+      if (!entry || entry.endpoint !== 'mark_student_cards_printed') return;
+      ((entry.payload && entry.payload.p_card_ids) || []).forEach(function (id) {
+        if (!out[id]) out[id] = entry.created_at || new Date().toISOString();
+      });
+    });
+  } catch (err) {
+    /* an unreadable queue only means nothing is known to be pending */
+  }
+  return out;
+}
+// Tests: forget this page's marks.
+function _forgetCardsPrintedHere() {
+  _cardsPrintedHere = {};
+}
+function _withPendingPrints(cards) {
+  var pending = _cardsPrintedPending();
+  return cards.map(function (c) {
+    if (c.printed_at) {
+      delete _cardsPrintedHere[c.id];
+      return c;
+    }
+    if (pending[c.id]) c.printed_at = pending[c.id];
+    return c;
+  });
+}
 /* The class's last reporting date when that is still ahead, else the next
    June 30: the day a card made on this device works until, as the server
    works it out for its own. */
@@ -12311,7 +12371,7 @@ function listStudentCards(cid) {
       if (res && res.error && !res.error.handledSessionExpired) console.warn('list_student_cards failed:', res.error);
       var ok = res && !res.error && res.data != null;
       return {
-        data: ok ? _rpcRows(res.data).map(_cardWithoutCode).filter(Boolean) : null,
+        data: ok ? _withPendingPrints(_rpcRows(res.data).map(_cardWithoutCode).filter(Boolean)) : null,
         error: (res && res.error) || null,
       };
     },
@@ -12534,6 +12594,9 @@ function markStudentCardsPrinted(cid, cardIds) {
   }
   ids = ids.filter(_isUuid);
   if (!_useSupabase || !_isUuid(cid) || !ids.length) return _cardsAnswer(null);
+  ids.forEach(function (id) {
+    _cardsPrintedHere[id] = at;
+  });
   _trackPendingSync(
     Promise.resolve(
       _writeRpc('mark_student_cards_printed', { p_card_ids: ids, p_idempotency_key: _newEntryId() }),

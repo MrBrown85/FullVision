@@ -47,8 +47,11 @@ var StudentCards = (function () {
   var _state = {}; // cid → { cards, at, loading, looking, making, failed, msg }
 
   /* The codes of the last Make and Print, for Print Again: { cid, items,
-     count, timer }. Only here, in this variable: never saved, logged or
-     put on the page outside the print dialog. */
+     count, until, timer }. Only here, in this variable: never saved, logged
+     or put on the page outside the print dialog. `until` is the clock time
+     they go; the timer only hurries that along, since a closed lid, a tab
+     in the background or an open print dialog can hold a timer back for
+     hours. Every use looks at the clock (_heldFor). */
   var _held = null;
   /* The screen that asked: { cid, gen, observer, interval }. gen changes
      whenever that screen goes away. */
@@ -110,6 +113,12 @@ var StudentCards = (function () {
     _held = null;
   }
 
+  // The held codes for this class, if their ten minutes have not run out by the clock; else none, and they go.
+  function _heldFor(cid) {
+    if (_held && Date.now() >= _held.until) _drop();
+    return _held && _held.cid === cid ? _held : null;
+  }
+
   // The screen that asked has gone: nothing it asked for is drawn or printed, and its codes go.
   function _left() {
     _gen += 1;
@@ -118,6 +127,11 @@ var StudentCards = (function () {
   }
 
   function _check() {
+    if (_held && Date.now() >= _held.until) {
+      _drop();
+      if (_watch && !_st(_watch.cid).making) _unwatch();
+      _rerender();
+    }
     if (_watch && !_shown(_watch.cid)) _left();
   }
 
@@ -212,7 +226,7 @@ var StudentCards = (function () {
      open no real page, so theirs is the student page's own demo. */
   function cardUrl(card, origin, demo) {
     if (!demo) return QrSlips.slipUrl(card.code, origin);
-    var base = origin || (typeof location !== 'undefined' ? location.origin : 'https://fullvision.ca');
+    var base = origin || (typeof location !== 'undefined' && location.origin) || 'https://fullvision.ca';
     return base.replace(/\/$/, '') + '/s/#demo-card' + (card.password ? '-password' : '');
   }
 
@@ -343,34 +357,38 @@ var StudentCards = (function () {
     st.making = makeStudentCards(cid, asked).then(function (res) {
       st.making = null;
       var results = res && res.data && Array.isArray(res.data.results) ? res.data.results : null;
+      // Anything short of every card made with its code (a refusal, no connection, another tab's change,
+      // a lost reply not made good): the list this screen holds may be wrong, so it is read again and the
+      // next press names the right cards.
+      var clean =
+        !!results &&
+        results.every(function (r) {
+          return r && r.result === 'made' && r.code;
+        });
       if (!_stillAsking(cid, gen)) {
         // Late: the screen that asked has gone. Nothing is drawn or printed, and the codes go with this
-        // answer. Any card that was made shows Not Printed the next time the list is read.
+        // answer. The screen there now is drawn as it is, and if it is this class's list, read again:
+        // any card that was made shows Not Printed.
         st.msg = '';
         st.at = 0;
+        _rerender();
         return 0;
       }
       if (!results) {
         st.msg = 'Could not make the cards. Check the connection and try again.';
         _unwatch();
         _rerender();
+        load(cid);
         return 0;
       }
       _putMade(st, results);
       st.failed = false;
-      // A student another tab changed, or one no longer in the class: the list is read again.
-      if (
-        results.some(function (r) {
-          return !r || r.result !== 'made';
-        })
-      ) {
-        st.at = 0;
-      }
       var items = cardItems(students, results, null, _demo());
       if (!items.length) {
         st.msg = 'Could not make the cards. Check the connection and try again.';
         _unwatch();
         _rerender();
+        load(cid);
         return 0;
       }
       st.msg = '';
@@ -378,10 +396,11 @@ var StudentCards = (function () {
         cid: cid,
         items: items,
         count: items.length,
+        until: Date.now() + HOLD_MS,
+        // The timer, when it does fire on time, ends them then.
         timer: setTimeout(function () {
-          _drop();
-          _unwatch();
-          _rerender();
+          if (_held) _held.until = 0;
+          _check();
         }, HOLD_MS),
       };
       _print(cid, items);
@@ -397,6 +416,7 @@ var StudentCards = (function () {
         _rerender();
       });
       _rerender();
+      if (!clean) load(cid);
       return items.length;
     });
     _rerender();
@@ -406,9 +426,10 @@ var StudentCards = (function () {
   // Print the held codes again. Returns how many were printed.
   function printAgain(cid) {
     _check();
-    if (!_held || _held.cid !== cid) return 0;
-    _print(cid, _held.items);
-    return _held.count;
+    var held = _heldFor(cid);
+    if (!held) return 0;
+    _print(cid, held.items);
+    return held.count;
   }
 
   /* ── The list ──────────────────────────────────────────────── */
@@ -466,7 +487,7 @@ var StudentCards = (function () {
     var byStudent = _byStudent(st.cards);
     var known = st.cards !== null;
     var n = known ? _toMake(students, byStudent).length : 0;
-    var held = _held && _held.cid === cid && !st.making ? _held : null;
+    var held = !st.making ? _heldFor(cid) : null;
     var failed = st.failed && !st.loading;
     var note = st.msg
       ? st.msg
@@ -536,9 +557,17 @@ var StudentCards = (function () {
     return false;
   }
 
-  // True while codes are held for Print Again (tests).
+  // True while codes are held for Print Again (tests). Looks at the clock, as every use does.
   function _holding(cid) {
+    if (_held && Date.now() >= _held.until) _drop();
     return !!_held && (!cid || _held.cid === cid);
+  }
+
+  // The page is going (closed, reloaded, or left for another site): the codes go now.
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('pagehide', function () {
+      _left();
+    });
   }
 
   // Forget every class's cards and any held codes (tests). Signing out leaves the app, and with it these.

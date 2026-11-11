@@ -278,34 +278,55 @@ describe('Demo Mode sends nothing for Draft and Returned', () => {
       _useSupabase = signedIn;
       const fetched = [];
       const realFetch = globalThis.fetch;
-      const realPrint = window.print;
+      const realSheet = QrSlips.printSheet;
+      const printed = [];
       globalThis.fetch = async url => {
         fetched.push(String(url));
         throw new TypeError('Failed to fetch');
       };
-      window.print = () => {};
+      // The sheet itself is drawn elsewhere (tests/student-cards.test.js); here, what goes on it.
+      QrSlips.printSheet = items => printed.push(items.length);
       try {
         setStudentPageSwitch(CID, true);
         expect((await listStudentCards(CID)).data).toEqual([]);
         const made = (await makeStudentCards(CID, [{ enrollment_id: 's1', replaces: null }])).data;
         expect(made.results[0].result).toBe('made');
         expect((await markStudentCardsPrinted(CID, [made.results[0].card_id])).data.printed).toBe(1);
-        StudentCards._reset();
-        StudentCards.render(CID);
-        await StudentCards.load(CID);
-        await StudentCards.makeAndPrint(CID);
+        // A second student, and the screen's own press: it makes and prints a card, on the device.
+        saveStudents(CID, getStudents(CID).concat([{ id: 's2', firstName: 'Avery', lastName: 'Test' }]));
+        const realQuery = document.querySelector;
+        const wasOpen = DashClassManager.classManagerOpen;
+        const realDraw = DashClassManager.renderClassManager;
+        document.querySelector = sel =>
+          sel === '.sc-card' ? { dataset: { cid: CID } } : realQuery.call(document, sel);
+        DashClassManager.classManagerOpen = true;
+        DashClassManager.renderClassManager = () => {};
+        let pressed;
+        try {
+          StudentCards._reset();
+          StudentCards.render(CID);
+          await StudentCards.load(CID);
+          pressed = await StudentCards.makeAndPrint(CID);
+        } finally {
+          document.querySelector = realQuery;
+          DashClassManager.classManagerOpen = wasOpen;
+          DashClassManager.renderClassManager = realDraw;
+        }
+        expect(pressed).toBe(1);
+        expect(printed).toEqual([1]);
         await tick();
         expect(calls).toEqual([]);
         expect(fetched).toEqual([]);
         const kept = localStorage.getItem('gb-student-cards-' + CID);
-        expect(JSON.parse(kept).length).toBe(1);
+        expect(JSON.parse(kept).length).toBe(2);
+        expect(JSON.parse(kept).every(c => !!c.printed_at)).toBe(true);
         expect(kept).not.toContain(made.results[0].code);
         expect(kept).not.toMatch(/"(code|password)":/);
         // Nothing waits in an outbox either.
         expect(localStorage.getItem('fv-sync-queue-v1')).toBe(null);
       } finally {
         globalThis.fetch = realFetch;
-        window.print = realPrint;
+        QrSlips.printSheet = realSheet;
         StudentCards._reset();
       }
     },

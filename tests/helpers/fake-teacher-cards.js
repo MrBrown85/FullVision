@@ -137,6 +137,7 @@ export function fetchFrom(fake, opts = {}) {
       throw new TypeError('Failed to fetch: not the teacher-cards function');
     }
     n += 1;
+    fetcher.inits.push(init);
     const post = { url: String(url), headers: init.headers || {}, body: JSON.parse(init.body || 'null') };
     if (opts.hold) await opts.hold(post, n);
     if (opts.fail && opts.fail(post, n)) throw new TypeError('Failed to fetch');
@@ -149,5 +150,6 @@ export function fetchFrom(fake, opts = {}) {
     });
   };
   fetcher.count = () => n;
+  fetcher.inits = [];
   return fetcher;
 }
