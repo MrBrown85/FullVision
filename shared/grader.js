@@ -298,7 +298,11 @@ window.Grader = (function () {
      leaves marks behind. */
   function returnTo(cid, aid, studentIds) {
     var ids = Array.isArray(studentIds) ? studentIds : [studentIds];
-    var out = typeof returnWork === 'function' ? returnWork(cid, aid, ids) : returnGrades(cid, aid, ids);
+    // Only where Mark Up can be on (Demo Mode, the build switch and Send
+    // Work): everywhere else, a signed-in class above all, Return is
+    // returnGrades exactly as it was.
+    var marks = typeof returnWork === 'function' && typeof isDemoMode === 'function' && isDemoMode();
+    var out = marks && workOnInClass(cid) ? returnWork(cid, aid, ids) : returnGrades(cid, aid, ids);
     return _saved(cid, ids.length === 1 ? ids[0] : null, aid, 'return', out);
   }
 

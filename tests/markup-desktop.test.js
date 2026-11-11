@@ -468,3 +468,35 @@ describe('answers that come late or say no', () => {
     expect(getPageMarkup(CID, 'a1').rev).toBe(2);
   });
 });
+
+describe('Return gives marks only where Mark Up can be on (a pin on every other Return)', () => {
+  it('signed in, Return is returnGrades with the same arguments, and never returnWork', () => {
+    seed();
+    window.isDemoMode = () => false;
+    const grades = vi.spyOn(globalThis, 'returnGrades').mockImplementation(() => ({ returned: 0 }));
+    const work = vi.spyOn(globalThis, 'returnWork');
+    Grader.returnGrades(CID, PIECE, ANA);
+    Grader.returnGrades(CID, PIECE, [ANA, BO]);
+    expect(grades.mock.calls).toEqual([
+      [CID, PIECE, [ANA]],
+      [CID, PIECE, [ANA, BO]],
+    ]);
+    expect(work).not.toHaveBeenCalled();
+  });
+
+  it('in Demo Mode with Send Work off, Return is returnGrades as before', () => {
+    seed({ sendWork: false });
+    const work = vi.spyOn(globalThis, 'returnWork');
+    const grades = vi.spyOn(globalThis, 'returnGrades');
+    Grader.returnGrades(CID, PIECE, [ANA]);
+    expect(work).not.toHaveBeenCalled();
+    expect(grades.mock.calls).toEqual([[CID, PIECE, [ANA]]]);
+  });
+
+  it('in Demo Mode with the build switch and Send Work on, Return gives the marks too', () => {
+    seed();
+    const work = vi.spyOn(globalThis, 'returnWork');
+    Grader.returnGrades(CID, PIECE, [ANA]);
+    expect(work.mock.calls).toEqual([[CID, PIECE, [ANA]]]);
+  });
+});
