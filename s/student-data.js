@@ -228,6 +228,15 @@ var StudentData = (function () {
       assessments: assessments,
       rubrics: rubrics,
       grades: grades,
+      // The classes this device's session has opened, for Switching Classes.
+      classes: (Array.isArray(res.classes) ? res.classes : [])
+        .filter(function (c) {
+          return c && str(c.enrollment_id);
+        })
+        .map(function (c) {
+          var k = c.course || {};
+          return { enrollmentId: str(c.enrollment_id), name: str(k.name), block: str(k.block) };
+        }),
     };
   }
 

@@ -102,6 +102,7 @@ var StudentPage = (function () {
       heading: '', // the loading screen's title when it is not a slip's: a card's page, or a code not yet known
       again: false, // a card's page couldn't be reached: offer Try Again
       from: '', // 'card' when the code was typed on one of the card's screens
+      sheet: false, // a card's page: Your Classes is open over it (app.js)
     };
   }
 

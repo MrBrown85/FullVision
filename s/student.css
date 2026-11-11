@@ -760,6 +760,199 @@ button {
 .sp-page .sp-demo-note {
   margin-top: 8px;
 }
+
+/* Phone-only and Chromebook-only blocks (S3-F3). */
+.sp-wide-block {
+  display: none;
+}
+.sp-btn-tint {
+  background: rgba(0, 122, 255, 0.12);
+  color: #0058d0;
+  gap: 8px;
+  font-size: 16px;
+  min-height: 48px;
+}
+.sp-card-add .sp-lead {
+  color: var(--sp-text-2);
+}
+.sp-card-add > .sp-btn-line {
+  width: 100%;
+}
+
+/* After Done (the artboard's "After Done"). */
+.sp-signed-out {
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+}
+.sp-out-mark {
+  width: 84px;
+  height: 84px;
+  border-radius: 42px;
+  background: var(--sp-green-soft);
+  color: var(--sp-green);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sp-signed-out .sp-big:focus {
+  outline: none;
+}
+.sp-signed-out .sp-lead {
+  font-size: 16px;
+  color: #3a3a3c;
+}
+.sp-signed-out .sp-btn {
+  margin-top: 20px;
+  width: 100%;
+  border-radius: 14px;
+  min-height: 52px;
+}
+
+/* The class's name in the page's header opens Your Classes. */
+.sp-head-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 32px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  color: var(--sp-text);
+}
+.sp-chevron {
+  flex: none;
+}
+
+/* Your Classes (the artboard's "Switching Classes"): a sheet from the
+   bottom over the page, dimmed behind. */
+.sp-sheet-back {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  border: 0;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.35);
+  cursor: default;
+}
+.sp-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+  max-width: 560px;
+  max-height: 85vh;
+  margin: 0 auto;
+  overflow-y: auto;
+  background: var(--sp-card);
+  border-radius: 22px 22px 0 0;
+  padding: 10px 16px calc(30px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sp-sheet-grip {
+  align-self: center;
+  width: 40px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--sp-line);
+}
+.sp-sheet-title {
+  margin: 0;
+  padding: 4px 4px 2px;
+  font-size: 19px;
+  font-weight: 700;
+}
+.sp-sheet-title:focus {
+  outline: none;
+}
+.sp-classes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--sp-bg);
+}
+.sp-classes li + li {
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+.sp-class {
+  width: 100%;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.sp-class-on {
+  background: rgba(0, 122, 255, 0.08);
+}
+.sp-class-words {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.sp-class-name {
+  font-size: 16px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.sp-class-sub {
+  font-size: 13px;
+  color: #58585d;
+}
+.sp-class-tick {
+  flex: none;
+  color: var(--sp-blue);
+  display: flex;
+}
+.sp-class-tick svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Scan the Code With the Camera (a Chromebook). */
+.sp-or-line {
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #58585d;
+}
+.sp-or-line::before,
+.sp-or-line::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--sp-fill);
+}
+.sp-scan-frame {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #2c2c2e;
+}
+.sp-scan-video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+.sp-card-scan .sp-big:focus,
+.sp-card-add .sp-big:focus {
+  outline: none;
+}
 /* The results didn't load (calc.js could not be fetched). */
 .sp-no-results {
   display: flex;
@@ -824,6 +1017,126 @@ button {
   }
   .sp-card-form .sp-fine {
     text-align: left;
+  }
+  .sp-narrow-block {
+    display: none;
+  }
+  .sp-wide-block {
+    display: block;
+  }
+  .sp-or-line.sp-wide-block {
+    display: flex;
+  }
+  .sp-btn.sp-wide-block {
+    display: flex;
+  }
+  /* The Chromebook board's buttons: rounder, a little shorter. */
+  .sp-card-start .sp-btn,
+  .sp-check-box .sp-btn {
+    min-height: 44px;
+    border-radius: 22px;
+    font-size: 16px;
+  }
+  .sp-card-start .sp-btn-line {
+    border: 0;
+    background: rgba(0, 122, 255, 0.12);
+    color: #0058d0;
+    font-weight: 600;
+  }
+  .sp-card-add .sp-lead {
+    font-size: 15px;
+  }
+  /* Is This You? as the Chromebook board's step 2: one card in the middle. */
+  .sp-card-check {
+    flex: none;
+    align-items: center;
+    padding-top: 96px;
+  }
+  .sp-check-box {
+    width: 440px;
+    max-width: 100%;
+    padding: 32px 36px;
+    border-radius: 20px;
+    background: var(--sp-card);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .sp-check-class {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #58585d;
+  }
+  .sp-check-box .sp-hello {
+    padding: 0;
+    background: none;
+    box-shadow: none;
+    align-items: stretch;
+    text-align: left;
+    gap: 6px;
+  }
+  .sp-hello-who {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .sp-check-box .sp-avatar {
+    flex: none;
+    width: 48px;
+    height: 48px;
+    border-radius: 24px;
+    background: #0058d0;
+    font-size: 20px;
+    font-weight: 700;
+  }
+  .sp-check-box .sp-lead {
+    font-size: 15px;
+    color: #3a3a3c;
+  }
+  .sp-check-box .sp-ident-card {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+  }
+  .sp-check-box .sp-ident .sp-lead {
+    text-align: left;
+  }
+  .sp-check-box .sp-btn-line {
+    margin-top: -6px;
+    border: 0;
+    background: rgba(0, 122, 255, 0.12);
+    color: #0058d0;
+    font-weight: 600;
+  }
+  .sp-card-check > .sp-btn-line,
+  .sp-card-check > .sp-fine {
+    width: 440px;
+    max-width: 100%;
+  }
+  /* Your Classes: a card under the class's name, not a sheet from the bottom. */
+  .sp-sheet {
+    top: 72px;
+    bottom: auto;
+    left: 50%;
+    right: auto;
+    width: 420px;
+    max-width: calc(100% - 32px);
+    margin: 0;
+    transform: translateX(-50%);
+    border-radius: 18px;
+    padding: 16px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.18);
+  }
+  .sp-sheet-grip {
+    display: none;
+  }
+  /* After Done: in the middle, the width of the sign-in card. */
+  .sp-signed-out {
+    width: 440px;
+    max-width: 100%;
+    margin: 0 auto;
   }
   /* The page for one class gets a wider column. */
   .sp-app:has(.sp-page) {

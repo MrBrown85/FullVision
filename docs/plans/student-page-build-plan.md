@@ -308,9 +308,10 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 
 **PRs.**
 
-- `S2-T1` Report surfaces read grades through one entry in `teacher/page-reports.js` so the score set is chosen in one place.
-- `S2-F1` Progress Reports use returned grades only. Print Reports with drafts names them and offers Return Them, Then Print; Print Without Them; Cancel.
-- `S2-F2` The Term Questionnaire's facts, Generate and Sent to Phones use returned grades only (Q6).
+- `S2-T1` Report surfaces read grades through one entry in `teacher/page-reports.js` so the score set is chosen in one place. Done (PR 983).
+- `S2-F1` Progress Reports use returned grades only. Print Reports with drafts names them and offers Return Them, Then Print; Print Without Them; Cancel. Done (PR 1004).
+- `S2-F2` The Term Questionnaire's facts, Generate and Sent to Phones use returned grades only (Q6). Done (PR 1005).
+- Follow-up: a Note for the Report waits with its grade (DECISIONS, "Student page build rulings (2026-11-10, night)" 2). Not built: it needs its own small migration (`grade_return` keeps the note as it was at the last return, and `list_course_grade_returns` sends it) and a client PR (`GradeState` gives it to the reports). Until then a note shows once its piece has ever been returned.
 
 **Files.** `teacher/page-reports.js`, `teacher/report-blocks.js`, `teacher/report-studio.js`, `teacher/report-questionnaire.js`, `teacher/comment-bank.js`, `teacher/phone-reports.js`, `teacher/grades-print.js` and `teacher/export-all.js` (to confirm they stay on all work).
 
@@ -340,18 +341,18 @@ The wording above is proposed; Colin approves it in each PR, as usual.
 
 **The student's side.** The code is eight characters, `K7M4-QX2P`; `s/student.js` accepts six (a slip) or eight (a card). A replaced card says "This card has been replaced. Ask your teacher for your new card." and, as any recognised card does, signs the last student out. A card password is the card's own.
 
-**PRs,** in order: twelve PRs, one of them done, and the day. "Fable" is the strongest model at high effort; "Opus" the builder (Colin's standing instruction).
+**PRs,** in order: twelve PRs, nine of them done, and the day. "Fable" is the strongest model at high effort; "Opus" the builder (Colin's standing instruction).
 
 - `S3-T1` `teacher/qr-slips.js`: lift the eight-to-a-page print sheet into a helper both slips and cards use. Done (PR 977).
-- `S3-D1` This plan's 1.5, 1.8 and S3, the DECISIONS section, and the ROADMAP items the change leaves. Docs only.
-- `S3-E1` The shared key module (`supabase/functions/_shared/card-key.ts`); `student-submit` checks cards by tag; `card_stopped`; what happens with no key. Not deployed. Fable.
-- `S3-E2` The `teacher-cards` function. Not deployed. Stacked on `S3-E1`. Fable.
-- `S3-M1` The migration (`migrations/<next>_card_codes_keyed.sql`): every live card stopped; `code`, `code_hash`, `salt` and `password` dropped; `code_hmac`, `pw_hmac`, `key_id` and `seq` added; the teacher's direct read of `student_card` removed; `student_submit.issue_cards` and the new `card` and `verify_card`; the old card RPCs dropped; the two slip issuers back to their bodies from before Batch A; cached card answers cleared from `fv_idempotency`. With its local harness suite, an undo and its proof, and pre-check and post-check queries. It deletes data (the 30 codes and passwords in Colin's test class), so it needs his review under rule 2. Fable, then one independent review of `S3-E1`, `S3-E2` and `S3-M1` together.
-- `S3-W1` The data layer asks `teacher-cards`; the list without codes; Make and Print from memory, each card printing its number ("Card 2") small; Print Again; Demo Mode on the same contract. Merges before `S3-M1` is applied, so `main` stops naming the old card RPCs first. Opus, with a short Fable read of "the code is stored nowhere".
-- `S3-F3a` Student page: eight-character codes and the replaced-card line. Opus.
-- **The day** (no PR). In one sitting: the read-only checks; Colin makes the key and keeps his copy; `S3-E1`, `S3-E2`, `S3-W1` and `S3-F3a` merged and `main` green; on his OK, both functions deployed; on his OK, `S3-M1` applied, its post-check run and `S3-M1` merged with the schema snapshot; a check on his Mac with `npm run dev:local` (Make and Print to a PDF, type a code, see the page; an old card does not open); then the release on his word. His test class has no working cards for about 15 to 30 minutes.
-- `S3-F1` The Student Cards page in full: the filters, the statuses, the card number, Cards Work Until.
-- `S3-F2` Unlock, Unlock All, Print New Card, New Codes for This Class, with their confirms.
+- `S3-D1` This plan's 1.5, 1.8 and S3, the DECISIONS section, and the ROADMAP items the change leaves. Docs only. Done (PR 1006).
+- `S3-E1` The shared key module (`supabase/functions/_shared/card-key.ts`); `student-submit` checks cards by tag; `card_stopped`; what happens with no key. Fable. Done (PR 1008); deployed Nov 11.
+- `S3-E2` The `teacher-cards` function. Stacked on `S3-E1`. Fable. Done (PR 1009); deployed Nov 11.
+- `S3-M1` The migration (`migrations/<next>_card_codes_keyed.sql`): every live card stopped; `code`, `code_hash`, `salt` and `password` dropped; `code_hmac`, `pw_hmac`, `key_id` and `seq` added; the teacher's direct read of `student_card` removed; `student_submit.issue_cards` and the new `card` and `verify_card`; the old card RPCs dropped; the two slip issuers back to their bodies from before Batch A; cached card answers cleared from `fv_idempotency`. With its local harness suite, an undo and its proof, and pre-check and post-check queries. It deletes data (the 30 codes and passwords in Colin's test class), so it needs his review under rule 2. Fable, then one independent review of `S3-E1`, `S3-E2` and `S3-M1` together. Done (PR 1011); applied Nov 11 as `card_codes_keyed`, version 20261111020227.
+- `S3-W1` The data layer asks `teacher-cards`; the list without codes; Make and Print from memory, each card printing its number ("Card 2") small; Print Again; Demo Mode on the same contract. Merges before `S3-M1` is applied, so `main` stops naming the old card RPCs first. Opus, with a short Fable read of "the code is stored nowhere". Done (PR 1012).
+- `S3-F3a` Student page: eight-character codes and the replaced-card line. Opus. Done (PR 1007).
+- **The day** (no PR). In one sitting: the read-only checks; Colin makes the key and keeps his copy; `S3-E1`, `S3-E2`, `S3-W1` and `S3-F3a` merged and `main` green; on his OK, both functions deployed; on his OK, `S3-M1` applied, its post-check run and `S3-M1` merged with the schema snapshot; a check on his Mac with `npm run dev:local` (Make and Print to a PDF, type a code, see the page; an old card does not open); then the release on his word. His test class has no working cards for about 15 to 30 minutes. Done Nov 11 up to the release: the key made, both functions deployed, `S3-M1` applied and merged, and on Colin's Mac a new card opened a real page against the live database. The release waits for his word.
+- `S3-F1` The Student Cards page in full: the filters, the statuses, the card number, Cards Work Until. Done (PR 1016).
+- `S3-F2` Unlock, Unlock All, Print New Card, New Codes for This Class, with their confirms. Done (PR 1014).
 - `S3-F3` The rest of the student sign-in screens, phone and Chromebook: the locks, Done, and Switching Classes with Add Another Card.
 - `S3-P1` The privacy page (`privacy.html`): a card's code and password are kept only as keyed fingerprints, nobody can look one up after printing, and what is recorded for a card. Colin's words; the privacy officer if he chooses.
 - `S3-S1` Slips move to the same key: a slip's code and `student.slip_password` stop being readable by the database. Its own change, with its own migration and review, right after cards are live and before the January pilot (DECISIONS, "Card codes the database cannot read" 2). Until it ships the privacy page must not say a slip code cannot be read back from the database.
@@ -718,7 +719,7 @@ The session that hands out the work keeps one list of who holds each of these fi
 - S8 before the release that opens Send Work.
 - S15 after S4 works.
 - S16 and S18 need only `S0-F1`.
-- The teacher student-page redesign runs as its own track (`docs/plans/teacher-student-page-redesign-plan.md`). R6 (Learner Profile) merges before S10 is handed out. R4 (Grades) waits for PR 1004. R2 (Competencies) lands the trend and Next Step helper in `calc.js` that S13 reuses.
+- The teacher student-page redesign (`docs/plans/teacher-student-page-redesign-plan.md`) is paused after R1 (PR 1015) by Colin, Nov 10. R2 to R7 are off until he says otherwise. So S10 no longer waits on R6, and S13 lands its own trend and Next Step helper in `calc.js`.
 
 ### A first night, as an example
 

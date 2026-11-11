@@ -384,6 +384,7 @@ describe('before the page knows whether a code is a card or a slip, it speaks as
     const dev = school();
     const first = await signIn(dev);
     await first.click('[data-act="card-done"]');
+    await first.click('[data-act="card-restart"]');
     first.server = body => (body.route === 'card' ? { ok: false, error: 'server' } : dev.fn.handle(body));
     first.type('#sp-code', 'P3R8-WDK4');
     await first.submit('form[data-form="card"]');
@@ -672,7 +673,7 @@ describe('a session’s end is checked before the list can be drawn again', () =
     await page.click('[data-act="card-done"]');
     page.advance(60 * MIN);
     page.runTicks();
-    expect(page.root().querySelector('form[data-form="card"]')).toBeTruthy();
+    expect(page.root().querySelector('.sp-signed-out')).toBeTruthy();
     expect(page.root().querySelector('.sp-msg')).toBeNull();
     // A slip in a tab that was signed in.
     const tab = await signIn(dev);

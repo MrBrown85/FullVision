@@ -160,7 +160,7 @@ test.describe('a shared Chromebook: who a scanned card signs out', () => {
     await serve(tab, fn);
     await tab.goto('/s/');
     await tab.getByRole('button', { name: 'Done' }).click();
-    await expect(tab.getByLabel('Card Code')).toBeVisible();
+    await expect(tab.getByRole('heading', { name: 'You’re signed out' })).toBeVisible();
     await tab.close();
 
     await page.bringToFront();

@@ -35,6 +35,7 @@ const PRECACHE_URLS = [
   '/shared/rubric-draft.js',
   '/shared/rubric-checks.js',
   '/shared/core-self.js',
+  '/shared/student-view.js',
   '/shared/loading-screen.js',
   '/shared/loading-screen.css',
   // Teacher desktop
@@ -50,6 +51,7 @@ const PRECACHE_URLS = [
   '/teacher/reports.css',
   '/teacher/rubric-print.css',
   '/teacher/qr-slips.css',
+  '/teacher/preview-student.css',
   '/shared/phone-report.css',
   '/teacher/grades-print.css',
   '/teacher/ui.js',
@@ -76,6 +78,7 @@ const PRECACHE_URLS = [
   '/teacher/export-all.js',
   '/teacher/cm-questionnaires.js',
   '/teacher/student-cards.js',
+  '/teacher/preview-student.js',
   '/teacher/cm-student-page.js',
   '/teacher/student-voice.js',
   '/teacher/learner-profile.js',

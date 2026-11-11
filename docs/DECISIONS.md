@@ -264,7 +264,7 @@ Context: the first night of the build ([`plans/student-page-build-plan.md`](plan
 8. **Leaving When I Return Them returns the waiting drafts.** Switching a class to As Soon As I Save, or turning its Student Page off, asks first ("12 grades are waiting as drafts. Changing this returns them to students now."), then returns them. No draft is left where no Draft mark or Return button shows.
 9. **Under As Soon As I Save, a changed grade is marked Updated only if the student had opened the earlier one.** Grading in several clicks never shows as an update. Under When I Return Them a re-returned grade is always marked.
 10. **A cleared grade, once returned, shows no result.** The student is not told a grade was removed.
-11. **A Note for the Report prints only once that piece's grade has been returned.** A note alone never makes a draft.
+11. **A Note for the Report prints only once that piece's grade has been returned.** A note alone never makes a draft. _Sharpened 2026-11-10: a note waits with its own grade; see "Student page build rulings (2026-11-10, night)" 2._
 12. **Duplicate Class copies the original's Return Grades choice;** the copy's Student Page starts off.
 13. **Missing wins at once.** Once a piece is marked Missing, a grade returned earlier for it stops counting and stops showing everywhere straight away, with no Return: the course grade and the competency levels agree, and the student sees Missing with no result. Adds to Student page build answers 4. This changes what `calc.js` counts from returned grades and gets Colin's review in the PR that builds it.
 14. **Section overrides count at once** on every screen. A hand-set section level has no Draft or Returned state, and it applies whether or not the section has scored work under it: a report shows it even when every piece in the section is still a draft. Before this a hand-set level on a section with no scored work was stored and showed a dash. It counts in the folder and the overall proficiency; the course %, letter and category grades come from the work and do not move (PR 974).
@@ -366,6 +366,49 @@ Words used here:
 17. His test class's 30 cards are replaced.
 18. Losing the key without the copy, or changing it, stops every card in every class until each teacher presses New Codes for This Class and prints. Whoever holds both the key and a copy of the database can work out every code; the two sit under one Supabase account, so two-step sign-in on that account matters most.
 19. Backups taken before the migration still hold the 30 old codes. They are dead after it, but restoring such a backup would bring back the old readable design.
+
+## Student page build rulings (2026-11-10, night)
+
+Context: the evening and night of the second day. Slice S2 (reports) and most of slice S3 (cards) were built, reviewed and merged, and the card migration was applied. Colin ruled on each point below, one at a time. The wording he approved earlier that day, and not recorded before, is in 5.
+
+**How work merges**
+
+1. **A pull request that is green and through its review merges without asking him again** (Colin, 2026-11-10: "anything that can be merged, or is ready to be merged and waiting, can go ahead and merge"). Green means every check, the browser tests included; through its review means whatever independent review the pull request needs has said it is ready. What still comes to him first: wording he has not seen, the OK to apply a migration, and every release. This widens his word that morning, "I approve anything waiting for me", which covered two grade pull requests (986 and 973) once their reviews were clean and was not taken as an OK to apply anything. How the rule reads in practice is the build's orchestrator's reading of his words; he can correct it.
+
+**Reports**
+
+2. **A Note for the Report waits with its grade** (Colin, 2026-11-10). A note written while regrading a piece already returned reaches the Term Questionnaire, Generate and the phone copies only when that regrade is returned. So a report never carries a note about a grade the family cannot see yet. Replaces "a note is used once its piece has ever been returned" (evening rulings 11). **Not built yet.** The returned copy of a grade leaves the note out on purpose, so this needs a small migration (`grade_return` keeps the note as it was at the last return, and `list_course_grade_returns` sends it) and a client pull request after it. Until then a note shows once its piece has ever been returned (PR 1005).
+
+**The teacher's student page**
+
+3. **"Keep all grades"** (Colin, 2026-11-10, relayed by the session building the teacher student-page redesign). The teacher's own student page reads all work, drafts included, and so does its Overview tab (PR 1013), though that tab was built for a student to read across the desk. In a class that holds grades, a student shown that tab sees grades not yet returned. Colin accepts that: it is the teacher's view, and teacher views use all work (Student page build answers 6). The student's own page (`s/`) and everything sent to students or families still show returned grades only.
+4. **The redesign is paused after its first slice** (Colin, 2026-11-10). R1 merged as PR 1015. R2 to R7 are off until he says otherwise ("nah they're good", of the Observations and Grades tabs as they are; no dashboard redo). So slice S10 no longer waits for R6, and S13 builds its own trend and Next Step helper in `calc.js` instead of reusing R2's.
+
+**Wording approved**
+
+5. **Approved as built**, each by Colin on Nov 10:
+   - PR 988 (Return Grades setting): "Return 12 Grades Now?" / "Return 1 Grade Now?"; Return and Change; "You haven't chosen yet. Until you do, a grade shows as soon as you save it."
+   - PR 990 (gradebook drafts): "N to return"; "Draft: graded, not returned"; Return N Graded; the drafts line with its "and 2 others" and one-draft forms; the pill's two hover hints; the screen-reader words; no "Draft" word inside cells.
+   - PR 994 (phone): Return and Next; To Return; "3 drafts" / "1 draft"; Return 3; "Graded but not returned. Students see these after you return them."; "3.5 · Cece can't see it yet"; "Complete · Cece can't see it yet"; See All Assessments; "Nothing to Return" / "No grades are waiting as drafts in Science 8."; the screen-reader names.
+   - PR 997 (grader and Assignments): To Return 3 / Returned 14 / All 28; "14 returned"; the pill's two hover hints; the screen-reader names; the Show bar and Return N Graded in their own bar under the dialog's title.
+   - PR 998 (student's page): the five refusal lines; "Couldn't reach FullVision. Check your internet and try again."; "You are signed out. Scan or type your card to open your page again."; Done; Updated.
+   - PR 999 (teacher wiring): the hidden Student Page switch and its two lines; Student Cards' line; "Changing…"; "Could not change this. Check the connection and try again."; "Could not check for grades waiting to be returned. Check the connection and try again."; Try Again. Its card list (Make Cards, the Card Code column) has since been replaced by slice S3's.
+   - PR 1002 (class settings on two computers): the category lines; What You Typed; Dismiss; Discard My Changes; the kept-changes line; the Copy Grading Setup lines; "Other changes from this computer are still being sent, so nothing was saved. Your changes are kept on this computer. Save again in a moment." (after a drag, "…Try again in a moment."); and in his own words, "Your earlier save went through after all. These are the saved categories."
+   - PR 1004 (reports with drafts): "N Grades Aren't Returned Yet" / "1 Grade Isn't Returned Yet"; "A progress report shows grades to families, so it leaves drafts out unless you return them."; "A rubric handout shows grades to students, so it leaves drafts out unless you return them."; Return Them, Then Print / Print Without Them; Return It, Then Print / Print Without It; Cancel; "Those grades couldn't be returned, so nothing printed. Try again."
+   - PR 1012 (making cards): "Make and Print N Cards"; "N cards went to the printer. Print Again works until you leave this screen. After that, printing makes new codes." (chosen over a version naming the ten-minute limit); Print Again; the Card column, "Card 2 · Made Nov 12"; the statuses Last Opened Nov 14, Needs a New Card, Past Its Last Day; "Card 2" small on the printed card.
+   - PR 1014 (replacing cards): "Print a New Card for Cece?" and "New Codes for All 28 Students?", with red buttons Print New Card and Make N New Cards; "Could not make the card. Check the connection and try again."; "2 students still have their old card: Bob Baker, Charlie Chen. Use Print New Card on their rows to try again."; "Cece's old card has stopped, but the new one didn't print. Press Make and Print 1 Card to print it." (and its form for a class run), the button named exactly as it reads at that moment; "Checking which cards were made…" while it waits; Unlock All only when two or more cards are locked.
+   - PR 1016 (the card list): the filters All / Not Printed / Locked / Never Opened with counts; "A card stops opening after this day. It's the class's last reporting date until you choose another day." (and its June 30 form); "That day has passed, so no card opens now."; Use Last Reporting Date; Use June 30; the three empty-filter lines.
+
+**What was applied and deployed that night**
+
+6. Each on Colin's word, in the order "Card codes the database cannot read" 13 sets:
+   - **The key.** Colin made `STUDENT_CARD_KEY` himself, with `STUDENT_SUBMIT_IP_KEY`, and keeps a copy of the card key in his password manager. No assistant saw either. He made the card key three times while saving it; the last is the one he kept, its key id `b5124c44`.
+   - **Both functions** ("Yes, deploy both"): `teacher-cards` (sign-in checking on) and then `student-submit` were deployed from `main`, and redeployed once he had made the last key. Both start with key id `b5124c44`.
+   - **The migration** ("I approve the migration."): S3-M1 (PR 1011) was applied as `card_codes_keyed`, version 20261111020227, on Nov 11 at 02:02 UTC (Nov 10, 6:02pm Pacific), after its read-only pre-check. Its post-check found nothing wrong. The 30 cards in his test class are stopped, and no card code or password is left in the database.
+   - **The check.** On Colin's Mac, the app from `main` against the live database made new codes, and a new card opened a real student page (recognised, Is This You? answered, a returned piece marked seen).
+   - **Not released.** The site still runs the release of PR 1001. The next release waits for his word, after the steps before every release ("Class settings on two computers" 5).
+
+Still open: the privacy page's wording, before cards go to another class.
 
 ## Phone-report birthday tries (2026-11-03)
 

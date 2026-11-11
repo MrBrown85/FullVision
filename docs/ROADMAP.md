@@ -29,6 +29,10 @@ Without these, no feature set will be worth paying for.
    - Hash a student's session token in the edge function, not in the database. Today the token crosses to the database in the clear on every page read; someone watching the database live could catch one (it ends at midnight).
    - Backups taken before the card migration hold its 30 old codes. They are dead, but restoring such a backup would bring back the old readable design.
    - One Supabase account holds both the database and the key, so two-step sign-in on that account matters more than anything in the card design.
+   - A Yes on Print New Card or New Codes for This Class waits while the card list is being read. If that read never answers, the screen shows no word while it waits. Show one ("Making cards…").
+   - A card marked Printed on one computer whose Printed mark has not reached the server yet shows Not Printed on another computer until it does. The computer that printed it keeps a note and sends the mark again the first time it reads the list after a reload (PR 1014).
+
+9. **Tied pieces on a report after a returned grade is cleared.** When a returned grade is cleared, its entry moves to the end of the student's returned grades, so a report can name two tied pieces the other way round ("Lowest work: A and B" becomes "B and A"; no number moves). The fix: the report orders tied pieces by `calc.js`'s own rule, so the order no longer rests on where the entry is stored. Its own pull request (PR 1004, review point 5).
 
 ## 2. Make the core job far better than anyone else
 

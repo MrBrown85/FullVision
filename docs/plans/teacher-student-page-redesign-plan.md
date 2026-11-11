@@ -1,5 +1,7 @@
 # Teacher student-page redesign (2026-11-10)
 
+**Paused after R1 by Colin, Nov 10.** R1 merged as PR 1015; R2 to R7 are off until he says otherwise.
+
 The teacher's student page, tab by tab, so a student at the desk can read it and a teacher can act on it. The Overview tab shipped in PR 1013. The other tabs were designed as mockups on Colin's canvas (Overview, Grades, Competencies, Observations, Learner Profile) and reviewed against a panel of grading, privacy, data and design experts.
 
 This track runs beside the student-page build (`docs/plans/student-page-build-plan.md`). The build's orchestrator keeps the hot-file list and the order; this track builds its own slices and merges each on green: every check including the browser shards and e2e-report, then main's run after the merge.

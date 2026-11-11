@@ -9,18 +9,26 @@
    characters and a slip's six (Colin, Nov 10), but the page does not guess
    from the shape: the server tells (`kind: 'card'`).
 
-   The card path asks the student-submit edge function five things, each
+   The card path asks the student-submit edge function six things, each
    one route (supabase/functions/student-submit/card-routes.ts):
-     card    a code in; whose card, which class and which check out
-     verify  the code again with what the student typed; a session out
-     page    the student's page for one class of the session
-     seen    the returned pieces the student has opened
-     done    Done: the session ends
+     card      a code in; whose card, which class and which check out
+     verify    the code again with what the student typed; a session out
+     add-card  the same check from Add Another Card: the class joins the
+               session this device has (Switching Classes)
+     page      the student's page for one class of the session
+     seen      the returned pieces the student has opened
+     done      Done: the session ends
    `ask` is the one place they are asked. Demo Mode (#demo-card;
    #demo-card-password for the card's password; #demo-card-letter and
-   #demo-card-both for a class graded by letter or both) answers all five
+   #demo-card-both for a class graded by letter or both) answers all six
    on the device in the shapes the function uses, and calls nothing; every
    screen and every step after `ask` is the same code for both.
+
+   S3-F3 adds the rest of the sign-in boards: After Done, Switching Classes
+   (Your Classes and Add Another Card), and on a Chromebook Is This You? as
+   one card and Scan the Code With the Camera. The locks (five wrong in a
+   row, fifteen in seven days, too many wrong codes from one address) are
+   the server's; this page says what the server answers.
 
    The session. A right answer to Is This You? starts one; the function
    gives back a token, and that token is the only thing this page keeps on
@@ -75,17 +83,28 @@
     return state.demo && text ? '<p class="sp-fine sp-demo-note">' + esc(text) + '</p>' : '';
   }
 
+  /* The card's first screen, and Add Another Card (Switching Classes),
+     which is the same screen for a student who is signed in. Adding, the
+     phone's own camera is not offered: a code it scans opens the page from
+     the start, which signs the student out first (Colin, Nov 9). So the
+     code is typed, or on a Chromebook scanned with this page's camera. */
   function renderCardStart(state) {
+    var add = !!adding;
     return (
-      '<main class="sp-main sp-main-center sp-card-start">' +
+      '<main class="sp-main sp-main-center sp-card-start' +
+      (add ? ' sp-card-add' : '') +
+      '">' +
       '<div class="sp-brand">FullVision</div>' +
-      '<h1 class="sp-big"><span class="sp-narrow">Scan the code on your card</span>' +
-      '<span class="sp-wide">Type the code on your card</span></h1>' +
-      '<div class="sp-narrow">' +
-      SCAN_PICTURE +
-      '</div>' +
+      (add
+        ? '<h1 class="sp-big" tabindex="-1">Add Another Card</h1>' +
+          '<p class="sp-lead">Type the code on the card for your other class.</p>'
+        : '<h1 class="sp-big"><span class="sp-narrow">Scan the code on your card</span>' +
+          '<span class="sp-wide">Type the code on your card</span></h1>' +
+          '<div class="sp-narrow">' +
+          SCAN_PICTURE +
+          '</div>') +
       '<form class="sp-card-form" data-form="card" novalidate>' +
-      '<div class="sp-or sp-narrow">or type it</div>' +
+      (add ? '' : '<div class="sp-or sp-narrow">or type it</div>') +
       '<label class="sp-sub-label sp-card-label" for="sp-code">Card Code</label>' +
       '<input id="sp-code" class="sp-input sp-card-code" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="9" value="' +
       esc(state.typed) +
@@ -95,11 +114,157 @@
           ? '<p class="sp-msg sp-msg-calm" role="status">' + esc(state.message) + '</p>'
           : '<p class="sp-msg" role="alert">' + esc(state.message) + '</p>'
         : '') +
-      demoNote(state, 'This is Demo Mode. Any code opens the sample card.') +
+      demoNote(
+        state,
+        add
+          ? 'This is Demo Mode. Any code adds a second sample class.'
+          : 'This is Demo Mode. Any code opens the sample card.',
+      ) +
       '<button type="submit" class="sp-btn sp-btn-primary">Continue</button>' +
       '</form>' +
+      (canScan()
+        ? '<div class="sp-or-line sp-wide-block" aria-hidden="true">or</div>' +
+          '<button type="button" class="sp-btn sp-btn-tint sp-wide-block" data-act="card-camera">Scan the Code With the Camera</button>'
+        : '') +
+      (add ? '<button type="button" class="sp-btn sp-btn-line" data-act="card-back">Back to Your Page</button>' : '') +
       '</main>'
     );
+  }
+
+  /* ── Scan the Code With the Camera (a Chromebook) ──────────── */
+
+  /* A phone scans a card with its own camera app, which opens this page at
+     the card's address. A Chromebook has a camera but no such app, so on a
+     wide screen this page offers its own: the camera's picture, read for a
+     QR code by the browser's own reader (BarcodeDetector, which Chrome has
+     on a Chromebook). A browser without that reader is not offered it. The
+     picture never leaves the device: it is read in the browser and nothing
+     of it is kept or sent. */
+  function canScan() {
+    return (
+      typeof BarcodeDetector === 'function' &&
+      typeof navigator !== 'undefined' &&
+      !!navigator.mediaDevices &&
+      typeof navigator.mediaDevices.getUserMedia === 'function'
+    );
+  }
+
+  function renderCardScan() {
+    return (
+      '<main class="sp-main sp-main-center sp-card-start sp-card-scan">' +
+      '<div class="sp-brand">FullVision</div>' +
+      '<h1 class="sp-big" tabindex="-1">Scan the code on your card</h1>' +
+      '<p class="sp-lead">Hold your card up to the camera.</p>' +
+      '<div class="sp-scan-frame"><video class="sp-scan-video" autoplay muted playsinline aria-hidden="true"></video></div>' +
+      '<button type="button" class="sp-btn sp-btn-line" data-act="card-type">Type the Code Instead</button>' +
+      '</main>'
+    );
+  }
+
+  var CAMERA_FAILED = 'The camera didn’t open. Type the code on your card instead.';
+  var SCAN_EVERY_MS = 250;
+  // The camera that is on: { stream, timer }. Null when it is off.
+  var scanning = null;
+
+  function stopCamera() {
+    var s = scanning;
+    scanning = null;
+    if (!s) return;
+    if (s.timer) clearTimeout(s.timer);
+    if (s.stream && typeof s.stream.getTracks === 'function') {
+      s.stream.getTracks().forEach(function (t) {
+        t.stop();
+      });
+    }
+  }
+
+  // Back to the code box, saying `message` if there is one.
+  function cameraOff(message) {
+    stopCamera();
+    S.screen = 'cardstart';
+    S.message = message || '';
+    S.calm = false;
+    paint('#sp-code');
+  }
+
+  /* A code from what the camera read: a card's address
+     (fullvision.ca/s/#P3R8WDK4) or the code alone. */
+  function codeFrom(raw) {
+    var text = String(raw || '');
+    var at = text.indexOf('#');
+    var c = cleanCode(at >= 0 ? decodeURIComponent(text.slice(at + 1)) : text);
+    return isCode(c) ? c : '';
+  }
+
+  /* The camera starts. Every answer from it (the camera opening, a frame
+     read) checks that this is still the camera on screen before it does
+     anything: Type the Code Instead, a hidden tab or a new screen turns it
+     off, and whatever arrives after that is dropped. */
+  function startCamera() {
+    stopCamera();
+    var mine = { stream: null, timer: 0 };
+    scanning = mine;
+    S.message = '';
+    S.screen = 'cardscan';
+    paint('.sp-big');
+    var detector;
+    try {
+      detector = new BarcodeDetector({ formats: ['qr_code'] });
+    } catch (e) {
+      cameraOff(CAMERA_FAILED);
+      return Promise.resolve();
+    }
+    return navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false }).then(
+      function (stream) {
+        if (scanning !== mine || S.screen !== 'cardscan') {
+          stream.getTracks().forEach(function (t) {
+            t.stop();
+          });
+          return;
+        }
+        mine.stream = stream;
+        var video = typeof document !== 'undefined' ? document.querySelector('.sp-scan-video') : null;
+        if (!video) return cameraOff(CAMERA_FAILED);
+        video.srcObject = stream;
+        if (typeof video.play === 'function') {
+          var played = video.play();
+          if (played && typeof played.catch === 'function') played.catch(function () {});
+        }
+        read(mine, detector, video);
+      },
+      function () {
+        if (scanning === mine) cameraOff(CAMERA_FAILED);
+      },
+    );
+  }
+
+  // One look at the picture, then the next, until a code is found.
+  function read(mine, detector, video) {
+    mine.timer = setTimeout(function () {
+      mine.timer = 0;
+      if (scanning !== mine) return;
+      Promise.resolve()
+        .then(function () {
+          return detector.detect(video);
+        })
+        .then(
+          function (found) {
+            if (scanning !== mine || S.screen !== 'cardscan') return;
+            var c = '';
+            (found || []).some(function (b) {
+              c = codeFrom(b && b.rawValue);
+              return !!c;
+            });
+            if (!c) return read(mine, detector, video);
+            stopCamera();
+            return openCard(c);
+          },
+          function () {
+            // The picture was not ready yet: look again.
+            if (scanning === mine) read(mine, detector, video);
+          },
+        );
+    }, SCAN_EVERY_MS);
   }
 
   /* ── Is This You? ──────────────────────────────────────────── */
@@ -117,19 +282,32 @@
     );
   }
 
+  /* Is This You? On a phone, as the phone board draws it: the class at the
+     top, the student's card, the two buttons under it. On a Chromebook, as
+     the Chromebook board's step 2: one card in the middle holding the
+     class, the student, the check and both buttons. The code box under it
+     is the phone's ("No camera?"); a Chromebook typed its code already. */
   function renderCardCheck(state) {
     var d = state.data;
     var first = (d.student && d.student.first_name) || '';
     return (
+      '<div class="sp-narrow-block">' +
       header(className(d.course), TITLE) +
-      '<main class="sp-main sp-main-center">' +
+      '</div>' +
+      '<main class="sp-main sp-main-center sp-card-check">' +
+      '<div class="sp-check-box">' +
+      '<p class="sp-check-class sp-wide-block">' +
+      esc(className(d.course)) +
+      '</p>' +
       '<section class="sp-card sp-hello">' +
+      '<div class="sp-hello-who">' +
       '<div class="sp-avatar" aria-hidden="true">' +
       esc(first.charAt(0).toUpperCase()) +
       '</div>' +
       '<h1 class="sp-big">' +
       esc('Is this you, ' + first + '?') +
       '</h1>' +
+      '</div>' +
       '<p class="sp-lead">This page is just for you.</p>' +
       (d.check ? '<div class="sp-ident sp-ident-card">' + identityFields(state) + '</div>' : '') +
       '</section>' +
@@ -139,10 +317,25 @@
       (state.sending ? 'Checking…' : 'Yes, That’s Me') +
       '</button>' +
       '<button type="button" class="sp-btn sp-btn-line" data-act="card-notme">No, That’s Not Me</button>' +
+      '</div>' +
       demoNote(state, demoHint(state)) +
-      codeBox(state, 'No camera? Type the code on your card', false, 'card') +
+      (adding
+        ? '<button type="button" class="sp-btn sp-btn-line" data-act="card-back">Back to Your Page</button>'
+        : '<div class="sp-narrow-block">' +
+          codeBox(state, 'No camera? Type the code on your card', false, 'card') +
+          '</div>') +
       '</main>'
     );
+  }
+
+  /* A screen's way out. Adding a card, the student is still signed in, so
+     a different code goes back to Add Another Card and the page is one
+     press away; from the start screen, back to the start. */
+  function wayOut() {
+    return adding
+      ? '<button type="button" class="sp-btn sp-btn-line" data-act="card-add">Type a Different Code</button>' +
+          '<button type="button" class="sp-btn sp-btn-line" data-act="card-back">Back to Your Page</button>'
+      : '<button type="button" class="sp-btn sp-btn-line" data-act="card-restart">Type a Different Code</button>';
   }
 
   function renderCardNotMe(state) {
@@ -151,7 +344,7 @@
       '<main class="sp-main sp-main-center sp-main-middle">' +
       '<section class="sp-card sp-hello"><h1 class="sp-big">Give This Card Back</h1>' +
       '<p class="sp-lead">This card is for someone else. Give it back to your teacher and ask for your own.</p></section>' +
-      '<button type="button" class="sp-btn sp-btn-line" data-act="card-restart">Type a Different Code</button>' +
+      wayOut() +
       '</main>'
     );
   }
@@ -170,7 +363,26 @@
           (state.sending ? 'Loading…' : 'Try Again') +
           '</button>'
         : '') +
-      '<button type="button" class="sp-btn sp-btn-line" data-act="card-restart">Type a Different Code</button>' +
+      wayOut() +
+      '</main>'
+    );
+  }
+
+  /* After Done (the artboard's "After Done"). Nothing of the student is on
+     it. A phone and a Chromebook each say what they are. */
+  var CHECK_MARK =
+    '<svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+
+  function renderSignedOut() {
+    return (
+      '<main class="sp-main sp-main-center sp-main-middle sp-signed-out">' +
+      '<span class="sp-out-mark">' +
+      CHECK_MARK +
+      '</span>' +
+      '<h1 class="sp-big" tabindex="-1">You’re signed out</h1>' +
+      '<p class="sp-lead"><span class="sp-narrow">This phone no longer has your card.</span>' +
+      '<span class="sp-wide">This computer no longer has your card.</span></p>' +
+      '<button type="button" class="sp-btn sp-btn-primary" data-act="card-restart">Scan a Card</button>' +
       '</main>'
     );
   }
@@ -180,12 +392,24 @@
   /* The frame every tab of the page sits in: the class and Done, which
      stay in reach as the page scrolls, then the tab's own body.
      assignments.js draws the first tab. */
+  var CHEVRON =
+    '<svg class="sp-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6"/></svg>';
+  var PLUS =
+    '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>';
+
+  /* The class's name is the way to Switching Classes: pressed, it opens
+     Your Classes, every class this device's session has opened, and Add
+     Another Card. */
   function pageFrame(state, body) {
     var course = (state.page && state.page.course) || {};
     return (
-      '<header class="sp-head sp-head-page"><div class="sp-head-words"><div class="sp-head-title">' +
+      '<header class="sp-head sp-head-page"><div class="sp-head-words">' +
+      '<button type="button" class="sp-head-title sp-head-switch" data-act="classes-open" aria-haspopup="dialog" aria-expanded="' +
+      (state.sheet ? 'true' : 'false') +
+      '">' +
       esc(className(course)) +
-      '</div><div class="sp-head-sub">' +
+      CHEVRON +
+      '</button><div class="sp-head-sub">' +
       esc(TITLE) +
       '</div></div>' +
       '<button type="button" class="sp-btn sp-btn-quiet sp-btn-small sp-done" data-act="card-done">Done</button>' +
@@ -193,8 +417,56 @@
       '<main class="sp-main sp-page">' +
       body +
       demoNote(state, 'This is Demo Mode. Cece and her results are samples.') +
-      '</main>'
+      '</main>' +
+      (state.sheet ? classesSheet(state.page) : '')
     );
+  }
+
+  /* Your Classes (the artboard's "Switching Classes"): the classes this
+     device's session has opened, the one showing ticked, then Add Another
+     Card. The server sends the list with the page; it holds each class's
+     name and block and the student's first name, nothing else. */
+  function classesSheet(page) {
+    var here = page && page.student ? page.student.id : '';
+    var list = (page && page.classes) || [];
+    return (
+      '<button type="button" class="sp-sheet-back" data-act="classes-close" aria-label="Close" tabindex="-1"></button>' +
+      '<div class="sp-sheet" role="dialog" aria-modal="true" aria-labelledby="sp-classes-title">' +
+      '<span class="sp-sheet-grip" aria-hidden="true"></span>' +
+      '<h2 class="sp-sheet-title" id="sp-classes-title" tabindex="-1">Your Classes</h2>' +
+      '<ul class="sp-classes">' +
+      list
+        .map(function (c) {
+          var on = c.enrollmentId === here;
+          return (
+            '<li><button type="button" class="sp-class' +
+            (on ? ' sp-class-on' : '') +
+            '" data-act="class-open" data-enrollment="' +
+            esc(c.enrollmentId) +
+            '"' +
+            (on ? ' aria-current="true"' : '') +
+            '><span class="sp-class-words"><span class="sp-class-name">' +
+            esc(c.name) +
+            '</span>' +
+            (c.block ? '<span class="sp-class-sub">' + esc(blockLabel(c.block)) + '</span>' : '') +
+            '</span>' +
+            (on ? '<span class="sp-class-tick">' + CHECK_MARK + '</span>' : '') +
+            '</button></li>'
+          );
+        })
+        .join('') +
+      '</ul>' +
+      '<button type="button" class="sp-btn sp-btn-tint" data-act="card-add">' +
+      PLUS +
+      'Add Another Card</button>' +
+      '</div>'
+    );
+  }
+
+  // "Block A", as the class's name shows it.
+  function blockLabel(block) {
+    var b = String(block || '').trim();
+    return /^[A-Za-z0-9]{1,2}$/.test(b) ? 'Block ' + b.toUpperCase() : b;
   }
 
   /* ── Demo Mode: the three answers, built on the device ─────── */
@@ -363,6 +635,56 @@
     };
   }
 
+  /* The second sample class, for Add Another Card (Switching Classes): one
+     piece returned, one a draft, one not graded yet. */
+  var DEMO_SECOND = 'demo-cece-hum';
+  function demoSecondClass() {
+    return {
+      student: { enrollment_id: DEMO_SECOND, first_name: 'Cece' },
+      course: { id: 'demo-humanities-8', name: 'Humanities 8', block: 'A', grading_scale: null },
+      rubrics: [],
+      work: [
+        {
+          id: 'demo-hum-worldview',
+          title: 'Thinking It Through: A Changing Worldview',
+          date: isoDay(-2),
+          due_date: isoDay(3),
+          tag_ids: ['demo-hum-evidence'],
+        },
+        {
+          // A draft, never returned: the date only.
+          id: 'demo-hum-feudal',
+          title: 'Feudalism Paragraph',
+          date: isoDay(-8),
+          due_date: isoDay(-4),
+          tag_ids: ['demo-hum-evidence'],
+          working: {
+            score: { value: null, comment: 'Draft: add one more piece of evidence.' },
+            tag_scores: [{ tag_id: 'demo-hum-evidence', value: 2, modifier: 0, comment: null }],
+          },
+          ret: { is_draft: true, returned_at: null, returned_copy: null },
+        },
+        {
+          id: 'demo-hum-map',
+          title: 'Medieval Europe Map',
+          date: isoDay(-15),
+          due_date: isoDay(-12),
+          tag_ids: ['demo-hum-evidence'],
+          working: {
+            score: { value: null, comment: 'Clear labels and a careful key.' },
+            tag_scores: [{ tag_id: 'demo-hum-evidence', value: 3, modifier: 0, comment: null }],
+          },
+          ret: { is_draft: false, returned_at: isoDay(-10) + 'T20:15:00Z', returned_copy: null },
+        },
+      ],
+    };
+  }
+
+  // The sample class an enrollment opens.
+  function demoClassFor(enrollment) {
+    return enrollment === DEMO_SECOND ? demoSecondClass() : demoClass();
+  }
+
   /* Demo Mode's stand-in for the server's one reader of a student's grade
      (student_submit._returned_grade, plan 1.2): nothing for a grade never
      returned, the returned copy while a newer draft waits, the working copy
@@ -432,8 +754,8 @@
      proficiency, letter or both. The one thing here the server does not
      send is the class's id; the page needs none and gives a real class a
      key of its own. */
-  function demoPage(system) {
-    var cls = demoClass();
+  function demoPage(system, enrollment) {
+    var cls = demoClassFor(enrollment);
     var seen = (demo && demo.seen) || {};
     return {
       ok: true,
@@ -445,7 +767,7 @@
         level_order: 'desc',
         round_percent: null,
       }),
-      classes: [demoKlass(cls)],
+      classes: demoClasses(),
       tags: {},
       rubrics: cls.rubrics,
       assessments: cls.work.map(function (w) {
@@ -477,32 +799,48 @@
     };
   }
 
+  // The classes the sample session has opened, as the server lists them.
+  function demoClasses() {
+    var opened = demo && demo.classes && demo.classes.length ? demo.classes : [demoClass().student.enrollment_id];
+    return opened.map(function (e) {
+      return demoKlass(demoClassFor(e));
+    });
+  }
+
+  /* The sample card, or, while a card is being added, the second sample
+     class's card: any code opens it. */
   function demoCard() {
     if (demo.wrong >= DEMO.tries) return { ok: false, error: 'card_locked' };
+    var cls = adding ? demoSecondClass() : demoClass();
     return {
       ok: true,
       kind: 'card',
       student: { first_name: 'Cece' },
-      course: { name: 'Science 8', block: 'B' },
+      course: { name: cls.course.name, block: cls.course.block },
       check: demo.check,
       also_password: false,
     };
   }
 
-  // Five wrong tries lock the card, as the server does.
-  function demoVerify(body) {
+  /* Five wrong tries lock the card, as the server does. From the start
+     screen a right answer starts a new session; Add Another Card (`add`)
+     joins the one sent and gives back no new token. */
+  function demoVerify(body, add) {
     var right =
       demo.check === 'password'
         ? body.password === DEMO.password
         : body.birthday === demoBirthday() || body.student_number === DEMO.number;
     if (right) {
-      var cls = demoClass();
+      var cls = add ? demoSecondClass() : demoClass();
+      var e = cls.student.enrollment_id;
+      if (!add) demo.classes = [];
+      if (demo.classes.indexOf(e) < 0) demo.classes.push(e);
       return {
         ok: true,
-        session_token: 'demo',
+        session_token: add ? null : 'demo',
         expires_at: nextMidnight(),
-        enrollment_id: cls.student.enrollment_id,
-        classes: [demoKlass(cls)],
+        enrollment_id: e,
+        classes: demoClasses(),
       };
     }
     demo.wrong += 1;
@@ -512,9 +850,16 @@
 
   var DEMO_ANSWERS = {
     card: demoCard,
-    verify: demoVerify,
-    page: function () {
-      return demoPage(demo.system);
+    verify: function (body) {
+      return demoVerify(body, false);
+    },
+    'add-card': function (body) {
+      return demoVerify(body, true);
+    },
+    page: function (body) {
+      // Only a class the sample session has opened, as the server answers.
+      if (demo.classes.indexOf(body.enrollment_id) < 0) return { ok: false, error: 'not_found' };
+      return demoPage(demo.system, body.enrollment_id);
     },
     seen: function (body) {
       var ids = body.assessment_ids || [];
@@ -599,6 +944,11 @@
   var session = null;
   // The last student's token: sent with the next check, so the server ends it.
   var ending = '';
+  /* Add Another Card is under way (Switching Classes): the student is
+     signed in and is typing another card's code. Null otherwise. While it
+     is set, a card that is recognised signs nobody out, and its check
+     joins this session (`add-card`) instead of starting a new one. */
+  var adding = null;
   var timer = 0;
   /* A timer counts time the device was awake. A Chromebook that slept with
      the list open wakes with its timer still far from done, and nothing
@@ -676,6 +1026,8 @@
   // `stored` false leaves another student's session, kept by another tab, where it is.
   function forget(stored) {
     session = null;
+    adding = null;
+    stopCamera();
     stopClocks();
     stopWatchingRows();
     if (stored === false) return;
@@ -737,13 +1089,20 @@
 
   /* Signed out: the session is forgotten, the page's data is dropped and
      the card's first screen is drawn, with `message` if the student did not
-     ask for it. Demo Mode starts the sample again. */
-  function leave(message, stored) {
+     ask for it. Demo Mode starts the sample again. `done` (the student
+     pressed Done) draws After Done instead, in Demo Mode too. */
+  function leave(message, stored, done) {
     var hash = demo && demo.hash;
     // Demo Mode keeps nothing, and leaves a real session on the device alone.
     forget(S.demo ? false : stored);
     StudentPage.reset();
     if (typeof StudentData !== 'undefined') StudentData.use(null);
+    if (done) {
+      S.screen = 'signedout';
+      setTitle();
+      paint('.sp-big');
+      return;
+    }
     if (hash && startDemo(hash)) return;
     S.screen = 'cardstart';
     S.message = message || '';
@@ -756,24 +1115,27 @@
      device forgets. Done and fifteen idle minutes both come this way. With
      the page open in two tabs, the tab that still finds the token on the
      device is the one that tells the server, so it is told once. */
-  function signOut(message) {
+  function signOut(message, done) {
     var s = session;
     var stored = s && s.kept ? readStored() : null;
     var others = !!(stored && stored.token !== s.token);
     if (s && (!s.kept || (stored && !others))) endOnce(s.token);
-    leave(message, others ? false : undefined);
+    leave(message, others ? false : undefined, done);
   }
 
   /* The card's own screens that show, or are opening, the session's page.
      The session is watched only while one of them is up: a questionnaire or
-     a report opened in the same tab is never taken down for it. */
+     a report opened in the same tab is never taken down for it. Adding a
+     card, every screen of it is the signed-in student's. */
   function showing() {
     return (
       S.screen === 'assignments' ||
       (S.screen === 'cardmessage' && !!S.again) ||
-      (S.screen === 'loading' && S.heading === TITLE)
+      (S.screen === 'loading' && S.heading === TITLE) ||
+      (!!adding && !!session && has(ADDING_SCREENS, S.screen))
     );
   }
+  var ADDING_SCREENS = { cardstart: 1, cardscan: 1, cardcheck: 1, cardnotme: 1, cardmessage: 1, loading: 1 };
 
   /* Is the session this tab shows still the device's, and still live?
      Asked when its end or its idle limit comes due, and before the page is
@@ -1055,8 +1417,9 @@
     return true;
   }
 
-  // The code typed on a card's screen.
+  // The code typed (or scanned with this page's camera) on a card's screen.
   function openCard(typed) {
+    stopCamera();
     var c = cleanCode(typed);
     S.typed = prettyCode(c);
     if (!isCode(c)) {
@@ -1067,6 +1430,7 @@
       return Promise.resolve();
     }
     S.message = '';
+    if (adding) return addCard(c);
     // A real code may be a slip's: student.js asks `card`, then `open`.
     if (!S.demo) return StudentPage.openCode(c, 'card');
     StudentPage.newTurn();
@@ -1074,6 +1438,117 @@
     return ask('card', { code: c }).then(function (res) {
       if (cardSaid(res) !== true) refused(res);
     });
+  }
+
+  /* ── Switching Classes ─────────────────────────────────────── */
+
+  /* Add Another Card: a card's code typed by a student who is signed in.
+     It is asked as a card only: a slip's code here is a code that didn't
+     work, since a slip opens no class. A card that is recognised signs
+     nobody out (Colin, Nov 9: a card joins a session only through Add
+     Another Card), and one that won't open says why on this screen, with
+     the student's own page one press away. */
+  function addCard(c) {
+    StudentPage.newTurn();
+    S.code = c;
+    S.sending = true;
+    S.screen = 'loading';
+    S.heading = TITLE;
+    paint();
+    return ask('card', { code: c }).then(function (res) {
+      S.sending = false;
+      if (!adding) return;
+      if (res && res.ok === true && res.kind === 'card') {
+        S.data = res;
+        S.typed = '';
+        S.number = '';
+        S.bday = { m: '', d: '', y: '' };
+        S.message = '';
+        S.screen = 'cardcheck';
+        paint(res.check === 'password' ? '#sp-ident' : '#sp-bm');
+        return;
+      }
+      S.message = cardMessage(res && res.ok === true ? { ok: false, error: 'not_found' } : res);
+      S.calm = false;
+      S.screen = 'cardstart';
+      paint('#sp-code');
+    });
+  }
+
+  /* Add Another Card opens over the page; Back to Your Page closes it.
+     The page's data is kept while a card is added, so going back draws it
+     again without asking. */
+  function startAdding() {
+    if (!session || !S.page) return;
+    StudentPage.newTurn();
+    stopWatchingRows();
+    adding = { from: session.enrollment };
+    S.sheet = false;
+    S.data = null;
+    S.typed = '';
+    S.message = '';
+    S.sending = false;
+    S.screen = 'cardstart';
+    paint('.sp-big');
+  }
+
+  function backToPage() {
+    StudentPage.newTurn();
+    stopCamera();
+    adding = null;
+    S.data = null;
+    S.code = '';
+    S.typed = '';
+    S.number = '';
+    S.bday = { m: '', d: '', y: '' };
+    S.message = '';
+    S.sending = false;
+    if (!session) return leave('');
+    if (!S.page) {
+      S.heading = TITLE;
+      S.screen = 'loading';
+      return openPage();
+    }
+    S.screen = 'assignments';
+    paint('.sp-page-title');
+    arm();
+    watchRows();
+    return Promise.resolve();
+  }
+
+  /* Another class from Your Classes. The device's session stays as it is;
+     only which class it opens changes, here and in what the device keeps. */
+  function openClass(enrollment) {
+    var known = ((S.page && S.page.classes) || []).some(function (c) {
+      return c.enrollmentId === enrollment;
+    });
+    if (!session || !known) return Promise.resolve();
+    S.sheet = false;
+    if (enrollment === session.enrollment) {
+      paint('.sp-head-switch');
+      return Promise.resolve();
+    }
+    StudentPage.newTurn();
+    stopWatchingRows();
+    session.enrollment = enrollment;
+    if (session.kept) keep(session);
+    S.page = null;
+    if (typeof StudentData !== 'undefined') StudentData.use(null);
+    S.heading = TITLE;
+    S.screen = 'loading';
+    return openPage();
+  }
+
+  function openSheet() {
+    if (!S.page || S.screen !== 'assignments') return;
+    S.sheet = true;
+    paint('#sp-classes-title');
+  }
+
+  function closeSheet() {
+    if (!S.sheet) return;
+    S.sheet = false;
+    paint('.sp-head-switch');
   }
 
   /* shared/constants.js and shared/calc.js work out and word a result. They
@@ -1216,6 +1691,7 @@
      and ended the last one. Its token is kept, then the page opens. */
   function signedIn(res) {
     ending = '';
+    if (adding) return added(res);
     session = {
       token: String(res.session_token || ''),
       expires: String(res.expires_at || ''),
@@ -1232,13 +1708,39 @@
     return openPage();
   }
 
+  /* Add Another Card passed its check: the class joined this device's
+     session, and the page opens on it. The server gives back no token for
+     a joined session; if the session had ended meanwhile it started a new
+     one, and gives back that one's token. */
+  function added(res) {
+    var e = String(res.enrollment_id || '');
+    if (!session || !e) {
+      adding = null;
+      pageRefused({ ok: false, error: 'network' });
+      return Promise.resolve();
+    }
+    adding = null;
+    if (res.session_token) {
+      session = { token: String(res.session_token), expires: '', enrollment: e, active: Date.now(), kept: false };
+    }
+    session.enrollment = e;
+    if (res.expires_at) session.expires = String(res.expires_at);
+    session.active = Date.now();
+    if (!S.demo) keep(session);
+    S.page = null;
+    if (typeof StudentData !== 'undefined') StudentData.use(null);
+    return openPage();
+  }
+
   /* Is This You? The code goes again with what the student typed; there is
-     no token between `card` and `verify`. */
+     no token between `card` and `verify`. Adding a card, it goes to
+     `add-card` with this device's session, which the class joins. */
   function checkCard() {
     var code = S.code;
     return verifyIdentity({
       send: function (ident) {
         var body = Object.assign({ code: code }, ident);
+        if (adding && session) return ask('add-card', Object.assign(body, { session: session.token }));
         if (ending) body.session = ending;
         return ask('verify', body);
       },
@@ -1259,7 +1761,9 @@
       system: kind === 'letter' || kind === 'both' ? kind : 'proficiency',
       wrong: 0,
       seen: {},
+      classes: [],
     };
+    adding = null;
     S.demo = true;
     S.typed = prettyCode(DEMO.code);
     S.screen = 'cardstart';
@@ -1295,6 +1799,8 @@
   // Back to the card's code, with nothing kept from the last student.
   function restartCard() {
     var hash = demo && demo.hash;
+    adding = null;
+    stopCamera();
     StudentPage.reset();
     if (typeof StudentData !== 'undefined') StudentData.use(null);
     stopWatchingRows();
@@ -1304,7 +1810,7 @@
     paint('#sp-code');
   }
 
-  function onClick(act) {
+  function onClick(act, el) {
     if (act === 'card-yes') {
       checkCard();
     } else if (act === 'card-notme') {
@@ -1317,7 +1823,31 @@
     } else if (act === 'card-restart') {
       restartCard();
     } else if (act === 'card-done') {
-      signOut('');
+      signOut('', true);
+    } else if (act === 'card-camera') {
+      startCamera();
+    } else if (act === 'card-type') {
+      cameraOff('');
+    } else if (act === 'classes-open') {
+      openSheet();
+    } else if (act === 'classes-close') {
+      closeSheet();
+    } else if (act === 'class-open') {
+      openClass(el.getAttribute('data-enrollment') || '');
+    } else if (act === 'card-add') {
+      if (adding) {
+        // Type a Different Code, while adding: back to Add Another Card.
+        StudentPage.newTurn();
+        S.data = null;
+        S.message = '';
+        S.sending = false;
+        S.screen = 'cardstart';
+        paint('#sp-code');
+      } else {
+        startAdding();
+      }
+    } else if (act === 'card-back') {
+      backToPage();
     } else if (act === 'page-retry') {
       openPage();
     } else if (act === 'grades-retry') {
@@ -1338,6 +1868,8 @@
   if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
     document.addEventListener('visibilitychange', function () {
       if (document.visibilityState === 'hidden') {
+        // The camera is never left on in a tab nobody is looking at.
+        if (scanning) cameraOff('');
         cover();
         lookAgain();
         return;
@@ -1353,6 +1885,22 @@
     window.addEventListener('pagehide', cover);
     window.addEventListener('storage', function () {
       checkSession();
+    });
+    // Your Classes: Escape closes it, and Tab goes round inside it.
+    window.addEventListener('keydown', function (e) {
+      if (!S || !S.sheet || typeof document === 'undefined') return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeSheet();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      var inside = Array.prototype.slice.call(document.querySelectorAll('.sp-sheet button'));
+      if (!inside.length) return;
+      var at = inside.indexOf(document.activeElement);
+      var next = e.shiftKey ? (at <= 0 ? inside.length - 1 : at - 1) : at < 0 || at === inside.length - 1 ? 0 : at + 1;
+      e.preventDefault();
+      inside[next].focus();
     });
     // What counts as activity: a touch, a key, the pointer, a scroll.
     ['pointerdown', 'pointermove', 'keydown', 'touchstart', 'wheel', 'scroll'].forEach(function (name) {
@@ -1375,6 +1923,8 @@
       cardcheck: renderCardCheck,
       cardnotme: renderCardNotMe,
       cardmessage: renderCardMessage,
+      cardscan: renderCardScan,
+      signedout: renderSignedOut,
     },
     click: onClick,
     submit: onSubmit,
@@ -1384,6 +1934,8 @@
          showing the session now: the device's copy stays where it is, for a
          card to end or the page to open again. */
       session = null;
+      adding = null;
+      stopCamera();
       stopClocks();
       stopWatchingRows();
       if (typeof document !== 'undefined') document.documentElement.classList.remove('sp-away');
@@ -1406,6 +1958,14 @@
       checkCard: checkCard,
       checkSession: checkSession,
       tellSeen: tellSeen,
+      codeFrom: codeFrom,
+      adding: function () {
+        return adding;
+      },
+      camera: function () {
+        return scanning;
+      },
+      SCAN_EVERY_MS: SCAN_EVERY_MS,
       SESSION_KEY: SESSION_KEY,
       IDLE_MS: IDLE_MS,
       DEMO: DEMO,
