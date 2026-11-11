@@ -49,6 +49,8 @@ export type Options = {
   // Who a teacher's sign-in token belongs to (Supabase Auth), for sweep.
   whoIs?: ((token: string) => Promise<string | null>) | null;
   now?: () => number;
+  // Runs the removal worker after the answer (EdgeRuntime.waitUntil in index.ts); absent, before it.
+  defer?: ((work: Promise<void>) => void) | null;
   log?: (entry: Record<string, unknown>) => void;
 };
 
@@ -205,6 +207,7 @@ export function makeHandler(opts: Options) {
     whoIs: opts.whoIs || null,
     log,
     now: opts.now || Date.now,
+    defer: opts.defer || null,
   });
 
   return async function handle(req: Request): Promise<Response> {

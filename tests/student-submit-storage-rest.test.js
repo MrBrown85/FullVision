@@ -263,3 +263,95 @@ describe('authUser and tokenShape', () => {
     }
   });
 });
+
+describe('every call to Storage or Auth has a deadline (review L4)', () => {
+  // A Storage or Auth that never answers: the call ends only when its signal does.
+  const hanging = () => {
+    const seen = [];
+    const fetcher = (url, init) =>
+      new Promise((_, reject) => {
+        seen.push(init && init.signal);
+        if (!init || !init.signal) return;
+        init.signal.addEventListener('abort', () => reject(init.signal.reason), { once: true });
+      });
+    return { fetcher, seen };
+  };
+
+  it('each of the five Storage calls gives up at its deadline, with a Storage error that names no path or key', async () => {
+    const h = hanging();
+    const store = storageRest(h.fetcher, URL_, KEY, { timeoutMs: 20 });
+    for (const call of [
+      () => store.signUpload(PAGE),
+      () => store.signDownloads([PAGE], 300),
+      () => store.read(PAGE, 10),
+      () => store.overwrite(PAGE, new Uint8Array(1)),
+      () => store.remove([PAGE]),
+    ]) {
+      const e = await call().then(
+        () => null,
+        x => x,
+      );
+      expect(e).toBeInstanceOf(Error);
+      expect(e.name).toBe('StorageError');
+      expect(e.message).not.toContain(PAGE);
+      expect(e.message).not.toContain(KEY);
+    }
+    expect(h.seen.length).toBe(5);
+    expect(h.seen.every(sig => sig instanceof AbortSignal)).toBe(true);
+  });
+
+  it('a read whose answer stops part way gives up at its deadline, and is never taken for the whole file', async () => {
+    const stalled = new ReadableStream({
+      start(c) {
+        c.enqueue(Uint8Array.from([0xff, 0xd8, 0xff]));
+      },
+      pull() {
+        return new Promise(() => {});
+      },
+    });
+    const store = storageRest(async () => new Response(stalled, { status: 200 }), URL_, KEY, { timeoutMs: 20 });
+    await expect(store.read(PAGE, 2_000_000)).rejects.toThrow('storage');
+  });
+
+  it('the deadline is 10 seconds unless one is given', async () => {
+    const sigs = [];
+    const fetcher = async (url, init) => (sigs.push(init.signal), json(200, { url: '/object/upload/sign/x?token=t' }));
+    await storageRest(fetcher, URL_, KEY).signUpload(PAGE);
+    await authUser(async (url, init) => (sigs.push(init.signal), json(200, { id: 'x' })), URL_, 'anon')('t'.repeat(30));
+    expect(sigs.length).toBe(2);
+    expect(sigs.every(sig => sig instanceof AbortSignal && !sig.aborted)).toBe(true);
+    const src = (await import('node:fs')).readFileSync('supabase/functions/_shared/storage-rest.ts', 'utf8');
+    expect(src).toMatch(/TIMEOUT_MS = 10_000/);
+    const auth = (await import('node:fs')).readFileSync('supabase/functions/_shared/teacher-auth.ts', 'utf8');
+    expect(auth).toMatch(/TIMEOUT_MS = 10_000/);
+  });
+
+  it('Auth that does not answer in time is an outage, thrown, never "nobody" and never "signed in"', async () => {
+    const h = hanging();
+    await expect(authUser(h.fetcher, URL_, 'anon', { timeoutMs: 20 })('t'.repeat(30))).rejects.toThrow('auth');
+    // A fetch that never lets go, signal or not, and an answer whose body never ends: the same.
+    const deaf = () => new Promise(() => {});
+    await expect(authUser(deaf, URL_, 'anon', { timeoutMs: 20 })('t'.repeat(30))).rejects.toThrow('auth');
+    const endless = async () =>
+      new Response(new ReadableStream({ pull: () => new Promise(() => {}) }), { status: 200 });
+    await expect(authUser(endless, URL_, 'anon', { timeoutMs: 20 })('t'.repeat(30))).rejects.toThrow('auth');
+  });
+
+  it('a Storage that ignores the signal, or whose answer never ends, still gives up at the deadline', async () => {
+    const deaf = () => new Promise(() => {});
+    const endless = async () =>
+      new Response(new ReadableStream({ pull: () => new Promise(() => {}) }), { status: 200 });
+    for (const fetcher of [deaf, endless]) {
+      const store = storageRest(fetcher, URL_, KEY, { timeoutMs: 20 });
+      for (const call of [
+        () => store.signUpload(PAGE),
+        () => store.signDownloads([PAGE], 300),
+        () => store.read(PAGE, 10),
+        () => store.overwrite(PAGE, new Uint8Array(1)),
+        () => store.remove([PAGE]),
+      ]) {
+        await expect(call()).rejects.toThrow(/^storage [a-z-]+-timeout 0$/);
+      }
+    }
+  });
+});

@@ -38,6 +38,11 @@
 // An error thrown here names the step and the status, never a path, a link
 // or a key: the handler logs only an error's class.
 //
+// Every call has a deadline, TIMEOUT_MS unless the caller gives another
+// (review L4): the request is aborted, a read's body let go, and the call
+// throws a StorageError ("<step>-timeout"). Nothing waits on a Storage
+// service that does not answer.
+//
 // No Deno imports: `fetcher` is fetch, so the tests can run it under Node.
 
 export const BUCKET = 'student-photos';
@@ -84,6 +89,27 @@ function checked(path: string): string {
   return path;
 }
 
+/** How long one call to the Storage service may take. */
+export const TIMEOUT_MS = 10_000;
+
+/* Runs one call with its own deadline. The call is given the signal (for
+   fetch, and to let a body go); whatever it is doing when the deadline
+   comes, the answer is a StorageError, never what it had so far. */
+function deadline<T>(step: string, ms: number, run: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const signal = AbortSignal.timeout(ms);
+  const late = () => new StorageError(step + '-timeout', 0);
+  let off = () => {};
+  const timedOut = new Promise<never>((_, reject) => {
+    const on = () => reject(late());
+    signal.addEventListener('abort', on, { once: true });
+    off = () => signal.removeEventListener('abort', on);
+  });
+  const done = run(signal).catch(e => {
+    throw signal.aborted ? late() : e;
+  });
+  return Promise.race([done, timedOut]).finally(off);
+}
+
 async function drop(res: Response): Promise<void> {
   try {
     if (res.body) await res.body.cancel();
@@ -92,7 +118,13 @@ async function drop(res: Response): Promise<void> {
   }
 }
 
-export function storageRest(fetcher: typeof fetch, supabaseUrl: string, serviceKey: string): Store {
+export function storageRest(
+  fetcher: typeof fetch,
+  supabaseUrl: string,
+  serviceKey: string,
+  opts: { timeoutMs?: number } = {},
+): Store {
+  const ms = opts.timeoutMs || TIMEOUT_MS;
   const api = supabaseUrl.replace(/\/+$/, '') + '/storage/v1';
   const auth = { Authorization: 'Bearer ' + serviceKey, apikey: serviceKey };
   // Every part of a path is an id, a slash or ".jpg"; nothing to encode. Checked again here.
@@ -114,24 +146,31 @@ export function storageRest(fetcher: typeof fetch, supabaseUrl: string, serviceK
 
   return {
     async signUpload(path) {
-      const res = await fetcher(`${api}/object/upload/sign/${object(path)}`, {
-        method: 'POST',
-        headers: { ...auth, 'Content-Type': 'application/json' },
-        body: '{}',
+      const url = `${api}/object/upload/sign/${object(path)}`;
+      return deadline('sign-upload', ms, async signal => {
+        const res = await fetcher(url, {
+          method: 'POST',
+          headers: { ...auth, 'Content-Type': 'application/json' },
+          body: '{}',
+          signal,
+        });
+        const said = (await json(res, 'sign-upload')) as { url?: unknown };
+        return absolute(said && said.url, 'sign-upload');
       });
-      const said = (await json(res, 'sign-upload')) as { url?: unknown };
-      return absolute(said && said.url, 'sign-upload');
     },
 
     async signDownloads(paths, seconds) {
       if (!paths.length) return {};
       paths.forEach(checked);
-      const res = await fetcher(`${api}/object/sign/${BUCKET}`, {
-        method: 'POST',
-        headers: { ...auth, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ expiresIn: seconds, paths }),
+      const said = await deadline('sign-download', ms, async signal => {
+        const res = await fetcher(`${api}/object/sign/${BUCKET}`, {
+          method: 'POST',
+          headers: { ...auth, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ expiresIn: seconds, paths }),
+          signal,
+        });
+        return json(res, 'sign-download');
       });
-      const said = await json(res, 'sign-download');
       if (!Array.isArray(said)) throw new StorageError('sign-download', 0);
       const out: Record<string, string> = {};
       for (const item of said as { path?: unknown; signedURL?: unknown; error?: unknown }[]) {
@@ -144,61 +183,73 @@ export function storageRest(fetcher: typeof fetch, supabaseUrl: string, serviceK
     },
 
     async read(path, maxBytes) {
-      const res = await fetcher(`${api}/object/authenticated/${object(path)}`, { method: 'GET', headers: auth });
-      // The Storage service answers a file that is not there with 404, or with 400 and a body saying 404.
-      if (res.status === 404 || res.status === 400) {
-        await drop(res);
-        return 'missing';
-      }
-      if (!res.ok || !res.body) {
-        await drop(res);
-        throw new StorageError('read', res.status);
-      }
-      const told = Number(res.headers.get('content-length'));
-      if (Number.isFinite(told) && told > maxBytes) {
-        await drop(res);
-        return 'too_large';
-      }
-      const reader = res.body.getReader();
-      const parts: Uint8Array[] = [];
-      let size = 0;
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        size += value.length;
-        if (size > maxBytes) {
-          await reader.cancel();
+      const url = `${api}/object/authenticated/${object(path)}`;
+      return deadline('read', ms, async (signal): Promise<Read> => {
+        const res = await fetcher(url, { method: 'GET', headers: auth, signal });
+        // The Storage service answers a file that is not there with 404, or with 400 and a body saying 404.
+        if (res.status === 404 || res.status === 400) {
+          await drop(res);
+          return 'missing';
+        }
+        if (!res.ok || !res.body) {
+          await drop(res);
+          throw new StorageError('read', res.status);
+        }
+        const told = Number(res.headers.get('content-length'));
+        if (Number.isFinite(told) && told > maxBytes) {
+          await drop(res);
           return 'too_large';
         }
-        parts.push(value);
-      }
-      const bytes = new Uint8Array(size);
-      let at = 0;
-      for (const p of parts) {
-        bytes.set(p, at);
-        at += p.length;
-      }
-      return { bytes };
+        const reader = res.body.getReader();
+        // At the deadline the body is let go; the deadline's error is the answer, never what was read so far.
+        signal.addEventListener('abort', () => reader.cancel().catch(() => {}), { once: true });
+        const parts: Uint8Array[] = [];
+        let size = 0;
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          size += value.length;
+          if (size > maxBytes) {
+            await reader.cancel();
+            return 'too_large';
+          }
+          parts.push(value);
+        }
+        const bytes = new Uint8Array(size);
+        let at = 0;
+        for (const p of parts) {
+          bytes.set(p, at);
+          at += p.length;
+        }
+        return { bytes };
+      });
     },
 
     async overwrite(path, bytes) {
-      const res = await fetcher(`${api}/object/${object(path)}`, {
-        method: 'PUT',
-        headers: { ...auth, 'Content-Type': 'image/jpeg', 'x-upsert': 'true', 'Cache-Control': 'private, no-store' },
-        body: bytes,
+      const url = `${api}/object/${object(path)}`;
+      await deadline('overwrite', ms, async signal => {
+        const res = await fetcher(url, {
+          method: 'PUT',
+          headers: { ...auth, 'Content-Type': 'image/jpeg', 'x-upsert': 'true', 'Cache-Control': 'private, no-store' },
+          body: bytes,
+          signal,
+        });
+        await json(res, 'overwrite');
       });
-      await json(res, 'overwrite');
     },
 
     async remove(paths) {
       if (!paths.length) return;
       paths.forEach(checked);
-      const res = await fetcher(`${api}/object/${BUCKET}`, {
-        method: 'DELETE',
-        headers: { ...auth, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prefixes: paths }),
+      await deadline('remove', ms, async signal => {
+        const res = await fetcher(`${api}/object/${BUCKET}`, {
+          method: 'DELETE',
+          headers: { ...auth, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prefixes: paths }),
+          signal,
+        });
+        await json(res, 'remove');
       });
-      await json(res, 'remove');
     },
   };
 }

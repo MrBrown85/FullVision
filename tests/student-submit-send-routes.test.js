@@ -82,6 +82,7 @@ function setup(extra = {}) {
             return token === TEACHER_TOKEN ? TEACHER_A : null;
           },
     log: entry => logs.push(entry),
+    defer: extra.defer,
   });
   const send = async (body, headers) => {
     const res = await handle(
@@ -1634,5 +1635,137 @@ describe('logs', () => {
         ),
       ).toBe(true);
     }
+  });
+});
+
+describe('a Storage call that does not answer in time (review L4)', () => {
+  const timeout = () => {
+    const e = new Error('storage read-timeout 0');
+    e.name = 'StorageError';
+    return e;
+  };
+  // The bucket, with one call made to time out the n-th time it is asked.
+  const flaky = (t, method, n) => {
+    const real = t.world.store[method];
+    let asked = 0;
+    t.world.store[method] = async (...args) => {
+      asked++;
+      if (asked === n) throw timeout();
+      return real(...args);
+    };
+  };
+
+  it('send-start: a plain server error; the same request again gives the links, and only one send is made', async () => {
+    const t = setup();
+    flaky(t, 'signUpload', 3);
+    const r = await t.send(startBody());
+    expect(r).toEqual({ status: 500, body: { ok: false, error: 'server' } });
+    expect(t.logs).toContainEqual(expect.objectContaining({ outcome: 'error', kind: 'StorageError' }));
+    const again = await t.send(startBody());
+    expect(again.body).toMatchObject({ ok: true, replayed: true });
+    expect(again.body.files.length).toBe(2);
+    expect(t.world.subs.size).toBe(1);
+  });
+
+  it('send-finish, reading: a plain server error, nothing handed in; the same finish again goes through', async () => {
+    const t = setup();
+    const s = await started(t);
+    flaky(t, 'read', 2);
+    expect((await t.send(finishBody(s))).status).toBe(500);
+    expect(names(t.world)).not.toContain('send_finish');
+    expect((await t.send(finishBody(s))).body).toMatchObject({ ok: true, pages: 2 });
+  });
+
+  it('send-finish, storing again: nothing handed in, every stored file still passes, and the finish again goes through', async () => {
+    const t = setup();
+    const s = await started(t);
+    flaky(t, 'overwrite', 3);
+    expect((await t.send(finishBody(s))).status).toBe(500);
+    expect(names(t.world)).not.toContain('send_finish');
+    const sub = t.world.subs.get(s.submission_id);
+    const { inspectJpeg } = await import('../supabase/functions/_shared/jpeg-check.ts');
+    for (const f of sub.files) {
+      expect(inspectJpeg(t.world.objects.get(f.path).bytes, { maxBytes: 2e6, maxSide: 4096 }).ok).toBe(true);
+      expect(inspectJpeg(t.world.objects.get(f.thumb_path).bytes, { maxBytes: 2e6, maxSide: 400 }).ok).toBe(true);
+    }
+    const r = await t.send(finishBody(s));
+    expect(r.body).toMatchObject({ ok: true, pages: 2 });
+    const [, params] = t.world.calls.find(c => c[0] === 'send_finish');
+    JSON.parse(params[3]).forEach((h, i) => expect(h.sha256).toBe(sha(t.world.objects.get(sub.files[i].path).bytes)));
+  });
+
+  it('file-links: a plain server error, no link', async () => {
+    const t = setup();
+    const s = await started(t);
+    await t.send(finishBody(s));
+    flaky(t, 'signDownloads', 1);
+    const r = await t.send({ route: 'file-links', session: CECE_PHONE, enrollment_id: CECE, assessment_id: LAB });
+    expect(r).toEqual({ status: 500, body: { ok: false, error: 'server' } });
+  });
+
+  it('the worker: logged, never in the answer, nothing reported done, and the next run takes the queue', async () => {
+    const t = setup();
+    const s = await started(t);
+    await t.send(finishBody(s));
+    flaky(t, 'remove', 1);
+    const unsend = { route: 'unsend', session: CECE_PHONE, enrollment_id: CECE, assessment_id: LAB };
+    expect((await t.send(unsend)).body).toMatchObject({ ok: true, unsent: true });
+    expect(t.logs).toContainEqual(expect.objectContaining({ route: 'unsend', worker: 'error', kind: 'StorageError' }));
+    expect(t.world.queue.length).toBe(4);
+    expect(t.world.queue.every(q => !q.done)).toBe(true);
+    await t.send(unsend);
+    expect(t.world.queue.every(q => q.done)).toBe(true);
+  });
+});
+
+describe('the worker runs after the answer where the runtime allows it (review L4)', () => {
+  it('with EdgeRuntime.waitUntil: the answer does not wait for the worker, and the runtime is handed it', async () => {
+    const later = [];
+    const t = setup({ defer: p => later.push(p) });
+    const s = await started(t);
+    await t.send(finishBody(s));
+    await Promise.all(later.splice(0));
+    // Storage's queue is slow now: the worker waits on it.
+    let release;
+    const gate = new Promise(r => (release = r));
+    t.world.override.removal_batch = async (params, fns) => (await gate, fns.removal_batch(params));
+    const unsend = t.send({ route: 'unsend', session: CECE_PHONE, enrollment_id: CECE, assessment_id: LAB });
+    const first = await Promise.race([unsend, new Promise(r => setTimeout(() => r('waited'), 200))]);
+    expect(first).not.toBe('waited');
+    expect(first.body).toMatchObject({ ok: true, unsent: true });
+    expect(later.length).toBe(1);
+    expect(t.world.queue.some(q => !q.done)).toBe(true);
+    release();
+    await Promise.all(later);
+    expect(t.world.queue.every(q => q.done)).toBe(true);
+  });
+
+  it('without it, the worker runs before the answer, as before', async () => {
+    const t = setup();
+    const s = await started(t);
+    await t.send(finishBody(s));
+    let release;
+    const gate = new Promise(r => (release = r));
+    t.world.override.removal_batch = async (params, fns) => (await gate, fns.removal_batch(params));
+    const unsend = t.send({ route: 'unsend', session: CECE_PHONE, enrollment_id: CECE, assessment_id: LAB });
+    expect(await Promise.race([unsend, new Promise(r => setTimeout(() => r('waited'), 100))])).toBe('waited');
+    release();
+    expect((await unsend).body).toMatchObject({ ok: true, unsent: true });
+    expect(t.world.queue.every(q => q.done)).toBe(true);
+  });
+
+  it('sweep is the worker itself: it runs before sweep answers', async () => {
+    const later = [];
+    const t = setup({ defer: p => later.push(p) });
+    await t.send({ route: 'sweep', access_token: TEACHER_TOKEN });
+    expect(names(t.world)).toContain('removal_batch');
+    expect(later).toEqual([]);
+  });
+
+  it('index.ts hands the worker to EdgeRuntime.waitUntil when there is one', async () => {
+    const src = (await import('node:fs')).readFileSync('supabase/functions/student-submit/index.ts', 'utf8');
+    expect(src).toMatch(/EdgeRuntime/);
+    expect(src).toMatch(/waitUntil/);
+    expect(src).toMatch(/defer:/);
   });
 });

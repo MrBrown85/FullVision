@@ -16,7 +16,10 @@
 // service key that Supabase gives every function (SUPABASE_SERVICE_ROLE_KEY).
 // `sweep` asks Supabase Auth whose a teacher's sign-in token is, with the
 // project's public key (SUPABASE_ANON_KEY), as teacher-cards does. Without
-// either, only the routes that need it answer a server error.
+// either, only the routes that need it answer a server error. Every call
+// to Storage or Auth gives up after 10 seconds. The removal worker that
+// follows a phone's route runs after the answer is sent, through
+// EdgeRuntime.waitUntil, where the runtime has it; otherwise before it.
 import postgres from 'https://deno.land/x/postgresjs@v3.4.5/mod.js';
 import { loadCardKey } from '../_shared/card-key.ts';
 import { storageRest } from '../_shared/storage-rest.ts';
@@ -35,11 +38,15 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL');
 const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
 
+const edge = (globalThis as { EdgeRuntime?: { waitUntil?: (work: Promise<unknown>) => void } }).EdgeRuntime;
+const waitUntil = edge && typeof edge.waitUntil === 'function' ? edge.waitUntil.bind(edge) : null;
+
 const handle = makeHandler({
   region: Deno.env.get('SB_REGION'),
   cardKey,
   store: supabaseUrl && serviceKey ? storageRest(fetch, supabaseUrl, serviceKey) : null,
   whoIs: supabaseUrl && anonKey ? authUser(fetch, supabaseUrl, anonKey) : null,
+  defer: waitUntil ? (work: Promise<void>) => waitUntil(work) : null,
   // A secret only this function holds; rotating it just resets the rate
   // limit windows.
   ipKey: Deno.env.get('STUDENT_SUBMIT_IP_KEY') || Deno.env.get('SUPABASE_DB_URL')!,

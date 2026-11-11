@@ -65,6 +65,9 @@ export type SendOptions = {
   whoIs: ((token: string) => Promise<string | null>) | null;
   log: (entry: Record<string, unknown>) => void;
   now: () => number;
+  // Runs the removal worker after the answer is sent, where the runtime allows it (EdgeRuntime.waitUntil).
+  // Absent: the worker runs before the answer, as it must then to run at all.
+  defer?: ((work: Promise<void>) => void) | null;
 };
 
 export type SendAnswer = { status: number; body: Json };
@@ -409,7 +412,13 @@ export function makeSendRoutes(opts: SendOptions) {
     }
   }
 
-  const after = (route: string) => worker(route, WORKER_AFTER_ROUTE);
+  /* The worker after a phone's route (the contract, 5). It never throws (a
+     failure is logged), so the answer is the same either way. */
+  const after = async (route: string): Promise<void> => {
+    const run = worker(route, WORKER_AFTER_ROUTE);
+    if (opts.defer) opts.defer(run);
+    else await run;
+  };
 
   async function start(route: 'send-start' | 'replace', body: Json, hash: string): Promise<SendAnswer> {
     const asked = readStart(body);
