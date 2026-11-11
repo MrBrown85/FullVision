@@ -85,6 +85,7 @@ describe('All Assignments: N Things Since You Last Looked', () => {
       'verify',
       'page',
       'work',
+      'forms',
     ]);
   });
 

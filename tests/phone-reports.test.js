@@ -7,6 +7,7 @@
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { signedIn, slipsFetch } from './helpers/teacher-cards-slips-fetch.js';
 import { parseHTML } from 'linkedom';
 
 const CID = 'course-pr';
@@ -167,13 +168,20 @@ describe('phone report v2 dispatch', () => {
     ]);
     await window.v2.updatePhoneReport(RID, [{ enrollment_id: ENR, data: { v: 1 } }]);
     await window.v2.closePhoneReport(RID);
-    const codes = await window.v2.issueReportCodes(RID, [ENR, 'local-id']);
-    expect(calls.map(c => c.name)).toEqual([
-      'create_phone_report',
-      'update_phone_report',
-      'close_phone_report',
-      'issue_report_codes',
-    ]);
+    // Since plan S3-S1 report slips are made by teacher-cards, not an RPC.
+    const fake = slipsFetch();
+    const rpc = getSupabase().rpc;
+    globalThis.getSupabase = () => signedIn({ rpc });
+    let codes;
+    try {
+      codes = await window.v2.issueReportCodes(RID, [ENR, 'local-id']);
+      expect(fake.bodies.map(b => b.body)).toMatchObject([
+        { route: 'slips', kind: 'report', id: RID, enrollment_ids: [ENR] },
+      ]);
+    } finally {
+      fake.restore();
+    }
+    expect(calls.map(c => c.name)).toEqual(['create_phone_report', 'update_phone_report', 'close_phone_report']);
     expect(calls[0].payload).toMatchObject({
       p_course_id: COURSE,
       p_term: 1,
@@ -181,7 +189,6 @@ describe('phone report v2 dispatch', () => {
       p_expires_on: '2027-01-31',
       p_students: [{ enrollment_id: ENR, data: { v: 1 } }],
     });
-    expect(calls[3].payload.p_enrollment_ids).toEqual([ENR]);
     calls.forEach(c => expect(c.payload.p_idempotency_key).toBeTruthy());
     expect(codes.data).toEqual([{ enrollment_id: ENR, code: 'K7M-4QX' }]);
     expect(localStorage.getItem('fv-outbox') || '').not.toContain('phone_report');

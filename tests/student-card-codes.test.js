@@ -92,7 +92,7 @@ describe('an eight-character card opens the student’s page', () => {
   it('scanned: card, verify and page are asked with the eight characters', async () => {
     const dev = school();
     const page = await signIn(dev, '#k7m4-qx2p');
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work']);
+    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'forms']);
     expect(page.calls[0].body).toEqual({ route: 'card', code: CARD });
     expect(page.calls[1].body).toMatchObject({ route: 'verify', code: CARD });
     expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');

@@ -52,8 +52,11 @@
     if (!state || !state.page || !state.reply) return null;
     if (typeof StudentView === 'undefined' || !StudentView || typeof StudentView.fromPage !== 'function') return null;
     var reply = gradesAreIn() ? state.reply : withoutGrades(state.reply);
-    // Demo Mode's samples for Questionnaires and My Reports, which the server's page does not send yet (S4-F4).
-    if (state.demo && StudentPage.demoForms) reply = Object.assign({}, reply, StudentPage.demoForms());
+    // Questionnaires and My Reports (S4-F4): Demo Mode's samples, or what a real card's `forms` answered (app.js).
+    var forms = state.demo
+      ? StudentPage.demoForms && StudentPage.demoForms()
+      : StudentPage.formsOf && StudentPage.formsOf(state);
+    if (forms) reply = Object.assign({}, reply, forms);
     try {
       // What the class takes and what is in (s/send.js; Demo Mode's until the `work` route exists).
       var work = typeof StudentPage.workOf === 'function' ? StudentPage.workOf(state) : null;

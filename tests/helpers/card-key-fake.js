@@ -30,6 +30,9 @@ export const bare = code =>
 export const codeTag = (code, key) => hmac('fv.card.code.v1\n' + bare(code), key);
 export const passwordTag = (code, digits, key) => hmac('fv.card.pass.v1\n' + bare(code) + '\n' + digits, key);
 export const keyId = key => hmac('fv.card.keyid.v1', key).slice(0, 8);
+// A slip's (plan S3-S1): the same key, labels of their own.
+export const slipCodeTag = (code, key) => hmac('fv.slip.code.v1\n' + bare(code), key);
+export const slipPasswordTag = (code, digits, key) => hmac('fv.slip.pass.v1\n' + bare(code) + '\n' + bare(digits), key);
 
 /** A random source for drawCode and drawPassword that hands out the given bytes in order, then stops. */
 export function bytesFrom(list) {

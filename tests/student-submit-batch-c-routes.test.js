@@ -982,12 +982,25 @@ describe('answer-seen', () => {
     expect(t.world.calls[0][1].slice(0, 3)).toEqual([CECE_PHONE, CECE, `{${LAB},${ESSAY}}`]);
   });
 
-  it('an empty list is answered here, and the database (and the class lock) is not asked', async () => {
+  it('an empty list is bad_request (Batch E, E6), and the database is not asked', async () => {
     for (const session of [CECE_PHONE, LOCKED_PHONE, ENDED]) {
       const t = setup();
       const r = await t.send({ ...ROUTES['answer-seen'], session, assessment_ids: [] });
-      expect(r).toEqual({ status: 200, body: { ok: true, seen: 0 } });
+      expect(r).toEqual({ status: 400, body: { ok: false, error: 'bad_request' } });
       expect(t.world.calls).toEqual([]);
+    }
+  });
+
+  it('too_many (E6) is passed on with its wait, on answer-seen, reflect and reply', async () => {
+    for (const [route, name] of [
+      ['answer-seen', 'answerSeen'],
+      ['reflect', 'reflect'],
+      ['reply', 'reply'],
+    ]) {
+      const t = setup({
+        answer: { [name]: () => ({ ok: false, error: 'too_many', retry_after_s: 1800, card_id: 'x' }) },
+      });
+      expect((await t.send(ROUTES[route])).body, route).toEqual({ ok: false, error: 'too_many', retry_after_s: 1800 });
     }
   });
 
@@ -1304,7 +1317,7 @@ describe('revise-unsend', () => {
 });
 
 describe('group-links', () => {
-  it("makes 300-second links for the group's pages, says which are mine, and sends no path or id of a student", async () => {
+  it("makes 60-second links (E8) for the group's pages, says which are mine, and sends no path or id of a student", async () => {
     const t = setup();
     const mine = t.bc.seedSent(CECE, LAB);
     const theirs = t.bc.seedSent(OMAR, LAB, 1, 2);
@@ -1320,7 +1333,7 @@ describe('group-links', () => {
     );
     const signed = t.world.storeCalls.filter(c => c[0] === 'signDownloads');
     expect(signed).toHaveLength(1);
-    expect(signed[0][2]).toBe(300);
+    expect(signed[0][2]).toBe(60);
     expect(JSON.stringify(r.body)).not.toContain('enrollment_id');
     expect(JSON.stringify(r.body)).not.toContain('"path"');
   });

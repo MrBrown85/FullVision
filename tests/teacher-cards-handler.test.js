@@ -1004,9 +1004,15 @@ describe('teacher-cards: where the key, Auth and the database come from (index.t
     expect(code).not.toMatch(/SERVICE_ROLE/);
   });
 
-  it('runs one statement: issue_cards, with every value a parameter', () => {
+  it('runs one statement for cards: issue_cards, and two for slips (plan S3-S1), with every value a parameter', () => {
     const statements = code.match(/sql`[^`]*`/g);
-    expect(statements).toHaveLength(1);
+    expect(statements).toHaveLength(3);
+    expect(statements[1].replace(/\s+/g, ' ')).toBe(
+      'sql` select student_submit.slip_roster(${teacherId}::uuid, ${kind}::text, ${targetId}::uuid) as r`',
+    );
+    expect(statements[2].replace(/\s+/g, ' ')).toBe(
+      'sql` select student_submit.issue_slips( ${teacherId}::uuid, ${kind}::text, ${targetId}::uuid, ${sql.json(items)}::jsonb, ${keyId}::text, ${requestId}::uuid) as r`',
+    );
     const text = statements[0].replace(/\s+/g, ' ');
     expect(text).toBe(
       'sql` select student_submit.issue_cards( ${teacherId}::uuid, ${courseId}::uuid, ${sql.json(items)}::jsonb, ${keyId}::text, ${requestId}::uuid) as r`',

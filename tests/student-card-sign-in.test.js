@@ -202,6 +202,8 @@ describe('Switching Classes: Your Classes', () => {
       { route: 'page', session: token, enrollment_id: CECE },
       // What the class takes (s/send.js), once its page is in.
       { route: 'work', session: token, enrollment_id: CECE },
+      // Its questionnaires and phone reports (S4-F4).
+      { route: 'forms', session: token, enrollment_id: CECE },
     ]);
     expect(head(page)).toBe('Science 8 · Block B');
     expect(JSON.parse(dev.store[KEY])).toMatchObject({ t: token, e: CECE });

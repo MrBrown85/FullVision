@@ -6,11 +6,12 @@ session can reach another student, and whether each refusal (withdrawn, in
 the trash, page off, session expired, card past its date, reissued, locked)
 holds on every route.
 
-Three checks marked KNOWN record what the SQL does today and is owed a change
-in the next migration batch (review of PR 1138, S3 and S4): a piece the
-teacher re-dates into the future after returning it is still served by
-markup and group_file_links, and an Excused group-mate's marks still reach
-the group. When that batch lands, those three checks fail: turn them round.
+It runs on the database as it is after Batch D and Batch E (2026111140,
+2026111150). Three checks were KNOWN gaps of the review (S3 and S4) until
+Batch E closed them, and now check the fix: a piece the teacher re-dates
+into the future after returning it is not served by markup or
+group_file_links, and an Excused group-mate's marks do not reach the
+group.
 
 Run it on a throwaway PostgreSQL 17 built by batch_c_common.py, never against
 gradebook-prod (see README.md, and the top of batch_c_common.py):
@@ -38,6 +39,8 @@ def edge(d, sql, *params):
 name, why = applied_template(with_c2=True); assert name, why
 d = CDb('routes1138', template=name)
 assert d.file('../2026111130_student_send_rules.sql') == 'ok'
+for _rel in ('photo-lifecycle-stand-in.sql', '../2026111140_photo_lifecycle.sql', '../2026111150_student_page_last_changes.sql'):
+    assert d.file(_rel) == 'ok', _rel
 k = seed(d); lab = k['lab']
 t1 = d.session(ENR1); t2 = d.session(ENR2, birthday='2012-06-16')
 
@@ -150,9 +153,9 @@ d.run("update assessment set date_assigned = current_date + 30 where id = :a", a
 f = edge(d, FB['feedback'], t1, ENR1)
 ok('hidden piece: feedback leaves it out', all(x['id'] != lab for x in f['assessments']), f)
 m = edge(d, FB['markup'], t1, ENR1, lab)
-ok('KNOWN (S3, next migration batch): a hidden piece\'s marks are still given by markup', len(m.get('files', [])) > 0, m)
+ok('Batch E (S3): a hidden piece\'s marks are not given by markup', m == {'ok': False, 'error': 'not_found'}, m)
 g = edge(d, RV['groupFileLinks'], t1, ENR1, lab)
-ok('KNOWN (S3, next migration batch): a hidden piece\'s pages are still named by group_file_links', len(g.get('files', [])) > 0, g)
+ok('Batch E (S3): a hidden piece\'s pages are not named by group_file_links', g.get('ok') and g['files'] == [], g)
 d.run("update assessment set date_assigned = null where id = :a", a=lab)
 
 # 5. Group: Cece and Stu2 a group; a third student outside it.
@@ -173,7 +176,7 @@ ok('group: the outsider gets none of the group\'s pages or marks', g3['files'] =
 # Stu2 Excused: do Stu2's marks still reach Cece?
 d.run("insert into score (enrollment_id, assessment_id, status) values (:e, :a, 'EXC') on conflict (enrollment_id, assessment_id) do update set status = 'EXC'", e=ENR2, a=lab)
 m = edge(d, FB['markup'], t1, ENR1, lab)
-ok("KNOWN (S4, next migration batch): Stu2 Excused, Cece still sees Stu2's marks (note)", 'For Stu2 only' in allstr(m), m)
+ok("Batch E (S4): Stu2 Excused, Cece no longer sees Stu2's marks (note), and still sees her own", 'For Stu2 only' not in allstr(m) and 'For Cece only' in allstr(m), m)
 d.close()
 admin('drop database if exists "%s" with (force)' % name)
 finish()

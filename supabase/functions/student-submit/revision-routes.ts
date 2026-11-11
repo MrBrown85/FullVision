@@ -18,7 +18,7 @@
 //   {route: 'revise-unsend', session, enrollment_id, assessment_id}
 //        -> student_submit.revision_unsend; then the worker.
 //   {route: 'group-links', session, enrollment_id, assessment_id}
-//        -> student_submit.group_file_links; then a 300-second link for
+//        -> student_submit.group_file_links; then a 60-second link for
 //           each path it named.
 //
 // Every rule send-routes.ts keeps, this file keeps, with send-routes.ts's
@@ -106,6 +106,8 @@ const ERRORS = {
     'cannot_change',
     'missing_pages',
     'bad_file',
+    // E6: twenty finishes an hour for a card (send_paths counts them).
+    'too_many',
   ],
   'revise-unsend': [...CHANGE_ERRORS, 'grading_started', 'cannot_change'],
   'group-links': SESSION_ERRORS,
@@ -265,7 +267,7 @@ export function makeRevisionRoutes(opts: RevisionOptions) {
   }
 
   /* group-links: every handed-in page of the group's work for one piece, as
-     links that live 300 seconds (the student's own only, for a piece that
+     links that live 60 seconds (the student's own only, for a piece that
      is not group work). Each file is checked before any link is made: a
      page and its thumbnail in the bucket's layout, in the same folder, in
      this piece, named for its file id, and in the same class as every

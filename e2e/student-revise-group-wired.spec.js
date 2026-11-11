@@ -152,7 +152,7 @@ test('a real card sends a revision through the revise routes and sees its group 
   await fits(page);
 
   const sent = posts.map(p => p.body.route).filter(r => r !== 'seen');
-  expect(sent.slice(0, 7)).toEqual(['card', 'verify', 'page', 'work', 'feedback', 'group-work', 'file-links']);
+  expect(sent.slice(0, 8)).toEqual(['card', 'verify', 'page', 'work', 'forms', 'feedback', 'group-work', 'file-links']);
   expect(sent).toContain('revise-start');
   expect(sent).toContain('revise-finish');
   expect(sent).not.toContain('send-start');
