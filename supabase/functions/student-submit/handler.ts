@@ -11,12 +11,14 @@
 // The SQL functions (migrations/20261025_student_submit.sql, and
 // migrations/2026110904_student_sessions_page.sql for a card) hold every
 // rule; this file only checks the request's shape, refuses to run outside
-// ca-central-1, turns the caller's IP into a keyed hash, and answers with
-// what the database said.
+// ca-central-1, turns the caller's IP into a keyed hash, turns a card's
+// code into its tag (the database cannot read a card's code), and answers
+// with what the database said.
 //
 // Kept free of Deno and database imports so the tests run it under Node
 // with stand-in database calls. index.ts wires the real ones.
-import { CARD_ROUTES, cardReply, type Param } from './card-routes.ts';
+import type { CardKey } from '../_shared/card-key.ts';
+import { CARD_ROUTES, cardParams, cardReply, type Param } from './card-routes.ts';
 
 export type Db = {
   open: (code: string, ipHash: string) => Promise<Record<string, unknown>>;
@@ -34,6 +36,9 @@ export type Options = {
   db: Db;
   region: string | undefined; // SB_REGION
   ipKey: string; // HMAC key for IP hashes
+  // STUDENT_CARD_KEY as readCardKey gives it: null or absent when it is missing or malformed. Only card, a
+  // card's verify and add-card use it. Without it they answer a server error and every other route carries on.
+  cardKey?: CardKey | null;
   log?: (entry: Record<string, unknown>) => void;
 };
 
@@ -225,9 +230,17 @@ export function makeHandler(opts: Options) {
     try {
       const hash = await ipHash(req, opts.ipKey);
       if (card) {
-        const params = card.params(body, identity(body));
-        if (!params) return reply(400, { ok: false, error: 'bad_request' }, origin);
-        result = cardReply(card, await opts.db.call(card.sql, [...params, hash]));
+        const params = await cardParams(card, body, identity(body), opts.cardKey || null);
+        if (params === 'bad_request') return reply(400, { ok: false, error: 'bad_request' }, origin);
+        if (params === 'no_key') {
+          log({ route, outcome: 'no_card_key', ms: Date.now() - started });
+          return reply(500, { ok: false, error: 'server' }, origin);
+        }
+        // Not a card's code: answered here as an unknown card is, and the database is not asked.
+        result =
+          params === 'not_a_card'
+            ? { ok: false, error: 'not_found' }
+            : cardReply(card, await opts.db.call(card.sql, [...params, hash]));
       } else if (route === 'open') {
         if (typeof body.code !== 'string' || body.code.length > 32) {
           return reply(400, { ok: false, error: 'bad_request' }, origin);
@@ -263,8 +276,8 @@ export function makeHandler(opts: Options) {
       return reply(500, { ok: false, error: 'server' }, origin);
     }
 
-    // Route, outcome and time. Never the code, token, session token,
-    // birthday, student number, password, answers or name.
+    // Route, outcome and time. Never the code, its tag, the key, a token,
+    // session token, birthday, student number, password, answers or name.
     log({
       route,
       outcome: result && result.ok ? 'ok' : (result && result.error) || 'unknown',

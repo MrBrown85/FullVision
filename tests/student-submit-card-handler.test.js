@@ -10,13 +10,26 @@
  * asked for and never logged, and a reply is copied field by field, so a
  * draft the database sent by mistake stops here.
  *
+ * Since S3-E1 the database cannot read a card's code: card, verify and
+ * add-card hand it a tag of the code, made with the card key. What that
+ * adds (the tag and never the code, no key, a code that is no card's) is in
+ * tests/student-submit-card-key.test.js. Here the stand-in database knows
+ * the card by its tag, worked out a second way (tests/helpers/card-key-fake.js).
+ *
  * The four slip routes are in tests/student-submit-handler.test.js.
  */
 import { describe, expect, it } from 'vitest';
+import { readCardKey } from '../supabase/functions/_shared/card-key.ts';
 import { makeHandler } from '../supabase/functions/student-submit/handler.ts';
 import { CARD_ROUTES } from '../supabase/functions/student-submit/card-routes.ts';
+import { FAKE_KEY, codeTag, keyId, passwordTag } from './helpers/card-key-fake.js';
 
-const CODE = 'P3R-8WD';
+const CODE = 'P3R8-WD4K'; // a card's code: eight characters
+const CODE_TAG = codeTag(CODE); // what the database is handed in its place
+const KEY = await readCardKey(FAKE_KEY);
+const KEY_ID = keyId();
+const pwTag = digits => passwordTag(CODE, digits);
+const GUESS = 'ZZZZ-ZZZZ'; // card-shaped, and nobody's
 const SLIP = 'K7M-4QX'; // a live questionnaire slip's code, typed where a card goes
 const SESSION = 'a'.repeat(64); // this phone, signed in to Cece's Science 8
 const OTHER_DEVICE = 'b'.repeat(64); // another phone, signed in to another student
@@ -174,11 +187,12 @@ function setup(answers, overrides) {
     !sessions[token] ? 'signed_out' : sessions[token].includes(enrollment) ? null : 'not_found';
   const sql = Object.assign(
     {
-      card: code => (code === CODE ? clone(CARD_OK) : { ok: false, error: 'not_found' }),
+      // The database knows a card by the tag of its code, and its password by a tag. It is handed neither as typed.
+      card: tag => (tag === CODE_TAG ? clone(CARD_OK) : { ok: false, error: 'not_found' }),
       // `add` is p_add, read from the statement: it is not a parameter.
-      verify_card(code, birthday, number, password, session, hash, add) {
-        if (code !== CODE) return { ok: false, error: 'not_found' };
-        if (birthday !== '2012-05-15' && number !== '0123456' && password !== '4821') {
+      verify_card(tag, key, birthday, number, password, session, hash, add) {
+        if (tag !== CODE_TAG) return { ok: false, error: 'not_found' };
+        if (birthday !== '2012-05-15' && number !== '0123456' && password !== pwTag('4821')) {
           return { ok: false, error: 'wrong_identity', tries_left: 4 };
         }
         // From the start screen: whoever was signed in on the device is signed out.
@@ -215,6 +229,7 @@ function setup(answers, overrides) {
       {
         region: 'ca-central-1',
         ipKey: 'test-key',
+        cardKey: KEY,
         log: entry => logs.push(entry),
         db: {
           open: untouched('open'),
@@ -275,8 +290,9 @@ describe('student-submit: the card route', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual(CARD_OK);
     expect(calls).toHaveLength(1);
-    expect(calls[0].sql).toBe('select student_submit.card($1::text, $2::text) as r');
-    expect(calls[0].params).toEqual([CODE, expect.stringMatching(/^[0-9a-f]{64}$/)]);
+    // The code's tag, the key id and the hashed address.
+    expect(calls[0].sql).toBe('select student_submit.card($1::text, $2::text, $3::text) as r');
+    expect(calls[0].params).toEqual([CODE_TAG, KEY_ID, expect.stringMatching(/^[0-9a-f]{64}$/)]);
     expect(res.headers.get('access-control-allow-origin')).toBe('https://fullvision.ca');
     expect(res.headers.get('cache-control')).toBe('no-store');
   });
@@ -305,22 +321,25 @@ describe('student-submit: the card route', () => {
 
   it("answers a slip's code as not_found, like any guess, and says nothing about slips", async () => {
     const { handle, calls, logs, slip } = setup();
-    const guess = await (await handle(post({ route: 'card', code: 'ZZZ-ZZZ' }))).json();
+    const guess = await (await handle(post({ route: 'card', code: GUESS }))).json();
     const res = await handle(post({ route: 'card', code: SLIP }));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual(guess);
     expect(guess).toEqual({ ok: false, error: 'not_found' });
     expect(logs.map(l => l.outcome)).toEqual(['not_found', 'not_found']);
-    // The function does not try open itself: one statement each, and open is the page's next request.
-    expect(calls).toHaveLength(2);
+    // The guess is card-shaped: the database is asked, and counts it. A slip's code is six characters, so it is
+    // no card's: the database is not asked, and a slip scanned here counts toward no limit.
+    expect(calls).toHaveLength(1);
+    expect(calls[0].params[0]).toBe(codeTag(GUESS));
+    // The function does not try open itself: open is the page's next request.
     expect(slip).toEqual([]);
 
     // Whatever else the database put beside the refusal stays behind.
     const dirty = setup({ card: () => ({ ok: false, error: 'not_found', kind: 'slip', questionnaire_id: QUIZ }) });
-    expect(await (await dirty.handle(post({ route: 'card', code: SLIP }))).json()).toEqual(guess);
+    expect(await (await dirty.handle(post({ route: 'card', code: GUESS }))).json()).toEqual(guess);
   });
 
-  it.each(['not_found', 'closed', 'card_locked', 'card_expired', 'reprint', 'locked'])(
+  it.each(['not_found', 'card_stopped', 'closed', 'card_locked', 'card_expired', 'reprint', 'locked'])(
     'answers %s as the database said it, with nothing else',
     async error => {
       const { handle, logs } = setup({ card: () => ({ ok: false, error, card_id: CHECK, course_id: RUBRIC }) });
@@ -331,29 +350,25 @@ describe('student-submit: the card route', () => {
     },
   );
 
-  it('answers a locked card, an expired card and a class with the page off the way it answers a guess', async () => {
+  it('answers a replaced, locked or expired card and a class with the page off the way it answers a guess', async () => {
     const answer = async (code, reply) => {
       const { handle } = setup(reply && { card: () => reply });
       const res = await handle(post({ route: 'card', code }));
       const body = await res.json();
       return { status: res.status, keys: Object.keys(body), ok: body.ok, headers: [...res.headers.keys()].sort() };
     };
-    const guess = await answer('ZZZ-ZZZ');
+    const guess = await answer(GUESS);
     expect(guess).toMatchObject({ status: 200, keys: ['ok', 'error'], ok: false });
-    for (const error of ['card_locked', 'card_expired', 'closed', 'reprint']) {
+    // And a code that is no card's, answered without the database.
+    expect(await answer(SLIP)).toEqual(guess);
+    for (const error of ['card_stopped', 'card_locked', 'card_expired', 'closed', 'reprint']) {
       expect(await answer(CODE, { ok: false, error, student: { first_name: 'Cece' } }), error).toEqual(guess);
     }
   });
 
   it('answers a code it does not know as not_found, and logs it as that', async () => {
     // busy is a slip's: there is no everyone-is-busy stop on a card's routes.
-    for (const error of [
-      'busy',
-      'card_stopped',
-      'no_identity',
-      'ambiguous',
-      'relation "student_card" does not exist',
-    ]) {
+    for (const error of ['busy', 'signed_out', 'no_identity', 'ambiguous', 'relation "student_card" does not exist']) {
       const { handle, logs } = setup({ card: () => ({ ok: false, error }) });
       const res = await handle(post(GOOD.card));
       expect(res.status, error).toBe(200);
@@ -391,10 +406,11 @@ describe('student-submit: verify for a card', () => {
     expect(await res.json()).toEqual(ok);
 
     for (const c of calls) expect(c.sql).toBe(VERIFY);
+    // The code's tag, the key id, the birthday, the number, the typed password's tag, the session, the address.
     expect(calls.map(c => c.params)).toEqual([
-      [CODE, '2012-05-15', null, null, null, hash],
-      [CODE, null, '0123456', null, null, hash],
-      [CODE, null, null, '4821', null, hash],
+      [CODE_TAG, KEY_ID, '2012-05-15', null, null, null, hash],
+      [CODE_TAG, KEY_ID, null, '0123456', null, null, hash],
+      [CODE_TAG, KEY_ID, null, null, pwTag('4821'), null, hash],
     ]);
     // The slip's verify is a different function and is not called.
     expect(slip).toEqual([]);
@@ -413,7 +429,7 @@ describe('student-submit: verify for a card', () => {
     });
     expect(calls[0].sql).toBe(VERIFY);
     // The token is sent, so the database can end that session.
-    expect(calls[0].params[4]).toBe(OTHER_DEVICE);
+    expect(calls[0].params[5]).toBe(OTHER_DEVICE);
     const old = await handle(post({ route: 'page', session: OTHER_DEVICE, enrollment_id: OMAR }));
     expect(await old.json()).toEqual({ ok: false, error: 'signed_out' });
     const fresh = await handle(post({ route: 'page', session: NEW_SESSION, enrollment_id: CECE }));
@@ -440,8 +456,9 @@ describe('student-submit: verify for a card', () => {
       expect(calls).toHaveLength(1);
       expect(calls[0].sql).toBe(VERIFY);
       expect(calls[0].sql).toMatch(/, p_add => false\) as r$/);
-      // Six parameters: the code, what was typed, the token and the hashed address. p_add is not one.
-      expect(calls[0].params).toHaveLength(6);
+      // Seven parameters: the code's tag, the key id, what was typed, the token and the hashed address.
+      // p_add is not one.
+      expect(calls[0].params).toHaveLength(7);
       expect(calls[0].params).not.toContain(true);
     }
   });
@@ -511,7 +528,7 @@ describe('student-submit: verify for a card', () => {
     expect(await (await handle(post(wrong))).json()).toEqual({ ok: false, error: 'card_locked' });
   });
 
-  it.each(['not_found', 'closed', 'card_locked', 'card_expired', 'reprint', 'locked'])(
+  it.each(['not_found', 'card_stopped', 'closed', 'card_locked', 'card_expired', 'reprint', 'locked'])(
     'answers %s as the database said it, with nothing else',
     async error => {
       const { handle } = setup({ verify_card: () => ({ ok: false, error, tries_left: 2, card_id: CHECK }) });
@@ -522,16 +539,18 @@ describe('student-submit: verify for a card', () => {
   );
 
   it('answers a code it does not know as not_found', async () => {
-    for (const error of ['card_stopped', 'busy', 'slip']) {
+    for (const error of ['signed_out', 'busy', 'slip']) {
       const { handle } = setup({ verify_card: () => ({ ok: false, error }) });
       expect(await (await handle(post(GOOD.verify))).json(), error).toEqual({ ok: false, error: 'not_found' });
     }
   });
 
   it("answers a slip's code as not_found: only a card is verified here", async () => {
-    const { handle } = setup();
+    const { handle, calls } = setup();
     const res = await handle(post({ route: 'verify', code: SLIP, birthday: '2012-05-15' }));
     expect(await res.json()).toEqual({ ok: false, error: 'not_found' });
+    // Six characters is no card's: the database is not asked, and no try is counted against anything.
+    expect(calls).toEqual([]);
   });
 
   it("still passes busy on from a slip's open", async () => {
@@ -596,7 +615,8 @@ describe('student-submit: add-card', () => {
     expect(calls[0].sql).toBe(ADD_CARD);
     expect(calls[0].sql).toMatch(/, p_add => true\) as r$/);
     expect(calls[0].params).toEqual([
-      CODE,
+      CODE_TAG,
+      KEY_ID,
       null,
       '0123456',
       null,
@@ -611,7 +631,7 @@ describe('student-submit: add-card', () => {
 
   it('differs from verify only in p_add, which neither takes from the request', () => {
     expect(VERIFY).toBe(
-      'select student_submit.verify_card($1::text, $2::text, $3::text, $4::text, $5::text, $6::text, p_add => false) as r',
+      'select student_submit.verify_card($1::text, $2::text, $3::text, $4::text, $5::text, $6::text, $7::text, p_add => false) as r',
     );
     expect(ADD_CARD).toBe(VERIFY.replace('p_add => false', 'p_add => true'));
     expect(CARD_ROUTES.verify.sql).toBe(VERIFY);
@@ -993,6 +1013,13 @@ describe('student-submit: every card route', () => {
     for (const secret of [
       CODE,
       'P3R',
+      'WD4K',
+      CODE_TAG,
+      CODE_TAG.slice(0, 12),
+      pwTag('4821'),
+      FAKE_KEY,
+      FAKE_KEY.slice(0, 12),
+      KEY_ID,
       SESSION,
       NEW_SESSION,
       OTHER_DEVICE,

@@ -125,14 +125,19 @@ A guard test fails if any file but `shared/grader.js` calls the score writers in
 
 ### 1.5 Student cards and sessions
 
-- **`student_card`** (public schema, the teacher's own rows): one live card per enrollment. It holds the code's hash and salt, when it was made, printed, last opened, locked and stopped, the wrong-try count, and the date it works until. The identity check is today's: birthday or student number, or `student.slip_password` when neither is on file. Five wrong tries lock it.
-- **Teacher RPCs:** issue cards for a class, mark printed, unlock, reissue (stops the old code at once and keeps everything the student sent), and set the Cards Work Until date (default the class's last reporting date).
+Card codes are unreadable to the database (`docs/DECISIONS.md`, "Card codes the database cannot read (2026-11-10)"). Words used here: **the key** is one secret, `STUDENT_CARD_KEY`, kept in the edge functions' settings; a **tag** is a keyed fingerprint of a code (HMAC-SHA-256) that only the key can make.
+
+- **`student_card`** (public schema; no teacher's browser reads it directly): one live card per enrollment. It holds the code's tag (`code_hmac`), the password's tag (`pw_hmac`, kept only for a student with no birthday and no student number), the id of the key that made the tag (`key_id`), the card number (`seq`: Card 1, 2, 3 per student), when it was made, printed, last opened, locked and stopped, the wrong-try counts, and the date it works until. It stores no code and no password. A unique index on `code_hmac` covers every card ever made, live or stopped.
+- **The code** is eight characters from the slip alphabet, shown `K7M4-QX2P`. A slip is six, so the two are told apart by length. **The password** is four digits, the card's own, never a copy of `student.slip_password`.
+- **The identity check:** birthday or student number, or the card's password when neither is on file. Five wrong tries in a row lock a card, and 15 in any 7 days.
+- **Making cards** goes through a second edge function, `teacher-cards` (1.8), never through an RPC. The function draws each code and password, makes their tags, and calls one service-only database function, `student_submit.issue_cards`, which checks the teacher owns the class through the same helpers every RPC uses and stores the tags. The new codes go back to the teacher's browser once, in the reply to that one press, and are kept nowhere. One operation covers every button: for each student the browser names the card it believes is live (or none), and the database stops that card and stores the new one in one step, or answers `changed` if another tab got there first.
+- **Teacher RPCs that need no key:** list cards (no code, no password; with the card number, whether it has a password, and Needs a New Card for a card made under another key), mark printed, unlock, Unlock All, and set the Cards Work Until date (default the class's last reporting date). They go through the outbox as any write does.
 - **Sessions** (`student_submit` schema, no API access): a session belongs to a device, not to a card. A second table lists the enrollments that session has opened, one per card added. That is what makes Switching Classes work now and lets a passkey or another sign-in attach to the same session later with no rework (Nov 8, decision 13).
-- **Questionnaire slips and phone-report slips keep working** as they do today, for one-offs.
+- **Questionnaire slips and phone-report slips keep working** as they do today, for one-offs. They move to the same key in their own change before the January pilot (`S3-S1`).
 
-The class's teacher can see a card's code again (Q10), so Print All and Show Card Code never stop a card the student holds: the code is stored for the teacher, readable only through `fv_owns_enrollment`, beside the hash the student path checks.
+No teacher's screen ever shows a code. A code is on screen only in the browser's print dialog while it is open. A lost card is replaced, never shown again: Print New Card stops the old card and makes a new one, and New Codes for This Class does that for every student. A replaced card tells the student "This card has been replaced. Ask your teacher for your new card." Changing the key stops every card; Colin keeps a copy of the key in his password manager only so a lost key can be put back without a reprint.
 
-- **A device stays signed in until midnight (Pacific time) or until the student taps Done**, whichever comes first (Q11). A shared Chromebook still signs out on Done.
+- **A device stays signed in until midnight (Pacific time) or until the student taps Done**, whichever comes first (Q11), and signs out after 15 minutes with no activity. A shared Chromebook still signs out on Done.
 - **Today Only codes are not built** (Q12); they wait with Family Codes.
 
 ### 1.6 Submissions, Mark Up, reflections, revisions
@@ -166,7 +171,7 @@ A revision is version 2 of a submission. When its grade is returned it replaces 
 
 ### 1.8 Edge function routes
 
-The one function, `student-submit`, keeps its four routes and gains these. Each calls a `student_submit` SQL function, granted to `service_role` only. The anon role stays locked out of every function.
+Two functions. `student-submit` is the public endpoint a student's phone posts to; it keeps its four slip routes and gains the routes below. `teacher-cards` is new and does one thing: it makes cards for a signed-in teacher (1.5). Each route calls a `student_submit` SQL function, granted to `service_role` only. The anon role stays locked out of every function.
 
 | Route                                 | Does                                                                        |
 | ------------------------------------- | --------------------------------------------------------------------------- |
@@ -184,6 +189,12 @@ The one function, `student-submit`, keeps its four routes and gains these. Each 
 `page` returns returned grades only, through the one reader in 1.2.
 
 The card's routes are in `supabase/functions/student-submit/card-routes.ts` (`S0-F4`): `card`, `verify` for a card, `add-card`, `page`, `seen` and `done`. A `verify` that carries a slip's token is a slip's, as before; one that carries a card's code is the card's. A card's `verify` always starts a new session and ends the one the device sent, so a shared Chromebook signs the last student out; only `add-card` joins a session. Which of the two it is (`p_add`) is written into each route's statement and never read from the request (`S0-F4b`). The device's session token travels in the request body as `session`, as a slip's token does: no cookie, no header, never in the address, never in a log. Each route names its one SQL call and copies its reply field by field, so a field the SQL gains by mistake does not reach a phone.
+
+**How a card is checked** (`S3-E1`). The function tidies the code (upper case, letters and digits only), makes its tag with the key, and sends the database the tag, never the code. A code that is not eight characters after tidying is answered `not_found` with no database call and no log row, so scanning a slip never counts toward the card limit; the page then asks `open`, as today. For a card's password the function makes the password's tag and the database compares tags. A stopped card answers `card_stopped`, logged with the card's id and not counted as a guess. The limits are unchanged: five wrong in a row, 15 in 7 days, 300 unknown codes per network address in 15 minutes.
+
+**`teacher-cards`** (`S3-E2`). Deployed with sign-in checking on. The function also asks Supabase Auth whose token it was sent and takes the teacher's id only from that answer, never from the request. The browser sends `{ course_id, items: [{ enrollment_id, replaces }], request_id }`; the reply gives each student `made`, `changed`, `not_found` or `failed`, and for `made` the card's id, number, last day, its code, and its password when the student has no birthday or number on file. A retry with the same `request_id` returns the results with no code: the database never had one. The reply is sent with `Cache-Control: no-store`.
+
+**The key.** Both functions accept `STUDENT_CARD_KEY` only when it is exactly 64 hex characters. There is no fallback. Without it the card routes and `teacher-cards` answer a server error and call the database for nothing; slips, `page`, `seen` and Done carry on. Unsetting the key is the emergency stop for cards. A function's log holds the route, the outcome and the time, never a code, tag, key, password, token, birthday, number or name. The tag formats are fixed for good in one shared module, `supabase/functions/_shared/card-key.ts`, guarded by known-answer tests: a change to them would silently stop every live card.
 
 ### 1.9 Client modules
 
@@ -208,16 +219,16 @@ The card's routes are in `supabase/functions/student-submit/card-routes.ts` (`S0
 
 ### 1.10 Demo Mode, piece by piece
 
-| Piece                                        | In Demo Mode                                                                                                                                           |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Draft and Returned                           | The same rule runs in `shared/grade-state.js`, kept in localStorage. No RPC.                                                                           |
-| Student cards                                | Cards are made on the device with random codes. Print works.                                                                                           |
-| The student page                             | Opens from Preview as Student, and from a demo address on `/s/` as today's `#demo` does. It never calls the edge function.                             |
-| Sample work                                  | Drawn sample pages ship with the app, on a new Science 8 assessment, Cell Microscope Lab: 2 to grade, 1 to return, the rest returned (the Demo board). |
-| Sending and adding work                      | Photos are shrunk and kept in IndexedDB on the device. Nothing uploads.                                                                                |
-| Mark Up, reflections, revisions, My Learning | Saved on the device like any Demo Mode change.                                                                                                         |
-| Passkeys                                     | A stand-in that walks the same screens without saving a key.                                                                                           |
-| MyEdBC Input                                 | Works on the Demo class.                                                                                                                               |
+| Piece                                        | In Demo Mode                                                                                                                                            |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Draft and Returned                           | The same rule runs in `shared/grade-state.js`, kept in localStorage. No RPC.                                                                            |
+| Student cards                                | Cards are made on the device with random codes and nothing is sent. Making a card returns its code once; the saved card keeps no code or password (S3). |
+| The student page                             | Opens from Preview as Student, and from a demo address on `/s/` as today's `#demo` does. It never calls the edge function.                              |
+| Sample work                                  | Drawn sample pages ship with the app, on a new Science 8 assessment, Cell Microscope Lab: 2 to grade, 1 to return, the rest returned (the Demo board).  |
+| Sending and adding work                      | Photos are shrunk and kept in IndexedDB on the device. Nothing uploads.                                                                                 |
+| Mark Up, reflections, revisions, My Learning | Saved on the device like any Demo Mode change.                                                                                                          |
+| Passkeys                                     | A stand-in that walks the same screens without saving a key.                                                                                            |
+| MyEdBC Input                                 | Works on the Demo class.                                                                                                                                |
 
 `tests/demo-mode-no-server-calls.test.js` is extended to cover each new module, `s/` included.
 
@@ -311,25 +322,49 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 
 ### S3. Student cards and sign-in
 
-**Goal.** A teacher prints one card per student for the course, and a student gets in with it on a phone or a Chromebook.
+**Goal.** A teacher prints one card per student for the course, and a student gets in with it on a phone or a Chromebook. No card's code is readable by the database or shown on a teacher's screen (`docs/DECISIONS.md`, "Card codes the database cannot read (2026-11-10)").
 
-**Boards.** Teacher: Student Cards (Print, Unlock, Reissue); Teacher: Reissue a Lost Card; Student: Scan or Type Your Card; Student: Is This You? Birthday or Student Number; Student: Is This You? Card Password; Student: After Done; Student: Switching Classes; Student: Signing In on a Chromebook; Class Settings, Student Page (the Student Cards row).
+**Boards.** Teacher: Student Cards (Print, Unlock, Reissue); Teacher: Reissue a Lost Card; Student: Scan or Type Your Card; Student: Is This You? Birthday or Student Number; Student: Is This You? Card Password; Student: After Done; Student: Switching Classes; Student: Signing In on a Chromebook; Class Settings, Student Page (the Student Cards row). The boards still show codes on screen, Reissue, Show Code, Print All with the same codes and a print preview; where they differ from this slice, this slice wins.
 
-**PRs.**
+**The teacher's screens.**
 
-- `S3-T1` `teacher/qr-slips.js`: lift the eight-to-a-page print sheet into a helper both slips and cards use.
-- `S3-F1` Student Cards page: the list with its filters (All, Not Printed, Locked, Never Opened), Print All, Print N New Cards, the print preview, Cards Work Until.
-- `S3-F2` Unlock, and Reissue with its dialog (Reissue, Show Code; Reissue and Print).
-- `S3-F3` Student sign-in screens, phone and Chromebook, the locks, Done, and Switching Classes with Add Another Card.
-- `S3-W1` Wire to Batch A.
+- **The list.** Columns: Student, Card, Status. No code anywhere. Card reads "Card 2 · Made Nov 12", or No Card Yet. Status reads Not Printed, Printed Nov 12, Last Opened Nov 14, Locked, Needs a New Card, or Past Its Last Day. Filters: All, Not Printed, Locked, Never Opened.
+- **Make and Print N Cards.** N is the students with no card plus those whose card was never printed and never opened. One press makes the cards and opens the browser's print dialog: a code exists only at that moment, so making without printing has no use. Replacing a card never printed and never opened needs no confirm, since no student can be holding it.
+- **Print Again.** If the dialog is cancelled or the printer jams, the codes stay in the page's memory and a line says so: "28 cards went to the printer. Print Again works until you leave this screen. After that, printing makes new codes." They are held only in a variable in `teacher/student-cards.js`, never in localStorage, sessionStorage, IndexedDB, the outbox or Sentry, and dropped when Class Settings closes, the class changes, the teacher signs out, the tab closes, or ten minutes pass. If the tab closes first, the cards show Not Printed and Make and Print replaces them.
+- **Print New Card** (one student; the board's Reissue). For a card that was printed or opened it asks first: "Print a New Card for Cece?" / "The card Cece has now stops working as soon as the new one is made. Everything Cece has sent stays." / Cancel · Print New Card.
+- **New Codes for This Class** (in place of Print All). "New Codes for All 28 Students?" / "28 cards stop working now. Print the new cards and hand them out. Students can't open their page until they have their new card. Everything they have sent stays." / Cancel · Make 28 New Cards. With some students holding no card: "26 cards stop working now. 2 students get their first card."
+- **Unlock, Unlock All, Cards Work Until,** through the RPCs that exist; they need no key.
+- **No in-app print preview.** The browser's own print dialog is the only place a code is drawn. A sheet saved as a PDF from that dialog is as sensitive as the cards; the help article says so.
 
-**Files.** `teacher/student-cards.js` (new), `teacher/qr-slips.js`, `teacher/cm-student-page.js`, `shared/data.js`, `s/app.js`, `s/student.css`, the edge function.
+The wording above is proposed; Colin approves it in each PR, as usual.
 
-**Tests.** SQL: a reissued code stops at once and the student's work stays; five wrong tries lock; a card past its date is refused; one session can hold two classes; rate limits. Unit: the print sheet. Browser: print preview, reissue, sign-in on phone and Chromebook sizes.
+**The student's side.** The code is eight characters, `K7M4-QX2P`; `s/student.js` accepts six (a slip) or eight (a card). A replaced card says "This card has been replaced. Ask your teacher for your new card." and, as any recognised card does, signs the last student out. A card password is the card's own.
 
-**Demo Mode.** Cards on the device; the demo student page opens from them. **Switch.** The build switch.
+**PRs,** in order: twelve PRs, one of them done, and the day. "Fable" is the strongest model at high effort; "Opus" the builder (Colin's standing instruction).
 
-**Done when.** Colin prints cards for his test class, signs in as two students in two classes on one phone, and a reissued card's old code no longer opens.
+- `S3-T1` `teacher/qr-slips.js`: lift the eight-to-a-page print sheet into a helper both slips and cards use. Done (PR 977).
+- `S3-D1` This plan's 1.5, 1.8 and S3, the DECISIONS section, and the ROADMAP items the change leaves. Docs only.
+- `S3-E1` The shared key module (`supabase/functions/_shared/card-key.ts`); `student-submit` checks cards by tag; `card_stopped`; what happens with no key. Not deployed. Fable.
+- `S3-E2` The `teacher-cards` function. Not deployed. Stacked on `S3-E1`. Fable.
+- `S3-M1` The migration (`migrations/<next>_card_codes_keyed.sql`): every live card stopped; `code`, `code_hash`, `salt` and `password` dropped; `code_hmac`, `pw_hmac`, `key_id` and `seq` added; the teacher's direct read of `student_card` removed; `student_submit.issue_cards` and the new `card` and `verify_card`; the old card RPCs dropped; the two slip issuers back to their bodies from before Batch A; cached card answers cleared from `fv_idempotency`. With its local harness suite, an undo and its proof, and pre-check and post-check queries. It deletes data (the 30 codes and passwords in Colin's test class), so it needs his review under rule 2. Fable, then one independent review of `S3-E1`, `S3-E2` and `S3-M1` together.
+- `S3-W1` The data layer asks `teacher-cards`; the list without codes; Make and Print from memory, each card printing its number ("Card 2") small; Print Again; Demo Mode on the same contract. Merges before `S3-M1` is applied, so `main` stops naming the old card RPCs first. Opus, with a short Fable read of "the code is stored nowhere".
+- `S3-F3a` Student page: eight-character codes and the replaced-card line. Opus.
+- **The day** (no PR). In one sitting: the read-only checks; Colin makes the key and keeps his copy; `S3-E1`, `S3-E2`, `S3-W1` and `S3-F3a` merged and `main` green; on his OK, both functions deployed; on his OK, `S3-M1` applied, its post-check run and `S3-M1` merged with the schema snapshot; a check on his Mac with `npm run dev:local` (Make and Print to a PDF, type a code, see the page; an old card does not open); then the release on his word. His test class has no working cards for about 15 to 30 minutes.
+- `S3-F1` The Student Cards page in full: the filters, the statuses, the card number, Cards Work Until.
+- `S3-F2` Unlock, Unlock All, Print New Card, New Codes for This Class, with their confirms.
+- `S3-F3` The rest of the student sign-in screens, phone and Chromebook: the locks, Done, and Switching Classes with Add Another Card.
+- `S3-P1` The privacy page (`privacy.html`): a card's code and password are kept only as keyed fingerprints, nobody can look one up after printing, and what is recorded for a card. Colin's words; the privacy officer if he chooses.
+- `S3-S1` Slips move to the same key: a slip's code and `student.slip_password` stop being readable by the database. Its own change, with its own migration and review, right after cards are live and before the January pilot (DECISIONS, "Card codes the database cannot read" 2). Until it ships the privacy page must not say a slip code cannot be read back from the database.
+
+`S3-E1`, `S3-E2`, `S3-W1` and `S3-F3a` can all be built while `S3-M1` is in review.
+
+**Files.** `supabase/functions/_shared/card-key.ts` (new), `supabase/functions/student-submit/*`, `supabase/functions/teacher-cards/*` (new), `migrations/`, `migrations/local-test/`, `schema.sql`, `docs/schema.generated.sql`, `teacher/student-cards.js`, `teacher/qr-slips.js`, `teacher/cm-student-page.js`, `shared/data.js` (card block), `s/student.js`, `s/app.js`, `s/student.css`, `e2e/student-card-fake.js`, `privacy.html`.
+
+**Tests.** SQL (`migrations/local-test/card_codes.py`, PostgreSQL 17): after the apply `student_card` holds no code or password; every card that was live is stopped; a second run stops no card made since; `issue_cards` refuses another teacher's class and a stale `replaces`, and a replay returns no tag; only tags of 64 hex characters are accepted; five wrong tries lock; a card past its date is refused; one session can hold two classes; `anon` and `authenticated` run nothing in `student_submit` and cannot read `student_card`; the file never names `hmac`, so the key cannot be used in the database even by mistake; the undo is proven. Handler: known-answer tags; the database receives the tag and never the code or the typed password; no log line holds a code, tag, key, password or token; no key means a server error and no database call while slips still work; a card `teacher-cards` just made opens through `student-submit`; `tests/student-submit-slips-unchanged.test.js` passes untouched. Unit: the print sheet. Browser: after Make and Print no code is in the list, any browser storage or the outbox; Print Again and its end; Print New Card's confirm; New Codes for This Class's counts; a lost reply ends with printed cards and no message; sign-in on phone and Chromebook sizes; an eight-character code opens; a replaced card's line.
+
+**Demo Mode.** Cards stay on the device and nothing is sent, on the same contract: making a card returns its code once, the saved card keeps no code or password, and the list shows what a signed-in teacher's shows. `tests/demo-mode-no-server-calls.test.js` covers the new call to `teacher-cards`. **Switch.** The build switch.
+
+**Done when.** Colin prints cards for his test class, signs in as two students in two classes on one phone, a replaced card's old code no longer opens and says so, and no code is anywhere in the database, a log, the teacher's screen or the browser's storage.
 
 ### S4. The student page: assignments, feedback, Questionnaires, Reports, Preview as Student
 
@@ -647,17 +682,17 @@ The rest of cleanup card cp1, after the build: what is still in `data.js` and th
 
 ### Tracks
 
-| Track             | Owns these files                                                                | Slices, in order                                          |
-| ----------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| A. Server         | `migrations/`, `supabase/functions/`, `schema.sql`, `migrations/local-test/`    | Batch A, B, C, D, E, F                                    |
-| B. Math           | `shared/calc.js`, its tests                                                     | S0-P2, S0-T1, S0-F1, then S13 and S11 if needed           |
-| C. Desktop grader | `teacher/page-assignments.js`, `teacher/assignments.css`                        | S0-T2, S0-F2, S1-T3, S1-F2, S6, S9, S10-F3, S11, S12      |
-| D. Gradebook      | `teacher/page-gradebook.js`, `teacher/class-results.js`                         | S1-T1, S1-F1, S6-F4, S10-F4                               |
-| E. Phone          | `teacher-mobile/*`                                                              | S1-T2, S1-F3, S7, S9-F2, S11-F1                           |
-| F. Student page   | `s/*`, `shared/student-view.js`, `shared/phone-report-view.js`                  | S0-T3, S0-F3, S3-F3, S4, S5, S9-F3, S10, S11-F2, S12, S13 |
-| G. Uploads        | `shared/photo-shrink.js`, `shared/photo-queue.js`                               | S5-T1                                                     |
-| H. Class Settings | `teacher/cm-student-page.js`, `teacher/student-cards.js`, `teacher/qr-slips.js` | S1-T4, S1-F4, S3, S5-F1, S8-F1                            |
-| I. Reports        | `teacher/page-reports.js`, `teacher/report-*.js`, `teacher/myed-input.js`       | S2, S16, S18                                              |
+| Track             | Owns these files                                                                | Slices, in order                                                  |
+| ----------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| A. Server         | `migrations/`, `supabase/functions/`, `schema.sql`, `migrations/local-test/`    | Batch A, S3-E1, S3-E2, S3-M1, S3-S1, Batch B, C, D, E, F          |
+| B. Math           | `shared/calc.js`, its tests                                                     | S0-P2, S0-T1, S0-F1, then S13 and S11 if needed                   |
+| C. Desktop grader | `teacher/page-assignments.js`, `teacher/assignments.css`                        | S0-T2, S0-F2, S1-T3, S1-F2, S6, S9, S10-F3, S11, S12              |
+| D. Gradebook      | `teacher/page-gradebook.js`, `teacher/class-results.js`                         | S1-T1, S1-F1, S6-F4, S10-F4                                       |
+| E. Phone          | `teacher-mobile/*`                                                              | S1-T2, S1-F3, S7, S9-F2, S11-F1                                   |
+| F. Student page   | `s/*`, `shared/student-view.js`, `shared/phone-report-view.js`                  | S0-T3, S0-F3, S3-F3a, S3-F3, S4, S5, S9-F3, S10, S11-F2, S12, S13 |
+| G. Uploads        | `shared/photo-shrink.js`, `shared/photo-queue.js`                               | S5-T1                                                             |
+| H. Class Settings | `teacher/cm-student-page.js`, `teacher/student-cards.js`, `teacher/qr-slips.js` | S1-T4, S1-F4, S3-W1, S3-F1, S3-F2, S5-F1, S8-F1                   |
+| I. Reports        | `teacher/page-reports.js`, `teacher/report-*.js`, `teacher/myed-input.js`       | S2, S16, S18                                                      |
 
 Tracks A, B, F, G and I share no files with each other or with C, D and E. They can all run from the first night.
 
@@ -678,6 +713,7 @@ The session that hands out the work keeps one list of who holds each of these fi
 - `S0-T2` before `S1-T1`, `S1-T2` and `S1-T3`. Those three are in different files and run side by side.
 - `S0-T1` before `S0-F1`. `S0-F1` before S2, S4 and S16-F3.
 - Batch A applied before any `W` PR in S0 to S4. Batch B before S5 to S7 wiring. Batch C before S9 to S13 wiring. Batch D before a real class turns on Send Work.
+- `S3-W1` merges before `S3-M1` is applied, and `S3-M1` before the S3 release (S3, the day). `S3-S1` before the January pilot.
 - S3 before real students use S4. S4 before S5's student screens. S5 before S6 and S7. S6 before S9, S11, S12 and S14.
 - S8 before the release that opens Send Work.
 - S15 after S4 works.
@@ -693,19 +729,20 @@ Six agents, six worktrees, no shared files: (1) `S0-P1`; (2) `S0-P2` then `S0-T1
 
 Each row stops only the work listed. Everything else keeps moving.
 
-| #   | What Colin is asked                                                                                                                                                                                                  | When                         | It unblocks           |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | --------------------- |
-| 1   | This plan, and the answers in section 6. Answered Nov 9.                                                                                                                                                             | Now                          | Batch A's final SQL   |
-| 2   | **Batch A.** One read of three migrations: `grade_return` with its backfill (existing scores become Returned; no score or number changes), cards, sessions and the page reader. Plus the first edge function deploy. | Once it passes on a branch   | S0 to S4 wiring       |
-| 3   | **Math review 1.** `S0-F1`, the returned-only option. The proof offered: with no drafts, every number in the golden file is unchanged.                                                                               | With Batch A                 | S2, S4, S16-F3        |
-| 4   | **Batch B.** Submissions, the two buckets and their policies, the second edge deploy. Unsend and Replace delete files. Also Colin's own step: spend cap off and usage alerts at about 70% (Nov 8, decision 7).       | When S1 is in review         | S5 to S7 wiring       |
-| 5   | **Batch C.** Mark Up, reflections, revisions, group submissions, the My Learning switch. Third edge deploy.                                                                                                          | When S5 is in review         | S9 to S13 wiring      |
-| 6   | **Math review 2.** `S11`: a revision's new grade replaces the old (Nov 8, decision 10).                                                                                                                              | With S11                     | S11 merge             |
-| 7   | **Math review 3.** `S13`: anything new in `calc.js` for My Learning.                                                                                                                                                 | With S13                     | S13 merge             |
-| 8   | **Batch D. Deletes data.** Photo deletion on class purge, student delete and Keep Photos Until; the nightly check.                                                                                                   | Before Send Work is released | The Send Work release |
-| 9   | **Batch E.** Passkeys, with the privacy page change.                                                                                                                                                                 | After S4 is live             | S15                   |
-| 10  | **Batch F.** MyEd tables.                                                                                                                                                                                            | Any time                     | S16 wiring            |
-| 11  | **Releases.** Suggested points, each on Colin's word: after S2 (nothing visible, switch off); after S4 (cards and the read-only page, for Colin's own classes); after S8 (photo submissions); then as he likes.      | His call                     | Teachers seeing it    |
+| #   | What Colin is asked                                                                                                                                                                                                                                                          | When                                         | It unblocks           |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | --------------------- |
+| 1   | This plan, and the answers in section 6. Answered Nov 9.                                                                                                                                                                                                                     | Now                                          | Batch A's final SQL   |
+| 2   | **Batch A.** One read of three migrations: `grade_return` with its backfill (existing scores become Returned; no score or number changes), cards, sessions and the page reader. Plus the first edge function deploy.                                                         | Once it passes on a branch                   | S0 to S4 wiring       |
+| 3   | **Math review 1.** `S0-F1`, the returned-only option. The proof offered: with no drafts, every number in the golden file is unchanged.                                                                                                                                       | With Batch A                                 | S2, S4, S16-F3        |
+| 4   | **Batch B.** Submissions, the two buckets and their policies, the second edge deploy. Unsend and Replace delete files. Also Colin's own step: spend cap off and usage alerts at about 70% (Nov 8, decision 7).                                                               | When S1 is in review                         | S5 to S7 wiring       |
+| 5   | **Batch C.** Mark Up, reflections, revisions, group submissions, the My Learning switch. Third edge deploy.                                                                                                                                                                  | When S5 is in review                         | S9 to S13 wiring      |
+| 6   | **Math review 2.** `S11`: a revision's new grade replaces the old (Nov 8, decision 10).                                                                                                                                                                                      | With S11                                     | S11 merge             |
+| 7   | **Math review 3.** `S13`: anything new in `calc.js` for My Learning.                                                                                                                                                                                                         | With S13                                     | S13 merge             |
+| 8   | **Batch D. Deletes data.** Photo deletion on class purge, student delete and Keep Photos Until; the nightly check.                                                                                                                                                           | Before Send Work is released                 | The Send Work release |
+| 9   | **Batch E.** Passkeys, with the privacy page change.                                                                                                                                                                                                                         | After S4 is live                             | S15                   |
+| 10  | **Batch F.** MyEd tables.                                                                                                                                                                                                                                                    | Any time                                     | S16 wiring            |
+| 11  | **S3-M1. Deletes data.** Card codes the database cannot read: every live card stopped, the 30 codes and passwords in Colin's test class erased. Read with `S3-E1` and `S3-E2` and their independent review. Before it, Colin makes the key and OKs the two function deploys. | When `S3-E1`, `S3-E2` and `S3-W1` are merged | The S3 release        |
+| 12  | **Releases.** Suggested points, each on Colin's word: after S2 (nothing visible, switch off); after S4 (cards and the read-only page, for Colin's own classes); after S8 (photo submissions); then as he likes.                                                              | His call                                     | Teachers seeing it    |
 
 How a batch is tested before Colin sees it: every migration runs on the throwaway Postgres harness with its tests, storage policies against the harness's stand-in storage table, and the edge function's handler with a fake database. No Supabase branch is used (Q18). The PR shows the SQL, the test results, and what the batch does to existing rows in one paragraph. After it is applied, the first real check is in Colin's own test class.
 
@@ -730,7 +767,8 @@ How a batch is tested before Colin sees it: every migration runs on the throwawa
 | The CSP blocks a photo or a PDF, or gets loosened to fix it                                 | Photos are fetched and shown from `blob:`, which the policy allows today. `tests/csp-directives.test.js` gains a line pinning `img-src`, `connect-src`, `frame-src` and `object-src` as they are. PDFs become JPEG pages in the browser (Q13). The HEIC decoder's CSP change is reviewed in its PR and limited to the upload pages (Q14). |
 | A student's location is stored                                                              | The browser redraws every photo. The server checks again on commit. A test uploads a photo with GPS data and reads the stored file.                                                                                                                                                                                                       |
 | A huge file fills storage                                                                   | The bucket limit: 2 MB a page. A PDF over 20 MB is refused in the browser. The shrink step runs on every upload path, tested for each.                                                                                                                                                                                                    |
-| A card code is guessed                                                                      | The identity check, the lock after five wrong tries, today's rate limits, and a limit of 20 sends per card per hour (Q20).                                                                                                                                                                                                                |
+| A card code is guessed                                                                      | Eight characters; the identity check; the locks after five wrong tries in a row and 15 in 7 days; 300 unknown codes per address in 15 minutes; a limit of 20 sends per card per hour (Q20).                                                                                                                                               |
+| A copy of the database gives away card codes                                                | The database keeps only keyed fingerprints; the key lives in the edge functions' settings (1.5). Handler tests check no code, tag, key or password reaches the database or a log. Slips follow in `S3-S1`.                                                                                                                                |
 | Student data leaves Canada                                                                  | Storage is in the project's region. The edge function already refuses to run outside `ca-central-1`; the new routes go through the same check. `s/` loads no Sentry.                                                                                                                                                                      |
 | The grade math changes by accident                                                          | The golden file from `S0-P2` must pass unchanged in every PR that does not say "math" in its title.                                                                                                                                                                                                                                       |
 | A migration turns every open PR red                                                         | Batches are applied at a quiet moment and the snapshot merges at once (see the rules above).                                                                                                                                                                                                                                              |
@@ -756,7 +794,7 @@ Colin answered the 25 questions one at a time on Nov 9. Each answer is written i
 | 7   | Missing, Excused and Late                                   | Never drafts: they show and count at once.                                                                                                                                                            |
 | 8   | Where existing classes start                                | As Soon As I Save, until the teacher first opens Class Settings › Student Page. New classes start on When I Return Them.                                                                              |
 | 9   | Grades from the grade-scans skill                           | Drafts, in a When I Return Them class.                                                                                                                                                                |
-| 10  | Seeing a card's code again                                  | Yes. Stored for the class's teacher only.                                                                                                                                                             |
+| 10  | Seeing a card's code again                                  | Yes. Stored for the class's teacher only. _Superseded 2026-11-10: no code is readable or shown again (DECISIONS, "Card codes the database cannot read")._                                             |
 | 11  | How long a device stays signed in                           | Until midnight, or until Done.                                                                                                                                                                        |
 | 12  | Today Only codes                                            | Not built; they wait with Family Codes.                                                                                                                                                               |
 | 13  | PDFs                                                        | Each page becomes a JPEG in the browser, using pdf.js for that step; the PDF is not kept. This changes the PDF part of Nov 8 decision 8.                                                              |

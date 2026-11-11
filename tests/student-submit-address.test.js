@@ -9,7 +9,9 @@
  * each full address let one connection step around the per-address limit.
  */
 import { describe, expect, it } from 'vitest';
+import { readCardKey } from '../supabase/functions/_shared/card-key.ts';
 import { addressKey, ipHash, makeHandler } from '../supabase/functions/student-submit/handler.ts';
+import { FAKE_KEY } from './helpers/card-key-fake.js';
 
 const from = headers => new Request('https://x.supabase.co/functions/v1/student-submit', { method: 'POST', headers });
 const hashOf = address => ipHash(from({ 'cf-connecting-ip': address }), 'k1');
@@ -188,6 +190,7 @@ describe('student-submit: the hashed address', () => {
     const handle = makeHandler({
       region: 'ca-central-1',
       ipKey: 'test-key',
+      cardKey: await readCardKey(FAKE_KEY),
       log: () => {},
       db: {
         open: record('open'),
@@ -206,7 +209,7 @@ describe('student-submit: the hashed address', () => {
       { route: 'verify', token, student_number: '0123456' },
       { route: 'check', token, birthday: '2012-05-15' },
       { route: 'submit', token, answers: {} },
-      { route: 'card', code: 'P3R-8WD' },
+      { route: 'card', code: 'P3R8-WD4K' },
       { route: 'done', session: token },
     ];
     for (const address of ['2001:db8:1:2::1', '2001:db8:1:2:aaaa:bbbb:cccc:dddd']) {

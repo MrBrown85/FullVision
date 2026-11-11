@@ -10,7 +10,7 @@ test('each level shows its descriptor, and the calculated level is marked', asyn
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   // The demo class seeds after the curriculum bank loads.
   await page.waitForFunction(() => getAssessments('sci8').length > 0);
-  await page.evaluate(() => window.Router.navigate('/student?id=st1&course=sci8'));
+  await page.evaluate(() => window.Router.navigate('/student?id=st1&course=sci8&tab=comps'));
   await page.locator('.stu-comp-row[data-tagid="PA4"]').click();
   await page.locator('[data-action="toggleOverridePanel"][data-secid="PA4"]').click();
   const panel = page.locator('#override-panel-PA4');

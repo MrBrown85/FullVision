@@ -232,6 +232,7 @@ describe('the class’s two settings come from the server with the class', () =>
     try {
       // As at the start of a session: the class's rows not yet read.
       delete _gradeReturnsLoadedFor[CID];
+      delete _gradeReturnsReadThisSession[CID];
       expect(ReportScores.ready(CID)).toBe(false);
       await _loadServerGradeReturns(CID, true);
       expect(ReportScores.ready(CID)).toBe(true);

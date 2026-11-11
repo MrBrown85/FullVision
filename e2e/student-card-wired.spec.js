@@ -46,7 +46,7 @@ for (const size of [
       page.on('pageerror', err => errors.push(String(err)));
 
       // The scanned card.
-      await page.goto('/s/#P3R-8WD');
+      await page.goto('/s/#P3R8-WDK4');
       await expect(page.getByRole('heading', { name: 'Is this you, Cece?' })).toBeVisible();
       await expect(page.locator('.sp-head-title')).toHaveText('Science 8 · Block B');
       await expect(page).toHaveTitle(/Student Page/);
@@ -97,7 +97,7 @@ for (const size of [
       await expect.poll(() => routes(posts)).toEqual(['card', 'verify', 'verify', 'page', 'seen']);
       expect(posts[2].body).toEqual({
         route: 'verify',
-        code: 'P3R8WD',
+        code: 'P3R8WDK4',
         birthday: '2012-05-15',
         student_number: null,
         password: null,
@@ -167,7 +167,7 @@ test.describe('a real card: the keyboard alone', () => {
     await page.goto('/s/');
     await page.keyboard.press('Tab');
     await expect(page.getByLabel('Type the code on your slip')).toBeFocused();
-    await page.keyboard.type('p3r-8wd');
+    await page.keyboard.type('p3r8-wdk4');
     await page.keyboard.press('Enter');
     await expect(page.getByRole('heading', { name: 'Is this you, Cece?' })).toBeVisible();
     // The first field has the focus; then Day, Year and the student number.
@@ -211,7 +211,7 @@ test.describe('a real card: what stops it, and what each one says', () => {
     test(`a card answered ${error} says why`, async ({ page }) => {
       const fn = school(card);
       const posts = await serve(page, fn);
-      await page.goto('/s/#P3R-8WD');
+      await page.goto('/s/#P3R8-WDK4');
       await expect(page.getByRole('alert')).toHaveText(line);
       await expect(page).toHaveURL(/\/s\/$/);
       await expect(page.getByLabel('Student Number')).toHaveCount(0);
@@ -229,7 +229,7 @@ test.describe('a real card: what stops it, and what each one says', () => {
   test('the card’s password, a wrong one, and the lock after five', async ({ page }) => {
     const fn = school({ birthday: null, number: null, password: '4821' });
     await serve(page, fn);
-    await page.goto('/s/#P3R-8WD');
+    await page.goto('/s/#P3R8-WDK4');
     await expect(page.getByText('To make sure it’s you, type the password printed on your card.')).toBeVisible();
     await named(page);
     await shot(page, '05-card-password');
@@ -255,7 +255,7 @@ test.describe('a real card: what stops it, and what each one says', () => {
   test('No, That’s Not Me: Give This Card Back', async ({ page }) => {
     const fn = school();
     const posts = await serve(page, fn);
-    await page.goto('/s/#P3R-8WD');
+    await page.goto('/s/#P3R8-WDK4');
     await page.getByRole('button', { name: 'No, That’s Not Me' }).tap();
     await expect(page.getByRole('heading', { name: 'Give This Card Back' })).toBeVisible();
     await named(page);
@@ -297,7 +297,7 @@ test.describe('a real card: what stops it, and what each one says', () => {
     const fn = school();
     fn.state.addressLocked = true;
     const posts = await serve(page, fn);
-    await page.goto('/s/#P3R-8WD');
+    await page.goto('/s/#P3R8-WDK4');
     await expect(page.getByRole('alert')).toHaveText('Too many tries. Wait 15 minutes and try again.');
     expect(routes(posts)).toEqual(['card', 'open']);
     await shot(page, '10-too-many-tries');
@@ -307,7 +307,7 @@ test.describe('a real card: what stops it, and what each one says', () => {
     const fn = school();
     let offline = 'verify';
     await serve(page, fn, { fail: body => body.route === offline });
-    await page.goto('/s/#P3R-8WD');
+    await page.goto('/s/#P3R8-WDK4');
     await page.getByLabel('Student Number').fill('0123456');
     await page.getByRole('button', { name: 'Yes, That’s Me' }).tap();
     await expect(page.getByRole('alert')).toHaveText("Couldn't reach FullVision. Check your internet and try again.");
@@ -337,7 +337,7 @@ test.describe('a real card: what stops it, and what each one says', () => {
       const fn = school();
       const posts = await serve(page, fn);
       await signIn(page);
-      Object.assign(fn.state.cards.P3R8WD, change);
+      Object.assign(fn.state.cards.P3R8WDK4, change);
       posts.length = 0;
       await page.reload();
       await expect(page.getByRole('alert')).toHaveText(line);
@@ -356,7 +356,7 @@ test.describe('a real card: what stops it, and what each one says', () => {
     const fn = school();
     const posts = await serve(page, fn);
     await page.route('**/shared/calc.js', route => route.abort());
-    await page.goto('/s/#P3R-8WD');
+    await page.goto('/s/#P3R8-WDK4');
     await page.getByLabel('Student Number').fill('0123456');
     await page.getByRole('button', { name: 'Yes, That’s Me' }).tap();
     await expect(page.getByRole('status')).toHaveText('Your results didn’t load. Check your internet and try again.');
@@ -395,7 +395,7 @@ test.describe('a real card: a shared Chromebook', () => {
 
   const omar = () =>
     sampleCard(TODAY, {
-      code: 'K7M4QX',
+      code: 'K7M4QX2P',
       enrollment: OMAR,
       first: 'Omar',
       birthday: null,
@@ -405,7 +405,7 @@ test.describe('a real card: a shared Chromebook', () => {
 
   test('the next student’s card signs the last student out before it asks anything', async ({ page }) => {
     const fn = school();
-    fn.state.cards.K7M4QX = omar();
+    fn.state.cards.K7M4QX2P = omar();
     const posts = await serve(page, fn);
     await signIn(page);
     const cece = JSON.parse((await stored(page)).local[KEY]).t;
@@ -413,12 +413,12 @@ test.describe('a real card: a shared Chromebook', () => {
     // Omar types his card's code into the same browser, in a new tab.
     const tab = await page.context().newPage();
     const tabPosts = await serve(tab, fn);
-    await tab.goto('/s/#K7M-4QX');
+    await tab.goto('/s/#K7M4-QX2P');
     await expect(tab.getByRole('heading', { name: 'Is this you, Omar?' })).toBeVisible();
     await expect
       .poll(() => tabPosts.map(p => p.body))
       .toEqual([
-        { route: 'card', code: 'K7M4QX' },
+        { route: 'card', code: 'K7M4QX2P' },
         { route: 'done', session: cece },
       ]);
     expect((await stored(tab)).local).toEqual({});
@@ -444,20 +444,20 @@ test.describe('a real card: a shared Chromebook', () => {
 
   test('the next card opened in the same tab signs the last student out too', async ({ page }) => {
     const fn = school();
-    fn.state.cards.K7M4QX = omar();
+    fn.state.cards.K7M4QX2P = omar();
     const posts = await serve(page, fn);
     await signIn(page);
     const cece = JSON.parse((await stored(page)).local[KEY]).t;
     posts.length = 0;
     // The address changes under the open page, as a scanned link does in a tab that is already there.
-    await page.evaluate(() => (location.hash = '#K7M-4QX'));
+    await page.evaluate(() => (location.hash = '#K7M4-QX2P'));
     await expect(page.getByRole('heading', { name: 'Is this you, Omar?' })).toBeVisible();
     await expect(page.locator('.sp-row')).toHaveCount(0);
     expect(await page.locator('body').innerText()).not.toMatch(/Cece|Extending/);
     await expect
       .poll(() => posts.map(p => p.body))
       .toEqual([
-        { route: 'card', code: 'K7M4QX' },
+        { route: 'card', code: 'K7M4QX2P' },
         { route: 'done', session: cece },
       ]);
     await expect(page).toHaveURL(/\/s\/$/);
@@ -574,8 +574,9 @@ test.describe('a slip is as it was', () => {
       { route: 'open', code: 'K7M4QX' },
       { route: 'verify', token: 'a'.repeat(64), birthday: null, student_number: '0123456', password: null },
     ]);
-    // The handler sent the token's verify to the slip's function, not the card's.
-    expect(fn.sql.map(q => q.fn)).toEqual(['card', 'open', 'verify']);
+    // Six characters is no card's code, so the function answers `card` without asking the database; and it sent
+    // the token's verify to the slip's function, not the card's.
+    expect(fn.sql.map(q => q.fn)).toEqual(['open', 'verify']);
     expect((await stored(page)).local).toEqual({});
   });
 

@@ -43,7 +43,7 @@ const SLIP = {
 
 const omar = more =>
   sampleCard(TODAY, {
-    code: 'ABCDEF',
+    code: 'ABCDEFGH',
     enrollment: OMAR,
     first: 'Omar',
     birthday: null,
@@ -99,19 +99,19 @@ test.describe('a shared Chromebook: who a scanned card signs out', () => {
   ]) {
     test(`Cece is signed in; Omar’s card is ${name}: he is told why, and she is signed out`, async ({ page }) => {
       const fn = school();
-      fn.state.cards.ABCDEF = omar(more);
+      fn.state.cards.ABCDEFGH = omar(more);
       await serve(page, fn);
       await signIn(page);
       const cece = JSON.parse((await stored(page)).local[KEY]).t;
 
       const tab = await page.context().newPage();
       const posts = await serve(tab, fn);
-      await tab.goto('/s/#ABC-DEF');
+      await tab.goto('/s/#ABCD-EFGH');
       await expect(tab.getByRole('alert')).toHaveText(line);
       await expect
         .poll(() => posts.map(p => p.body))
         .toEqual([
-          { route: 'card', code: 'ABCDEF' },
+          { route: 'card', code: 'ABCDEFGH' },
           { route: 'done', session: cece },
         ]);
       expect((await stored(tab)).local).toEqual({});
@@ -182,7 +182,7 @@ test.describe('before the page knows whether a code is a card or a slip', () => 
     const fn = school();
     let down = true;
     const posts = await serve(page, fn, { fail: () => down });
-    await page.goto('/s/#P3R-8WD');
+    await page.goto('/s/#P3R8-WDK4');
     await expect(page.getByRole('alert')).toHaveText(UNREACHED);
     await expect(page.locator('.sp-head-title')).toHaveText('FullVision');
     expect(await page.locator('#app').innerText()).not.toMatch(/slip|card|answers|Student Questions|Student Page/i);
@@ -206,7 +206,7 @@ test.describe('before the page knows whether a code is a card or a slip', () => 
     const posts = await serve(page, fn, {
       answer: body => (broken && body.route === 'card' ? { status: 500, json: { ok: false, error: 'server' } } : null),
     });
-    await page.goto('/s/#P3R-8WD');
+    await page.goto('/s/#P3R8-WDK4');
     await expect(page.getByRole('alert')).toHaveText(UNREACHED);
     expect(await page.locator('#app').innerText()).not.toMatch(/didn't work|slip/i);
     expect(routes(posts)).toEqual(['card', 'open']);
@@ -252,7 +252,7 @@ test.describe('before the page knows whether a code is a card or a slip', () => 
   test('Is This You? opens with the first field in focus, and a wrong answer is read out from it', async ({ page }) => {
     const fn = school();
     await serve(page, fn);
-    await page.goto('/s/#P3R-8WD');
+    await page.goto('/s/#P3R8-WDK4');
     await expect(page.getByLabel('Month')).toBeFocused();
     await page.getByLabel('Student Number').fill('999');
     await page.getByRole('button', { name: 'Yes, That’s Me' }).tap();
@@ -287,7 +287,7 @@ test.describe('before the page knows whether a code is a card or a slip', () => 
   test('after a wrong student number, the right one typed straight in opens the page', async ({ page }) => {
     const fn = school();
     await serve(page, fn);
-    await page.goto('/s/#P3R-8WD');
+    await page.goto('/s/#P3R8-WDK4');
     await page.getByLabel('Student Number').fill('999');
     await page.keyboard.press('Enter');
     await expect(page.getByRole('alert')).toContainText('4 tries left.');
@@ -303,7 +303,7 @@ test.describe('before the page knows whether a code is a card or a slip', () => 
   test('a card that asks for its password opens with the password box in focus', async ({ page }) => {
     const fn = school({ birthday: null, number: null, password: '4821' });
     await serve(page, fn);
-    await page.goto('/s/#P3R-8WD');
+    await page.goto('/s/#P3R8-WDK4');
     await expect(page.getByLabel('Password')).toBeFocused();
     await page.keyboard.type('0000');
     await page.keyboard.press('Enter');
@@ -324,13 +324,13 @@ test.describe('a reply that comes too late is dropped', () => {
     page,
   }) => {
     const fn = school();
-    fn.state.cards.ABCDEF = omar();
+    fn.state.cards.ABCDEFGH = omar();
     await serve(page, fn, { delay: { card: 600, page: 200 } });
     await signIn(page);
     // The device is signed in. Opened again, her page is asked for; before it arrives the address changes.
     await page.reload();
     await page.evaluate(WATCH_FRAMES);
-    await page.evaluate(() => (location.hash = '#ABC-DEF'));
+    await page.evaluate(() => (location.hash = '#ABCD-EFGH'));
     await expect(page.getByRole('heading', { name: 'Is this you, Omar?' })).toBeVisible();
     await page.waitForTimeout(400);
     expect(await drewTheList(page)).toBe(false);
@@ -340,10 +340,10 @@ test.describe('a reply that comes too late is dropped', () => {
 
   test('the list is up when Omar’s code arrives: it comes down at once, not when the answer does', async ({ page }) => {
     const fn = school();
-    fn.state.cards.ABCDEF = omar();
+    fn.state.cards.ABCDEFGH = omar();
     await serve(page, fn, { delay: { card: 800 } });
     await signIn(page);
-    await page.evaluate(() => (location.hash = '#ABC-DEF'));
+    await page.evaluate(() => (location.hash = '#ABCD-EFGH'));
     await page.evaluate(WATCH_FRAMES);
     await expect(page.locator('.sp-row')).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Is this you, Omar?' })).toBeVisible();
@@ -607,7 +607,7 @@ test.describe('"opened" means the row was on screen', () => {
         .map(el => el.querySelector('.sp-row-title').textContent);
     });
   const sent = (fn, posts) => {
-    const titles = Object.fromEntries(fn.state.cards.P3R8WD.page.assessments.map(a => [a.id, a.title]));
+    const titles = Object.fromEntries(fn.state.cards.P3R8WDK4.page.assessments.map(a => [a.id, a.title]));
     return posts.filter(p => p.body.route === 'seen').map(p => p.body.assessment_ids.map(a => titles[a]));
   };
 
@@ -722,7 +722,7 @@ test.describe('"opened" means the row was on screen', () => {
     await signIn(page);
     await expect.poll(() => sent(fn, posts).length).toBe(1);
     // A second return, so there is something new to open.
-    const contract = fn.state.cards.P3R8WD.page.assessments.find(a => a.title === 'Lab Safety Contract');
+    const contract = fn.state.cards.P3R8WDK4.page.assessments.find(a => a.title === 'Lab Safety Contract');
     fn.state.seen = {};
     contract.seen_at = null;
     // The page is opened in a tab nobody is looking at.

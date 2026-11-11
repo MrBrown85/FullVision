@@ -33,9 +33,13 @@ async function demo(page) {
 }
 const notLoaded = page =>
   page.evaluate(() => {
+    // The data layer's own refusal, with its code (shared/data.js, RETURNED_NOT_LOADED).
     window.getReturnedScores = function () {
-      throw new Error(
-        'This class holds grades until they are returned, and which of its grades are returned has not loaded.',
+      throw Object.assign(
+        new Error(
+          'This class holds grades until they are returned, and which of its grades are returned has not loaded.',
+        ),
+        { code: 'RETURNED_NOT_LOADED' },
       );
     };
     clearProfCache();
@@ -108,14 +112,58 @@ test('every page and every Reports tab: nothing throws or stays busy, and each d
     await go(page, '/dashboard?course=sci8');
     await notLoaded(page);
     await go(page, address);
+    // A page that fails its first draw is a page error (teacher/router.js throws it again, outside the navigation).
     expect(errors, address + ' not loaded').toEqual([]);
     expect(await busy(page), address + ' not loaded').toEqual([]);
+    if (address.indexOf('/reports') === 0) {
+      // Reports reads returned grades: it waits with the class's loading line.
+      await expect(page.locator('#report-output .report-waiting'), address).toHaveText('Loading this class…');
+    } else {
+      // Every other page shows the teacher's own work: the same with the rows missing as with them loaded.
+      expect(await shown(page), address + ' not loaded').toBe(expected[address]);
+    }
     await loaded(page);
     await page.waitForTimeout(700);
     expect(errors, address + ' loaded').toEqual([]);
     expect(await busy(page), address + ' loaded').toEqual([]);
     expect(await shown(page), address + ' once loaded').toBe(expected[address]);
   }
+});
+
+test('the walk sees a page that fails its first draw', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e.message)));
+  await demo(page);
+  await page.evaluate(() => {
+    const real = PageGradebook.init;
+    PageGradebook.init = function () {
+      PageGradebook.init = real;
+      throw new Error('a first draw that failed (a test)');
+    };
+  });
+  await go(page, '/gradebook?course=sci8');
+  // The app goes on: the address is the gradebook's, and the next page draws.
+  expect(page.url()).toContain('/gradebook');
+  expect(errors).toEqual(['a first draw that failed (a test)']);
+  await go(page, '/dashboard?course=sci8');
+  expect(errors.length).toBe(1);
+});
+
+test('a fault while the returned grades are worked out is not taken for loading: it surfaces', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e.message)));
+  await demo(page);
+  await page.evaluate(() => {
+    Grader.setPoints('sci8', 'st1', 'sci8q2', 1);
+    GradeState.returnedScores = function () {
+      throw new TypeError("Cannot read properties of undefined (reading 'returned_copy')");
+    };
+    clearProfCache();
+    _returnedSets = {};
+  });
+  await go(page, '/reports?course=sci8&tab=progress');
+  await expect(page.locator('#report-output .report-waiting')).toHaveCount(0);
+  expect(errors.some(m => /returned_copy/.test(m))).toBe(true);
 });
 
 test.describe('Reports and Assignments while the rows load', () => {
