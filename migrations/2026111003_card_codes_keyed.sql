@@ -227,10 +227,21 @@
 -- migrations/local-test/s3-m1-live-precheck.sql   expected: no rows from its
 --   first query (every function is as tested), and the counts 30, 1, 1, 0,
 --   0, any number, 1 from its second.
+--   Run on gradebook-prod on 2026-11-10 (read-only, by the orchestrator):
+--   the nine functions this file changes, the six it makes (absent), the
+--   table, the owners, the earlier migrations and auth.uid() were all as
+--   tested. Three functions it does not touch were listed (student_submit's
+--   _norm, check and submit): the harness had been built without two
+--   applied migrations; it now loads them and reproduces all three
+--   fingerprints. The counts were 30, 1, 1, 0, 1, 8, 1: one remembered card
+--   answer, issue_student_cards', which is a count and holds no code and no
+--   password.
 -- migrations/local-test/s3-m1-live-postcheck.sql  expected: no rows.
--- After the apply, as a statement of its own (it cannot run inside a
--- transaction): vacuum public.fv_idempotency; only if the pre-check counted
--- a remembered card answer (cached_card_answers above 0).
+-- A remembered answer of reissue_student_card or unlock_student_card holds
+-- a card's code. If the pre-check's count includes one, run this after the
+-- apply, as a statement of its own (it cannot run inside a transaction):
+-- vacuum public.fv_idempotency; On 2026-11-10 there was none, so no vacuum
+-- is needed.
 --
 -- ── Taking it back out ──────────────────────────────────────────────────────
 -- migrations/local-test/s3-m1-undo.sql (not a migration; proved by

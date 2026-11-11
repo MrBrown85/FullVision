@@ -47,8 +47,8 @@ with expected(fn, md5) as (values
     ('student_submit._returned_grade(uuid,uuid)',                              '21706ae9eec783107d9da24e52e1855a'),
     ('student_submit.open(text,text)',                                         'd11b2e67cbf10cae4d44ae6082fd8e01'),
     ('student_submit.verify(text,text,text,text,text)',                        '901e62bdb5d94a9ffcebe33563425ad7'),
-    ('student_submit."check"(text,text,text)',                                 'e2ba0c71703d86fc860859e7f049e906'),
-    ('student_submit.submit(text,jsonb,text)',                                 'c08c00dd76f13de2d88bd83be685280d')
+    ('student_submit."check"(text,text,text)',                                 'cc54e80ca585024c65926cb5e73f3f43'),
+    ('student_submit.submit(text,jsonb,text)',                                 '90ace3c164dab19f6a77ba7dfb19e40e')
 ), card as (select to_regclass('public.student_card') as oid
 ), names(kind, expected, found) as (
     select 'student_card columns',

@@ -86,6 +86,9 @@ def scen_apply():
            not re.search(r'(?<![a-z_])hmac\s*\(', TEXT, re.I) and 'pgcrypto' not in TEXT.lower() and 'digest(' not in code_only.lower())
 
         # ── A database in use, the old way ──────────────────────────────
+        got = fingerprints(d, list(LIVE_MD5))
+        ok("student_submit's _norm, check and submit are the live functions, byte for byte (the three S3-M1's pre-check found the harness building another way: it left out 20261102_housekeeping_fk_indexes.sql and 20261107_no_report_reply.sql)",
+           got == LIVE_MD5, got)
         ok('this database has Batch A, S0-M5 and S0-M4b and not S3-M1',
            d.one("select to_regprocedure('student_submit.issue_cards(uuid,uuid,jsonb,text,uuid)') is null and to_regprocedure('public._grade_return_repair_class(uuid)') is not null"))
         d.teacher('issue_student_cards(:c, null, :k)', c=COURSE_A, k=nid())
@@ -967,12 +970,17 @@ def scen_suites():
     """The suites that make no cards, untouched, on a database with the file applied."""
     d = Db('suites')
     try:
+        # phone_reports.py: 35 on a database built as live (no Reply to Report since 20261107), 37 where the reply exists.
+        for script, want in (('student_submit.py', '79 passed, 0 failed'), ('questionnaire_identity.py', '47 passed, 0 failed'),
+                             ('phone_reports.py', '35 passed, 0 failed'), ('questionnaires.py', '42 passed, 0 failed')):
+            before = d.suite(script)
+            ok('before the file %s passes on the database as live has it: %s' % (script, want), before == want, (before, d.failures[:3]))
         r = d.migrate()
         ok('the file applies to the database as built (no cards in it)', r == 'ok', r)
         for script, want in (('student_submit.py', '79 passed, 0 failed'), ('questionnaire_identity.py', '47 passed, 0 failed'),
-                             ('phone_reports.py', '37 passed, 0 failed'), ('questionnaires.py', '42 passed, 0 failed')):
+                             ('phone_reports.py', '35 passed, 0 failed'), ('questionnaires.py', '42 passed, 0 failed')):
             got = d.suite(script)
-            ok('with the file applied %s passes untouched, as before: %s' % (script, want), got == want, (got, d.failures[:3]))
+            ok('with the file applied %s passes as before: %s' % (script, want), got == want, (got, d.failures[:3]))
         # These two make a card where they need a signed-in phone, and one lists what a teacher can run:
         # they read which way this database makes cards (batch_a_common.card_session, keyed_cards).
         for script, want in (('grade_return.py', '284 passed, 0 failed'), ('grade_return_limits.py', '74 passed, 0 failed')):

@@ -33,11 +33,19 @@ BASE = ['harness.sql', 'score-prelude.sql', 'score-tables.sql', 'bundle-prelude.
         '../20261025_student_submit.sql', '../20261025_student_submit_phone.sql',
         '../20261025_student_submit_token_80.sql', '../20261025_phone_reports.sql',
         '../20261101_questionnaire_identity_check.sql', '../20261101_questionnaire_slip_fixes.sql',
-        '../20261103_slip_password_kept_for_live_slips.sql', 'batch-a-tables.sql', 'batch-a-prelude.sql',
-        'class-writers-prelude.sql', 'search-path-prelude.sql']
-BATCH_A = ['../2026110901_score_rows_same_class.sql', '../2026110902_grade_return.sql', '../2026110903_student_card.sql',
-           '../2026110904_student_sessions_page.sql']
-LIVE = BASE + BATCH_A + ['../2026111002_security_definer_search_path.sql', '../2026110905_grade_return_limits.sql']
+        '../20261103_slip_password_kept_for_live_slips.sql',
+        # Two migrations the lists in README.md ("Batch A", "S0-M4b") leave out, and live has. Without
+        # them student_submit._norm, check and submit are not the live functions: the first gives _norm
+        # its empty search_path; the second (reports are read-only) rewrites check and submit.
+        '../20261102_housekeeping_fk_indexes.sql', '../20261107_no_report_reply.sql',
+        'batch-a-tables.sql', 'batch-a-prelude.sql', 'class-writers-prelude.sql', 'search-path-prelude.sql']
+# Statements of a loaded migration that name something this stand-in does not have (the report-issue
+# tables of 20261020, fv_check_reporting_terms) and are left out, by the word that marks them.
+NOT_IN_THE_STAND_IN = {'../20261102_housekeeping_fk_indexes.sql': ('report_issue', 'fv_check_reporting_terms')}
+# student_submit's _norm, check and submit as gradebook-prod has them (md5 of pg_get_functiondef, read
+# from live on 2026-11-10 by the orchestrator, read-only): the three the harness built differently
+# until then. Recorded in live-function-md5.txt, on the lines that start "#student-submit".
+LIVE_MD5 = {l.split()[1]: l.split()[2] for l in open(os.path.join(HERE, 'live-function-md5.txt')) if l.startswith('#student-submit ')}
 
 A = '11111111-1111-1111-1111-111111111111'; B = '22222222-2222-2222-2222-222222222222'
 COURSE_A = 'aaaaaaaa-0000-0000-0000-000000000001'; COURSE_B = 'bbbbbbbb-0000-0000-0000-000000000001'
@@ -81,6 +89,7 @@ def build():
         for st in split(text_of(rel)):
             words = st.split('\n')[-1].split()
             if rel == 'harness.sql' and words[:2] == ['create', 'role'] and words[2] in roles: continue   # roles belong to the whole server
+            if any(w in bare(st) for w in NOT_IN_THE_STAND_IN.get(rel, ())): continue
             try: c.run(st)
             except Exception as e: sys.exit('FAILED in %s:\n%s\n-> %s' % (rel, st[:300], e))
             n += 1

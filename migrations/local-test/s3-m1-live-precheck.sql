@@ -14,6 +14,12 @@
 -- The fingerprints are md5(pg_get_functiondef(...)) from the local harness
 -- on PostgreSQL 17.11 (18.6 prints the same): what Batch A's files, S0-M5
 -- and S0-M4b create.
+-- First run on gradebook-prod on 2026-11-10: three rows, all stops = 'no'
+-- (student_submit._norm, check and submit). The harness had left out two
+-- applied migrations (20261102_housekeeping_fk_indexes.sql and
+-- 20261107_no_report_reply.sql); it loads them now, builds all three with
+-- the live fingerprints, and the values below are those. Expected again:
+-- no rows.
 with expected(fn, md5, stops) as (values
     -- the nine functions the migration drops, replaces or patches
     ('public._issue_access_code(uuid,uuid,timestamptz)',                      '42c79553ae6e6900e0e37832ba935405', 'yes'),
@@ -47,7 +53,7 @@ with expected(fn, md5, stops) as (values
     ('public._access_code_hash(text,text)',                                   '6795d47c7db1537c7409409c354282a8', 'no'),
     ('student_submit._card_refusal(uuid)',                                    'cb88af0a6bf62c22ff6c636b291b1a25', 'no'),
     ('student_submit._log(text,text,text,uuid,uuid)',                         '6737ebb0cb553bf22434d703d666f178', 'no'),
-    ('student_submit._norm(text)',                                            '5973c7a9f9a337090bb2e49835870d02', 'no'),
+    ('student_submit._norm(text)',                                            '276ee00aa8e488d789af9e2016714c94', 'no'),
     ('student_submit._midnight(text)',                                        'bf7920f2b31724bd007c66f729ac5edb', 'no'),
     ('student_submit._device_session(text)',                                  'fa1e510e4ccd3bccbf91e29540a837bb', 'no'),
     ('student_submit._session_classes(uuid)',                                 '6ef848f90721affa406d2b7fef89d285', 'no'),
@@ -58,8 +64,8 @@ with expected(fn, md5, stops) as (values
     ('student_submit._returned_grade(uuid,uuid)',                             '21706ae9eec783107d9da24e52e1855a', 'no'),
     ('student_submit.open(text,text)',                                        'd11b2e67cbf10cae4d44ae6082fd8e01', 'no'),
     ('student_submit.verify(text,text,text,text,text)',                       '901e62bdb5d94a9ffcebe33563425ad7', 'no'),
-    ('student_submit."check"(text,text,text)',                                'e2ba0c71703d86fc860859e7f049e906', 'no'),
-    ('student_submit.submit(text,jsonb,text)',                                'c08c00dd76f13de2d88bd83be685280d', 'no')
+    ('student_submit."check"(text,text,text)',                                'cc54e80ca585024c65926cb5e73f3f43', 'no'),
+    ('student_submit.submit(text,jsonb,text)',                                '90ace3c164dab19f6a77ba7dfb19e40e', 'no')
 ), known(fn) as (values   -- every function that may name student_card: the ones above that do, and no other
     ('public._issue_access_code(uuid,uuid,timestamptz)'), ('public._issue_report_code(uuid,uuid,timestamptz)'),
     ('public._issue_student_card(uuid,text)'), ('public.issue_student_cards(uuid,uuid[],uuid)'),
@@ -142,14 +148,19 @@ order by 1;
 
 -- ── QUERY 2: what the migration will stop and delete ────────────────────────
 -- Expected on 2026-11-10: 30, 1, 1, 0, 0, any number, 1.
+-- It answered 30, 1, 1, 0, 1, 8, 1 that day: the one remembered answer was
+-- issue_student_cards', a count with no code and no password in it.
 --   live_cards            cards that work now: every one is stopped
 --   classes_with_cards    classes that have a live card
 --   teachers_with_cards   teachers who have ever made a card
 --   live_sessions         phones signed in with a card right now: each is told
 --                         its card was replaced
 --   cached_card_answers   remembered answers of the three old card calls:
---                         deleted (above 0: run `vacuum public.fv_idempotency;`
---                         after the apply, as a statement of its own)
+--                         deleted. Those of reissue_student_card and
+--                         unlock_student_card hold a card's code; if one of
+--                         them is counted, run `vacuum public.fv_idempotency;`
+--                         after the apply, as a statement of its own.
+--                         issue_student_cards' is a count only.
 --   live_slips            slips that still open: not touched
 --   classes_with_page_on  classes whose Make Cards does not work between the
 --                         function deploy and the release

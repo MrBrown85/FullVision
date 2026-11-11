@@ -107,8 +107,14 @@ BASE = ['harness.sql', 'score-prelude.sql', 'score-tables.sql', 'bundle-prelude.
         '../20261025_student_submit.sql', '../20261025_student_submit_phone.sql',
         '../20261025_student_submit_token_80.sql', '../20261025_phone_reports.sql',
         '../20261101_questionnaire_identity_check.sql', '../20261101_questionnaire_slip_fixes.sql',
-        '../20261103_slip_password_kept_for_live_slips.sql', 'batch-a-tables.sql', 'batch-a-prelude.sql',
-        'class-writers-prelude.sql']
+        '../20261103_slip_password_kept_for_live_slips.sql',
+        # Live has these two as well, and without them student_submit._norm, check and submit are not the
+        # live functions (found by S3-M1's read-only pre-check on 2026-11-10): _norm's empty search_path,
+        # and reports that are read-only (no Reply to Report).
+        '../20261102_housekeeping_fk_indexes.sql', '../20261107_no_report_reply.sql',
+        'batch-a-tables.sql', 'batch-a-prelude.sql', 'class-writers-prelude.sql']
+# Statements of a loaded migration that name something this stand-in does not have, left out by that word.
+NOT_IN_THE_STAND_IN = {'../20261102_housekeeping_fk_indexes.sql': ('report_issue', 'fv_check_reporting_terms')}
 A = '11111111-1111-1111-1111-111111111111'
 # Classes of their own, so the other scripts (which grade in Teacher A's seeded class) find theirs as they expect it.
 COURSE = 'aaaaaaaa-0000-0000-0000-0000000000dd'      # When I Return Them
@@ -260,6 +266,7 @@ def build():
         for st in split(text_of('local-test/' + rel, S0_M5_REF)):
             words = st.split('\n')[-1].split()
             if rel == 'harness.sql' and words[:2] == ['create', 'role'] and words[2] in roles: continue   # roles belong to the whole server
+            if any(w in bare(st) for w in NOT_IN_THE_STAND_IN.get(rel, ())): continue
             try: c.run(st)
             except Exception as e: sys.exit('FAILED in %s:\n%s\n-> %s' % (rel, st[:300], e))
             n += 1
@@ -574,7 +581,7 @@ def scen_main():
     ok('after the undo, score_rpcs.py: 182 of its 183 checks pass as before Batch A; the one that does not is the comparison with the schema snapshot, which still describes the database with Batch A',
        r == '182 passed, 1 failed' and d.failures == ['every score table matches the live snapshot: columns, constraints, indexes, triggers, policies'], (r, d.failures))
     for script, want in (('student_submit.py', '79 passed, 0 failed'),
-                         ('questionnaire_identity.py', '47 passed, 0 failed'), ('phone_reports.py', '37 passed, 0 failed'),
+                         ('questionnaire_identity.py', '47 passed, 0 failed'), ('phone_reports.py', '35 passed, 0 failed'),   # 37 where the report reply still exists; live has had none since 20261107
                          ('questionnaires.py', '42 passed, 0 failed')):
         r = d.suite(script)
         ok('after the undo, %s passes as before Batch A: %s' % (script, want.split(',')[0]), r == want, r)
