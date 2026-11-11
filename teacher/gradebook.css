@@ -2119,11 +2119,15 @@ th.gb-group-alt {
   border: 1.5px dashed var(--score-3);
   border-radius: 4px;
 }
-/* The toolbar's "N to return": a count that is also the filter. */
-.gb-to-return {
+/* The toolbar's one pill: "9 to grade · 4 to return · 1 question", with
+   the camera when work came in. Each part is a count that is also its
+   filter; the one pressed is filled. */
+.gb-work-pill {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
   height: var(--control-h);
-  padding: 0 12px;
-  border: none;
+  padding: 0 6px 0 10px;
   border-radius: 16px;
   background: var(--demo-pill-bg);
   color: var(--demo-pill-text);
@@ -2131,11 +2135,40 @@ th.gb-group-alt {
   font-size: var(--text-sm);
   font-weight: 700;
   white-space: nowrap;
+}
+.gb-work-pill:not(:has(.gb-work-camera)) {
+  padding-left: 6px;
+}
+.gb-work-pill .gb-work-camera {
+  margin: 0 2px 0 0;
+  color: inherit;
+}
+.gb-pill-part {
+  height: calc(var(--control-h) - 8px);
+  padding: 0 4px;
+  border: none;
+  border-radius: 12px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
   cursor: pointer;
 }
-.gb-to-return:hover,
-.gb-to-return.active {
-  box-shadow: inset 0 0 0 1.5px var(--demo-pill-text);
+.gb-pill-part:hover {
+  text-decoration: underline;
+}
+.gb-pill-part.active {
+  padding: 0 8px;
+  background: var(--demo-pill-text);
+  color: var(--demo-pill-bg);
+  text-decoration: none;
+}
+.gb-pill-part:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 1px;
+}
+.gb-work-pill-sep {
+  padding: 0 1px;
 }
 /* Return N Graded under a Competencies header. */
 .gb-return-drafts {
@@ -2187,7 +2220,4 @@ th.gb-group-alt {
 }
 .gb-key-item .gb-question {
   margin: 0 5px 0 0;
-}
-.gb-questions-btn .gb-question {
-  margin: 0 6px 0 0;
 }

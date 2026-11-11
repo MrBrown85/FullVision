@@ -614,11 +614,15 @@ describe('the Advanced Rubric a criterion at a time', () => {
     expect(RubricChecks.hasChecks(crits()[0])).toBe(true);
   });
 
-  it('with Send Work off the card lists every criterion, as before', () => {
+  // The board "Phone Grader, Advanced Rubric" in every class (Nov 11 drift check).
+  it('with no student page, or Send Work off, a criterion at a time too, Next on the bar', () => {
+    open();
+    expect(card('st1').querySelectorAll('.m-crit-group').length).toBe(1);
+    expect(card('st1').querySelector('.m-crit-pager')).not.toBeNull();
+    expect(text(bar().querySelector('.m-grade-return-btn'))).toBe('Next: ' + crits()[1].name);
     setStudentPageSwitch(CID, true, 'on_return');
     open();
-    expect(card('st1').querySelector('.m-crit-pager')).toBeNull();
-    expect(card('st1').querySelectorAll('.m-crit-group').length).toBe(crits().length);
+    expect(card('st1').querySelector('.m-crit-pager')).not.toBeNull();
   });
 
   it('one criterion with its pager, levels, a group of boxes per level, ± and Comment', () => {
@@ -649,7 +653,7 @@ describe('the Advanced Rubric a criterion at a time', () => {
     const openHeads = heads.filter(h => h.getAttribute('aria-expanded') === 'true');
     expect(openHeads.length).toBeLessThanOrEqual(1);
     expect(pager.querySelectorAll('.m-check-group:not(.is-open) input').length).toBe(0);
-    expect(pager.querySelector('.m-score-mods [aria-label="Minus"]')).not.toBeNull();
+    expect(pager.querySelector('.m-score-mods [data-mod="-1"]').textContent).toBe('\u2212Minus');
     expect(pager.querySelector('.m-crit-comment-btn')).not.toBeNull();
     // The bar goes on to the next criterion.
     expect(text(bar().querySelector('.m-grade-return-btn'))).toBe('Next: ' + crits()[1].name);

@@ -45,7 +45,10 @@ describe('S12-F1: the group card', () => {
     expect(words(q(page, '[data-segment="sent"]'))).toBe('Sent 1');
     await page.click('[data-segment="sent"]');
     const c = card(page);
-    expect([...c.querySelectorAll('.sp-flag')].map(words)).toEqual([expect.stringMatching(/^Sent \S+ \d+$/), 'Group']);
+    expect([...c.querySelectorAll('.sp-flag')].map(words)).toEqual([
+      expect.stringMatching(/^Sent \S+ \d+ · 4 photos$/),
+      'Group',
+    ]);
     expect(words(c.querySelector('.sp-group-sent'))).toMatch(/^Sent \S+ \d+ · 4 photos$/);
     expect(words(c.querySelector('.sp-group-line'))).toBe('3 in your group. Someone in your group sent it.');
     expect(words(c.querySelector('[data-act="send-open"]'))).toBe('Add a Page');

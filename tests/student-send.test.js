@@ -149,8 +149,10 @@ describe('S5-F2: Send My Work, Check and Send, Sent, Sending Late, Closed', () =
     expect(words(card(page, 'Disease Research Poster').querySelector('[data-act="send-open"]'))).toBe('Send My Work');
     const quick = card(page, 'Immune System Quick Check');
     expect(quick.querySelector('[data-act="send-open"]')).toBeNull();
-    expect(words(quick.querySelector('.sp-send-closed-title'))).toMatch(/^Closed \S+ \d+$/);
-    expect(words(quick.querySelector('.sp-send-closed-line'))).toBe('Hand this one in on paper');
+    // The Closed Assignment board: a "Closed Nov 13" pill, then a locked row; no due pill.
+    expect(words(quick.querySelector('.sp-flag-closed'))).toMatch(/^Closed \S+ \d+$/);
+    expect(words(quick.querySelector('.sp-lock-row.sp-send-closed-line'))).toBe('Hand this one in on paper');
+    expect(quick.querySelector('.sp-flag-due')).toBeNull();
   });
 
   it('Check and Send opens with the camera and the file chooser; a piece that takes files also takes PDFs', async () => {
@@ -198,7 +200,8 @@ describe('S5-F2: Send My Work, Check and Send, Sent, Sending Late, Closed', () =
     expect(text(page, '[data-segment="todo"]')).toBe('To Do 2');
     await page.click('[data-segment="sent"]');
     const sent = card(page, 'Science Fair Proposal');
-    expect(words(sent.querySelector('.sp-flag-sent'))).toMatch(/^Sent \S+ \d+$/);
+    // "Sent Nov 4 · 3 photos" (the Sent, Being Graded board).
+    expect(words(sent.querySelector('.sp-flag-sent'))).toMatch(/^Sent \S+ \d+ · \d+ photos?$/);
     expect(words(sent.querySelector('.sp-send-line'))).toBe(
       'Your teacher hasn’t started grading it. You can still change it.',
     );

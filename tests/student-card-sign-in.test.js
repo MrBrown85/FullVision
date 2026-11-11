@@ -176,7 +176,11 @@ describe('Switching Classes: Your Classes', () => {
     // The same session, now opening Humanities 8.
     expect(Object.keys(dev.fn.state.sessions)).toEqual([token]);
     expect(JSON.parse(dev.store[KEY])).toMatchObject({ t: token, e: HUM });
-    expect(page.calls[page.calls.length - 1].body).toEqual({ route: 'page', session: token, enrollment_id: HUM });
+    expect(page.calls.filter(c => c.body.route === 'page').pop().body).toEqual({
+      route: 'page',
+      session: token,
+      enrollment_id: HUM,
+    });
     expect(head(page)).toBe('Humanities 8 · Block A');
     expect(titles(page)).toEqual(['Medieval Europe Map']);
   });
@@ -194,7 +198,11 @@ describe('Switching Classes: Your Classes', () => {
     expect(page.root().querySelector('.sp-class[aria-current="true"] .sp-class-name').textContent).toBe('Humanities 8');
     page.calls.length = 0;
     await page.click('.sp-class[data-enrollment="' + CECE + '"]');
-    expect(page.calls.map(c => c.body)).toEqual([{ route: 'page', session: token, enrollment_id: CECE }]);
+    expect(page.calls.map(c => c.body)).toEqual([
+      { route: 'page', session: token, enrollment_id: CECE },
+      // What the class takes (s/send.js), once its page is in.
+      { route: 'work', session: token, enrollment_id: CECE },
+    ]);
     expect(head(page)).toBe('Science 8 · Block B');
     expect(JSON.parse(dev.store[KEY])).toMatchObject({ t: token, e: CECE });
     expect(has(page, '.sp-sheet')).toBe(false);

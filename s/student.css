@@ -17,6 +17,14 @@
   --sp-green-soft: #bbf7d0;
   --sp-green-line: #2e7d32;
   --sp-amber: #b45309;
+  --sp-amber-soft: #fff1db;
+  --sp-amber-tint: #fff7e8;
+  --sp-amber-line: #c07a00;
+  --sp-amber-text: #8a4b00;
+  --sp-green-tint: #eef7ef;
+  --sp-green-deep: #1b5e20;
+  --sp-said: #e8f1ff;
+  --sp-said-text: #0058d0;
   --sp-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
@@ -389,6 +397,21 @@ button {
   font-size: 16px;
   line-height: 1.45;
   white-space: pre-wrap;
+}
+
+/* Is This You? on a phone: the avatar centred above the heading, and
+   Yes, That's Me / No, That's Not Me full width with a gap. The Chromebook
+   rules (min-width: 900px) put the avatar beside the heading. */
+.sp-check-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sp-hello-who {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
 }
 
 /* Start, Sent and messages */
@@ -973,8 +996,7 @@ button {
     gap: 6px;
   }
   .sp-hello-who {
-    display: flex;
-    align-items: center;
+    flex-direction: row;
     gap: 14px;
   }
   .sp-check-box .sp-avatar {
@@ -1042,11 +1064,16 @@ button {
   padding: 12px 16px 0;
 }
 
-/* Your Classes: how many pieces wait in each class (S4-W1). */
+/* Your Classes: how many pieces wait in each class (S4-W1), as the board's
+   amber pill at the right of the row. */
 .sp-class-todo {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 10px;
+  background: var(--sp-amber-soft);
+  color: var(--sp-amber-text);
   font-size: 13px;
-  font-weight: 600;
-  color: var(--sp-blue-text, #0066cc);
+  font-weight: 700;
 }
 
 /* Sending work (S5-F2, S5-F3; s/send.js): Check and Send, the camera and
@@ -1090,8 +1117,8 @@ button {
   margin: 0;
   padding: 8px 12px;
   border-radius: 10px;
-  background: #fff1db;
-  color: #8a4b00;
+  background: var(--sp-amber-soft);
+  color: var(--sp-amber-text);
   font-weight: 600;
 }
 .sp-send-pages {
@@ -1314,6 +1341,14 @@ label.sp-btn:focus-within {
   color: #fff;
   font-size: 14px;
 }
+/* Step 1 answered Yes: its number becomes a green check (the board). */
+.sp-reflect-n-done {
+  background: var(--sp-green-line);
+}
+.sp-reflect-n-done svg {
+  width: 14px;
+  height: 14px;
+}
 .sp-reflect-aside {
   margin-left: auto;
   font-size: 13px;
@@ -1338,46 +1373,174 @@ label.sp-btn:focus-within {
   font-size: 15px;
   color: var(--sp-text-2);
 }
+.sp-reflect-step .sp-reflect-line {
+  color: var(--sp-text);
+}
+/* The teacher's words, tinted blue as on the board. */
+.sp-reflect-view .sp-fb-card.sp-reflect-said {
+  background: var(--sp-said);
+}
+.sp-reflect-view .sp-reflect-said .sp-fb-label {
+  color: var(--sp-said-text);
+}
+.sp-reflect-cols,
+.sp-reflect-left,
+.sp-reflect-right {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+/* Send (or Done) pinned at the bottom of the screen, also when the page is short. */
+.sp-reflect,
+.sp-reflect-view,
+.sp-reflect-view > .sp-feedback {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.sp-reflect-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: auto -16px 0;
+  padding: 10px 16px calc(16px + env(safe-area-inset-bottom));
+  background: rgba(245, 245, 247, 0.96);
+  box-shadow: 0 -0.5px 0 rgba(0, 0, 0, 0.12);
+}
+.sp-reflect-foot .sp-reflect-private {
+  text-align: center;
+  font-size: 13px;
+}
+.sp-reflect-foot-done {
+  box-shadow: none;
+}
+/* Reflection Sent: centred, the check above the title. */
 .sp-reflect-sent {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 12px;
+  align-items: center;
+  gap: 14px;
+  padding: 24px 4px 8px;
+  text-align: center;
 }
-.sp-seg-2 {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.sp-reflect-sent-tick {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 84px;
+  height: 84px;
+  border-radius: 42px;
+  background: var(--sp-green-soft);
+  color: var(--sp-green-deep);
 }
-.sp-seg-3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.sp-reflect-sent-tick svg {
+  width: 40px;
+  height: 40px;
 }
+.sp-reflect-sent .sp-reflect-line {
+  font-size: 16px;
+}
+.sp-reflect-sent .sp-fb-card {
+  align-self: stretch;
+  text-align: left;
+}
+/* The plan, amber wherever it shows (Reflection Sent, Check and Send). */
+.sp-reflect-plan {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--sp-amber-tint);
+  text-align: left;
+}
+.sp-reflect-view .sp-reflect-plan .sp-fb-label {
+  color: var(--sp-amber-text);
+}
+.sp-reflect-plan .sp-plan-words {
+  margin: 0;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+.sp-reflect-plan-when {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: #3a3a3c;
+}
+/* Yes / Not Sure, and Yes / Partly / Not This Time: separate bordered
+   buttons; the chosen one green (Yes), amber (Not Sure) or blue. */
+.sp-choices {
+  display: flex;
+  gap: 8px;
+}
+.sp-choices .sp-choice {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 4px 8px;
+  border: 1.5px solid var(--sp-line);
+  border-radius: 12px;
+  background: var(--sp-card);
+  color: var(--sp-text);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.sp-choices .sp-choice[aria-checked='true'] {
+  border-color: var(--sp-blue);
+  background: var(--sp-blue-soft);
+  color: var(--sp-blue-text);
+  font-weight: 700;
+}
+.sp-choices .sp-choice-green[aria-checked='true'] {
+  border-color: var(--sp-green-line);
+  background: var(--sp-green-tint);
+  color: var(--sp-green-deep);
+}
+.sp-choices .sp-choice-amber[aria-checked='true'] {
+  border-color: var(--sp-amber-line);
+  background: var(--sp-amber-tint);
+  color: var(--sp-amber-text);
+}
+.sp-choices .sp-choice:disabled {
+  cursor: default;
+}
+/* Your Teacher Answered: the student's words white, the teacher's blue. */
 .sp-talk {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 .sp-bubble {
-  max-width: 88%;
-  padding: 10px 14px;
-  border-radius: 16px;
+  padding: 14px 16px;
+  border-radius: 18px;
   background: var(--sp-card);
 }
-.sp-bubble-mine {
-  align-self: flex-end;
-  background: #e8f1ff;
+.sp-bubble-theirs {
+  background: var(--sp-said);
 }
 .sp-bubble-who {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 0 0 4px;
+  margin: 0 0 6px;
   font-size: 13px;
   font-weight: 700;
-  color: var(--sp-text-2);
+  color: #3a3a3c;
+}
+.sp-bubble-theirs .sp-bubble-who {
+  color: var(--sp-said-text);
 }
 .sp-bubble-words {
   margin: 0;
-  font-size: 16px;
-  line-height: 1.4;
+  font-size: 17px;
+  line-height: 1.45;
   overflow-wrap: anywhere;
 }
 .sp-send-plan {
@@ -1385,15 +1548,17 @@ label.sp-btn:focus-within {
   flex-direction: column;
   gap: 8px;
   padding: 12px 14px;
-  border-left: 4px solid var(--sp-green-line);
-  border-radius: 12px;
-  background: #f0f7f1;
+  border-radius: 16px;
+  background: var(--sp-amber-tint);
 }
 .sp-send-plan .sp-plan-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: 0;
   font-size: 13px;
   font-weight: 700;
-  color: var(--sp-green);
+  color: var(--sp-amber-text);
 }
 .sp-send-plan .sp-plan-words {
   margin: 0;
@@ -1403,4 +1568,54 @@ label.sp-btn:focus-within {
   margin: 4px 0 0;
   font-size: 15px;
   font-weight: 700;
+}
+/* Reflect on Feedback on a Chromebook (the board): the teacher's words on
+   the left, the steps on the right, Send pinned bottom right. */
+@media (min-width: 900px) {
+  .sp-app:has(> .sp-reflect) {
+    max-width: none;
+  }
+  .sp-main.sp-reflect {
+    max-width: 1000px;
+    padding: 24px 32px 0;
+  }
+  .sp-reflect-cols {
+    display: grid;
+    grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
+    align-items: start;
+    gap: 18px;
+  }
+  .sp-reflect-cols-one {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sp-reflect-foot {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    margin: auto 0 0;
+    padding: 16px 0 24px;
+    background: var(--sp-bg);
+    box-shadow: none;
+  }
+  .sp-reflect-foot .sp-reflect-private {
+    text-align: left;
+    font-size: 14px;
+  }
+  .sp-reflect-foot .sp-btn {
+    width: auto;
+    min-width: 164px;
+    padding: 0 22px;
+    border-radius: 25px;
+  }
+  .sp-reflect-foot-done {
+    justify-content: center;
+  }
+  .sp-reflect-foot .sp-msg {
+    flex: 1;
+  }
+  .sp-reflect-sent {
+    width: 100%;
+    max-width: 520px;
+    margin: 0 auto;
+  }
 }

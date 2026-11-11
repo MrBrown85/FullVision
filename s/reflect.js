@@ -203,12 +203,23 @@
 
   var BACK =
     '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 5l-7 7 7 7"/></svg>';
+  var TICK =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  // A chosen answer's colour, as the boards: Yes green, Not Sure amber, the rest blue.
+  var TONE = { yes: ' sp-choice-green', not_sure: ' sp-choice-amber' };
 
-  function head(title, sub) {
+  function backHtml() {
     return (
       '<button type="button" class="sp-fb-back sp-reflect-back" data-act="reflect-back">' +
       BACK +
-      '<span>Your Feedback</span></button><div class="sp-fb-head"><h1 class="sp-fb-title" id="sp-reflect-title" tabindex="-1">' +
+      '<span>Your Feedback</span></button>'
+    );
+  }
+
+  function head(title, sub) {
+    return (
+      backHtml() +
+      '<div class="sp-fb-head"><h1 class="sp-fb-title" id="sp-reflect-title" tabindex="-1">' +
       esc(title) +
       '</h1>' +
       (sub ? '<p class="sp-fb-sub">' + esc(sub) + '</p>' : '') +
@@ -218,17 +229,15 @@
 
   function choicesHtml(label, act, options, chosen, busy) {
     return (
-      '<div class="sp-seg sp-seg-' +
-      options.length +
-      '" role="radiogroup" aria-label="' +
+      '<div class="sp-choices" role="radiogroup" aria-label="' +
       esc(label) +
       '">' +
       options
         .map(function (o, i) {
           var on = chosen === o[0];
           return (
-            '<button type="button" class="sp-seg-btn' +
-            (on ? ' sp-seg-on' : '') +
+            '<button type="button" class="sp-choice' +
+            (TONE[o[0]] || '') +
             '" role="radio" aria-checked="' +
             on +
             '" tabindex="' +
@@ -285,11 +294,13 @@
     );
   }
 
-  function stepHtml(n, title, body, aside) {
+  // A step's number; a green check once it is answered (step 1 on Yes, the board).
+  function stepHtml(n, title, body, aside, done) {
     return (
-      '<section class="sp-reflect-step"><h2 class="sp-reflect-step-title"><span class="sp-reflect-n" aria-hidden="true">' +
-      n +
-      '</span>' +
+      '<section class="sp-reflect-step"><h2 class="sp-reflect-step-title">' +
+      (done
+        ? '<span class="sp-reflect-n sp-reflect-n-done" aria-hidden="true">' + TICK + '</span>'
+        : '<span class="sp-reflect-n" aria-hidden="true">' + n + '</span>') +
       esc(title) +
       (aside ? '<span class="sp-reflect-aside">' + esc(aside) + '</span>' : '') +
       '</h2>' +
@@ -315,28 +326,33 @@
       : '';
   }
 
-  // Reflect on Feedback and Reflect, Not Sure (the boards).
+  // Reflect on Feedback and Reflect, Not Sure (the boards). On a Chromebook
+  // the teacher's words sit left of the steps and Send is pinned bottom right.
   function formHtml(r, p, v) {
     var who = 'your teacher';
-    var body =
-      head('Reflect on Feedback', p.title) +
-      saidHtml(p) +
-      stepHtml(
-        1,
-        'Does the Feedback Make Sense?',
-        choicesHtml(
-          'Does the feedback make sense?',
-          'reflect-sense',
-          [
-            ['yes', 'Yes'],
-            ['not_sure', 'Not Sure'],
-          ],
-          r.sense,
-          r.busy,
-        ),
-      );
+    var said = saidHtml(p);
+    var first = choicesHtml(
+      'Does the feedback make sense?',
+      'reflect-sense',
+      [
+        ['yes', 'Yes'],
+        ['not_sure', 'Not Sure'],
+      ],
+      r.sense,
+      r.busy,
+    );
+    if (r.sense === 'not_sure') {
+      // Not Sure: the reassurance, the starters and the question in step 1's card.
+      first +=
+        '<p class="sp-reflect-line">' +
+        esc('That’s okay. Ask ' + who + ' about the part that doesn’t make sense.') +
+        '</p>' +
+        startersHtml('question') +
+        boxHtml('question', r.question, 'Your question for ' + who);
+    }
+    var steps = stepHtml(1, 'Does the Feedback Make Sense?', first, '', r.sense === 'yes');
     if (r.sense === 'yes') {
-      body +=
+      steps +=
         stepHtml(
           2,
           'What Will You Do Next Time?',
@@ -348,17 +364,19 @@
           startersHtml('went') + boxHtml('went', r.went, 'What went well?', 'Something that went well'),
           'Optional',
         );
-    } else if (r.sense === 'not_sure') {
-      body +=
-        '<section class="sp-reflect-step"><p class="sp-reflect-line">' +
-        esc('That’s okay. Ask ' + who + ' about the part that doesn’t make sense.') +
-        '</p>' +
-        startersHtml('question') +
-        boxHtml('question', r.question, 'Your question for ' + who) +
-        '</section>';
     }
+    var body =
+      head('Reflect on Feedback', p.title) +
+      '<div class="sp-reflect-cols' +
+      (said ? '' : ' sp-reflect-cols-one') +
+      '">' +
+      (said ? '<div class="sp-reflect-left">' + said + '</div>' : '') +
+      '<div class="sp-reflect-right">' +
+      steps +
+      '</div></div>';
     if (r.sense) {
       body +=
+        '<div class="sp-reflect-foot">' +
         '<p class="sp-reflect-private">' +
         esc('Only ' + who + ' sees this.') +
         '</p>' +
@@ -367,32 +385,38 @@
         (!ready(r) || r.busy ? ' disabled' : '') +
         '>' +
         esc(r.busy ? 'Sending…' : r.sense === 'yes' ? 'Send Reflection' : 'Ask Your Teacher') +
-        '</button>';
+        '</button></div>';
     }
     return body;
   }
 
-  // Reflection Sent (the board), and its question form (mine).
+  // Reflection Sent (the board), and its question form (mine): centred, the
+  // check above the title, the plan in amber, Done at the bottom.
   function sentHtml(r, p, v) {
     var mine = p.reflection || {};
     var who = 'Your teacher';
     var plan = mine.makesSense === 'yes';
     return (
-      head(plan ? 'Reflection Sent' : 'Question Sent', '') +
-      '<section class="sp-reflect-sent"><span class="sp-send-tick" aria-hidden="true">✓</span><p class="sp-reflect-line">' +
+      backHtml() +
+      '<section class="sp-reflect-sent"><span class="sp-reflect-sent-tick" aria-hidden="true">' +
+      TICK +
+      '</span><h1 class="sp-fb-title" id="sp-reflect-title" tabindex="-1">' +
+      esc(plan ? 'Reflection Sent' : 'Question Sent') +
+      '</h1><p class="sp-reflect-line">' +
       esc(plan ? who + ' will read it.' : who + ' will answer it here.') +
       '</p>' +
       (plan
-        ? '<div class="sp-fb-card sp-reflect-plan"><h2 class="sp-fb-label">Your Plan</h2><p class="sp-plan-words">' +
+        ? '<div class="sp-reflect-plan"><h2 class="sp-fb-label">Your Plan</h2><p class="sp-plan-words">' +
           esc(mine.plan) +
-          '</p></div>' +
-          '<p class="sp-reflect-line">' +
+          '</p>' +
+          '<p class="sp-reflect-plan-when">' +
           esc('It’ll show on your next ' + ((v.course && v.course.name) || 'class') + ' assignment.') +
-          '</p>'
-        : '<div class="sp-fb-card sp-reflect-plan"><h2 class="sp-fb-label">You Asked</h2><p class="sp-plan-words">' +
+          '</p></div>'
+        : '<div class="sp-fb-card sp-reflect-asked"><h2 class="sp-fb-label">You Asked</h2><p class="sp-plan-words">' +
           esc(mine.question) +
           '</p></div>') +
-      '<button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="reflect-back">Done</button></section>'
+      '</section>' +
+      '<div class="sp-reflect-foot sp-reflect-foot-done"><button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="reflect-back">Done</button></div>'
     );
   }
 
@@ -425,7 +449,7 @@
     if (asked && mine.answer) {
       var sense = mine.senseNow || (r.asking ? 'not_sure' : '');
       after +=
-        '<section class="sp-reflect-step"><h2 class="sp-reflect-step-title">Does It Make Sense Now?</h2>' +
+        '<section class="sp-reflect-step sp-reflect-now"><h2 class="sp-reflect-step-title">Does It Make Sense Now?</h2>' +
         choicesHtml(
           'Does it make sense now?',
           'reflect-sense-now',
@@ -436,10 +460,12 @@
           sense,
           r.busy || !!mine.senseNow,
         ) +
+        // Not the board's "Then make your plan for next time.": Make My Plan isn't built (PR 1074).
+        (mine.senseNow === 'yes'
+          ? '<p class="sp-reflect-line">Your teacher will see that it makes sense now.</p>'
+          : '') +
         '</section>';
-      if (mine.senseNow === 'yes') {
-        after += '<p class="sp-reflect-line">Then make your plan for next time.</p>';
-      } else if (!mine.senseNow && r.asking) {
+      if (!mine.senseNow && r.asking) {
         after +=
           '<section class="sp-reflect-step">' +
           boxHtml('follow', r.follow, 'Your question for your teacher') +

@@ -332,11 +332,11 @@ var CmStudentPage = (function () {
      photos sent before Send Work was turned off are still deleted on that
      date (ruling 108's follow-up).
 
-     Demo Mode first: the server's columns come with Batch B, which is not
-     applied. So the two rows are drawn in Demo Mode only; for a signed-in
-     teacher they are not drawn at all and nothing is asked of the server.
-     They are kept with Demo Mode's student work (getCourseSendWork,
-     saveDemoStudentWork in shared/data.js), read through workSettings. The line under Keep Photos Until and the
+     Drawn in Demo Mode and for a signed-in class whose student page the
+     server has on (studentWorkLive, S5-W1). Read through workSettings
+     (getCourseSendWork) and saved through setCourseSendWork in
+     shared/data.js: Demo Mode keeps them with its sample work, a signed-in
+     class sends set_course_send_work. The line under Keep Photos Until and the
      Delete Photos Now? question are Colin's (ruling 102); the reminder it
      promises and the deleting itself come with S8. */
   var KEEP_CHOICES = [
@@ -344,9 +344,12 @@ var CmStudentPage = (function () {
     { value: 'end_of_year', label: 'End of Year' },
   ];
 
-  // Demo Mode: the one place the two rows are drawn until S5-W1.
   function _demo() {
     return typeof isDemoMode === 'function' && isDemoMode();
+  }
+  // Demo Mode, or a signed-in class whose student work is the server's.
+  function _workHere(cid) {
+    return _demo() || (typeof studentWorkLive === 'function' && studentWorkLive(cid));
   }
 
   /* The class's Send Work and Keep Photos Until, as the screens read them:
@@ -356,7 +359,7 @@ var CmStudentPage = (function () {
      send_work is false too: nothing about student work shows anywhere. */
   function workSettings(cid) {
     var s = _settings(cid);
-    var offered = !!s && s.student_page === true && _demo() && typeof getCourseSendWork === 'function';
+    var offered = !!s && s.student_page === true && _workHere(cid) && typeof getCourseSendWork === 'function';
     var w = offered ? getCourseSendWork(cid) : { send_work: false, keep_photos_until: 'end_of_year' };
     return {
       offered: offered,
@@ -401,12 +404,9 @@ var CmStudentPage = (function () {
     return _day(iso, 'long');
   }
 
-  // Demo Mode's one writer of student work (saveDemoStudentWork), with the
-  // class's two settings changed and everything else as it was.
+  // The one writer of the class's two settings (setCourseSendWork).
   function _saveWork(cid, change) {
-    var work = getCourseSubmissions(cid);
-    work.course = Object.assign({}, work.course, change);
-    saveDemoStudentWork(cid, work);
+    setCourseSendWork(cid, change);
     _rerender();
   }
 
@@ -731,22 +731,23 @@ var CmStudentPage = (function () {
       (l.on ? ' checked' : '') +
       '><span class="gpd-switch-ui" aria-hidden="true"></span></span>' +
       '</div>' +
-      '<div class="cm-hint" id="sp-learning-would">' +
+      // The board's grey panel: what they would see, and See What They'd See after it as a link.
+      '<div class="sp-learning-panel">' +
+      '<span id="sp-learning-would">' +
       esc(
         'Students would see their level on each skill and their grade in this class’s grading style (' +
           style +
           "), only from work you've returned.",
       ) +
+      '</span> ' +
+      '<button type="button" class="sp-link-btn" id="sp-learning-see" data-action="spSeeLearning" aria-describedby="sp-learning-would">' +
+      esc("See What They'd See") +
+      '</button>' +
       '</div>' +
       '<div class="cm-hint" id="sp-learning-device">' +
       esc(
         "Students' own phones and Chromebooks can't show My Learning yet, even with this on. For now only Preview as Student shows it.",
       ) +
-      '</div>' +
-      '<div class="sp-learning-see">' +
-      '<button type="button" class="btn btn-secondary" id="sp-learning-see" data-action="spSeeLearning" aria-describedby="sp-learning-would">' +
-      esc("See What They'd See") +
-      '</button>' +
       '</div>' +
       '</div>'
     );
@@ -870,7 +871,7 @@ var CmStudentPage = (function () {
         })
         .join('') +
       '</select>' +
-      '<button type="button" class="btn btn-secondary" id="sp-preview-open" data-action="spPreview">Open Preview</button>' +
+      '<button type="button" class="btn sp-tint-btn" id="sp-preview-open" data-action="spPreview">Open Preview</button>' +
       '</div>' +
       '</div>'
     );
@@ -884,6 +885,22 @@ var CmStudentPage = (function () {
     if (!sid) return;
     _previewFor[cid] = sid;
     PreviewStudent.open(cid, sid, el, 'sp-preview-open');
+  }
+
+  /* ── Questionnaires and Reports ────────────────────────────── */
+
+  // Nothing to choose here: the row says where they are set up (the board's last row).
+  function _questionnairesRow() {
+    return (
+      '<div class="sp-row sp-questionnaires">' +
+      '<div class="sp-row-head">' +
+      '<div class="sp-row-title">Questionnaires and Reports</div>' +
+      '<div class="cm-hint">' +
+      esc('Open with the same card. Set them up on the Questionnaires tab and in Reports.') +
+      '</div>' +
+      '</div>' +
+      '</div>'
+    );
   }
 
   /* ── The panel ─────────────────────────────────────────────── */
@@ -901,18 +918,29 @@ var CmStudentPage = (function () {
     return (
       (_buildFlag ? _buildSwitchCard(cid) : '') +
       (on
-        ? '<div class="cm-section sp-card" data-cid="' +
+        ? '<div class="sp-layout"><div class="sp-main">' +
+          '<div class="cm-section sp-card" data-cid="' +
           esc(cid) +
           '">' +
           '<h2 class="cm-grade-title">Student Page</h2>' +
+          '<div class="cm-hint sp-intro">' +
+          esc('What students can do when they open their page with their card. Each one is off until you turn it on.') +
+          '</div>' +
           photoReminderHtml(cid, 'sp') +
           _returnGradesRow(cid) +
           _sendWorkRows(cid) +
           _reflectRow(cid) +
           _learningRow(cid) +
+          _questionnairesRow() +
           '</div>' +
           (typeof StudentCards !== 'undefined' ? StudentCards.render(cid) : '') +
-          _previewCard(cid)
+          '</div>' +
+          // The board's right column: the cards in short, and Preview as Student.
+          '<div class="sp-aside">' +
+          (typeof StudentCards !== 'undefined' ? StudentCards.summaryHtml(cid) : '') +
+          _previewCard(cid) +
+          '</div>' +
+          '</div>'
         : '')
     );
   }

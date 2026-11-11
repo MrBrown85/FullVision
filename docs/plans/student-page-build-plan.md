@@ -415,7 +415,7 @@ The wording above is proposed; Colin approves it in each PR, as usual.
 - `S5-F3` Student: Not Sent Yet, One Page Didn't Send, the blurry check, Unsend and Replace. Done (PR 1057).
 - `S5-F4` Edge routes `send-start`, `send-finish`, `unsend`, `replace`, `file-links`, with the server's location check. Open as a draft (PR 1086): not merged, not deployed; waits for an independent security review, Batch B applied, and Colin's word to deploy.
 - `S5-F5` Demo Mode sample work: the drawn pages and the Cell Microscope Lab assessment (the Demo board). The Science 8 class moves from `constants.js` into `seed-data.js` here (a cp1 item). Done (PR 1035); the script that draws the pages is `scripts/draw-sample-work.cjs`.
-- `S5-W1` Wire to Batch B. Not started: waits for Batch B.
+- `S5-W1` Wire to Batch B. Teacher half open (S5-W1, S6-W1 (teacher)): Send Work, Keep Photos Until and the assessment's Students Send, After the Due Date and Last Day save to the server; Add Work uploads through the photo queue. The student half (the `s/` page through the edge routes) is its own PR.
 - Not in the list above: pdf.js in `vendor/`, loaded only when a PDF is chosen, with the Content Security Policy unchanged. Done (PR 1073).
 
 **Status (Nov 11 morning).** Every screen works in Demo Mode behind Send Work; nothing reaches the server. Not built: the HEIC decoder (its licence is Colin's call); Handed In Paper on the student's card (no route for it); the live camera viewfinder; showing a sent page from a `blob:` link on a real phone. Not tested: Safari, Firefox, real devices and real scans.
@@ -444,7 +444,7 @@ The wording above is proposed; Colin approves it in each PR, as usual.
 - `S6-F3` The To Grade, To Return, Returned, Not In and All filters and counts; the exact-match "Same photo as" note. Done (PR 1055).
 - `S6-F4` Assignments page with submissions; gradebook To Grade cells, camera mark and hover card. Done (PR 1056).
 - `S6-F5` Dashboard To Grade cell, in every state on its board. Done (PR 1056).
-- `S6-W1` Wire to Batch B. Not started: waits for Batch B.
+- `S6-W1` Wire to Batch B. Open (S5-W1, S6-W1 (teacher)): the work pane, the counts, Add Work, Delete Work, Grade From Paper's paper hand-in and the Work Wall read and write a signed-in class's real submissions. Mark Up, reflections, revisions and group work stay Demo Mode's; Return still calls `return_grades`.
 
 **Status (Nov 11 morning).** Demo Mode only, behind the build switch and Send Work. The artboard's worked example holds in a test (7, 3, 14, 4, then 6, 3, 15, 4). Simplified from the boards: Focus on Work's Advanced Rubric tiles stack; the gradebook's hover card is a hover line. Not built: the "9" badge on Assignments in the top bar, and the per-row Submitted lines on whole-class grids. Three screens still load pictures their own way and should move to `WorkThumbs` (S14-T1) later: the grader's work pane, the phone's grade photos and the phone's Add Work.
 

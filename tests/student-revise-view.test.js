@@ -130,7 +130,7 @@ function drawn(view, ui) {
   return box;
 }
 const words = el => (el ? el.textContent.replace(/\s+/g, ' ').trim() : null);
-const parts = r => [...r.querySelectorAll('.sp-ba-name, .sp-level, .sp-ba-same')].map(words);
+const parts = r => [...r.querySelectorAll('.sp-ba-name, .sp-level, .sp-ba-old, .sp-ba-new, .sp-ba-same')].map(words);
 
 // The student's own device: s/student-data.js, calc.js and student-view.js on their own.
 let side = null;

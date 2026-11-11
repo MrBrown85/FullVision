@@ -2208,32 +2208,115 @@ body.fv-switching-course::after {
   color: #fff;
 }
 
-/* + / − under the levels */
-.m-score-mods {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  margin-top: 10px;
+/* A level button: its figure over its word, four to a row that fits a
+   375 px phone (the board "Phone Speed Grader With Photos";
+   MComponents.levelButtonsHTML). */
+.m-score-btn.m-level-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
+  height: auto;
+  min-height: 52px;
+  padding: 6px 2px;
+  border-width: 1.5px;
+  border-radius: 10px;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--text);
 }
-.m-mod-btn {
-  width: 52px;
-  height: 36px;
-  border-radius: 18px;
-  border: 2px solid var(--border);
-  background: var(--surface);
-  font-size: 20px;
+.m-level-fig {
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.m-level-word {
+  max-width: 100%;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+}
+.m-score-btn.m-level-btn.m-score-active {
+  color: #fff;
+}
+.m-score-btn.m-level-btn.m-score-active .m-level-word {
+  font-weight: 700;
+  color: inherit;
+}
+.m-score-btns:has(.m-level-btn) {
+  gap: 6px;
+}
+/* The board fills the chosen level; it carries no tick. */
+.m-score-btn.m-level-btn.m-score-active::after {
+  content: none;
+}
+@media (max-width: 359px) {
+  .m-score-btn.m-level-btn {
+    padding: 6px 0;
+  }
+  .m-level-word {
+    font-size: 9.5px;
+    letter-spacing: -0.02em;
+  }
+}
+/* "Suggested: Proficient" over a criterion's levels, from its ticks, in
+   the level's colour. */
+.m-crit-suggested {
+  margin: -2px 0 8px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--text-2);
+}
+.m-crit-suggested.l1 {
+  color: var(--score-1-text);
+}
+.m-crit-suggested.l2 {
+  color: var(--score-2-text);
+}
+.m-crit-suggested.l3 {
+  color: var(--score-3-text);
+}
+.m-crit-suggested.l4 {
+  color: var(--score-4-text);
+}
+
+/* Fine-tune: − Minus and + Plus under the levels; an applied one is amber. */
+.m-score-mods {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.m-mod-btn {
+  flex: 1 1 0;
+  height: 44px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
+.m-mod-sign {
+  font-size: 16px;
+  font-weight: 700;
+}
 .m-mod-btn.m-mod-active {
-  background: var(--text);
-  border-color: transparent;
-  color: var(--surface);
+  background: var(--score-2-bg);
+  border-color: var(--score-2);
+  color: var(--score-2-text);
 }
 .m-mod-btn:disabled {
-  opacity: 0.35;
+  opacity: 0.4;
   cursor: default;
 }
 
@@ -2291,11 +2374,14 @@ body.fv-switching-course::after {
 .m-overall-comment:focus {
   box-shadow: 0 0 0 2px var(--active);
 }
+/* Missing | Excused | Late: one segmented control under the student's name
+   (the board "Phone Speed Grader With Photos"). */
 .m-status-row {
-  display: flex;
-  gap: 8px;
-  margin-top: 16px;
-  justify-content: center;
+  display: inline-flex;
+  margin-top: 6px;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--surface-2);
 }
 .m-status-pill {
   padding: 10px 16px;
@@ -2309,6 +2395,51 @@ body.fv-switching-course::after {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: all 0.15s;
+}
+.m-status-row .m-status-pill {
+  position: relative;
+  padding: 0 12px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+.m-status-row .m-status-pill + .m-status-pill::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 1px;
+  background: var(--border);
+}
+.m-status-row .m-status-pill.m-status-active::before,
+.m-status-row .m-status-pill.m-status-active + .m-status-pill::before {
+  display: none;
+}
+.m-status-row .m-status-pill.m-status-active {
+  background: var(--score-1);
+  color: #fff;
+  font-weight: 700;
+}
+.m-status-row .m-status-pill.m-status-active[data-val='EXC'] {
+  background: var(--text-2);
+}
+.m-status-row .m-status-pill.m-status-active[data-val='LATE'] {
+  background: var(--score-2);
+}
+.m-grade-student-main {
+  min-width: 0;
+}
+.m-grade-student-main .m-status-hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  text-align: left;
+}
+.m-grade-student-header:has(.m-status-row) {
+  align-items: flex-start;
 }
 .m-status-pill:disabled {
   opacity: 0.4;
@@ -2333,19 +2464,6 @@ body.fv-switching-course::after {
   font-size: 13px;
   color: var(--text-2);
   text-align: center;
-}
-/* The level numbers' names, under the score rows. */
-.m-level-key {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 4px 12px;
-  margin: 4px 16px 12px;
-  font-size: 12px;
-  color: var(--text-2);
-}
-.m-level-key b {
-  color: var(--text);
 }
 .m-grade-view-hint {
   width: 100%;
@@ -4388,6 +4506,50 @@ body.fv-switching-course::after {
   background: var(--active-light);
   color: var(--link);
 }
+/* The board's chip "☑ 2": grey and filled. */
+.m-checks-btn {
+  border-color: transparent;
+  background: var(--surface-2);
+  color: var(--text);
+}
+/* The criterion's Comment: a round icon beside the name, blue-tinted, and
+   filled blue once there is a comment; in the pager's ± row, "Comment". */
+.m-crit-comment-btn {
+  justify-content: center;
+  width: 44px;
+  min-width: 44px;
+  padding: 0;
+  border-radius: 50%;
+  border-color: transparent;
+  background: var(--active-light);
+  color: var(--active);
+}
+.m-crit-comment-btn.is-on {
+  background: var(--active);
+  color: #fff;
+}
+.m-crit-comment-btn.is-labelled {
+  flex: 1 1 0;
+  width: auto;
+  height: 44px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.m-fine-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.m-fine-row .m-score-mods {
+  flex: 2 1 0;
+  margin-top: 0;
+}
+/* A saved comment reads as a note; tapped, it is a box to type in. */
+.m-crit-comment:not(:focus):not(:placeholder-shown) {
+  background: var(--active-light);
+  font-size: 15px;
+}
 .m-checklist {
   margin-top: 12px;
   padding: 12px 14px;
@@ -4538,11 +4700,6 @@ body.fv-switching-course::after {
 .m-check-group.is-open {
   padding-bottom: 6px;
 }
-.m-crit-pager-tools {
-  display: flex;
-  justify-content: flex-start;
-  margin-top: 10px;
-}
 .m-crit-pager .m-crit-comment {
   margin-top: 10px;
 }
@@ -4669,7 +4826,6 @@ body.fv-switching-course::after {
 }
 .m-mod-btn {
   height: 44px;
-  border-radius: 22px;
 }
 .m-wdg-editor-drag {
   display: flex;
@@ -5074,10 +5230,74 @@ body.fv-switching-course::after {
   font-size: 14px;
   font-weight: 700;
 }
+/* "4 not in" is amber, as on the board. */
 .m-tg-notin {
   font-size: 14px;
   font-weight: 600;
-  color: var(--priority);
+  color: var(--score-2-text);
+}
+/* To Grade's count is blue, as on the board. */
+.m-seg-count.m-seg-count-tograde {
+  background: var(--active);
+  color: #fff;
+}
+/* All Caught Up: a green tick, the line, and See All Assessments as a pill. */
+.m-tg-caught-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 84px;
+  height: 84px;
+  margin-bottom: 14px;
+  border-radius: 50%;
+  background: var(--score-3-bg);
+  color: var(--score-3-text);
+}
+.m-tg-caught .m-empty-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+}
+.m-tg-caught .m-empty-subtitle {
+  color: var(--text-2);
+}
+.m-tg-caught-btn {
+  margin-top: 18px;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 22px;
+  background: var(--active-light);
+  color: var(--link);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+}
+/* The row menu: a round tinted icon before each choice. */
+.m-tg-menu-item:has(.m-tg-menu-icon) {
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+}
+.m-tg-menu-icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--active-light);
+  color: var(--active);
+}
+.m-tg-menu-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.m-tg-menu-item:has(.m-tg-menu-icon) .m-tg-menu-title {
+  color: var(--text);
 }
 .m-tg-done {
   font-size: 14px;
@@ -5147,23 +5367,50 @@ body.fv-switching-course::after {
   font-size: 17px;
   font-weight: 600;
 }
+/* The board "Grade Tab, Filter That Applies As You Tap": Filter on the
+   left, Clear All and Done on the right; "Showing 6 of 18" in green; a
+   chosen chip blue-tinted with a tick. */
 .m-live-filter-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 4px;
 }
 .m-live-filter-head .m-filter-sheet-heading {
+  flex: 1;
   margin: 0;
+  padding: 0;
 }
-.m-live-filter-done {
+.m-live-filter-head .m-btn-ghost {
+  flex: none;
+  width: auto;
+  min-height: 44px;
+  padding: 0 8px;
+  background: none;
+  color: var(--link);
+  font-size: 17px;
+  font-weight: 500;
+}
+.m-live-filter-head .m-live-filter-done {
   font-weight: 700;
 }
 .m-live-filter-count {
-  margin: 4px 0 10px;
-  font-size: 13px;
-  color: var(--text-2);
-  text-align: center;
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--score-3-text);
+}
+.m-live-filter .m-filter-sheet-title {
+  font-size: 15px;
+  color: var(--text);
+}
+.m-live-filter .m-filter-pill.m-filter-active {
+  background: var(--active-light);
+  border-color: var(--active);
+  color: var(--link);
+  font-weight: 600;
+}
+.m-live-filter .m-filter-pill.m-filter-active::before {
+  content: '\2713\00a0';
 }
 
 /* The grading card's work: when it came, the pages, the note. */

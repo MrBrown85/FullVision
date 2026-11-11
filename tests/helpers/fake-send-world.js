@@ -75,18 +75,23 @@ export const STATEMENTS = {
 };
 const BY_SQL = Object.fromEntries(Object.entries(STATEMENTS).map(([k, v]) => [v, k]));
 
-export function fakeWorld() {
+/* opts, for a world inside another stand-in (tests/helpers/fake-student-submit.js): `enrollments` and
+   `assessments` in place of the ones below, `sessionError(token, enrollment)` in place of this world's own
+   sessions (null when the session holds the class), `storeBase`, the Storage address its links are on, and
+   `now`, its clock (left out, every send starts at the same moment on Nov 11). */
+export function fakeWorld(opts = {}) {
   const calls = []; // [name, params]
-  const enrollments = {
+  const enrollments = opts.enrollments || {
     [CECE]: { course: C1 },
     [OMAR]: { course: C1 },
     [LIAM]: { course: C2 },
   };
-  const assessments = {
+  const assessments = opts.assessments || {
     [LAB]: { course: C1, students_send: 'photos', open: true },
     [ESSAY]: { course: C1, students_send: 'photos', open: true },
     [MAP]: { course: C2, students_send: 'photos', open: true },
   };
+  const storeBase = opts.storeBase || 'https://store.test/storage/v1';
   const sessions = { [CECE_PHONE]: [CECE], [OMAR_PHONE]: [OMAR], [LIAM_PHONE]: [LIAM] };
   const subs = new Map(); // id -> submission
   const queue = []; // { id, bucket, path, done }
@@ -107,6 +112,7 @@ export function fakeWorld() {
     subs.delete(sub.id);
   };
   const sessionError = (token, e) => {
+    if (opts.sessionError) return opts.sessionError(token, e);
     if (token === ENDED) return { ok: false, error: 'signed_out' };
     const list = sessions[token];
     if (!list) return { ok: false, error: 'signed_out' };
@@ -229,8 +235,8 @@ export function fakeWorld() {
         sent_by: 'student',
         request_id: req,
         note,
-        created_at: '2026-11-11T17:00:00+00:00',
-        finish_by: '2026-11-11T19:00:00+00:00',
+        created_at: opts.now ? new Date(opts.now()).toISOString() : '2026-11-11T17:00:00+00:00',
+        finish_by: opts.now ? new Date(opts.now() + 7200e3).toISOString() : '2026-11-11T19:00:00+00:00',
         files,
       };
       subs.set(id, sub);
@@ -339,7 +345,7 @@ export function fakeWorld() {
       }
       sub.state = 'sent';
       sub.intent = 'new';
-      sub.sent_at = '2026-11-11T17:30:00+00:00';
+      sub.sent_at = opts.now ? new Date(opts.now()).toISOString() : '2026-11-11T17:30:00+00:00';
       sub.late = !piece.open;
       return {
         ok: true,
@@ -441,12 +447,12 @@ export function fakeWorld() {
       storeCalls.push(['signUpload', path]);
       const token = 'up' + ++tokenN;
       tokens.set(token, path);
-      return `https://store.test/storage/v1/object/upload/sign/student-photos/${path}?token=${token}`;
+      return `${storeBase}/object/upload/sign/student-photos/${path}?token=${token}`;
     },
     async signDownloads(paths, seconds) {
       storeCalls.push(['signDownloads', paths, seconds]);
       return Object.fromEntries(
-        paths.map(p => [p, `https://store.test/storage/v1/object/sign/student-photos/${p}?token=dl&s=${seconds}`]),
+        paths.map(p => [p, `${storeBase}/object/sign/student-photos/${p}?token=dl&s=${seconds}`]),
       );
     },
     async read(path, max) {
@@ -483,5 +489,26 @@ export function fakeWorld() {
     return 200;
   }
 
-  return { db, store, calls, storeCalls, objects, subs, queue, override, assessments, sessions, phoneUpload, fns };
+  /* What a phone gets from a download link: the file's bytes, while it is there. */
+  function phoneDownload(url) {
+    const path = decodeURIComponent(new URL(url).pathname.split('/object/sign/student-photos/')[1] || '');
+    const o = objects.get(path);
+    return o ? { status: 200, bytes: o.bytes } : { status: 400, bytes: null };
+  }
+
+  return {
+    db,
+    store,
+    calls,
+    storeCalls,
+    objects,
+    subs,
+    queue,
+    override,
+    assessments,
+    sessions,
+    phoneUpload,
+    phoneDownload,
+    fns,
+  };
 }

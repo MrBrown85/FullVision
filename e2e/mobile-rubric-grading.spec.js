@@ -55,7 +55,9 @@ test.describe('Phone grading by rubric criterion', () => {
     const group = card.locator('.m-crit-group').first();
     const target = (await group.locator('.m-score-btn.m-score-active').count()) ? '1' : '4';
     await group.locator(`.m-score-btn[data-score="${target}"]`).click();
-    await expect(card.locator('.m-crit-group').first().locator('.m-score-btn.m-score-active')).toHaveText(target);
+    await expect(card.locator('.m-crit-group').first().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText(
+      target,
+    );
     const saved = await page.evaluate(() => {
       const cid = Object.keys(COURSES)[0];
       const a = getAssessments(cid).find(x => x.title === 'Science Fair Proposal');
@@ -101,15 +103,15 @@ test.describe('Phone grading by rubric criterion', () => {
     const row = card.locator('.m-score-group').first();
     const target =
       (await row
-        .locator('.m-score-btn.m-score-active')
+        .locator('.m-score-btn.m-score-active .m-level-fig')
         .textContent()
         .catch(() => '')) === '4'
         ? '1'
         : '4';
     await row.locator(`.m-score-btn[data-score="${target}"]`).click();
-    await expect(firstCard(page).locator('.m-score-group').first().locator('.m-score-btn.m-score-active')).toHaveText(
-      target,
-    );
+    await expect(
+      firstCard(page).locator('.m-score-group').first().locator('.m-score-btn.m-score-active .m-level-fig'),
+    ).toHaveText(target);
     const behind = await page.evaluate(tid => {
       const cid = Object.keys(COURSES)[0];
       const a = getAssessments(cid).find(x => x.title === 'Science Fair Proposal');
@@ -123,26 +125,32 @@ test.describe('Phone grading by rubric criterion', () => {
     expect(new Set(behind)).toEqual(new Set([Number(target)]));
   });
 
+  // An Advanced Rubric shows a criterion at a time in every class (the board
+  // "Phone Grader, Advanced Rubric"): its boxes in a group per level.
   test('an Advanced Rubric ticks its way to a level', async ({ page }) => {
     await openLab(page, true);
-    const group = () => firstCard(page).locator('.m-crit-group').first();
+    const group = () => firstCard(page).locator('.m-crit-pager');
+    const head = lv => group().locator(`.m-check-group-head[data-level="${lv}"]`);
+    const open = async lv => {
+      if ((await head(lv).getAttribute('aria-expanded')) !== 'true') await head(lv).click();
+    };
     // Start from no level so the boxes decide it.
     if (await group().locator('.m-score-btn.m-score-active').count())
       await group().locator('.m-score-btn.m-score-active').click();
     await expect(group().locator('.m-score-btn.m-score-active')).toHaveCount(0);
 
-    await group().locator('.m-checks-btn').click();
-    await expect(group().locator('.m-checklist-head')).toHaveText('No Level Suggested Yet');
+    await open(4);
+    await expect(head(4).locator('.m-check-group-count')).toHaveText('0 of 2');
     await group().getByLabel('Repeats trials').check();
     await expect(group().locator('.m-score-btn.m-score-active')).toHaveCount(0);
     await group().getByLabel('Explains an odd result').check();
-    await expect(group().locator('.m-score-btn.m-score-active')).toHaveText('4');
-    await expect(group().locator('.m-checklist-head')).toHaveText('Suggested: Extending');
-    await expect(group().locator('.m-checks-btn')).toHaveText('2');
+    await expect(group().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText('4');
+    await expect(head(4).locator('.m-check-group-count')).toHaveText('2 of 2');
 
     // A level picked by hand stays.
     await group().locator('.m-score-btn[data-score="2"]').click();
+    await open(3);
     await group().getByLabel('Records units').check();
-    await expect(group().locator('.m-score-btn.m-score-active')).toHaveText('2');
+    await expect(group().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText('2');
   });
 });

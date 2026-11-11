@@ -136,3 +136,53 @@ test('Add Work for a student with nothing in, then Delete Work', async ({ page }
   await expect(dialog.locator('.grader-addwork')).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+/* The scoring column beside the work, at its widest and in Focus on Work,
+   holds every kind of piece: label over control, nothing past its right
+   edge, and a chosen rubric tile keeps its level's whole name. */
+test('every kind of piece fits the scoring column, with and without Focus on Work', async ({ page }) => {
+  await openDemo(page);
+  // Rubric, single-point, points, Complete/Incomplete, competency levels.
+  const pieces = ['sci8a3', 'sci8a18', 'sci8q1', 'sci8q4', 'sci8a2'];
+  await page.evaluate(pieces => {
+    const cid = getActiveCourse();
+    const work = getCourseSubmissions(cid);
+    work.assessments.forEach(e => {
+      if (pieces.includes(e.id)) e.students_send = 'photos';
+    });
+    saveDemoStudentWork(cid, work);
+  }, pieces);
+  const past = col =>
+    col.evaluate(el => {
+      const edge = el.getBoundingClientRect().right + 1;
+      return [...el.querySelectorAll('*')]
+        .filter(x => x.getBoundingClientRect().width && x.getBoundingClientRect().right > edge)
+        .map(x => String(x.className));
+    });
+  for (const aid of pieces) {
+    await page.goto('/gradebook');
+    await page.waitForSelector('#dock-mount nav', { timeout: 10000 });
+    const cell = page.locator('.gb-scores-cell[data-sid="st5"][data-aid="' + aid + '"]');
+    await cell.scrollIntoViewIfNeeded();
+    await cell.click();
+    const dialog = page.locator('#grader-overlay .grader-dialog');
+    await expect(dialog).toHaveClass(/has-work/);
+    // Nothing in yet: add the photo, so Focus on Work is offered.
+    const files = dialog.locator('.grader-work-files');
+    if (await files.count()) {
+      await files.setInputFiles(PHOTO);
+      await expect(dialog.locator('.grader-work-img')).toBeVisible({ timeout: 10000 });
+    }
+    const col = dialog.locator('.grader-panel-col');
+    expect(await past(col), aid).toEqual([]);
+    const chosen = dialog.locator('.grdt-chosen-label').first();
+    if (await chosen.count()) {
+      await expect(chosen).toHaveText('Proficient');
+      expect(await chosen.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+    }
+    await dialog.locator('[data-grader="work-focus"]').click();
+    await expect(dialog).toHaveClass(/is-focus/);
+    expect(await past(col), aid + ' in Focus on Work').toEqual([]);
+    await page.keyboard.press('Escape');
+  }
+});

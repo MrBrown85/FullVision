@@ -3,23 +3,37 @@
    "Not Sent Yet", "One Page Didn't Send", "Blurry Photo, Retake", "Sent,
    Being Graded" and "Unsend or Replace").
 
-   Demo Mode only, behind three switches: the class's student page (the
-   build switch), Send Work (Demo Mode's #demo-card-send; off at
-   #demo-card, as in every class), and Students Send on the piece. Nothing
-   is sent anywhere: the server's side (migrations/local-test/
-   batch-b-contract.md: `work`, `send_start`, `send_finish`, `unsend`,
-   `replace`) is not applied, and the routes that will call it (S5-F4) are
-   not built. Here Demo Mode answers as those functions are written to:
-   what each piece takes (workOf, the shape of `work`), a send that is
-   finished only once every page is up, Late judged at the finish, a send
-   that can be finished for two hours from its first start, no Unsend or
-   Replace once grading has started. Photos stay on this device, in memory,
-   for as long as the sample runs.
+   Behind three switches: the class's student page (the build switch),
+   Send Work, and Students Send on the piece.
+
+   Demo Mode (#demo-card-send; Send Work is off at #demo-card, as in every
+   class) answers on the device as the server's functions are written to
+   (migrations/local-test/batch-b-contract.md): what each piece takes
+   (workOf, the shape of `work`), a send that is finished only once every
+   page is up, Late judged at the finish, a send that can be finished for
+   two hours from its first start, no Unsend or Replace once grading has
+   started. Photos stay on this device, in memory, for as long as the
+   sample runs. Nothing is sent anywhere.
+
+   A real card (S5-W1) asks the student-submit function's routes
+   (supabase/functions/student-submit/send-routes.ts) through app.js's
+   askClass, which adds the device's session: `work` once the page is in,
+   and only a class whose `work` says Send Work is on shows anything about
+   sending. Any other class's page is drawn exactly as before. A send is
+   `send-start` (or `replace`), each page and its thumbnail put to the
+   one-time upload link the start gave for it, then `send-finish`; Unsend
+   is `unsend`; the student's own pages come through `file-links` and are
+   shown from blob: addresses. A send's pages are kept on the device
+   (IndexedDB, through shared/photo-queue.js's store) from the press of
+   Send until the server has them, so a reload or a dropped connection
+   finishes the send within its two hours; after that the student sends
+   again. Every sign-out (Done, idle, another tab, midnight) empties that
+   store (ruling 138). Mark Up, reflections, revisions and
+   group work stay Demo Mode's.
 
    Every photo and PDF goes through shared/photo-shrink.js (one path for
    every upload): JPEG pages under 2 MB, a PDF turned into pages (30 pages
-   at most in one send), the blurry check. A real send will hand the pages
-   to shared/photo-queue.js; Demo Mode hands nothing to it.
+   at most in one send), the blurry check.
 
    Any answer from anything asynchronous (a file being shrunk, a send)
    draws only if the same send is still on screen for the same student:
@@ -62,8 +76,9 @@
   }
 
   /* The `work` reply for the class on screen, as the contract gives it, or
-     null: Demo Mode with Send Work on only. */
+     null: Demo Mode with Send Work on, or a real card whose class has it on. */
   function workOf(state) {
+    if (state && !state.demo) return realWorkOf(state);
     if (!state || !state.demo || !state.demoSend || !state.reply) return null;
     var day = today();
     var sentFor = state.demoSent || {};
@@ -233,16 +248,26 @@
   function open(id, replace) {
     var p = pieceOf(id);
     if (!p || !p.send || !p.send.takes) return;
+    // A real send of this piece still going up, or waiting: its own screen, as it stands.
+    var going = !S.demo && !replace ? running[S.page.student.id + ':' + id] : null;
+    if (going) return show(going);
     if (replace ? !(p.send.sent && p.send.sent.canChange) : !p.send.open) return;
     // Send My Revision (S11-F2): a piece returned for revision, or replacing the revision sent.
     var revision = !!p.revision && (replace ? p.kind === 'sent' : p.kind === 'revise');
     if (!replace && p.revision && !revision) return;
+    // Sending onto the pages the teacher added (ruling 107): the new pages go first, and 30 fit in all.
+    var joins = !replace && p.send.sent && p.send.sent.byTeacher ? p.send.sent.pages : 0;
     S.send = {
       id: p.id,
       student: S.page.student.id,
       replace: !!replace,
       revision: revision,
-      pages: [], // { key, blob, thumb, hash, url, thumbUrl, blurry, from, sent }
+      real: !S.demo,
+      room: Math.max(0, MAX_PAGES - joins), // pages this send may hold
+      request: '', // a real send's request id: the same on every try, so the server makes it once
+      submission: '',
+      finishBy: 0, // when the server stops holding it (ms)
+      pages: [], // { key, id, blob, thumb, hash, width, height, url, thumbUrl, blurry, from, sent, fileId, landed }
       note: '',
       followed: '', // Did You Do It? (S10-F2): '' | yes | partly | no (Batch B's followed_plan)
       step: 'check', // check | blurry | sending | notsent | pagefailed | expired | sent
@@ -253,6 +278,11 @@
       sentAt: 0,
       seq: 0,
     };
+    show(S.send);
+  }
+
+  function show(send) {
+    S.send = send;
     S.sendAsk = null;
     S.screen = 'send';
     whenShrinkIsIn();
@@ -261,12 +291,17 @@
   }
 
   function back() {
-    var id = S.send ? S.send.id : '';
+    var send = S.send;
+    var id = send ? send.id : '';
+    // A real send the student leaves after it stopped for good is not kept for next time.
+    if (send && send.real && send.step === 'expired') forget(send);
     S.send = null;
     S.screen = 'assignments';
     StudentPage.paint(
       id ? '[data-piece="' + String(id).replace(/["\\]/g, '') + '"] .sp-piece-title' : '.sp-segment-on',
     );
+    // Sent: another send waiting on this device, if there is one, goes next.
+    if (send && send.real && send.step === 'sent') resume();
   }
 
   /* ── Adding pages ────────────────────────────────────────────── */
@@ -353,7 +388,7 @@
 
   function shrink(send, files, at, prepare) {
     var room = function () {
-      return MAX_PAGES - send.pages.length + (at >= 0 ? 1 : 0);
+      return send.room - send.pages.length + (at >= 0 ? 1 : 0);
     };
     var out = [];
     var why = '';
@@ -369,7 +404,7 @@
             return;
           }
           if (out.length + res.pages.length > room()) {
-            why = 'You can send ' + MAX_PAGES + ' pages at most.';
+            why = 'You can send ' + send.room + ' pages at most.';
             return;
           }
           res.pages.forEach(function (pg) {
@@ -394,18 +429,7 @@
       send.busy = false;
       send.message = why;
       var made = out.map(function (o) {
-        return {
-          key: 'pg' + (send.seq += 1),
-          blob: o.pg.blob,
-          thumb: o.pg.thumb,
-          hash: o.pg.hash,
-          url: objectUrl(o.pg.blob),
-          thumbUrl: objectUrl(o.pg.thumb),
-          // Only a photo is checked for blur: a PDF's page is as sharp as it was made.
-          blurry: o.from !== 'pdf' && !!o.pg.blurry,
-          from: o.from,
-          sent: false,
-        };
+        return pageOf(send, o.pg, o.from);
       });
       if (made.length) {
         if (at >= 0 && at < send.pages.length) send.pages.splice.apply(send.pages, [at, 1].concat(made));
@@ -427,14 +451,48 @@
     });
   }
 
+  // One page as the send keeps it: the shrunk JPEG and thumbnail, and what a real send knows of it.
+  function pageOf(send, pg, from) {
+    return {
+      key: 'pg' + (send.seq += 1),
+      id: newId(), // its own id where the device keeps it
+      blob: pg.blob,
+      thumb: pg.thumb,
+      hash: pg.hash,
+      width: pg.width,
+      height: pg.height,
+      url: objectUrl(pg.blob),
+      thumbUrl: objectUrl(pg.thumb),
+      // Only a photo is checked for blur: a PDF's page is as sharp as it was made.
+      blurry: from !== 'pdf' && !!pg.blurry,
+      from: from,
+      sent: false,
+      fileId: '', // the server's id for it, once a start has named it
+      landed: { photo: false, thumb: false }, // which of its two files the server has
+    };
+  }
+
   function remove(key) {
     var send = S.send;
     if (!send || send.busy) return;
+    dropPage(send, key);
+    send.message = '';
+    StudentPage.paint(send.pages.length ? '.sp-send-add' : '#sp-send-title');
+  }
+
+  // A page taken out of the send, and off the device.
+  function dropPage(send, key) {
+    var gone = send.pages.filter(function (pg) {
+      return pg.key === key;
+    });
     send.pages = send.pages.filter(function (pg) {
       return pg.key !== key;
     });
-    send.message = '';
-    StudentPage.paint(send.pages.length ? '.sp-send-add' : '#sp-send-title');
+    if (send.real && gone.length) {
+      onDevice(function (st) {
+        return st.remove([gone[0].id]);
+      });
+    }
   }
 
   /* ── Sending ─────────────────────────────────────────────────── */
@@ -449,6 +507,7 @@
   function go(again) {
     var send = S.send;
     if (!send || send.busy || !send.pages.length) return Promise.resolve();
+    if (send.real) return goReal(send);
     var now = clock();
     if (again && send.startedAt && now > send.startedAt + HOLD_MS) {
       send.step = 'expired';
@@ -544,6 +603,750 @@
     StudentPage.paint('#sp-send-title');
   }
 
+  /* ── A real card (S5-W1) ─────────────────────────────────────── */
+
+  var running = {}; // 'student:piece' → a real send started and not handed in, on screen or not
+  var thumbs = {}; // submission id → the blob: addresses of its pages' thumbnails, in order
+  var thumbsAsked = {}; // submission id → true once its links were asked for
+  var realSeen = false; // a real card's page has opened in this tab: a sign-out empties the device's store
+  var DAY_MS = 24 * 60 * 60 * 1000;
+
+  // The routes, for the class on screen. app.js adds the session; Demo Mode never comes here. A send's
+  // own calls name its student (enrollment): app.js asks nothing when another student is signed in now.
+  function askRoute(route, body, enrollment) {
+    return typeof StudentPage.askClass === 'function'
+      ? StudentPage.askClass(route, body, enrollment)
+      : Promise.resolve({ ok: false, error: 'network' });
+  }
+
+  function list(v) {
+    return Array.isArray(v) ? v : [];
+  }
+
+  function newId() {
+    var c = typeof crypto !== 'undefined' && crypto ? crypto : null;
+    if (c && typeof c.randomUUID === 'function') return c.randomUUID();
+    var b = [];
+    for (var i = 0; i < 16; i++) b.push(Math.floor(Math.random() * 256));
+    if (c && typeof c.getRandomValues === 'function')
+      b = Array.prototype.slice.call(c.getRandomValues(new Uint8Array(16)));
+    b[6] = (b[6] & 0x0f) | 0x40;
+    b[8] = (b[8] & 0x3f) | 0x80;
+    var hex = b
+      .map(function (x) {
+        return (x < 16 ? '0' : '') + x.toString(16);
+      })
+      .join('');
+    return [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join('-');
+  }
+
+  function offline() {
+    return typeof navigator !== 'undefined' && navigator.onLine === false;
+  }
+
+  /* `work`, once the class's page is drawn. A class that takes no work
+     (or a function that does not know the route yet) gets nothing: the
+     page stays exactly as it was drawn, and nothing is drawn again. */
+  function loadWork() {
+    if (!S || S.demo || !S.page) return Promise.resolve();
+    realSeen = true;
+    var student = S.page.student.id;
+    return askRoute('work', {}).then(function (res) {
+      if (!S || !S.page || S.page.student.id !== student) return;
+      var on = !!(res && res.ok === true && res.send_work === true);
+      var had = !!(S.realWork && S.realWork.student === student);
+      S.realWork = on ? { student: student, reply: res } : null;
+      if (!on && !had) return;
+      repaint();
+      if (!on) return;
+      loadThumbs(res, student);
+      if (!S.send) resume();
+    });
+  }
+
+  /* The reply as the route gave it, each piece with work in given the
+     thumbnails this device has fetched for it. */
+  function realWorkOf(state) {
+    var w = state && state.realWork;
+    if (!w || !state.page || w.student !== state.page.student.id) return null;
+    return Object.assign({}, w.reply, {
+      assessments: list(w.reply.assessments).map(function (a) {
+        if (!a || !a.sent || typeof a.sent !== 'object') return a;
+        var mine = thumbs[a.sent.submission_id] || [];
+        return Object.assign({}, a, { sent: Object.assign({}, a.sent, { thumbs: mine }) });
+      }),
+    });
+  }
+
+  // The page again with what came back, the focus left where it was. Only the Assignments list.
+  function repaint() {
+    if (!S || S.screen !== 'assignments' || S.sendAsk) return;
+    var el = typeof document !== 'undefined' ? document.activeElement : null;
+    var sel = '';
+    if (el && el.getAttribute && el.getAttribute('data-act')) {
+      var piece = el.getAttribute('data-piece');
+      sel = '[data-act="' + el.getAttribute('data-act') + '"]' + (piece ? '[data-piece="' + cssId(piece) + '"]' : '');
+    } else if (el && el.classList && el.classList.contains('sp-page-title')) {
+      sel = '.sp-page-title';
+    }
+    StudentPage.paint();
+    var back = sel && typeof document !== 'undefined' ? document.querySelector('#app ' + sel) : null;
+    if (back && back.focus) back.focus({ preventScroll: true });
+  }
+
+  function cssId(id) {
+    return String(id).replace(/["\\]/g, '');
+  }
+
+  /* The student's own pages of each piece with work in and not back yet
+     (the Sent card's pictures): `file-links` gives a link to each page and
+     its thumbnail that lives five minutes; each thumbnail is fetched at
+     once and shown from a blob: address, so the page needs nothing of the
+     Content Security Policy it does not have. Asked once a submission. */
+  function loadThumbs(reply, student) {
+    var back = {};
+    list(S.reply && S.reply.assessments).forEach(function (a) {
+      if (a && a.returned_at) back[a.id] = true;
+    });
+    list(reply.assessments).forEach(function (a) {
+      var sent = a && a.sent && typeof a.sent === 'object' ? a.sent : null;
+      var sub = sent && typeof sent.submission_id === 'string' ? sent.submission_id : '';
+      if (!sub || thumbsAsked[sub] || !(sent.pages > 0) || back[a.id]) return;
+      thumbsAsked[sub] = true;
+      askRoute('file-links', { assessment_id: a.id }).then(function (res) {
+        var files = res && res.ok === true ? list(res.files) : null;
+        if (!files) {
+          delete thumbsAsked[sub];
+          return;
+        }
+        files = files
+          .filter(function (f) {
+            return f && typeof f.thumb_url === 'string' && /^https:\/\//.test(f.thumb_url);
+          })
+          .sort(function (x, y) {
+            return (Number(x.version) || 0) - (Number(y.version) || 0) || (Number(x.page) || 0) - (Number(y.page) || 0);
+          });
+        return StudentPage.whileCurrent(
+          Promise.all(
+            files.map(function (f) {
+              return picture(f.thumb_url);
+            }),
+          ),
+        ).then(function (blobs) {
+          thumbs[sub] = blobs.filter(Boolean).map(objectUrl).filter(Boolean);
+          if (S && S.realWork && S.realWork.student === student) repaint();
+        });
+      });
+    });
+  }
+
+  // One page's picture from its link, or null. The link carries its own key: nothing else is sent.
+  function picture(url) {
+    if (typeof fetch !== 'function') return Promise.resolve(null);
+    return fetch(url, { method: 'GET', credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store' }).then(
+      function (res) {
+        return res && res.ok ? res.blob() : null;
+      },
+      function () {
+        return null;
+      },
+    );
+  }
+
+  /* One file to its one-time upload link: PUT, the JPEG as the body, its
+     type and nothing else. → 'up' (the server has it; a file already there
+     is an earlier try that landed), 'refused', or 'network'. */
+  function put(url, blob) {
+    if (typeof fetch !== 'function' || typeof url !== 'string' || !/^https:\/\//.test(url)) {
+      return Promise.resolve('refused');
+    }
+    return fetch(url, {
+      method: 'PUT',
+      body: blob,
+      headers: { 'Content-Type': 'image/jpeg' },
+      credentials: 'omit',
+      referrerPolicy: 'no-referrer',
+      cache: 'no-store',
+    }).then(
+      function (res) {
+        if (res.ok || res.status === 409) return 'up';
+        if (res.status >= 500) return 'network';
+        // Storage answers a file that is already there with 400 and a body that says 409.
+        return Promise.resolve(res.json()).then(
+          function (b) {
+            return b && (String(b.statusCode) === '409' || /duplicate|already exists/i.test(String(b.error || '')))
+              ? 'up'
+              : 'refused';
+          },
+          function () {
+            return 'refused';
+          },
+        );
+      },
+      function () {
+        return 'network';
+      },
+    );
+  }
+
+  /* ── Where a real send's pages wait (IndexedDB) ──
+     Each page is one record, with the send's own facts beside it: the
+     class (its enrollment id), the piece, the request id, the server's
+     ids once a start has named them, which of the two files are up, and
+     the note. No name, no token, no link. */
+  var DB_NAME = 'fv-s-send';
+  var storeFn = null; // tests hand in their own
+  var device = null; // a promise of the store, or of null where the browser keeps nothing
+  function deviceStore() {
+    if (storeFn) return Promise.resolve(storeFn);
+    if (device) return device;
+    var have = typeof PhotoQueue !== 'undefined' && PhotoQueue && PhotoQueue.indexedDbStore;
+    device = (have || typeof document === 'undefined' ? Promise.resolve() : load('../shared/photo-queue.js'))
+      .then(function () {
+        if (typeof PhotoQueue === 'undefined' || !PhotoQueue || !PhotoQueue.indexedDbStore) return null;
+        // Only the queue's store is used here: its own sending is the teacher apps'.
+        if (!have && typeof PhotoQueue.release === 'function') PhotoQueue.release();
+        var st = PhotoQueue.indexedDbStore(DB_NAME);
+        return st.list().then(
+          function () {
+            return st;
+          },
+          function () {
+            return null;
+          },
+        );
+      })
+      .then(null, function () {
+        return null;
+      });
+    return device;
+  }
+  // fn(store), or nothing where there is no store. Never throws: a send goes on in memory without one.
+  function onDevice(fn) {
+    return deviceStore()
+      .then(function (st) {
+        return st ? fn(st) : null;
+      })
+      .then(null, function () {
+        return null;
+      });
+  }
+
+  function recordOf(send, pg, i) {
+    return {
+      id: pg.id,
+      kind: 'send',
+      enrollment: send.student,
+      piece: send.id,
+      replace: send.replace,
+      request: send.request,
+      submission: send.submission,
+      finish_by: send.finishBy,
+      note: send.note,
+      followed: send.followed,
+      order: i,
+      file_id: pg.fileId,
+      landed: { photo: !!pg.landed.photo, thumb: !!pg.landed.thumb },
+      from: pg.from,
+      width: pg.width || null,
+      height: pg.height || null,
+      saved_at: clock(),
+    };
+  }
+
+  // What the device holds of a send: its pages, in order, its note and its answer on the plan.
+  function keptAs(send) {
+    return JSON.stringify([
+      send.pages.map(function (pg) {
+        return pg.id || pg.key;
+      }),
+      send.note,
+      send.followed,
+    ]);
+  }
+
+  // The whole send kept again: every page of it, and nothing left of an earlier send of the same piece.
+  function saveAll(send) {
+    send.kept = send.pages.length > 0;
+    send.keptAs = keptAs(send);
+    return onDevice(function (st) {
+      return st
+        .list()
+        .then(function (rows) {
+          var old = list(rows)
+            .filter(function (r) {
+              return r && r.kind === 'send' && r.enrollment === send.student && r.piece === send.id;
+            })
+            .map(function (r) {
+              return r.id;
+            });
+          return old.length ? st.remove(old) : null;
+        })
+        .then(function () {
+          return st.putAll(
+            send.pages.map(function (pg, i) {
+              return { meta: recordOf(send, pg, i), photo: pg.blob, thumb: pg.thumb };
+            }),
+          );
+        });
+    });
+  }
+
+  // What the server said, written into the records the send already has.
+  function savePatch(send, only) {
+    return onDevice(function (st) {
+      return Promise.all(
+        send.pages.map(function (pg, i) {
+          if (only && only !== pg) return null;
+          var r = recordOf(send, pg, i);
+          delete r.id;
+          return st.update(pg.id, r);
+        }),
+      );
+    });
+  }
+
+  function forget(send) {
+    delete running[send.student + ':' + send.id];
+    send.kept = false;
+    return saveAll(Object.assign({}, send, { pages: [] }));
+  }
+
+  function wipeDevice() {
+    device = null;
+    if (storeFn) return storeFn.clear();
+    try {
+      if (typeof indexedDB !== 'undefined' && indexedDB) indexedDB.deleteDatabase(DB_NAME);
+    } catch (e) {
+      /* nothing kept */
+    }
+    return Promise.resolve();
+  }
+
+  /* The class's page has opened: a send this device kept for it carries
+     on, on its own screen. The newest one; the next after it is sent.
+     Kept sends of a class this session has not opened, or more than a day
+     old, are let go: on a shared device they are someone else's. Past its
+     two hours, the screen says the send stopped and the photos are still
+     here; Send Again starts it over. */
+  function resume() {
+    if (!S || S.demo || !S.page || S.send || S.screen !== 'assignments') return Promise.resolve();
+    var student = S.page.student.id;
+    var classes = list(S.page.classes)
+      .map(function (c) {
+        return c && c.enrollmentId;
+      })
+      .concat([student]);
+    return onDevice(function (st) {
+      return st.list().then(function (rows) {
+        var sends = list(rows).filter(function (r) {
+          return r && r.kind === 'send';
+        });
+        var stale = sends.filter(function (r) {
+          return classes.indexOf(r.enrollment) < 0 || clock() - (Number(r.saved_at) || 0) > DAY_MS;
+        });
+        if (stale.length) {
+          st.remove(
+            stale.map(function (r) {
+              return r.id;
+            }),
+          );
+        }
+        var mine = sends
+          .filter(function (r) {
+            // A send still going in this tab (left on Not Sent Yet) is not opened twice.
+            return stale.indexOf(r) < 0 && r.enrollment === student && !running[student + ':' + r.piece];
+          })
+          .sort(function (a, b) {
+            return (Number(b.saved_at) || 0) - (Number(a.saved_at) || 0);
+          });
+        if (!mine.length) return null;
+        var first = mine[0];
+        var pages = mine
+          .filter(function (r) {
+            return r.piece === first.piece && r.request === first.request;
+          })
+          .sort(function (a, b) {
+            return a.order - b.order;
+          });
+        return Promise.all(
+          pages.map(function (r) {
+            return st.blobs(r.id);
+          }),
+        ).then(function (blobs) {
+          return { rows: pages, blobs: blobs };
+        });
+      });
+    }).then(function (kept) {
+      if (!kept || !S || !S.page || S.page.student.id !== student || S.send || S.screen !== 'assignments') return;
+      var first = kept.rows[0];
+      var p = pieceOf(first.piece);
+      if (!p || !p.send || !p.send.takes) return;
+      var send = {
+        id: first.piece,
+        student: student,
+        replace: !!first.replace,
+        revision: false,
+        real: true,
+        kept: true, // these pages are on the device already
+        room: MAX_PAGES,
+        request: String(first.request || ''),
+        submission: String(first.submission || ''),
+        finishBy: Number(first.finish_by) || 0,
+        pages: [],
+        note: String(first.note || '').slice(0, NOTE_MAX),
+        followed: FOLLOWED[first.followed] ? first.followed : '',
+        step: 'sending',
+        message: '',
+        busy: false,
+        startedAt: Number(first.finish_by) ? Number(first.finish_by) - HOLD_MS : 0,
+        failed: -1,
+        sentAt: 0,
+        seq: 0,
+      };
+      kept.rows.forEach(function (r, i) {
+        var b = kept.blobs[i];
+        if (!b || !b.photo || !b.thumb) return;
+        var pg = pageOf(send, { blob: b.photo, thumb: b.thumb, width: r.width, height: r.height }, r.from);
+        pg.id = r.id;
+        pg.fileId = String(r.file_id || '');
+        pg.landed = { photo: !!(r.landed && r.landed.photo), thumb: !!(r.landed && r.landed.thumb) };
+        pg.blurry = false;
+        send.pages.push(pg);
+      });
+      if (!send.pages.length) return;
+      send.keptAs = send.pages.length === kept.rows.length ? keptAs(send) : '';
+      show(send);
+      return goReal(send);
+    });
+  }
+
+  // How big each page is, for the start: only what the route takes, and only whole numbers.
+  function sizeOf(pg) {
+    var out = {};
+    // Pixels and bytes, as whole numbers.
+    var put1 = function (k, size) {
+      if (typeof size === 'number' && isFinite(size) && size >= 1) out[k] = Math.round(size);
+    };
+    put1('width', pg.width);
+    put1('height', pg.height);
+    put1('bytes', pg.blob && pg.blob.size);
+    put1('thumb_bytes', pg.thumb && pg.thumb.size);
+    return out;
+  }
+
+  // Draw the send if it is the one on screen.
+  function draw(send, focus) {
+    if (current(send)) StudentPage.paint(focus);
+  }
+
+  function stop(send, step, message) {
+    send.busy = false;
+    send.step = step;
+    send.message = message || '';
+    draw(send, '#sp-send-title');
+  }
+
+  /* Hand the pages in: the start (the same request id each try, so the
+     server makes the send once, holds it two hours from the first try, and
+     gives fresh upload links each time), every page and thumbnail not up
+     yet, then the finish. A page the server named stays named: a new page
+     (a Retake, Add Page) makes a new send. The pages are kept on the device
+     first. */
+  function goReal(send) {
+    running[send.student + ':' + send.id] = send;
+    // A new send: none yet, or a page added since the server named this one's. A start whose answer never
+    // came keeps its request id, so the server, if it got it, hands back the same send.
+    var named = send.pages.some(function (pg) {
+      return !!pg.fileId;
+    });
+    var fresh =
+      !send.request ||
+      (named &&
+        send.pages.some(function (pg) {
+          return !pg.fileId;
+        }));
+    if (fresh) {
+      send.request = newId();
+      send.submission = '';
+      send.finishBy = 0;
+      send.startedAt = 0;
+      send.pages.forEach(function (pg) {
+        pg.fileId = '';
+        pg.landed = { photo: false, thumb: false };
+        pg.sent = false;
+      });
+    }
+    if (send.finishBy && clock() > send.finishBy) return Promise.resolve(expire(send));
+    send.busy = true;
+    send.step = 'sending';
+    send.message = '';
+    send.failed = -1;
+    draw(send);
+    // Kept again when new, never kept, or changed since (a page added after a refusal that kept the send).
+    return (fresh || !send.kept || send.keptAs !== keptAs(send) ? saveAll(send) : Promise.resolve()).then(function () {
+      if (offline()) return stop(send, 'notsent');
+      return startReal(send);
+    });
+  }
+
+  function startReal(send) {
+    var p = pieceOf(send.id);
+    var body = {
+      assessment_id: send.id,
+      request_id: send.request,
+      pages: send.pages.map(sizeOf),
+      note: send.note.slice(0, NOTE_MAX) || null,
+      followed_plan: p && p.plan && FOLLOWED[send.followed] ? send.followed : null,
+    };
+    return askRoute(send.replace ? 'replace' : 'send-start', body, send.student).then(function (res) {
+      if (!res || res.ok !== true) return refused(send, res);
+      // Handed in already: an earlier try's finish went through and its answer was lost.
+      if (res.state === 'sent') return handedIn(send, clock());
+      var by = {};
+      list(res.files).forEach(function (f) {
+        if (f && typeof f.file_id === 'string') by[f.file_id] = f;
+      });
+      send.pages.forEach(function (pg, i) {
+        if (pg.fileId) return;
+        var named = list(res.files).filter(function (f) {
+          return f && f.page === i + 1;
+        })[0];
+        pg.fileId = named ? named.file_id : '';
+      });
+      // The server had this request from before a page was added: it holds fewer pages. A new send.
+      if (
+        res.replayed === true &&
+        !send.pages.every(function (pg) {
+          return !!pg.fileId;
+        })
+      ) {
+        send.request = '';
+        return goReal(send);
+      }
+      var whole = send.pages.every(function (pg) {
+        return by[pg.fileId] && by[pg.fileId].upload_url && by[pg.fileId].thumb_upload_url;
+      });
+      // An answer the page cannot use is a server's trouble: the pages wait here, as offline.
+      if (!whole || typeof res.submission_id !== 'string') return stop(send, 'notsent');
+      send.pages.forEach(function (pg) {
+        pg.up = by[pg.fileId].upload_url;
+        pg.thumbUp = by[pg.fileId].thumb_upload_url;
+      });
+      send.submission = res.submission_id;
+      send.finishBy = Date.parse(String(res.finish_by || '').replace(/(\.\d{3})\d+/, '$1')) || 0;
+      send.startedAt = send.finishBy ? send.finishBy - HOLD_MS : clock();
+      savePatch(send);
+      return upload(send, 0);
+    });
+  }
+
+  // Each page, then its thumbnail, in order; a page already up is not sent again.
+  function upload(send, i) {
+    if (i >= send.pages.length) return finishReal(send);
+    var pg = send.pages[i];
+    return part(send, pg, 'photo')
+      .then(function (got) {
+        return got === 'up' ? part(send, pg, 'thumb') : got;
+      })
+      .then(function (got) {
+        if (got !== 'up') {
+          if (got === 'network' && offline()) return stop(send, 'notsent');
+          send.failed = i;
+          return stop(send, 'pagefailed');
+        }
+        pg.sent = true;
+        return upload(send, i + 1);
+      });
+  }
+
+  function part(send, pg, which) {
+    if (pg.landed[which]) return Promise.resolve('up');
+    return StudentPage.whileCurrent(
+      put(which === 'photo' ? pg.up : pg.thumbUp, which === 'photo' ? pg.blob : pg.thumb),
+    ).then(function (got) {
+      if (got === 'up') {
+        pg.landed[which] = true;
+        savePatch(send, pg);
+      }
+      return got;
+    });
+  }
+
+  function finishReal(send) {
+    var body = {
+      submission_id: send.submission,
+      files: send.pages.map(function (pg) {
+        return pg.fileId;
+      }),
+    };
+    return askRoute('send-finish', body, send.student).then(function (res) {
+      if (res && res.ok === true) return handedIn(send, Date.parse(String(res.sent_at || '')) || clock());
+      if (res && res.error === 'missing_pages') {
+        // The server does not have these yet: they go again.
+        var missing = list(res.missing);
+        var at = -1;
+        send.pages.forEach(function (pg, i) {
+          if (missing.indexOf(pg.fileId) < 0) return;
+          pg.landed = { photo: false, thumb: false };
+          pg.sent = false;
+          if (at < 0) at = i;
+        });
+        if (at >= 0) {
+          savePatch(send);
+          send.failed = at;
+          return stop(send, 'pagefailed');
+        }
+      }
+      return refused(send, res);
+    });
+  }
+
+  function handedIn(send, at) {
+    forget(send);
+    send.busy = false;
+    send.sentAt = at;
+    send.step = 'sent';
+    draw(send, '#sp-send-title');
+    loadWork();
+  }
+
+  function expire(send) {
+    send.request = '';
+    stop(send, 'expired');
+  }
+
+  /* A start or a finish the server did not take. Words for each, mine.
+     A refusal that will not change on a retry lets the device's copy go;
+     the pages stay on screen until the student leaves. One that means the
+     session is over is app.js's. Anything else (no answer, a server error)
+     leaves the pages waiting on the device: Not Sent Yet. */
+  var FOR_GOOD = {
+    send_off: 'Your teacher has turned off sending work in this class.',
+    not_taking_work: 'Your teacher isn’t taking work for this one.',
+    already_sent: 'Your work for this one is already in.',
+    nothing_sent: 'There’s nothing sent to replace. Go back and send it.',
+    cannot_change: 'Your teacher added this work, so it can’t be changed here. Ask your teacher.',
+    grading_started: 'Your teacher has started grading this. Ask your teacher instead.',
+    class_full: 'Your class can’t take any more photos right now. Ask your teacher.',
+  };
+  var SESSION_OVER = { signed_out: 1, card_stopped: 1, card_expired: 1, closed: 1 };
+  var NOT_FOUND = 'This one can’t take your work right now. Ask your teacher.';
+  var NOT_UNDERSTOOD = 'Something went wrong sending this. Try again later, or ask your teacher.';
+  function refused(send, res) {
+    var e = (res && res.ok === false && typeof res.error === 'string' && res.error) || 'network';
+    if (e === 'other_student') {
+      // Another student is signed in now: this send is not theirs. Its pages stay on the device.
+      send.busy = false;
+      delete running[send.student + ':' + send.id];
+      return;
+    }
+    if (has(SESSION_OVER, e)) {
+      send.busy = false;
+      if (typeof StudentPage.sessionRefused === 'function') StudentPage.sessionRefused({ ok: false, error: e });
+      return;
+    }
+    if (e === 'expired') return expire(send);
+    if (e === 'work_closed') {
+      forget(send);
+      return stop(
+        send,
+        'check',
+        (res.closed_on ? 'This one closed ' + fmtDay(res.closed_on) + '.' : 'This one is closed.') +
+          ' Hand it in on paper.',
+      );
+    }
+    if (has(FOR_GOOD, e)) {
+      forget(send);
+      stop(send, 'check', FOR_GOOD[e]);
+      return loadWork();
+    }
+    if (e === 'too_many_pages') {
+      // The send keeps its place: with `room` pages left in it, the next press finishes it.
+      var room = typeof res.room === 'number' && res.room >= 0 ? Math.floor(res.room) : 0;
+      if (room > 0) send.room = room;
+      return stop(
+        send,
+        'check',
+        room > 0
+          ? 'Only ' +
+              room +
+              ' ' +
+              plural(room, 'page fits', 'pages fit') +
+              ' with the pages your teacher added. Remove some, then send again.'
+          : 'No more pages fit with the pages your teacher added. Ask your teacher.',
+      );
+    }
+    if (e === 'too_many') {
+      var mins = Math.max(1, Math.ceil((Number(res.retry_after_s) || 60) / 60));
+      return stop(
+        send,
+        'check',
+        'You’ve sent a lot this hour. Try again in ' + mins + ' ' + plural(mins, 'minute', 'minutes') + '.',
+      );
+    }
+    if (e === 'card_locked') return stop(send, 'check', StudentPage.MESSAGES.card_locked);
+    if (e === 'bad_file') {
+      // The server will not take this send as it is: the next press starts a new one.
+      send.request = '';
+      return stop(send, 'check', 'One of your pages couldn’t be sent. Check your pages, then send again.');
+    }
+    if (e === 'not_found') {
+      // The piece is hidden now, or the student is no longer in the class: sending again won't help.
+      send.request = '';
+      stop(send, 'check', NOT_FOUND);
+      return loadWork();
+    }
+    // An answer the page doesn't understand, from a connection that works: not Not Sent Yet, which waits for one.
+    if (e === 'bad_request') return stop(send, 'check', NOT_UNDERSTOOD);
+    return stop(send, 'notsent');
+  }
+
+  function has(map, key) {
+    return typeof key === 'string' && Object.prototype.hasOwnProperty.call(map, key);
+  }
+
+  // Unsend, asked of the server. The question stays up, its buttons held, until the answer.
+  function unsendReal(id) {
+    S.sendAsk = { kind: 'unsend', id: id, busy: true };
+    StudentPage.paint('#sp-send-ask-title');
+    var student = S.page.student.id;
+    return askRoute('unsend', { assessment_id: id }).then(function (res) {
+      if (!S || !S.page || S.page.student.id !== student) return;
+      var e = res && res.ok === false && typeof res.error === 'string' ? res.error : res && res.ok ? '' : 'network';
+      if (has(SESSION_OVER, e)) {
+        S.sendAsk = null;
+        if (typeof StudentPage.sessionRefused === 'function') StudentPage.sessionRefused({ ok: false, error: e });
+        return;
+      }
+      if (!e) {
+        S.sendAsk = null;
+        return loadWork().then(function () {
+          if (S && S.screen === 'assignments') StudentPage.paint('.sp-segment-on');
+        });
+      }
+      S.sendAsk = {
+        kind: 'said',
+        id: id,
+        title: 'Not Unsent',
+        text:
+          e === 'grading_started'
+            ? 'Your teacher has started grading this. Ask your teacher instead.'
+            : e === 'work_closed'
+              ? 'This one is closed now, so it stays sent. Ask your teacher.'
+              : has(FOR_GOOD, e)
+                ? FOR_GOOD[e]
+                : e === 'card_locked'
+                  ? StudentPage.MESSAGES.card_locked
+                  : e === 'network' || e === 'server'
+                    ? 'Couldn’t reach FullVision. Check your internet and try again.'
+                    : 'This one can’t be unsent right now. Ask your teacher.',
+      };
+      StudentPage.paint('#sp-send-ask-title');
+      if (e !== 'network' && e !== 'server') loadWork();
+    });
+  }
+
   /* ── Unsend and Replace (S5-F3), asked over the card ─────────── */
 
   function ask(kind, id) {
@@ -555,10 +1358,13 @@
 
   function answer(yes) {
     var q = S.sendAsk;
+    // An Unsend on its way to the server: its buttons wait for the answer.
+    if (q && q.busy) return;
     S.sendAsk = null;
-    if (!q || !yes) {
+    if (!q || !yes || q.kind === 'said') {
+      var piece = q ? '[data-piece="' + String(q.id).replace(/["\\]/g, '') + '"]' : '';
       StudentPage.paint(
-        q ? '[data-act="send-' + q.kind + '"][data-piece="' + String(q.id).replace(/["\\]/g, '') + '"]' : null,
+        !q ? null : q.kind === 'said' ? piece + ' .sp-piece-title' : '[data-act="send-' + q.kind + '"]' + piece,
       );
       return;
     }
@@ -572,6 +1378,7 @@
       open(q.id, true);
       return;
     }
+    if (!S.demo) return unsendReal(q.id);
     // Unsend My Revision (S11-F2): the revision goes, and the piece needs its revision again.
     var revs = p.revision && typeof StudentPage.demoRevisions === 'function' ? StudentPage.demoRevisions(S) : null;
     if (revs && revs[q.id] && revs[q.id].revision) {
@@ -598,6 +1405,8 @@
     var q = state && state.sendAsk;
     if (!q || state.screen !== 'assignments') return '';
     var p = pieceOf(q.id);
+    // What a real Unsend's refusal says, over the card, with one way out.
+    if (p && q.kind === 'said') return sheetHtml(q.title, q.text, '', 'OK', false);
     if (!p || !p.send || !p.send.sent) return '';
     var sent = p.send.sent;
     // The page never names the teacher (Colin's ruling 112).
@@ -635,6 +1444,14 @@
       yes = 'Replace Photos';
       no = 'Cancel';
     }
+    // A real Unsend on its way: the same question, its buttons held until the answer.
+    if (q.busy) yes = 'Unsending…';
+    return sheetHtml(title, body, yes, no, q.kind === 'unsend', q.busy);
+  }
+
+  // The sheet over the card. `yes` '' draws only the way out.
+  function sheetHtml(title, body, yes, no, danger, busy) {
+    var held = busy ? ' disabled' : '';
     return (
       '<button type="button" class="sp-sheet-back" data-act="send-ask-no" aria-label="Close" tabindex="-1"></button>' +
       '<div class="sp-sheet sp-send-ask" role="alertdialog" aria-modal="true" aria-labelledby="sp-send-ask-title" aria-describedby="sp-send-ask-body">' +
@@ -642,11 +1459,21 @@
       esc(title) +
       '</h2><p class="sp-send-ask-body" id="sp-send-ask-body">' +
       esc(body) +
-      '</p><div class="sp-send-ask-buttons"><button type="button" class="sp-btn ' +
-      (q.kind === 'unsend' ? 'sp-btn-danger' : 'sp-btn-primary') +
-      '" data-act="send-ask-yes">' +
-      esc(yes) +
-      '</button><button type="button" class="sp-btn sp-btn-quiet" data-act="send-ask-no">' +
+      '</p><div class="sp-send-ask-buttons">' +
+      (yes
+        ? '<button type="button" class="sp-btn ' +
+          (danger ? 'sp-btn-danger' : 'sp-btn-primary') +
+          '" data-act="send-ask-yes"' +
+          held +
+          '>' +
+          esc(yes) +
+          '</button>'
+        : '') +
+      '<button type="button" class="sp-btn ' +
+      (yes ? 'sp-btn-quiet' : 'sp-btn-primary') +
+      '" data-act="send-ask-no"' +
+      held +
+      '>' +
       esc(no) +
       '</button></div></div>'
     );
@@ -729,18 +1556,23 @@
      it" is the student's, Nov 8, decision 11): Yes, Partly or Not This
      Time, or none. */
   var FOLLOWED = { yes: 'Yes', partly: 'Partly', no: 'Not This Time' };
+  var PLAN_ARROW =
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
   function planAskHtml(send, p) {
     if (!p.plan || !p.plan.text) return '';
     return (
-      '<section class="sp-send-plan" aria-labelledby="sp-send-plan-title"><h2 class="sp-plan-title" id="sp-send-plan-title">Your Plan From Last Time</h2><p class="sp-plan-words">' +
+      '<section class="sp-send-plan" aria-labelledby="sp-send-plan-title"><h2 class="sp-plan-title" id="sp-send-plan-title">' +
+      PLAN_ARROW +
+      'Your Plan From Last Time</h2><p class="sp-plan-words">' +
       esc(p.plan.text) +
-      '</p><h3 class="sp-send-plan-ask" id="sp-send-plan-ask">Did You Do It?</h3><div class="sp-seg sp-seg-3" role="radiogroup" aria-label="Did you follow your plan?">' +
+      '</p><h3 class="sp-send-plan-ask" id="sp-send-plan-ask">Did You Do It?</h3><div class="sp-choices" role="radiogroup" aria-label="Did you follow your plan?">' +
       Object.keys(FOLLOWED)
         .map(function (k) {
           var on = send.followed === k;
           return (
-            '<button type="button" class="sp-seg-btn' +
-            (on ? ' sp-seg-on' : '') +
+            // Yes green when chosen, as the board; Partly and Not This Time blue.
+            '<button type="button" class="sp-choice' +
+            (k === 'yes' ? ' sp-choice-green' : '') +
             '" role="radio" aria-checked="' +
             on +
             '" tabindex="' +
@@ -762,7 +1594,7 @@
     var n = send.pages.length;
     var late = p.send.lateNow;
     var accept = acceptFor(p);
-    var full = n >= MAX_PAGES;
+    var full = n >= send.room;
     return (
       head('Check and Send', p.title) +
       (late
@@ -782,7 +1614,7 @@
       (send.busy ? '<p class="sp-send-msg" role="status">Getting your photos ready…</p>' : '') +
       (send.message ? '<p class="sp-send-msg sp-msg" role="alert">' + esc(send.message) + '</p>' : '') +
       (full
-        ? '<p class="sp-send-hint">You can send ' + MAX_PAGES + ' pages at most.</p>'
+        ? '<p class="sp-send-hint">You can send ' + send.room + ' pages at most.</p>'
         : n
           ? '<div class="sp-send-add">' +
             pickHtml('Add Page or File', 'sp-btn-tint', accept, { multiple: true }) +
@@ -967,12 +1799,17 @@
       return (el && el.getAttribute && el.getAttribute(n)) || '';
     };
     if (act === 'card-done' || act === 'class-open' || act === 'card-add') {
-      // Leaving the student or the class: the send and its photos go.
+      // Leaving the student or the class: the send and its photos go. A real send's pages stay on the
+      // device for the next time this class opens, until Done.
       S.send = null;
       S.sendAsk = null;
+      running = {};
       if (act === 'card-done') {
         S.demoSent = {};
         letGo();
+        thumbs = {};
+        thumbsAsked = {};
+        if (realSeen) wipeDevice();
       }
       return;
     }
@@ -988,15 +1825,16 @@
     if (act === 'send-again') return go(true);
     if (act === 'send-restart') {
       S.send.startedAt = 0;
+      S.send.request = ''; // a new send, with two hours of its own
       return go(false);
     }
     if (act === 'send-drop') {
-      S.send.pages = S.send.pages.filter(function (pg) {
-        return pg.key !== attr('data-page');
-      });
+      dropPage(S.send, attr('data-page'));
       if (!S.send.pages.length) {
+        if (S.send.real) forget(S.send);
         S.send.step = 'check';
         S.send.startedAt = 0;
+        S.send.request = '';
         return StudentPage.paint('#sp-send-title');
       }
       return go(true);
@@ -1044,11 +1882,18 @@
   if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
     window.addEventListener('online', function () {
       if (S && S.screen === 'send' && S.send && S.send.step === 'notsent') go(true);
+      // A real send the student left on Not Sent Yet goes too, off screen.
+      Object.keys(running).forEach(function (k) {
+        var send = running[k];
+        if (send !== (S && S.send) && send.step === 'notsent' && !send.busy) goReal(send);
+      });
     });
   }
 
   StudentPage.workOf = workOf;
   StudentPage.sendDialog = dialogHtml;
+  // app.js, once a real card's page for a class is drawn: ask what the class takes.
+  StudentPage.pageOpened = loadWork;
 
   StudentPage.addScreens({
     file: 'send',
@@ -1057,6 +1902,17 @@
     input: onInput,
     change: onChange,
     share: function (state) {
+      // A new state is a sign-out (StudentPage.reset: Done, 15 idle minutes, Done in another tab,
+      // midnight, signed_out): the last student's unfinished sends and thumbnails go with it, so coming
+      // back online sends nothing of theirs under the next student, and so do the photos this device
+      // kept for them (ruling 138, "Yes, wipe them").
+      if (state !== S) {
+        running = {};
+        thumbs = {};
+        thumbsAsked = {};
+        letGo();
+        if (realSeen) wipeDevice();
+      }
       S = state;
     },
     test: {
@@ -1074,6 +1930,12 @@
       madeUrls: function () {
         return urls.slice();
       },
+      // A store for a real send's pages in place of IndexedDB (shared/photo-queue.js's store's shape).
+      setSendStore: function (store) {
+        storeFn = store;
+        device = null;
+      },
+      loadWork: loadWork,
       HOLD_MS: HOLD_MS,
       MAX_PAGES: MAX_PAGES,
     },
