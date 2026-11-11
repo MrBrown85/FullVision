@@ -20,8 +20,8 @@
 
    - S3-F1: the rest of Student Cards (filters, Cards Work Until).
    - S5-F1: Send Work and Keep Photos Until, in Demo Mode (below).
-   - S8-F1: the reminder and the "photos go for good" line on Keep Photos
-     Until.
+   - S8-F1: the "photos go for good" line on Keep Photos Until, and the
+     one-week reminder (below), here and on the Dashboard.
    - S13-F1: Show My Learning and See What They'd See, in Demo Mode (below).
    - Then Reflect on Feedback (S10).
 
@@ -371,8 +371,8 @@ var CmStudentPage = (function () {
   function _today(cid) {
     return typeof courseToday === 'function' ? courseToday(cid) : new Date().toISOString().slice(0, 10);
   }
-  function keepPhotosDate(cid, choice) {
-    var today = _today(cid);
+  function keepPhotosDate(cid, choice, onDay) {
+    var today = onDay || _today(cid);
     var y = parseInt(today.slice(0, 4), 10);
     var june = (parseInt(today.slice(5, 7), 10) >= 8 ? y + 1 : y) + '-06-30';
     if (choice !== 'end_of_term') return june;
@@ -490,6 +490,121 @@ var CmStudentPage = (function () {
       'danger',
       choose,
     );
+  }
+
+  /* ── The one-week reminder (S8-F1) ─────────────────────────────
+     Colin's words (ruling 102, s8-f1-wording-draft.md item 2), in the app
+     only: a line at the top of the class's Dashboard and of this tab, from
+     one week before the class's Keep Photos Until date until that date, or
+     until the teacher presses Dismiss. Change the Date opens this tab at
+     Keep Photos Until.
+
+     Shown only where it is true: the class's build switch on, Send Work on
+     (Keep Photos Until, which Change the Date opens, shows only then), and
+     photos of student work kept for the class (classHasPhotos). The job
+     that deletes them (S8-M1) is not built, so until it is no signed-in
+     class has photos here and the line never shows for one.
+
+     Dismiss is kept on this device, for the class and the date: a new date
+     brings the line back. It sends nothing; DashOverview keeps it (this tab
+     writes only through saveReturnSettings and Demo Mode's student work). `today` is an argument (tests pass it); the screens
+     pass nothing and get the class's own day (courseToday). */
+  var REMIND_DAYS = 7;
+
+  /* True when the class has photos of student work that would be deleted:
+     with its build switch on, a submission with at least one page. The same
+     question the delete warnings ask (dash-class-manager.js,
+     _cmStudentsWithPhotos; page-gradebook.js, _studentsWithSentPhotos). */
+  function classHasPhotos(cid) {
+    if (!cid || typeof getCourseSubmissions !== 'function') return false;
+    var s = _settings(cid);
+    if (!s || s.student_page !== true) return false;
+    return (getCourseSubmissions(cid).submissions || []).some(function (sub) {
+      return !!sub && Array.isArray(sub.files) && sub.files.length > 0;
+    });
+  }
+
+  function _dismissedOn(cid) {
+    return typeof DashOverview !== 'undefined' && DashOverview.photoReminderDismissed
+      ? DashOverview.photoReminderDismissed(cid)
+      : null;
+  }
+
+  function _daysBetween(fromIso, toIso) {
+    var a = Date.parse(fromIso + 'T12:00:00Z');
+    var b = Date.parse(toIso + 'T12:00:00Z');
+    return isNaN(a) || isNaN(b) ? NaN : Math.round((b - a) / 86400000);
+  }
+
+  /* The reminder for class `cid` on `today` ('YYYY-MM-DD'), or null:
+     { date, text }. */
+  function photoReminder(cid, today) {
+    if (!classHasPhotos(cid)) return null;
+    var day = today || _today(cid);
+    var w = workSettings(cid);
+    if (!w.send_work) return null;
+    var date = keepPhotosDate(cid, w.keep_photos_until, day);
+    var left = _daysBetween(day, date);
+    if (!(left >= 0 && left <= REMIND_DAYS)) return null;
+    if (_dismissedOn(cid) === date) return null;
+    var name = typeof COURSES !== 'undefined' && COURSES[cid] && COURSES[cid].name ? COURSES[cid].name : 'this class';
+    return {
+      date: date,
+      text:
+        'Photos of student work in ' +
+        name +
+        ' are deleted on ' +
+        _longDay(date) +
+        ". Grades, comments and Mark Up stay. Deleted photos can't come back.",
+    };
+  }
+
+  // Dismiss: remembered for the class and that date only.
+  function dismissPhotoReminder(cid, date) {
+    if (!cid || !date || typeof DashOverview === 'undefined' || !DashOverview.dismissPhotoReminder) return;
+    DashOverview.dismissPhotoReminder(cid, date);
+  }
+
+  /* The line and its two buttons. `where` is 'dash' (the Dashboard, whose
+     actions page-dashboard.js handles) or 'sp' (this tab). */
+  function photoReminderHtml(cid, where, today) {
+    var r = photoReminder(cid, today);
+    if (!r) return '';
+    var pre = where === 'sp' ? 'sp' : 'dash';
+    return (
+      '<div class="photo-reminder" id="' +
+      pre +
+      '-photo-reminder" data-cid="' +
+      esc(cid) +
+      '">' +
+      '<p class="photo-reminder-text">' +
+      esc(r.text) +
+      '</p>' +
+      '<div class="photo-reminder-actions">' +
+      '<button type="button" class="btn btn-secondary" data-action="' +
+      pre +
+      'PhotoReminderChange" data-cid="' +
+      esc(cid) +
+      '">Change the Date</button>' +
+      '<button type="button" class="btn btn-ghost" data-action="' +
+      pre +
+      'PhotoReminderDismiss" data-cid="' +
+      esc(cid) +
+      '" data-date="' +
+      esc(r.date) +
+      '">Dismiss</button>' +
+      '</div>' +
+      '</div>'
+    );
+  }
+
+  // Change the Date: Keep Photos Until's chosen button, in view and focused.
+  function focusKeepPhotos(cid) {
+    var w = workSettings(cid);
+    var el = typeof document !== 'undefined' ? document.getElementById('sp-keep-' + w.keep_photos_until) : null;
+    if (!el) return;
+    if (typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'center' });
+    if (typeof el.focus === 'function') el.focus({ preventScroll: true });
   }
 
   /* ── Show My Learning (S13-F1) ─────────────────────────────────
@@ -709,6 +824,7 @@ var CmStudentPage = (function () {
           esc(cid) +
           '">' +
           '<h2 class="cm-grade-title">Student Page</h2>' +
+          photoReminderHtml(cid, 'sp') +
           _returnGradesRow(cid) +
           _sendWorkRows(cid) +
           _learningRow(cid) +
@@ -732,6 +848,17 @@ var CmStudentPage = (function () {
     }
     if (action === 'spSeeLearning') {
       _seeLearning(_cid(el), el);
+      return true;
+    }
+    if (action === 'spPhotoReminderChange') {
+      focusKeepPhotos(_cid(el));
+      return true;
+    }
+    if (action === 'spPhotoReminderDismiss') {
+      var on = _cid(el);
+      dismissPhotoReminder(on, el && el.dataset ? el.dataset.date : null);
+      _rerender();
+      if (_stillHere(on)) _focus('sp-keep-' + workSettings(on).keep_photos_until);
       return true;
     }
     if (action === 'spKeepPhotos') {
@@ -789,6 +916,11 @@ var CmStudentPage = (function () {
     workSettings: workSettings,
     learningSettings: learningSettings,
     keepPhotosDate: keepPhotosDate,
+    classHasPhotos: classHasPhotos,
+    photoReminder: photoReminder,
+    photoReminderHtml: photoReminderHtml,
+    dismissPhotoReminder: dismissPhotoReminder,
+    focusKeepPhotos: focusKeepPhotos,
     handleAction: handleAction,
     handleChange: handleChange,
     handleBlur: handleBlur,
