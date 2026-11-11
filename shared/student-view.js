@@ -724,7 +724,6 @@ window.StudentView = (function () {
       criterionIds: list(r.criterion_ids).filter(function (id) {
         return typeof id === 'string';
       }),
-      hidden: r.grade_hidden === true,
       firstGrade: r.first_grade && typeof r.first_grade === 'object' ? r.first_grade : null,
       firstSentAt: text(r.first_sent_at),
       sentAt: r.state === 'open' ? '' : text(r.revision_sent_at),
@@ -788,7 +787,6 @@ window.StudentView = (function () {
         .map(function (id) {
           return names[id];
         }),
-      hidden: rev.hidden,
       firstSentAt: rev.firstSentAt,
       sentAt: rev.sentAt,
       note: rev.note,

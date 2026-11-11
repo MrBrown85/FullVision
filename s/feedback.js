@@ -241,8 +241,8 @@
      memory until Done. The stand-in answers as Batch C's student functions
      are written to (shared/data.js, "Revisions"): a revision only on an open
      request, Unsend and Replace only until grading starts, Late after
-     Revise By, and the first version's grade given only while it is not
-     hidden. */
+     Revise By. The grade is always kept: there is no Hide in this build
+     (Colin, Nov 11). */
   function isoDay(offset) {
     var t = new Date(Date.now() + offset * 864e5);
     return (
@@ -255,7 +255,6 @@
         what_to_fix: 'Write the magnification beside each drawing, then send it again.',
         revise_by: isoDay(3),
         criterion_ids: ['demo-crit-drawing'],
-        hidden: false,
         asked_at: at(-1),
         first_sent_at: at(-15, 19),
         first_thumbs: [SAMPLE + 'cell-lab-cece-1-thumb.jpg'],
@@ -267,7 +266,6 @@
         what_to_fix: 'Add a third example of how the body remembers a germ.',
         revise_by: isoDay(-3),
         criterion_ids: [],
-        hidden: false,
         asked_at: at(-9),
         first_sent_at: at(-11, 19),
         first_thumbs: [SAMPLE + 'cell-lab-cece-1-thumb.jpg'],
@@ -315,11 +313,11 @@
       what_to_fix: r.what_to_fix,
       revise_by: r.revise_by || null,
       criterion_ids: r.criterion_ids.slice(),
-      keep_grade: !r.hidden,
-      grade_hidden: !!r.hidden && !r.returned,
+      keep_grade: true,
+      grade_hidden: false,
       first_version: 1,
       first_sent_at: r.first_sent_at,
-      first_grade: r.hidden && !r.returned ? null : r.first_grade || row.grade || null,
+      first_grade: r.first_grade || row.grade || null,
       revision_version: rec ? 2 : null,
       revision_sent_at: rec ? rec.at : null,
       revision_note: rec ? rec.note || null : null,

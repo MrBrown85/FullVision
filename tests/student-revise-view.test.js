@@ -7,8 +7,8 @@
  * The board's worked example (Socials 10, graded by both): the first
  * version is Developing + and Proficient, 2.7 · 67%; the revision is
  * Proficient and Proficient, 3.0 · 75%.
- * - Needs Revision while nothing is in, the grade kept (or none at all
- *   while it is hidden);
+ * - Needs Revision while nothing is in, the grade kept (there is no Hide in
+ *   this build: Colin, Nov 11);
  * - Sent again once the revision is in; a draft regrade changes nothing a
  *   student sees, and the grade they have is still 2.7 · 67%;
  * - once returned the new grade replaces the old, and Before and After
@@ -193,7 +193,7 @@ describe('the loop in Preview as Student, and the same HTML on the student’s d
     const p = pieceIn(view);
     expect(p.kind).toBe('revise');
     expect(p.result.text).toBe('2.7 · 67%');
-    expect(p.revision).toMatchObject({ state: 'open', whatToFix: FIX, reviseBy: '2026-11-10', hidden: false });
+    expect(p.revision).toMatchObject({ state: 'open', whatToFix: FIX, reviseBy: '2026-11-10' });
     expect(view.counts.toDo).toBe(1);
     const box = drawn(view, UIS[0]);
     expect(words(box.querySelector('.sp-flag-revise'))).toBe('Revise by Tue, Nov 10');
@@ -201,28 +201,6 @@ describe('the loop in Preview as Student, and the same HTML on the student’s d
     // Preview has no `work` reply: no Send My Revision there, as there is no Send My Work.
     expect(box.querySelector('[data-act="revise-open"]')).toBeNull();
     expect(box.innerHTML).not.toMatch(/Colin|Brown/);
-  });
-
-  it('Hide: no grade anywhere on the page until the new one is returned', async () => {
-    gradeFirstVersion();
-    expect((await askForRevision({ keep_grade: false })).hidden).toBe(true);
-    const { view, reply } = sameOnBoth();
-    const p = pieceIn(view);
-    expect(p.kind).toBe('revise');
-    expect(p.result.kind).toBe('none');
-    expect(p.revision.hidden).toBe(true);
-    expect(reply.assessments[0].grade).toBeNull();
-    const html = UIS.map(ui => StudentPageView.html(view, ui)).join('');
-    expect(html).not.toMatch(/2\.7|67%|Developing|Proficient/);
-    expect(drawn(view, UIS[0]).querySelector('[data-act="feedback"]')).toBeNull();
-    sendRevision();
-    regrade();
-    expect(pieceIn(sameOnBoth().view).result.kind).toBe('none');
-    Grader.returnGrades(CID, PIECE, [JORDAN]);
-    const back = pieceIn(sameOnBoth().view);
-    expect(back.kind).toBe('back');
-    expect(back.result.text).toBe('3.0 · 75%');
-    expect(back.revision.before.result.text).toBe('2.7 · 67%');
   });
 
   it('sent, then a draft regrade: Sent again, and the student still has 2.7 · 67%', async () => {
@@ -266,9 +244,9 @@ describe('the loop in Preview as Student, and the same HTML on the student’s d
     expect(withReturnedOnly(() => formatLevel(CID, getOverallProficiency(CID, JORDAN)))).toBe('3.0 · 75%');
   });
 
-  it('Take Back: the revision is gone and the grade is the student’s again', async () => {
+  it('Take Back: the revision is gone and the grade is the student’s as it was', async () => {
     gradeFirstVersion();
-    const made = await askForRevision({ keep_grade: false });
+    const made = await askForRevision();
     expect((await cancelRevision(CID, made.request.id, key())).result).toBe('cancelled');
     const p = pieceIn(sameOnBoth().view);
     expect(p.revision).toBeNull();
