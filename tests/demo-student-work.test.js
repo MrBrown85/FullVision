@@ -62,7 +62,7 @@ describe('the sample work, in the shape of list_course_submissions', () => {
     const all = getCourseSubmissions(CID);
     expect(Object.keys(all).sort()).toEqual(['assessments', 'bucket', 'course', 'submissions', 'uploads']);
     expect(all.bucket).toBe('student-photos');
-    expect(all.course).toEqual({ send_work: true, keep_photos_until: 'end_of_year' });
+    expect(all.course).toEqual({ send_work: false, keep_photos_until: 'end_of_year' });
     expect(all.uploads).toEqual([]);
     expect(all.assessments).toHaveLength(getAssessments(CID).length);
     all.assessments.forEach(a =>
@@ -198,8 +198,24 @@ describe('the sample work, in the shape of list_course_submissions', () => {
   });
 });
 
+// Send Work on for the sample class, as a teacher would turn it on.
+function sendWorkOn() {
+  const stored = JSON.parse(localStorage.getItem('gb-student-work-sci8'));
+  stored.course.send_work = true;
+  expect(saveDemoStudentWork(CID, stored)).toBe(true);
+}
+
 describe('the student page’s work(...)', () => {
+  it('with Send Work off, as it starts: the work sent shows, nothing is open and nothing can change', () => {
+    const w = getStudentWork(CID, 'st1');
+    expect(w.send_work).toBe(false);
+    expect(w.assessments.map(a => a.id)).toEqual([LAB, KMT]);
+    expect(w.assessments[0]).toMatchObject({ open: false, sent: { pages: 1, can_change: false } });
+    expect(getStudentWork(CID, 'st11').assessments[0]).toMatchObject({ open: false, sent: null });
+  });
+
   it('lists what takes work or has work in, with the window and what was sent', () => {
+    sendWorkOn();
     const w = getStudentWork(CID, 'st1');
     expect(Object.keys(w).sort()).toEqual(['assessments', 'ok', 'send_work', 'v']);
     expect(w).toMatchObject({ ok: true, v: 1, send_work: true });
@@ -234,11 +250,13 @@ describe('the student page’s work(...)', () => {
   });
 
   it('shows nothing sent for a student who sent nothing, and the lab still open to them', () => {
+    sendWorkOn();
     const lab = getStudentWork(CID, 'st11').assessments.find(a => a.id === LAB);
     expect(lab).toMatchObject({ open: true, sent: null });
   });
 
   it('lets a student change their own send only before grading starts', () => {
+    sendWorkOn();
     // Take Cece's grade away: her lab is sent and not being graded.
     saveScores(
       CID,
