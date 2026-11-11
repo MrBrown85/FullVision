@@ -18502,7 +18502,9 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
    answer_reflection, list_course_feedback). Only for a class the server keeps
    student-page rows for (_workOnServer, as Send Work's wiring above): any
    other class is answered exactly as before and sent nothing new. Return
-   for Revision, revisions and group work are not here (Phase 3).
+   for Revision, its edit and Take Back are here (S7-W1, "Revisions" below);
+   a student's own revision (revision_start, revision_finish, revision_unsend)
+   and group work are not (Phase 3).
 
    What is read: list_course_feedback (the class's switches, a line for
    every marked page, every reflection) when the class loads with Send Work
@@ -20241,9 +20243,13 @@ function saveDemoReflections(cid, list) {
    says: with either off every reader here shows nothing and every writer
    answers revisions_off. DEMO MODE ONLY, in gb-student-feedback-<cid>
    (field `revisions`, by request id) and the student work's own
-   submissions (gb-student-work-<cid>). Signed in, the readers show none
-   and the writers answer { result: 'not_available' } (the student's,
-   { ok: false, error: 'not_available' }) with no RPC, until S11-W1. */
+   submissions (gb-student-work-<cid>). A signed-in class's requests are the
+   server's (_fbRevisions, from list_course_feedback with this device's
+   unanswered Return for Revision, edits and Take Backs laid over them): the
+   teacher's writers go to return_for_revision, set_revision_request and
+   cancel_revision through the outbox. The student's own writers here are
+   Demo Mode's and answer { ok: false, error: 'not_available' } signed in
+   (a real student sends through the revision routes: S11-W1, student side). */
 var REVISION_FIX_MAX = 2000;
 var _firstVersionScope = null; // { cid, sid, aid, entries } while getRevisionFirstCell reads
 
