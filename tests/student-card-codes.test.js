@@ -3,11 +3,10 @@
  * Colin, Nov 10: card codes become eight characters, shown K7M4-QX2P; slips
  * stay six, shown K7M-4QX; a replaced card tells the student).
  *
- * The stand-in database (tests/helpers/fake-student-submit.js) knows cards
- * by six characters, as the database does today, and the function on main
- * answers a replaced card not_found. The card routes as S3-E1 makes them
- * are stood in for here: an eight-character code is put to the function as
- * the sample card's, and a replaced card answers card_stopped.
+ * The page runs against the function's real handler (S3-E1) over a stand-in
+ * database (tests/helpers/fake-student-submit.js): the card is eight
+ * characters, the database is handed its tag, and a replaced card answers
+ * card_stopped.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -23,20 +22,15 @@ const CARD = 'K7M4QX2P';
 const routes = page => page.calls.map(c => c.body.route);
 const alertText = page => (page.root().querySelector('[role="alert"]') || {}).textContent || '';
 
-/* One device and the function it talks to. `stopped` makes the
-   eight-character card a replaced one. */
+/* One device and the function it talks to. `card.stopped = true` makes
+   the card a replaced one, as the database would say of it. */
 function school() {
-  const fn = fakeStudentSubmit({ cards: [sampleCard(TODAY)] });
+  const fn = fakeStudentSubmit({ cards: [sampleCard(TODAY, { code: CARD })] });
   const store = {};
-  const dev = { fn, store, stopped: false };
-  dev.server = body => {
-    if (body.code !== CARD) return fn.handle(body);
-    if (dev.stopped && /^(card|verify)$/.test(body.route)) return { ok: false, error: 'card_stopped' };
-    return fn.handle(Object.assign({}, body, { code: 'P3R8WD' }));
-  };
+  const dev = { fn, store, card: fn.state.cards[CARD] };
   dev.open = async hash => {
     const page = openStudentPage({ store });
-    page.server = body => dev.server(body);
+    page.server = body => fn.handle(body);
     await page.start(hash || '');
     return page;
   };
@@ -150,7 +144,7 @@ describe('a replaced card says so', () => {
 
   it('card answers card_stopped: the line, no check asked, and the code leaves the address', async () => {
     const dev = school();
-    dev.stopped = true;
+    dev.card.stopped = true;
     const page = await dev.open('#K7M4-QX2P');
     expect(routes(page)).toEqual(['card']);
     expect(alertText(page)).toBe(REPLACED);
@@ -163,11 +157,11 @@ describe('a replaced card says so', () => {
 
   it('a replaced card signs the last student out, as any recognised card does', async () => {
     const dev = school();
-    await signIn(dev, '#P3R-8WD');
+    await signIn(dev);
     const last = JSON.parse(dev.store[KEY]).t;
     expect(dev.fn.state.sessions[last]).toBeTruthy();
 
-    dev.stopped = true;
+    dev.card.stopped = true;
     const page = await dev.open('#K7M4-QX2P');
     expect(page.calls.map(c => c.body)).toEqual([
       { route: 'card', code: CARD },
@@ -180,7 +174,7 @@ describe('a replaced card says so', () => {
 
   it('typed on the card’s screen: the same line', async () => {
     const dev = school();
-    dev.stopped = true;
+    dev.card.stopped = true;
     const page = await dev.open('');
     page.type('#sp-code', 'K7M4-QX2P');
     await page.submit('form[data-form="code"]');
@@ -191,7 +185,7 @@ describe('a replaced card says so', () => {
   it('verify answers card_stopped (replaced while Is This You? was open): the same line, and nothing kept', async () => {
     const dev = school();
     const page = await dev.open('#K7M4-QX2P');
-    dev.stopped = true;
+    dev.card.stopped = true;
     page.type('#sp-ident', '0123456');
     await page.click('[data-act="card-yes"]');
     expect(routes(page)).toEqual(['card', 'verify']);

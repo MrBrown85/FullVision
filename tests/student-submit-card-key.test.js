@@ -25,8 +25,6 @@ import { describe, expect, it } from 'vitest';
 import { readCardKey } from '../supabase/functions/_shared/card-key.ts';
 import { makeHandler } from '../supabase/functions/student-submit/handler.ts';
 import { CARD_ROUTES } from '../supabase/functions/student-submit/card-routes.ts';
-import { makeHandler as handlerBefore } from './fixtures/student-submit-handler-2026-11-10.ts';
-import { CARD_ROUTES as ROUTES_BEFORE } from './fixtures/student-submit-card-routes-2026-11-10.ts';
 import { FAKE_KEY, codeTag, keyId, passwordTag } from './helpers/card-key-fake.js';
 import { CECE, fakeStudentSubmit, sampleCard } from './helpers/fake-student-submit.js';
 
@@ -68,7 +66,7 @@ const VERIFIED = {
 
 /* A handler over a database that records everything it is handed and
    answers yes. `cardKey` is what readCardKey made of the secret. */
-function setup(cardKey, answers, make) {
+function setup(cardKey, answers) {
   const asked = []; // every value that reached the database, by function
   const logs = [];
   const answer = Object.assign(
@@ -85,7 +83,7 @@ function setup(cardKey, answers, make) {
     asked.push({ fn: name, params: [first, second, third] });
     return { ok: true, parts: [], slip: name };
   };
-  const handle = (make || makeHandler)({
+  const handle = makeHandler({
     region: 'ca-central-1',
     ipKey: 'test-key',
     cardKey,
@@ -248,21 +246,18 @@ describe('student-submit: the database is handed a tag, never the code or the ty
     expect(h.asked[0].params[0]).not.toBe(TAG);
   });
 
-  it('before S3-E1 the code and the password went to the database as typed; now neither does', async () => {
-    const was = setup(KEY, null, handlerBefore);
-    const is = setup(KEY);
-    for (const h of [was, is]) await send(h, CODE_ROUTES.verify);
-    expect(was.asked[0].params.slice(0, 4)).toEqual([CODE, null, null, '4821']);
-    expect(JSON.stringify(is.asked)).not.toContain(CODE);
-    expect(JSON.stringify(is.asked)).not.toContain('4821');
-    // The two statements take a different number of values, so the function from before S3-E1 cannot call the
-    // database after S3-M1, nor this one the database before it: either way the call fails and nothing opens.
+  it('the statements do not fit the database from before S3-M1, so old and new can never half-work together', () => {
+    // Before S3-E1 card took two values (the code, the address) and verify_card six. Now they take three and
+    // seven. The function from before cannot call the database after S3-M1, nor this one the database before
+    // it: either way the call fails and nothing opens.
     const values = sql => sql.match(/\$\d/g).length;
-    expect([values(ROUTES_BEFORE.card.sql), values(CARD_ROUTES.card.sql)]).toEqual([2, 3]);
-    expect([values(ROUTES_BEFORE.verify.sql), values(CARD_ROUTES.verify.sql)]).toEqual([6, 7]);
-    expect([values(ROUTES_BEFORE['add-card'].sql), values(CARD_ROUTES['add-card'].sql)]).toEqual([6, 7]);
-    // page, seen and done are called as they were.
-    for (const route of ['page', 'seen', 'done']) expect(CARD_ROUTES[route].sql).toBe(ROUTES_BEFORE[route].sql);
+    expect(values(CARD_ROUTES.card.sql)).toBe(3);
+    expect(values(CARD_ROUTES.verify.sql)).toBe(7);
+    expect(values(CARD_ROUTES['add-card'].sql)).toBe(7);
+    // page, seen and done are called as they were before S3-E1.
+    expect(CARD_ROUTES.page.sql).toBe('select student_submit.page($1::text, $2::uuid, $3::text) as r');
+    expect(CARD_ROUTES.seen.sql).toBe('select student_submit.seen($1::text, $2::uuid, $3::uuid[], $4::text) as r');
+    expect(CARD_ROUTES.done.sql).toBe('select student_submit.done($1::text, $2::text) as r');
   });
 });
 
@@ -402,12 +397,6 @@ describe('student-submit: a replaced card', () => {
     expect(await send(h, CODE_ROUTES[route])).toEqual({ status: 200, body: { ok: false, error: 'card_stopped' } });
     expect(h.logs).toEqual([{ route, outcome: 'card_stopped', ms: expect.any(Number) }]);
   });
-
-  it('before S3-E1 the first routes answered it as a code that did not work', async () => {
-    const stopped = () => ({ ok: false, error: 'card_stopped' });
-    const was = setup(KEY, { card: stopped, verify_card: stopped }, handlerBefore);
-    expect((await send(was, CODE_ROUTES.card)).body).toEqual({ ok: false, error: 'not_found' });
-  });
 });
 
 describe('student-submit: no log line holds a secret', () => {
@@ -526,18 +515,16 @@ describe('student-submit: where the key comes from (index.ts)', () => {
   const index = readFileSync(new URL('../supabase/functions/student-submit/index.ts', import.meta.url), 'utf8');
   const code = index.replace(/^\s*\/\/.*$/gm, '');
 
-  it('reads STUDENT_CARD_KEY once, through readCardKey, with no fallback', () => {
+  it('reads STUDENT_CARD_KEY once, inside loadCardKey, with no fallback, and keeps its text under no name', () => {
     expect(code.match(/STUDENT_CARD_KEY/g)).toHaveLength(1);
-    expect(code).toContain("const cardKeyValue = Deno.env.get('STUDENT_CARD_KEY');");
-    expect(code).toContain('const cardKey = await readCardKey(cardKeyValue);');
-    // The value is used for two things only: reading the key, and saying whether one was set.
-    expect(code.match(/\bcardKeyValue\b/g)).toHaveLength(3);
-    expect(code).toContain("console.log(JSON.stringify(keyLine('student-submit', cardKeyValue, cardKey)));");
+    expect(code).toContain(
+      "const cardKey = await loadCardKey('student-submit', () => Deno.env.get('STUDENT_CARD_KEY'));",
+    );
     expect(code).toMatch(/makeHandler\(\{\s*region: Deno\.env\.get\('SB_REGION'\),\s*cardKey,/);
   });
 
-  it('logs one line at start and nothing else', () => {
-    expect(code.match(/console\.\w+\(/g)).toEqual(['console.log(']);
+  it('logs nothing itself: the one line at start is loadCardKey’s', () => {
+    expect(code.match(/console\.\w+\(/g)).toBeNull();
   });
 
   it('hands the key to nothing but the handler: it is in no statement', () => {
@@ -555,9 +542,8 @@ describe('the stand-in function the student page’s tests use (tests/helpers/fa
   const TODAY = '2026-11-10';
   const card8 = more => sampleCard(TODAY, { code: 'P3R8WD4K', ...more });
 
-  it('with an eight-character card it is the function in the repo: the card opens by its tag', async () => {
+  it('is the function in the repo: the card opens by its tag', async () => {
     const fn = fakeStudentSubmit({ cards: [card8()] });
-    expect(fn.keyed).toBe(true);
     expect(await fn.handle({ route: 'card', code: 'p3r8-wd4k' })).toMatchObject({ ok: true, kind: 'card' });
     const verified = await fn.handle({ route: 'verify', code: 'P3R8-WD4K', birthday: '2012-05-15' });
     expect(verified).toMatchObject({ ok: true, enrollment_id: CECE });
@@ -610,15 +596,18 @@ describe('the stand-in function the student page’s tests use (tests/helpers/fa
     }
   });
 
-  it('with a six-character card it is the function from before S3-E1, as deployed until the day', async () => {
+  it('its sample card is eight characters, and it holds no card of any other length', async () => {
     const fn = fakeStudentSubmit({ cards: [sampleCard(TODAY)] });
-    expect(fn.keyed).toBe(false);
-    expect(await fn.handle({ route: 'card', code: 'P3R-8WD' })).toMatchObject({ ok: true, kind: 'card' });
-    expect(fn.sql[0].params).toEqual(['P3R-8WD']);
+    expect(Object.keys(fn.state.cards)).toEqual(['P3R8WDK4']);
+    expect(await fn.handle({ route: 'card', code: 'P3R8-WDK4' })).toMatchObject({ ok: true, kind: 'card' });
+    for (const code of ['P3R8WD', 'P3R8WD4', 'P3R8WDK42']) {
+      expect(() => fakeStudentSubmit({ cards: [sampleCard(TODAY, { code })] }), code).toThrow('eight characters');
+    }
   });
 
-  it('refuses to hold both kinds of card', () => {
-    expect(() => fakeStudentSubmit({ cards: [sampleCard(TODAY), card8()] })).toThrow('not both');
-    expect(() => fakeStudentSubmit({ cards: [sampleCard(TODAY, { code: 'P3R8WD4' })] })).toThrow();
+  it('runs no handler but the one in the repo', () => {
+    const helper = readFileSync(new URL('./helpers/fake-student-submit.js', import.meta.url), 'utf8');
+    const imports = helper.match(/^import .*$/gm).filter(line => /handler|card-routes|fixtures/.test(line));
+    expect(imports).toEqual(["import { makeHandler } from '../../supabase/functions/student-submit/handler.ts';"]);
   });
 });
