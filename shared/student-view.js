@@ -233,11 +233,13 @@ window.StudentView = (function () {
       var scoring = scoringOf(cid, a);
       var grade = dibels ? null : givenCopy(cid, sid, a, status, scoring, returned);
       var hidden = status === 'NS' || status === 'EXC';
-      // When it came back. A grade with no row was there before the rule was
-      // kept: the server's first batch dated those the day it was applied,
+      // When it came back. A grade given with no return date was there before
+      // the rule was kept (no row; or a row this device made when a draft
+      // was saved over it, which keeps the old grade as returned_copy and no
+      // date). The server's first batch dated those the day it was applied,
       // which this device does not know, so the piece's own date stands in.
       var returnedAt = row && row.returned_at ? row.returned_at : null;
-      if (!returnedAt && grade && !row) returnedAt = a.date || a.dueDate || today;
+      if (!returnedAt && grade) returnedAt = a.date || a.dueDate || today;
       var tagIds = (a.tagIds || a.tag_ids || []).filter(function (id) {
         return !!tags[id];
       });

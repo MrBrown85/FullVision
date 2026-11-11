@@ -1,0 +1,292 @@
+/* Preview as Student (teacher/preview-student.js). The page inside the
+   device follows s/student.css's list (placeholder until the student page's
+   real screens land). */
+.ps-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  color: var(--text);
+  font-family: var(--font-base);
+  font-size: 14px;
+  line-height: 1.4;
+}
+.ps-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  min-height: 54px;
+  padding: 8px 20px;
+  background: #1d1d1f;
+  color: #ffffff;
+}
+.ps-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+.ps-bar-line {
+  font-size: 13px;
+  color: #c7c7cc;
+}
+.ps-bar-space {
+  flex: 1;
+}
+.ps-seg {
+  display: flex;
+  padding: 2px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.15);
+}
+.ps-seg-btn {
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #ffffff;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.ps-seg-btn.active {
+  background: #ffffff;
+  color: #1d1d1f;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+.ps-back {
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ps-seg-btn:focus-visible,
+.ps-back:focus-visible {
+  outline: 2px solid #5ca9ff;
+  outline-offset: 2px;
+}
+.ps-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto minmax(240px, 1fr);
+  align-items: start;
+  gap: 24px;
+  padding: 28px 32px;
+}
+.ps-side-left {
+  display: flex;
+  justify-content: flex-end;
+}
+.ps-card {
+  width: 100%;
+  max-width: 320px;
+  box-sizing: border-box;
+  padding: 18px 20px;
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+.ps-card-title {
+  margin: 0;
+  padding-bottom: 6px;
+  font-size: 16px;
+  font-weight: 700;
+}
+.ps-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ps-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 0;
+  border-top: 0.5px solid rgba(0, 0, 0, 0.1);
+}
+.ps-item-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+.ps-item-line {
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+/* The device. */
+.ps-stage {
+  display: flex;
+  justify-content: center;
+}
+.ps-device {
+  flex: none;
+  padding: 12px;
+  background: #1d1d1f;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+.ps-device-phone {
+  border-radius: 44px;
+}
+.ps-device-phone .ps-screen {
+  width: 390px;
+  height: 780px;
+  border-radius: 34px;
+}
+.ps-device-chromebook {
+  border-radius: 14px;
+}
+.ps-device-chromebook .ps-screen {
+  width: 820px;
+  height: 540px;
+  border-radius: 4px;
+}
+.ps-screen {
+  overflow-y: auto;
+  box-sizing: border-box;
+  background: #f5f5f7;
+  color: #1d1d1f;
+  font-size: 15px;
+}
+.ps-device-chromebook .ps-page-head,
+.ps-device-chromebook .ps-page-main {
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.ps-page-head {
+  padding: 20px 16px 8px;
+}
+.ps-page-class {
+  font-size: 17px;
+  font-weight: 700;
+}
+.ps-page-sub {
+  font-size: 13px;
+  color: #58585d;
+}
+.ps-page-main {
+  padding: 0 16px 24px;
+}
+.ps-page-title {
+  margin: 4px 4px 8px;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.ps-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: #ffffff;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.ps-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 10px 14px;
+}
+.ps-row + .ps-row {
+  border-top: 1px solid #e5e5ea;
+}
+.ps-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #c7c7cc;
+}
+.ps-dot-back {
+  background: #2e7d32;
+}
+.ps-dot-missing {
+  background: #c07a00;
+}
+.ps-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.ps-row-title {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.ps-row-sub {
+  font-size: 13px;
+  line-height: 1.35;
+  color: #58585d;
+}
+.ps-row-result {
+  flex: none;
+  max-width: 45%;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.ps-empty,
+.ps-waiting {
+  padding: 24px 20px;
+  color: #58585d;
+}
+
+/* Narrow windows: the lists go under the device. */
+@media (max-width: 1100px) {
+  .ps-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+  }
+  .ps-side,
+  .ps-side-left {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+  .ps-stage {
+    order: -1;
+    flex: none;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}
+
+/* The door, in Class Settings › Student Page: a card laid out as the tab's others (.sp-card). */
+.sp-preview {
+  display: flex;
+  flex-direction: column;
+}
+.sp-preview > .cm-grade-title {
+  margin-bottom: 14px;
+}
+.sp-preview-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 12px;
+}
+.sp-preview-select {
+  flex: 1 1 220px;
+  max-width: 320px;
+}

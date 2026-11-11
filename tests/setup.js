@@ -250,6 +250,7 @@ load('teacher/questionnaires.js');
 load('teacher/qr-slips.js');
 load('teacher/cm-questionnaires.js');
 load('teacher/student-cards.js');
+load('teacher/preview-student.js');
 load('teacher/cm-student-page.js');
 load('teacher/student-voice.js');
 load('teacher/learner-profile.js');
