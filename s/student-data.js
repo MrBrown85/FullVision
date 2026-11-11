@@ -36,6 +36,27 @@ var StudentData = (function () {
     return v == null ? '' : String(v);
   }
 
+  /* The keys S4-M1 added (migrations/local-test/s4-m1-contract.md), each
+     read as the contract types it. A key the reply lacks, or holds as
+     another type, reads as its empty value: never a throw. */
+  function text(v) {
+    return typeof v === 'string' ? v : '';
+  }
+  function textList(v) {
+    return Array.isArray(v)
+      ? v.filter(function (s) {
+          return typeof s === 'string';
+        })
+      : [];
+  }
+  function idList(v) {
+    return textList(v).filter(Boolean);
+  }
+  // A whole number, 0 or more, or null.
+  function count(v) {
+    return typeof v === 'number' && isFinite(v) && v >= 0 && Math.floor(v) === v ? v : null;
+  }
+
   function num(v) {
     if (v == null || v === '') return null;
     var n = Number(v);
@@ -93,9 +114,26 @@ var StudentData = (function () {
           return c && c.id;
         })
         .map(function (c) {
-          return { id: str(c.id), name: str(c.name), weight: num(c.weight), levelValues: levelValues(c) };
+          return {
+            id: str(c.id),
+            name: str(c.name),
+            weight: num(c.weight),
+            levelValues: levelValues(c),
+            tagIds: idList(c.tag_ids),
+          };
         }),
     };
+  }
+
+  function tagsFrom(byId) {
+    var out = {};
+    if (!byId || typeof byId !== 'object' || Array.isArray(byId)) return out;
+    Object.keys(byId).forEach(function (id) {
+      var t = byId[id];
+      if (!t || typeof t !== 'object') return;
+      out[id] = { label: str(t.label), code: str(t.code), iCan: textList(t.i_can) };
+    });
+    return out;
   }
 
   function assessmentFrom(row) {
@@ -115,6 +153,20 @@ var StudentData = (function () {
       // pieces with one date: the one made later counts later (Colin, Nov
       // 10). '' until the server sends it.
       created_at: row.created_at ? str(row.created_at) : '',
+      description: text(row.description),
+      moduleName: text(row.module_name),
+      categoryName: text(row.category_name),
+      categoryPercent:
+        typeof row.category_percent === 'number' && isFinite(row.category_percent) && row.category_percent >= 0
+          ? row.category_percent
+          : null,
+      coreCompetencies: (Array.isArray(row.core_competencies) ? row.core_competencies : [])
+        .filter(function (c) {
+          return c && typeof c === 'object' && text(c.id) && text(c.name);
+        })
+        .map(function (c) {
+          return { id: c.id, name: c.name };
+        }),
       updated: false, // set by fromServer, with `unseen`
       unseen: false,
     };
@@ -224,10 +276,24 @@ var StudentData = (function () {
         block: str(course.block),
         gradingSystem: SYSTEMS[course.grading_system] || 'proficiency',
         gradingScale: course.grading_scale && typeof course.grading_scale === 'object' ? course.grading_scale : null,
+        // course.teacher_name is never read: the page never names the
+        // teacher (Colin's ruling 112, "Leave the name off.").
       },
+      // The class's competencies: name, code and I Can statements (blanks kept, as sent).
+      tags: tagsFrom(res.tags),
       assessments: assessments,
       rubrics: rubrics,
       grades: grades,
+      // The classes this device's session has opened, for Switching Classes.
+      classes: (Array.isArray(res.classes) ? res.classes : [])
+        .filter(function (c) {
+          return c && str(c.enrollment_id);
+        })
+        .map(function (c) {
+          var k = c.course || {};
+          // toDo: how many pieces wait in that class, null when the server does not say.
+          return { enrollmentId: str(c.enrollment_id), name: str(k.name), block: str(k.block), toDo: count(c.to_do) };
+        }),
     };
   }
 

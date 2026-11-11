@@ -2,6 +2,11 @@
 the teacher's functions (as Teacher A, Teacher B, anon), report codes, the
 birthday check, the reply, update and close. One transaction, rolled back.
 
+It reads which database it is given. With 20261107_no_report_reply.sql
+loaded (as gradebook-prod has been since Nov 7: a report is for reading)
+there is no Reply to Report: the checks on the reply are replaced by checks
+that it is gone (REPLY below).
+
 PGPORT=54331 PGDATABASE=fv_ss python3 run.py harness.sql student-submit-prelude.sql \\
   ../20261025_questionnaires_tables_and_functions.sql ../20261025_questionnaires_templates.sql \\
   ../20261025_student_submit.sql ../20261025_student_submit_phone.sql \\
@@ -50,6 +55,8 @@ def submit(token, answers, ip='ip-1'):
     as_role('service_role'); return c.run('select student_submit.submit(:t, :a::jsonb, :i)', t=token, a=json.dumps(answers), i=ip)[0][0]
 
 today = one("select (now() at time zone 'America/Vancouver')::date::text")
+# False once 20261107_no_report_reply.sql is loaded: it drops this column with the reply.
+REPLY = one("select count(*) from information_schema.columns where table_name = 'phone_report' and column_name = 'reply_questionnaire_id'") == 1
 DATA1 = {'v': 1, 'first': 'Cece', 'overall': {'text': '3.0', 'level': 3, 'word': 'Proficient'}, 'comment': ['Cece is curious.']}
 DATA2 = {'v': 1, 'first': 'Marcus', 'overall': {'text': '2.0', 'level': 2, 'word': 'Developing'}}
 STUDENTS = json.dumps([{'enrollment_id': ENR1, 'data': DATA1}, {'enrollment_id': ENR2, 'data': DATA2}])
@@ -73,12 +80,15 @@ k = key()
 rep = c.run("select create_phone_report(:c, 1, 'Report 1', (:d::date + 30), :s::jsonb, :k)", c=COURSE_A, d=today, s=STUDENTS, k=k)[0][0]
 rid = rep['id']
 ok('the report holds both students', sorted(x['enrollment_id'] for x in rep['students']) == sorted([ENR1, ENR2]), rep)
-ok('nobody has opened or replied yet', all(x['opened_at'] is None and x['replied_at'] is None for x in rep['students']), rep['students'])
+ok('nobody has opened or replied yet', all(x['opened_at'] is None and (x['replied_at'] is None if REPLY else 'replied_at' not in x) for x in rep['students']), rep['students'])
 again = c.run("select create_phone_report(:c, 1, 'Report 1', (:d::date + 30), :s::jsonb, :k)", c=COURSE_A, d=today, s=STUDENTS, k=k)[0][0]
 ok('the same key replays', again['id'] == rid)
-reply_q = one('select reply_questionnaire_id::text from phone_report where id = :r', r=rid)
-rq = one("select jsonb_build_object('kind', kind, 'title', title, 'n', (select count(*) from question where questionnaire_id = q.id), 'closes', closes_on::text) from questionnaire q where id = :q", q=reply_q)
-ok('a Reply to Report questionnaire comes with it', rq['kind'] == 'report_reply' and rq['title'] == 'Reply to Report 1' and rq['n'] == 5, rq)
+if REPLY:
+    reply_q = one('select reply_questionnaire_id::text from phone_report where id = :r', r=rid)
+    rq = one("select jsonb_build_object('kind', kind, 'title', title, 'n', (select count(*) from question where questionnaire_id = q.id), 'closes', closes_on::text) from questionnaire q where id = :q", q=reply_q)
+    ok('a Reply to Report questionnaire comes with it', rq['kind'] == 'report_reply' and rq['title'] == 'Reply to Report 1' and rq['n'] == 5, rq)
+else:
+    ok('no Reply to Report questionnaire comes with it (20261107): the class has no questionnaire at all', one('select count(*) from questionnaire where course_id = :c', c=COURSE_A) == 0)
 as_teacher(B)
 ok("Teacher B's list doesn't show it", c.run('select list_phone_reports(:c)', c=COURSE_A)[0][0] == [])
 as_teacher(A)
@@ -116,32 +126,48 @@ r = open_(code[ENR1])
 tok = r['token']
 sp()
 r2 = submit(tok, {})
-ok('a reply before the birthday check is refused', r2 == {'ok': False, 'error': 'expired'}, r2)
+ok('a reply before the birthday check is refused', r2 == {'ok': False, 'error': 'expired' if REPLY else 'closed'}, r2)
 back()
 r2 = check(tok, '2012-05-15')
 ok('the right birthday opens the report as it was sent', r2.get('ok') is True and r2['report'] == DATA1, r2)
-ok('with the reply questions, not yet replied', r2['reply'] and len(r2['reply']['questions']) == 5 and r2['replied_at'] is None, r2.get('reply'))
+if REPLY:
+    ok('with the reply questions, not yet replied', r2['reply'] and len(r2['reply']['questions']) == 5 and r2['replied_at'] is None, r2.get('reply'))
+else:
+    ok('and nothing else: no reply questions, no replied_at (20261107)', set(r2) == {'ok', 'report'}, sorted(r2))
 ok('opened is recorded', one('select opened_at is not null from student_access_code where enrollment_id = :e and phone_report_id = :r and revoked_at is null', e=ENR1, r=rid))
 
-# ── Replying ───────────────────────────────────────────────────────────
-qs = {x['prompt']: x['id'] for x in r2['reply']['questions']}
-answers = {
-    qs['What are you most proud of?']: 'my biodiversity journal',
-    qs['Your goal: keep it or change it?']: ['Keep It'],
-    qs['One thing you will do before the next report']: 'start the data table at lunch',
-}
-r3 = submit(tok, answers)
-ok('the reply is saved', r3.get('ok') is True, r3)
-ok('as a response to the reply questionnaire', one('select count(*) from response where questionnaire_id = :q and enrollment_id = :e', q=reply_q, e=ENR1) == 1)
-ok('the code still works for reading', one('select used_at is null from student_access_code where enrollment_id = :e and phone_report_id = :r and revoked_at is null', e=ENR1, r=rid))
-r = open_(code[ENR1])
-r4 = check(r['token'], '2012-05-15')
-ok('reopened, the report shows and the reply is done', r4.get('ok') and r4['reply'] is None and r4['replied_at'], r4)
-r5 = submit(r['token'], answers)
-ok('a second reply is refused', r5 == {'ok': False, 'error': 'used'}, r5)
-as_teacher(A)
-st = {x['enrollment_id']: x for x in c.run('select list_phone_reports(:c)', c=COURSE_A)[0][0][0]['students']}
-ok('the list shows who opened and replied', st[ENR1]['opened_at'] and st[ENR1]['replied_at'] and st[ENR2]['opened_at'] is None, st)
+if REPLY:
+    # ── Replying ───────────────────────────────────────────────────────
+    qs = {x['prompt']: x['id'] for x in r2['reply']['questions']}
+    answers = {
+        qs['What are you most proud of?']: 'my biodiversity journal',
+        qs['Your goal: keep it or change it?']: ['Keep It'],
+        qs['One thing you will do before the next report']: 'start the data table at lunch',
+    }
+    r3 = submit(tok, answers)
+    ok('the reply is saved', r3.get('ok') is True, r3)
+    ok('as a response to the reply questionnaire', one('select count(*) from response where questionnaire_id = :q and enrollment_id = :e', q=reply_q, e=ENR1) == 1)
+    ok('the code still works for reading', one('select used_at is null from student_access_code where enrollment_id = :e and phone_report_id = :r and revoked_at is null', e=ENR1, r=rid))
+    r = open_(code[ENR1])
+    r4 = check(r['token'], '2012-05-15')
+    ok('reopened, the report shows and the reply is done', r4.get('ok') and r4['reply'] is None and r4['replied_at'], r4)
+    r5 = submit(r['token'], answers)
+    ok('a second reply is refused', r5 == {'ok': False, 'error': 'used'}, r5)
+    as_teacher(A)
+    st = {x['enrollment_id']: x for x in c.run('select list_phone_reports(:c)', c=COURSE_A)[0][0][0]['students']}
+    ok('the list shows who opened and replied', st[ENR1]['opened_at'] and st[ENR1]['replied_at'] and st[ENR2]['opened_at'] is None, st)
+else:
+    # ── A report is for reading: there is nothing to send (20261107) ───
+    r3 = submit(tok, {'anything': 'at all'})
+    ok('after the birthday check too, a report code has nothing to send', r3 == {'ok': False, 'error': 'closed'}, r3)
+    ok('and nothing is saved', one('select count(*) from response where enrollment_id = :e', e=ENR1) == 0)
+    ok('the code still works for reading', one('select used_at is null from student_access_code where enrollment_id = :e and phone_report_id = :r and revoked_at is null', e=ENR1, r=rid))
+    r = open_(code[ENR1])
+    r4 = check(r['token'], '2012-05-15')
+    ok('reopened, the report shows again', r4 == {'ok': True, 'report': DATA1}, r4)
+    as_teacher(A)
+    st = {x['enrollment_id']: x for x in c.run('select list_phone_reports(:c)', c=COURSE_A)[0][0][0]['students']}
+    ok('the list shows who opened', st[ENR1]['opened_at'] and 'replied_at' not in st[ENR1] and st[ENR2]['opened_at'] is None, st)
 
 # ── Update and close ───────────────────────────────────────────────────
 as_teacher(A)
@@ -151,7 +177,7 @@ u = c.run("select update_phone_report(:r, :s::jsonb, (:d::date + 40), :k)", r=ri
 ok('Update Issued Copy replaces the copy', one('select data from phone_report_student where report_id = :r and enrollment_id = :e', r=rid, e=ENR1) == DATA1b)
 ok('and moves the last day for the report, its reply and its codes',
    u['expires_on'] == one("select (:d::date + 40)::text", d=today)
-   and one('select closes_on::text from questionnaire where id = :q', q=reply_q) == u['expires_on']
+   and (not REPLY or one('select closes_on::text from questionnaire where id = :q', q=reply_q) == u['expires_on'])
    and one('select bool_and(expires_at::date = (:d::date + 41)) from student_access_code where phone_report_id = :r and revoked_at is null', r=rid, d=today))
 sp()
 as_owner(); c.run("update phone_report set expires_on = (now() at time zone 'America/Vancouver')::date - 1 where id = :r", r=rid)
@@ -162,7 +188,7 @@ as_teacher(A)
 c.run('select close_phone_report(:r, :k)', r=rid, k=key())
 r = open_(code[ENR1])
 ok('Close All Links stops every code', r == {'ok': False, 'error': 'not_found'}, r)
-ok('and turns the reply off', one('select is_on from questionnaire where id = :q', q=reply_q) is False)
+if REPLY: ok('and turns the reply off', one('select is_on from questionnaire where id = :q', q=reply_q) is False)
 sp(); as_teacher(A)
 expect_error('no new slips for a closed report', lambda: c.run('select issue_report_codes(:r, null, :k)', r=rid, k=key()), 'closed')
 

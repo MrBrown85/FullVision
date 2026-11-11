@@ -120,23 +120,29 @@ function quick(cid, students, ctx, out, view, handout) {
       extra: GradeReport.extraCards(cid, st, ctx, { observations: true, termComment: true }),
       observations: ReportFeedback.observations(cid, st, ctx.termId),
       termComment: ReportFeedback.termComment(cid, st, ctx.termId),
-      // The rubric sheet itself, asked for as Print Rubrics asks: the handout, not a report.
+      // The rubric sheet itself, as Print Rubrics draws it: inside the handout's own surface, not a report.
       sheets: !handout
         ? undefined
-        : assessments.map(a => {
-            const sheet = RubricPrint.sheetData(cid, a.id, st.id);
-            return (
-              sheet && {
-                status: sheet.status,
-                scored: sheet.scored,
-                rows: sheet.rows.map(r => [r.criterion.id, r.level, r.mod, r.mixed, r.comment, r.beyond]),
-                overall: sheet.overall,
-                feedback: sheet.feedback,
-                ticked: sheet.ticked,
-              }
-            );
-          }),
-      comments: handout ? assessments.map(a => RubricPrint.feedbackItems(cid, st.id, a.id)) : undefined,
+        : ReportScores.withReportScores('handout', () =>
+            assessments.map(a => {
+              const sheet = RubricPrint.sheetData(cid, a.id, st.id);
+              return (
+                sheet && {
+                  status: sheet.status,
+                  scored: sheet.scored,
+                  rows: sheet.rows.map(r => [r.criterion.id, r.level, r.mod, r.mixed, r.comment, r.beyond]),
+                  overall: sheet.overall,
+                  feedback: sheet.feedback,
+                  ticked: sheet.ticked,
+                }
+              );
+            }),
+          ),
+      comments: handout
+        ? ReportScores.withReportScores('handout', () =>
+            assessments.map(a => RubricPrint.feedbackItems(cid, st.id, a.id)),
+          )
+        : undefined,
     });
   });
 }

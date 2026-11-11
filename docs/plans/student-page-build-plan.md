@@ -125,14 +125,19 @@ A guard test fails if any file but `shared/grader.js` calls the score writers in
 
 ### 1.5 Student cards and sessions
 
-- **`student_card`** (public schema, the teacher's own rows): one live card per enrollment. It holds the code's hash and salt, when it was made, printed, last opened, locked and stopped, the wrong-try count, and the date it works until. The identity check is today's: birthday or student number, or `student.slip_password` when neither is on file. Five wrong tries lock it.
-- **Teacher RPCs:** issue cards for a class, mark printed, unlock, reissue (stops the old code at once and keeps everything the student sent), and set the Cards Work Until date (default the class's last reporting date).
+Card codes are unreadable to the database (`docs/DECISIONS.md`, "Card codes the database cannot read (2026-11-10)"). Words used here: **the key** is one secret, `STUDENT_CARD_KEY`, kept in the edge functions' settings; a **tag** is a keyed fingerprint of a code (HMAC-SHA-256) that only the key can make.
+
+- **`student_card`** (public schema; no teacher's browser reads it directly): one live card per enrollment. It holds the code's tag (`code_hmac`), the password's tag (`pw_hmac`, kept only for a student with no birthday and no student number), the id of the key that made the tag (`key_id`), the card number (`seq`: Card 1, 2, 3 per student), when it was made, printed, last opened, locked and stopped, the wrong-try counts, and the date it works until. It stores no code and no password. A unique index on `code_hmac` covers every card ever made, live or stopped.
+- **The code** is eight characters from the slip alphabet, shown `K7M4-QX2P`. A slip is six, so the two are told apart by length. **The password** is four digits, the card's own, never a copy of `student.slip_password`.
+- **The identity check:** birthday or student number, or the card's password when neither is on file. Five wrong tries in a row lock a card, and 15 in any 7 days.
+- **Making cards** goes through a second edge function, `teacher-cards` (1.8), never through an RPC. The function draws each code and password, makes their tags, and calls one service-only database function, `student_submit.issue_cards`, which checks the teacher owns the class through the same helpers every RPC uses and stores the tags. The new codes go back to the teacher's browser once, in the reply to that one press, and are kept nowhere. One operation covers every button: for each student the browser names the card it believes is live (or none), and the database stops that card and stores the new one in one step, or answers `changed` if another tab got there first.
+- **Teacher RPCs that need no key:** list cards (no code, no password; with the card number, whether it has a password, and Needs a New Card for a card made under another key), mark printed, unlock, Unlock All, and set the Cards Work Until date (default the class's last reporting date). They go through the outbox as any write does.
 - **Sessions** (`student_submit` schema, no API access): a session belongs to a device, not to a card. A second table lists the enrollments that session has opened, one per card added. That is what makes Switching Classes work now and lets a passkey or another sign-in attach to the same session later with no rework (Nov 8, decision 13).
-- **Questionnaire slips and phone-report slips keep working** as they do today, for one-offs.
+- **Questionnaire slips and phone-report slips keep working** as they do today, for one-offs. They move to the same key in their own change before the January pilot (`S3-S1`).
 
-The class's teacher can see a card's code again (Q10), so Print All and Show Card Code never stop a card the student holds: the code is stored for the teacher, readable only through `fv_owns_enrollment`, beside the hash the student path checks.
+No teacher's screen ever shows a code. A code is on screen only in the browser's print dialog while it is open. A lost card is replaced, never shown again: Print New Card stops the old card and makes a new one, and New Codes for This Class does that for every student. A replaced card tells the student "This card has been replaced. Ask your teacher for your new card." Changing the key stops every card; Colin keeps a copy of the key in his password manager only so a lost key can be put back without a reprint.
 
-- **A device stays signed in until midnight (Pacific time) or until the student taps Done**, whichever comes first (Q11). A shared Chromebook still signs out on Done.
+- **A device stays signed in until midnight (Pacific time) or until the student taps Done**, whichever comes first (Q11), and signs out after 15 minutes with no activity. A shared Chromebook still signs out on Done.
 - **Today Only codes are not built** (Q12); they wait with Family Codes.
 
 ### 1.6 Submissions, Mark Up, reflections, revisions
@@ -166,7 +171,7 @@ A revision is version 2 of a submission. When its grade is returned it replaces 
 
 ### 1.8 Edge function routes
 
-The one function, `student-submit`, keeps its four routes and gains these. Each calls a `student_submit` SQL function, granted to `service_role` only. The anon role stays locked out of every function.
+Two functions. `student-submit` is the public endpoint a student's phone posts to; it keeps its four slip routes and gains the routes below. `teacher-cards` is new and does one thing: it makes cards for a signed-in teacher (1.5). Each route calls a `student_submit` SQL function, granted to `service_role` only. The anon role stays locked out of every function.
 
 | Route                                 | Does                                                                        |
 | ------------------------------------- | --------------------------------------------------------------------------- |
@@ -184,6 +189,12 @@ The one function, `student-submit`, keeps its four routes and gains these. Each 
 `page` returns returned grades only, through the one reader in 1.2.
 
 The card's routes are in `supabase/functions/student-submit/card-routes.ts` (`S0-F4`): `card`, `verify` for a card, `add-card`, `page`, `seen` and `done`. A `verify` that carries a slip's token is a slip's, as before; one that carries a card's code is the card's. A card's `verify` always starts a new session and ends the one the device sent, so a shared Chromebook signs the last student out; only `add-card` joins a session. Which of the two it is (`p_add`) is written into each route's statement and never read from the request (`S0-F4b`). The device's session token travels in the request body as `session`, as a slip's token does: no cookie, no header, never in the address, never in a log. Each route names its one SQL call and copies its reply field by field, so a field the SQL gains by mistake does not reach a phone.
+
+**How a card is checked** (`S3-E1`). The function tidies the code (upper case, letters and digits only), makes its tag with the key, and sends the database the tag, never the code. A code that is not eight characters after tidying is answered `not_found` with no database call and no log row, so scanning a slip never counts toward the card limit; the page then asks `open`, as today. For a card's password the function makes the password's tag and the database compares tags. A stopped card answers `card_stopped`, logged with the card's id and not counted as a guess. The limits are unchanged: five wrong in a row, 15 in 7 days, 300 unknown codes per network address in 15 minutes.
+
+**`teacher-cards`** (`S3-E2`). Deployed with sign-in checking on. The function also asks Supabase Auth whose token it was sent and takes the teacher's id only from that answer, never from the request. The browser sends `{ course_id, items: [{ enrollment_id, replaces }], request_id }`; the reply gives each student `made`, `changed`, `not_found` or `failed`, and for `made` the card's id, number, last day, its code, and its password when the student has no birthday or number on file. A retry with the same `request_id` returns the results with no code: the database never had one. The reply is sent with `Cache-Control: no-store`.
+
+**The key.** Both functions accept `STUDENT_CARD_KEY` only when it is exactly 64 hex characters. There is no fallback. Without it the card routes and `teacher-cards` answer a server error and call the database for nothing; slips, `page`, `seen` and Done carry on. Unsetting the key is the emergency stop for cards. A function's log holds the route, the outcome and the time, never a code, tag, key, password, token, birthday, number or name. The tag formats are fixed for good in one shared module, `supabase/functions/_shared/card-key.ts`, guarded by known-answer tests: a change to them would silently stop every live card.
 
 ### 1.9 Client modules
 
@@ -208,16 +219,16 @@ The card's routes are in `supabase/functions/student-submit/card-routes.ts` (`S0
 
 ### 1.10 Demo Mode, piece by piece
 
-| Piece                                        | In Demo Mode                                                                                                                                           |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Draft and Returned                           | The same rule runs in `shared/grade-state.js`, kept in localStorage. No RPC.                                                                           |
-| Student cards                                | Cards are made on the device with random codes. Print works.                                                                                           |
-| The student page                             | Opens from Preview as Student, and from a demo address on `/s/` as today's `#demo` does. It never calls the edge function.                             |
-| Sample work                                  | Drawn sample pages ship with the app, on a new Science 8 assessment, Cell Microscope Lab: 2 to grade, 1 to return, the rest returned (the Demo board). |
-| Sending and adding work                      | Photos are shrunk and kept in IndexedDB on the device. Nothing uploads.                                                                                |
-| Mark Up, reflections, revisions, My Learning | Saved on the device like any Demo Mode change.                                                                                                         |
-| Passkeys                                     | A stand-in that walks the same screens without saving a key.                                                                                           |
-| MyEdBC Input                                 | Works on the Demo class.                                                                                                                               |
+| Piece                                        | In Demo Mode                                                                                                                                            |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Draft and Returned                           | The same rule runs in `shared/grade-state.js`, kept in localStorage. No RPC.                                                                            |
+| Student cards                                | Cards are made on the device with random codes and nothing is sent. Making a card returns its code once; the saved card keeps no code or password (S3). |
+| The student page                             | Opens from Preview as Student, and from a demo address on `/s/` as today's `#demo` does. It never calls the edge function.                              |
+| Sample work                                  | Drawn sample pages ship with the app, on a new Science 8 assessment, Cell Microscope Lab: 2 to grade, 1 to return, the rest returned (the Demo board).  |
+| Sending and adding work                      | Photos are shrunk and kept in IndexedDB on the device. Nothing uploads.                                                                                 |
+| Mark Up, reflections, revisions, My Learning | Saved on the device like any Demo Mode change.                                                                                                          |
+| Passkeys                                     | A stand-in that walks the same screens without saving a key.                                                                                            |
+| MyEdBC Input                                 | Works on the Demo class.                                                                                                                                |
 
 `tests/demo-mode-no-server-calls.test.js` is extended to cover each new module, `s/` included.
 
@@ -297,9 +308,10 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 
 **PRs.**
 
-- `S2-T1` Report surfaces read grades through one entry in `teacher/page-reports.js` so the score set is chosen in one place.
-- `S2-F1` Progress Reports use returned grades only. Print Reports with drafts names them and offers Return Them, Then Print; Print Without Them; Cancel.
-- `S2-F2` The Term Questionnaire's facts, Generate and Sent to Phones use returned grades only (Q6).
+- `S2-T1` Report surfaces read grades through one entry in `teacher/page-reports.js` so the score set is chosen in one place. Done (PR 983).
+- `S2-F1` Progress Reports use returned grades only. Print Reports with drafts names them and offers Return Them, Then Print; Print Without Them; Cancel. Done (PR 1004).
+- `S2-F2` The Term Questionnaire's facts, Generate and Sent to Phones use returned grades only (Q6). Done (PR 1005).
+- Follow-up: a Note for the Report waits with its grade (DECISIONS, "Student page build rulings (2026-11-10, night)" 2). Not built: it needs its own small migration (`grade_return` keeps the note as it was at the last return, and `list_course_grade_returns` sends it) and a client PR (`GradeState` gives it to the reports). Until then a note shows once its piece has ever been returned.
 
 **Files.** `teacher/page-reports.js`, `teacher/report-blocks.js`, `teacher/report-studio.js`, `teacher/report-questionnaire.js`, `teacher/comment-bank.js`, `teacher/phone-reports.js`, `teacher/grades-print.js` and `teacher/export-all.js` (to confirm they stay on all work).
 
@@ -311,25 +323,49 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 
 ### S3. Student cards and sign-in
 
-**Goal.** A teacher prints one card per student for the course, and a student gets in with it on a phone or a Chromebook.
+**Goal.** A teacher prints one card per student for the course, and a student gets in with it on a phone or a Chromebook. No card's code is readable by the database or shown on a teacher's screen (`docs/DECISIONS.md`, "Card codes the database cannot read (2026-11-10)").
 
-**Boards.** Teacher: Student Cards (Print, Unlock, Reissue); Teacher: Reissue a Lost Card; Student: Scan or Type Your Card; Student: Is This You? Birthday or Student Number; Student: Is This You? Card Password; Student: After Done; Student: Switching Classes; Student: Signing In on a Chromebook; Class Settings, Student Page (the Student Cards row).
+**Boards.** Teacher: Student Cards (Print, Unlock, Reissue); Teacher: Reissue a Lost Card; Student: Scan or Type Your Card; Student: Is This You? Birthday or Student Number; Student: Is This You? Card Password; Student: After Done; Student: Switching Classes; Student: Signing In on a Chromebook; Class Settings, Student Page (the Student Cards row). The boards still show codes on screen, Reissue, Show Code, Print All with the same codes and a print preview; where they differ from this slice, this slice wins.
 
-**PRs.**
+**The teacher's screens.**
 
-- `S3-T1` `teacher/qr-slips.js`: lift the eight-to-a-page print sheet into a helper both slips and cards use.
-- `S3-F1` Student Cards page: the list with its filters (All, Not Printed, Locked, Never Opened), Print All, Print N New Cards, the print preview, Cards Work Until.
-- `S3-F2` Unlock, and Reissue with its dialog (Reissue, Show Code; Reissue and Print).
-- `S3-F3` Student sign-in screens, phone and Chromebook, the locks, Done, and Switching Classes with Add Another Card.
-- `S3-W1` Wire to Batch A.
+- **The list.** Columns: Student, Card, Status. No code anywhere. Card reads "Card 2 · Made Nov 12", or No Card Yet. Status reads Not Printed, Printed Nov 12, Last Opened Nov 14, Locked, Needs a New Card, or Past Its Last Day. Filters: All, Not Printed, Locked, Never Opened.
+- **Make and Print N Cards.** N is the students with no card plus those whose card was never printed and never opened. One press makes the cards and opens the browser's print dialog: a code exists only at that moment, so making without printing has no use. Replacing a card never printed and never opened needs no confirm, since no student can be holding it.
+- **Print Again.** If the dialog is cancelled or the printer jams, the codes stay in the page's memory and a line says so: "28 cards went to the printer. Print Again works until you leave this screen. After that, printing makes new codes." They are held only in a variable in `teacher/student-cards.js`, never in localStorage, sessionStorage, IndexedDB, the outbox or Sentry, and dropped when Class Settings closes, the class changes, the teacher signs out, the tab closes, or ten minutes pass. If the tab closes first, the cards show Not Printed and Make and Print replaces them.
+- **Print New Card** (one student; the board's Reissue). For a card that was printed or opened it asks first: "Print a New Card for Cece?" / "The card Cece has now stops working as soon as the new one is made. Everything Cece has sent stays." / Cancel · Print New Card.
+- **New Codes for This Class** (in place of Print All). "New Codes for All 28 Students?" / "28 cards stop working now. Print the new cards and hand them out. Students can't open their page until they have their new card. Everything they have sent stays." / Cancel · Make 28 New Cards. With some students holding no card: "26 cards stop working now. 2 students get their first card."
+- **Unlock, Unlock All, Cards Work Until,** through the RPCs that exist; they need no key.
+- **No in-app print preview.** The browser's own print dialog is the only place a code is drawn. A sheet saved as a PDF from that dialog is as sensitive as the cards; the help article says so.
 
-**Files.** `teacher/student-cards.js` (new), `teacher/qr-slips.js`, `teacher/cm-student-page.js`, `shared/data.js`, `s/app.js`, `s/student.css`, the edge function.
+The wording above is proposed; Colin approves it in each PR, as usual.
 
-**Tests.** SQL: a reissued code stops at once and the student's work stays; five wrong tries lock; a card past its date is refused; one session can hold two classes; rate limits. Unit: the print sheet. Browser: print preview, reissue, sign-in on phone and Chromebook sizes.
+**The student's side.** The code is eight characters, `K7M4-QX2P`; `s/student.js` accepts six (a slip) or eight (a card). A replaced card says "This card has been replaced. Ask your teacher for your new card." and, as any recognised card does, signs the last student out. A card password is the card's own.
 
-**Demo Mode.** Cards on the device; the demo student page opens from them. **Switch.** The build switch.
+**PRs,** in order: twelve PRs, eleven of them done, and the day. "Fable" is the strongest model at high effort; "Opus" the builder (Colin's standing instruction).
 
-**Done when.** Colin prints cards for his test class, signs in as two students in two classes on one phone, and a reissued card's old code no longer opens.
+- `S3-T1` `teacher/qr-slips.js`: lift the eight-to-a-page print sheet into a helper both slips and cards use. Done (PR 977).
+- `S3-D1` This plan's 1.5, 1.8 and S3, the DECISIONS section, and the ROADMAP items the change leaves. Docs only. Done (PR 1006).
+- `S3-E1` The shared key module (`supabase/functions/_shared/card-key.ts`); `student-submit` checks cards by tag; `card_stopped`; what happens with no key. Fable. Done (PR 1008); deployed Nov 11.
+- `S3-E2` The `teacher-cards` function. Stacked on `S3-E1`. Fable. Done (PR 1009); deployed Nov 11.
+- `S3-M1` The migration (`migrations/<next>_card_codes_keyed.sql`): every live card stopped; `code`, `code_hash`, `salt` and `password` dropped; `code_hmac`, `pw_hmac`, `key_id` and `seq` added; the teacher's direct read of `student_card` removed; `student_submit.issue_cards` and the new `card` and `verify_card`; the old card RPCs dropped; the two slip issuers back to their bodies from before Batch A; cached card answers cleared from `fv_idempotency`. With its local harness suite, an undo and its proof, and pre-check and post-check queries. It deletes data (the 30 codes and passwords in Colin's test class), so it needs his review under rule 2. Fable, then one independent review of `S3-E1`, `S3-E2` and `S3-M1` together. Done (PR 1011); applied Nov 11 as `card_codes_keyed`, version 20261111020227.
+- `S3-W1` The data layer asks `teacher-cards`; the list without codes; Make and Print from memory, each card printing its number ("Card 2") small; Print Again; Demo Mode on the same contract. Merges before `S3-M1` is applied, so `main` stops naming the old card RPCs first. Opus, with a short Fable read of "the code is stored nowhere". Done (PR 1012).
+- `S3-F3a` Student page: eight-character codes and the replaced-card line. Opus. Done (PR 1007).
+- **The day** (no PR). In one sitting: the read-only checks; Colin makes the key and keeps his copy; `S3-E1`, `S3-E2`, `S3-W1` and `S3-F3a` merged and `main` green; on his OK, both functions deployed; on his OK, `S3-M1` applied, its post-check run and `S3-M1` merged with the schema snapshot; a check on his Mac with `npm run dev:local` (Make and Print to a PDF, type a code, see the page; an old card does not open); then the release on his word. His test class has no working cards for about 15 to 30 minutes. Done Nov 11 up to the release: the key made, both functions deployed, `S3-M1` applied and merged, and on Colin's Mac a new card opened a real page against the live database. The release waits for his word.
+- `S3-F1` The Student Cards page in full: the filters, the statuses, the card number, Cards Work Until. Done (PR 1016).
+- `S3-F2` Unlock, Unlock All, Print New Card, New Codes for This Class, with their confirms. Done (PR 1014).
+- `S3-F3` The rest of the student sign-in screens, phone and Chromebook: the locks, Done, and Switching Classes with Add Another Card. Done (PR 1021).
+- `S3-P1` The privacy page (`privacy.html`): a card's code and password are kept only as keyed fingerprints, nobody can look one up after printing, and what is recorded for a card. Colin's words; the privacy officer if he chooses. Done (PR 1037), approved as drafted (DECISIONS, "Student page build rulings (2026-11-10, late night)" 20). Not released: the two current teachers are emailed before the release that carries it.
+- `S3-S1` Slips move to the same key: a slip's code and `student.slip_password` stop being readable by the database. Its own change, with its own migration and review, right after cards are live and before the January pilot (DECISIONS, "Card codes the database cannot read" 2). Until it ships the privacy page must not say a slip code cannot be read back from the database.
+
+`S3-E1`, `S3-E2`, `S3-W1` and `S3-F3a` can all be built while `S3-M1` is in review.
+
+**Files.** `supabase/functions/_shared/card-key.ts` (new), `supabase/functions/student-submit/*`, `supabase/functions/teacher-cards/*` (new), `migrations/`, `migrations/local-test/`, `schema.sql`, `docs/schema.generated.sql`, `teacher/student-cards.js`, `teacher/qr-slips.js`, `teacher/cm-student-page.js`, `shared/data.js` (card block), `s/student.js`, `s/app.js`, `s/student.css`, `e2e/student-card-fake.js`, `privacy.html`.
+
+**Tests.** SQL (`migrations/local-test/card_codes.py`, PostgreSQL 17): after the apply `student_card` holds no code or password; every card that was live is stopped; a second run stops no card made since; `issue_cards` refuses another teacher's class and a stale `replaces`, and a replay returns no tag; only tags of 64 hex characters are accepted; five wrong tries lock; a card past its date is refused; one session can hold two classes; `anon` and `authenticated` run nothing in `student_submit` and cannot read `student_card`; the file never names `hmac`, so the key cannot be used in the database even by mistake; the undo is proven. Handler: known-answer tags; the database receives the tag and never the code or the typed password; no log line holds a code, tag, key, password or token; no key means a server error and no database call while slips still work; a card `teacher-cards` just made opens through `student-submit`; `tests/student-submit-slips-unchanged.test.js` passes untouched. Unit: the print sheet. Browser: after Make and Print no code is in the list, any browser storage or the outbox; Print Again and its end; Print New Card's confirm; New Codes for This Class's counts; a lost reply ends with printed cards and no message; sign-in on phone and Chromebook sizes; an eight-character code opens; a replaced card's line.
+
+**Demo Mode.** Cards stay on the device and nothing is sent, on the same contract: making a card returns its code once, the saved card keeps no code or password, and the list shows what a signed-in teacher's shows. `tests/demo-mode-no-server-calls.test.js` covers the new call to `teacher-cards`. **Switch.** The build switch.
+
+**Done when.** Colin prints cards for his test class, signs in as two students in two classes on one phone, a replaced card's old code no longer opens and says so, and no code is anywhere in the database, a log, the teacher's screen or the browser's storage.
 
 ### S4. The student page: assignments, feedback, Questionnaires, Reports, Preview as Student
 
@@ -339,14 +375,19 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 
 **PRs.**
 
-- `S4-T1` `shared/student-view.js`: build one student's page from the cache, returned only. Nothing uses it yet.
-- `S4-F1` Student page shell: the four tabs (Assignments, My Learning, Questionnaires, Reports), the To Do, Sent and Back counts, phone and Chromebook layouts.
-- `S4-F2` Assignment cards and All Assignments with search and filters.
-- `S4-F3` Your Feedback for each scoring type, What the Levels Mean, The Whole Rubric.
-- `S4-F4` Questionnaires and Reports tabs: today's questionnaires and phone reports, opened from the card's session.
-- `S4-F5` What Changed Since You Last Looked.
-- `S4-F6` Preview as Student, with the Phone and Chromebook toggle and the Jordan Sees and Jordan Doesn't See lists.
-- `S4-W1` Wire to the server.
+- `S4-T1` `shared/student-view.js`: build one student's page from the cache, returned only. Nothing uses it yet. Done (PR 1020).
+- `S4-F1` Student page shell: the four tabs (Assignments, My Learning, Questionnaires, Reports), the To Do, Sent and Back counts, phone and Chromebook layouts. Done (PR 1023).
+- `S4-F2` Assignment cards and All Assignments with search and filters. Done (PR 1025).
+- `S4-F3` Your Feedback for each scoring type, What the Levels Mean, The Whole Rubric. Done (PR 1026).
+- `S4-F4` Questionnaires and Reports tabs: today's questionnaires and phone reports, opened from the card's session. Screens done (PR 1027); the server cannot list or open them from a card yet.
+- `S4-F5` What Changed Since You Last Looked. Done (PR 1028).
+- `S4-F6` Preview as Student, with the Phone and Chromebook toggle and the Jordan Sees and Jordan Doesn't See lists. Done (PR 1022).
+- `S4-W1` Wire to the server. Client done (PR 1052: the page reads the nine new fields). Server open (PR 1050: the edge function passes them on; not merged, not deployed, waits for Colin's word).
+- Not in the list above: `S4-M1`, the migration that sends the page the assessment's description, category, weight, unit, Core Competencies, I Can text, a criterion's competencies, the teacher's name and each class's To Do count. Done (PR 1032); applied Nov 11 as `student_page_fields`, version 20261111074023. Also merged: the independent review's fixes (PR 1047).
+
+**Status (Nov 11 morning).** Not built or not wired: listing and opening questionnaires and phone reports from a card (S4-F4's server side); the new fields on a real phone until PR 1050 is deployed; the teacher's name beside each class in Your Classes; the grader's door into Preview (Preview from the grader, Back to Grader); Read Aloud. Waits for Colin: whether Preview may show the teacher which returned pieces a student opened, and whether only Your Feedback counts as opened.
+
+**Found while building.** The edge function's `page` route copies only the fields it names, and so does `s/student-data.js`, so a field the SQL adds reaches no student until both are changed. For S4-F4, and for My Learning on a student's own device (S13), `student_submit.page` must send more: the questionnaires and phone reports, and `show_my_learning`, the learning map, categories and the calculation settings. S4-M1's `to_do` counts work already sent, so it can differ from the page's To Do once students send work.
 
 **Files.** `shared/student-view.js`, `s/*`, `teacher/preview-student.js` (new), `teacher/cm-student-page.js`, `shared/phone-report-view.js`, the edge function's `page` and `seen`.
 
@@ -366,15 +407,20 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 
 **PRs.**
 
-- `S5-T1` `shared/photo-shrink.js` and `shared/photo-queue.js`, with tests, used by nothing yet.
-- `S5-M1` (Batch B) `submission`, `submission_file`, the assessment and course columns, the teacher RPCs and the student functions.
-- `S5-M2` (Batch B) The two buckets and their policies.
-- `S5-F1` Assessment form: the Student Work card, without Keep Photos Until. Class Settings: Send Work and Keep Photos Until.
-- `S5-F2` Student: camera and file choice, Check and Send with the note, Sent, Sending Late, Closed.
-- `S5-F3` Student: Not Sent Yet, One Page Didn't Send, the blurry check, Unsend and Replace.
-- `S5-F4` Edge routes `send-start`, `send-finish`, `unsend`, `replace`, `file-links`, with the server's location check.
-- `S5-F5` Demo Mode sample work: the drawn pages and the Cell Microscope Lab assessment (the Demo board). The Science 8 class moves from `constants.js` into `seed-data.js` here (a cp1 item).
-- `S5-W1` Wire to Batch B.
+- `S5-T1` `shared/photo-shrink.js` and `shared/photo-queue.js`, with tests, used by nothing yet. Done (PR 964; the 20-page PDF limit, PR 971).
+- `S5-M1` (Batch B) `submission`, `submission_file`, the assessment and course columns, the teacher RPCs and the student functions. Open (PR 1024): reviewed twice, ready; not applied, waits for Colin's read and OK. Its review fixes are a follow-up migration, open as a draft (PR 1053), reviewed and ready, applied after Batch B on his word.
+- `S5-M2` (Batch B) The two buckets and their policies. Open, in PR 1024 (one bucket: DECISIONS, "Student page build rulings (2026-11-10, late night)" 1).
+- `S5-F1` Assessment form: the Student Work card, without Keep Photos Until. Class Settings: Send Work and Keep Photos Until. Done (PR 1044).
+- `S5-F2` Student: camera and file choice, Check and Send with the note, Sent, Sending Late, Closed. Done (PR 1057; a PDF becomes pages, PR 1079).
+- `S5-F3` Student: Not Sent Yet, One Page Didn't Send, the blurry check, Unsend and Replace. Done (PR 1057).
+- `S5-F4` Edge routes `send-start`, `send-finish`, `unsend`, `replace`, `file-links`, with the server's location check. Open as a draft (PR 1086): not merged, not deployed; waits for an independent security review, Batch B applied, and Colin's word to deploy.
+- `S5-F5` Demo Mode sample work: the drawn pages and the Cell Microscope Lab assessment (the Demo board). The Science 8 class moves from `constants.js` into `seed-data.js` here (a cp1 item). Done (PR 1035); the script that draws the pages is `scripts/draw-sample-work.cjs`.
+- `S5-W1` Wire to Batch B. Not started: waits for Batch B.
+- Not in the list above: pdf.js in `vendor/`, loaded only when a PDF is chosen, with the Content Security Policy unchanged. Done (PR 1073).
+
+**Status (Nov 11 morning).** Every screen works in Demo Mode behind Send Work; nothing reaches the server. Not built: the HEIC decoder (its licence is Colin's call); Handed In Paper on the student's card (no route for it); the live camera viewfinder; showing a sent page from a `blob:` link on a real phone. Not tested: Safari, Firefox, real devices and real scans.
+
+**Found while building.** `shared/photo-queue.js` was emptied by nothing on Sign Out, leaving Demo Mode or Reset Demo Data, so photos stayed on the device; fixed before any wiring (PR 1064). `shared/photo-queue.js` is not loaded on `s/` yet. Batch B's `work` reply gives no page thumbnails and does not say how many pages the teacher added, which the approved Unsend line needs. `send_finish` names no paths, so the draft route replays the start to get them; a small read-only database function would be the clean fix (Colin's call). Batch B's `update_assessment` can move a due date past `accept_until`.
 
 **Files.** `shared/photo-shrink.js`, `shared/photo-queue.js`, `shared/data.js`, `shared/seed-data.js`, `shared/constants.js`, `shared/supabase.js` (sign-out wipe), `teacher/page-assignments.js` (the form), `teacher/cm-student-page.js`, `s/send.js`, the edge function, `assets/` (sample pages), `privacy.html`.
 
@@ -392,13 +438,17 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 
 **PRs.**
 
-- `S6-T1` Grader dialog: lift the student header and the scoring panel into parts that can sit beside a work pane. No behaviour change.
-- `S6-F1` The work pane: pages, Whole Page and Fit Width, the student's note, Focus on Work and its panels for each scoring type.
-- `S6-F2` Nothing In: Add Work (Choose Files, shrunk the same way), Grade From Paper, Set To.
-- `S6-F3` The To Grade, To Return, Returned, Not In and All filters and counts; the exact-match "Same photo as" note.
-- `S6-F4` Assignments page with submissions; gradebook To Grade cells, camera mark and hover card.
-- `S6-F5` Dashboard To Grade cell, in every state on its board.
-- `S6-W1` Wire to Batch B.
+- `S6-T1` Grader dialog: lift the student header and the scoring panel into parts that can sit beside a work pane. No behaviour change. Done (PR 1030; a group-grading follow-up, PR 1033).
+- `S6-F1` The work pane: pages, Whole Page and Fit Width, the student's note, Focus on Work and its panels for each scoring type. Done (PR 1055).
+- `S6-F2` Nothing In: Add Work (Choose Files, shrunk the same way), Grade From Paper, Set To. Done (PR 1055, with Delete Work; the data side, PR 1049).
+- `S6-F3` The To Grade, To Return, Returned, Not In and All filters and counts; the exact-match "Same photo as" note. Done (PR 1055).
+- `S6-F4` Assignments page with submissions; gradebook To Grade cells, camera mark and hover card. Done (PR 1056).
+- `S6-F5` Dashboard To Grade cell, in every state on its board. Done (PR 1056).
+- `S6-W1` Wire to Batch B. Not started: waits for Batch B.
+
+**Status (Nov 11 morning).** Demo Mode only, behind the build switch and Send Work. The artboard's worked example holds in a test (7, 3, 14, 4, then 6, 3, 15, 4). Simplified from the boards: Focus on Work's Advanced Rubric tiles stack; the gradebook's hover card is a hover line. Not built: the "9" badge on Assignments in the top bar, and the per-row Submitted lines on whole-class grids. Three screens still load pictures their own way and should move to `WorkThumbs` (S14-T1) later: the grader's work pane, the phone's grade photos and the phone's Add Work.
+
+**Found while building.** The one counting place is `window.GraderWork` in `shared/grader.js` (`workCounts`, `classWorkCounts`, `setToFromPaper`, `deleteWork`); the grader, the Assignments page, the gradebook, the dashboard and, since PR 1082, the phone all count through it. `shared/data.js` could not record work a teacher adds in Demo Mode or show a photo waiting in the queue, and the photo modules were not loaded on the phone or in `teacher/app.html`: PR 1049 added that before the screens. `deleteStudentWork` is Demo-only and answers `not_available` signed in.
 
 **Files.** `teacher/page-assignments.js`, `teacher/assignments.css`, `teacher/page-gradebook.js`, `teacher/page-dashboard.js`, `teacher/dash-overview.js`, `shared/grader.js`, `shared/photo-queue.js`.
 
@@ -416,12 +466,16 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 
 **PRs.**
 
-- `S7-T1` Phone Grade tab: split the list from the grader inside `tab-grade.js`, and lift the photo strip host into `teacher-mobile/grade-photos.js`.
-- `S7-F1` Grade tab: To Grade by default, the row menu, All Caught Up, the new filter.
-- `S7-F2` Speed grader with photos, the pinned photo, the Advanced Rubric layout.
-- `S7-F3` Add Work: camera, Save and Next, the already-sent choice (Add as More Pages, Replace Them, Skip).
-- `S7-F4` Student card To Grade widget (a new card widget, on by default), View Profile's list, the grader on one student's work.
-- `S7-W1` Wire to Batch B.
+- `S7-T1` Phone Grade tab: split the list from the grader inside `tab-grade.js`, and lift the photo strip host into `teacher-mobile/grade-photos.js`. Done (PR 1029).
+- `S7-F1` Grade tab: To Grade by default, the row menu, All Caught Up, the new filter. Done (PR 1046).
+- `S7-F2` Speed grader with photos, the pinned photo, the Advanced Rubric layout. Done (PR 1046; the Advanced Rubric a criterion at a time, PR 1058).
+- `S7-F3` Add Work: camera, Save and Next, the already-sent choice (Add as More Pages, Replace Them, Skip). Done (PR 1051; Grade From Paper and Set To, PR 1065; a PDF, PR 1077).
+- `S7-F4` Student card To Grade widget (a new card widget, on by default), View Profile's list, the grader on one student's work. Done (PRs 1051 and 1058).
+- `S7-W1` Wire to Batch B. Not started: waits for Batch B.
+
+**Status (Nov 11 morning).** Demo Mode only, behind the build switch and Send Work. The phone's counts come from the one count since PR 1082; the row menu opens the Work Wall (PR 1075). Not tested: a real phone camera, Safari, HEIC, a real pinch. A class made offline is not re-keyed before its photos send (an assessment made offline is, kanban f2). Mark Up on the phone saves on Done or a page change, so marks are lost if the app closes with it open.
+
+**Found while building.** The phone counted "not in" its own way (17 on the sample against `GraderWork`'s 0) until PR 1082. The To Grade widget was off for any teacher who had ever saved Customize Card; fixed in PR 1064.
 
 **Files.** `teacher-mobile/tab-grade.js`, `teacher-mobile/grade-photos.js`, `teacher-mobile/add-work.js`, `teacher-mobile/card-widgets.js`, `teacher-mobile/card-stack.js`, `teacher-mobile/student-detail.js`, `teacher-mobile/shell.js`.
 
@@ -439,9 +493,11 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 
 **PRs.**
 
-- `S8-M1` (Batch D) Deletes that follow the rows: the 30-day class purge and `delete_withdrawn_student` remove the files too; the Keep Photos Until job and its one-week reminder; the nightly check for strays.
-- `S8-F1` The reminder and the plain "photos go for good" lines on Keep Photos Until, Unsend, Delete Class and Delete Student.
-- `S8-F2` Class backup and Download All My Data leave photos out and say so: "Photos of student work are not in this file." (Q22). Sentry never receives an image (a test on `shared/sentry-init.js`).
+- `S8-M1` (Batch D) Deletes that follow the rows: the 30-day class purge and `delete_withdrawn_student` remove the files too; the Keep Photos Until job and its one-week reminder; the nightly check for strays. Not started. The class purge, a student's permanent delete and deleting an assessment now delete photos in Batch B itself (DECISIONS, "Student page build rulings (2026-11-10, late night)" 5); the Keep Photos Until job and the nightly check for strays stay here.
+- `S8-F1` The reminder and the plain "photos go for good" lines on Keep Photos Until, Unsend, Delete Class and Delete Student. Done (PRs 1045 and 1048, the teacher's deletes; PR 1083, the one-week reminder, in the app only; the student's Unsend and Replace lines in PR 1057). Wording approved as drafted (ruling 20 of that section).
+- `S8-F2` Class backup and Download All My Data leave photos out and say so: "Photos of student work are not in this file." (Q22). Sentry never receives an image (a test on `shared/sentry-init.js`). Done (PR 1042).
+
+**Status (Nov 11 morning).** The warnings and the reminder show in Demo Mode; nothing is deleted on the server until Batch B, and the date job until Batch D. A teacher who turns Send Work off after photos were sent gets no reminder (for Colin).
 
 **Files.** `migrations/`, `teacher/dash-class-manager.js`, `teacher/cm-student-page.js`, `shared/backup-restore.js`, `teacher/export-all.js`, `shared/sentry-init.js`, `privacy.html`.
 
@@ -459,12 +515,16 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 
 **PRs.**
 
-- `S9-T1` The work pane exposes a page surface a drawing layer can sit on.
-- `S9-M1` (Batch C) `markup` and `save_markup`; Return copies the working marks to the student's copy.
-- `S9-F1` Desktop Mark Up: Pen, Highlight, Note, Tick, Cross, Eraser, Notes on This Page.
-- `S9-F2` Phone Mark Up: one finger draws, two fingers move.
-- `S9-F3` Student: See Your Work with Show Marks. Marks follow Students See Your Mark Up.
-- `S9-W1` Wire.
+- `S9-T1` The work pane exposes a page surface a drawing layer can sit on. Done (PR 1060).
+- `S9-M1` (Batch C) `markup` and `save_markup`; Return copies the working marks to the student's copy. Open, in Batch C (PR 1043, draft): not reviewed, not applied; being refreshed against Batch B.
+- `S9-F1` Desktop Mark Up: Pen, Highlight, Note, Tick, Cross, Eraser, Notes on This Page. Done (PR 1069; the Demo data side, PR 1063).
+- `S9-F2` Phone Mark Up: one finger draws, two fingers move. Done (PR 1072, sharing the desktop's `shared/markup-draw.js`).
+- `S9-F3` Student: See Your Work with Show Marks. Marks follow Students See Your Mark Up. Done (PR 1068).
+- `S9-W1` Wire. Not started: waits for Batch C.
+
+**Status (Nov 11 morning).** Demo Mode only. Not built: the board's place labels beside each note ("Headline"); a note's words in a bubble on the photo (each note is a numbered pin, its words listed under the page). Waits for Colin: whether Mark Up counts as "started grading" (Batch B's rule does not count it, so once Mark Up exists a student could unsend a marked-up photo).
+
+**Found while building.** For about an hour between the merges of PRs 1069 and 1078, Return on `main` went through the Demo-only `returnWork` for every class, which would have failed for a real class. It was never released, and it is fixed and pinned by a test: a signed-in class calls `returnGrades` as before. The `file-links` reply's shape is not written down in Batch B; the student page reads `{ ok, files: [ { file_id, page, url } ] }`. Where a mark sits on a page is not stated in Batch C's contract (Demo uses fractions from 0 to 1), and `given` is the marks in one function's answer and true or false in another's.
 
 **Files.** `teacher/markup.js`, `teacher/page-assignments.js`, `teacher-mobile/grade-photos.js`, `s/feedback.js`.
 
@@ -482,13 +542,18 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 
 **PRs.**
 
-- `S10-T1` Learner Profile: lift its section list so a Reflections on Feedback section can be added.
-- `S10-M1` (Batch C) `feedback_reflection`, the course switch, the student `reflect` and `reply` functions, the teacher's answer RPC.
-- `S10-F1` Student: the three steps, Not Sure with Ask, Sent, Your Teacher Answered.
-- `S10-F2` The plan on the next assignment and "Did You Do It?" (Yes, Partly, Not This Time), shown as the student's word ("Jordan says…").
-- `S10-F3` Teacher: the reflection in the grader with Send Answer; Save as Observation.
-- `S10-F4` Learner Profile's Working On, Reflecting So Far and Reflections on Feedback; the dashboard's Questions From Students; the gradebook and profile marks. Answering clears all three.
-- `S10-W1` Wire.
+- `S10-T1` Learner Profile: lift its section list so a Reflections on Feedback section can be added. Done (PR 1036).
+- `S10-M1` (Batch C) `feedback_reflection`, the course switch, the student `reflect` and `reply` functions, the teacher's answer RPC. Open, in Batch C (PR 1043, draft): not reviewed, not applied.
+- `S10-F1` Student: the three steps, Not Sure with Ask, Sent, Your Teacher Answered. Done (PR 1074; the Demo data side, PR 1067).
+- `S10-F2` The plan on the next assignment and "Did You Do It?" (Yes, Partly, Not This Time), shown as the student's word ("Jordan says…"). Done (PR 1074).
+- `S10-F3` Teacher: the reflection in the grader with Send Answer; Save as Observation. Done (PR 1071).
+- `S10-F4` Learner Profile's Working On, Reflecting So Far and Reflections on Feedback; the dashboard's Questions From Students; the gradebook and profile marks. Answering clears all three. Done (PR 1080).
+- `S10-W1` Wire. Not started: waits for Batch C.
+- Not in the list above: the Reflect on Feedback switch in Class Settings › Student Page (PR 1085, Demo Mode only).
+
+**Status (Nov 11 morning).** Demo Mode only, behind Reflect on Feedback. Not built: Make My Plan after the teacher answers (Batch C's contract has nowhere for it); "Mr. Brown answered your question" in What Changed; the reflection rows on the Assignments page's one-student view; the board's Course Goal card; Read Aloud and voice input. Waits for Colin: whether a reflection saved as an observation may later be quoted in a report (the student is told "Only Mr. Brown sees this.").
+
+**Found while building.** S10-F4 also needs `teacher/page-student.js` (`_profileTabHtml` builds the section order), which the file list leaves out. Batch C's `reply` does not list `reflect_off`, and `list_course_feedback` returns reflections whatever the switch says; both go to Batch C's refresh.
 
 **Files.** `s/reflect.js`, `s/assignments.js`, `s/send.js`, `teacher/page-assignments.js`, `teacher/learner-profile.js`, `teacher/student-voice.js`, `teacher/page-dashboard.js`, `teacher/page-gradebook.js`, `teacher/cm-student-page.js`.
 
@@ -506,12 +571,17 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 
 **PRs.**
 
-- `S11-T1` The grader's Return area becomes one part both layouts fill.
-- `S11-M1` (Batch C) `revision_request`, submission versions, `return_for_revision`.
-- `S11-F1` The Return for Revision sheet, desktop and phone: What to Fix, Revise By, which criteria, keep or hide the grade.
-- `S11-F2` Student: Needs Revision, Send My Revision, Before and After.
-- `S11-F3` Grading both versions, with "Was Developing + on the Oct 30 version".
-- `S11-W1` Wire.
+- `S11-T1` The grader's Return area becomes one part both layouts fill. Not started.
+- `S11-M1` (Batch C) `revision_request`, submission versions, `return_for_revision`. Open, in Batch C (PR 1043, draft): not reviewed, not applied.
+- `S11-F1` The Return for Revision sheet, desktop and phone: What to Fix, Revise By, which criteria, keep or hide the grade. Not started.
+- `S11-F2` Student: Needs Revision, Send My Revision, Before and After. Not started.
+- `S11-F3` Grading both versions, with "Was Developing + on the Oct 30 version". Not started.
+- `S11-W1` Wire. Not started.
+- Not in the list above: "S11 data", returning work for revision in Demo Mode (PR 1084). Open, all checks green, not merged: it waits for Colin's Math review 2. It changes nothing in `shared/calc.js` or `shared/grade-state.js`, and its test computes the board's worked example (2.7 · 67% before, 3.0 · 75% after the returned revision).
+
+**Status (Nov 11 morning).** The screens were held on purpose: they could not merge before Colin's review of the rule, and he may change it. Waits for Colin: while a regrade is a draft, the teacher's own views show the draft's 3.0, as teacher views count drafts.
+
+**Found while building.** `GraderWork.workStateOf` must ask `revisionWorkState` first ("revised" counts as To Grade; "revising" is neither To Grade nor To Return), Return N Graded must leave out students who are revising, and `Grader` needs `returnForRevision` and `cancelRevision`.
 
 **Files.** `shared/grader.js`, `shared/grade-state.js`, `shared/calc.js` (a hidden grade is a draft, Q5, so likely no change), `teacher/page-assignments.js`, `teacher-mobile/tab-grade.js`, `s/assignments.js`, `s/feedback.js`.
 
@@ -529,6 +599,8 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 
 **PRs.** `S12-T1` the submission reader takes a group. `S12-M1` (Batch C) group submissions. `S12-F1` student group card with Add a Page. `S12-F2` grader: one work pane for the group, Students in This Group, Change One Student. `S12-W1` wire.
 
+**Status (Nov 11 morning).** `S12-T1` Done (PR 1070). `S12-M1` open, in Batch C (PR 1043, draft). `S12-F1` Done (PR 1076). `S12-F2` Done (PR 1078, with the Work Wall door, PDFs in Add Work and Return's guard). `S12-W1` not started: waits for Batch C. Demo Mode only. Not built: the group's name chips on the student's card (counts only); a student's own Replace and Unsend on a group piece after adding pages; Delete Work for a group's work. Demo Mode's sample has no group piece (Colin's call). A group's marks reach only the sender's own page, which matters at wiring.
+
 **Files.** `teacher/assign-collab.js`, `teacher/page-assignments.js`, `shared/data.js` (`_groupWrite`), `s/assignments.js`, `s/send.js`.
 
 **Tests.** A group counts once in every count; a member graded separately returns on their own; a missing or excused member is left out, as today.
@@ -544,6 +616,10 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 **Boards.** Student: My Learning (Proficiency Class); One Skill; My Learning (Letter Grade Class); Falling Grade, 3 Missing; Skills Across Two Courses; Nothing Marked Yet; One Skill, First Piece; One Skill, Top Step; Points-Only Class; Letter and Skills; My Learning on a Chromebook; Class Settings, Student Page (Show My Learning, See What They'd See).
 
 **PRs.** `S13-T1` `student-view.js` gains a learning section built from existing `calc.js` functions. `S13-F1` the switch and See What They'd See. `S13-F2` the My Learning screens for each grading style. `S13-F3` One Skill with How It's Going and Your Work.
+
+**Status (Nov 11 morning).** `S13-T1` Done (PR 1039). `S13-F1` Done (PR 1054, Demo Mode only; follow-up PR 1059). `S13-F2` and `S13-F3` Done (PR 1041; shown only in Preview as Student and only when Show My Learning is on). Open: "S13 math" (PR 1081, `shared/calc.js`: the month-ago level from returned work and which Next Step applies), not merged; it waits for Colin's Math review 3 and an independent review. Not built: "Up from Developing a month ago" and Next Step on the page (they wait for PR 1081); "All 8 Skills"; Read Aloud; Send It on Missing work. The `show_my_learning` column is in Batch C.
+
+**Found while building.** A student's own phone or Chromebook can never show My Learning until `student_submit.page` sends `show_my_learning`, the learning map, categories and the calculation settings; only Preview can show it now. "It counts as 0 until it's in." is true only in Letter and Both classes, so it is shown only there.
 
 **Files.** `shared/student-view.js`, `shared/calc.js` (only for what does not exist yet: "Up from Developing a month ago": returned work dated on or before 30 days ago, Q16), `s/learning.js`, `teacher/cm-student-page.js`, `teacher/comment-bank.js` and `shared/bank-comment.js` (read only, for Next Step).
 
@@ -562,6 +638,8 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 **Boards.** Teacher: Work Wall for One Assessment; Teacher: Student Page, Work Tab.
 
 **PRs.** `S14-T1` thumbnails load through one helper. `S14-F1` Work Wall. `S14-F2` the Work tab. Evidence Picks are not built until drawn (Q19).
+
+**Status (Nov 11 morning).** `S14-T1` Done (PR 1062, `shared/work-thumbs.js`). `S14-F1` and `S14-F2` Done (PR 1066). The phone's row menu opens the Work Wall (PR 1075), and so does a button on Assignments cards (PR 1078). Demo Mode only. Not built: Compare 2 (on the board, not in this slice); Evidence Picks. Not tested: the wall at phone width.
 
 **Files.** `teacher/work-wall.js`, `teacher/page-student.js`, `teacher-mobile/tab-grade.js` (the row menu's Work Wall).
 
@@ -587,6 +665,8 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 
 **Done when.** Every S3 test still passes with passkeys on. It needs no Microsoft or Google sign-in.
 
+**Status (Nov 11 morning).** Nothing built. The screens and words are drafted for Colin's approval, with five choices for him; S15 waits for that and for Batch E.
+
 ### S16. MyEdBC Input and the Export Sheet
 
 **Goal.** Marks and comments laid out the way MyEd wants them, from returned grades only.
@@ -594,6 +674,8 @@ Order is by value to teachers. PR ids: P pins behaviour, T tidies, F adds a feat
 **Boards.** MyEdBC Plugin: Reports › MyEdBC Input (FullVision); MyEdBC Plugin: Export Sheet in MyEd Order (FullVision).
 
 **PRs.** `S16-T1` Reports gains a third tab host. `S16-M1` (Batch F) what Mark Ready and Save need to keep. `S16-F1` the MyEdBC Input table with the 500-character limit, Generate, Mark Ready. `S16-F2` the Export Sheet with Download CSV, Print and Copy. `S16-F3` it asks before using a class with drafts, as Progress Reports does.
+
+**Status (Nov 11 morning).** Paused by Colin (DECISIONS, "Student page build rulings (2026-11-10, late night)" 15). `S16-T1` Done (PR 963). `S16-F1` is a draft (PR 1031), left as it is. Nothing else is started, and nothing of S16 or Batch F is merged, reviewed or applied until he says otherwise.
 
 **Files.** `teacher/page-reports.js`, `teacher/myed-input.js`, `teacher/report-questionnaire.js`, `shared/calc.js` (read only: `levelCode`).
 
@@ -614,6 +696,8 @@ Colin, Nov 9 (Q25): not now. MyEdBC Input and the Export Sheet (S16) still ship.
 **Boards.** Teacher: Term Questionnaire, In Their Words; Teacher: Term Questionnaire, Sentence Options Menus; Teacher: Reports With Student Page Work.
 
 **PRs.** `S18-T1` the Add Here menu takes a sentence from a new source. `S18-F1` the "her words" Next Step sentence and its Options menu. `S18-F2` the From the Student Page report blocks (In Their Words, Their Goal).
+
+**Status (Nov 11 morning).** `S18-T1` Done (PR 962). `S18-F1` Done (PR 1034). `S18-F2` not built, on purpose: the board's In Their Words block quotes a reflection plan in a family report, but the student's Reflect screen promises "Only Mr. Brown sees this." on every reflection, and a test forbids any report file reading reflections. Waits for Colin: change that line, add a per-reflection "My teacher can share this", or drop the block. Their Goal was left out: it would repeat the Self-Assessment and Goal blocks.
 
 **Files.** `teacher/report-questionnaire.js`, `teacher/comment-bank.js`, `shared/comment-bank.js`, `teacher/report-blocks.js`.
 
@@ -647,17 +731,17 @@ The rest of cleanup card cp1, after the build: what is still in `data.js` and th
 
 ### Tracks
 
-| Track             | Owns these files                                                                | Slices, in order                                          |
-| ----------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| A. Server         | `migrations/`, `supabase/functions/`, `schema.sql`, `migrations/local-test/`    | Batch A, B, C, D, E, F                                    |
-| B. Math           | `shared/calc.js`, its tests                                                     | S0-P2, S0-T1, S0-F1, then S13 and S11 if needed           |
-| C. Desktop grader | `teacher/page-assignments.js`, `teacher/assignments.css`                        | S0-T2, S0-F2, S1-T3, S1-F2, S6, S9, S10-F3, S11, S12      |
-| D. Gradebook      | `teacher/page-gradebook.js`, `teacher/class-results.js`                         | S1-T1, S1-F1, S6-F4, S10-F4                               |
-| E. Phone          | `teacher-mobile/*`                                                              | S1-T2, S1-F3, S7, S9-F2, S11-F1                           |
-| F. Student page   | `s/*`, `shared/student-view.js`, `shared/phone-report-view.js`                  | S0-T3, S0-F3, S3-F3, S4, S5, S9-F3, S10, S11-F2, S12, S13 |
-| G. Uploads        | `shared/photo-shrink.js`, `shared/photo-queue.js`                               | S5-T1                                                     |
-| H. Class Settings | `teacher/cm-student-page.js`, `teacher/student-cards.js`, `teacher/qr-slips.js` | S1-T4, S1-F4, S3, S5-F1, S8-F1                            |
-| I. Reports        | `teacher/page-reports.js`, `teacher/report-*.js`, `teacher/myed-input.js`       | S2, S16, S18                                              |
+| Track             | Owns these files                                                                | Slices, in order                                                  |
+| ----------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| A. Server         | `migrations/`, `supabase/functions/`, `schema.sql`, `migrations/local-test/`    | Batch A, S3-E1, S3-E2, S3-M1, S3-S1, Batch B, C, D, E, F          |
+| B. Math           | `shared/calc.js`, its tests                                                     | S0-P2, S0-T1, S0-F1, then S13 and S11 if needed                   |
+| C. Desktop grader | `teacher/page-assignments.js`, `teacher/assignments.css`                        | S0-T2, S0-F2, S1-T3, S1-F2, S6, S9, S10-F3, S11, S12              |
+| D. Gradebook      | `teacher/page-gradebook.js`, `teacher/class-results.js`                         | S1-T1, S1-F1, S6-F4, S10-F4                                       |
+| E. Phone          | `teacher-mobile/*`                                                              | S1-T2, S1-F3, S7, S9-F2, S11-F1                                   |
+| F. Student page   | `s/*`, `shared/student-view.js`, `shared/phone-report-view.js`                  | S0-T3, S0-F3, S3-F3a, S3-F3, S4, S5, S9-F3, S10, S11-F2, S12, S13 |
+| G. Uploads        | `shared/photo-shrink.js`, `shared/photo-queue.js`                               | S5-T1                                                             |
+| H. Class Settings | `teacher/cm-student-page.js`, `teacher/student-cards.js`, `teacher/qr-slips.js` | S1-T4, S1-F4, S3-W1, S3-F1, S3-F2, S5-F1, S8-F1                   |
+| I. Reports        | `teacher/page-reports.js`, `teacher/report-*.js`, `teacher/myed-input.js`       | S2, S16, S18                                                      |
 
 Tracks A, B, F, G and I share no files with each other or with C, D and E. They can all run from the first night.
 
@@ -678,10 +762,12 @@ The session that hands out the work keeps one list of who holds each of these fi
 - `S0-T2` before `S1-T1`, `S1-T2` and `S1-T3`. Those three are in different files and run side by side.
 - `S0-T1` before `S0-F1`. `S0-F1` before S2, S4 and S16-F3.
 - Batch A applied before any `W` PR in S0 to S4. Batch B before S5 to S7 wiring. Batch C before S9 to S13 wiring. Batch D before a real class turns on Send Work.
+- `S3-W1` merges before `S3-M1` is applied, and `S3-M1` before the S3 release (S3, the day). `S3-S1` before the January pilot.
 - S3 before real students use S4. S4 before S5's student screens. S5 before S6 and S7. S6 before S9, S11, S12 and S14.
 - S8 before the release that opens Send Work.
 - S15 after S4 works.
 - S16 and S18 need only `S0-F1`.
+- The teacher student-page redesign (`docs/plans/teacher-student-page-redesign-plan.md`) is paused after R1 (PR 1015) by Colin, Nov 10. R2 to R7 are off until he says otherwise. So S10 no longer waits on R6, and S13 lands its own trend and Next Step helper in `calc.js`.
 
 ### A first night, as an example
 
@@ -693,19 +779,20 @@ Six agents, six worktrees, no shared files: (1) `S0-P1`; (2) `S0-P2` then `S0-T1
 
 Each row stops only the work listed. Everything else keeps moving.
 
-| #   | What Colin is asked                                                                                                                                                                                                  | When                         | It unblocks           |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | --------------------- |
-| 1   | This plan, and the answers in section 6. Answered Nov 9.                                                                                                                                                             | Now                          | Batch A's final SQL   |
-| 2   | **Batch A.** One read of three migrations: `grade_return` with its backfill (existing scores become Returned; no score or number changes), cards, sessions and the page reader. Plus the first edge function deploy. | Once it passes on a branch   | S0 to S4 wiring       |
-| 3   | **Math review 1.** `S0-F1`, the returned-only option. The proof offered: with no drafts, every number in the golden file is unchanged.                                                                               | With Batch A                 | S2, S4, S16-F3        |
-| 4   | **Batch B.** Submissions, the two buckets and their policies, the second edge deploy. Unsend and Replace delete files. Also Colin's own step: spend cap off and usage alerts at about 70% (Nov 8, decision 7).       | When S1 is in review         | S5 to S7 wiring       |
-| 5   | **Batch C.** Mark Up, reflections, revisions, group submissions, the My Learning switch. Third edge deploy.                                                                                                          | When S5 is in review         | S9 to S13 wiring      |
-| 6   | **Math review 2.** `S11`: a revision's new grade replaces the old (Nov 8, decision 10).                                                                                                                              | With S11                     | S11 merge             |
-| 7   | **Math review 3.** `S13`: anything new in `calc.js` for My Learning.                                                                                                                                                 | With S13                     | S13 merge             |
-| 8   | **Batch D. Deletes data.** Photo deletion on class purge, student delete and Keep Photos Until; the nightly check.                                                                                                   | Before Send Work is released | The Send Work release |
-| 9   | **Batch E.** Passkeys, with the privacy page change.                                                                                                                                                                 | After S4 is live             | S15                   |
-| 10  | **Batch F.** MyEd tables.                                                                                                                                                                                            | Any time                     | S16 wiring            |
-| 11  | **Releases.** Suggested points, each on Colin's word: after S2 (nothing visible, switch off); after S4 (cards and the read-only page, for Colin's own classes); after S8 (photo submissions); then as he likes.      | His call                     | Teachers seeing it    |
+| #   | What Colin is asked                                                                                                                                                                                                                                                          | When                                         | It unblocks           |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | --------------------- |
+| 1   | This plan, and the answers in section 6. Answered Nov 9.                                                                                                                                                                                                                     | Now                                          | Batch A's final SQL   |
+| 2   | **Batch A.** One read of three migrations: `grade_return` with its backfill (existing scores become Returned; no score or number changes), cards, sessions and the page reader. Plus the first edge function deploy.                                                         | Once it passes on a branch                   | S0 to S4 wiring       |
+| 3   | **Math review 1.** `S0-F1`, the returned-only option. The proof offered: with no drafts, every number in the golden file is unchanged.                                                                                                                                       | With Batch A                                 | S2, S4, S16-F3        |
+| 4   | **Batch B.** Submissions, the two buckets and their policies, the second edge deploy. Unsend and Replace delete files. Also Colin's own step: spend cap off and usage alerts at about 70% (Nov 8, decision 7).                                                               | When S1 is in review                         | S5 to S7 wiring       |
+| 5   | **Batch C.** Mark Up, reflections, revisions, group submissions, the My Learning switch. Third edge deploy.                                                                                                                                                                  | When S5 is in review                         | S9 to S13 wiring      |
+| 6   | **Math review 2.** `S11`: a revision's new grade replaces the old (Nov 8, decision 10).                                                                                                                                                                                      | With S11                                     | S11 merge             |
+| 7   | **Math review 3.** `S13`: anything new in `calc.js` for My Learning.                                                                                                                                                                                                         | With S13                                     | S13 merge             |
+| 8   | **Batch D. Deletes data.** Photo deletion on class purge, student delete and Keep Photos Until; the nightly check.                                                                                                                                                           | Before Send Work is released                 | The Send Work release |
+| 9   | **Batch E.** Passkeys, with the privacy page change.                                                                                                                                                                                                                         | After S4 is live                             | S15                   |
+| 10  | **Batch F.** MyEd tables.                                                                                                                                                                                                                                                    | Any time                                     | S16 wiring            |
+| 11  | **S3-M1. Deletes data.** Card codes the database cannot read: every live card stopped, the 30 codes and passwords in Colin's test class erased. Read with `S3-E1` and `S3-E2` and their independent review. Before it, Colin makes the key and OKs the two function deploys. | When `S3-E1`, `S3-E2` and `S3-W1` are merged | The S3 release        |
+| 12  | **Releases.** Suggested points, each on Colin's word: after S2 (nothing visible, switch off); after S4 (cards and the read-only page, for Colin's own classes); after S8 (photo submissions); then as he likes.                                                              | His call                                     | Teachers seeing it    |
 
 How a batch is tested before Colin sees it: every migration runs on the throwaway Postgres harness with its tests, storage policies against the harness's stand-in storage table, and the edge function's handler with a fake database. No Supabase branch is used (Q18). The PR shows the SQL, the test results, and what the batch does to existing rows in one paragraph. After it is applied, the first real check is in Colin's own test class.
 
@@ -730,7 +817,8 @@ How a batch is tested before Colin sees it: every migration runs on the throwawa
 | The CSP blocks a photo or a PDF, or gets loosened to fix it                                 | Photos are fetched and shown from `blob:`, which the policy allows today. `tests/csp-directives.test.js` gains a line pinning `img-src`, `connect-src`, `frame-src` and `object-src` as they are. PDFs become JPEG pages in the browser (Q13). The HEIC decoder's CSP change is reviewed in its PR and limited to the upload pages (Q14). |
 | A student's location is stored                                                              | The browser redraws every photo. The server checks again on commit. A test uploads a photo with GPS data and reads the stored file.                                                                                                                                                                                                       |
 | A huge file fills storage                                                                   | The bucket limit: 2 MB a page. A PDF over 20 MB is refused in the browser. The shrink step runs on every upload path, tested for each.                                                                                                                                                                                                    |
-| A card code is guessed                                                                      | The identity check, the lock after five wrong tries, today's rate limits, and a limit of 20 sends per card per hour (Q20).                                                                                                                                                                                                                |
+| A card code is guessed                                                                      | Eight characters; the identity check; the locks after five wrong tries in a row and 15 in 7 days; 300 unknown codes per address in 15 minutes; a limit of 20 sends per card per hour (Q20).                                                                                                                                               |
+| A copy of the database gives away card codes                                                | The database keeps only keyed fingerprints; the key lives in the edge functions' settings (1.5). Handler tests check no code, tag, key or password reaches the database or a log. Slips follow in `S3-S1`.                                                                                                                                |
 | Student data leaves Canada                                                                  | Storage is in the project's region. The edge function already refuses to run outside `ca-central-1`; the new routes go through the same check. `s/` loads no Sentry.                                                                                                                                                                      |
 | The grade math changes by accident                                                          | The golden file from `S0-P2` must pass unchanged in every PR that does not say "math" in its title.                                                                                                                                                                                                                                       |
 | A migration turns every open PR red                                                         | Batches are applied at a quiet moment and the snapshot merges at once (see the rules above).                                                                                                                                                                                                                                              |
@@ -756,7 +844,7 @@ Colin answered the 25 questions one at a time on Nov 9. Each answer is written i
 | 7   | Missing, Excused and Late                                   | Never drafts: they show and count at once.                                                                                                                                                            |
 | 8   | Where existing classes start                                | As Soon As I Save, until the teacher first opens Class Settings › Student Page. New classes start on When I Return Them.                                                                              |
 | 9   | Grades from the grade-scans skill                           | Drafts, in a When I Return Them class.                                                                                                                                                                |
-| 10  | Seeing a card's code again                                  | Yes. Stored for the class's teacher only.                                                                                                                                                             |
+| 10  | Seeing a card's code again                                  | Yes. Stored for the class's teacher only. _Superseded 2026-11-10: no code is readable or shown again (DECISIONS, "Card codes the database cannot read")._                                             |
 | 11  | How long a device stays signed in                           | Until midnight, or until Done.                                                                                                                                                                        |
 | 12  | Today Only codes                                            | Not built; they wait with Family Codes.                                                                                                                                                               |
 | 13  | PDFs                                                        | Each page becomes a JPEG in the browser, using pdf.js for that step; the PDF is not kept. This changes the PDF part of Nov 8 decision 8.                                                              |

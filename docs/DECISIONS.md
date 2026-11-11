@@ -16,6 +16,16 @@ Context: `grading-compliance-plan.md`. All implemented; see its status table.
 - **D9 Missing means labelled Missing** (Colin, 2026-10-30). Work is missing only when its status is Missing (`NS`), whatever its due date. An empty cell past its due date is an empty cell: no "0", no "Past Due", and it is not counted as missing in the gradebook, Missing and Late, Needs Attention, the student cards, the Assignments page, the report blocks or the comment. The grade was never changed by a due date; only the display was.
 - **D8 + and − on every proficiency score** (Colin, 2026-10-22: "the plus minus should be consistent"): a competency, a rubric criterion, and an assessment scored as a whole on its Overall row (`score.modifier`, `migrations/20261022_score_modifier.sql`), in Assignments, the gradebook and the phone. A 3+ counts as 3.33 wherever it is.
 
+## A level reads as it is printed (Nov 11, 2026)
+
+Colin (2026-11-11): "I'll defer to your recommendations on the grade round issue. Make it so." A student at 2.47 saw "2.5" beside "Developing", though the scale says 2.5 is Proficient. An average that was exactly 2.5 on paper could also read Developing, because a computer holds 2.5 as 2.4999999999999996. PR 1101.
+
+- **Rule:** a level reads as it is printed. The printed figure is the level on paper to one decimal, with a half rounding up (`printedLevel` in `shared/calc.js`). The word, code, colour, + or −, counts by level and everything else read from a level follow that figure. So 2.47 prints 2.5 and reads Proficient, and 2.44 prints 2.4 and reads Developing. 1.5 and 3.5 work the same way. The + or − is the nearest step to the printed figure, and a tie goes up (2.5 is 3−).
+- **Why:** the number and the word must agree. Letters already work this way: the % is rounded as shown, then the letter is taken from it (D6).
+- **What moves:** a student whose average is from x.45 to just under x.5 moves up a word, a code, a colour and a + or −. An exact x.x5 (1.65) now always prints 1.7, however the computer came to it. Stored, averaged and server-bound levels do not change. Percents and letters keep their own rule.
+- A points score exactly on a Points to Proficiency start (29 / 50 = 58%) gets that level, though the computer makes it 57.99999999999999.
+- Pages outside `calc.js` that still round a level themselves are a follow-up: they will call `printedLevel` / `roundLevel`.
+
 ## Assessment Factor (2026-10-25)
 
 Supersedes D2. Teachers asked for the multiplier back on points work (an assignment out of 6 counted 4 times), and Schoology has one ("Factor"). Colin: taking it out was an oversight.
@@ -239,7 +249,7 @@ Context: [`plans/student-page-build-plan.md`](plans/student-page-build-plan.md),
 4. **Missing, Excused and Late are never drafts.** They show and count as soon as they are set. _See also "Student page build rulings" 13: Missing also hides a grade returned earlier._
 5. **Existing classes start on As Soon As I Save** until their teacher first opens Class Settings › Student Page; new classes start on When I Return Them. Grades from the grade-scans skill follow the class's setting, so they can arrive as drafts.
 6. **Which grades each screen uses.** Returned only for anything a family or student reads (Progress Reports, the Term Questionnaire's facts and Generate, Sent to Phones, MyEdBC Input, the student page, Preview as Student). All work, drafts marked, for the teacher's own views. A grade hidden during a revision is a draft.
-7. **Cards.** The class's teacher can see a card's code again, so reprinting never stops a card. A device stays signed in until midnight or until Done. Today Only codes wait with Family Codes. A card can send 20 times an hour.
+7. **Cards.** The class's teacher can see a card's code again, so reprinting never stops a card. A device stays signed in until midnight or until Done. Today Only codes wait with Family Codes. A card can send 20 times an hour. _The first sentence is superseded 2026-11-10: see "Card codes the database cannot read"._
 8. **Keep Photos Until is per class only.** Backups and Download All My Data leave photos out and say so.
 9. **Migrations are tested locally only,** on the throwaway Postgres harness; no Supabase branch. The first real check is in Colin's own test class after a batch is applied.
 10. **The MyEd extension is not in this build.** MyEdBC Input and the Export Sheet are.
@@ -264,7 +274,7 @@ Context: the first night of the build ([`plans/student-page-build-plan.md`](plan
 8. **Leaving When I Return Them returns the waiting drafts.** Switching a class to As Soon As I Save, or turning its Student Page off, asks first ("12 grades are waiting as drafts. Changing this returns them to students now."), then returns them. No draft is left where no Draft mark or Return button shows.
 9. **Under As Soon As I Save, a changed grade is marked Updated only if the student had opened the earlier one.** Grading in several clicks never shows as an update. Under When I Return Them a re-returned grade is always marked.
 10. **A cleared grade, once returned, shows no result.** The student is not told a grade was removed.
-11. **A Note for the Report prints only once that piece's grade has been returned.** A note alone never makes a draft.
+11. **A Note for the Report prints only once that piece's grade has been returned.** A note alone never makes a draft. _Sharpened 2026-11-10: a note waits with its own grade; see "Student page build rulings (2026-11-10, night)" 2._
 12. **Duplicate Class copies the original's Return Grades choice;** the copy's Student Page starts off.
 13. **Missing wins at once.** Once a piece is marked Missing, a grade returned earlier for it stops counting and stops showing everywhere straight away, with no Return: the course grade and the competency levels agree, and the student sees Missing with no result. Adds to Student page build answers 4. This changes what `calc.js` counts from returned grades and gets Colin's review in the PR that builds it.
 14. **Section overrides count at once** on every screen. A hand-set section level has no Draft or Returned state, and it applies whether or not the section has scored work under it: a report shows it even when every piece in the section is still a draft. Before this a hand-set level on a section with no scored work was stored and showed a dash. It counts in the folder and the overall proficiency; the course %, letter and category grades come from the work and do not move (PR 974).
@@ -300,8 +310,213 @@ Context: the second day of the build. The math and screen reviews, and the first
 
 7. **The first migration batch (PR 966) is applied as verified,** with its three known limits closed in a small migration straight behind it (PR 989) rather than by reopening a batch that four review rounds had proven. One exception: its four ownership helpers are rewritten before applying. Production runs PostgreSQL 17, which plans a SQL-language function again on every statement; with the helpers written that way the batch took a 30-student rubric fill from about 23 ms to about 100 ms. Written in PL/pgSQL they cost what a save costs today.
 8. **Three stronger measures are built now, each its own migration:** every security-definer function in `public` names `pg_temp` last in its search path (PR 991); score rows carry their class, so a score filed under another class's student is refused from any writer; and the class's sync row is taken once at commit, which ends nine ways two of today's saves can block each other. None is applied without Colin.
-9. **A card's code and password stay readable by the class's teacher.** The privacy page must say so, and Colin puts it to his district's privacy officer.
+9. **A card's code and password stay readable by the class's teacher.** The privacy page must say so, and Colin puts it to his district's privacy officer. _Superseded 2026-11-10: see "Card codes the database cannot read"._
 10. **When a student opens a returned piece is recorded for the student's own page only.** It is what marks a grade Updated (evening rulings 9). It is not shown to teachers, is kept as long as the grade, and goes on the privacy page.
+
+## Student page build rulings (2026-11-10, later)
+
+Context: the same day, after the first migration batch was applied. The screens that return grades went through review one by one, the student's page was wired to the server, and Colin tested a real card in his own class. He ruled on each point below, one at a time.
+
+**Returning grades**
+
+1. **A Return that reaches past the student on screen asks first.** "Return 3 Grades Now?", a line naming who is waiting, Cancel and Return 3 Graded. It applies to the gradebook's Competencies header button, an Assignments card's Return N Graded, and every Return N on the phone's To Return tab, Return 1 included: a return cannot be undone, and a thumb in a scrolling list or a stray click on a header should return nothing. One exception: the gradebook's Scores column menu stays one click, because the line directly above the item names who gets their grade. Returning the one student whose grade is on screen is one tap (the grader's Return, the phone's Return and Next, the student card's Return), unless a pair or group partner's draft goes with it; then it asks and names everyone.
+2. **Counts are students, and they match who is returned.** On pair and group work To Return and Return N Graded count students, not groups, on every screen. A count and its line of names always equal the grades that will be returned, a partner hidden by a search included.
+3. **On the phone, Return and Next goes to the next student in the strip,** graded or not. The To Return tab is where a teacher returns what is left in bulk.
+
+**The student's page**
+
+4. **The page signs itself out after 15 minutes with no activity,** on top of midnight and Done. A page forgotten on a shared Chromebook closes before the next block. Adds to Student page build answers 7.
+5. **"Opened" means the row was on screen.** A returned piece counts as opened once its row has been at least 60% in view, in a visible tab, for 0.6 seconds. So Updated stays on a changed grade the student never scrolled to. The feedback screen, when it is built, tightens this to a real open. Adds to 10 above.
+6. **Any card that is recognised signs the last student out,** also when it will not open (locked, past its date, the class's page off, needs reprinting). A code that is no card (a slip, a typo) signs nobody out. Applies the evening rulings' 2.
+7. **A piece switched to DIBELS and back keeps its returned grades.** While it is DIBELS its Draft and Returned records are dormant: nothing counts, lists, returns or shows them. Changed back, each is as it was (PR 989).
+
+**What was applied and released that day**
+
+Each on Colin's word, after its independent review: the first migration batch (PR 966), the search-path change (PR 991) and the follow-up to the batch (PR 989) were applied to the database; the `student-submit` edge function was deployed with its card routes; and `main` was released (PR 1001). Colin then turned Student Page on for one of his own classes, made cards, scanned one, and saw a returned grade and no draft. That closed the build plan's first slice.
+
+Still open: the privacy page's wording, which must change before cards go to another class.
+
+## Card codes the database cannot read (2026-11-10)
+
+Context: Batch A stored each card's code and password so the teacher could read them again. Colin was asked which of three options was best practice, chose the strongest, and then answered the design's questions one at a time. Design and build order: [`plans/student-page-build-plan.md`](plans/student-page-build-plan.md), sections 1.5 and 1.8 and slice S3. This section SUPERSEDES "Student page build answers (2026-11-09)" 7's first sentence ("The class's teacher can see a card's code again, so reprinting never stops a card") and "Student page build rulings (2026-11-10)" 9 (a card's code and password stay readable by the class's teacher).
+
+Words used here:
+
+- **The key:** one secret, `STUDENT_CARD_KEY`, kept in the edge functions' settings and nowhere in the database.
+- **Tag:** a keyed fingerprint of a code (HMAC-SHA-256). Only someone holding the key can make one. The database stores tags, never codes.
+- **Stopped:** a card that never opens again. Its row stays as history.
+
+**The rulings**
+
+1. **The database stores no card code or card password it can read back** (Colin, 2026-11-10: "yes, i would like the stronger fix to be built now rather than deferred"). Making a card and checking one both go through an edge function that holds the key. The database keeps only tags. So a copy of the database, a leaked backup or a stolen database password gives nobody a working card. With it come New Codes for This Class, and codes kept off the screen. There is no timed rotation: a code is replaced when the teacher asks, and it ends with the class's last reporting date.
+2. **Slips get the same fix next, as their own change** (Colin, 2026-11-10). Questionnaire and phone-report slips have the same weakness: their codes are salted hashes made inside the database, and `student.slip_password` is stored readable. They move to the same key right after cards are live and before the January pilot, with their own migration and review. Not inside the card migration: slips are live for both current users, and a card mistake must not be able to break them. Not left on the roadmap.
+3. **A card code is eight characters** (`K7M4-QX2P`); a slip stays six (Colin, 2026-11-10). Once the database cannot read a card's code it cannot compare one with a slip's, so the two are told apart by length. Eight characters also make a card 841 times harder to guess, which matters for a code that lasts the course. Students type two more characters; a scan is the same. No class but Colin's test class has cards, so this is the cheapest moment to change it.
+4. **Colin keeps a copy of the key in his password manager** (Colin, 2026-11-10). This reverses the design's advice to keep no copy. He asked what teachers would actually want: never to reprint every card because a key was lost. The copy adds little risk, because his password manager already holds his Supabase sign-in. He makes the key and the copy himself, in his Mac's own Terminal: the key goes to the clipboard, into the password manager, into the functions' settings, and the clipboard is cleared. No assistant ever sees it. The password manager should have two-step sign-in on. The copy is only for putting a lost key back; changing the key still stops every old card.
+5. **A replaced card says so** (Colin, 2026-11-10): "This card has been replaced. Ask your teacher for your new card." A reprint now always stops the old card, so after New Codes for This Class a whole class may be holding old cards; "That code didn't work" would send them looking for a typo. The line names no one, so it tells a guesser nothing.
+6. **A card number tells a student's cards apart** (Colin, 2026-11-10): Card 1, Card 2, Card 3, printed small on the card and shown in the list. Never any characters of the code: they would have to be stored, and they would make one chosen card easier to guess.
+
+**What follows from ruling 1 without a choice**
+
+7. **A card password is the card's own.** A student with no birthday and no student number gets four digits made with the card, kept only as a tag. Before this it was a copy of `student.slip_password`, which the database stores readable. That student's slip and card now print different passwords.
+8. **Print All, with the same codes, cannot exist.** It becomes New Codes for This Class, which stops every card and makes new ones.
+9. **No code is shown on a teacher's screen.** "Reissue, Show Code" and the in-app print preview go. A code exists only in the reply to the press that made it and in the browser's print dialog. Print Again works from the page's memory until the teacher leaves the screen, or for ten minutes at most; the code is never saved on the computer or sent anywhere else.
+10. **Colin's test class loses its 30 cards.** The migration stops them and erases their codes and passwords; its undo cannot bring them back. Converting them was rejected: the codes have sat readable in the database and its backups since Nov 10, so only new codes make ruling 1 true. That class has no working cards for about 15 to 30 minutes on the day.
+11. **"A new slip avoids every live card code" ("Student page build rulings (2026-11-09, evening)" 5) now holds by length:** a card has eight characters and a slip six, so they can never match. The two slip issuers lose the check Batch A added and go back to their earlier bodies.
+12. **The privacy page changes.** The question Colin was to put to his district's privacy officer (the teacher can read a card's code) is gone. The page must say that FullVision keeps a keyed fingerprint of a card's code and password, not the code; that nobody can look one up after the card is printed; and, until ruling 2 is built, that slip codes are salted hashes a copy of the database could work out.
+
+**The deploy order**
+
+13. **The key, then both functions, then the migration, then the release.** Colin makes the key. Then `student-submit` (it checks cards by tag) and the new `teacher-cards` (it makes cards) are deployed. Then the migration is applied. Then Colin checks on his Mac and says "release". The step that can be undone comes before the step that erases: if the functions misbehave, the old ones go back and nothing is lost. In no step does a card open by the old check, and in none does a slip fail. The teacher's screens merge to `main` before the migration is applied, so the database check in CI stays green. Each step waits for Colin's OK.
+
+**The costs Colin accepted**
+
+14. One more migration, with its independent review and his OK before it is applied. It deletes data (the 30 codes and passwords), so it is reviewed under project rule 2.
+15. A reprint makes a new code and stops the old card. A lost card is replaced, never shown again.
+16. A code cannot be looked up after it is made. If the print dialog is cancelled and the teacher leaves the screen, the cards are made again.
+17. His test class's 30 cards are replaced.
+18. Losing the key without the copy, or changing it, stops every card in every class until each teacher presses New Codes for This Class and prints. Whoever holds both the key and a copy of the database can work out every code; the two sit under one Supabase account, so two-step sign-in on that account matters most.
+19. Backups taken before the migration still hold the 30 old codes. They are dead after it, but restoring such a backup would bring back the old readable design.
+
+## Student page build rulings (2026-11-10, night)
+
+Context: the evening and night of the second day. Slice S2 (reports) and most of slice S3 (cards) were built, reviewed and merged, and the card migration was applied. Colin ruled on each point below, one at a time. The wording he approved earlier that day, and not recorded before, is in 5.
+
+**How work merges**
+
+1. **A pull request that is green and through its review merges without asking him again** (Colin, 2026-11-10: "anything that can be merged, or is ready to be merged and waiting, can go ahead and merge"). Green means every check, the browser tests included; through its review means whatever independent review the pull request needs has said it is ready. What still comes to him first: wording he has not seen, the OK to apply a migration, and every release. This widens his word that morning, "I approve anything waiting for me", which covered two grade pull requests (986 and 973) once their reviews were clean and was not taken as an OK to apply anything. How the rule reads in practice is the build's orchestrator's reading of his words; he can correct it.
+
+**Reports**
+
+2. **A Note for the Report waits with its grade** (Colin, 2026-11-10). A note written while regrading a piece already returned reaches the Term Questionnaire, Generate and the phone copies only when that regrade is returned. So a report never carries a note about a grade the family cannot see yet. Replaces "a note is used once its piece has ever been returned" (evening rulings 11). **Not built yet.** The returned copy of a grade leaves the note out on purpose, so this needs a small migration (`grade_return` keeps the note as it was at the last return, and `list_course_grade_returns` sends it) and a client pull request after it. Until then a note shows once its piece has ever been returned (PR 1005).
+
+**The teacher's student page**
+
+3. **"Keep all grades"** (Colin, 2026-11-10, relayed by the session building the teacher student-page redesign). The teacher's own student page reads all work, drafts included, and so does its Overview tab (PR 1013), though that tab was built for a student to read across the desk. In a class that holds grades, a student shown that tab sees grades not yet returned. Colin accepts that: it is the teacher's view, and teacher views use all work (Student page build answers 6). The student's own page (`s/`) and everything sent to students or families still show returned grades only.
+4. **The redesign is paused after its first slice** (Colin, 2026-11-10). R1 merged as PR 1015. R2 to R7 are off until he says otherwise ("nah they're good", of the Observations and Grades tabs as they are; no dashboard redo). So slice S10 no longer waits for R6, and S13 builds its own trend and Next Step helper in `calc.js` instead of reusing R2's.
+
+**Wording approved**
+
+5. **Approved as built**, each by Colin on Nov 10:
+   - PR 988 (Return Grades setting): "Return 12 Grades Now?" / "Return 1 Grade Now?"; Return and Change; "You haven't chosen yet. Until you do, a grade shows as soon as you save it."
+   - PR 990 (gradebook drafts): "N to return"; "Draft: graded, not returned"; Return N Graded; the drafts line with its "and 2 others" and one-draft forms; the pill's two hover hints; the screen-reader words; no "Draft" word inside cells.
+   - PR 994 (phone): Return and Next; To Return; "3 drafts" / "1 draft"; Return 3; "Graded but not returned. Students see these after you return them."; "3.5 · Cece can't see it yet"; "Complete · Cece can't see it yet"; See All Assessments; "Nothing to Return" / "No grades are waiting as drafts in Science 8."; the screen-reader names.
+   - PR 997 (grader and Assignments): To Return 3 / Returned 14 / All 28; "14 returned"; the pill's two hover hints; the screen-reader names; the Show bar and Return N Graded in their own bar under the dialog's title.
+   - PR 998 (student's page): the five refusal lines; "Couldn't reach FullVision. Check your internet and try again."; "You are signed out. Scan or type your card to open your page again."; Done; Updated.
+   - PR 999 (teacher wiring): the hidden Student Page switch and its two lines; Student Cards' line; "Changing…"; "Could not change this. Check the connection and try again."; "Could not check for grades waiting to be returned. Check the connection and try again."; Try Again. Its card list (Make Cards, the Card Code column) has since been replaced by slice S3's.
+   - PR 1002 (class settings on two computers): the category lines; What You Typed; Dismiss; Discard My Changes; the kept-changes line; the Copy Grading Setup lines; "Other changes from this computer are still being sent, so nothing was saved. Your changes are kept on this computer. Save again in a moment." (after a drag, "…Try again in a moment."); and in his own words, "Your earlier save went through after all. These are the saved categories."
+   - PR 1004 (reports with drafts): "N Grades Aren't Returned Yet" / "1 Grade Isn't Returned Yet"; "A progress report shows grades to families, so it leaves drafts out unless you return them."; "A rubric handout shows grades to students, so it leaves drafts out unless you return them."; Return Them, Then Print / Print Without Them; Return It, Then Print / Print Without It; Cancel; "Those grades couldn't be returned, so nothing printed. Try again."
+   - PR 1012 (making cards): "Make and Print N Cards"; "N cards went to the printer. Print Again works until you leave this screen. After that, printing makes new codes." (chosen over a version naming the ten-minute limit); Print Again; the Card column, "Card 2 · Made Nov 12"; the statuses Last Opened Nov 14, Needs a New Card, Past Its Last Day; "Card 2" small on the printed card.
+   - PR 1014 (replacing cards): "Print a New Card for Cece?" and "New Codes for All 28 Students?", with red buttons Print New Card and Make N New Cards; "Could not make the card. Check the connection and try again."; "2 students still have their old card: Bob Baker, Charlie Chen. Use Print New Card on their rows to try again."; "Cece's old card has stopped, but the new one didn't print. Press Make and Print 1 Card to print it." (and its form for a class run), the button named exactly as it reads at that moment; "Checking which cards were made…" while it waits; Unlock All only when two or more cards are locked.
+   - PR 1016 (the card list): the filters All / Not Printed / Locked / Never Opened with counts; "A card stops opening after this day. It's the class's last reporting date until you choose another day." (and its June 30 form); "That day has passed, so no card opens now."; Use Last Reporting Date; Use June 30; the three empty-filter lines.
+
+**What was applied and deployed that night**
+
+6. Each on Colin's word, in the order "Card codes the database cannot read" 13 sets:
+   - **The key.** Colin made `STUDENT_CARD_KEY` himself, with `STUDENT_SUBMIT_IP_KEY`, and keeps a copy of the card key in his password manager. No assistant saw either. He made the card key three times while saving it; the last is the one he kept, its key id `b5124c44`.
+   - **Both functions** ("Yes, deploy both"): `teacher-cards` (sign-in checking on) and then `student-submit` were deployed from `main`, and redeployed once he had made the last key. Both start with key id `b5124c44`.
+   - **The migration** ("I approve the migration."): S3-M1 (PR 1011) was applied as `card_codes_keyed`, version 20261111020227, on Nov 11 at 02:02 UTC (Nov 10, 6:02pm Pacific), after its read-only pre-check. Its post-check found nothing wrong. The 30 cards in his test class are stopped, and no card code or password is left in the database.
+   - **The check.** On Colin's Mac, the app from `main` against the live database made new codes, and a new card opened a real student page (recognised, Is This You? answered, a returned piece marked seen).
+   - **Not released.** The site still runs the release of PR 1001. The next release waits for his word, after the steps before every release ("Class settings on two computers" 5).
+
+Still open: the privacy page's wording, before cards go to another class.
+
+## Student page build rulings (2026-11-10, late night)
+
+Context: the night of Nov 10 to 11. Slices S4 to S14 and S18 were built as screens in Demo Mode behind their switches, the second migration batch (Batch B: students send work, PR 1024) went through its reviews, and a small migration for the student page's new fields was applied. Colin ruled on each point below before going to bed; a fresh orchestrator session ran the rest of the night under these rulings. Where a ruling is in his words they are quoted. Where the orchestrator read his words a certain way, that is marked as its reading: he can correct it.
+
+**Students sending work (Batch B)**
+
+1. **One private bucket, JPEG pages only, 2 MB a page.** A PDF becomes pages in the browser and is not kept. This settles the plan's "two buckets" (S5-M2) against its own 1.7 and Student page build answers 2: there is one bucket.
+2. **"Started grading" means the piece has a draft or returned grade, or an Overall Comment, for that student.** A Late or Missing mark alone does not lock the work. Once grading has started there is no Unsend and no Replace.
+3. **A student may send work for a piece that already has a grade.** It locks at once.
+4. **After the Due Date starts at Keep Accepting:** late work is taken and marked Late. A piece closed to sending refuses Unsend and Replace. A Replace started after the due date is marked Late.
+5. **Deleting an assessment, permanently deleting a student, and the 30-day class purge delete that work's photos too, from the day Batch B is applied. A deleted photo cannot come back.** This moves those three deletes up from Batch D (S8-M1), so no photo is left with no row. The orchestrator told him Send Work is not released until the on-screen warnings (S8-F1) are built; they were built that night (PRs 1045, 1048, 1083).
+6. **A teacher can delete one student's submission and its photos.** The database function comes with Batch B; the button and its confirm come later, with their wording to him.
+7. **A submission holds 30 pages at most. Copy Assessment, Duplicate Class and Restore do not copy the Student Work setting:** a copy starts at Nothing.
+8. **Nobody, the teacher included, can open a photo a student unsent or never finished sending.** Only the cleanup job touches it.
+9. **A student's Unsend or Replace removes only the student's own pages.** Pages the teacher added stay, and the submission stays with them.
+10. **A send can be finished for two hours from its first start, never longer.** Finished after the due date, it is Late. After two hours it is dropped and the student starts again.
+
+8 to 10 came from Batch B's first independent review; the builder built each as chosen.
+
+**The student page's new fields, and what Colin approved to apply**
+
+11. **"Yes, I approve the migration." Then, asked which: "Both."** (Colin, Nov 10 late night.)
+    - (a) **The page-fields migration (S4-M1, PR 1032):** build it, have it reviewed by someone who did not write it, tell him plainly what it changes, and apply it on this approval unless it differs from what was described. What was described: the student page is also sent the assessment's description, its category name and weight, its unit name, its Core Competencies, I Can text, a rubric criterion's competencies, the teacher's display name and each class's To Do count. Nothing about grades changes. **Used:** see "What was applied that night" below.
+    - (b) **Batch B (PR 1024):** apply it when the independent review says ready, without asking again; but if the review finds anything that changes what it does or deletes, go back to him first. **Not used:** see below.
+    - Each apply still gets the read-only pre-check, the md5-guarded statement rehearsed locally first (it refuses to run unless the live functions are exactly the ones it was tested against), and the post-check. Neither covers deploying an edge function or a release.
+
+**How the build runs while he is away**
+
+12. **"good, make sure everything merges on green"** (Colin, Nov 10 late night). The orchestrator's reading, told to him and not objected to: every pull request merges as soon as all its checks are green; a migration pull request waits for its apply; wording he has not seen is merged on green while he is away and listed for his approval before any release. That list exists, kept beside the night's notes.
+13. **"I'm heading to bed. keep an eye on usage, but continue on and finish all of the slices if possible. orchestrate tasks to different models like we discussed earlier."** (Colin, Nov 10 late night.) The limits the orchestrator then set itself, not his words: builders on Opus, each merging its own green screen pull requests by written rules; Fable only for the two migrations already approved (Batch B and S4-M1), their reviews and applies; no new Fable work once the week's Fable use passed 75%, none past 85%; no new builders past 80% on all models; no other migration applied, no edge function deployed, nothing released.
+14. **"I approve a standing OK to migrate changes, except anything that touches current student data for Karen or Colin."** (Colin, Nov 10 late night, after being told that project rule 1 and the build's rules need his OK for each apply.) The orchestrator's reading, told to him: a migration may be applied without asking only when (a) an independent reviewer who wrote none of it says ready, (b) the live pre-check is clean, (c) the guarded statement was rehearsed locally, and (d) it does not change, move or delete any existing row about a student in a real class (grades, returned-grade rows, students, enrolments, comments, observations, answers, slips, cards, photos), and does not change a function or trigger that writes such rows. That covers new tables, new columns with a default on class or assessment settings, new functions, and read-only function changes. It does not cover, and each still needs his explicit OK: anything under (d) (so the Note for the Report migration, which changes the trigger on every score save; S3-S1, which rewrites live slips and slip passwords; Batch D's deletions; any part of Batch C that changes `return_grades` or how a grade is stored), any edge function deploy, and any release. Batch B and S4-M1 keep their own terms from 11. **It was not used that night:** no migration was applied under it. Batch C's first file was held back on purpose (see the list below).
+15. **"Let's pause the myed integration work but not anything else."** (Colin, Nov 10 late night.) S16 (MyEdBC Input and the Export Sheet) and Batch F (the MyEd tables) stop: nothing of them is merged, reviewed or applied until he says otherwise. The draft PR 1031 stays as it is. S18 and everything else carry on. Adds to Student page build answers 10.
+16. **"Let's definitely relax the one pr per change rule. Go with your recommendation."** (Colin, Nov 10 late night.) For this build, the screens of one slice on one track go in one pull request, titled with the range ("S6-F1 to F3: …"), and so do the wiring pull requests for one migration batch. Kept separate, one pull request each: a tidy-up that changes no behaviour, a migration, anything that touches grade math, and anything waiting on a decision of his. Inside a bundle each plan id is its own commit and has its own part of the description. This relaxes `CLAUDE.md` rule 8's "One PR per change" for the student page build only. `CLAUDE.md` itself is unchanged; whether it should say so is his to decide and his to change.
+17. **A fresh orchestrator session takes over from the long one** (Colin, Nov 10 late night: "I completely agree with your suggestion… Go with 1 and 3, with 4 as a habit"). As the notes record what that meant: the old session only passes on its own builders' final reports and goes quiet; Fable stays for migrations, their reviews and the live database; routine work runs on Opus.
+18. **On small choices, the recommendation stands** (Colin, Nov 10 late night). A choice behind the build switch that is easy to reverse (wording not on a board, a default, a layout) goes with the board's words or the orchestrator's recommendation, and each one is listed for him. Anything that deletes, touches privacy, changes a grade or how one is stored, or cannot be undone is still asked first.
+19. **One sitting a day for what only Colin can release** (Colin, Nov 10 late night): edge function deploys, migrations that touch student data, and releases are read and OK'd together, in the morning, so builders are not waiting on them one at a time.
+
+**The privacy page and the photo warnings**
+
+20. **"Approve them and I'll modify them later"** (Colin, Nov 10 late night, of the privacy page draft, PR 1037, and the drafted photo warnings for S8-F1). The orchestrator's reading: the privacy page is approved as drafted and merges on green (it merged that night); every recommended line in the warnings draft is approved to build, and its four open choices go with the draft's recommendation: the one-week reminder shows in the app only; the board's "Page 1 is with Mr. Brown" is replaced; the Unsend line says whatever the server does; a Keep Photos Until date already past asks "Delete Photos Now?" first. He changes any of it later, as follow-ups. It does not cover a release. The privacy page promises teachers an email before a change to how student data is stored, so the two current teachers are emailed before the release that carries the page. This closes "Still open: the privacy page's wording" above, apart from that email.
+
+**Wording approved**
+
+21. **PR 1025 (assignment cards and All Assignments), approved as built** (Colin, Nov 10): a "Missing" pill on a To Do card; "Back to cards" (the board's words, replacing "Back to Assignments", approved earlier with PR 1023); "Nothing matches."; the teacher's name left off the comment for now.
+
+**What was applied that night**
+
+- **S4-M1 was applied**, on ruling 11(a), on Nov 11 at 07:40 UTC (Nov 10, 11:40pm Pacific), as `student_page_fields`, version 20261111074023. Its independent review said ready with nothing to fix and found that it adds only what Colin was told. It replaced two read-only functions, `student_submit.page` and `student_submit._session_classes`, and nothing else. The read-only pre-check before it was clean, and so was the post-check after it: both functions carry the tested fingerprints, the functions around them are untouched, and their grants are as before. The schema snapshot did not change (it does not record function bodies), so no other pull request was affected. PR 1032 merged after it. **Students do not see the new fields yet:** the deployed edge function passes on only the fields it names, so they reach a phone only when PR 1050 is merged and the function redeployed, on his word.
+- **Batch B was not applied.** Its second independent review said ready with nothing to fix before applying, and the guarded statements were built and rehearsed. But that review lists sixteen points that differ from or go beyond rulings 1 to 10, and he had said to come back to him first if the review found anything that changes what Batch B does or deletes. Two of them are faults against his rulings (a submission can pass 30 pages when a teacher's Add crosses a student's Replace, against 7; a student's Unsend or Replace deletes a teacher's upload not yet finished, against 9). They are fixed in a follow-up migration, PR 1053, whose own independent review says ready. Neither fault touches existing data, and no student can reach either until the routes in PR 1086 are deployed. Batch B, then PR 1053, wait for his read and OK.
+- **The nightly repair job** that S0-M4b added ran for the first time on Nov 11 at 10:47 UTC: it succeeded in 2 seconds with nothing to repair (read-only check).
+- **Nothing else** was applied, no edge function was deployed, and nothing was released. The site still runs the release of PR 1001.
+
+**Choices made for him that night** (under 18; each is his to reverse)
+
+- Batch C's first file was not applied under 14: it adds delete triggers on `assessment` and `enrollment`, existing tables that hold or lead to student data, which by the narrow reading is not "adds only". All of Batch C waits for his sitting, and its independent review was not started that night, to keep Fable for the morning's live work; it is owed after Batch B is applied and Batch C is refreshed against it.
+- The student's routes for sending work (S5-F4, PR 1086) were drafted on Opus, not Fable, to save Fable's allowance. The draft is never merged before an independent Fable security review.
+- S11's screens were not started: they could not merge before his review of the revision rule, and he may change it.
+- Batch B's builder chose, under 18: a class holds at most 10,000 pages and 5 GB (a send past it is refused); a photo link lasts five minutes; the teacher's upload also ends after the two hours; a send started before midnight on the due date and finished after is Late.
+- The S8-F1 delete warnings show whenever there are photos to lose, not only while Send Work is on (photos sent before the switch was turned off would otherwise go unwarned).
+
+### Waiting for Colin (as of Nov 11 morning)
+
+A snapshot, taken from the night's notes on the morning of Nov 11. It is not kept up to date: check the open pull requests and the newer sections below it.
+
+**Needs his word to apply, deploy or release**
+
+- Batch B (PR 1024), then its fixes (PR 1053): read the review's points that go beyond rulings 1 to 10 and say yes or no to applying; the points most needing his word are that photos are also deleted when a deleted teacher account is purged and by `clear_data()`, that a send started on a closing day and finished after midnight is refused rather than marked Late, that a student cannot send again after unsending work the teacher added pages to, that Add Work and Handed In on Paper ignore both switches and are never Late, that a student can open pages the teacher photographed under their name, that with Send Work off a student can no longer unsend or replace, and the choices in "Choices made for him" above.
+- PR 1053 leaves two choices for him: if a student unsends, sends again and finishes before the teacher finishes adding pages, the teacher's pages are dropped and the teacher is told "already sent"; and a teacher's unfinished Replace Them is dropped when the student unsends or finishes a Replace.
+- Whether Batch B gains one small read-only database function that returns an open send's paths, the clean fix for a gap PR 1086 found (without it, a wrong request id could drop the student's own open send).
+- PR 1050 (edge function: the nine new fields): merge and redeploy on his word, once he knows students will then read the assessment's Description box, its unit and category names, and the teacher's sign-up name ("Colin Brown", since there is no "what students call me" field).
+- PR 1086 (the routes a student sends work through): an independent Fable security review first, then Batch B applied, then his word to deploy. Nine questions about Supabase Storage that only the real service can answer are in its description.
+- Batch C (PR 1043, draft): all of it, after the refresh and its independent review.
+- Before Send Work opens to a class: his own step of turning the Supabase spend cap off and setting usage alerts at about 70%.
+- Before the release that carries the privacy page: the email to the two teachers about cards.
+- Not built yet, each a change to `student_submit.page` for his sitting: listing questionnaires and phone reports, and opening one from a card's session (S4-F4 works only in Demo and Preview until then); sending what My Learning needs to a student's own device (only Preview can show it now); a To Do count that leaves out work already sent.
+
+**Decisions about what the product does**
+
+- Does a teacher's Mark Up count as "started grading"? Built as recommended (yes), as a separate commit in the Batch C refresh; it must be settled before Mark Up can be used on a real class.
+- PR 1081 (S13 math, `calc.js`): his review, and an independent review owed. Its choices: undated work counts in both the month-ago and the current grade; "a month ago" is shown on the overall grade and on one skill; at the top of the scale the page says "You've Reached the Top Step"; when the level or letter is the same then and now, no line shows.
+- PR 1084 (S11 data): while a revision's regrade is a draft, the teacher's own views show the draft's grade (3.0), as teacher views count drafts; keeping the old grade there too would be a real `calc.js` change.
+- In Their Words (S18-F2, not built): the board quotes a reflection plan in a family report, but the student's Reflect screen promises "Only Mr. Brown sees this." Change that line, add a "My teacher can share this" choice per reflection, or drop the block. The same question touches Save as Observation in the grader (PR 1071).
+- Demo Mode's sample has every piece graded and no group piece, so To Grade reads All Caught Up in Demo; giving it ungraded, draft or group work changes Demo grades that tests pin.
+- Preview as Student shows the teacher which returned pieces a student has opened, against "Student page build rulings (2026-11-10)" 10.
+- Should only opening Your Feedback count as "opened"?
+- A HEIC decoder for iPhone photos on a Chromebook (its licence).
+- `sw.js` stores pdf.js on every teacher device at install after each release (about 1.85 MB).
+- The five S15 passkey choices in the drafted screens (nothing built).
+- "It counts as 0 until it's in." is shown only in Letter and Both classes, though the board shows it in a Proficiency class too.
+- A teacher who turns Send Work off after photos were sent gets no reminder before they are deleted.
+- To Return does not count marks waiting on a grade already returned, so it matches Return's list of names.
+- "The photos N students sent" in the delete warnings also counts pages the teacher added.
+- PR 1054 changed two guard tests on purpose (`tests/cm-student-page-return-grades.test.js`, `tests/grade-return-server.test.js`) to allow one Demo-only settings save.
+
+**Wording**
+
+- Every new line of wording merged that night while he was away, marked as the board's or the builder's, is listed for his approval before any release, beside the night's notes. Among them: S5-F1's labels "Until a Date" and "Last Day"; "Did it on the next one? Jordan says: Yes" in place of the board's "Followed it on the next one"; group work shown as counts, not name chips; "3 notes on Jordan's work" with no pronouns.
 
 ## Phone-report birthday tries (2026-11-03)
 
@@ -679,3 +894,14 @@ Context: a teacher could export one class's scores as a CSV and print reports, b
 4. **Read-only.** There is no import from this file. Restoring a class is Class Settings → Class Actions → Download Class Backup and Restore from Backup, which carry one class as data.
 5. **Withdrawn students** are on the Summary sheet, marked. Their records stay behind Download Records in Class Settings, which already exists for them.
 6. **ExcelJS** (`vendor/exceljs.min.js`, MIT) writes the styles; it loads only when the button is clicked. `tests/export-all.test.js` fails when a new per-class reader in `shared/data.js` is neither exported nor listed with a reason.
+
+## Class settings on two computers (2026-11-10)
+
+Context: saving any one class setting sent that device's copy of every other setting, so a computer that had loaded the class before a change made on another computer put the old values back, with no message. A class load never replaced the calculation method or decay weight on the device, so two computers could work out different grades for one class. How each decision is built is in `docs/ARCHITECTURE.md` (Writes, "Class settings").
+
+1. **The server holds the one true copy of a class's settings** (Colin, 2026-11-10).
+2. **A device's copy is a working cache: it gives way to the server's on every load** (Colin, 2026-11-10).
+3. **A save sends only what the teacher changed** (Colin, 2026-11-10).
+4. **A stale Save Categories is checked in the browser** (Colin, 2026-11-10): before a whole list of categories is saved, the server's list is read, and a list that changed on another device is not saved over. A check in the database may follow (`docs/ROADMAP.md`).
+5. **A settings save the older app left waiting is discarded on any difference** (Colin, 2026-11-10). It is compared with the server before it is sent. Nothing differs: it is dropped. Anything differs: it is never sent, the sync dot shows a change could not be saved until the class has been read again, and the class is read again. The same holds for a category save the older app left waiting. The cost, accepted: a genuine change made offline on the older app and still waiting when the new version opens is lost and shows as not set; the teacher sets it again. The reason: one setting differing could be the teacher's own change or an old value that computer had kept, the two cannot be told apart, and sending the second would put back another computer's change with no sign. This is about saves that carry a whole copy of the settings. A save the older app wrote for one setting alone (calculation method, decay weight, grading style, class name, grade level, late work policy) carries only what the teacher changed and is sent as it is; so part of an old offline sitting can still arrive while the rest is discarded. **Before each release, every computer opens the app online and waits for a green sync dot,** so nothing is left waiting for the new version to judge.
+6. **Display preferences kept on one device follow in a later pull request** (Colin, 2026-11-10; `docs/ROADMAP.md`).

@@ -118,11 +118,8 @@
      figure ("3+"); '' when there is none. */
   function criterionLevelText(v) {
     if (!(v > 0)) return { word: '', figure: '' };
-    var step = SCORE_MOD_STEP;
-    var steps = Math.round(v / step);
-    var level = Math.max(1, Math.min(4, Math.round(steps * step)));
-    var mod = Math.round((steps * step - level) / step);
-    return { word: scoreLevelText(level, mod), figure: nearestScoreLevel(v).text };
+    // calc.js's nearest step, so the word and figure agree with the app's.
+    return { word: nearestScoreLevelName(v), figure: nearestScoreLevel(v).text };
   }
 
   /* A score as the Scores view shows it, in words a spreadsheet reader
@@ -243,6 +240,21 @@
      opts.teacher: the teacher's name; opts.date: 'YYYY-MM-DD';
      opts.entries(cid, sid): a student's questionnaire answers
      (StudentVoice.entries), or left out. */
+  /* Photos of student work never go in this file, and nor do the records of
+     what was sent (Colin, Q22; S8-F2). Where a class could hold any, the
+     Contents sheet says so: a class whose student page is on (the build
+     switch) and that takes work (Send Work). With either off the file is as
+     it was. */
+  var PHOTOS_NOTE = 'Photos of student work are not in this file.';
+
+  function studentWorkIn(cids) {
+    return cids.some(function (cid) {
+      var settings = typeof getReturnSettings === 'function' ? getReturnSettings(cid) : null;
+      var send = typeof getCourseSendWork === 'function' ? getCourseSendWork(cid) : null;
+      return !!(settings && settings.student_page && send && send.send_work);
+    });
+  }
+
   function rows(opts) {
     opts = opts || {};
     var cids = opts.cids || classIds();
@@ -384,7 +396,14 @@
             day(ob.date || ob.created),
             cname,
             studentName(st),
-            kind ? kind.label : text(ob.sentiment),
+            // One saved from a student's reflection says so here, as it
+            // does in the app's lists (ruling 110).
+            [
+              kind ? kind.label : text(ob.sentiment),
+              isReflectionObservation(ob) ? 'From a reflection. Not used in reports.' : '',
+            ]
+              .filter(Boolean)
+              .join(' · '),
             text(linked),
             comp,
             text(ob.text),
@@ -638,7 +657,7 @@
         'Grades read exactly as FullVision shows them, following each class’s grading style.',
         'Withdrawn students are listed on the Summary sheet. Their records are in Class Settings, under Withdrawn, with Download Records.',
         'Deleted classes are not included.',
-      ],
+      ].concat(studentWorkIn(cids) ? [PHOTOS_NOTE] : []),
     };
     return [contents].concat(sheets);
   }

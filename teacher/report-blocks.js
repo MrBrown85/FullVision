@@ -145,10 +145,14 @@ window.ReportBlocks = (function () {
   /* ●●●○ for level 3: the level as a shape, so a photocopy still reads it
      (DECISIONS.md, "Report forms" 6). Nothing for no evidence. */
   function levelDots(level) {
-    const n = Math.max(0, Math.min(4, Math.round(Number(level) || 0)));
+    const n = Math.max(0, Math.min(4, roundLevel(Number(level) || 0)));
     if (n === 0) return '';
     return `<span class="report-dots" aria-hidden="true">${'\u25CF'.repeat(n)}${'\u25CB'.repeat(4 - n)}</span>`;
   }
+
+  /* A level's printed figure in tenths (2.47 prints 2.5, so 25), for
+     comparing two figures as they print (calc.js printedLevel). */
+  const _tenths = v => Math.round(printedLevel(v) * 10);
 
   /* sanitizeNarrativeHtml — delegates to shared sanitizeHtml in gb-ui.js */
   function sanitizeNarrativeHtml(raw) {
@@ -280,7 +284,7 @@ window.ReportBlocks = (function () {
   function renderBlockAcademicSummary(cid, student, ctx) {
     const sections = getSections(cid);
     const overall = getOverallProficiency(cid, student.id);
-    const overallRound = Math.round(overall);
+    const overallRound = roundLevel(overall);
     const cc = getCourseConfig(cid);
     const usePercentage = cc.reportAsPercentage || false;
     const course = COURSES[cid];
@@ -303,8 +307,7 @@ window.ReportBlocks = (function () {
         profLine += `<div class="report-overall-label" style="margin-top:6px">Overall Proficiency: ${profDisplay}</div>`;
       }
     } else if (usePercentage && (overall > 0 || (letterData && letterData.R != null))) {
-      overallDisplay =
-        letterData && letterData.R != null ? letterData.R + '%' : Math.round(levelToPercent(cid, overall)) + '%';
+      overallDisplay = letterData && letterData.R != null ? letterData.R + '%' : formatLevelAs(cid, overall, 'percent');
       overallHeading = 'Overall Grade';
     } else {
       overallDisplay = profDisplay;
@@ -318,7 +321,7 @@ window.ReportBlocks = (function () {
     <div class="report-overall-sections">`;
     const _rptGrouped = getGroupedSections(cid);
     const _renderChip = (name, prof, color) => {
-      const sr = Math.round(prof);
+      const sr = roundLevel(prof);
       const slabel = prof > 0 ? esc(levelText(cid, prof)) : 'No Evidence';
       const scolor = PROF_COLORS[sr] || PROF_COLORS[0];
       return `<div class="report-section-chip">
@@ -439,7 +442,7 @@ window.ReportBlocks = (function () {
      the word, the letter, or both with the %. Nothing computes a grade
      here; calc.js does (formatLevel). */
   function _levelHtml(cid, sp) {
-    const r = Math.round(sp);
+    const r = roundLevel(sp);
     const mode = courseGradeMode(cid);
     if (!(sp > 0)) return '<span class="report-ct-none">No evidence yet</span>';
     if (mode === 'proficiency') return levelDots(r) + esc(PROF_LABELS[r] || '');
@@ -476,7 +479,7 @@ window.ReportBlocks = (function () {
     const grouped = getGroupedSections(cid);
     const row = sec => {
       const sp = getSectionProficiency(cid, student.id, sec.id);
-      const r = Math.round(sp);
+      const r = roundLevel(sp);
       const ids = new Set();
       (sec.tags || []).forEach(tag => {
         getTagScores(cid, student.id, tag.id).forEach(sc => {
@@ -556,7 +559,7 @@ window.ReportBlocks = (function () {
     <div style="font-size:0.62rem;color:var(--text-3);margin:-2px 0 6px">Competency levels: ${esc(describeCalcMethod(cid))}</div>`;
     sections.forEach(sec => {
       const secProf = getSectionProficiency(cid, student.id, sec.id);
-      const sr = Math.round(secProf);
+      const sr = roundLevel(secProf);
       // Only an override that applies to this report (dated by its end).
       const secOverride = sectionOverrideInView(cid, student.id, sec.id);
       html += `<div class="report-outcome-section" style="page-break-inside:avoid">
@@ -574,7 +577,7 @@ window.ReportBlocks = (function () {
       }
       sec.tags.forEach(tag => {
         const prof = getTagProficiency(cid, student.id, tag.id);
-        const r = Math.round(prof);
+        const r = roundLevel(prof);
         const color = PROF_COLORS[r] || PROF_COLORS[0];
         const tint = PROF_TINT[r] || PROF_TINT[0];
         const label = prof > 0 ? esc(levelText(cid, prof)) : 'Not yet assessed';
@@ -592,7 +595,7 @@ window.ReportBlocks = (function () {
             const a = assessments.find(x => x.id === aId);
             if (!a) return null;
             const avg = evidenceMap[aId].reduce((s, x) => s + x, 0) / evidenceMap[aId].length;
-            const ar = Math.round(avg);
+            const ar = roundLevel(avg);
             return { title: a.title, r: ar, label: PROF_LABELS[ar] || '?' };
           })
           .filter(Boolean);
@@ -675,7 +678,7 @@ window.ReportBlocks = (function () {
       // The biggest change, then the lowest now. by says which picked it,
       // so a block never calls a change of 0.0 the biggest (step 4 group 3
       // #63).
-      const change = r => (r.then > 0 ? Math.abs(Math.round(r.now * 10) - Math.round(r.then * 10)) : -1);
+      const change = r => (r.then > 0 ? Math.abs(_tenths(r.now) - _tenths(r.then)) : -1);
       sorted.sort((a, b) => change(b) - change(a) || a.now - b.now);
       return Object.assign({ by: change(sorted[0]) > 0 ? 'change' : 'lowest' }, sorted[0]);
     }
@@ -1047,7 +1050,7 @@ window.ReportBlocks = (function () {
     );
   }
   function _profWord(v) {
-    return v > 0 ? PROF_LABELS[Math.min(4, Math.max(1, Math.round(v)))] : '';
+    return v > 0 ? PROF_LABELS[Math.min(4, Math.max(1, roundLevel(v)))] : '';
   }
   function _assessmentWhen(a) {
     const d = a && (typeof _assessmentDate === 'function' ? _assessmentDate(a) : a.date || a.dueDate);
@@ -1257,7 +1260,7 @@ window.ReportBlocks = (function () {
         .slice()
         .sort((a, b) => b.now - a.now);
       if (ranked.length) {
-        const ties = (list, pick) => list.filter(r => Math.round(r.now * 10) === Math.round(pick.now * 10)).slice(0, 3);
+        const ties = (list, pick) => list.filter(r => printedLevel(r.now) === printedLevel(pick.now)).slice(0, 3);
         const names = list =>
           list
             .map(r => r.name)
@@ -1294,7 +1297,7 @@ window.ReportBlocks = (function () {
         const hi = ties(ranked, ranked[0]);
         const lo = ties(ranked.slice().reverse(), ranked[ranked.length - 1]);
         facts += `<div class="report-prof-fact"><b>Highest now:</b> ${esc(names(hi))} ${esc(formatLevel(cid, hi[0].now))}.${work(hi, true)}</div>`;
-        if (ranked.length > 1 && Math.round(lo[0].now * 10) !== Math.round(hi[0].now * 10)) {
+        if (ranked.length > 1 && printedLevel(lo[0].now) !== printedLevel(hi[0].now)) {
           facts += `<div class="report-prof-fact"><b>Lowest now:</b> ${esc(names(lo))} ${esc(formatLevel(cid, lo[0].now))}.${work(lo, false)}</div>`;
         }
       }
@@ -1473,13 +1476,13 @@ window.ReportBlocks = (function () {
 
     sections.forEach((sec, si) => {
       const secProf = getSectionProficiency(cid, student.id, sec.id);
-      const sr = Math.round(secProf);
+      const sr = roundLevel(secProf);
       const secLabel = secProf > 0 ? esc(levelText(cid, secProf)) : 'No Evidence';
 
       // Tag-level breakdown
       const tagData = sec.tags.map(tag => {
         const prof = getTagProficiency(cid, student.id, tag.id);
-        const r = Math.round(prof);
+        const r = roundLevel(prof);
         return { tag, prof, r };
       });
       const assessed = tagData.filter(t => t.prof > 0);
@@ -1498,7 +1501,7 @@ window.ReportBlocks = (function () {
           const aScores = secScores.filter(s => s.assessmentId === a.id);
           if (aScores.length === 0) return null;
           const avg = aScores.reduce((s, x) => s + x.score, 0) / aScores.length;
-          return { title: a.title, avg, r: Math.round(avg) };
+          return { title: a.title, avg, r: roundLevel(avg) };
         })
         .filter(Boolean)
         .sort((a, b) => b.avg - a.avg);
@@ -1608,7 +1611,7 @@ window.ReportBlocks = (function () {
     // Count by proficiency level
     const counts = { 1: 0, 2: 0, 3: 0, 4: 0 };
     scored.forEach(s => {
-      const level = Math.round(s.score);
+      const level = roundLevel(s.score);
       if (level >= 1 && level <= 4) counts[level]++;
     });
     const total = scored.length;
@@ -1642,7 +1645,7 @@ window.ReportBlocks = (function () {
         const rawScores = allScores.filter(s => s.assessmentId === a.id && s.score > 0);
         const rubricAvg = getRubricAssessmentScore(cid, a, rawScores);
         if (rubricAvg != null) avg = rubricAvg;
-        return { title: a.title, avg, r: Math.round(avg), type: a.type, id: a.id };
+        return { title: a.title, avg, r: roundLevel(avg), type: a.type, id: a.id };
       })
       .filter(Boolean);
     const sorted = [...assessAvgs].sort((a, b) => b.avg - a.avg);
@@ -1815,6 +1818,34 @@ window.ReportBlocks = (function () {
     return { score: '\u2014', percent: '', word: '' };
   }
 
+  /* The Assignment Grades groups ({ name, grade?, rows: [row html] }) laid
+     in one column or two. Also lays out each part of a table too long for
+     one side (ReportSheets cuts it at its rows), so a part reads as the
+     whole table does. */
+  function gradeColumnsHtml(groups, one) {
+    const groupHtml = g =>
+      `<div class="report-grades-head"><span>${esc(g.name)}</span>${g.grade ? `<span class="report-grades-headgrade">${esc(g.grade)}</span>` : ''}</div>${g.rows.join('')}`;
+    if (one) return `<div class="report-grades-col">${groups.map(groupHtml).join('')}</div>`;
+    // The rows split evenly between the columns, read down the left and
+    // then the right. A group cut by the split carries on at the top of the
+    // right column under its name again; a heading never ends a column.
+    const total = groups.reduce((t, g) => t + g.rows.length + 1, 0);
+    const cut = Math.ceil(total / 2);
+    const left = [];
+    const right = [];
+    let used = 0;
+    groups.forEach(g => {
+      const room = cut - used;
+      if (room >= g.rows.length + 1) left.push(g);
+      else if (room >= 2 && !right.length) {
+        left.push(Object.assign({}, g, { rows: g.rows.slice(0, room - 1) }));
+        right.push({ name: g.name + ' (continued)', rows: g.rows.slice(room - 1) });
+      } else right.push(g);
+      used += g.rows.length + 1;
+    });
+    return `<div class="report-grades-cols"><div class="report-grades-col">${left.map(groupHtml).join('')}</div><div class="report-grades-col">${right.map(groupHtml).join('')}</div></div>`;
+  }
+
   function renderBlockGradeTable(cid, student, options, ctx) {
     options = options || {};
     const sid = student.id;
@@ -1923,30 +1954,7 @@ window.ReportBlocks = (function () {
     }
     if (!groups.length) return '';
 
-    const groupHtml = g =>
-      `<div class="report-grades-head"><span>${esc(g.name)}</span>${g.grade ? `<span class="report-grades-headgrade">${esc(g.grade)}</span>` : ''}</div>${g.rows.join('')}`;
-    let body;
-    if (one) body = `<div class="report-grades-col">${groups.map(groupHtml).join('')}</div>`;
-    else {
-      // The rows split evenly between the columns, read down the left and
-      // then the right. A group cut by the split carries on at the top of the
-      // right column under its name again; a heading never ends a column.
-      const total = groups.reduce((t, g) => t + g.rows.length + 1, 0);
-      const cut = Math.ceil(total / 2);
-      const left = [];
-      const right = [];
-      let used = 0;
-      groups.forEach(g => {
-        const room = cut - used;
-        if (room >= g.rows.length + 1) left.push(g);
-        else if (room >= 2 && !right.length) {
-          left.push(Object.assign({}, g, { rows: g.rows.slice(0, room - 1) }));
-          right.push({ name: g.name + ' (continued)', rows: g.rows.slice(room - 1) });
-        } else right.push(g);
-        used += g.rows.length + 1;
-      });
-      body = `<div class="report-grades-cols"><div class="report-grades-col">${left.map(groupHtml).join('')}</div><div class="report-grades-col">${right.map(groupHtml).join('')}</div></div>`;
-    }
+    const body = gradeColumnsHtml(groups, one);
     const n = pool.length;
     const meta = half
       ? 'Last 10'
@@ -2025,7 +2033,7 @@ window.ReportBlocks = (function () {
         const d = compData[c.id];
         const avg = d.scored > 0 ? d.totalScore / d.scored : 0;
         if (!(avg > 0) && options.noEvidence === 'hide') return;
-        const r = Math.round(avg);
+        const r = roundLevel(avg);
         const pct = levelBarPercent(cid, avg);
         const color = avg > 0 ? PROF_COLORS[r] || 'var(--text-3)' : 'var(--border)';
         const profLabel = d.count === 0 ? 'Not yet assessed' : avg > 0 ? esc(levelText(cid, avg)) : 'Not yet assessed';
@@ -2180,7 +2188,7 @@ window.ReportBlocks = (function () {
     // The arrow follows the figures beside it: the proficiency word in a
     // Proficiency class, the % in a Letter or Both class (_levelHtml), so
     // 70% to 78% is up even when both are Proficient.
-    const shown = v => (courseGradeMode(cid) === 'proficiency' ? Math.round(v) : Math.round(levelToPercent(cid, v)));
+    const shown = v => (courseGradeMode(cid) === 'proficiency' ? roundLevel(v) : wholePercent(levelToPercent(cid, v)));
     const arrow = (a, b) => {
       if (!(a > 0) || !(b > 0)) return '';
       const d = shown(b) - shown(a);
@@ -2191,7 +2199,7 @@ window.ReportBlocks = (function () {
     const rows = sections
       .map(
         (sec, i) =>
-          `<tr><td class="report-ct-name">${esc(sec.shortName || sec.name)}</td><td class="report-ct-level col-before" data-prof="${Math.round(before[i])}">${_levelHtml(cid, before[i])}</td><td class="report-ct-level" data-prof="${Math.round(current[i])}">${_levelHtml(cid, current[i])}</td><td class="report-growth-arrow">${arrow(before[i], current[i])}</td></tr>`,
+          `<tr><td class="report-ct-name">${esc(sec.shortName || sec.name)}</td><td class="report-ct-level col-before" data-prof="${roundLevel(before[i])}">${_levelHtml(cid, before[i])}</td><td class="report-ct-level" data-prof="${roundLevel(current[i])}">${_levelHtml(cid, current[i])}</td><td class="report-growth-arrow">${arrow(before[i], current[i])}</td></tr>`,
       )
       .join('');
     return `<div class="report-block-box report-growth">
@@ -2418,6 +2426,7 @@ window.ReportBlocks = (function () {
     renderBlockTeacherNarrative: renderBlockTeacherNarrative,
     renderCommentBox: renderCommentBox,
     printableComment: printableComment,
+    gradeColumnsHtml: gradeColumnsHtml,
     renderBlockCompetencyTable: renderBlockCompetencyTable,
     renderBlockObservations: renderBlockObservations,
     renderBlockSectionOutcomes: renderBlockSectionOutcomes,

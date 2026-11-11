@@ -14,30 +14,22 @@ window.PageGradebook = (function () {
   var viewMode = 'scores';
   /* The Competencies view shows a rubric assessment as one column per
      criterion ('criteria', the default: no score repeated across columns)
-     or one per competency ('competencies'). Remembered per class on this
-     device. */
+     or one per competency ('competencies'). Remembered per class for the
+     teacher (getViewPref). */
   function rubricColumnsMode(cid) {
-    return localStorage.getItem('gb_rubricColumns_' + cid) === 'competencies' ? 'competencies' : 'criteria';
+    return getViewPref('gb_rubricColumns_' + cid) === 'competencies' ? 'competencies' : 'criteria';
   }
   function setRubricColumns(mode) {
-    localStorage.setItem('gb_rubricColumns_' + activeCourse, mode === 'criteria' ? 'criteria' : 'competencies');
+    saveViewPref('gb_rubricColumns_' + activeCourse, mode === 'criteria' ? 'criteria' : 'competencies');
     render();
   }
   /* Newest First puts the latest assessments on the left, in both views.
-     On unless the teacher turned it off; remembered on this device. */
-  var _newestFirst = true;
-  try {
-    _newestFirst = localStorage.getItem('gb_newestFirst') !== '0';
-  } catch (e) {
-    /* storage blocked: newest first */
+     On unless the teacher turned it off; remembered for the teacher. */
+  function _isNewestFirst() {
+    return getViewPref('gb_newestFirst') !== '0';
   }
   function toggleNewestFirst() {
-    _newestFirst = !_newestFirst;
-    try {
-      localStorage.setItem('gb_newestFirst', _newestFirst ? '1' : '0');
-    } catch (e) {
-      /* storage blocked: the order still changes until the page reloads */
-    }
+    saveViewPref('gb_newestFirst', _isNewestFirst() ? '0' : '1');
     render();
   }
   var _pinnedCols = { name: true, final: true }; // pinnable: name, categories, final
@@ -57,6 +49,16 @@ window.PageGradebook = (function () {
   // Draft and Returned (S1-F1): the "N to return" filter, and the drafts on
   // screen as the last render counted them (null where grades aren't held).
   var _toReturnOnly = false;
+  // Work to grade (S6-F4): the "N to grade" filter, and what each cell's
+  // student has in (GraderWork, shared/grader.js).
+  var _toGradeOnly = false;
+  var _work = null;
+  // Questions From Students (S10-F4): the "N questions" filter, and the
+  // questions waiting on each cell (getQuestionsWaiting, shared/data.js).
+  var _questionsOnly = false;
+  var _questions = null;
+  // Revisions (S11): true while the class's revisions show (GraderWork.revisionsOnInClass).
+  var _revisions = false;
   var _drafts = null;
   var _scrollShadowCleanup = null;
   var _scrollKey = null; // class and view of the last render, so a redraw keeps the table's scroll
@@ -107,6 +109,8 @@ window.PageGradebook = (function () {
     activeCourse = cid;
     if (!(await switchActiveCourse(cid))) return;
     _toReturnOnly = false;
+    _toGradeOnly = false;
+    _questionsOnly = false;
     filterStudentIds = [];
     filterSections = [];
     filterModules = [];
@@ -263,7 +267,7 @@ window.PageGradebook = (function () {
     var letterData = _getStudentLetterData(cid, sid);
     if (letterData.R != null) return letterData.R;
     var overall = getOverallProficiency(cid, sid);
-    return overall > 0 ? Math.round(levelToPercent(cid, overall) * 10) / 10 : null;
+    return overall > 0 ? oneDecimal(levelToPercent(cid, overall)) : null;
   }
 
   /* ══════════════════════════════════════════════════════════
@@ -283,7 +287,7 @@ window.PageGradebook = (function () {
       .sort(function (a, b) {
         return (a.date || '').localeCompare(b.date || '');
       });
-    if (_newestFirst) allAssessments.reverse();
+    if (_isNewestFirst()) allAssessments.reverse();
     var sections = getSections(cid);
     var course = COURSES[cid];
     var isLetter = courseShowsLetterGrades(course);
@@ -344,6 +348,30 @@ window.PageGradebook = (function () {
     // shown, and the "N to return" filter, which leaves only those.
     _drafts = _countDrafts(cid, students, assessments);
     if (!_drafts || !_drafts.total) _toReturnOnly = false;
+    // Work to grade (S6-F4), over the students and columns shown: the same
+    // count as the grader's Show bar and the dashboard's To Grade cell.
+    _work = _countWork(cid, students, assessments);
+    if (!_work || !_work.total) _toGradeOnly = false;
+    _revisions = !!window.GraderWork && GraderWork.revisionsOnInClass(cid);
+    // Questions From Students (S10-F4), over the students and columns shown.
+    _questions = _countQuestions(cid, students, assessments);
+    if (!_questions || !_questions.total) _questionsOnly = false;
+    if (_questionsOnly) {
+      students = students.filter(function (s) {
+        return _questions.bySid[s.id];
+      });
+      assessments = assessments.filter(function (a) {
+        return _questions.byAid[a.id];
+      });
+    }
+    if (_toGradeOnly) {
+      students = students.filter(function (s) {
+        return _work.bySid[s.id];
+      });
+      assessments = assessments.filter(function (a) {
+        return _work.byAid[a.id];
+      });
+    }
     if (_toReturnOnly) {
       students = students.filter(function (s) {
         return _drafts.bySid[s.id];
@@ -428,7 +456,9 @@ window.PageGradebook = (function () {
         ' <span aria-hidden="true">\u00D7</span></button>';
     }
 
+    html += _toGradeButton();
     html += _toReturnButton();
+    html += _questionsButton();
 
     html +=
       '<div style="margin-left:auto;display:flex;align-items:center;gap:12px">' +
@@ -770,9 +800,9 @@ window.PageGradebook = (function () {
   function _newestFirstButton() {
     return (
       '<button class="tb-toggle-btn gb-newest-first' +
-      (_newestFirst ? ' active' : '') +
+      (_isNewestFirst() ? ' active' : '') +
       '" data-action="toggleNewestFirst" aria-pressed="' +
-      _newestFirst +
+      _isNewestFirst() +
       '" title="Put the latest assessments on the left">Newest First</button>'
     );
   }
@@ -804,6 +834,16 @@ window.PageGradebook = (function () {
       (_drafts
         ? '<span class="gb-key-item gb-key-item-draft"><span class="gb-key-draft"></span>' + DRAFT_KEY_TEXT + '</span>'
         : '') +
+      (_work
+        ? '<span class="gb-key-item"><span class="gb-to-grade">To Grade</span>Sent, not graded</span>' +
+          '<span class="gb-key-item">' +
+          WORK_CAMERA +
+          'Has photos</span>'
+        : '') +
+      (_revisions
+        ? '<span class="gb-key-item"><span class="gb-revising">Revising</span>Returned for revision</span>'
+        : '') +
+      (_questions ? '<span class="gb-key-item">' + QUESTION_DOT + 'Question waiting</span>' : '') +
       '</div>';
     return html;
   }
@@ -843,10 +883,10 @@ window.PageGradebook = (function () {
     });
     var out = { byAid: {}, bySid: {}, total: 0, returns: {} };
     assessments.forEach(function (a) {
-      var waiting = GradeState.draftsIn(cid, a.id, ids);
+      var waiting = GraderWork.draftsIn(cid, a.id, ids);
       if (!waiting.length) return;
       out.byAid[a.id] = waiting;
-      out.returns[a.id] = GradeState.draftsReturned(cid, a.id, ids);
+      out.returns[a.id] = GraderWork.draftsReturned(cid, a.id, ids);
       waiting.forEach(function (sid) {
         out.bySid[sid] = true;
       });
@@ -858,6 +898,142 @@ window.PageGradebook = (function () {
   // True when `sid`'s piece on `aid` was a draft at the last render.
   function _isDraft(sid, aid) {
     return !!(_drafts && _drafts.byAid[aid] && _drafts.byAid[aid].indexOf(sid) >= 0);
+  }
+
+  /* ── Work to grade (S6-F4) ──────────────────────────────────
+     In a class whose student page and Send Work are on: the toolbar's
+     "N to grade", which pressed leaves only the students and columns with
+     work waiting; "To Grade" in a cell whose work waits; a camera on a cell
+     whose work came in as photos; and a hover line saying what came in
+     ("Sent Oct 30 · 2 photos. Click to open in the grader."). The numbers
+     are GraderWork.workCounts' (shared/grader.js): a pair or group counts
+     once, as in the grader. With Send Work off none of it is drawn. */
+  var WORK_CAMERA =
+    '<span class="gb-work-camera" aria-hidden="true"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span>';
+
+  function _countWork(cid, students, assessments) {
+    if (!window.GraderWork || !GraderWork.workOnInClass(cid)) return null;
+    var ids = students.map(function (s) {
+      return s.id;
+    });
+    var out = { total: 0, byAid: {}, bySid: {} };
+    assessments.forEach(function (a) {
+      if (!GraderWork.workOn(cid, a)) return;
+      var c = GraderWork.workCounts(cid, a.id, ids);
+      out.total += c.tograde;
+      if (c.ids.tograde.length) out.byAid[a.id] = c.ids.tograde;
+      c.ids.tograde.forEach(function (sid) {
+        out.bySid[sid] = true;
+      });
+    });
+    return out;
+  }
+
+  // What a cell's student has in on `a`, or null: { tograde, photos, words, title }.
+  function _workCell(cid, a, sid) {
+    if (!_work || !GraderWork.workOn(cid, a)) return null;
+    var sub = getStudentSubmission(cid, sid, a.id);
+    var tograde = !!(_work.byAid[a.id] && _work.byAid[a.id].indexOf(sid) >= 0);
+    if (!sub) return null;
+    var n = (sub.files || []).length;
+    var day = sub.sent_at || sub.created_at ? formatShortDate(String(sub.sent_at || sub.created_at).slice(0, 10)) : '';
+    var what = sub.on_paper
+      ? 'Handed in on paper'
+      : (sub.sent_by === 'teacher' ? 'Added by you' : 'Sent') +
+        (day ? ' ' + day : '') +
+        ' · ' +
+        n +
+        (n === 1 ? ' photo' : ' photos');
+    return {
+      tograde: tograde,
+      photos: n > 0,
+      words: (tograde ? ', sent, not graded' : '') + (n > 0 ? ', has photos' : ''),
+      title: what + '. Click to open in the grader.',
+    };
+  }
+
+  /* ── Questions From Students (S10-F4) ───────────────────────
+     In a class whose student page and Reflect on Feedback are on: a yellow
+     dot on the cell of a piece whose student asked a question not answered
+     yet, its hover line ("Asked you a question Nov 4"), "Question waiting"
+     in the key, and the toolbar's "N questions", which pressed leaves only
+     the students and columns with one. Every count is getQuestionsWaiting
+     (shared/data.js), the list the dashboard's Questions From Students and
+     the Learner Profile read, so one answer in the grader clears all three.
+     With the switch off none of it is drawn. */
+  var QUESTION_DOT = '<span class="gb-question" aria-hidden="true"></span>';
+
+  function _countQuestions(cid, students, assessments) {
+    if (typeof getReflectOnFeedback !== 'function' || !getReflectOnFeedback(cid)) return null;
+    var shownS = {};
+    students.forEach(function (s) {
+      shownS[s.id] = true;
+    });
+    var shownA = {};
+    assessments.forEach(function (a) {
+      shownA[a.id] = true;
+    });
+    var out = { total: 0, byAid: {}, bySid: {}, cells: {} };
+    getQuestionsWaiting(cid).forEach(function (r) {
+      if (!shownS[r.enrollment_id] || !shownA[r.assessment_id]) return;
+      out.total++;
+      out.byAid[r.assessment_id] = true;
+      out.bySid[r.enrollment_id] = true;
+      out.cells[r.assessment_id + '|' + r.enrollment_id] = r;
+    });
+    return out;
+  }
+
+  // The question waiting on this cell, or null.
+  function _questionCell(aid, sid) {
+    return (_questions && _questions.cells[aid + '|' + sid]) || null;
+  }
+
+  // When the question waiting was asked: a follow-up's day, or the reflection's.
+  function _askedOn(r) {
+    var at = r.follow_up && !r.follow_up_answer ? r.sense_now_at || r.sent_at : r.sent_at;
+    return at ? formatShortDate(String(at).slice(0, 10)) : '';
+  }
+
+  // html-safe: a number and fixed words
+  function _questionsButton() {
+    if (!_questions || !_questions.total) return '';
+    return (
+      '<button type="button" class="gb-to-return gb-questions-btn' +
+      (_questionsOnly ? ' active' : '') +
+      '" data-action="toggleQuestions" aria-pressed="' +
+      _questionsOnly +
+      '" title="' +
+      (_questionsOnly
+        ? 'Showing only the work with a question waiting. Click to show everything.'
+        : 'Show only the students and assessments with a question waiting for you.') +
+      '">' +
+      QUESTION_DOT +
+      _questions.total +
+      (_questions.total === 1 ? ' question' : ' questions') +
+      (_questionsOnly ? ' <span aria-hidden="true">×</span>' : '') +
+      '</button>'
+    );
+  }
+
+  // html-safe: a number and fixed words
+  function _toGradeButton() {
+    if (!_work || !_work.total) return '';
+    return (
+      '<button type="button" class="gb-to-return gb-to-grade-btn' +
+      (_toGradeOnly ? ' active' : '') +
+      '" data-action="toggleToGrade" aria-pressed="' +
+      _toGradeOnly +
+      '" title="' +
+      (_toGradeOnly
+        ? 'Showing only the work waiting to grade. Click to show everything.'
+        : 'Show only the students and assessments with work waiting to grade.') +
+      '">' +
+      _work.total +
+      ' to grade' +
+      (_toGradeOnly ? ' <span aria-hidden="true">×</span>' : '') +
+      '</button>'
+    );
   }
 
   /* The toolbar's "N to return": the drafts on screen, summed over the
@@ -897,7 +1073,7 @@ window.PageGradebook = (function () {
     var cid = activeCourse;
     var klass = getReturnSettings(cid);
     if (!klass.student_page || !GradeState.holds(klass)) return false;
-    var waiting = GradeState.draftsIn(cid, aid, _rowIds());
+    var waiting = GraderWork.draftsIn(cid, aid, _rowIds());
     if (!waiting.length) return false;
     Grader.returnGrades(cid, aid, GradeState.returnTogether(cid, aid, waiting));
     clearProfCache();
@@ -916,7 +1092,7 @@ window.PageGradebook = (function () {
   function _askReturnDrafts(button) {
     var cid = activeCourse;
     var aid = button.dataset.aid;
-    var waiting = _drafts ? GradeState.draftsReturned(cid, aid, _rowIds()) : [];
+    var waiting = _drafts ? GraderWork.draftsReturned(cid, aid, _rowIds()) : [];
     var n = waiting.length;
     if (!n) return;
     // The dialog gives the focus back to what had it when it opened. Safari
@@ -1103,14 +1279,12 @@ window.PageGradebook = (function () {
 
   /* ── Header row height resize (Scores view) ─────────────── */
   /* The slanted header's height: the one the teacher dragged to, kept on
-     this device, or else just tall enough for the longest title, up to
+     the teacher's preferences, or else just tall enough for the longest title, up to
      170px (a longer title ends in an ellipsis and shows whole on hover). */
-  var _savedHeaderHeight = 0;
-  try {
-    _savedHeaderHeight = parseInt(localStorage.getItem('gb_headerHeight') || '0', 10) || 0;
-  } catch (e) {
-    /* storage blocked: fit the titles */
+  function _headerHeightPref() {
+    return parseInt(getViewPref('gb_headerHeight') || '0', 10) || 0;
   }
+  var _savedHeaderHeight = _headerHeightPref();
   var _headerHeight = _savedHeaderHeight || 170;
 
   var _measureCtx = null;
@@ -1134,6 +1308,9 @@ window.PageGradebook = (function () {
   function initHeaderResize() {
     var colheads = document.getElementById('gb-colheads');
     if (!colheads) return;
+    // After signing in, the saved height arrives after this file loads.
+    _savedHeaderHeight = _headerHeightPref();
+    if (_savedHeaderHeight) _headerHeight = _savedHeaderHeight;
     // Add resize handle at bottom of colheads container
     var handle = colheads.querySelector('.gb-header-resize-handle');
     if (!handle) {
@@ -1158,11 +1335,7 @@ window.PageGradebook = (function () {
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
         _savedHeaderHeight = _headerHeight;
-        try {
-          localStorage.setItem('gb_headerHeight', _headerHeight);
-        } catch (e) {
-          /* storage blocked: the height holds until the page reloads */
-        }
+        saveViewPref('gb_headerHeight', _headerHeight);
       }
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onUp);
@@ -1728,7 +1901,7 @@ window.PageGradebook = (function () {
         } else if (col.isPointsCol) {
           var max = assess.maxPoints || 100;
           var score = getPointsScore(cid, s.id, col.assessmentId);
-          var pct = score != null ? ((score / max) * 100).toFixed(1) : '0.0';
+          var pct = score != null ? oneDecimal((score / max) * 100).toFixed(1) : '0.0';
           var title = score != null ? formatPoints(score) + '/' + max + ' (' + pct + '%)' : '';
           var cellContent =
             score != null
@@ -1884,7 +2057,7 @@ window.PageGradebook = (function () {
           '"' +
           _avgCellAttrs(cid, colAssess) +
           '><span class="gb-avg-val" style="color:' +
-          PROF_COLORS[Math.round(stats.avg)] +
+          PROF_COLORS[roundLevel(stats.avg)] +
           ';font-weight:700">' +
           formatColumnAverageLevel(cid, stats.avg) +
           '</span></td>';
@@ -2116,6 +2289,29 @@ window.PageGradebook = (function () {
           cellClass += ' gb-draft';
           cellStyle = cellStyle.replace(/^background:[^;]*;/, '');
         }
+        // Work in (S6-F4): To Grade in place of the dash while it waits,
+        // the camera when photos came in, and a hover line saying what.
+        var work = _workCell(cid, a, s.id);
+        if (work && work.tograde) {
+          cellStyle = '';
+          display = '<span class="gb-to-grade">To Grade</span>';
+        }
+        if (work && work.photos) display += WORK_CAMERA;
+        // Out for revision (S11): "Revising" under the grade, nothing in yet.
+        var revising = _revisions && GraderWork.revisionStateOf(cid, s.id, a.id) === 'revising';
+        if (revising) display += '<span class="gb-revising">Revising</span>';
+        // A question waiting (S10-F4): the yellow dot and its hover line.
+        var question = _questionCell(a.id, s.id);
+        if (question) display += QUESTION_DOT;
+        var cellTitle = work ? work.title : '';
+        if (question) {
+          var asked = _askedOn(question);
+          cellTitle =
+            'Asked you a question' +
+            (asked ? ' ' + asked : '') +
+            '. ' +
+            (work && work.title ? work.title : 'Click to open in the grader.');
+        }
         var isScoreModeCell = _scoreMode && _scoreMode.assessmentId === a.id && si === _scoreMode.studentIdx;
         var isScoreModeCol = _scoreMode && _scoreMode.assessmentId === a.id;
         html +=
@@ -2145,7 +2341,12 @@ window.PageGradebook = (function () {
                 : 'no score') +
           (cell.late && !statusMark ? ', Late' : '') +
           (draft ? DRAFT_CELL_WORDS : '') +
-          '" data-action="editScoreCell" data-aid="' +
+          (work ? esc(work.words) : '') +
+          (revising ? ', returned for revision' : '') +
+          (question ? ', question waiting' : '') +
+          '"' +
+          (cellTitle ? ' title="' + esc(cellTitle) + '"' : '') +
+          ' data-action="editScoreCell" data-aid="' +
           a.id +
           '" data-sid="' +
           s.id +
@@ -2172,7 +2373,7 @@ window.PageGradebook = (function () {
       }
       var level = isPointsScored(a)
         ? pointsToProf(stats.pct != null ? stats.pct : 0, 100, getGradingScale(cid))
-        : Math.round(stats.avg);
+        : roundLevel(stats.avg);
       html +=
         '<td class="gb-scores-avg"' +
         _avgCellAttrs(cid, a) +
@@ -2208,7 +2409,7 @@ window.PageGradebook = (function () {
   function renderOverallCell(cid, sid) {
     var val = getOverallProficiency(cid, sid);
     var grade = courseGradeMode(cid) === 'letter' ? studentGradeSummary(cid, sid, viewedReportTerm(cid)) : null;
-    var r = grade ? grade.level : Math.round(val);
+    var r = grade ? grade.level : roundLevel(val);
     var color = PROF_COLORS[r] || PROF_COLORS[0];
     var label = levelWord(cid, val);
     var num = grade ? grade.text || '—' : levelFigure(val);
@@ -2301,7 +2502,7 @@ window.PageGradebook = (function () {
       var n = Object.keys(ids).length;
       var sp = getSectionProficiency(cid, student.id, sec.id);
       if (getSectionProficiencyRaw(cid, student.id, sec.id) > 0) withEvidence++;
-      var r = Math.max(0, Math.min(4, Math.round(sp)));
+      var r = Math.max(0, Math.min(4, roundLevel(sp)));
       rows +=
         '<div class="gb-tip-row"><span class="gb-tip-label">' +
         esc(sec.shortName || sec.name) +
@@ -2431,7 +2632,7 @@ window.PageGradebook = (function () {
       '<td class="gb-score gb-avg-cell' + classes + '" style="' + wStyle + '"' + _avgCellAttrs(cid, assess) + '>';
     if (!stats) return open + '<span class="gb-score-val s0" style="background:transparent">\u2014</span></td>';
     var r = pointsToProf(stats.pct, 100, getGradingScale(cid));
-    var text = isCompletionScored(assess) ? Math.round(stats.pct) + '%' : _pointsAverageText(assess, stats);
+    var text = isCompletionScored(assess) ? wholePercent(stats.pct) + '%' : _pointsAverageText(assess, stats);
     return (
       open + '<span class="gb-avg-val" style="color:' + PROF_COLORS[r] + ';font-weight:700">' + text + '</span></td>'
     );
@@ -2957,14 +3158,14 @@ window.PageGradebook = (function () {
 
   /* A points Class Average on screen, in both views: "6/10". */
   function _pointsAverageText(a, stats) {
-    return formatPoints(Math.round(stats.avg * 10) / 10) + '/' + formatPoints(Number(a.maxPoints) || 100);
+    return formatPoints(oneDecimal(stats.avg)) + '/' + formatPoints(Number(a.maxPoints) || 100);
   }
 
   /* A Class Average as the CSV prints it, the printed sheet's way. */
   function _csvAverageText(cid, a, stats) {
     if (!stats) return '';
-    if (isCompletionScored(a)) return Math.round(stats.pct) + '%';
-    if (isPointsScored(a)) return formatPoints(Math.round(stats.avg * 10) / 10);
+    if (isCompletionScored(a)) return wholePercent(stats.pct) + '%';
+    if (isPointsScored(a)) return formatPoints(oneDecimal(stats.avg));
     return formatColumnAverageLevel(cid, stats.avg, 'proficiency');
   }
 
@@ -3373,7 +3574,7 @@ window.PageGradebook = (function () {
     // Print Rubrics (or Print Scores), as on Class Results and the grader.
     var printLabel = window.RubricPrint ? RubricPrint.printLabel(activeCourse, assess) : '';
     // Return N Graded and who is waiting, when the column has drafts (S1-F1).
-    var waiting = _drafts ? GradeState.draftsReturned(activeCourse, aid, _rowIds()) : [];
+    var waiting = _drafts ? GraderWork.draftsReturned(activeCourse, aid, _rowIds()) : [];
     // html-safe: the hint is a figure from calc.js, escaped; the drafts line's names go through esc
     menu.innerHTML =
       (waiting.length
@@ -3453,11 +3654,20 @@ window.PageGradebook = (function () {
         var title = assess && assess.title ? assess.title : 'this assessment';
         // A linked copy in another class stays; say so, as Assignments does.
         var copyNote = window.AssessmentCopy && assess ? AssessmentCopy.deleteNote(activeCourse, assess) : '';
+        // Photos students sent for it go too (S8-F1, Colin's ruling 102).
+        var sentPhotos = _studentsWithSentPhotos(activeCourse, aid);
         showConfirm(
           'Delete “' + title + '”?',
-          'All scores, statuses, and observations linked to this assessment will be removed.' +
-            copyNote +
-            ' You can undo this for a few seconds.',
+          sentPhotos
+            ? 'All scores, statuses, and observations linked to this assessment will be removed, and the photos ' +
+                sentPhotos +
+                (sentPhotos === 1 ? ' student' : ' students') +
+                ' sent for it.' +
+                copyNote +
+                " You can undo this for a few seconds. After that, deleted photos can't come back."
+            : 'All scores, statuses, and observations linked to this assessment will be removed.' +
+                copyNote +
+                ' You can undo this for a few seconds.',
           'Delete',
           'danger',
           function () {
@@ -3467,6 +3677,17 @@ window.PageGradebook = (function () {
       }
       _dismissContextMenu();
     });
+  }
+
+  /* S8-F1: how many students have photos sent for `aid`, which Delete
+     Assessment deletes with it: students not pages, whoever sent it
+     (CmStudentPage.studentsWithPhotos, the one question). 0, and the dialog
+     reads as it always has, while the class's build switch is off or nothing
+     has been sent. Send Work is not asked: photos sent before it was turned
+     off are still deleted. */
+  function _studentsWithSentPhotos(cid, aid) {
+    if (!aid || typeof CmStudentPage === 'undefined' || !CmStudentPage.studentsWithPhotos) return 0;
+    return Object.keys(CmStudentPage.studentsWithPhotos(cid, aid)).length;
   }
 
   /* Delete Assignment hides the column and offers Undo (the toast's button or
@@ -3671,7 +3892,7 @@ window.PageGradebook = (function () {
     inp.className = 'gb-scores-input';
     var currentPts = isPts ? getPointsScore(cid, sid, aid) : null;
     if (isPts) inp.value = currentPts != null ? formatPoints(currentPts) : '';
-    else inp.value = currentVal > 0 ? String(Math.round(currentVal)) : '';
+    else inp.value = currentVal > 0 ? String(roundLevel(currentVal)) : '';
     td.appendChild(inp);
     inp.focus();
     inp.select();
@@ -3690,7 +3911,7 @@ window.PageGradebook = (function () {
       // levels. Anything else that isn't a score (a typo, 3.5 or 9 as a
       // proficiency) leaves the saved score alone.
       if (typed === '') val = isPts ? null : 0;
-      else if (isPts ? val == null || isNaN(val) : !(val >= 1 && val <= 4 && val === Math.round(val))) return;
+      else if (isPts ? val == null || isNaN(val) : !(val >= 1 && val <= 4 && Number.isInteger(val))) return;
       var undo = _pushUndo(cid, sid, aid, tagIds);
       // Apply score to all tags in this assessment. A save this device
       // couldn't keep shows on the sync dot (data.js), not here.
@@ -4392,6 +4613,20 @@ window.PageGradebook = (function () {
       },
       // Draft and Returned (S1-F1). The button is redrawn with the page, so
       // the new one takes the focus.
+      toggleToGrade: function () {
+        _flushActiveScoreEditor();
+        _toGradeOnly = !_toGradeOnly;
+        render();
+        var again = document.querySelector('.gb-to-grade-btn');
+        if (again) again.focus({ preventScroll: true });
+      },
+      toggleQuestions: function () {
+        _flushActiveScoreEditor();
+        _questionsOnly = !_questionsOnly;
+        render();
+        var again = document.querySelector('.gb-questions-btn');
+        if (again) again.focus({ preventScroll: true });
+      },
       toggleToReturn: function () {
         _flushActiveScoreEditor();
         _toReturnOnly = !_toReturnOnly;
@@ -4465,6 +4700,8 @@ window.PageGradebook = (function () {
     // From a dashboard link: these students, and one competency's columns.
     filterStudentIds = params.students ? String(params.students).split(',').filter(Boolean) : [];
     _toReturnOnly = false;
+    _toGradeOnly = false;
+    _questionsOnly = false;
     _drafts = null;
     var linkedSection = params.section;
     if (

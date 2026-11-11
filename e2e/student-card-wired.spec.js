@@ -17,6 +17,7 @@ import {
   shot,
   contrast,
   signIn,
+  showAll,
 } from './student-card-fake.js';
 
 /* A real student card on the student page, /s/#CODE (docs/plans/
@@ -46,7 +47,7 @@ for (const size of [
       page.on('pageerror', err => errors.push(String(err)));
 
       // The scanned card.
-      await page.goto('/s/#P3R-8WD');
+      await page.goto('/s/#P3R8-WDK4');
       await expect(page.getByRole('heading', { name: 'Is this you, Cece?' })).toBeVisible();
       await expect(page.locator('.sp-head-title')).toHaveText('Science 8 · Block B');
       await expect(page).toHaveTitle(/Student Page/);
@@ -73,7 +74,8 @@ for (const size of [
       await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
 
       // The Assignments list: returned results only.
-      await expect(page.getByRole('heading', { name: 'Assignments' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
+      await showAll(page);
       await expect(row(page, 'Energy Transfer Investigation').locator('.sp-row-result')).toHaveText('4.0');
       await expect(row(page, 'Energy Transfer Investigation').locator('.sp-row-sub')).toHaveText(
         /^Back \S+ \d+ · Extending$/,
@@ -97,7 +99,7 @@ for (const size of [
       await expect.poll(() => routes(posts)).toEqual(['card', 'verify', 'verify', 'page', 'seen']);
       expect(posts[2].body).toEqual({
         route: 'verify',
-        code: 'P3R8WD',
+        code: 'P3R8WDK4',
         birthday: '2012-05-15',
         student_number: null,
         password: null,
@@ -122,10 +124,19 @@ for (const size of [
       expect(JSON.stringify(kept)).not.toMatch(/Cece|Science|P3R|0123456|2012-05|Extending/);
       expect(await page.context().cookies()).toEqual([]);
 
+      // The student reads down the list: every returned piece has been on screen
+      // (the line over the list, What Changed Since You Last Looked, takes some room).
+      await page.locator('.sp-row').last().scrollIntoViewIfNeeded();
+      await expect
+        .poll(() => posts.filter(p => p.body.route === 'seen').flatMap(p => p.body.assessment_ids).length)
+        .toBe(6);
+      await page.getByRole('button', { name: 'Back', exact: true }).click();
+
       // The page opened again: the student's page, with no card and no check.
       posts.length = 0;
       await page.reload();
-      await expect(page.getByRole('heading', { name: 'Assignments' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
+      await showAll(page);
       await expect(row(page, 'Cell Structure Quiz').locator('.sp-row-result')).toHaveText('8 / 10');
       // Opened last time: no longer marked, and nothing more to tell the server.
       await expect(row(page, 'Lab Safety Contract').locator('.sp-row-sub')).toHaveText(/^Back \S+ \d+$/);
@@ -133,9 +144,13 @@ for (const size of [
 
       // Done.
       await page.getByRole('button', { name: 'Done' }).click();
-      await expect(page.getByLabel('Card Code')).toBeVisible();
-      await expect(page.getByLabel('Card Code')).toHaveValue('');
-      await expect(page.locator('.sp-msg')).toHaveCount(0);
+      // After Done (the artboard's board): nothing of the student, and Scan a Card.
+      await expect(page.getByRole('heading', { name: 'You’re signed out' })).toBeFocused();
+      await expect(
+        page.getByText(
+          size.name === 'a phone' ? 'This phone no longer has your card.' : 'This computer no longer has your card.',
+        ),
+      ).toBeVisible();
       expect(await page.locator('body').innerText()).not.toMatch(/Cece|Science 8|Assignments|Extending|Quiz/);
       expect((await stored(page)).local).toEqual({});
       await expect.poll(() => routes(posts)).toEqual(['page', 'done']);
@@ -144,6 +159,10 @@ for (const size of [
       await named(page);
       await contrast(page);
       await shot(page, size.name === 'a phone' ? '04-after-done' : 'chromebook-04-after-done');
+      await page.getByRole('button', { name: 'Scan a Card' }).click();
+      await expect(page.getByLabel('Card Code')).toBeVisible();
+      await expect(page.getByLabel('Card Code')).toHaveValue('');
+      await expect(page.locator('.sp-msg')).toHaveCount(0);
 
       // The page again after Done is the page of a device nobody has used.
       posts.length = 0;
@@ -167,7 +186,7 @@ test.describe('a real card: the keyboard alone', () => {
     await page.goto('/s/');
     await page.keyboard.press('Tab');
     await expect(page.getByLabel('Type the code on your slip')).toBeFocused();
-    await page.keyboard.type('p3r-8wd');
+    await page.keyboard.type('p3r8-wdk4');
     await page.keyboard.press('Enter');
     await expect(page.getByRole('heading', { name: 'Is this you, Cece?' })).toBeVisible();
     // The first field has the focus; then Day, Year and the student number.
@@ -186,8 +205,16 @@ test.describe('a real card: the keyboard alone', () => {
     await page.keyboard.type('0123456');
     await page.keyboard.press('Enter');
     await expect(page.getByRole('heading', { name: 'Assignments' })).toBeFocused();
+    // Back up the header: All Assignments, then Done.
     await page.keyboard.press('Shift+Tab');
+    await expect(page.getByRole('button', { name: 'All assignments' })).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    // The class's name (Your Classes) comes before Done.
     await expect(page.getByRole('button', { name: 'Done' })).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('heading', { name: 'You’re signed out' })).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('button', { name: 'Scan a Card' })).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page.getByLabel('Card Code')).toBeFocused();
     expect((await stored(page)).local).toEqual({});
@@ -211,7 +238,7 @@ test.describe('a real card: what stops it, and what each one says', () => {
     test(`a card answered ${error} says why`, async ({ page }) => {
       const fn = school(card);
       const posts = await serve(page, fn);
-      await page.goto('/s/#P3R-8WD');
+      await page.goto('/s/#P3R8-WDK4');
       await expect(page.getByRole('alert')).toHaveText(line);
       await expect(page).toHaveURL(/\/s\/$/);
       await expect(page.getByLabel('Student Number')).toHaveCount(0);
@@ -229,7 +256,7 @@ test.describe('a real card: what stops it, and what each one says', () => {
   test('the card’s password, a wrong one, and the lock after five', async ({ page }) => {
     const fn = school({ birthday: null, number: null, password: '4821' });
     await serve(page, fn);
-    await page.goto('/s/#P3R-8WD');
+    await page.goto('/s/#P3R8-WDK4');
     await expect(page.getByText('To make sure it’s you, type the password printed on your card.')).toBeVisible();
     await named(page);
     await shot(page, '05-card-password');
@@ -255,7 +282,7 @@ test.describe('a real card: what stops it, and what each one says', () => {
   test('No, That’s Not Me: Give This Card Back', async ({ page }) => {
     const fn = school();
     const posts = await serve(page, fn);
-    await page.goto('/s/#P3R-8WD');
+    await page.goto('/s/#P3R8-WDK4');
     await page.getByRole('button', { name: 'No, That’s Not Me' }).tap();
     await expect(page.getByRole('heading', { name: 'Give This Card Back' })).toBeVisible();
     await named(page);
@@ -283,6 +310,7 @@ test.describe('a real card: what stops it, and what each one says', () => {
     // On the card's screen (after Done): the card's words.
     await signIn(page);
     await page.getByRole('button', { name: 'Done' }).tap();
+    await page.getByRole('button', { name: 'Scan a Card' }).tap();
     await page.getByLabel('Card Code').fill('ABC-234');
     await page.getByRole('button', { name: 'Continue' }).tap();
     await expect(page.getByRole('alert')).toHaveText(
@@ -297,7 +325,7 @@ test.describe('a real card: what stops it, and what each one says', () => {
     const fn = school();
     fn.state.addressLocked = true;
     const posts = await serve(page, fn);
-    await page.goto('/s/#P3R-8WD');
+    await page.goto('/s/#P3R8-WDK4');
     await expect(page.getByRole('alert')).toHaveText('Too many tries. Wait 15 minutes and try again.');
     expect(routes(posts)).toEqual(['card', 'open']);
     await shot(page, '10-too-many-tries');
@@ -307,7 +335,7 @@ test.describe('a real card: what stops it, and what each one says', () => {
     const fn = school();
     let offline = 'verify';
     await serve(page, fn, { fail: body => body.route === offline });
-    await page.goto('/s/#P3R-8WD');
+    await page.goto('/s/#P3R8-WDK4');
     await page.getByLabel('Student Number').fill('0123456');
     await page.getByRole('button', { name: 'Yes, That’s Me' }).tap();
     await expect(page.getByRole('alert')).toHaveText("Couldn't reach FullVision. Check your internet and try again.");
@@ -323,7 +351,8 @@ test.describe('a real card: what stops it, and what each one says', () => {
     await shot(page, '12-page-not-reached');
     offline = '';
     await page.getByRole('button', { name: 'Try Again' }).tap();
-    await expect(page.getByRole('heading', { name: 'Assignments' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
+    await showAll(page);
   });
 
   const GONE = [
@@ -337,7 +366,7 @@ test.describe('a real card: what stops it, and what each one says', () => {
       const fn = school();
       const posts = await serve(page, fn);
       await signIn(page);
-      Object.assign(fn.state.cards.P3R8WD, change);
+      Object.assign(fn.state.cards.P3R8WDK4, change);
       posts.length = 0;
       await page.reload();
       await expect(page.getByRole('alert')).toHaveText(line);
@@ -356,9 +385,10 @@ test.describe('a real card: what stops it, and what each one says', () => {
     const fn = school();
     const posts = await serve(page, fn);
     await page.route('**/shared/calc.js', route => route.abort());
-    await page.goto('/s/#P3R-8WD');
+    await page.goto('/s/#P3R8-WDK4');
     await page.getByLabel('Student Number').fill('0123456');
     await page.getByRole('button', { name: 'Yes, That’s Me' }).tap();
+    await showAll(page);
     await expect(page.getByRole('status')).toHaveText('Your results didn’t load. Check your internet and try again.');
     await expect(page.locator('.sp-row')).toHaveCount(9);
     await expect(page.locator('.sp-row-result')).toHaveCount(0);
@@ -395,7 +425,7 @@ test.describe('a real card: a shared Chromebook', () => {
 
   const omar = () =>
     sampleCard(TODAY, {
-      code: 'K7M4QX',
+      code: 'K7M4QX2P',
       enrollment: OMAR,
       first: 'Omar',
       birthday: null,
@@ -405,7 +435,7 @@ test.describe('a real card: a shared Chromebook', () => {
 
   test('the next student’s card signs the last student out before it asks anything', async ({ page }) => {
     const fn = school();
-    fn.state.cards.K7M4QX = omar();
+    fn.state.cards.K7M4QX2P = omar();
     const posts = await serve(page, fn);
     await signIn(page);
     const cece = JSON.parse((await stored(page)).local[KEY]).t;
@@ -413,12 +443,12 @@ test.describe('a real card: a shared Chromebook', () => {
     // Omar types his card's code into the same browser, in a new tab.
     const tab = await page.context().newPage();
     const tabPosts = await serve(tab, fn);
-    await tab.goto('/s/#K7M-4QX');
+    await tab.goto('/s/#K7M4-QX2P');
     await expect(tab.getByRole('heading', { name: 'Is this you, Omar?' })).toBeVisible();
     await expect
       .poll(() => tabPosts.map(p => p.body))
       .toEqual([
-        { route: 'card', code: 'K7M4QX' },
+        { route: 'card', code: 'K7M4QX2P' },
         { route: 'done', session: cece },
       ]);
     expect((await stored(tab)).local).toEqual({});
@@ -444,20 +474,20 @@ test.describe('a real card: a shared Chromebook', () => {
 
   test('the next card opened in the same tab signs the last student out too', async ({ page }) => {
     const fn = school();
-    fn.state.cards.K7M4QX = omar();
+    fn.state.cards.K7M4QX2P = omar();
     const posts = await serve(page, fn);
     await signIn(page);
     const cece = JSON.parse((await stored(page)).local[KEY]).t;
     posts.length = 0;
     // The address changes under the open page, as a scanned link does in a tab that is already there.
-    await page.evaluate(() => (location.hash = '#K7M-4QX'));
+    await page.evaluate(() => (location.hash = '#K7M4-QX2P'));
     await expect(page.getByRole('heading', { name: 'Is this you, Omar?' })).toBeVisible();
     await expect(page.locator('.sp-row')).toHaveCount(0);
     expect(await page.locator('body').innerText()).not.toMatch(/Cece|Extending/);
     await expect
       .poll(() => posts.map(p => p.body))
       .toEqual([
-        { route: 'card', code: 'K7M4QX' },
+        { route: 'card', code: 'K7M4QX2P' },
         { route: 'done', session: cece },
       ]);
     await expect(page).toHaveURL(/\/s\/$/);
@@ -470,7 +500,7 @@ test.describe('a real card: a shared Chromebook', () => {
     await page.goto('/login.html');
     await signIn(page);
     await page.getByRole('button', { name: 'Done' }).click();
-    await expect(page.getByLabel('Card Code')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'You’re signed out' })).toBeVisible();
     posts.length = 0;
     await page.goBack();
     await page.goForward();
@@ -494,9 +524,10 @@ test.describe('a real card: a shared Chromebook', () => {
     const tab = await page.context().newPage();
     await serve(tab, fn);
     await tab.goto('/s/');
-    await expect(tab.getByRole('heading', { name: 'Assignments' })).toBeVisible();
+    await expect(tab.getByRole('heading', { name: 'Assignments' })).toBeAttached();
+    await showAll(tab);
     await tab.getByRole('button', { name: 'Done' }).click();
-    await expect(tab.getByLabel('Card Code')).toBeVisible();
+    await expect(tab.getByRole('heading', { name: 'You’re signed out' })).toBeVisible();
     await tab.close();
     // Back in the first tab: whatever the browser kept of the page, the list is not shown.
     await page.goBack();
@@ -574,8 +605,9 @@ test.describe('a slip is as it was', () => {
       { route: 'open', code: 'K7M4QX' },
       { route: 'verify', token: 'a'.repeat(64), birthday: null, student_number: '0123456', password: null },
     ]);
-    // The handler sent the token's verify to the slip's function, not the card's.
-    expect(fn.sql.map(q => q.fn)).toEqual(['card', 'open', 'verify']);
+    // Six characters is no card's code, so the function answers `card` without asking the database; and it sent
+    // the token's verify to the slip's function, not the card's.
+    expect(fn.sql.map(q => q.fn)).toEqual(['open', 'verify']);
     expect((await stored(page)).local).toEqual({});
   });
 

@@ -113,3 +113,48 @@ upsert_section 07e3bfc041047a08b6c34dd431d86da1 1808 class-writer
 upsert_subject 3fa8209ed1f82365ac49d745c1b7b301 1365 class-writer
 upsert_tag 3a527f37023f8290a9bfe63c91320aca 1903 class-writer
 withdraw_student c4fc1f0e7c9ecee57726e975c0b89847 1153 class-writer
+
+# Three functions in student_submit, as they are on gradebook-prod: read by
+# the orchestrator on 2026-11-10 with S3-M1's read-only pre-check
+# (s3-m1-live-precheck.sql), which listed them as differing from the harness.
+# The cause was the harness, not live: its lists left out two applied
+# migrations, 20261102_housekeeping_fk_indexes.sql (student_submit._norm gets
+# an empty search_path) and 20261107_no_report_reply.sql (check and submit
+# rewritten: a report is for reading). No earlier record here carried these
+# three, so nothing recorded was wrong; but every harness database built
+# before that day had the older check and submit and _norm without its
+# setting. card_codes_common.LIVE and batch_a_undo.py's list now load both
+# files, and the md5s below are reproduced exactly (card_codes.py checks it).
+# Kept as comment lines so the scripts that compare public functions by name
+# do not read them; card_codes_common.py reads the lines that start
+# "#student-submit".
+#student-submit student_submit._norm(text) 276ee00aa8e488d789af9e2016714c94 214
+#student-submit student_submit."check"(text,text,text) cc54e80ca585024c65926cb5e73f3f43 3192
+#student-submit student_submit.submit(text,jsonb,text) 90ace3c164dab19f6a77ba7dfb19e40e 7616
+
+# S3-M1 (2026111003_card_codes_keyed.sql) was APPLIED to gradebook-prod on
+# 2026-11-11 at 02:02 UTC, recorded as card_codes_keyed, 20261111020227.
+# Its post-check (s3-m1-live-postcheck.sql), run read-only right after,
+# found no difference. These are the nine functions it made or replaced, as
+# live has them AFTER it: the md5s are the "becomes" values of the file's
+# final check block. The lengths were read from a harness database built
+# as live (card_codes.py build) with S3-M1 applied on PostgreSQL 17.11,
+# where all nine md5s are the same. The six functions it dropped
+# (_issue_student_card, issue_student_cards, reissue_student_card, and
+# student_submit's _card_lookup(text,text), card(text,text) and the
+# seven-argument verify_card) had no line here.
+# The three in public carry a fourth word, as S0-M5's lines do, so
+# score_rpcs.py and batch_a_apply.py (three words) do not compare them with
+# a harness built with Batch A's bodies. The six in student_submit are
+# comment lines marked "#after-s3-m1", not "#student-submit": card_codes.py
+# compares the "#student-submit" lines with a database WITHOUT S3-M1, where
+# these six do not exist yet.
+_issue_access_code 1c4eab088284f90c919d07ba35ffc14d 1342 after-s3-m1
+_issue_report_code 020cb811d2214dd5866cc2cf4ab705eb 1312 after-s3-m1
+_student_card_json bba8282f322ad6913ecca134c24d5cfa 1326 after-s3-m1
+#after-s3-m1 student_submit._as_teacher(uuid) a478e6e00d91742951036fcec250ae0d 624
+#after-s3-m1 student_submit._card_key_seen(text) 455da128c868ae4c67f9ef1ee2c0a125 634
+#after-s3-m1 student_submit._card_lookup(text,text,text) b35a926e60a39330f8851d368acec7e6 2517
+#after-s3-m1 student_submit.card(text,text,text) 253b34cd5da404aca98806f6d334f277 1763
+#after-s3-m1 student_submit.verify_card(text,text,text,text,text,text,text,boolean) add37c8bb49f28472972920561401580 5162
+#after-s3-m1 student_submit.issue_cards(uuid,uuid,jsonb,text,uuid) 3662c2827078922670b5347ca37c685e 9633

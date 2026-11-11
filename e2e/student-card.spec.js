@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { showAll } from './student-card-fake.js';
 
 /* A student card on the student page, /s/#demo-card (docs/plans/
    student-page-build-plan.md, S0-F3), against the built site with the live
@@ -53,7 +54,7 @@ for (const size of SIZES) {
         page.getByRole('heading', { name: wide ? 'Type the code on your card' : 'Scan the code on your card' }),
       ).toBeVisible();
       await expect(page).toHaveTitle(/Student Page/);
-      await expect(page.getByLabel('Card Code')).toHaveValue('P3R-8WD');
+      await expect(page.getByLabel('Card Code')).toHaveValue('P3R8-WDK4');
       await fits();
       await press('Continue');
 
@@ -77,7 +78,8 @@ for (const size of SIZES) {
       await press('Yes, That’s Me');
 
       // Assignments: both arrive, once, before the list is drawn.
-      await expect(page.getByRole('heading', { name: 'Assignments' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
+      await showAll(page);
       const row = title => page.locator('.sp-row', { hasText: title });
       await expect(row('Energy Transfer Investigation').locator('.sp-row-result')).toHaveText('4.0 · 100%');
       await expect(row('Energy Transfer Investigation').locator('.sp-row-sub')).toHaveText(
@@ -186,7 +188,8 @@ test.describe('student card: the card’s password and the lock', () => {
     await page.getByRole('button', { name: 'Continue' }).tap();
     await page.getByLabel('Student Number').fill('1234567');
     await page.getByRole('button', { name: 'Yes, That’s Me' }).tap();
-    await expect(page.getByRole('heading', { name: 'Assignments' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
+    await showAll(page);
     await expect(page.getByRole('status')).toHaveText('Your results didn’t load. Check your internet and try again.');
     await expect(page.locator('.sp-row')).toHaveCount(9);
     await expect(page.locator('.sp-row-result')).toHaveCount(0);

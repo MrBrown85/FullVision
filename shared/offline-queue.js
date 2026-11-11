@@ -11,7 +11,21 @@
  *   fv-sync-owner-v1          — { tab, at }: which tab sends (fallback only, see Tabs)
  *
  * Entry shape:
- *   { id, created_at, owner, key, endpoint, payload, attempts, last_error, last_code, next_at, blocked_on, sent_at }
+ *   { id, created_at, owner, key, endpoint, payload, attempts, last_error, last_code, next_at, blocked_on, sent_at,
+ *     guard, no_retry, until_reload, reloaded }
+ *
+ * Guard: what the sender needs to check before a write that waited may go
+ *   (a category list is sent only over the list it was made for). Kept with
+ *   the entry, so it is still there after a reload; handed to the sender
+ *   with every attempt, with how many attempts came before.
+ *
+ * Discarded: a write the sender decides must never go (error.noRetry) is
+ *   kept in the failed list without a last try. When it also names a class
+ *   (error.untilReload), no later write clears it and no page load drops it
+ *   until that class has been read again from the server (markReloaded):
+ *   the sync dot stays red until what is on screen is the server's. The
+ *   class list can end it sooner (releaseDiscarded): a class gone from the
+ *   server, or an archived one at the next page load.
  *
  * Tabs: every tab shares the queue, but only one tab — the owner — sends.
  *   The owner holds the Web Lock fv-sync-queue-v1 for as long as it is open;
@@ -317,13 +331,27 @@
   }
 
   /* The fields a write sets on its target, for writes that send only the
-     fields that changed (save_term_rating's p_payload); null when a write
-     sets the whole record. */
+     fields that changed (save_term_rating's p_payload, update_course's
+     p_patch); null when a write sets the whole record. */
   function _fields(entry) {
-    if (!entry || entry.endpoint !== 'save_term_rating') return null;
-    var p = entry.payload && entry.payload.p_payload;
-    return p && typeof p === 'object' ? Object.keys(p) : [];
+    var param = entry && FIELDS_PARAM[entry.endpoint];
+    if (!param) return null;
+    var p = entry.payload && entry.payload[param];
+    if (!p || typeof p !== 'object') return [];
+    // A class-settings write sets only the fields it names once it says so
+    // (shared/data.js FV_SETTINGS_CHANGED_ONLY). One without the mark is
+    // from an earlier build, or is the student page's two settings: it is
+    // replaced whole, as it always was.
+    if (MARKED_ONLY[entry.endpoint] && !p[CHANGED_ONLY]) return null;
+    return Object.keys(p).filter(function (k) {
+      return k !== CHANGED_ONLY;
+    });
   }
+  // The param that holds the fields, for each write that sends only those;
+  // and the ones that do so only when their fields carry the mark.
+  var FIELDS_PARAM = { save_term_rating: 'p_payload', update_course: 'p_patch' };
+  var MARKED_ONLY = { update_course: true };
+  var CHANGED_ONLY = '_changed_only';
 
   /* What is left of an older failed write once a newer write to the same
      target is queued or lands: the older one itself when the targets differ,
@@ -336,7 +364,8 @@
     var target = _target(newer.endpoint, newer.payload);
     if (!target || _target(older.endpoint, older.payload) !== target) return older;
     var mine = _replacedFields(newer);
-    if (!mine) return null;
+    // Either one sets its whole record: nothing of the older is left.
+    if (!mine || !_fields(older)) return null;
     return _withoutKeys(older, mine);
   }
 
@@ -362,11 +391,16 @@
     });
     if (!left.length) return null;
     if (left.length === theirs.length) return entry;
+    var param = FIELDS_PARAM[entry.endpoint];
+    var whole = entry.payload[param];
     var wire = {};
     left.forEach(function (k) {
-      wire[k] = entry.payload.p_payload[k];
+      wire[k] = whole[k];
     });
-    return Object.assign({}, entry, { payload: Object.assign({}, entry.payload, { p_payload: wire }) });
+    if (whole[CHANGED_ONLY]) wire[CHANGED_ONLY] = whole[CHANGED_ONLY];
+    var payload = Object.assign({}, entry.payload);
+    payload[param] = wire;
+    return Object.assign({}, entry, { payload: payload });
   }
 
   /* A new narrative queued for a term rating takes the approval out of the
@@ -394,7 +428,8 @@
   function _pruneDead(dead, newer) {
     return dead
       .map(function (e) {
-        return _without(newer, e);
+        // A discarded write stays until its class has been read again.
+        return e.until_reload ? e : _without(newer, e);
       })
       .filter(Boolean);
   }
@@ -826,6 +861,7 @@
       last_error: null,
     };
     if (opts && Array.isArray(opts.blockedOn) && opts.blockedOn.length) entry.blocked_on = opts.blockedOn.slice();
+    if (opts && opts.guard && typeof opts.guard === 'object') entry.guard = opts.guard;
     // A replacement doesn't grow the queue, so a full queue still takes it.
     var at = _coalesceIndex(q.entries, entry);
     var replaced = at >= 0 ? q.entries[at] : null;
@@ -898,7 +934,13 @@
     opts = opts || {};
     payload = payload || {};
     var id = opts.id || payload.p_idempotency_key || _uuid4();
-    var queued = enqueue(endpoint, payload, { id: id, key: opts.key, blockedOn: opts.blockedOn, noFlush: true });
+    var queued = enqueue(endpoint, payload, {
+      id: id,
+      key: opts.key,
+      blockedOn: opts.blockedOn,
+      guard: opts.guard,
+      noFlush: true,
+    });
     if (!queued.ok) {
       var refused = Promise.resolve({
         data: null,
@@ -929,7 +971,16 @@
       // a blip (server committed, client missed the 200) replays to the
       // cached result instead of creating a duplicate row.
       var payload = _withIdemKey(entry.endpoint, entry.payload, entry.id);
-      var res = await _sendNow(entry.endpoint, payload, _sendOptions[entry.id]);
+      // The sender is told when this is the one more try after a reload.
+      // And what the entry itself says of the write: its guard, and how many
+      // attempts came before this one.
+      var options = _sendOptions[entry.id];
+      if (entry.last_try || entry.guard || entry.attempts) {
+        options = Object.assign({}, options, { attempts: entry.attempts || 0 });
+        if (entry.last_try) options.lastTry = true;
+        if (entry.guard) options.guard = entry.guard;
+      }
+      var res = await _sendNow(entry.endpoint, payload, options);
       return res || { data: null, error: null };
     } catch (e) {
       return { data: null, error: { message: e && e.message ? e.message : String(e) } };
@@ -1034,9 +1085,13 @@
     }
 
     // One failed write per target: a newer failure replaces an older one.
-    // The last try after a reload is dropped instead.
+    // The last try after a reload is dropped instead. A write the sender
+    // says must never go again (error.noRetry) gets no last try either.
+    if (res && res.error && res.error.noRetry) entry.no_retry = true;
+    if (res && res.error && res.error.noRetry && res.error.untilReload) entry.until_reload = res.error.untilReload;
     var dead = _pruneDead(_readDead(), entry);
-    if (entry.last_try) _reportDropped(entry);
+    // (A discarded write stays even on its last try: see Discarded, above.)
+    if (entry.last_try && !entry.until_reload) _reportDropped(entry);
     else dead.push(entry);
     _writeDead(dead);
     _writeQueue(_removeEntry(entry.id));
@@ -1289,6 +1344,21 @@
     });
   }
 
+  /* This teacher's writes to one endpoint still waiting to be sent, oldest
+     first, in flight included: copies of { id, payload }. A load reads them
+     to lay an unsent change back over what the server sent
+     (shared/data.js _unsentCourseChanges). */
+  function queued(endpoint) {
+    var owner = currentOwner();
+    return _readQueue()
+      .entries.filter(function (e) {
+        return e.endpoint === endpoint && !_isForeign(e, owner);
+      })
+      .map(function (e) {
+        return { id: e.id, payload: JSON.parse(JSON.stringify(e.payload || {})) };
+      });
+  }
+
   /* Let the caller change queued payloads, for example to put a server id
      where a local id was. fn(entry) returns { payload, blockedOn } or null
      to leave the entry alone. Entries in flight are skipped. A key that was
@@ -1405,8 +1475,14 @@
         keep.push(entry);
         return;
       }
+      // Discarded, and its class not yet read again from the server: it
+      // stays, and so does the red dot.
+      if (entry.until_reload && !entry.reloaded) {
+        keep.push(entry);
+        return;
+      }
       var target = _target(entry.endpoint, entry.payload);
-      var drop = !target || entry.last_try || entry.blocked_on || q.entries.length >= MAX_ENTRIES;
+      var drop = !target || entry.last_try || entry.no_retry || entry.blocked_on || q.entries.length >= MAX_ENTRIES;
       // What a queued write sets is newer: only the rest is retried.
       var rest = entry;
       for (var i = 0; !drop && i < queued.length; i++) {
@@ -1429,6 +1505,48 @@
       return;
     }
     _writeDead(keep);
+  }
+
+  /* A class has been read again from the server: the writes discarded for
+     it (until_reload) may go with the next page load. Returns how many. */
+  function markReloaded(classId) {
+    if (!classId) return 0;
+    var dead = _readDead();
+    var n = 0;
+    dead.forEach(function (e) {
+      if (e.until_reload === classId && !e.reloaded) {
+        e.reloaded = true;
+        n++;
+      }
+    });
+    if (n) _writeDead(dead);
+    return n;
+  }
+
+  /* The server's class list says a class's discarded writes (until_reload)
+     have nothing left to show: the class is gone from it, or it is archived
+     and the writes were discarded before this page loaded (_discardedBefore).
+     They leave the failed list now, with the red dot. Returns how many. */
+  var _discardedBefore = {}; // entry id → discarded before this page loaded
+  function releaseDiscarded(classId, opts) {
+    if (!classId) return 0;
+    var earlierOnly = !!(opts && opts.earlierPage);
+    var owner = currentOwner();
+    var gone = [];
+    var keep = _readDead().filter(function (e) {
+      var go = e.until_reload === classId && !_isForeign(e, owner) && (!earlierOnly || _discardedBefore[e.id] === true);
+      if (go) gone.push(e);
+      return !go;
+    });
+    if (!gone.length) return 0;
+    _writeDead(keep);
+    gone.forEach(_reportDropped);
+    _notify('dead-letter:dismiss', {
+      ids: gone.map(function (e) {
+        return e.id;
+      }),
+    });
+    return gone.length;
   }
 
   function dismissDeadLetter(id) {
@@ -1474,6 +1592,9 @@
   window.addEventListener('pagehide', release);
   window.addEventListener('pageshow', claim);
   _retryDeadOnLoad();
+  _readDead().forEach(function (e) {
+    if (e && e.until_reload) _discardedBefore[e.id] = true;
+  });
   _openChannel();
   // A page loads this file once. A test loading it again stands for a
   // reload: the old copy's page is gone, so it lets go of the queue.
@@ -1488,11 +1609,14 @@
     flush: flush,
     stats: stats,
     has: has,
+    queued: queued,
     rewrite: rewrite,
     remove: remove,
     dropBlockedOn: dropBlockedOn,
     deadLetter: deadLetter,
     dismissDeadLetter: dismissDeadLetter,
+    markReloaded: markReloaded,
+    releaseDiscarded: releaseDiscarded,
     resume: resume,
     clear: clear,
     claim: claim,

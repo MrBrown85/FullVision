@@ -901,22 +901,30 @@ window.PageObservations = (function () {
     return h;
   }
 
-  // html-safe: tags from _renderFocusTagsHtml; ObsCard.contextMenuHtml uses fixed OBS_CONTEXTS keys and escaped labels.
+  // html-safe: tags from _renderFocusTagsHtml; ObsCard.contextMenuHtml uses fixed OBS_CONTEXTS keys and escaped labels; obsPrivateLabelHtml is constant markup.
   function _focusRowHtml() {
     return (
       '<span class="obs-row-label">Tags</span>' +
       _renderFocusTagsHtml() +
       '<span class="obs-row-sep" aria-hidden="true"></span>' +
       '<span class="obs-row-label" id="focus-ctx-label">Context</span>' +
-      Card.contextMenuHtml({
-        id: 'focus-ctx',
-        value: _focusDraft.context,
-        open: _focusCtxOpen,
-        toggleAction: 'focusToggleCtxMenu',
-        pickAction: 'focusPickContext',
-        labelledBy: 'focus-ctx-label',
-      })
+      (_focusFromReflection()
+        ? // An observation from a reflection keeps its context for good
+          // (updateQuickOb refuses to change it): no menu, just the label.
+          obsPrivateLabelHtml(_focusOriginal)
+        : Card.contextMenuHtml({
+            id: 'focus-ctx',
+            value: _focusDraft.context,
+            open: _focusCtxOpen,
+            toggleAction: 'focusToggleCtxMenu',
+            pickAction: 'focusPickContext',
+            labelledBy: 'focus-ctx-label',
+          }))
     );
+  }
+
+  function _focusFromReflection() {
+    return isReflectionObservation(_focusOriginal);
   }
 
   function _refreshFocusRow() {
@@ -1132,7 +1140,7 @@ window.PageObservations = (function () {
   }
 
   function focusToggleCtxMenu() {
-    if (!_focusDraft) return;
+    if (!_focusDraft || _focusFromReflection()) return;
     _focusCtxOpen = !_focusCtxOpen;
     _focusTagPopoverOpen = false;
     _refreshFocusRow();
@@ -1144,7 +1152,7 @@ window.PageObservations = (function () {
   }
 
   function focusPickContext(val) {
-    if (!_focusDraft) return;
+    if (!_focusDraft || _focusFromReflection()) return;
     _focusDraft.context = val || null;
     _focusCtxOpen = false;
     _refreshFocusRow();

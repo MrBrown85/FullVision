@@ -34,10 +34,33 @@
 
   /* Every score, comment, tick and status a sheet shows is read through
      ReportScores (teacher/report-scores.js), never from the data layer
-     here. A sheet drawn for a Feedback Page follows that report's set of
-     scores. A handout printed from the grader is drawn on the teacher's
-     working copy (all work), as it always was: it is not one of the
-     report surfaces in ReportScores' table. */
+     here. The helpers that read one sheet (sheetData, scoreSheetData,
+     feedbackItems, isStudentScored) read in whatever set their caller is
+     in: a Feedback Page's sheet takes its report's set, and the Rubric
+     Bank's Delete Rubric counts the teacher's own scores (all work).
+
+     The handout is a report surface of its own ('handout'): it is handed
+     to students, so in a class that holds grades it shows returned grades
+     only (DECISIONS, "Student page build rulings (2026-11-10)" 6), and
+     Print asks first when a student in the print has a draft on the piece
+     (_printFromDialog). The functions below are its doors, each run inside
+     ReportScores.withReportScores every time it is called, from whichever
+     page opened the dialog: what prints and its preview (renderPages), who
+     prints (selectStudents), the dialog's list of students and its Already
+     Printed box, who the question asks about (_mayPrint), what a print
+     records (markPrinted), and the Printed and Changed Since Printed marks
+     beside a name (_markState), which compare what the handout would print
+     now with what was printed. */
+  var _inReportScores = function (fn) {
+    return ReportScores.scoped('handout', fn);
+  };
+  renderPages = _inReportScores(renderPages);
+  selectStudents = _inReportScores(selectStudents);
+  _studentsGroupHtml = _inReportScores(_studentsGroupHtml);
+  _printedSummaryText = _inReportScores(_printedSummaryText);
+  _mayPrint = _inReportScores(_mayPrint);
+  markPrinted = _inReportScores(markPrinted);
+  _markState = _inReportScores(_markState);
 
   var ROOT_ID = 'rubric-print-root';
   var STYLE_ID = 'rubric-print-page';
@@ -651,8 +674,39 @@
     var printed = typeof getRubricPrint === 'function' && getRubricPrint(cid, sid, aid);
     return printed ? printState(cid, aid, sid) : { kind: 'unprinted', at: null };
   }
+  /* The mark's state, or null while it cannot be worked out: in a class
+     that holds grades whose Draft and Returned rows have not loaded (the
+     first draw of a session, or offline), what the handout would print
+     now is not known (ReportScores.ready). Then there is no mark. The page
+     is drawn again when the rows load (the data layer's redraw), and the
+     marks with it. Any other fault in working it out is reported (the
+     console and Sentry, once for the page) and leaves no mark. A mark
+     never stops a page drawing. */
+  function _markStateOrNone(cid, aid, sid) {
+    try {
+      return ReportScores.ready(cid) ? _markState(cid, aid, sid) : null;
+    } catch (e) {
+      _reportFault('The Printed marks could not be worked out', e);
+      return null;
+    }
+  }
+
+  /* A fault on the handout's side, reported without taking down the page
+     that asked: to the console and to Sentry, once for each kind of fault
+     until the page is drawn again. */
+  var _faultsReported = {};
+  function _reportFault(what, e) {
+    var key = what + ': ' + (e && e.message);
+    if (_faultsReported[key]) return;
+    _faultsReported[key] = true;
+    setTimeout(function () {
+      delete _faultsReported[key];
+    }, 0);
+    console.error(what + ':', e);
+    if (window.Sentry && typeof window.Sentry.captureException === 'function') window.Sentry.captureException(e);
+  }
   function markHtml(cid, aid, sid) {
-    var state = _markState(cid, aid, sid);
+    var state = _markStateOrNone(cid, aid, sid) || { kind: 'unprinted', at: null };
     var on = state.kind === 'printed' || state.kind === 'changed';
     return (
       '<span class="' +
@@ -670,7 +724,7 @@
   }
   function refreshMarks(cid, root) {
     (root || document).querySelectorAll('[data-rp-mark-sid]').forEach(function (el) {
-      var state = _markState(cid, el.dataset.rpMarkAid, el.dataset.rpMarkSid);
+      var state = _markStateOrNone(cid, el.dataset.rpMarkAid, el.dataset.rpMarkSid) || { kind: 'unprinted', at: null };
       var on = state.kind === 'printed' || state.kind === 'changed';
       var html = on ? _markInner(state) : '';
       var cls = _markClass(state);
@@ -1597,11 +1651,28 @@
     var assessment = aid ? _assessment(cid, aid) : null;
     if (_needsBankLevels(cid, assessment)) {
       loadBankLevels().then(function () {
-        _openNow(cid, aid, openOpts);
+        _openSafely(cid, aid, openOpts);
       });
       return;
     }
-    _openNow(cid, aid, openOpts);
+    _openSafely(cid, aid, openOpts);
+  }
+
+  /* In a class that holds grades whose Draft and Returned rows have not
+     loaded, what the handout would print is not known: the dialog does not
+     open (no draft is printed), and the page it was opened from is left as
+     it was. A fault in opening it stops that one action: it is reported
+     (the console and Sentry), the dialog is closed, and the page it was
+     opened from (Assignments, the gradebook, Class Results, the Rubric
+     Bank) goes on. */
+  function _openSafely(cid, aid, openOpts) {
+    try {
+      if (!ReportScores.ready(cid)) return;
+      _openNow(cid, aid, openOpts);
+    } catch (e) {
+      close();
+      _reportFault('Print Rubrics could not open', e);
+    }
   }
 
   function _openNow(cid, aid, openOpts) {
@@ -1727,8 +1798,69 @@
     _redraw(overlay, 'input[data-pick="' + sid + '"]');
   }
 
+  /* The students this print could hold once their grades are returned:
+     the ones picked; everyone; with Not Printed Yet, everyone not printed
+     (a student whose only grade is a draft has nothing printed); with
+     Changed Since Printed, everyone printed before. Their drafts on the
+     piece are what Print asks about. */
+  function _mayPrint(cid, aid, opts) {
+    var students = _rosterOrder(cid);
+    if (opts.students === 'pick') {
+      var picked = opts.picked || [];
+      students = students.filter(function (s) {
+        return picked.indexOf(s.id) >= 0;
+      });
+    } else if (opts.students === 'unprinted' || opts.students === 'changed') {
+      var kinds = opts.students === 'unprinted' ? ['unprinted', 'unscored'] : ['changed', 'printed'];
+      students = students.filter(function (s) {
+        return kinds.indexOf(printState(cid, aid, s.id).kind) >= 0;
+      });
+    }
+    return students.map(function (s) {
+      return s.id;
+    });
+  }
+
+  /* Print in the dialog. In a class that holds grades the handout shows
+     returned grades only; when a student in the print has a draft on the
+     piece it asks first (DECISIONS, "Student page build rulings
+     (2026-11-10)" 6; teacher/drafts-before-print.js): Return It, Then
+     Print returns exactly those drafts and prints with them in; Print
+     Without It prints the returned grades; Cancel goes back to this
+     dialog and does nothing. */
   function _printFromDialog() {
     if (!_state) return;
+    var cid = _state.cid,
+      aid = _state.aid,
+      opts = _state.opts;
+    var found = aid && opts.mode === 'completed' ? DraftsBeforePrint.find(cid, [aid], _mayPrint(cid, aid, opts)) : null;
+    if (!found) return _printAndMark();
+    // The question belongs to this Print Rubrics dialog, for this class and piece.
+    var state = _state;
+    var overlay = document.getElementById(OVERLAY_ID);
+    var owner = {
+      el: overlay,
+      still: function () {
+        return _state === state;
+      },
+    };
+    DraftsBeforePrint.ask(
+      found,
+      'handout',
+      function (choice) {
+        if (choice === 'cancel') return;
+        // Every draft it named is returned, or nothing prints and nothing is marked printed.
+        if (choice === 'return' && !DraftsBeforePrint.returnAll(found).all) {
+          DraftsBeforePrint.showFailed(overlay);
+          return;
+        }
+        _printAndMark();
+      },
+      owner,
+    );
+  }
+
+  function _printAndMark() {
     var cid = _state.cid,
       aid = _state.aid,
       opts = _state.opts,
@@ -1754,6 +1886,8 @@
   }
 
   function close() {
+    // A question over this dialog goes with it.
+    if (window.DraftsBeforePrint) DraftsBeforePrint.close();
     var overlay = document.getElementById(OVERLAY_ID);
     if (overlay && overlay.remove) overlay.remove();
     if (_state) {

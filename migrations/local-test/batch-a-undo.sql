@@ -4,6 +4,15 @@
 -- Batch A, then S0-M5 (2026111002), then S0-M4b (2026110905, applied
 -- 2026-11-10 17:12 UTC).
 --
+-- S3-M1 (2026111003_card_codes_keyed.sql: card codes the database cannot
+-- read) STANDS ON BATCH A TOO, once it is applied: it changes Batch A's
+-- student_card table and replaces its card functions. It has its own undo,
+-- migrations/local-test/s3-m1-undo.sql. With S3-M1 applied:
+--   PART 1, PART 1A and PART 1B here run as they are and touch nothing of
+--     S3-M1 (it adds no trigger and no save runs its code);
+--   PART 2 needs S3-M1's undo first, and refuses without it. The order is
+--     S3-M1's undo, then S0-M4b's, then PART 2.
+--
 -- S0-M4b STANDS ON BATCH A and has its own undo,
 -- migrations/local-test/s0-m4b-undo.sql. With it applied, as it is:
 --   PART 1 and PART 1B here run as they are and touch nothing of S0-M4b;
@@ -226,10 +235,16 @@
 -- parts), then PART 2. Tested in that order on a database built as
 -- gradebook-prod is now: it comes back as it was before Batch A, with
 -- S0-M5 in place.
--- The same list, read-only, to run before PART 2. Its first row says
--- whether S0-M4b is on top of Batch A; every row after it is something
--- ELSE that would stop PART 2 (today there should be none). It is PART 2's
--- own query, and it reads pg_cron's cron.job, which gradebook-prod has:
+-- S3-M1 is such a thing as well, once it is applied: PART 2 stops, says so
+-- first, and lists what it found of S3-M1 (its functions, its key-id table,
+-- its columns, indexes and constraints on student_card). Run S3-M1's undo
+-- (migrations/local-test/s3-m1-undo.sql), then S0-M4b's, then PART 2.
+-- Tested in that order (batch_a_undo.py, scenario s3-m1).
+-- The same list, read-only, to run before PART 2. Its first two rows say
+-- whether S0-M4b and S3-M1 are on top of Batch A; every row after them is
+-- something ELSE that would stop PART 2 (today there should be none). It
+-- is PART 2's own query, and it reads pg_cron's cron.job, which
+-- gradebook-prod has:
 -- precheck:
 --   with a as (select
 --       string_to_array(   -- the 47 functions Batch A made
@@ -260,6 +275,15 @@
 --       string_to_array(   -- what S0-M4b (2026110905) made, to tell it from anything else
 --           'public._grade_return_settle(uuid,uuid) public._grade_return_repair_class(uuid) public._grade_return_repair_lost() '
 --           'public._grade_return_truncated() public._grade_return_mode_changed() public.grade_return_repair_nightly()', ' ') as m4b,
+--       string_to_array(   -- what S3-M1 (2026111003) made, to tell it from anything else: its functions,
+--           'student_submit._card_lookup(text,text,text) student_submit.card(text,text,text) '
+--           'student_submit.verify_card(text,text,text,text,text,text,text,boolean) '
+--           'student_submit.issue_cards(uuid,uuid,jsonb,text,uuid) student_submit._as_teacher(uuid) '
+--           'student_submit._card_key_seen(text)', ' ') as m1,
+--       string_to_array(   -- and what it put on Batch A's student_card: columns, indexes, constraints
+--           'student_card.code_hmac student_card.pw_hmac student_card.key_id student_card.seq student_card_code_hmac_key '
+--           'student_card_enrollment_seq student_card_code_hmac_check student_card_pw_hmac_check student_card_key_id_check '
+--           'student_card_seq_check student_card_live_has_tag', ' ') as m1_on,
 --       array['grade_return_delete', 'grade_return_insert', 'grade_return_update', 'grade_return_repoint', 'grade_return_gone', 'grade_return_release'] as trg,
 --       string_to_array(   -- the columns of Batch A's four tables
 --           'grade_return.enrollment_id grade_return.assessment_id grade_return.is_draft grade_return.returned_at '
@@ -281,6 +305,7 @@
 --   ), fn as (select to_regprocedure(x)::oid as oid from a, unnest(a.made) x where to_regprocedure(x) is not null
 --   ), known as (select oid from fn union select to_regprocedure(x)::oid from a, unnest(a.patched) x where to_regprocedure(x) is not null
 --   ), theirs as (select to_regprocedure(x)::oid as oid from a, unnest(a.m4b) x where to_regprocedure(x) is not null
+--   ), keyed as (select to_regprocedure(x)::oid as oid from a, unnest(a.m1) x where to_regprocedure(x) is not null
 --   ), tbl as (select to_regclass(x)::oid as oid
 --                from unnest(array['public.grade_return', 'public.student_card', 'student_submit.device_session', 'student_submit.device_session_enrollment']) x
 --               where to_regclass(x) is not null
@@ -312,7 +337,8 @@
 --   ), found as (
 --       -- 1. depends on something of Batch A's in Postgres's own record, and is not Batch A's
 --       select case when coalesce(d.home = to_regclass('public.grade_return_repair_log'), false) or (d.classid = 'pg_proc'::regclass and d.objid in (select oid from theirs))
---                   then 'S0-M4b' else 'other' end as whose,
+--                   then 'S0-M4b'
+--                   when d.classid = 'pg_proc'::regclass and d.objid in (select oid from keyed) then 'S3-M1' else 'other' end as whose,
 --              'depends on Batch A: ' || pg_describe_object(d.classid, d.objid, d.objsubid) as what
 --         from dep d, a
 --        where not (d.classid = 'pg_proc'::regclass and d.objid in (select oid from known))
@@ -324,14 +350,15 @@
 --                                                   or (d.classid = 'pg_attrdef'::regclass and d.home = to_regclass('public.course'))
 --                                                   or (d.classid = 'pg_trigger'::regclass and d.name = 'grade_return_release'), false))
 --       union all   -- 2. sits on one of Batch A's four tables and is not Batch A's
---       select 'other', 'on Batch A''s table, not Batch A''s: column ' || c.relname || '.' || t.attname
+--       select case when (c.relname || '.' || t.attname) = any (a.m1_on) then 'S3-M1' else 'other' end,
+--              'on Batch A''s table, not Batch A''s: column ' || c.relname || '.' || t.attname
 --         from pg_attribute t join tbl on tbl.oid = t.attrelid join pg_class c on c.oid = t.attrelid, a
 --        where t.attnum > 0 and not t.attisdropped and (c.relname || '.' || t.attname) <> all (a.cols)
 --       union all
---       select 'other', 'on Batch A''s table, not Batch A''s: index ' || c.relname
+--       select case when c.relname::text = any (a.m1_on) then 'S3-M1' else 'other' end, 'on Batch A''s table, not Batch A''s: index ' || c.relname
 --         from pg_index i join tbl on tbl.oid = i.indrelid join pg_class c on c.oid = i.indexrelid, a where c.relname::text <> all (a.names)
 --       union all
---       select 'other', 'on Batch A''s table, not Batch A''s: constraint ' || k.conname
+--       select case when k.conname::text = any (a.m1_on) then 'S3-M1' else 'other' end, 'on Batch A''s table, not Batch A''s: constraint ' || k.conname
 --         from pg_constraint k join tbl on tbl.oid = k.conrelid, a where k.contype <> 'n' and k.conname::text <> all (a.names)
 --       union all
 --       select 'other', 'on Batch A''s table, not Batch A''s: trigger ' || t.tgname || ' on ' || t.tgrelid::regclass::text
@@ -340,7 +367,7 @@
 --       select 'other', 'on Batch A''s table, not Batch A''s: policy ' || p.polname
 --         from pg_policy p join tbl on tbl.oid = p.polrelid where p.polname not in ('grade_return_read', 'student_card_read')
 --       union all   -- 3. a function, in any schema, whose text (comments left out) names something of Batch A's
---       select case when p.oid in (select oid from theirs) then 'S0-M4b' else 'other' end,
+--       select case when p.oid in (select oid from theirs) then 'S0-M4b' when p.oid in (select oid from keyed) then 'S3-M1' else 'other' end,
 --              'names Batch A: function ' || n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')'
 --         from pg_proc p join pg_namespace n on n.oid = p.pronamespace, rx
 --        where n.nspname !~ '^pg_' and n.nspname <> 'information_schema' and p.prokind in ('f', 'p')
@@ -358,6 +385,11 @@
 --         from (select 'pg_proc'::regclass as cls, oid from pg_proc where pronamespace = to_regnamespace('fv_private')
 --               union all select 'pg_class'::regclass, oid from pg_class where relnamespace = to_regnamespace('fv_private')) x
 --        where x.oid not in (select oid from fn)
+--       union all   -- 4b. S3-M1's own: its key-id table, and a helper that names nothing of Batch A's
+--       select 'S3-M1', 'table student_submit.card_key' where to_regclass('student_submit.card_key') is not null
+--       union all
+--       select 'S3-M1', 'function ' || x from a, unnest(a.m1) x
+--        where to_regprocedure(x) is not null and x in ('student_submit._card_key_seen(text)', 'student_submit._as_teacher(uuid)')
 --       union all   -- 5. a pg_cron job whose command names something of Batch A's
 --       select case when j.jobname = 'fv_grade_return_repair_daily' then 'S0-M4b' else 'other' end, 'names Batch A: cron job ' || j.jobname
 --         from cron.job j, rx where to_regclass('public.grade_return') is not null and j.command ~ rx.re
@@ -366,6 +398,11 @@
 --                       then 'S0-M4b is applied on top of Batch A (' || (select count(distinct what) from found where whose = 'S0-M4b')
 --                            || ' of its objects found): PART 2 will stop until s0-m4b-undo.sql has been run. Any row below is something ELSE that would stop PART 2.'
 --                       else 'S0-M4b is not on top of Batch A. Any row below is something that would stop PART 2.' end as part_2
+--   union all
+--   select 0, case when exists (select 1 from found where whose = 'S3-M1')
+--                  then 'S3-M1 is applied on top of Batch A (' || (select count(distinct what) from found where whose = 'S3-M1')
+--                       || ' of its objects found): PART 2 will stop until s3-m1-undo.sql has been run.'
+--                  else 'S3-M1 is not on top of Batch A.' end
 --   union all
 --   select distinct 1, what from found where whose = 'other'
 --   order by 1, 2;
@@ -812,6 +849,7 @@ declare
     _f   record;
     _def text;
     _strangers text;   -- S0-M4b's objects
+    _keyed text;       -- S3-M1's objects
     _others text;      -- anything else
     _re text;
     _job record;
@@ -823,8 +861,9 @@ begin
     -- that depends on one of those, sits on one of its tables, or is a
     -- function whose text names one of them, stops PART 2 here, before
     -- anything is dropped, with the whole list. It knows S0-M4b's own
-    -- objects too (2026110905, applied to gradebook-prod on 2026-11-10),
-    -- only to say which of the two it has found.
+    -- objects too (2026110905, applied to gradebook-prod on 2026-11-10), and
+    -- S3-M1's (2026111003, card codes the database cannot read), only to
+    -- say which it has found: each has its own undo, which goes first.
     with a as (select
         string_to_array(   -- the 47 functions Batch A made
             'public.fv_owns_rubric_check_cell(uuid,uuid,uuid) public.fv_owns_rubric_score_cell(uuid,uuid,uuid) '
@@ -854,6 +893,15 @@ begin
         string_to_array(   -- what S0-M4b (2026110905) made, to tell it from anything else
             'public._grade_return_settle(uuid,uuid) public._grade_return_repair_class(uuid) public._grade_return_repair_lost() '
             'public._grade_return_truncated() public._grade_return_mode_changed() public.grade_return_repair_nightly()', ' ') as m4b,
+        string_to_array(   -- what S3-M1 (2026111003) made, to tell it from anything else: its functions,
+            'student_submit._card_lookup(text,text,text) student_submit.card(text,text,text) '
+            'student_submit.verify_card(text,text,text,text,text,text,text,boolean) '
+            'student_submit.issue_cards(uuid,uuid,jsonb,text,uuid) student_submit._as_teacher(uuid) '
+            'student_submit._card_key_seen(text)', ' ') as m1,
+        string_to_array(   -- and what it put on Batch A's student_card: columns, indexes, constraints
+            'student_card.code_hmac student_card.pw_hmac student_card.key_id student_card.seq student_card_code_hmac_key '
+            'student_card_enrollment_seq student_card_code_hmac_check student_card_pw_hmac_check student_card_key_id_check '
+            'student_card_seq_check student_card_live_has_tag', ' ') as m1_on,
         array['grade_return_delete', 'grade_return_insert', 'grade_return_update', 'grade_return_repoint', 'grade_return_gone', 'grade_return_release'] as trg,
         string_to_array(   -- the columns of Batch A's four tables
             'grade_return.enrollment_id grade_return.assessment_id grade_return.is_draft grade_return.returned_at '
@@ -875,6 +923,7 @@ begin
     ), fn as (select to_regprocedure(x)::oid as oid from a, unnest(a.made) x where to_regprocedure(x) is not null
     ), known as (select oid from fn union select to_regprocedure(x)::oid from a, unnest(a.patched) x where to_regprocedure(x) is not null
     ), theirs as (select to_regprocedure(x)::oid as oid from a, unnest(a.m4b) x where to_regprocedure(x) is not null
+    ), keyed as (select to_regprocedure(x)::oid as oid from a, unnest(a.m1) x where to_regprocedure(x) is not null
     ), tbl as (select to_regclass(x)::oid as oid
                  from unnest(array['public.grade_return', 'public.student_card', 'student_submit.device_session', 'student_submit.device_session_enrollment']) x
                 where to_regclass(x) is not null
@@ -905,13 +954,15 @@ begin
          where d.deptype in ('n', 'a')
     )
     select string_agg(what, '; ' order by what) filter (where whose = 'S0-M4b'),
+           string_agg(what, '; ' order by what) filter (where whose = 'S3-M1'),
            string_agg(what, '; ' order by what) filter (where whose = 'other'),
            max(what) filter (where whose = 'rx')
-      into _strangers, _others, _re
+      into _strangers, _keyed, _others, _re
       from (
         -- 1. depends on something of Batch A's in Postgres's own record, and is not Batch A's
         select case when coalesce(d.home = to_regclass('public.grade_return_repair_log'), false) or (d.classid = 'pg_proc'::regclass and d.objid in (select oid from theirs))
-                    then 'S0-M4b' else 'other' end as whose,
+                    then 'S0-M4b'
+                    when d.classid = 'pg_proc'::regclass and d.objid in (select oid from keyed) then 'S3-M1' else 'other' end as whose,
                'depends on Batch A: ' || pg_describe_object(d.classid, d.objid, d.objsubid) as what
           from dep d, a
          where not (d.classid = 'pg_proc'::regclass and d.objid in (select oid from known))
@@ -923,14 +974,15 @@ begin
                                                     or (d.classid = 'pg_attrdef'::regclass and d.home = to_regclass('public.course'))
                                                     or (d.classid = 'pg_trigger'::regclass and d.name = 'grade_return_release'), false))
         union all   -- 2. sits on one of Batch A's four tables and is not Batch A's
-        select 'other', 'on Batch A''s table, not Batch A''s: column ' || c.relname || '.' || t.attname
+        select case when (c.relname || '.' || t.attname) = any (a.m1_on) then 'S3-M1' else 'other' end,
+               'on Batch A''s table, not Batch A''s: column ' || c.relname || '.' || t.attname
           from pg_attribute t join tbl on tbl.oid = t.attrelid join pg_class c on c.oid = t.attrelid, a
          where t.attnum > 0 and not t.attisdropped and (c.relname || '.' || t.attname) <> all (a.cols)
         union all
-        select 'other', 'on Batch A''s table, not Batch A''s: index ' || c.relname
+        select case when c.relname::text = any (a.m1_on) then 'S3-M1' else 'other' end, 'on Batch A''s table, not Batch A''s: index ' || c.relname
           from pg_index i join tbl on tbl.oid = i.indrelid join pg_class c on c.oid = i.indexrelid, a where c.relname::text <> all (a.names)
         union all
-        select 'other', 'on Batch A''s table, not Batch A''s: constraint ' || k.conname
+        select case when k.conname::text = any (a.m1_on) then 'S3-M1' else 'other' end, 'on Batch A''s table, not Batch A''s: constraint ' || k.conname
           from pg_constraint k join tbl on tbl.oid = k.conrelid, a where k.contype <> 'n' and k.conname::text <> all (a.names)
         union all
         select 'other', 'on Batch A''s table, not Batch A''s: trigger ' || t.tgname || ' on ' || t.tgrelid::regclass::text
@@ -939,7 +991,7 @@ begin
         select 'other', 'on Batch A''s table, not Batch A''s: policy ' || p.polname
           from pg_policy p join tbl on tbl.oid = p.polrelid where p.polname not in ('grade_return_read', 'student_card_read')
         union all   -- 3. a function, in any schema, whose text (comments left out) names something of Batch A's
-        select case when p.oid in (select oid from theirs) then 'S0-M4b' else 'other' end,
+        select case when p.oid in (select oid from theirs) then 'S0-M4b' when p.oid in (select oid from keyed) then 'S3-M1' else 'other' end,
                'names Batch A: function ' || n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')'
           from pg_proc p join pg_namespace n on n.oid = p.pronamespace, rx
          where n.nspname !~ '^pg_' and n.nspname <> 'information_schema' and p.prokind in ('f', 'p')
@@ -957,6 +1009,11 @@ begin
           from (select 'pg_proc'::regclass as cls, oid from pg_proc where pronamespace = to_regnamespace('fv_private')
                 union all select 'pg_class'::regclass, oid from pg_class where relnamespace = to_regnamespace('fv_private')) x
          where x.oid not in (select oid from fn)
+        union all   -- 4b. S3-M1's own: its key-id table, and a helper that names nothing of Batch A's
+        select 'S3-M1', 'table student_submit.card_key' where to_regclass('student_submit.card_key') is not null
+        union all
+        select 'S3-M1', 'function ' || x from a, unnest(a.m1) x
+         where to_regprocedure(x) is not null and x in ('student_submit._card_key_seen(text)', 'student_submit._as_teacher(uuid)')
         union all select 'rx', re from rx
       ) found;
     -- A pg_cron job whose command names something of Batch A's. (cron.job is
@@ -970,8 +1027,9 @@ begin
             end if;
         end loop;
     end if;
-    if _strangers is not null or _others is not null then
-        raise exception '%', coalesce('S0-M4b (2026110905_grade_return_limits.sql) is applied on top of Batch A. Run S0-M4b''s undo first (migrations/local-test/s0-m4b-undo.sql, both its parts), then this. Found of it: ' || _strangers || '. ', '')
+    if _keyed is not null or _strangers is not null or _others is not null then
+        raise exception '%', coalesce('S3-M1 (2026111003_card_codes_keyed.sql) is applied on top of Batch A. Run S3-M1''s undo first (migrations/local-test/s3-m1-undo.sql), then this. Found of it: ' || _keyed || '. ', '')
+            || coalesce('S0-M4b (2026110905_grade_return_limits.sql) is applied on top of Batch A. Run S0-M4b''s undo first (migrations/local-test/s0-m4b-undo.sql, both its parts), then this. Found of it: ' || _strangers || '. ', '')
             || coalesce('Something else stands on Batch A, and PART 2 would break it or lose it: ' || _others || '. ', '')
             || 'Nothing was changed.';
     end if;

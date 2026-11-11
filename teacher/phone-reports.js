@@ -186,7 +186,7 @@ var PhoneReports = (function () {
           line: (tag && (tag.i_can_statements || [])[0]) || '',
           text: formatLevel(cid, sp, ''),
           word: levelWord(cid, sp) || '',
-          level: sp > 0 ? Math.round(sp) : 0,
+          level: sp > 0 ? roundLevel(sp) : 0,
         };
       }),
       comment: _paragraphs(ReportBlocks.printableComment(cid, rating, rating.narrative)),
@@ -307,8 +307,14 @@ var PhoneReports = (function () {
     });
   }
 
+  /* Send and Update build each student's copy from returned grades. In a
+     class whose returned grades have not loaded yet (ReportScores.ready)
+     neither does anything: the page shows the class's loading line, and
+     redraws once they load. A copy that cannot be built after all (the
+     grades stopped being readable mid-send) sends nothing and lets go of
+     Sending…, never leaving the button stuck. */
   function send(cid, ctx, expiresOn) {
-    if (_busy) return Promise.resolve();
+    if (_busy || !ReportScores.ready(cid)) return Promise.resolve();
     _busy = true;
     _msg = 'Sending…';
     _rerender();
@@ -351,13 +357,29 @@ var PhoneReports = (function () {
         return printSlips(cid, report, null).then(function () {
           return report;
         });
+      })
+      .catch(function (e) {
+        console.error('Sent to Phones did not send:', e);
+        _busy = false;
+        _msg = '';
+        _rerender();
+        return null;
       });
   }
 
   function update(cid, report, ctx) {
+    if (!ReportScores.ready(cid)) return Promise.resolve(null);
     _msg = 'Updating…';
     _rerender();
-    var students = _copies(cid, Object.assign({}, ctx, { issued: report.issued_at }));
+    var students;
+    try {
+      students = _copies(cid, Object.assign({}, ctx, { issued: report.issued_at }));
+    } catch (e) {
+      console.error('Update Issued Copy did not update:', e);
+      _msg = '';
+      _rerender();
+      return Promise.resolve(null);
+    }
     var done = function (fresh) {
       _msg = fresh ? 'Updated. Phones now show today’s copy.' : 'Could not update. Check the connection and try again.';
       if (fresh) _store(cid, fresh);

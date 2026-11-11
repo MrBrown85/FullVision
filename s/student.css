@@ -665,100 +665,188 @@ button {
 .sp-away #app {
   visibility: hidden;
 }
-/* The page's header: the class on the left, Done on the right, both in
-   reach as the list scrolls. */
-.sp-head-page {
-  flex-direction: row;
+/* The page for one class (s/page-view.js, styled by s/page-view.css) fills
+   the window, the full width of a Chromebook as on its board. */
+.sp-app:has(> .sp-view) {
+  max-width: none;
+}
+.sp-app > .sp-view {
+  flex: 1;
+}
+
+/* Phone-only and Chromebook-only blocks (S3-F3). */
+.sp-wide-block {
+  display: none;
+}
+.sp-btn-tint {
+  background: rgba(0, 122, 255, 0.12);
+  color: #0058d0;
+  gap: 8px;
+  font-size: 16px;
+  min-height: 48px;
+}
+.sp-card-add .sp-lead {
+  color: var(--sp-text-2);
+}
+.sp-card-add > .sp-btn-line {
+  width: 100%;
+}
+
+/* After Done (the artboard's "After Done"). */
+.sp-signed-out {
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  text-align: center;
+  gap: 16px;
 }
-.sp-head-words {
-  min-width: 0;
+.sp-out-mark {
+  width: 84px;
+  height: 84px;
+  border-radius: 42px;
+  background: var(--sp-green-soft);
+  color: var(--sp-green);
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  justify-content: center;
 }
-.sp-done {
-  flex: none;
-  padding: 0 18px;
-}
-.sp-page {
-  gap: 10px;
-}
-.sp-page-title:focus {
+.sp-signed-out .sp-big:focus {
   outline: none;
 }
-.sp-page-title {
-  margin: 4px 4px 2px;
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.2;
+.sp-signed-out .sp-lead {
+  font-size: 16px;
+  color: #3a3a3c;
 }
-.sp-list {
+.sp-signed-out .sp-btn {
+  margin-top: 20px;
+  width: 100%;
+  border-radius: 14px;
+  min-height: 52px;
+}
+
+/* Your Classes (the artboard's "Switching Classes"): a sheet from the
+   bottom over the page, dimmed behind. */
+.sp-sheet-back {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  border: 0;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.35);
+  cursor: default;
+}
+.sp-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+  max-width: 560px;
+  max-height: 85vh;
+  margin: 0 auto;
+  overflow-y: auto;
+  background: var(--sp-card);
+  border-radius: 22px 22px 0 0;
+  padding: 10px 16px calc(30px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sp-sheet-grip {
+  align-self: center;
+  width: 40px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--sp-line);
+}
+.sp-sheet-title {
+  margin: 0;
+  padding: 4px 4px 2px;
+  font-size: 19px;
+  font-weight: 700;
+}
+.sp-sheet-title:focus {
+  outline: none;
+}
+.sp-classes {
   list-style: none;
   margin: 0;
   padding: 0;
-  background: var(--sp-card);
   border-radius: 14px;
-  box-shadow: var(--sp-shadow);
   overflow: hidden;
+  background: var(--sp-bg);
 }
-.sp-row {
+.sp-classes li + li {
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+.sp-class {
+  width: 100%;
+  min-height: 56px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 56px;
-  padding: 10px 14px;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 0;
+  background: transparent;
+  text-align: left;
 }
-.sp-row + .sp-row {
-  border-top: 1px solid var(--sp-fill);
+.sp-class-on {
+  background: rgba(0, 122, 255, 0.08);
 }
-.sp-dot {
-  flex: none;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--sp-field);
-}
-.sp-dot-back {
-  background: var(--sp-green);
-}
-.sp-dot-missing {
-  background: var(--sp-amber);
-}
-.sp-row-text {
+.sp-class-words {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 1px;
 }
-.sp-row-title {
+.sp-class-name {
   font-size: 16px;
-  font-weight: 500;
-  line-height: 1.3;
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
-.sp-row-sub {
+.sp-class-sub {
   font-size: 13px;
-  line-height: 1.35;
-  color: var(--sp-text-2);
+  color: #58585d;
 }
-.sp-row-result {
+.sp-class-tick {
   flex: none;
-  max-width: 45%;
-  font-size: 16px;
-  font-weight: 700;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
+  color: var(--sp-blue);
+  display: flex;
 }
-.sp-empty {
-  padding: 24px 4px;
-  color: var(--sp-text-2);
+.sp-class-tick svg {
+  width: 18px;
+  height: 18px;
 }
-.sp-page .sp-demo-note {
-  margin-top: 8px;
+
+/* Scan the Code With the Camera (a Chromebook). */
+.sp-or-line {
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #58585d;
+}
+.sp-or-line::before,
+.sp-or-line::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--sp-fill);
+}
+.sp-scan-frame {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #2c2c2e;
+}
+.sp-scan-video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+.sp-card-scan .sp-big:focus,
+.sp-card-add .sp-big:focus {
+  outline: none;
 }
 /* The results didn't load (calc.js could not be fetched). */
 .sp-no-results {
@@ -825,14 +913,494 @@ button {
   .sp-card-form .sp-fine {
     text-align: left;
   }
-  /* The page for one class gets a wider column. */
-  .sp-app:has(.sp-page) {
-    max-width: 760px;
+  .sp-narrow-block {
+    display: none;
   }
-  .sp-page {
-    padding: 24px;
+  .sp-wide-block {
+    display: block;
   }
-  .sp-page-title {
-    font-size: 26px;
+  .sp-or-line.sp-wide-block {
+    display: flex;
   }
+  .sp-btn.sp-wide-block {
+    display: flex;
+  }
+  /* The Chromebook board's buttons: rounder, a little shorter. */
+  .sp-card-start .sp-btn,
+  .sp-check-box .sp-btn {
+    min-height: 44px;
+    border-radius: 22px;
+    font-size: 16px;
+  }
+  .sp-card-start .sp-btn-line {
+    border: 0;
+    background: rgba(0, 122, 255, 0.12);
+    color: #0058d0;
+    font-weight: 600;
+  }
+  .sp-card-add .sp-lead {
+    font-size: 15px;
+  }
+  /* Is This You? as the Chromebook board's step 2: one card in the middle. */
+  .sp-card-check {
+    flex: none;
+    align-items: center;
+    padding-top: 96px;
+  }
+  .sp-check-box {
+    width: 440px;
+    max-width: 100%;
+    padding: 32px 36px;
+    border-radius: 20px;
+    background: var(--sp-card);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .sp-check-class {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #58585d;
+  }
+  .sp-check-box .sp-hello {
+    padding: 0;
+    background: none;
+    box-shadow: none;
+    align-items: stretch;
+    text-align: left;
+    gap: 6px;
+  }
+  .sp-hello-who {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .sp-check-box .sp-avatar {
+    flex: none;
+    width: 48px;
+    height: 48px;
+    border-radius: 24px;
+    background: #0058d0;
+    font-size: 20px;
+    font-weight: 700;
+  }
+  .sp-check-box .sp-lead {
+    font-size: 15px;
+    color: #3a3a3c;
+  }
+  .sp-check-box .sp-ident-card {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+  }
+  .sp-check-box .sp-ident .sp-lead {
+    text-align: left;
+  }
+  .sp-check-box .sp-btn-line {
+    margin-top: -6px;
+    border: 0;
+    background: rgba(0, 122, 255, 0.12);
+    color: #0058d0;
+    font-weight: 600;
+  }
+  .sp-card-check > .sp-btn-line,
+  .sp-card-check > .sp-fine {
+    width: 440px;
+    max-width: 100%;
+  }
+  /* Your Classes: a card under the class's name, not a sheet from the bottom. */
+  .sp-sheet {
+    top: 72px;
+    bottom: auto;
+    left: 50%;
+    right: auto;
+    width: 420px;
+    max-width: calc(100% - 32px);
+    margin: 0;
+    transform: translateX(-50%);
+    border-radius: 18px;
+    padding: 16px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.18);
+  }
+  .sp-sheet-grip {
+    display: none;
+  }
+  /* After Done: in the middle, the width of the sign-in card. */
+  .sp-signed-out {
+    width: 440px;
+    max-width: 100%;
+    margin: 0 auto;
+  }
+}
+
+/* A phone report opened from a card's page (S4-F4): the way back above it. */
+.sp-report-back {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 12px 16px 0;
+}
+
+/* Your Classes: how many pieces wait in each class (S4-W1). */
+.sp-class-todo {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sp-blue-text, #0066cc);
+}
+
+/* Sending work (S5-F2, S5-F3; s/send.js): Check and Send, the camera and
+   file buttons, Sent, Not Sent Yet, One Page Didn't Send, the blurry check,
+   and Unsend or Replace over a card. */
+.sp-send {
+  max-width: 560px;
+  width: 100%;
+  margin: 0 auto;
+}
+.sp-send-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sp-send-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+.sp-send-head-words {
+  display: flex;
+  flex-direction: column;
+}
+.sp-send-head-piece,
+.sp-send-piece {
+  margin: 0;
+  font-size: 15px;
+  color: #58585d;
+  overflow-wrap: anywhere;
+}
+.sp-send-head-page {
+  font-size: 17px;
+  font-weight: 700;
+}
+.sp-send-due {
+  margin: 0;
+  font-size: 15px;
+}
+.sp-send-late {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #fff1db;
+  color: #8a4b00;
+  font-weight: 600;
+}
+.sp-send-pages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+}
+.sp-send-page {
+  position: relative;
+}
+.sp-send-page-img {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--sp-line, #d1d1d6);
+  background: #e5e5ea;
+  display: block;
+}
+.sp-send-page-failed .sp-send-page-img {
+  outline: 3px solid #b45309;
+}
+.sp-send-page-n {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 11px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sp-send-page-x {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 32px;
+  height: 32px;
+  border-radius: 16px;
+  border: 0;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: 20px;
+  line-height: 1;
+}
+.sp-send-add,
+.sp-send-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sp-send-row {
+  display: flex;
+  gap: 8px;
+}
+.sp-send-row .sp-btn {
+  flex: 1;
+}
+.sp-send label.sp-btn {
+  position: relative;
+  cursor: pointer;
+}
+.sp-send-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+}
+label.sp-btn:focus-within {
+  outline: 3px solid var(--sp-blue);
+  outline-offset: 2px;
+}
+.sp-send-hint,
+.sp-send-msg {
+  margin: 0;
+  font-size: 14px;
+  color: #58585d;
+}
+.sp-send-note-label {
+  font-size: 15px;
+  font-weight: 600;
+}
+.sp-send-note {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--sp-line, #d1d1d6);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 16px;
+  resize: vertical;
+}
+.sp-send-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.sp-send-center .sp-send-col,
+.sp-send-center .sp-btn {
+  align-self: stretch;
+}
+.sp-send-tick {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 28px;
+  background: #bbf7d0;
+  color: #166534;
+  font-size: 30px;
+  font-weight: 700;
+}
+.sp-send-when {
+  margin: 0;
+  font-size: 15px;
+  color: #58585d;
+}
+.sp-send-thumbs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.sp-send-thumb {
+  width: 72px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--sp-line, #d1d1d6);
+}
+.sp-send-blurry-img {
+  width: 100%;
+  max-height: 50vh;
+  object-fit: contain;
+  border-radius: 12px;
+  background: #1d1d1f;
+}
+.sp-send-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sp-send-ask-body {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.45;
+}
+.sp-send-ask-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sp-btn-danger {
+  background: #c62828;
+  color: #fff;
+}
+.sp-send-head .sp-head-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--sp-blue, #007aff);
+}
+
+/* Reflect on Feedback (S10-F1; s/reflect.js) and Did You Do It? on Check
+   and Send (S10-F2). The screen reuses Your Feedback's look (page-view.css,
+   under .sp-view). */
+.sp-reflect {
+  max-width: 620px;
+  width: 100%;
+  margin: 0 auto;
+}
+.sp-reflect-view {
+  min-height: 0;
+  background: transparent;
+}
+.sp-reflect-view .sp-fb-back.sp-reflect-back {
+  display: inline-flex;
+}
+.sp-reflect-step {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: var(--sp-card);
+  border-radius: 18px;
+}
+.sp-reflect-step-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+.sp-reflect-n {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 13px;
+  background: var(--sp-text);
+  color: #fff;
+  font-size: 14px;
+}
+.sp-reflect-aside {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sp-text-2);
+}
+.sp-reflect-box {
+  width: 100%;
+  min-height: 84px;
+  padding: 10px 12px;
+  border: 1px solid var(--sp-field);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--sp-text);
+  font: inherit;
+  font-size: 16px;
+  resize: vertical;
+}
+.sp-reflect-line,
+.sp-reflect-private {
+  margin: 0;
+  font-size: 15px;
+  color: var(--sp-text-2);
+}
+.sp-reflect-sent {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+.sp-seg-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.sp-seg-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.sp-talk {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sp-bubble {
+  max-width: 88%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: var(--sp-card);
+}
+.sp-bubble-mine {
+  align-self: flex-end;
+  background: #e8f1ff;
+}
+.sp-bubble-who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sp-text-2);
+}
+.sp-bubble-words {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.sp-send-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-left: 4px solid var(--sp-green-line);
+  border-radius: 12px;
+  background: #f0f7f1;
+}
+.sp-send-plan .sp-plan-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sp-green);
+}
+.sp-send-plan .sp-plan-words {
+  margin: 0;
+  font-size: 16px;
+}
+.sp-send-plan-ask {
+  margin: 4px 0 0;
+  font-size: 15px;
+  font-weight: 700;
 }

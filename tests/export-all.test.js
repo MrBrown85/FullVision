@@ -386,9 +386,11 @@ describe('the export stays complete', () => {
     getAssignmentObs: 'a subset of getAllQuickObs',
     getCategories: 'read through getAssessmentCategoryName',
     getCategoryById: 'read through getAssessmentCategoryName',
+    getCategoryDraft: 'category edits not yet saved, kept on this device until they are; not a record',
     getCompetencyGroupById: 'the learning map, not student data',
     getCompetencyGroups: 'the learning map, not student data',
     getCoreSelf: 'Core Competency steps entered from reflection sheets; shown on the Dashboard only',
+    getCardsWorkUntil: 'the last day the class’s student cards open; a class setting, not student data',
     getCourseConfig: 'class settings, not student data',
     getCustomTags: 'observation tag names, not student data',
     getDibelsScore: 'read through assessmentCellValue (the reading level)',
@@ -407,7 +409,6 @@ describe('the export stays complete', () => {
     getQuickObsByDim: 'a subset of getAllQuickObs',
     getRemovedSections: 'the learning map, not student data',
     getReportConfig: 'report layout settings, not student data',
-    getReturnSettings: 'class settings, not student data',
     getRubricById: 'read through _assessmentRubric',
     getRubricCheckIds: 'Advanced Rubric ticks; the level they suggest is on Rubric Levels',
     getRubricChecks: 'Advanced Rubric ticks; the level they suggest is on Rubric Levels',
@@ -422,6 +423,33 @@ describe('the export stays complete', () => {
     getStudentTermRating: 'read through getTermRatings',
     getSubjects: 'the learning map, not student data',
     getCompletionMark: 'read through assessmentCellValue',
+    // Student work (S5-F5): photos of student work are not in this file (Q22).
+    getCourseSubmissions: 'student work, kept out with its photos',
+    getStudentSubmission: 'student work, kept out with its photos',
+    getAssessmentStudentWork: 'student work settings, kept out with the photos',
+    getStudentWork: 'the student page’s view of student work',
+    // Group work (S12-T1): student work read by group, kept out with its photos.
+    getStudentWorkGroup: 'the group on the assessment, already in the class file',
+    getGroupSubmissions: 'student work, kept out with its photos',
+    getGroupWorkFiles: 'student work, kept out with its photos',
+    getStudentGroupWork: 'the student page’s view of group work',
+    // Mark Up (S9): drawing data over the photos, kept out with them.
+    getPageMarkup: 'Mark Up on a page of student work, kept out with the photos',
+    getAssessmentMarkup: 'Mark Up on student work, kept out with the photos',
+    getStudentMarkup: 'the student page’s view of Mark Up',
+    getStudentMarkCounts: 'the student page’s count of Mark Up notes',
+    // Reflect on Feedback (S10): Demo Mode only until S10-W1; kept out with student work.
+    getReflectOnFeedback: 'a class switch, not student data',
+    getCourseFeedback: 'reflections on student work, Demo Mode only for now',
+    getQuestionsWaiting: 'a subset of getCourseFeedback',
+    getStudentReflections: 'a subset of getCourseFeedback',
+    getStudentLastPlan: 'a subset of getCourseFeedback',
+    getStudentFeedback: 'the student page’s view of its own feedback',
+    // Revisions (S11): Demo Mode only until S11-W1; kept out with student work.
+    getRevisionRequest: 'a revision request on student work, Demo Mode only for now',
+    getStudentRevision: 'the student page’s view of its own revision',
+    getSubmissionVersions: 'student work, kept out with its photos',
+    getRevisionFirstCell: 'the first version’s result, read through assessmentCellValue',
   };
 
   it('uses every per-class reader in shared/data.js, or says why not', () => {
@@ -434,5 +462,64 @@ describe('the export stays complete', () => {
     // A reader that is used, or gone, comes off the list.
     const stale = Object.keys(LEFT_OUT).filter(name => !readers.includes(name) || used.includes(name));
     expect(stale).toEqual([]);
+  });
+});
+
+describe('photos of student work (S8-F2)', () => {
+  const NOTE = 'Photos of student work are not in this file.';
+
+  function withSendWork(on, fn) {
+    const wasDemo = window.isDemoMode;
+    window.isDemoMode = () => true;
+    try {
+      saveDemoStudentWork(CID, { course: { send_work: on } });
+      return fn();
+    } finally {
+      window.isDemoMode = wasDemo;
+    }
+  }
+
+  it('says on Contents that photos are not in the file, for a class with its student page and Send Work on', () => {
+    seed({ config: { student_page_enabled: true } });
+    withSendWork(true, () => expect(sheet(rows(), 'Contents').notes).toContain(NOTE));
+  });
+
+  it('says nothing new while either is off', () => {
+    seed();
+    expect(sheet(rows(), 'Contents').notes).not.toContain(NOTE);
+    withSendWork(true, () => expect(sheet(rows(), 'Contents').notes).not.toContain(NOTE));
+    seed({ config: { student_page_enabled: true } });
+    withSendWork(false, () => expect(sheet(rows(), 'Contents').notes).not.toContain(NOTE));
+  });
+
+  it('puts nothing of the work sent in the file: no page, no note, no file name', () => {
+    const wasDemo = window.isDemoMode;
+    window.isDemoMode = () => true;
+    try {
+      seed({ config: { student_page_enabled: true }, assessments: [level('a1')] });
+      saveDemoStudentWork(CID, {
+        course: { send_work: true },
+        assessments: [{ id: 'a1', students_send: 'photos' }],
+        submissions: [
+          {
+            id: 'sub-1',
+            assessment_id: 'a1',
+            enrollment_id: 's1',
+            state: 'sent',
+            sent_by: 'student',
+            note: 'ZZSENT my note',
+            sent_at: '2026-10-11T16:00:00.000Z',
+            files: [
+              { id: 'f1', page: 1, path: 'zz-page.jpg', thumb_path: 'zz-page-thumb.jpg', sha256: 'ab'.repeat(32) },
+            ],
+          },
+        ],
+      });
+      expect(getCourseSubmissions(CID).submissions).toHaveLength(1);
+      const out = JSON.stringify(rows());
+      ['ZZSENT', 'zz-page', 'sub-1', 'ab'.repeat(32)].forEach(v => expect(out).not.toContain(v));
+    } finally {
+      window.isDemoMode = wasDemo;
+    }
   });
 });

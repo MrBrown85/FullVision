@@ -50,7 +50,7 @@ shots:
 
 ## Import a Roster
 
-A roster file is a CSV file with a header row and one row per student. Columns are matched by their headings, in any order.
+A roster file is a CSV file with a header row and one row per student. Columns are matched by their headings, in any order. A class list downloaded from MyEducation BC can be imported as it is: [Get a Class List From MyEducation BC](get-a-class-list-from-myeducation-bc) shows where to find it.
 
 1. On the **Students** tab, choose **Import Roster**. The panel lists every column the import reads. **Download Template** saves a sample file.
 2. Choose **Choose File**, then select the roster file.

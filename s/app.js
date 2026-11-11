@@ -5,22 +5,30 @@
    Assignments list (assignments.js).
 
    A card is not a slip. A slip opens one questionnaire or one report; a card
-   opens the student's page for the course. The boards draw both codes as six
-   characters, so the page does not guess from the shape: the server tells
-   (`kind: 'card'`).
+   opens the student's page for the course. A card's code is eight
+   characters and a slip's six (Colin, Nov 10), but the page does not guess
+   from the shape: the server tells (`kind: 'card'`).
 
-   The card path asks the student-submit edge function five things, each
+   The card path asks the student-submit edge function six things, each
    one route (supabase/functions/student-submit/card-routes.ts):
-     card    a code in; whose card, which class and which check out
-     verify  the code again with what the student typed; a session out
-     page    the student's page for one class of the session
-     seen    the returned pieces the student has opened
-     done    Done: the session ends
+     card      a code in; whose card, which class and which check out
+     verify    the code again with what the student typed; a session out
+     add-card  the same check from Add Another Card: the class joins the
+               session this device has (Switching Classes)
+     page      the student's page for one class of the session
+     seen      the returned pieces the student has opened
+     done      Done: the session ends
    `ask` is the one place they are asked. Demo Mode (#demo-card;
    #demo-card-password for the card's password; #demo-card-letter and
-   #demo-card-both for a class graded by letter or both) answers all five
+   #demo-card-both for a class graded by letter or both) answers all six
    on the device in the shapes the function uses, and calls nothing; every
    screen and every step after `ask` is the same code for both.
+
+   S3-F3 adds the rest of the sign-in boards: After Done, Switching Classes
+   (Your Classes and Add Another Card), and on a Chromebook Is This You? as
+   one card and Scan the Code With the Camera. The locks (five wrong in a
+   row, fifteen in seven days, too many wrong codes from one address) are
+   the server's; this page says what the server answers.
 
    The session. A right answer to Is This You? starts one; the function
    gives back a token, and that token is the only thing this page keeps on
@@ -75,17 +83,28 @@
     return state.demo && text ? '<p class="sp-fine sp-demo-note">' + esc(text) + '</p>' : '';
   }
 
+  /* The card's first screen, and Add Another Card (Switching Classes),
+     which is the same screen for a student who is signed in. Adding, the
+     phone's own camera is not offered: a code it scans opens the page from
+     the start, which signs the student out first (Colin, Nov 9). So the
+     code is typed, or on a Chromebook scanned with this page's camera. */
   function renderCardStart(state) {
+    var add = !!adding;
     return (
-      '<main class="sp-main sp-main-center sp-card-start">' +
+      '<main class="sp-main sp-main-center sp-card-start' +
+      (add ? ' sp-card-add' : '') +
+      '">' +
       '<div class="sp-brand">FullVision</div>' +
-      '<h1 class="sp-big"><span class="sp-narrow">Scan the code on your card</span>' +
-      '<span class="sp-wide">Type the code on your card</span></h1>' +
-      '<div class="sp-narrow">' +
-      SCAN_PICTURE +
-      '</div>' +
+      (add
+        ? '<h1 class="sp-big" tabindex="-1">Add Another Card</h1>' +
+          '<p class="sp-lead">Type the code on the card for your other class.</p>'
+        : '<h1 class="sp-big"><span class="sp-narrow">Scan the code on your card</span>' +
+          '<span class="sp-wide">Type the code on your card</span></h1>' +
+          '<div class="sp-narrow">' +
+          SCAN_PICTURE +
+          '</div>') +
       '<form class="sp-card-form" data-form="card" novalidate>' +
-      '<div class="sp-or sp-narrow">or type it</div>' +
+      (add ? '' : '<div class="sp-or sp-narrow">or type it</div>') +
       '<label class="sp-sub-label sp-card-label" for="sp-code">Card Code</label>' +
       '<input id="sp-code" class="sp-input sp-card-code" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="9" value="' +
       esc(state.typed) +
@@ -95,11 +114,157 @@
           ? '<p class="sp-msg sp-msg-calm" role="status">' + esc(state.message) + '</p>'
           : '<p class="sp-msg" role="alert">' + esc(state.message) + '</p>'
         : '') +
-      demoNote(state, 'This is Demo Mode. Any code opens the sample card.') +
+      demoNote(
+        state,
+        add
+          ? 'This is Demo Mode. Any code adds a second sample class.'
+          : 'This is Demo Mode. Any code opens the sample card.',
+      ) +
       '<button type="submit" class="sp-btn sp-btn-primary">Continue</button>' +
       '</form>' +
+      (canScan()
+        ? '<div class="sp-or-line sp-wide-block" aria-hidden="true">or</div>' +
+          '<button type="button" class="sp-btn sp-btn-tint sp-wide-block" data-act="card-camera">Scan the Code With the Camera</button>'
+        : '') +
+      (add ? '<button type="button" class="sp-btn sp-btn-line" data-act="card-back">Back to Your Page</button>' : '') +
       '</main>'
     );
+  }
+
+  /* ── Scan the Code With the Camera (a Chromebook) ──────────── */
+
+  /* A phone scans a card with its own camera app, which opens this page at
+     the card's address. A Chromebook has a camera but no such app, so on a
+     wide screen this page offers its own: the camera's picture, read for a
+     QR code by the browser's own reader (BarcodeDetector, which Chrome has
+     on a Chromebook). A browser without that reader is not offered it. The
+     picture never leaves the device: it is read in the browser and nothing
+     of it is kept or sent. */
+  function canScan() {
+    return (
+      typeof BarcodeDetector === 'function' &&
+      typeof navigator !== 'undefined' &&
+      !!navigator.mediaDevices &&
+      typeof navigator.mediaDevices.getUserMedia === 'function'
+    );
+  }
+
+  function renderCardScan() {
+    return (
+      '<main class="sp-main sp-main-center sp-card-start sp-card-scan">' +
+      '<div class="sp-brand">FullVision</div>' +
+      '<h1 class="sp-big" tabindex="-1">Scan the code on your card</h1>' +
+      '<p class="sp-lead">Hold your card up to the camera.</p>' +
+      '<div class="sp-scan-frame"><video class="sp-scan-video" autoplay muted playsinline aria-hidden="true"></video></div>' +
+      '<button type="button" class="sp-btn sp-btn-line" data-act="card-type">Type the Code Instead</button>' +
+      '</main>'
+    );
+  }
+
+  var CAMERA_FAILED = 'The camera didn’t open. Type the code on your card instead.';
+  var SCAN_EVERY_MS = 250;
+  // The camera that is on: { stream, timer }. Null when it is off.
+  var scanning = null;
+
+  function stopCamera() {
+    var s = scanning;
+    scanning = null;
+    if (!s) return;
+    if (s.timer) clearTimeout(s.timer);
+    if (s.stream && typeof s.stream.getTracks === 'function') {
+      s.stream.getTracks().forEach(function (t) {
+        t.stop();
+      });
+    }
+  }
+
+  // Back to the code box, saying `message` if there is one.
+  function cameraOff(message) {
+    stopCamera();
+    S.screen = 'cardstart';
+    S.message = message || '';
+    S.calm = false;
+    paint('#sp-code');
+  }
+
+  /* A code from what the camera read: a card's address
+     (fullvision.ca/s/#P3R8WDK4) or the code alone. */
+  function codeFrom(raw) {
+    var text = String(raw || '');
+    var at = text.indexOf('#');
+    var c = cleanCode(at >= 0 ? decodeURIComponent(text.slice(at + 1)) : text);
+    return isCode(c) ? c : '';
+  }
+
+  /* The camera starts. Every answer from it (the camera opening, a frame
+     read) checks that this is still the camera on screen before it does
+     anything: Type the Code Instead, a hidden tab or a new screen turns it
+     off, and whatever arrives after that is dropped. */
+  function startCamera() {
+    stopCamera();
+    var mine = { stream: null, timer: 0 };
+    scanning = mine;
+    S.message = '';
+    S.screen = 'cardscan';
+    paint('.sp-big');
+    var detector;
+    try {
+      detector = new BarcodeDetector({ formats: ['qr_code'] });
+    } catch (e) {
+      cameraOff(CAMERA_FAILED);
+      return Promise.resolve();
+    }
+    return navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false }).then(
+      function (stream) {
+        if (scanning !== mine || S.screen !== 'cardscan') {
+          stream.getTracks().forEach(function (t) {
+            t.stop();
+          });
+          return;
+        }
+        mine.stream = stream;
+        var video = typeof document !== 'undefined' ? document.querySelector('.sp-scan-video') : null;
+        if (!video) return cameraOff(CAMERA_FAILED);
+        video.srcObject = stream;
+        if (typeof video.play === 'function') {
+          var played = video.play();
+          if (played && typeof played.catch === 'function') played.catch(function () {});
+        }
+        read(mine, detector, video);
+      },
+      function () {
+        if (scanning === mine) cameraOff(CAMERA_FAILED);
+      },
+    );
+  }
+
+  // One look at the picture, then the next, until a code is found.
+  function read(mine, detector, video) {
+    mine.timer = setTimeout(function () {
+      mine.timer = 0;
+      if (scanning !== mine) return;
+      Promise.resolve()
+        .then(function () {
+          return detector.detect(video);
+        })
+        .then(
+          function (found) {
+            if (scanning !== mine || S.screen !== 'cardscan') return;
+            var c = '';
+            (found || []).some(function (b) {
+              c = codeFrom(b && b.rawValue);
+              return !!c;
+            });
+            if (!c) return read(mine, detector, video);
+            stopCamera();
+            return openCard(c);
+          },
+          function () {
+            // The picture was not ready yet: look again.
+            if (scanning === mine) read(mine, detector, video);
+          },
+        );
+    }, SCAN_EVERY_MS);
   }
 
   /* ── Is This You? ──────────────────────────────────────────── */
@@ -117,19 +282,32 @@
     );
   }
 
+  /* Is This You? On a phone, as the phone board draws it: the class at the
+     top, the student's card, the two buttons under it. On a Chromebook, as
+     the Chromebook board's step 2: one card in the middle holding the
+     class, the student, the check and both buttons. The code box under it
+     is the phone's ("No camera?"); a Chromebook typed its code already. */
   function renderCardCheck(state) {
     var d = state.data;
     var first = (d.student && d.student.first_name) || '';
     return (
+      '<div class="sp-narrow-block">' +
       header(className(d.course), TITLE) +
-      '<main class="sp-main sp-main-center">' +
+      '</div>' +
+      '<main class="sp-main sp-main-center sp-card-check">' +
+      '<div class="sp-check-box">' +
+      '<p class="sp-check-class sp-wide-block">' +
+      esc(className(d.course)) +
+      '</p>' +
       '<section class="sp-card sp-hello">' +
+      '<div class="sp-hello-who">' +
       '<div class="sp-avatar" aria-hidden="true">' +
       esc(first.charAt(0).toUpperCase()) +
       '</div>' +
       '<h1 class="sp-big">' +
       esc('Is this you, ' + first + '?') +
       '</h1>' +
+      '</div>' +
       '<p class="sp-lead">This page is just for you.</p>' +
       (d.check ? '<div class="sp-ident sp-ident-card">' + identityFields(state) + '</div>' : '') +
       '</section>' +
@@ -139,10 +317,25 @@
       (state.sending ? 'Checking…' : 'Yes, That’s Me') +
       '</button>' +
       '<button type="button" class="sp-btn sp-btn-line" data-act="card-notme">No, That’s Not Me</button>' +
+      '</div>' +
       demoNote(state, demoHint(state)) +
-      codeBox(state, 'No camera? Type the code on your card', false, 'card') +
+      (adding
+        ? '<button type="button" class="sp-btn sp-btn-line" data-act="card-back">Back to Your Page</button>'
+        : '<div class="sp-narrow-block">' +
+          codeBox(state, 'No camera? Type the code on your card', false, 'card') +
+          '</div>') +
       '</main>'
     );
+  }
+
+  /* A screen's way out. Adding a card, the student is still signed in, so
+     a different code goes back to Add Another Card and the page is one
+     press away; from the start screen, back to the start. */
+  function wayOut() {
+    return adding
+      ? '<button type="button" class="sp-btn sp-btn-line" data-act="card-add">Type a Different Code</button>' +
+          '<button type="button" class="sp-btn sp-btn-line" data-act="card-back">Back to Your Page</button>'
+      : '<button type="button" class="sp-btn sp-btn-line" data-act="card-restart">Type a Different Code</button>';
   }
 
   function renderCardNotMe(state) {
@@ -151,7 +344,7 @@
       '<main class="sp-main sp-main-center sp-main-middle">' +
       '<section class="sp-card sp-hello"><h1 class="sp-big">Give This Card Back</h1>' +
       '<p class="sp-lead">This card is for someone else. Give it back to your teacher and ask for your own.</p></section>' +
-      '<button type="button" class="sp-btn sp-btn-line" data-act="card-restart">Type a Different Code</button>' +
+      wayOut() +
       '</main>'
     );
   }
@@ -170,7 +363,26 @@
           (state.sending ? 'Loading…' : 'Try Again') +
           '</button>'
         : '') +
-      '<button type="button" class="sp-btn sp-btn-line" data-act="card-restart">Type a Different Code</button>' +
+      wayOut() +
+      '</main>'
+    );
+  }
+
+  /* After Done (the artboard's "After Done"). Nothing of the student is on
+     it. A phone and a Chromebook each say what they are. */
+  var CHECK_MARK =
+    '<svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+
+  function renderSignedOut() {
+    return (
+      '<main class="sp-main sp-main-center sp-main-middle sp-signed-out">' +
+      '<span class="sp-out-mark">' +
+      CHECK_MARK +
+      '</span>' +
+      '<h1 class="sp-big" tabindex="-1">You’re signed out</h1>' +
+      '<p class="sp-lead"><span class="sp-narrow">This phone no longer has your card.</span>' +
+      '<span class="sp-wide">This computer no longer has your card.</span></p>' +
+      '<button type="button" class="sp-btn sp-btn-primary" data-act="card-restart">Scan a Card</button>' +
       '</main>'
     );
   }
@@ -180,26 +392,63 @@
   /* The frame every tab of the page sits in: the class and Done, which
      stay in reach as the page scrolls, then the tab's own body.
      assignments.js draws the first tab. */
-  function pageFrame(state, body) {
-    var course = (state.page && state.page.course) || {};
+  var PLUS =
+    '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>';
+
+  /* Your Classes (the artboard's "Switching Classes"): the classes this
+     device's session has opened, the one showing ticked, then Add Another
+     Card. The server sends the list with the page; it holds each class's
+     name and block, the student's first name and, since S4-M1, how many
+     pieces wait there (to_do), nothing else. */
+  function classesSheet(page) {
+    var here = page && page.student ? page.student.id : '';
+    var list = (page && page.classes) || [];
     return (
-      '<header class="sp-head sp-head-page"><div class="sp-head-words"><div class="sp-head-title">' +
-      esc(className(course)) +
-      '</div><div class="sp-head-sub">' +
-      esc(TITLE) +
-      '</div></div>' +
-      '<button type="button" class="sp-btn sp-btn-quiet sp-btn-small sp-done" data-act="card-done">Done</button>' +
-      '</header>' +
-      '<main class="sp-main sp-page">' +
-      body +
-      demoNote(state, 'This is Demo Mode. Cece and her results are samples.') +
-      '</main>'
+      '<button type="button" class="sp-sheet-back" data-act="classes-close" aria-label="Close" tabindex="-1"></button>' +
+      '<div class="sp-sheet" role="dialog" aria-modal="true" aria-labelledby="sp-classes-title">' +
+      '<span class="sp-sheet-grip" aria-hidden="true"></span>' +
+      '<h2 class="sp-sheet-title" id="sp-classes-title" tabindex="-1">Your Classes</h2>' +
+      '<ul class="sp-classes">' +
+      list
+        .map(function (c) {
+          var on = c.enrollmentId === here;
+          return (
+            '<li><button type="button" class="sp-class' +
+            (on ? ' sp-class-on' : '') +
+            '" data-act="class-open" data-enrollment="' +
+            esc(c.enrollmentId) +
+            '"' +
+            (on ? ' aria-current="true"' : '') +
+            '><span class="sp-class-words"><span class="sp-class-name">' +
+            esc(c.name) +
+            '</span>' +
+            (c.block ? '<span class="sp-class-sub">' + esc(blockLabel(c.block)) + '</span>' : '') +
+            // How many pieces wait there ("3 to do"), once the server says; nothing at 0 or when it does not.
+            (c.toDo > 0 ? '<span class="sp-class-todo">' + esc(c.toDo + ' to do') + '</span>' : '') +
+            '</span>' +
+            (on ? '<span class="sp-class-tick">' + CHECK_MARK + '</span>' : '') +
+            '</button></li>'
+          );
+        })
+        .join('') +
+      '</ul>' +
+      '<button type="button" class="sp-btn sp-btn-tint" data-act="card-add">' +
+      PLUS +
+      'Add Another Card</button>' +
+      '</div>'
     );
+  }
+
+  // "Block A", as the class's name shows it.
+  function blockLabel(block) {
+    var b = String(block || '').trim();
+    return /^[A-Za-z0-9]{1,2}$/.test(b) ? 'Block ' + b.toUpperCase() : b;
   }
 
   /* ── Demo Mode: the three answers, built on the device ─────── */
 
-  var DEMO = { code: 'P3R8WD', number: '1234567', password: '4821', tries: 5 };
+  // The sample card's code is a card's eight characters, shown P3R8-WDK4.
+  var DEMO = { code: 'P3R8WDK4', number: '1234567', password: '4821', tries: 5 };
   // Which demo is running: { hash, check, system, wrong, seen }. Null outside Demo Mode.
   var demo = null;
 
@@ -221,6 +470,47 @@
      plan 1.2). Some work is returned, some is a draft, one returned grade
      has a newer draft over it, and some is not graded. */
   function demoClass() {
+    var cls = demoScience();
+    // #demo-card-group: one more piece, sent by Cece's group (S12-F1); every other demo is as it was.
+    if (demo && demo.group) {
+      cls.work.unshift({
+        id: 'demo-cell-model',
+        title: 'Cell Model Project',
+        date: isoDay(-3),
+        due_date: isoDay(5),
+        tag_ids: ['demo-com'],
+        unit: 'Unit 1: Cells',
+        category: 'Projects',
+        about: 'With your group, build a model of a plant or animal cell. Label every part.',
+      });
+    }
+    /* #demo-card-revise (S11-F2): one more piece, whose revision has come
+       back: its first version was Developing + and Proficient, the revision
+       is Proficient and Proficient (s/feedback.js keeps the request and the
+       first version's grade). The Cell Microscope Lab is returned for
+       revision there too. */
+    if (demo && demo.revise) {
+      cls.work.unshift({
+        id: 'demo-vaccine',
+        title: 'How Vaccines Work',
+        date: isoDay(-15),
+        due_date: isoDay(-10),
+        tag_ids: ['demo-com', 'demo-qp'],
+        unit: 'Unit 2: Body Systems',
+        category: 'Projects',
+        working: {
+          score: { value: null, comment: 'Your third example makes the explainer complete.' },
+          tag_scores: [
+            { tag_id: 'demo-com', value: 3, modifier: 0, comment: null },
+            { tag_id: 'demo-qp', value: 3, modifier: 0, comment: null },
+          ],
+        },
+        ret: { is_draft: false, returned_at: isoDay(-2) + 'T20:15:00Z', returned_copy: null },
+      });
+    }
+    return cls;
+  }
+  function demoScience() {
     function level(tagId, value, modifier) {
       return { tag_id: tagId, value: value, modifier: modifier || 0, comment: null };
     }
@@ -232,15 +522,44 @@
     }
     return {
       student: { enrollment_id: 'demo-cece', first_name: 'Cece' },
-      course: { id: 'demo-science-8', name: 'Science 8', block: 'B', grading_scale: null },
+      // teacher_name as the server may send it: the page never shows it (Colin's ruling 112).
+      course: { id: 'demo-science-8', name: 'Science 8', block: 'B', grading_scale: null, teacher_name: 'Ms. Rivera' },
+      // The class's categories and what each weighs (category_percent is worked out from them as the server does).
+      categories: [
+        { name: 'Labs and Investigations', weight: 50 },
+        { name: 'Quizzes', weight: 30 },
+        { name: 'Projects', weight: 20 },
+        { name: 'Practice', weight: 0 },
+      ],
       rubrics: [
         {
           id: 'demo-rubric-lab',
           name: 'Lab Report',
           style: 'simple',
+          // What each level asks, as the teacher wrote it: Your Feedback and The Whole Rubric show it.
           criteria: [
-            { id: 'demo-crit-method', name: 'Method', weight: 1, checks: [] },
-            { id: 'demo-crit-drawing', name: 'Labelled Drawing', weight: 1, checks: [] },
+            demoCriterion(
+              'demo-crit-method',
+              'Method',
+              ['demo-pc'],
+              [
+                'Lists a few of the steps.',
+                'Lists the steps, with some out of order.',
+                'Lists every step in order, so someone else could repeat it.',
+                'Lists every step in order and says why each one matters.',
+              ],
+            ),
+            demoCriterion(
+              'demo-crit-drawing',
+              'Labelled Drawing',
+              ['demo-com'],
+              [
+                'Draws the cell.',
+                'Draws the cell and labels some of its parts.',
+                'Draws the cell and labels every part.',
+                'Draws the cell to scale and labels every part.',
+              ],
+            ),
           ],
         },
       ],
@@ -251,6 +570,11 @@
           date: isoDay(-1),
           due_date: isoDay(4),
           tag_ids: ['demo-qp', 'demo-pc'],
+          unit: 'Unit 2: Body Systems',
+          category: 'Projects',
+          about:
+            'Choose a question you can test. Write your question, what you predict, and the steps you will follow.',
+          core: ['CT', 'CRT'],
         },
         {
           // A draft, never returned: the student sees the piece and its date only.
@@ -259,6 +583,10 @@
           date: isoDay(-9),
           due_date: isoDay(-2),
           tag_ids: ['demo-pa', 'demo-com'],
+          unit: 'Unit 2: Body Systems',
+          category: 'Projects',
+          about: 'Make a poster about one disease: what causes it, how it spreads, and how the body fights it.',
+          core: ['COM', 'CRT'],
           working: {
             score: { value: null, comment: 'Draft: two of your sources are missing.' },
             tag_scores: [level('demo-pa', 1), level('demo-com', 1)],
@@ -270,6 +598,8 @@
           title: 'Immune System Quick Check',
           date: isoDay(-7),
           due_date: isoDay(-5),
+          unit: 'Unit 2: Body Systems',
+          category: 'Quizzes',
           score_mode: 'points',
           max_points: 12,
           status: 'NS',
@@ -280,6 +610,8 @@
           date: isoDay(-13),
           due_date: isoDay(-8),
           tag_ids: ['demo-pa'],
+          unit: 'Unit 1: Cells',
+          category: 'Labs and Investigations',
           working: {
             score: { value: null, comment: 'Your data table shows every transfer. Well done.' },
             tag_scores: [level('demo-pa', 4)],
@@ -291,6 +623,8 @@
           title: 'Cell Structure Quiz',
           date: isoDay(-11),
           due_date: isoDay(-11),
+          unit: 'Unit 1: Cells',
+          category: 'Quizzes',
           score_mode: 'points',
           max_points: 10,
           working: { score: { value: 8, comment: '' } },
@@ -303,6 +637,8 @@
           due_date: isoDay(-14),
           rubric_id: 'demo-rubric-lab',
           tag_ids: ['demo-qp', 'demo-pc'],
+          unit: 'Unit 1: Cells',
+          category: 'Labs and Investigations',
           working: {
             score: { value: null, comment: 'Careful focusing. Label the nucleus next time.' },
             rubric_scores: [criterion('demo-crit-method', 3), criterion('demo-crit-drawing', 2, 1)],
@@ -317,6 +653,7 @@
           date: isoDay(-24),
           due_date: isoDay(-17),
           tag_ids: ['demo-com'],
+          category: 'Projects',
           working: {
             score: { value: null, comment: 'Draft: much clearer after your rewrite.' },
             tag_scores: [level('demo-com', 3, 1)],
@@ -336,6 +673,7 @@
           date: isoDay(-27),
           due_date: isoDay(-22),
           tag_ids: ['demo-pc'],
+          category: 'Labs and Investigations',
           status: 'LATE',
           working: { score: { value: null, comment: '' }, tag_scores: [level('demo-pc', 3)] },
           ret: { is_draft: false, returned_at: at(-19), returned_copy: null },
@@ -347,6 +685,7 @@
           title: 'Lab Safety Contract',
           date: isoDay(-32),
           due_date: isoDay(-30),
+          category: 'Practice',
           score_mode: 'complete',
           working: { score: { value: 1, comment: '' } },
           ret: {
@@ -360,6 +699,140 @@
         },
       ],
     };
+  }
+
+  // One criterion of a sample rubric, in the server's shape, with what each of its four levels asks.
+  function demoCriterion(id, name, tagIds, words) {
+    var c = { id: id, name: name, weight: 1, tag_ids: tagIds, checks: [] };
+    words.forEach(function (w, i) {
+      c['level_' + (i + 1) + '_value'] = i + 1;
+      c['level_' + (i + 1) + '_descriptor'] = w;
+    });
+    return c;
+  }
+
+  var DEMO_TAGS = {
+    'demo-qp': {
+      label: 'Questioning and Predicting',
+      code: 'QP',
+      i_can: ['I can ask a question that can be tested and say what I expect to happen.'],
+    },
+    'demo-pc': {
+      label: 'Planning and Conducting',
+      code: 'PC',
+      i_can: ['I can plan a fair test and carry it out safely.'],
+    },
+    'demo-pa': {
+      label: 'Processing and Analyzing Data',
+      code: 'PA',
+      i_can: ['I can find patterns in my data and explain what they show.'],
+    },
+    'demo-com': { label: 'Communicating', code: 'COM', i_can: ['I can share what I found in words and diagrams.'] },
+    'demo-hum-evidence': {
+      label: 'Evidence',
+      code: 'EV',
+      i_can: ['I can use evidence from sources to back up what I say.'],
+    },
+  };
+
+  // The Core Competencies by the names the server sends (shared/constants.js's labels, in its order).
+  var DEMO_CORE = [
+    ['COM', 'Communicating'],
+    ['COL', 'Collaborating'],
+    ['CT', 'Creative Thinking'],
+    ['CRT', 'Critical & Reflective Thinking'],
+    ['PPI', 'Personal & Cultural Identity'],
+    ['PAR', 'Personal Awareness & Responsibility'],
+    ['SAR', 'Social Awareness & Responsibility'],
+  ];
+  function demoCore(ids) {
+    return DEMO_CORE.filter(function (c) {
+      return (ids || []).indexOf(c[0]) >= 0;
+    }).map(function (c) {
+      return { id: c[0], name: c[1] };
+    });
+  }
+
+  /* What a sample piece's category counts, by the server's rule
+     (migrations/local-test/s4-m1-contract.md, "category_percent"). */
+  function demoPercent(cls, w, system) {
+    var cats = cls.categories || [];
+    var k = cats.filter(function (c) {
+      return c.name === w.category;
+    })[0];
+    if (!k || w.score_mode === 'dibels') return null;
+    if (k.weight === 0) return 0;
+    var total = cats.reduce(function (sum, c) {
+      return sum + c.weight;
+    }, 0);
+    return system !== 'proficiency' && total === 100 ? k.weight : null;
+  }
+
+  /* How many pieces wait for the student in a sample class, by the
+     server's rule (to_do): not a reading benchmark, and Missing, or not
+     Excused and never returned. */
+  function demoToDo(cls) {
+    return cls.work.filter(function (w) {
+      if (w.score_mode === 'dibels') return false;
+      return w.status === 'NS' || (w.status !== 'EXC' && !returnedGrade(w));
+    }).length;
+  }
+
+  /* The second sample class, for Add Another Card (Switching Classes): one
+     piece returned, one a draft, one not graded yet. */
+  var DEMO_SECOND = 'demo-cece-hum';
+  function demoSecondClass() {
+    return {
+      student: { enrollment_id: DEMO_SECOND, first_name: 'Cece' },
+      course: {
+        id: 'demo-humanities-8',
+        name: 'Humanities 8',
+        block: 'A',
+        grading_scale: null,
+        teacher_name: 'Mr. Okafor',
+      },
+      rubrics: [],
+      work: [
+        {
+          id: 'demo-hum-worldview',
+          title: 'Thinking It Through: A Changing Worldview',
+          date: isoDay(-2),
+          due_date: isoDay(3),
+          tag_ids: ['demo-hum-evidence'],
+          unit: 'Unit 1: Medieval Europe',
+        },
+        {
+          // A draft, never returned: the date only.
+          id: 'demo-hum-feudal',
+          title: 'Feudalism Paragraph',
+          date: isoDay(-8),
+          due_date: isoDay(-4),
+          tag_ids: ['demo-hum-evidence'],
+          working: {
+            score: { value: null, comment: 'Draft: add one more piece of evidence.' },
+            tag_scores: [{ tag_id: 'demo-hum-evidence', value: 2, modifier: 0, comment: null }],
+          },
+          ret: { is_draft: true, returned_at: null, returned_copy: null },
+        },
+        {
+          id: 'demo-hum-map',
+          title: 'Medieval Europe Map',
+          date: isoDay(-15),
+          due_date: isoDay(-12),
+          tag_ids: ['demo-hum-evidence'],
+          working: {
+            score: { value: null, comment: 'Clear labels and a careful key.' },
+            tag_scores: [{ tag_id: 'demo-hum-evidence', value: 3, modifier: 0, comment: null }],
+          },
+          ret: { is_draft: false, returned_at: isoDay(-10) + 'T20:15:00Z', returned_copy: null },
+        },
+      ],
+    };
+  }
+
+  // The sample class an enrollment opens.
+  function demoClassFor(enrollment) {
+    return enrollment === DEMO_SECOND ? demoSecondClass() : demoClass();
   }
 
   /* Demo Mode's stand-in for the server's one reader of a student's grade
@@ -416,6 +889,7 @@
       enrollment_id: cls.student.enrollment_id,
       student: { first_name: cls.student.first_name },
       course: { name: cls.course.name, block: cls.course.block },
+      to_do: demoToDo(cls),
     };
   }
 
@@ -431,8 +905,8 @@
      proficiency, letter or both. The one thing here the server does not
      send is the class's id; the page needs none and gives a real class a
      key of its own. */
-  function demoPage(system) {
-    var cls = demoClass();
+  function demoPage(system, enrollment) {
+    var cls = demoClassFor(enrollment);
     var seen = (demo && demo.seen) || {};
     return {
       ok: true,
@@ -444,8 +918,9 @@
         level_order: 'desc',
         round_percent: null,
       }),
-      classes: [demoKlass(cls)],
-      tags: {},
+      classes: demoClasses(),
+      // The sample classes' competencies, by the names a card shows beside each level.
+      tags: DEMO_TAGS,
       rubrics: cls.rubrics,
       assessments: cls.work.map(function (w) {
         var rows = returnedGrade(w);
@@ -464,6 +939,11 @@
           weight: 1,
           rubric_id: w.rubric_id || null,
           tag_ids: w.tag_ids || [],
+          description: w.about || null,
+          module_name: w.unit || null,
+          category_name: w.category || null,
+          category_percent: demoPercent(cls, w, system || 'proficiency'),
+          core_competencies: demoCore(w.core),
           // Missing, Excused and Late are never drafts: they show at once.
           status: w.status || null,
           returned_at: back ? back.returned_at : null,
@@ -476,32 +956,48 @@
     };
   }
 
+  // The classes the sample session has opened, as the server lists them.
+  function demoClasses() {
+    var opened = demo && demo.classes && demo.classes.length ? demo.classes : [demoClass().student.enrollment_id];
+    return opened.map(function (e) {
+      return demoKlass(demoClassFor(e));
+    });
+  }
+
+  /* The sample card, or, while a card is being added, the second sample
+     class's card: any code opens it. */
   function demoCard() {
     if (demo.wrong >= DEMO.tries) return { ok: false, error: 'card_locked' };
+    var cls = adding ? demoSecondClass() : demoClass();
     return {
       ok: true,
       kind: 'card',
       student: { first_name: 'Cece' },
-      course: { name: 'Science 8', block: 'B' },
+      course: { name: cls.course.name, block: cls.course.block },
       check: demo.check,
       also_password: false,
     };
   }
 
-  // Five wrong tries lock the card, as the server does.
-  function demoVerify(body) {
+  /* Five wrong tries lock the card, as the server does. From the start
+     screen a right answer starts a new session; Add Another Card (`add`)
+     joins the one sent and gives back no new token. */
+  function demoVerify(body, add) {
     var right =
       demo.check === 'password'
         ? body.password === DEMO.password
         : body.birthday === demoBirthday() || body.student_number === DEMO.number;
     if (right) {
-      var cls = demoClass();
+      var cls = add ? demoSecondClass() : demoClass();
+      var e = cls.student.enrollment_id;
+      if (!add) demo.classes = [];
+      if (demo.classes.indexOf(e) < 0) demo.classes.push(e);
       return {
         ok: true,
-        session_token: 'demo',
+        session_token: add ? null : 'demo',
         expires_at: nextMidnight(),
-        enrollment_id: cls.student.enrollment_id,
-        classes: [demoKlass(cls)],
+        enrollment_id: e,
+        classes: demoClasses(),
       };
     }
     demo.wrong += 1;
@@ -511,9 +1007,16 @@
 
   var DEMO_ANSWERS = {
     card: demoCard,
-    verify: demoVerify,
-    page: function () {
-      return demoPage(demo.system);
+    verify: function (body) {
+      return demoVerify(body, false);
+    },
+    'add-card': function (body) {
+      return demoVerify(body, true);
+    },
+    page: function (body) {
+      // Only a class the sample session has opened, as the server answers.
+      if (demo.classes.indexOf(body.enrollment_id) < 0) return { ok: false, error: 'not_found' };
+      return demoPage(demo.system, body.enrollment_id);
     },
     seen: function (body) {
       var ids = body.assessment_ids || [];
@@ -598,6 +1101,11 @@
   var session = null;
   // The last student's token: sent with the next check, so the server ends it.
   var ending = '';
+  /* Add Another Card is under way (Switching Classes): the student is
+     signed in and is typing another card's code. Null otherwise. While it
+     is set, a card that is recognised signs nobody out, and its check
+     joins this session (`add-card`) instead of starting a new one. */
+  var adding = null;
   var timer = 0;
   /* A timer counts time the device was awake. A Chromebook that slept with
      the list open wakes with its timer still far from done, and nothing
@@ -675,6 +1183,8 @@
   // `stored` false leaves another student's session, kept by another tab, where it is.
   function forget(stored) {
     session = null;
+    adding = null;
+    stopCamera();
     stopClocks();
     stopWatchingRows();
     if (stored === false) return;
@@ -732,17 +1242,25 @@
     forget();
     if (typeof StudentData !== 'undefined') StudentData.use(null);
     S.page = null;
+    S.reply = null;
   }
 
   /* Signed out: the session is forgotten, the page's data is dropped and
      the card's first screen is drawn, with `message` if the student did not
-     ask for it. Demo Mode starts the sample again. */
-  function leave(message, stored) {
+     ask for it. Demo Mode starts the sample again. `done` (the student
+     pressed Done) draws After Done instead, in Demo Mode too. */
+  function leave(message, stored, done) {
     var hash = demo && demo.hash;
     // Demo Mode keeps nothing, and leaves a real session on the device alone.
     forget(S.demo ? false : stored);
     StudentPage.reset();
     if (typeof StudentData !== 'undefined') StudentData.use(null);
+    if (done) {
+      S.screen = 'signedout';
+      setTitle();
+      paint('.sp-big');
+      return;
+    }
     if (hash && startDemo(hash)) return;
     S.screen = 'cardstart';
     S.message = message || '';
@@ -755,24 +1273,27 @@
      device forgets. Done and fifteen idle minutes both come this way. With
      the page open in two tabs, the tab that still finds the token on the
      device is the one that tells the server, so it is told once. */
-  function signOut(message) {
+  function signOut(message, done) {
     var s = session;
     var stored = s && s.kept ? readStored() : null;
     var others = !!(stored && stored.token !== s.token);
     if (s && (!s.kept || (stored && !others))) endOnce(s.token);
-    leave(message, others ? false : undefined);
+    leave(message, others ? false : undefined, done);
   }
 
   /* The card's own screens that show, or are opening, the session's page.
      The session is watched only while one of them is up: a questionnaire or
-     a report opened in the same tab is never taken down for it. */
+     a report opened in the same tab is never taken down for it. Adding a
+     card, every screen of it is the signed-in student's. */
   function showing() {
     return (
       S.screen === 'assignments' ||
       (S.screen === 'cardmessage' && !!S.again) ||
-      (S.screen === 'loading' && S.heading === TITLE)
+      (S.screen === 'loading' && S.heading === TITLE) ||
+      (!!adding && !!session && has(ADDING_SCREENS, S.screen))
     );
   }
+  var ADDING_SCREENS = { cardstart: 1, cardscan: 1, cardcheck: 1, cardnotme: 1, cardmessage: 1, loading: 1 };
 
   /* Is the session this tab shows still the device's, and still live?
      Asked when its end or its idle limit comes due, and before the page is
@@ -900,12 +1421,17 @@
     stopWatchingRows();
     if (!S.page || !session || S.screen !== 'assignments') return;
     if (typeof IntersectionObserver !== 'function' || typeof document === 'undefined') return;
-    var rows = document.querySelectorAll('.sp-row[data-unseen]');
+    var rows = document.querySelectorAll('[data-unseen]');
     if (!rows.length) return;
     var w = { page: S.page, observer: null, since: {}, timer: 0 };
     // The header stays over the top of the list: a row under it is not on screen.
     var head = document.querySelector('.sp-head');
     var under = (head && head.offsetHeight) || 0;
+    // On a phone the tabs sit over the bottom of the list: a row under them is not on screen either.
+    var bar = document.querySelector('.sp-tabs-bottom');
+    var rect = bar && typeof bar.getBoundingClientRect === 'function' ? bar.getBoundingClientRect() : null;
+    var over =
+      rect && typeof window.innerHeight === 'number' && rect.top > window.innerHeight / 2 ? bar.offsetHeight || 0 : 0;
     w.observer = new IntersectionObserver(
       function (entries) {
         entries.forEach(function (entry) {
@@ -915,7 +1441,7 @@
         });
         if (watching === w) shown();
       },
-      { rootMargin: '-' + under + 'px 0px 0px 0px', threshold: 0.6 },
+      { rootMargin: '-' + under + 'px 0px -' + over + 'px 0px', threshold: 0.6 },
     );
     Array.prototype.forEach.call(rows, function (row) {
       w.observer.observe(row);
@@ -994,7 +1520,8 @@
        'locked'     this address has made too many wrong tries;
        'unreached'  anything else (no internet, a server error, an answer
                     with no meaning here): not known. */
-  var WONT_OPEN = { closed: 1, card_locked: 1, card_expired: 1, reprint: 1 };
+  // card_stopped: the card was replaced by a new one (Colin, Nov 10).
+  var WONT_OPEN = { closed: 1, card_locked: 1, card_expired: 1, reprint: 1, card_stopped: 1 };
   function cardSaid(res) {
     var isCard = !!(res && res.ok === true && res.kind === 'card');
     var e = res && res.ok === false ? res.error : '';
@@ -1053,8 +1580,9 @@
     return true;
   }
 
-  // The code typed on a card's screen.
+  // The code typed (or scanned with this page's camera) on a card's screen.
   function openCard(typed) {
+    stopCamera();
     var c = cleanCode(typed);
     S.typed = prettyCode(c);
     if (!isCode(c)) {
@@ -1065,6 +1593,7 @@
       return Promise.resolve();
     }
     S.message = '';
+    if (adding) return addCard(c);
     // A real code may be a slip's: student.js asks `card`, then `open`.
     if (!S.demo) return StudentPage.openCode(c, 'card');
     StudentPage.newTurn();
@@ -1072,6 +1601,264 @@
     return ask('card', { code: c }).then(function (res) {
       if (cardSaid(res) !== true) refused(res);
     });
+  }
+
+  /* ── Switching Classes ─────────────────────────────────────── */
+
+  /* Add Another Card: a card's code typed by a student who is signed in.
+     It is asked as a card only: a slip's code here is a code that didn't
+     work, since a slip opens no class. A card that is recognised signs
+     nobody out (Colin, Nov 9: a card joins a session only through Add
+     Another Card), and one that won't open says why on this screen, with
+     the student's own page one press away. */
+  function addCard(c) {
+    StudentPage.newTurn();
+    S.code = c;
+    S.sending = true;
+    S.screen = 'loading';
+    S.heading = TITLE;
+    paint();
+    return ask('card', { code: c }).then(function (res) {
+      S.sending = false;
+      if (!adding) return;
+      if (res && res.ok === true && res.kind === 'card') {
+        S.data = res;
+        S.typed = '';
+        S.number = '';
+        S.bday = { m: '', d: '', y: '' };
+        S.message = '';
+        S.screen = 'cardcheck';
+        paint(res.check === 'password' ? '#sp-ident' : '#sp-bm');
+        return;
+      }
+      S.message = cardMessage(res && res.ok === true ? { ok: false, error: 'not_found' } : res);
+      S.calm = false;
+      S.screen = 'cardstart';
+      paint('#sp-code');
+    });
+  }
+
+  /* Add Another Card opens over the page; Back to Your Page closes it.
+     The page's data is kept while a card is added, so going back draws it
+     again without asking. */
+  function startAdding() {
+    if (!session || !S.page) return;
+    StudentPage.newTurn();
+    stopWatchingRows();
+    adding = { from: session.enrollment };
+    S.sheet = false;
+    S.data = null;
+    S.typed = '';
+    S.message = '';
+    S.sending = false;
+    S.screen = 'cardstart';
+    paint('.sp-big');
+  }
+
+  function backToPage() {
+    StudentPage.newTurn();
+    stopCamera();
+    adding = null;
+    S.data = null;
+    S.code = '';
+    S.typed = '';
+    S.number = '';
+    S.bday = { m: '', d: '', y: '' };
+    S.message = '';
+    S.sending = false;
+    if (!session) return leave('');
+    if (!S.page) {
+      S.heading = TITLE;
+      S.screen = 'loading';
+      return openPage();
+    }
+    S.screen = 'assignments';
+    paint('.sp-page-title');
+    arm();
+    watchRows();
+    return Promise.resolve();
+  }
+
+  /* Another class from Your Classes. The device's session stays as it is;
+     only which class it opens changes, here and in what the device keeps. */
+  function openClass(enrollment) {
+    var known = ((S.page && S.page.classes) || []).some(function (c) {
+      return c.enrollmentId === enrollment;
+    });
+    if (!session || !known) return Promise.resolve();
+    S.sheet = false;
+    if (enrollment === session.enrollment) {
+      paint('.sp-head-switch');
+      return Promise.resolve();
+    }
+    StudentPage.newTurn();
+    stopWatchingRows();
+    session.enrollment = enrollment;
+    if (session.kept) keep(session);
+    S.page = null;
+    S.reply = null;
+    if (typeof StudentData !== 'undefined') StudentData.use(null);
+    S.heading = TITLE;
+    S.screen = 'loading';
+    return openPage();
+  }
+
+  /* A tab, one of To Do, Sent and Back, or All Assignments. The page's data
+     is already here: nothing is asked. The rows on screen change, so what
+     is watched for "opened" starts again. */
+  /* What the student looks at on the page, as s/page-view.js reads it. */
+  var UI_KEYS = [
+    'tab',
+    'segment',
+    'all',
+    'pick',
+    'search',
+    'filter',
+    'feedback',
+    'whole',
+    'levels',
+    'form',
+    'work',
+    'workPage',
+    'marksOff',
+    'workPages',
+    'compare',
+  ];
+  function uiOf() {
+    var ui = {};
+    UI_KEYS.forEach(function (k) {
+      ui[k] = S[k];
+    });
+    return ui;
+  }
+
+  /* A tab, one of To Do, Sent and Back, All Assignments, a filter, or a
+     piece's card. s/page-view.js says what each press changes (the preview
+     answers the same presses the same way); the page's data is already
+     here, so nothing is asked. The rows and cards on screen change, so
+     what is watched for "opened" starts again. */
+  function showPart(act, el) {
+    if (!S.page || S.screen !== 'assignments' || typeof StudentPageView === 'undefined') return;
+    var view = StudentPage.viewOf ? StudentPage.viewOf(S) : null;
+    var out = StudentPageView.press(uiOf(), view, act, el);
+    if (!out) return;
+    UI_KEYS.forEach(function (k) {
+      S[k] = out.ui[k];
+    });
+    S.sheet = false;
+    stopWatchingRows();
+    paint(out.focus);
+    if (!out.piece && typeof window !== 'undefined' && typeof window.scrollTo === 'function') window.scrollTo(0, 0);
+    watchRows();
+  }
+
+  /* ── Questionnaires and My Reports (S4-F4) ─────────────────── */
+
+  /* Demo Mode's samples, in the shape the server's page is to send them
+     (shared/student-view.js, questionnairesOf and reportsOf). Kept out of
+     the page reply itself, which is the server's shape today. */
+  function demoForms() {
+    function at(offset) {
+      return isoDay(offset) + 'T20:15:00Z';
+    }
+    var report = StudentPage.demoReport();
+    return {
+      questionnaires: [
+        {
+          id: 'demo-q-reflection',
+          title: 'November Reflection',
+          description: 'Core Competencies and your goal check-in',
+          minutes: 10,
+          state: 'open',
+          closes_on: isoDay(9),
+        },
+        { id: 'demo-q-about', title: 'About Me', state: 'sent', sent_at: at(-58) },
+        { id: 'demo-q-march', title: 'March Reflection', state: 'not_open_yet', opens_on: isoDay(112) },
+      ],
+      reports: [
+        {
+          id: 'demo-r-1',
+          title: report.report,
+          issued_at: at(-1),
+          expires_on: isoDay(6),
+          opened_at: null,
+          overall: report.overall,
+          comment: report.comment,
+        },
+        { id: 'demo-r-0', title: 'Interim Update', issued_at: at(-40), opened_at: at(-39) },
+      ],
+    };
+  }
+
+  /* Start, or See Your Report, from the card's page. A real card cannot
+     open either yet: the server has no route that opens a questionnaire or
+     a phone report from a card's session (S4-F4's pull request names what
+     is missing), and the server's page lists none, so these buttons show
+     only in Demo Mode. There they open the sample questionnaire and report
+     on the slip's own screens, with the student already known. */
+  function openForm(act, id) {
+    if (!S.demo || !S.page || S.screen !== 'assignments') return;
+    var forms = demoForms();
+    var known = (act === 'q-start' ? forms.questionnaires : forms.reports).some(function (x) {
+      return x.id === id;
+    });
+    if (!known) return;
+    StudentPage.newTurn();
+    stopWatchingRows();
+    S.back = S.tab;
+    S.sheet = false;
+    if (act === 'r-open') {
+      S.data = {
+        ok: true,
+        kind: 'report',
+        token: 'demo',
+        student: { first_name: S.page.student.firstName },
+        course: { name: S.page.course.name, block: S.page.course.block },
+        report: { title: StudentPage.demoReport().report },
+      };
+      S.report = StudentPage.demoReport();
+      S.screen = 'report';
+      paint('.pr-view h1, .pr-view h2');
+      return;
+    }
+    S.screen = 'loading';
+    paint();
+    var mine = S;
+    StudentPage.loadDemoTemplates(function () {
+      if (S !== mine || S.screen !== 'loading' || !S.back) return;
+      S.data = StudentPage.demoData('reflection');
+      S.part = 0;
+      S.answers = {};
+      S.screen = 'part';
+      paint('h1');
+    });
+  }
+
+  // Back to Your Page from a questionnaire sent or a report read: the tab it was opened from.
+  function pageBack() {
+    if (!S.back || !S.page) return;
+    StudentPage.newTurn();
+    S.tab = S.back;
+    S.back = '';
+    S.data = null;
+    S.report = null;
+    S.screen = 'assignments';
+    setTitle();
+    paint('.sp-page-title');
+    arm();
+    watchRows();
+  }
+
+  function openSheet() {
+    if (!S.page || S.screen !== 'assignments') return;
+    S.sheet = true;
+    paint('#sp-classes-title');
+  }
+
+  function closeSheet() {
+    if (!S.sheet) return;
+    S.sheet = false;
+    paint('.sp-head-switch');
   }
 
   /* shared/constants.js and shared/calc.js work out and word a result. They
@@ -1098,6 +1885,19 @@
       '../shared/calc.js',
       function () {
         return typeof assessmentCellValue === 'function';
+      },
+    ],
+    // What the page draws from (S4-F1); index.html names it, so it is fetched only for an older copy.
+    [
+      '../shared/student-view.js',
+      function () {
+        return typeof StudentView !== 'undefined';
+      },
+    ],
+    [
+      'page-view.js',
+      function () {
+        return typeof StudentPageView !== 'undefined';
       },
     ],
   ];
@@ -1149,6 +1949,7 @@
       forget();
     }
     S.page = null;
+    S.reply = null;
     if (typeof StudentData !== 'undefined') StudentData.use(null);
     S.message = MESSAGES[words || 'card_network'];
     S.again = !words;
@@ -1182,8 +1983,31 @@
         mine.expires = String(res.expires_at);
         if (mine.kept) keep(mine);
       }
-      S.page = StudentData.fromServer(res);
-      StudentData.use(S.page);
+      // A class opened afresh starts on Assignments, To Do.
+      if (!S.page) {
+        S.tab = 'assignments';
+        S.segment = 'todo';
+        S.all = false;
+        S.pick = '';
+        S.search = '';
+        S.filter = 'all';
+        S.feedback = '';
+        S.whole = false;
+        S.levels = false;
+        S.form = '';
+      }
+      // A reply the page cannot read (a list that is not a list) is a
+      // failed page: the plain message with Try Again, never a throw.
+      var read;
+      try {
+        read = StudentData.fromServer(res);
+        StudentData.use(read);
+      } catch (e) {
+        pageRefused({ ok: false, error: 'network' });
+        return;
+      }
+      S.reply = res;
+      S.page = read;
       // What the student typed to get in is not kept once they are in.
       S.number = '';
       S.bday = { m: '', d: '', y: '' };
@@ -1203,7 +2027,8 @@
   function fetchGradesAgain() {
     S.sending = true;
     paint();
-    return whenGradesAreIn().then(function () {
+    // Drawn only if the page that asked is still the one showing (not after Done).
+    return StudentPage.whileCurrent(whenGradesAreIn()).then(function () {
       S.sending = false;
       paint();
       watchRows();
@@ -1214,6 +2039,7 @@
      and ended the last one. Its token is kept, then the page opens. */
   function signedIn(res) {
     ending = '';
+    if (adding) return added(res);
     session = {
       token: String(res.session_token || ''),
       expires: String(res.expires_at || ''),
@@ -1230,13 +2056,40 @@
     return openPage();
   }
 
+  /* Add Another Card passed its check: the class joined this device's
+     session, and the page opens on it. The server gives back no token for
+     a joined session; if the session had ended meanwhile it started a new
+     one, and gives back that one's token. */
+  function added(res) {
+    var e = String(res.enrollment_id || '');
+    if (!session || !e) {
+      adding = null;
+      pageRefused({ ok: false, error: 'network' });
+      return Promise.resolve();
+    }
+    adding = null;
+    if (res.session_token) {
+      session = { token: String(res.session_token), expires: '', enrollment: e, active: Date.now(), kept: false };
+    }
+    session.enrollment = e;
+    if (res.expires_at) session.expires = String(res.expires_at);
+    session.active = Date.now();
+    if (!S.demo) keep(session);
+    S.page = null;
+    S.reply = null;
+    if (typeof StudentData !== 'undefined') StudentData.use(null);
+    return openPage();
+  }
+
   /* Is This You? The code goes again with what the student typed; there is
-     no token between `card` and `verify`. */
+     no token between `card` and `verify`. Adding a card, it goes to
+     `add-card` with this device's session, which the class joins. */
   function checkCard() {
     var code = S.code;
     return verifyIdentity({
       send: function (ident) {
         var body = Object.assign({ code: code }, ident);
+        if (adding && session) return ask('add-card', Object.assign(body, { session: session.token }));
         if (ending) body.session = ending;
         return ask('verify', body);
       },
@@ -1248,17 +2101,31 @@
   }
 
   function startDemo(hash) {
-    var m = /^demo-card(?:-(password|letter|both))?$/i.exec(hash || '');
+    // #demo-card-send: the sample class with Send Work on (S5-F2); off, as in every class, otherwise.
+    // #demo-card-reflect: Send Work and Reflect on Feedback both on (S10).
+    // #demo-card-group: Send Work on, and a piece sent as One per Group (S12-F1).
+    // #demo-card-revise: Send Work on, a piece returned for revision and a revision returned (S11-F2),
+    // in a class graded by both, so Before and After shows the board's "2.7 · 67%" and "3.0 · 75%".
+    var m = /^demo-card(?:-(password|letter|both|send|reflect|group|revise))?$/i.exec(hash || '');
     if (!m) return false;
     var kind = (m[1] || '').toLowerCase();
     demo = {
       hash: hash,
       check: kind === 'password' ? 'password' : 'identity',
-      system: kind === 'letter' || kind === 'both' ? kind : 'proficiency',
+      system: kind === 'letter' || kind === 'both' ? kind : kind === 'revise' ? 'both' : 'proficiency',
       wrong: 0,
       seen: {},
+      classes: [],
+      group: kind === 'group',
+      revise: kind === 'revise',
     };
+    adding = null;
     S.demo = true;
+    S.demoSend = kind === 'send' || kind === 'reflect' || kind === 'group' || kind === 'revise';
+    S.demoGroup = kind === 'group';
+    S.demoReflect = kind === 'reflect';
+    S.demoRevise = kind === 'revise';
+    S.demoRevisions = null;
     S.typed = prettyCode(DEMO.code);
     S.screen = 'cardstart';
     setTitle();
@@ -1293,6 +2160,8 @@
   // Back to the card's code, with nothing kept from the last student.
   function restartCard() {
     var hash = demo && demo.hash;
+    adding = null;
+    stopCamera();
     StudentPage.reset();
     if (typeof StudentData !== 'undefined') StudentData.use(null);
     stopWatchingRows();
@@ -1302,12 +2171,20 @@
     paint('#sp-code');
   }
 
-  function onClick(act) {
+  function onClick(act, el) {
     if (act === 'card-yes') {
       checkCard();
     } else if (act === 'card-notme') {
       // An answer still on its way is for a card this student has handed back.
       StudentPage.newTurn();
+      // The check may already have passed and kept a session (its page
+      // still on the way): that student is signed out, as Done does, so
+      // the next person on this device never opens their page. Adding a
+      // card, the session is the student already signed in, and stays.
+      if (session && !adding) {
+        endOnServer(session.token);
+        forget();
+      }
       S.sending = false;
       S.message = '';
       S.screen = 'cardnotme';
@@ -1315,7 +2192,41 @@
     } else if (act === 'card-restart') {
       restartCard();
     } else if (act === 'card-done') {
-      signOut('');
+      signOut('', true);
+    } else if (act === 'card-camera') {
+      startCamera();
+    } else if (act === 'card-type') {
+      cameraOff('');
+    } else if (act === 'classes-open') {
+      openSheet();
+    } else if (act === 'classes-close') {
+      closeSheet();
+    } else if (act === 'class-open') {
+      openClass(el.getAttribute('data-enrollment') || '');
+    } else if (act === 'card-add') {
+      if (adding) {
+        // Type a Different Code, while adding: back to Add Another Card.
+        StudentPage.newTurn();
+        S.data = null;
+        S.message = '';
+        S.sending = false;
+        S.screen = 'cardstart';
+        paint('#sp-code');
+      } else {
+        startAdding();
+      }
+    } else if (act === 'card-back') {
+      backToPage();
+    } else if (
+      /^(tab|segment|all-open|all-close|filter|pick|open-piece|feedback|feedback-close|whole|whole-close|levels|form-pick|work|work-close|work-page|work-marks|compare)$/.test(
+        act,
+      )
+    ) {
+      showPart(act, el);
+    } else if (act === 'q-start' || act === 'r-open') {
+      openForm(act, el.getAttribute('data-form-id') || '');
+    } else if (act === 'page-back') {
+      pageBack();
     } else if (act === 'page-retry') {
       openPage();
     } else if (act === 'grades-retry') {
@@ -1336,6 +2247,8 @@
   if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
     document.addEventListener('visibilitychange', function () {
       if (document.visibilityState === 'hidden') {
+        // The camera is never left on in a tab nobody is looking at.
+        if (scanning) cameraOff('');
         cover();
         lookAgain();
         return;
@@ -1352,6 +2265,22 @@
     window.addEventListener('storage', function () {
       checkSession();
     });
+    // Your Classes: Escape closes it, and Tab goes round inside it.
+    window.addEventListener('keydown', function (e) {
+      if (!S || !S.sheet || typeof document === 'undefined') return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeSheet();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      var inside = Array.prototype.slice.call(document.querySelectorAll('.sp-sheet button'));
+      if (!inside.length) return;
+      var at = inside.indexOf(document.activeElement);
+      var next = e.shiftKey ? (at <= 0 ? inside.length - 1 : at - 1) : at < 0 || at === inside.length - 1 ? 0 : at + 1;
+      e.preventDefault();
+      inside[next].focus();
+    });
     // What counts as activity: a touch, a key, the pointer, a scroll.
     ['pointerdown', 'pointermove', 'keydown', 'touchstart', 'wheel', 'scroll'].forEach(function (name) {
       window.addEventListener(
@@ -1364,7 +2293,9 @@
     });
   }
 
-  StudentPage.pageFrame = pageFrame;
+  StudentPage.classesSheet = classesSheet;
+  StudentPage.demoForms = demoForms;
+  StudentPage.pageBack = pageBack;
 
   StudentPage.addScreens({
     file: 'app',
@@ -1373,6 +2304,8 @@
       cardcheck: renderCardCheck,
       cardnotme: renderCardNotMe,
       cardmessage: renderCardMessage,
+      cardscan: renderCardScan,
+      signedout: renderSignedOut,
     },
     click: onClick,
     submit: onSubmit,
@@ -1382,6 +2315,8 @@
          showing the session now: the device's copy stays where it is, for a
          card to end or the page to open again. */
       session = null;
+      adding = null;
+      stopCamera();
       stopClocks();
       stopWatchingRows();
       if (typeof document !== 'undefined') document.documentElement.classList.remove('sp-away');
@@ -1404,6 +2339,14 @@
       checkCard: checkCard,
       checkSession: checkSession,
       tellSeen: tellSeen,
+      codeFrom: codeFrom,
+      adding: function () {
+        return adding;
+      },
+      camera: function () {
+        return scanning;
+      },
+      SCAN_EVERY_MS: SCAN_EVERY_MS,
       SESSION_KEY: SESSION_KEY,
       IDLE_MS: IDLE_MS,
       DEMO: DEMO,

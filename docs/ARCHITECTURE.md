@@ -27,7 +27,7 @@ The app persists teacher data through Supabase Auth plus a public RPC surface. I
 
 - `login.html` and `login-auth.js` handle sign-in, sign-up, password reset, and Demo Mode entry.
 - Authenticated users are routed into the teacher experience.
-- Teachers are the only accounts. Students answer questionnaires and read phone reports on the student page (`s/index.html`; `s/student.js`, the shell, then its screens in `s/questionnaire.js` and `s/report.js`; `shared/phone-report-view.js`) with a code from their slip, through the `student-submit` Supabase edge function. A student card's screens are `s/app.js` (the card, Is This You?) and `s/assignments.js` (the Assignments list), with `s/student-data.js` feeding `shared/calc.js` from the student's own page (`calc.js` and `constants.js` are fetched only when the list is about to open, so a slip never loads them); they run in Demo Mode only (`/s/#demo-card`) until the card routes exist. There is no parent portal.
+- Teachers are the only accounts. Students answer questionnaires and read phone reports on the student page (`s/index.html`; `s/student.js`, the shell, then its screens in `s/questionnaire.js` and `s/report.js`; `shared/phone-report-view.js`) with a code from their slip, through the `student-submit` Supabase edge function. A student card's screens are `s/app.js` (the card, Is This You?, After Done, Switching Classes, the page's frame and its four tabs) and `s/assignments.js` (To Do, Sent, Back and All Assignments), drawn from `shared/student-view.js` (the one builder the student page and Preview as Student share), with `s/student-data.js` feeding `shared/calc.js` from the student's own page (`calc.js` and `constants.js` are fetched only when the list is about to open, so a slip never loads them); they run in Demo Mode only (`/s/#demo-card`) until the card routes exist. There is no parent portal.
 
 ### Desktop SPA
 
@@ -36,7 +36,7 @@ The app persists teacher data through Supabase Auth plus a public RPC surface. I
 - Main page modules:
   - `page-dashboard.js`
   - `page-assignments.js`
-  - `page-student.js`
+  - `page-student.js`; its Work tab, and the Work Wall (one assessment's work side by side), are `work-wall.js`, with every picture of student work loaded through `shared/work-thumbs.js`
   - `page-gradebook.js`
   - `page-observations.js`
   - `page-starters.js`: Observations › Starters (`/observations/starters`)
@@ -53,8 +53,8 @@ The desktop app is a single-page app on real paths: `/dashboard`, `/assignments`
 - Main tab modules:
   - `tab-students.js`, with `students-list.js` and `student-detail.js`
   - `tab-observe.js`
-  - `tab-grade.js`, with `sweep.js`
-- It also loads `teacher/obs-capture.js` and `teacher/obs-card.js` from the desktop.
+  - `tab-grade.js`: the list of assessments and the speed grader, with `sweep.js` and `grade-photos.js` (the student's work on a grading card and a student's To Grade list), `add-work.js` (Add Work: photographing a student's paper work) and `markup.js` (Mark Up: drawing on a page of the work)
+- It also loads `teacher/obs-capture.js`, `teacher/obs-card.js` and `teacher/work-wall.js` (the Work Wall, from the Grade tab's row menu) from the desktop.
 
 The mobile experience reuses the same shared auth, data, queue, and calculation layers as desktop, but presents them through a separate shell and touch-first UI.
 
@@ -175,6 +175,21 @@ Remote persistence then happens through explicit v2 helpers and dispatchers, inc
 - term ratings
 - report configuration and preferences
 - imports and restore flows
+
+#### Class settings
+
+The decisions are in `docs/DECISIONS.md`, "Class settings on two computers"; these are the engineering choices that carry them out.
+
+- **A save sends what changed.** `saveCourseConfig` and `updateCourse` send `update_course(p_course_id, p_patch)`. `saveCourseConfig` builds the patch from the settings, then drops every key equal to the copy this page started from: a clone taken when the class loaded from the server or was last saved (the `courseConfigs` server-state baseline), or, while the class has not loaded from the server this session, a clone of what the page read from the browser's storage (`_settingsRead`), never the storage as another tab has since left it. A save that changes nothing sends nothing.
+- **A load replaces the device's copy.** `_applyBundleCourseConfig` takes every setting from the course row, the calculation method and decay weight included; `_applyBundleCourseRow` refreshes the class list's row (name, grading style, time zone, late work policy). The older load (`get_gradebook`) does the same. This device's queued changes are laid back over the row (`_unsentCourseChanges`), and a row edited while a load is in flight is left for the next pass.
+- **Two devices changing the same setting:** the later save stays, and neither is told. This was not asked of the owner; it is what `update_course` does.
+- **A copy saved before the fix** may hold the device's own old method beside an unchanged version number, for which the server answers "not modified". The saved copy's record carries `settings: 1` once its settings came from the server; a copy without it is shown at once but downloaded in full once.
+- **A method the server never got.** When the course row has never been updated since it was made (`updated_at` equals `created_at`), no computer has changed a setting of the class on the server, so a method or decay weight this device holds that differs is not an old copy: it is sent up once instead of overwritten. This is a class restored from a backup by the build before the fix, which sent the server Average 65% whatever the backup held. `restoredCourse` in `shared/backup-restore.js` now takes the method from the backup's settings.
+- **What a queued settings write carries.** Each patch this build queues carries the mark `_changed_only`, taken out as it is sent (`_sendableCoursePatch`, in the one place every `update_course` passes). An unmarked patch naming a setting only a whole copy ever carried is an older build's: it is compared with the server's row (`_oldSettingsWrite`) and dropped if nothing differs, discarded if anything does.
+- **A discarded write** (`_discardWrite`) tells Sentry the kind of write, never its content; has the class read again; and is kept in the failed list with no retry, so the sync dot is red. No later write and no page load clears it until its class has been read again from the server (`until_reload`, `markReloaded` in `shared/offline-queue.js`), and it goes with the page load after that. Two classes are never read again, so the class list ends it (`_releaseDiscardsByClassList`, `releaseDiscarded`): a class gone from `list_teacher_courses` at once, an archived one at the next page load (a write discarded on the page itself stays). Until the class has loaded again, the load's "send up a setting only this device has" rule stands aside for it (`noSendUp`), so nothing of the discarded save reaches the server by another route.
+- **Categories.** Class Settings' Save Categories and its drag read `list_categories`, compare it with the list the form was opened with, and send, asked of the server directly and never left in the outbox (`saveCategoriesNow`, `reorderCategoriesNow`). A drag made with other edits unsaved waits for Save, because `reorder_categories` numbers only the rows it is sent. Copy Grading Setup checks first (`categoriesStillCurrent`) and saves through the outbox with the list it was made over kept beside it (the entry's `guard`). A `save_categories` that waited in the outbox (a retry, a later page) is read against the server first (`_guardCategorySave`): already there, dropped; the list it was made over, sent; anything else, discarded. An older build's entry has no guard, so it goes only when the server already holds its list. Copy Grading Setup's guard also names the class copied from (`guard.copy`), so a copied list discarded this way leaves the same note on the class as one not copied at once.
+- **A save or drag sent with no answer** is kept as `tried` (in memory, and in the draft below, new rows with a `key`). A server list equal to it is this computer's own save, never "changed on another device"; edits typed after it are unsaved edits over that list. A save held back because this computer's other writes had not gone (`why: 'waiting'`) is not said to need a connection. Discard My Changes with such a list outstanding reads the server's list and shows it (`_cmCatFollowServer`), or does so the next time Class Settings draws the categories if there is no connection. A category list that reaches the server clears the class's "not copied" note (`_clearCategoriesNotCopied`).
+- **Nothing typed is lost with a refused category save.** `gb-category-draft-<cid>` keeps the unsaved edits (no connection) or what was typed (changed elsewhere) on the device until saved, discarded or dismissed, and the note Copy Grading Setup leaves on a class whose categories it did not copy. It is kept only as long as the class's saved copy: the 14-day purge and storage eviction take it too.
 
 ### Offline and retry
 

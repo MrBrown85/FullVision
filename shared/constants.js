@@ -36,172 +36,6 @@
 /* ── Student Display Helpers ───────────────────────────────── */
 const PRONOUNS_OPTIONS = ['he/him', 'she/her', 'they/them', 'prefer not to say'];
 
-/* ── Courses ────────────────────────────────────────────────── */
-const DEFAULT_COURSES = {
-  sci8: {
-    id: 'sci8',
-    name: 'Science 8',
-    block: 'A',
-    // Demo Mode's class: Proficiency, Mean, Emerging First (Colin, 2026-10-26).
-    gradingSystem: 'proficiency',
-    calcMethod: 'average',
-    decayWeight: 0.65,
-    levelOrder: 'asc',
-    curriculumTags: ['SCI8'],
-  },
-};
-
-/* ── Learning Map: Learning Standards (flat format) ─────────── */
-const LEARNING_MAP = {
-  sci8: {
-    _flatVersion: 2,
-    subjects: [{ id: 'SCI8', name: 'Science 8', color: '#0891b2' }],
-    sections: [
-      {
-        id: 'QAP',
-        subject: 'SCI8',
-        name: 'Questioning and Predicting',
-        shortName: 'Questioning',
-        color: '#0891b2',
-        tags: [
-          {
-            id: 'QAP',
-            label: 'Question and Predict',
-            text: '',
-            color: '#0891b2',
-            subject: 'SCI8',
-            name: 'Questioning and Predicting',
-            shortName: 'Questioning',
-            i_can_statements: [
-              'I can identify a scientific question that genuinely interests me and pursue it with curiosity.',
-              'I can make careful observations of the natural world and generate questions based on what I notice.',
-              'I can formulate a hypothesis and predict what I think will happen in an investigation.',
-            ],
-          },
-        ],
-      },
-      {
-        id: 'PI',
-        subject: 'SCI8',
-        name: 'Planning and Conducting',
-        shortName: 'Planning',
-        color: '#0891b2',
-        tags: [
-          {
-            id: 'PI',
-            label: 'Plan Investigations',
-            text: '',
-            color: '#0891b2',
-            subject: 'SCI8',
-            name: 'Planning and Conducting',
-            shortName: 'Planning',
-            i_can_statements: [
-              'I can plan a fair test by identifying and controlling variables.',
-              'I can choose the right tools and methods to collect accurate and reliable data.',
-              'I can use appropriate SI units and convert between units when needed.',
-              'I can follow safety and ethical guidelines during investigations.',
-            ],
-          },
-        ],
-      },
-      {
-        id: 'IP',
-        subject: 'SCI8',
-        name: 'Processing and Analyzing Data and Information',
-        shortName: 'Processing',
-        color: '#0891b2',
-        tags: [
-          {
-            id: 'IP',
-            label: 'Identify Patterns',
-            text: '',
-            color: '#0891b2',
-            subject: 'SCI8',
-            name: 'Processing and Analyzing Data and Information',
-            shortName: 'Processing',
-            i_can_statements: [
-              'I can organize data into tables and graphs to reveal patterns.',
-              'I can analyze my data to identify trends, patterns, and relationships.',
-              'I can apply First Peoples knowledge and perspectives as valid sources of scientific understanding.',
-              'I can use scientific understanding to draw conclusions supported by evidence.',
-            ],
-          },
-        ],
-      },
-      {
-        id: 'EM',
-        subject: 'SCI8',
-        name: 'Evaluating',
-        shortName: 'Evaluating',
-        color: '#0891b2',
-        tags: [
-          {
-            id: 'EM',
-            label: 'Evaluate Methods',
-            text: '',
-            color: '#0891b2',
-            subject: 'SCI8',
-            name: 'Evaluating',
-            shortName: 'Evaluating',
-            i_can_statements: [
-              'I can identify sources of error in my investigation and suggest specific improvements.',
-              'I can evaluate the quality of my data and explain how it could be made more reliable.',
-              'I can consider the social, ethical, and environmental implications of a scientific issue.',
-              'I can exercise informed skepticism \u2014 questioning claims and demanding evidence.',
-            ],
-          },
-        ],
-      },
-      {
-        id: 'CA',
-        subject: 'SCI8',
-        name: 'Applying and Innovating',
-        shortName: 'Applying',
-        color: '#0891b2',
-        tags: [
-          {
-            id: 'CA',
-            label: 'Community Applications',
-            text: '',
-            color: '#0891b2',
-            subject: 'SCI8',
-            name: 'Applying and Innovating',
-            shortName: 'Applying',
-            i_can_statements: [
-              "I can apply what I've learned in science to a new situation or problem.",
-              'I can design a project or solution that addresses a real need in my community or the world.',
-              'I can generate and refine creative ideas when problem-solving.',
-            ],
-          },
-        ],
-      },
-      {
-        id: 'SC',
-        subject: 'SCI8',
-        name: 'Communicating',
-        shortName: 'Communicating',
-        color: '#0891b2',
-        tags: [
-          {
-            id: 'SC',
-            label: 'Scientific Communication',
-            text: '',
-            color: '#0891b2',
-            subject: 'SCI8',
-            name: 'Communicating',
-            shortName: 'Communicating',
-            i_can_statements: [
-              'I can communicate my scientific findings clearly using appropriate scientific vocabulary.',
-              'I can use digital tools to represent and share scientific information.',
-              "I can express how my local environment and First Peoples perspectives relate to the science I'm learning.",
-            ],
-          },
-        ],
-      },
-    ],
-  },
-};
-
 /* ── BC Ministry of Education — Special Education Designations ── */
 const BC_DESIGNATIONS = {
   A: {
@@ -610,12 +444,13 @@ function parsePointsInput(text, max, saved) {
 }
 
 /* The % beside a points input, marked "bonus" above the maximum. `digits`
-   is the decimal places (0 rounds to a whole %). Returns HTML; empty when
-   there is no score. */
+   1 prints one decimal (85.9%), anything else a whole % (86%), each as
+   calc.js prints a %: on paper, a half rounding up (57.5% is 58%). Returns
+   HTML; empty when there is no score. */
 function pointsPctHtml(v, max, digits) {
   if (v == null || !(max > 0)) return '';
   var pct = (v / max) * 100;
-  var html = (digits ? pct.toFixed(digits) : String(Math.round(pct))) + '%';
+  var html = (digits ? oneDecimal(pct).toFixed(1) : String(wholePercent(pct))) + '%';
   return v > max ? html + '<span class="gb-pts-bonus">bonus</span>' : html;
 }
 
@@ -861,23 +696,43 @@ const OBS_SENTIMENTS = {
   note: { label: 'Note', color: 'var(--obs-note)', tint: 'rgba(242,194,0,0.14)', border: '#f2c200' },
 };
 
+/* An observation saved from a student's reflection on feedback (Save as
+   Observation in the grader, S10-F3) holds the student's own words, and a
+   reflection stays between the student and the teacher: it is never
+   quoted into a report (Colin's ruling 110, "Keep private"). It is marked
+   where it is saved by its context, 'reflection' (observation.context_type,
+   which takes any text and is sent and read back with the observation; no
+   context the teacher picks is called that). The mark holds whatever the
+   teacher later makes its type, and for good: the edit screens show the
+   context as fixed, and updateQuickOb (shared/data.js) refuses to change
+   it. */
+const REFLECTION_OBS_CONTEXT = 'reflection';
+function isReflectionObservation(ob) {
+  return !!ob && ob.context === REFLECTION_OBS_CONTEXT;
+}
 /* Concern and Note observations are private: they can be about a vacation,
    a meeting with parents or a worry, so they never print or go home on any
-   report, and the screens that list them say "Private" (Colin, Oct 29). */
+   report, and the screens that list them say "Private" (Colin, Oct 29). An
+   observation from a reflection is private whatever its type (above). */
 const PRIVATE_OBS_SENTIMENTS = ['concern', 'note'];
 function isPrivateObservation(ob) {
-  return !!ob && PRIVATE_OBS_SENTIMENTS.indexOf(ob.sentiment) >= 0;
+  return !!ob && (isReflectionObservation(ob) || PRIVATE_OBS_SENTIMENTS.indexOf(ob.sentiment) >= 0);
 }
 /* The small "Private" label every observation list shows on a private one
    (styled in teacher/obs-capture.css, which the desktop and phone apps
-   both load). '' for any other observation. */
+   both load); on one from a reflection it says why it is not offered to a
+   report. '' for any other observation. */
 function obsPrivateLabelHtml(ob) {
   if (!isPrivateObservation(ob)) return '';
-  return (
-    '<span class="obs-private" title="Private: never printed or sent home">' +
-    (typeof LINE_ICONS !== 'undefined' ? LINE_ICONS.lock : '') +
-    'Private</span>'
-  );
+  var lock = typeof LINE_ICONS !== 'undefined' ? LINE_ICONS.lock : '';
+  if (isReflectionObservation(ob)) {
+    return (
+      '<span class="obs-private obs-from-reflection" title="Private: never printed or sent home">' +
+      lock +
+      'From a reflection. Not used in reports.</span>'
+    );
+  }
+  return '<span class="obs-private" title="Private: never printed or sent home">' + lock + 'Private</span>';
 }
 
 const OBS_CONTEXTS = {
@@ -933,6 +788,7 @@ function obsTagColor(key) {
 /* ── Card Widget Registry ─────────────────────────────────── */
 const WIDGET_REGISTRY = [
   { key: 'hero', label: 'Name & Proficiency', defaultOn: true },
+  { key: 'toGrade', label: 'To Grade', defaultOn: true },
   { key: 'sectionBars', label: 'Section Progress', defaultOn: true },
   { key: 'completion', label: 'Evidence Coverage', defaultOn: true },
   { key: 'missingWork', label: 'Missing Work', defaultOn: false },

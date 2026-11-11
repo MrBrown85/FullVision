@@ -187,7 +187,7 @@ describe('Demo Mode sends nothing from the student page', () => {
       page.type('#sp-ident', hash === '#demo-card-password' ? page.T.DEMO.password : page.T.DEMO.number);
       await page.click('[data-act="card-yes"]');
       expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
-      expect(page.root().querySelectorAll('.sp-row').length).toBeGreaterThan(0);
+      expect(page.root().querySelectorAll('.sp-row, .sp-piece').length).toBeGreaterThan(0);
       expect(page.calls).toEqual([]);
       // The only files fetched late are the site's own calc.js and constants.js.
       expect(page.fetched).toEqual(['../shared/constants.js', '../shared/calc.js']);
@@ -268,25 +268,84 @@ describe('Demo Mode sends nothing for Draft and Returned', () => {
     expect(JSON.parse(localStorage.getItem('gb-grade-returns-' + CID)).essay.s1.is_draft).toBe(false);
   });
 
-  // Student cards (S0-W1): made, listed and marked printed on the device.
+  /* Student cards (S0-W1, S3-W1): made, listed and marked printed on the
+     device. Making cards is the teacher-cards function for a signed-in
+     teacher (a fetch, not an RPC): in Demo Mode it is never fetched, and
+     the saved card keeps no code. */
   it.each([false, true])(
-    'student cards: Make Cards and marking them printed (signed in behind it: %s)',
+    'student cards: Make and Print and marking them printed (signed in behind it: %s)',
     async signedIn => {
       _useSupabase = signedIn;
-      setStudentPageSwitch(CID, true);
-      expect((await listStudentCards(CID)).data).toEqual([]);
-      const made = (await issueStudentCards(CID)).data;
-      expect(made.issued).toBe(1);
-      expect((await markStudentCardsPrinted(CID, [made.cards[0].id])).data.printed).toBe(1);
-      StudentCards._reset();
-      StudentCards.render(CID);
-      await StudentCards.load(CID);
-      await StudentCards.make(CID);
-      await tick();
-      expect(calls).toEqual([]);
-      expect(JSON.parse(localStorage.getItem('gb-student-cards-' + CID)).length).toBe(1);
-      // Nothing waits in an outbox either.
-      expect(localStorage.getItem('fv-sync-queue-v1')).toBe(null);
+      const fetched = [];
+      const realFetch = globalThis.fetch;
+      const realSheet = QrSlips.printSheet;
+      const printed = [];
+      globalThis.fetch = async url => {
+        fetched.push(String(url));
+        throw new TypeError('Failed to fetch');
+      };
+      // The sheet itself is drawn elsewhere (tests/student-cards.test.js); here, what goes on it.
+      QrSlips.printSheet = items => printed.push(items.length);
+      try {
+        setStudentPageSwitch(CID, true);
+        expect((await listStudentCards(CID)).data).toEqual([]);
+        const made = (await makeStudentCards(CID, [{ enrollment_id: 's1', replaces: null }])).data;
+        expect(made.results[0].result).toBe('made');
+        expect((await markStudentCardsPrinted(CID, [made.results[0].card_id])).data.printed).toBe(1);
+        // A second student, and the screen's own press: it makes and prints a card, on the device.
+        saveStudents(CID, getStudents(CID).concat([{ id: 's2', firstName: 'Avery', lastName: 'Test' }]));
+        const realQuery = document.querySelector;
+        const wasOpen = DashClassManager.classManagerOpen;
+        const realDraw = DashClassManager.renderClassManager;
+        document.querySelector = sel =>
+          sel === '.sc-card' ? { dataset: { cid: CID } } : realQuery.call(document, sel);
+        DashClassManager.classManagerOpen = true;
+        DashClassManager.renderClassManager = () => {};
+        const realConfirm = globalThis.showConfirm;
+        // Every question is answered Yes.
+        globalThis.showConfirm = (title, message, ok, style, onOk) => onOk();
+        let pressed;
+        try {
+          StudentCards._reset();
+          StudentCards.render(CID);
+          await StudentCards.load(CID);
+          pressed = await StudentCards.makeAndPrint(CID);
+          // Print New Card, New Codes for This Class, Unlock and Unlock All: on the device too.
+          await StudentCards.printNewCard(CID, 's1');
+          await tick();
+          StudentCards.newCodes(CID);
+          await tick();
+          const kept = JSON.parse(localStorage.getItem('gb-student-cards-' + CID));
+          kept.forEach(c => (c.locked_at = new Date().toISOString()));
+          localStorage.setItem('gb-student-cards-' + CID, JSON.stringify(kept));
+          await StudentCards.load(CID);
+          StudentCards.unlock(CID, kept[0].id);
+          StudentCards.unlockAll(CID);
+          await tick();
+        } finally {
+          document.querySelector = realQuery;
+          DashClassManager.classManagerOpen = wasOpen;
+          DashClassManager.renderClassManager = realDraw;
+          globalThis.showConfirm = realConfirm;
+        }
+        expect(pressed).toBe(1);
+        expect(printed).toEqual([1, 1, 2]);
+        expect(JSON.parse(localStorage.getItem('gb-student-cards-' + CID)).every(c => !c.locked_at)).toBe(true);
+        await tick();
+        expect(calls).toEqual([]);
+        expect(fetched).toEqual([]);
+        const kept = localStorage.getItem('gb-student-cards-' + CID);
+        expect(JSON.parse(kept).length).toBe(2);
+        expect(JSON.parse(kept).every(c => !!c.printed_at)).toBe(true);
+        expect(kept).not.toContain(made.results[0].code);
+        expect(kept).not.toMatch(/"(code|password)":/);
+        // Nothing waits in an outbox either.
+        expect(localStorage.getItem('fv-sync-queue-v1')).toBe(null);
+      } finally {
+        globalThis.fetch = realFetch;
+        QrSlips.printSheet = realSheet;
+        StudentCards._reset();
+      }
     },
   );
 
@@ -309,7 +368,8 @@ describe('Demo Mode sends nothing for Draft and Returned', () => {
   );
 
   it('the rule and the grader name no server function', () => {
-    ['shared/grade-state.js', 'shared/grader.js'].forEach(file => {
+    // Mark Up (S9-F1) too: it saves through data.js's saveMarkup only.
+    ['shared/grade-state.js', 'shared/grader.js', 'shared/markup-draw.js', 'teacher/markup.js'].forEach(file => {
       const src = readFileSync(new URL('../' + file, import.meta.url), 'utf-8');
       expect(src, file).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|sendBeacon|_writeRpc|\.rpc\(|getSupabase/);
     });

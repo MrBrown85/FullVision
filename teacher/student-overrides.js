@@ -26,7 +26,7 @@ window.StudentOverrides = (function () {
       return x.id === secId;
     });
     var tag = sec && sec.tags ? sec.tags[0] : null;
-    var calcLevel = rawProf > 0 ? Math.max(1, Math.min(4, Math.round(rawProf))) : 0;
+    var calcLevel = rawProf > 0 ? Math.max(1, Math.min(4, roundLevel(rawProf))) : 0;
     var calcText = [formatLevel(activeCourse, rawProf), levelWord(activeCourse, rawProf)].filter(Boolean).join(' ');
     var wording = function (l) {
       var w = window.CompetencyWording && tag ? CompetencyWording.lines(tag, l) : null;

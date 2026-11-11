@@ -1337,7 +1337,7 @@ window.ReportQuestionnaire = (function () {
 
   /* A competency's colour step for .qn-level, 1 to 4. */
   function _levelStep(v) {
-    return Math.max(1, Math.min(4, Math.round(v)));
+    return Math.max(1, Math.min(4, roundLevel(v)));
   }
   /* "5 pieces", "1 piece": a competency's scored pieces. */
   function _pieces(c) {
@@ -3933,10 +3933,15 @@ window.ReportQuestionnaire = (function () {
       // that read with the old pronouns show on the card (staleFor) with
       // Keep as Approved or Use the New Sentence.
       if (was) _recordPronouns(student, was);
-      _rows[key] = recoverRows(text, ctx, rating.draftMeta);
+      _rows[key] = markWords(recoverRows(text, ctx, rating.draftMeta), student, f);
       return _rows[key];
     }
-    return _applyPronouns(student, f, was, recoverRows(text, _pronounContext(student, f, was), rating.draftMeta));
+    return _applyPronouns(
+      student,
+      f,
+      was,
+      markWords(recoverRows(text, _pronounContext(student, f, was), rating.draftMeta), student, f),
+    );
   }
 
   /* ── Pronouns changed (Edit Student) ────────────────────── */
@@ -4458,7 +4463,8 @@ window.ReportQuestionnaire = (function () {
      between its sentences (the LayoutE and InContext mockups). */
   var NEXT_KEYS = ['nextStep', 'goWords', 'home'];
   function _isNext(row) {
-    return !!row && NEXT_KEYS.indexOf(row.step) >= 0;
+    // The student's own words (S18-F1) are a row of their own, never joined to the bank's next step.
+    return !!row && !row.words && NEXT_KEYS.indexOf(row.step) >= 0;
   }
   function _units(rows) {
     var out = [];
@@ -4919,6 +4925,8 @@ window.ReportQuestionnaire = (function () {
      weakest skill. An edited sentence says so instead. */
   function rowSource(row, cid, student, f, ctx) {
     var first = _first(student);
+    // The student's own words, quoted (S18-F1).
+    if (row.words) return wordsSource(student, row.words);
     // A sentence put in from Browse with a fact missing shows it as …
     if (isTyped(row))
       return /…/.test(row.text)
@@ -5210,10 +5218,11 @@ window.ReportQuestionnaire = (function () {
                     in the row's place.
      The comment bank is the one source today. */
   var _sources = [];
-  /* Adds a source after the ones there; returns a function that takes it
-     out again. */
-  function registerSource(src) {
-    _sources.push(src);
+  /* Adds a source after the ones there (before them with opts.first);
+     returns a function that takes it out again. */
+  function registerSource(src, opts) {
+    if (opts && opts.first) _sources.unshift(src);
+    else _sources.push(src);
     return function () {
       var at = _sources.indexOf(src);
       if (at >= 0) _sources.splice(at, 1);
@@ -5269,6 +5278,251 @@ window.ReportQuestionnaire = (function () {
     pick: _pickWording,
   };
   registerSource(BANK_SOURCE);
+
+  /* ── In Their Words (S18-F1) ─────────────────────────────────
+     A Next Step sentence that quotes what the student wrote on the
+     questionnaire, exactly: only the name and pronoun around it are filled
+     in, from the student's record, in one of two fixed frames. No model
+     writes it. It is offered in Add Here, first, and never by Generate.
+     Only answers the student shared are offered: Wants to Get Better At,
+     Hard Right Now, Good At, and the goal from the Goal Check-In. An
+     answer marked To You Only (teacher_only) is never offered. Quoting a
+     plan waits for Reflect on Feedback (S10). */
+  var WORDS = [
+    { key: 'better', from: 'about', item: 'goal', label: 'Wants to Get Better At' },
+    { key: 'hard', from: 'about', item: 'hard', label: 'Hard Right Now' },
+    { key: 'good', from: 'about', item: 'goodAt', label: 'Good At' },
+    { key: 'goal', from: 'checkin', item: 'coreGoal', label: 'Goal' },
+  ];
+  /* The two fixed frames for each answer. {N} the name, {s} she, {O} her
+     (object), {P} her (possessive), {V} the verb's s, {IS} is or are, {Q}
+     the answer in quotation marks. */
+  var WORDS_FRAMES = {
+    better: [
+      'Asked what {s} want{V} to get better at, {N} wrote: {Q}',
+      '{N} named what {s} want{V} to get better at: {Q}',
+    ],
+    hard: ['Asked what is hard for {O} right now, {N} wrote: {Q}', '{N} named what is hard for {O} right now: {Q}'],
+    good: [
+      'Asked what {s} {IS} good at as a learner, {N} wrote: {Q}',
+      '{N} named what {s} {IS} good at as a learner: {Q}',
+    ],
+    goal: ['{N}’s goal, in {P} own words: {Q}', '{N} set this goal: {Q}'],
+  };
+  /* The student's shared answers on file, in WORDS order: { key, label,
+     question, text, status }. The text is the answer's first paragraph as
+     written, with each run of spaces and line breaks made one space. */
+  function wordsAnswers(f) {
+    var prof = f && f.voice && f.voice.profile;
+    if (!prof) return [];
+    var out = [];
+    WORDS.forEach(function (w) {
+      var it = prof[w.from] && prof[w.from][w.item];
+      if (!it || (it.q && it.q.teacher_only)) return;
+      // Its first paragraph, as Generate reads the goal (CommentBank.facts): a plan below it is not quoted.
+      var text = _answer(it)
+        .trim()
+        .split(/\n\s*\n/)[0]
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (!text) return;
+      out.push({
+        key: w.key,
+        label: w.label,
+        question: (it.q && String(it.q.prompt || '').trim()) || w.label,
+        text: text,
+        status: w.key === 'goal' && f.voice.goalStatus ? f.voice.goalStatus : '',
+      });
+    });
+    return out;
+  }
+  /* One frame filled for the student: the answer inside “ ”, unchanged. A
+     full stop follows the closing mark only when the answer has no ending
+     of its own. */
+  function wordsSentence(student, answer, frame) {
+    var p = ReportBlocks.getPronouns(student);
+    var they = p.subj === 'they';
+    var q = '“' + answer.text + '”' + (/[.!?…]$/.test(answer.text) ? '' : '.');
+    return WORDS_FRAMES[answer.key][frame || 0].replace(/\{(\w+)\}/g, function (m, k) {
+      if (k === 'N') return _first(student);
+      if (k === 's') return p.subj;
+      if (k === 'O') return p.obj;
+      if (k === 'P') return p.poss;
+      if (k === 'V') return they ? '' : 's';
+      if (k === 'IS') return they ? 'are' : 'is';
+      if (k === 'Q') return q;
+      return m;
+    });
+  }
+  function _wordsId(key, frame) {
+    return 'words:' + key + ':' + (frame || 0);
+  }
+  function _wordsParse(id) {
+    var m = /^words:(\w+):([01])$/.exec(String(id || ''));
+    return m ? { key: m[1], frame: Number(m[2]) } : null;
+  }
+  function wordsRow(student, answer, frame) {
+    var text = wordsSentence(student, answer, frame);
+    return {
+      id: _wordsId(answer.key, frame),
+      step: 'nextStep',
+      text: text,
+      drafted: text,
+      edited: false,
+      // Kept as written: the realiser never rewords or renames it.
+      kept: true,
+      raw: null,
+      prov: null,
+      s: null,
+      classLine: false,
+      words: answer.key,
+    };
+  }
+  /* The rows, with each run of sentences that reads exactly as one of the
+     student's quoted answers in a frame made its words row again: a
+     comment read back from its record, or the box after typing, gives
+     plain sentences. A sentence the teacher edited is theirs and stays so. */
+  function markWords(rows, student, f) {
+    var answers = wordsAnswers(f);
+    if (!answers.length || !rows || !rows.length) return rows;
+    var known = {};
+    answers.forEach(function (a) {
+      [0, 1].forEach(function (k) {
+        known[wordsSentence(student, a, k)] = { a: a, k: k };
+      });
+    });
+    var out = [];
+    for (var i = 0; i < rows.length; i++) {
+      var hit = null;
+      var text = '';
+      for (var j = i; j < rows.length && j < i + 6 && !hit && !rows[i].words; j++) {
+        if (rows[j].words || rows[j].classLine || (rows[j].edited && !isTyped(rows[j]))) break;
+        text = text ? text + ' ' + rows[j].text : rows[j].text;
+        if (known[text]) hit = { end: j, w: known[text] };
+      }
+      if (!hit) {
+        out.push(rows[i]);
+        continue;
+      }
+      out.push(wordsRow(student, hit.w.a, hit.w.k));
+      i = hit.end;
+    }
+    return out;
+  }
+  // Where a words row's sentence came from: "Her words, from her questionnaire".
+  function wordsSource(student, key) {
+    var p = ReportBlocks.getPronouns(student);
+    var poss = p.poss.charAt(0).toUpperCase() + p.poss.slice(1);
+    return key === 'goal'
+      ? poss + ' goal, from ' + p.poss + ' Goal Check-In'
+      : poss + ' words, from ' + p.poss + ' questionnaire';
+  }
+  // html-safe: every answer, question, sentence and name through esc
+  function _wordsMenuHtml(cid, student, ctx, rows, i) {
+    var row = rows[i];
+    var answers = wordsAnswers(_facts(student));
+    var first = _first(student);
+    var mine = _wordsParse(row.id) || { key: row.words, frame: 0 };
+    var item = function (id, text, meta, on) {
+      return `<button type="button" role="menuitemradio" aria-checked="${on}" class="qn-menu-item${on ? ' on' : ''}" data-action="tqSentences" data-do="pick" data-row="${i}" data-sentence="${esc(id)}" title="${on ? 'The sentence in use.' : 'Use this instead.'}"><span class="qn-menu-mark" aria-hidden="true">${on ? '✓' : ''}</span><span class="qn-menu-body"><span class="qn-menu-text">${esc(text)}</span>${meta ? `<span class="qn-menu-meta">${esc(meta)}</span>` : ''}</span></button>`;
+    };
+    var cur = answers.find(function (a) {
+      return a.key === mine.key;
+    });
+    var ways = cur
+      ? [0, 1]
+          .map(function (k) {
+            return item(
+              _wordsId(cur.key, k),
+              wordsSentence(student, cur, k),
+              k === mine.frame ? 'In use' : '',
+              k === mine.frame,
+            );
+          })
+          .join('')
+      : '';
+    var others = answers
+      .filter(function (a) {
+        return a.key !== mine.key;
+      })
+      .map(function (a) {
+        return item(
+          _wordsId(a.key, 0),
+          wordsSentence(student, a, 0),
+          a.question + (a.status ? ' · ' + a.status : ''),
+          false,
+        );
+      })
+      .join('');
+    var part = partOf('nextStep');
+    var low = part.label.toLowerCase();
+    return `<div class="qn-menu qn-wording" role="menu" aria-label="Other ways to say ${esc(first)}’s words" id="tq-wording-menu">
+      <span class="qn-menu-head">Other ways to say this</span>
+      ${ways}
+      ${others ? `<span class="qn-menu-head">Quote another answer</span>${others}` : ''}
+      <span class="qn-menu-meta qn-menu-note">Answers marked To You Only are never listed.</span>
+      <div class="qn-menu-sep" role="separator"></div>
+      <button type="button" role="menuitem" class="qn-menu-add qn-menu-all" data-action="tqSentences" data-do="all" data-row="${i}" title="Opens Browse Sentences on ${esc(part.label)}: every sentence that fits ${esc(first)}.">All ${_plural(_fitCount(part, ctx), esc(low) + ' sentence', esc(low) + ' sentences')}…</button>
+      <button type="button" role="menuitem" class="qn-menu-add" data-action="tqSentences" data-do="remove" data-row="${i}" title="Takes this sentence out of the comment. Undo puts it back.">Remove From Comment</button>
+      ${
+        window.PersonalBank && PersonalBank.stepAllowed('nextStep')
+          ? `<button type="button" role="menuitem" class="qn-menu-add" data-action="tqSentences" data-do="ownOpen" data-where="row" data-mode="write" data-row="${i}" title="Write a sentence of your own for this part. It goes in your bank and into ${esc(first)}’s comment here.">+ Write Your Own</button>`
+          : ''
+      }
+    </div>`;
+  }
+  function _pickWords(st, i, id) {
+    var rows = _rows[_rowKey(st)] || [];
+    var want = _wordsParse(id);
+    var a = want
+      ? wordsAnswers(_facts(st)).find(function (x) {
+          return x.key === want.key;
+        })
+      : null;
+    _wording = null;
+    _addAt = null;
+    if (rows[i] && a && rows[i].id !== id) {
+      rows[i] = wordsRow(st, a, want.frame);
+      _writeRows(st);
+    } else _syncRequired();
+    _focusSel('#tq-sentences [data-row="' + i + '"] [data-do="wording"]');
+  }
+  var WORDS_SOURCE = {
+    id: 'words',
+    label: 'In Their Words',
+    list: function (at) {
+      if (
+        (at.rows || []).some(function (r) {
+          return r && r.words;
+        })
+      )
+        return [];
+      var a = wordsAnswers(at.f)[0];
+      if (!a) return [];
+      return [
+        {
+          step: 'nextStep',
+          part: 'nextStep',
+          label: 'Next Step',
+          id: _wordsId(a.key, 0),
+          text: wordsSentence(at.student, a, 0),
+          words: a.key,
+          answer: a,
+          student: at.student,
+        },
+      ];
+    },
+    row: function (c) {
+      return wordsRow(c.student, c.answer, 0);
+    },
+    owns: function (row) {
+      return !!row && !!row.words;
+    },
+    optionsMenu: _wordsMenuHtml,
+    pick: _pickWords,
+  };
+  // Offered first in Add Here (the board: "With her answer on file, it offers this one first").
+  registerSource(WORDS_SOURCE, { first: true });
 
   /* A choice put in at a gap: the row there with a brief tint, the
      sentence at the same place in the comment (the realiser moves the name
@@ -8654,6 +8908,9 @@ window.ReportQuestionnaire = (function () {
     insertRow: insertRow,
     insertChoices: insertChoices,
     registerSource: registerSource,
+    wordsAnswers: wordsAnswers,
+    wordsSentence: wordsSentence,
+    markWords: markWords,
     sourceChoices: sourceChoices,
     gapPart: _gapPart,
     recoverRows: recoverRows,

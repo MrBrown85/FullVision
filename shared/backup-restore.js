@@ -181,9 +181,27 @@
 
   /* The class row a restore makes, in COURSES shape. A backup from before
      Nov 2026 has no `courseInfo`: the class takes the given name and the
-     defaults, and the teacher sets its grade and grading style after. */
+     defaults, and the teacher sets its grade and grading style after.
+
+     The calculation method and decay weight are the ones the backup's
+     settings hold (`config`), when it holds them: those are what the class
+     was graded with on the computer that made the backup (shared/calc.js
+     reads the settings first), and what this device grades the restored
+     class with. The row took them from `courseInfo` alone, so a backup
+     with none sent the server Average 65% while the device showed the real
+     method; nothing sends it later, and the class's first load from the
+     server moved every grade. */
   function restoredCourse(backup, cid, name) {
     var info = obj(backup.courseInfo);
+    var config = obj(backup.config);
+    var method = str(config.calcMethod) || str(info.calcMethod) || 'average';
+    var decay = [config.decayWeight, info.decayWeight]
+      .map(function (v) {
+        return v == null || v === '' ? NaN : Number(v);
+      })
+      .filter(function (v) {
+        return isFinite(v);
+      })[0];
     return {
       id: cid,
       name: str(name).trim() || str(info.name).trim() || 'Restored Class',
@@ -194,8 +212,8 @@
       displayOrder: 0,
       gradingSystem:
         ['proficiency', 'letter', 'both'].indexOf(info.gradingSystem) >= 0 ? info.gradingSystem : 'proficiency',
-      calcMethod: info.calcMethod || 'average',
-      decayWeight: info.decayWeight != null ? info.decayWeight : 0.65,
+      calcMethod: method,
+      decayWeight: decay != null ? decay : 0.65,
       timezone: info.timezone || 'America/Vancouver',
       lateWorkPolicy: info.lateWorkPolicy || null,
       block: str(info.block).trim().slice(0, 24),
@@ -821,7 +839,35 @@
     return { cid: cid, course: plan.course, sent: sent };
   }
 
+  /* Photos of student work are never in a class backup, and nor are the
+     records of what was sent (Colin, Q22; S8-F2): the backup is built from
+     the class's own records, and student work is not one of them. Where a
+     class could hold any (its student page is on and it takes work, Send
+     Work), the file says so, in its `photos` field. Otherwise undefined,
+     which leaves the file as it always was. A restore reads nothing from
+     the field. */
+  var PHOTOS_NOTE = 'Photos of student work are not in this file.';
+
+  function photosNote(cid) {
+    var settings = typeof getReturnSettings === 'function' ? getReturnSettings(cid) : null;
+    var send = typeof getCourseSendWork === 'function' ? getCourseSendWork(cid) : null;
+    return settings && settings.student_page && send && send.send_work ? PHOTOS_NOTE : undefined;
+  }
+
+  // Restore Class from Backup says the same, once any class takes work.
+  var PHOTOS_NOT_IN_BACKUP = 'Photos of student work are not in a backup.';
+
+  function anyClassTakesWork() {
+    return Object.keys(typeof COURSES !== 'undefined' && COURSES ? COURSES : {}).some(function (cid) {
+      return !!photosNote(cid);
+    });
+  }
+
   window.FVBackupRestore = {
+    PHOTOS_NOTE: PHOTOS_NOTE,
+    PHOTOS_NOT_IN_BACKUP: PHOTOS_NOT_IN_BACKUP,
+    anyClassTakesWork: anyClassTakesWork,
+    photosNote: photosNote,
     parseBackup: parseBackup,
     collectIds: collectIds,
     remapBackup: remapBackup,

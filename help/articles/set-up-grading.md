@@ -1,7 +1,7 @@
 ---
 title: Set Up Grading
 section: Getting Started
-order: 3
+order: 4
 summary: Grading settings decide how scores become a grade, shown as a proficiency level, a letter grade and percent, or both.
 checked: 2026-11-05
 pages:

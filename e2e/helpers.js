@@ -692,8 +692,19 @@ export async function mockAuth(page) {
     function fakeRpc(name, params) {
       window.__e2eRpcLog.push({ name, params: params || null, at: Date.now() });
       let res;
+      // The server keeps dashboard_prefs across reloads, even though the seed
+      // scripts rewrite gb-config on every page load.
+      if (name === 'save_teacher_preferences' && params && params.p_patch && 'dashboard_prefs' in params.p_patch) {
+        try {
+          sessionStorage.setItem('e2e-server-dashboard-prefs', JSON.stringify(params.p_patch.dashboard_prefs));
+        } catch (e) {}
+      }
       if (name === 'bootstrap_teacher') {
         const { config } = serverDb();
+        let savedPrefs = null;
+        try {
+          savedPrefs = JSON.parse(sessionStorage.getItem('e2e-server-dashboard-prefs'));
+        } catch (e) {}
         const rows = courseRows();
         res = {
           data: {
@@ -708,6 +719,9 @@ export async function mockAuth(page) {
               mobile_view_mode: null,
               mobile_sort_mode: null,
               card_widget_config: null,
+              // As the live RPC returns it (20261022_dashboard_prefs.sql):
+              // view choices (getViewPref) come back after a reload.
+              dashboard_prefs: savedPrefs || config.dashboardPrefs || null,
             },
           },
         };

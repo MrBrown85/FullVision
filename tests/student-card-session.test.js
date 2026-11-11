@@ -32,7 +32,9 @@ const MIN = 60 * 1000;
 const text = page => page.root().textContent;
 const routes = page => page.calls.map(c => c.body.route);
 const alertText = page => (page.root().querySelector('[role="alert"]') || {}).textContent || '';
+// Every piece, as All Assignments lists it (S4-F1: the tab opens on To Do).
 const rowSubs = page =>
+  (page.showAll(), 0) ||
   Object.fromEntries(
     [...page.root().querySelectorAll('.sp-row')].map(li => [
       li.querySelector('.sp-row-title').textContent,
@@ -40,6 +42,15 @@ const rowSubs = page =>
     ]),
   );
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+// Waits for what a held-up or slow reply leads to, however long a busy machine takes.
+const big = page => (page.root().querySelector('.sp-big') || {}).textContent;
+async function until(ok, what) {
+  const giveUp = Date.now() + 10000;
+  while (!ok()) {
+    if (Date.now() > giveUp) throw new Error('never happened: ' + what);
+    await sleep(5);
+  }
+}
 const offline = () => {
   throw new Error('offline');
 };
@@ -59,7 +70,7 @@ function omarCard(more) {
   page.student = { enrollment_id: OMAR, first_name: 'Omar' };
   return sampleCard(
     TODAY,
-    Object.assign({ code: 'ABCDEF', enrollment: OMAR, first: 'Omar', birthday: null, number: '7654321', page }, more),
+    Object.assign({ code: 'ABCDEFGH', enrollment: OMAR, first: 'Omar', birthday: null, number: '7654321', page }, more),
   );
 }
 
@@ -78,14 +89,15 @@ function school(opts = {}) {
     await page.start(hash || '');
     return page;
   };
-  return { fn, store, tab, open, card: fn.state.cards.P3R8WD };
+  return { fn, store, tab, open, card: fn.state.cards.P3R8WDK4 };
 }
 
 async function signIn(dev, server) {
-  const page = await dev.open('#P3R-8WD', server);
+  const page = await dev.open('#P3R8-WDK4', server);
   page.type('#sp-ident', '0123456');
   await page.click('[data-act="card-yes"]');
-  expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+  expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
+  page.showAll();
   return page;
 }
 
@@ -122,11 +134,11 @@ describe('any recognised card signs the last student out', () => {
     await signIn(dev);
     const cece = JSON.parse(dev.store[KEY]).t;
 
-    const omar = await dev.open('#ABC-DEF');
+    const omar = await dev.open('#ABCD-EFGH');
     expect(alertText(omar)).toBe(line);
     // Cece is signed out, on the device and on the server.
     expect(omar.calls.map(c => c.body)).toEqual([
-      { route: 'card', code: 'ABCDEF' },
+      { route: 'card', code: 'ABCDEFGH' },
       { route: 'done', session: cece },
     ]);
     expect(dev.store).toEqual({});
@@ -141,7 +153,7 @@ describe('any recognised card signs the last student out', () => {
   it('a tab still showing Cece’s list is taken down by it too', async () => {
     const dev = school({ more: [omarCard({ locked: true })] });
     const first = await signIn(dev);
-    await dev.open('#ABC-DEF');
+    await dev.open('#ABCD-EFGH');
     first.fire('storage');
     expect(first.root().querySelector('.sp-row')).toBeNull();
     expect(text(first)).not.toContain('Cece');
@@ -170,7 +182,7 @@ describe('any recognised card signs the last student out', () => {
     await signIn(dev);
     const kept = dev.store[KEY];
     dev.fn.state.addressLocked = true;
-    const other = await dev.open('#ABC-DEF');
+    const other = await dev.open('#ABCD-EFGH');
     expect(alertText(other)).toBe('Too many tries. Wait 15 minutes and try again.');
     expect(dev.store[KEY]).toBe(kept);
   });
@@ -248,7 +260,7 @@ describe('before the page knows whether a code is a card or a slip, it speaks as
   it('a scanned card with no internet: one neutral line and Try Again', async () => {
     const dev = school();
     let down = true;
-    const page = await dev.open('#P3R-8WD', body => (down ? offline() : dev.fn.handle(body)));
+    const page = await dev.open('#P3R8-WDK4', body => (down ? offline() : dev.fn.handle(body)));
     // The card route did not answer, so the slip route was tried too. Neither did.
     expect(routes(page)).toEqual(['card', 'open']);
     neither(page);
@@ -279,7 +291,7 @@ describe('before the page knows whether a code is a card or a slip, it speaks as
       await sleep(20);
       return dev.fn.handle(body);
     });
-    page.T.start(page.root(), '#P3R-8WD');
+    page.T.start(page.root(), '#P3R8-WDK4');
     expect(page.root().querySelector('.sp-head-title').textContent).toBe('FullVision');
     expect(text(page)).not.toMatch(/Student Questions|Student Page|slip|card/i);
     await page.settle();
@@ -303,7 +315,9 @@ describe('before the page knows whether a code is a card or a slip, it speaks as
     async (name, says) => {
       const dev = school();
       let broken = true;
-      const page = await dev.open('#P3R-8WD', body => (broken && body.route === 'card' ? says() : dev.fn.handle(body)));
+      const page = await dev.open('#P3R8-WDK4', body =>
+        broken && body.route === 'card' ? says() : dev.fn.handle(body),
+      );
       expect(routes(page)).toEqual(['card', 'open']);
       neither(page);
       expect(text(page)).not.toContain("didn't work");
@@ -358,7 +372,10 @@ describe('before the page knows whether a code is a card or a slip, it speaks as
       ['busy', 'FullVision is busy right now. Wait a minute and try again.'],
     ]) {
       const dev = school();
-      const page = await dev.open('#P3R-8WD', body => ({ ok: false, error: body.route === 'card' ? 'server' : error }));
+      const page = await dev.open('#P3R8-WDK4', body => ({
+        ok: false,
+        error: body.route === 'card' ? 'server' : error,
+      }));
       expect(alertText(page), error).toBe(line);
       expect(page.root().querySelector('.sp-head-title').textContent).toBe('FullVision');
       expect(text(page)).not.toMatch(/slip|card|Student Questions/i);
@@ -370,8 +387,9 @@ describe('before the page knows whether a code is a card or a slip, it speaks as
     const dev = school();
     const first = await signIn(dev);
     await first.click('[data-act="card-done"]');
+    await first.click('[data-act="card-restart"]');
     first.server = body => (body.route === 'card' ? { ok: false, error: 'server' } : dev.fn.handle(body));
-    first.type('#sp-code', 'P3R-8WD');
+    first.type('#sp-code', 'P3R8-WDK4');
     await first.submit('form[data-form="card"]');
     expect(alertText(first)).toBe(UNREACHED);
     expect(first.root().querySelector('form[data-form="card"]')).toBeTruthy();
@@ -460,7 +478,7 @@ describe('before the page knows whether a code is a card or a slip, it speaks as
   it('the address is locked for cards and the slip route can’t be reached: still neither', async () => {
     const dev = school();
     dev.fn.state.addressLocked = true;
-    const page = await dev.open('#P3R-8WD', body => (body.route === 'open' ? offline() : dev.fn.handle(body)));
+    const page = await dev.open('#P3R8-WDK4', body => (body.route === 'open' ? offline() : dev.fn.handle(body)));
     expect(routes(page)).toEqual(['card', 'open']);
     neither(page);
   });
@@ -468,7 +486,7 @@ describe('before the page knows whether a code is a card or a slip, it speaks as
   it('the address is locked for cards and the code opens no slip: Too many tries, as neither’s', async () => {
     const dev = school();
     dev.fn.state.addressLocked = true;
-    const page = await dev.open('#P3R-8WD');
+    const page = await dev.open('#P3R8-WDK4');
     expect(alertText(page)).toBe('Too many tries. Wait 15 minutes and try again.');
     expect(page.root().querySelector('.sp-head-title').textContent).toBe('FullVision');
     expect(text(page)).not.toMatch(/slip|Student Questions/i);
@@ -479,19 +497,28 @@ describe('a reply for a card or a session that is no longer the current one is d
   it('Cece’s page is on its way when Omar’s code arrives in the same tab: her list is never drawn', async () => {
     const dev = school({ more: [omarCard()] });
     await signIn(dev);
-    let releaseCard;
+    let releaseCard, releasePage, pageAnswered;
     const slowCard = new Promise(r => (releaseCard = r));
+    const slowPage = new Promise(r => (releasePage = r));
+    const answered = new Promise(r => (pageAnswered = r));
     const tab = dev.tab(async body => {
-      if (body.route === 'page') await sleep(30);
       if (body.route === 'card') await slowCard;
-      return dev.fn.handle(body);
+      if (body.route !== 'page') return dev.fn.handle(body);
+      await slowPage;
+      const reply = await dev.fn.handle(body);
+      pageAnswered();
+      return reply;
     });
     const drawn = [];
     const watch = setInterval(() => drawn.push(text(tab).includes('Energy Transfer Investigation')), 5);
     tab.T.start(tab.root(), ''); // the device is signed in: Cece's page is asked for
-    await tab.tick();
-    tab.T.start(tab.root(), '#ABC-DEF'); // the address changes to Omar's code
-    await sleep(120);
+    await until(() => routes(tab).includes('page'), 'Cece’s page asked for');
+    tab.T.start(tab.root(), '#ABCD-EFGH'); // the address changes to Omar's code
+    // Cece's page arrives while Omar's code is still being looked up.
+    releasePage();
+    await answered;
+    // Her page's reply has been handed to the page and handled: only Omar's card is still out.
+    await until(() => tab.inFlight() === 1, 'Cece’s page reply handled');
     expect(text(tab)).not.toContain('Energy Transfer Investigation');
     expect(text(tab)).not.toContain('8 / 10');
     releaseCard();
@@ -515,9 +542,9 @@ describe('a reply for a card or a session that is no longer the current one is d
     expect(alertText(tab)).toBe(UNREACHED);
     down = false;
     tab.tap('[data-act="page-retry"]');
-    await tab.tick();
+    await until(() => routes(tab).filter(r => r === 'page').length >= 2, 'Try Again on its way');
     tab.tap('[data-act="card-restart"]');
-    await tab.tick();
+    await until(() => tab.root().querySelector('form[data-form="card"]'), 'the code box');
     expect(tab.root().querySelector('form[data-form="card"]')).toBeTruthy();
     release();
     await tab.settle();
@@ -529,15 +556,15 @@ describe('a reply for a card or a session that is no longer the current one is d
     const dev = school();
     let release;
     const gate = new Promise(r => (release = r));
-    const tab = await dev.open('#P3R-8WD', async body => {
+    const tab = await dev.open('#P3R8-WDK4', async body => {
       if (body.route === 'verify') await gate;
       return dev.fn.handle(body);
     });
     tab.type('#sp-ident', '0123456');
     tab.tap('[data-act="card-yes"]');
-    await tab.tick();
+    await until(() => routes(tab).includes('verify'), 'the check on its way');
     tab.tap('[data-act="card-notme"]');
-    await tab.tick();
+    await until(() => big(tab) === 'Give This Card Back', 'Give This Card Back');
     expect(tab.root().querySelector('.sp-big').textContent).toBe('Give This Card Back');
     release();
     await tab.settle();
@@ -547,20 +574,100 @@ describe('a reply for a card or a session that is no longer the current one is d
     expect(dev.store).toEqual({});
   });
 
-  it('another code typed under Is This You? while the check is on its way: the new card’s screen is ready to answer', async () => {
-    const dev = school({ more: [omarCard()] });
+  it('the check has passed and the page is on its way, then No, That’s Not Me: that student is signed out, as Done does', async () => {
+    const dev = school();
     let release;
     const gate = new Promise(r => (release = r));
-    const tab = await dev.open('#P3R-8WD', async body => {
-      if (body.route === 'verify' && body.code === 'P3R8WD') await gate;
+    const tab = await dev.open('#P3R8-WDK4', async body => {
+      if (body.route === 'page') await gate;
       return dev.fn.handle(body);
     });
     tab.type('#sp-ident', '0123456');
     tab.tap('[data-act="card-yes"]');
-    await tab.tick();
-    tab.type('#sp-code', 'ABC-DEF');
+    await until(() => Object.keys(dev.store).length > 0, 'the session kept');
+    const token = JSON.parse(dev.store[KEY]).t;
+    tab.tap('[data-act="card-notme"]');
+    await until(() => big(tab) === 'Give This Card Back', 'Give This Card Back');
+    expect(tab.root().querySelector('.sp-big').textContent).toBe('Give This Card Back');
+    release();
+    await tab.settle();
+    expect(tab.root().querySelector('.sp-row')).toBeNull();
+    // Nothing of hers is left on the device, and the server has ended her session.
+    expect(dev.store).toEqual({});
+    expect(tab.calls.map(c => c.body)).toContainEqual({ route: 'done', session: token });
+    expect(dev.fn.state.sessions).toEqual({});
+    // The next person to open the page gets nobody's list.
+    const next = await dev.open('');
+    expect(next.calls).toEqual([]);
+    expect(text(next)).not.toContain('Energy Transfer Investigation');
+  });
+
+  it.each([
+    ['assessments', 'x'],
+    ['rubrics', 7],
+  ])('a page whose %s is not a list: the plain message and Try Again, not Checking… for good', async (field, value) => {
+    const dev = school();
+    const tab = await dev.open('#P3R8-WDK4', async body => {
+      const res = await dev.fn.handle(body);
+      if (body.route === 'page' && res && res.ok) return Object.assign({}, res, { [field]: value });
+      return res;
+    });
+    tab.type('#sp-ident', '0123456');
+    await tab.click('[data-act="card-yes"]');
+    await tab.settle();
+    expect(alertText(tab)).toBe(UNREACHED);
+    expect(tab.root().querySelector('[data-act="page-retry"]')).toBeTruthy();
+    expect(text(tab)).not.toContain('Checking');
+  });
+
+  it('Try Again on results, then Done: the signed-out screen is not drawn again when the results arrive', async () => {
+    const dev = school();
+    const page = dev.tab();
+    page.net.fail = src => /calc\.js$/.test(src);
+    await page.start('#P3R8-WDK4');
+    page.type('#sp-ident', '0123456');
+    await page.click('[data-act="card-yes"]');
+    expect(page.root().querySelector('[data-act="grades-retry"]')).toBeTruthy();
+    page.net.fail = () => false;
+    page.tap('[data-act="grades-retry"]');
+    page.tap('[data-act="card-done"]');
+    const shown = page.root().firstElementChild;
+    await page.settle();
+    // The screen Done drew is the one still showing, untouched.
+    expect(page.root().firstElementChild).toBe(shown);
+    expect(page.root().querySelector('.sp-row')).toBeNull();
+  });
+
+  it('another tab signs Omar in: the tab still showing Cece’s list takes it down', async () => {
+    const dev = school({ more: [omarCard()] });
+    const first = await signIn(dev);
+    const omar = await dev.open('#ABCD-EFGH');
+    omar.type('#sp-ident', '7654321');
+    await omar.click('[data-act="card-yes"]');
+    expect(JSON.parse(dev.store[KEY]).e).toBe(OMAR);
+    first.fire('storage');
+    first.T.checkSession();
+    await first.settle();
+    expect(first.root().querySelector('.sp-row')).toBeNull();
+    // Omar stays signed in: Cece's tab leaves without touching his session.
+    expect(JSON.parse(dev.store[KEY]).e).toBe(OMAR);
+  });
+
+  it('another code typed under Is This You? while the check is on its way: the new card’s screen is ready to answer', async () => {
+    const dev = school({ more: [omarCard()] });
+    let release;
+    const gate = new Promise(r => (release = r));
+    const tab = await dev.open('#P3R8-WDK4', async body => {
+      if (body.route === 'verify' && body.code === 'P3R8WDK4') await gate;
+      return dev.fn.handle(body);
+    });
+    tab.type('#sp-ident', '0123456');
+    tab.tap('[data-act="card-yes"]');
+    await until(() => routes(tab).includes('verify'), 'Cece’s check on its way');
+    tab.type('#sp-code', 'ABCD-EFGH');
     tab.send('form[data-form="card"]');
-    await sleep(80); // Cece's check is still held up
+    // Cece's check is still held up.
+    await until(() => big(tab) === 'Is this you, Omar?', 'Omar’s card');
     expect(tab.root().querySelector('.sp-big').textContent).toBe('Is this you, Omar?');
     const yes = tab.root().querySelector('[data-act="card-yes"]');
     expect(yes.textContent).toBe('Yes, That’s Me');
@@ -580,9 +687,10 @@ describe('a reply for a card or a session that is no longer the current one is d
       return dev.fn.handle(body);
     });
     tab.T.start(tab.root(), '#K7M-4QX');
-    await sleep(30);
-    tab.T.start(tab.root(), '#P3R-8WD');
-    await sleep(80); // the slip's reply is still held up
+    await until(() => routes(tab).includes('open'), 'the slip asked for');
+    tab.T.start(tab.root(), '#P3R8-WDK4');
+    // The slip's reply is still held up.
+    await until(() => big(tab) === 'Is this you, Cece?', 'Cece’s card');
     expect(tab.root().querySelector('.sp-big').textContent).toBe('Is this you, Cece?');
     release();
     await tab.settle();
@@ -592,9 +700,12 @@ describe('a reply for a card or a session that is no longer the current one is d
 
 describe('a session’s end is checked before the list can be drawn again', () => {
   it('at its end time the page takes itself down, with nobody touching it', async () => {
-    const dev = school({ lasts: 150 });
+    // Ten minutes long, so its end comes before the fifteen idle minutes do.
+    const dev = school({ lasts: 10 * MIN });
     const page = await signIn(dev);
-    await sleep(260);
+    page.advance(10 * MIN + 1000);
+    page.runTimers(); // the page's own timer, on time; no tick, no event
+    await page.settle();
     expect(page.root().querySelector('.sp-row')).toBeNull();
     expect(page.root().querySelector('.sp-msg').textContent).toBe(SIGNED_OUT);
     expect(dev.store).toEqual({});
@@ -609,7 +720,7 @@ describe('a session’s end is checked before the list can be drawn again', () =
     page.advance(10 * MIN);
     page.fire('pointerdown'); // still in use
     page.runTicks();
-    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
     page.advance(4 * 60 * MIN); // asleep four hours
     page.runTicks();
     await page.settle();
@@ -625,7 +736,7 @@ describe('a session’s end is checked before the list can be drawn again', () =
     const token = JSON.parse(dev.store[KEY]).t;
     page.advance(14 * MIN);
     page.runTicks();
-    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
     page.advance(2 * MIN);
     page.runTicks();
     page.runTicks();
@@ -644,7 +755,7 @@ describe('a session’s end is checked before the list can be drawn again', () =
     await page.click('[data-act="card-done"]');
     page.advance(60 * MIN);
     page.runTicks();
-    expect(page.root().querySelector('form[data-form="card"]')).toBeTruthy();
+    expect(page.root().querySelector('.sp-signed-out')).toBeTruthy();
     expect(page.root().querySelector('.sp-msg')).toBeNull();
     // A slip in a tab that was signed in.
     const tab = await signIn(dev);
@@ -679,7 +790,7 @@ describe('a session’s end is checked before the list can be drawn again', () =
     expect(covered()).toBe(true);
     page.show();
     expect(covered()).toBe(false);
-    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
   });
 
   it.each(['pageshow', 'show', 'focus'])(
@@ -710,10 +821,11 @@ describe('a session’s end is checked before the list can be drawn again', () =
   );
 
   it('the device opened again after midnight draws nothing of the list and asks nothing', async () => {
-    const dev = school({ lasts: 60 });
+    // Ten minutes long, so its end comes before the fifteen idle minutes do.
+    const dev = school({ lasts: 10 * MIN });
     await signIn(dev);
-    await sleep(90);
     const page = dev.tab();
+    page.advance(11 * MIN); // the device is opened again eleven minutes later
     const seen = [];
     page.T.start(page.root(), '');
     seen.push(page.root().querySelectorAll('.sp-row').length);
@@ -722,6 +834,7 @@ describe('a session’s end is checked before the list can be drawn again', () =
     expect(seen).toEqual([0, 0]);
     expect(page.calls).toEqual([]);
     expect(page.root().querySelector('.sp-msg').textContent).toBe(SIGNED_OUT);
+    expect(dev.store).toEqual({});
   });
 });
 
@@ -732,7 +845,7 @@ describe('fifteen minutes with no activity ends the session, as Done does', () =
     const token = JSON.parse(dev.store[KEY]).t;
     page.advance(14 * MIN);
     page.T.checkSession();
-    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
     expect(dev.store[KEY]).toBeTruthy();
 
     page.advance(1 * MIN);
@@ -765,7 +878,7 @@ describe('fifteen minutes with no activity ends the session, as Done does', () =
       page.fire(name);
       page.advance(10 * MIN); // twenty minutes since the sign-in, ten since the activity
       page.T.checkSession();
-      expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+      expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
       page.advance(5 * MIN);
       page.T.checkSession();
       expect(page.root().querySelector('.sp-row')).toBeNull();
@@ -780,7 +893,7 @@ describe('fifteen minutes with no activity ends the session, as Done does', () =
     const again = dev.tab();
     again.advance(10 * MIN);
     await again.start('');
-    expect(again.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(again.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
     again.advance(5 * MIN);
     // The first thing that happens is a touch.
     again.fire('pointerdown');
@@ -850,7 +963,7 @@ describe('fifteen minutes with no activity ends the session, as Done does', () =
     const dev = school();
     const one = await signIn(dev);
     const two = await dev.open('');
-    expect(two.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(two.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
     const token = JSON.parse(dev.store[KEY]).t;
 
     // Ten minutes on, the student is working in tab one.
@@ -862,8 +975,8 @@ describe('fifteen minutes with no activity ends the session, as Done does', () =
     two.advance(10 * MIN);
     two.T.checkSession();
     one.T.checkSession();
-    expect(two.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
-    expect(one.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(two.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
+    expect(one.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
 
     // Five more with nothing in either.
     one.advance(5 * MIN);
@@ -892,7 +1005,7 @@ describe('fifteen minutes with no activity ends the session, as Done does', () =
     page.fire('pointerdown');
     page.hide();
     page.show();
-    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
     expect(page.calls).toEqual([]);
     expect(page.store).toEqual({});
   });
@@ -937,6 +1050,7 @@ describe('"opened" means the row was on screen in a visible tab', () => {
     expect(rowSubs(page)['Lab Safety Contract']).toMatch(/· Updated$/);
     // The list loaded again: every one of them can still be opened, and the mark is still there.
     const next = await dev.open('');
+    next.showAll();
     expect(next.root().querySelectorAll('[data-unseen]')).toHaveLength(6);
     expect(rowSubs(next)['Lab Safety Contract']).toMatch(/· Updated$/);
   });
@@ -1033,7 +1147,8 @@ describe('"opened" means the row was on screen in a visible tab', () => {
     page.onScreen(el => [WORK.energy, WORK.quiz].includes(el.getAttribute('data-unseen')));
     page.onScreen(el => [WORK.energy, WORK.quiz, WORK.lab].includes(el.getAttribute('data-unseen')));
     expect(seenCalls(page)).toEqual([]);
-    await sleep(900);
+    page.advance(900);
+    page.runTimers(); // the page's own timer, on time
     await page.settle();
     expect(seenCalls(page)).toEqual([[WORK.energy, WORK.quiz, WORK.lab]]);
   });
@@ -1044,7 +1159,8 @@ describe('"opened" means the row was on screen in a visible tab', () => {
     const page = dev.tab();
     page.hide();
     await page.start('');
-    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    page.showAll();
+    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
     // The browser reports the rows in view, but nobody is looking.
     page.onScreen(() => true);
     await readFor(page, 2000);
@@ -1060,6 +1176,7 @@ describe('"opened" means the row was on screen in a visible tab', () => {
     const page = dev.tab();
     page.hide();
     await page.start('');
+    page.showAll();
     page.onScreen(() => true);
     page.onScreen(el => el.getAttribute('data-unseen') === WORK.quiz);
     page.show();
@@ -1106,15 +1223,17 @@ describe('"opened" means the row was on screen in a visible tab', () => {
     const dev = school();
     const page = dev.tab();
     page.net.fail = src => /calc\.js$/.test(src);
-    await page.start('#P3R-8WD');
+    await page.start('#P3R8-WDK4');
     page.type('#sp-ident', '0123456');
     await page.click('[data-act="card-yes"]');
+    page.showAll();
     expect(page.root().querySelector('.sp-no-results')).toBeTruthy();
     expect(unseenRows(page)).toEqual([]);
     await scrollThroughAll(page);
     expect(routes(page)).toEqual(['card', 'verify', 'page']);
     page.net.fail = () => false;
     await page.click('[data-act="grades-retry"]');
+    page.showAll();
     expect(unseenRows(page)).toHaveLength(6);
     await scrollThroughAll(page);
     expect(seenCalls(page)).toHaveLength(1);
@@ -1176,7 +1295,7 @@ describe('"opened" means the row was on screen in a visible tab', () => {
     const dev = school();
     const page = openStudentPage({ store: dev.store, noObserver: true });
     page.server = body => dev.fn.handle(body);
-    await page.start('#P3R-8WD');
+    await page.start('#P3R8-WDK4');
     page.type('#sp-ident', '0123456');
     await page.click('[data-act="card-yes"]');
     await readFor(page, 2000);
@@ -1202,7 +1321,8 @@ describe('"opened" means the row was on screen in a visible tab', () => {
     const page = await signIn(dev);
     page.onScreen(() => true);
     await page.click('[data-act="card-done"]');
-    await sleep(800);
+    page.advance(800);
+    page.runTimers(); // any timer left behind
     await readFor(page, 2000);
     expect(routes(page)).toEqual(['card', 'verify', 'page', 'done']);
     expect(page.observers).toEqual([]);
@@ -1289,7 +1409,7 @@ describe('a DIBELS benchmark on a student’s page', () => {
 describe('Is This You? says a wrong answer where a screen reader will read it', () => {
   it('the fields point at the message, and are marked wrong', async () => {
     const dev = school();
-    const page = await dev.open('#P3R-8WD');
+    const page = await dev.open('#P3R8-WDK4');
     const field = sel => page.root().querySelector(sel);
     expect(field('#sp-ident').hasAttribute('aria-describedby')).toBe(false);
     page.type('#sp-ident', '999');

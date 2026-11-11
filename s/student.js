@@ -1,7 +1,8 @@
 /* The student phone page (docs/STUDENT-VOICE-PLAN.md, PR 7; canvas screens
    1–5). A student scans their slip (fullvision.ca/s/#K7M-4QX) or types the
    code, checks it's them, answers one page per part (the questionnaire,
-   then its Goal Check-In), and sends.
+   then its Goal Check-In), and sends. A student card's code is eight
+   characters (K7M4-QX2P); a slip's is six.
 
    It talks only to the student-submit edge function, pinned to
    ca-central-1, with no key: the slip's code is the credential. The code
@@ -30,7 +31,9 @@
 var StudentPage = (function () {
   'use strict';
 
-  var CODE_RE = /^[ABCDEFGHJKMNPQRTUVWXYZ2346789]{6}$/;
+  // A slip's code is six characters, a card's eight (Colin, Nov 10), from
+  // the same alphabet. Only the server says which a code is.
+  var CODE_RE = /^[ABCDEFGHJKMNPQRTUVWXYZ2346789]{6}(?:[ABCDEFGHJKMNPQRTUVWXYZ2346789]{2})?$/;
 
   var MESSAGES = {
     not_found:
@@ -91,6 +94,21 @@ var StudentPage = (function () {
       message: '',
       sending: false,
       demo: false,
+      // Sending work (s/send.js): Demo Mode's Send Work switch, the send under way, what the sample has
+      // in (by piece), and the question over a card (Unsend Your Work?, Replace Your Photos?).
+      demoSend: false,
+      send: null,
+      demoSent: {},
+      // Reflect on Feedback (s/reflect.js, S10): Demo Mode's switch, what the sample has sent (s/feedback.js), the screen.
+      demoReflect: false,
+      demoGroup: false, // #demo-card-group: a piece sent as One per Group (s/feedback.js, S12-F1)
+      demoReflections: null,
+      // Revisions (S11-F2): #demo-card-revise, and what the sample has asked and been sent (s/feedback.js).
+      demoRevise: false,
+      demoRevisions: null,
+      compare: false, // Before and After is open on the piece Your Feedback names
+      reflect: null,
+      sendAsk: null,
       ident: null, // what matched on a questionnaire slip, kept to open again if the session runs out
       number: '', // the student number or slip password as typed
       bday: { m: '', d: '', y: '' }, // the pickers as chosen
@@ -99,6 +117,23 @@ var StudentPage = (function () {
       heading: '', // the loading screen's title when it is not a slip's: a card's page, or a code not yet known
       again: false, // a card's page couldn't be reached: offer Try Again
       from: '', // 'card' when the code was typed on one of the card's screens
+      sheet: false, // a card's page: Your Classes is open over it (app.js)
+      reply: null, // a card's page: the server's `page` reply, which student-view.js draws from
+      tab: 'assignments', // a card's page: assignments | learning | questionnaires | reports
+      segment: 'todo', // the Assignments tab: todo | sent | back
+      all: false, // the Assignments tab: All Assignments is showing
+      pick: '', // the Assignments tab: the card showing
+      search: '', // All Assignments: the search words
+      filter: 'all', // All Assignments: all | todo | sent | back
+      feedback: '', // the Assignments tab: the piece Your Feedback is open on
+      whole: false, // the Assignments tab: The Whole Rubric is showing for that piece
+      levels: false, // Your Feedback: What the Levels Mean is open
+      work: '', // Your Feedback: See Your Work is open on this piece (s/feedback.js, S9-F3)
+      workPage: 0, // See Your Work: the page showing, from 0
+      marksOff: false, // See Your Work: Show Marks is off
+      workPages: null, // See Your Work: the pages fetched, { id, state, pages } (s/feedback.js)
+      form: '', // Questionnaires and My Reports: the one picked on a Chromebook
+      back: '', // a questionnaire or report opened from a card's page: the tab to go back to
     };
   }
 
@@ -119,8 +154,11 @@ var StudentPage = (function () {
     return name.toLowerCase().indexOf(label.toLowerCase()) >= 0 ? name : name + ' \u00b7 ' + label;
   }
 
+  /* As it is printed: a slip's K7M-4QX, a card's K7M4-QX2P. Anything
+     else is shown as typed. */
   function prettyCode(c) {
-    return c.length === 6 ? c.slice(0, 3) + '-' + c.slice(3) : c;
+    var half = c.length === 6 || c.length === 8 ? c.length / 2 : 0;
+    return half ? c.slice(0, half) + '-' + c.slice(half) : c;
   }
 
   function fmtDate(iso, opts) {
@@ -568,6 +606,10 @@ var StudentPage = (function () {
     if (S.screen === 'loading' && window.FVLoading) window.FVLoading.start(root, 'student');
     root.querySelectorAll('textarea.sp-text').forEach(grow);
     rovingRadios(root);
+    // A screen file's own step once its screen is drawn (assignments.js: the cards follow the swipe).
+    files.forEach(function (f) {
+      if (f.drawn) f.drawn(root, S);
+    });
     var f = focusSel ? root.querySelector(focusSel) : null;
     if (f && f.focus) f.focus({ preventScroll: false });
   }
@@ -884,6 +926,14 @@ var StudentPage = (function () {
     });
   }
 
+  // A file chosen (s/send.js's camera and file buttons).
+  function onChange(e) {
+    var el = e.target;
+    files.forEach(function (f) {
+      if (f.change) f.change(el);
+    });
+  }
+
   function onSubmit(e) {
     var form = e.target.closest('[data-form]');
     if (!form) return;
@@ -941,6 +991,7 @@ var StudentPage = (function () {
     root.addEventListener('click', onClick);
     root.addEventListener('input', onInput);
     root.addEventListener('submit', onSubmit);
+    root.addEventListener('change', onChange);
     root.addEventListener('keydown', onKeydown);
     var h = String(hash || '').replace(/^#/, '');
     // A screen file's own address (app.js: #demo-card).
@@ -1059,6 +1110,8 @@ var StudentPage = (function () {
     saveDraft: saveDraft,
     clearDraft: clearDraft,
     demoReport: demoReport,
+    demoData: demoData,
+    loadDemoTemplates: loadDemoTemplates,
     paint: paint,
     grow: grow,
     _test: {

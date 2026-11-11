@@ -3497,6 +3497,30 @@ a.dash-ins-name:hover {
 .cm-cat-field {
   margin-top: 14px;
 }
+/* A save that was not made: the list changed on another device, or could
+   not be checked (dash-class-manager.js CM_CAT_NOTICES). */
+.cm-cat-notice {
+  margin: 2px 0 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: var(--text-sm);
+  line-height: 1.35;
+}
+.cm-cat-notice .cm-add-link {
+  margin-top: 6px;
+}
+.cm-cat-typed {
+  margin-top: 6px;
+}
+.cm-cat-typed-label {
+  font-weight: 600;
+}
+.cm-cat-typed ul {
+  margin: 2px 0 0;
+  padding-left: 18px;
+}
 .cm-cat-list {
   display: flex;
   flex-direction: column;
@@ -6750,8 +6774,8 @@ label.cm-cr-row {
   border: 0;
 }
 
-/* ── Student Cards (teacher/student-cards.js): the bare list under Return
-   Grades ── */
+/* ── Student Cards (teacher/student-cards.js): the list under Return
+   Grades. No code is ever shown in it. ── */
 .sc-card {
   display: flex;
   flex-direction: column;
@@ -6804,17 +6828,72 @@ label.cm-cr-row {
 .sc-table .sc-name {
   font-weight: 600;
 }
-.sc-code {
-  font-family: ui-monospace, Menlo, monospace;
-  letter-spacing: 1px;
-}
-.sc-none .sc-code {
-  font-family: var(--font-base);
-  letter-spacing: 0;
+.sc-none .sc-which {
   color: var(--text-3);
 }
 .sc-status {
   color: var(--text-2);
+}
+.sc-note {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* A row's own buttons (Unlock, Print New Card), at the end of the row. */
+.sc-table .sc-do {
+  padding-right: 0;
+  text-align: right;
+  white-space: nowrap;
+}
+.sc-do .sc-row-btn {
+  display: inline-flex;
+  margin-left: 8px;
+  padding: 3px 10px;
+  font-size: var(--text-xs);
+}
+.sc-do .sc-row-btn:first-child {
+  margin-left: 0;
+}
+/* Cards Work Until: a day, and the way back to the default. */
+.sc-until {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sc-until .cm-hint {
+  margin: 0;
+}
+.sc-until-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.sc-until-row .sc-until-date {
+  width: auto;
+  font-size: var(--text-sm);
+  padding: 5px 8px;
+}
+.sc-until-row .sc-row-btn {
+  margin-left: 0;
+}
+/* The filters: All, Not Printed, Locked, Never Opened, each with its count. */
+.sc-filters {
+  align-self: flex-start;
+  flex-wrap: wrap;
+}
+.sc-count {
+  margin-left: 4px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.sc-empty {
+  margin: 0;
+}
+.sc-actions .cm-action-btn:disabled,
+.sc-do .sc-row-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 .sc-lock {
   margin-left: 8px;
@@ -7282,4 +7361,126 @@ label.cm-cr-row {
     flex: 1 1 auto;
     min-height: 0;
   }
+}
+
+/* ── Questions From Students (S10-F4) ──────────────────────── */
+/* #main is a flex column: the card keeps its height, as Observations does. */
+.page-dashboard .dash-questions {
+  flex-shrink: 0;
+  margin-top: 12px;
+}
+.dash-questions-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.page-dashboard .dash-questions-head .dash-section-title {
+  margin-bottom: 0;
+}
+.dash-questions-count {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 11px;
+  background: #f5b800;
+  color: #3b2a00;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-align: center;
+}
+.dash-questions-hint {
+  margin: 4px 0 8px;
+  color: var(--text-2);
+  font-size: var(--text-sm);
+}
+.dash-questions-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.dash-questions-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--divider);
+}
+.dash-questions-av {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--active);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+.dash-questions-body {
+  flex: 1;
+  min-width: 0;
+}
+.dash-questions-name {
+  font-weight: 600;
+  color: var(--text);
+}
+.dash-questions-meta {
+  color: var(--text-2);
+  font-size: var(--text-sm);
+}
+.dash-questions-text {
+  margin: 6px 0 0;
+  padding: 6px 10px;
+  border-left: 3px solid #f5b800;
+  border-radius: 0 6px 6px 0;
+  background: var(--bg);
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.dash-questions-answer {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+@media (max-width: 600px) {
+  .dash-questions-row {
+    flex-wrap: wrap;
+  }
+  .dash-questions-answer {
+    margin-left: 42px;
+  }
+}
+
+/* ── The photo reminder (S8-F1) ────────────────────────────── */
+/* The week before a class's photos of student work are deleted: at the top
+   of its Dashboard and of Class Settings › Student Page. */
+.photo-reminder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--divider-strong);
+  border-left: 4px solid var(--late);
+  border-radius: 12px;
+}
+.page-dashboard .photo-reminder {
+  flex-shrink: 0;
+  margin-bottom: 12px;
+}
+.sp-card .photo-reminder {
+  margin: 8px 0 4px;
+}
+.photo-reminder-text {
+  flex: 1 1 320px;
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-base);
+  line-height: 1.4;
+}
+.photo-reminder-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
 }

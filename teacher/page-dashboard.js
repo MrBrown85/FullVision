@@ -330,7 +330,7 @@ window.PageDashboard = (function () {
             return a + b;
           }, 0) / overallVals.length
         : 0;
-    var classR = Math.round(classAvg);
+    var classR = roundLevel(classAvg);
 
     var ccCounts = {};
     var ccAssessments = {};
@@ -383,7 +383,9 @@ window.PageDashboard = (function () {
     });
 
     /* -- Overview Panel -- */
-    var html = '';
+    // The photo reminder (S8-F1) first: only in the week before the class's
+    // photos are deleted.
+    var html = Overview.photoReminderHtml(cid);
     html += Overview.renderOverviewPanel({
       cid: cid,
       sections: sections,
@@ -409,6 +411,9 @@ window.PageDashboard = (function () {
       naComp: naComp,
     });
     obsHighlight = _lastObsState.highlight;
+
+    // Questions From Students (S10-F4): only while a class has one waiting.
+    html += Overview.questionsCardHtml(cid);
 
     /* -- Students: cards or the grid -- */
     if (focusCol && allStudents.length)
@@ -1074,6 +1079,19 @@ window.PageDashboard = (function () {
   }
 
   /* ── Delegated click handler ────────────────────────────── */
+  /* Answer in the Grader: the grader on the student's piece, that student
+     only. Closing it draws the dashboard again, so an answered question
+     leaves the card, if the dashboard is still the page shown. */
+  function _answerInGrader(cid, aid, sid) {
+    if (!cid || !aid || !sid || !window.PageAssignments || !PageAssignments.openGrader) return;
+    PageAssignments.openGrader(cid, aid, sid, {
+      studentIds: [sid],
+      onClose: function () {
+        if (document.querySelector('#main .dash-glance')) render();
+      },
+    });
+  }
+
   function _handleClick(e) {
     // A click outside the open segment list closes it.
     if (mixPop && !e.target.closest('#dash-mix-pop, .dash-mix-seg')) _closeMixPop();
@@ -1089,6 +1107,32 @@ window.PageDashboard = (function () {
 
     // Dashboard-only actions
     var handlers = {
+      // The photo reminder (S8-F1): Class Settings › Student Page at Keep
+      // Photos Until, or Dismiss for this class and date.
+      dashPhotoReminderChange: function () {
+        var cid = el.dataset.cid;
+        if (!cid || cid !== activeCourse) return;
+        openClassManager('student-page', cid);
+        CmStudentPage.focusKeepPhotos(cid);
+        // Class Settings draws again as the classes finish loading, which
+        // drops the focus: give it back once, if Class Settings is still on
+        // this class and nothing else has taken the focus.
+        setTimeout(function () {
+          var lost = !document.activeElement || document.activeElement === document.body;
+          var here = CM.classManagerOpen && document.querySelector('.sp-card[data-cid="' + CSS.escape(cid) + '"]');
+          if (lost && here) CmStudentPage.focusKeepPhotos(cid);
+        }, 0);
+      },
+      dashPhotoReminderDismiss: function () {
+        var cid = el.dataset.cid;
+        if (!cid || cid !== activeCourse) return;
+        CmStudentPage.dismissPhotoReminder(cid, el.dataset.date);
+        render();
+      },
+      // Questions From Students (S10-F4): the grader on that student's piece.
+      dashAnswerQuestion: function () {
+        _answerInGrader(el.dataset.cid, el.dataset.aid, el.dataset.sid);
+      },
       goToStudent: function () {
         // The competency tiles open Competencies, the observation line Evidence.
         var part = e.target.closest('[data-student-tab]');
