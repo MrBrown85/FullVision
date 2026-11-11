@@ -966,23 +966,31 @@ test.describe('the Sentences card', () => {
     const p = await plus.boundingBox();
     expect(Math.abs(p.y + p.height / 2 - g.y)).toBeLessThan(2);
     expect(await boxes(page)).toEqual(before);
-    // The menu: Add Here, the Best Piece part (the only one missing that
-    // fits), Write Your Own… and Browse Sentences…
+    // The menu: Add Here; Cece's own words first, as a Next Step sentence
+    // (S18-F1: the sample Cece has answered the questionnaire); then the
+    // Best Piece part (the only bank part missing that fits); Write Your
+    // Own… and Browse Sentences…
     await plus.click();
     const menu = page.locator('#tq-add-menu');
     await expect(menu).toBeVisible();
-    await expect(menu.locator('.qn-menu-head')).toHaveText('Add Here');
+    await expect(menu.locator('.qn-menu-head')).toHaveText(['Add Here', 'In Their Words', 'Sentence Bank']);
     const items = menu.locator('.qn-add-item');
-    await expect(items).toHaveCount(1);
-    await expect(items.first().locator('.qn-add-part')).toHaveText('Best Piece');
-    await expect(items.first().locator('.qn-menu-text')).not.toHaveText('');
-    await expect(items.first().locator('.qn-menu-meta')).not.toHaveText('');
+    await expect(items).toHaveCount(2);
+    await expect(items.first().locator('.qn-add-part')).toHaveText('Next Step');
+    await expect(items.first().locator('.qn-menu-text')).toHaveText(
+      /^Asked what she wants to get better at, Cece wrote: “/,
+    );
+    await expect(items.first().locator('.qn-menu-meta')).toHaveText('Her words, from her questionnaire');
     await expect(items.first()).toBeFocused();
+    const bank = items.nth(1);
+    await expect(bank.locator('.qn-add-part')).toHaveText('Best Piece');
+    await expect(bank.locator('.qn-menu-text')).not.toHaveText('');
+    await expect(bank.locator('.qn-menu-meta')).not.toHaveText('');
     await expect(menu.locator('.qn-menu-add')).toHaveText(['Write Your Own…', 'Browse Sentences…']);
     expect(await boxes(page)).toEqual(before);
-    const sentence = await items.first().locator('.qn-menu-text').textContent();
+    const sentence = await bank.locator('.qn-menu-text').textContent();
     const countWas = await page.locator('#tq-count').textContent();
-    await items.first().click();
+    await bank.click();
     await expect(menu).toHaveCount(0);
     // The row at that gap, tinted, "added just now"; the comment has the
     // sentence at the same place; the count moved.
@@ -1003,12 +1011,12 @@ test.describe('the Sentences card', () => {
     expect(await page.locator('#tq-count').textContent()).not.toBe(countWas);
     expect(await page.evaluate(() => getStudentTermRating('sci8', 'st1', 'term-2').narrative)).toBe(text);
     await expect(added.locator('.qn-line-menu')).toBeFocused();
-    // Now every part is in: the menu says so.
+    // Now every bank part is in: only Cece's own words are offered (S18-F1,
+    // the board: "With her answer on file, it offers this one first").
     await gaps.nth(1).locator('.qn-gap-add').click();
-    await expect(menu.locator('.qn-add-item')).toHaveCount(0);
-    await expect(menu.locator('.qn-add-none')).toHaveText(
-      'Every part with a sentence that fits Cece is in the comment.',
-    );
+    await expect(menu.locator('.qn-add-item')).toHaveCount(1);
+    await expect(menu.locator('.qn-add-item .qn-add-part')).toHaveText('Next Step');
+    await expect(menu.locator('.qn-add-none')).toHaveCount(0);
     await page.keyboard.press('Escape');
     await expect(menu).toHaveCount(0);
     await expect(gaps.nth(1).locator('.qn-gap-add')).toBeFocused();
@@ -1016,6 +1024,19 @@ test.describe('the Sentences card', () => {
     await expect(added).not.toHaveClass(/\badded\b/, { timeout: 7000 });
     await expect(added.locator('.qn-req-source')).not.toHaveText(/added just now/);
     await expect(page.locator('#tq-marks .qn-mark.added')).toHaveCount(0);
+    // With her words in too, every part is in: the menu says so.
+    const last = gaps.nth((await gaps.count()) - 1);
+    await last.locator('.qn-gap-add').click();
+    await menu.locator('.qn-add-item').first().click();
+    await expect(menu).toHaveCount(0);
+    await expect(rows(page).last().locator('.qn-req-source')).toHaveText(/^Her words, from her questionnaire/);
+    await gaps.nth(1).locator('.qn-gap-add').click();
+    await expect(menu.locator('.qn-add-item')).toHaveCount(0);
+    await expect(menu.locator('.qn-add-none')).toHaveText(
+      'Every part with a sentence that fits Cece is in the comment.',
+    );
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
   });
 
   test('Browse Sentences… from a gap: opens on a part that can go in; Use adds at the gap, never in another row’s place; ⌘A Delete then Generate at once', async ({
