@@ -25,6 +25,14 @@ const alertText = page => (page.root().querySelector('[role="alert"]') || {}).te
 // Every piece's title, as All Assignments lists them (S4-F1: the tab opens on To Do).
 const titles = page => (page.showAll(), [...page.root().querySelectorAll('.sp-row-title')].map(el => el.textContent));
 const has = (page, sel) => !!page.root().querySelector(sel);
+// Waits, a turn at a time, until `ok()` holds, however long a busy machine takes (never a fixed number of turns).
+async function until(ok, what) {
+  const giveUp = performance.now() + 4000;
+  while (!ok()) {
+    if (performance.now() > giveUp) throw new Error('never happened: ' + what);
+    await new Promise(r => setImmediate(r));
+  }
+}
 // The class showing: its name and, on the page (S4-F1), its block beside it.
 const head = page => {
   const pill = page.root().querySelector('.sp-pill');
@@ -213,14 +221,18 @@ describe('Switching Classes: Your Classes', () => {
     page.type('#sp-ident', '0123456');
     await page.click('[data-act="card-yes"]');
     let release;
+    let asked = false;
     const held = new Promise(r => (release = r));
     page.server = async body => {
-      if (body.route === 'page' && body.enrollment_id === CECE) await held;
+      if (body.route === 'page' && body.enrollment_id === CECE) {
+        asked = true;
+        await held;
+      }
       return dev.fn.handle(body);
     };
     await page.click('[data-act="classes-open"]');
     page.tap('.sp-class[data-enrollment="' + CECE + '"]');
-    await page.tick();
+    await until(() => asked, 'Science 8 asked for');
     // Science 8 is still loading when fifteen idle minutes pass.
     page.advance(16 * 60 * 1000);
     page.runTicks();
@@ -313,16 +325,20 @@ describe('Switching Classes: what stops Add Another Card', () => {
     const dev = school();
     const page = await signIn(dev);
     let release;
+    let asked = false;
     const held = new Promise(r => (release = r));
     page.server = async body => {
-      if (body.route === 'card') await held;
+      if (body.route === 'card') {
+        asked = true;
+        await held;
+      }
       return dev.fn.handle(body);
     };
     await page.click('[data-act="classes-open"]');
     await page.click('.sp-sheet [data-act="card-add"]');
     page.type('#sp-code', 'K7M4-QX2P');
     page.send('form[data-form="card"]');
-    await page.tick();
+    await until(() => asked, 'the code on its way');
     page.advance(16 * 60 * 1000);
     page.runTicks();
     expect(page.root().querySelector('.sp-msg').textContent).toBe(SIGNED_OUT);

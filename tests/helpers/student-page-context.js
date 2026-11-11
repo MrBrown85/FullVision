@@ -294,6 +294,8 @@ export function openStudentPage(opts = {}) {
     },
     tick,
     settle,
+    // How many fetches and scripts are still out (a reply counts until a turn after it was handed over).
+    inFlight: () => pending,
     watchGlobals: files => {
       const reached = new Set();
       const defined = name => {

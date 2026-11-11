@@ -23,7 +23,8 @@ import './setup.js';
 import { readFileSync } from 'node:fs';
 import { parseHTML } from 'linkedom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { U, signIn, seedClass, clearClass, settle, serverSaysStudentPageOn } from './helpers/pin-save-paths.js';
+import { U, signIn, seedClass, clearClass, serverSaysStudentPageOn } from './helpers/pin-save-paths.js';
+
 import { fakeTeacherCards, fetchFrom } from './helpers/fake-teacher-cards.js';
 import { notAdded } from './helpers/kept-secret.js';
 
@@ -123,10 +124,42 @@ const el = cid => ({ closest: () => ({ dataset: { cid } }) });
    Student Page tab does and waits for the read. */
 let onPage = null;
 const realQuery = document.querySelector;
-const afterDraw = async () => {
-  await new Promise(r => setTimeout(r, 5));
-  await settle();
-};
+/* No test here waits a fixed time or a fixed number of turns for anything
+   asynchronous: a press signs its request with WebCrypto, off the event
+   loop, so a busy runner can outlast any fixed wait. They wait on the thing
+   itself: until() a turn at a time until it holds, quiet() on what
+   StudentCards says is still to come (StudentCards._busy), the press's own
+   promise (StudentCards._making), or the write's own record in
+   shared/data.js (an unlock, a Cards Work Until day). */
+async function until(ok, what) {
+  const giveUp = performance.now() + 4000;
+  while (!ok()) {
+    if (performance.now() > giveUp) throw new Error('never happened: ' + what);
+    await new Promise(r => setImmediate(r));
+  }
+}
+// Until no read is waiting to start or out, and no press is out (any class, with no cid).
+const quiet = cid =>
+  until(() => {
+    const b = StudentCards._busy(cid);
+    return !b.read && !b.press;
+  }, 'the reads and the press to land');
+// After a draw: the read it starts (or decides not to start) has landed and been drawn.
+const afterDraw = () => quiet();
+// An unlock (of one card, or Unlock All for a class) has been answered and handled: shared/data.js
+// keeps it in _cardsUnlockedHere / _cardsUnlockedAllHere until its answer comes.
+const unlockLanded = (cardId, cid) =>
+  until(() => !(cardId in _cardsUnlockedHere) && !(cid in _cardsUnlockedAllHere), 'the unlock to be answered');
+// A request has reached the stand-in function (and, held, waits there).
+const reached = (t, n = 1) => until(() => t.fetcher.count() >= n, n + ' request(s) to reach the function');
+// Every Cards Work Until day this page set for the class has been answered and handled (shared/data.js
+// keeps each in _cardsWorkUntilHere until its answer comes).
+const dayLanded = cid => until(() => !(cid in _cardsWorkUntilHere), 'the day to be answered');
+// An RPC has reached the stand-in database.
+const called = (t, name, n = 1) =>
+  until(() => t.session.fake.calls.filter(c => c.name === name).length >= n, name + ' to be called');
+// Every print's clean-up has run (teacher/ui.js printThen: the dialog closed, the sheet off the page).
+const sheetOff = () => until(() => !restore || cleaned >= sheets.length, 'every print to be cleaned up');
 async function shown(cid) {
   onPage = cid;
   StudentCards.render(cid);
@@ -137,6 +170,7 @@ async function shown(cid) {
    The sheet is drawn into a linkedom document for the test's length. */
 let sheets;
 let restore;
+let cleaned; // prints whose clean-up has run: printThen's done() lets go of 'afterprint'
 function catchPrints() {
   const doc = parseHTML('<!doctype html><html><head></head><body><main id="app"></main></body></html>').document;
   restore = {
@@ -153,8 +187,11 @@ function catchPrints() {
   globalThis.document = doc;
   location.origin = 'https://fullvision.ca';
   window.addEventListener = () => {};
-  window.removeEventListener = () => {};
+  window.removeEventListener = type => {
+    if (type === 'afterprint') cleaned += 1;
+  };
   sheets = [];
+  cleaned = 0;
   window.print = () => {
     const root = doc.getElementById('qr-slips-root');
     sheets.push({
@@ -202,7 +239,7 @@ beforeEach(() => {
 afterEach(async () => {
   // A print's own clean-up runs a moment after the dialog (teacher/ui.js printThen): it runs while the
   // test's stand-in window is still there, never after, whichever test printed last.
-  await new Promise(r => setTimeout(r, 5));
+  await sheetOff();
   releasePrints();
   document.querySelector = realQuery;
   DashClassManager.classManagerOpen = wasOpen.open;
@@ -603,7 +640,7 @@ describe('a signed-in teacher: making cards asks teacher-cards', () => {
     t = await signedIn();
     const out = await markStudentCardsPrinted(LIVE, [U(901), 'not-a-card', U(902)]);
     expect(out.data.printed).toBe(2);
-    await settle();
+    await quiet();
     const sent = t.session.fake.calls;
     expect(sent.map(c => c.name)).toEqual(['mark_student_cards_printed']);
     expect(Object.keys(sent[0].params).sort()).toEqual(['p_card_ids', 'p_idempotency_key']);
@@ -779,7 +816,7 @@ describe('the list in Class Settings › Student Page', () => {
     seedDemo({ return_grades: 'on_return' });
     expect(CmStudentPage.handleAction('spCardsMake', el(CID))).toBe(false);
     expect(CmStudentPage.handleAction('spCardsPrintAgain', el(CID))).toBe(false);
-    await settle();
+    await quiet();
     expect(cardKeys()).toEqual([]);
     seedDemo();
     await shown(CID);
@@ -813,9 +850,9 @@ describe('Make and Print, and Print Again', () => {
     expect(sheet.text).toContain('Scan with your phone camera.');
     expect(sheet.text).not.toMatch(/once/i);
     // The sheet comes off the page once the dialog closes.
-    await new Promise(r => setTimeout(r, 5));
+    await sheetOff();
     expect(document.getElementById('qr-slips-root').innerHTML).toBe('');
-    await settle();
+    await quiet();
 
     // The list: no code, every card printed, the line and Print Again.
     let box = parse(StudentCards.render(CID));
@@ -896,7 +933,7 @@ describe('Make and Print, and Print Again', () => {
       expect(sheets[0].names).toEqual(['Jordan Abel', 'Avery Byrne']);
       expect(sheets[0].numbers).toEqual(['Card 1', 'Card 2']);
       expect(sheets[0].passwords.length).toBe(1);
-      await settle();
+      await quiet();
       const marked = t.session.fake.calls.filter(c => c.name === 'mark_student_cards_printed');
       expect(marked.length).toBe(1);
       expect(marked[0].params.p_card_ids).toEqual([t.fn.live(U(11)).id, t.fn.live(U(12)).id]);
@@ -925,7 +962,7 @@ describe('Make and Print, and Print Again', () => {
       expect(t.fn.posts.length).toBe(3);
       // The codes printed are the live cards'.
       expect(sheets[0].numbers).toEqual(['Card 2', 'Card 2', 'Card 2']);
-      await settle();
+      await quiet();
       const box = parse(StudentCards.render(LIVE));
       expect(noteOf(box)).toBe(
         '3 cards went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
@@ -962,7 +999,7 @@ describe('Make and Print, and Print Again', () => {
       CmStudentPage.handleAction('spCardsMake', el(LIVE));
       CmStudentPage.handleAction('spCardsMake', el(LIVE));
       CmStudentPage.handleAction('spCardsMake', el(LIVE));
-      await settle();
+      await reached(t);
       expect(t.fetcher.count()).toBe(1);
       const waiting = parse(StudentCards.render(LIVE));
       expect(noteOf(waiting)).toBe('Making cards…');
@@ -987,7 +1024,7 @@ describe('Make and Print, and Print Again', () => {
     try {
       await shown(LIVE);
       const pressed = StudentCards.makeAndPrint(LIVE);
-      await settle();
+      await reached(t);
       leave();
       release();
       expect(await pressed).toBe(0);
@@ -1013,7 +1050,7 @@ describe('Make and Print, and Print Again', () => {
     try {
       await shown(LIVE);
       const pressed = StudentCards.makeAndPrint(LIVE);
-      await settle();
+      await reached(t);
       onPage = null;
       vi.advanceTimersByTime(1000); // the watch sees the card gone
       onPage = LIVE;
@@ -1085,7 +1122,7 @@ describe('Make and Print, and Print Again', () => {
     shot.pages.forEach(count => expect(count).toBeLessThanOrEqual(8));
     expect(shot.names).toEqual(many.map(s => 'Student ' + s.lastName));
     expect(shot.qrs).toBe(n);
-    await settle();
+    await quiet();
     expect(noteOf(parse(StudentCards.render(CID)))).toMatch(
       new RegExp('^' + (n === 1 ? '1 card went' : n + ' cards went') + ' to the printer\\.'),
     );
@@ -1305,7 +1342,7 @@ describe('after the review', () => {
       const drawn = [];
       DashClassManager.renderClassManager = () => drawn.push(1);
       const pressed = StudentCards.makeAndPrint(LIVE);
-      await settle();
+      await reached(t);
       expect(noteOf(parse(StudentCards.render(LIVE)))).toBe('Making cards…');
       onPage = null;
       vi.advanceTimersByTime(1000);
@@ -1647,7 +1684,7 @@ describe('Print New Card', () => {
       });
       await shown(LIVE);
       const out = StudentCards.printNewCard(LIVE, U(11));
-      await settle();
+      await reached(t);
       expect(noteOf(parse(StudentCards.render(LIVE)))).toBe('Making cards…');
       DashClassManager.classManagerOpen = false;
       release();
@@ -1988,7 +2025,7 @@ describe('New Codes for This Class', () => {
       await shown(LIVE);
       press('spCardsNewCodes', LIVE);
       asked[0].onOk();
-      await settle();
+      await reached(t);
       onPage = null;
       release();
       await afterDraw();
@@ -2059,7 +2096,7 @@ describe('Unlock and Unlock All', () => {
     expect(buttons(box)).toEqual(['New Codes for This Class']);
     expect(rowButtons(box)[0]).toEqual(['Unlock Jordan Abel’s Card', 'Print a New Card for Jordan Abel']);
     press('spCardsUnlock', CID, { card: made[0].card_id });
-    await settle();
+    await quiet(CID);
     expect(storedCards()[0].locked_at).toBe(null);
     expect(storedCards()[0].wrong_tries).toBe(0);
     box = parse(StudentCards.render(CID));
@@ -2075,7 +2112,7 @@ describe('Unlock and Unlock All', () => {
     await shown(CID);
     expect(buttons(parse(StudentCards.render(CID)))).toEqual(['Unlock All', 'New Codes for This Class']);
     press('spCardsUnlockAll', CID);
-    await settle();
+    await quiet(CID);
     expect(storedCards().every(c => !c.locked_at)).toBe(true);
     box = parse(StudentCards.render(CID));
     expect(buttons(box)).toEqual(['New Codes for This Class']);
@@ -2090,7 +2127,7 @@ describe('Unlock and Unlock All', () => {
       t.session.fake.on('unlock_student_card', () => new Promise(r => (release = r)));
       await shown(LIVE);
       expect(StudentCards.unlock(LIVE, U(901))).toBe(1);
-      await settle();
+      await until(() => release, 'the unlock to reach the database');
       const sent = t.session.fake.calls.filter(c => c.name === 'unlock_student_card');
       expect(sent.length).toBe(1);
       expect(Object.keys(sent[0].params).sort()).toEqual(['p_card_id', 'p_idempotency_key']);
@@ -2104,7 +2141,7 @@ describe('Unlock and Unlock All', () => {
       expect(rowsOf(parse(StudentCards.render(LIVE)))[0][2]).toMatch(/^Printed /);
       // The server has answered: from now on its list is the truth. Locked again: Locked.
       release({ data: {}, error: null });
-      await settle();
+      await unlockLanded(U(901), LIVE);
       await StudentCards.load(LIVE);
       expect(rowsOf(parse(StudentCards.render(LIVE)))[0][2]).toBe('Locked');
     } finally {
@@ -2120,7 +2157,7 @@ describe('Unlock and Unlock All', () => {
       await shown(LIVE);
       expect(buttons(parse(StudentCards.render(LIVE)))).toContain('Unlock All');
       press('spCardsUnlockAll', LIVE);
-      await settle();
+      await until(() => release, 'Unlock All to reach the database');
       const sent = t.session.fake.calls.filter(c => c.name === 'unlock_all_student_cards');
       expect(sent.length).toBe(1);
       expect(Object.keys(sent[0].params).sort()).toEqual(['p_course_id', 'p_idempotency_key']);
@@ -2136,7 +2173,7 @@ describe('Unlock and Unlock All', () => {
         'Not',
       ]);
       release({ data: { unlocked: 2 }, error: null });
-      await settle();
+      await unlockLanded(null, LIVE);
     } finally {
       t.session.signOut();
     }
@@ -2153,7 +2190,9 @@ describe('Unlock and Unlock All', () => {
       const reads = () => t.session.sent().filter(c => c[0] === 'list_student_cards').length;
       const before = reads();
       press('spCardsUnlock', LIVE, { card: U(901) });
-      await afterDraw();
+      // The refusal is handled (it reads again), and the read it started has landed.
+      await unlockLanded(U(901), LIVE);
+      await quiet(LIVE);
       expect(reads()).toBe(before + 1);
       expect(rowsOf(parse(StudentCards.render(LIVE)))[0][2]).toBe('Locked');
     } finally {
@@ -2168,14 +2207,17 @@ describe('Unlock and Unlock All', () => {
       t.session.fake.on('unlock_student_card', () => new Promise(r => (refuse = r)));
       await shown(LIVE);
       press('spCardsUnlock', LIVE, { card: U(901) });
-      await settle();
+      await until(() => refuse, 'the unlock to reach the database');
       const drawn = [];
       DashClassManager.renderClassManager = () => drawn.push(1);
       DashClassManager.classManagerOpen = false;
       const reads = () => t.session.sent().filter(c => c[0] === 'list_student_cards').length;
       const before = reads();
       refuse({ data: null, error: { message: 'card not found', code: 'P0002' } });
-      await afterDraw();
+      // The refusal has been handled (it would read again here), and nothing more is still to come.
+      await unlockLanded(U(901), LIVE);
+      await quiet(LIVE);
+
       expect(reads()).toBe(before);
       expect(drawn).toEqual([]);
       // Back on the screen: read again, and Locked.
@@ -2195,7 +2237,7 @@ describe('Unlock and Unlock All', () => {
       expect(StudentCards.unlock(LIVE, U(901))).toBe(0);
       expect(StudentCards.unlock(LIVE, U(999))).toBe(0);
       expect(StudentCards.unlockAll(LIVE)).toBe(0);
-      await settle();
+      await quiet(LIVE);
       expect(t.session.fake.calls.filter(c => /unlock/.test(c.name))).toEqual([]);
     } finally {
       t.session.signOut();
@@ -2224,6 +2266,7 @@ describe('the three faults the review of S3-W1 left', () => {
       expect(drawn.length).toBeGreaterThan(0);
       drawn.forEach(box => expect(make(box).hasAttribute('disabled')).toBe(true));
       expect(make(parse(StudentCards.render(LIVE))).hasAttribute('disabled')).toBe(true);
+      await until(() => land, 'the request to reach the database');
       land({ data: [], error: null });
       await afterDraw();
       const box = parse(StudentCards.render(LIVE));
@@ -2242,7 +2285,7 @@ describe('the three faults the review of S3-W1 left', () => {
     try {
       await shown(LIVE);
       const pressed = StudentCards.makeAndPrint(LIVE);
-      await settle();
+      await reached(t);
       onPage = null;
       vi.advanceTimersByTime(1000);
       onPage = LIVE;
@@ -2253,6 +2296,7 @@ describe('the three faults the review of S3-W1 left', () => {
       expect(
         parse(StudentCards.render(LIVE)).querySelector('[data-action="spCardsMake"]').hasAttribute('disabled'),
       ).toBe(true);
+      await until(() => land, 'the request to reach the database');
       land({ data: t.fn.cardsListed(), error: null });
       await afterDraw();
       expect(
@@ -2292,7 +2336,7 @@ describe('the three faults the review of S3-W1 left', () => {
       }));
       await shown(LIVE);
       await StudentCards.makeAndPrint(LIVE);
-      await settle();
+      await quiet(LIVE);
       const made = [U(11), U(12), U(13)].map(sid => t.fn.live(sid).id);
       // The server never heard: its list says Not Printed.
       expect(t.fn.cardsListed().every(c => c.printed_at === null)).toBe(true);
@@ -2313,13 +2357,14 @@ describe('the three faults the review of S3-W1 left', () => {
       expect(buttons(box)).toEqual(['New Codes for This Class']);
       expect(await StudentCards.makeAndPrint(LIVE)).toBe(0);
       // The mark is sent once more, through the outbox, ids only.
-      await settle();
+      await until(() => marks().length > sentBefore, 'the mark to be sent again');
+      await quiet(LIVE);
       expect(marks().length).toBe(sentBefore + 1);
       expect(marks()[marks().length - 1].params.p_card_ids.slice().sort()).toEqual(made.slice().sort());
       // And only once from this page.
       StudentCards._reset();
       await shown(LIVE);
-      await settle();
+      await quiet(LIVE);
       expect(marks().length).toBe(sentBefore + 1);
       press('spCardsNewCard', LIVE, { student: U(11) });
       expect(asked.map(q => q.title)).toEqual(['Print a New Card for Jordan?']);
@@ -2336,6 +2381,8 @@ describe('the three faults the review of S3-W1 left', () => {
       await StudentCards.makeAndPrint(LIVE);
       await afterDraw();
       expect(Object.keys(JSON.parse(localStorage.getItem('gb-cards-printed-here'))).length).toBe(3);
+      // The server has the mark: its list shows the cards printed.
+      await until(() => t.fn.cardsListed().every(c => !!c.printed_at), 'the server to have the mark');
       await StudentCards.load(LIVE);
       expect(localStorage.getItem('gb-cards-printed-here')).toBe(null);
     } finally {
@@ -2371,7 +2418,8 @@ describe('an old card stopped and the new one not printed', () => {
       press('spCardsNewCard', LIVE, { student: U(11) });
       asked[0].onOk();
       await StudentCards._making(LIVE);
-      await afterDraw();
+      // The list is read again (held here until the test lands it).
+      await until(() => land, 'the list read again to reach the database');
       expect(sheets).toEqual([]);
       // The server stopped the old card and made a new one nobody printed.
       expect(t.fn.db.state.cards.find(k => k.id === U(901)).stopped).toBe(true);
@@ -2460,7 +2508,10 @@ describe('a read and a press never cross', () => {
       t.session.fake.on('list_student_cards', () => new Promise(r => (land = r)));
       const drawn = [];
       DashClassManager.renderClassManager = () => drawn.push(parse(StudentCards.render(LIVE)));
-      await shown(LIVE);
+      // Shown: the read starts, and is held at the database until the test lands it.
+      onPage = LIVE;
+      StudentCards.render(LIVE);
+      await until(() => land, 'the read to reach the database');
       expect(drawn.length).toBe(1);
       // Every button that acts on the cards (a filter only changes which rows show).
       const off = box =>
@@ -2493,7 +2544,7 @@ describe('a read and a press never cross', () => {
       t.session.fake.on('list_student_cards', () => new Promise(r => (land = r)));
       const read = StudentCards.load(LIVE);
       asked[0].onOk();
-      await afterDraw();
+      await until(() => land, 'the read to reach the database');
       expect(t.fn.posts).toEqual([]);
       t.session.fake.on('list_student_cards', () => ({ data: t.fn.cardsListed(), error: null }));
       land({ data: before, error: null });
@@ -2537,7 +2588,7 @@ describe('a read and a press never cross', () => {
         // Drawn at once with the line, and every button that acts on the list off.
         expect(drawn.length).toBe(1);
         expect(notesOf(drawn[0])).toEqual(['Making cards…']);
-        await afterDraw();
+        await until(() => land, 'the read to reach the database');
         let box = parse(StudentCards.render(LIVE));
         expect(notesOf(box)).toEqual(['Making cards…']);
         expect(
@@ -2548,7 +2599,7 @@ describe('a read and a press never cross', () => {
         expect(t.fn.posts).toEqual([]);
         t.session.fake.on('list_student_cards', () => ({ data: t.fn.cardsListed(), error: null }));
         land({ data: t.fn.cardsListed(), error: null });
-        await settle();
+        await until(() => !StudentCards._busy(LIVE).read, 'the read the Yes waits on to land');
         await StudentCards._making(LIVE);
         await afterDraw();
         expect(t.fn.posts.length).toBe(1);
@@ -2589,6 +2640,7 @@ describe('a read and a press never cross', () => {
         back();
         // Back on the list before the read lands: the Yes came to nothing, so nothing says cards are being made.
         expect(notesOf(parse(StudentCards.render(LIVE))) || []).not.toContain('Making cards…');
+        await until(() => land, 'the request to reach the database');
         land({ data: t.fn.cardsListed(), error: null });
         await afterDraw();
         expect(t.fn.posts).toEqual([]);
@@ -2609,7 +2661,7 @@ describe('a read and a press never cross', () => {
       t.session.fake.on('mark_student_cards_printed', () => new Promise(() => {})); // the server never hears
       await shown(LIVE);
       const pressed = StudentCards.makeAndPrint(LIVE);
-      await settle();
+      await reached(t);
       // A read begun while the press is out (as Try Again could), answered with the list from before.
       const before = t.fn.cardsListed();
       let land;
@@ -2620,6 +2672,7 @@ describe('a read and a press never cross', () => {
       t.session.fake.on('list_student_cards', () => ({ data: t.fn.cardsListed(), error: null }));
       const reads = () => t.session.sent().filter(c => c[0] === 'list_student_cards').length;
       const n = reads();
+      await until(() => land, 'the request to reach the database');
       land({ data: before, error: null });
       await afterDraw();
       // Dropped: the cards just printed still show, and their notes are kept.
@@ -2638,14 +2691,16 @@ describe('a read and a press never cross', () => {
       let land;
       t.session.fake.on('list_student_cards', () => new Promise(r => (land = r)));
       const reading = listStudentCards(LIVE);
-      await settle();
-      await new Promise(r => setTimeout(r, 2));
+      const began = Date.now();
+      await until(() => land, 'the read to reach the database');
+      await until(() => Date.now() > began, 'the clock to pass the read’s start');
       await markStudentCardsPrinted(LIVE, [U(901)]);
       land({ data: [], error: null });
       await reading;
       expect(Object.keys(JSON.parse(localStorage.getItem('gb-cards-printed-here')))).toEqual([U(901)]);
       // A read begun after the note, with no such card: it was replaced, and the note goes.
-      await new Promise(r => setTimeout(r, 2));
+      const noted = Date.now();
+      await until(() => Date.now() > noted, 'the clock to pass the note');
       t.session.fake.on('list_student_cards', () => ({ data: [], error: null }));
       await listStudentCards(LIVE);
       expect(localStorage.getItem('gb-cards-printed-here')).toBe(null);
@@ -2820,7 +2875,7 @@ describe('Cards Work Until', () => {
       button: null,
     });
     expect(changeDay(CID, '2027-01-29')).toBe(true);
-    await settle();
+    await quiet(CID);
     expect(JSON.parse(localStorage.getItem('gb-student-cards-' + CID))[0].works_until).toBe('2027-01-29');
     expect(getCardsWorkUntil(CID).chosen).toBe('2027-01-29');
     box = parse(StudentCards.render(CID));
@@ -2834,7 +2889,7 @@ describe('Cards Work Until', () => {
     const made = (await makeStudentCards(CID, [{ enrollment_id: 's2', replaces: null }])).data.results[0];
     expect(made.works_until).toBe('2027-01-29');
     press('spCardsWorkUntilDefault', CID);
-    await settle();
+    await quiet(CID);
     expect(getCardsWorkUntil(CID).chosen).toBe(null);
     expect(localStorage.getItem('gb-cards-work-until-' + CID)).toBe(null);
     expect(JSON.parse(localStorage.getItem('gb-student-cards-' + CID)).map(c => c.works_until)).toEqual([
@@ -2860,7 +2915,7 @@ describe('Cards Work Until', () => {
       "A card stops opening after this day. It's the class's last reporting date until you choose another day.",
     );
     changeDay(CID, '2027-03-12');
-    await settle();
+    await quiet(CID);
     box = parse(StudentCards.render(CID));
     expect(untilOf(box).button).toBe('Use Last Reporting Date');
   });
@@ -2874,7 +2929,7 @@ describe('Cards Work Until', () => {
     StudentCards._reset();
     await shown(CID);
     changeDay(CID, '2026-11-01');
-    await settle();
+    await quiet(CID);
     const box = parse(StudentCards.render(CID));
     expect(untilOf(box).hint).toBe('A card stops opening after this day. That day has passed, so no card opens now.');
     expect(rowsOf(box)[0][2]).toBe('Past Its Last Day');
@@ -2886,11 +2941,13 @@ describe('Cards Work Until', () => {
       await shown(LIVE);
       changeDay(LIVE, 'soon');
       changeDay(LIVE, '2027-02-30x');
-      await settle();
+      await quiet(LIVE);
+      await dayLanded(LIVE);
       expect(t.session.fake.calls.filter(c => c.name === 'set_cards_work_until')).toEqual([]);
       changeDay(LIVE, '2027-02-26');
       changeDay(LIVE, '2027-02-26');
-      await settle();
+      await called(t, 'set_cards_work_until');
+      await dayLanded(LIVE);
       expect(t.session.fake.calls.filter(c => c.name === 'set_cards_work_until').length).toBe(1);
     } finally {
       t.session.signOut();
@@ -2908,7 +2965,7 @@ describe('Cards Work Until', () => {
       );
       expect(getCardsWorkUntil(LIVE)).toMatchObject({ chosen: '2027-05-14', date: '2027-05-14', known: true });
       expect(JSON.stringify(getCourseConfig(LIVE))).not.toContain('2027-05-14');
-      await settle();
+      await quiet(LIVE);
       expect(t.session.fake.calls.filter(c => c.name === 'update_course')).toEqual([]);
       _applyBundleCourseConfig(LIVE, {}, { cards_work_until: null });
       expect(getCardsWorkUntil(LIVE)).toMatchObject({ chosen: null, known: true });
@@ -2927,7 +2984,7 @@ describe('Cards Work Until', () => {
       await shown(LIVE);
       expect(rowsOf(parse(StudentCards.render(LIVE)))[0][2]).toBe('Past Its Last Day');
       changeDay(LIVE, '2027-06-25');
-      await settle();
+      await until(() => land, 'the new day to reach the database');
       const sent = t.session.fake.calls.filter(c => c.name === 'set_cards_work_until');
       expect(sent.length).toBe(1);
       expect(Object.keys(sent[0].params).sort()).toEqual(['p_course_id', 'p_date', 'p_idempotency_key']);
@@ -2940,12 +2997,12 @@ describe('Cards Work Until', () => {
       expect(rowsOf(box)[0][2]).toMatch(/^Printed /);
       expect(untilOf(box).value).toBe('2027-06-25');
       land({ data: { works_until: '2027-06-25' }, error: null });
-      await settle();
+      await dayLanded(LIVE);
       expect(getCardsWorkUntil(LIVE)).toMatchObject({ chosen: '2027-06-25', known: true });
       // Back to the default: p_date null.
       t.session.fake.on('set_cards_work_until', () => ({ data: { works_until: '2027-06-30' }, error: null }));
       press('spCardsWorkUntilDefault', LIVE);
-      await settle();
+      await dayLanded(LIVE);
       const last = t.session.fake.calls.filter(c => c.name === 'set_cards_work_until').pop();
       expect(last.params.p_date).toBe(null);
       expect(getCardsWorkUntil(LIVE).chosen).toBe(null);
@@ -2966,8 +3023,11 @@ describe('Cards Work Until', () => {
       const reads = () => t.session.sent().filter(c => c[0] === 'list_student_cards').length;
       const before = reads();
       changeDay(LIVE, '2027-06-25');
+      // The refusal is handled (it reads again), and the read it started has landed.
+      await dayLanded(LIVE);
       await afterDraw();
       expect(reads()).toBe(before + 1);
+
       expect(untilOf(parse(StudentCards.render(LIVE))).value).toBe('2027-05-14');
     } finally {
       t.session.signOut();
@@ -2981,13 +3041,15 @@ describe('Cards Work Until', () => {
       t.session.fake.on('set_cards_work_until', () => new Promise(r => (refuse = r)));
       await shown(LIVE);
       changeDay(LIVE, '2027-06-25');
-      await settle();
+      await until(() => refuse, 'the new day to reach the database');
       const drawn = [];
       DashClassManager.renderClassManager = () => drawn.push(1);
       onPage = null;
       const reads = () => t.session.sent().filter(c => c[0] === 'list_student_cards').length;
       const before = reads();
       refuse({ data: null, error: { message: 'course not found', code: 'P0002' } });
+      // The refusal has been handled (it would read again here), and any read it started has landed.
+      await dayLanded(LIVE);
       await afterDraw();
       expect(reads()).toBe(before);
       expect(drawn).toEqual([]);

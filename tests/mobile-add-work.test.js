@@ -10,6 +10,7 @@ import { runInThisContext } from 'vm';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseHTML } from 'linkedom';
 import { newBankIndex } from './helpers/bc-bank-fixture.js';
+import { ungradeLabNotSent } from './helpers/demo-lab-not-in.js';
 
 const CID = 'sci8';
 const LAB = 'sci8a1';
@@ -122,6 +123,8 @@ beforeEach(() => {
   stubDocument = globalThis.document;
   page();
   seedDemo();
+  // The students who sent nothing have no grade yet, so they are Not In.
+  ungradeLabNotSent(CID, LAB);
   store = memoryStore();
   window.PhotoQueue.configure({ store, isDemo: () => window.isDemoMode(), upload: async () => ({ error: null }) });
   urls = { made: 0, revoked: [] };
