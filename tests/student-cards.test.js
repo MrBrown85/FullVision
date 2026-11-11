@@ -2491,12 +2491,16 @@ describe('a read and a press never cross', () => {
       const before = t.fn.cardsListed();
       let land;
       t.session.fake.on('list_student_cards', () => new Promise(r => (land = r)));
-      StudentCards.load(LIVE);
+      const read = StudentCards.load(LIVE);
       asked[0].onOk();
       await afterDraw();
       expect(t.fn.posts).toEqual([]);
       t.session.fake.on('list_student_cards', () => ({ data: t.fn.cardsListed(), error: null }));
       land({ data: before, error: null });
+      // The waiting Yes runs as the read lands (it was waiting on this same read), then the press itself
+      // is waited for: its request signs with WebCrypto, which no fixed number of turns outlasts.
+      await read;
+      expect(await StudentCards._making(LIVE)).toBe(1);
       await afterDraw();
       expect(t.fn.posts.length).toBe(1);
       expect(sheets.length).toBe(1);
