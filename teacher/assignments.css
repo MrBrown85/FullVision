@@ -9235,16 +9235,20 @@ button.grader-member-name {
   height: 28px;
   border: none;
   border-radius: 8px;
-  background: var(--active);
-  color: #fff;
+  background: rgba(118, 118, 128, 0.12);
+  color: var(--text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
 }
-.assess-more-btn:hover,
+.assess-more-btn:hover {
+  background: rgba(118, 118, 128, 0.22);
+}
+/* Blue only while its menu is open, as on the board: one solid primary per screen. */
 .assess-more-btn[aria-expanded='true'] {
-  background: var(--btn-hover-blue);
+  background: var(--active);
+  color: #fff;
 }
 .assess-menu {
   position: absolute;
