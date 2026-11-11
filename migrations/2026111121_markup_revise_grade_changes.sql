@@ -94,7 +94,7 @@ begin
             ('public._revision_hide_available()',                            'cd50f4c6493a73b3c42ae51f7580f970', 'a4b4e942de351d6849702b96f25c7356'),
             ('public._revision_hide_grade(uuid)',                            '247080f6572bb45951cef807a2b849bd', 'a4c3f002d3bb2fc01e58ec5b8dab8ecb'),
             ('public._revision_unhide_grade(uuid)',                          '26d2861325edf27f95d090ebd590eb0f', 'cbbc6fd7654c2b8677c7d210b5e15cc4'),
-            ('public._markup_on_return()',                                   'absent', '03373450cd9c6949b6beb858a3a85a69')
+            ('public._markup_on_return()',                                   'absent', '86761bf5b10476cc72b0fea25387c46e')
             -- FINGERPRINTS-END
         ) as v(fn, first_run, later_run)
     loop
@@ -238,7 +238,8 @@ create or replace function public._markup_on_return()
  set search_path to 'public', 'pg_temp'
 as $function$
 declare
-    _r revision_request%rowtype;
+    _r   revision_request%rowtype;
+    _now jsonb;
 begin
     -- Take Back giving a hidden grade back (_revision_unhide_grade) is not
     -- a Return: no mark is given, and its hide has already ended.
@@ -263,6 +264,21 @@ begin
         update revision_request
            set grade_hidden = false, hide_ended_at = clock_timestamp(), hide_ended_by = 'returned', updated_at = now()
          where id = _r.id;
+        -- The grade the student had before the hide is the one they last
+        -- saw: a different grade returned now is an update on it (Updated,
+        -- "was" that grade), as any change to a returned grade is; the same
+        -- grade returned is what they had. Only these two columns are
+        -- written, so this trigger does not fire again.
+        _now := _grade_copy(new.enrollment_id, new.assessment_id);
+        if _now is distinct from _r.hidden_state->'copy' then
+            update grade_return set previous_copy = _r.hidden_state->'copy', updated_at = new.returned_at
+             where enrollment_id = new.enrollment_id and assessment_id = new.assessment_id;
+        else
+            update grade_return
+               set previous_copy = nullif(_r.hidden_state->'previous_copy', 'null'::jsonb),
+                   updated_at = (_r.hidden_state->>'updated_at')::timestamptz
+             where enrollment_id = new.enrollment_id and assessment_id = new.assessment_id;
+        end if;
     end if;
     return null;
 end;
@@ -292,7 +308,7 @@ begin
             ('public._revision_hide_available()',   'a4b4e942de351d6849702b96f25c7356'),
             ('public._revision_hide_grade(uuid)',   'a4c3f002d3bb2fc01e58ec5b8dab8ecb'),
             ('public._revision_unhide_grade(uuid)', 'cbbc6fd7654c2b8677c7d210b5e15cc4'),
-            ('public._markup_on_return()',          '03373450cd9c6949b6beb858a3a85a69')
+            ('public._markup_on_return()',          '86761bf5b10476cc72b0fea25387c46e')
             -- FINGERPRINTS-END
         ) as v(fn, becomes)
     loop
