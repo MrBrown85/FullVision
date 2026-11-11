@@ -22,6 +22,22 @@ select 'a trigger C2 adds is missing or off', x.trg, 'absent or off', 'enabled'
   from (values ('markup_given_on_insert'), ('markup_given_on_return')) x(trg)
  where not exists (select 1 from pg_trigger t where t.tgrelid = 'public.grade_return'::regclass and t.tgname = x.trg and t.tgenabled = 'O')
 union all
+-- Each trigger as C2 makes it: when it fires (its events, columns and
+-- condition, read from the definition with the function cut off, since how
+-- the function is named depends on the search path) and what it runs.
+select 'a trigger C2 adds is not as C2 makes it', x.trg,
+       coalesce(regexp_replace(pg_get_triggerdef(t.oid), ' EXECUTE FUNCTION .*$', ''), 'absent'), x.fires
+  from (values
+        ('markup_given_on_insert',
+         'CREATE TRIGGER markup_given_on_insert AFTER INSERT ON public.grade_return FOR EACH ROW WHEN (((new.returned_at IS NOT NULL) AND (NOT new.is_draft)))'),
+        ('markup_given_on_return',
+         'CREATE TRIGGER markup_given_on_return AFTER UPDATE OF returned_at, is_draft ON public.grade_return FOR EACH ROW WHEN (((new.returned_at IS NOT NULL) AND (NOT new.is_draft) AND ((old.returned_at IS DISTINCT FROM new.returned_at) OR old.is_draft)))')
+       ) x(trg, fires)
+  left join pg_trigger t on t.tgrelid = 'public.grade_return'::regclass and t.tgname = x.trg and not t.tgisinternal
+ where t.oid is null
+    or regexp_replace(pg_get_triggerdef(t.oid), ' EXECUTE FUNCTION .*$', '') <> x.fires
+    or t.tgfoid <> coalesce(to_regprocedure('public._markup_on_return()'), 0)
+union all
 select 'a SECURITY DEFINER function does not name pg_temp last', n.nspname || '.' || p.proname, coalesce(p.proconfig::text, ''), 'search_path=…, pg_temp'
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
  where n.nspname in ('public', 'student_submit', 'fv_private') and p.prosecdef

@@ -31,6 +31,10 @@ select 'a trigger name C2 makes is taken', t.tgname, 'present', 'absent'
  where to_regclass('public.grade_return') is not null and t.tgrelid = 'public.grade_return'::regclass and not t.tgisinternal
    and t.tgname in ('markup_given_on_insert', 'markup_given_on_return')
 union all
-select 'a revision request is marked as hiding a grade before C2', 'revision_request', count(*)::text, '0'
-  from public.revision_request where grade_hidden
-having count(*) > 0;
+-- Read only when C1's table is there (named in a string, so a database
+-- without C1 answers the row above, not an error).
+select 'a revision request is marked as hiding a grade before C2', 'revision_request', x.n::text, '0'
+  from (select case when to_regclass('public.revision_request') is not null
+                    then (xpath('/row/n/text()', query_to_xml('select count(*) as n from public.revision_request where grade_hidden', false, true, '')))[1]::text::int
+               end as n) x
+ where x.n > 0;
