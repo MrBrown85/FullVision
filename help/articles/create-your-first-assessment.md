@@ -1,7 +1,7 @@
 ---
 title: Create Your First Assessment
 section: Getting Started
-order: 4
+order: 5
 summary: An assessment is one piece of student work, scored against the competencies it shows. Its scores appear in the gradebook and on reports.
 checked: 2026-11-05
 pages:

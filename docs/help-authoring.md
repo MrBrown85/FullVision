@@ -68,7 +68,7 @@ Try It in Demo Mode, like the header's Try Demo Mode, opens `/login.html?demo=1`
 
 ### Body
 
-The Markdown is a small subset: `##` and `###` headings, paragraphs, numbered and bulleted lists, `**bold**`, `*italic*`, `> note` paragraphs, links and pictures.
+The Markdown is a small subset: `##` and `###` headings, paragraphs, numbered and bulleted lists, `**bold**`, `*italic*` (or `_italic_`, as Prettier writes it), `> note` paragraphs, links and pictures.
 
 - Link to another article by its slug: `[Set Up Grading](set-up-grading)`. The build fails on a slug that has no article.
 - A picture is a line of its own: `![What the picture shows](img/file.jpg 'The caption.')`. A numbered list can stop for a picture and carry on with `3.`.
