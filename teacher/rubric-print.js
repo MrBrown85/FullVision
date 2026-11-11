@@ -674,29 +674,14 @@
     var printed = typeof getRubricPrint === 'function' && getRubricPrint(cid, sid, aid);
     return printed ? printState(cid, aid, sid) : { kind: 'unprinted', at: null };
   }
-  /* The mark's state, or null when it cannot be worked out: in a class
+  /* The mark's state, or null while it cannot be worked out: in a class
      that holds grades whose Draft and Returned rows have not loaded (the
      first draw of a session, or offline), what the handout would print
-     now is not known. Then there is no mark, and the marks on the page
-     are tried again a moment later until they can be worked out
-     (_marksLater). A mark never stops a page drawing. */
+     now is not known (ReportScores.ready). Then there is no mark. The page
+     is drawn again when the rows load (the data layer's redraw), and the
+     marks with it. A mark never stops a page drawing. */
   function _markStateOrNone(cid, aid, sid) {
-    try {
-      return _markState(cid, aid, sid);
-    } catch (e) {
-      _marksLater(cid);
-      return null;
-    }
-  }
-  var MARKS_RETRY_MS = 2000;
-  var _marksTimer = {}; // cid → the timer that draws the marks again
-  function _marksLater(cid) {
-    if (_marksTimer[cid]) return;
-    _marksTimer[cid] = setTimeout(function () {
-      delete _marksTimer[cid];
-      // Only the marks on the page: once they are gone, so is the retry.
-      refreshMarks(cid);
-    }, MARKS_RETRY_MS);
+    return ReportScores.ready(cid) ? _markState(cid, aid, sid) : null;
   }
   function markHtml(cid, aid, sid) {
     var state = _markStateOrNone(cid, aid, sid) || { kind: 'unprinted', at: null };
@@ -1656,12 +1641,8 @@
      open (no draft is printed), and the page it was opened from is left as
      it was. */
   function _openSafely(cid, aid, openOpts) {
-    try {
-      _openNow(cid, aid, openOpts);
-    } catch (e) {
-      close();
-      console.warn('Print Rubrics did not open:', e && e.message);
-    }
+    if (!ReportScores.ready(cid)) return;
+    _openNow(cid, aid, openOpts);
   }
 
   function _openNow(cid, aid, openOpts) {

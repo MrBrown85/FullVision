@@ -525,8 +525,23 @@ window.PageReports = (function () {
     var t = _tab();
     // A tab with no comment box of its own lets go of the last tab's.
     if (!t.longForm) _syncLongFormAuthContext();
+    /* Every tab reads returned grades in a class that holds them. Until
+       they can be read (ReportScores.ready) the page waits with the
+       class's loading line and draws nothing else: Print Reports then has
+       nothing to print, and the data layer's redraw once the rows load
+       reaches this page through render(). */
+    if (!ReportScores.ready(cid)) {
+      _waitingForReturns = true;
+      _lastSummary = null;
+      _lastSummarySet = '';
+      // html-safe: ReportScores.WAITING_HTML is fixed markup
+      if (output) output.innerHTML = ReportScores.WAITING_HTML;
+      return;
+    }
+    _waitingForReturns = false;
     t.render(cid, output);
   }
+  var _waitingForReturns = false; // the page drew the waiting line, not the tab
 
   function _renderQuestionnaireTab(cid, output) {
     // The sentence bank loads the first time Reports needs it.
@@ -1312,6 +1327,13 @@ window.PageReports = (function () {
         if (choice === 'return') {
           // Every draft it named is returned, or nothing prints and no copy is saved.
           if (!DraftsBeforePrint.returnAll(found).all) {
+            // Some may have returned: what Print Without Them prints is drawn again from them.
+            renderReportPreview();
+            if (_issueState) {
+              var again = _issueCounts();
+              if (who === 'changed') again.changed = c.changed;
+              _issueState.counts = again;
+            }
             DraftsBeforePrint.showFailed(overlay);
             return;
           }
@@ -2760,6 +2782,13 @@ window.PageReports = (function () {
     init: init,
     destroy: destroy,
     switchCourse: switchCourse,
+    /* The data layer's redraw (_invalidateAndRerender) after the class's
+       returned grades load: the page draws what it was waiting for. While
+       nothing was waiting it does nothing, as before this page had a
+       render(), so no other change of data redraws Reports. */
+    render: function () {
+      if (_waitingForReturns && document.getElementById('report-output')) renderReports();
+    },
     // A redraw from elsewhere (Sent to Phones) only while the page is up.
     renderReports: function () {
       if (document.getElementById('report-output')) renderReports();

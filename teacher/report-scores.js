@@ -114,7 +114,7 @@ window.ReportScores = (function () {
     };
   }
 
-  // The surface whose function is running now, or null outside every report.
+  // The surface whose function is running now, or null outside every report ('ready' while ready() asks).
   function running() {
     return _running;
   }
@@ -261,7 +261,40 @@ window.ReportScores = (function () {
     return statuses(cid)[sid + ':' + aid] || null;
   }
 
+  /* ── Ready, or waiting ─────────────────────────────────────────
+     The one question a page asks before it draws or acts on anything that
+     reads returned grades: can this class's returned grades be read now?
+     Always yes in a class that does not hold grades (its returned set is
+     the working copy). In a signed-in class that holds grades, no until
+     its Draft and Returned rows have loaded this session (the first draw
+     of a session, or offline): the data layer then refuses, rightly, to
+     call anything returned. While the answer is no, a surface draws
+     WAITING_HTML instead of itself, and a button that needs the returned
+     grades does nothing. Once the rows load, the data layer redraws the
+     page on screen (_invalidateAndRerender, which calls the page's
+     render()). */
+  function ready(cid) {
+    if (typeof getReturnedScores !== 'function') return false;
+    // The seam's own read, not a report's: it draws nothing (running() says 'ready' meanwhile).
+    var was = _running;
+    if (!was) _running = 'ready';
+    try {
+      getReturnedScores(cid);
+      return true;
+    } catch (e) {
+      return false;
+    } finally {
+      _running = was;
+    }
+  }
+
+  // html-safe: fixed markup; the words are Class Settings' own loading line
+  var WAITING_HTML =
+    '<div class="empty-state report-waiting" role="status"><div class="empty-state-text">Loading this class\u2026</div></div>';
+
   var api = {
+    ready: ready,
+    WAITING_HTML: WAITING_HTML,
     reportScoreSet: reportScoreSet,
     withReportScores: withReportScores,
     scoped: scoped,
