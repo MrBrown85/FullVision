@@ -9319,11 +9319,25 @@ button.grader-member-name {
   font-size: 13px;
   white-space: nowrap;
 }
+/* The gradebook's To Grade: a filled blue chip, the camera inside when
+   the work came in as photos. */
 .gb-to-grade {
-  color: var(--active);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 10px;
+  background: var(--active);
+  color: #fff;
   font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
+  vertical-align: middle;
+}
+.gb-to-grade .gb-work-camera {
+  margin: 0;
+  color: inherit;
 }
 .gb-work-camera {
   display: inline-flex;
