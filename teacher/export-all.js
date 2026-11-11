@@ -243,6 +243,21 @@
      opts.teacher: the teacher's name; opts.date: 'YYYY-MM-DD';
      opts.entries(cid, sid): a student's questionnaire answers
      (StudentVoice.entries), or left out. */
+  /* Photos of student work never go in this file, and nor do the records of
+     what was sent (Colin, Q22; S8-F2). Where a class could hold any, the
+     Contents sheet says so: a class whose student page is on (the build
+     switch) and that takes work (Send Work). With either off the file is as
+     it was. */
+  var PHOTOS_NOTE = 'Photos of student work are not in this file.';
+
+  function studentWorkIn(cids) {
+    return cids.some(function (cid) {
+      var settings = typeof getReturnSettings === 'function' ? getReturnSettings(cid) : null;
+      var send = typeof getCourseSendWork === 'function' ? getCourseSendWork(cid) : null;
+      return !!(settings && settings.student_page && send && send.send_work);
+    });
+  }
+
   function rows(opts) {
     opts = opts || {};
     var cids = opts.cids || classIds();
@@ -638,7 +653,7 @@
         'Grades read exactly as FullVision shows them, following each class’s grading style.',
         'Withdrawn students are listed on the Summary sheet. Their records are in Class Settings, under Withdrawn, with Download Records.',
         'Deleted classes are not included.',
-      ],
+      ].concat(studentWorkIn(cids) ? [PHOTOS_NOTE] : []),
     };
     return [contents].concat(sheets);
   }
