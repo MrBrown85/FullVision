@@ -237,7 +237,8 @@
 -- card_codes_undo.py). It puts the table, the functions, the policy and the
 -- grant back as Batch A made them. It cannot restore a code: every card is
 -- left stopped and teachers make new ones. To stop cards at once without
--- it: unset STUDENT_CARD_KEY, or turn a class's Student Page off.
+-- it: unset STUDENT_CARD_KEY (every class), or turn one class's Student Page
+-- off (which also returns that class's waiting drafts, as it always does).
 -- Batch A's own undo (batch-a-undo.sql, PART 2) refuses while this file is
 -- applied: this file's undo goes first.
 --

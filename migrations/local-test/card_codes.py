@@ -389,6 +389,17 @@ def scen_cards():
                 n += d.one('select count(*) from %s x where to_jsonb(x)::text like :n' % t, n='%' + needle + '%')
             return n
 
+        # ── The stand-in for the edge functions makes the tags they make ────
+        # The known answers of the functions' own tests (tests/card-key.test.js, with
+        # supabase/functions/_shared/card-key.ts; worked out there with Node and with openssl).
+        known_key = bytes.fromhex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f')
+        ok("this script's stand-in for the edge functions makes the same tags as their own known answers: a code's, a password's, the key id",
+           code_tag('K7M4QX2P', known_key) == '6e378dc16c71e059b359f5587e4224bdf661aec4b2bdeec3a05bfcb3a224831b'
+           and code_tag('k7m4-qx2p', known_key) == '6e378dc16c71e059b359f5587e4224bdf661aec4b2bdeec3a05bfcb3a224831b'
+           and pw_tag('K7M4-QX2P', '4821', known_key) == 'cc968eefc4387a5a8cd44720e2e7875d9c426571a5d995ce93113703ba15d142'
+           and pw_tag('P3R8WD4K', '4821', known_key) == '43487c36f9cc08d7fa149a65a96517d5a2f2ed0167e8665ab665fb7ffc6c3270'
+           and key_id(known_key) == '84c20222')
+
         # ── The owner can ───────────────────────────────────────────────
         reply, p = d.issue([(ENR2, None), (ENR1, None)], idem=(first_key := nid()))
         got = p.codes(reply)
@@ -643,6 +654,15 @@ def scen_lookup():
             ok('a card past its last day: card_expired', d.card(code1) == {'ok': False, 'error': 'card_expired'} and d.verify(code1, birthday='2012-05-15') == {'ok': False, 'error': 'card_expired'})
             d.teacher('set_cards_work_until(:c, :d::date, :k)', c=COURSE_A, d=TODAY, k=nid())
             ok('a card works through its last day', d.card(code1).get('ok') is True)
+
+        # The statements the edge functions send, word for word (card-routes.ts, teacher-cards/index.ts):
+        # p_add by name, the items as jsonb.
+        r = d.role('service_role', 'select student_submit.verify_card(:a::text, :b::text, :c::text, :d::text, :e::text, :f::text, :g::text, p_add => false) as r',
+                   a=code_tag(code1), b=KEY_ID, c='2000-01-01', d=None, e=None, f=None, g='ip-1')[0][0]
+        ok("student-submit's own statement for verify (seven values, then p_add by name) is answered", r == {'ok': False, 'error': 'wrong_identity', 'tries_left': 4}, r)
+        r = d.role('service_role', 'select student_submit.issue_cards(:t::uuid, :c::uuid, :i::jsonb, :k::text, :r::uuid) as r', t=A, c=COURSE_A, i='[]', k=KEY_ID, r=nid())[0][0]
+        ok("teacher-cards' own statement for issue_cards is answered", r == {'replayed': False, 'results': []}, r)
+        d.teacher('unlock_student_card(:i, :k)', i=card1, k=nid())
 
         # ── A caller that sends the wrong shape ─────────────────────────
         n = attempts()

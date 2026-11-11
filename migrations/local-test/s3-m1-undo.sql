@@ -12,7 +12,7 @@
 -- ── IT CANNOT BRING A CODE BACK ─────────────────────────────────────────────
 -- S3-M1 erased the old cards' codes, and a card made since never had its
 -- code in the database. So after this script NO CARD WORKS: every card is
--- left stopped, students are signed out of nothing but can open nothing,
+-- left stopped, a phone that was signed in is told its card was replaced,
 -- and each teacher presses Make Cards and prints again.
 --
 -- ── To stop cards at once, without this script ──────────────────────────────
@@ -20,8 +20,11 @@
 -- database to switch off. Cards stop the moment either of these is done:
 --   the key is unset (supabase secrets unset STUDENT_CARD_KEY): the card
 --     routes answer a server error; slips and signed-in pages carry on;
---   a class's Student Page is turned off: its cards answer "closed".
--- Neither loses anything. This script is for taking the change itself out.
+--   a class's Student Page is turned off in Class Settings: its cards
+--     answer "closed". (Turning it off also returns that class's grades
+--     that were waiting to be returned; the screen asks first.)
+-- Neither loses a card, a grade or a setting. This script is for taking
+-- the change itself out.
 --
 -- ── BEFORE IT ───────────────────────────────────────────────────────────────
 -- Nothing here turns off what calls S3-M1's functions. First:
@@ -40,21 +43,21 @@
 -- absent, student_card with exactly S3-M1's columns, indexes and
 -- constraints, and no function it does not know naming student_card or
 -- card_key (something built on S3-M1 since would break). Then:
---   1. every live card is stopped, and the last query says how many;
---   2. S3-M1's six functions and its key-id table are dropped;
---   3. student_card is made again as Batch A made it (code, code_hash, salt
+--   1. every live card is stopped (the last query says how many), and
+--      S3-M1's six functions and its key-id table are dropped;
+--   2. student_card is made again as Batch A made it (code, code_hash, salt
 --      and password are back; code_hmac, pw_hmac, key_id and seq are gone),
 --      with its indexes, its read policy for the class's teacher and the
 --      SELECT grant to signed-in teachers. Every card row is kept, stopped,
 --      with a stand-in where its code, hash and salt were ("undone:" and
 --      the card's id) and no password;
---   4. Batch A's functions are created again from Batch A's own files:
+--   3. Batch A's functions are created again from Batch A's own files:
 --      _student_card_json, _issue_student_card, issue_student_cards,
 --      reissue_student_card, and student_submit's _card_lookup, card and
 --      verify_card with their old arguments;
---   5. Batch A's patch to the two functions that draw slip codes is made
+--   4. Batch A's patch to the two functions that draw slip codes is made
 --      again (a new slip avoids a live card's code);
---   6. every function it restored is checked against its fingerprint from
+--   5. every function it restored is checked against its fingerprint from
 --      before S3-M1, and the whole script is undone if one differs.
 --
 -- ── What is different afterwards from before S3-M1 ──────────────────────────

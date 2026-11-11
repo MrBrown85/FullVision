@@ -1284,8 +1284,9 @@ The database is sent tags and nothing else, as it will be.
   changes no catalog line and no row, and the card made since is still
   live and still opens.** A second run on a database where one of the
   file's own functions was changed by hand stops.
-- **cards.** `issue_cards` as the `teacher-cards` function calls it: the
-  owner; results in the request's order; what is stored (the first
+- **cards.** The stand-in makes the same tags as the edge functions' own
+  known answers (`tests/card-key.test.js` on their branch). `issue_cards`
+  as the `teacher-cards` function calls it: the owner; results in the request's order; what is stored (the first
   candidate's tag, the key id, a password tag only for a student with
   nothing else on file); no tag in any reply and no code in any row of any
   table; a replay returns the first answer without `candidate`, makes
@@ -1298,12 +1299,12 @@ The database is sent tags and nothing else, as it will be.
   and changes nothing; a withdrawn student, another class's and nobody's
   give `not_found`; the second candidate used when the first one's tag is
   taken; both taken gives `failed` **and the old card is still live**;
-  every malformed request refused whole (19 shapes, no items, four bad key
+  every malformed request refused whole (18 shapes, no items, four bad key
   ids); the table's own constraints refusing a plain code, a live card
   with no tag, a second live card; `needs_new` following the key id last
   seen, and stopping nothing.
-- **lookup.** `card` and `verify_card` as `student-submit` calls them:
-  found by tag; closed, withdrawn, deleted, expired; a caller that sends
+- **lookup.** `card` and `verify_card` as `student-submit` calls them (its
+  own statements, word for word, among them): found by tag; closed, withdrawn, deleted, expired; a caller that sends
   the wrong shape gets an error and nothing is logged; five wrong in a row
   and fifteen in 7 days; Unlock; the password by its tag only (the right
   digits tagged for another card, or under another key, do not open it); a
@@ -1374,7 +1375,7 @@ PART 2, and that PART 1, 1A and 1B run with S3-M1 applied and leave it
 alone.
 
 Result on 2026-11-10, on PostgreSQL 17.11 (port 54331, what production
-runs) and on 18.6 (port 54329), the same on both: `card_codes.py` 275 of 275;
+runs) and on 18.6 (port 54329), the same on both: `card_codes.py` 278 of 278;
 `card_codes_undo.py` 67 of 67; `batch_a_undo.py` 169 of 169 (158 before
 its `s3-m1` scenario was added).
 
