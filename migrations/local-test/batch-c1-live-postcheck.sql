@@ -5,10 +5,11 @@ with made(fn, becomes, or_c2) as (values
     -- FINGERPRINTS-BEGIN new (written by migrations/local-test/batch_c_fingerprints.py)
     ('public._work_feedback_gone()',                                       '5c760a38a7675c1d49ef95ab994b76e5', '5c760a38a7675c1d49ef95ab994b76e5'),
     ('public._work_feedback_truncated()',                                  '450e3b27b73c51d01f4c431adb402bbd', '450e3b27b73c51d01f4c431adb402bbd'),
+    ('public._revision_gone()',                                            '13b5fb325c563a0475437829446ef089', '13b5fb325c563a0475437829446ef089'),
     ('public._markup_check(jsonb)',                                        'd5fac66f176bf8f23391a7c6c19b053a', 'd5fac66f176bf8f23391a7c6c19b053a'),
     ('public._markup_give(uuid,uuid)',                                     'f0f07a1b879ff038e2f0afe020233c29', 'f0f07a1b879ff038e2f0afe020233c29'),
     ('public._piece_latest(uuid,uuid)',                                    'fee319ef4d87447eeac9b4d53a1f1b50', 'fee319ef4d87447eeac9b4d53a1f1b50'),
-    ('public._revision_state(uuid)',                                       '808f6944ea937a32576729e48115e58d', '808f6944ea937a32576729e48115e58d'),
+    ('public._revision_state(uuid)',                                       '894bb53b0ad066e21f36c3a8038d5c6c', '894bb53b0ad066e21f36c3a8038d5c6c'),
     ('public._revision_settle(uuid,uuid,boolean)',                         '5abc02afbaa29294cdb317838657b37c', '5abc02afbaa29294cdb317838657b37c'),
     ('public._revision_json(uuid)',                                        '4ea85d4b58243fc0d6512b31ac6d165e', '4ea85d4b58243fc0d6512b31ac6d165e'),
     ('public._reflection_json(uuid)',                                      'f089277294adaf7d7834b41a1e93d5fa', 'f089277294adaf7d7834b41a1e93d5fa'),
@@ -102,8 +103,22 @@ select 'a class switch is missing or not off by default', 'course.' || c, coales
 union all
 select 'a trigger Batch C adds is missing or off', x.tbl || '.' || x.trg, 'absent or off', 'enabled'
   from (values ('public.assessment', 'work_feedback_gone'), ('public.enrollment', 'work_feedback_gone'),
-               ('public.assessment', 'work_feedback_truncate'), ('public.enrollment', 'work_feedback_truncate')) x(tbl, trg)
+               ('public.assessment', 'work_feedback_truncate'), ('public.enrollment', 'work_feedback_truncate'),
+               ('public.submission', 'revision_gone')) x(tbl, trg)
  where not exists (select 1 from pg_trigger t where t.tgrelid = to_regclass(x.tbl) and t.tgname = x.trg and t.tgenabled = 'O')
+union all
+-- revision_gone as C1 makes it: before a sent revision is deleted (the
+-- definition with the function cut off, since how it is named depends on
+-- the search path), and what it runs.
+select 'a trigger Batch C adds is not as Batch C makes it', 'public.submission.revision_gone',
+       coalesce((select regexp_replace(pg_get_triggerdef(t.oid), ' EXECUTE FUNCTION .*$', '') from pg_trigger t
+                  where t.tgrelid = 'public.submission'::regclass and t.tgname = 'revision_gone'), 'absent'),
+       'CREATE TRIGGER revision_gone BEFORE DELETE ON public.submission FOR EACH ROW WHEN (((old.state = ''sent''::text) AND (old.version > 1)))'
+ where not exists (select 1 from pg_trigger t
+                    where t.tgrelid = 'public.submission'::regclass and t.tgname = 'revision_gone' and not t.tgisinternal
+                      and regexp_replace(pg_get_triggerdef(t.oid), ' EXECUTE FUNCTION .*$', '')
+                          = 'CREATE TRIGGER revision_gone BEFORE DELETE ON public.submission FOR EACH ROW WHEN (((old.state = ''sent''::text) AND (old.version > 1)))'
+                      and t.tgfoid = coalesce(to_regprocedure('public._revision_gone()'), 0))
 union all
 select 'a SECURITY DEFINER function does not name pg_temp last', n.nspname || '.' || p.proname, coalesce(p.proconfig::text, ''), 'search_path=…, pg_temp'
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace

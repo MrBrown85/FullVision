@@ -6,6 +6,7 @@ gradebook-prod will be once Batch B is applied (batch_c_common.build).
     PGDATABASE=...                                            python3 batch_c.py teacher    only those named
 
 Scenarios: apply1 teacher markup started contract gone reflect revision group grants race apply2 given closes only_me round2 put_back hide_out same_rows
+revision_deleted leave_holds
 """
 import threading, time
 from batch_c_common import *
@@ -61,6 +62,7 @@ def apply1():
             ('a name taken', "create function public.save_markup(p_file_id uuid, p_marks jsonb, p_base_rev integer, p_idempotency_key uuid) returns jsonb language sql as $f$ select null::jsonb $f$", 'drop function public.save_markup(uuid, jsonb, integer, uuid)'),
             ('a column taken', 'alter table public.course add column show_my_learning boolean', 'alter table public.course drop column show_my_learning'),
             ('a trigger name taken', "create trigger work_feedback_gone after delete on public.enrollment for each row execute function public._submission_gone()", 'drop trigger work_feedback_gone on public.enrollment'),
+            ('a trigger name taken on submission', "create trigger revision_gone after delete on public.submission for each row execute function public._submission_target_gone()", 'drop trigger revision_gone on public.submission'),
             ("Batch B's _grading_started changed", "create or replace function student_submit._grading_started(p_enrollment_id uuid, p_assessment_id uuid) returns boolean language sql stable security definer set search_path to 'public', 'student_submit', 'pg_temp' as $f$ select false; $f$", None),
         ]:
             snap = d.one('select md5(pg_get_functiondef(%s))' % ("'public._work_hold()'::regprocedure" if 'Batch B function' in name else "'public._grade_return_holds(uuid)'::regprocedure"))
@@ -107,6 +109,8 @@ def apply1():
                           ('a student function for teachers', 'grant execute on function student_submit.reflect(text, uuid, uuid, jsonb, text) to authenticated'),
                           ('a table readable', 'grant select on public.feedback_reflection to authenticated'),
                           ('a trigger off', 'alter table public.enrollment disable trigger work_feedback_gone'),
+                          ('the revision trigger off', 'alter table public.submission disable trigger revision_gone'),
+                          ('the revision trigger recreated to run after the delete', "create or replace trigger revision_gone after delete on public.submission for each row when (old.state = 'sent' and old.version > 1) execute function public._revision_gone()"),
                           ('a helper granted', 'grant execute on function public._markup_give(uuid, uuid) to service_role'),
                           ('a function changed', "create or replace function public._piece_latest(p_assessment_id uuid, p_enrollment_id uuid) returns public.submission language sql stable security definer set search_path to 'public', 'pg_temp' as $f$ select s.* from submission s limit 1; $f$"),
                           ('the replaced _grading_started changed', "create or replace function student_submit._grading_started(p_enrollment_id uuid, p_assessment_id uuid) returns boolean language sql stable security definer set search_path to 'public', 'student_submit', 'pg_temp' as $f$ select false; $f$"),
@@ -967,7 +971,8 @@ def apply2():
         before = catalog(d.c); rows = row_checksums(d.c)
         for name, sql in [('_revision_settle changed', "create or replace function public._revision_settle(p_enrollment_id uuid, p_assessment_id uuid, p_returned boolean) returns integer language plpgsql security definer set search_path to 'public', 'pg_temp' as $f$ begin return 0; end; $f$"),
                           ('_markup_give changed', "create or replace function public._markup_give(p_enrollment_id uuid, p_assessment_id uuid) returns integer language plpgsql security definer set search_path to 'public', 'pg_temp' as $f$ begin return 0; end; $f$"),
-                          ('a trigger of that name already there', "create trigger markup_given_on_insert after insert on public.grade_return for each row execute function public._grade_return_gone()")]:
+                          ('a trigger of that name already there', "create trigger markup_given_on_insert after insert on public.grade_return for each row execute function public._grade_return_gone()"),
+                          ('a trigger of that name already on course', "create trigger markup_given_on_release after update on public.course for each row execute function public._grade_return_release()")]:
             d.begin(); d.run(sql)
             r = d.statements(split(text_at(C2_USED))); d.in_tx = False
             ok('apply2: the guard stops on ' + name, r.startswith('STOPPED') and d.at == 2, r)
@@ -979,15 +984,19 @@ def apply2():
         changed_fns = sorted({fname(l) for l in gone if l.startswith('function ') and not l.startswith('function more')})
         ok('apply2: no existing function changes', changed_fns == [], changed_fns)
         new_fns = sorted({fname(l) for l in new if l.startswith('function ') and not l.startswith('function more')} - set(changed_fns))
-        ok('apply2: and one function is new', new_fns == C2_NEW, new_fns)
+        ok('apply2: and two functions are new', new_fns == sorted(C2_NEW), new_fns)
         new_trg = sorted(l.split(' | ')[1] for l in new if l.startswith('trigger ') and not l.startswith('trigger comment'))
-        ok('apply2: and two triggers on grade_return', new_trg == ['markup_given_on_insert', 'markup_given_on_return'], new_trg)
+        ok('apply2: and two triggers on grade_return and one on course', new_trg == ['markup_given_on_insert', 'markup_given_on_release', 'markup_given_on_return'], new_trg)
         other = [l for l in gone if not l.startswith(('function', 'depends', 'comments on'))]
         ok('apply2: nothing else in the catalog changes', other == [], other)
         ok('apply2: the apply changes no row', row_checksums(d.c) == rows)
         ok('apply2: the post-check is clean', postcheck(d, 'batch-c2-live-postcheck.sql') == [], postcheck(d, 'batch-c2-live-postcheck.sql'))
         d.begin(); d.run('alter table public.grade_return disable trigger markup_given_on_return')
         ok('apply2: the post-check notices a trigger off', postcheck(d, 'batch-c2-live-postcheck.sql') != []); d.rollback()
+        d.begin(); d.run('alter table public.course disable trigger markup_given_on_release')
+        ok('apply2: the post-check notices the course trigger off', postcheck(d, 'batch-c2-live-postcheck.sql') != []); d.rollback()
+        d.begin(); d.run('create or replace trigger markup_given_on_release after update on public.course for each row execute function public._markup_on_release()')
+        ok('apply2: the post-check notices the course trigger recreated to fire on every update', postcheck(d, 'batch-c2-live-postcheck.sql') != []); d.rollback()
         d.begin(); d.run('grant execute on function public._markup_on_return() to authenticated')
         ok('apply2: the post-check notices a grant', postcheck(d, 'batch-c2-live-postcheck.sql') != []); d.rollback()
         cat2 = catalog(d.c); rows2 = row_checksums(d.c)
@@ -1527,9 +1536,139 @@ def same_rows():
     ok('same_rows: C2 differs only in marks given and requests closed', len(q1) == len(q2) and [x[:2] for x in q1] == [x[:2] for x in q2]
        and all(x == y or (x[2] == 'open' and y[2] == 'done') for x, y in zip(q1, q2)), (q1, q2))
 
+# ── Review round 3 (batch-c-review-3.md) ───────────────────────────────────
+def rstates(d, tok, a, rid):
+    """A request as it is stored, as the student is told, and as the teacher is told."""
+    p = piece(d.feedback(tok, ENR1), a)
+    return (d.one('select state from revision_request where id = :r', r=rid), p['revision']['state'] if p and p.get('revision') else None,
+            [x for x in d.rpc('list_course_feedback(:c)', c=COURSE_A)['revisions'] if x['id'] == rid][0]['state'])
+
+def revision_deleted():
+    """F1: the teacher deletes a student's waiting revision. The request is open again to both sides and stays open
+    through a Return of a changed grade (in a class that returns at once, through a save); the student can send a
+    revision again, and the next Return of a changed grade returns that one. A teacher's Replace of the revision keeps
+    it the revision in."""
+    for c2 in (False, True):
+        tag = ' (C1 and C2)' if c2 else ' (C1 alone)'
+        for how in ('return_work', 'return_grades', 'a class that returns at once'):
+            def give_back(d, a):
+                if how == 'return_work': d.return_work(a, [ENR1])
+                elif how == 'return_grades': d.rpc('return_grades(:a, :e, :k)', a=a, e=[ENR1], k=nid())
+            d = scenario_db('revdel', with_c2=c2)
+            try:
+                k = seed(d, on_return=how != 'a class that returns at once'); a = k['lab']
+                tok = d.session(ENR1); d.send(tok, ENR1, a)
+                d.score(ENR1, a, 6); d.return_work(a, [ENR1])
+                rid = d.rfr(a, ENR1, {'what_to_fix': 'Fix'})['request']['id']
+                s, f = d.revise(tok, ENR1, a); assert f['ok'], f
+                ok('revision_deleted%s, %s: the revision is in' % (tag, how), rstates(d, tok, a, rid) == ('open', 'sent', 'sent'), rstates(d, tok, a, rid))
+                x = d.rpc('delete_submission(:s, :k)', s=f['submission_id'], k=nid())
+                ok('revision_deleted%s, %s: the teacher deletes it: open again to both sides, stored open' % (tag, how),
+                   x['deleted'] is True and rstates(d, tok, a, rid) == ('open', 'open', 'open'), (x, rstates(d, tok, a, rid)))
+                fp = fingerprint_rows(d)
+                d.score(ENR1, a, 7); give_back(d, a)
+                ok('revision_deleted%s, %s: then a changed grade returned: the request stays open to both sides, stored open' % (tag, how),
+                   rstates(d, tok, a, rid) == ('open', 'open', 'open'), rstates(d, tok, a, rid))
+                ok('revision_deleted%s, %s: and that Return returned the grade' % (tag, how), fingerprint_rows(d) != fp
+                   and shown(d, ENR1, a) == 7, shown(d, ENR1, a))
+                s2, f2 = d.revise(tok, ENR1, a)
+                ok('revision_deleted%s, %s: the student can send a revision again, as version 2' % (tag, how),
+                   s2.get('ok') is True and f2 is not None and f2.get('ok') is True and f2.get('version') == 2, (s2, f2))
+                ok('revision_deleted%s, %s: which is in, not returned, to both sides' % (tag, how),
+                   rstates(d, tok, a, rid) == ('open', 'sent', 'sent'), rstates(d, tok, a, rid))
+                d.score(ENR1, a, 8); give_back(d, a)
+                st = rstates(d, tok, a, rid)
+                ok('revision_deleted%s, %s: the next changed grade returned returns it, to both sides' % (tag, how),
+                   st[1:] == ('returned', 'returned') and (st[0] == 'done' if (c2 or how == 'return_work') else True), st)
+            finally:
+                d.close()
+        # the teacher's own photos in place of the student's revision (Batch B's Replace Them)
+        d = scenario_db('revdel', with_c2=c2)
+        try:
+            k = seed(d); a = k['lab']
+            tok = d.session(ENR1); d.send(tok, ENR1, a)
+            d.score(ENR1, a, 6); d.return_work(a, [ENR1])
+            rid = d.rfr(a, ENR1, {'what_to_fix': 'Fix'})['request']['id']
+            s, f = d.revise(tok, ENR1, a); assert f['ok'], f
+            up = d.rpc('start_work_upload(:a, :e, :p::jsonb, :m, :k)', a=a, e=ENR1, p=json.dumps([{'width': 1500, 'height': 2000}]), m='replace', k=nid())
+            d.upload(up['files'])
+            fin = d.rpc('finish_work_upload(:s, :f::jsonb, :k)', s=up['submission_id'],
+                        f=json.dumps([{'file_id': x['file_id'], 'sha256': HASH} for x in up['files']]), k=nid())
+            ok('revision_deleted%s: the teacher replaces the revision\'s photos with their own: still the revision in (version 2), sent' % tag,
+               fin['result'] == 'sent' and fin['submission']['version'] == 2 and rstates(d, tok, a, rid) == ('open', 'sent', 'sent'),
+               (fin, rstates(d, tok, a, rid)))
+            d.score(ENR1, a, 7); d.rpc('return_grades(:a, :e, :k)', a=a, e=[ENR1], k=nid())
+            st = rstates(d, tok, a, rid)
+            ok('revision_deleted%s: and a changed grade returned by return_grades returns it' % tag,
+               st[1:] == ('returned', 'returned') and (st[0] == 'done' if c2 else True), st)
+        finally:
+            d.close()
+
+def leave_holds():
+    """F2: marks drawn after the work was returned still wait when the class stops holding grades (it leaves When I
+    Return Them, or its Student Page is turned off). With C2 they are given then, as a Return gives them (Students See
+    Your Mark Up off and Missing as a Return has them); marks on a piece with no returned grade, and another class's,
+    still wait. Entering or staying in When I Return Them gives nothing. No grade row is written."""
+    def given(d, f): return d.one('select given_rev is not distinct from working_rev from markup where file_id = :f', f=f)
+    def waiting(d, a, f): return [x for x in d.rpc('list_assessment_markup(:a)', a=a) if x['file_id'] == f][0]['waiting']
+    def told(d, f): return [x for x in d.rpc('list_course_feedback(:c)', c=COURSE_A)['markup'] if x['file_id'] == f][0]['waiting']
+    for c2 in (False, True):
+        tag = ' (C1 and C2)' if c2 else ' (C1 alone)'
+        for how, patch, back in (('the class leaves When I Return Them', {'return_grades': 'on_save'}, {'return_grades': 'on_return'}),
+                                 ('the Student Page turned off', {'student_page_enabled': False}, {'student_page_enabled': True})):
+            d = scenario_db('leaveholds', with_c2=c2)
+            try:
+                k = seed(d); a = k['lab']; hid = nid(); mis = nid()
+                d.run("""insert into assessment (id, course_id, title, score_mode, max_points, students_send, students_see_markup) values
+                           (:h, :c, 'Hidden Marks Lab', 'points', 10, 'photos', false), (:m, :c, 'Missing Lab', 'points', 10, 'photos', true)""",
+                      h=hid, m=mis, c=COURSE_A)
+                tok = d.session(ENR1); tok2 = d.session(ENR2, '2012-06-16')
+                tb = d.session(ENR_B, '2012-07-17', course=COURSE_B, teacher=B)
+                _, fa = d.send(tok, ENR1, a); _, fn = d.send(tok2, ENR2, a); _, fh = d.send(tok, ENR1, hid); _, fm = d.send(tok, ENR1, mis)
+                _, fb = d.send(tb, ENR_B, k['b_lab'])
+                for p in (a, hid, mis): d.score(ENR1, p, 6); d.return_work(p, [ENR1])
+                d.rpc("set_score_status(:e, :a, 'NS')", e=ENR1, a=mis); d.return_work(mis, [ENR1])
+                d.rpc('upsert_score(:e, :a, 5)', B, e=ENR_B, a=k['b_lab']); d.return_work(k['b_lab'], [ENR_B], uid=B)
+                # marks drawn after the work was returned: they wait
+                d.save_markup(fa[0], marks('AFTER-RETURN')); d.save_markup(fn[0], marks('NO-GRADE-YET'))
+                d.save_markup(fh[0], marks('HIDDEN')); d.save_markup(fm[0], marks('MISSING'))
+                d.save_markup(fb[0], marks('OTHER-CLASS'), uid=B)
+                ok('leave_holds%s, %s: before, the marks wait and the teacher is told so' % (tag, how),
+                   not given(d, fa[0]) and waiting(d, a, fa[0]) is True and told(d, fa[0]) is True)
+                rows = fingerprint_rows(d)
+                d.rpc('update_course(:c, :p::jsonb)', c=COURSE_A, p=json.dumps(patch))
+                ok('leave_holds%s, %s: no grade row is written' % (tag, how), fingerprint_rows(d) == rows)
+                if c2:
+                    ok('leave_holds%s, %s: the marks waiting on a returned grade are given, and the teacher is no longer told they wait' % (tag, how),
+                       given(d, fa[0]) and waiting(d, a, fa[0]) is False and told(d, fa[0]) is False, (given(d, fa[0]), told(d, fa[0])))
+                    ok('leave_holds%s, %s: Students See Your Mark Up off: given, as a Return gives them' % (tag, how), given(d, fh[0]))
+                    ok('leave_holds%s, %s: Missing on the piece: given, as a Return gives them' % (tag, how), given(d, fm[0]))
+                else:
+                    ok('leave_holds%s, %s: not given (C1 alone: return_work or a save gives them), and the teacher is told they wait' % (tag, how),
+                       not given(d, fa[0]) and told(d, fa[0]) is True)
+                ok('leave_holds%s, %s: marks on a piece with no returned grade still wait (as built)' % (tag, how),
+                   not given(d, fn[0]) and waiting(d, a, fn[0]) is True)
+                ok("leave_holds%s, %s: another teacher's class is left alone" % (tag, how), not given(d, fb[0]))
+                if how == 'the Student Page turned off':
+                    d.rpc('update_course(:c, :p::jsonb)', c=COURSE_A, p=json.dumps(back))
+                m = json.dumps([d.marks(tok, ENR1, a), d.marks(tok, ENR1, hid), d.marks(tok, ENR1, mis)])
+                ok('leave_holds%s, %s: the student %s, and not the hidden or Missing ones' % (tag, how, 'sees them' if c2 else 'does not see them'),
+                   ('AFTER-RETURN' in m) is c2 and 'HIDDEN' not in m and 'MISSING' not in m, m[:300])
+                if how == 'the class leaves When I Return Them':
+                    d.rpc('update_course(:c, :p::jsonb)', c=COURSE_A, p=json.dumps(back))
+                # holding grades again: new marks wait, and staying in it gives nothing
+                d.save_markup(fa[0], marks('AFTER-RETURN', 'HELD AGAIN'))
+                for p in (back, {'return_grades': 'on_return', 'student_page_enabled': True}):
+                    d.rpc('update_course(:c, :p::jsonb)', c=COURSE_A, p=json.dumps(p))
+                ok('leave_holds%s, %s: back in When I Return Them, a change waits, and a class staying in it gives nothing' % (tag, how),
+                   not given(d, fa[0]) and told(d, fa[0]) is True)
+            finally:
+                d.close()
+
 SCENARIOS = {'apply1': apply1, 'teacher': teacher, 'markup': markup, 'started': started, 'contract': contract, 'gone': gone, 'reflect': reflect, 'revision': revision, 'group': group,
              'grants': grants, 'race': race, 'apply2': apply2, 'given': given,
-             'closes': closes, 'only_me': only_me, 'round2': round2, 'put_back': put_back, 'hide_out': hide_out, 'same_rows': same_rows}
+             'closes': closes, 'only_me': only_me, 'round2': round2, 'put_back': put_back, 'hide_out': hide_out, 'same_rows': same_rows,
+             'revision_deleted': revision_deleted, 'leave_holds': leave_holds}
 if __name__ == '__main__':
     for name in (sys.argv[1:] or list(SCENARIOS)):
         try: SCENARIOS[name]()

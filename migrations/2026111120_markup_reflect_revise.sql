@@ -54,7 +54,11 @@
 --    lock. (Marks go with their pages, which Batch B's triggers delete.)
 --    None of the three tables has a foreign key to assessment, enrollment
 --    or course, for the reason grade_return and submission have none
---    (2026110902, "ONE LOCK PER CLASS").
+--    (2026110902, "ONE LOCK PER CLASS"). And one on submission: before a
+--    revision that is in is deleted (the teacher's Delete, a Replace, a
+--    class purged), its request is settled as Unsend settles it, so a
+--    revision whose grade was returned stays returned and one deleted
+--    before that leaves the request open.
 -- 6. The teacher's RPCs (public; signed-in teachers; each checks the caller
 --    owns the class; each write takes p_idempotency_key and asks for its
 --    remembered answer under the class's lock, except the class switches,
@@ -116,7 +120,9 @@
 -- enrollment gain two triggers each (work_feedback_gone after a row is
 -- deleted, work_feedback_truncate after a truncate). For a class with no
 -- revision request and no reflection those triggers take the lock
--- grade_return_gone has just taken and delete no row.
+-- grade_return_gone has just taken and delete no row. submission gains one
+-- (revision_gone, before a row is deleted), which runs only for a sent
+-- revision (version 2 or more): none exists until a student sends one.
 --
 -- ── The checks it makes first ───────────────────────────────────────────────
 -- It stops, with nothing changed, unless:
@@ -138,7 +144,7 @@
 --
 -- ── Locks ───────────────────────────────────────────────────────────────────
 -- Adding the columns takes course whole for an instant; adding the triggers
--- takes assessment and enrollment against writes for an instant. If a long
+-- takes assessment, enrollment and submission against writes for an instant. If a long
 -- transaction holds one of them the file gives up after five seconds with
 -- nothing applied: run it again.
 --
@@ -237,10 +243,11 @@ begin
             -- FINGERPRINTS-BEGIN new (written by migrations/local-test/batch_c_fingerprints.py)
             ('public._work_feedback_gone()',                                       '5c760a38a7675c1d49ef95ab994b76e5', '5c760a38a7675c1d49ef95ab994b76e5'),
             ('public._work_feedback_truncated()',                                  '450e3b27b73c51d01f4c431adb402bbd', '450e3b27b73c51d01f4c431adb402bbd'),
+            ('public._revision_gone()',                                            '13b5fb325c563a0475437829446ef089', '13b5fb325c563a0475437829446ef089'),
             ('public._markup_check(jsonb)',                                        'd5fac66f176bf8f23391a7c6c19b053a', 'd5fac66f176bf8f23391a7c6c19b053a'),
             ('public._markup_give(uuid,uuid)',                                     'f0f07a1b879ff038e2f0afe020233c29', 'f0f07a1b879ff038e2f0afe020233c29'),
             ('public._piece_latest(uuid,uuid)',                                    'fee319ef4d87447eeac9b4d53a1f1b50', 'fee319ef4d87447eeac9b4d53a1f1b50'),
-            ('public._revision_state(uuid)',                                       '808f6944ea937a32576729e48115e58d', '808f6944ea937a32576729e48115e58d'),
+            ('public._revision_state(uuid)',                                       '894bb53b0ad066e21f36c3a8038d5c6c', '894bb53b0ad066e21f36c3a8038d5c6c'),
             ('public._revision_settle(uuid,uuid,boolean)',                         '5abc02afbaa29294cdb317838657b37c', '5abc02afbaa29294cdb317838657b37c'),
             ('public._revision_json(uuid)',                                        '4ea85d4b58243fc0d6512b31ac6d165e', '4ea85d4b58243fc0d6512b31ac6d165e'),
             ('public._reflection_json(uuid)',                                      'f089277294adaf7d7834b41a1e93d5fa', 'f089277294adaf7d7834b41a1e93d5fa'),
@@ -309,6 +316,10 @@ begin
                     where not t.tgisinternal and t.tgname in ('work_feedback_gone', 'work_feedback_truncate')
                       and t.tgrelid in ('public.assessment'::regclass, 'public.enrollment'::regclass)) then
             raise exception 'a trigger named work_feedback_gone or work_feedback_truncate is already on assessment or enrollment, and public.markup does not exist. Nothing was changed.';
+        end if;
+        if exists (select 1 from pg_trigger t
+                    where not t.tgisinternal and t.tgname = 'revision_gone' and t.tgrelid = 'public.submission'::regclass) then
+            raise exception 'a trigger named revision_gone is already on submission, and public.markup does not exist. Nothing was changed.';
         end if;
     end if;
 end
@@ -427,8 +438,11 @@ create table if not exists public.revision_request (
     -- then, both written under the class's lock. Every Return writes
     -- returned_at under that lock too, so a Return after the revision came
     -- in is one that has changed returned_at since: no two clocks are
-    -- compared. A grade so returned has returned the revision, even once
-    -- the revision's photos are deleted.
+    -- compared. They are read only while a revision is in
+    -- (_revision_state): once the revision is deleted they describe a
+    -- revision no longer there, and the next revision_finish writes them
+    -- again. A revision deleted after its grade was returned is stored as
+    -- done first (revision_gone), so it stays returned.
     revision_in_at timestamptz,
     in_returned_at timestamptz,
     created_by    uuid,
@@ -558,6 +572,33 @@ create or replace trigger work_feedback_truncate after truncate on public.enroll
 create or replace trigger work_feedback_truncate after truncate on public.assessment
     for each statement execute function public._work_feedback_truncated();
 
+-- Before a revision that is in is deleted, by any path (the teacher's
+-- Delete, the teacher's Replace Them, the student's Replace or Unsend, a
+-- student or piece deleted, a class purged), its request is settled under
+-- the class's lock, as revision_unsend settles it before it deletes: a
+-- revision whose grade has been returned since it came in is stored as done
+-- while it is still there to be read, so it stays returned. Otherwise
+-- nothing is written, and once the row is gone _revision_state reads the
+-- request open (no revision in) whatever was returned afterwards. Only a
+-- sent revision (version 2 or more): a first version or a send not
+-- finished never has a request to settle. It deletes nothing and never
+-- stops the delete.
+create or replace function public._revision_gone()
+ returns trigger
+ language plpgsql
+ security definer
+ set search_path to 'public', 'pg_temp'
+as $function$
+begin
+    perform _grade_return_lock(old.course_id);
+    perform _revision_settle(old.enrollment_id, old.assessment_id, false);
+    return old;
+end;
+$function$;
+create or replace trigger revision_gone before delete on public.submission
+    for each row when (old.state = 'sent' and old.version > 1)
+    execute function public._revision_gone();
+
 -- ── 6. Shared pieces ────────────────────────────────────────────────────────
 -- Marks, as save_markup takes them: { "v": 1, "marks": [ mark, ... ] }, 500
 -- marks at most, 256 KB at most. A place is a fraction of the page from its
@@ -677,12 +718,16 @@ $function$;
 
 -- Where a revision request stands:
 --   cancelled  the teacher took it back (stored)
---   returned   kept as done (stored: _revision_settle), or a grade was
---              returned after the revision came in: returned_at is not
---              what it was when the revision came in (in_returned_at,
---              stored then under the class's lock, so a revision whose
---              photos are deleted afterwards is still read as returned)
---   open       nothing newer than the version it was asked of is in
+--   returned   kept as done (stored: _revision_settle), or the revision is
+--              in and a grade was returned after it came in: returned_at
+--              is not what it was when the revision came in
+--              (in_returned_at, stored then under the class's lock). A
+--              revision deleted after that was stored as done first
+--              (revision_gone), so it is still read as returned.
+--   open       nothing newer than the version it was asked of is in (the
+--              revision was never sent, or was unsent, or the teacher
+--              deleted it before its grade was returned: a Return then
+--              does not close the request, and the student can send again)
 --   sent       the revision is in; grading it has not started
 --   grading    the revision is in and the grade has changed since, or the
 --              teacher's marks are on one of its pages (section 2b's rule)
@@ -698,10 +743,10 @@ as $function$
     select jsonb_build_object(
                'state', case when r.state = 'cancelled' then 'cancelled'
                              when r.state = 'done' then 'returned'
-                             -- returned since the revision came in (a draft on it since does not take that back)
+                             when v.id is null then 'open'
+                             -- the revision in, returned since it came in (a draft on it since does not take that back)
                              when r.revision_in_at is not null and g.returned_at is not null
                                   and g.returned_at is distinct from r.in_returned_at then 'returned'
-                             when v.id is null then 'open'
                              when md5(coalesce(g.working_copy::text, '')) is distinct from r.grade_mark then 'grading'
                              when exists (select 1 from markup m join submission_file f on f.id = m.file_id
                                            where f.submission_id = v.id
@@ -2196,6 +2241,7 @@ grant execute on function public.list_course_feedback(uuid) to authenticated, se
 -- Helpers in public: nobody is granted them, the service role included.
 revoke all on function public._work_feedback_gone() from public, anon, authenticated, service_role;
 revoke all on function public._work_feedback_truncated() from public, anon, authenticated, service_role;
+revoke all on function public._revision_gone() from public, anon, authenticated, service_role;
 revoke all on function public._markup_check(jsonb) from public, anon, authenticated, service_role;
 revoke all on function public._markup_give(uuid, uuid) from public, anon, authenticated, service_role;
 revoke all on function public._piece_latest(uuid, uuid) from public, anon, authenticated, service_role;
@@ -2242,10 +2288,11 @@ begin
             -- FINGERPRINTS-BEGIN new (written by migrations/local-test/batch_c_fingerprints.py)
             ('public._work_feedback_gone()',                                       '5c760a38a7675c1d49ef95ab994b76e5', '5c760a38a7675c1d49ef95ab994b76e5'),
             ('public._work_feedback_truncated()',                                  '450e3b27b73c51d01f4c431adb402bbd', '450e3b27b73c51d01f4c431adb402bbd'),
+            ('public._revision_gone()',                                            '13b5fb325c563a0475437829446ef089', '13b5fb325c563a0475437829446ef089'),
             ('public._markup_check(jsonb)',                                        'd5fac66f176bf8f23391a7c6c19b053a', 'd5fac66f176bf8f23391a7c6c19b053a'),
             ('public._markup_give(uuid,uuid)',                                     'f0f07a1b879ff038e2f0afe020233c29', 'f0f07a1b879ff038e2f0afe020233c29'),
             ('public._piece_latest(uuid,uuid)',                                    'fee319ef4d87447eeac9b4d53a1f1b50', 'fee319ef4d87447eeac9b4d53a1f1b50'),
-            ('public._revision_state(uuid)',                                       '808f6944ea937a32576729e48115e58d', '808f6944ea937a32576729e48115e58d'),
+            ('public._revision_state(uuid)',                                       '894bb53b0ad066e21f36c3a8038d5c6c', '894bb53b0ad066e21f36c3a8038d5c6c'),
             ('public._revision_settle(uuid,uuid,boolean)',                         '5abc02afbaa29294cdb317838657b37c', '5abc02afbaa29294cdb317838657b37c'),
             ('public._revision_json(uuid)',                                        '4ea85d4b58243fc0d6512b31ac6d165e', '4ea85d4b58243fc0d6512b31ac6d165e'),
             ('public._reflection_json(uuid)',                                      'f089277294adaf7d7834b41a1e93d5fa', 'f089277294adaf7d7834b41a1e93d5fa'),

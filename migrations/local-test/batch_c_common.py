@@ -69,7 +69,7 @@ def build():
 
 # Every function C1 makes, by signature, and the three C2 replaces.
 C1_FUNCTIONS = [
-    'public._work_feedback_gone()', 'public._work_feedback_truncated()', 'public._markup_check(jsonb)',
+    'public._work_feedback_gone()', 'public._work_feedback_truncated()', 'public._revision_gone()', 'public._markup_check(jsonb)',
     'public._markup_give(uuid,uuid)', 'public._piece_latest(uuid,uuid)', 'public._revision_state(uuid)', 'public._revision_settle(uuid,uuid,boolean)',
     'public._revision_json(uuid)', 'public._reflection_json(uuid)',
     'public.set_course_feedback_options(uuid,jsonb,uuid)', 'public.save_markup(uuid,jsonb,integer,uuid)',
@@ -97,7 +97,7 @@ C1_STUDENT = ['student_submit.feedback(text,uuid,text)', 'student_submit.markup(
               'student_submit.group_work(text,uuid,text)', 'student_submit.group_file_links(text,uuid,uuid,text)']
 # C2 replaces no function (Hide, which replaced three stand-ins of C1's, is not in Batch C).
 C2_REPLACES = []
-C2_NEW = ['public._markup_on_return()']
+C2_NEW = ['public._markup_on_return()', 'public._markup_on_release()']
 # Existing functions the new ones call (or, for C2, that its trigger's
 # work depends on), and so rely on.
 C1_RELIED = ['public.fv_owns_course(uuid)', 'public.fv_owns_enrollment(uuid)', 'public.fv_owns_assessment(uuid)',
@@ -117,10 +117,10 @@ C1_RELIED = ['public.fv_owns_course(uuid)', 'public.fv_owns_enrollment(uuid)', '
              # fixes are in first (the apply order is Batch B's two files, the fixes, then C1)
              'public.finish_work_upload(uuid,jsonb,uuid)', 'student_submit.send_finish(text,uuid,uuid,jsonb,text)',
              'student_submit.unsend(text,uuid,uuid,text)']
-# C2's trigger calls the first two; the last two are every Return's writers of
+# C2's triggers call the first three; the last two are every Return's writers of
 # returned_at, whose stamping a new date on a Return (and only then) the
 # trigger relies on.
-C2_RELIED = ['public._markup_give(uuid,uuid)', 'public._revision_settle(uuid,uuid,boolean)',
+C2_RELIED = ['public._markup_give(uuid,uuid)', 'public._revision_settle(uuid,uuid,boolean)', 'public._grade_return_lock(uuid)',
              'public._grade_return_apply(uuid,uuid,jsonb,jsonb)',
              'public._grade_return_one(uuid,uuid,timestamp with time zone)']
 

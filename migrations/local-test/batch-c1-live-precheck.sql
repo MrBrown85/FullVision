@@ -50,6 +50,7 @@ with relied(fn, md5) as (values
     -- FINGERPRINTS-BEGIN absent (written by migrations/local-test/batch_c_fingerprints.py)
     ('public._work_feedback_gone()',                                       'absent'),
     ('public._work_feedback_truncated()',                                  'absent'),
+    ('public._revision_gone()',                                            'absent'),
     ('public._markup_check(jsonb)',                                        'absent'),
     ('public._markup_give(uuid,uuid)',                                     'absent'),
     ('public._piece_latest(uuid,uuid)',                                    'absent'),
@@ -111,6 +112,10 @@ union all
 select 'a trigger name Batch C makes is taken', t.tgrelid::regclass::text || '.' || t.tgname, 'present', 'absent'
   from pg_trigger t
  where not t.tgisinternal and t.tgname in ('work_feedback_gone', 'work_feedback_truncate')
+union all
+select 'a trigger name Batch C makes is taken', 'public.submission.' || t.tgname, 'present', 'absent'
+  from pg_trigger t
+ where not t.tgisinternal and t.tgname = 'revision_gone' and t.tgrelid = 'public.submission'::regclass
 union all
 select 'the server is not PostgreSQL 17', current_setting('server_version'), current_setting('server_version_num'), '17xxxx'
  where current_setting('server_version_num')::int / 10000 <> 17;

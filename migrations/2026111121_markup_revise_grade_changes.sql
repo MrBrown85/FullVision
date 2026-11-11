@@ -37,21 +37,33 @@
 --      again. With C1 alone that is stored only at the next Batch C call.
 --      (Not during a restore: the backup's own state is written over
 --      what the restore first marks Returned.)
+-- And one more function, public._markup_on_release(), and one trigger on
+-- course that runs it (markup_given_on_release) when a class stops holding
+-- grades: it leaves When I Return Them, or its Student Page is turned off
+-- (the condition Batch A's grade_return_release has, and after it). Batch
+-- A then returns each draft, and the trigger above gives those pieces'
+-- marks. Marks drawn after a grade was already returned are waiting for a
+-- next Return the class no longer has: they are given then, for every
+-- piece of the class whose grade is returned, as a Return gives them
+-- (C1's _markup_give; while Students See Your Mark Up is off, or the piece
+-- is Missing or Excused, the student's calls show none, as after any
+-- Return). Marks on a piece with no grade yet are not given by it: they
+-- go with the grade, or at the next save of marks.
 -- Why not C1: it runs inside every Return. A fault in it would stop
 -- teachers saving or returning grades.
 --
 -- ── What it writes ──────────────────────────────────────────────────────────
 -- markup.given, given_rev and given_at, and revision_request's state,
--- closed_at and updated_at. NEVER A GRADE ROW: no grade_return, score,
+-- closed_at and updated_at (the course trigger: markup only). NEVER A GRADE ROW: no grade_return, score,
 -- tag_score, rubric_score or rubric_check_score row is written by it
 -- (batch_c.py's same_rows runs one script with and without this file and
 -- finds them all the same). On the apply: no row at all.
 --
 -- ── The checks it makes first ───────────────────────────────────────────────
 -- It stops, with nothing changed, unless C1 is applied, the functions the
--- trigger calls or relies on are the definitions the tests ran against
+-- triggers call or rely on are the definitions the tests ran against
 -- (and its own, on a second run), and no trigger of those names is on
--- grade_return already (on a first run).
+-- grade_return or course already (on a first run).
 --
 -- ── Before and after the apply (read-only) ──────────────────────────────────
 -- migrations/local-test/batch-c2-live-precheck.sql   expected: no rows.
@@ -59,8 +71,8 @@
 --
 -- ── Taking it back out ──────────────────────────────────────────────────────
 -- migrations/local-test/batch-c2-undo.sql (proved by batch_c_undo.py): the
--- two triggers and the function go. No row changes: marks already given
--- stay given and requests stored done stay done.
+-- three triggers and the two functions go. No row changes: marks already
+-- given stay given and requests stored done stay done.
 begin;
 
 set local lock_timeout = '5s';
@@ -78,6 +90,11 @@ begin
     _first := not exists (select 1 from pg_trigger t
                            where t.tgrelid = 'public.grade_return'::regclass and not t.tgisinternal
                              and t.tgname in ('markup_given_on_return', 'markup_given_on_insert'));
+    if _first and exists (select 1 from pg_trigger t
+                           where t.tgrelid = 'public.course'::regclass and not t.tgisinternal
+                             and t.tgname = 'markup_given_on_release') then
+        raise exception 'a trigger named markup_given_on_release is already on course, and this file''s triggers on grade_return are not there. Nothing was changed.';
+    end if;
     -- The functions it calls or relies on (as C1 leaves them), and its own
     -- (absent on a first run; as this file leaves it on a second).
     for _f in
@@ -85,9 +102,11 @@ begin
             -- FINGERPRINTS-BEGIN c2relied (written by migrations/local-test/batch_c_fingerprints.py)
             ('public._markup_give(uuid,uuid)',                               'f0f07a1b879ff038e2f0afe020233c29', 'f0f07a1b879ff038e2f0afe020233c29'),
             ('public._revision_settle(uuid,uuid,boolean)',                   '5abc02afbaa29294cdb317838657b37c', '5abc02afbaa29294cdb317838657b37c'),
+            ('public._grade_return_lock(uuid)',                              '530dca441198b1546a4ec4967cd83b9f', '530dca441198b1546a4ec4967cd83b9f'),
             ('public._grade_return_apply(uuid,uuid,jsonb,jsonb)',            '89899f9dbc1569f7f1cc4216e252eb32', '89899f9dbc1569f7f1cc4216e252eb32'),
             ('public._grade_return_one(uuid,uuid,timestamp with time zone)', '99e3165d005b5b2020ec40dcf307c689', '99e3165d005b5b2020ec40dcf307c689'),
-            ('public._markup_on_return()',                                   'absent', 'ce8ceaa830617aa9caf935b161d7e379')
+            ('public._markup_on_return()',                                   'absent', 'ce8ceaa830617aa9caf935b161d7e379'),
+            ('public._markup_on_release()',                                  'absent', 'a7e8838702d000c42621d72bf8621dfb')
             -- FINGERPRINTS-END
         ) as v(fn, first_run, later_run)
     loop
@@ -137,7 +156,38 @@ create or replace trigger markup_given_on_return after update of returned_at on 
                        and old.returned_at is distinct from new.returned_at)
     execute function public._markup_on_return();
 
+
+-- ── Marks waiting on returned work, when a class stops holding grades ──────
+-- After a class leaves When I Return Them, or its Student Page is turned
+-- off (and after Batch A's grade_return_release, which returns its drafts
+-- under the class's lock: trigger names run in order), every page of the
+-- class with marks not yet given, on a piece whose grade is returned, is
+-- given, as a Return gives it. It writes no grade row.
+create or replace function public._markup_on_release()
+ returns trigger
+ language plpgsql
+ security definer
+ set search_path to 'public', 'pg_temp'
+as $function$
+begin
+    perform _grade_return_lock(new.id);
+    perform _markup_give(p.enrollment_id, p.assessment_id)
+       from (select distinct m.enrollment_id, m.assessment_id
+               from markup m
+               join enrollment e on e.id = m.enrollment_id and e.course_id = new.id
+               join grade_return g on g.enrollment_id = m.enrollment_id and g.assessment_id = m.assessment_id
+              where m.course_id = new.id and m.given_rev is distinct from m.working_rev
+                and g.returned_at is not null and not g.is_draft) p;
+    return null;
+end;
+$function$;
+create or replace trigger markup_given_on_release after update of student_page_enabled, return_grades on public.course
+    for each row when (old.student_page_enabled and old.return_grades is not distinct from 'on_return'
+                       and not (new.student_page_enabled and new.return_grades is not distinct from 'on_return'))
+    execute function public._markup_on_release();
+
 revoke all on function public._markup_on_return() from public, anon, authenticated, service_role;
+revoke all on function public._markup_on_release() from public, anon, authenticated, service_role;
 
 do $final$
 declare
@@ -148,7 +198,8 @@ begin
     for _f in
         select * from (values
             -- FINGERPRINTS-BEGIN c2new (written by migrations/local-test/batch_c_fingerprints.py)
-            ('public._markup_on_return()', 'ce8ceaa830617aa9caf935b161d7e379')
+            ('public._markup_on_return()',  'ce8ceaa830617aa9caf935b161d7e379'),
+            ('public._markup_on_release()', 'a7e8838702d000c42621d72bf8621dfb')
             -- FINGERPRINTS-END
         ) as v(fn, becomes)
     loop
