@@ -48,6 +48,7 @@ const WRITERS = [
   'saveRubricChecks', // the class's whole tick list
   'moveRubricScores', // scores follow an assessment to another rubric
   'returnGrades', // Return: the students are given their grade (S0-F2)
+  'returnWork', // the same, with the marks on their pages (S9-F1)
 ];
 
 // data.js holds the writers; grader.js is the one caller; seed-data.js

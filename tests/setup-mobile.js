@@ -122,6 +122,8 @@ function _mobileStubElement(id) {
 // Photos: shrinking and the queue that keeps them (Add Work).
 load('shared/photo-shrink.js');
 load('shared/photo-queue.js');
+// The PDF reader (pdf.js is fetched only when a PDF is opened).
+load('shared/photo-readers.js');
 load('teacher-mobile/components.js');
 load('teacher-mobile/card-stack.js');
 load('teacher-mobile/card-widgets.js');

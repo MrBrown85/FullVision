@@ -289,11 +289,17 @@ window.Grader = (function () {
   }
 
   /* Return: the students in `studentIds` (one id or a list) are given
-     their grade on `aid`. Only drafts are returned. Answers
-     { returned, enrollment_ids, returned_at }. */
+     their grade on `aid`, and the marks on their pages (S9-F1): data.js's
+     returnWork is returnGrades, then each student is given the working
+     Mark Up. Only drafts are returned; marks made since the last Return
+     are given even on a grade already returned. Answers
+     { returned, enrollment_ids, returned_at, marks_given,
+     marks_enrollment_ids }. Every screen's Return comes here, so no Return
+     leaves marks behind. */
   function returnTo(cid, aid, studentIds) {
     var ids = Array.isArray(studentIds) ? studentIds : [studentIds];
-    return _saved(cid, ids.length === 1 ? ids[0] : null, aid, 'return', returnGrades(cid, aid, ids));
+    var out = typeof returnWork === 'function' ? returnWork(cid, aid, ids) : returnGrades(cid, aid, ids);
+    return _saved(cid, ids.length === 1 ? ids[0] : null, aid, 'return', out);
   }
 
   /* ── Student work: what is in, and the counts (S6-F3) ──────────────
