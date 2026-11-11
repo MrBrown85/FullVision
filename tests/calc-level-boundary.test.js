@@ -293,6 +293,159 @@ describe('letters and printed percents', () => {
   });
 });
 
+/* ── Every other reading of a level or %, each with the noisy 2.5 ────── */
+
+const NOISY = 1 + (4 - 1 / 3) + (4 - 1 / 3) + (2 - 1 / 3); // 9.999999999999998
+const HALF = NOISY / 4; // 2.4999999999999996, exactly 2.5 on paper
+
+/* One piece that scores four competencies: Emerging, Extending −,
+   Extending −, Developing −. The gradebook cell is their mean. */
+function seedFourOnOne(system) {
+  localStorage.clear();
+  clearClass(CID);
+  const ids = ['a', 'b', 'c', 'd'];
+  const marks = [E, Xm, Xm, Dm];
+  const assessments = [
+    {
+      id: 'p0',
+      title: 'p0',
+      date: '2026-10-10',
+      dueDate: '2026-10-10',
+      type: 'summative',
+      weight: 1,
+      tagIds: ids.map(i => 't-' + i),
+    },
+  ];
+  const tags = {};
+  ids.forEach((id, i) => (tags['t-' + id] = lv(marks[i][0], marks[i][1])));
+  seedClass(CID, {
+    students: [{ id: ME, firstName: 'Priya', lastName: 'Shah' }],
+    assessments,
+    scores: _gradebookCellsToScoreCache(CID, assessments, { [ME]: { p0: levels(tags) } }).scores,
+    learningMaps: {
+      subjects: [{ id: 'subj', name: 'Course' }],
+      competencyGroups: [],
+      sections: ids.map(id => ({ id, name: id, subject: 'subj', tags: [{ id: 't-' + id, label: id }] })),
+    },
+    categories: [],
+    courseConfigs: {},
+  });
+  COURSES[CID] = {
+    id: CID,
+    name: 'Course',
+    block: 'A',
+    gradingSystem: system,
+    gradeLevel: system === 'proficiency' ? '8' : '11',
+  };
+  clearProfCache();
+  return assessments[0];
+}
+
+describe('every other reading of a level or a % on a boundary', () => {
+  it('the noisy value is really under 2.5', () => {
+    expect(HALF).toBeLessThan(2.5);
+  });
+
+  it('a gradebook cell: its level (colour) and its %', () => {
+    const a = seedFourOnOne('both');
+    const cell = assessmentCellValue(CID, ME, a);
+    expect(cell.value).toBeLessThan(2.5);
+    expect(cell.level).toBe(3);
+    expect(cell.percentText).toBe('63%');
+    expect(cell.text).toBe('2.5 · 63%');
+  });
+
+  it('a column’s score spread and its counts by level', () => {
+    const a = seedFourOnOne('proficiency');
+    const counts = classColumnLevelCounts(CID, [{ id: ME }], { assessment: a });
+    expect(counts.counts[3]).toBe(1);
+    expect(counts.counts[2]).toBe(0);
+  });
+
+  it('a group grade’s level (an assessment group, a category)', () => {
+    seedSkill([E, Xm, Xm, Dm]);
+    const g = assessmentGroupGrade(CID, ME, _cache.assessments[CID]);
+    expect(g.prof).toBeLessThan(2.5);
+    expect(g.level).toBe(3);
+  });
+
+  it('a results grid row’s counts by level', () => {
+    const row = _gridRow([{ id: ME }], () => HALF);
+    expect(row.counts[3]).toBe(1);
+    expect(row.ids[3]).toEqual([ME]);
+  });
+
+  it('first and latest evidence (evidenceChange)', () => {
+    const c = evidenceChange([
+      { score: HALF, date: '2026-10-01' },
+      { score: 1, date: '2026-10-02' },
+    ]);
+    expect(c.first).toBe(3);
+  });
+
+  it('the growth sparkline’s colour and title', () => {
+    const html = renderGrowthSparkline([{ prof: HALF, date: '2026-10-01' }]);
+    expect(html).toContain(PROF_COLORS[3]);
+    expect(html).toContain(': Proficient"');
+  });
+
+  it('a Letter class’s change texts read each % on paper', () => {
+    seedStyle('letter');
+    // 62.5% (an exact 2.5) is 63%; 2.0 is 50%.
+    expect(levelChangeAs(CID, 2, HALF)).toBe('+13%');
+    expect(levelChangeAs(CID, HALF, 2)).toBe('−13%');
+    expect(levelMoveText(CID, 2, HALF).text).toBe('↑ 13');
+    expect(levelMoveText(CID, HALF, 2).text).toBe('↓ 13');
+  });
+
+  it('a Class Average’s %: points and Complete/Incomplete', () => {
+    seedStyle('proficiency');
+    const pct = (11.5 / 20) * 100; // 57.5 on paper
+    expect(pct).toBeLessThan(57.5);
+    const points = { id: 'q', scoreMode: 'points', maxPoints: 20 };
+    expect(classColumnAverageText(CID, points, { avg: 11.5, pct, count: 1 })).toBe('11.5/20 · 58%');
+    const done = { id: 'q', scoreMode: 'complete', maxPoints: 1 };
+    expect(isCompletionScored(done)).toBe(true);
+    expect(classColumnAverageText(CID, done, { avg: 0.575, pct, count: 1 })).toBe('58%');
+  });
+
+  it('a Letter class’s month line compares the % each side prints', () => {
+    // September: Proficient, Developing (exactly 2.5, 62.5%, "63%").
+    // October: Emerging, Extending −, Extending −, Developing −. Still
+    // exactly 2.5, though the computer gets 2.4999999999999996.
+    localStorage.clear();
+    clearClass(CID);
+    const dates = ['2026-09-08', '2026-09-15', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23'];
+    const marks = [[3, 0], [2, 0], E, Xm, Xm, Dm];
+    const assessments = dates.map((d, i) => piece('p' + i, d));
+    const cells = { [ME]: {} };
+    marks.forEach((m, i) => (cells[ME]['p' + i] = levels({ 't-ev': lv(m[0], m[1]) })));
+    const rows = {};
+    assessments.forEach(a => (rows[a.id] = { [ME]: { is_draft: false, returned_at: '2026-11-02T18:00:00Z' } }));
+    seedClass(CID, {
+      students: [{ id: ME, firstName: 'Priya', lastName: 'Shah' }],
+      assessments,
+      scores: _gradebookCellsToScoreCache(CID, assessments, cells).scores,
+      learningMaps: {
+        subjects: [{ id: 'subj', name: 'Course' }],
+        competencyGroups: [],
+        sections: [{ id: 'ev', name: 'Evidence', subject: 'subj', tags: [{ id: 't-ev', label: 'Evidence' }] }],
+      },
+      categories: [],
+      courseConfigs: { student_page_enabled: true, return_grades: 'on_return' },
+      gradeReturns: rows,
+    });
+    COURSES[CID] = { id: CID, name: 'Course', block: 'A', gradingSystem: 'letter', gradeLevel: '11' };
+    delete _returnedSets[CID];
+    clearProfCache();
+    const m = skillMonthChange(CID, ME, 'ev', '2026-11-10');
+    expect(m.then).toBe(2.5);
+    expect(m.now).toBeLessThan(2.5);
+    expect(m.from).toBe('63%');
+    expect(m.dir).toBe(0);
+  });
+});
+
 describe('what stays as it was', () => {
   it('the level itself is never changed, only what it is compared as', () => {
     seedSkill([E, Xm, Xm, Dm]);
