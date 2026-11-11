@@ -27,6 +27,12 @@
 //           id must have a row in public.teacher that is not deleted. Then
 //           student_submit.removal_batch, the files deleted,
 //           student_submit.removal_done: the worker, and nothing else.
+//   {route: 'scheduled-sweep', secret}
+//        -> the database's own timer (pg_cron through pg_net,
+//           migrations/2026111140_photo_lifecycle.sql, section 6) only: the
+//           secret must be PHOTO_SWEEP_SECRET exactly. Then the worker, for
+//           up to 40 seconds, after the answer where the runtime allows it.
+//           Nothing else in the body is read.
 //
 // The rules every route keeps:
 //   - The session is checked as `page` checks it, before anything else: a
@@ -70,7 +76,24 @@ export type SendOptions = {
   // Runs the removal worker after the answer is sent, where the runtime allows it (EdgeRuntime.waitUntil).
   // Absent: the worker runs before the answer, as it must then to run at all.
   defer?: ((work: Promise<void>) => void) | null;
+  // PHOTO_SWEEP_SECRET as sweepSecret() gives it: 64 lower-case hex characters, or null. Null: scheduled-sweep
+  // answers a server error and runs nothing.
+  sweepSecret?: string | null;
 };
+
+/** PHOTO_SWEEP_SECRET, only when it is exactly 64 lower-case hex characters (what the database's timer checks
+    its own copy is); anything else is no secret. */
+export function sweepSecret(value: unknown): string | null {
+  return typeof value === 'string' && /^[0-9a-f]{64}$/.test(value) ? value : null;
+}
+
+/** Whether two secrets of the same length are the same, in time that does not depend on where they differ. */
+function sameSecret(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
 
 export type SendAnswer = { status: number; body: Json };
 
@@ -83,6 +106,7 @@ export const SEND_ROUTES: Record<string, true> = {
   unsend: true,
   'file-links': true,
   sweep: true,
+  'scheduled-sweep': true,
 };
 
 // ── The limits (the contract, "Storage" and "What the edge function must do", 1) ──
@@ -105,6 +129,9 @@ const MAX_BYTES_SAID = 2_097_152;
 const BATCH = 200;
 const WORKER_AFTER_ROUTE = { ms: 2_000, rounds: 2 };
 const WORKER_SWEEP = { ms: 10_000, rounds: 10 };
+// The database's timer (every ten minutes, when a file is due): long enough for a class's photos at the end of
+// the year (40 rounds of 200 is 8,000 files a run).
+const WORKER_SCHEDULED = { ms: 40_000, rounds: 40 };
 // How many Storage requests run at once.
 const AT_ONCE = 4;
 
@@ -668,6 +695,22 @@ export function makeSendRoutes(opts: SendOptions) {
     return ok({ ok: true });
   }
 
+  /* scheduled-sweep: the worker, for the database's timer (migrations/
+     2026111140, section 6). The secret travels in the body, as sweep's
+     token does; it is compared whole, in constant time, and never logged.
+     Answered at once where the runtime can carry on after the answer
+     (pg_net waits 10 seconds), the worker running behind it. */
+  async function scheduledSweep(body: Json): Promise<SendAnswer> {
+    const mine = opts.sweepSecret ? sweepSecret(opts.sweepSecret) : null;
+    if (!mine || !store) return server();
+    const given = sweepSecret(body.secret);
+    if (!given || !sameSecret(given, mine)) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+    const run = worker('scheduled-sweep', WORKER_SCHEDULED);
+    if (opts.defer) opts.defer(run);
+    else await run;
+    return ok({ ok: true });
+  }
+
   return async function run(route: string, body: Json, hash: string): Promise<SendAnswer> {
     switch (route) {
       case 'work': {
@@ -688,6 +731,8 @@ export function makeSendRoutes(opts: SendOptions) {
         return fileLinks(body, hash);
       case 'sweep':
         return sweep(body);
+      case 'scheduled-sweep':
+        return scheduledSweep(body);
       default:
         return bad();
     }
