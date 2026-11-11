@@ -498,6 +498,7 @@
     }
     return {
       student: { enrollment_id: 'demo-cece', first_name: 'Cece' },
+      // teacher_name as the server may send it: the page never shows it (Colin's ruling 112).
       course: { id: 'demo-science-8', name: 'Science 8', block: 'B', grading_scale: null, teacher_name: 'Ms. Rivera' },
       // The class's categories and what each weighs (category_percent is worked out from them as the server does).
       categories: [

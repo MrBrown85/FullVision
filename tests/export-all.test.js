@@ -445,6 +445,11 @@ describe('the export stays complete', () => {
     getStudentReflections: 'a subset of getCourseFeedback',
     getStudentLastPlan: 'a subset of getCourseFeedback',
     getStudentFeedback: 'the student page’s view of its own feedback',
+    // Revisions (S11): Demo Mode only until S11-W1; kept out with student work.
+    getRevisionRequest: 'a revision request on student work, Demo Mode only for now',
+    getStudentRevision: 'the student page’s view of its own revision',
+    getSubmissionVersions: 'student work, kept out with its photos',
+    getRevisionFirstCell: 'the first version’s result, read through assessmentCellValue',
   };
 
   it('uses every per-class reader in shared/data.js, or says why not', () => {

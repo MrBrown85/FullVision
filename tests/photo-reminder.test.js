@@ -163,13 +163,18 @@ describe('Pin: with the build switch off, or no photos, both screens are as they
     expect(withPhotos).not.toContain('photo-reminder');
   });
 
-  it('Send Work off: both screens are the same with photos as with none', () => {
-    const dash = dashboardHtml(() => seedDemo({ send: false }));
-    expect(dash).toBe(dashboardHtml(() => seedDemo({ send: false, photos: false })));
+  /* Changed on purpose (ruling 108's follow-up): this pin said Send Work off
+     looked the same with photos as with none. Photos sent before Send Work
+     was turned off are still deleted, so with photos Keep Photos Until and
+     the reminder now show (below, "Send Work turned off after photos were
+     sent"). With no photos and Send Work off nothing shows, as before. */
+  it('Send Work off with no photos: no reminder, and no Keep Photos Until', () => {
+    const dash = dashboardHtml(() => seedDemo({ send: false, photos: false }));
     expect(dash).not.toContain('photo-reminder');
-    const settings = settingsHtml(() => seedDemo({ send: false }));
-    expect(settings).toBe(settingsHtml(() => seedDemo({ send: false, photos: false })));
+    const settings = settingsHtml(() => seedDemo({ send: false, photos: false }));
+    expect(settings).toContain('Send Work');
     expect(settings).not.toContain('Keep Photos Until');
+    expect(settings).not.toContain('photo-reminder');
   });
 
   it('build switch on with no photos: no reminder on either screen, and Keep Photos Until waits for Send Work', () => {
@@ -223,9 +228,43 @@ describe('The reminder', () => {
     expect(settingsHtml(() => seedDemo())).not.toContain('photo-reminder');
   });
 
-  it('is not shown with Send Work off, where Keep Photos Until is not shown either', () => {
+  /* Ruling 108's follow-up: a teacher who turns Send Work off after photos
+     were sent still has photos that go on the date, so the setting and the
+     reminder stay in sight. */
+  it('Send Work turned off after photos were sent: the reminder and Keep Photos Until still show', () => {
     seedDemo({ send: false });
+    expect(CmStudentPage.photoReminder(CID, '2027-06-25')).toEqual({ date: '2027-06-30', text: LINE });
+    expect(dashboardHtml(() => seedDemo({ send: false }))).toContain(LINE);
+    const settings = settingsHtml(() => seedDemo({ send: false }));
+    expect(settings).toContain('Keep Photos Until');
+    expect(settings).toContain('Photos of student work in this class are deleted on June 30.');
+    expect(settings).toContain(LINE);
+    expect(settings).not.toMatch(/id="sp-send-switch"[^>]*checked/);
+    // Without photos it goes with Send Work, as before.
+    seedDemo({ send: false, photos: false });
     expect(CmStudentPage.photoReminder(CID, '2027-06-25')).toBeNull();
+  });
+
+  it('Keep Photos Until can be changed with Send Work off while photos are kept', () => {
+    const terms = globalThis.getReportingTerms;
+    globalThis.getReportingTerms = () => [{ ends_on: '2027-06-28' }];
+    try {
+      page(
+        () => seedDemo({ send: false }),
+        doc => {
+          DashClassManager.resetState();
+          DashClassManager.configure({ activeCourse: CID, onRender() {}, onCourseChange() {} });
+          DashClassManager.openClassManager('student-page', CID);
+          const btn = doc.getElementById('sp-keep-end_of_term');
+          expect(btn).not.toBe(null);
+          expect(DashClassManager.handleAction('spKeepPhotos', btn)).toBe(true);
+          DashClassManager.resetState();
+        },
+      );
+      expect(CmStudentPage.workSettings(CID).keep_photos_until).toBe('end_of_term');
+    } finally {
+      globalThis.getReportingTerms = terms;
+    }
   });
 
   it('follows End of Term: the term’s last day', () => {

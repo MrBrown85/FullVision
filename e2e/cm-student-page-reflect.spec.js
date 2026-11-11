@@ -33,6 +33,8 @@ test('Reflect on Feedback: off at first, on shows the reflection screens, off ag
   await expect(page.locator('.sp-card .sp-row-title')).toHaveText([
     'Return Grades',
     'Send Work',
+    // Demo Mode's sample has photos, so Keep Photos Until shows with Send Work off (ruling 108's follow-up).
+    'Keep Photos Until',
     'Reflect on Feedback',
     'Show My Learning',
   ]);

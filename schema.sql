@@ -885,6 +885,11 @@ create table student_submit.device_session_enrollment (
 -- _work_class_max_bytes). The teacher's Add Work and Handed In on Paper work
 -- whatever Send Work and Students Send say. None of these functions reads or
 -- writes a grade. The contract: migrations/local-test/batch-b-contract.md.
+-- 2026111104_student_work_review_fixes (not applied when this was written)
+-- replaces finish_work_upload, send_finish and unsend: 30 pages at most is
+-- asked again when a Replace or an Add as More Pages is finished, and a
+-- teacher's unfinished Add as More Pages survives a student's Unsend or
+-- Replace. No table changes.
 create table submission (
   id            uuid        primary key default gen_random_uuid(),
   course_id     uuid        not null,                               -- no foreign key (see above); a trigger checks the student and the assessment are both in it

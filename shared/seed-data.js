@@ -3875,6 +3875,7 @@ function seedIfNeeded() {
   seedDemoStudentWork();
   seedDemoMarkup();
   seedDemoReflections();
+  seedDemoRevisions();
   seedDemoDrafts();
 
   // ── Migrate old gb-notes into gb-quick-obs (one-time) ──
@@ -4246,4 +4247,40 @@ function seedDemoDrafts() {
     if (saveScoreComment('sci8', sid, lightLab.id, row[1])) made++;
   });
   return made > 0;
+}
+
+/* ── Sample revision (S11) ─────────────────────────────────────────
+   One piece returned for revision: Jas's Cell Microscope Lab, with What to
+   Fix and a Revise By date, the grade kept (shared/data.js, "Revisions").
+   Nothing is returned, hidden or sent, so no grade changes. Shown only once
+   the teacher turns on the student page and Send Work. Seeded once per
+   class. */
+function seedDemoRevisions() {
+  if (typeof saveDemoRevisions !== 'function' || !COURSES.sci8) return false;
+  var stored = null;
+  try {
+    stored = JSON.parse(localStorage.getItem('gb-student-feedback-sci8') || 'null');
+  } catch (e) {
+    stored = null;
+  }
+  if (stored && stored.revisions && Object.keys(stored.revisions).length) return false;
+  var lab = (getAssessments('sci8') || []).find(function (a) {
+    return a && a.id === 'sci8a1';
+  });
+  var jas = getStudents('sci8').some(function (s) {
+    return s.id === 'st7';
+  });
+  if (!lab || !lab.date || !jas) return false;
+  var day = String(lab.date).slice(0, 10);
+  return saveDemoRevisions('sci8', [
+    {
+      assessment_id: 'sci8a1',
+      enrollment_id: 'st7',
+      what_to_fix: 'Write the magnification beside each drawing, then send it again.',
+      // A week from today, so the sample is never overdue (the lab itself is months back).
+      revise_by: _demoDayAfter(getTodayStr(), 7),
+      criterion_ids: [],
+      created_at: _demoDayAfter(day, 2) + 'T21:15:00.000Z',
+    },
+  ]);
 }

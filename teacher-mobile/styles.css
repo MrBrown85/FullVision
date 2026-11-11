@@ -1283,6 +1283,9 @@ body.fv-switching-course::after {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
+.m-edit-row-fixed {
+  cursor: default;
+}
 .m-edit-row-k {
   font-weight: 500;
 }

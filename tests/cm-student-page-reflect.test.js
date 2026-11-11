@@ -118,6 +118,8 @@ describe('Reflect on Feedback in Class Settings › Student Page', () => {
     expect([...doc.querySelectorAll('.sp-card .sp-row-title')].map(el => el.textContent)).toEqual([
       'Return Grades',
       'Send Work',
+      // The sample class has photos, so Keep Photos Until shows with Send Work off (ruling 108's follow-up).
+      'Keep Photos Until',
       'Reflect on Feedback',
       'Show My Learning',
     ]);

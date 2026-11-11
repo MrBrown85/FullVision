@@ -327,8 +327,10 @@ var CmStudentPage = (function () {
      Send Work is the class's switch for students sending photos or files
      (course.send_work, off), and Keep Photos Until when they are deleted
      (course.keep_photos_until: End of Year, the default, or End of Term;
-     DECISIONS, Grades, photos and sign-in 5). Keep Photos Until shows only
-     while Send Work is on.
+     DECISIONS, Grades, photos and sign-in 5). Keep Photos Until shows while
+     Send Work is on, and whenever the class has photos kept (classHasPhotos):
+     photos sent before Send Work was turned off are still deleted on that
+     date (ruling 108's follow-up).
 
      Demo Mode first: the server's columns come with Batch B, which is not
      applied. So the two rows are drawn in Demo Mode only; for a signed-in
@@ -407,10 +409,17 @@ var CmStudentPage = (function () {
     _rerender();
   }
 
+  /* Whether Keep Photos Until is drawn and can be changed: Send Work on, or
+     photos kept for the class. Inside the build switch and Demo Mode (offered). */
+  function _keepShown(cid, w) {
+    w = w || workSettings(cid);
+    return w.offered && (w.send_work || classHasPhotos(cid));
+  }
+
   function _sendWorkRows(cid) {
     var w = workSettings(cid);
     if (!w.offered) return '';
-    var keep = w.send_work
+    var keep = _keepShown(cid, w)
       ? '<div class="sp-row-head">' +
         '<div class="sp-row-title sp-keep-title" id="sp-keep-label">Keep Photos Until</div>' +
         '</div>' +
@@ -466,7 +475,7 @@ var CmStudentPage = (function () {
 
   function _chooseKeepPhotos(cid, value) {
     var w = cid ? workSettings(cid) : null;
-    if (!w || !w.send_work) return;
+    if (!w || !_keepShown(cid, w)) return;
     var known = KEEP_CHOICES.some(function (c) {
       return c.value === value;
     });
@@ -499,9 +508,10 @@ var CmStudentPage = (function () {
      until the teacher presses Dismiss. Change the Date opens this tab at
      Keep Photos Until.
 
-     Shown only where it is true: the class's build switch on, Send Work on
-     (Keep Photos Until, which Change the Date opens, shows only then), and
-     photos of student work kept for the class (classHasPhotos). The job
+     Shown only where it is true: the class's build switch on, and photos
+     of student work kept for the class (classHasPhotos), whether or not Send
+     Work is still on (Keep Photos Until, which Change the Date opens, shows
+     then too; ruling 108's follow-up). The job
      that deletes them (S8-M1) is not built, so until it is no signed-in
      class has photos here and the line never shows for one.
 
@@ -511,17 +521,29 @@ var CmStudentPage = (function () {
      pass nothing and get the class's own day (courseToday). */
   var REMIND_DAYS = 7;
 
-  /* True when the class has photos of student work that would be deleted:
-     with its build switch on, a submission with at least one page. The same
-     question the delete warnings ask (dash-class-manager.js,
-     _cmStudentsWithPhotos; page-gradebook.js, _studentsWithSentPhotos). */
-  function classHasPhotos(cid) {
-    if (!cid || typeof getCourseSubmissions !== 'function') return false;
+  /* Who in class `cid` has photos of their work kept, { enrollment_id: true },
+     from the read side in shared/data.js (getCourseSubmissions): a submission
+     with at least one page, whoever sent it; for one assessment when `aid` is
+     given. Empty while the class's build switch is off. Send Work is not
+     asked: photos sent before it was turned off are still kept, and still
+     deleted. The one question the delete warnings (dash-class-manager.js,
+     page-gradebook.js), Keep Photos Until and the reminder ask. */
+  function studentsWithPhotos(cid, aid) {
+    var who = {};
+    if (!cid || typeof getCourseSubmissions !== 'function') return who;
     var s = _settings(cid);
-    if (!s || s.student_page !== true) return false;
-    return (getCourseSubmissions(cid).submissions || []).some(function (sub) {
-      return !!sub && Array.isArray(sub.files) && sub.files.length > 0;
+    if (!s || s.student_page !== true) return who;
+    (getCourseSubmissions(cid).submissions || []).forEach(function (sub) {
+      if (!sub || !Array.isArray(sub.files) || !sub.files.length) return;
+      if (aid && sub.assessment_id !== aid) return;
+      who[sub.enrollment_id] = true;
     });
+    return who;
+  }
+
+  // True when the class has photos of student work that would be deleted.
+  function classHasPhotos(cid) {
+    return Object.keys(studentsWithPhotos(cid)).length > 0;
   }
 
   function _dismissedOn(cid) {
@@ -542,7 +564,7 @@ var CmStudentPage = (function () {
     if (!classHasPhotos(cid)) return null;
     var day = today || _today(cid);
     var w = workSettings(cid);
-    if (!w.send_work) return null;
+    if (!_keepShown(cid, w)) return null;
     var date = keepPhotosDate(cid, w.keep_photos_until, day);
     var left = _daysBetween(day, date);
     if (!(left >= 0 && left <= REMIND_DAYS)) return null;
@@ -981,6 +1003,7 @@ var CmStudentPage = (function () {
     reflectSettings: reflectSettings,
     keepPhotosDate: keepPhotosDate,
     classHasPhotos: classHasPhotos,
+    studentsWithPhotos: studentsWithPhotos,
     photoReminder: photoReminder,
     photoReminderHtml: photoReminderHtml,
     dismissPhotoReminder: dismissPhotoReminder,
