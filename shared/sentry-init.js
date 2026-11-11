@@ -61,6 +61,9 @@
   var SECRET_RE = /\b(\w*(?:token|code|key|secret|pass)\w*)=[^&\s]+/gi;
   // Slip codes: three and three from the slip alphabet (K7P-3QX).
   var SLIP_RE = /\b[A-HJKMNP-RT-Z2-46-9]{3}-[A-HJKMNP-RT-Z2-46-9]{3}\b/g;
+  // Card codes: four and four (K7M4-QX2P). No code is ever put in a message;
+  // this is a backstop.
+  var CARD_RE = /\b[A-HJKMNP-RT-Z2-46-9]{4}-[A-HJKMNP-RT-Z2-46-9]{4}\b/g;
   var DATE_RE = /\b(?:\d{4}-\d{1,2}-\d{1,2}|\d{1,2}\/\d{1,2}\/\d{2,4})\b/g;
   // Long letter-and-digit runs are tokens; six or more digits, a student
   // number (five-digit Postgres error codes such as 23505 stay).
@@ -77,6 +80,7 @@
       .replace(JWT_RE, '[token]')
       .replace(SECRET_RE, '$1=[value]')
       .replace(UUID_RE, '[id]')
+      .replace(CARD_RE, '[code]')
       .replace(SLIP_RE, '[code]')
       .replace(DATE_RE, '[date]')
       .replace(TOKEN_RE, '[token]')

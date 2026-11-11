@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { mockAuth } from './helpers.js';
+import { catchPrints, fakeTeacherCards, heldAnywhere, serveTeacherCards, sheets } from './student-card-fake.js';
 
 // S0-W1: Draft and Returned and student cards for a signed-in teacher, in
 // the browser, against a stand-in server.
@@ -14,12 +15,14 @@ import { mockAuth } from './helpers.js';
 //   how many grades wait, and asks the teacher before returning them.
 // - A grade saved in the dialog is a Draft at once; Return sends
 //   return_grades for that student and that work, with a key.
-// - Student Cards: Make Cards is issue_student_cards, Print All marks them
-//   printed (mark_student_cards_printed), and no code is kept on the device.
+// - Student Cards: Make and Print asks the teacher-cards function (its real
+//   handler over a stand-in database), prints, and marks the cards printed
+//   (mark_student_cards_printed); no code is shown in the list or kept on
+//   the device; a lost reply ends with printed cards and no message.
 //
 // helpers.js `mockAuth` answers the class load. This file wraps it with the
 // part of the server this build added: the two settings on the course row,
-// the rows, Return and the cards. Its state is kept in localStorage under
+// the rows, Return and the cards' list (from the teacher-cards stand-in). Its state is kept in localStorage under
 // e2e-s0w1-server so it lasts across the test's reloads.
 
 const id = n => 'e2e00000-0000-4000-8000-' + String(n).padStart(12, '0');
@@ -110,7 +113,18 @@ const SEED = {
 /* The stand-in for what this build added to the server. `start` is what it
    holds when the test begins: { course: { student_page_enabled,
    return_grades }, rows }. */
-async function serverWithStudentPage(page, start) {
+async function serverWithStudentPage(page, start, cardOpts) {
+  // The teacher-cards function and its database: its real handler over a stand-in.
+  const fake = await fakeTeacherCards({
+    course: CID,
+    tokens: ['e2e-test-token'],
+    students: [
+      { id: ALICE, first: 'Alice', number: '1001' },
+      { id: BOB, first: 'Bob', birthday: '2012-05-06' },
+      { id: CHARLIE, first: 'Charlie' },
+    ],
+  });
+  const posts = await serveTeacherCards(page, fake, cardOpts);
   await mockAuth(page);
   await page.addInitScript(
     ({ seed, start }) => {
@@ -125,10 +139,7 @@ async function serverWithStudentPage(page, start) {
         localStorage.setItem('gb-students-' + cid, JSON.stringify(seed.students));
         localStorage.setItem('gb-assessments-' + cid, JSON.stringify(seed.assessments));
         localStorage.setItem('gb-scores-' + cid, JSON.stringify({}));
-        localStorage.setItem(
-          KEY,
-          JSON.stringify({ version: 1, course: start.course, rows: start.rows || {}, cards: [], seq: 0 }),
-        );
+        localStorage.setItem(KEY, JSON.stringify({ version: 1, course: start.course, rows: start.rows || {} }));
       }
       const read = () => JSON.parse(localStorage.getItem(KEY));
       const write = s => localStorage.setItem(KEY, JSON.stringify(s));
@@ -211,51 +222,21 @@ async function serverWithStudentPage(page, start) {
         }
         if (name === 'list_student_cards') {
           window.__e2eRpcLog.push({ name, params, at: Date.now() });
-          return ok(s.cards);
-        }
-        if (name === 'issue_student_cards') {
-          window.__e2eRpcLog.push({ name, params, at: Date.now() });
-          let made = 0;
-          seed.students.forEach(st => {
-            if (s.cards.some(c => c.enrollment_id === st.id)) return;
-            s.seq += 1;
-            const identity = !!(st.dateOfBirth || st.studentNumber);
-            s.cards.push({
-              id: 'e2e00000-0000-4000-8000-' + String(900 + s.seq).padStart(12, '0'),
-              enrollment_id: st.id,
-              code: 'K7M-4Q' + (s.seq + 1),
-              created_at: new Date().toISOString(),
-              printed_at: null,
-              last_opened_at: null,
-              locked_at: null,
-              wrong_tries: 0,
-              wrong_tries_7d: 0,
-              works_until: '2027-06-30',
-              check: identity ? 'identity' : 'password',
-              password: identity ? null : '4821',
-            });
-            made += 1;
-          });
-          write(s);
-          return ok({ issued: made, cards: s.cards });
+          // The cards as the stand-in teacher-cards database holds them, shaped as after S3-M1.
+          return window.__e2eCardList().then(data => ({ data, error: null }));
         }
         if (name === 'mark_student_cards_printed') {
           window.__e2eRpcLog.push({ name, params, at: Date.now() });
-          const at = new Date().toISOString();
-          let n = 0;
-          s.cards.forEach(c => {
-            if ((params.p_card_ids || []).indexOf(c.id) < 0) return;
-            c.printed_at = at;
-            n += 1;
-          });
-          write(s);
-          return ok({ printed: n });
+          // A test can hold Mark Printed back: the server never hears it.
+          if (window.__e2eHoldMarks) return new Promise(() => {});
+          return window.__e2eCardsPrinted(params.p_card_ids || []).then(data => ({ data, error: null }));
         }
         return real(name, params);
       };
     },
     { seed: SEED, start },
   );
+  return { fake, posts };
 }
 
 const log = page => page.evaluate(() => window.__e2eRpcLog.map(c => ({ name: c.name, params: c.params })));
@@ -317,7 +298,9 @@ test('with the student page off, a signed-in class asks the server nothing new a
 test('switch on at the build address, a draft, Return, and a card for each student', async ({ page }) => {
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
-  await serverWithStudentPage(page, { course: { student_page_enabled: false, return_grades: 'on_return' } });
+  const cards = await serverWithStudentPage(page, {
+    course: { student_page_enabled: false, return_grades: 'on_return' },
+  });
 
   // The switch: the server is asked for it alone, then the class and its rows are read.
   await page.goto('/dashboard?manage=student-page&build=student-page');
@@ -380,63 +363,65 @@ test('switch on at the build address, a draft, Return, and a card for each stude
   );
   await expect(page.locator('.gb-draft')).toHaveCount(0);
 
-  // Student Cards.
+  // Student Cards: no card yet, one button.
   await page.goto('/dashboard?manage=student-page');
   const card = page.locator('.sc-card');
   await expect(card.locator('.sc-table tbody tr')).toHaveCount(3);
-  await expect(card.locator('.sc-code')).toHaveText(['No Card Yet', 'No Card Yet', 'No Card Yet']);
+  await expect(card.locator('.sc-which')).toHaveText(['No Card Yet', 'No Card Yet', 'No Card Yet']);
   expect((await calls(page, 'list_student_cards')).pop()).toEqual({ p_course_id: CID });
-  await card.getByRole('button', { name: 'Make Cards' }).click();
-  await expect(card.locator('.sc-code')).toHaveText(['K7M-4Q2', 'K7M-4Q3', 'K7M-4Q4']);
-  const issued = await calls(page, 'issue_student_cards');
-  expect(issued.length).toBe(1);
-  expect(issued[0].p_course_id).toBe(CID);
-  expect(issued[0].p_enrollment_ids).toBe(null);
-  expect(issued[0].p_idempotency_key).toMatch(UUID);
-  await expect(card.getByRole('button')).toHaveText(['Print All']);
+  await expect(card.getByRole('button')).toHaveText(['Make and Print 3 Cards']);
 
-  // Print All: the three cards on one sheet, the QR carrying the code after #.
-  await page.evaluate(() => {
-    window.__sheet = null;
-    window.print = () => {
-      var root = document.getElementById('qr-slips-root');
-      window.__sheet = {
-        cells: root.querySelectorAll('.qs-slip').length,
-        names: Array.from(root.querySelectorAll('.qs-name')).map(e => e.textContent),
-        classes: Array.from(root.querySelectorAll('.qs-class')).map(e => e.textContent),
-        codes: Array.from(root.querySelectorAll('.qs-type:not(.qs-pass) strong')).map(e => e.textContent),
-        passwords: Array.from(root.querySelectorAll('.qs-pass strong')).map(e => e.textContent),
-      };
-    };
-  });
-  await card.getByRole('button', { name: 'Print All' }).click();
-  await page.waitForFunction(() => !!window.__sheet);
-  expect(await page.evaluate(() => window.__sheet)).toEqual({
-    cells: 3,
-    names: ['Alice Anderson', 'Bob Baker', 'Charlie Chen'],
-    classes: ['Science 8 · Block B', 'Science 8 · Block B', 'Science 8 · Block B'],
-    codes: ['K7M-4Q2', 'K7M-4Q3', 'K7M-4Q4'],
-    passwords: ['4821'],
-  });
-  expect(await page.evaluate(() => StudentCards.cardUrl({ code: 'K7M-4Q2' }, 'https://fullvision.ca'))).toBe(
-    'https://fullvision.ca/s/#K7M-4Q2',
-  );
+  // Make and Print: one request to teacher-cards with the teacher's sign-in, then the print dialog.
+  await catchPrints(page);
+  await card.getByRole('button', { name: 'Make and Print 3 Cards' }).click();
+  await expect.poll(async () => (await sheets(page)).length).toBe(1);
+  expect(cards.posts.length).toBe(1);
+  const asked = cards.posts[0];
+  expect(asked.url).toMatch(/\/functions\/v1\/teacher-cards\?forceFunctionRegion=ca-central-1$/);
+  expect(asked.headers.authorization).toBe('Bearer e2e-test-token');
+  expect(Object.keys(asked.body).sort()).toEqual(['course_id', 'items', 'request_id']);
+  expect(asked.body.course_id).toBe(CID);
+  expect(asked.body.request_id).toMatch(UUID);
+  expect(asked.body.items).toEqual([ALICE, BOB, CHARLIE].map(enrollment_id => ({ enrollment_id, replaces: null })));
+  // No RPC makes a card.
+  expect((await log(page)).filter(c => /issue/.test(c.name))).toEqual([]);
+  const [sheet] = await sheets(page);
+  expect(sheet.names).toEqual(['Alice Anderson', 'Bob Baker', 'Charlie Chen']);
+  expect(sheet.classes).toEqual(['Science 8 · Block B']);
+  expect(sheet.numbers).toEqual(['Card 1', 'Card 1', 'Card 1']);
+  sheet.codes.forEach(code => expect(code).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/));
+  // Only Charlie has no birthday or student number: only his card prints a password.
+  expect(sheet.passwords.length).toBe(1);
+  expect(sheet.passwords[0]).toMatch(/^\d{4}$/);
+
+  // Marked printed, through the outbox, with the live cards' ids.
   await expect.poll(async () => (await calls(page, 'mark_student_cards_printed')).length).toBe(1);
   const marked = (await calls(page, 'mark_student_cards_printed'))[0];
-  expect(marked.p_card_ids).toEqual((await server(page)).cards.map(c => c.id));
+  expect(marked.p_card_ids).toEqual([ALICE, BOB, CHARLIE].map(sid => cards.fake.live(sid).id));
   expect(marked.p_idempotency_key).toMatch(UUID);
   await expect(card.locator('.sc-status', { hasText: /^Printed / })).toHaveCount(3);
+  await expect(card.locator('.sc-which').first()).toHaveText(/^Card 1 · Made \w+ \d+$/);
+  await expect(card.locator('.sc-note')).toHaveText(
+    '3 cards went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
+  );
 
-  // No code or password is kept on this device.
-  const kept = await page.evaluate(() => {
-    var out = [];
-    for (var i = 0; i < localStorage.length; i++) {
-      var k = localStorage.key(i);
-      if (k !== 'e2e-s0w1-server' && /K7M-4Q|4821/.test(localStorage.getItem(k))) out.push(k);
-    }
-    return out;
-  });
-  expect(kept).toEqual([]);
+  // No code or password on the screen or anywhere on this device.
+  const shownText = await page.locator('body').innerText();
+  const kept = await heldAnywhere(page);
+  for (const code of sheet.codes.concat(sheet.passwords)) {
+    expect(shownText).not.toContain(code);
+    expect(kept).not.toContain(code);
+    expect(kept).not.toContain(code.replace('-', ''));
+  }
+
+  // Print Again prints the same; after a reload it is gone, and the server's list shows the cards printed.
+  await card.getByRole('button', { name: 'Print Again' }).click();
+  await expect.poll(async () => (await sheets(page)).length).toBe(2);
+  expect((await sheets(page))[1].codes).toEqual(sheet.codes);
+  await page.reload();
+  await expect(page.locator('.sc-card .sc-status', { hasText: /^Printed / })).toHaveCount(3);
+  await expect(page.locator('.sc-card .sc-which')).toHaveText(Array(3).fill(/^Card 1 · Made /));
+  await expect(page.locator('.sc-card').getByRole('button')).toHaveCount(0);
 
   // The sync dot is quiet, and nothing asked for a count of drafts.
   await expect(page.locator('#sync-indicator-dot').first()).toHaveClass(/idle/);
@@ -528,5 +513,115 @@ test('starting to hold grades needs a connection; stopping asks the server how m
   // The server returned it itself; no return was sent.
   expect(await calls(page, 'return_grades')).toEqual([]);
   await expect.poll(async () => (await server(page)).rows[LAB][ALICE].is_draft).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+/* A reply lost on the way back (the card-codes design, section 7): the
+   function made the cards, but the page never heard. The retry under the
+   same request id is answered as a replay with no codes; the page asks
+   again, naming those cards; fresh codes are printed. The teacher sees no
+   message, only printed cards. */
+test('Make and Print: a lost reply ends with printed cards and no message', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  const cards = await serverWithStudentPage(
+    page,
+    { course: { student_page_enabled: true, return_grades: 'on_return' } },
+    { lose: (post, n) => n === 1 },
+  );
+  await page.goto('/dashboard?manage=student-page');
+  const card = page.locator('.sc-card');
+  await expect(card.getByRole('button')).toHaveText(['Make and Print 3 Cards']);
+  await catchPrints(page);
+  await card.getByRole('button', { name: 'Make and Print 3 Cards' }).click();
+  await expect.poll(async () => (await sheets(page)).length).toBe(1);
+  // The lost one, the same one again (a replay), and one naming the cards it made.
+  expect(cards.posts.length).toBe(3);
+  expect(cards.posts[1].body).toEqual(cards.posts[0].body);
+  expect(cards.posts[2].body.request_id).not.toBe(cards.posts[0].body.request_id);
+  const firstMade = cards.fake.db.state.cards.slice(0, 3);
+  expect(cards.posts[2].body.items).toEqual(firstMade.map(k => ({ enrollment_id: k.enrollment_id, replaces: k.id })));
+  expect(firstMade.every(k => k.stopped)).toBe(true);
+  const [sheet] = await sheets(page);
+  expect(sheet.names).toEqual(['Alice Anderson', 'Bob Baker', 'Charlie Chen']);
+  expect(sheet.numbers).toEqual(['Card 2', 'Card 2', 'Card 2']);
+  await expect.poll(async () => (await calls(page, 'mark_student_cards_printed')).length).toBe(1);
+  expect((await calls(page, 'mark_student_cards_printed'))[0].p_card_ids).toEqual(
+    [ALICE, BOB, CHARLIE].map(sid => cards.fake.live(sid).id),
+  );
+  await expect(card.locator('.sc-status', { hasText: /^Printed / })).toHaveCount(3);
+  // No message but the usual line.
+  await expect(card.locator('.sc-note')).toHaveText(
+    '3 cards went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
+  );
+  await expect(page.locator('.toast, [role="alert"]')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('Make and Print offline says so and makes nothing; an answer after Class Settings closes prints nothing', async ({
+  page,
+}) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  let hold = null;
+  const cards = await serverWithStudentPage(
+    page,
+    { course: { student_page_enabled: true, return_grades: 'on_return' } },
+    { fail: (post, n) => n <= 2 },
+  );
+  await page.goto('/dashboard?manage=student-page');
+  const card = page.locator('.sc-card');
+  await catchPrints(page);
+  await card.getByRole('button', { name: 'Make and Print 3 Cards' }).click();
+  await expect(card.locator('.sc-note')).toHaveText('Could not make the cards. Check the connection and try again.');
+  expect(await sheets(page)).toEqual([]);
+  expect(cards.fake.db.state.cards).toEqual([]);
+  await expect(card.locator('.sc-which')).toHaveText(['No Card Yet', 'No Card Yet', 'No Card Yet']);
+
+  // A slow answer that lands after Class Settings has closed: nothing is printed.
+  await page.route('**/functions/v1/teacher-cards**', async route => {
+    if (route.request().method() === 'OPTIONS') return route.fallback();
+    await new Promise(r => (hold = r));
+    return route.fallback();
+  });
+  await card.getByRole('button', { name: 'Make and Print 3 Cards' }).click();
+  await expect.poll(() => !!hold).toBe(true);
+  await page.locator('[data-action="closeClassManager"]').first().click();
+  await expect(page.locator('.sc-card')).toHaveCount(0);
+  hold();
+  await expect.poll(() => cards.fake.db.state.cards.length).toBe(3);
+  await page.waitForTimeout(300);
+  expect(await sheets(page)).toEqual([]);
+  // Back on the screen: the cards that were made show Not Printed, and Make and Print replaces them.
+  await page.goto('/dashboard?manage=student-page');
+  await expect(page.locator('.sc-card .sc-status')).toHaveText(['Not Printed', 'Not Printed', 'Not Printed']);
+  await expect(page.locator('.sc-card').getByRole('button')).toHaveText(['Make and Print 3 Cards']);
+  expect(errors).toEqual([]);
+});
+
+/* The review of Nov 10: a list read again before Mark Printed reaches the
+   server must not show just-printed cards as Not Printed, or the next
+   press would replace them without asking. */
+test('Make and Print with Mark Printed held back: a list read again keeps the cards printed', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  const cards = await serverWithStudentPage(page, {
+    course: { student_page_enabled: true, return_grades: 'on_return' },
+  });
+  await page.goto('/dashboard?manage=student-page');
+  const card = page.locator('.sc-card');
+  await page.evaluate(() => (window.__e2eHoldMarks = true));
+  await catchPrints(page);
+  await card.getByRole('button', { name: 'Make and Print 3 Cards' }).click();
+  await expect.poll(async () => (await sheets(page)).length).toBe(1);
+  await expect(card.locator('.sc-status', { hasText: /^Printed / })).toHaveCount(3);
+  // The server still says Not Printed; the list is read again from it.
+  expect(cards.fake.cardsListed().every(c => c.printed_at === null)).toBe(true);
+  const reads = (await calls(page, 'list_student_cards')).length;
+  await page.evaluate(cid => StudentCards.load(cid), CID);
+  expect((await calls(page, 'list_student_cards')).length).toBe(reads + 1);
+  await expect(card.locator('.sc-status', { hasText: /^Printed / })).toHaveCount(3);
+  await expect(card.getByRole('button', { name: /^Make and Print/ })).toHaveCount(0);
+  expect(cards.posts.length).toBe(1);
   expect(errors).toEqual([]);
 });

@@ -59,7 +59,7 @@ function omarCard(more) {
   page.student = { enrollment_id: OMAR, first_name: 'Omar' };
   return sampleCard(
     TODAY,
-    Object.assign({ code: 'ABCDEF', enrollment: OMAR, first: 'Omar', birthday: null, number: '7654321', page }, more),
+    Object.assign({ code: 'ABCDEFGH', enrollment: OMAR, first: 'Omar', birthday: null, number: '7654321', page }, more),
   );
 }
 
@@ -78,11 +78,11 @@ function school(opts = {}) {
     await page.start(hash || '');
     return page;
   };
-  return { fn, store, tab, open, card: fn.state.cards.P3R8WD };
+  return { fn, store, tab, open, card: fn.state.cards.P3R8WDK4 };
 }
 
 async function signIn(dev, server) {
-  const page = await dev.open('#P3R-8WD', server);
+  const page = await dev.open('#P3R8-WDK4', server);
   page.type('#sp-ident', '0123456');
   await page.click('[data-act="card-yes"]');
   expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
@@ -122,11 +122,11 @@ describe('any recognised card signs the last student out', () => {
     await signIn(dev);
     const cece = JSON.parse(dev.store[KEY]).t;
 
-    const omar = await dev.open('#ABC-DEF');
+    const omar = await dev.open('#ABCD-EFGH');
     expect(alertText(omar)).toBe(line);
     // Cece is signed out, on the device and on the server.
     expect(omar.calls.map(c => c.body)).toEqual([
-      { route: 'card', code: 'ABCDEF' },
+      { route: 'card', code: 'ABCDEFGH' },
       { route: 'done', session: cece },
     ]);
     expect(dev.store).toEqual({});
@@ -141,7 +141,7 @@ describe('any recognised card signs the last student out', () => {
   it('a tab still showing Cece’s list is taken down by it too', async () => {
     const dev = school({ more: [omarCard({ locked: true })] });
     const first = await signIn(dev);
-    await dev.open('#ABC-DEF');
+    await dev.open('#ABCD-EFGH');
     first.fire('storage');
     expect(first.root().querySelector('.sp-row')).toBeNull();
     expect(text(first)).not.toContain('Cece');
@@ -170,7 +170,7 @@ describe('any recognised card signs the last student out', () => {
     await signIn(dev);
     const kept = dev.store[KEY];
     dev.fn.state.addressLocked = true;
-    const other = await dev.open('#ABC-DEF');
+    const other = await dev.open('#ABCD-EFGH');
     expect(alertText(other)).toBe('Too many tries. Wait 15 minutes and try again.');
     expect(dev.store[KEY]).toBe(kept);
   });
@@ -248,7 +248,7 @@ describe('before the page knows whether a code is a card or a slip, it speaks as
   it('a scanned card with no internet: one neutral line and Try Again', async () => {
     const dev = school();
     let down = true;
-    const page = await dev.open('#P3R-8WD', body => (down ? offline() : dev.fn.handle(body)));
+    const page = await dev.open('#P3R8-WDK4', body => (down ? offline() : dev.fn.handle(body)));
     // The card route did not answer, so the slip route was tried too. Neither did.
     expect(routes(page)).toEqual(['card', 'open']);
     neither(page);
@@ -279,7 +279,7 @@ describe('before the page knows whether a code is a card or a slip, it speaks as
       await sleep(20);
       return dev.fn.handle(body);
     });
-    page.T.start(page.root(), '#P3R-8WD');
+    page.T.start(page.root(), '#P3R8-WDK4');
     expect(page.root().querySelector('.sp-head-title').textContent).toBe('FullVision');
     expect(text(page)).not.toMatch(/Student Questions|Student Page|slip|card/i);
     await page.settle();
@@ -303,7 +303,9 @@ describe('before the page knows whether a code is a card or a slip, it speaks as
     async (name, says) => {
       const dev = school();
       let broken = true;
-      const page = await dev.open('#P3R-8WD', body => (broken && body.route === 'card' ? says() : dev.fn.handle(body)));
+      const page = await dev.open('#P3R8-WDK4', body =>
+        broken && body.route === 'card' ? says() : dev.fn.handle(body),
+      );
       expect(routes(page)).toEqual(['card', 'open']);
       neither(page);
       expect(text(page)).not.toContain("didn't work");
@@ -358,7 +360,10 @@ describe('before the page knows whether a code is a card or a slip, it speaks as
       ['busy', 'FullVision is busy right now. Wait a minute and try again.'],
     ]) {
       const dev = school();
-      const page = await dev.open('#P3R-8WD', body => ({ ok: false, error: body.route === 'card' ? 'server' : error }));
+      const page = await dev.open('#P3R8-WDK4', body => ({
+        ok: false,
+        error: body.route === 'card' ? 'server' : error,
+      }));
       expect(alertText(page), error).toBe(line);
       expect(page.root().querySelector('.sp-head-title').textContent).toBe('FullVision');
       expect(text(page)).not.toMatch(/slip|card|Student Questions/i);
@@ -371,7 +376,7 @@ describe('before the page knows whether a code is a card or a slip, it speaks as
     const first = await signIn(dev);
     await first.click('[data-act="card-done"]');
     first.server = body => (body.route === 'card' ? { ok: false, error: 'server' } : dev.fn.handle(body));
-    first.type('#sp-code', 'P3R-8WD');
+    first.type('#sp-code', 'P3R8-WDK4');
     await first.submit('form[data-form="card"]');
     expect(alertText(first)).toBe(UNREACHED);
     expect(first.root().querySelector('form[data-form="card"]')).toBeTruthy();
@@ -460,7 +465,7 @@ describe('before the page knows whether a code is a card or a slip, it speaks as
   it('the address is locked for cards and the slip route can’t be reached: still neither', async () => {
     const dev = school();
     dev.fn.state.addressLocked = true;
-    const page = await dev.open('#P3R-8WD', body => (body.route === 'open' ? offline() : dev.fn.handle(body)));
+    const page = await dev.open('#P3R8-WDK4', body => (body.route === 'open' ? offline() : dev.fn.handle(body)));
     expect(routes(page)).toEqual(['card', 'open']);
     neither(page);
   });
@@ -468,7 +473,7 @@ describe('before the page knows whether a code is a card or a slip, it speaks as
   it('the address is locked for cards and the code opens no slip: Too many tries, as neither’s', async () => {
     const dev = school();
     dev.fn.state.addressLocked = true;
-    const page = await dev.open('#P3R-8WD');
+    const page = await dev.open('#P3R8-WDK4');
     expect(alertText(page)).toBe('Too many tries. Wait 15 minutes and try again.');
     expect(page.root().querySelector('.sp-head-title').textContent).toBe('FullVision');
     expect(text(page)).not.toMatch(/slip|Student Questions/i);
@@ -490,7 +495,7 @@ describe('a reply for a card or a session that is no longer the current one is d
     const watch = setInterval(() => drawn.push(text(tab).includes('Energy Transfer Investigation')), 5);
     tab.T.start(tab.root(), ''); // the device is signed in: Cece's page is asked for
     await tab.tick();
-    tab.T.start(tab.root(), '#ABC-DEF'); // the address changes to Omar's code
+    tab.T.start(tab.root(), '#ABCD-EFGH'); // the address changes to Omar's code
     await sleep(120);
     expect(text(tab)).not.toContain('Energy Transfer Investigation');
     expect(text(tab)).not.toContain('8 / 10');
@@ -529,7 +534,7 @@ describe('a reply for a card or a session that is no longer the current one is d
     const dev = school();
     let release;
     const gate = new Promise(r => (release = r));
-    const tab = await dev.open('#P3R-8WD', async body => {
+    const tab = await dev.open('#P3R8-WDK4', async body => {
       if (body.route === 'verify') await gate;
       return dev.fn.handle(body);
     });
@@ -551,14 +556,14 @@ describe('a reply for a card or a session that is no longer the current one is d
     const dev = school({ more: [omarCard()] });
     let release;
     const gate = new Promise(r => (release = r));
-    const tab = await dev.open('#P3R-8WD', async body => {
-      if (body.route === 'verify' && body.code === 'P3R8WD') await gate;
+    const tab = await dev.open('#P3R8-WDK4', async body => {
+      if (body.route === 'verify' && body.code === 'P3R8WDK4') await gate;
       return dev.fn.handle(body);
     });
     tab.type('#sp-ident', '0123456');
     tab.tap('[data-act="card-yes"]');
     await tab.tick();
-    tab.type('#sp-code', 'ABC-DEF');
+    tab.type('#sp-code', 'ABCD-EFGH');
     tab.send('form[data-form="card"]');
     await sleep(80); // Cece's check is still held up
     expect(tab.root().querySelector('.sp-big').textContent).toBe('Is this you, Omar?');
@@ -581,7 +586,7 @@ describe('a reply for a card or a session that is no longer the current one is d
     });
     tab.T.start(tab.root(), '#K7M-4QX');
     await sleep(30);
-    tab.T.start(tab.root(), '#P3R-8WD');
+    tab.T.start(tab.root(), '#P3R8-WDK4');
     await sleep(80); // the slip's reply is still held up
     expect(tab.root().querySelector('.sp-big').textContent).toBe('Is this you, Cece?');
     release();
@@ -1106,7 +1111,7 @@ describe('"opened" means the row was on screen in a visible tab', () => {
     const dev = school();
     const page = dev.tab();
     page.net.fail = src => /calc\.js$/.test(src);
-    await page.start('#P3R-8WD');
+    await page.start('#P3R8-WDK4');
     page.type('#sp-ident', '0123456');
     await page.click('[data-act="card-yes"]');
     expect(page.root().querySelector('.sp-no-results')).toBeTruthy();
@@ -1176,7 +1181,7 @@ describe('"opened" means the row was on screen in a visible tab', () => {
     const dev = school();
     const page = openStudentPage({ store: dev.store, noObserver: true });
     page.server = body => dev.fn.handle(body);
-    await page.start('#P3R-8WD');
+    await page.start('#P3R8-WDK4');
     page.type('#sp-ident', '0123456');
     await page.click('[data-act="card-yes"]');
     await readFor(page, 2000);
@@ -1289,7 +1294,7 @@ describe('a DIBELS benchmark on a student’s page', () => {
 describe('Is This You? says a wrong answer where a screen reader will read it', () => {
   it('the fields point at the message, and are marked wrong', async () => {
     const dev = school();
-    const page = await dev.open('#P3R-8WD');
+    const page = await dev.open('#P3R8-WDK4');
     const field = sel => page.root().querySelector(sel);
     expect(field('#sp-ident').hasAttribute('aria-describedby')).toBe(false);
     page.type('#sp-ident', '999');

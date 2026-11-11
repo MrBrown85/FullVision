@@ -4,20 +4,29 @@
  * e2e/student-card-wired.spec.js.
  *
  * The handler and its routes are the real ones
- * (supabase/functions/student-submit/handler.ts and card-routes.ts): the
- * request's shape is checked, the reply is copied field by field, and a
- * refusal is passed on or turned into not_found exactly as when deployed.
- * Only Postgres is replaced. The stand-in answers each student_submit
- * function the way the applied SQL does
- * (migrations/2026110904_student_sessions_page.sql): a card is looked up by
- * its code, five wrong answers in a row lock it, a right answer from the
- * start screen starts a new session and ends the one sent, a session ends
- * at its time or on Done, and page() is refused once the card or the class
- * can no longer open.
+ * (supabase/functions/student-submit/handler.ts and card-routes.ts), with a
+ * made-up card key: the request's shape is checked, a card's code is turned
+ * into its tag, the reply is copied field by field, and a refusal is passed
+ * on or turned into not_found exactly as when deployed. Only Postgres is
+ * replaced. The stand-in answers each student_submit function the way the
+ * SQL does after S3-M1: a card is found by the tag of its code, five wrong
+ * answers in a row lock it, a replaced card answers card_stopped, a right
+ * answer from the start screen starts a new session and ends the one sent,
+ * a session ends at its time or on Done, and page() is refused once the
+ * card or the class can no longer open.
+ *
+ * A card's code is eight characters (P3R8-WDK4). The database is handed a
+ * tag of the code and never the code, and a typed card password as a tag
+ * too; the stand-in refuses anything else, so a code or a password that
+ * ever reached the database would fail the test that sent it. A code that
+ * is not eight characters is not_found without the database being asked,
+ * so a card here cannot be given any other length.
  *
  * Nothing here reaches a real database or a real function.
  */
+import { readCardKey } from '../../supabase/functions/_shared/card-key.ts';
 import { makeHandler } from '../../supabase/functions/student-submit/handler.ts';
+import { FAKE_KEY, codeTag, passwordTag } from './card-key-fake.js';
 
 const clone = v => JSON.parse(JSON.stringify(v));
 const no = (error, more) => Object.assign({ ok: false, error }, more);
@@ -189,7 +198,7 @@ export function samplePage(today, system) {
 export function sampleCard(today, more) {
   return Object.assign(
     {
-      code: 'P3R8WD',
+      code: 'P3R8WDK4', // printed P3R8-WDK4
       enrollment: CECE,
       first: 'Cece',
       course: { name: 'Science 8', block: 'B' },
@@ -214,13 +223,20 @@ export function sampleCard(today, more) {
  *   slips     { code: what student_submit.open answers }
  *   now       () => milliseconds; the database's clock
  *   lasts     how long a new session lasts, in milliseconds (default 6 hours)
+ *   cardKey   what STUDENT_CARD_KEY is set to. Left out, a made-up key.
+ *             null is no key; a string that is not 64 hex characters is a
+ *             malformed one.
  * Returns { handle(body, headers) → the reply's JSON, respond(body) →
  * { status, json }, state, sql, logs }. `state` can be changed between
- * calls: state.cards.P3R8WD.locked = true, state.addressLocked = true,
- * state.down = true (the database is unreachable).
+ * calls: state.cards.P3R8WDK4.locked = true, state.addressLocked = true,
+ * state.down = true (the database is unreachable). A card is added the same
+ * way: state.cards.K7M4QX2P = sampleCard(today, { code: 'K7M4QX2P' }).
  */
 export function fakeStudentSubmit(opts = {}) {
   const now = opts.now || (() => Date.now());
+  for (const k of opts.cards || []) {
+    if (norm(k.code).length !== 8) throw new Error('fakeStudentSubmit: a card’s code is eight characters');
+  }
   const state = {
     cards: {},
     slips: Object.assign({}, opts.slips),
@@ -258,11 +274,24 @@ export function fakeStudentSubmit(opts = {}) {
   };
   const refusal = k =>
     k.stopped ? 'card_stopped' : k.withdrawn ? 'not_found' : k.closed ? 'closed' : k.expired ? 'card_expired' : null;
-  const lookup = code => {
+  const isTag = v => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v);
+  /* `tag` is the tag of a code. The stand-in knows the made-up key, so it
+     can tell which card a tag names (the real database cannot; it compares
+     the tag with the one it stored). Anything that is not a tag is refused,
+     as the real functions refuse it, so a code that reached the database
+     would fail the test that sent it. */
+  const lookup = tag => {
+    if (!isTag(tag)) throw new Error('the database was handed something that is not a tag');
     if (state.addressLocked) return { error: 'locked' };
-    const k = state.cards[norm(code)];
-    if (!/^[ABCDEFGHJKMNPQRTUVWXYZ2346789]{6}$/.test(norm(code)) || !k || k.stopped) return { error: 'not_found' };
+    const k = Object.values(state.cards).find(c => codeTag(c.code) === tag);
+    if (!k) return { error: 'not_found' };
+    // A replaced card says so (Colin, Nov 10).
     return refusal(k) ? { error: refusal(k) } : k.locked ? { error: 'card_locked' } : { card: k };
+  };
+  // The card's own password, as a tag bound to the card. No password typed is nothing at all.
+  const passwordRight = (k, tag) => {
+    if (tag != null && !isTag(tag)) throw new Error('the database was handed a password that is not a tag');
+    return !!k.password && tag === passwordTag(k.code, norm(k.password));
   };
   const classes = s =>
     Object.keys(s.cards)
@@ -277,9 +306,12 @@ export function fakeStudentSubmit(opts = {}) {
     return refusal(k) ? { error: refusal(k) } : { session: s, card: k };
   };
 
+  /* Each function takes the parameters its statement sends, in order, less
+     the key id (taken off below): card and verify_card take the code's tag
+     first. */
   const fns = {
-    card(code) {
-      const found = lookup(code);
+    card(tag) {
+      const found = lookup(tag);
       if (found.error) return no(found.error);
       const k = found.card;
       if (!k.birthday && !k.number && !k.password) return no('reprint');
@@ -293,15 +325,15 @@ export function fakeStudentSubmit(opts = {}) {
         also_password: identity && !!k.password,
       };
     },
-    verify_card(code, birthday, number, password, token, hash, add) {
-      const found = lookup(code);
+    verify_card(tag, birthday, number, password, token, hash, add) {
+      const found = lookup(tag);
       if (found.error) return no(found.error);
       const k = found.card;
       if (!k.birthday && !k.number && !k.password) return no('reprint');
       const right =
         (k.birthday && birthday === k.birthday) ||
         (k.number && norm(number) === norm(k.number)) ||
-        (k.password && norm(password) === norm(k.password));
+        passwordRight(k, password);
       if (!right) {
         k.wrong += 1;
         if (k.wrong >= 5) {
@@ -364,7 +396,7 @@ export function fakeStudentSubmit(opts = {}) {
     if (name !== 'open') return clone(state.slipAnswers[name]);
     return state.slips[norm(code)] ? clone(state.slips[norm(code)]) : no('not_found');
   };
-  const handler = makeHandler({
+  const options = {
     region: 'ca-central-1',
     ipKey: 'test-key',
     log: entry => logs.push(entry),
@@ -378,13 +410,25 @@ export function fakeStudentSubmit(opts = {}) {
         const fn = /^select student_submit\.(\w+)\(/.exec(text)[1];
         const add = /, p_add => (true|false)\) as r$/.exec(text);
         sql.push({ fn, params: params.slice(0, -1), add: add ? add[1] === 'true' : undefined });
-        return fns[fn](...params, add ? add[1] === 'true' : undefined);
+        const args = [...params, add ? add[1] === 'true' : undefined];
+        // card and verify_card take the key id second. The stand-in only checks it is one.
+        if (fn === 'card' || fn === 'verify_card') {
+          if (!/^[0-9a-f]{8}$/.test(String(args[1]))) throw new Error('the database was handed no key id');
+          args.splice(1, 1);
+        }
+        return fns[fn](...args);
       },
     },
-  });
+  };
+  // Reading the key is not instant, so the handler is ready a moment after the fake is made.
+  const handler = readCardKey(opts.cardKey === undefined ? FAKE_KEY : opts.cardKey).then(cardKey =>
+    makeHandler({ ...options, cardKey }),
+  );
 
   const respond = async (body, headers) => {
-    const res = await handler(
+    const res = await (
+      await handler
+    )(
       new Request('https://x.supabase.co/functions/v1/student-submit?forceFunctionRegion=ca-central-1', {
         method: 'POST',
         headers: Object.assign(
