@@ -12,7 +12,9 @@
 -- before. PART 1b puts the permissions back.
 --
 -- PART 2, THE FULL REMOVAL. Everything C1 made goes: the three tables, the
--- two course columns, the four triggers, every function. IT DELETES
+-- two course columns, the four triggers, every function; and Batch B's
+-- student_submit._grading_started is put back exactly as Batch B made it
+-- (so marks no longer count as grading started; there are none left). IT DELETES
 -- TEACHERS' MARKS, REVISION REQUESTS AND STUDENTS' REFLECTIONS. It refuses
 -- while any of the three tables holds a row, unless the session first says
 -- so:  set fv.batch_c_undo = 'discard';
@@ -86,6 +88,20 @@ begin
     end if;
 end
 $guard$;
+-- Batch B's _grading_started, as 2026111101 made it (its text, unchanged).
+create or replace function student_submit._grading_started(p_enrollment_id uuid, p_assessment_id uuid)
+ returns boolean
+ language sql
+ stable
+ security definer
+ set search_path to 'public', 'student_submit', 'pg_temp'
+as $function$
+    select coalesce((select g.is_draft or g.returned_at is not null
+                       from grade_return g
+                      where g.enrollment_id = p_enrollment_id and g.assessment_id = p_assessment_id
+                        -- a DIBELS benchmark has no Draft and no Returned (2026110905)
+                        and not exists (select 1 from assessment a where a.id = p_assessment_id and a.score_mode = 'dibels')), false);
+$function$;
 drop trigger if exists work_feedback_gone on public.enrollment;
 drop trigger if exists work_feedback_gone on public.assessment;
 drop trigger if exists work_feedback_truncate on public.enrollment;
@@ -125,11 +141,24 @@ drop table if exists public.revision_request;
 drop table if exists public.markup;
 alter table public.course drop column if exists reflect_on_feedback, drop column if exists show_my_learning;
 do $final$
+declare
+    _f record;
 begin
     if exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                 where (n.nspname, p.proname) in (('public', 'save_markup'), ('student_submit', 'revision_start'), ('public', '_markup_give'))) then
         raise exception 'something of C1 is left. Nothing was changed.';
     end if;
+    for _f in
+        select * from (values
+            -- FINGERPRINTS-BEGIN replbefore (written by migrations/local-test/batch_c_fingerprints.py)
+            ('student_submit._grading_started(uuid,uuid)', '720b9f044b853b5c57b04bec7f59010c')
+            -- FINGERPRINTS-END
+        ) as v(fn, md5)
+    loop
+        if coalesce(md5(pg_get_functiondef(to_regprocedure(_f.fn))), 'absent') <> _f.md5 then
+            raise exception '% is not as Batch B made it. Nothing was changed.', _f.fn;
+        end if;
+    end loop;
 end
 $final$;
 notify pgrst, 'reload schema';

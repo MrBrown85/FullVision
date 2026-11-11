@@ -5,7 +5,7 @@ gradebook-prod will be once Batch B is applied (batch_c_common.build).
     PGDATABASE=<template> BATCH_B_DIR=<Batch B's migrations/> python3 batch_c.py            every scenario
     PGDATABASE=...                                            python3 batch_c.py teacher    only those named
 
-Scenarios: apply1 teacher markup reflect revision group grants race apply2 hide given
+Scenarios: apply1 teacher markup started reflect revision group grants race apply2 hide given
 """
 import threading, time
 from batch_c_common import *
@@ -61,6 +61,7 @@ def apply1():
             ('a name taken', "create function public.save_markup(p_file_id uuid, p_marks jsonb, p_base_rev integer, p_idempotency_key uuid) returns jsonb language sql as $f$ select null::jsonb $f$", 'drop function public.save_markup(uuid, jsonb, integer, uuid)'),
             ('a column taken', 'alter table public.course add column show_my_learning boolean', 'alter table public.course drop column show_my_learning'),
             ('a trigger name taken', "create trigger work_feedback_gone after delete on public.enrollment for each row execute function public._submission_gone()", 'drop trigger work_feedback_gone on public.enrollment'),
+            ("Batch B's _grading_started changed", "create or replace function student_submit._grading_started(p_enrollment_id uuid, p_assessment_id uuid) returns boolean language sql stable security definer set search_path to 'public', 'student_submit', 'pg_temp' as $f$ select false; $f$", None),
         ]:
             snap = d.one('select md5(pg_get_functiondef(%s))' % ("'public._work_hold()'::regprocedure" if 'Batch B function' in name else "'public._grade_return_holds(uuid)'::regprocedure"))
             d.begin(); d.run(sql)
@@ -75,16 +76,25 @@ def apply1():
         d.begin(); d.run("create or replace function public._work_hold() returns interval language sql stable set search_path to 'public', 'pg_temp' as $f$ select interval '2 hours' ; $f$")
         ok('apply1: the pre-check notices a changed function', any('_work_hold' in str(r) for r in postcheck(d, 'batch-c1-live-precheck.sql')))
         d.rollback()
+        d.begin(); d.run("create or replace function student_submit._grading_started(p_enrollment_id uuid, p_assessment_id uuid) returns boolean language sql stable security definer set search_path to 'public', 'student_submit', 'pg_temp' as $f$ select false; $f$")
+        ok("apply1: the pre-check notices Batch B's _grading_started changed", any('_grading_started' in str(r) for r in postcheck(d, 'batch-c1-live-precheck.sql')))
+        d.rollback()
         # the apply
         r = d.apply1(); ok('apply1: the file applies', r == 'ok', r)
         after = catalog(d.c)
         gone, new = differences(before, after)
         # nothing that existed is changed: the only lines gone are counts that grew
-        allowed_gone = [l for l in gone if not (l.startswith('depends ') or l.startswith('comments on ') or l.startswith('internal triggers submission_file '))]
-        ok('apply1: no existing catalog line changes (functions, triggers, policies, grants, columns, constraints)', allowed_gone == [], allowed_gone[:5])
-        ok('apply1: every existing function keeps its fingerprint',
-           [l for l in before if l.startswith('function ')] == [l for l in after if l.startswith('function ') and any(l.split(' | ')[0] == b.split(' | ')[0] for b in before if b.startswith('function '))])
-        newfns = sorted(l.split(' ')[1].split(' |')[0] for l in new if l.startswith('function ') and not l.startswith('function more'))
+        # but Batch B's _grading_started, the one function C1 replaces (section 2b)
+        replaced = lambda l: '_grading_started(' in l
+        allowed_gone = [l for l in gone if not (l.startswith('depends ') or l.startswith('comments on ') or l.startswith('internal triggers submission_file ') or replaced(l))]
+        ok('apply1: no existing catalog line changes (functions, triggers, policies, grants, columns, constraints), but the one replaced function', allowed_gone == [], allowed_gone[:5])
+        ok('apply1: of _grading_started only its body changed (owner, grants, settings, arguments, result as Batch B made them)',
+           sorted(l.split(' | ')[0] for l in gone if replaced(l)) == sorted(l.split(' | ')[0] for l in new if replaced(l))
+           and [l for l in gone if replaced(l) and l.startswith('function student')][0].split(' | ')[3:] == [l for l in new if replaced(l) and l.startswith('function student')][0].split(' | ')[3:],
+           [l for l in gone + new if replaced(l)])
+        ok('apply1: every existing function but _grading_started keeps its fingerprint',
+           [l for l in before if l.startswith('function ') and not replaced(l)] == [l for l in after if l.startswith('function ') and not replaced(l) and any(l.split(' | ')[0] == b.split(' | ')[0] for b in before if b.startswith('function '))])
+        newfns = sorted(l.split(' ')[1].split(' |')[0] for l in new if l.startswith('function ') and not l.startswith('function more') and not replaced(l))
         ok('apply1: exactly the %d functions of C1 are new' % len(C1_FUNCTIONS), len(newfns) == len(C1_FUNCTIONS), (len(newfns), newfns[:3]))
         ok('apply1: no row of any existing table changes in any column it had', row_checksums(d.c, cols) == rows,
            [t for t in rows if row_checksums(d.c, {t: cols[t]})[t] != rows[t]])
@@ -98,7 +108,9 @@ def apply1():
                           ('a table readable', 'grant select on public.feedback_reflection to authenticated'),
                           ('a trigger off', 'alter table public.enrollment disable trigger work_feedback_gone'),
                           ('a helper granted', 'grant execute on function public._markup_give(uuid, uuid) to service_role'),
-                          ('a function changed', "create or replace function public._revision_hide_available() returns boolean language sql immutable set search_path to 'public', 'pg_temp' as $f$ select true; $f$")]:
+                          ('a function changed', "create or replace function public._revision_hide_available() returns boolean language sql immutable set search_path to 'public', 'pg_temp' as $f$ select true; $f$"),
+                          ('the replaced _grading_started changed', "create or replace function student_submit._grading_started(p_enrollment_id uuid, p_assessment_id uuid) returns boolean language sql stable security definer set search_path to 'public', 'student_submit', 'pg_temp' as $f$ select false; $f$"),
+                          ('the replaced _grading_started granted', 'grant execute on function student_submit._grading_started(uuid, uuid) to service_role')]:
             d.begin(); d.run(sql)
             ok('apply1: the post-check notices ' + name, postcheck(d, 'batch-c1-live-postcheck.sql') != [])
             d.rollback()
@@ -119,9 +131,15 @@ def apply1():
            bare(sts[0]).endswith('begin') and 'lock_timeout' in sts[1] and sts[2].startswith('do $guard$') and bare(sts[-1]) == 'commit')
         # the file never changes an existing object by name
         body = bare(text_at(C1_USED)).lower()
-        ok('apply1: the file replaces no existing function (every create or replace names a new one)',
-           all(fn.split('(')[0].lower() in [f.split('(')[0].lower() for f in C1_FUNCTIONS]
-               for fn in re.findall(r'create or replace function ([\w.]+)\(', body)))
+        ok('apply1: the file replaces no existing function but _grading_started (every other create or replace names a new one)',
+           sorted(fn for fn in re.findall(r'create or replace function ([\w.]+)\(', body)
+                  if fn.split('(')[0].lower() not in [f.split('(')[0].lower() for f in C1_FUNCTIONS]) == ['student_submit._grading_started'])
+        b_text = open(B1).read()
+        b_body = b_text[b_text.index('create or replace function student_submit._grading_started'):]
+        b_body = b_body[:b_body.index('$function$;')].rstrip().rstrip(';')
+        c_text = text_at(C1_USED)
+        ok("apply1: C1's _grading_started is Batch B's text, unchanged, with one condition added after it",
+           b_body in c_text and 'or exists (select 1 from markup m' in c_text[c_text.index(b_body):c_text.index(b_body) + len(b_body) + 300])
         top = [bare(x).lower() for x in split(text_at(C1_USED))]
         ok('apply1: no statement of the file writes a row (only its functions, when called, do)',
            not [x for x in top if re.match(r'(update|delete|insert|truncate|merge)\b', x)], [x[:60] for x in top if re.match(r'(update|delete|insert)', x)])
@@ -281,14 +299,95 @@ def markup():
         d.run('update course set student_page_enabled = true where id = :c', c=COURSE_A)
         # the photo is never touched
         ok('markup: the stored page is unchanged by marks', d.one('select sha256 from submission_file where id = :f', f=files[0]) == HASH)
-        # Unsend takes the marks (and the student cannot unsend once graded anyway)
+        # Marks count as grading started (C1 2b): no Unsend while a mark is on the page; once every mark
+        # is erased, Unsend takes the page and its (empty) marks row
         d.save_markup(files2[0], marks('on two'))
-        ok('markup: marks on unsent work', d.one('select count(*) from markup where file_id = :f', f=files2[0]) == 1)
+        ok('markup: marks on work not yet graded', d.one('select count(*) from markup where file_id = :f', f=files2[0]) == 1)
         r = d.service("student_submit.unsend(:t, :e, :a, 'ip-1')", t=t2, e=ENR2, a=k['lab'])
-        ok('markup: Unsend before grading takes the page and its marks', r.get('unsent') and d.one('select count(*) from markup where file_id = :f', f=files2[0]) == 0, r)
+        ok('markup: Unsend of a marked-up page is refused as grading started, and the page and marks stay',
+           r == {'ok': False, 'error': 'grading_started'} and d.one('select count(*) from markup where file_id = :f', f=files2[0]) == 1, r)
+        d.save_markup(files2[0], {'v': 1, 'marks': []})
+        r = d.service("student_submit.unsend(:t, :e, :a, 'ip-1')", t=t2, e=ENR2, a=k['lab'])
+        ok('markup: every mark erased, Unsend takes the page and its marks row', r.get('unsent') and d.one('select count(*) from markup where file_id = :f', f=files2[0]) == 0, r)
         # a student deleted: marks go
         d.run('delete from enrollment where id = :e', e=ENR1)
         ok('markup: deleting a student takes their marks', d.one('select count(*) from markup') == 0)
+    finally:
+        d.close()
+
+# ── started: the teacher's marks count as grading started (C1 2b) ──────────
+def started():
+    d = scenario_db('started')
+    try:
+        k = seed(d); t1 = d.session(ENR1); t2 = d.session(ENR2, '2012-06-16')
+        gs = lambda e, a: d.one('select student_submit._grading_started(:e, :a)', e=e, a=a)
+        work = lambda t, e, a: next(x for x in d.service("student_submit.work(:t, :e, 'ip-1')", t=t, e=e)['assessments'] if x['id'] == a)
+        sub, files = d.send(t1, ENR1, k['lab'], 2)
+        # no grade, no marks: not started, as Batch B had it
+        ok('started: no grade and no marks: not started', gs(ENR1, k['lab']) is False)
+        ok("started: Batch B's work says the same (and Unsend and Replace are offered)", work(t1, ENR1, k['lab'])['sent']['grading'] is False and work(t1, ENR1, k['lab'])['sent']['can_change'] is True, work(t1, ENR1, k['lab']))
+        # one mark on one page: started
+        d.save_markup(files[1], marks(pen=1))
+        ok('started: one pen mark on one page: started', gs(ENR1, k['lab']) is True)
+        ok("started: Batch B's work says grading, and offers no Unsend or Replace", work(t1, ENR1, k['lab'])['sent']['grading'] is True and work(t1, ENR1, k['lab'])['sent']['can_change'] is False)
+        ok("started: not for another student of the piece", gs(ENR2, k['lab']) is False)
+        ok("started: not for the same student's other piece", gs(ENR1, k['rub']) is False)
+        rows0 = fingerprint_rows(d); n_files = d.one('select count(*) from submission_file')
+        r = d.service("student_submit.unsend(:t, :e, :a, 'ip-1')", t=t1, e=ENR1, a=k['lab'])
+        ok('started: Unsend is refused as grading_started', r == {'ok': False, 'error': 'grading_started'}, r)
+        s = d.service("student_submit.replace(:t, :e, :a, :p::jsonb, null, null, :r, 'ip-1')", t=t1, e=ENR1, a=k['lab'],
+                      p='[{"width": 10, "height": 10}]', r=nid())
+        ok('started: Replace is refused as grading_started', s == {'ok': False, 'error': 'grading_started'}, s)
+        ok('started: nothing was removed and no grade row changed', d.one('select count(*) from submission_file') == n_files
+           and d.one('select count(*) from markup') == 1 and fingerprint_rows(d) == rows0)
+        # a Replace already uploading when the teacher marks: its finish is refused and only its new pages go
+        d.save_markup(files[1], {'v': 1, 'marks': []})
+        ok('started: every mark erased: not started again', gs(ENR1, k['lab']) is False)
+        s = d.service("student_submit.replace(:t, :e, :a, :p::jsonb, null, null, :r, 'ip-1')", t=t1, e=ENR1, a=k['lab'],
+                      p='[{"width": 10, "height": 10}]', r=nid())
+        ok('started: with no mark left, Replace starts', s.get('ok'), s)
+        d.upload(s['files'])
+        d.save_markup(files[0], marks('Look again here'))
+        f = d.service("student_submit.send_finish(:t, :e, :s, :f::jsonb, 'ip-1')", t=t1, e=ENR1, s=s['submission_id'],
+                      f=json.dumps([{'file_id': x['file_id'], 'sha256': HASH} for x in s['files']]))
+        ok('started: a Replace finishing after the teacher marked is refused as grading_started', f == {'ok': False, 'error': 'grading_started'}, f)
+        ok('started: and the marked work and its marks stay', d.one("select count(*) from submission where id = :s and state = 'sent'", s=sub) == 1
+           and d.one('select count(*) from submission_file where submission_id = :s', s=sub) == 2
+           and d.one("select working->'marks'->0->>'text' from markup where file_id = :f", f=files[0]) == 'Look again here')
+        # a marked-up page given back with the work still counts (given or not)
+        d.score(ENR1, k['lab'], 7); d.return_work(k['lab'], [ENR1])
+        d.run("delete from grade_return where enrollment_id = :e and assessment_id = :a", e=ENR1, a=k['lab'])
+        ok('started: marks already given count too', gs(ENR1, k['lab']) is True)
+        # group work: a group-mate's marked pages do not lock this student's own
+        d.run("update assessment set group_work = 'group', collab_mode = 'groups', "
+              "collab_config = jsonb_build_object('groups', jsonb_build_array(jsonb_build_array(:a::text, :b::text))) where id = :p",
+              a=ENR1, b=ENR2, p=k['rub'])
+        g1, gf1 = d.send(t1, ENR1, k['rub'], 1); g2, gf2 = d.send(t2, ENR2, k['rub'], 1)
+        d.save_markup(gf2[0], marks('on the mate'))
+        r = d.service("student_submit.unsend(:t, :e, :a, 'ip-1')", t=t1, e=ENR1, a=k['rub'])
+        ok("started: marks on a group-mate's pages do not stop this student's Unsend", r.get('unsent') is True, r)
+        r = d.service("student_submit.unsend(:t, :e, :a, 'ip-1')", t=t2, e=ENR2, a=k['rub'])
+        ok("started: the marked group-mate's own Unsend is refused", r == {'ok': False, 'error': 'grading_started'}, r)
+        # the old rule stands beside it: a draft alone still counts, a DIBELS piece's grade does not
+        ok('started: a draft with no marks still counts (ruling 83)', (d.score(ENR2, k['lab'], 3), gs(ENR2, k['lab']))[1] is True)
+        # a revision: marks on its pages count as grading it, so it cannot be unsent or sent again over them
+        d.send(t2, ENR2, k['lab'], 1); d.return_work(k['lab'], [ENR2])
+        ok('started: a revision is asked', d.rfr(k['lab'], ENR2, {'what_to_fix': 'Add a third reason.'})['result'] == 'made')
+        rs, rf = d.revise(t2, ENR2, k['lab'])
+        ok('started: the revision is in', rf.get('ok'), rf)
+        req = d.one('select id from revision_request where enrollment_id = :e and assessment_id = :a', e=ENR2, a=k['lab'])
+        ok('started: before marks the revision is sent', d.one('select public._revision_state(:r)', r=req)['state'] == 'sent')
+        d.save_markup(rs['files'][0]['file_id'], marks('On the revision'))
+        ok("started: a mark on the revision's page: its state is grading", d.one('select public._revision_state(:r)', r=req)['state'] == 'grading')
+        r = d.service("student_submit.revision_unsend(:t, :e, :a, 'ip-1')", t=t2, e=ENR2, a=k['lab'])
+        ok('started: revision_unsend is refused as grading_started', r == {'ok': False, 'error': 'grading_started'}, r)
+        ok('started: revision_start is refused as grading_started', d.rev_start(t2, ENR2, k['lab']) == {'ok': False, 'error': 'grading_started'})
+        d.save_markup(rs['files'][0]['file_id'], {'v': 1, 'marks': []})
+        ok("started: the revision's marks erased: sent again", d.one('select public._revision_state(:r)', r=req)['state'] == 'sent')
+        r = d.service("student_submit.revision_unsend(:t, :e, :a, 'ip-1')", t=t2, e=ENR2, a=k['lab'])
+        ok('started: and revision_unsend works', r.get('unsent') is True, r)
+        ok('started: the helper stays granted to nobody', not any(d.one("select has_function_privilege(:r, 'student_submit._grading_started(uuid,uuid)'::regprocedure, 'execute')", r=r)
+                                                                for r in ('anon', 'authenticated', 'service_role')))
     finally:
         d.close()
 
@@ -836,7 +935,7 @@ def given():
     finally:
         d.close()
 
-SCENARIOS = {'apply1': apply1, 'teacher': teacher, 'markup': markup, 'reflect': reflect, 'revision': revision, 'group': group,
+SCENARIOS = {'apply1': apply1, 'teacher': teacher, 'markup': markup, 'started': started, 'reflect': reflect, 'revision': revision, 'group': group,
              'grants': grants, 'race': race, 'apply2': apply2, 'hide': hide, 'given': given}
 if __name__ == '__main__':
     for name in (sys.argv[1:] or list(SCENARIOS)):

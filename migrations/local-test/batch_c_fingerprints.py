@@ -14,6 +14,9 @@ as rows of a VALUES list. <which>:
                                          the three it replaces, after C1 alone and after C2
     c2new      (fn, becomes)             the four functions C2 leaves
     c1stand    (fn, md5)                 the three C2 replaces, as C1 leaves them (C2's undo)
+    replaces   (fn, before, becomes)     the existing function C1 replaces, before C1 and after it
+    replbefore (fn, md5)                 the same, before C1 (the pre-check; C1's undo puts it back)
+    replafter  (fn, md5)                 the same, after C1 (the post-check)
 
 The values come from copies of the template with each file applied, its own
 lists stood aside for that apply. md5(pg_get_functiondef) does not depend on them.
@@ -27,13 +30,13 @@ BEGIN = re.compile(r'^([ \t]*)-- FINGERPRINTS-BEGIN[ \t]*(\w*)[^\n]*$', re.M)
 def measured():
     d = CDb('fp')
     try:
-        relied = fingerprints(d, C1_RELIED)
+        relied = fingerprints(d, C1_RELIED + C1_REPLACES)
         r = d.statements(split(neutral(text_at(C1))))
         if r != 'ok': sys.exit('C1 does not apply: ' + r)
-        after1 = fingerprints(d, C1_FUNCTIONS + C2_RELIED + C2_NEW)
+        after1 = fingerprints(d, C1_FUNCTIONS + C1_REPLACES + C2_RELIED + C2_NEW)
         r = d.statements(split(neutral(text_at(C2))))
         if r != 'ok': sys.exit('C2 does not apply: ' + r)
-        after2 = fingerprints(d, C1_FUNCTIONS + C2_RELIED + C2_NEW)
+        after2 = fingerprints(d, C1_FUNCTIONS + C1_REPLACES + C2_RELIED + C2_NEW)
     finally:
         d.close()
     missing = [k for k, v in list(relied.items()) if v is None] + [k for k in C1_FUNCTIONS + C2_NEW if after2[k] is None]
@@ -47,6 +50,9 @@ def measured():
         'c2relied': [(k, a(after1[k]), a(after2[k])) for k in dict.fromkeys(c2fns)],
         'c2new': [(k, after2[k]) for k in C2_REPLACES + C2_NEW],
         'c1stand': [(k, after1[k]) for k in C2_REPLACES],
+        'replaces': [(k, relied[k], after1[k]) for k in C1_REPLACES],
+        'replbefore': [(k, relied[k]) for k in C1_REPLACES],
+        'replafter': [(k, after2[k]) for k in C1_REPLACES],
     }
 
 def rewrite(text, lists):

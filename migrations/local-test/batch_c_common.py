@@ -83,6 +83,9 @@ C1_FUNCTIONS = [
     'student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)',
     'student_submit.revision_finish(text,uuid,uuid,jsonb,text)', 'student_submit.revision_unsend(text,uuid,uuid,text)',
     'student_submit.group_work(text,uuid,text)', 'student_submit.group_file_links(text,uuid,uuid,text)']
+# The one existing function C1 replaces (Batch B's): a page with the teacher's marks counts as
+# grading started (C1 section 2b; the owner has not decided it).
+C1_REPLACES = ['student_submit._grading_started(uuid,uuid)']
 C1_PUBLIC_RPCS = ['public.set_course_feedback_options(uuid,jsonb,uuid)', 'public.save_markup(uuid,jsonb,integer,uuid)',
                   'public.list_assessment_markup(uuid)', 'public.return_work(uuid,uuid[],uuid)',
                   'public.return_for_revision(uuid,uuid,jsonb,uuid)', 'public.set_revision_request(uuid,jsonb,uuid)',
@@ -122,7 +125,7 @@ def neutral(text):
     """The file with every list stood aside, so it applies whatever it holds."""
     def row(m):
         head = m.group(1)
-        three = any(w in head for w in ('BEGIN new', 'BEGIN c2relied'))
+        three = any(w in head for w in ('BEGIN new', 'BEGIN c2relied', 'BEGIN replaces'))
         return head + ("            ('public.no_such_function_at_all()', 'absent', 'absent')" if three
                        else "            ('public.no_such_function_at_all()', 'absent')") + m.group(3)
     return MARK.sub(row, text)

@@ -42,6 +42,10 @@ with relied(fn, md5) as (values
     ('student_submit.send_finish(text,uuid,uuid,jsonb,text)',                               '286e463dca1842c2586a93c77fb93456'),
     ('student_submit.unsend(text,uuid,uuid,text)',                                          '68665f35e1678f1bba64d30c082409d8')
     -- FINGERPRINTS-END
+), replaced(fn, md5) as (values
+    -- FINGERPRINTS-BEGIN replbefore (written by migrations/local-test/batch_c_fingerprints.py)
+    ('student_submit._grading_started(uuid,uuid)', '720b9f044b853b5c57b04bec7f59010c')
+    -- FINGERPRINTS-END
 ), absent(fn, md5) as (values
     -- FINGERPRINTS-BEGIN absent (written by migrations/local-test/batch_c_fingerprints.py)
     ('public._work_feedback_gone()',                                       'absent'),
@@ -79,6 +83,11 @@ with relied(fn, md5) as (values
 select 'a function Batch C calls differs from the tested one' as problem, r.fn as detail,
        coalesce(md5(pg_get_functiondef(to_regprocedure(r.fn))), 'absent') as found, r.md5 as expected
   from relied r
+ where coalesce(md5(pg_get_functiondef(to_regprocedure(r.fn))), 'absent') <> r.md5
+union all
+select 'the function Batch C replaces differs from the tested one', r.fn,
+       coalesce(md5(pg_get_functiondef(to_regprocedure(r.fn))), 'absent'), r.md5
+  from replaced r
  where coalesce(md5(pg_get_functiondef(to_regprocedure(r.fn))), 'absent') <> r.md5
 union all
 select 'a name Batch C makes is taken', a.fn, 'present', 'absent'

@@ -18,10 +18,22 @@ refuses to apply is reported as caught by the file.
 import subprocess, tempfile
 from batch_c_common import *
 
-C1S = 'teacher markup reflect revision group grants race'
+C1S = 'teacher markup started reflect revision group grants race'
 C2S = 'hide given'
 CHANGES = [
     # ── C1 ──
+    ("_grading_started: marks do not count (Batch B's rule only)", C1,
+     "        -- Mark Up (2026111120): the teacher's marks on a page of this student's work for the piece\n        or exists (select 1 from markup m",
+     "        -- Mark Up (2026111120): the teacher's marks on a page of this student's work for the piece\n        or false and exists (select 1 from markup m", 'markup started'),
+    ("_grading_started: a page whose marks were all erased still counts", C1,
+     "                      and jsonb_array_length(coalesce(m.working->'marks', '[]'::jsonb)) > 0);\n$function$;",
+     "                      and true);\n$function$;", 'markup started'),
+    ("_grading_started: a group-mate's marks count for every member", C1,
+     "                    where m.enrollment_id = p_enrollment_id and m.assessment_id = p_assessment_id\n                      and jsonb_array_length",
+     "                    where m.assessment_id = p_assessment_id\n                      and jsonb_array_length", 'started'),
+    ("_revision_state: marks on a revision's pages do not count as grading", C1,
+     "                                             and jsonb_array_length(coalesce(m.working->'marks', '[]'::jsonb)) > 0) then 'grading'",
+     "                                             and false) then 'grading'", 'started'),
     ("save_markup: another teacher's page is saved (ownership not asked)", C1,
      "     where f.id = p_file_id and fv_owns_course(s.course_id);\n    if _course is not null then\n        perform _grade_return_lock_first(_course);\n    end if;\n    -- Asked under the lock (when there is a class to lock).\n    _cached := fv_idem_check(p_idempotency_key, 'save_markup');",
      "     where f.id = p_file_id;\n    if _course is not null then\n        perform _grade_return_lock_first(_course);\n    end if;\n    -- Asked under the lock (when there is a class to lock).\n    _cached := fv_idem_check(p_idempotency_key, 'save_markup');", 'teacher'),

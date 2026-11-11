@@ -92,11 +92,15 @@
 -- ── What it does to existing rows ───────────────────────────────────────────
 -- Nothing. Every class gets Reflect on Feedback and Show My Learning off.
 -- No existing row of any table changes, no row is deleted, and no existing
--- function, trigger, policy or grant changes
+-- function (but _grading_started, below), trigger, policy or grant changes
 -- (migrations/local-test/batch_c.py proves both on a database built as live
 -- is, with Batch B applied and in use).
 --
 -- ── What it changes in what exists ──────────────────────────────────────────
+-- ONE EXISTING FUNCTION IS REPLACED: Batch B's student_submit._grading_started
+-- (section 2b; the owner has not decided it): a page carrying the teacher's
+-- marks counts as grading started, so the student can no longer Unsend or
+-- Replace it. Batch B's text is kept and one condition added.
 -- course gains two columns (a constant default: no rewrite). assessment and
 -- enrollment gain two triggers each (work_feedback_gone after a row is
 -- deleted, work_feedback_truncate after a truncate). For a class with no
@@ -229,7 +233,7 @@ begin
             ('public._revision_hide_grade(uuid)',                                  '247080f6572bb45951cef807a2b849bd', '295f0e5f94eeb8492af2c205b641377b'),
             ('public._revision_unhide_grade(uuid)',                                '26d2861325edf27f95d090ebd590eb0f', '3c0ff04195505dacf40b55217f8fe839'),
             ('public._piece_latest(uuid,uuid)',                                    'fee319ef4d87447eeac9b4d53a1f1b50', 'fee319ef4d87447eeac9b4d53a1f1b50'),
-            ('public._revision_state(uuid)',                                       '0d24c69115bdd04815e8f173d51745f1', '0d24c69115bdd04815e8f173d51745f1'),
+            ('public._revision_state(uuid)',                                       'd8103c802e246bfac948fa620d06fe09', 'd8103c802e246bfac948fa620d06fe09'),
             ('public._revision_json(uuid)',                                        '969f930b121a6714edfde8052a4d876b', '969f930b121a6714edfde8052a4d876b'),
             ('public._reflection_json(uuid)',                                      '39bd36ae13b6f2f3a19beabcb223b787', '39bd36ae13b6f2f3a19beabcb223b787'),
             ('public.set_course_feedback_options(uuid,jsonb,uuid)',                '1954af2eef430d63baa91d38e74106d2', '1954af2eef430d63baa91d38e74106d2'),
@@ -259,6 +263,25 @@ begin
             raise exception '% already exists, and public.markup does not: something else made it. Nothing was changed.', _f.fn;
         elsif not _first and _md5 <> _f.becomes and _md5 <> _f.or_c2 then
             raise exception 'public.markup exists, so this file has been applied, but % is not as it or the second file leaves it (found %). Do not run this file again. Nothing was changed.',
+                _f.fn, _md5;
+        end if;
+    end loop;
+    -- The one existing function this file replaces (Batch B's
+    -- student_submit._grading_started, section 2b): on a first run it must be
+    -- Batch B's; on a later run, this file's.
+    for _f in
+        select * from (values
+            -- FINGERPRINTS-BEGIN replaces (written by migrations/local-test/batch_c_fingerprints.py)
+            ('student_submit._grading_started(uuid,uuid)', '720b9f044b853b5c57b04bec7f59010c', '13622bbca72904fdf877ce6b336dc6b4')
+            -- FINGERPRINTS-END
+        ) as v(fn, before, becomes)
+    loop
+        _md5 := coalesce(md5(pg_get_functiondef(to_regprocedure(_f.fn))), 'absent');
+        if _first and _md5 <> _f.before then
+            raise exception '% is not the definition this migration was tested against (found %, expected %). Nothing was changed.',
+                _f.fn, _md5, _f.before;
+        elsif not _first and _md5 <> _f.becomes then
+            raise exception 'public.markup exists, so this file has been applied, but % is not as it leaves it (found %). Do not run this file again. Nothing was changed.',
                 _f.fn, _md5;
         end if;
     end loop;
@@ -324,6 +347,39 @@ create index if not exists markup_enrollment_idx on public.markup (enrollment_id
 create index if not exists markup_course_idx on public.markup (course_id);
 comment on table public.markup is
     'Mark Up: drawing data over one page of handed-in work. working is the teacher''s; given is what the student was given when the work was returned. Read and written only through the functions of 2026111120.';
+
+-- ── 2b. Marks count as grading started ──────────────────────────────────────
+-- THE OWNER HAS NOT DECIDED THIS (it is the one replaced function in this
+-- file; the commit that adds it can be taken out on its own). Batch B's
+-- student_submit._grading_started (2026111101) says the teacher has
+-- started grading a student's work when the piece holds a draft or a
+-- returned grade (ruling 83, made before Mark Up existed). Without this, a
+-- student could Unsend or Replace a page the teacher has drawn on, and the
+-- marks would go with the page. With it, a page of that student's work for
+-- the piece that carries at least one of the teacher's marks (in the
+-- working copy: given or not) also counts, so Unsend, Replace and a
+-- finishing send answer grading_started, as they do for a draft. A page
+-- whose marks were all erased does not count. Marks on a group-mate's
+-- pages do not count for this student. Batch B's text, unchanged, then one
+-- more condition; everything that calls it (Batch B's work, send_start,
+-- send_finish, unsend, replace) follows without change.
+create or replace function student_submit._grading_started(p_enrollment_id uuid, p_assessment_id uuid)
+ returns boolean
+ language sql
+ stable
+ security definer
+ set search_path to 'public', 'student_submit', 'pg_temp'
+as $function$
+    select coalesce((select g.is_draft or g.returned_at is not null
+                       from grade_return g
+                      where g.enrollment_id = p_enrollment_id and g.assessment_id = p_assessment_id
+                        -- a DIBELS benchmark has no Draft and no Returned (2026110905)
+                        and not exists (select 1 from assessment a where a.id = p_assessment_id and a.score_mode = 'dibels')), false)
+        -- Mark Up (2026111120): the teacher's marks on a page of this student's work for the piece
+        or exists (select 1 from markup m
+                    where m.enrollment_id = p_enrollment_id and m.assessment_id = p_assessment_id
+                      and jsonb_array_length(coalesce(m.working->'marks', '[]'::jsonb)) > 0);
+$function$;
 
 -- ── 3. revision_request ─────────────────────────────────────────────────────
 create table if not exists public.revision_request (
@@ -594,7 +650,8 @@ $function$;
 -- path is read right):
 --   open       nothing newer than the version it was asked of is in
 --   sent       the revision is in; grading it has not started
---   grading    the revision is in and the grade has changed since
+--   grading    the revision is in and the grade has changed since, or the
+--              teacher's marks are on one of its pages (section 2b's rule)
 --   returned   the revision is in and a grade was returned after it (and
 --              so for every request kept as done)
 --   cancelled  the teacher took it back
@@ -611,6 +668,9 @@ as $function$
                              when v.id is null then 'open'
                              when g.returned_at is not null and not g.is_draft and g.returned_at > v.sent_at then 'returned'
                              when md5(coalesce(g.working_copy::text, '')) is distinct from r.grade_mark then 'grading'
+                             when exists (select 1 from markup m join submission_file f on f.id = m.file_id
+                                           where f.submission_id = v.id
+                                             and jsonb_array_length(coalesce(m.working->'marks', '[]'::jsonb)) > 0) then 'grading'
                              else 'sent' end,
                'revision_submission_id', v.id, 'revision_version', v.version, 'revision_sent_at', v.sent_at,
                'revision_note', v.note, 'revision_late', v.is_late, 'revision_sent_by', v.sent_by)
@@ -1934,6 +1994,9 @@ revoke all on function public._revision_state(uuid) from public, anon, authentic
 revoke all on function public._revision_json(uuid) from public, anon, authenticated, service_role;
 revoke all on function public._reflection_json(uuid) from public, anon, authenticated, service_role;
 
+-- Batch B's _grading_started, replaced in 2b, stays granted to nobody.
+revoke all on function student_submit._grading_started(uuid, uuid) from public, anon, authenticated, service_role;
+
 -- The student's side: the service role only. The helpers are granted to nobody.
 revoke all on function student_submit._group_members(uuid, uuid) from public, anon, authenticated, service_role;
 revoke all on function student_submit.feedback(text, uuid, text) from public, anon, authenticated;
@@ -1973,7 +2036,7 @@ begin
             ('public._revision_hide_grade(uuid)',                                  '247080f6572bb45951cef807a2b849bd', '295f0e5f94eeb8492af2c205b641377b'),
             ('public._revision_unhide_grade(uuid)',                                '26d2861325edf27f95d090ebd590eb0f', '3c0ff04195505dacf40b55217f8fe839'),
             ('public._piece_latest(uuid,uuid)',                                    'fee319ef4d87447eeac9b4d53a1f1b50', 'fee319ef4d87447eeac9b4d53a1f1b50'),
-            ('public._revision_state(uuid)',                                       '0d24c69115bdd04815e8f173d51745f1', '0d24c69115bdd04815e8f173d51745f1'),
+            ('public._revision_state(uuid)',                                       'd8103c802e246bfac948fa620d06fe09', 'd8103c802e246bfac948fa620d06fe09'),
             ('public._revision_json(uuid)',                                        '969f930b121a6714edfde8052a4d876b', '969f930b121a6714edfde8052a4d876b'),
             ('public._reflection_json(uuid)',                                      '39bd36ae13b6f2f3a19beabcb223b787', '39bd36ae13b6f2f3a19beabcb223b787'),
             ('public.set_course_feedback_options(uuid,jsonb,uuid)',                '1954af2eef430d63baa91d38e74106d2', '1954af2eef430d63baa91d38e74106d2'),
@@ -2000,6 +2063,18 @@ begin
     loop
         _md5 := coalesce(md5(pg_get_functiondef(to_regprocedure(_f.fn))), 'absent');
         if _md5 <> _f.becomes and _md5 <> _f.or_c2 then
+            raise exception '% is not as this migration should leave it (found %, expected %). Nothing was changed.', _f.fn, _md5, _f.becomes;
+        end if;
+    end loop;
+    for _f in
+        select * from (values
+            -- FINGERPRINTS-BEGIN replaces (written by migrations/local-test/batch_c_fingerprints.py)
+            ('student_submit._grading_started(uuid,uuid)', '720b9f044b853b5c57b04bec7f59010c', '13622bbca72904fdf877ce6b336dc6b4')
+            -- FINGERPRINTS-END
+        ) as v(fn, before, becomes)
+    loop
+        _md5 := coalesce(md5(pg_get_functiondef(to_regprocedure(_f.fn))), 'absent');
+        if _md5 <> _f.becomes then
             raise exception '% is not as this migration should leave it (found %, expected %). Nothing was changed.', _f.fn, _md5, _f.becomes;
         end if;
     end loop;

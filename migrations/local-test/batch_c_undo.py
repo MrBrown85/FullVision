@@ -50,7 +50,9 @@ def undo1():
         sub, files = d.send(t1, ENR1, k['lab'], 1)
         d.score(ENR1, k['lab'], 6)
         cat0 = catalog(d.c); cols0 = table_columns(d.c)
+        gs_b = d.one("select md5(pg_get_functiondef('student_submit._grading_started(uuid,uuid)'::regprocedure))")
         ok('undo1: C1 applies', d.apply1() == 'ok')
+        ok('undo1: C1 replaced _grading_started', d.one("select md5(pg_get_functiondef('student_submit._grading_started(uuid,uuid)'::regprocedure))") != gs_b)
         # PART 2 on a C1 nobody has used: no discard needed
         P = parts(text_at(UNDO_C1))
         cat_c1 = catalog(d.c)
@@ -82,6 +84,7 @@ def undo1():
         ok('undo1: the catalog is the one before C1, but for the dropped columns\' slots',
            [l for l in gone if not l.startswith('dropped columns public.course')] == [] and
            [l for l in new if not l.startswith('dropped columns public.course')] == [], (gone[:3], new[:3]))
+        ok("undo1: PART 2 puts Batch B's _grading_started back exactly", d.one("select md5(pg_get_functiondef('student_submit._grading_started(uuid,uuid)'::regprocedure))") == gs_b)
         after = row_checksums(d.c, cols0)
         ok('undo1: no row of a table that existed before changes but what Batch B holds of the revision',
            {t: v for t, v in after.items() if t not in ('public.submission', 'public.submission_file', 'public.submission_file_removal', 'student_submit.send_log', 'storage.objects', 'public.course')}

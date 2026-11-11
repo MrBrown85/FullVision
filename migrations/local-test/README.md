@@ -1734,6 +1734,16 @@ for those three new rows.
   student, another class, no session, a wrong shape; Students See Your Mark
   Up off; Missing; the page off; the stored photo is untouched; Unsend and
   deleting a student take the marks.
+- **started** (C1 2b, not yet decided by the owner). Batch B's
+  `_grading_started` replaced: no grade and no marks is not started; one
+  mark on one page is (given or not), for that student and piece only;
+  Unsend, Replace and a Replace finishing after the teacher marked answer
+  `grading_started` and remove nothing; every mark erased, not started
+  again; a group-mate's marks do not lock this student; a draft alone still
+  counts; marks on a revision's pages make it `grading` (no
+  `revision_unsend`, no second `revision_start`) until erased. apply1 also
+  checks C1's body is Batch B's text with one condition added, and that
+  only that function's body changes; the undo puts Batch B's back exactly.
 - **reflect**. Every refusal (not returned, no grade, the switch off,
   another student, another class, not yet on the page, no session, a locked
   card, eight wrong shapes); yes with a plan; the same twice; sent again

@@ -13,6 +13,7 @@ Batch C applies only after Batch B (`2026111101`, `2026111102`), and builds on i
 - Students write their own words in a reflection; the teacher cannot change them. A teacher's answer reaches the student once it is sent.
 - Group work (One per Group) is the groups the teacher made on the assessment (Pairs or Groups). Each member who sends makes their own submission; the group's work is all of them together. No function sends a student another student's name, or another student's enrollment id as a field (a group-mate's page path, turned into a link, carries that student's enrollment id: an opaque id, never a name).
 - Every function takes the class's lock before it writes, and asks for a remembered answer under it.
+- **The teacher's marks count as grading started** (not yet decided by Colin; C1 section 2b, one separable commit). Batch B's `student_submit._grading_started` counts a draft or returned grade (ruling 83); C1 replaces it, keeping that text, so that a page of the student's own work for the piece with at least one mark in the teacher's copy also counts, given or not. Batch B's `unsend`, `replace` and a finishing `send_finish` then answer `grading_started`, and Batch B's `work` shows `sent.grading: true`, `sent.can_change: false`. A page whose marks were all erased does not count; marks on a group-mate's pages do not count for this student. The same rule holds for a revision: marks on a revision's pages make its `state` `grading`, so `revision_unsend` and a second `revision_start` answer `grading_started`. The teacher's screen should say so before the first mark goes on a page (the student can no longer take it back).
 
 ## Class settings
 
@@ -94,7 +95,7 @@ A request (`request`, and each item of `list_course_feedback.revisions`):
 }
 ```
 
-`state`: `open` (no revision in), `sent` (in, grading not started), `grading` (the grade changed since it came in), `returned` (a grade was returned after it came in), `cancelled`. Read live from the submissions and `grade_return`, so a grade saved by any path is read right. `first_grade` is the raw copy: "Was Developing + on the Oct 30 version".
+`state`: `open` (no revision in), `sent` (in, grading not started), `grading` (the grade changed since it came in, or the teacher's marks are on one of its pages), `returned` (a grade was returned after it came in), `cancelled`. Read live from the submissions and `grade_return`, so a grade saved by any path is read right. `first_grade` is the raw copy: "Was Developing + on the Oct 30 version".
 
 ### `set_revision_request(p_request_id uuid, p_patch jsonb, p_idempotency_key uuid)`
 

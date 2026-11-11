@@ -11,7 +11,7 @@ with made(fn, becomes, or_c2) as (values
     ('public._revision_hide_grade(uuid)',                                  '247080f6572bb45951cef807a2b849bd', '295f0e5f94eeb8492af2c205b641377b'),
     ('public._revision_unhide_grade(uuid)',                                '26d2861325edf27f95d090ebd590eb0f', '3c0ff04195505dacf40b55217f8fe839'),
     ('public._piece_latest(uuid,uuid)',                                    'fee319ef4d87447eeac9b4d53a1f1b50', 'fee319ef4d87447eeac9b4d53a1f1b50'),
-    ('public._revision_state(uuid)',                                       '0d24c69115bdd04815e8f173d51745f1', '0d24c69115bdd04815e8f173d51745f1'),
+    ('public._revision_state(uuid)',                                       'd8103c802e246bfac948fa620d06fe09', 'd8103c802e246bfac948fa620d06fe09'),
     ('public._revision_json(uuid)',                                        '969f930b121a6714edfde8052a4d876b', '969f930b121a6714edfde8052a4d876b'),
     ('public._reflection_json(uuid)',                                      '39bd36ae13b6f2f3a19beabcb223b787', '39bd36ae13b6f2f3a19beabcb223b787'),
     ('public.set_course_feedback_options(uuid,jsonb,uuid)',                '1954af2eef430d63baa91d38e74106d2', '1954af2eef430d63baa91d38e74106d2'),
@@ -34,6 +34,10 @@ with made(fn, becomes, or_c2) as (values
     ('student_submit.group_work(text,uuid,text)',                          '1db83448b1b3d7ae998870bdb07c4f36', '1db83448b1b3d7ae998870bdb07c4f36'),
     ('student_submit.group_file_links(text,uuid,uuid,text)',               '1c034fa5647b5808209b0ef9b31e8e4d', '1c034fa5647b5808209b0ef9b31e8e4d')
     -- FINGERPRINTS-END
+), replaced(fn, becomes) as (values
+    -- FINGERPRINTS-BEGIN replafter (written by migrations/local-test/batch_c_fingerprints.py)
+    ('student_submit._grading_started(uuid,uuid)', '13622bbca72904fdf877ce6b336dc6b4')
+    -- FINGERPRINTS-END
 ), rpcs(fn) as (values
     ('public.set_course_feedback_options(uuid,jsonb,uuid)'), ('public.save_markup(uuid,jsonb,integer,uuid)'),
     ('public.list_assessment_markup(uuid)'), ('public.return_work(uuid,uuid[],uuid)'),
@@ -50,6 +54,18 @@ select 'a function is not as Batch C leaves it' as problem, m.fn as detail,
        coalesce(md5(pg_get_functiondef(to_regprocedure(m.fn))), 'absent') as found, m.becomes as expected
   from made m
  where coalesce(md5(pg_get_functiondef(to_regprocedure(m.fn))), 'absent') not in (m.becomes, m.or_c2)
+union all
+select 'the function Batch C replaces is not as it leaves it', r.fn,
+       coalesce(md5(pg_get_functiondef(to_regprocedure(r.fn))), 'absent'), r.becomes
+  from replaced r
+ where coalesce(md5(pg_get_functiondef(to_regprocedure(r.fn))), 'absent') <> r.becomes
+union all
+select 'the function Batch C replaces can be run by a role it should not', r.fn, 'yes', 'no'
+  from replaced r
+ where to_regprocedure(r.fn) is not null
+   and (has_function_privilege('anon', to_regprocedure(r.fn), 'execute')
+        or has_function_privilege('authenticated', to_regprocedure(r.fn), 'execute')
+        or has_function_privilege('service_role', to_regprocedure(r.fn), 'execute'))
 union all
 select 'anon can run a Batch C function', m.fn, 'yes', 'no'
   from made m where to_regprocedure(m.fn) is not null and has_function_privilege('anon', to_regprocedure(m.fn), 'execute')

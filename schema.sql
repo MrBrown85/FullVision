@@ -923,6 +923,9 @@ create table support_report (
 -- of the piece's submission (submission.version 2, 3). The second file
 -- (2026111121_markup_revise_grade_changes, waits for the owner) hides a
 -- grade during a revision and gives marks on every return path.
+-- C1 also replaces Batch B's student_submit._grading_started (not yet decided
+-- by the owner): a page carrying the teacher's marks counts as grading
+-- started, so the student cannot Unsend or Replace it.
 -- The contract: migrations/local-test/batch-c-contract.md.
 create table markup (
   file_id       uuid        primary key references submission_file(id) on delete cascade, -- the page; its marks go with it
