@@ -102,6 +102,66 @@ var LearnerProfile = (function () {
     return '<svg class="lp-ic" viewBox="0 0 24 24" aria-hidden="true">' + paths[kind] + '</svg>';
   }
 
+  /* The latest reflection's date: a questionnaire reflection, or a
+     competency reflection (+ Reflection) when that is newer. */
+  function reflectedAt(o) {
+    var refl = o.model.reflections[0];
+    var comp = o.compRefl || { count: 0, last: null };
+    var reflAt = refl ? refl.at : null;
+    if (comp.last && (!reflAt || String(comp.last) > String(reflAt))) reflAt = comp.last;
+    return reflAt;
+  }
+
+  /* The profile's sections, in page order. Each has the id its <section>
+     carries, the jump link's label, and what the link says beside the
+     label. A new section (Reflections on Feedback, S10-F4) is one more
+     entry here. */
+  var SECTIONS = [
+    {
+      id: 'lp-about',
+      label: 'About Me',
+      sub: function (o) {
+        var a = o.model.about;
+        return a ? day(a.at) : 'Not yet';
+      },
+    },
+    {
+      id: 'lp-goals',
+      label: 'Goals',
+      sub: function (o) {
+        return o.goalCount + ' set';
+      },
+    },
+    {
+      id: 'lp-refl',
+      label: 'Reflections',
+      sub: function (o) {
+        var at = reflectedAt(o);
+        return at ? day(at) : 'Not yet';
+      },
+    },
+  ];
+
+  function jumpHtml(o) {
+    return (
+      '<nav class="id-jump" aria-label="On this page">' +
+      SECTIONS.map(function (s) {
+        return (
+          '<a href="#' +
+          esc(s.id) +
+          '" data-action="lpJump" data-target="' +
+          esc(s.id) +
+          '">' +
+          esc(s.label) +
+          ' <span>' +
+          esc(s.sub(o)) +
+          '</span></a>'
+        );
+      }).join('') +
+      '</nav>'
+    );
+  }
+
   function idCardHtml(o) {
     var a = o.model.about;
     var say = a && text(a.say && a.say.v);
@@ -122,11 +182,6 @@ var LearnerProfile = (function () {
     }
     if (learns)
       facts += '<div><dt>' + icon('people') + 'Learns best</dt><dd><strong>' + esc(learns) + '</strong></dd></div>';
-    var refl = o.model.reflections[0];
-    // A competency reflection (+ Reflection) counts too: the newer date shows.
-    var comp = o.compRefl || { count: 0, last: null };
-    var reflAt = refl ? refl.at : null;
-    if (comp.last && (!reflAt || String(comp.last) > String(reflAt))) reflAt = comp.last;
     var html =
       '<div class="id-card"><div class="id-band"><span>' +
       esc(o.classLabel) +
@@ -139,16 +194,8 @@ var LearnerProfile = (function () {
       (o.pronouns ? '<span class="id-pron">' + esc(o.pronouns) + '</span>' : '') +
       '</div>' +
       (facts ? '<dl class="id-facts">' + facts + '</dl>' : '') +
-      '<nav class="id-jump" aria-label="On this page">' +
-      '<a href="#lp-about" data-action="lpJump" data-target="lp-about">About Me <span>' +
-      esc(a ? day(a.at) : 'Not yet') +
-      '</span></a>' +
-      '<a href="#lp-goals" data-action="lpJump" data-target="lp-goals">Goals <span>' +
-      esc(o.goalCount + ' set') +
-      '</span></a>' +
-      '<a href="#lp-refl" data-action="lpJump" data-target="lp-refl">Reflections <span>' +
-      esc(reflAt ? day(reflAt) : 'Not yet') +
-      '</span></a></nav></div>';
+      jumpHtml(o) +
+      '</div>';
     var note = a && text(a.note && a.note.v);
     if (note) {
       html +=
@@ -391,6 +438,7 @@ var LearnerProfile = (function () {
   }
 
   return {
+    SECTIONS: SECTIONS,
     idCardHtml: idCardHtml,
     aboutHtml: aboutHtml,
     courseGoalHtml: courseGoalHtml,
