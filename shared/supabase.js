@@ -301,6 +301,34 @@
     });
   }
 
+  /* The photo queue: through PhotoQueue.wipe() where the page has it (it
+     also stops a send under way and tells the other tabs), else by deleting
+     its database. Resolves either way, after 2 s at most. */
+  function _deletePhotoQueue() {
+    const q = window.PhotoQueue;
+    if (q && typeof q.wipe === 'function') {
+      return Promise.race([
+        Promise.resolve()
+          .then(() => q.wipe())
+          .catch(e => console.warn('Could not clear waiting photos:', e)),
+        new Promise(r => setTimeout(r, 2000)),
+      ]);
+    }
+    return new Promise(function (resolve) {
+      try {
+        if (typeof indexedDB === 'undefined') return resolve();
+        const req = indexedDB.deleteDatabase('fv-photo-queue');
+        req.onsuccess = req.onerror = function () {
+          resolve();
+        };
+        setTimeout(resolve, 2000);
+      } catch (e) {
+        console.warn('Could not clear waiting photos:', e);
+        resolve();
+      }
+    });
+  }
+
   /* Sign Out in one tab signs the whole device out: the other open tabs clear
      what they would save back and go to sign-in. Their wipe runs again on
      pagehide, after the pages' own pagehide saves (a delete still in its Undo
@@ -400,6 +428,9 @@
     // Printed report copies (teacher/report-issues.js) hold every student's
     // full report and live in IndexedDB, not localStorage.
     await _deleteReportCopies();
+    // Photos of student work waiting on this device (shared/photo-queue.js,
+    // IndexedDB) never outlive a sign-out on a shared device.
+    await _deletePhotoQueue();
     // All portals share the same login page — it routes to the right interface after sign-in.
     // opts.redirect picks its tab (Leave Demo Mode's Create an Account: /login.html#signup).
     window.location.href = opts.redirect || '/login.html';

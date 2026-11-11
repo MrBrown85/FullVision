@@ -16408,9 +16408,28 @@ function getCardWidgetConfigFromRaw(raw) {
       })
     : [];
 
+  /* A widget the saved config does not name was added after the teacher
+     saved it (a save names every widget). One on by default goes into the
+     order after the nearest widget before it in the registry that is shown
+     (first when none is); one off by default is off. A widget the teacher
+     turned off is in `disabled` and stays off. */
   var present = new Set(order.concat(disabled));
-  WIDGET_KEYS.forEach(function (k) {
-    if (!present.has(k)) disabled.push(k);
+  WIDGET_REGISTRY.forEach(function (w, i) {
+    var k = w.key;
+    if (present.has(k)) return;
+    if (!w.defaultOn) {
+      disabled.push(k);
+      return;
+    }
+    var at = 0;
+    for (var j = i - 1; j >= 0; j--) {
+      var before = order.indexOf(WIDGET_REGISTRY[j].key);
+      if (before >= 0) {
+        at = before + 1;
+        break;
+      }
+    }
+    order.splice(at, 0, k);
   });
 
   return { order: order, disabled: disabled };
@@ -17757,6 +17776,16 @@ window.resetDemoData = async function () {
   // not, seedIfNeeded puts the class back itself.
   if (typeof DEFAULT_COURSES !== 'undefined') Object.assign(COURSES, structuredClone(DEFAULT_COURSES));
   saveCourses(COURSES);
+  // Photos added in Demo Mode wait in the photo queue (IndexedDB), not in
+  // the class data: they go too.
+  var q = window.PhotoQueue;
+  if (q && typeof q.wipe === 'function') {
+    try {
+      await q.wipe();
+    } catch (e) {
+      console.warn('Could not clear waiting photos:', e);
+    }
+  }
   await window.loadSeedIfNeeded();
 };
 
