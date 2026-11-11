@@ -1235,6 +1235,21 @@ var StudentCards = (function () {
     _making: function (cid) {
       return _st(cid).making || Promise.resolve(0);
     },
+    /* What is still to come for the class (every class, with no cid):
+       { read } a read waiting to start or out, { press } a press out.
+       Tests wait on these, never for a fixed time: a press signs its
+       request with WebCrypto, off the event loop, so no fixed number of
+       turns outlasts it. */
+    _busy: function (cid) {
+      var out = { read: false, press: false };
+      (cid ? [cid] : Object.keys(_state)).forEach(function (id) {
+        var st = _state[id];
+        if (!st) return;
+        out.read = out.read || !!(st.looking || st.loading);
+        out.press = out.press || !!st.making;
+      });
+      return out;
+    },
     _stoppedLine: _stoppedLine,
     _pagehide: _pagehide,
     _pageshow: _pageshow,

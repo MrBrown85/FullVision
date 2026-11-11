@@ -512,13 +512,13 @@ describe('a reply for a card or a session that is no longer the current one is d
     const drawn = [];
     const watch = setInterval(() => drawn.push(text(tab).includes('Energy Transfer Investigation')), 5);
     tab.T.start(tab.root(), ''); // the device is signed in: Cece's page is asked for
-    await tab.tick();
+    await until(() => routes(tab).includes('page'), 'Cece’s page asked for');
     tab.T.start(tab.root(), '#ABCD-EFGH'); // the address changes to Omar's code
     // Cece's page arrives while Omar's code is still being looked up.
     releasePage();
     await answered;
-    await tab.tick();
-    await tab.tick();
+    // Her page's reply has been handed to the page and handled: only Omar's card is still out.
+    await until(() => tab.inFlight() === 1, 'Cece’s page reply handled');
     expect(text(tab)).not.toContain('Energy Transfer Investigation');
     expect(text(tab)).not.toContain('8 / 10');
     releaseCard();
@@ -542,9 +542,9 @@ describe('a reply for a card or a session that is no longer the current one is d
     expect(alertText(tab)).toBe(UNREACHED);
     down = false;
     tab.tap('[data-act="page-retry"]');
-    await tab.tick();
+    await until(() => routes(tab).filter(r => r === 'page').length >= 2, 'Try Again on its way');
     tab.tap('[data-act="card-restart"]');
-    await tab.tick();
+    await until(() => tab.root().querySelector('form[data-form="card"]'), 'the code box');
     expect(tab.root().querySelector('form[data-form="card"]')).toBeTruthy();
     release();
     await tab.settle();
@@ -562,9 +562,9 @@ describe('a reply for a card or a session that is no longer the current one is d
     });
     tab.type('#sp-ident', '0123456');
     tab.tap('[data-act="card-yes"]');
-    await tab.tick();
+    await until(() => routes(tab).includes('verify'), 'the check on its way');
     tab.tap('[data-act="card-notme"]');
-    await tab.tick();
+    await until(() => big(tab) === 'Give This Card Back', 'Give This Card Back');
     expect(tab.root().querySelector('.sp-big').textContent).toBe('Give This Card Back');
     release();
     await tab.settle();
@@ -587,7 +587,7 @@ describe('a reply for a card or a session that is no longer the current one is d
     await until(() => Object.keys(dev.store).length > 0, 'the session kept');
     const token = JSON.parse(dev.store[KEY]).t;
     tab.tap('[data-act="card-notme"]');
-    await tab.tick();
+    await until(() => big(tab) === 'Give This Card Back', 'Give This Card Back');
     expect(tab.root().querySelector('.sp-big').textContent).toBe('Give This Card Back');
     release();
     await tab.settle();
@@ -663,7 +663,7 @@ describe('a reply for a card or a session that is no longer the current one is d
     });
     tab.type('#sp-ident', '0123456');
     tab.tap('[data-act="card-yes"]');
-    await tab.tick();
+    await until(() => routes(tab).includes('verify'), 'Cece’s check on its way');
     tab.type('#sp-code', 'ABCD-EFGH');
     tab.send('form[data-form="card"]');
     // Cece's check is still held up.
