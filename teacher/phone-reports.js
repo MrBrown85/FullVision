@@ -186,7 +186,7 @@ var PhoneReports = (function () {
           line: (tag && (tag.i_can_statements || [])[0]) || '',
           text: formatLevel(cid, sp, ''),
           word: levelWord(cid, sp) || '',
-          level: sp > 0 ? Math.round(sp) : 0,
+          level: sp > 0 ? roundLevel(sp) : 0,
         };
       }),
       comment: _paragraphs(ReportBlocks.printableComment(cid, rating, rating.narrative)),

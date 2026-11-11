@@ -1516,7 +1516,7 @@ window.PageAssignments = (function () {
       '><span class="grdp-max">/ ' +
       esc(formatPoints(max)) +
       '</span>' +
-      (raw != null ? '<span class="grdp-pct">' + Math.round((raw / max) * 100) + '%</span>' : '') +
+      (raw != null ? '<span class="grdp-pct">' + formatPointsPercent(raw, max) + '</span>' : '') +
       '</div></section>'
     );
   }
@@ -7107,7 +7107,7 @@ window.PageAssignments = (function () {
       }, 0);
       // calc.js's median, so this line and Class Results agree.
       var mid = medianOf(counted);
-      html += '<span>Average <b>' + Math.round(((sum / counted.length) * 100) / max) + '%</b></span>';
+      html += '<span>Average <b>' + formatPointsPercent(sum / counted.length, max) + '</b></span>';
       if (stats)
         // html-safe: figures from formatPoints; the class and assessment ids are escaped
         stats.innerHTML =
@@ -15543,7 +15543,7 @@ window.PageAssignments = (function () {
     if (cell.kind === 'complete')
       return cell.mark === 'complete' ? { text: 'Complete', tone: 'l3' } : { text: 'Incomplete', tone: 'l1' };
     if (cell.kind === 'level') {
-      var lv = Math.max(1, Math.min(4, Math.round(cell.value)));
+      var lv = Math.max(1, Math.min(4, cell.level));
       return { text: PROF_LABELS[lv] + ' (' + cell.text + ')', tone: 'l' + lv };
     }
     if (cell.kind === 'points') return { text: cell.text + ' of ' + (a.maxPoints || 100), tone: 'ink' };

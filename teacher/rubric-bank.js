@@ -289,7 +289,7 @@ window.RubricBank = (function () {
         if (custom && typeof getAssessmentOverallScore === 'function') {
           var v = getAssessmentOverallScore(cid, s.id, a.id);
           if (v > 0) {
-            out.overall[Math.min(4, Math.max(1, Math.round(v)))]++;
+            out.overall[Math.min(4, Math.max(1, roundLevel(v)))]++;
             out.overallCount++;
           }
         }

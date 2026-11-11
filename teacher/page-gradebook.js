@@ -267,7 +267,7 @@ window.PageGradebook = (function () {
     var letterData = _getStudentLetterData(cid, sid);
     if (letterData.R != null) return letterData.R;
     var overall = getOverallProficiency(cid, sid);
-    return overall > 0 ? Math.round(levelToPercent(cid, overall) * 10) / 10 : null;
+    return overall > 0 ? oneDecimal(levelToPercent(cid, overall)) : null;
   }
 
   /* ══════════════════════════════════════════════════════════
@@ -1901,7 +1901,7 @@ window.PageGradebook = (function () {
         } else if (col.isPointsCol) {
           var max = assess.maxPoints || 100;
           var score = getPointsScore(cid, s.id, col.assessmentId);
-          var pct = score != null ? ((score / max) * 100).toFixed(1) : '0.0';
+          var pct = score != null ? oneDecimal((score / max) * 100).toFixed(1) : '0.0';
           var title = score != null ? formatPoints(score) + '/' + max + ' (' + pct + '%)' : '';
           var cellContent =
             score != null
@@ -2057,7 +2057,7 @@ window.PageGradebook = (function () {
           '"' +
           _avgCellAttrs(cid, colAssess) +
           '><span class="gb-avg-val" style="color:' +
-          PROF_COLORS[Math.round(stats.avg)] +
+          PROF_COLORS[roundLevel(stats.avg)] +
           ';font-weight:700">' +
           formatColumnAverageLevel(cid, stats.avg) +
           '</span></td>';
@@ -2373,7 +2373,7 @@ window.PageGradebook = (function () {
       }
       var level = isPointsScored(a)
         ? pointsToProf(stats.pct != null ? stats.pct : 0, 100, getGradingScale(cid))
-        : Math.round(stats.avg);
+        : roundLevel(stats.avg);
       html +=
         '<td class="gb-scores-avg"' +
         _avgCellAttrs(cid, a) +
@@ -2409,7 +2409,7 @@ window.PageGradebook = (function () {
   function renderOverallCell(cid, sid) {
     var val = getOverallProficiency(cid, sid);
     var grade = courseGradeMode(cid) === 'letter' ? studentGradeSummary(cid, sid, viewedReportTerm(cid)) : null;
-    var r = grade ? grade.level : Math.round(val);
+    var r = grade ? grade.level : roundLevel(val);
     var color = PROF_COLORS[r] || PROF_COLORS[0];
     var label = levelWord(cid, val);
     var num = grade ? grade.text || '—' : levelFigure(val);
@@ -2502,7 +2502,7 @@ window.PageGradebook = (function () {
       var n = Object.keys(ids).length;
       var sp = getSectionProficiency(cid, student.id, sec.id);
       if (getSectionProficiencyRaw(cid, student.id, sec.id) > 0) withEvidence++;
-      var r = Math.max(0, Math.min(4, Math.round(sp)));
+      var r = Math.max(0, Math.min(4, roundLevel(sp)));
       rows +=
         '<div class="gb-tip-row"><span class="gb-tip-label">' +
         esc(sec.shortName || sec.name) +
@@ -2632,7 +2632,7 @@ window.PageGradebook = (function () {
       '<td class="gb-score gb-avg-cell' + classes + '" style="' + wStyle + '"' + _avgCellAttrs(cid, assess) + '>';
     if (!stats) return open + '<span class="gb-score-val s0" style="background:transparent">\u2014</span></td>';
     var r = pointsToProf(stats.pct, 100, getGradingScale(cid));
-    var text = isCompletionScored(assess) ? Math.round(stats.pct) + '%' : _pointsAverageText(assess, stats);
+    var text = isCompletionScored(assess) ? wholePercent(stats.pct) + '%' : _pointsAverageText(assess, stats);
     return (
       open + '<span class="gb-avg-val" style="color:' + PROF_COLORS[r] + ';font-weight:700">' + text + '</span></td>'
     );
@@ -3158,14 +3158,14 @@ window.PageGradebook = (function () {
 
   /* A points Class Average on screen, in both views: "6/10". */
   function _pointsAverageText(a, stats) {
-    return formatPoints(Math.round(stats.avg * 10) / 10) + '/' + formatPoints(Number(a.maxPoints) || 100);
+    return formatPoints(oneDecimal(stats.avg)) + '/' + formatPoints(Number(a.maxPoints) || 100);
   }
 
   /* A Class Average as the CSV prints it, the printed sheet's way. */
   function _csvAverageText(cid, a, stats) {
     if (!stats) return '';
-    if (isCompletionScored(a)) return Math.round(stats.pct) + '%';
-    if (isPointsScored(a)) return formatPoints(Math.round(stats.avg * 10) / 10);
+    if (isCompletionScored(a)) return wholePercent(stats.pct) + '%';
+    if (isPointsScored(a)) return formatPoints(oneDecimal(stats.avg));
     return formatColumnAverageLevel(cid, stats.avg, 'proficiency');
   }
 
@@ -3892,7 +3892,7 @@ window.PageGradebook = (function () {
     inp.className = 'gb-scores-input';
     var currentPts = isPts ? getPointsScore(cid, sid, aid) : null;
     if (isPts) inp.value = currentPts != null ? formatPoints(currentPts) : '';
-    else inp.value = currentVal > 0 ? String(Math.round(currentVal)) : '';
+    else inp.value = currentVal > 0 ? String(roundLevel(currentVal)) : '';
     td.appendChild(inp);
     inp.focus();
     inp.select();
@@ -3911,7 +3911,7 @@ window.PageGradebook = (function () {
       // levels. Anything else that isn't a score (a typo, 3.5 or 9 as a
       // proficiency) leaves the saved score alone.
       if (typed === '') val = isPts ? null : 0;
-      else if (isPts ? val == null || isNaN(val) : !(val >= 1 && val <= 4 && val === Math.round(val))) return;
+      else if (isPts ? val == null || isNaN(val) : !(val >= 1 && val <= 4 && Number.isInteger(val))) return;
       var undo = _pushUndo(cid, sid, aid, tagIds);
       // Apply score to all tags in this assessment. A save this device
       // couldn't keep shows on the sync dot (data.js), not here.

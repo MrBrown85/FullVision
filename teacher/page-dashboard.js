@@ -330,7 +330,7 @@ window.PageDashboard = (function () {
             return a + b;
           }, 0) / overallVals.length
         : 0;
-    var classR = Math.round(classAvg);
+    var classR = roundLevel(classAvg);
 
     var ccCounts = {};
     var ccAssessments = {};

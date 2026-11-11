@@ -55,7 +55,7 @@ window.MCardWidgets = (function () {
   /* ── hero ────────────────────────────────────────────────────── */
   _renderers.hero = function (st, cid, data) {
     var overall = getOverallProficiency(cid, st.id);
-    var rounded = Math.round(overall);
+    var rounded = roundLevel(overall);
     // The overall grade as the class is set to grade (level, letter, or both).
     var grade = studentGradeSummary(cid, st.id);
     var gradeText = grade.text || '\u2014';
@@ -137,7 +137,7 @@ window.MCardWidgets = (function () {
       '<div class="m-scard-sec-bar"><div class="m-scard-sec-fill" style="width:' +
       pct +
       '%;background:' +
-      MC.profBg(Math.round(value)) +
+      MC.profBg(roundLevel(value)) +
       '"></div></div>' +
       '<div class="m-scard-sec-val">' +
       MC.esc(value > 0 ? formatLevel(cid, value) : '—') +

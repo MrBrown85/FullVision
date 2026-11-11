@@ -268,7 +268,7 @@ window.ClassResults = (function () {
     var avg = classColumnAverage(cid, students, col);
     var st = classColumnStatusCounts(cid, students, a);
     var html = '<div class="gb-tip-head">Class Average</div>';
-    var level = avg ? (mode === 'level' ? Math.round(avg.avg) : pointsToProf(avg.pct, 100, getGradingScale(cid))) : 0;
+    var level = avg ? (mode === 'level' ? roundLevel(avg.avg) : pointsToProf(avg.pct, 100, getGradingScale(cid))) : 0;
     var word = mode === 'level' && avg && courseGradeMode(cid) === 'proficiency' ? levelWord(cid, avg.avg) : '';
     html +=
       '<div class="gb-tip-avg-line"><span class="gb-tip-grade" style="color:' +
@@ -543,7 +543,7 @@ window.ClassResults = (function () {
     var col = { assessment: a };
     var spread = classColumnSpread(cid, students, col);
     var counts = classColumnLevelCounts(cid, students, col);
-    var lvl = avg ? Math.round(avg.avg) : 0;
+    var lvl = avg ? roundLevel(avg.avg) : 0;
     return (
       '<div class="cr-band">' +
       '<div class="cr-stats cr-stats-4">' +
@@ -569,7 +569,7 @@ window.ClassResults = (function () {
     var spread = classColumnSpread(cid, students, { assessment: a });
     var lvl = avg ? pointsToProf(avg.pct, 100, getGradingScale(cid)) : 0;
     var avgText = avg
-      ? esc(classSpreadText(cid, a, avg.avg, true)) + ' <small>· ' + esc(Math.round(avg.pct) + '%') + '</small>'
+      ? esc(classSpreadText(cid, a, avg.avg, true)) + ' <small>· ' + esc(wholePercent(avg.pct) + '%') + '</small>'
       : '—';
     return (
       '<div class="cr-band">' +
@@ -913,7 +913,7 @@ window.ClassResults = (function () {
           n +
           '</button>';
       });
-      var avgLevel = r.avg ? Math.max(1, Math.min(4, Math.round(r.avg))) : 0;
+      var avgLevel = r.avg ? Math.max(1, Math.min(4, roundLevel(r.avg))) : 0;
       html +=
         '<strong class="cr-gavg" role="cell" style="color:' +
         (avgLevel ? 'var(--score-' + avgLevel + '-text)' : 'var(--text-3)') +
@@ -968,7 +968,7 @@ window.ClassResults = (function () {
       '</div></div>';
     var medianX = (Math.min(max, spread.median) / max) * 100;
     if (desc) medianX = 100 - medianX;
-    var medianLabel = 'Median ' + formatPoints(Math.round(spread.median * 10) / 10);
+    var medianLabel = 'Median ' + formatPoints(oneDecimal(spread.median));
     if (chart === 'bars') {
       var list = desc ? pb.bands.slice().reverse() : pb.bands;
       var tallest = 1;

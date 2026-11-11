@@ -118,11 +118,8 @@
      figure ("3+"); '' when there is none. */
   function criterionLevelText(v) {
     if (!(v > 0)) return { word: '', figure: '' };
-    var step = SCORE_MOD_STEP;
-    var steps = Math.round(v / step);
-    var level = Math.max(1, Math.min(4, Math.round(steps * step)));
-    var mod = Math.round((steps * step - level) / step);
-    return { word: scoreLevelText(level, mod), figure: nearestScoreLevel(v).text };
+    // calc.js's nearest step, so the word and figure agree with the app's.
+    return { word: nearestScoreLevelName(v), figure: nearestScoreLevel(v).text };
   }
 
   /* A score as the Scores view shows it, in words a spreadsheet reader

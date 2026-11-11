@@ -444,12 +444,13 @@ function parsePointsInput(text, max, saved) {
 }
 
 /* The % beside a points input, marked "bonus" above the maximum. `digits`
-   is the decimal places (0 rounds to a whole %). Returns HTML; empty when
-   there is no score. */
+   1 prints one decimal (85.9%), anything else a whole % (86%), each as
+   calc.js prints a %: on paper, a half rounding up (57.5% is 58%). Returns
+   HTML; empty when there is no score. */
 function pointsPctHtml(v, max, digits) {
   if (v == null || !(max > 0)) return '';
   var pct = (v / max) * 100;
-  var html = (digits ? pct.toFixed(digits) : String(Math.round(pct))) + '%';
+  var html = (digits ? oneDecimal(pct).toFixed(1) : String(wholePercent(pct))) + '%';
   return v > max ? html + '<span class="gb-pts-bonus">bonus</span>' : html;
 }
 

@@ -172,7 +172,7 @@ window.DashInsights = (function () {
   /* One student on one column under the Who Needs Help rule: their value is
      below the rule's proficiency and rests on at least `min` scores. */
   function isBelowRule(cid, col, sid, value, rule) {
-    if (!(value > 0) || Math.round(value) >= rule.below) return false;
+    if (!(value > 0) || roundLevel(value) >= rule.below) return false;
     var evidence = col.sectionIds.reduce(function (n, secId) {
       return n + getSectionEvidenceCount(cid, sid, secId);
     }, 0);
@@ -203,7 +203,7 @@ window.DashInsights = (function () {
 
   // A student's name with their proficiency on one competency, tinted by it.
   function _personChip(cid, st, value) {
-    var level = value > 0 ? Math.max(1, Math.min(4, Math.round(value))) : 0;
+    var level = value > 0 ? Math.max(1, Math.min(4, roundLevel(value))) : 0;
     return (
       '<a class="dash-ins-person" role="link" tabindex="0" data-href="' +
       _studentHref(cid, st.id, 'comps') +
@@ -501,7 +501,7 @@ window.DashInsights = (function () {
       return x.id === secId;
     });
     var tag = sec && sec.tags && sec.tags[0];
-    return tag ? CompetencyWording.nextStep(tag, Math.max(1, Math.min(4, Math.round(value)))) : '';
+    return tag ? CompetencyWording.nextStep(tag, Math.max(1, Math.min(4, roundLevel(value)))) : '';
   }
   function _secLabel(cid, secId) {
     var sec = getSections(cid).find(function (x) {
@@ -596,7 +596,7 @@ window.DashInsights = (function () {
   // A competency cell: the value as the class shows it, tinted by its
   // proficiency, with the proficiency's shape unless the class is Letter.
   function _cellHtml(cid, value, title, prof) {
-    var level = value > 0 ? Math.max(1, Math.min(4, Math.round(value))) : 0;
+    var level = value > 0 ? Math.max(1, Math.min(4, roundLevel(value))) : 0;
     if (!level) return '<td class="dash-sg-cell"><span class="dash-sg-none" title="' + esc(title) + '">—</span></td>';
     return (
       '<td class="dash-sg-cell"><span class="dash-sg-val" title="' +
