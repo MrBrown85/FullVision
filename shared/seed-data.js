@@ -3894,8 +3894,10 @@ function seedIfNeeded() {
    (Sam, with a note), added by the teacher (Mateo), handed in on paper
    (Ethan), and nothing sent (everyone else). KMT & States of Matter Lab
    (sci8a4) takes photos and files and closed a week after its date, with
-   nothing sent; every other piece takes no work. Send Work is on, so the
-   sample shows once the class's student page is turned on.
+   nothing sent; every other piece takes no work. Send Work starts off, as
+   it does for every class (plan S5: the build switch, then Send Work, then
+   Students Send); the work is there for the screens that show it once a
+   teacher turns both on.
 
    Seeded once per class: a class seeded before this existed gets it the
    next time Demo Mode opens. */
@@ -3994,7 +3996,7 @@ function seedDemoStudentWork() {
     });
   }
   return saveDemoStudentWork('sci8', {
-    course: { send_work: true, keep_photos_until: 'end_of_year' },
+    course: { send_work: false, keep_photos_until: 'end_of_year' },
     assessments: assessments,
     submissions: submissions,
   });

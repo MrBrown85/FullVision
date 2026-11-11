@@ -1213,6 +1213,9 @@ async function initAllCourses() {
   if (_demoMode) {
     _useSupabase = false;
     _teacherId = 'demo-user';
+    // The demo class (DEFAULT_COURSES) is in seed-data.js: have it before
+    // the classes are read, so a first visit opens on it as it always has.
+    await _loadSeedScript();
   }
 
   // Check Supabase availability
@@ -16957,6 +16960,27 @@ window.GB = {
   saveViewPref,
 };
 
+/* seed-data.js, fetched once, in Demo Mode only. It holds the demo class
+   (DEFAULT_COURSES), read when the classes are, and seedIfNeeded. Resolves
+   at once where it has already run; a failed fetch resolves too. */
+var _seedScript = null;
+function _loadSeedScript() {
+  if (typeof DEFAULT_COURSES !== 'undefined') return Promise.resolve();
+  if (!_seedScript) {
+    _seedScript = new Promise(function (resolve) {
+      var s = document.createElement('script');
+      s.src = '/shared/seed-data.js?v=46';
+      s.onload = resolve;
+      s.onerror = function () {
+        _seedScript = null;
+        resolve();
+      };
+      document.head.appendChild(s);
+    });
+  }
+  return _seedScript;
+}
+
 /**
  * Lazily loads seed-data.js and calls seedIfNeeded() — only fetches the 113KB
  * script when actually needed (new accounts, or after explicit data reset).
@@ -16980,14 +17004,7 @@ window.loadSeedIfNeeded = function () {
   // User deliberately wiped all data — never auto-seed
   if (localStorage.getItem('gb-data-wiped') === '1') return Promise.resolve();
   // Lazy-load the script, then seed
-  var script = new Promise(function (resolve) {
-    var s = document.createElement('script');
-    s.src = '/shared/seed-data.js?v=45';
-    s.onload = resolve;
-    s.onerror = resolve;
-    document.head.appendChild(s);
-  });
-  return Promise.all([script, bank]).then(function () {
+  return Promise.all([_loadSeedScript(), bank]).then(function () {
     if (typeof seedIfNeeded === 'function') seedIfNeeded();
   });
 };
