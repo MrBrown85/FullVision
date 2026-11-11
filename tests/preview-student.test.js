@@ -252,7 +252,7 @@ describe('the preview', () => {
     same.innerHTML = StudentPageView.html(view, { tab: 'assignments', segment: 'back', all: false, pick: '' });
     expect(screen().innerHTML === same.innerHTML).toBe(true);
     click(screen().querySelector('.sp-tabs-bottom [data-tab="reports"]'));
-    expect(text(screen().querySelector('.sp-page-title'))).toBe('Reports');
+    expect(text(screen().querySelector('.sp-page-title'))).toBe('My Reports');
     click(screen().querySelector('[data-act="all-open"]'));
     const box = screen().querySelector('#sp-search');
     box.value = 'reflection';

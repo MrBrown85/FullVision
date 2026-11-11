@@ -65,7 +65,12 @@ describe('the four tabs', () => {
       page.root().querySelector('.sp-tabs-bottom').innerHTML.replace('sp-tabs-bottom', ''),
     );
     const tabs = [...page.root().querySelectorAll('.sp-tabs-bottom .sp-tab')];
-    expect(tabs.map(t => t.textContent)).toEqual(['Assignments', 'My Learning', 'Questionnaires', 'Reports']);
+    expect(tabs.map(t => t.querySelector('.sp-tab-label').textContent)).toEqual([
+      'Assignments',
+      'My Learning',
+      'Questionnaires',
+      'Reports',
+    ]);
     expect(tabs.map(t => t.getAttribute('aria-current'))).toEqual(['page', null, null, null]);
   });
 
@@ -85,7 +90,7 @@ describe('the four tabs', () => {
     expect(lines).toEqual({
       'My Learning': 'Your teacher hasn’t turned on My Learning for this class.',
       Questionnaires: 'Questionnaires from your teacher will show here.',
-      Reports: 'Reports from your teacher will show here.',
+      'My Reports': 'Reports from your teacher will show here.',
     });
     // No grade anywhere on them.
     await page.click('[data-tab="learning"]');

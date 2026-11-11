@@ -51,8 +51,11 @@
   function viewOf(state) {
     if (!state || !state.page || !state.reply) return null;
     if (typeof StudentView === 'undefined' || !StudentView || typeof StudentView.fromPage !== 'function') return null;
+    var reply = gradesAreIn() ? state.reply : withoutGrades(state.reply);
+    // Demo Mode's samples for Questionnaires and My Reports, which the server's page does not send yet (S4-F4).
+    if (state.demo && StudentPage.demoForms) reply = Object.assign({}, reply, StudentPage.demoForms());
     try {
-      return StudentView.fromPage(gradesAreIn() ? state.reply : withoutGrades(state.reply), state.page);
+      return StudentView.fromPage(reply, state.page);
     } catch (e) {
       return null;
     }
@@ -70,6 +73,7 @@
       feedback: state.feedback,
       whole: state.whole,
       levels: state.levels,
+      form: state.form,
       sheet: state.sheet,
       sending: state.sending,
       noResults: !gradesAreIn(),

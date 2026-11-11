@@ -405,6 +405,30 @@ window.StudentView = (function () {
     };
   }
 
+  /* A returned grade changed since the student last looked (the
+     artboard's "A Returned Grade Was Updated"): when, and on each row whose
+     level moved, the level the student saw before ("Was Developing"),
+     named by constants.js's scoreLevelText. The reply's `previous` is the
+     grade before the newest return. */
+  function markWas(piece, row) {
+    var previous = row.previous;
+    var tagIds = row.tag_ids || [];
+    piece.updatedAt = str(row.updated_at);
+    if (!previous || typeof previous !== 'object') return;
+    var rows = piece.rubric ? piece.rubric.rows : piece.competencies;
+    var before = (piece.rubric ? previous.criteria : previous.tags) || {};
+    // An Overall level alone stands under the first competency, as the page shows it.
+    if (!piece.rubric && !Object.keys(before).length && num(previous.value) > 0 && tagIds.length) {
+      before = {};
+      before[tagIds[0]] = { value: previous.value, modifier: previous.modifier };
+    }
+    rows.forEach(function (r) {
+      var p = before[r.id];
+      var was = p && num(p.value) > 0 ? scoreLevelText(num(p.value), num(p.modifier) || 0) : '';
+      if (was && was !== r.text) r.was = was;
+    });
+  }
+
   // What a piece is graded on: its competencies by name, in the reply's order.
   function gradedOn(row, tags) {
     return (row.tag_ids || [])
@@ -428,7 +452,11 @@ window.StudentView = (function () {
        work:    [ piece ], newest first,
        changes: [ { id, title, why: 'updated' | 'back' } ],
        levels:  [ { level, name } ], Emerging to Extending (What the
-                Levels Mean), or none while constants.js is not in }
+                Levels Mean), or none while constants.js is not in,
+       questionnaires: [ { id, title, line, minutes, state: 'open' |
+                'sent' | 'soon', opensOn, until, sentOn } ],
+       reports: [ { id, title, issued, until, isNew, result: { word, text,
+                level }, comment } ] }
      piece: { id, title, date, dueDate, kind: 'due' | 'back' | 'missing' |
               'excused', late, returnedAt, updated, unseen,
               result: { kind: 'level' | 'points' | 'complete' | 'none',
@@ -436,6 +464,7 @@ window.StudentView = (function () {
                         1-4 band); for points: points, outOf, percent,
                         bar },
               comment, competencies: [ row ], gradedOn: [ { id, name } ],
+              updatedAt (when updated), and on a row that moved, was,
               rubric: null | { id, name, style, rows: [ row + beyond,
               descriptors, checks, levelName, descriptor, shown, next,
               goal, whole ] } }
@@ -505,6 +534,7 @@ window.StudentView = (function () {
               return levelRow(id, (tags[id] || {}).label, parts[id]);
             });
         }
+        if (piece.updated) markWas(piece, row);
       }
       work.push(piece);
     });
@@ -535,7 +565,58 @@ window.StudentView = (function () {
       work: work,
       changes: changes,
       levels: levelsLegend(),
+      questionnaires: questionnairesOf(page),
+      reports: reportsOf(page),
     };
+  }
+
+  /* The Questionnaires and Reports tabs (S4-F4), from the reply's
+     `questionnaires` and `reports` when it has them. The server's `page`
+     sends neither yet (see the S4-F4 pull request): until it does both lists
+     are empty, from either door. The server decides each questionnaire's
+     state, so nothing here reads a clock.
+       questionnaire: { id, title, description, minutes, state: 'open' |
+                        'sent' | 'not_open_yet', opens_on, closes_on, sent_at }
+       report:        { id, title, issued_at, expires_on, opened_at,
+                        overall: { word, text, level }, comment: [ text ] }
+     The report's overall and comment are the phone report as the teacher
+     sent it (worded by calc.js when it was sent), as s/report.js shows it. */
+  var Q_STATES = { open: 'open', sent: 'sent', not_open_yet: 'soon' };
+  function questionnairesOf(page) {
+    return (Array.isArray(page.questionnaires) ? page.questionnaires : [])
+      .filter(function (q) {
+        return q && q.id && Q_STATES[q.state];
+      })
+      .map(function (q) {
+        return {
+          id: str(q.id),
+          title: str(q.title),
+          line: str(q.description),
+          minutes: num(q.minutes),
+          state: Q_STATES[q.state],
+          opensOn: str(q.opens_on).slice(0, 10),
+          until: str(q.closes_on).slice(0, 10),
+          sentOn: str(q.sent_at),
+        };
+      });
+  }
+  function reportsOf(page) {
+    return (Array.isArray(page.reports) ? page.reports : [])
+      .filter(function (r) {
+        return r && r.id;
+      })
+      .map(function (r) {
+        var o = r.overall && typeof r.overall === 'object' ? r.overall : {};
+        return {
+          id: str(r.id),
+          title: str(r.title),
+          issued: str(r.issued_at),
+          until: str(r.expires_on).slice(0, 10),
+          isNew: !r.opened_at,
+          result: { word: str(o.word), text: str(o.text), level: num(o.level) },
+          comment: Array.isArray(r.comment) ? str(r.comment[0]) : str(r.comment),
+        };
+      });
   }
 
   /* Newest first, by due date, or the date with none. Two pieces with the

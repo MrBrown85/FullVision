@@ -1553,7 +1553,7 @@
      is already here: nothing is asked. The rows on screen change, so what
      is watched for "opened" starts again. */
   /* What the student looks at on the page, as s/page-view.js reads it. */
-  var UI_KEYS = ['tab', 'segment', 'all', 'pick', 'search', 'filter', 'feedback', 'whole', 'levels'];
+  var UI_KEYS = ['tab', 'segment', 'all', 'pick', 'search', 'filter', 'feedback', 'whole', 'levels', 'form'];
   function uiOf() {
     var ui = {};
     UI_KEYS.forEach(function (k) {
@@ -1579,6 +1579,103 @@
     stopWatchingRows();
     paint(out.focus);
     if (!out.piece && typeof window !== 'undefined' && typeof window.scrollTo === 'function') window.scrollTo(0, 0);
+    watchRows();
+  }
+
+  /* ── Questionnaires and My Reports (S4-F4) ─────────────────── */
+
+  /* Demo Mode's samples, in the shape the server's page is to send them
+     (shared/student-view.js, questionnairesOf and reportsOf). Kept out of
+     the page reply itself, which is the server's shape today. */
+  function demoForms() {
+    function at(offset) {
+      return isoDay(offset) + 'T20:15:00Z';
+    }
+    var report = StudentPage.demoReport();
+    return {
+      questionnaires: [
+        {
+          id: 'demo-q-reflection',
+          title: 'November Reflection',
+          description: 'Core Competencies and your goal check-in',
+          minutes: 10,
+          state: 'open',
+          closes_on: isoDay(9),
+        },
+        { id: 'demo-q-about', title: 'About Me', state: 'sent', sent_at: at(-58) },
+        { id: 'demo-q-march', title: 'March Reflection', state: 'not_open_yet', opens_on: isoDay(112) },
+      ],
+      reports: [
+        {
+          id: 'demo-r-1',
+          title: report.report,
+          issued_at: at(-1),
+          expires_on: isoDay(6),
+          opened_at: null,
+          overall: report.overall,
+          comment: report.comment,
+        },
+        { id: 'demo-r-0', title: 'Interim Update', issued_at: at(-40), opened_at: at(-39) },
+      ],
+    };
+  }
+
+  /* Start, or See Your Report, from the card's page. A real card cannot
+     open either yet: the server has no route that opens a questionnaire or
+     a phone report from a card's session (S4-F4's pull request names what
+     is missing), and the server's page lists none, so these buttons show
+     only in Demo Mode. There they open the sample questionnaire and report
+     on the slip's own screens, with the student already known. */
+  function openForm(act, id) {
+    if (!S.demo || !S.page || S.screen !== 'assignments') return;
+    var forms = demoForms();
+    var known = (act === 'q-start' ? forms.questionnaires : forms.reports).some(function (x) {
+      return x.id === id;
+    });
+    if (!known) return;
+    StudentPage.newTurn();
+    stopWatchingRows();
+    S.back = S.tab;
+    S.sheet = false;
+    if (act === 'r-open') {
+      S.data = {
+        ok: true,
+        kind: 'report',
+        token: 'demo',
+        student: { first_name: S.page.student.firstName },
+        course: { name: S.page.course.name, block: S.page.course.block },
+        report: { title: StudentPage.demoReport().report },
+      };
+      S.report = StudentPage.demoReport();
+      S.screen = 'report';
+      paint('.pr-view h1, .pr-view h2');
+      return;
+    }
+    S.screen = 'loading';
+    paint();
+    var mine = S;
+    StudentPage.loadDemoTemplates(function () {
+      if (S !== mine || S.screen !== 'loading' || !S.back) return;
+      S.data = StudentPage.demoData('reflection');
+      S.part = 0;
+      S.answers = {};
+      S.screen = 'part';
+      paint('h1');
+    });
+  }
+
+  // Back to Your Page from a questionnaire sent or a report read: the tab it was opened from.
+  function pageBack() {
+    if (!S.back || !S.page) return;
+    StudentPage.newTurn();
+    S.tab = S.back;
+    S.back = '';
+    S.data = null;
+    S.report = null;
+    S.screen = 'assignments';
+    setTitle();
+    paint('.sp-page-title');
+    arm();
     watchRows();
   }
 
@@ -1727,6 +1824,7 @@
         S.feedback = '';
         S.whole = false;
         S.levels = false;
+        S.form = '';
       }
       S.reply = res;
       S.page = StudentData.fromServer(res);
@@ -1920,11 +2018,15 @@
     } else if (act === 'card-back') {
       backToPage();
     } else if (
-      /^(tab|segment|all-open|all-close|filter|pick|open-piece|feedback|feedback-close|whole|whole-close|levels)$/.test(
+      /^(tab|segment|all-open|all-close|filter|pick|open-piece|feedback|feedback-close|whole|whole-close|levels|form-pick)$/.test(
         act,
       )
     ) {
       showPart(act, el);
+    } else if (act === 'q-start' || act === 'r-open') {
+      openForm(act, el.getAttribute('data-form-id') || '');
+    } else if (act === 'page-back') {
+      pageBack();
     } else if (act === 'page-retry') {
       openPage();
     } else if (act === 'grades-retry') {
@@ -1992,6 +2094,8 @@
   }
 
   StudentPage.classesSheet = classesSheet;
+  StudentPage.demoForms = demoForms;
+  StudentPage.pageBack = pageBack;
 
   StudentPage.addScreens({
     file: 'app',
