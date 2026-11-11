@@ -77,3 +77,56 @@ test('Add Competency opens the new card with its Title ready to type over', asyn
   await page.keyboard.type('Lab Safety');
   await expect(title).toHaveValue('Lab Safety');
 });
+
+test('Escape closes the account menu and puts the focus on its button', async ({ page }) => {
+  await enterDemo(page);
+  const btn = page.locator('.tb-user-btn');
+  await btn.click();
+  await expect(btn).toHaveAttribute('aria-expanded', 'true');
+  await page.keyboard.press('Escape');
+  await expect(btn).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('.tb-user-menu')).not.toHaveClass(/open/);
+  await expect(btn).toBeFocused();
+});
+
+test('Grading tab: a switch keeps the focus after Space, through its question, and a menu keeps it after a change', async ({
+  page,
+}) => {
+  await enterDemo(page);
+  await page.locator('[data-action="openClassManager"]').first().click();
+  await page.getByRole('tab', { name: /^Grading/ }).click();
+  const sw = () => page.locator('#cm-folders-count');
+  const before = await sw().isChecked();
+  await sw().focus();
+  await page.keyboard.press('Space');
+  // Folders Count as One moves grades, so it asks first.
+  await expect(page.locator('#confirm-cancel-btn')).toBeFocused();
+  await page.keyboard.press('Enter'); // Cancel
+  await expect(sw()).toBeFocused();
+  await expect(sw()).toBeChecked({ checked: before });
+  await page.keyboard.press('Space');
+  await page.locator('#confirm-ok-btn').click();
+  await expect(sw()).toBeChecked({ checked: !before });
+  await expect(sw()).toBeFocused();
+
+  // A menu with no question keeps the focus after a change.
+  const sel = page.locator('#cm-recent-limit');
+  await sel.focus();
+  const values = await sel.locator('option').evaluateAll(o => o.map(x => x.value));
+  const now = await sel.inputValue();
+  await sel.selectOption(values.find(v => v !== now));
+  const confirm = page.locator('#confirm-ok-btn');
+  if (await confirm.isVisible().catch(() => false)) await confirm.click();
+  await expect(page.locator('#cm-recent-limit')).toBeFocused();
+});
+
+test('Re-link with no changes shows Apply Changes greyed out', async ({ page }) => {
+  await enterDemo(page);
+  await openCompetencies(page);
+  await page.locator('button', { hasText: 'Re-link Curriculum' }).first().click();
+  await page.locator('[data-action="cmRelinkNext"]').click();
+  await expect(page.locator('.cm-import-foot')).toContainText('No changes.');
+  const apply = page.locator('[data-action="cmCompReviewApply"]');
+  await expect(apply).toBeDisabled();
+  expect(Number(await apply.evaluate(el => getComputedStyle(el).opacity))).toBeLessThan(0.6);
+});

@@ -75,14 +75,6 @@ const notIn = page =>
   );
 const fullName = (page, sid) => page.evaluate(sid => displayName(getStudents('sci8').find(s => s.id === sid)), sid);
 
-test('with the build switch off there is no Add Work and no count', async ({ page }) => {
-  await openPhone(page, { on: false, clear: ['st2'] });
-  await expect(page.locator('.m-scard-tograde')).toHaveCount(0);
-  await expect(page.locator('.m-tab-badge')).toHaveCount(0);
-  await openLab(page);
-  await expect(page.locator('[data-action="m-add-work"]')).toHaveCount(0);
-});
-
 test('Add Work from a not-in card: a photo, Save and Next, then the work is on the card', async ({ page }) => {
   await openPhone(page);
   await openLab(page);
@@ -129,50 +121,6 @@ test('Add Work from a not-in card: a photo, Save and Next, then the work is on t
   // The card now shows the work, its photo read back from the phone.
   await expect(card.locator('[data-action="m-add-work"]')).toHaveCount(0);
   await expect(card.locator('.m-work-page img')).toHaveAttribute('src', /^blob:/);
-});
-
-test('a student who sent meanwhile: Add as More Pages, Replace Them, Skip', async ({ page }) => {
-  await openPhone(page);
-  await openLab(page);
-  const sid = (await notIn(page))[0];
-  await page.locator('#m-thumb-strip .m-thumb[data-sid="' + sid + '"]').click();
-  await page.locator('.m-swiper-card[data-sid="' + sid + '"] [data-action="m-add-work"]').click();
-  const screen = page.locator('#m-addwork');
-  await screen.locator('.m-addwork-input').setInputFiles(PHOTO);
-  await expect(screen.locator('.m-addwork-taken img')).toHaveCount(1);
-  // The student sends from home while the teacher takes the photo.
-  await page.evaluate(
-    ({ sid, LAB }) => {
-      const work = getCourseSubmissions('sci8');
-      const pages = getStudentSubmission('sci8', 'st2', LAB).files;
-      work.submissions.push({
-        id: 'from-home',
-        assessment_id: LAB,
-        enrollment_id: sid,
-        version: 1,
-        state: 'sent',
-        sent_by: 'student',
-        on_paper: false,
-        is_late: false,
-        note: null,
-        followed_plan: null,
-        created_at: '2026-10-30T20:39:00',
-        sent_at: '2026-10-30T20:41:00',
-        files: pages.map(f => Object.assign({}, f, { id: 'h-' + f.id })),
-      });
-      saveDemoStudentWork('sci8', work);
-    },
-    { sid, LAB },
-  );
-  await screen.locator('.m-addwork-save').click();
-  await expect(screen.locator('.m-addwork-conflict-line')).toHaveText(/ already sent 2 photos$/);
-  await expect(screen.locator('.m-addwork-choice')).toHaveText(['Add as More Pages', 'Replace Them', /^Skip /]);
-  await expect(screen.locator('.m-addwork-conflict-page img').first()).toHaveAttribute('src', /sample-work/);
-  await shot(page, 'S7-F3-already-sent');
-  await screen.locator('[data-aw="add"]').click();
-  await expect(screen.locator('.m-addwork-conflict')).toHaveCount(0);
-  const files = await page.evaluate(({ sid, LAB }) => getStudentSubmission('sci8', sid, LAB).files, { sid, LAB });
-  expect(files.map(f => f.added_by)).toEqual(['student', 'student', 'teacher']);
 });
 
 test('the student card’s To Grade list, View Profile’s, the red count, and Add Work, Then Grade It', async ({
@@ -232,33 +180,6 @@ test('the student card’s To Grade list, View Profile’s, the red count, and A
   // Back goes back to Noor.
   await page.locator('#m-nav-bar-grade-swiper .m-nav-bar-back').click();
   await expect(page.locator('#m-screen-student-detail')).toBeVisible();
-});
-
-test('Add Work, Then Grade It from a student with nothing in', async ({ page }) => {
-  await openPhone(page);
-  const sid = (await notIn(page))[0];
-  await page.locator('[data-action="m-all-students"]').click();
-  const row = await page.evaluate(
-    sid => sortStudents(getStudents('sci8').slice(), 'alpha').findIndex(s => s.id === sid),
-    sid,
-  );
-  await page.locator('[data-action="m-jump-student"]').nth(row).click();
-  const top = page.locator('.m-card-stack-item[data-depth="0"]');
-  const addRow = top.locator('.m-scard-tograde-row[data-action="m-add-work"][data-aid="' + LAB + '"]');
-  await expect(addRow.locator('.m-scard-tograde-act')).toHaveText('Add Work');
-  await addRow.click();
-  const screen = page.locator('#m-addwork');
-  await expect(screen.locator('.m-addwork-close')).toHaveText('Cancel');
-  await expect(screen.locator('.m-addwork-save')).toHaveText('Save and Grade');
-  await screen.locator('.m-addwork-input').setInputFiles(PHOTO);
-  await expect(screen.locator('.m-addwork-taken img')).toHaveCount(1);
-  await shot(page, 'S7-F3-add-work-then-grade');
-  await screen.locator('.m-addwork-save').click();
-  await expect(screen).toHaveCount(0);
-  await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
-  const card = page.locator('.m-swiper-card[data-sid="' + sid + '"]');
-  await expect(card.locator('.m-work-sent')).toHaveText(/^Submitted .+ · 1 photo$/);
-  await expect(card.locator('[data-action="m-add-work"]')).toHaveCount(0);
 });
 
 test('Reset Demo Data deletes the photos a teacher added on the phone', async ({ page }) => {

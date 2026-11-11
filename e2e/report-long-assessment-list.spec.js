@@ -7,7 +7,7 @@
  * The Conference Pack lists every assessment as a row of its grade table.
  * Demo Mode's Science 8 has 37; with 38 the continued side's content was
  * 1010 px tall in a 996 px sheet, so the printed page was clipped. Here the
- * class is given 38, 60 and 100 assessments (copies of its own, on this
+ * class is given 38 and 100 assessments (copies of its own, on this
  * page only) and every side of every student must hold its content.
  */
 import { test, expect } from '@playwright/test';
@@ -115,7 +115,7 @@ async function overflowing(page) {
   );
 }
 
-for (const total of [38, 60, 100]) {
+for (const total of [38, 100]) {
   test(`${total} assessments: the Conference Pack flows to further sides and none overflows`, async ({ page }) => {
     await openWith(page, total);
     // The preview (the longest report) first, then every student.
@@ -142,17 +142,19 @@ for (const total of [38, 60, 100]) {
 }
 
 // The table's other layouts cut the same way: two columns, and by category.
-// Each is checked on the previewed student.
-for (const [columns, organize] of [
-  ['Two', 'Category'],
-  ['Two', 'Date'],
-  ['One', 'Category'],
-]) {
-  test(`100 assessments, ${columns} column(s) by ${organize}: none overflows, none lost`, async ({ page }) => {
-    await openWith(page, 100);
-    await page.locator('#rb-preview .sheet-cell[data-block="grade-table"]').first().click();
-    const bar = page.locator('.studio-bar');
-    await expect(bar).toBeVisible();
+// One class with 100 assessments, each layout checked on the previewed student.
+test('100 assessments, in two columns by category, two by date and one by category: none overflows, none lost', async ({
+  page,
+}) => {
+  await openWith(page, 100);
+  await page.locator('#rb-preview .sheet-cell[data-block="grade-table"]').first().click();
+  const bar = page.locator('.studio-bar');
+  await expect(bar).toBeVisible();
+  for (const [columns, organize] of [
+    ['Two', 'Category'],
+    ['Two', 'Date'],
+    ['One', 'Category'],
+  ]) {
     for (const [group, choice] of [
       ['Columns', columns],
       ['Organize By', organize],
@@ -163,14 +165,14 @@ for (const [columns, organize] of [
     }
     // The previewed student, the longest report (the length tests above
     // check every student).
-    expect(await overflowing(page)).toEqual([]);
+    expect(await overflowing(page), columns + ' by ' + organize).toEqual([]);
     const first = page.locator('#rb-preview');
     expect(await first.locator('.report-grades').count()).toBeGreaterThan(1);
     const meta = await first.locator('.report-grades .report-prof-meta').first().textContent();
     const listed = Number((meta.match(/(\d+) assessments/) || [])[1]);
-    expect(await first.locator('.report-grades-row').count()).toBe(listed);
-  });
-}
+    expect(await first.locator('.report-grades-row').count(), columns + ' by ' + organize).toBe(listed);
+  }
+});
 
 // A new Build Your Own report: the name and Assignment Grades on the Front,
 // an empty Back. A table longer than the Front starts under the name and

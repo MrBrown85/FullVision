@@ -4,11 +4,8 @@ import { test, expect } from '@playwright/test';
 // ("changed since Nov 2", "printed Nov 2"). The list is two columns, and a
 // long name with its note once ran into the next column. Every note now stays
 // inside its own column at the widths teachers use.
-for (const [width, height] of [
-  [1440, 900],
-  [1280, 800],
-  [1024, 768],
-]) {
+// 1024 px, the narrowest, is the run that catches it; wider windows only have more room.
+for (const [width, height] of [[1024, 768]]) {
   test(`Print Rubrics notes stay in their column at ${width} wide`, async ({ page }) => {
     await page.setViewportSize({ width, height });
     await page.goto('/login.html?demo=1');

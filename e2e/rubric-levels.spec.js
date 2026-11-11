@@ -96,7 +96,7 @@ test.describe('Rubric Levels', () => {
     await seedRubric(page);
   });
 
-  test('Extending first by default, Emerging first once the class chooses it', async ({ page }) => {
+  test('Extending first by default, Emerging first once the class chooses it, and after a reload', async ({ page }) => {
     await gotoApp(page, '/dashboard');
     await openCard(page);
     expect(await cardOrder(page)).toEqual({ header: DESC, row: DESC });
@@ -123,13 +123,9 @@ test.describe('Rubric Levels', () => {
     await first.click();
     await expect(first).toHaveClass(/active/);
     expect(await printedHeads(page)).toEqual(ASC);
-  });
 
-  test('a class that chose Emerging first opens that way', async ({ page }) => {
-    await page.addInitScript(cid => {
-      localStorage.setItem('gb-courseconfig-' + cid, JSON.stringify({ levelOrder: 'asc' }));
-    }, TEST_COURSE.id);
-    await gotoApp(page, '/dashboard');
+    // A class that chose Emerging first opens that way.
+    await page.reload();
     await openCard(page);
     expect(await cardOrder(page)).toEqual({ header: ASC, row: ASC });
   });

@@ -234,24 +234,29 @@ test.describe('a real card: what stops it, and what each one says', () => {
       'This card needs to be printed again. Ask your teacher for a new card.',
     ],
   ];
-  for (const [error, card, line] of WHY) {
-    test(`a card answered ${error} says why`, async ({ page }) => {
+  // The four answers on one page: each is a fresh card address and a fresh stand-in function.
+  test('a card the school answers closed, locked, expired or needing a reprint says why', async ({ page }) => {
+    for (const [error, card, line] of WHY) {
+      await page.goto('about:blank');
       const fn = school(card);
       const posts = await serve(page, fn);
       await page.goto('/s/#P3R8-WDK4');
-      await expect(page.getByRole('alert')).toHaveText(line);
+      await expect(page.getByRole('alert'), error).toHaveText(line);
       await expect(page).toHaveURL(/\/s\/$/);
       await expect(page.getByLabel('Student Number')).toHaveCount(0);
-      expect(routes(posts)).toEqual(['card']);
-      expect(fn.logs.map(l => l.outcome)).toEqual([error]);
+      expect(routes(posts), error).toEqual(['card']);
+      expect(
+        fn.logs.map(l => l.outcome),
+        error,
+      ).toEqual([error]);
       await fits(page);
       await named(page);
       await contrast(page);
       await shot(page, '10-' + error.replace('_', '-'));
       await page.getByRole('button', { name: 'Type a Different Code' }).tap();
       await expect(page.getByLabel('Card Code')).toBeVisible();
-    });
-  }
+    }
+  });
 
   test('the card’s password, a wrong one, and the lock after five', async ({ page }) => {
     const fn = school({ birthday: null, number: null, password: '4821' });
@@ -361,23 +366,26 @@ test.describe('a real card: what stops it, and what each one says', () => {
     ['closed', { closed: true }, 'The student page is turned off for this class. Ask your teacher.'],
     ['not_found', { withdrawn: true }, "Your page for this class can't be opened any more. Ask your teacher."],
   ];
-  for (const [error, change, line] of GONE) {
-    test(`the page answered ${error} says why and signs the device out`, async ({ page }) => {
+  test('the page answered stopped, expired, closed or not found says why and signs the device out', async ({
+    page,
+  }) => {
+    for (const [error, change, line] of GONE) {
+      await page.goto('about:blank');
       const fn = school();
       const posts = await serve(page, fn);
       await signIn(page);
       Object.assign(fn.state.cards.P3R8WDK4, change);
       posts.length = 0;
       await page.reload();
-      await expect(page.getByRole('alert')).toHaveText(line);
+      await expect(page.getByRole('alert'), error).toHaveText(line);
       await expect(page.locator('.sp-row')).toHaveCount(0);
       await expect(page.getByRole('button', { name: 'Try Again' })).toHaveCount(0);
-      await expect.poll(() => routes(posts)).toEqual(['page', 'done']);
-      expect((await stored(page)).local).toEqual({});
+      await expect.poll(() => routes(posts), error).toEqual(['page', 'done']);
+      expect((await stored(page)).local, error).toEqual({});
       await named(page);
       await shot(page, '13-page-' + error.replace('_', '-'));
-    });
-  }
+    }
+  });
 
   test('when calc.js can’t be fetched the real list opens without results, and tells the server nothing yet', async ({
     page,
