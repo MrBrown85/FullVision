@@ -405,6 +405,30 @@ window.StudentView = (function () {
     };
   }
 
+  /* A returned grade changed since the student last looked (the
+     artboard's "A Returned Grade Was Updated"): when, and on each row whose
+     level moved, the level the student saw before ("Was Developing"),
+     named by constants.js's scoreLevelText. The reply's `previous` is the
+     grade before the newest return. */
+  function markWas(piece, row) {
+    var previous = row.previous;
+    var tagIds = row.tag_ids || [];
+    piece.updatedAt = str(row.updated_at);
+    if (!previous || typeof previous !== 'object') return;
+    var rows = piece.rubric ? piece.rubric.rows : piece.competencies;
+    var before = (piece.rubric ? previous.criteria : previous.tags) || {};
+    // An Overall level alone stands under the first competency, as the page shows it.
+    if (!piece.rubric && !Object.keys(before).length && num(previous.value) > 0 && tagIds.length) {
+      before = {};
+      before[tagIds[0]] = { value: previous.value, modifier: previous.modifier };
+    }
+    rows.forEach(function (r) {
+      var p = before[r.id];
+      var was = p && num(p.value) > 0 ? scoreLevelText(num(p.value), num(p.modifier) || 0) : '';
+      if (was && was !== r.text) r.was = was;
+    });
+  }
+
   // What a piece is graded on: its competencies by name, in the reply's order.
   function gradedOn(row, tags) {
     return (row.tag_ids || [])
@@ -428,7 +452,12 @@ window.StudentView = (function () {
        work:    [ piece ], newest first,
        changes: [ { id, title, why: 'updated' | 'back' } ],
        levels:  [ { level, name } ], Emerging to Extending (What the
-                Levels Mean), or none while constants.js is not in }
+                Levels Mean), or none while constants.js is not in,
+       questionnaires: [ { id, title, line, minutes, state: 'open' |
+                'sent' | 'soon', opensOn, until, sentOn } ],
+       reports: [ { id, title, issued, until, isNew, result: { word, text,
+                level }, comment } ],
+       learning: null here; fromCache's My Learning (learning() below) }
      piece: { id, title, date, dueDate, kind: 'due' | 'back' | 'missing' |
               'excused', late, returnedAt, updated, unseen,
               result: { kind: 'level' | 'points' | 'complete' | 'none',
@@ -436,6 +465,7 @@ window.StudentView = (function () {
                         1-4 band); for points: points, outOf, percent,
                         bar },
               comment, competencies: [ row ], gradedOn: [ { id, name } ],
+              updatedAt (when updated), and on a row that moved, was,
               rubric: null | { id, name, style, rows: [ row + beyond,
               descriptors, checks, levelName, descriptor, shown, next,
               goal, whole ] } }
@@ -505,6 +535,7 @@ window.StudentView = (function () {
               return levelRow(id, (tags[id] || {}).label, parts[id]);
             });
         }
+        if (piece.updated) markWas(piece, row);
       }
       work.push(piece);
     });
@@ -535,7 +566,62 @@ window.StudentView = (function () {
       work: work,
       changes: changes,
       levels: levelsLegend(),
+      questionnaires: questionnairesOf(page),
+      reports: reportsOf(page),
+      // My Learning: fromCache fills it when the class shows it. The
+      // server's `page` sends nothing for it yet, so on the student's own
+      // device it stays null and the tab says it is off.
+      learning: null,
     };
+  }
+
+  /* The Questionnaires and Reports tabs (S4-F4), from the reply's
+     `questionnaires` and `reports` when it has them. The server's `page`
+     sends neither yet (see the S4-F4 pull request): until it does both lists
+     are empty, from either door. The server decides each questionnaire's
+     state, so nothing here reads a clock.
+       questionnaire: { id, title, description, minutes, state: 'open' |
+                        'sent' | 'not_open_yet', opens_on, closes_on, sent_at }
+       report:        { id, title, issued_at, expires_on, opened_at,
+                        overall: { word, text, level }, comment: [ text ] }
+     The report's overall and comment are the phone report as the teacher
+     sent it (worded by calc.js when it was sent), as s/report.js shows it. */
+  var Q_STATES = { open: 'open', sent: 'sent', not_open_yet: 'soon' };
+  function questionnairesOf(page) {
+    return (Array.isArray(page.questionnaires) ? page.questionnaires : [])
+      .filter(function (q) {
+        return q && q.id && Q_STATES[q.state];
+      })
+      .map(function (q) {
+        return {
+          id: str(q.id),
+          title: str(q.title),
+          line: str(q.description),
+          minutes: num(q.minutes),
+          state: Q_STATES[q.state],
+          opensOn: str(q.opens_on).slice(0, 10),
+          until: str(q.closes_on).slice(0, 10),
+          sentOn: str(q.sent_at),
+        };
+      });
+  }
+  function reportsOf(page) {
+    return (Array.isArray(page.reports) ? page.reports : [])
+      .filter(function (r) {
+        return r && r.id;
+      })
+      .map(function (r) {
+        var o = r.overall && typeof r.overall === 'object' ? r.overall : {};
+        return {
+          id: str(r.id),
+          title: str(r.title),
+          issued: str(r.issued_at),
+          until: str(r.expires_on).slice(0, 10),
+          isNew: !r.opened_at,
+          result: { word: str(o.word), text: str(o.text), level: num(o.level) },
+          comment: Array.isArray(r.comment) ? str(r.comment[0]) : str(r.comment),
+        };
+      });
   }
 
   /* Newest first, by due date, or the date with none. Two pieces with the
@@ -557,20 +643,233 @@ window.StudentView = (function () {
     });
   }
 
+  /* ── My Learning (S13-T1) ──────────────────────────────────── */
+
+  /* Show My Learning, the class's switch (Class Settings › Student Page,
+     S13-F1): on only when the class's settings say so. Missing is off. */
+  function learningOn(cid) {
+    var cfg = (typeof getCourseConfig === 'function' && getCourseConfig(cid)) || {};
+    return cfg.show_my_learning === true;
+  }
+
+  // A whole level, 1 to 4, for a level's colour and its step on the ladder; 0 with none (calc.js's).
+  function bandOf(value) {
+    return nearestScoreLevel(Number(value)).level;
+  }
+
+  /* One skill's mark on one returned piece: the piece, its date, and the
+     mark named by constants.js's scoreLevelText ("Proficient +") in a class
+     that uses levels, or calc.js's formatLevel ("78%") in a Letter class.
+     `value` places it on How It's Going (a + or − a third of a level, as
+     every calculation counts it). */
+  function markOf(cid, p, e) {
+    var value = scoreModValue(e);
+    var whole = e.level != null ? Number(e.level) : Number(e.score);
+    var letter = courseGradeMode(cid) === 'letter';
+    return {
+      id: p.id,
+      title: p.title,
+      date: p.dueDate || p.date || '',
+      value: value,
+      level: bandOf(value),
+      text: letter ? formatLevel(cid, value) : scoreLevelText(whole, e.mod) || levelText(cid, value),
+      code: letter ? '' : levelCode(value),
+    };
+  }
+
+  /* One skill (a competency of the learning map): its name, its I Can
+     statements as the learning map holds them (the curriculum bank's), the
+     level calc.js gives it from returned work (getSectionProficiency),
+     worded as the class grades, and its marks on each returned piece,
+     newest first. */
+  function skillOf(cid, sid, sec, back) {
+    var value = getSectionProficiency(cid, sid, sec.id);
+    var letter = courseGradeMode(cid) === 'letter';
+    var iCan = [];
+    var pieces = [];
+    (sec.tags || []).forEach(function (t) {
+      (t.i_can_statements || t.iCanStatements || []).forEach(function (s) {
+        var line = str(s).trim();
+        if (line) iCan.push(line);
+      });
+      tagMarksByAssessment(cid, sid, t.id).forEach(function (e) {
+        var p = back[e.assessmentId];
+        if (p && Number(e.score) > 0) pieces.push(markOf(cid, p, e));
+      });
+    });
+    pieces.sort(function (x, y) {
+      return x.date === y.date ? 0 : x.date < y.date ? 1 : -1;
+    });
+    var has = value > 0;
+    return {
+      id: str(sec.id),
+      name: str(sec.name || sec.shortName || sec.id),
+      level: bandOf(value),
+      text: has ? (letter ? formatLevel(cid, value) : levelWord(cid, value)) : '',
+      code: has && !letter ? levelCode(value) : '',
+      iCan: iCan,
+      pieces: pieces,
+      value: has ? value : 0,
+    };
+  }
+
+  /* The class's skills in the learning map's order, in its folders, under
+     each course's name when the class holds more than one. */
+  function skillGroups(cid, sid, back) {
+    var grouped = getGroupedSections(cid) || { groups: [], ungrouped: [] };
+    var subjects = {};
+    ((typeof getSubjects === 'function' && getSubjects(cid)) || []).forEach(function (s) {
+      if (s && s.id) subjects[s.id] = str(s.name || s.label);
+    });
+    var out = [];
+    var add = function (folder, sections) {
+      var bySubject = [];
+      sections.forEach(function (sec) {
+        var subject = subjects[sec.subject] || '';
+        var last = bySubject[bySubject.length - 1];
+        if (!last || last.subject !== subject) bySubject.push((last = { subject: subject, sections: [] }));
+        last.sections.push(sec);
+      });
+      bySubject.forEach(function (g) {
+        out.push({
+          subject: g.subject,
+          folder: folder,
+          skills: g.sections.map(function (sec) {
+            return skillOf(cid, sid, sec, back);
+          }),
+        });
+      });
+    };
+    (grouped.groups || []).forEach(function (g) {
+      if (g && g.sections && g.sections.length) add(str(g.group.name || g.group.label), g.sections);
+    });
+    if ((grouped.ungrouped || []).length) add('', grouped.ungrouped);
+    // One course's name says nothing; two or more head their skills.
+    var names = {};
+    out.forEach(function (g) {
+      if (g.subject) names[g.subject] = true;
+    });
+    if (Object.keys(names).length < 2) {
+      out.forEach(function (g) {
+        g.subject = '';
+      });
+    }
+    return out;
+  }
+
+  /* What Makes Up Your Grade: each category with a grade, its weight and
+     the student's letter and % on its work (calc.js's assessmentGroupGrade,
+     the category's own way of adding up). Letter and Both classes only. */
+  function categoriesOf(cid, sid) {
+    if (courseGradeMode(cid) === 'proficiency') return [];
+    var all = getAssessments(cid) || [];
+    return ((typeof getCategories === 'function' && getCategories(cid)) || [])
+      .slice()
+      .sort(function (x, y) {
+        return (Number(x.displayOrder) || 0) - (Number(y.displayOrder) || 0);
+      })
+      .map(function (category) {
+        var g = assessmentGroupGrade(
+          cid,
+          sid,
+          all.filter(function (a) {
+            return (a.categoryId || a.category_id || null) === category.id;
+          }),
+          typeof categoryCalcMode === 'function' ? categoryCalcMode(category) : 'points',
+        );
+        if (!g || !g.letter) return null;
+        return {
+          id: str(category.id),
+          name: str(category.name),
+          weight: num(category.weight),
+          text: g.letter,
+          level: g.level,
+        };
+      })
+      .filter(Boolean);
+  }
+
+  /* The student's My Learning, from the teacher's cache. Called inside
+     withReturnedOnly (fromCache), so every level, letter and % is calc.js's
+     on returned work only, for the year so far. `view` is the page built
+     from the same reply (its returned pieces and its Missing work).
+       { mode: 'proficiency' | 'letter' | 'both', empty,
+         overall: { text, level, word, letter: null | { grade, pct } },
+         categories: [ { id, name, weight, text, level } ],
+         strongest: skill | null, missing: [ piece ], work: [ piece ]
+         (returned pieces with a result, newest first),
+         groups: [ { subject, folder, skills: [ skill ] } ] }
+       skill: { id, name, level, text, code, iCan: [ text ], pieces:
+         [ { id, title, date, value, level, text, code } ] }
+     Nothing in it is another student's or the class's: no average, no
+     rank, no count of anyone else. Left out until calc.js has them (Colin's
+     review): how the grade moved in a month, and the Next Step. */
+  function learning(cid, sid, view) {
+    return readAsOfTerm(cid, null, function () {
+      var mode = courseGradeMode(cid);
+      var back = {};
+      var work = [];
+      view.work.forEach(function (p) {
+        if (p.kind === 'back' && p.result && p.result.text) {
+          back[p.id] = p;
+          work.push(p);
+        }
+      });
+      var groups = skillGroups(cid, sid, back);
+      var strongest = null;
+      groups.forEach(function (g) {
+        g.skills.forEach(function (s) {
+          if (s.value > 0 && (!strongest || s.value > strongest.value)) strongest = s;
+        });
+      });
+      var badges = studentGradeBadges(cid, sid);
+      var summary = studentGradeSummary(cid, sid);
+      var overall = {
+        text: summary.text,
+        level: summary.level,
+        word: badges.prof ? levelWord(cid, getOverallProficiency(cid, sid)) : '',
+        letter: badges.letter ? { grade: str(badges.letter.grade), pct: str(badges.letter.pct) } : null,
+      };
+      groups.forEach(function (g) {
+        g.skills.forEach(function (s) {
+          delete s.value;
+        });
+      });
+      var missing = view.work
+        .filter(function (p) {
+          return p.kind === 'missing';
+        })
+        .reverse();
+      return {
+        mode: mode,
+        empty: !summary.text && !work.length,
+        overall: overall,
+        categories: categoriesOf(cid, sid),
+        strongest: strongest,
+        missing: missing,
+        work: work,
+        groups: groups,
+      };
+    });
+  }
+
   /* ── The two doors ─────────────────────────────────────────── */
 
   /* Preview as Student: one student's page from the teacher's cache.
      { ready: false } while the class's returned grades cannot be read;
      otherwise { ready: true, reply, view }. Every result is worked out by
-     calc.js on returned grades only. */
+     calc.js on returned grades only. view.learning is My Learning when the
+     class shows it, else null. */
   function fromCache(cid, sid) {
     var page = reply(cid, sid);
     if (!page) return { ready: false };
     var view = withReturnedOnly(function () {
-      return build(page, cid, function (aid) {
+      var v = build(page, cid, function (aid) {
         var a = pieceOf(cid, aid);
         return a ? assessmentCellValue(cid, sid, a) : null;
       });
+      v.learning = learningOn(cid) ? learning(cid, sid, v) : null;
+      return v;
     });
     return { ready: true, reply: page, view: view };
   }
@@ -599,5 +898,6 @@ window.StudentView = (function () {
     build: build,
     fromCache: fromCache,
     fromPage: fromPage,
+    learningOn: learningOn,
   };
 })();

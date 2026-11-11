@@ -1214,6 +1214,10 @@ var StudentCards = (function () {
     newCodesQuestion: newCodesQuestion,
     _holding: _holding,
     _reset: _reset,
+    // The press out for a class, or a promise of 0 with none (tests wait on the press itself, not the clock).
+    _making: function (cid) {
+      return _st(cid).making || Promise.resolve(0);
+    },
     _stoppedLine: _stoppedLine,
     _pagehide: _pagehide,
     _pageshow: _pageshow,

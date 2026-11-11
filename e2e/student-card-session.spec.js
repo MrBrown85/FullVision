@@ -626,7 +626,8 @@ test.describe('"opened" means the row was on screen', () => {
     await signIn(page);
     await expect(page.locator('.sp-row')).toHaveCount(39);
     const first = await onScreen(page);
-    expect(first.length).toBeGreaterThan(5);
+    // Fewer than a whole screen of rows: the line over the list (S4-F5) takes some room.
+    expect(first.length).toBeGreaterThan(4);
     expect(first.length).toBeLessThan(20);
     expect(first[0]).toBe('Piece 01');
     await expect.poll(() => sent(fn, posts)).toEqual([first]);
@@ -762,6 +763,8 @@ test.describe('"opened" means the row was on screen', () => {
       document.dispatchEvent(new Event('visibilitychange'));
     });
     await expect(page.locator('#app')).toHaveCSS('visibility', 'visible');
+    // The line over the list (What Changed Since You Last Looked, S4-F5) takes room: the student scrolls to the last row.
+    await page.evaluate(() => [...document.querySelectorAll('.sp-row')].pop().scrollIntoView({ block: 'center' }));
     await expect.poll(() => sent(fn, posts).length).toBe(1);
     expect(sent(fn, posts)[0]).toContain('Lab Safety Contract');
   });
