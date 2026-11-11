@@ -24,19 +24,30 @@ from the service's source: the service itself is not run.
            shapes, replays.
   student  work, send_start, send_finish, replace, unsend, file_links as
            the student-submit function calls them: every refusal, every
-           happy path, replays, the hourly limit, grading, and that no
-           grade is read or written.
+           happy path, replays, the two hours a started send holds its
+           place, open and late asked again at the finish, whose pages an
+           Unsend removes, what a class may hold, the hourly limit,
+           grading, and that no grade is read or written.
   storage  The bucket and its four policies, as a teacher, another teacher,
-           nobody and the service key; one careless policy added on top;
-           the removal queue from every way a row can go; that SQL cannot
-           delete a file.
+           nobody and the service key (a teacher reads handed-in work and
+           their own uploads, nothing else); one careless policy added on
+           top; the removal queue from every way a row can go; that SQL
+           cannot delete a file; rows as a versioned bucket would have
+           them; the second file's two checks of the bucket's versioning.
   race     On connections of their own: two sends at once, Unsend during a
            send, Unsend against a grade being saved, Replace during
-           grading, a send against its assessment being deleted, the hourly
-           limit under a burst, and a mix of everything.
+           grading, the same teacher request twice (and that the second
+           waits for the class, not for the request's key), a student
+           withdrawn as they send, a send against its assessment being
+           deleted, the hourly limit under a burst, and a mix of
+           everything.
   grants   The files' own revokes and grants, on a copy where a new
            function is runnable by everyone unless the file says otherwise.
   suites   The older suites, untouched, with the two files applied.
+  scale    With a million submissions in the table and 300,000 files in the
+           bucket: deleting an assessment for a teacher who never used
+           photos, handing in 30 pages, and a teacher reading one page stay
+           fast, and each look-up is by an index.
 
 PGPORT=54341 PGDATABASE=bb python3 submissions_common.py build
 PGPORT=54341 PGDATABASE=bb python3 submissions.py
@@ -650,7 +661,10 @@ def scen_student():
             again = d.send_start(tok, ENR1, a, pages=2, request=req)
             ok('one minute before its two hours are up a repeat of the start still answers with its paths, and with the finish_by of the first start, not a new one',
                again.get('replayed') is True and again['files'] == s['files']
-               and d.one("select :f::timestamptz = now() + interval '1 minute'", f=again['finish_by']), again)
+               and d.one("select :f::timestamptz = now() + interval '1 minute'", f=again['finish_by'])
+               and d.one("select created_at = now() - interval '1 hour 59 minutes' from submission where id = :s", s=s['submission_id']), again)
+            ok('nor did the repeat move the time its two hours are counted from: the row still says when it was first started, and its links still die when they did',
+               d.one("select s.created_at = now() - interval '1 hour 59 minutes' and bool_and(f.link_dies_at = now() + interval '4 hours 10 minutes') from submission s join submission_file f on f.submission_id = s.id where s.id = :s group by s.created_at", s=s['submission_id']))
             d.run("update submission set created_at = now() - interval '2 hours 1 minute' where id = :s", s=s['submission_id'])
             ok('past two hours, the page no longer shows it as a send in progress', d.work(tok, ENR1)['assessments'][0]['sending'] is None)
             r = d.send_start(tok, ENR1, a, pages=2, request=req)
@@ -688,6 +702,13 @@ def scen_student():
                d.all("select enrollment_id, sent_by from submission") == [[ENR1, 'student']] and len(queued(d, 'expired')) == 4, (d.all('select enrollment_id, sent_by, state from submission'), queued(d)))
             ok("the teacher finishing that upload now: gone", d.rpc('finish_work_upload(:s, :f::jsonb, :k)', s=up['submission_id'],
                                                                   f=json.dumps([{'file_id': up['files'][0]['file_id'], 'sha256': HASH}]), k=nid()) == {'result': 'gone'})
+        with tx(d):
+            up = d.rpc('start_work_upload(:a, :e, :p::jsonb, :m, :k)', a=a, e=ENR2, p='[{}]', m='new', k=nid()); f_ = up['files'][0]
+            for p_ in (f_['path'], f_['thumb_path']): d.storage.put_as('authenticated', A, p_)
+            d.run("update submission set created_at = now() - interval '2 hours 1 minute' where id = :s", s=up['submission_id'])
+            r = d.rpc('finish_work_upload(:s, :f::jsonb, :k)', s=up['submission_id'], f=json.dumps([{'file_id': f_['file_id'], 'sha256': HASH}]), k=nid())
+            ok("the teacher's own upload, every file up, finished more than two hours after it was started: gone. Nothing is handed in, and its two files are queued as expired",
+               r == {'result': 'gone'} and d.one('select count(*) from submission') == 0 and queued(d, 'expired') == sorted([f_['path'], f_['thumb_path']]), (r, queued(d)))
 
         # ── The switches change between start and finish ────────────────
         with tx(d):
@@ -951,6 +972,12 @@ def scen_storage():
             ok('a path that differs by one character is refused (403)', put('authenticated', A, f['path'][:-5] + ('0' if f['path'][-5] != '0' else '1') + '.jpg') == 403)
             ok('Teacher A can write it, and its thumbnail', put('authenticated', A, f['path']) == 'stored' and put('authenticated', A, f['thumb_path']) == 'stored')
             ok('a second file at the same path is refused (409)', put('authenticated', A, f['path']) == 409)
+            s3 = d.rpc('start_work_upload(:a, :e, :p::jsonb, :m, :k)', a=a, e=ENR2, p='[{}]', m='new', k=nid())
+            d.run("update submission set created_at = now() - interval '2 hours 1 minute' where id = :s", s=s3['submission_id'])
+            ok('an upload that has lost its place (started more than two hours ago) takes no more files (403)', put('authenticated', A, s3['files'][0]['path']) == 403)
+            d.run("update submission set created_at = now() - interval '1 hour 59 minutes' where id = :s", s=s3['submission_id'])
+            ok('one minute before, it does', put('authenticated', A, s3['files'][0]['path']) == 'stored')
+            st.remove([s3['files'][0]['path']]); d.rpc('delete_submission(:s, :k)', s=s3['submission_id'], k=nid())
             st2 = d.send_start(tok, ENR1, a, pages=1)
             ok("a teacher cannot write a path that was named for a student's send (403): that goes through the student's link", put('authenticated', A, st2['files'][0]['path']) == 403)
             d.rpc('finish_work_upload(:s, :f::jsonb, :k)', s=s['submission_id'], f=json.dumps([{'file_id': f['file_id'], 'sha256': HASH}]), k=nid())
@@ -1129,6 +1156,20 @@ def scen_storage():
             d.run("update storage.objects set is_delete_marker = false, metadata = '{\"size\": 9000, \"mimetype\": \"image/jpeg\"}' where name = :n", n=f['thumb_path'])
             ok('the current version is, versioned row or not, with its own size and not the archived one\'s', d.send_finish(tok, ENR1, s['submission_id'], s['files'])['ok'] is True
                and d.all('select bytes, thumb_bytes from submission_file') == [[300000, 9000]])
+
+        # ── The bucket keeps no old version of a file ───────────────────
+        # (Last: these two change the bucket for good.) Checked twice by the second file, each where only it can:
+        # its first check on a bucket that is already there, its last step on the one it has just made.
+        d.run("update storage.buckets set versioning_status = 'ENABLED' where id = 'student-photos'")
+        r = d.file(M2_USED)
+        ok("the second file, run on a bucket that has been set to keep old versions, stops at its first check and says what it found",
+           r.startswith('STOPPED') and 'versioning ENABLED' in r, r)
+        d.run("set storage.allow_delete_query = 'true'")
+        d.run("delete from storage.objects where bucket_id = 'student-photos'"); d.run("delete from storage.buckets where id = 'student-photos'")
+        d.run("alter table storage.buckets alter column versioning_status set default 'ENABLED'")
+        r = d.file(M2_USED)
+        ok("and where storage itself would make a new bucket keep old versions (its default changed), the second file's last step stops it: no bucket is left behind",
+           r.startswith('STOPPED') and 'the bucket student-photos is not private' in r and d.one("select count(*) from storage.buckets where id = 'student-photos'") == 0, r)
     finally:
         d.close()
 
@@ -1149,8 +1190,14 @@ def scen_race():
         h = side(); h.begin(); a1 = attempt(lambda: first(h))
         out = {}; o = side()
         t = threading.Thread(target=lambda: out.setdefault('r', attempt(lambda: second(o)))); t.start(); time.sleep(0.6)
-        waited = t.is_alive(); h.commit(); t.join(15); let_go(h, o)
+        waited = t.is_alive()
+        # What it is waiting for: how many sessions of this database are in line for a request's own key
+        # (the advisory lock fv_idem_check takes) rather than for the class's row.
+        waits['for_a_key'] = d.one("select count(*) from pg_locks l where l.locktype = 'advisory' and not l.granted "
+                                   "and l.database = (select oid from pg_database where datname = current_database())")
+        h.commit(); t.join(15); let_go(h, o)
         return waited, a1, out.get('r')
+    waits = {}
     try:
         a = k['takes']
         tok, _ = d.session(ENR1); tok2, _ = d.session(ENR2, birthday='2012-06-16')
@@ -1185,7 +1232,7 @@ def scen_race():
         s = d.send_start(tok, ENR1, a); d.upload(s['files'])
         waited, f, u = second_waits(lambda x: x.send_finish(tok, ENR1, s['submission_id'], s['files']), lambda x: x.unsend(tok, ENR1, a))
         ok('Unsend while the send is being finished, the finish first: Unsend waits, then unsends what was just handed in; its files are queued',
-           waited and f['ok'] and u == {'ok': True, 'unsent': True, 'cancelled': False, 'pages': 1} and d.one('select count(*) from submission') == 0 and sound(d) == '', (f, u))
+           waited and f['ok'] and u == {'ok': True, 'unsent': True, 'cancelled': False, 'pages': 1, 'kept': 0} and d.one('select count(*) from submission') == 0 and sound(d) == '', (f, u))
         s = d.send_start(tok, ENR1, a); d.upload(s['files'])
         waited, u, f = second_waits(lambda x: x.unsend(tok, ENR1, a), lambda x: x.send_finish(tok, ENR1, s['submission_id'], s['files']))
         ok('the other way round, Unsend first: it drops the unfinished send; the finish waits, then is not_found; nothing is handed in',
@@ -1238,6 +1285,59 @@ def scen_race():
         waited, t1, t2 = second_waits(start, start)
         ok("the teacher's same Add Work request sent twice at once: the second waits and is given the first's answer; one upload, not two",
            waited and t1['result'] == 'ready' and t2 == t1 and d.one('select count(*) from submission') == 1, (t1, t2))
+        # Every teacher write that takes the class takes it FIRST and asks for its remembered answer under it: one
+        # order for the two locks (the class, then the request's key), whichever call it is.
+        ok('and what the second waited for was the class, not the key of the request', waits['for_a_key'] == 0, waits)
+        # The other four teacher writes ask for their remembered answer under the class lock too.
+        for f_ in t1['files']:
+            for p_ in (f_['path'], f_['thumb_path']): d.storage.put_as('authenticated', A, p_)
+        tf = json.dumps([{'file_id': t1['files'][0]['file_id'], 'sha256': HASH}])
+        d.rpc('finish_work_upload(:s, :f::jsonb, :k)', s=t1['submission_id'], f=tf, k=nid())
+        # An Add as More Pages: finished, its own row is gone, so a second run of the finish would answer "gone".
+        t3 = d.rpc('start_work_upload(:a, :e, :p::jsonb, :m, :k)', a=a, e=ENR1, p='[{}]', m='add', k=nid())
+        for f_ in t3['files']:
+            for p_ in (f_['path'], f_['thumb_path']): d.storage.put_as('authenticated', A, p_)
+        same = nid(); tf = json.dumps([{'file_id': t3['files'][0]['file_id'], 'sha256': HASH}])
+        fin = lambda x: x.rpc('finish_work_upload(:s, :f::jsonb, :k)', s=t3['submission_id'], f=tf, k=same)
+        waited, r1, r2 = second_waits(fin, fin)
+        ok("the same finish_work_upload request twice at once (an Add as More Pages): the second waits and is given the first's answer, sent with 2 pages, not gone",
+           waited and r1['result'] == 'sent' and len(r1['submission']['files']) == 2 and r2 == r1, (r1, r2))
+        ok('finish_work_upload: the second waited for the class, not the key', waits['for_a_key'] == 0, waits)
+        same = nid(); fid = t1['files'][0]['file_id']
+        turn = lambda x: x.rpc('rotate_submission_page(:f, 90, :k)', f=fid, k=same)
+        waited, r1, r2 = second_waits(turn, turn)
+        ok("the same rotate_submission_page request twice at once: the second waits and is given the first's answer", waited and r1 == {'file_id': fid, 'rotation': 90} and r2 == r1, (r1, r2))
+        ok('rotate_submission_page: the second waited for the class, not the key', waits['for_a_key'] == 0, waits)
+        same = nid()
+        paper = lambda x: x.rpc('mark_handed_in_paper(:a, :e, :k)', a=a, e=[ENR2], k=same)
+        waited, r1, r2 = second_waits(paper, paper)
+        ok("the same mark_handed_in_paper request twice at once: the second waits and is given the first's answer (marked 1, not 0)",
+           waited and r1['marked'] == 1 and r2 == r1 and d.one('select count(*) from submission where on_paper') == 1, (r1, r2))
+        ok('mark_handed_in_paper: the second waited for the class, not the key', waits['for_a_key'] == 0, waits)
+        same = nid()
+        gone = lambda x: x.rpc('delete_submission(:s, :k)', s=t1['submission_id'], k=same)
+        waited, r1, r2 = second_waits(gone, gone)
+        ok("the same delete_submission request twice at once: the second waits and is given the first's answer (deleted true, not false)",
+           waited and r1 == {'deleted': True, 'pages': 2} and r2 == r1, (r1, r2))
+        ok('delete_submission: the second waited for the class, not the key', waits['for_a_key'] == 0, waits)
+        clear()
+
+        # ── A student is withdrawn as their send starts ─────────────────
+        waited, w, s = second_waits(lambda h: h.rpc('withdraw_student(:e, :k)', e=ENR2, k=nid()), lambda o: o.send_start(tok2, ENR2, a))
+        ok('the teacher is withdrawing a student when that student starts a send: the send waits for the class, then is not_found; nothing is made',
+           waited and err(s) == 'not_found' and d.one('select count(*) from submission') == 0, (w, s))
+        d.run('update enrollment set withdrawn_at = null where id = :e', e=ENR2)
+        clear()
+
+        # ── The trigger on assessment takes the class lock itself ───────
+        # delete_assessment already holds the class's row by the time this trigger runs (the sync-cursor trigger and
+        # grade_return's run first). Take those two away for this one check, and the wait can only be this trigger's.
+        x = nid(); d.run("insert into assessment (id, course_id, title, score_mode, max_points, students_send) values (:a, :c, 'Quick Check', 'points', 5, 'photos')", a=x, c=COURSE_A)
+        d.run('alter table public.assessment disable trigger course_sync_cursor_assessment_gradebook'); d.run('alter table public.assessment disable trigger grade_return_gone')
+        waited, s, g = second_waits(lambda h: h.send_start(tok, ENR1, x), lambda o: o.run('delete from public.assessment where id = :a', a=x))
+        d.run('alter table public.assessment enable trigger course_sync_cursor_assessment_gradebook'); d.run('alter table public.assessment enable trigger grade_return_gone')
+        ok("with the two other triggers that take the class's row switched off, deleting an assessment still waits for a send that holds the class: submission_gone takes the lock itself; then it takes the send with it",
+           waited and s['ok'] and not str(g).startswith('ERROR') and d.one('select count(*) from submission where assessment_id = :a', a=x) == 0, (s, g))
         clear()
 
         # ── A send against its assessment being deleted ─────────────────
@@ -1413,7 +1513,7 @@ def scen_apply():
         ok('of the twelve live functions the new ones call, the %d that live-function-md5.txt records are the live ones byte for byte (the rest go to the read-only pre-check)' % len(known),
            len(known) >= 5 and all(a == b for a, b in known.values()), known)
         lists1 = fingerprint_lists(T1); lists2 = fingerprint_lists(T2)
-        ok('the first file carries one list of its 39 functions, twice (its first check and its last), and the second file a list of the three its policies call',
+        ok('the first file carries one list of its 44 functions, twice (its first check and its last), and the second file a list of the three its policies call',
            len(lists1) == 2 and lists1[0] == lists1[1] and [f for f, _ in lists1[0]] == B_FUNCTIONS and [f for f, _ in lists2[0]] == POLICY_FUNCTIONS, (len(lists1), len(lists2)))
         pre_lists = fingerprint_lists(text_of('batch-b-live-precheck.sql')); post_lists = fingerprint_lists(text_of('batch-b-live-postcheck.sql'))
         ok('the pre-check carries the twelve live functions as this database has them, and each new function as absent; the post-check carries both lists as they should be afterwards',
@@ -1458,6 +1558,7 @@ def scen_apply():
                 ('one of its trigger names is taken', ["create function public.bb_t() returns trigger language plpgsql as $f$ begin return null; end $f$",
                                                        'create trigger submission_gone after delete on public.assessment for each row execute function public.bb_t()'], 'a trigger named submission_gone'),
                 ('storage.objects has no metadata column', ['alter table storage.objects drop column metadata'], 'storage.objects is not there'),
+                ('storage.objects has no is_delete_marker column (an older storage)', ['alter table storage.objects drop column is_delete_marker'], 'storage.objects is not there'),
                 ('there is no storage schema', ['alter schema storage rename to bb_renamed'], 'storage.objects is not there')):
             good, said = stopped_by(S1, setup, want)
             ok('guard: %s: the first file stops, nothing changed' % label, good, said)
@@ -1482,9 +1583,12 @@ def scen_apply():
                 d.rollback()
         ok('with the service role as Supabase makes it, it lists nothing: every function, table and earlier migration is as tested', pre1() == [], pre1()[:3])
         facts = d.all(PRE2)
-        ok('its second query describes storage and counts what the two ALTERs touch: PostgreSQL 17 or 18, storage at prevent-direct-deletes, SQL deletes refused, the name index there, '
-           'one shape of storage.objects, no bucket, no file, no policy, 2 classes, 2 assessments, 1 Student Page on',
-           len(facts) == 1 and re.match(r'1[78]\.', facts[0][0]) and facts[0][1:] == ['prevent-direct-deletes', True, True, False, 0, 0, 0, 2, 2, 1], facts)
+        ok("its second query describes storage as gradebook-prod's is and counts what the two ALTERs touch: PostgreSQL 17 or 18, storage at lifecycle-writer-coordination, SQL deletes refused, "
+           'the whole index on (bucket_id, name) there, old versions kept, no bucket, no file, no policy, 2 classes, 2 assessments, 1 Student Page on',
+           len(facts) == 1 and re.match(r'1[78]\.', facts[0][0]) and facts[0][1:] == ['lifecycle-writer-coordination', True, True, True, 0, 0, 0, 2, 2, 1], facts)
+        d.begin(); d.run('drop index storage.idx_objects_bucket_id_name'); f2 = d.all(PRE2); d.rollback()
+        ok('with the whole index on (bucket_id, name) gone and only the partial ones left, its name_index answers false: a partial index alone does not count',
+           f2[0][3] is False and f2[0][1:3] == ['lifecycle-writer-coordination', True], f2)
         got = pre1([retouched(d, 'student_submit._session_class(text,uuid)'), retouched(d, 'public.fv_owns_course(uuid)')])
         ok('the pre-check lists a function that is not the one tested, and says whether a file would stop on it',
            got == [['function public.fv_owns_course(uuid)', 'no'], ['function student_submit._session_class(text,uuid)', 'yes']], got)
@@ -1503,7 +1607,8 @@ def scen_apply():
                                    'storage.objects and storage.buckets'], got)
         before_rows = d.all(POST)
         ok('the live post-check, run before the apply, lists what is not there yet (%d rows)' % len(before_rows),
-           len(before_rows) > 60 and ['the bucket student-photos', 'private, 2097152 bytes a file, image/jpeg only', 'absent'] in before_rows, before_rows[:2])
+           len(before_rows) > 60 and ['the bucket student-photos', 'private, 2097152 bytes a file, image/jpeg only, versioning DISABLED', 'absent'] in before_rows
+           and ['index submission_assessment_idx', 'a whole index on public.submission (assessment_id)', 'absent'] in before_rows, before_rows[:2])
         ok('none of those checks changed anything', same())
 
         # A lock it cannot get.
@@ -1520,6 +1625,23 @@ def scen_apply():
            sorted(x[0] for x in d.all(POST)) == ['policy fv_student_photos_fence on storage.objects', 'policy fv_student_photos_read on storage.objects',
                                                 'policy fv_student_photos_teachers_only on storage.objects', 'policy fv_student_photos_upload on storage.objects',
                                                 'the bucket student-photos'], d.all(POST)[:3])
+        # ── The first file alone is a safe state ────────────────────────
+        d.begin()
+        d.run('update course set send_work = true where id = :c', c=COURSE_A); d.run("update assessment set students_send = 'photos' where id = :a", a=k['a2'])
+        def storage_says(fn):
+            try: fn(); return 'taken'
+            except StorageError as e: return e.status
+        s = d.send_start(k['token'], ENR1, k['a2'])
+        no_link = storage_says(lambda: d.storage.sign_upload(s['files'][0]['path']))
+        t = d.rpc('start_work_upload(:a, :e, :p::jsonb, :m, :k)', a=k['a2'], e=ENR2, p='[{}]', m='new', k=nid())
+        no_put = storage_says(lambda: d.storage.put_as('authenticated', A, t['files'][0]['path']))
+        f = d.send_finish(k['token'], ENR1, s['submission_id'], s['files'])
+        paper = d.rpc('mark_handed_in_paper(:a, :e, :k)', a=k['a1'], e=[ENR2], k=nid())
+        ok('with the first file applied and the second not (refused, say), nothing is exposed and nothing breaks: a send can be started, but storage has no such bucket, so no upload link '
+           'can be made (404) and no teacher upload is taken (404); nothing with photos can be handed in (missing_pages); Handed In on Paper works; storage holds nothing',
+           s['ok'] and no_link == 404 and no_put == 404 and err(f) == 'missing_pages' and paper['marked'] == 1 and d.one('select count(*) from storage.objects') == 0,
+           (s, no_link, no_put, f, paper))
+        d.rollback()
         for label, setup, want in (
                 ('a function its policies call is not the one tested', [retouched(d, 'fv_private.work_upload_allowed(text)')], 'fv_private.work_upload_allowed'),
                 ('row security is off on storage.objects', ['alter table storage.objects disable row level security'], 'row security turned off'),
@@ -1528,6 +1650,10 @@ def scen_apply():
                  ["insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values ('student-photos', 'student-photos', false, 52428800, array['image/jpeg'])"], 'is not private'),
                 ('the bucket already holds a file', ["insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values ('student-photos', 'student-photos', false, 2097152, array['image/jpeg'])",
                                                      "insert into storage.objects (bucket_id, name) values ('student-photos', 'someone/elses.jpg')"], 'already holds files'),
+                ('a bucket of that name that keeps old versions exists',
+                 ["insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types, versioning_status) values ('student-photos', 'student-photos', false, 2097152, array['image/jpeg'], 'ENABLED')"], 'versioning ENABLED'),
+                ('storage.buckets has no versioning_status column (an older storage)', ['alter table storage.buckets drop constraint buckets_versioning_status_check, drop constraint buckets_versioning_standard_only_check',
+                                                                                   'alter table storage.buckets drop column versioning_status cascade'], 'not the shape this file was written for'),
                 ('storage.buckets has no file_size_limit column', ['alter table storage.buckets drop column file_size_limit'], 'not the shape this file was written for')):
             good, said = stopped_by(S2, setup, want)
             ok('guard: %s: the second file stops, nothing changed' % label, good, said)
@@ -1550,13 +1676,18 @@ def scen_apply():
            all(re.match(r'(depends|comments on) ', l) for l in gone) and all(ABOUT.search(l) for l in new), [l for l in new if not ABOUT.search(l)][:5] + gone[:2])
         changed = sorted(f for f in fps0 if fps1.get(f) != fps0[f]); added = sorted(set(fps1) - set(fps0))
         ok('no function that existed was changed or dropped: all %d are byte for byte what they were' % len(fps0), changed == [], changed)
-        ok('39 functions are new, the ones the first file lists, each with the fingerprint it lists',
-           len(added) == 39 and fingerprints(d, B_FUNCTIONS) == dict(lists1[0]), added[:3])
+        ok('44 functions are new, the ones the first file lists, each with the fingerprint it lists',
+           len(added) == 44 and fingerprints(d, B_FUNCTIONS) == dict(lists1[0]), added[:3])
+        ok('the bucket was made by a plain insert that names no lifecycle column, as storage requires of anyone but its own service, and its versioning is DISABLED',
+           d.all("select versioning_status, lifecycle_configuration, lifecycle_configuration_generation from storage.buckets where id = 'student-photos'") == [['DISABLED', None, None]])
         ok('the grades are untouched, and the signed-in phone reads the same page as before', score_fingerprint(d) == g0 and d.page(k['token'], ENR1) == page0)
         ok('saving, returning and reading a grade work as before',
            d.teacher('upsert_score(:e, :a, 9)', e=ENR2, a=k['a2']) is not None and d.teacher('return_grades(:a, :e, :k)', a=k['a2'], e=[ENR2], k=nid())['returned'] == 1
            and d.one('select student_submit._returned_grade(:e, :a)', e=ENR2, a=k['a2'])['grade']['value'] == 9)
         ok('the live post-check lists nothing: the apply landed as tested', d.all(POST) == [], d.all(POST)[:4])
+        d.begin(); d.run("update storage.buckets set versioning_status = 'ENABLED' where id = 'student-photos'"); d.run('drop index public.submission_assessment_idx')
+        got = sorted(r[0] for r in d.all(POST)); d.rollback()
+        ok('it notices the bucket set to keep old versions, and the index the assessment trigger deletes by gone', got == ['index submission_assessment_idx', 'the bucket student-photos'], got)
         d.begin()
         d.run('grant select on public.submission to authenticated'); d.run('create policy peek on public.submission_file for select using (true)')
         d.run('grant execute on function public._work_begin(uuid,uuid,uuid,text,text,uuid,jsonb,text,text,boolean,uuid,uuid) to authenticated')
@@ -1598,6 +1729,9 @@ def scen_apply():
         d.run("update storage.buckets set file_size_limit = 52428800 where id = 'student-photos'")
         r = d.file(M2_USED)
         ok('and the second file run again after the bucket\'s limit was raised by hand stops and says so, rather than leave it or quietly reset it', r.startswith('STOPPED') and 'is not private, limited to 2097152' in r, r)
+        d.run("update storage.buckets set file_size_limit = 2097152, versioning_status = 'ENABLED' where id = 'student-photos'")
+        r = d.file(M2_USED)
+        ok('nor does it pass a bucket that has since been set to keep old versions of a file: it stops', r.startswith('STOPPED') and 'versioning ENABLED' in r, r)
     finally:
         d.close()
 
@@ -1631,8 +1765,8 @@ def scen_grants():
            len(teachers) == 11 and all(mine[s] == ['authenticated', 'service_role'] for s in teachers), {s: mine[s] for s in teachers if mine[s] != ['authenticated', 'service_role']})
         ok("grants: the eight functions the edge function calls are left to the service role and nobody else",
            len(students) == 8 and all(mine[s] == ['service_role'] for s in students), {s: mine[s] for s in students if mine[s] != ['service_role']})
-        ok("grants: the other twenty (helpers and trigger functions) are left to nobody but their owner, by the file's own revokes: not the public, anon, a signed-in teacher or the service role",
-           len(helpers) == 20 and all(mine[s] == [] for s in helpers), {s: mine[s] for s in helpers if mine[s]})
+        ok("grants: the other twenty-five (helpers and trigger functions) are left to nobody but their owner, by the file's own revokes: not the public, anon, a signed-in teacher or the service role",
+           len(helpers) == 25 and all(mine[s] == [] for s in helpers), {s: mine[s] for s in helpers if mine[s]})
         k = seed_work(d)
         for role in ('anon', 'authenticated'):
             for s, call in (('student_submit.work', "select student_submit.work('x', '%s', 'ip')" % ENR1),
@@ -1700,7 +1834,67 @@ def scen_suites():
     finally:
         d.close()
 
-SCENARIOS = {'apply': scen_apply, 'teacher': scen_teacher, 'student': scen_student, 'storage': scen_storage, 'race': scen_race, 'grants': scen_grants, 'suites': scen_suites}
+# ════════════════════════════════════════════════════════════════════════════
+def scen_scale():
+    """A table and a bucket the size of years of use. What a teacher who never used photos pays, what a
+    send pays, and that each look-up goes through an index (read from the plan, not only from the clock)."""
+    d, k = applied('scale')
+    try:
+        a = k['takes']; st = d.storage
+        tok, _ = d.session(ENR1)
+        plan = lambda sql, **kw: '\n'.join(r[0] for r in d.run('explain ' + sql, **kw))
+        def each_ms(n, fn):
+            t = time.time()
+            for _ in range(n): fn()
+            return (time.time() - t) / n * 1000
+        def delete_one():
+            x = nid()
+            d.run("insert into assessment (id, course_id, title, score_mode, max_points) values (:a, :c, 'T', 'points', 10)", a=x, c=COURSE_B)
+            return x
+        def timed_deletes(n=25):
+            ids = [delete_one() for _ in range(n)]; it = iter(ids)
+            return each_ms(n, lambda: d.rpc('delete_assessment(:a)', uid=B, a=next(it)))
+        empty_ms = timed_deletes()
+        # A million submissions of other classes (the checks a real insert makes are stood aside for the load only).
+        d.run("set session_replication_role = replica")
+        d.run("""insert into submission (course_id, assessment_id, enrollment_id, state, sent_by, sent_at, note)
+                 select gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), 'sent', 'student', now(), repeat('x', 60) from generate_series(1, 1000000)""")
+        d.run("set session_replication_role = origin"); d.run('analyze public.submission')
+        full_ms = timed_deletes()
+        p1 = plan("delete from public.submission where assessment_id = :a", a=a); p2 = plan("delete from public.submission where enrollment_id = :e", e=ENR1)
+        ok('with 1,000,000 submissions in the table, the trigger\'s delete by assessment and its delete by student each go through an index, never the whole table',
+           'submission_assessment_idx' in p1 and 'Seq Scan' not in p1 and 'submission_enrollment_idx' in p2 and 'Seq Scan' not in p2, (p1, p2))
+        ok('and delete_assessment, for a teacher who has never used photos, takes single-digit milliseconds as it did with the table empty (the number is printed below)',
+           full_ms < 10 and empty_ms < 10, (empty_ms, full_ms))
+        print('# delete_assessment, teacher with no photos: %.2f ms each with submission empty, %.2f ms each with 1,000,000 rows' % (empty_ms, full_ms))
+        d.run('delete from public.submission where course_id not in (select id from course)')
+
+        # 300,000 files in the bucket, half of them under this teacher's class folder.
+        d.run("""insert into storage.objects (bucket_id, name, metadata)
+                 select 'student-photos', case when g % 2 = 0 then :c else gen_random_uuid()::text end || '/' || gen_random_uuid()::text || '/' || g || '.jpg',
+                        '{"size": 300000, "mimetype": "image/jpeg"}' from generate_series(1, 300000) g""", c=COURSE_A)
+        d.run('analyze storage.objects')
+        p3 = plan("""select 1 from storage.objects o where o.bucket_id = 'student-photos' and o.name = :n collate "C" and o.archived_at is null and not o.is_delete_marker""", n='x/y.jpg')
+        ok("with 300,000 files in the bucket, the look-up every function makes (is this file there?) goes through one of storage's indexes on (bucket_id, name), never the whole table",
+           'Index' in p3 and 'Seq Scan' not in p3 and re.search(r'idx_objects_(bucket_id_name|current_version|null_version)|objects_bucket_id_name_version_key', p3), p3)
+        d.begin(); d.run('drop index storage.idx_objects_current_version'); d.run('drop index storage.idx_objects_null_version'); d.run('drop index storage.objects_bucket_id_name_version_key')
+        p4 = plan("""select 1 from storage.objects o where o.bucket_id = 'student-photos' and o.name = :n collate "C" and o.archived_at is null and not o.is_delete_marker""", n='x/y.jpg'); d.rollback()
+        ok('with only the plain index left (the one gradebook-prod is known to have whatever else changes), it still goes through that index', 'idx_objects_bucket_id_name' in p4 and 'Seq Scan' not in p4, p4)
+        s = d.send_start(tok, ENR1, a, pages=30); d.upload(s['files'])
+        t = time.time(); f = d.send_finish(tok, ENR1, s['submission_id'], s['files']); finish_ms = (time.time() - t) * 1000
+        ok('handing in 30 pages (60 files looked up twice each) takes well under a second', f['ok'] is True and finish_ms < 500, finish_ms)
+        path = s['files'][0]['path']
+        t = time.time(); can = st.can_read('authenticated', A, path); read_ms = (time.time() - t) * 1000
+        p5 = '\n'.join(r[0] for r in d.role('authenticated', "explain select 1 from storage.objects where bucket_id = 'student-photos' and name = :n", uid=A, n=path))
+        ok("a teacher reading one page by its name, under the policies, goes through an index and takes milliseconds", can and read_ms < 100 and 'Seq Scan' not in p5, (read_ms, p5))
+        t = time.time(); b_, done_ = d.unsend(tok, ENR1, a), d.drain(100); drain_ms = (time.time() - t) * 1000
+        ok('an Unsend of 30 pages and one pass of the worker over its 60 files take well under a second', done_[1]['gone'] == 60 and drain_ms < 1000, drain_ms)
+        print('# with 300,000 files in the bucket: send_finish of 30 pages %.0f ms; a teacher reads one page %.1f ms; unsend and one worker pass over 60 files %.0f ms' % (finish_ms, read_ms, drain_ms))
+    finally:
+        d.close()
+
+SCENARIOS = {'apply': scen_apply, 'teacher': scen_teacher, 'student': scen_student, 'storage': scen_storage, 'race': scen_race, 'grants': scen_grants, 'suites': scen_suites,
+             'scale': scen_scale}
 if __name__ == '__main__':
     import traceback
     for name in (sys.argv[1:] or list(SCENARIOS)):

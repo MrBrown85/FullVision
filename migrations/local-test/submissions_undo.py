@@ -16,13 +16,17 @@ scenario runs on a copy of it, made and dropped here.
               a student's send, the teacher's Add Work, a Replace, a paper
               hand-in. PART 2 refuses while a file or a page is left, and at
               each of its other checks, with nothing changed. PART 1 turns
-              Send Work off and deletes nothing. Then the photos are deleted
-              the way the header says, and PART 2: the catalog is the one
-              from before Batch B but for the dropped-column slots; which
-              rows differ; everything from before still works; PART 2
-              refuses a second run; both files apply again; PART 2 again.
-  apply-only  Applied and undone with nothing in between: the catalog but
-              for the slots, and every row.
+              Send Work off and deletes nothing. PART 1B drops the four
+              triggers and nothing else; what a delete then leaves behind,
+              and the way back the header gives. Then the photos are deleted
+              the way the header says; PART 2 refuses until the last upload
+              link is dead and the worker has looked once more; and PART 2:
+              the catalog is the one from before Batch B but for the
+              dropped-column slots; which rows differ; everything from
+              before still works; PART 2 refuses a second run; both files
+              apply again.
+  apply-only  Applied and undone with nothing in between, all three parts:
+              the catalog but for the slots, and every row.
 
 PGPORT=54341 PGDATABASE=bb python3 submissions_undo.py
 """
@@ -32,8 +36,8 @@ from submissions import in_use, queued, live_paths, retouched, all_functions
 UNDO_TEXT = text_of(UNDO_B)
 STATEMENTS = split(UNDO_TEXT)
 last = lambda st: st.split('\n')[-1].strip().lower()
-CUT = [n for n, st in enumerate(STATEMENTS) if last(st) == 'commit'][0] + 1
-PART1, PART2 = STATEMENTS[:CUT], STATEMENTS[CUT:]
+CUTS = [n + 1 for n, st in enumerate(STATEMENTS) if last(st) == 'commit']
+PART1, PART1B, PART2 = STATEMENTS[:CUTS[0]], STATEMENTS[CUTS[0]:CUTS[1]], STATEMENTS[CUTS[1]:]
 SLOTS = ['dropped columns public.assessment | 5', 'dropped columns public.course | 2']
 
 def marked(name):
@@ -41,13 +45,13 @@ def marked(name):
     body = UNDO_TEXT.split('-- %s:\n' % name)[1].split('-- end %s' % name)[0]
     return '\n'.join(l[2:] for l in body.splitlines()).strip().rstrip(';')
 
-def refuses(d, setup, want):
-    """PART 2 run after `setup` (all of it undone afterwards): True when it stops at its first check saying `want`."""
+def refuses(d, setup, want, part=None):
+    """PART 2 (or the part given) run after `setup` (all of it undone afterwards): True when it stops at its first check saying `want`."""
     d.begin()
     try:
         for st in setup: d.run(st)
         try:
-            for n, st in enumerate(PART2):
+            for n, st in enumerate(part or PART2):
                 at = n
                 if last(st) not in ('begin', 'commit'): d.run(st)
             return (False, 'it ran')
@@ -65,9 +69,13 @@ def scen_main():
         d.run("insert into supabase_migrations.schema_migrations (version, name) values ('20261111020227', 'card_codes_keyed')")
         cat0 = catalog(d.c); rows0 = row_checksums(d.c); fps0 = all_functions(d); page0 = d.page(k['token'], ENR1)
 
-        ok('the script is two transactions: PART 1 (three statements between begin and commit) and PART 2 (a lock timeout, then every check, then the drops)',
-           last(PART1[0]) == 'begin' and last(PART1[-1]) == 'commit' and last(PART2[0]) == 'begin' and last(PART2[-1]) == 'commit'
-           and '$guard$' in PART2[2] and len(PART1) == 6 and not any(w in bare(' '.join(PART1)).lower() for w in ('drop table', 'drop function', 'delete ', 'alter table')))
+        ok('the script is three transactions: PART 1 (a lock timeout and three statements between begin and commit), PART 1B (a lock timeout, its check, four DROP TRIGGERs) '
+           'and PART 2 (a lock timeout, then every check, then the drops)',
+           len(CUTS) == 3 and all(last(p[0]) == 'begin' and last(p[-1]) == 'commit' for p in (PART1, PART1B, PART2))
+           and '$guard$' in PART2[2] and '$guard$' in PART1B[2] and len(PART1) == 6 and len(PART1B) == 8
+           and [bare(st).split()[:2] for st in PART1B[3:7]] == [['drop', 'trigger']] * 4
+           and not any(w in bare(' '.join(PART1)).lower() for w in ('drop table', 'drop function', 'delete ', 'alter table'))
+           and not any(w in bare(' '.join(PART1B[3:])).lower() for w in ('drop table', 'drop function', 'delete ', 'alter table', 'drop policy')))
 
         # ── Batch B applied and used ────────────────────────────────────
         r = d.apply_b()
@@ -104,13 +112,57 @@ def scen_main():
            and len(d.rpc('list_course_submissions(:c)', c=COURSE_A)['submissions']) == 4 and len(d.file_links(k['token'], ENR1, k['a2'])['files']) == 1)
         ok('PART 1 again: runs, lists nothing', d.statements(PART1) == 'ok' and d.rows == [])
 
+        # ── PART 1B: the fast stop for the triggers ─────────────────────
+        cat_p1 = catalog(d.c); rows_p1 = row_checksums(d.c)
+        good, said = refuses(d, ['drop trigger submission_truncate on public.enrollment'], 'found 3', PART1B)
+        ok('PART 1B refuses when one of the four triggers is not there', good, said)
+        good, said = refuses(d, ["create function public.bb_other() returns trigger language plpgsql as $f$ begin return null; end $f$",
+                                 'drop trigger submission_gone on public.assessment',
+                                 'create trigger submission_gone after delete on public.assessment for each row execute function public.bb_other()'], 'found 3', PART1B)
+        ok("or when one of that name is not Batch B's own; neither refusal changed anything", good and (catalog(d.c), row_checksums(d.c)) == (cat_p1, rows_p1), said)
+        r = d.statements(PART1B)
+        gone, new = differences(cat_p1, catalog(d.c))
+        plain = lambda ls: [l for l in ls if not l.startswith('depends pg_trigger ')]   # the catalog's counts of what triggers depend on
+        ok('PART 1B runs: four triggers are gone from the catalog, nothing else of it differs, and no row of any table changed',
+           r == 'ok' and len(plain(gone)) == 4 and all(l.startswith('trigger ') and ('submission_gone' in l or 'submission_truncate' in l) for l in plain(gone))
+           and plain(new) == [] and row_checksums(d.c) == rows_p1, (r, plain(gone), plain(new)))
+        r = d.statements(PART1B)
+        ok('PART 1B again: refused (they are gone), nothing changed', r.startswith('STOPPED') and 'found 0' in r, r)
+        x = nid(); d.run("insert into assessment (id, course_id, title, score_mode, max_points, students_send) values (:a, :c, 'Exit Slip', 'points', 5, 'photos')", a=x, c=COURSE_A)
+        d.teacher_upload(x, ENR1, 1)
+        d.run('delete from assessment where id = :a', a=x)
+        ok('with the triggers gone, deleting an assessment leaves its work behind, as the header warns: a submission with nothing to belong to, its page listed, its two files in storage and not queued',
+           d.one('select count(*) from submission where assessment_id = :a', a=x) == 1 and len(live_paths(d)) == 6 and len(queued(d)) == 4 and len(d.storage.names()) == 10)
+        r = d.apply_b()
+        gone, new = differences(cat_p1, catalog(d.c))
+        ok('the way back the header gives: the migration files run again put the four triggers back, and the catalog is what it was before PART 1B', r == 'ok' and (gone, new) == ([], []), (r, gone[:3], new[:3]))
+        orphans = marked('orphans')
+        ok('and the one statement it gives for what was left behind meanwhile', orphans.startswith('delete from public.submission s where not exists'), orphans)
+        d.run(orphans)
+        ok('removes exactly that: the left-behind submission is gone, its two files are queued, and every other submission is untouched',
+           d.one('select count(*) from submission where assessment_id = :a', a=x) == 0 and d.one("select count(*) from submission where state = 'sent'") == 4
+           and len(queued(d)) == 6 and len(live_paths(d)) == 4)
+        x2 = nid(); d.run("insert into assessment (id, course_id, title, score_mode, max_points, students_send) values (:a, :c, 'Exit Slip 2', 'points', 5, 'photos')", a=x2, c=COURSE_A)
+        d.rpc('mark_handed_in_paper(:a, :e, :k)', a=x2, e=[ENR1], k=nid()); d.run('delete from assessment where id = :a', a=x2)
+        ok('with the triggers back, a deleted assessment takes its work with it again', d.one('select count(*) from submission where assessment_id = :a', a=x2) == 0)
+
         # ── The photos are deleted, the way the header says ─────────────
         empty = marked('empty')
         ok('the header gives the one statement that deletes every submission', empty == 'delete from public.submission', empty)
         d.run(empty)
-        ok('it queues every file (the four that were waiting and the four of the pages just deleted)', d.one('select count(*) from submission') == 0 and len(queued(d)) == 8)
+        ok('it queues every file (the six that were waiting and the four of the pages just deleted)', d.one('select count(*) from submission') == 0 and len(queued(d)) == 10)
         while d.drain()[0]['items']: pass
         ok('the worker empties the bucket', d.storage.names() == [])
+        # Every one of those pages was started minutes ago: the upload links made for them could still be used.
+        waiting = d.one('select count(*) from submission_file_removal where not done')
+        good, said = refuses(d, [], 'the removal queue is not finished: %d files' % waiting)
+        ok('PART 2 with the bucket empty but upload links still alive (a file could come back): refused, and it says how many and when the last link dies',
+           good and waiting == 10 and 'The last link dies at 20' in said, said)
+        good, said = refuses(d, ['update public.submission_file_removal set done = true where id <> (select max(id) from public.submission_file_removal)'], 'the removal queue is not finished: 1 files')
+        ok('one path left unfinished is enough to refuse', good, said)
+        d.run("update submission_file_removal set link_dies_at = now() - interval '1 second' where not done")
+        ok('four hours and ten minutes on (the clock moved for the test), the worker is offered every path once more, finds each still gone, and the queue is finished',
+           len(d.drain()[0]['items']) == 10 and d.one('select count(*) from submission_file_removal where not done') == 0)
         rows_empty = row_checksums(d.c)
         same = lambda: (catalog(d.c), row_checksums(d.c)) == (cat_used, rows_empty)
 
@@ -184,8 +236,10 @@ def scen_apply_only():
         ok('apply-only: Batch B applies', r == 'ok', r)
         r = d.statements(PART1)
         ok('apply-only: PART 1 with no class on changes no row', r == 'ok' and d.rows == [] and all(v == rows0[t] for t, v in row_checksums(d.c, cols0).items() if t != 'storage.buckets'))
+        r = d.statements(PART1B)
+        ok('apply-only: PART 1B runs', r == 'ok', r)
         r = d.statements(PART2)
-        ok('apply-only: PART 2 runs straight after', r == 'ok', r)
+        ok('apply-only: PART 2 runs straight after, the triggers already gone', r == 'ok', r)
         gone, new = differences(cat0, catalog(d.c)); rows2 = row_checksums(d.c)
         ok('apply-only: the catalog is identical but for the dropped-column slots', gone == [] and new == SLOTS, (gone[:3], new[:5]))
         ok('apply-only: every row of every table is identical; the only difference is the empty bucket left in storage.buckets',
