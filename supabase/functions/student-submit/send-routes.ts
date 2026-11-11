@@ -23,8 +23,10 @@
 //        -> student_submit.file_links; then a 300-second link for each path
 //           it named.
 //   {route: 'sweep', access_token}
-//        -> a signed-in teacher only. student_submit.removal_batch, the files
-//           deleted, student_submit.removal_done: the worker, and nothing else.
+//        -> a signed-in teacher only: Auth says whose the token is, and that
+//           id must have a row in public.teacher that is not deleted. Then
+//           student_submit.removal_batch, the files deleted,
+//           student_submit.removal_done: the worker, and nothing else.
 //
 // The rules every route keeps:
 //   - The session is checked as `page` checks it, before anything else: a
@@ -121,6 +123,9 @@ export const SQL = {
   fileLinks: 'select student_submit.file_links($1::text, $2::uuid, $3::uuid, $4::text) as r',
   removalBatch: 'select student_submit.removal_batch($1::int) as r',
   removalDone: 'select student_submit.removal_done($1::bigint[]) as r',
+  // sweep: whether a signed-in user is a teacher, as student_submit._as_teacher asks it. A read of one row by
+  // its key; no SQL function is added for it.
+  isTeacher: 'select exists (select 1 from public.teacher where id = $1::uuid and deleted_at is null) as r',
 };
 
 // ── What each route passes on ───────────────────────────────────────────────
@@ -637,15 +642,19 @@ export function makeSendRoutes(opts: SendOptions) {
 
   /* sweep: the worker, for a signed-in teacher's browser (the contract, 5).
      The teacher's sign-in token travels in the body, as a student's session
-     does, so nothing new is asked of CORS. Auth says whose it is; nothing
-     else in the body is read. A phone holds no sign-in token, so a student
-     cannot run it. */
+     does, so nothing new is asked of CORS. Auth says whose it is, and the
+     database whether that is a teacher (review L5: Auth may know users who
+     are not, an anonymous sign-in or an account whose teacher was deleted);
+     nothing else in the body is read. A phone holds no sign-in token, so a
+     student cannot run it. */
   async function sweep(body: Json): Promise<SendAnswer> {
     const token = tokenShape(body.access_token);
     if (!token) return { status: 401, body: { ok: false, error: 'unauthorized' } };
     if (!store || !opts.whoIs) return server();
-    const who = await opts.whoIs(token);
+    const who = uuid(await opts.whoIs(token));
     if (!who) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+    if ((await db.call(SQL.isTeacher, [who])) !== true)
+      return { status: 401, body: { ok: false, error: 'unauthorized' } };
     await worker('sweep', WORKER_SWEEP);
     return ok({ ok: true });
   }

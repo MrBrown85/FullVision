@@ -37,10 +37,14 @@ import {
   CECE_PHONE,
   ENDED,
   ESSAY,
+  GONE_TEACHER,
+  GONE_TEACHER_TOKEN,
   LAB,
   LIAM,
   LIAM_PHONE,
   MAP,
+  NOT_TEACHER,
+  NOT_TEACHER_TOKEN,
   OMAR,
   OMAR_PHONE,
   PAGE2_JPEG,
@@ -79,7 +83,12 @@ function setup(extra = {}) {
         ? extra.whoIs
         : async token => {
             world.calls.push(['auth', [token === TEACHER_TOKEN ? 'teacher' : 'other']]);
-            return token === TEACHER_TOKEN ? TEACHER_A : null;
+            const users = {
+              [TEACHER_TOKEN]: TEACHER_A,
+              [NOT_TEACHER_TOKEN]: NOT_TEACHER,
+              [GONE_TEACHER_TOKEN]: GONE_TEACHER,
+            };
+            return users[token] || null;
           },
     log: entry => logs.push(entry),
     defer: extra.defer,
@@ -1486,8 +1495,36 @@ describe('the removal worker and sweep', () => {
     const r = await t.send({ route: 'sweep', access_token: TEACHER_TOKEN, course_id: C2, paths: ['x'] });
     expect(r).toEqual({ status: 200, body: { ok: true } });
     expect(t.world.queue.every(q => q.done)).toBe(true);
-    expect(names(t.world).filter(n => !['send_start', 'removal_batch', 'removal_done'].includes(n))).toEqual(['auth']);
+    expect(names(t.world).filter(n => !['send_start', 'removal_batch', 'removal_done'].includes(n))).toEqual([
+      'auth',
+      'is_teacher',
+    ]);
+    expect(t.world.calls.find(c => c[0] === 'is_teacher')[1]).toEqual([TEACHER_A]);
     expect(s.submission_id).toBeTruthy();
+  });
+
+  it('sweep: someone Auth knows who is not a teacher (no teacher row, or a deleted one) is refused, and the worker never runs (review L5)', async () => {
+    for (const token of [NOT_TEACHER_TOKEN, GONE_TEACHER_TOKEN]) {
+      const t = setup();
+      await started(t, {}, []);
+      t.world.fns.unsend([CECE_PHONE, CECE, LAB]);
+      const before = t.world.calls.length;
+      const r = await t.send({ route: 'sweep', access_token: token });
+      expect(r).toEqual({ status: 401, body: { ok: false, error: 'unauthorized' } });
+      expect(t.world.calls.slice(before).map(c => c[0])).toEqual(['auth', 'is_teacher']);
+      expect(t.world.queue.every(q => !q.done)).toBe(true);
+    }
+  });
+
+  it('sweep: a database that cannot say is a server error, never a teacher', async () => {
+    const t = setup();
+    t.world.override.is_teacher = () => {
+      throw new Error('connection');
+    };
+    expect((await t.send({ route: 'sweep', access_token: TEACHER_TOKEN })).status).toBe(500);
+    t.world.override.is_teacher = () => 'yes';
+    expect((await t.send({ route: 'sweep', access_token: TEACHER_TOKEN })).status).toBe(401);
+    expect(names(t.world)).not.toContain('removal_batch');
   });
 
   it('sweep refuses a student’s session, no token, a token Auth does not know, and asks the database nothing', async () => {

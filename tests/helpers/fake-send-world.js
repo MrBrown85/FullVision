@@ -33,6 +33,11 @@ export const LIAM_PHONE = 'u'.repeat(64);
 export const ENDED = 'x'.repeat(64);
 export const TEACHER_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.teacher-a.signature-of-teacher-a';
 export const TEACHER_A = 'f1f1f1f1-0000-4000-8000-000000000001';
+// A sign-in Auth knows that is no teacher (anonymous, or an account with no teacher row), and a teacher deleted.
+export const NOT_TEACHER_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.someone-signed-in.signature-of-them';
+export const NOT_TEACHER = 'f9f9f9f9-0000-4000-8000-000000000009';
+export const GONE_TEACHER_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.deleted-teacher.signature-of-them';
+export const GONE_TEACHER = 'f8f8f8f8-0000-4000-8000-000000000008';
 
 export const SAMPLE = 'assets/sample-work/';
 export const PAGE_JPEG = new Uint8Array(fs.readFileSync(SAMPLE + 'cell-lab-cece-1.jpg'));
@@ -66,6 +71,7 @@ export const STATEMENTS = {
   file_links: 'select student_submit.file_links($1::text, $2::uuid, $3::uuid, $4::text) as r',
   removal_batch: 'select student_submit.removal_batch($1::int) as r',
   removal_done: 'select student_submit.removal_done($1::bigint[]) as r',
+  is_teacher: 'select exists (select 1 from public.teacher where id = $1::uuid and deleted_at is null) as r',
 };
 const BY_SQL = Object.fromEntries(Object.entries(STATEMENTS).map(([k, v]) => [v, k]));
 
@@ -391,6 +397,12 @@ export function fakeWorld() {
         items: items.map(q => ({ id: q.id, bucket: q.bucket, path: q.path })),
         left: queue.filter(q => !q.done).length - items.length,
       };
+    },
+
+    // public.teacher: Ms. A is a teacher; the deleted teacher's row has deleted_at set; anyone else has none.
+    is_teacher([id]) {
+      if (!UUID.test(id)) raise();
+      return id === TEACHER_A;
     },
 
     removal_done([ids]) {
