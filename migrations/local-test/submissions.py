@@ -256,6 +256,11 @@ def scen_teacher():
             d.run("update storage.objects set metadata = '{\"size\": 300000, \"mimetype\": \"application/pdf\"}' where name = :n", n=s['files'][1]['path'])
             r = d.rpc('finish_work_upload(:s, :f::jsonb, :k)', s=s['submission_id'], f=json.dumps(good), k=nid())
             ok('nor one storage holds as a PDF: bad_file', r == {'result': 'bad_file', 'files': [s['files'][1]['file_id']]}, r)
+            d.run("update storage.objects set metadata = '{\"size\": 300000, \"mimetype\": \"image/jpeg\"}' where name = :n", n=s['files'][1]['path'])
+            d.run("update storage.objects set metadata = '{\"size\": 20000, \"mimetype\": \"image/png\"}' where name = :n", n=s['files'][0]['thumb_path'])
+            r = d.rpc('finish_work_upload(:s, :f::jsonb, :k)', s=s['submission_id'], f=json.dumps(good), k=nid())
+            ok('nor a page whose thumbnail storage holds as a PNG: bad_file names the page', r == {'result': 'bad_file', 'files': [s['files'][0]['file_id']]}, r)
+            d.run("update storage.objects set metadata = '{\"size\": 20000, \"mimetype\": \"image/jpeg\"}' where name = :n", n=s['files'][0]['thumb_path'])
             # leave a page out: Remove the Page
             r = d.rpc('finish_work_upload(:s, :f::jsonb, :k)', s=s['submission_id'], f=json.dumps(good[:1]), k=nid())
             ok('finishing with only the first page hands in one page; the page left out is deleted and its two files queued',
@@ -286,6 +291,11 @@ def scen_teacher():
             ok('the same key again returns the same answer and marks nobody', d.rpc('mark_handed_in_paper(:a, :e, :k)', a=a, e=[ENR1, ENR2], k=pkey) == r and d.one('select count(*) from submission') == 2)
             ok('a second call with a new key marks nobody: both have work in', d.rpc('mark_handed_in_paper(:a, :e, :k)', a=a, e=[ENR1, ENR2], k=nid())['marked'] == 0)
             ok('it works on an assessment set to take nothing: the paper pile', d.rpc('mark_handed_in_paper(:a, :e, :k)', a=k['nothing'], e=[ENR1], k=nid())['marked'] == 1)
+            d.run('update enrollment set withdrawn_at = now() where id = :e', e=ENR2)
+            r = d.rpc('mark_handed_in_paper(:a, :e, :k)', a=k['nothing'], e=[ENR2], k=nid())
+            ok('a withdrawn student is passed over: nothing is marked for them', r == {'marked': 0, 'submissions': []}
+               and d.one('select count(*) from submission where assessment_id = :a and enrollment_id = :e', a=k['nothing'], e=ENR2) == 0, r)
+            d.run('update enrollment set withdrawn_at = null where id = :e', e=ENR2)
             e = refused(d, lambda: d.rpc('mark_handed_in_paper(:a, :e, :k)', uid=B, a=a, e=[ENR1], k=nid()))
             ok("another teacher's assessment: not found (P0002)", e is not None and e[1] == 'P0002', e)
             r = d.rpc('start_work_upload(:a, :e, :p::jsonb, :m, :k)', a=a, e=ENR2, p='[{}]', m='add', k=nid())
@@ -428,6 +438,8 @@ def scen_student():
                     ('pages that are not a list', lambda: d.service("student_submit.send_start(:t, :e, :a, '{}'::jsonb, null, null, :r, 'ip')", t=tok, e=ENR1, a=a, r=nid())),
                     ('a page that is not an object', lambda: d.send_start(tok, ENR1, a, pages=['page'])),
                     ('a height of 30000', lambda: d.send_start(tok, ENR1, a, pages=[{'height': 30000}])),
+                    ('a page said to be 3 MB', lambda: d.send_start(tok, ENR1, a, pages=[{'bytes': 3000000}])),
+                    ('a thumbnail size that is not a number', lambda: d.send_start(tok, ENR1, a, pages=[{'thumb_bytes': 'small'}])),
                     ('a note of 1001 characters', lambda: d.send_start(tok, ENR1, a, note='x' * 1001)),
                     ('a Did You Do It? that is none of the three', lambda: d.send_start(tok, ENR1, a, plan='maybe')),
                     ('a finish with no submission', lambda: d.service("student_submit.send_finish(:t, :e, null, '[]'::jsonb, 'ip')", t=tok, e=ENR1)),
@@ -451,18 +463,18 @@ def scen_student():
                s['ok'] is True and s['replayed'] is False and s['state'] == 'sending' and s['bucket'] == 'student-photos' and s['late'] is False
                and [f['page'] for f in s['files']] == [1, 2, 3] and all(PATH_RE.match(f['path']).groups()[:5] == (COURSE_A, a, ENR1, s['submission_id'], f['file_id'])
                                                                         and f['thumb_path'] == f['path'][:-4] + '-thumb.jpg' for f in s['files']), s)
-            ok('the reply gives nothing but ids, paths and the late mark', sorted(s) == ['bucket', 'files', 'late', 'ok', 'replayed', 'state', 'submission_id']
-               and sorted(s['files'][0]) == ['file_id', 'page', 'path', 'thumb_path'], sorted(s))
+            ok('the reply gives nothing but ids, paths, the late mark and the time the send must be finished by: two hours from now',
+               sorted(s) == ['bucket', 'files', 'finish_by', 'late', 'ok', 'replayed', 'state', 'submission_id']
+               and sorted(s['files'][0]) == ['file_id', 'page', 'path', 'thumb_path']
+               and d.one("select :f::timestamptz = now() + interval '2 hours'", f=s['finish_by']), sorted(s))
             again = d.send_start(tok, ENR1, a, pages=3, request=req)
             ok('the same request id again (the reply was lost): the same submission and the same paths, marked replayed; nothing new is made or counted',
                again['replayed'] is True and (again['submission_id'], again['files']) == (s['submission_id'], s['files'])
                and d.one('select count(*) from submission') == 1 and d.one('select count(*) from student_submit.send_log') == 1, again)
-            d.run("update submission set links_at = now() - interval '90 minutes' where id = :s", s=s['submission_id'])
-            d.run("update submission_file set link_dies_at = link_dies_at - interval '90 minutes' where submission_id = :s", s=s['submission_id'])
-            d.send_start(tok, ENR1, a, pages=3, request=req)
-            ok('a repeat hands the paths out again for fresh links, so the send and each of its pages are given their two hours (and ten minutes) again',
-               d.one('select links_at = now() from submission where id = :s', s=s['submission_id'])
-               and d.one("select bool_and(link_dies_at = now() + interval '2 hours 10 minutes') from submission_file where submission_id = :s", s=s['submission_id']))
+            ok("a repeat gives the send no longer: the same finish_by; and each page's last link is counted dead four hours and ten minutes after the first start "
+               "(a link made by a repeat in the last minute of the two hours lives two hours itself)",
+               again['finish_by'] == s['finish_by']
+               and d.one("select bool_and(link_dies_at = now() + interval '4 hours 10 minutes') from submission_file where submission_id = :s", s=s['submission_id']))
             w = d.work(tok, ENR1)['assessments'][0]
             ok('work shows it as a send of the student\'s that is not finished, and nothing sent yet',
                w['sent'] is None and w['sending'] is not None and (w['sending']['submission_id'], w['sending']['intent'], w['sending']['pages']) == (s['submission_id'], 'new', 3), w)
@@ -509,13 +521,13 @@ def scen_student():
             # ── Unsend ──────────────────────────────────────────────────
             paths = live_paths(d)
             r = d.unsend(tok, ENR1, a)
-            ok('unsend: the submission and its pages are gone', r == {'ok': True, 'unsent': True, 'cancelled': False, 'pages': 3} and d.one('select count(*) from submission') == 0
+            ok('unsend: the submission and its pages are gone', r == {'ok': True, 'unsent': True, 'cancelled': False, 'pages': 3, 'kept': 0} and d.one('select count(*) from submission') == 0
                and d.one('select count(*) from submission_file') == 0, r)
             ok('all six files are queued for deletion, as unsent, in the same transaction', queued(d, 'unsend') == paths and len(paths) == 6, queued(d))
-            ok('each queued file carries the time its page\'s last upload link dies: two hours and ten minutes after the paths were last handed out',
-               d.one("select bool_and(link_dies_at = now() + interval '2 hours 10 minutes') from submission_file_removal"))
+            ok('each queued file carries the time by which its page\'s last upload link is dead',
+               d.one("select bool_and(link_dies_at = now() + interval '4 hours 10 minutes') from submission_file_removal"))
             ok('the database deleted no file itself: storage still holds all six until the worker removes them', d.storage.names() == paths)
-            ok('unsend again: ok, nothing was sent, and that is not an error', d.unsend(tok, ENR1, a) == {'ok': True, 'unsent': False, 'cancelled': False, 'pages': 0})
+            ok('unsend again: ok, nothing was sent, and that is not an error', d.unsend(tok, ENR1, a) == {'ok': True, 'unsent': False, 'cancelled': False, 'pages': 0, 'kept': 0})
             ok('the piece is back to nothing sent, and can be sent again', d.work(tok, ENR1)['assessments'][0]['sent'] is None and d.send_start(tok, ENR1, a)['ok'] is True)
             b, done = d.drain()
             ok('the worker: one batch of six, each removed through the Storage API, and then believed',
@@ -536,6 +548,88 @@ def scen_student():
             e = refused(d, lambda: d.send_finish(tok2, ENR2, other['submission_id'], [s['files'][0]]))
             ok("a finish naming a page of another student's submission fails (22023)", e is not None and e[1] == '22023', e)
 
+        # ── A send that is not finished is nobody's but the student's ───
+        with tx(d):
+            s = d.send_start(tok, ENR1, a, pages=1); d.upload(s['files'])
+            ok('file_links gives no page of a send that is not finished', d.file_links(tok, ENR1, a)['files'] == [])
+            r = d.rpc('finish_work_upload(:s, :f::jsonb, :k)', s=s['submission_id'], f=json.dumps([{'file_id': s['files'][0]['file_id'], 'sha256': HASH}]), k=nid())
+            ok("the teacher's finish_work_upload cannot hand in a student's unfinished send, though every file is up: gone, and it is still unfinished",
+               r == {'result': 'gone'} and d.all('select state, sent_by from submission') == [['sending', 'student']], r)
+            r = d.rpc('delete_submission(:s, :k)', s=s['submission_id'], k=nid())
+            ok("nor can the teacher's delete_submission delete it: deleted false, and it is still there, nothing queued",
+               r == {'deleted': False, 'pages': 0} and d.one('select count(*) from submission') == 1 and queued(d) == [], r)
+            ok('the student finishes it as if nothing had happened', d.send_finish(tok, ENR1, s['submission_id'], s['files'])['ok'] is True)
+            # a Replace in progress goes with the work it was to replace
+            rep = d.send_start(tok, ENR1, a, pages=2, replace=True)
+            ok('with a Replace started and not finished there are two rows: the work, and the unfinished send that is to take its place',
+               d.all('select state, intent from submission order by state') == [['sending', 'replace'], ['sent', 'new']])
+            d.rpc('delete_submission(:s, :k)', s=s['submission_id'], k=nid())
+            ok('when the teacher deletes the work, the unfinished Replace goes with it, and the files of both are queued',
+               d.one('select count(*) from submission') == 0 and len(queued(d)) == 6 and sound(d) == '', (d.all('select state, intent from submission'), len(queued(d))))
+            ok('finishing that Replace now: not_found', err(d.send_finish(tok, ENR1, rep['submission_id'], rep['files'])) == 'not_found')
+
+        # ── A page keeps who added it ───────────────────────────────────
+        with tx(d):
+            s, f = d.send(tok, ENR1, a, 2, note='Mine.')
+            add, done = d.teacher_upload(a, ENR1, 2, mode='add')
+            ok("the teacher adds two pages to a student's work: four pages, the first two the student's and the last two the teacher's; the work is still the student's",
+               [(x['page'], x['added_by']) for x in done['submission']['files']] == [(1, 'student'), (2, 'student'), (3, 'teacher'), (4, 'teacher')]
+               and done['submission']['sent_by'] == 'student', done)
+            mine = sorted(p for x in s['files'] for p in (x['path'], x['thumb_path'])); theirs = sorted(p for x in add['files'] for p in (x['path'], x['thumb_path']))
+            r = d.unsend(tok, ENR1, a)
+            ok("the student's Unsend removes the student's two pages and keeps the teacher's two: the answer says so", r == {'ok': True, 'unsent': True, 'cancelled': False, 'pages': 2, 'kept': 2}, r)
+            ok("only the student's four files are queued; the teacher's two pages are now pages 1 and 2 of the same work, their files untouched",
+               queued(d, 'unsend') == mine and live_paths(d) == theirs and d.all('select page, added_by from submission_file order by page') == [[1, 'teacher'], [2, 'teacher']]
+               and set(theirs) <= set(d.storage.names()), (queued(d), live_paths(d)))
+            ok("the work stays, as the teacher's, without the student's note; the student can no longer change it, and can still see its pages",
+               d.all('select id, state, sent_by, note from submission') == [[s['submission_id'], 'sent', 'teacher', None]]
+               and err(d.unsend(tok, ENR1, a)) == 'cannot_change' and err(d.send_start(tok, ENR1, a, replace=True)) == 'cannot_change'
+               and err(d.send_start(tok, ENR1, a)) == 'already_sent' and len(d.file_links(tok, ENR1, a)['files']) == 2 and sound(d) == '', sound(d))
+        with tx(d):
+            s, f = d.send(tok, ENR1, a, 2)
+            add, done = d.teacher_upload(a, ENR1, 1, mode='add')
+            mine = sorted(p for x in s['files'] for p in (x['path'], x['thumb_path']))
+            rep = d.send_start(tok, ENR1, a, pages=3, replace=True); d.upload(rep['files'])
+            r = d.send_finish(tok, ENR1, rep['submission_id'], rep['files'])
+            ok("the student's Replace takes the place of the student's own pages only: three new pages, then the page the teacher added, four in all",
+               r['ok'] and r['pages'] == 4 and d.all('select f.page, f.added_by, f.id from submission_file f order by f.page')
+               == [[1, 'student', rep['files'][0]['file_id']], [2, 'student', rep['files'][1]['file_id']], [3, 'student', rep['files'][2]['file_id']],
+                   [4, 'teacher', add['files'][0]['file_id']]], (r, d.all('select page, added_by from submission_file order by page')))
+            ok("the student's two old pages are queued as replaced; the teacher's page keeps its file and its path, and is not queued",
+               queued(d, 'replace') == mine and add['files'][0]['path'] in live_paths(d) and d.one('select count(*) from submission') == 1 and sound(d) == '', (queued(d), sound(d)))
+            r = d.send_start(tok, ENR1, a, pages=30, replace=True)
+            ok('a Replace of 30 pages on work that holds a page of the teacher\'s: too_many_pages, room for 29', err(r) == 'too_many_pages' and r['room'] == 29, r)
+            d.rpc('delete_submission(:s, :k)', s=rep['submission_id'], k=nid())
+            ok("the teacher's delete removes every page of the work, whoever added it", d.one('select count(*) from submission_file') == 0 and len(queued(d, 'teacher')) == 8)
+
+        # ── What one class may hold ─────────────────────────────────────
+        with tx(d):
+            ok('one class may hold 10,000 pages and 5 GB, pages handed in and unfinished together',
+               (d.one('select public._work_class_max_pages()'), d.one('select public._work_class_max_bytes()')) == (10000, 5368709120))
+            d.run("create or replace function public._work_class_max_pages() returns integer language sql stable set search_path to 'public', 'pg_temp' as $f$ select 5 $f$")
+            d.send(tok2, ENR2, a, 3)
+            ok('with the limit set to 5 pages for this check and 3 handed in: a send of 3 more is refused (class_full), nothing made; a send of 2 is taken',
+               err(d.send_start(tok, ENR1, a, pages=3)) == 'class_full' and d.one('select count(*) from submission') == 1 and d.send_start(tok, ENR1, a, pages=2)['ok'] is True)
+            ok('an unfinished send counts: with 3 handed in and 2 unfinished, one more page from the teacher is refused, with what the class holds',
+               (lambda r: r['result'] == 'class_full' and r['pages'] == 5 and r['max_pages'] == 5)(d.rpc('start_work_upload(:a, :e, :p::jsonb, :m, :k)', a=k['nothing'], e=ENR1, p='[{}]', m='new', k=nid())))
+            d.unsend(tok, ENR1, a)
+            ok('and room comes back when work is unsent', d.send_start(tok, ENR1, a, pages=2)['ok'] is True)
+        with tx(d):
+            d.run("create or replace function public._work_class_max_bytes() returns bigint language sql stable set search_path to 'public', 'pg_temp' as $f$ select 1000000::bigint $f$")
+            small = [{'bytes': 300000, 'thumb_bytes': 20000}]
+            s = d.send_start(tok, ENR1, a, pages=small * 3)
+            ok('with the limit set to 1,000,000 bytes for this check: three pages said to be 320,000 bytes each are taken (960,000)', s.get('ok') is True, s)
+            ok('a fourth is refused (class_full); a page that says nothing of its size counts as the most the bucket allows, and is refused too',
+               err(d.send_start(tok2, ENR2, a, pages=small)) == 'class_full' and err(d.send_start(tok2, ENR2, a, pages=[{}])) == 'class_full')
+            for f_ in s['files']:
+                d.storage.put_signed(d.storage.sign_upload(f_['path']), size=300000 if f_['page'] < 3 else 300001)
+                d.storage.put_signed(d.storage.sign_upload(f_['thumb_path']), size=20000)
+            r = d.send_finish(tok, ENR1, s['submission_id'], s['files'])
+            ok('a file that turns out larger than its sender said (by one byte) is not taken when the work is handed in: bad_file names that page',
+               r == {'ok': False, 'error': 'bad_file', 'files': [s['files'][2]['file_id']]}, r)
+            r = d.send_finish(tok, ENR1, s['submission_id'], s['files'][:2])
+            ok('handed in without it, the work counts at the sizes storage recorded', r['ok'] is True and d.all('select bytes, thumb_bytes from submission_file order by page') == [[300000, 20000]] * 2, r)
+
         # ── Starting again; an expired send ─────────────────────────────
         with tx(d):
             s1 = d.send_start(tok, ENR1, a, pages=2)
@@ -545,18 +639,70 @@ def scen_student():
                s2['ok'] and s2['submission_id'] != s1['submission_id'] and d.one('select count(*) from submission') == 1
                and queued(d, 'abandoned') == sorted(p for f in s1['files'] for p in (f['path'], f['thumb_path'])), queued(d))
             ok('finishing the dropped one: not_found', err(d.send_finish(tok, ENR1, s1['submission_id'], s1['files'])) == 'not_found')
-            d.run("update submission set links_at = now() - interval '2 hours 1 minute' where id = :s", s=s2['submission_id'])
-            d.upload(s2['files'])
-            ok('a send whose upload links have stopped working cannot be finished: expired', err(d.send_finish(tok, ENR1, s2['submission_id'], s2['files'])) == 'expired')
-            ok('unsend drops a send that is not finished, whatever else', d.unsend(tok, ENR1, a) == {'ok': True, 'unsent': False, 'cancelled': True, 'pages': 0}
+            ok('unsend drops a send that is not finished, whatever else', d.unsend(tok, ENR1, a) == {'ok': True, 'unsent': False, 'cancelled': True, 'pages': 0, 'kept': 0}
                and d.one('select count(*) from submission') == 0)
+
+        # ── A started send holds its place for two hours, from its first start ──
+        with tx(d):
+            req = nid(); s = d.send_start(tok, ENR1, a, pages=2, request=req); d.upload(s['files'])
+            mine = sorted(p for f in s['files'] for p in (f['path'], f['thumb_path']))
+            d.run("update submission set created_at = now() - interval '1 hour 59 minutes' where id = :s", s=s['submission_id'])
+            again = d.send_start(tok, ENR1, a, pages=2, request=req)
+            ok('one minute before its two hours are up a repeat of the start still answers with its paths, and with the finish_by of the first start, not a new one',
+               again.get('replayed') is True and again['files'] == s['files']
+               and d.one("select :f::timestamptz = now() + interval '1 minute'", f=again['finish_by']), again)
+            d.run("update submission set created_at = now() - interval '2 hours 1 minute' where id = :s", s=s['submission_id'])
+            ok('past two hours, the page no longer shows it as a send in progress', d.work(tok, ENR1)['assessments'][0]['sending'] is None)
+            r = d.send_start(tok, ENR1, a, pages=2, request=req)
+            ok('and a repeat of the start is refused: expired. The send is gone and its four files are queued for deletion as expired',
+               err(r) == 'expired' and d.one('select count(*) from submission') == 0 and queued(d, 'expired') == mine, (r, queued(d)))
+            ok('a new send, with a new request id, starts afresh', d.send_start(tok, ENR1, a, pages=2)['ok'] is True)
+        with tx(d):
+            s = d.send_start(tok, ENR1, a, pages=1); d.upload(s['files'])
+            d.run("update submission set created_at = now() - interval '2 hours 1 minute' where id = :s", s=s['submission_id'])
+            r = d.send_finish(tok, ENR1, s['submission_id'], s['files'])
+            ok('a finish more than two hours after the first start, every page up: expired; nothing is handed in, the send is gone and its files are queued',
+               err(r) == 'expired' and d.one('select count(*) from submission') == 0
+               and queued(d, 'expired') == sorted([s['files'][0]['path'], s['files'][0]['thumb_path']]), (r, queued(d)))
+            ok('the same finish again: not_found', err(d.send_finish(tok, ENR1, s['submission_id'], s['files'])) == 'not_found')
+        with tx(d):
+            # Three weeks on: the reviewer's case. Started on the last day, repeated and finished long after the piece closed.
+            req = nid()
+            d.run("update assessment set due_date = :d::date, after_due = 'stop' where id = :a", d=k['today'], a=a)
+            s = d.send_start(tok, ENR1, a, pages=1, request=req); d.upload(s['files'])
+            d.run("update assessment set due_date = due_date - 21 where id = :a", a=a)
+            d.run("update submission set created_at = created_at - interval '21 days' where id = :s", s=s['submission_id'])
+            r1 = d.send_start(tok, ENR1, a, pages=1, request=req); r2 = d.send_finish(tok, ENR1, s['submission_id'], s['files'])
+            ok('a send started on the last day cannot be repeated or finished three weeks after the piece closed: expired, then not_found; nothing is handed in',
+               (err(r1), err(r2)) == ('expired', 'not_found') and d.one('select count(*) from submission') == 0, (r1, r2))
+        with tx(d):
+            # Anyone's activity in the class clears every expired send of the class, the teacher's unfinished uploads too.
+            theirs = d.send_start(tok2, ENR2, a, pages=1)
+            up = d.rpc('start_work_upload(:a, :e, :p::jsonb, :m, :k)', a=k['nothing'], e=ENR2, p='[{}]', m='new', k=nid())
+            d.run("update submission set created_at = now() - interval '3 hours'")
+            d.work(tok, ENR1); d.file_links(tok, ENR1, a)
+            ok('reading the page drops nothing (it changes nothing)', d.one('select count(*) from submission') == 2)
+            ok("an upload of the teacher's that has lost its place is not listed as waiting", d.rpc('list_course_submissions(:c)', c=COURSE_A)['uploads'] == [])
+            d.send_start(tok, ENR1, a, pages=1)
+            ok("one student's send clears the class's expired ones: the other student's unfinished send and the teacher's unfinished upload are gone, their files queued as expired",
+               d.all("select enrollment_id, sent_by from submission") == [[ENR1, 'student']] and len(queued(d, 'expired')) == 4, (d.all('select enrollment_id, sent_by, state from submission'), queued(d)))
+            ok("the teacher finishing that upload now: gone", d.rpc('finish_work_upload(:s, :f::jsonb, :k)', s=up['submission_id'],
+                                                                  f=json.dumps([{'file_id': up['files'][0]['file_id'], 'sha256': HASH}]), k=nid()) == {'result': 'gone'})
 
         # ── The switches change between start and finish ────────────────
         with tx(d):
             s = d.send_start(tok, ENR1, a); d.upload(s['files'])
             d.run("update assessment set due_date = :d::date - 1, after_due = 'stop' where id = :a", d=k['today'], a=a)
-            ok('a send started while the piece was open is taken though it closed before the pages were up (open and late are settled when it starts)',
-               d.send_finish(tok, ENR1, s['submission_id'], s['files'])['ok'] is True)
+            r = d.send_finish(tok, ENR1, s['submission_id'], s['files'])
+            ok('the piece closed between the start and the finish: the finish is refused (work_closed, with the day it closed); nothing is handed in',
+               err(r) == 'work_closed' and r['closed_on'] == str(k['today'] - datetime.timedelta(days=1)) and d.one("select count(*) from submission where state = 'sent'") == 0, r)
+        with tx(d):
+            d.run("update assessment set due_date = :d::date where id = :a", d=k['today'], a=a)
+            s = d.send_start(tok, ENR1, a); d.upload(s['files'])
+            d.run("update assessment set due_date = :d::date - 1 where id = :a", d=k['today'], a=a)
+            r = d.send_finish(tok, ENR1, s['submission_id'], s['files'])
+            ok('started on the due date (not late), finished after it with Keep Accepting: taken, and marked Late (late is what it is when the work is handed in)',
+               s['late'] is False and r['ok'] is True and r['late'] is True and d.one('select is_late from submission') is True, (s['late'], r))
         with tx(d):
             s = d.send_start(tok, ENR1, a); d.upload(s['files'])
             d.run("update assessment set students_send = 'nothing' where id = :a", a=a)
@@ -712,7 +858,7 @@ def scen_student():
            {n: set(re.findall(r'(?:insert\s+into|(?<!for )update|delete\s+from)\s+([a-z_.]+)', code_only(src[n]))) for n in new_fns})
         pub = {r[0]: r[1] for r in d.all("""select p.oid::regprocedure::text, p.prosrc from pg_proc p where p.oid = any(:f::regprocedure[])""",
                                          f=[s for s in B_FUNCTIONS if not s.startswith('student_submit.')])}
-        ok("nor do the teacher's functions and the helpers (27 of them) name a score table or a copy of a grade", len(pub) == 27 and not [n for n, s in pub.items() if GRADES.search(code_only(s)) or 'grade_return ' in code_only(s)],
+        ok("nor do the teacher's functions and the helpers (32 of them) name a score table or a copy of a grade", len(pub) == 32 and not [n for n, s in pub.items() if GRADES.search(code_only(s)) or 'grade_return ' in code_only(s)],
            [n for n, s in pub.items() if GRADES.search(code_only(s))])
         ok("student_submit still has one reader of grades: of every function in the schema only _returned_grade names a score table or a stored copy",
            sorted(n for n, s in src.items() if re.search(r'\b(score|tag_score|rubric_score|rubric_check_score|returned_copy|previous_copy|_grade_copy)\b', code_only(s))) == ['_returned_grade'])
@@ -725,8 +871,9 @@ def scen_storage():
     try:
         a = k['takes']; st = d.storage
         tok, _ = d.session(ENR1); tokb, _ = d.session(ENR_B, birthday='2012-07-17', course=COURSE_B, teacher=B)
-        ok('the bucket: private, 2 MB a file, JPEG only',
-           d.all("select public, file_size_limit, allowed_mime_types from storage.buckets where id = 'student-photos'") == [[False, 2097152, ['image/jpeg']]])
+        ok('the bucket: private, 2 MB a file, JPEG only, keeping no old version of a file and with no lifecycle policy',
+           d.all("select public, file_size_limit, allowed_mime_types, versioning_status, lifecycle_configuration from storage.buckets where id = 'student-photos'")
+           == [[False, 2097152, ['image/jpeg'], 'DISABLED', None]])
         ok('one bucket, and four policies on storage.objects, two that allow and two that restrict',
            d.one('select count(*) from storage.buckets') == 1
            and d.all("select polname, polcmd, polpermissive, polroles::regrole[]::text from pg_policy where polrelid = 'storage.objects'::regclass order by 1")
@@ -773,6 +920,25 @@ def scen_storage():
             d.run('alter role service_role bypassrls')   # undone with this block
             ok('the service role as Supabase makes it (it passes row security) sees every file: it is the key the edge functions hold', len(st.visible('service_role', None)) == 4)
             ok("a teacher of a deleted class reads none of its files", (lambda: (d.run("update course set deleted_at = now() where id = :c", c=COURSE_A), st.visible('authenticated', A))[-1])() == [])
+        with tx(d):
+            # Only handed-in work and the teacher's own uploads can be read: not what a student unsent or has not finished.
+            sent, _ = d.send(tok, ENR1, a, 1); p_sent = sent['files'][0]['path']
+            ok("the class's teacher reads a page that is handed in", st.can_read('authenticated', A, p_sent))
+            d.unsend(tok, ENR1, a)
+            ok("once the student has unsent it, the file is still in storage (the worker has not run) and its teacher can no longer read it or see it listed; nor can anyone but the service key",
+               p_sent in st.names() and not st.can_read('authenticated', A, p_sent) and st.visible('authenticated', A) == []
+               and not st.can_read('authenticated', B, p_sent) and not st.can_read('anon', None, p_sent))
+            un = d.send_start(tok, ENR1, a, pages=1); d.upload(un['files'])
+            ok("a page of a send the student has not finished is in storage and cannot be read by the class's teacher",
+               un['files'][0]['path'] in st.names() and not st.can_read('authenticated', A, un['files'][0]['path']) and not st.can_read('authenticated', A, un['files'][0]['thumb_path']))
+            d.send_finish(tok, ENR1, un['submission_id'], un['files'])
+            ok('handed in, it can', st.can_read('authenticated', A, un['files'][0]['path']) and st.can_read('authenticated', A, un['files'][0]['thumb_path']))
+            up = d.rpc('start_work_upload(:a, :e, :p::jsonb, :m, :k)', a=a, e=ENR2, p='[{}]', m='new', k=nid())
+            st.put_as('authenticated', A, up['files'][0]['path'])
+            ok("the teacher reads a file of their own upload before it is finished (the browser needs it back to check it); another teacher does not",
+               st.can_read('authenticated', A, up['files'][0]['path']) and not st.can_read('authenticated', B, up['files'][0]['path']))
+            d.run("insert into storage.objects (bucket_id, name) values ('student-photos', :n)", n=COURSE_A + '/stray.jpg')
+            ok("a file in the class's folder that no page row names (a stray) is read by no teacher", not st.can_read('authenticated', A, COURSE_A + '/stray.jpg'))
         with tx(d):
             folder = '%s/%s/%s/%s' % (COURSE_A, a, ENR1, nid())
             def put(role, uid, path):
@@ -937,10 +1103,10 @@ def scen_storage():
             while d.drain()[0]['items']: pass
             ok('after a replace, an add, an unsend and the worker run to the end: storage holds exactly the files of the pages that are handed in, no more and no fewer',
                d.storage.names() == stay and len(stay) == 8 and sound(d) == '' and d.one('select count(*) from submission_file_removal where not done') == 0, (len(d.storage.names()), len(stay), sound(d)))
-            e = refused(d, lambda: d.run("insert into submission_file (id, submission_id, page, path, thumb_path) values (:i, :s, 9, :p, :t)",
+            e = refused(d, lambda: d.run("insert into submission_file (id, submission_id, page, path, thumb_path, added_by, declared_bytes, declared_thumb_bytes, link_dies_at) values (:i, :s, 9, :p, :t, 'student', 1, 1, now())",
                                          i=nid(), s=keep['submission_id'], p=keep['files'][0]['path'].replace(keep['files'][0]['file_id'], nid()), t='x'))
             ok("a page row cannot be given a file name that is not its own id (so it can never be given a queued file's name)", e is not None and 'submission_file_path_is_own' in e[0], e)
-            e = refused(d, lambda: d.run("insert into submission_file (submission_id, page, path, thumb_path) select submission_id, 9, path, thumb_path from submission_file limit 1"))
+            e = refused(d, lambda: d.run("insert into submission_file (submission_id, page, path, thumb_path, added_by, declared_bytes, declared_thumb_bytes, link_dies_at) select submission_id, 9, path, thumb_path, 'student', 1, 1, now() from submission_file limit 1"))
             ok('nor the path of another page', e is not None and e[1] in ('23505', '23514'), e)
             # a queued path that a page holds (cannot happen; if it did) is never said to be gone
             d.run("insert into submission_file_removal (bucket, path, reason, link_dies_at) values ('student-photos', :p, 'test', now())", p=stay[0])
@@ -948,18 +1114,20 @@ def scen_storage():
             r = d.service('student_submit.removal_done(:ids)', ids=[i['id'] for i in b['items']])
             ok('and a queue row that names a live page\'s file is never marked gone', r['gone'] == 0 and r['still_there'] == [i['id'] for i in b['items']], r)
 
-        # ── Storage's newer shape: several versions of one name ─────────
+        # ── A name with several rows: old versions and delete markers ───
+        # gradebook-prod's storage.objects can hold these (only in a bucket whose versioning is on, which this
+        # one's is checked not to be). The functions read them right all the same.
         with tx(d):
-            d.run('alter table storage.objects add column archived_at timestamptz, add column is_delete_marker boolean not null default false')
-            d.run('drop index storage.bucketid_objname')
             s = d.send_start(tok, ENR1, a, pages=1); f = s['files'][0]
-            d.run("insert into storage.objects (bucket_id, name, metadata, archived_at) values ('student-photos', :n, '{\"size\": 5}', now())", n=f['path'])
-            d.run("insert into storage.objects (bucket_id, name, metadata, is_delete_marker) values ('student-photos', :n, null, true)", n=f['thumb_path'])
-            ok('where storage keeps old versions: an archived version alone, or a delete marker, is not the file being there (missing_pages)',
+            d.run("insert into storage.objects (bucket_id, name, metadata, archived_at, is_versioned, version) values ('student-photos', :n, '{\"size\": 5}', now(), true, 'v1')", n=f['path'])
+            d.run("insert into storage.objects (bucket_id, name, metadata, is_delete_marker, is_versioned, version) values ('student-photos', :n, null, true, true, 'v1')", n=f['thumb_path'])
+            ok('an archived version alone, or a current row that is a delete marker, is not the file being there (missing_pages)',
                err(d.send_finish(tok, ENR1, s['submission_id'], s['files'])) == 'missing_pages')
-            d.run("insert into storage.objects (bucket_id, name, metadata) values ('student-photos', :n, '{\"size\": 300000, \"mimetype\": \"image/jpeg\"}')", n=f['path'])
-            d.run("delete from storage.objects where is_delete_marker") if False else d.run("update storage.objects set is_delete_marker = false, metadata = '{\"size\": 9000, \"mimetype\": \"image/jpeg\"}' where name = :n", n=f['thumb_path'])
-            ok('and the current version is', d.send_finish(tok, ENR1, s['submission_id'], s['files'])['ok'] is True
+            ok('to every function that asks, such a name holds no file (so the removal worker counts it gone)',
+               d.all("select count(*) from public._work_object(:p)", p=f['path']) == [[0]] and d.all("select count(*) from public._work_object(:p)", p=f['thumb_path']) == [[0]])
+            d.run("insert into storage.objects (bucket_id, name, metadata, is_versioned, version) values ('student-photos', :n, '{\"size\": 300000, \"mimetype\": \"image/jpeg\"}', true, 'v2')", n=f['path'])
+            d.run("update storage.objects set is_delete_marker = false, metadata = '{\"size\": 9000, \"mimetype\": \"image/jpeg\"}' where name = :n", n=f['thumb_path'])
+            ok('the current version is, versioned row or not, with its own size and not the archived one\'s', d.send_finish(tok, ENR1, s['submission_id'], s['files'])['ok'] is True
                and d.all('select bytes, thumb_bytes from submission_file') == [[300000, 9000]])
     finally:
         d.close()

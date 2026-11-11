@@ -115,7 +115,7 @@ begin
             -- FINGERPRINTS-BEGIN policy (written by migrations/local-test/submissions_fingerprints.py)
             ('fv_private.work_path_course(text)',    '7fb0272243ceef1cb6b42658d27664e3'),
             ('fv_private.work_upload_allowed(text)', '02b678a47cb50ef6bf233a0ff244b51c'),
-            ('fv_private.work_read_allowed(text)',   'd5462a39d4090cdd6c2d1e8df067729c')
+            ('fv_private.work_read_allowed(text)',   '3ea2b37a835c7a86a881ed743b95d1c9')
             -- FINGERPRINTS-END
         ) as v(fn, md5)
     loop
@@ -130,7 +130,7 @@ begin
     if to_regclass('storage.buckets') is null or to_regclass('storage.objects') is null
        or (select count(*) from pg_attribute
             where attrelid = to_regclass('storage.buckets') and not attisdropped
-              and attname in ('id', 'name', 'public', 'file_size_limit', 'allowed_mime_types')) <> 5
+              and attname in ('id', 'name', 'public', 'file_size_limit', 'allowed_mime_types', 'versioning_status')) <> 6
        or (select count(*) from pg_attribute
             where attrelid = to_regclass('storage.objects') and not attisdropped
               and attname in ('bucket_id', 'name')) <> 2 then
@@ -143,11 +143,12 @@ begin
 
     _first := not exists (select 1 from pg_policy p
                            where p.polrelid = 'storage.objects'::regclass and p.polname like 'fv\_student\_photos\_%');
-    select b.public, b.file_size_limit, b.allowed_mime_types into _b from storage.buckets b where b.id = 'student-photos';
+    select b.public, b.file_size_limit, b.allowed_mime_types, b.versioning_status into _b from storage.buckets b where b.id = 'student-photos';
     if found and (_b.public is distinct from false or _b.file_size_limit is distinct from 2097152
-                  or _b.allowed_mime_types is distinct from array['image/jpeg']) then
-        raise exception 'a bucket named student-photos exists and is not private, limited to 2097152 bytes and to image/jpeg (found public %, limit %, types %). Put it right or remove it through the Storage API, then run this file. Nothing was changed.',
-            _b.public, _b.file_size_limit, _b.allowed_mime_types;
+                  or _b.allowed_mime_types is distinct from array['image/jpeg']
+                  or _b.versioning_status is distinct from 'DISABLED') then
+        raise exception 'a bucket named student-photos exists and is not private, limited to 2097152 bytes and to image/jpeg, with versioning DISABLED (found public %, limit %, types %, versioning %). Put it right or remove it through the Storage API, then run this file. (Versioning cannot be turned back off: such a bucket has to be removed.) Nothing was changed.',
+            _b.public, _b.file_size_limit, _b.allowed_mime_types, _b.versioning_status;
     end if;
     if _first and exists (select 1 from storage.objects o where o.bucket_id = 'student-photos') then
         raise exception 'the bucket student-photos already holds files, and this file has not been applied: something else put them there. Nothing was changed.';
@@ -158,7 +159,11 @@ $guard$;
 -- ── 1. The bucket ───────────────────────────────────────────────────────────
 -- Private. The Storage service refuses a file over 2 MB (2097152 bytes) and
 -- any upload that does not say it is a JPEG. Made by a row, as Supabase's
--- own guide does; the bucket lives in the project's region.
+-- own guide does; the bucket lives in the project's region. Its versioning
+-- is the column's own default, DISABLED, and its two lifecycle columns are
+-- left null (storage refuses an insert that sets them): no old version of a
+-- file is kept, so a file that is deleted is gone. The last step checks the
+-- row came out that way.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('student-photos', 'student-photos', false, 2097152, array['image/jpeg'])
 on conflict (id) do nothing;
@@ -211,10 +216,10 @@ declare
     _b record;
     _n int;
 begin
-    select b.public, b.file_size_limit, b.allowed_mime_types into _b from storage.buckets b where b.id = 'student-photos';
+    select b.public, b.file_size_limit, b.allowed_mime_types, b.versioning_status into _b from storage.buckets b where b.id = 'student-photos';
     if not found or _b.public is distinct from false or _b.file_size_limit is distinct from 2097152
-       or _b.allowed_mime_types is distinct from array['image/jpeg'] then
-        raise exception 'the bucket student-photos is not private, limited to 2097152 bytes and to image/jpeg. Nothing was changed.';
+       or _b.allowed_mime_types is distinct from array['image/jpeg'] or _b.versioning_status is distinct from 'DISABLED' then
+        raise exception 'the bucket student-photos is not private, limited to 2097152 bytes and to image/jpeg, with versioning DISABLED. Nothing was changed.';
     end if;
     select count(*) into _n from pg_policy p
      where p.polrelid = 'storage.objects'::regclass

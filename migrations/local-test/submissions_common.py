@@ -231,9 +231,11 @@ def score_fingerprint(d):
 # Every function Batch B's first file makes, by signature. submissions_fingerprints.py writes their
 # fingerprints into the two files; submissions.py checks the files' lists against a fresh apply.
 B_FUNCTIONS = [
-    'public._work_bucket()', 'public._work_max_bytes()', 'public._work_object(text)', 'public._work_check_pages(jsonb)',
+    'public._work_bucket()', 'public._work_max_bytes()', 'public._work_object(text)',
+    'public._work_hold()', 'public._work_class_max_pages()', 'public._work_class_max_bytes()', 'public._work_check_pages(jsonb)',
     'public._work_check_files(jsonb)',
     'public._work_begin(uuid,uuid,uuid,text,text,uuid,jsonb,text,text,boolean,uuid,uuid)',
+    'public._work_drop_expired(uuid)', 'public._work_class_full(uuid,jsonb)',
     'public._work_files_state(uuid,jsonb)', 'public._work_settle_files(uuid,jsonb)', 'public._work_upload_json(uuid)',
     'public._submission_json(uuid)', 'public._assessment_work_json(uuid)',
     'public._submission_same_class()', 'public._submission_file_removed()', 'public._submission_target_gone()',

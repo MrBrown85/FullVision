@@ -320,8 +320,8 @@ begin
     if to_regclass('storage.objects') is null or to_regclass('storage.buckets') is null
        or (select count(*) from pg_attribute
             where attrelid = to_regclass('storage.objects') and not attisdropped
-              and attname in ('bucket_id', 'name', 'metadata')) <> 3 then
-        raise exception 'storage.objects is not there with bucket_id, name and metadata. Nothing was changed.';
+              and attname in ('bucket_id', 'name', 'metadata', 'archived_at', 'is_delete_marker')) <> 5 then
+        raise exception 'storage.objects is not there with bucket_id, name, metadata, archived_at and is_delete_marker (the shape gradebook-prod had on 2026-11-10). Nothing was changed.';
     end if;
     -- storage.objects has row security and belongs to Supabase's storage
     -- role. The functions below run as the role applying this file; unless
@@ -341,14 +341,19 @@ begin
             -- FINGERPRINTS-BEGIN new (written by migrations/local-test/submissions_fingerprints.py)
             ('public._work_bucket()',                                                               '3f13f4e2c303b5a53caea4925abc8350'),
             ('public._work_max_bytes()',                                                            '1384cb1ea953d11cea982d60d87e5421'),
-            ('public._work_object(text)',                                                           'e52420e0be52353b1208dbc395ae9e5c'),
-            ('public._work_check_pages(jsonb)',                                                     '4f17b090aea75e8d9d9b296f99f0f5a8'),
+            ('public._work_object(text)',                                                           '1c78c7884df1e02c326b06989da25c5c'),
+            ('public._work_hold()',                                                                 'e0479f5f0ab703fd3cd77f677ec34eb2'),
+            ('public._work_class_max_pages()',                                                      'b8ccccd702ef8a8260bd7cf54bc9982a'),
+            ('public._work_class_max_bytes()',                                                      '3c5df6fb4a11ae55005ec87362fdf95e'),
+            ('public._work_check_pages(jsonb)',                                                     '8269b2b9c84377619778ca9154f39652'),
             ('public._work_check_files(jsonb)',                                                     'a3dfe8ce7a7f4eeb82e51d9e02c671c7'),
-            ('public._work_begin(uuid,uuid,uuid,text,text,uuid,jsonb,text,text,boolean,uuid,uuid)', '57e75c6fa0bbbd12a04e11d21752bc5b'),
-            ('public._work_files_state(uuid,jsonb)',                                                '975d75466b7b1dd7100240028441bea8'),
+            ('public._work_begin(uuid,uuid,uuid,text,text,uuid,jsonb,text,text,boolean,uuid,uuid)', '658a51b97817bfa115aa8dc048003c26'),
+            ('public._work_drop_expired(uuid)',                                                     '417711d4dadba3966d0358baee0214f0'),
+            ('public._work_class_full(uuid,jsonb)',                                                 '5ba6a4c79d6862b3b9543be420bca532'),
+            ('public._work_files_state(uuid,jsonb)',                                                '8fe968ca61404cfb4c8706d722c9c9a8'),
             ('public._work_settle_files(uuid,jsonb)',                                               '215b8fe4cc3eada5c45e8c86c847ef19'),
             ('public._work_upload_json(uuid)',                                                      '63982ca7888b11ce9b80e962f674c98a'),
-            ('public._submission_json(uuid)',                                                       '2d20f60def0f309725f16b7b86477fab'),
+            ('public._submission_json(uuid)',                                                       'a1933b27974307aeae814ce98714c18f'),
             ('public._assessment_work_json(uuid)',                                                  'e281660216f4186fe3f374eeacaf2fe6'),
             ('public._submission_same_class()',                                                     '301c53b36722954a92211ea582b7842a'),
             ('public._submission_file_removed()',                                                   'edc99e4c04baefcf83b9ce3c94723023'),
@@ -357,24 +362,24 @@ begin
             ('public._submission_truncated()',                                                      '9abaa6530a1e7f7215951d9952675de0'),
             ('public.set_course_send_work(uuid,jsonb,uuid)',                                        '694863746b03f4be25263a5107f5b02e'),
             ('public.set_assessment_student_work(uuid,jsonb,uuid)',                                 'c58c518c44d32262b3713753b7aaac1f'),
-            ('public.list_course_submissions(uuid)',                                                '8703f5ddc09b3c8dc92aa70878b5d7b1'),
-            ('public.start_work_upload(uuid,uuid,jsonb,text,uuid)',                                 'aa86a41467680581f47ab2f5da4f54a2'),
-            ('public.finish_work_upload(uuid,jsonb,uuid)',                                          'd62a6e550d7535f123f58b17cfe838f2'),
-            ('public.mark_handed_in_paper(uuid,uuid[],uuid)',                                       '1a966bceb2e46eb59107e2753e731bd4'),
-            ('public.delete_submission(uuid,uuid)',                                                 '7da38ac3304aaf2f9639877b3fd0f81a'),
-            ('public.rotate_submission_page(uuid,integer,uuid)',                                    'e684b853403b25a1706d29f02a581d5c'),
+            ('public.list_course_submissions(uuid)',                                                '525db92cdf4129afb9e2bc15aa7d4725'),
+            ('public.start_work_upload(uuid,uuid,jsonb,text,uuid)',                                 '538ffab506d6c20344c07662837fe714'),
+            ('public.finish_work_upload(uuid,jsonb,uuid)',                                          'a6b8abb071daf36993e1318c07b42085'),
+            ('public.mark_handed_in_paper(uuid,uuid[],uuid)',                                       '6a3caf6c0bfad3398bbb33a8ac1aa79a'),
+            ('public.delete_submission(uuid,uuid)',                                                 'c1f98e77a7fb756e75af4334d520f5fc'),
+            ('public.rotate_submission_page(uuid,integer,uuid)',                                    '2c08eb9198d7dc2b50a81caf18e08365'),
             ('fv_private.work_path_course(text)',                                                   '7fb0272243ceef1cb6b42658d27664e3'),
             ('fv_private.work_upload_allowed(text)',                                                '02b678a47cb50ef6bf233a0ff244b51c'),
-            ('fv_private.work_read_allowed(text)',                                                  'd5462a39d4090cdd6c2d1e8df067729c'),
+            ('fv_private.work_read_allowed(text)',                                                  '3ea2b37a835c7a86a881ed743b95d1c9'),
             ('student_submit._grading_started(uuid,uuid)',                                          '720b9f044b853b5c57b04bec7f59010c'),
             ('student_submit._send_session(text,uuid)',                                             'c39242f54850eeeada19945ac8123644'),
             ('student_submit._work_window(uuid)',                                                   '767795b7835e3c4d6cb628c76df8e6eb'),
-            ('student_submit._send_begin(text,text,uuid,uuid,jsonb,text,text,uuid)',                '247b8c12e04333451ae7821a2344a30e'),
-            ('student_submit.work(text,uuid,text)',                                                 '72233e7985f93eb6a150c1822ed69d14'),
+            ('student_submit._send_begin(text,text,uuid,uuid,jsonb,text,text,uuid)',                '595e0a34dc67e23ca9fadc478c2ab9b7'),
+            ('student_submit.work(text,uuid,text)',                                                 '64d016d3d102327917e987b24e811129'),
             ('student_submit.send_start(text,uuid,uuid,jsonb,text,text,uuid,text)',                 'e1ccea79acc7dedcbbe10da2a4548643'),
             ('student_submit.replace(text,uuid,uuid,jsonb,text,text,uuid,text)',                    '1dad4dba0d66dcd87820b72485ecb28c'),
-            ('student_submit.send_finish(text,uuid,uuid,jsonb,text)',                               'c20e5a7beae5343f50b968368dfae8c6'),
-            ('student_submit.unsend(text,uuid,uuid,text)',                                          '719b3aef45f8946343138924b84a03e9'),
+            ('student_submit.send_finish(text,uuid,uuid,jsonb,text)',                               'fe147af22bb706b08193504b72de223d'),
+            ('student_submit.unsend(text,uuid,uuid,text)',                                          '3161f6b51e8a8e4e54e2d01033a20848'),
             ('student_submit.file_links(text,uuid,uuid,text)',                                      '99ef3b9e89574fae0a230c4464998baf'),
             ('student_submit.removal_batch(integer)',                                               '964eef99a747dc7180d4ad61bd19b1db'),
             ('student_submit.removal_done(bigint[])',                                               'de793c82a2b5aa59052994a82e80d166')
@@ -486,10 +491,9 @@ create table if not exists public.submission (
     is_late       boolean     not null default false,
     card_id       uuid,       -- the card whose session sent it; history only
     request_id    uuid,       -- the sender's own id for the call that made the row
+    -- When it was first started. An unfinished send holds its place for
+    -- _work_hold from then (section 6), whatever is asked of it afterwards.
     created_at    timestamptz not null default now(),
-    -- When its paths were last handed out to be given upload links (a student's
-    -- send only: each send_start or replace, and each repeat of one).
-    links_at      timestamptz not null default now(),
     sent_at       timestamptz,
     updated_at    timestamptz not null default now(),
     constraint submission_sent_has_time check ((state = 'sent') = (sent_at is not null)),
@@ -503,6 +507,11 @@ create unique index if not exists submission_one_sent on public.submission (asse
 create unique index if not exists submission_one_sending on public.submission (assessment_id, enrollment_id, sent_by) where state = 'sending';
 create index if not exists submission_enrollment_idx on public.submission (enrollment_id);
 create index if not exists submission_course_idx on public.submission (course_id);
+-- Plain, on its own: what the trigger on assessment deletes by. (The two
+-- unique indexes above are partial, so neither serves a delete of every
+-- submission of one assessment; without this one, deleting any assessment
+-- would read the whole table.)
+create index if not exists submission_assessment_idx on public.submission (assessment_id);
 create index if not exists submission_target_idx on public.submission (target_id) where target_id is not null;
 comment on table public.submission is
     'Work handed in for one assessment by one student: by the student from their page, or by the teacher (Add Work, Handed In on Paper). Read and written only through the functions of 2026111101, under the class''s lock.';
@@ -522,10 +531,21 @@ create table if not exists public.submission_file (
     height        integer     constraint submission_file_height_check check (height between 1 and 20000),
     sha256        text        constraint submission_file_sha256_check check (sha256 ~ '^[0-9a-f]{64}$'),
     rotation      smallint    not null default 0 constraint submission_file_rotation_check check (rotation in (0, 90, 180, 270)),
+    -- Who added the page. A student's Unsend or Replace removes only the
+    -- student's own pages; one the teacher added stays.
+    added_by      text        not null constraint submission_file_added_by_check check (added_by in ('student', 'teacher')),
+    -- The sizes its sender said the page and its thumbnail would be (the
+    -- bucket's limit where nothing was said). What a page not yet handed in
+    -- counts for against the class's limit; a file larger than was said is
+    -- refused when the work is handed in.
+    declared_bytes       integer not null constraint submission_file_declared_bytes_check check (declared_bytes between 1 and 2097152),
+    declared_thumb_bytes integer not null constraint submission_file_declared_thumb_bytes_check check (declared_thumb_bytes between 1 and 2097152),
     created_at    timestamptz not null default now(),
-    -- The last upload link made for this page stops working before this time:
-    -- two hours after its paths were last handed out, and ten minutes more.
-    link_dies_at  timestamptz not null default (now() + interval '2 hours 10 minutes'),
+    -- The last upload link made for this page has stopped working by this
+    -- time. Links can be made for as long as the send holds its place
+    -- (_work_hold after its first start) and each lasts two hours; ten
+    -- minutes are added for clocks that disagree.
+    link_dies_at  timestamptz not null,
     -- The file's name is the row's own id, so two rows can never share a
     -- file and a new row can never be given the name of a file that is
     -- waiting to be deleted.
@@ -550,8 +570,9 @@ create table if not exists public.submission_file_removal (
     course_id    uuid,       -- the path's first folder; the class itself may be gone
     reason       text        not null,
     queued_at    timestamptz not null default now(),
-    -- The upload link made for this path stops working at about this time.
-    -- Until then the file could be put back by whoever holds the link.
+    -- The last upload link made for this path has stopped working by this
+    -- time (its page's link_dies_at). Until then the file could be put back
+    -- by whoever holds a link.
     link_dies_at timestamptz not null,
     tries        integer     not null default 0,
     last_try_at  timestamptz,
@@ -719,10 +740,16 @@ create or replace trigger submission_truncate after truncate on public.assessmen
     for each statement execute function public._submission_truncated();
 
 -- ── 6. Shared pieces ────────────────────────────────────────────────────────
--- Is the file there? Read from Supabase's own table. Written to read both
--- shapes of it: where a bucket can keep old versions of a file, the current
--- one has no archived_at and is not a delete marker.
--- Returns its size and type as storage recorded them, or no row.
+-- Is the file there? Read from Supabase's own table, in the shape
+-- gradebook-prod has it (the Storage service's migration
+-- "lifecycle-writer-coordination"): one name can have several rows, one
+-- current (archived_at is null) and its older versions, and the current one
+-- can be a marker that says the file was deleted. The file is there when
+-- its current row is not such a marker, whether or not the row is one of a
+-- versioned bucket. (This bucket's versioning is off, and the second file
+-- checks that it is, so in practice a name has one row; the other cases are
+-- read right all the same.)
+-- Returns the file's size and type as storage recorded them, or no row.
 create or replace function public._work_object(p_path text)
  returns table (bytes bigint, mimetype text)
  language sql
@@ -733,10 +760,10 @@ as $function$
     select nullif(o.metadata->>'size', '')::bigint, o.metadata->>'mimetype'
       from storage.objects o
      where o.bucket_id = public._work_bucket()
-       -- compared as storage's own index on (bucket_id, name) is kept
+       -- compared byte by byte, as storage's own indexes on (bucket_id, name) are kept
        and o.name = p_path collate "C"
-       and to_jsonb(o)->>'archived_at' is null
-       and coalesce((to_jsonb(o)->>'is_delete_marker')::boolean, false) = false
+       and o.archived_at is null
+       and not o.is_delete_marker
      limit 1;
 $function$;
 
@@ -750,8 +777,45 @@ as $function$
     select 2097152::bigint;
 $function$;
 
+-- How long a started send or upload holds its place: it can be finished for
+-- this long after its FIRST start, and a repeat of the start does not give
+-- it longer. After that it is refused, dropped, and its files queued for
+-- deletion. The one place this is written. (STABLE, not IMMUTABLE, like the
+-- two limits below: each is a setting a later migration may change, so no
+-- plan may keep an old value folded into it.)
+create or replace function public._work_hold()
+ returns interval
+ language sql
+ stable
+ set search_path to 'public', 'pg_temp'
+as $function$
+    select interval '2 hours';
+$function$;
+
+-- The most pages one class may hold, handed in and unfinished together.
+create or replace function public._work_class_max_pages()
+ returns integer
+ language sql
+ stable
+ set search_path to 'public', 'pg_temp'
+as $function$
+    select 10000;
+$function$;
+
+-- The most bytes one class may hold, handed in and unfinished together: 5 GB.
+create or replace function public._work_class_max_bytes()
+ returns bigint
+ language sql
+ stable
+ set search_path to 'public', 'pg_temp'
+as $function$
+    select 5368709120::bigint;
+$function$;
+
 -- p_pages, as every start call takes it: a list of 1 to 30 pages, each
--- { width, height } or {}. Raises when it is anything else.
+-- { width, height, bytes, thumb_bytes } with any of them left out. bytes and
+-- thumb_bytes are the sizes the sender says the page and its thumbnail will
+-- be: at most the bucket's limit. Raises when it is anything else.
 create or replace function public._work_check_pages(p_pages jsonb)
  returns void
  language plpgsql
@@ -760,7 +824,7 @@ create or replace function public._work_check_pages(p_pages jsonb)
 as $function$
 declare
     _p jsonb;
-    _k text;
+    _k record;
 begin
     if p_pages is null or jsonb_typeof(p_pages) <> 'array' then
         raise exception 'pages must be a list' using errcode = '22023';
@@ -772,10 +836,10 @@ begin
         if jsonb_typeof(_p) <> 'object' then
             raise exception 'a page is not an object' using errcode = '22023';
         end if;
-        foreach _k in array array['width', 'height'] loop
-            if _p ? _k and jsonb_typeof(_p->_k) <> 'null'
-               and (jsonb_typeof(_p->_k) <> 'number' or (_p->>_k) !~ '^[0-9]{1,5}$' or (_p->>_k)::int not between 1 and 20000) then
-                raise exception 'a page has a % that is not a whole number from 1 to 20000', _k using errcode = '22023';
+        for _k in select * from (values ('width', 20000::bigint), ('height', 20000), ('bytes', _work_max_bytes()), ('thumb_bytes', _work_max_bytes())) as v(name, most) loop
+            if _p ? _k.name and jsonb_typeof(_p->_k.name) <> 'null'
+               and (jsonb_typeof(_p->_k.name) <> 'number' or (_p->>_k.name) !~ '^[0-9]{1,7}$' or (_p->>_k.name)::bigint not between 1 and _k.most) then
+                raise exception 'a page has a % that is not a whole number from 1 to %', _k.name, _k.most using errcode = '22023';
             end if;
         end loop;
     end loop;
@@ -814,7 +878,11 @@ end;
 $function$;
 
 -- A new unfinished send with its page rows. The paths are made here, from
--- ids, and nowhere else.
+-- ids, and nowhere else. Each page remembers who added it, the sizes its
+-- sender said it and its thumbnail would be (the bucket's limit where
+-- nothing was said), and by when its last upload link is dead: the send can
+-- be given links for as long as it holds its place, and a link lasts two
+-- hours (ten minutes are added for clocks that disagree).
 create or replace function public._work_begin(
     p_course_id uuid, p_assessment_id uuid, p_enrollment_id uuid, p_sent_by text, p_intent text, p_target_id uuid,
     p_pages jsonb, p_note text, p_followed_plan text, p_is_late boolean, p_card_id uuid, p_request_id uuid)
@@ -837,19 +905,73 @@ begin
     for _p in select t.x, t.ord from jsonb_array_elements(p_pages) with ordinality as t(x, ord) order by t.ord loop
         _file := gen_random_uuid();
         _path := p_course_id::text || '/' || p_assessment_id::text || '/' || p_enrollment_id::text || '/' || _id::text || '/' || _file::text;
-        insert into submission_file (id, submission_id, page, path, thumb_path, width, height)
-        values (_file, _id, _p.ord, _path || '.jpg', _path || '-thumb.jpg', (_p.x->>'width')::int, (_p.x->>'height')::int);
+        insert into submission_file (id, submission_id, page, path, thumb_path, width, height, added_by,
+                                     declared_bytes, declared_thumb_bytes, link_dies_at)
+        values (_file, _id, _p.ord, _path || '.jpg', _path || '-thumb.jpg', (_p.x->>'width')::int, (_p.x->>'height')::int, p_sent_by,
+                coalesce((_p.x->>'bytes')::int, _work_max_bytes()::int), coalesce((_p.x->>'thumb_bytes')::int, _work_max_bytes()::int),
+                now() + _work_hold() + interval '2 hours 10 minutes');
     end loop;
     return _id;
 end;
 $function$;
 
+-- Unfinished sends and uploads of a class that have lost their place (started
+-- longer ago than _work_hold) are dropped, and their files queued for
+-- deletion. Called under the class's lock by every call that starts,
+-- finishes or unsends work in the class, so a class in use clears its own.
+-- Returns how many were dropped.
+create or replace function public._work_drop_expired(p_course_id uuid)
+ returns integer
+ language plpgsql
+ security definer
+ set search_path to 'public', 'pg_temp'
+as $function$
+declare
+    _n int;
+begin
+    perform set_config('fv.work_removal_reason', 'expired', true);
+    delete from submission
+     where course_id = p_course_id and state = 'sending' and created_at < now() - _work_hold();
+    get diagnostics _n = row_count;
+    perform set_config('fv.work_removal_reason', '', true);
+    return _n;
+end;
+$function$;
+
+-- Would these new pages take the class past what one class may hold? Null
+-- when they fit; otherwise what the class holds now and the two limits.
+-- Counted: every page of the class, handed in or not. A page handed in
+-- counts at the sizes storage recorded; one not handed in yet at the sizes
+-- its sender said (send_finish refuses a file larger than was said).
+create or replace function public._work_class_full(p_course_id uuid, p_pages jsonb)
+ returns jsonb
+ language sql
+ stable
+ security definer
+ set search_path to 'public', 'pg_temp'
+as $function$
+    select case when u.pages + n.pages > _work_class_max_pages() or u.bytes + n.bytes > _work_class_max_bytes()
+                then jsonb_build_object('pages', u.pages, 'bytes', u.bytes,
+                                        'max_pages', _work_class_max_pages(), 'max_bytes', _work_class_max_bytes()) end
+      from (select count(f.id) as pages,
+                   coalesce(sum(case when s.state = 'sent'
+                                     then coalesce(f.bytes, f.declared_bytes) + coalesce(f.thumb_bytes, f.declared_thumb_bytes)
+                                     else f.declared_bytes + f.declared_thumb_bytes end), 0)::bigint as bytes
+              from submission s join submission_file f on f.submission_id = s.id
+             where s.course_id = p_course_id) u,
+           (select count(*) as pages,
+                   coalesce(sum(coalesce((x->>'bytes')::bigint, _work_max_bytes()) + coalesce((x->>'thumb_bytes')::bigint, _work_max_bytes())), 0)::bigint as bytes
+              from jsonb_array_elements(p_pages) x) n;
+$function$;
+
 -- Which of a finish call's pages are not in storage yet (the page or its
--- thumbnail), and which are there but are larger than the bucket allows or
--- are not recorded as a JPEG. p_files has been checked to be files of
--- p_submission_id. (The bucket itself refuses both at upload; this is a
--- second look at what storage recorded. A file whose record has no size or
--- no type is taken as storage accepted it.)
+-- thumbnail), and which are there but are not what was promised: larger
+-- than the bucket allows, larger than its sender said it would be, or not
+-- recorded as a JPEG (the page or its thumbnail). p_files has been checked
+-- to be files of p_submission_id. (The bucket itself refuses a file over its
+-- limit or of another type at upload; this is a second look at what storage
+-- recorded. A file whose record has no size or no type is taken as storage
+-- accepted it.)
 create or replace function public._work_files_state(p_submission_id uuid, p_files jsonb)
  returns jsonb
  language sql
@@ -861,6 +983,7 @@ as $function$
         'missing', coalesce(jsonb_agg(f.id order by t.ord) filter (where o.n = 0 or th.n = 0), '[]'::jsonb),
         'bad', coalesce(jsonb_agg(f.id order by t.ord) filter (where o.n > 0 and th.n > 0 and (
                             o.bytes > _work_max_bytes() or th.bytes > _work_max_bytes()
+                            or o.bytes > f.declared_bytes or th.bytes > f.declared_thumb_bytes
                             or o.mimetype <> 'image/jpeg' or th.mimetype <> 'image/jpeg')), '[]'::jsonb))
       from jsonb_array_elements(p_files) with ordinality as t(x, ord)
       join submission_file f on f.id = (t.x->>'file_id')::uuid and f.submission_id = p_submission_id
@@ -914,7 +1037,7 @@ as $function$
                    select jsonb_agg(jsonb_build_object(
                               'id', f.id, 'page', f.page, 'path', f.path, 'thumb_path', f.thumb_path,
                               'bytes', f.bytes, 'thumb_bytes', f.thumb_bytes, 'width', f.width, 'height', f.height,
-                              'rotation', f.rotation, 'sha256', f.sha256) order by f.page, f.id)
+                              'rotation', f.rotation, 'sha256', f.sha256, 'added_by', f.added_by) order by f.page, f.id)
                      from submission_file f where f.submission_id = s.id), '[]'::jsonb))
       from submission s
      where s.id = p_submission_id;
@@ -953,7 +1076,12 @@ as $function$
                       and fv_owns_course(s.course_id));
 $function$;
 
--- May the signed-in teacher read this path? Any file under a class they own.
+-- May the signed-in teacher read this path? Only a page, or its thumbnail,
+-- that still has its row, in a class they own, and is either handed in or
+-- part of an upload of the teacher's own. So a file a student unsent, or
+-- one of a send a student has not finished, can be read by no teacher: its
+-- row is gone, or is not handed in. (Such a file stays in storage until the
+-- removal worker deletes it; until then only the service key reaches it.)
 create or replace function fv_private.work_read_allowed(p_name text)
  returns boolean
  language sql
@@ -961,7 +1089,13 @@ create or replace function fv_private.work_read_allowed(p_name text)
  security definer
  set search_path to 'public', 'pg_temp'
 as $function$
-    select coalesce(fv_owns_course(fv_private.work_path_course(p_name)), false);
+    select (select auth.uid()) is not null
+       and exists (select 1
+                     from submission_file f
+                     join submission s on s.id = f.submission_id
+                    where (f.path = p_name or f.thumb_path = p_name)
+                      and (s.state = 'sent' or s.sent_by = 'teacher')
+                      and fv_owns_course(s.course_id));
 $function$;
 
 -- ── 8. The teacher's RPCs ───────────────────────────────────────────────────
@@ -1123,16 +1257,18 @@ begin
         'submissions', coalesce((
             select jsonb_agg(_submission_json(s.id) - 'intent' - 'target_id' order by s.sent_at, s.id)
               from submission s where s.course_id = p_course_id and s.state = 'sent'), '[]'::jsonb),
-        -- the teacher's own uploads that are not finished
+        -- the teacher's own uploads that are not finished and still hold their place
         'uploads', coalesce((
-            select jsonb_agg(_submission_json(s.id) order by s.created_at, s.id)
-              from submission s where s.course_id = p_course_id and s.state = 'sending' and s.sent_by = 'teacher'), '[]'::jsonb));
+            select jsonb_agg(_submission_json(s.id) || jsonb_build_object('finish_by', s.created_at + _work_hold()) order by s.created_at, s.id)
+              from submission s
+             where s.course_id = p_course_id and s.state = 'sending' and s.sent_by = 'teacher'
+               and s.created_at >= now() - _work_hold()), '[]'::jsonb));
 end;
 $function$;
 
 -- Add Work, first half: the rows and the paths. The teacher's browser then
 -- uploads each page and thumbnail itself, signed in, and calls
--- finish_work_upload.
+-- finish_work_upload within _work_hold of this call.
 create or replace function public.start_work_upload(
     p_assessment_id uuid, p_enrollment_id uuid, p_pages jsonb, p_mode text default 'new', p_idempotency_key uuid default null)
  returns jsonb
@@ -1146,6 +1282,7 @@ declare
     _sent   submission%rowtype;
     _id     uuid;
     _pages  int;
+    _full   jsonb;
 begin
     if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
     if not fv_owns_assessment(p_assessment_id) then
@@ -1172,6 +1309,7 @@ begin
         -- deleted while this call waited for the class
         raise exception 'assessment not found' using errcode = 'P0002';
     end if;
+    perform _work_drop_expired(_course);
     select * into _sent from submission
      where assessment_id = p_assessment_id and enrollment_id = p_enrollment_id and state = 'sent'
      order by version desc limit 1;
@@ -1184,7 +1322,7 @@ begin
     if p_mode in ('add', 'replace') and _sent.id is null then
         return jsonb_build_object('result', 'nothing_sent');
     end if;
-    -- Two more things the screen cannot know for sure when it asks (another
+    -- More things the screen cannot know for sure when it asks (another
     -- device may have changed the piece): answers, not errors, and not
     -- remembered.
     if p_mode = 'add' and _sent.on_paper then
@@ -1200,10 +1338,15 @@ begin
     delete from submission
      where assessment_id = p_assessment_id and enrollment_id = p_enrollment_id and state = 'sending' and sent_by = 'teacher';
     perform set_config('fv.work_removal_reason', '', true);
+    -- The class may hold only so much.
+    _full := _work_class_full(_course, p_pages);
+    if _full is not null then
+        return jsonb_build_object('result', 'class_full') || _full;
+    end if;
     _id := _work_begin(_course, p_assessment_id, p_enrollment_id, 'teacher', p_mode,
                        case when p_mode = 'new' then null else _sent.id end, p_pages, null, null, false, null, p_idempotency_key);
     _cached := jsonb_build_object('result', 'ready', 'submission_id', _id, 'mode', p_mode, 'bucket', _work_bucket(),
-                                  'files', _work_upload_json(_id));
+                                  'finish_by', now() + _work_hold(), 'files', _work_upload_json(_id));
     perform fv_idem_store(p_idempotency_key, 'start_work_upload', _cached);
     return _cached;
 end;
@@ -1228,15 +1371,22 @@ declare
 begin
     if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
     perform _work_check_files(p_files);
+    select s.course_id into _course from submission s where s.id = p_submission_id and fv_owns_course(s.course_id);
+    if _course is not null then
+        perform _grade_return_lock_first(_course);
+    end if;
+    -- Asked under the lock (when there is a class to lock): the same request
+    -- sent twice at once waits above, and the second is answered as a repeat.
     _cached := fv_idem_check(p_idempotency_key, 'finish_work_upload');
     if _cached is not null then return _cached; end if;
-    select s.course_id into _course from submission s where s.id = p_submission_id and fv_owns_course(s.course_id);
     if _course is null then
         -- Never existed, another teacher's, or already finished and since
         -- replaced or deleted. The same answer for all of them.
         return jsonb_build_object('result', 'gone');
     end if;
-    perform _grade_return_lock_first(_course);
+    -- An upload that has lost its place is dropped here, with the class's others.
+    perform _work_drop_expired(_course);
+    -- The teacher's own upload, and never a student's unfinished send.
     select * into _sub from submission where id = p_submission_id and sent_by = 'teacher' for update;
     if not found then
         return jsonb_build_object('result', 'gone');
@@ -1267,8 +1417,9 @@ begin
     end if;
     perform _work_settle_files(_sub.id, p_files);
     if _sub.intent = 'add' then
-        -- Its pages go on the end of what was sent, and the row that carried
-        -- them goes (it has no pages left, so nothing is queued).
+        -- Its pages go on the end of what was sent, each still marked as the
+        -- teacher's, and the row that carried them goes (it has no pages
+        -- left, so nothing is queued).
         select coalesce(max(f.page), 0) into _last from submission_file f where f.submission_id = _target.id;
         update submission_file set submission_id = _target.id, page = page + _last where submission_id = _sub.id;
         delete from submission where id = _sub.id;
@@ -1303,7 +1454,8 @@ end;
 $function$;
 
 -- Handed In on Paper: the piece moves to Sent for these students, with no
--- photos. A student who already has work in is left as they are.
+-- photos. A student who already has work in is left as they are, and so is
+-- one who is withdrawn or not in the class.
 create or replace function public.mark_handed_in_paper(p_assessment_id uuid, p_enrollment_ids uuid[], p_idempotency_key uuid default null)
  returns jsonb
  language plpgsql
@@ -1321,10 +1473,12 @@ begin
     if not fv_owns_assessment(p_assessment_id) then
         raise exception 'assessment not found' using errcode = 'P0002';
     end if;
-    _cached := fv_idem_check(p_idempotency_key, 'mark_handed_in_paper');
-    if _cached is not null then return _cached; end if;
     select a.course_id into _course from assessment a where a.id = p_assessment_id;
     perform _grade_return_lock_first(_course);
+    -- Asked under the lock: the same request sent twice at once waits above,
+    -- and the second is answered as a repeat of the first.
+    _cached := fv_idem_check(p_idempotency_key, 'mark_handed_in_paper');
+    if _cached is not null then return _cached; end if;
     if not exists (select 1 from assessment a where a.id = p_assessment_id) then
         raise exception 'assessment not found' using errcode = 'P0002';
     end if;
@@ -1350,7 +1504,9 @@ end;
 $function$;
 
 -- The teacher removes work that was handed in (or an upload of their own
--- that is not finished). ITS PHOTOS ARE DELETED and cannot come back.
+-- that is not finished), every page of it, whoever added the page. ITS
+-- PHOTOS ARE DELETED and cannot come back. A send a student has not
+-- finished is not the teacher's to delete.
 create or replace function public.delete_submission(p_submission_id uuid, p_idempotency_key uuid default null)
  returns jsonb
  language plpgsql
@@ -1363,12 +1519,14 @@ declare
     _pages  int;
 begin
     if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
-    _cached := fv_idem_check(p_idempotency_key, 'delete_submission');
-    if _cached is not null then return _cached; end if;
     select s.course_id into _course from submission s where s.id = p_submission_id and fv_owns_course(s.course_id);
     if _course is not null then
         perform _grade_return_lock_first(_course);
     end if;
+    -- Asked under the lock (when there is a class to lock): the same request
+    -- sent twice at once waits above, and the second is answered as a repeat.
+    _cached := fv_idem_check(p_idempotency_key, 'delete_submission');
+    if _cached is not null then return _cached; end if;
     select count(*) into _pages from submission_file f join submission s on s.id = f.submission_id
      where s.id = p_submission_id and s.course_id = _course and (s.state = 'sent' or s.sent_by = 'teacher');
     perform set_config('fv.work_removal_reason', 'teacher', true);
@@ -1398,15 +1556,19 @@ begin
     if p_rotation is null or p_rotation not in (0, 90, 180, 270) then
         raise exception 'rotation must be 0, 90, 180 or 270' using errcode = '22023';
     end if;
-    _cached := fv_idem_check(p_idempotency_key, 'rotate_submission_page');
-    if _cached is not null then return _cached; end if;
     select s.course_id into _course
       from submission_file f join submission s on s.id = f.submission_id
      where f.id = p_file_id and fv_owns_course(s.course_id);
+    if _course is not null then
+        perform _grade_return_lock_first(_course);
+    end if;
+    -- Asked under the lock (when there is a class to lock): the same request
+    -- sent twice at once waits above, and the second is answered as a repeat.
+    _cached := fv_idem_check(p_idempotency_key, 'rotate_submission_page');
+    if _cached is not null then return _cached; end if;
     if _course is null then
         raise exception 'page not found' using errcode = 'P0002';
     end if;
-    perform _grade_return_lock_first(_course);
     update submission_file set rotation = p_rotation where id = p_file_id;
     if not found then
         raise exception 'page not found' using errcode = 'P0002';
@@ -1519,9 +1681,10 @@ begin
                                    -- Unsend and Replace: the student's own send, not yet being graded, still open
                                    'can_change', s.sent_by = 'student' and not g.started and _course.send_work
                                                  and a.students_send <> 'nothing' and (w.j->>'open')::boolean) end,
-                       -- a send of this student's that is not finished
+                       -- a send of this student's that is not finished and still holds its place
                        'sending', case when u.id is null then null else jsonb_build_object(
                                       'submission_id', u.id, 'intent', u.intent, 'started_at', u.created_at,
+                                      'finish_by', u.created_at + public._work_hold(),
                                       'pages', (select count(*) from submission_file f where f.submission_id = u.id)) end)
                      order by a.date_assigned nulls first, a.display_order, a.created_at, a.id)
               from assessment a
@@ -1531,7 +1694,8 @@ begin
                                   order by x.version desc limit 1) s on true
               left join lateral (select x.* from submission x
                                   where x.assessment_id = a.id and x.enrollment_id = p_enrollment_id
-                                    and x.state = 'sending' and x.sent_by = 'student' limit 1) u on true
+                                    and x.state = 'sending' and x.sent_by = 'student'
+                                    and x.created_at >= now() - public._work_hold() limit 1) u on true
              cross join lateral (select s.id is not null and _grading_started(p_enrollment_id, a.id) as started) g
              where a.course_id = _course.id
                and (w.j->>'listed')::boolean
@@ -1549,16 +1713,19 @@ create or replace function student_submit._send_begin(
  set search_path to 'public', 'student_submit', 'pg_temp'
 as $function$
 declare
-    _in     jsonb;
-    _course course%rowtype;
-    _a      assessment%rowtype;
-    _w      jsonb;
-    _card   uuid;
-    _sub    submission%rowtype;
-    _sent   submission%rowtype;
-    _n      int;
-    _oldest timestamptz;
-    _id     uuid;
+    _in      jsonb;
+    _course  course%rowtype;
+    _a       assessment%rowtype;
+    _w       jsonb;
+    _card    uuid;
+    _sub     submission%rowtype;
+    _sent    submission%rowtype;
+    _expired boolean;
+    _n       int;
+    _oldest  timestamptz;
+    _theirs  int;
+    _full    jsonb;
+    _id      uuid;
 begin
     -- The request's shape, before anything is read. A wrong shape is the
     -- caller's bug, not something a student did: the call fails.
@@ -1587,6 +1754,15 @@ begin
     -- teacher's Add Work and a grade being saved take turns.
     perform public._grade_return_lock_first((_in->>'course_id')::uuid);
     select * into _course from course where id = (_in->>'course_id')::uuid;
+
+    -- Is this a repeat of a send that has lost its place? Looked at before
+    -- the class's expired sends are dropped, this one among them.
+    _expired := exists (select 1 from submission
+                         where assessment_id = p_assessment_id and enrollment_id = p_enrollment_id and sent_by = 'student'
+                           and request_id = p_request_id and state = 'sending'
+                           and created_at < now() - public._work_hold());
+    perform public._work_drop_expired(_course.id);
+
     if not exists (select 1 from enrollment e
                     where e.id = p_enrollment_id and e.course_id = _course.id and e.withdrawn_at is null) then
         return jsonb_build_object('ok', false, 'error', 'not_found');
@@ -1602,20 +1778,21 @@ begin
     if _a.students_send = 'nothing' then
         return jsonb_build_object('ok', false, 'error', 'not_taking_work');
     end if;
+    if _expired then
+        -- Started more than _work_hold ago and never finished: it is gone,
+        -- and its files are queued. A new send needs a new request id.
+        return jsonb_build_object('ok', false, 'error', 'expired');
+    end if;
 
     -- The same request again (the reply was lost): the same answer, and
-    -- nothing new is made or counted.
+    -- nothing new is made or counted. It does not give the send any longer:
+    -- it still has to be finished within _work_hold of its first start.
     select * into _sub from submission
      where assessment_id = _a.id and enrollment_id = p_enrollment_id and sent_by = 'student' and request_id = p_request_id;
     if found then
-        if _sub.state = 'sending' then
-            -- Its paths are about to be given fresh upload links, good for two
-            -- hours from now: the send, and each page, is given that long again.
-            update submission set links_at = now() where id = _sub.id;
-            update submission_file set link_dies_at = now() + interval '2 hours 10 minutes' where submission_id = _sub.id;
-        end if;
         return jsonb_build_object('ok', true, 'replayed', true, 'submission_id', _sub.id, 'state', _sub.state,
                                   'bucket', public._work_bucket(), 'late', _sub.is_late,
+                                  'finish_by', case when _sub.state = 'sending' then _sub.created_at + public._work_hold() end,
                                   'files', case when _sub.state = 'sending' then public._work_upload_json(_sub.id) else '[]'::jsonb end);
     end if;
 
@@ -1639,6 +1816,12 @@ begin
         if _grading_started(p_enrollment_id, _a.id) then
             return jsonb_build_object('ok', false, 'error', 'grading_started');
         end if;
+        -- Pages the teacher added to it stay when the student's are
+        -- replaced: with them the new pages must still fit in 30.
+        select count(*) into _theirs from submission_file f where f.submission_id = _sent.id and f.added_by = 'teacher';
+        if _theirs + jsonb_array_length(p_pages) > 30 then
+            return jsonb_build_object('ok', false, 'error', 'too_many_pages', 'room', 30 - _theirs);
+        end if;
     end if;
 
     -- Twenty sends an hour for one card (Colin, Nov 9). Counted when links
@@ -1649,7 +1832,6 @@ begin
         return jsonb_build_object('ok', false, 'error', 'too_many',
                                   'retry_after_s', greatest(1, ceil(extract(epoch from (_oldest + interval '1 hour' - now())))::int));
     end if;
-    insert into send_log (card_id) values (_card);
 
     -- A send this student started for the piece and never finished goes.
     perform set_config('fv.work_removal_reason', 'abandoned', true);
@@ -1657,11 +1839,20 @@ begin
      where assessment_id = _a.id and enrollment_id = p_enrollment_id and state = 'sending' and sent_by = 'student';
     perform set_config('fv.work_removal_reason', '', true);
 
+    -- The class may hold only so much (pages and bytes, handed in and
+    -- unfinished together).
+    _full := public._work_class_full(_course.id, p_pages);
+    if _full is not null then
+        return jsonb_build_object('ok', false, 'error', 'class_full');
+    end if;
+
+    insert into send_log (card_id) values (_card);
     _id := public._work_begin(_course.id, _a.id, p_enrollment_id, 'student', p_intent,
                               case when p_intent = 'replace' then _sent.id end,
                               p_pages, p_note, p_followed_plan, (_w->>'late')::boolean, _card, p_request_id);
     return jsonb_build_object('ok', true, 'replayed', false, 'submission_id', _id, 'state', 'sending',
                               'bucket', public._work_bucket(), 'late', (_w->>'late')::boolean,
+                              'finish_by', now() + public._work_hold(),
                               'files', public._work_upload_json(_id));
 end;
 $function$;
@@ -1699,13 +1890,15 @@ create or replace function student_submit.send_finish(
  set search_path to 'public', 'student_submit', 'pg_temp'
 as $function$
 declare
-    _in     jsonb;
-    _course course%rowtype;
-    _sub    submission%rowtype;
-    _target submission%rowtype;
-    _a      assessment%rowtype;
-    _state  jsonb;
-    _pages  int;
+    _in      jsonb;
+    _course  course%rowtype;
+    _sub     submission%rowtype;
+    _target  submission%rowtype;
+    _a       assessment%rowtype;
+    _w       jsonb;
+    _state   jsonb;
+    _expired boolean;
+    _pages   int;
 begin
     if p_submission_id is null then
         raise exception 'a submission is needed' using errcode = '22023';
@@ -1717,6 +1910,18 @@ begin
     end if;
     perform public._grade_return_lock_first((_in->>'course_id')::uuid);
     select * into _course from course where id = (_in->>'course_id')::uuid;
+
+    -- Has this send lost its place? Looked at before the class's expired
+    -- sends are dropped, this one among them.
+    _expired := exists (select 1 from submission
+                         where id = p_submission_id and enrollment_id = p_enrollment_id and course_id = _course.id
+                           and sent_by = 'student' and state = 'sending' and created_at < now() - public._work_hold());
+    perform public._work_drop_expired(_course.id);
+    if _expired then
+        -- It could be finished for _work_hold after its first start and no
+        -- longer. It is gone and its files are queued: start again.
+        return jsonb_build_object('ok', false, 'error', 'expired');
+    end if;
 
     -- This student's own send, and no one else's.
     select * into _sub from submission
@@ -1737,8 +1942,9 @@ begin
                     where e.id = p_enrollment_id and e.course_id = _course.id and e.withdrawn_at is null) then
         return jsonb_build_object('ok', false, 'error', 'not_found');
     end if;
-    -- Send Work turned off, or the piece set to take nothing, since it was
-    -- started. Whether it was open, and late, was settled when it started.
+    -- Everything a start asks is asked again now, at the moment of handing
+    -- in: Send Work, the piece still taking work, still open; and late is
+    -- what it is now, not what it was when the send started.
     if not _course.send_work then
         return jsonb_build_object('ok', false, 'error', 'send_off');
     end if;
@@ -1746,9 +1952,9 @@ begin
     if _a.students_send = 'nothing' then
         return jsonb_build_object('ok', false, 'error', 'not_taking_work');
     end if;
-    -- Its upload links have stopped working: start again.
-    if _sub.links_at < now() - interval '2 hours' then
-        return jsonb_build_object('ok', false, 'error', 'expired');
+    _w := _work_window(_a.id);
+    if not (_w->>'open')::boolean then
+        return jsonb_build_object('ok', false, 'error', 'work_closed', 'closed_on', _w->'closes_on');
     end if;
     if exists (select 1 from jsonb_array_elements(p_files) x
                 where not exists (select 1 from submission_file f
@@ -1780,12 +1986,6 @@ begin
             perform set_config('fv.work_removal_reason', '', true);
             return jsonb_build_object('ok', false, 'error', 'grading_started');
         end if;
-        -- Let go of what it replaces first: an unfinished send goes with
-        -- its target, and this one is about to take its place.
-        update submission set intent = 'new', target_id = null where id = _sub.id;
-        perform set_config('fv.work_removal_reason', 'replace', true);
-        delete from submission where id = _target.id;
-        perform set_config('fv.work_removal_reason', '', true);
     elsif exists (select 1 from submission
                    where assessment_id = _sub.assessment_id and enrollment_id = p_enrollment_id and state = 'sent') then
         -- The teacher added this student's work while the pages were going up.
@@ -1796,18 +1996,36 @@ begin
     end if;
 
     _pages := public._work_settle_files(_sub.id, p_files);
+    if _sub.intent = 'replace' then
+        -- The student's old pages go. Pages the teacher added to the old
+        -- work are not the student's to remove: they move to the new work,
+        -- after the new pages, each keeping its file.
+        update submission_file f
+           set submission_id = _sub.id, page = _pages + x.rn
+          from (select t.id, row_number() over (order by t.page, t.id) as rn
+                  from submission_file t where t.submission_id = _target.id and t.added_by = 'teacher') x
+         where f.id = x.id;
+        -- Let go of what it replaces first: an unfinished send goes with
+        -- its target, and this one is about to take its place.
+        update submission set intent = 'new', target_id = null where id = _sub.id;
+        perform set_config('fv.work_removal_reason', 'replace', true);
+        delete from submission where id = _target.id;
+        perform set_config('fv.work_removal_reason', '', true);
+    end if;
     update submission
        set state = 'sent', intent = 'new', target_id = null, version = coalesce(_target.version, version),
-           sent_at = now(), updated_at = now()
+           is_late = (_w->>'late')::boolean, sent_at = now(), updated_at = now()
      where id = _sub.id
     returning * into _sub;
     return jsonb_build_object('ok', true, 'replayed', false, 'submission_id', _sub.id, 'sent_at', _sub.sent_at,
-                              'late', _sub.is_late, 'pages', _pages);
+                              'late', _sub.is_late,
+                              'pages', (select count(*) from submission_file f where f.submission_id = _sub.id));
 end;
 $function$;
 
 -- ── 13. unsend ──────────────────────────────────────────────────────────────
--- THE STUDENT'S PHOTOS ARE DELETED and cannot come back.
+-- THE STUDENT'S PHOTOS ARE DELETED and cannot come back. Only the student's
+-- own: a page the teacher added to the work stays, and the work with it.
 create or replace function student_submit.unsend(
     p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text)
  returns jsonb
@@ -1823,6 +2041,7 @@ declare
     _sent      submission%rowtype;
     _cancelled int;
     _pages     int;
+    _kept      int;
 begin
     if p_assessment_id is null then
         raise exception 'an assessment is needed' using errcode = '22023';
@@ -1835,6 +2054,7 @@ begin
     -- the piece take turns: whichever is second sees what the first did.
     perform public._grade_return_lock_first((_in->>'course_id')::uuid);
     select * into _course from course where id = (_in->>'course_id')::uuid;
+    perform public._work_drop_expired(_course.id);
     select * into _a from assessment where id = p_assessment_id and course_id = _course.id;
     if _a.id is null then
         return jsonb_build_object('ok', false, 'error', 'not_found');
@@ -1854,7 +2074,7 @@ begin
        for update;
     if not found then
         -- Nothing is handed in: also the answer to an Unsend sent twice.
-        return jsonb_build_object('ok', true, 'unsent', false, 'cancelled', _cancelled > 0, 'pages', 0);
+        return jsonb_build_object('ok', true, 'unsent', false, 'cancelled', _cancelled > 0, 'pages', 0, 'kept', 0);
     end if;
     if _sent.sent_by <> 'student' then
         return jsonb_build_object('ok', false, 'error', 'cannot_change');
@@ -1874,11 +2094,29 @@ begin
         return jsonb_build_object('ok', false, 'error', 'grading_started');
     end if;
 
-    select count(*) into _pages from submission_file f where f.submission_id = _sent.id;
+    select count(*) filter (where f.added_by = 'student'), count(*) filter (where f.added_by = 'teacher')
+      into _pages, _kept
+      from submission_file f where f.submission_id = _sent.id;
     perform set_config('fv.work_removal_reason', 'unsend', true);
-    delete from submission where id = _sent.id;
+    if _kept = 0 then
+        delete from submission where id = _sent.id;
+    else
+        -- The teacher added pages to this work. They are not the student's
+        -- to remove: the student's own pages go, the teacher's close up to
+        -- pages 1, 2, 3, and the work stays as the teacher's, without the
+        -- student's note.
+        delete from submission_file where submission_id = _sent.id and added_by = 'student';
+        update submission_file f
+           set page = x.rn
+          from (select t.id, row_number() over (order by t.page, t.id) as rn
+                  from submission_file t where t.submission_id = _sent.id) x
+         where f.id = x.id;
+        update submission
+           set sent_by = 'teacher', note = null, followed_plan = null, card_id = null, request_id = null, updated_at = now()
+         where id = _sent.id;
+    end if;
     perform set_config('fv.work_removal_reason', '', true);
-    return jsonb_build_object('ok', true, 'unsent', true, 'cancelled', _cancelled > 0, 'pages', _pages);
+    return jsonb_build_object('ok', true, 'unsent', true, 'cancelled', _cancelled > 0, 'pages', _pages, 'kept', _kept);
 end;
 $function$;
 
@@ -1996,6 +2234,11 @@ grant execute on function public.rotate_submission_page(uuid, integer, uuid) to 
 -- functions above, as their owner.
 revoke all on function public._work_bucket() from public, anon, authenticated, service_role;
 revoke all on function public._work_max_bytes() from public, anon, authenticated, service_role;
+revoke all on function public._work_hold() from public, anon, authenticated, service_role;
+revoke all on function public._work_class_max_pages() from public, anon, authenticated, service_role;
+revoke all on function public._work_class_max_bytes() from public, anon, authenticated, service_role;
+revoke all on function public._work_drop_expired(uuid) from public, anon, authenticated, service_role;
+revoke all on function public._work_class_full(uuid, jsonb) from public, anon, authenticated, service_role;
 revoke all on function public._work_object(text) from public, anon, authenticated, service_role;
 revoke all on function public._work_check_pages(jsonb) from public, anon, authenticated, service_role;
 revoke all on function public._work_check_files(jsonb) from public, anon, authenticated, service_role;
@@ -2056,14 +2299,19 @@ begin
             -- FINGERPRINTS-BEGIN new (written by migrations/local-test/submissions_fingerprints.py)
             ('public._work_bucket()',                                                               '3f13f4e2c303b5a53caea4925abc8350'),
             ('public._work_max_bytes()',                                                            '1384cb1ea953d11cea982d60d87e5421'),
-            ('public._work_object(text)',                                                           'e52420e0be52353b1208dbc395ae9e5c'),
-            ('public._work_check_pages(jsonb)',                                                     '4f17b090aea75e8d9d9b296f99f0f5a8'),
+            ('public._work_object(text)',                                                           '1c78c7884df1e02c326b06989da25c5c'),
+            ('public._work_hold()',                                                                 'e0479f5f0ab703fd3cd77f677ec34eb2'),
+            ('public._work_class_max_pages()',                                                      'b8ccccd702ef8a8260bd7cf54bc9982a'),
+            ('public._work_class_max_bytes()',                                                      '3c5df6fb4a11ae55005ec87362fdf95e'),
+            ('public._work_check_pages(jsonb)',                                                     '8269b2b9c84377619778ca9154f39652'),
             ('public._work_check_files(jsonb)',                                                     'a3dfe8ce7a7f4eeb82e51d9e02c671c7'),
-            ('public._work_begin(uuid,uuid,uuid,text,text,uuid,jsonb,text,text,boolean,uuid,uuid)', '57e75c6fa0bbbd12a04e11d21752bc5b'),
-            ('public._work_files_state(uuid,jsonb)',                                                '975d75466b7b1dd7100240028441bea8'),
+            ('public._work_begin(uuid,uuid,uuid,text,text,uuid,jsonb,text,text,boolean,uuid,uuid)', '658a51b97817bfa115aa8dc048003c26'),
+            ('public._work_drop_expired(uuid)',                                                     '417711d4dadba3966d0358baee0214f0'),
+            ('public._work_class_full(uuid,jsonb)',                                                 '5ba6a4c79d6862b3b9543be420bca532'),
+            ('public._work_files_state(uuid,jsonb)',                                                '8fe968ca61404cfb4c8706d722c9c9a8'),
             ('public._work_settle_files(uuid,jsonb)',                                               '215b8fe4cc3eada5c45e8c86c847ef19'),
             ('public._work_upload_json(uuid)',                                                      '63982ca7888b11ce9b80e962f674c98a'),
-            ('public._submission_json(uuid)',                                                       '2d20f60def0f309725f16b7b86477fab'),
+            ('public._submission_json(uuid)',                                                       'a1933b27974307aeae814ce98714c18f'),
             ('public._assessment_work_json(uuid)',                                                  'e281660216f4186fe3f374eeacaf2fe6'),
             ('public._submission_same_class()',                                                     '301c53b36722954a92211ea582b7842a'),
             ('public._submission_file_removed()',                                                   'edc99e4c04baefcf83b9ce3c94723023'),
@@ -2072,24 +2320,24 @@ begin
             ('public._submission_truncated()',                                                      '9abaa6530a1e7f7215951d9952675de0'),
             ('public.set_course_send_work(uuid,jsonb,uuid)',                                        '694863746b03f4be25263a5107f5b02e'),
             ('public.set_assessment_student_work(uuid,jsonb,uuid)',                                 'c58c518c44d32262b3713753b7aaac1f'),
-            ('public.list_course_submissions(uuid)',                                                '8703f5ddc09b3c8dc92aa70878b5d7b1'),
-            ('public.start_work_upload(uuid,uuid,jsonb,text,uuid)',                                 'aa86a41467680581f47ab2f5da4f54a2'),
-            ('public.finish_work_upload(uuid,jsonb,uuid)',                                          'd62a6e550d7535f123f58b17cfe838f2'),
-            ('public.mark_handed_in_paper(uuid,uuid[],uuid)',                                       '1a966bceb2e46eb59107e2753e731bd4'),
-            ('public.delete_submission(uuid,uuid)',                                                 '7da38ac3304aaf2f9639877b3fd0f81a'),
-            ('public.rotate_submission_page(uuid,integer,uuid)',                                    'e684b853403b25a1706d29f02a581d5c'),
+            ('public.list_course_submissions(uuid)',                                                '525db92cdf4129afb9e2bc15aa7d4725'),
+            ('public.start_work_upload(uuid,uuid,jsonb,text,uuid)',                                 '538ffab506d6c20344c07662837fe714'),
+            ('public.finish_work_upload(uuid,jsonb,uuid)',                                          'a6b8abb071daf36993e1318c07b42085'),
+            ('public.mark_handed_in_paper(uuid,uuid[],uuid)',                                       '6a3caf6c0bfad3398bbb33a8ac1aa79a'),
+            ('public.delete_submission(uuid,uuid)',                                                 'c1f98e77a7fb756e75af4334d520f5fc'),
+            ('public.rotate_submission_page(uuid,integer,uuid)',                                    '2c08eb9198d7dc2b50a81caf18e08365'),
             ('fv_private.work_path_course(text)',                                                   '7fb0272243ceef1cb6b42658d27664e3'),
             ('fv_private.work_upload_allowed(text)',                                                '02b678a47cb50ef6bf233a0ff244b51c'),
-            ('fv_private.work_read_allowed(text)',                                                  'd5462a39d4090cdd6c2d1e8df067729c'),
+            ('fv_private.work_read_allowed(text)',                                                  '3ea2b37a835c7a86a881ed743b95d1c9'),
             ('student_submit._grading_started(uuid,uuid)',                                          '720b9f044b853b5c57b04bec7f59010c'),
             ('student_submit._send_session(text,uuid)',                                             'c39242f54850eeeada19945ac8123644'),
             ('student_submit._work_window(uuid)',                                                   '767795b7835e3c4d6cb628c76df8e6eb'),
-            ('student_submit._send_begin(text,text,uuid,uuid,jsonb,text,text,uuid)',                '247b8c12e04333451ae7821a2344a30e'),
-            ('student_submit.work(text,uuid,text)',                                                 '72233e7985f93eb6a150c1822ed69d14'),
+            ('student_submit._send_begin(text,text,uuid,uuid,jsonb,text,text,uuid)',                '595e0a34dc67e23ca9fadc478c2ab9b7'),
+            ('student_submit.work(text,uuid,text)',                                                 '64d016d3d102327917e987b24e811129'),
             ('student_submit.send_start(text,uuid,uuid,jsonb,text,text,uuid,text)',                 'e1ccea79acc7dedcbbe10da2a4548643'),
             ('student_submit.replace(text,uuid,uuid,jsonb,text,text,uuid,text)',                    '1dad4dba0d66dcd87820b72485ecb28c'),
-            ('student_submit.send_finish(text,uuid,uuid,jsonb,text)',                               'c20e5a7beae5343f50b968368dfae8c6'),
-            ('student_submit.unsend(text,uuid,uuid,text)',                                          '719b3aef45f8946343138924b84a03e9'),
+            ('student_submit.send_finish(text,uuid,uuid,jsonb,text)',                               'fe147af22bb706b08193504b72de223d'),
+            ('student_submit.unsend(text,uuid,uuid,text)',                                          '3161f6b51e8a8e4e54e2d01033a20848'),
             ('student_submit.file_links(text,uuid,uuid,text)',                                      '99ef3b9e89574fae0a230c4464998baf'),
             ('student_submit.removal_batch(integer)',                                               '964eef99a747dc7180d4ad61bd19b1db'),
             ('student_submit.removal_done(bigint[])',                                               'de793c82a2b5aa59052994a82e80d166')
