@@ -220,6 +220,7 @@ Send My Revision, as Batch B's `send_start`, `send_finish` and `unsend`, with th
 - `revision_finish` errors: Batch B's (`not_found`, `send_off`, `not_taking_work`, `expired`, `missing_pages`, `bad_file`), plus `no_revision` and `grading_started` (the pages are dropped), `request_changed` (the teacher took the request back and asked again while these pages went up: they are dropped; start a fresh send, which is the next version; show "Your teacher changed what to fix. Read it again, then send your revision."), and `cannot_change` (the revision in was added by the teacher).
 - Sent again before grading starts, a revision takes the place of the one in (the student's pages go, for good; pages the teacher added move to the new one).
 - `revision_unsend`: `{ ok, unsent, cancelled, pages }`. THE PHOTOS ARE DELETED. Errors `grading_started` (also for a revision whose request was returned), `cannot_change`.
+- A revision the teacher deletes (Batch B's `delete_submission`) before its grade is returned leaves the request `open` to both sides, as Unsend does: a later Return does not close it, and the student can send a revision again (`revision_start` answers `ok`; it is version 2 again). Deleted after its grade was returned, the request stays `returned`. The teacher's Replace Them on a revision keeps it the revision in (same version, `sent`).
 
 **The edge function must route a revision to these.** Batch B's `send_start` answers `already_sent` for a piece with work in; Batch B's `send_finish` on a revision's send answers `already_sent` and drops it; Batch B's `unsend` and `replace` on a piece with a revision in answer `grading_started` (the first version's grade was returned). Nothing is lost by a wrong route; it is refused. Batch B's `work` lists a revision's unfinished send as that piece's `sending`, and a revision handed in as its `sent` (the latest version): tell them apart with `feedback`'s `revision`. A wrong request id is the caller's bug: one Batch B's `send_start` used before is answered by `revision_start` as a replay of that send.
 
@@ -257,6 +258,8 @@ Copy each reply field by field, as the card routes do.
 - Hide is not in C2 or anywhere in Batch C.
 
 ## Changes
+
+- 2026-11-11, review round 3 (`batch-c-review-3.md`): a revision the teacher deletes before its grade is returned leaves the request open (it was closed as `returned` by the next Return, and the student got `no_revision`). No answer changes shape.
 
 - 2026-11-11, Hide taken out (Colin: "Take hide out and we'll work on it later"). Return for Revision keeps the grade; `keep_grade: false` answers `hide_not_available` with C2 or without, and writes nothing; `hide_needs_holding` is gone. `keep_grade` (always true), `grade_hidden`, `hidden` and `unhidden` (always false) stay in the answers so a later change that adds Hide changes no caller. `cancel_revision` writes no grade row. C2 is now only the trigger that gives marks and stores a finished request as done.
 

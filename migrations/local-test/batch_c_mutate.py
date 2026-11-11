@@ -18,8 +18,8 @@ refuses to apply is reported as caught by the file.
 import subprocess, tempfile
 from batch_c_common import *
 
-C1S = 'teacher markup started contract reflect revision group grants race closes only_me round2 put_back hide_out same_rows'
-C2S = 'given closes round2 put_back hide_out same_rows'
+C1S = 'teacher markup started contract reflect revision group grants race closes only_me round2 put_back hide_out same_rows revision_deleted'
+C2S = 'given closes round2 put_back hide_out same_rows revision_deleted'
 CHANGES = [
     # ── C1 ──
     ("_grading_started: marks do not count (Batch B's rule only)", C1,
@@ -178,8 +178,8 @@ CHANGES = [
     ("C2: the trigger function left runnable", C2, "revoke all on function public._markup_on_return() from public, anon, authenticated, service_role;\n", "", C2S),
     ("C2 (b) 1: the trigger does not close the request", C2, "    perform _revision_settle(new.enrollment_id, new.assessment_id, false);\n    return null;", "    return null;", C2S),
     ("C1 (b) 1: the state reads 'returned' from the revision's photos", C1,
-     "                             when r.revision_in_at is not null and g.returned_at is not null\n                                  and g.returned_at is distinct from r.in_returned_at then 'returned'\n                             when v.id is null then 'open'",
-     "                             when v.id is null then 'open'\n                             when g.returned_at is not null and not g.is_draft and g.returned_at > v.sent_at then 'returned'", 'closes revision'),
+     "                             when v.id is null then 'open'\n                             -- the revision in, returned since it came in (a draft on it since does not take that back)\n                             when r.revision_in_at is not null and g.returned_at is not null\n                                  and g.returned_at is distinct from r.in_returned_at then 'returned'",
+     "                             when v.id is null then 'open'\n                             when g.returned_at is not null and not g.is_draft and g.returned_at > v.sent_at then 'returned'", 'closes revision round2'),
     ("C1 (b) 1: revision_finish does not keep when the revision came in", C1, "           revision_in_at = _sub.sent_at,\n", "", 'closes revision'),
     ("C1 round 2 (b) 1: a revision is returned by a grade returned after its send began (two clocks)", C1,
      "                             when r.revision_in_at is not null and g.returned_at is not null\n                                  and g.returned_at is distinct from r.in_returned_at then 'returned'",
@@ -229,6 +229,23 @@ CHANGES = [
     ("C1 (b) 3: a follow-up note is sent", C1,
      "                                     'follow_up_answer', f.follow_up_answer, 'follow_up_answered_at', f.follow_up_answered_at,",
      "                                     'follow_up_answer', coalesce(f.follow_up_answer, f.follow_up_note), 'follow_up_answered_at', f.follow_up_answered_at,", 'only_me reflect'),
+    # ── review round 3, F1: a revision the teacher deleted ──
+    ("C1 round 3 F1: a request reads returned with no revision in (the reviewed _revision_state)", C1,
+     "                             when v.id is null then 'open'\n                             -- the revision in, returned since it came in (a draft on it since does not take that back)\n                             when r.revision_in_at is not null and g.returned_at is not null\n                                  and g.returned_at is distinct from r.in_returned_at then 'returned'",
+     "                             when r.revision_in_at is not null and g.returned_at is not null\n                                  and g.returned_at is distinct from r.in_returned_at then 'returned'\n                             when v.id is null then 'open'", 'revision_deleted'),
+    ("C1 round 3 F1: nothing settles a revision before it is deleted", C1,
+     "    perform _revision_settle(old.enrollment_id, old.assessment_id, false);\n    return old;", "    return old;", 'closes revision_deleted'),
+    ("C1 round 3 F1: the settle runs after the revision is deleted", C1,
+     "create or replace trigger revision_gone before delete on public.submission",
+     "create or replace trigger revision_gone after delete on public.submission", 'closes revision_deleted'),
+    ("C1 round 3 F1: a deleted revision settles as a Return (a waiting revision deleted closes the request)", C1,
+     "    perform _revision_settle(old.enrollment_id, old.assessment_id, false);\n    return old;",
+     "    perform _revision_settle(old.enrollment_id, old.assessment_id, true);\n    return old;", 'revision_deleted'),
+    ("C1 round 3 F1: only a third version or later is settled before it goes", C1,
+     "    for each row when (old.state = 'sent' and old.version > 1)", "    for each row when (old.state = 'sent' and old.version > 2)", 'closes revision_deleted'),
+    ("C1 round 3 F1: a deleted revision's dates are cleared (the teacher's Replace then loses the revision)", C1,
+     "    perform _revision_settle(old.enrollment_id, old.assessment_id, false);\n    return old;",
+     "    perform _revision_settle(old.enrollment_id, old.assessment_id, false);\n    update revision_request set grade_mark = null, revision_in_at = null, in_returned_at = null\n     where assessment_id = old.assessment_id and enrollment_id = old.enrollment_id and state = 'open';\n    return old;", 'revision_deleted'),
 ]
 
 def run(i, desc, rel, old, new, scen):

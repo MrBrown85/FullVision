@@ -69,7 +69,7 @@ def build():
 
 # Every function C1 makes, by signature, and the three C2 replaces.
 C1_FUNCTIONS = [
-    'public._work_feedback_gone()', 'public._work_feedback_truncated()', 'public._markup_check(jsonb)',
+    'public._work_feedback_gone()', 'public._work_feedback_truncated()', 'public._revision_gone()', 'public._markup_check(jsonb)',
     'public._markup_give(uuid,uuid)', 'public._piece_latest(uuid,uuid)', 'public._revision_state(uuid)', 'public._revision_settle(uuid,uuid,boolean)',
     'public._revision_json(uuid)', 'public._reflection_json(uuid)',
     'public.set_course_feedback_options(uuid,jsonb,uuid)', 'public.save_markup(uuid,jsonb,integer,uuid)',

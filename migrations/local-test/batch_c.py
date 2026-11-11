@@ -62,6 +62,7 @@ def apply1():
             ('a name taken', "create function public.save_markup(p_file_id uuid, p_marks jsonb, p_base_rev integer, p_idempotency_key uuid) returns jsonb language sql as $f$ select null::jsonb $f$", 'drop function public.save_markup(uuid, jsonb, integer, uuid)'),
             ('a column taken', 'alter table public.course add column show_my_learning boolean', 'alter table public.course drop column show_my_learning'),
             ('a trigger name taken', "create trigger work_feedback_gone after delete on public.enrollment for each row execute function public._submission_gone()", 'drop trigger work_feedback_gone on public.enrollment'),
+            ('a trigger name taken on submission', "create trigger revision_gone after delete on public.submission for each row execute function public._submission_target_gone()", 'drop trigger revision_gone on public.submission'),
             ("Batch B's _grading_started changed", "create or replace function student_submit._grading_started(p_enrollment_id uuid, p_assessment_id uuid) returns boolean language sql stable security definer set search_path to 'public', 'student_submit', 'pg_temp' as $f$ select false; $f$", None),
         ]:
             snap = d.one('select md5(pg_get_functiondef(%s))' % ("'public._work_hold()'::regprocedure" if 'Batch B function' in name else "'public._grade_return_holds(uuid)'::regprocedure"))
@@ -108,6 +109,8 @@ def apply1():
                           ('a student function for teachers', 'grant execute on function student_submit.reflect(text, uuid, uuid, jsonb, text) to authenticated'),
                           ('a table readable', 'grant select on public.feedback_reflection to authenticated'),
                           ('a trigger off', 'alter table public.enrollment disable trigger work_feedback_gone'),
+                          ('the revision trigger off', 'alter table public.submission disable trigger revision_gone'),
+                          ('the revision trigger recreated to run after the delete', "create or replace trigger revision_gone after delete on public.submission for each row when (old.state = 'sent' and old.version > 1) execute function public._revision_gone()"),
                           ('a helper granted', 'grant execute on function public._markup_give(uuid, uuid) to service_role'),
                           ('a function changed', "create or replace function public._piece_latest(p_assessment_id uuid, p_enrollment_id uuid) returns public.submission language sql stable security definer set search_path to 'public', 'pg_temp' as $f$ select s.* from submission s limit 1; $f$"),
                           ('the replaced _grading_started changed', "create or replace function student_submit._grading_started(p_enrollment_id uuid, p_assessment_id uuid) returns boolean language sql stable security definer set search_path to 'public', 'student_submit', 'pg_temp' as $f$ select false; $f$"),

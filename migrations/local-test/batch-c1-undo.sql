@@ -12,7 +12,7 @@
 -- before. PART 1b puts the permissions back.
 --
 -- PART 2, THE FULL REMOVAL. Everything C1 made goes: the three tables, the
--- two course columns, the four triggers, every function; and Batch B's
+-- two course columns, the five triggers, every function; and Batch B's
 -- student_submit._grading_started is put back exactly as Batch B made it
 -- (so marks no longer count as grading started; there are none left). IT DELETES
 -- TEACHERS' MARKS, REVISION REQUESTS AND STUDENTS' REFLECTIONS. It refuses
@@ -108,6 +108,7 @@ drop trigger if exists work_feedback_gone on public.enrollment;
 drop trigger if exists work_feedback_gone on public.assessment;
 drop trigger if exists work_feedback_truncate on public.enrollment;
 drop trigger if exists work_feedback_truncate on public.assessment;
+drop trigger if exists revision_gone on public.submission;
 drop function if exists student_submit.group_file_links(text, uuid, uuid, text);
 drop function if exists student_submit.group_work(text, uuid, text);
 drop function if exists student_submit.revision_unsend(text, uuid, uuid, text);
@@ -137,6 +138,7 @@ drop function if exists public._markup_give(uuid, uuid);
 drop function if exists public._markup_check(jsonb);
 drop function if exists public._work_feedback_truncated();
 drop function if exists public._work_feedback_gone();
+drop function if exists public._revision_gone();
 drop table if exists public.feedback_reflection;
 drop table if exists public.revision_request;
 drop table if exists public.markup;
