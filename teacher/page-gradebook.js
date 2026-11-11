@@ -3668,28 +3668,48 @@ window.PageGradebook = (function () {
         var title = assess && assess.title ? assess.title : 'this assessment';
         // A linked copy in another class stays; say so, as Assignments does.
         var copyNote = window.AssessmentCopy && assess ? AssessmentCopy.deleteNote(activeCourse, assess) : '';
-        // Photos students sent for it go too (S8-F1, Colin's ruling 102).
-        var sentPhotos = _studentsWithSentPhotos(activeCourse, aid);
-        showConfirm(
-          'Delete “' + title + '”?',
-          sentPhotos
-            ? 'All scores, statuses, and observations linked to this assessment will be removed, and the photos ' +
-                sentPhotos +
-                (sentPhotos === 1 ? ' student' : ' students') +
-                ' sent for it.' +
-                copyNote +
-                " You can undo this for a few seconds. After that, deleted photos can't come back."
-            : 'All scores, statuses, and observations linked to this assessment will be removed.' +
-                copyNote +
-                ' You can undo this for a few seconds.',
-          'Delete',
-          'danger',
-          function () {
-            _deleteAssessWithUndo(activeCourse, aid, title);
-          },
-        );
+        // Photos students sent for it go too (S8-F1, Colin's ruling 102). A class
+        // whose work this session has not read is read first; if that read fails
+        // the dialog says photos go rather than miss them.
+        var cid = activeCourse;
+        _photosBeforeDelete(cid, aid, function (sentPhotos, maybe) {
+          if (activeCourse !== cid) return;
+          var sent = sentPhotos
+            ? 'the photos ' + sentPhotos + (sentPhotos === 1 ? ' student' : ' students') + ' sent for it.'
+            : maybe
+              ? 'any photos students sent for it.'
+              : '';
+          showConfirm(
+            'Delete “' + title + '”?',
+            sent
+              ? 'All scores, statuses, and observations linked to this assessment will be removed, and ' +
+                  sent +
+                  copyNote +
+                  " You can undo this for a few seconds. After that, deleted photos can't come back."
+              : 'All scores, statuses, and observations linked to this assessment will be removed.' +
+                  copyNote +
+                  ' You can undo this for a few seconds.',
+            'Delete',
+            'danger',
+            function () {
+              _deleteAssessWithUndo(cid, aid, title);
+            },
+          );
+        });
       }
       _dismissContextMenu();
+    });
+  }
+
+  /* The same, read from the server first when this session has not read the
+     class's work (readStudentWorkForDelete: Send Work off reads nothing
+     else); then(count, maybe), maybe true when that read failed. At once
+     when nothing needs reading. */
+  function _photosBeforeDelete(cid, aid, then) {
+    var read = typeof readStudentWorkForDelete === 'function' ? readStudentWorkForDelete(cid) : null;
+    if (!read) return then(_studentsWithSentPhotos(cid, aid), false);
+    return read.then(function (res) {
+      return then(_studentsWithSentPhotos(cid, aid), !(res && res.known));
     });
   }
 

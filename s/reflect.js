@@ -108,7 +108,13 @@
     };
     S.screen = 'reflect';
     StudentPage.paint('#sp-reflect-title');
+    seen(S.reflect);
     if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') window.scrollTo(0, 0);
+  }
+
+  // A teacher's answer on screen is marked seen (`answer-seen`, a real card only; s/feedback.js).
+  function seen(r) {
+    if (r.step === 'answer' && typeof StudentPage.feedbackSeen === 'function') StudentPage.feedbackSeen([r.id]);
   }
 
   function leave() {
@@ -192,6 +198,7 @@
         // The teacher answered meanwhile: show the answer.
         r.step = 'answer';
         StudentPage.paint('#sp-reflect-title');
+        seen(r);
         return;
       }
       r.message = said(res);

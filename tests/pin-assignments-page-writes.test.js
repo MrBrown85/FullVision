@@ -1341,6 +1341,24 @@ describe('pin: what the Assignments page writes', () => {
       expect(storedMatchesCache('scores', CID)).toBe(true);
       expect(session.sent().map(c => c[0])).toEqual(['delete_assessment']);
     });
+
+    it('a signed-in class whose work is not read yet: the dialog waits for the read, and says photos may go when it failed (S9-W1)', async () => {
+      open(ESSAY, { only: [ESSAY, QUIZ] }, ['saveAssessments', 'deleteAssessmentObservations']);
+      const was = globalThis.readStudentWorkForDelete;
+      let release;
+      globalThis.readStudentWorkForDelete = vi.fn(() => new Promise(r => (release = r)));
+      try {
+        click(document.querySelector('[data-action="deleteAssess"][data-aid="' + ESSAY + '"]'));
+        expect(document.querySelector('.confirm-card')).toBeNull();
+        release({ known: false });
+        await settle();
+        expect(document.querySelector('.confirm-message').textContent).toContain(
+          " Any photos students sent for it are deleted too. Deleted photos can't come back.",
+        );
+      } finally {
+        globalThis.readStudentWorkForDelete = was;
+      }
+    });
   });
 
   describe('the grader dialog’s two writes left on data.js', () => {

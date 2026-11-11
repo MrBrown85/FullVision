@@ -438,6 +438,33 @@ export function fakeStudentSubmit(opts = {}) {
         if (world && WORKER_FNS.includes(fn)) return world.db.call(text, params);
         sql.push({ fn, params: params.slice(0, -1), add: add ? add[1] === 'true' : undefined });
         if (world && SEND_FNS.includes(fn)) return world.db.call(text, params);
+        // Batch C's `feedback`: what state.feedback holds, else a class with no marks and Reflect on Feedback off.
+        if (fn === 'feedback') {
+          return clone(
+            state.feedback || {
+              ok: true,
+              v: 1,
+              reflect_on_feedback: false,
+              show_my_learning: false,
+              assessments: [],
+              last_plan: null,
+            },
+          );
+        }
+        // `reflect`: a reflection kept as sent, and given back by `feedback` after (state.feedback must be set).
+        if (fn === 'reflect') {
+          const kept = typeof params[3] === 'string' ? JSON.parse(params[3]) : params[3];
+          const reflection = {
+            makes_sense: kept.makes_sense,
+            question: kept.question || null,
+            plan: kept.plan || null,
+            went_well: kept.went_well || null,
+            sent_at: new Date(now()).toISOString(),
+          };
+          const row = { id: params[2], marks: null, revision: null, reflection };
+          state.feedback.assessments = state.feedback.assessments.filter(a => a.id !== params[2]).concat([row]);
+          return { ok: true, reflection };
+        }
         const args = [...params, add ? add[1] === 'true' : undefined];
         // card and verify_card take the key id second. The stand-in only checks it is one.
         if (fn === 'card' || fn === 'verify_card') {
