@@ -9626,3 +9626,96 @@ button.grader-member-name {
 .markup-note-list + .markup-notes-hint {
   margin-top: 12px;
 }
+
+/* ── A student's reflection in the grader (S10-F3) ───────────────────── */
+.grader-reflect {
+  background: var(--surface);
+  border: 1px solid var(--divider, #e5e5ea);
+  border-left: 4px solid var(--active);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 14px;
+  font-size: 14px;
+}
+.grader-reflect-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.grader-reflect-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+.grader-reflect-when {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.grader-reflect-sense {
+  display: inline-block;
+  margin: 0 0 8px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--surface-2, #f2f2f4);
+  color: var(--text-2);
+}
+.grader-reflect-sense.is-unsure {
+  background: rgba(255, 159, 10, 0.15);
+  color: #8a5300;
+}
+.grader-reflect-who {
+  margin: 6px 0 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+.grader-reflect-said {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.grader-reflect-now {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.grader-reflect-label {
+  display: block;
+  margin: 10px 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+.grader-reflect-input {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 14px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--divider-heavy, #d1d1d6);
+  resize: vertical;
+}
+.grader-reflect-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+.grader-reflect-only {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.grader-reflect-msg {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--score-1, #c0392b);
+}
+.grader-reflect-msg:empty {
+  display: none;
+}
