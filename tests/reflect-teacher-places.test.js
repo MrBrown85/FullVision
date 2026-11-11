@@ -282,9 +282,8 @@ describe('the Learner Profile', () => {
   it('Jordan: the tile, the jump link, and his question with Answer in the Grader', () => {
     profileHtml(on, JORDAN, doc => {
       expect(text($(doc, '#stu-tab-profile'))).toBe('Learner Profile1 Reflection1 question to answer');
-      expect(text($(doc, '.id-jump a[data-target="lp-feedback"]'))).toBe('Reflections on Feedback 1 question');
-      // First in the main column.
-      expect($(doc, '.lp-main > section').id).toBe('lp-feedback');
+      // A question waiting puts Reflections on Feedback first, under the card.
+      expect($(doc, '.lp2 > section').id).toBe('lp-feedback');
       const so = $$(doc, '.lp-so-far li').map(text);
       expect(so[0]).toMatch(/^1 reflection on \d+ returned pieces?$/);
       expect(so[so.length - 1]).toBe('1 question waiting for you');

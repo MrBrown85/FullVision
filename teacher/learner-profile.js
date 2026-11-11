@@ -329,6 +329,76 @@ var LearnerProfile = (function () {
     return html + '</div></div>';
   }
 
+  /* ── The Learner Profile as the redesign's board draws it ───────
+     (docs/plans/teacher-student-page-redesign-plan.md, R6). The student's
+     words as a list of question and answer, and their own goals as items
+     the page lays out beside the competency goals. */
+
+  /* Every About Me answer, in the order asked: { q, t }. */
+  function wordsItems(o) {
+    var a = o.model.about;
+    if (!a) return [];
+    var out = [];
+    ['learns', 'goodAt', 'hard', 'outside'].forEach(function (k) {
+      var it = a[k];
+      var t = it && text(it.v);
+      if (t) out.push({ q: (it.q && it.q.prompt) || '', t: t });
+    });
+    var langs = a.languages && a.languages.v && Array.isArray(a.languages.v.json) ? a.languages.v.json : [];
+    if (langs.length)
+      out.push({ q: (a.languages.q && a.languages.q.prompt) || 'Languages at home', t: langs.join(', ') });
+    (a.rest || []).forEach(function (it) {
+      if (it.q && it.q.teacher_only) return;
+      var t = text(it.v);
+      if (t) out.push({ q: it.q.prompt, t: t });
+    });
+    return out;
+  }
+
+  /* The private note the student left for the teacher in About Me, or ''. */
+  function privateNote(o) {
+    var a = o.model.about;
+    return (a && text(a.note && a.note.v)) || '';
+  }
+
+  /* The student's own goals: the course goal (with its check-in status)
+     and the Core Competency goal. { from, comp, text, status, when }. */
+  function studentGoals(o) {
+    var a = o.model.about;
+    var c = o.model.checkin;
+    var out = [];
+    var goal = a && a.goal && text(a.goal.v);
+    if (goal)
+      out.push({
+        comp: o.courseName + ' Goal',
+        text: goal,
+        status: c && c.status ? text(c.status.v) : '',
+        when: a.at ? 'Set ' + day(a.at) : '',
+      });
+    var coreGoal = c && c.coreGoal && text(c.coreGoal.v);
+    if (coreGoal) {
+      var pick = c.core && c.core.v ? text(c.core.v) : '';
+      out.push({
+        comp: pick ? coreName(pick) : 'Core Competency Goal',
+        text: coreGoal,
+        status: '',
+        when: c.at ? 'Set ' + day(c.at) : '',
+      });
+    }
+    return out;
+  }
+
+  /* A goal's status as four steps and its word (Not Started … Done). */
+  var STATUS_STEP = { 'Not Started': 0, 'Working On It': 2, 'Mostly There': 3, Done: 4 };
+  function statusHtml(status) {
+    if (!status) return '';
+    var n = STATUS_STEP[status] != null ? STATUS_STEP[status] : 0;
+    var color = STATUS_COLORS[status] || 'var(--text-2)';
+    var html = '<span class="lp2-steps" role="img" aria-label="' + esc(status) + '">';
+    for (var i = 1; i <= 4; i++) html += '<span' + (i <= n ? ' style="background:' + color + '"' : '') + '></span>';
+    return html + '</span><span class="st lp2-status" style="color:' + color + '">' + esc(status) + '</span>';
+  }
+
   function goalCount(model) {
     var n = 0;
     if (model.about && model.about.goal && model.about.goal.v) n++;
@@ -706,6 +776,11 @@ var LearnerProfile = (function () {
     coreGoalHtml: coreGoalHtml,
     reflectionsHtml: reflectionsHtml,
     goalCount: goalCount,
+    wordsItems: wordsItems,
+    privateNote: privateNote,
+    studentGoals: studentGoals,
+    statusHtml: statusHtml,
+    text: text,
     sayHtml: sayHtml,
     day: day,
     src: src,
