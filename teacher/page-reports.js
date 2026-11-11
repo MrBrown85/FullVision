@@ -279,7 +279,7 @@ window.PageReports = (function () {
     const tbPrint = document.getElementById('tb-print-btn');
     if (tbPrint) tbPrint.style.display = open.printButton ? '' : 'none';
     var layout = document.getElementById('page-layout');
-    if (layout) layout.classList.toggle('sidebar-hidden', !_sidebarVisible);
+    if (layout) layout.classList.toggle('sidebar-hidden', !_sidebarIsVisible());
     renderReports();
   }
 
