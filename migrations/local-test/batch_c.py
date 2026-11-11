@@ -5,7 +5,7 @@ gradebook-prod will be once Batch B is applied (batch_c_common.build).
     PGDATABASE=<template> BATCH_B_DIR=<Batch B's migrations/> python3 batch_c.py            every scenario
     PGDATABASE=...                                            python3 batch_c.py teacher    only those named
 
-Scenarios: apply1 teacher markup started contract gone reflect revision group grants race apply2 hide given
+Scenarios: apply1 teacher markup started contract gone reflect revision group grants race apply2 hide given closes only_me hide_round1 round2
 """
 import threading, time
 from batch_c_common import *
@@ -1430,9 +1430,143 @@ def hide_round1():
     finally:
         d.close()
 
+# ── round2: the second review's (b) 1, 2 and 4 and (c) 2 ───────────────────
+def round2():
+    """Review round 2: when a revision came in, a send under a request asked again, return_work's count,
+    and C2's two checks."""
+    def fb_state(d, tok, a):
+        p = piece(d.feedback(tok, ENR1), a); return p['revision']['state'] if p and p.get('revision') else None
+    def t_state(d, rid): return [x for x in d.rpc('list_course_feedback(:c)', c=COURSE_A)['revisions'] if x['id'] == rid][0]['state']
+    def side(d, role_sql):
+        x = d.other(); x.run(role_sql[0], **role_sql[1]) if role_sql[1] else x.run(role_sql[0]); return x
+    def finish_args(tok, s):
+        return dict(t=tok, e=ENR1, s=s['submission_id'], f=json.dumps([{'file_id': x['file_id'], 'sha256': HASH} for x in s['files']]))
+    FIN = "select student_submit.revision_finish(:t, :e, :s, :f::jsonb, 'ip-1')"
+    for c2 in (False, True):
+        tag = ' (C1 and C2)' if c2 else ' (C1 alone)'
+        # (b) 1: a Return that lands while the revision's send waits for the class came before the revision
+        d = scenario_db('round2', with_c2=c2)
+        try:
+            k = seed(d); a = k['lab']
+            tok = d.session(ENR1); d.send(tok, ENR1, a, 1)
+            d.score(ENR1, a, 5); d.return_work(a, [ENR1])
+            rid = d.rfr(a, ENR1, {'what_to_fix': 'Fix'})['request']['id']
+            d.score(ENR1, a, 6)                                   # the first version regraded: a draft
+            s = d.rev_start(tok, ENR1, a); d.upload(s['files'])
+            t = d.other(); t.run("select set_config('request.jwt.claim.sub', :u, false)", u=A); t.run('set role authenticated')
+            st = d.other(); st.run('set role service_role')
+            st.run('begin'); st.run('select now()')               # the student's request has started
+            time.sleep(0.05)
+            t.run('begin'); t.run('select return_grades(:a, :e, :k)', a=a, e=[ENR1], k=nid())   # holds the class
+            out = {}
+            def fin():
+                out['r'] = J(st.run(FIN, **finish_args(tok, s))[0][0]); st.run('commit')
+            th = threading.Thread(target=fin); th.start(); time.sleep(0.4)
+            t.run('commit'); th.join(10); t.close(); st.close()
+            got = (out['r'].get('ok'), fb_state(d, tok, a), t_state(d, rid))
+            ok('round2 (b) 1%s: a Return that lands while the revision waits for the class: the revision is in, not returned, to both sides' % tag,
+               got == (True, 'sent', 'sent'), got)
+            ok('round2 (b) 1%s: and the request is stored open' % tag, d.one('select state from revision_request where id = :r', r=rid) == 'open')
+            u = d.svc('revision_unsend', tok, ENR1, a)
+            ok('round2 (b) 1%s: and the student can still Unsend it' % tag, u.get('ok') is True and u.get('unsent') is True, u)
+        finally:
+            d.close()
+        # (b) 1, the other way: the teacher's Return started before the revision's send, but got the class after it
+        d = scenario_db('round2', with_c2=c2)
+        try:
+            k = seed(d); a = k['lab']
+            tok = d.session(ENR1); d.send(tok, ENR1, a, 1)
+            d.score(ENR1, a, 5); d.return_work(a, [ENR1])
+            rid = d.rfr(a, ENR1, {'what_to_fix': 'Fix'})['request']['id']
+            s = d.rev_start(tok, ENR1, a); d.upload(s['files'])
+            t = d.other(); t.run("select set_config('request.jwt.claim.sub', :u, false)", u=A); t.run('set role authenticated')
+            st = d.other(); st.run('set role service_role')
+            t.run('begin'); t.run('select now()')                 # the teacher's request has started
+            time.sleep(0.05)
+            st.run('begin'); r = J(st.run(FIN, **finish_args(tok, s))[0][0])   # in, holding the class
+            out = {}
+            def ret():
+                t.run('select upsert_score(:e, :a, 8)', e=ENR1, a=a)
+                out['r'] = J(t.run('select return_grades(:a, :e, :k)', a=a, e=[ENR1], k=nid())[0][0]); t.run('commit')
+            th = threading.Thread(target=ret); th.start(); time.sleep(0.4)
+            st.run('commit'); th.join(10); t.close(); st.close()
+            got = (r.get('ok'), out['r'].get('returned'), fb_state(d, tok, a), t_state(d, rid))
+            ok('round2 (b) 1%s: a Return that got the class after the revision came in returned it, to both sides' % tag,
+               got == (True, 1, 'returned', 'returned'), got)
+        finally:
+            d.close()
+        # (b) 2: the request taken back and asked again while a second revision goes up
+        d = scenario_db('round2', with_c2=c2)
+        try:
+            k = seed(d); a = k['lab']
+            tok = d.session(ENR1); d.send(tok, ENR1, a, 1)
+            d.score(ENR1, a, 5); d.return_work(a, [ENR1])
+            r1 = d.rfr(a, ENR1, {'what_to_fix': 'Fix'})['request']['id']
+            s, f = d.revise(tok, ENR1, a); assert f['ok'], f
+            s2 = d.rev_start(tok, ENR1, a); assert s2['ok'], s2
+            d.upload(s2['files'])
+            d.rpc('cancel_revision(:r, :k)', r=r1, k=nid())
+            d.rfr(a, ENR1, {'what_to_fix': 'Fix this instead'})
+            rows = fingerprint_rows(d)
+            subs = d.all('select id, version, state from submission where assessment_id = :a and enrollment_id = :e and state = \'sent\' order by version', a=a, e=ENR1)
+            e = None; out = None
+            try: out = d.rev_finish(tok, ENR1, s2['submission_id'], s2['files'])
+            except Exception as ex: e = (sqlstate(ex), message(ex))
+            ok('round2 (b) 2%s: a send finishing under a request asked again gets an answer, not an error' % tag,
+               e is None and out == {'ok': False, 'error': 'request_changed'}, e or out)
+            ok('round2 (b) 2%s: and nothing is stored: the send is dropped, the revision in and the grade rows are as they were' % tag,
+               e is None and d.one('select count(*) from submission where id = :s', s=s2['submission_id']) == 0
+               and d.all('select id, version, state from submission where assessment_id = :a and enrollment_id = :e and state = \'sent\' order by version', a=a, e=ENR1) == subs
+               and fingerprint_rows(d) == rows)
+            s3, f3 = d.revise(tok, ENR1, a)
+            ok('round2 (b) 2%s: a fresh send then works, as the next version' % tag, f3 is not None and f3.get('ok') is True and f3.get('version') == 3, (s3, f3))
+        finally:
+            d.close()
+        # (b) 4: return_work's count of pages given
+        d = scenario_db('round2', with_c2=c2)
+        try:
+            k = seed(d); a = k['lab']
+            tok = d.session(ENR1); sub, files = d.send(tok, ENR1, a, 2)
+            t2 = d.session(ENR2, '2012-06-16'); sub2, files2 = d.send(t2, ENR2, a, 1)
+            d.save_markup(files[0], marks('a')); d.save_markup(files[1], marks('b')); d.score(ENR1, a, 6)
+            d.save_markup(files2[0], marks('c'))                  # ENR2: marks waiting, no draft
+            r = d.return_work(a, [ENR1, ENR2])
+            given = d.one('select count(*) from markup where given is not null')
+            ok('round2 (b) 4%s: return_work answers the pages it gave, for a student whose grade it returned and one with marks only' % tag,
+               r['returned'] == 1 and r['marks_given'] == 3 == given and sorted(r['marks_enrollment_ids']) == sorted([ENR1, ENR2]), (r, given))
+            r = d.return_work(a, [ENR1, ENR2])
+            ok('round2 (b) 4%s: and nothing the second time' % tag, r['marks_given'] == 0 and r['marks_enrollment_ids'] == [], r)
+            d.save_markup(files[0], marks('a', 'again')); d.score(ENR1, a, 7)
+            rr = d.rfr(a, ENR1, {'what_to_fix': 'x'})
+            ok('round2 (b) 4%s: Return for Revision\'s "returned" counts the page it gave' % tag,
+               rr['returned']['marks_given'] == 1 and rr['returned']['marks_enrollment_ids'] == [ENR1], rr['returned'])
+        finally:
+            d.close()
+    # (c) 2: C2's pre-check on a database without C1 answers a row; its post-check compares the triggers
+    d = CDb('round2_noc1')
+    try:
+        e = None; rows = None
+        try: rows = postcheck(d, 'batch-c2-live-precheck.sql')
+        except Exception as ex: e = message(ex)
+        ok('round2 (c) 2: C2\'s pre-check without C1 answers a row, not an error',
+           e is None and rows and any(r[0] == 'C1 is not applied' for r in rows), e or rows)
+    finally:
+        d.close()
+    d = scenario_db('round2', with_c2=True)
+    try:
+        ok('round2 (c) 2: C2\'s post-check is clean', postcheck(d, 'batch-c2-live-postcheck.sql') == [])
+        for what, sql in [('fires on every update of a grade row', 'create or replace trigger markup_given_on_return after update on public.grade_return for each row execute function public._markup_on_return()'),
+                          ('fires on every insert', 'create or replace trigger markup_given_on_insert after insert on public.grade_return for each row execute function public._markup_on_return()'),
+                          ('fires once a statement', 'create or replace trigger markup_given_on_return after update of returned_at, is_draft on public.grade_return for each statement execute function public._markup_on_return()')]:
+            d.begin(); d.run(sql)
+            ok('round2 (c) 2: C2\'s post-check notices a trigger recreated so it %s' % what, postcheck(d, 'batch-c2-live-postcheck.sql') != [])
+            d.rollback()
+    finally:
+        d.close()
+
 SCENARIOS = {'apply1': apply1, 'teacher': teacher, 'markup': markup, 'started': started, 'contract': contract, 'gone': gone, 'reflect': reflect, 'revision': revision, 'group': group,
              'grants': grants, 'race': race, 'apply2': apply2, 'hide': hide, 'given': given,
-             'closes': closes, 'only_me': only_me, 'hide_round1': hide_round1}
+             'closes': closes, 'only_me': only_me, 'hide_round1': hide_round1, 'round2': round2}
 if __name__ == '__main__':
     for name in (sys.argv[1:] or list(SCENARIOS)):
         try: SCENARIOS[name]()
