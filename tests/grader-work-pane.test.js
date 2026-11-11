@@ -267,6 +267,31 @@ describe('Nothing in: Add Work and Grade From Paper', () => {
     }
   });
 
+  it('each refusal from keeping the pages has its own sentence; any other keeps the old one', async () => {
+    const pages = [{ blob: new Blob(['x']), thumb: new Blob(['t']), hash: 'h' }];
+    vi.spyOn(PhotoShrink, 'prepare').mockResolvedValue({ ok: true, kind: 'jpeg', pages });
+    const real = globalThis.addStudentWorkPages;
+    const overlay = openGrader(seed, CID, PIECE, DEE);
+    const choose = async result => {
+      globalThis.addStudentWorkPages = vi.fn().mockResolvedValue({ result });
+      const input = $(overlay, '.grader-work-files');
+      Object.defineProperty(input, 'files', { value: [new Blob(['a'])], configurable: true });
+      fire(input, 'change');
+      await settle();
+      return text($(overlay, '.grader-addwork-msg'));
+    };
+    try {
+      expect(await choose('class_full')).toBe('This class has no room for more photos.');
+      expect(await choose('nothing_sent')).toBe('That work was taken away meanwhile. Add it again as new work.');
+      expect(await choose('uploading')).toBe("That work is still uploading. Try again when it's in.");
+      expect(await choose('on_paper')).toBe('This was handed in on paper. Use Replace Them to add photos.');
+      expect(await choose('not_found')).toBe('This student is no longer in this class.');
+      expect(await choose('failed')).toBe("The photos couldn't be kept. Try again.");
+    } finally {
+      globalThis.addStudentWorkPages = real;
+    }
+  });
+
   it('a Word file is refused with the plan’s line; a locked PDF, or no PDF reader, says so', async () => {
     const overlay = openGrader(seed, CID, PIECE, DEE);
     const input = () => $(overlay, '.grader-work-files');

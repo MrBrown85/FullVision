@@ -623,14 +623,17 @@ window.PageAssignments = (function () {
     return renderTagGrid(cid, a, tagObjs, students, scores);
   }
 
-  /* ── Rubric tiles: one student, the rubric's full wording ──
-     Each criterion is a card: its name, competency codes and a Not Scored
-     mark on the left; the four levels as tiles in the course's level order,
-     each with its full descriptor. The chosen tile is the level's solid
-     colour with the − | + stepper inside it. Under the tiles, the
-     criterion's feedback (rubric_score.comment, printed on the graded
-     rubric). Clicking a tile, a stepper half or pressing 1–4 / + / − on a
-     focused card goes through _handleClick / _graderKeydown. */
+  /* ── A rubric for one student: the board's compact rows ──
+     Each criterion is a card (Main, MainRevised, TGroupGrade, as the
+     Assignments page's rows): its name, a Checklist chip with the ticks
+     and a Comment chip, Suggested at the right, and the four levels as one
+     bar in the course's level order, the chosen level holding its − | +.
+     Descriptors stay off the scoring grid (DECISIONS): a level's wording
+     is its hover. The checklist folds under its chip, a column of boxes
+     under each level; the criterion's comment (rubric_score.comment,
+     printed on the graded rubric) shows under the levels, a box while the
+     Comment chip is open. Clicking a level, − | + or pressing 1–4 / + / −
+     on a focused card goes through _handleClick / _graderKeydown. */
   function _criterionState(cid, sid, aid, crit) {
     var entries = getScores(cid)[sid] || [];
     var level = 0;
@@ -650,180 +653,172 @@ window.PageAssignments = (function () {
     });
     return { level: level, mod: mixed ? 0 : mod, mixed: mixed };
   }
+  // A criterion's comment box is open while the teacher writes in it.
+  var _graderNotesOpen = new Set();
+  var _CHECK_ICON =
+    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 12l3 3 5-6"/></svg>';
+  var _COMMENT_ICON =
+    '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"/></svg>';
+  // html-safe: names, words, check labels and comments through esc; ids are ours; levels are numbers
   function _rubricTilesHtml(cid, a, rubric, st, advanced) {
     var order = levelOrderFor(cid);
     var ticked = advanced ? getRubricCheckIds(cid, st.id, a.id) : [];
-    var html =
-      '<div class="grdt-legend"><span></span>' +
-      order
-        .map(function (lv) {
-          return (
-            '<span class="grdt-legend-level"><span class="grdt-dot l' + lv + '"></span>' + PROF_LABELS[lv] + '</span>'
-          );
-        })
-        .join('') +
-      '</div>';
+    var html = '';
     (rubric.criteria || []).forEach(function (crit) {
       if (!crit) return;
       var state = _criterionState(cid, st.id, a.id, crit);
-      var advice = advanced && RubricChecks.hasChecks(crit) ? _checklistAdvice(crit, ticked, state.level) : null;
-      var codes = _rubricCodesHtml(cid, crit);
-      var tiles = order
+      var hasChecks = advanced && RubricChecks.hasChecks(crit);
+      var advice = hasChecks ? _checklistAdvice(crit, ticked, state.level) : null;
+      var open = hasChecks && _isChecklistOpen(a.id, st.id, crit.id);
+      var note = getRubricCriterionComment(cid, st.id, a.id, crit);
+      var noteKey = _checklistKey(a.id, st.id, crit.id);
+      var writing = _graderNotesOpen.has(noteKey);
+      var name = esc(crit.name || 'Criterion');
+      var seg = order
         .map(function (lv) {
+          var on = state.level === lv;
           var words = (crit.levels && (crit.levels[lv] || crit.levels[String(lv)])) || '';
-          var boxes = advanced ? RubricChecks.checksAt(crit, lv) : [];
-          var body = boxes.length
-            ? (words ? '<span class="grdt-words grdt-words-small">' + esc(words) + '</span>' : '') +
-              '<span class="grdt-checks">' +
-              boxes
-                .map(function (check) {
-                  return (
-                    '<label class="grdt-check"><input type="checkbox" data-action="graderTick" data-critid="' +
-                    crit.id +
-                    '" data-checkid="' +
-                    check.id +
-                    '"' +
-                    (ticked.indexOf(check.id) >= 0 ? ' checked' : '') +
-                    '><span>' +
-                    esc(check.label) +
-                    '</span></label>'
-                  );
-                })
-                .join('') +
-              '</span>'
-            : '<span class="grdt-words">' + esc(words) + '</span>';
-          if (state.level === lv) {
-            var canUp = normalizeScoreMod(lv, 1) === 1;
-            var canDown = normalizeScoreMod(lv, -1) === -1;
-            // A click anywhere on the tile clears it, except on − | +.
-            return (
-              '<div class="grdt-tile is-chosen l' +
-              lv +
-              '" data-action="graderLevel" data-critid="' +
-              crit.id +
-              '" data-level="' +
-              lv +
-              '" title="Click to clear">' +
-              '<div class="grdt-tile-head">' +
-              '<button type="button" class="grdt-chosen-label" data-action="graderLevel" data-critid="' +
-              crit.id +
-              '" data-level="' +
-              lv +
-              '" aria-pressed="true" title="Click to clear">' +
-              PROF_LABELS[lv] +
-              '</button>' +
-              '<span class="grdt-stepper" role="group" aria-label="Fine-tune ' +
-              PROF_LABELS[lv] +
-              '">' +
-              '<button type="button" data-action="graderMod" data-critid="' +
-              crit.id +
-              '" data-mod="-1" aria-label="Low ' +
-              PROF_LABELS[lv] +
-              '" aria-pressed="' +
-              (state.mod < 0) +
-              '"' +
-              (canDown ? '' : ' disabled') +
-              (state.mod < 0 ? ' class="is-on"' : '') +
-              '>−</button>' +
-              '<span class="grdt-stepper-sep" aria-hidden="true"></span>' +
-              '<button type="button" data-action="graderMod" data-critid="' +
-              crit.id +
-              '" data-mod="1" aria-label="High ' +
-              PROF_LABELS[lv] +
-              '" aria-pressed="' +
-              (state.mod > 0) +
-              '"' +
-              (canUp ? '' : ' disabled') +
-              (state.mod > 0 ? ' class="is-on"' : '') +
-              '>+</button>' +
-              '</span></div>' +
-              body +
-              '</div>'
-            );
-          }
-          if (boxes.length) {
-            // Checkboxes can't sit inside a button: clicking the tile around
-            // them picks its level (1–4 on the focused criterion does too).
-            var isSuggested = advice && advice.suggested === lv;
-            return (
-              '<div class="grdt-tile is-checklist l' +
-              lv +
-              (isSuggested ? ' is-suggested' : '') +
-              '" data-action="graderLevel" data-critid="' +
-              crit.id +
-              '" data-level="' +
-              lv +
-              '" title="Pick ' +
-              PROF_LABELS[lv] +
-              '">' +
-              // Every tile keeps the chosen tile's head row, so picking a
-              // level moves nothing: here it holds the suggestion, if any.
-              '<div class="grdt-tile-head">' +
-              (isSuggested ? '<span class="grdt-suggested-tag">' + _SUGGESTED_ICON + 'Suggested</span>' : '') +
-              '</div>' +
-              body +
-              '</div>'
-            );
-          }
-          return (
-            '<button type="button" class="grdt-tile" data-action="graderLevel" data-critid="' +
+          var btn =
+            '<button type="button" class="grdl-level' +
+            (on ? ' is-on l' + lv + (state.mixed ? ' mixed' : '') : '') +
+            '" data-action="graderLevel" data-critid="' +
             crit.id +
             '" data-level="' +
             lv +
-            '" aria-label="' +
+            '" aria-pressed="' +
+            on +
+            '"' +
+            (words ? ' title="' + esc(PROF_LABELS[lv] + ': ' + words) + '"' : '') +
+            '>' +
             PROF_LABELS[lv] +
-            ': ' +
-            esc(words) +
-            '"><span class="grdt-tile-head" aria-hidden="true"></span><span class="grdt-words">' +
-            esc(words) +
-            '</span></button>'
-          );
+            '</button>';
+          return on
+            ? _graderPickHtml(
+                btn,
+                lv,
+                state.mixed ? 0 : state.level,
+                state.mod,
+                'data-action="graderMod" data-critid="' + crit.id + '"',
+                state.mixed,
+              )
+            : btn;
         })
         .join('');
-      var note = getRubricCriterionComment(cid, st.id, a.id, crit);
+      var count = hasChecks ? RubricChecks.tickedCount(crit, ticked) : null;
+      var chips =
+        (hasChecks
+          ? '<button type="button" class="rsg-checks-btn grdr-chip' +
+            (open ? ' is-open' : '') +
+            (count.ticked ? ' has-ticks' : '') +
+            '" data-action="graderChecks" data-critid="' +
+            crit.id +
+            '" aria-expanded="' +
+            open +
+            '" aria-label="Checklist for ' +
+            name +
+            ', ' +
+            count.ticked +
+            ' ticked">' +
+            _CHECK_ICON +
+            (count.ticked ? count.ticked : 'Checklist') +
+            '</button>'
+          : '') +
+        '<button type="button" class="rsg-crit-comment grdr-chip' +
+        (note ? ' has-comment' : '') +
+        (writing ? ' is-open' : '') +
+        '" data-action="graderNote" data-critid="' +
+        crit.id +
+        '" aria-expanded="' +
+        writing +
+        '" aria-label="Comment on ' +
+        name +
+        '">' +
+        _COMMENT_ICON +
+        'Comment</button>';
+      var checklist = '';
+      if (open) {
+        checklist = '<div class="rsg-checklist grdr-checklist">';
+        order.forEach(function (lv) {
+          checklist +=
+            '<div class="rsg-checklist-col l' +
+            lv +
+            (state.level === lv ? ' is-chosen' : '') +
+            '" data-level="' +
+            lv +
+            '" data-level-name="' +
+            PROF_LABELS[lv] +
+            '">';
+          RubricChecks.checksAt(crit, lv).forEach(function (check) {
+            checklist +=
+              '<label class="rsg-check grdt-check"><input type="checkbox" data-action="graderTick" data-critid="' +
+              crit.id +
+              '" data-checkid="' +
+              check.id +
+              '"' +
+              (ticked.indexOf(check.id) >= 0 ? ' checked' : '') +
+              '><span>' +
+              esc(check.label) +
+              '</span></label>';
+          });
+          checklist += '</div>';
+        });
+        checklist += '</div>';
+      }
+      var id = 'grdt-note-' + a.id + '-' + crit.id;
+      var comment = writing
+        ? '<textarea id="' +
+          id +
+          '" class="grdt-note' +
+          (note ? ' has-text' : '') +
+          '" rows="1" aria-label="Comment on ' +
+          name +
+          '" placeholder="Add a comment on ' +
+          name +
+          '" data-action-blur="graderCritNote" data-critid="' +
+          crit.id +
+          '">' +
+          esc(note) +
+          '</textarea>'
+        : note
+          ? '<button type="button" class="grdr-note" data-action="graderNote" data-critid="' +
+            crit.id +
+            '">' +
+            _COMMENT_ICON +
+            '<span>' +
+            esc(note) +
+            '</span></button>'
+          : '';
       html +=
-        '<section class="grdt-crit" tabindex="0" data-critid="' +
+        '<section class="grdt-crit grdr-crit' +
+        (open ? ' is-open' : '') +
+        '" tabindex="0" data-critid="' +
         crit.id +
         '" aria-label="' +
-        esc(crit.name || 'Criterion') +
+        name +
         '">' +
-        '<div class="grdt-row">' +
-        '<div class="grdt-crit-side"><h3 class="grdt-crit-name">' +
-        esc(crit.name || 'Criterion') +
+        '<div class="grdr-head"><h3 class="grdt-crit-name">' +
+        name +
         '</h3>' +
-        (codes ? '<div class="grdt-codes">' + codes + '</div>' : '') +
-        (state.level ? '' : '<span class="grdt-not-scored">' + _NOT_SCORED_ICON + 'Not Scored</span>') +
-        (advice
-          ? '<div class="grdt-advice' +
-            (advice.suggested ? ' l' + advice.suggested : '') +
-            '"><strong>' +
+        chips +
+        (advice && advice.suggested
+          ? // A level picked by hand stays; the hover says so (nothing moves).
+            '<span class="grdr-suggested l' +
+            advice.suggested +
+            '"' +
+            (advice.hint ? ' title="' + esc(advice.hint) + '"' : '') +
+            '>' +
             esc(advice.head) +
-            '</strong><span>' +
-            esc(advice.hint) +
-            '</span></div>'
+            '</span>'
           : '') +
         '</div>' +
-        tiles +
-        '</div>' +
-        '<div class="grdt-note-row"><label class="grdt-note-label" for="grdt-note-' +
-        a.id +
-        '-' +
-        crit.id +
-        '">Comment (Optional)</label>' +
-        '<textarea id="grdt-note-' +
-        a.id +
-        '-' +
-        crit.id +
-        '" class="grdt-note' +
-        (note ? ' has-text' : '') +
-        '" rows="1" data-action-blur="graderCritNote" data-critid="' +
-        crit.id +
-        '">' +
-        esc(note) +
-        '</textarea></div>' +
+        '<div class="grdl-controls grdr-levels"><div class="grdl-seg" role="group" aria-label="Level">' +
+        seg +
+        '</div></div>' +
+        checklist +
+        comment +
         '</section>';
     });
-    return '<div class="grdt-tiles">' + html + '</div>';
+    return '<div class="grdt-tiles grdr-rows">' + html + '</div>';
   }
 
   /* ── Single-point rubric: one student ──────────────────────
@@ -1724,7 +1719,6 @@ window.PageAssignments = (function () {
         '</div>' +
         '<div class="assess-header-actions" data-stop-prop="true">' +
         _gradeSubmissionsHtml(cid, a, shownIds) +
-        _workWallButtonHtml(cid, a) +
         (holds && !isDibelsScored(a)
           ? '<span class="assess-return-slot" data-return-slot-aid="' +
             a.id +
@@ -1732,74 +1726,8 @@ window.PageAssignments = (function () {
             _returnDraftsButtonHtml(cid, a, shownIds) +
             '</span>'
           : '') +
-        (a.rubricId && getRubricById(cid, a.rubricId)
-          ? (function () {
-              var showRubric = rubricViewStates[a.id] !== undefined ? rubricViewStates[a.id] : true;
-              return (
-                '<div class="seg seg-sm rubric-view-toggle" role="group" aria-label="Grade by">' +
-                '<button class="seg-btn rubric-view-btn"' +
-                segAttr(!showRubric) +
-                ' data-action="setRubricView" data-aid="' +
-                a.id +
-                '" data-rubric="false">Competencies</button>' +
-                '<button class="seg-btn rubric-view-btn"' +
-                segAttr(showRubric) +
-                ' data-action="setRubricView" data-aid="' +
-                a.id +
-                '" data-rubric="true">Rubric</button>' +
-                '</div>' +
-                (showRubric && _isAdvancedRubric(getRubricById(cid, a.rubricId)) ? _checklistModeHtml() : '') +
-                '<button class="rubric-print-btn" data-action="printRubrics" data-aid="' +
-                a.id +
-                '" title="Print a graded rubric for each student">' +
-                _GRADER_PRINTER +
-                'Print Rubrics</button>'
-              );
-            })()
-          : isDibelsScored(a)
-            ? '<button class="rubric-print-btn" data-action="printDibels" data-aid="' +
-              a.id +
-              '" title="Print this window\'s scores for the class">' +
-              _GRADER_PRINTER +
-              'Print Class Sheet</button>'
-            : !isPointsScored(a)
-              ? // No rubric of its own: a Tag Rubric, or a General Rubric when it
-                // has no competencies, with the proficiency scale's wording.
-                '<button class="rubric-print-btn" data-action="printRubrics" data-aid="' +
-                a.id +
-                '" title="Print a graded ' +
-                (scoreTagIds(a, cid).some(function (t) {
-                  return !isUnlinkedTag(t);
-                })
-                  ? 'tag'
-                  : 'general') +
-                ' rubric for each student">' +
-                _GRADER_PRINTER +
-                'Print Rubrics</button>'
-              : // Points and Complete/Incomplete: a score sheet per student.
-                '<button class="rubric-print-btn" data-action="printRubrics" data-aid="' +
-                a.id +
-                '" title="Print each student\'s ' +
-                (isCompletionScored(a) ? 'mark' : 'score') +
-                ' and feedback">' +
-                _GRADER_PRINTER +
-                'Print Scores</button>') +
-        _classResultsButtonHtml(cid, a) +
-        '<button class="assess-header-action-btn" data-action="editAssess" data-aid="' +
-        a.id +
-        '" title="Edit" aria-label="Edit assessment">' +
-        LINE_ICONS.edit +
-        '</button>' +
-        '<button class="assess-header-action-btn" data-action="dupeAssess" data-aid="' +
-        a.id +
-        '" title="Duplicate" aria-label="Duplicate assessment">' +
-        LINE_ICONS.copy +
-        '</button>' +
-        '<button class="assess-header-action-btn action-delete" data-action="deleteAssess" data-aid="' +
-        a.id +
-        '" title="Delete assessment" aria-label="Delete assessment">' +
-        LINE_ICONS.trash +
-        '</button>' +
+        _setEveryoneMenuHtml(cid, a) +
+        _cardMoreMenuHtml(cid, a) +
         '</div>' +
         '<span class="assess-chevron" aria-hidden="true">' +
         _CHEVRON_ICON +
@@ -3769,10 +3697,13 @@ window.PageAssignments = (function () {
     if (_afTipSource) return _hideAfTip();
     var aid = _editingAssessId;
     cancelAssessForm(function () {
-      // Back to the button that opened the form.
+      // Back to the button that opened the form: the card's ⋯ for Edit
+      // Assessment, which sits in its menu.
       var back = aid
         ? document.querySelector('[data-action="editAssess"][data-aid="' + CSS.escape(aid) + '"]')
         : document.querySelector('.tb-action-btn[data-action="showNewForm"]');
+      var menu = back && back.closest('.assess-menu');
+      if (menu) back = menu.parentNode.querySelector('[data-action="toggleCardMenu"]');
       if (back) back.focus({ preventScroll: true });
     });
   }
@@ -7021,15 +6952,6 @@ window.PageAssignments = (function () {
       ' data-action="classResults" data-cid="' + esc(cid) + '" data-aid="' + esc(aid) + '" title="View Class Results"'
     );
   }
-  function _classResultsButtonHtml(cid, a) {
-    return (
-      '<button type="button" class="cr-card-btn" aria-label="Class Results"' +
-      _classResultsAttrs(cid, a.id) +
-      '>' +
-      _CLASS_RESULTS_ICON +
-      '<span class="cr-card-label">Class Results</span></button>'
-    );
-  }
   function _classResultsLinkHtml(cid, aid) {
     return (
       '<button type="button" class="ldg-name cr-ldg-link"' + _classResultsAttrs(cid, aid) + '>Class Results</button>'
@@ -8080,18 +8002,6 @@ window.PageAssignments = (function () {
       })
       .join('<span class="rsg-level-sep" aria-hidden="true"></span>');
   }
-  /* The whole-class grid's top row: "Set Everyone To" and a capsule per
-     level (today's fill-all). No hover hint: the wording bar shows itself. */
-  function _setEveryoneHtml(cid, action, aid) {
-    return (
-      '<div class="rsg-header">' +
-      '<span class="rsg-header-label">Set Everyone To</span>' +
-      '<div class="rsg-header-levels">' +
-      _fillAllHeaderHtml(cid, action, aid) +
-      '</div>' +
-      '</div>'
-    );
-  }
   /* A single-point rubric's Proficient standard, once above the class:
      a tinted card per criterion. */
   function _singlePointStripHtml(rubric) {
@@ -8414,29 +8324,6 @@ window.PageAssignments = (function () {
   }
   var _ROW_FILL_ICON =
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
-  function _fillAllHeaderHtml(cid, action, aid) {
-    return levelOrderFor(cid)
-      .map(function (l) {
-        return (
-          '<div class="rsg-header-level hl' +
-          l +
-          '" data-action="' +
-          action +
-          '" data-aid="' +
-          aid +
-          '" data-score="' +
-          l +
-          '" data-label="' +
-          PROF_LABELS[l] +
-          '" title="Fill all ' +
-          PROF_LABELS[l] +
-          '">' +
-          PROF_LABELS[l] +
-          '</div>'
-        );
-      })
-      .join('');
-  }
   function _rowFillOptionsHtml(cid, action, aid, sid) {
     return levelOrderFor(cid)
       .map(function (l) {
@@ -8463,7 +8350,6 @@ window.PageAssignments = (function () {
 
   function renderTagGrid(cid, a, tagObjs, students, scores) {
     var html = '<div class="rsg-grid">';
-    html += _setEveryoneHtml(cid, 'confirmFillAll', a.id);
     var statuses = getAssignmentStatuses(cid);
     students.forEach(function (st) {
       var stStatus = statuses[st.id + ':' + a.id] || null;
@@ -8557,20 +8443,6 @@ window.PageAssignments = (function () {
   function _isChecklistOpen(aid, sid, critId) {
     var key = _checklistKey(aid, sid, critId);
     return _checklistMode() === 'show' ? !_closedChecklists.has(key) : _openChecklists.has(key);
-  }
-  function _checklistModeHtml() {
-    var show = _checklistMode() === 'show';
-    return (
-      '<span class="rsg-checklist-mode-label">Checklists</span>' +
-      '<div class="seg seg-sm rsg-checklist-mode" role="group" aria-label="Checklists">' +
-      '<button class="seg-btn"' +
-      segAttr(show) +
-      ' data-action="setChecklistMode" data-mode="show">Show</button>' +
-      '<button class="seg-btn"' +
-      segAttr(!show) +
-      ' data-action="setChecklistMode" data-mode="hide">Hide</button>' +
-      '</div>'
-    );
   }
   function _checksButtonHtml(cid, aid, sid, crit) {
     if (!RubricChecks.hasChecks(crit)) return '';
@@ -8749,7 +8621,6 @@ window.PageAssignments = (function () {
     var single = rubricStyle(rubric) === 'single_point';
     var html = '<div class="rsg-grid' + (advanced ? ' is-advanced' : '') + (single ? ' is-single-point' : '') + '">';
     if (single) html += _singlePointStripHtml(rubric);
-    html += _setEveryoneHtml(cid, 'confirmFillRubricAll', a.id);
 
     var statuses = getAssignmentStatuses(cid);
     students.forEach(function (st) {
@@ -10939,6 +10810,9 @@ window.PageAssignments = (function () {
   function _handleClick(e) {
     if (!e.target.closest('.rsg-group-members .grader-member-menu, .rsg-group-members .grader-member-more'))
       _closeGroupMenus();
+    // A card's menu closes on any click but its own button's (an item's
+    // action still runs).
+    if (!e.target.closest('[data-action="toggleCardMenu"]')) _closeCardMenus();
     // KB focus on score cells
     var critRow = e.target.closest('.rsg-criterion-row');
     if (critRow) {
@@ -11001,6 +10875,12 @@ window.PageAssignments = (function () {
       },
       editAssess: function () {
         editAssess(el.dataset.aid);
+      },
+      toggleCardMenu: function () {
+        _toggleCardMenu(el);
+      },
+      copyAssessToClass: function () {
+        copyAssessToClass(el.dataset.aid);
       },
       dupeAssess: function () {
         dupeAssess(el.dataset.aid);
@@ -11253,6 +11133,12 @@ window.PageAssignments = (function () {
         // a chosen tile's − | + (a disabled one, the gap) never clears it.
         if (e.target.closest('.grdt-check, .grdt-stepper')) return;
         _graderSetLevel(_graderAid(el), el.dataset.critid, parseInt(el.dataset.level, 10));
+      },
+      graderChecks: function () {
+        _graderToggleRow(_graderAid(el), el.dataset.critid, 'checks');
+      },
+      graderNote: function () {
+        _graderToggleRow(_graderAid(el), el.dataset.critid, 'note');
       },
       graderTagLevel: function () {
         _graderSetTagLevel(_graderAid(el), el.dataset.tag, parseInt(el.dataset.level, 10));
@@ -11645,6 +11531,7 @@ window.PageAssignments = (function () {
       closeMenus();
       return;
     }
+    if (_cardMenuKeydown(e)) return;
     // One student's grader open on the page (the dialog runs its own).
     if (!_grader && _graderCardKey(e)) return;
     if (e.key === 'Escape' && document.querySelector('.rsg-group-members .grader-member-menu:not([hidden])')) {
@@ -13238,17 +13125,213 @@ window.PageAssignments = (function () {
     );
   }
 
-  /* Work Wall (S14, teacher/work-wall.js): every student's work on the
-     piece side by side. Its door on the card, only while the piece takes
-     work (the build switch and Send Work on, Students Send not Nothing). */
-  // html-safe: ids are ours; fixed words
-  function _workWallButtonHtml(cid, a) {
-    if (focusStudentId || !window.WorkWall || !GraderWork.workOn(cid, a)) return '';
+  /* The open card's header (AssignmentsPage board): Grade Submissions,
+     Set Everyone To ▾ and a ⋯ menu, so the title keeps its room. Every
+     action the old row of buttons had is in the ⋯ menu: Class Results,
+     Print, the Work Wall (while the piece takes work), Grade by
+     Competencies or Rubric, Show or Hide Checklists, Edit Assessment,
+     Duplicate, Copy to Another Class… and Delete…. One menu is open at a
+     time; a click elsewhere or Esc closes it. */
+  var _ARROW_RIGHT_ICON =
+    '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 8h11M9 3.5L13.5 8 9 12.5"/></svg>';
+  var _WALL_ICON =
+    '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="2" width="5.5" height="5" rx="1"/><rect x="9" y="2" width="5.5" height="5" rx="1"/><rect x="1.5" y="9" width="5.5" height="5" rx="1"/><rect x="9" y="9" width="5.5" height="5" rx="1"/></svg>';
+  var _MENU_CARET =
+    '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+
+  // html-safe: attrs are built from our ids and fixed words; label and icon are fixed
+  function _cardMenuItem(attrs, icon, label, cls) {
     return (
-      '<button type="button" class="assess-work-wall-btn" data-action="openWorkWall" data-aid="' +
-      a.id +
-      '">Work Wall</button>'
+      '<button type="button" role="menuitem" class="assess-menu-item' +
+      (cls ? ' ' + cls : '') +
+      '" ' +
+      attrs +
+      '>' +
+      (icon || '<span class="assess-menu-icon" aria-hidden="true"></span>') +
+      '<span>' +
+      label +
+      '</span></button>'
     );
+  }
+
+  /* Set Everyone To ▾ while the class's levels grid shows (the competency
+     or rubric grid, not one student's grader, points, a mark or DIBELS):
+     the four levels in the class's order, each as the grid's row was. */
+  // html-safe: ids are ours; level names are fixed
+  function _setEveryoneMenuHtml(cid, a) {
+    if (focusStudentId || isDibelsScored(a) || isCompletionScored(a) || a.scoreMode === 'points') return '';
+    var rubric = a.rubricId && getRubricById(cid, a.rubricId);
+    var showRubric = rubricViewStates[a.id] !== undefined ? rubricViewStates[a.id] : true;
+    var action = rubric && showRubric ? 'confirmFillRubricAll' : 'confirmFillAll';
+    var items = levelOrderFor(cid)
+      .map(function (l) {
+        return _cardMenuItem(
+          'data-action="' +
+            action +
+            '" data-aid="' +
+            a.id +
+            '" data-score="' +
+            l +
+            '" data-label="' +
+            PROF_LABELS[l] +
+            '"',
+          '<span class="assess-menu-dot l' + l + '" aria-hidden="true"></span>',
+          PROF_LABELS[l],
+        );
+      })
+      .join('');
+    return (
+      '<div class="assess-menu-wrap assess-setto">' +
+      '<button type="button" class="assess-setto-btn" data-action="toggleCardMenu" aria-haspopup="menu" aria-expanded="false">Set Everyone To' +
+      _MENU_CARET +
+      '</button>' +
+      '<div class="assess-menu" role="menu" aria-label="Set Everyone To" hidden>' +
+      items +
+      '</div></div>'
+    );
+  }
+
+  // The ⋯ menu's Print: the same print the card always offered.
+  function _cardPrintItem(cid, a) {
+    var attrs = function (action, title) {
+      return 'data-action="' + action + '" data-aid="' + a.id + '" title="' + title + '"';
+    };
+    if (a.rubricId && getRubricById(cid, a.rubricId))
+      return _cardMenuItem(
+        attrs('printRubrics', 'Print a graded rubric for each student'),
+        LINE_ICONS.print,
+        'Print Rubrics',
+      );
+    if (isDibelsScored(a))
+      return _cardMenuItem(
+        attrs('printDibels', 'Print this window’s scores for the class'),
+        LINE_ICONS.print,
+        'Print Class Sheet',
+      );
+    if (!isPointsScored(a)) {
+      // No rubric of its own: a Tag Rubric, or a General Rubric when it
+      // has no competencies, with the proficiency scale's wording.
+      var kind = scoreTagIds(a, cid).some(function (t) {
+        return !isUnlinkedTag(t);
+      })
+        ? 'tag'
+        : 'general';
+      return _cardMenuItem(
+        attrs('printRubrics', 'Print a graded ' + kind + ' rubric for each student'),
+        LINE_ICONS.print,
+        'Print Rubrics',
+      );
+    }
+    // Points and Complete/Incomplete: a score sheet per student.
+    return _cardMenuItem(
+      attrs('printRubrics', 'Print each student’s ' + (isCompletionScored(a) ? 'mark' : 'score') + ' and feedback'),
+      LINE_ICONS.print,
+      'Print Scores',
+    );
+  }
+
+  // html-safe: ids are ours; labels and icons are fixed
+  function _cardMoreMenuHtml(cid, a) {
+    var aid = 'data-aid="' + a.id + '"';
+    var html =
+      _cardMenuItem(
+        'data-action="classResults" data-cid="' + esc(cid) + '" ' + aid,
+        _CLASS_RESULTS_ICON,
+        'Class Results',
+      ) + _cardPrintItem(cid, a);
+    // Work Wall (S14, teacher/work-wall.js): every student's work side by
+    // side, only while the piece takes work.
+    if (!focusStudentId && window.WorkWall && GraderWork.workOn(cid, a))
+      html += _cardMenuItem('data-action="openWorkWall" ' + aid, _WALL_ICON, 'Work Wall', 'assess-work-wall-btn');
+    var rubric = a.rubricId && getRubricById(cid, a.rubricId);
+    if (rubric) {
+      var showRubric = rubricViewStates[a.id] !== undefined ? rubricViewStates[a.id] : true;
+      html +=
+        '<span class="assess-menu-sep" role="separator"></span>' +
+        _cardMenuItem(
+          'data-action="setRubricView" ' + aid + ' data-rubric="' + !showRubric + '"',
+          null,
+          showRubric ? 'Grade by Competencies' : 'Grade by Rubric',
+        );
+      if (showRubric && _isAdvancedRubric(rubric)) {
+        var show = _checklistMode() === 'show';
+        html += _cardMenuItem(
+          'data-action="setChecklistMode" data-mode="' + (show ? 'hide' : 'show') + '"',
+          null,
+          show ? 'Hide Checklists' : 'Show Checklists',
+        );
+      }
+    }
+    html +=
+      '<span class="assess-menu-sep" role="separator"></span>' +
+      _cardMenuItem('data-action="editAssess" ' + aid, LINE_ICONS.edit, 'Edit Assessment') +
+      _cardMenuItem('data-action="dupeAssess" ' + aid, LINE_ICONS.copy, 'Duplicate');
+    var targets = window.AssessmentCopy ? AssessmentCopy.copyTargets(cid) : null;
+    if (targets && (targets.sameCourse.length || targets.other.length))
+      html += _cardMenuItem('data-action="copyAssessToClass" ' + aid, _ARROW_RIGHT_ICON, 'Copy to Another Class…');
+    html +=
+      '<span class="assess-menu-sep" role="separator"></span>' +
+      _cardMenuItem('data-action="deleteAssess" ' + aid, LINE_ICONS.trash, 'Delete…', 'is-delete');
+    return (
+      '<div class="assess-menu-wrap assess-more">' +
+      '<button type="button" class="assess-more-btn" data-action="toggleCardMenu" aria-haspopup="menu" aria-expanded="false" aria-label="More for ' +
+      esc(a.title || 'this assessment') +
+      '">' +
+      _GRADER_MORE_ICON +
+      '</button>' +
+      '<div class="assess-menu" role="menu" aria-label="More" hidden>' +
+      html +
+      '</div></div>'
+    );
+  }
+
+  function _closeCardMenus(except) {
+    document.querySelectorAll('.assess-menu-wrap .assess-menu').forEach(function (menu) {
+      if (menu === except || menu.hidden) return;
+      menu.hidden = true;
+      var btn = menu.parentNode.querySelector('[data-action="toggleCardMenu"]');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+    });
+  }
+  function _toggleCardMenu(btn) {
+    var menu = btn.parentNode.querySelector('.assess-menu');
+    if (!menu) return;
+    _closeCardMenus(menu);
+    menu.hidden = !menu.hidden;
+    btn.setAttribute('aria-expanded', String(!menu.hidden));
+    if (!menu.hidden) {
+      var first = menu.querySelector('button');
+      if (first) first.focus({ preventScroll: true });
+    }
+  }
+  // ↑ ↓ move through an open menu; Esc closes it and goes back to its button.
+  function _cardMenuKeydown(e) {
+    var menu = e.target.closest && e.target.closest('.assess-menu-wrap .assess-menu:not([hidden])');
+    if (!menu) return false;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      _closeCardMenus();
+      var btn = menu.parentNode.querySelector('[data-action="toggleCardMenu"]');
+      if (btn) btn.focus({ preventScroll: true });
+      return true;
+    }
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return false;
+    e.preventDefault();
+    var items = Array.prototype.slice.call(menu.querySelectorAll('button'));
+    var i = items.indexOf(e.target) + (e.key === 'ArrowDown' ? 1 : -1);
+    items[(i + items.length) % items.length].focus();
+    return true;
+  }
+
+  /* Copy to Another Class…: the edit form, at its Classes row (the copy is
+     made when the form is saved, as from the form itself). */
+  function copyAssessToClass(aid) {
+    editAssess(aid);
+    var field = document.getElementById('af-copy-field');
+    if (!field) return;
+    field.scrollIntoView({ block: 'center' });
+    var chip = field.querySelector('button.af-copy-chip:not([disabled])');
+    if (chip) chip.focus({ preventScroll: true });
   }
 
   /* One student's grader on the page: what came in ("Submitted Oct 30 ·
@@ -14686,6 +14769,11 @@ window.PageAssignments = (function () {
     if (res.result === 'storage_full') return 'This computer is full. Free some space, then try again.';
     if (res.result === 'already_sent') return 'Work came in for this student meanwhile. It is shown now.';
     if (res.result === 'not_available') return 'Adding work is not ready for signed-in classes yet.';
+    if (res.result === 'class_full') return 'This class has no room for more photos.';
+    if (res.result === 'nothing_sent') return 'That work was taken away meanwhile. Add it again as new work.';
+    if (res.result === 'uploading') return "That work is still uploading. Try again when it's in.";
+    if (res.result === 'on_paper') return 'This was handed in on paper. Use Replace Them to add photos.';
+    if (res.result === 'not_found') return 'This student is no longer in this class.';
     return "The photos couldn't be kept. Try again.";
   }
   function _graderAddWorkFiles(input) {
@@ -15213,8 +15301,9 @@ window.PageAssignments = (function () {
       if ((was ? was._fvKey : '') === key) return;
       if (was) was.remove();
       if (!text) return;
-      var side = card.querySelector('.grdt-crit-side, .grdl-side');
-      if (!side) return;
+      // An amber chip under the level bar (MainRevised).
+      var bar = card.querySelector('.grdl-controls, .grsp-controls');
+      if (!bar) return;
       was = document.createElement('div');
       was.className = 'grader-was';
       var line = document.createElement('p');
@@ -15228,7 +15317,7 @@ window.PageAssignments = (function () {
         was.appendChild(hint);
       }
       was._fvKey = key;
-      side.appendChild(was);
+      bar.parentNode.insertBefore(was, bar.nextSibling);
     });
   }
 
@@ -15611,6 +15700,33 @@ window.PageAssignments = (function () {
     refreshSidebarGrades(focusStudentId);
     render();
     _focusGraderCard(aid, '.grdt-crit[data-critid="' + critId + '"]');
+  }
+  /* A rubric row's Checklist or Comment chip opens or closes what folds
+     under it; the checklist keeps the Assignments page's Show | Hide rule. */
+  function _graderToggleRow(aid, critId, what) {
+    if (!aid || !focusStudentId) return;
+    var key = _checklistKey(aid, focusStudentId, critId);
+    var opened;
+    if (what === 'checks') {
+      var open = _isChecklistOpen(aid, focusStudentId, critId);
+      var set = _checklistMode() === 'show' ? _closedChecklists : _openChecklists;
+      if (open === (set === _closedChecklists)) set.add(key);
+      else set.delete(key);
+      opened = !open;
+    } else {
+      opened = !_graderNotesOpen.has(key);
+      if (opened) _graderNotesOpen.add(key);
+      else _graderNotesOpen.delete(key);
+    }
+    render();
+    var root = _graderRoot(aid);
+    var card = root && root.querySelector('.grdt-crit[data-critid="' + critId + '"]');
+    if (!card) return;
+    var to =
+      what === 'note' && opened
+        ? card.querySelector('textarea.grdt-note')
+        : card.querySelector(what === 'checks' ? '[data-action="graderChecks"]' : '[data-action="graderNote"]');
+    if (to) to.focus({ preventScroll: true });
   }
   /* A tick saves the box and, like the Assignments checklist, moves the
      level to the one the boxes suggest unless the teacher picked another. */

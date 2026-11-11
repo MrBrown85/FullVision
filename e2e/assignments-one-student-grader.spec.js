@@ -63,19 +63,20 @@ test('one student is graded with the grader inside the card', async ({ page }) =
   await expect(page.locator('#rsg-descriptor-bar')).toBeHidden();
 
   const hyp = grader.locator('.grdt-crit[data-critid="crit-hyp"]');
-  await expect(hyp).toContainText('Clear and testable');
-  await hyp.locator('.grdt-tile[data-level="3"]').click();
-  await expect(card.locator('.grdt-tile.is-chosen')).toContainText('Proficient');
+  // Descriptors stay off the scoring grid: the wording is the level's hover.
+  await expect(hyp).not.toContainText('Clear and testable');
+  await hyp.locator('[data-action="graderLevel"][data-level="3"]').click();
+  await expect(card.locator('.grdl-level.is-on')).toContainText('Proficient');
   await expect(card.locator('.grader-grade')).toContainText('Proficient');
 
   await card.locator('.grdt-crit[data-critid="crit-hyp"]').focus();
   await page.keyboard.press('4');
-  await expect(card.locator('.grdt-chosen-label')).toHaveText(/Extending/);
+  await expect(card.locator('.grdl-level.is-on')).toHaveText(/Extending/);
 
   // Scored work can't be Excused; clearing the level frees it.
   await expect(card.locator('.grader-status [data-status="EXC"]')).toBeDisabled();
-  await card.locator('.grdt-chosen-label').click();
-  await expect(card.locator('.grdt-tile.is-chosen')).toHaveCount(0);
+  await card.locator('.grdl-level.is-on').click();
+  await expect(card.locator('.grdl-level.is-on')).toHaveCount(0);
   await card.locator('.grader-status [data-status="EXC"]').click();
   await expect(card.locator('.grader-inline')).toHaveClass(/is-locked/);
   await expect(card.locator('.grader-grade')).toHaveText('Excused');

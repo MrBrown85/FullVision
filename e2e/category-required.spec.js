@@ -8,6 +8,7 @@ import {
   TEST_COURSE,
   TEST_ASSESSMENT,
 } from './helpers.js';
+import { cardMenuItem } from './card-menu.js';
 
 // A category on every assessment (docs/DECISIONS.md, 2026-11-01): in a
 // class with categories, scored work can't be saved without one, as in
@@ -105,7 +106,7 @@ test.describe('A category on every assessment', () => {
 
     // A closed card shows its buttons on hover.
     await page.locator('#ac-assess-001 .assess-header').hover();
-    await page.locator('#ac-assess-001 [data-action="editAssess"]').click();
+    await (await cardMenuItem(page.locator('#ac-assess-001'), 'editAssess')).click();
     const category = page.locator('#af-category');
     await expect(category).toHaveValue('');
     await expect(page.locator('#af-category-hint')).toBeVisible();
