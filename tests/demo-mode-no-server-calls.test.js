@@ -268,25 +268,46 @@ describe('Demo Mode sends nothing for Draft and Returned', () => {
     expect(JSON.parse(localStorage.getItem('gb-grade-returns-' + CID)).essay.s1.is_draft).toBe(false);
   });
 
-  // Student cards (S0-W1): made, listed and marked printed on the device.
+  /* Student cards (S0-W1, S3-W1): made, listed and marked printed on the
+     device. Making cards is the teacher-cards function for a signed-in
+     teacher (a fetch, not an RPC): in Demo Mode it is never fetched, and
+     the saved card keeps no code. */
   it.each([false, true])(
-    'student cards: Make Cards and marking them printed (signed in behind it: %s)',
+    'student cards: Make and Print and marking them printed (signed in behind it: %s)',
     async signedIn => {
       _useSupabase = signedIn;
-      setStudentPageSwitch(CID, true);
-      expect((await listStudentCards(CID)).data).toEqual([]);
-      const made = (await issueStudentCards(CID)).data;
-      expect(made.issued).toBe(1);
-      expect((await markStudentCardsPrinted(CID, [made.cards[0].id])).data.printed).toBe(1);
-      StudentCards._reset();
-      StudentCards.render(CID);
-      await StudentCards.load(CID);
-      await StudentCards.make(CID);
-      await tick();
-      expect(calls).toEqual([]);
-      expect(JSON.parse(localStorage.getItem('gb-student-cards-' + CID)).length).toBe(1);
-      // Nothing waits in an outbox either.
-      expect(localStorage.getItem('fv-sync-queue-v1')).toBe(null);
+      const fetched = [];
+      const realFetch = globalThis.fetch;
+      const realPrint = window.print;
+      globalThis.fetch = async url => {
+        fetched.push(String(url));
+        throw new TypeError('Failed to fetch');
+      };
+      window.print = () => {};
+      try {
+        setStudentPageSwitch(CID, true);
+        expect((await listStudentCards(CID)).data).toEqual([]);
+        const made = (await makeStudentCards(CID, [{ enrollment_id: 's1', replaces: null }])).data;
+        expect(made.results[0].result).toBe('made');
+        expect((await markStudentCardsPrinted(CID, [made.results[0].card_id])).data.printed).toBe(1);
+        StudentCards._reset();
+        StudentCards.render(CID);
+        await StudentCards.load(CID);
+        await StudentCards.makeAndPrint(CID);
+        await tick();
+        expect(calls).toEqual([]);
+        expect(fetched).toEqual([]);
+        const kept = localStorage.getItem('gb-student-cards-' + CID);
+        expect(JSON.parse(kept).length).toBe(1);
+        expect(kept).not.toContain(made.results[0].code);
+        expect(kept).not.toMatch(/"(code|password)":/);
+        // Nothing waits in an outbox either.
+        expect(localStorage.getItem('fv-sync-queue-v1')).toBe(null);
+      } finally {
+        globalThis.fetch = realFetch;
+        window.print = realPrint;
+        StudentCards._reset();
+      }
     },
   );
 

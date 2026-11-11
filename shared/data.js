@@ -12178,38 +12178,77 @@ function _dropGradeReturnsOf(cid, sid) {
 }
 /* ── end Draft and Returned (S0-F2) ── */
 
-/* ── Student cards (S0-W1; docs/plans/student-page-build-plan.md 1.5) ─────
+/* ── Student cards (S0-W1, S3-W1; docs/plans/student-page-build-plan.md 1.5) ──
    One card for each student in a class: a printed code that opens the
-   student's page (migrations/2026110903_student_card.sql). A card, as the
-   server lists it and as this file keeps it:
-     { id, enrollment_id, code, created_at, printed_at, last_opened_at,
-       locked_at, wrong_tries, wrong_tries_7d, works_until, check, password }
-   `check` is 'identity' (the student has a birthday or a student number on
-   file) or 'password'; `password` is the four digits to print when it is
-   'password'.
+   student's page. The database cannot read a card's code (DECISIONS,
+   ruling 63): it keeps a keyed fingerprint of it, and the code exists only
+   in the one reply that made the card.
+
+   A card, as this file hands it out and as it is ever kept:
+     { id, enrollment_id, seq, created_at, printed_at, last_opened_at,
+       locked_at, wrong_tries, wrong_tries_7d, works_until, check,
+       has_password, needs_new }
+   Never a code and never a password. `seq` is the card number (Card 2);
+   the server's list before the S3-M1 migration has none, and still
+   carries the old readable code and password: both are dropped here, as
+   they arrive, and so is a code an older build saved in Demo Mode.
+
+   Making cards (makeStudentCards) asks the teacher-cards edge function,
+   online, with the teacher's own sign-in, and never through the outbox. Its
+   reply's codes and passwords are handed to the caller and go nowhere
+   else: not localStorage, sessionStorage, IndexedDB, the outbox, a log or
+   any cache. teacher/student-cards.js prints them and holds them for Print
+   Again only.
 
    Only a class whose student page is on has cards (the build switch): for
    any other class each function here answers with no data and calls
-   nothing. Each answers a promise of { data, error }.
-
-   A signed-in teacher's cards are the server's, and are kept nowhere on
-   this device: a card's code and password are read when the Student Cards
-   list is opened and held by that screen only. Making cards is asked for
-   online, with the teacher waiting on the answer, as slip codes are
-   (v2.issueAccessCodes); marking them printed is a write like any other,
-   through the outbox. In Demo Mode the cards are made and kept on this
-   device (gb-student-cards-<cid>) and nothing is sent. */
+   nothing. Each answers a promise of { data, error }. In Demo Mode the
+   cards are made and kept on this device (gb-student-cards-<cid>), by the
+   same rules, and nothing is sent. */
 var _CARD_CODE_LETTERS = 'ABCDEFGHJKMNPQRTUVWXYZ2346789'; // the slip alphabet (teacher/questionnaires.js)
+var _CARD_FIELDS = [
+  'id',
+  'enrollment_id',
+  'seq',
+  'created_at',
+  'printed_at',
+  'last_opened_at',
+  'locked_at',
+  'wrong_tries',
+  'wrong_tries_7d',
+  'works_until',
+  'check',
+  'has_password',
+  'needs_new',
+];
 
 function _cardsAnswer(data, error) {
   return Promise.resolve({ data: data == null ? null : data, error: error || null });
 }
+/* A card with only the fields above: whatever else a reply or an older
+   build's copy carries (a code, a password) is left behind. */
+function _cardWithoutCode(c) {
+  var out = {};
+  if (!c || typeof c !== 'object') return null;
+  _CARD_FIELDS.forEach(function (k) {
+    if (c[k] !== undefined) out[k] = c[k];
+  });
+  if (out.seq != null && !(Number(out.seq) > 0)) delete out.seq;
+  return out;
+}
 function _demoStudentCards(cid) {
   var kept = _safeParseLS('gb-student-cards-' + cid, []);
-  return Array.isArray(kept) ? kept : [];
+  if (!Array.isArray(kept)) return [];
+  // A card an older build saved still carries its code and password: kept without them from now on.
+  var old = kept.some(function (c) {
+    return c && (c.code !== undefined || c.password !== undefined);
+  });
+  kept = kept.map(_cardWithoutCode).filter(Boolean);
+  if (old) _saveDemoStudentCards(cid, kept);
+  return kept;
 }
 function _saveDemoStudentCards(cid, cards) {
-  _safeLSSet('gb-student-cards-' + cid, JSON.stringify(cards));
+  _safeLSSet('gb-student-cards-' + cid, JSON.stringify(cards.map(_cardWithoutCode).filter(Boolean)));
 }
 /* The class's last reporting date when that is still ahead, else the next
    June 30: the day a card made on this device works until, as the server
@@ -12224,14 +12263,25 @@ function _demoCardsWorkUntil(cid) {
   var year = Number(today.slice(0, 4));
   return (today <= year + '-06-30' ? year : year + 1) + '-06-30';
 }
+// A whole number from 0 to n - 1, for n up to 256.
+function _cardRandom(n) {
+  if (typeof crypto !== 'undefined' && crypto && typeof crypto.getRandomValues === 'function') {
+    // Rejection sampling: every value below n equally likely.
+    var limit = 256 - (256 % n);
+    var b = new Uint8Array(1);
+    do crypto.getRandomValues(b);
+    while (b[0] >= limit);
+    return b[0] % n;
+  }
+  return Math.floor(Math.random() * n);
+}
+// Eight characters, shown K7M4-QX2P, as a card made by teacher-cards.
 function _demoCardCode(taken) {
   var code;
   do {
     code = '';
-    for (var i = 0; i < 6; i++) {
-      code += _CARD_CODE_LETTERS.charAt(Math.floor(Math.random() * _CARD_CODE_LETTERS.length));
-    }
-    code = code.slice(0, 3) + '-' + code.slice(3);
+    for (var i = 0; i < 8; i++) code += _CARD_CODE_LETTERS.charAt(_cardRandom(_CARD_CODE_LETTERS.length));
+    code = code.slice(0, 4) + '-' + code.slice(4);
   } while (taken[code]);
   taken[code] = true;
   return code;
@@ -12260,65 +12310,207 @@ function listStudentCards(cid) {
     function (res) {
       if (res && res.error && !res.error.handledSessionExpired) console.warn('list_student_cards failed:', res.error);
       var ok = res && !res.error && res.data != null;
-      return { data: ok ? _rpcRows(res.data) : null, error: (res && res.error) || null };
+      return {
+        data: ok ? _rpcRows(res.data).map(_cardWithoutCode).filter(Boolean) : null,
+        error: (res && res.error) || null,
+      };
     },
   );
 }
 
-/* Make a card for every student in the class who has none (or for those of
-   `studentIds` who have none). A student who has a card keeps it. Answers
-   { issued, cards }: how many were made, and every card in the class, as
-   listStudentCards gives them. */
-function issueStudentCards(cid, studentIds) {
-  if (!cid || !_gradesKept(cid)) return _cardsAnswer(null);
-  var only = Array.isArray(studentIds) && studentIds.length ? studentIds : null;
-  if (!_writesEnabled()) {
-    var kept = _demoStudentCards(cid);
-    var has = {};
-    var taken = {};
-    kept.forEach(function (c) {
-      has[c.enrollment_id] = true;
-      taken[c.code] = true;
+/* Demo Mode's teacher-cards: the same request and the same reply, on this
+   device. The saved card keeps no code or password; the reply carries
+   them once. A student whose live card is not the one named is
+   `changed`, as the server answers a second tab. */
+function _demoMakeCards(cid, items) {
+  var kept = _demoStudentCards(cid);
+  var students = {};
+  getStudents(cid).forEach(function (st) {
+    students[st.id] = st;
+  });
+  var until = _demoCardsWorkUntil(cid);
+  var taken = {};
+  var results = items.map(function (it) {
+    var st = students[it.enrollment_id];
+    if (!st) return { enrollment_id: it.enrollment_id, result: 'not_found' };
+    var at = -1;
+    kept.forEach(function (c, i) {
+      if (c.enrollment_id === it.enrollment_id) at = i;
     });
-    var until = _demoCardsWorkUntil(cid);
-    var made = 0;
-    getStudents(cid).forEach(function (st) {
-      if (has[st.id] || (only && only.indexOf(st.id) < 0)) return;
-      var identity = !!(st.dateOfBirth || st.studentNumber);
-      kept.push({
-        id: uid(),
-        enrollment_id: st.id,
-        code: _demoCardCode(taken),
-        created_at: new Date().toISOString(),
-        printed_at: null,
-        last_opened_at: null,
-        locked_at: null,
-        wrong_tries: 0,
-        wrong_tries_7d: 0,
-        works_until: until,
-        check: identity ? 'identity' : 'password',
-        password: identity ? null : String(1000 + Math.floor(Math.random() * 9000)),
-      });
-      made++;
-    });
-    if (made) _saveDemoStudentCards(cid, kept);
-    return _cardsAnswer({ issued: made, cards: _demoCardsListed(cid) });
+    var live = at >= 0 ? kept[at] : null;
+    if ((live ? live.id : null) !== (it.replaces || null))
+      return { enrollment_id: it.enrollment_id, result: 'changed' };
+    var hasPassword = !(st.dateOfBirth || st.studentNumber);
+    var card = {
+      id: uid(),
+      enrollment_id: st.id,
+      seq: (live && Number(live.seq) > 0 ? Number(live.seq) : live ? 1 : 0) + 1,
+      created_at: new Date().toISOString(),
+      printed_at: null,
+      last_opened_at: null,
+      locked_at: null,
+      wrong_tries: 0,
+      wrong_tries_7d: 0,
+      works_until: until,
+      check: hasPassword ? 'password' : 'identity',
+      has_password: hasPassword,
+      needs_new: false,
+    };
+    if (at >= 0) kept[at] = card;
+    else kept.push(card);
+    var out = {
+      enrollment_id: st.id,
+      result: 'made',
+      card_id: card.id,
+      seq: card.seq,
+      works_until: until,
+      code: _demoCardCode(taken),
+    };
+    if (hasPassword) {
+      out.password = '';
+      for (var d = 0; d < 4; d++) out.password += String(_cardRandom(10));
+    }
+    return out;
+  });
+  _saveDemoStudentCards(cid, kept);
+  return { replayed: false, results: results };
+}
+
+function _teacherCardsUrl() {
+  var base = ((window.__ENV && window.__ENV.SUPABASE_URL) || '').replace(/\/$/, '');
+  return base ? base + '/functions/v1/teacher-cards?forceFunctionRegion=ca-central-1' : '';
+}
+async function _teacherToken() {
+  var sb = getSupabase();
+  if (!sb || !sb.auth || typeof sb.auth.getSession !== 'function') return null;
+  try {
+    var got = await sb.auth.getSession();
+    var session = got && got.data && got.data.session;
+    return (session && session.access_token) || null;
+  } catch (e) {
+    return null;
   }
+}
+/* One POST to teacher-cards. Answers { status, body }, or { status: 0 }
+   when no reply came (the network, or a reply that is not JSON). Nothing
+   about the reply is logged: it holds codes. */
+async function _askTeacherCards(url, token, body) {
+  try {
+    var res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + token,
+        apikey: (window.__ENV && window.__ENV.SUPABASE_KEY) || '',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      cache: 'no-store',
+      credentials: 'omit',
+    });
+    var json = null;
+    try {
+      json = await res.json();
+    } catch (e) {
+      json = null;
+    }
+    return { status: res.status, body: json };
+  } catch (e) {
+    return { status: 0, body: null };
+  }
+}
+/* One request to teacher-cards, under one request_id. A reply that never
+   came is asked once more with the same id, so the server makes nothing
+   twice; a sign-in that ran out is renewed once and asked again, the same
+   way. */
+async function _teacherCardsRequest(cid, items) {
+  var url = _teacherCardsUrl();
+  var token = await _teacherToken();
+  if (!url || !token) return { data: null, error: { status: 401, error: 'unauthorized' } };
+  var body = { course_id: cid, items: items, request_id: _newEntryId() };
+  var got = await _askTeacherCards(url, token, body);
+  if (got.status === 0) got = await _askTeacherCards(url, token, body);
+  if (got.status === 401 && typeof refreshSupabaseSession === 'function') {
+    var renewed = null;
+    try {
+      renewed = await refreshSupabaseSession();
+    } catch (e) {
+      renewed = null;
+    }
+    var fresh = renewed && renewed.session && renewed.session.access_token;
+    if (fresh) got = await _askTeacherCards(url, fresh, body);
+    else if (typeof showSessionExpiredToast === 'function') showSessionExpiredToast();
+  }
+  var out = got.body;
+  if (got.status === 200 && out && typeof out.replayed === 'boolean' && Array.isArray(out.results)) {
+    return { data: { replayed: out.replayed, results: out.results }, error: null };
+  }
+  var error = got.status === 0 ? 'network' : (out && typeof out.error === 'string' && out.error) || 'server';
+  console.warn('teacher-cards failed:', got.status, error);
+  return { data: null, error: { status: got.status, error: error } };
+}
+
+/* Make a card for each of `items`: [{ enrollment_id, replaces }], where
+   `replaces` is the id of the card the caller believes is the student's
+   live one, or null for a student with none. The server stops that card
+   and makes the new one together, or answers `changed` when the student's
+   live card is another (a second tab got there first).
+
+   Answers { data: { results }, error }, each result
+     { enrollment_id, result: 'made' | 'changed' | 'not_found' | 'failed',
+       card_id, seq, works_until, code, password }
+   with card_id, seq and works_until for a card that was made, its code
+   (K7M4-QX2P) when it could be had, and its password only for a student
+   with no birthday or student number on file. The codes are the caller's
+   alone: nothing here keeps them.
+
+   A reply lost on the way back (the card-codes design, section 7): the
+   retry under the same request_id comes back `replayed`, with the new
+   cards' ids and no codes, since nothing ever kept them. Those cards are
+   then asked for again, each naming itself as the card to replace, and
+   their fresh codes are the answer. If that fails too, the card is
+   answered made with no code: it exists, unprinted, and the next Make and
+   Print replaces it. */
+function makeStudentCards(cid, items) {
+  if (!cid || !_gradesKept(cid)) return _cardsAnswer(null);
+  var asked = (Array.isArray(items) ? items : [])
+    .filter(function (it) {
+      return it && it.enrollment_id;
+    })
+    .map(function (it) {
+      return { enrollment_id: it.enrollment_id, replaces: it.replaces || null };
+    });
+  if (!asked.length) return _cardsAnswer(null);
+  if (!_writesEnabled()) return _cardsAnswer(_demoMakeCards(cid, asked));
   if (!_useSupabase || !_isUuid(cid)) return _cardsAnswer(null);
-  var ids = only ? only.filter(_isUuid) : null;
+  asked = asked.filter(function (it) {
+    return _isUuid(it.enrollment_id) && (it.replaces === null || _isUuid(it.replaces));
+  });
+  if (!asked.length) return _cardsAnswer(null);
   return _trackPendingSync(
-    _callRpcWithAuthGuard('issue_student_cards', {
-      p_course_id: cid,
-      p_enrollment_ids: ids && ids.length ? ids : null,
-      p_idempotency_key: _newEntryId(),
-    }).then(function (res) {
-      if (res && res.error && !res.error.handledSessionExpired) console.warn('issue_student_cards failed:', res.error);
-      var out = res && !res.error ? _rpcObject(res.data) : null;
-      return {
-        data: out ? { issued: Number(out.issued) || 0, cards: Array.isArray(out.cards) ? out.cards : [] } : null,
-        error: (res && res.error) || null,
-      };
-    }),
+    (async function () {
+      var first = await _teacherCardsRequest(cid, asked);
+      if (!first.data) return { data: null, error: first.error };
+      var results = first.data.results.slice();
+      var lost = results.filter(function (r) {
+        return r && r.result === 'made' && !r.code && _isUuid(r.card_id);
+      });
+      if (lost.length) {
+        var again = await _teacherCardsRequest(
+          cid,
+          lost.map(function (r) {
+            return { enrollment_id: r.enrollment_id, replaces: r.card_id };
+          }),
+        );
+        var fresh = {};
+        ((again.data && again.data.results) || []).forEach(function (r) {
+          if (r && r.result === 'made' && r.code) fresh[r.enrollment_id] = r;
+        });
+        results = results.map(function (r) {
+          return r && fresh[r.enrollment_id] && r.result === 'made' && !r.code ? fresh[r.enrollment_id] : r;
+        });
+      }
+      return { data: { results: results }, error: null };
+    })(),
   );
 }
 
@@ -15953,7 +16145,7 @@ window.GB = {
   getReturnedScores,
   returnGrades,
   listStudentCards,
-  issueStudentCards,
+  makeStudentCards,
   markStudentCardsPrinted,
   upsertScore,
   persistScoreDiffToCanonical,
