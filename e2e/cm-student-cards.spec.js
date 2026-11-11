@@ -508,3 +508,90 @@ test('Student Cards: Print New Card, New Codes for This Class, Unlock, with thei
   expect(await page.evaluate(() => localStorage.getItem('fv-sync-queue-v1'))).toBe(null);
   expect(errors).toEqual([]);
 });
+
+/* S3-F1 in Demo Mode: the filters, each with its count, and Cards Work
+   Until. No code on the page or the device. Set S3F2_SHOTS to a folder for
+   pictures of the whole page and of a filter. */
+test('Student Cards: the filters and Cards Work Until', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  page.on('console', m => {
+    if (m.type() === 'error') errors.push(m.text());
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const at = await demo(page);
+  await page.evaluate(cid => setStudentPageSwitch(cid, true), at.cid);
+  await page.goto('/dashboard?manage=student-page');
+  const card = page.locator('.sc-card');
+  const filters = card.getByRole('radiogroup', { name: 'Show' });
+  await expect(filters.getByRole('radio')).toHaveText([
+    'All ' + at.count,
+    'Not Printed ' + at.count,
+    'Locked 0',
+    'Never Opened 0',
+  ]);
+  await expect(filters.getByRole('radio', { name: /^All/ })).toHaveAttribute('aria-checked', 'true');
+
+  await catchPrints(page);
+  await card.getByRole('button', { name: 'Make and Print ' + at.count + ' Cards' }).click();
+  await expect.poll(async () => (await sheets(page)).length).toBe(1);
+  const [sheet] = await sheets(page);
+
+  // One card opened, one locked (as the student's page and five wrong tries would leave them).
+  await page.evaluate(cid => {
+    var kept = JSON.parse(localStorage.getItem('gb-student-cards-' + cid));
+    kept[0].last_opened_at = new Date().toISOString();
+    kept[1].locked_at = new Date().toISOString();
+    localStorage.setItem('gb-student-cards-' + cid, JSON.stringify(kept));
+  }, at.cid);
+  await page.goto('/dashboard?manage=student-page');
+  await expect(filters.getByRole('radio')).toHaveText([
+    'All ' + at.count,
+    'Not Printed 0',
+    'Locked 1',
+    'Never Opened ' + (at.count - 1),
+  ]);
+  if (F2_SHOTS) {
+    await page.setViewportSize({ width: 1280, height: 2200 });
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: F2_SHOTS + '/s3f1-page.png' });
+    await page.setViewportSize({ width: 1280, height: 900 });
+  }
+
+  await filters.getByRole('radio', { name: /^Locked/ }).click();
+  await expect(filters.getByRole('radio', { name: /^Locked/ })).toHaveAttribute('aria-checked', 'true');
+  await expect(filters.getByRole('radio', { name: /^Locked/ })).toBeFocused();
+  await expect(card.locator('.sc-name')).toHaveText([at.names[1]]);
+  if (F2_SHOTS) {
+    await page.waitForTimeout(300);
+    await card.screenshot({ path: F2_SHOTS + '/s3f1-filter-locked.png' });
+  }
+  await filters.getByRole('radio', { name: /^Not Printed/ }).click();
+  await expect(card.locator('.sc-table')).toHaveCount(0);
+  await expect(card.locator('.sc-empty')).toHaveText('Every student has a printed card.');
+  await filters.getByRole('radio', { name: /^Never Opened/ }).click();
+  await expect(card.locator('.sc-name')).toHaveCount(at.count - 1);
+  await expect(card.locator('.sc-name')).not.toContainText([at.names[0]]);
+  await filters.getByRole('radio', { name: /^All/ }).click();
+  await expect(card.locator('.sc-name')).toHaveText(at.names);
+
+  // Cards Work Until: the default, a chosen day on every card, and back.
+  const day = card.getByLabel('Cards Work Until');
+  const until = await page.evaluate(cid => getCardsWorkUntil(cid), at.cid);
+  await expect(day).toHaveValue(until.date);
+  await expect(card.locator('#sc-until-hint')).toContainText('A card stops opening after this day.');
+  await day.fill('2027-03-12');
+  await expect(card.locator('[data-action="spCardsWorkUntilDefault"]')).toBeVisible();
+  await expect(card.locator('#sc-until-hint')).toHaveText('A card stops opening after this day.');
+  expect((await savedCards(page, at.cid)).every(c => c.works_until === '2027-03-12')).toBe(true);
+  await page.reload();
+  await expect(page.locator('.sc-card').getByLabel('Cards Work Until')).toHaveValue('2027-03-12');
+  await page.locator('.sc-card [data-action="spCardsWorkUntilDefault"]').click();
+  await expect(page.locator('.sc-card').getByLabel('Cards Work Until')).toHaveValue(until.date);
+  await expect(page.locator('.sc-card [data-action="spCardsWorkUntilDefault"]')).toHaveCount(0);
+  expect((await savedCards(page, at.cid)).every(c => c.works_until === until.date)).toBe(true);
+
+  await noCodeKept(page, [sheet]);
+  expect(await page.evaluate(() => localStorage.getItem('fv-sync-queue-v1'))).toBe(null);
+  expect(errors).toEqual([]);
+});
