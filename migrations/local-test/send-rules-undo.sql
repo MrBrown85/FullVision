@@ -105,10 +105,12 @@ begin
             ('public._work_settle_files(uuid,jsonb)',                                               '215b8fe4cc3eada5c45e8c86c847ef19'),
             ('public._work_upload_json(uuid)',                                                      '63982ca7888b11ce9b80e962f674c98a'),
             ('public._submission_target_gone()',                                                    'f4f03a728aa0937ff0d89d9e5b62cc67'),
-            ('public._revision_state(uuid)',                                                        '808f6944ea937a32576729e48115e58d'),
+            ('public._revision_state(uuid)',                                                        '894bb53b0ad066e21f36c3a8038d5c6c'),
             ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)',                  '43ca2e50ff067a4fb51762367895ee84'),
             ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',                           'a04e2d62a76b00a7f6ad03a76a0ede74'),
-            ('public._markup_on_return()',                                                          'ce8ceaa830617aa9caf935b161d7e379')
+            ('public._revision_gone()',                                                             '13b5fb325c563a0475437829446ef089'),
+            ('public._markup_on_return()',                                                          'ce8ceaa830617aa9caf935b161d7e379'),
+            ('public._markup_on_release()',                                                         'a7e8838702d000c42621d72bf8621dfb')
             -- FINGERPRINTS-END
         ) as v(fn, md5)
     loop
@@ -531,10 +533,12 @@ begin
             ('public._work_settle_files(uuid,jsonb)',                                               '215b8fe4cc3eada5c45e8c86c847ef19'),
             ('public._work_upload_json(uuid)',                                                      '63982ca7888b11ce9b80e962f674c98a'),
             ('public._submission_target_gone()',                                                    'f4f03a728aa0937ff0d89d9e5b62cc67'),
-            ('public._revision_state(uuid)',                                                        '808f6944ea937a32576729e48115e58d'),
+            ('public._revision_state(uuid)',                                                        '894bb53b0ad066e21f36c3a8038d5c6c'),
             ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)',                  '43ca2e50ff067a4fb51762367895ee84'),
             ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',                           'a04e2d62a76b00a7f6ad03a76a0ede74'),
-            ('public._markup_on_return()',                                                          'ce8ceaa830617aa9caf935b161d7e379')
+            ('public._revision_gone()',                                                             '13b5fb325c563a0475437829446ef089'),
+            ('public._markup_on_return()',                                                          'ce8ceaa830617aa9caf935b161d7e379'),
+            ('public._markup_on_release()',                                                         'a7e8838702d000c42621d72bf8621dfb')
             -- FINGERPRINTS-END
         ) as v(fn, md5)
     loop

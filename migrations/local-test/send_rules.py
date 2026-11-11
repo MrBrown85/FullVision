@@ -75,10 +75,13 @@ RELIED = ['student_submit._work_window(uuid)', 'student_submit._grading_started(
           'public._work_begin(uuid,uuid,uuid,text,text,uuid,jsonb,text,text,boolean,uuid,uuid)', 'public._work_drop_expired(uuid)',
           'public._work_class_full(uuid,jsonb)', 'public._work_files_state(uuid,jsonb)', 'public._work_settle_files(uuid,jsonb)',
           'public._work_upload_json(uuid)', 'public._submission_target_gone()',
-          # Batch C as tested (b26cf1c7): what makes a version 2 and when a request is open (C1), and C2's trigger
-          # function. The new lines call none of them; listed so the file stops unless C1 and C2 are both in, as tested.
+          # Batch C as tested (round 3, a682b559): what makes a version 2 and when a request is open (C1), and C2's
+          # trigger functions. The new lines call none of them; listed so the file stops unless C1 and C2 are both in,
+          # as tested. C1's _revision_gone (round 3) runs when send_finish's join deletes a teacher's sent version 2;
+          # C2's _markup_on_release (round 3) pins C2's third round.
           'public._revision_state(uuid)', 'student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)',
-          'student_submit.revision_finish(text,uuid,uuid,jsonb,text)', 'public._markup_on_return()']
+          'student_submit.revision_finish(text,uuid,uuid,jsonb,text)', 'public._revision_gone()',
+          'public._markup_on_return()', 'public._markup_on_release()']
 BEGIN = re.compile(r'^([ \t]*)-- FINGERPRINTS-BEGIN[ \t]*(\w*)[^\n]*$', re.M)
 LISTS = re.compile(r'-- FINGERPRINTS-BEGIN[ \t]*(\w*)[^\n]*\n(.*?)\n[ \t]*-- FINGERPRINTS-END', re.S)
 last = lambda st: st.split('\n')[-1].strip().lower()

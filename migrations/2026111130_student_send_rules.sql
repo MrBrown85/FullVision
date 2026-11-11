@@ -3,7 +3,8 @@
 -- 2026111102_student_work_storage.sql (Batch B) and
 -- 2026111104_student_work_review_fixes.sql (its review fixes), all three on
 -- live, then Batch C's 2026111120_markup_reflect_revise.sql (C1) and
--- 2026111121_markup_revise_grade_changes.sql (C2), PR 1043 as of b26cf1c7.
+-- 2026111121_markup_revise_grade_changes.sql (C2), PR 1043 as of a682b559
+-- (its review round 3).
 -- None of those is changed. This file replaces three functions, adds one
 -- (section 4, its own commit, approved by Colin on Nov 11), and changes
 -- nothing else:
@@ -136,11 +137,14 @@
 -- exists and every function in the two lists below carries the fingerprint
 -- (md5(pg_get_functiondef), PostgreSQL 17) it has once the files above are
 -- applied: the three it replaces (or, on a second run, as this file leaves
--- them), the ones their new lines rely on, and four that pin Batch C as
--- tested (C1's _revision_state, revision_start and revision_finish, which
--- decide what a version 2 is and when a revision is open, and C2's trigger
--- function _markup_on_return; none is called here). So it stops on a
--- database with C1 and not C2, and on a Batch C other than the one tested.
+-- them), the ones their new lines rely on, and six that pin Batch C as
+-- tested, round 3 (C1's _revision_state, revision_start and revision_finish,
+-- which decide what a version 2 is and when a revision is open; C1's
+-- trigger function _revision_gone, which runs when send_finish's join
+-- deletes a teacher's sent version 2 and then finds no open request to
+-- settle; and C2's trigger functions _markup_on_return and
+-- _markup_on_release; none is called here). So it stops on a database with
+-- C1 and not C2, and on a Batch C other than the one tested.
 -- The lists are written by
 -- migrations/local-test/send_rules.py fingerprints, never by hand. Its last
 -- step checks that the three are as this file leaves them, the others
@@ -239,10 +243,12 @@ begin
             ('public._work_settle_files(uuid,jsonb)',                                               '215b8fe4cc3eada5c45e8c86c847ef19'),
             ('public._work_upload_json(uuid)',                                                      '63982ca7888b11ce9b80e962f674c98a'),
             ('public._submission_target_gone()',                                                    'f4f03a728aa0937ff0d89d9e5b62cc67'),
-            ('public._revision_state(uuid)',                                                        '808f6944ea937a32576729e48115e58d'),
+            ('public._revision_state(uuid)',                                                        '894bb53b0ad066e21f36c3a8038d5c6c'),
             ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)',                  '43ca2e50ff067a4fb51762367895ee84'),
             ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',                           'a04e2d62a76b00a7f6ad03a76a0ede74'),
-            ('public._markup_on_return()',                                                          'ce8ceaa830617aa9caf935b161d7e379')
+            ('public._revision_gone()',                                                             '13b5fb325c563a0475437829446ef089'),
+            ('public._markup_on_return()',                                                          'ce8ceaa830617aa9caf935b161d7e379'),
+            ('public._markup_on_release()',                                                         'a7e8838702d000c42621d72bf8621dfb')
             -- FINGERPRINTS-END
         ) as v(fn, md5)
     loop
@@ -791,10 +797,12 @@ begin
             ('public._work_settle_files(uuid,jsonb)',                                               '215b8fe4cc3eada5c45e8c86c847ef19'),
             ('public._work_upload_json(uuid)',                                                      '63982ca7888b11ce9b80e962f674c98a'),
             ('public._submission_target_gone()',                                                    'f4f03a728aa0937ff0d89d9e5b62cc67'),
-            ('public._revision_state(uuid)',                                                        '808f6944ea937a32576729e48115e58d'),
+            ('public._revision_state(uuid)',                                                        '894bb53b0ad066e21f36c3a8038d5c6c'),
             ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)',                  '43ca2e50ff067a4fb51762367895ee84'),
             ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',                           'a04e2d62a76b00a7f6ad03a76a0ede74'),
-            ('public._markup_on_return()',                                                          'ce8ceaa830617aa9caf935b161d7e379')
+            ('public._revision_gone()',                                                             '13b5fb325c563a0475437829446ef089'),
+            ('public._markup_on_return()',                                                          'ce8ceaa830617aa9caf935b161d7e379'),
+            ('public._markup_on_release()',                                                         'a7e8838702d000c42621d72bf8621dfb')
             -- FINGERPRINTS-END
         ) as v(fn, md5)
     loop
