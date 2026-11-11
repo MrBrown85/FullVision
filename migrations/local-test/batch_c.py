@@ -50,7 +50,7 @@ def busy(d, k):
 def apply1():
     d = CDb('apply1')
     try:
-        k = seed(d); t1, t2, sub, files = busy(d, k)
+        k = seed(d, reflect=False); t1, t2, sub, files = busy(d, k)
         before = catalog(d.c); cols = table_columns(d.c); rows = row_checksums(d.c, cols)
         page_before = d.page(t1, ENR1)
         # the guards: each stops the file with nothing changed
@@ -80,7 +80,7 @@ def apply1():
         after = catalog(d.c)
         gone, new = differences(before, after)
         # nothing that existed is changed: the only lines gone are counts that grew
-        allowed_gone = [l for l in gone if not (l.startswith('depends ') or l.startswith('comments on ') or l.startswith('internal triggers public.submission_file'))]
+        allowed_gone = [l for l in gone if not (l.startswith('depends ') or l.startswith('comments on ') or l.startswith('internal triggers submission_file '))]
         ok('apply1: no existing catalog line changes (functions, triggers, policies, grants, columns, constraints)', allowed_gone == [], allowed_gone[:5])
         ok('apply1: every existing function keeps its fingerprint',
            [l for l in before if l.startswith('function ')] == [l for l in after if l.startswith('function ') and any(l.split(' | ')[0] == b.split(' | ')[0] for b in before if b.startswith('function '))])
@@ -122,14 +122,15 @@ def apply1():
         ok('apply1: the file replaces no existing function (every create or replace names a new one)',
            all(fn.split('(')[0].lower() in [f.split('(')[0].lower() for f in C1_FUNCTIONS]
                for fn in re.findall(r'create or replace function ([\w.]+)\(', body)))
-        ok('apply1: the file updates and deletes no existing table (only its own, inside functions)',
-           not re.search(r'^\s*(update|delete from|insert into)\s+(public\.)?(score|grade_return|submission|enrollment|course|assessment)\b', body, re.M))
-        # it waits on a held assessment row and gives up with nothing applied
+        top = [bare(x).lower() for x in split(text_at(C1_USED))]
+        ok('apply1: no statement of the file writes a row (only its functions, when called, do)',
+           not [x for x in top if re.match(r'(update|delete|insert|truncate|merge)\b', x)], [x[:60] for x in top if re.match(r'(update|delete|insert)', x)])
+        # it waits on a reader of course and gives up with nothing applied
         d2 = CDb('apply1_lock')
         try:
-            o = d2.other(); o.run('begin'); o.run('select 1 from assessment for update')
+            o = d2.other(); o.run('begin'); o.run('select 1 from course limit 1')
             t0 = time.time(); r = d2.apply1(); dt = time.time() - t0
-            ok('apply1: an assessment row held by another session: it gives up at five seconds', r.startswith('STOPPED') and 4 <= dt < 15, (r, dt))
+            ok('apply1: a transaction reading course: it gives up at five seconds', r.startswith('STOPPED') and 4 <= dt < 15, (r, dt))
             o.run('rollback'); o.close()
             ok('apply1: and nothing was applied', d2.one("select to_regclass('public.markup') is null"))
         finally:
@@ -687,9 +688,10 @@ def apply2():
         ok('apply2: the pre-check is clean', postcheck(d, 'batch-c2-live-precheck.sql') == [], postcheck(d, 'batch-c2-live-precheck.sql'))
         r = d.apply2(); ok('apply2: the file applies', r == 'ok', r)
         after = catalog(d.c); gone, new = differences(before, after)
-        changed_fns = sorted({l.split(' ')[1].split(' |')[0] for l in gone if l.startswith('function ')})
-        ok('apply2: exactly the three stand-ins change', changed_fns == sorted(C2_REPLACES), changed_fns)
-        new_fns = sorted({l.split(' ')[1].split(' |')[0] for l in new if l.startswith('function ')} - set(C2_REPLACES))
+        fname = lambda l: l.split(' ', 1)[1].split('(')[0] + '()'
+        changed_fns = sorted({fname(l) for l in gone if l.startswith('function ') and not l.startswith('function more')})
+        ok('apply2: exactly the three stand-ins change', changed_fns == sorted(x.split('(')[0] + '()' for x in C2_REPLACES), changed_fns)
+        new_fns = sorted({fname(l) for l in new if l.startswith('function ') and not l.startswith('function more')} - set(changed_fns))
         ok('apply2: and one function is new', new_fns == C2_NEW, new_fns)
         new_trg = sorted(l.split(' | ')[1] for l in new if l.startswith('trigger ') and not l.startswith('trigger comment'))
         ok('apply2: and two triggers on grade_return', new_trg == ['markup_given_on_insert', 'markup_given_on_return'], new_trg)
@@ -750,6 +752,20 @@ def hide():
         r = d.rfr(k['lab'], ENR2, {'what_to_fix': 'x', 'keep_grade': False})
         c = d.rpc('cancel_revision(:r, :k)', r=r['request']['id'], k=nid())
         ok('hide: Take Back gives the grade back exactly', c['unhidden'] is True and gr(d, ENR2, k['lab']) == b2, (gr(d, ENR2, k['lab']), b2))
+        ok('hide: after Take Back the request no longer says hidden', c['request']['grade_hidden'] is False)
+        ok('hide: Take Back for one student leaves another\'s grade alone', piece(d.page(t1, ENR1), k['lab'])['grade']['value'] == 9)
+        # hidden while a draft sits on the returned grade (Return for Revision returns the work first, so only the
+        # helper itself can meet this): what comes back is what the student had, not the draft
+        d.score(ENR2, k['lab'], 5)
+        rid = d.one("insert into revision_request (course_id, assessment_id, enrollment_id, what_to_fix, keep_grade) values (:c, :a, :e, 'x', false) returning id",
+                    c=COURSE_A, a=k['lab'], e=ENR2)
+        ok('hide: the helper hides a grade that has a draft on it', d.one('select public._revision_hide_grade(:r)', r=rid) is True
+           and piece(d.page(t2, ENR2), k['lab'])['grade'] is None)
+        c = d.rpc('cancel_revision(:r, :k)', r=rid, k=nid())
+        ok('hide: taken back, the student has what they had (4) and the draft (5) still waits',
+           c['unhidden'] and piece(d.page(t2, ENR2), k['lab'])['grade']['value'] == 4 and gr(d, ENR2, k['lab'])[0][0] is True
+           and gr(d, ENR2, k['lab'])[0][2]['value'] == 4, gr(d, ENR2, k['lab']))
+        d.score(ENR2, k['lab'], 4); d.return_work(k['lab'], [ENR2]); b2 = gr(d, ENR2, k['lab'])
         # take back after the teacher changed the grade: the change waits as a draft on the old grade
         r = d.rfr(k['lab'], ENR2, {'what_to_fix': 'x', 'keep_grade': False})
         d.score(ENR2, k['lab'], 2)
@@ -795,6 +811,21 @@ def given():
         d.run("update course set return_grades = 'on_save' where id = :c", c=COURSE_A)
         d.score(ENR1, k['lab'], 6)
         ok('given: a save in a class that returns at once gives the marks', 'n1 later' in json.dumps(d.marks(t1, ENR1, k['lab'])))
+        # a draft change on a returned grade gives no marks
+        d.run("update course set return_grades = 'on_return' where id = :c", c=COURSE_A)
+        d.save_markup(files[0], marks('DRAFT-MARK'))
+        d.score(ENR1, k['lab'], 7)
+        ok('given: a draft change on a returned grade gives no marks', 'DRAFT-MARK' not in json.dumps(d.marks(t1, ENR1, k['lab'])))
+        # marks drawn while the class held grades, on a piece with no grade, then the first save in a class that returns at once
+        d.save_markup(files2[0], marks('BEFORE-GRADE'))
+        d.run('delete from score where enrollment_id = :e and assessment_id = :a', e=ENR2, a=k['lab'])
+        d.run("update course set return_grades = 'on_save' where id = :c", c=COURSE_A)
+        d.run("update markup set given = null, given_rev = null, given_at = null where file_id = :f", f=files2[0])
+        d.run("delete from grade_return where enrollment_id = :e and assessment_id = :a", e=ENR2, a=k['lab'])
+        d.score(ENR2, k['lab'], 4)
+        ok('given: a grade first returned (a new row) gives the marks', 'BEFORE-GRADE' in json.dumps(d.marks(t2, ENR2, k['lab'])))
+        for fn in C2_REPLACES + C2_NEW:
+            ok('given: nobody but the owner runs ' + fn, d.one("select not has_function_privilege('authenticated', to_regprocedure(:f), 'execute') and not has_function_privilege('service_role', to_regprocedure(:f), 'execute') and not has_function_privilege('anon', to_regprocedure(:f), 'execute')", f=fn))
         # a fault would stop saves: the trigger works for every writer (an owner's direct write)
         d.run("update course set return_grades = 'on_return' where id = :c", c=COURSE_A)
         d.run('update score set value = 2 where enrollment_id = :e and assessment_id = :a', e=ENR1, a=k['lab'])

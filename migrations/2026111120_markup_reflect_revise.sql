@@ -517,37 +517,55 @@ begin
 end;
 $function$;
 
--- Whether the second file is applied: a grade can be hidden during a
--- revision. This file's answer is no; C2 replaces it.
-create or replace function public._revision_hide_available()
+-- Three stand-ins the second file (C2) replaces. Made only when they are
+-- not there, so running this file again after C2 leaves C2's in place.
+--   _revision_hide_available()  whether a grade can be hidden during a
+--                               revision: here, no
+--   _revision_hide_grade(id)    hide the grade of a request from its
+--                               student (called under the class's lock):
+--                               here, nothing is hidden
+--   _revision_unhide_grade(id)  give a hidden grade back: here, there is
+--                               none to give
+do $stand_ins$
+begin
+    if to_regprocedure('public._revision_hide_available()') is null then
+        execute $f$
+create function public._revision_hide_available()
  returns boolean
  language sql
  immutable
  set search_path to 'public', 'pg_temp'
 as $function$
     select false;
-$function$;
-
--- Hide the grade of a revision request from its student (C2). This file's
--- version hides nothing. Called under the class's lock.
-create or replace function public._revision_hide_grade(p_request_id uuid)
+$function$
+        $f$;
+    end if;
+    if to_regprocedure('public._revision_hide_grade(uuid)') is null then
+        execute $f$
+create function public._revision_hide_grade(p_request_id uuid)
  returns boolean
  language sql
  stable
  set search_path to 'public', 'pg_temp'
 as $function$
     select false;
-$function$;
-
--- Give a hidden grade back (C2). This file's version has none to give.
-create or replace function public._revision_unhide_grade(p_request_id uuid)
+$function$
+        $f$;
+    end if;
+    if to_regprocedure('public._revision_unhide_grade(uuid)') is null then
+        execute $f$
+create function public._revision_unhide_grade(p_request_id uuid)
  returns boolean
  language sql
  stable
  set search_path to 'public', 'pg_temp'
 as $function$
     select false;
-$function$;
+$function$
+        $f$;
+    end if;
+end
+$stand_ins$;
 
 -- The student's handed-in work for one piece: the latest version first.
 -- (Batch B's tables; versions above 1 are revisions.)
