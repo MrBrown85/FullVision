@@ -4,8 +4,8 @@
 with made(fn, becomes) as (values
     -- FINGERPRINTS-BEGIN c2new (written by migrations/local-test/batch_c_fingerprints.py)
     ('public._revision_hide_available()',   'a4b4e942de351d6849702b96f25c7356'),
-    ('public._revision_hide_grade(uuid)',   '295f0e5f94eeb8492af2c205b641377b'),
-    ('public._revision_unhide_grade(uuid)', '3c0ff04195505dacf40b55217f8fe839'),
+    ('public._revision_hide_grade(uuid)',   'a4c3f002d3bb2fc01e58ec5b8dab8ecb'),
+    ('public._revision_unhide_grade(uuid)', '12dd830d953d13db1617e40a27f35133'),
     ('public._markup_on_return()',          '7aee1528f49c74565268dd37d191afd0')
     -- FINGERPRINTS-END
 )

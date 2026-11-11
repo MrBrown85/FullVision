@@ -11,8 +11,8 @@ with relied(fn, first_run, later_run) as (values
     ('public._grade_return_apply(uuid,uuid,jsonb,jsonb)',            '89899f9dbc1569f7f1cc4216e252eb32', '89899f9dbc1569f7f1cc4216e252eb32'),
     ('public._grade_return_one(uuid,uuid,timestamp with time zone)', '99e3165d005b5b2020ec40dcf307c689', '99e3165d005b5b2020ec40dcf307c689'),
     ('public._revision_hide_available()',                            'cd50f4c6493a73b3c42ae51f7580f970', 'a4b4e942de351d6849702b96f25c7356'),
-    ('public._revision_hide_grade(uuid)',                            '247080f6572bb45951cef807a2b849bd', '295f0e5f94eeb8492af2c205b641377b'),
-    ('public._revision_unhide_grade(uuid)',                          '26d2861325edf27f95d090ebd590eb0f', '3c0ff04195505dacf40b55217f8fe839'),
+    ('public._revision_hide_grade(uuid)',                            '247080f6572bb45951cef807a2b849bd', 'a4c3f002d3bb2fc01e58ec5b8dab8ecb'),
+    ('public._revision_unhide_grade(uuid)',                          '26d2861325edf27f95d090ebd590eb0f', '12dd830d953d13db1617e40a27f35133'),
     ('public._markup_on_return()',                                   'absent', '7aee1528f49c74565268dd37d191afd0')
     -- FINGERPRINTS-END
 )

@@ -232,8 +232,8 @@ begin
             ('public._markup_check(jsonb)',                                        'd5fac66f176bf8f23391a7c6c19b053a', 'd5fac66f176bf8f23391a7c6c19b053a'),
             ('public._markup_give(uuid,uuid)',                                     'f0f07a1b879ff038e2f0afe020233c29', 'f0f07a1b879ff038e2f0afe020233c29'),
             ('public._revision_hide_available()',                                  'cd50f4c6493a73b3c42ae51f7580f970', 'a4b4e942de351d6849702b96f25c7356'),
-            ('public._revision_hide_grade(uuid)',                                  '247080f6572bb45951cef807a2b849bd', '295f0e5f94eeb8492af2c205b641377b'),
-            ('public._revision_unhide_grade(uuid)',                                '26d2861325edf27f95d090ebd590eb0f', '3c0ff04195505dacf40b55217f8fe839'),
+            ('public._revision_hide_grade(uuid)',                                  '247080f6572bb45951cef807a2b849bd', 'a4c3f002d3bb2fc01e58ec5b8dab8ecb'),
+            ('public._revision_unhide_grade(uuid)',                                '26d2861325edf27f95d090ebd590eb0f', '12dd830d953d13db1617e40a27f35133'),
             ('public._piece_latest(uuid,uuid)',                                    'fee319ef4d87447eeac9b4d53a1f1b50', 'fee319ef4d87447eeac9b4d53a1f1b50'),
             ('public._revision_state(uuid)',                                       'd8103c802e246bfac948fa620d06fe09', 'd8103c802e246bfac948fa620d06fe09'),
             ('public._revision_json(uuid)',                                        '969f930b121a6714edfde8052a4d876b', '969f930b121a6714edfde8052a4d876b'),
@@ -414,16 +414,29 @@ create table if not exists public.revision_request (
     -- grading of the revision has started once the working copy differs.
     -- A fingerprint only: no grade is kept here.
     grade_mark    text,
-    -- The second file (C2) sets these when it hides the grade: what the
-    -- student had, so taking the request back can give it back.
+    -- Hide (the second file, C2). A hide is a stored fact with a beginning
+    -- and an end. grade_hidden is true from the moment the grade is hidden
+    -- until the hide ends, and never true again for this request.
+    -- hidden_state is what the student had been given when it began (the
+    -- grade_return row's returned_at, updated_at and previous_copy, and the
+    -- copy they were shown), kept there whatever the teacher does to the
+    -- score meanwhile, so Take Back can give it back. hide_ended_at and
+    -- hide_ended_by say when and how it ended: 'returned' (a Return gave
+    -- the student a grade for the piece), 'taken_back' (Take Back gave the
+    -- kept grade back) or 'undone' (the second file's undo did).
     grade_hidden  boolean     not null default false,
     hidden_state  jsonb,
+    hide_ended_at timestamptz,
+    hide_ended_by text        constraint revision_request_hide_ended_by_check check (hide_ended_by in ('returned', 'taken_back', 'undone')),
     created_by    uuid,
     created_at    timestamptz not null default now(),
     updated_at    timestamptz not null default now(),
     closed_at     timestamptz,
     constraint revision_request_first_grade_object check (first_grade is null or jsonb_typeof(first_grade) = 'object'),
-    constraint revision_request_closed_has_time check ((state = 'open') = (closed_at is null))
+    constraint revision_request_closed_has_time check ((state = 'open') = (closed_at is null)),
+    -- A hide that is on keeps what the student had, and has not ended.
+    constraint revision_request_hide_kept check (not grade_hidden or (hidden_state is not null and hide_ended_at is null)),
+    constraint revision_request_hide_ended_has_time check ((hide_ended_at is null) = (hide_ended_by is null))
 );
 -- One open request per student per piece.
 create unique index if not exists revision_request_one_open on public.revision_request (assessment_id, enrollment_id) where state = 'open';
@@ -2198,8 +2211,8 @@ begin
             ('public._markup_check(jsonb)',                                        'd5fac66f176bf8f23391a7c6c19b053a', 'd5fac66f176bf8f23391a7c6c19b053a'),
             ('public._markup_give(uuid,uuid)',                                     'f0f07a1b879ff038e2f0afe020233c29', 'f0f07a1b879ff038e2f0afe020233c29'),
             ('public._revision_hide_available()',                                  'cd50f4c6493a73b3c42ae51f7580f970', 'a4b4e942de351d6849702b96f25c7356'),
-            ('public._revision_hide_grade(uuid)',                                  '247080f6572bb45951cef807a2b849bd', '295f0e5f94eeb8492af2c205b641377b'),
-            ('public._revision_unhide_grade(uuid)',                                '26d2861325edf27f95d090ebd590eb0f', '3c0ff04195505dacf40b55217f8fe839'),
+            ('public._revision_hide_grade(uuid)',                                  '247080f6572bb45951cef807a2b849bd', 'a4c3f002d3bb2fc01e58ec5b8dab8ecb'),
+            ('public._revision_unhide_grade(uuid)',                                '26d2861325edf27f95d090ebd590eb0f', '12dd830d953d13db1617e40a27f35133'),
             ('public._piece_latest(uuid,uuid)',                                    'fee319ef4d87447eeac9b4d53a1f1b50', 'fee319ef4d87447eeac9b4d53a1f1b50'),
             ('public._revision_state(uuid)',                                       'd8103c802e246bfac948fa620d06fe09', 'd8103c802e246bfac948fa620d06fe09'),
             ('public._revision_json(uuid)',                                        '969f930b121a6714edfde8052a4d876b', '969f930b121a6714edfde8052a4d876b'),

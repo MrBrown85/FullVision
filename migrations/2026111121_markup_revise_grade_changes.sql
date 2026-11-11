@@ -92,8 +92,8 @@ begin
             ('public._grade_return_apply(uuid,uuid,jsonb,jsonb)',            '89899f9dbc1569f7f1cc4216e252eb32', '89899f9dbc1569f7f1cc4216e252eb32'),
             ('public._grade_return_one(uuid,uuid,timestamp with time zone)', '99e3165d005b5b2020ec40dcf307c689', '99e3165d005b5b2020ec40dcf307c689'),
             ('public._revision_hide_available()',                            'cd50f4c6493a73b3c42ae51f7580f970', 'a4b4e942de351d6849702b96f25c7356'),
-            ('public._revision_hide_grade(uuid)',                            '247080f6572bb45951cef807a2b849bd', '295f0e5f94eeb8492af2c205b641377b'),
-            ('public._revision_unhide_grade(uuid)',                          '26d2861325edf27f95d090ebd590eb0f', '3c0ff04195505dacf40b55217f8fe839'),
+            ('public._revision_hide_grade(uuid)',                            '247080f6572bb45951cef807a2b849bd', 'a4c3f002d3bb2fc01e58ec5b8dab8ecb'),
+            ('public._revision_unhide_grade(uuid)',                          '26d2861325edf27f95d090ebd590eb0f', '12dd830d953d13db1617e40a27f35133'),
             ('public._markup_on_return()',                                   'absent', '7aee1528f49c74565268dd37d191afd0')
             -- FINGERPRINTS-END
         ) as v(fn, first_run, later_run)
@@ -139,7 +139,7 @@ declare
     _copy jsonb;
 begin
     select * into _r from revision_request where id = p_request_id and state = 'open' for update;
-    if not found or _r.grade_hidden then
+    if not found or _r.grade_hidden or _r.hide_ended_at is not null then
         return false;
     end if;
     select * into _g from grade_return
@@ -154,10 +154,14 @@ begin
     if _copy is null then
         return false;
     end if;
+    -- The hide begins: what the student had is kept on the request, where
+    -- nothing the teacher does to the score can reach it.
     update revision_request
        set grade_hidden = true,
            hidden_state = jsonb_build_object('returned_at', _g.returned_at, 'updated_at', _g.updated_at,
+                                             'previous_copy', _g.previous_copy,
                                              'copy', _copy, 'hidden_at', clock_timestamp()),
+           hide_ended_at = null, hide_ended_by = null,
            updated_at = now()
      where id = _r.id;
     update grade_return
@@ -167,12 +171,14 @@ begin
 end;
 $function$;
 
--- The request is taken back while its grade is hidden: the student is
--- given back what they had. If the teacher has changed the grade since, the
--- change waits as a draft on it, as any change to a returned grade does.
--- If the grade was returned since (the hide is already over), nothing
--- changes. Called under the class's lock. Returns whether a grade was
--- given back.
+-- The request is taken back while its grade is hidden (the hide is on: it
+-- began and has not ended). The student is given back exactly what they
+-- had when it began, kept on the request; whatever the teacher has done to
+-- the score since (changed it, cleared it by any writer, Set Everyone To,
+-- a restore) waits as a draft on it, as any change to a returned grade
+-- does. Once a hide has ended (a Return gave the student a grade for the
+-- piece, or it was taken back), nothing is given back. The hide ends here.
+-- Called under the class's lock. Returns whether a grade was given back.
 create or replace function public._revision_unhide_grade(p_request_id uuid)
  returns boolean
  language plpgsql
@@ -181,7 +187,6 @@ create or replace function public._revision_unhide_grade(p_request_id uuid)
 as $function$
 declare
     _r   revision_request%rowtype;
-    _g   grade_return%rowtype;
     _h   jsonb;
     _now jsonb;
 begin
@@ -190,26 +195,25 @@ begin
         return false;
     end if;
     _h := _r.hidden_state;
-    update revision_request set grade_hidden = false, updated_at = now() where id = _r.id;
-    select * into _g from grade_return
+    update revision_request
+       set grade_hidden = false, hide_ended_at = clock_timestamp(), hide_ended_by = 'taken_back', updated_at = now()
+     where id = _r.id;
+    -- The row is there: no writer deletes it but the delete of its student
+    -- or piece, which takes this request with it.
+    perform 1 from grade_return
      where enrollment_id = _r.enrollment_id and assessment_id = _r.assessment_id
        for update;
-    if not found or not _g.is_draft or _g.returned_at is not null or _h is null then
-        -- returned since, or the row is gone: the hide is over
+    if not found then
         return false;
     end if;
     _now := _grade_copy(_r.enrollment_id, _r.assessment_id);
-    if _now is not distinct from _h->'copy' then
-        update grade_return
-           set is_draft = false, returned_at = (_h->>'returned_at')::timestamptz,
-               updated_at = (_h->>'updated_at')::timestamptz, returned_copy = null
-         where enrollment_id = _r.enrollment_id and assessment_id = _r.assessment_id;
-    else
-        update grade_return
-           set is_draft = true, returned_at = (_h->>'returned_at')::timestamptz,
-               updated_at = (_h->>'updated_at')::timestamptz, returned_copy = _h->'copy'
-         where enrollment_id = _r.enrollment_id and assessment_id = _r.assessment_id;
-    end if;
+    update grade_return
+       set is_draft = _now is distinct from _h->'copy',
+           returned_at = (_h->>'returned_at')::timestamptz,
+           updated_at = (_h->>'updated_at')::timestamptz,
+           previous_copy = nullif(_h->'previous_copy', 'null'::jsonb),
+           returned_copy = case when _now is distinct from _h->'copy' then _h->'copy' end
+     where enrollment_id = _r.enrollment_id and assessment_id = _r.assessment_id;
     return true;
 end;
 $function$;
@@ -253,8 +257,8 @@ begin
         select * from (values
             -- FINGERPRINTS-BEGIN c2new (written by migrations/local-test/batch_c_fingerprints.py)
             ('public._revision_hide_available()',   'a4b4e942de351d6849702b96f25c7356'),
-            ('public._revision_hide_grade(uuid)',   '295f0e5f94eeb8492af2c205b641377b'),
-            ('public._revision_unhide_grade(uuid)', '3c0ff04195505dacf40b55217f8fe839'),
+            ('public._revision_hide_grade(uuid)',   'a4c3f002d3bb2fc01e58ec5b8dab8ecb'),
+            ('public._revision_unhide_grade(uuid)', '12dd830d953d13db1617e40a27f35133'),
             ('public._markup_on_return()',          '7aee1528f49c74565268dd37d191afd0')
             -- FINGERPRINTS-END
         ) as v(fn, becomes)

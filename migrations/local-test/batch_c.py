@@ -966,7 +966,7 @@ def apply2():
         before = catalog(d.c); rows = row_checksums(d.c)
         for name, sql in [('a stand-in not as C1 left it', "create or replace function public._revision_hide_grade(p_request_id uuid) returns boolean language sql stable set search_path to 'public', 'pg_temp' as $f$ select true; $f$"),
                           ('_markup_give changed', "create or replace function public._markup_give(p_enrollment_id uuid, p_assessment_id uuid) returns integer language plpgsql security definer set search_path to 'public', 'pg_temp' as $f$ begin return 0; end; $f$"),
-                          ('a hidden grade already marked', "update revision_request set grade_hidden = true")]:
+                          ('a hidden grade already marked', "update revision_request set grade_hidden = true, hidden_state = '{}'")]:
             d.begin(); d.run(sql)
             r = d.statements(split(text_at(C2_USED))); d.in_tx = False
             ok('apply2: the guard stops on ' + name, r.startswith('STOPPED') and d.at == 2, r)
