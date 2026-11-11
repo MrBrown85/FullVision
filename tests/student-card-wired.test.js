@@ -1168,8 +1168,8 @@ describe('two pieces with the same date: the one made later counts later', () =>
 
 /* The nine keys S4-M1 added to the page (migrations/local-test/
    s4-m1-contract.md). The database sends them; the function's allow-list
-   passes them once its lists name them (PR 1050), and drops them until
-   then. Demo Mode sends them, as the database does. */
+   passes eight and never the teacher's name (DECISIONS, Nov 11). Demo Mode
+   sends them, as the database does. */
 const S4M1 = {
   course: ['teacher_name'],
   classes: ['to_do'],
@@ -1225,11 +1225,14 @@ describe('Demo Mode and a real card cannot drift', () => {
     // The sample class's reply before anything was opened (the walk above has opened its own).
     const sent = realIds(openStudentPage().T.demoPage(system));
     // The allow-list drops nothing the list reads: only the class id Demo Mode adds, and the
-    // nine S4-M1 keys all together while the function's lists do not name them (none, once they do).
+    // teacher's name, which the function never sends (DECISIONS, Nov 11). The other eight
+    // S4-M1 keys pass.
     const passed = cardReply(CARD_ROUTES.page, sent);
     const dropped = JSON.parse(JSON.stringify(sent));
     delete dropped.course.id;
-    expect([dropped, withoutS4M1(dropped)]).toContainEqual(passed);
+    expect(dropped.course.teacher_name).toBeTruthy();
+    delete dropped.course.teacher_name;
+    expect(passed).toEqual(dropped);
     expect(withoutS4M1(dropped)).not.toEqual(dropped);
 
     const dev = school({ card: { page: sent } });

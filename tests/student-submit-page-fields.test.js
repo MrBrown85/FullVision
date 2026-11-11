@@ -1,10 +1,11 @@
 /**
- * S4-W1: the nine keys S4-M1 adds to a student's page reach the phone
- * through the student-submit edge function
+ * S4-W1: eight of the nine keys S4-M1 adds to a student's page reach the
+ * phone through the student-submit edge function
  * (supabase/functions/student-submit/card-routes.ts), and nothing else does.
+ * The ninth, course.teacher_name, is never sent: students do not see the
+ * teacher's name (DECISIONS, Nov 11), whatever the database sends.
  *
  * The contract is migrations/local-test/s4-m1-contract.md:
- *   course.teacher_name                 text or null
  *   tags.<id>.i_can                     list of text
  *   rubrics[].criteria[].tag_ids        list of tag ids
  *   assessments[].description           text or null
@@ -158,9 +159,9 @@ const OLD_PAGE = {
   ],
 };
 
-// The same page once S4-M1 is applied: the contract's worked example.
+// The same page once S4-M1 is applied, as the phone gets it: the contract's
+// worked example, without the teacher's name.
 const NEW_PAGE = clone(OLD_PAGE);
-NEW_PAGE.course.teacher_name = 'Ms. Okafor';
 NEW_PAGE.classes[0].to_do = 2;
 NEW_PAGE.classes[1].to_do = 0;
 NEW_PAGE.tags[TAG].i_can = ['I can ask a question that can be tested.', 'I can say what I expect to happen.'];
@@ -190,6 +191,10 @@ Object.assign(NEW_PAGE.assessments[2], {
   category_percent: 0,
   core_competencies: [],
 });
+
+// What the database sends for that page: the same, with the teacher's name.
+const FROM_DATABASE = clone(NEW_PAGE);
+FROM_DATABASE.course.teacher_name = 'Ms. Okafor';
 
 const OLD_VERIFIED = {
   ok: true,
@@ -240,11 +245,10 @@ async function phone(reply) {
 }
 
 describe('student-submit: the S4-M1 keys reach the phone', () => {
-  it('hands on all nine when the database sends them, as it sent them', async () => {
-    const { text } = await phone(NEW_PAGE);
+  it('hands on all eight when the database sends them, as it sent them', async () => {
+    const { text } = await phone(FROM_DATABASE);
     const page = JSON.parse(text);
     expect(page).toEqual(NEW_PAGE);
-    expect(page.course.teacher_name).toBe('Ms. Okafor');
     expect(page.classes.map(c => c.to_do)).toEqual([2, 0]);
     expect(page.tags[TAG].i_can).toEqual(NEW_PAGE.tags[TAG].i_can);
     expect(page.tags[TAG_2].i_can).toEqual([]);
@@ -267,7 +271,6 @@ describe('student-submit: the S4-M1 keys reach the phone', () => {
 
   it('keeps text as it is stored: no trimming, blanks and order kept', async () => {
     const sent = clone(NEW_PAGE);
-    sent.course.teacher_name = '  Colin Brown ';
     sent.tags[TAG].i_can = ['', ' I can ask.', 'I can ask.', 'I can ask.'];
     sent.assessments[0].description = 'Line one.\n\n  Line two.';
     sent.assessments[0].category_percent = 33.5;
@@ -276,7 +279,7 @@ describe('student-submit: the S4-M1 keys reach the phone', () => {
   });
 
   it('logs route, outcome and time only: none of the new values', async () => {
-    const { logs } = await phone(NEW_PAGE);
+    const { logs } = await phone(FROM_DATABASE);
     expect(logs).toEqual([{ route: 'page', outcome: 'ok', ms: expect.any(Number) }]);
     const text = JSON.stringify(logs);
     for (const value of ['Okafor', 'I can', 'density', 'Unit 1', 'Projects', 'Communicating', 'COM', TAG, TAG_2]) {
@@ -307,8 +310,15 @@ describe('student-submit: a wrong type from the database is never passed on', ()
     }
   }
 
-  it('teacher_name: text or null', async () => {
-    await check((p, v) => (p.course.teacher_name = v), null, NOT_TEXT);
+  it('teacher_name: never sent, whatever the database sends', async () => {
+    for (const value of ['Ms. Okafor', '  Colin Brown ', '', null, ...NOT_TEXT]) {
+      const sent = clone(NEW_PAGE);
+      sent.course.teacher_name = value === undefined ? null : value;
+      const { text } = await phone(sent);
+      expect(JSON.parse(text), JSON.stringify(value)).toEqual(NEW_PAGE);
+      expect(text, JSON.stringify(value)).not.toContain('teacher_name');
+      for (const leak of ['Okafor', 'Colin Brown', 'DRAFT-ONLY']) expect(text, leak).not.toContain(leak);
+    }
   });
 
   it('description, module_name and category_name: text or null', async () => {
@@ -457,7 +467,6 @@ describe('student-submit: a reply from before S4-M1 reads as it did', () => {
 
   it('the new keys change nothing else: the new page minus them is the old page', async () => {
     const page = JSON.parse((await phone(NEW_PAGE)).text);
-    delete page.course.teacher_name;
     page.classes.forEach(c => delete c.to_do);
     Object.values(page.tags).forEach(t => delete t.i_can);
     page.rubrics.forEach(r => r.criteria.forEach(c => delete c.tag_ids));

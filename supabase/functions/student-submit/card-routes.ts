@@ -222,7 +222,8 @@ function course(v: unknown): Json {
   return {
     ...pick(c, ['name', 'block', 'grading_system', 'level_order', 'round_percent']),
     grading_scale: isObject(c.grading_scale) ? c.grading_scale : null,
-    ...typed(c, ['teacher_name'], textOrNull),
+    // teacher_name is never copied: students do not see the teacher's name
+    // (DECISIONS, Nov 11). The database may send it; it stops here.
   };
 }
 
