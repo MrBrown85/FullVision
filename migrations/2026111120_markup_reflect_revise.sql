@@ -2,9 +2,10 @@
 -- switch: the part that only adds (2026-11-11). Student page build plan,
 -- Batch C, first file (C1): S9-M1, S10-M1, S11-M1, S12-M1 and S13's column.
 -- docs/plans/student-page-build-plan.md 1.6 and slices S9 to S13;
--- DECISIONS, "Grades, photos and sign-in on the student page" 4, 10 and 11,
--- "Student page build answers" 6 (a grade hidden during a revision is a
--- draft). What the edge routes and the browser code against is
+-- DECISIONS, "Grades, photos and sign-in on the student page" 4, 10 and 11.
+-- Hiding a grade during a revision ("Student page build answers" 6) is not
+-- in Batch C (Colin, Nov 11: it comes later as its own change); Return for
+-- Revision keeps the grade. What the edge routes and the browser code against is
 -- migrations/local-test/batch-c-contract.md.
 --
 -- BATCH C APPLIES ONLY AFTER BATCH B (2026111101, 2026111102): it builds
@@ -12,13 +13,14 @@
 -- check stops it, with nothing changed, if Batch B is not there or not the
 -- version it was tested with.
 --
--- The second file, 2026111121_markup_revise_grade_changes.sql (C2), holds
--- the two things that change how a grade is returned or stored. It waits
--- for the owner's review. This file works without it: with this file alone
--- a teacher cannot hide a grade during a revision (the call answers
--- hide_not_available and changes nothing), and marks reach a student only
--- when the teacher's screen returns work through return_work (or saves them
--- in a class that returns grades as soon as they are saved).
+-- The second file, 2026111121_markup_revise_grade_changes.sql (C2), adds a
+-- trigger inside every Return: it gives the marks and stores a finished
+-- revision request as done whatever path returned the grade. It waits for
+-- the owner's review. This file works without it: marks reach a student
+-- only when the teacher's screen returns work through return_work (or
+-- saves them in a class that returns grades as soon as they are saved).
+-- With either file a request for Hide (keep_grade false) answers
+-- hide_not_available and changes nothing.
 --
 -- ── What it adds ────────────────────────────────────────────────────────────
 -- 1. Two class switches, each off: course.reflect_on_feedback (Reflect on
@@ -33,13 +35,20 @@
 --    row goes with its page (a foreign key to submission_file, on delete
 --    cascade), so a page the student unsent takes its marks with it.
 -- 3. public.revision_request: Return for Revision. What to Fix, Revise By,
---    which criteria, Keep or Hide the grade, the version it was asked of,
+--    which criteria, Keep the grade (always, in Batch C), the version it was asked of,
 --    and that version's grade as the student had it (for Before and
 --    After). A revision is the next version of the piece's submission
---    (Batch B's version column): version 2, then 3.
+--    (Batch B's version column): version 2, then 3. A request is closed
+--    as done, a stored fact, once its revision's grade is returned, or
+--    once the teacher returns the student's work with the revision in
+--    (return_work), even at the same grade; nothing done to the work or
+--    the grade afterwards opens it again (_revision_settle).
 -- 4. public.feedback_reflection: Reflect on Feedback. Does the feedback make
 --    sense, the question, the plan, what went well; the teacher's answer;
 --    Does It Make Sense Now, and one follow-up question and its answer.
+--    The teacher's Only Me notes (note, follow_up_note) are kept apart
+--    from the answers: no function a student calls reads them, and a real
+--    answer can still be sent after one.
 -- 5. Triggers on assessment and enrollment, as Batch B has: when one is
 --    deleted, its revision requests and reflections go, under the class's
 --    lock. (Marks go with their pages, which Batch B's triggers delete.)
@@ -83,13 +92,13 @@
 --
 -- ── What a student is never sent ────────────────────────────────────────────
 -- markup.working (only markup.given); a reflection's answer before the
--- teacher sends it, or one the teacher kept to themselves (Only Me);
+-- teacher sends it, or the teacher's Only Me notes, or that there is one;
 -- another student's name; another student's enrollment
 -- id as a field (a group-mate's page path, which the edge function turns
 -- into a link, has that student's enrollment id in it: an opaque id, never
 -- a name); a grade other than their own returned one
 -- (revision_request.first_grade is the copy they were given, cut to what
--- the work's scoring uses now, and not sent while the grade is hidden).
+-- the work's scoring uses now).
 --
 -- ── What it does to existing rows ───────────────────────────────────────────
 -- Nothing. Every class gets Reflect on Feedback and Show My Learning off.
@@ -100,7 +109,7 @@
 --
 -- ── What it changes in what exists ──────────────────────────────────────────
 -- ONE EXISTING FUNCTION IS REPLACED: Batch B's student_submit._grading_started
--- (section 2b; the owner has not decided it): a page carrying the teacher's
+-- (section 2b; Colin decided it, ruling 109): a page carrying the teacher's
 -- marks counts as grading started, so the student can no longer Unsend or
 -- Replace it. Batch B's text is kept and one condition added.
 -- course gains two columns (a constant default: no rewrite). assessment and
@@ -222,8 +231,7 @@ begin
     end loop;
 
     -- A first run: none of this file's names may be taken. A later run:
-    -- each function is as this file leaves it, or (for the three C2
-    -- replaces) as C2 leaves it.
+    -- each function is as this file leaves it (C2 replaces none of them).
     for _f in
         select * from (values
             -- FINGERPRINTS-BEGIN new (written by migrations/local-test/batch_c_fingerprints.py)
@@ -231,31 +239,29 @@ begin
             ('public._work_feedback_truncated()',                                  '450e3b27b73c51d01f4c431adb402bbd', '450e3b27b73c51d01f4c431adb402bbd'),
             ('public._markup_check(jsonb)',                                        'd5fac66f176bf8f23391a7c6c19b053a', 'd5fac66f176bf8f23391a7c6c19b053a'),
             ('public._markup_give(uuid,uuid)',                                     'f0f07a1b879ff038e2f0afe020233c29', 'f0f07a1b879ff038e2f0afe020233c29'),
-            ('public._revision_hide_available()',                                  'cd50f4c6493a73b3c42ae51f7580f970', 'a4b4e942de351d6849702b96f25c7356'),
-            ('public._revision_hide_grade(uuid)',                                  '247080f6572bb45951cef807a2b849bd', '295f0e5f94eeb8492af2c205b641377b'),
-            ('public._revision_unhide_grade(uuid)',                                '26d2861325edf27f95d090ebd590eb0f', '3c0ff04195505dacf40b55217f8fe839'),
             ('public._piece_latest(uuid,uuid)',                                    'fee319ef4d87447eeac9b4d53a1f1b50', 'fee319ef4d87447eeac9b4d53a1f1b50'),
-            ('public._revision_state(uuid)',                                       'd8103c802e246bfac948fa620d06fe09', 'd8103c802e246bfac948fa620d06fe09'),
-            ('public._revision_json(uuid)',                                        '969f930b121a6714edfde8052a4d876b', '969f930b121a6714edfde8052a4d876b'),
-            ('public._reflection_json(uuid)',                                      '89f6847f6ab6a468284ea1df003391a6', '89f6847f6ab6a468284ea1df003391a6'),
+            ('public._revision_state(uuid)',                                       '808f6944ea937a32576729e48115e58d', '808f6944ea937a32576729e48115e58d'),
+            ('public._revision_settle(uuid,uuid,boolean)',                         '5abc02afbaa29294cdb317838657b37c', '5abc02afbaa29294cdb317838657b37c'),
+            ('public._revision_json(uuid)',                                        '4ea85d4b58243fc0d6512b31ac6d165e', '4ea85d4b58243fc0d6512b31ac6d165e'),
+            ('public._reflection_json(uuid)',                                      'f089277294adaf7d7834b41a1e93d5fa', 'f089277294adaf7d7834b41a1e93d5fa'),
             ('public.set_course_feedback_options(uuid,jsonb,uuid)',                '1954af2eef430d63baa91d38e74106d2', '1954af2eef430d63baa91d38e74106d2'),
             ('public.save_markup(uuid,jsonb,integer,uuid)',                        '808290a14511b137bc5c1a4574016429', '808290a14511b137bc5c1a4574016429'),
             ('public.list_assessment_markup(uuid)',                                '5e64579a923a0f0c02791b6428e54d98', '5e64579a923a0f0c02791b6428e54d98'),
-            ('public.return_work(uuid,uuid[],uuid)',                               '9175f90ed1158790acef376c98319295', '9175f90ed1158790acef376c98319295'),
-            ('public.return_for_revision(uuid,uuid,jsonb,uuid)',                   'f66c0fdd60dd969203a345125280d760', 'f66c0fdd60dd969203a345125280d760'),
+            ('public.return_work(uuid,uuid[],uuid)',                               '13f1d5ec77567d5909c49c493ad77b64', '13f1d5ec77567d5909c49c493ad77b64'),
+            ('public.return_for_revision(uuid,uuid,jsonb,uuid)',                   '0f3cc087f25815ba377919f68b870f36', '0f3cc087f25815ba377919f68b870f36'),
             ('public.set_revision_request(uuid,jsonb,uuid)',                       '6f9fb14cc1c8ced04cca7e0302c40b13', '6f9fb14cc1c8ced04cca7e0302c40b13'),
-            ('public.cancel_revision(uuid,uuid)',                                  '03f508a459eb621f868b699a0ea3f076', '03f508a459eb621f868b699a0ea3f076'),
-            ('public.answer_reflection(uuid,text,uuid,boolean)',                   'b384f9b1c729f42733db290a0f4ddae5', 'b384f9b1c729f42733db290a0f4ddae5'),
+            ('public.cancel_revision(uuid,uuid)',                                  '15fb7d84333ed19b362e778b6667f377', '15fb7d84333ed19b362e778b6667f377'),
+            ('public.answer_reflection(uuid,text,uuid,boolean)',                   '3dc0da991f10c092ae0a80202310d56f', '3dc0da991f10c092ae0a80202310d56f'),
             ('public.list_course_feedback(uuid)',                                  '7fbe6b367a0c28fd4dd2b894f0dc7711', '7fbe6b367a0c28fd4dd2b894f0dc7711'),
             ('student_submit._group_members(uuid,uuid)',                           'b38b1af6f2dc142c94ce1cca454fd0fb', 'b38b1af6f2dc142c94ce1cca454fd0fb'),
-            ('student_submit.feedback(text,uuid,text)',                            'c45a01cc31eab1111dc89994008ba4d4', 'c45a01cc31eab1111dc89994008ba4d4'),
+            ('student_submit.feedback(text,uuid,text)',                            '4ee8ebfb4b2af25698d2fb3eafc7f9ea', '4ee8ebfb4b2af25698d2fb3eafc7f9ea'),
             ('student_submit.markup(text,uuid,uuid,text)',                         '6cc78118aa4e98252514826aabf957a9', '6cc78118aa4e98252514826aabf957a9'),
             ('student_submit.reflect(text,uuid,uuid,jsonb,text)',                  '7a4e2ab29d369ef159dce65e1e1e8f77', '7a4e2ab29d369ef159dce65e1e1e8f77'),
-            ('student_submit.reply(text,uuid,uuid,jsonb,text)',                    '51e8f1db4f92885e8e310b255fa7aa70', '51e8f1db4f92885e8e310b255fa7aa70'),
-            ('student_submit.answer_seen(text,uuid,uuid[],text)',                  'a32cc8e5329954ac909969269afc2518', 'a32cc8e5329954ac909969269afc2518'),
-            ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)', 'aa5207487f67fe4fbc7dcbf803276f6b', 'aa5207487f67fe4fbc7dcbf803276f6b'),
-            ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',          'a86921ac1689264c2db5dea1e081f276', 'a86921ac1689264c2db5dea1e081f276'),
-            ('student_submit.revision_unsend(text,uuid,uuid,text)',                '763f31c96e1ee07ac5477762db0f7784', '763f31c96e1ee07ac5477762db0f7784'),
+            ('student_submit.reply(text,uuid,uuid,jsonb,text)',                    '264a736a722cf19022c20c343ecb01fb', '264a736a722cf19022c20c343ecb01fb'),
+            ('student_submit.answer_seen(text,uuid,uuid[],text)',                  'da85d013a0511618c989d7bb44eac2f3', 'da85d013a0511618c989d7bb44eac2f3'),
+            ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)', '43ca2e50ff067a4fb51762367895ee84', '43ca2e50ff067a4fb51762367895ee84'),
+            ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',          'a04e2d62a76b00a7f6ad03a76a0ede74', 'a04e2d62a76b00a7f6ad03a76a0ede74'),
+            ('student_submit.revision_unsend(text,uuid,uuid,text)',                '73ac162e56dde98d11ffcd03aa4b5ffa', '73ac162e56dde98d11ffcd03aa4b5ffa'),
             ('student_submit.group_work(text,uuid,text)',                          '1db83448b1b3d7ae998870bdb07c4f36', '1db83448b1b3d7ae998870bdb07c4f36'),
             ('student_submit.group_file_links(text,uuid,uuid,text)',               '1c034fa5647b5808209b0ef9b31e8e4d', '1c034fa5647b5808209b0ef9b31e8e4d')
             -- FINGERPRINTS-END
@@ -352,7 +358,7 @@ comment on table public.markup is
     'Mark Up: drawing data over one page of handed-in work. working is the teacher''s; given is what the student was given when the work was returned. Read and written only through the functions of 2026111120.';
 
 -- ── 2b. Marks count as grading started ──────────────────────────────────────
--- THE OWNER HAS NOT DECIDED THIS (it is the one replaced function in this
+-- COLIN DECIDED THIS ON NOV 11 (ruling 109) (it is the one replaced function in this
 -- file; the commit that adds it can be taken out on its own). Batch B's
 -- student_submit._grading_started (2026111101) says the teacher has
 -- started grading a student's work when the piece holds a draft or a
@@ -392,15 +398,17 @@ create table if not exists public.revision_request (
     enrollment_id uuid        not null,
     -- open: waiting for a revision, or one is in and its grade is not yet
     -- returned (which of the two is read from the submissions, not kept).
-    -- done: the revision's grade was returned. cancelled: the teacher took
-    -- the request back.
+    -- done: the revision's grade was returned, kept as a stored fact
+    -- (_revision_settle) so nothing done to the work or the grade later
+    -- opens it again. cancelled: the teacher took the request back.
     state         text        not null default 'open' constraint revision_request_state_check check (state in ('open', 'done', 'cancelled')),
     what_to_fix   text        not null constraint revision_request_what_to_fix_check check (char_length(what_to_fix) between 1 and 2000),
     revise_by     date,
     criterion_ids uuid[]      not null default '{}',
-    -- Keep this grade (true) or hide it from the student until the new
-    -- version is graded (false). Hiding is the second file's (C2).
-    keep_grade    boolean     not null default true,
+    -- Keep this grade while the student revises. Always true in Batch C:
+    -- a request to hide it is refused (hide_not_available). The column
+    -- keeps the request's shape for a later change that adds Hide.
+    keep_grade    boolean     not null default true constraint revision_request_keep_grade_check check (keep_grade),
     -- The version it was asked of: the piece's latest handed-in submission
     -- then (null when nothing was handed in: work on paper, graded as such).
     first_submission_id uuid,
@@ -414,10 +422,15 @@ create table if not exists public.revision_request (
     -- grading of the revision has started once the working copy differs.
     -- A fingerprint only: no grade is kept here.
     grade_mark    text,
-    -- The second file (C2) sets these when it hides the grade: what the
-    -- student had, so taking the request back can give it back.
-    grade_hidden  boolean     not null default false,
-    hidden_state  jsonb,
+    -- When the revision now in came in (revision_finish; cleared by
+    -- revision_unsend), and the grade_return row's returned_at as it was
+    -- then, both written under the class's lock. Every Return writes
+    -- returned_at under that lock too, so a Return after the revision came
+    -- in is one that has changed returned_at since: no two clocks are
+    -- compared. A grade so returned has returned the revision, even once
+    -- the revision's photos are deleted.
+    revision_in_at timestamptz,
+    in_returned_at timestamptz,
     created_by    uuid,
     created_at    timestamptz not null default now(),
     updated_at    timestamptz not null default now(),
@@ -431,7 +444,7 @@ create index if not exists revision_request_assessment_idx on public.revision_re
 create index if not exists revision_request_enrollment_idx on public.revision_request (enrollment_id);
 create index if not exists revision_request_course_idx on public.revision_request (course_id);
 comment on table public.revision_request is
-    'Return for Revision: what to fix, by when, which criteria, keep or hide the grade, and the first version''s grade for Before and After. Read and written only through the functions of 2026111120 (and 2026111121''s hide).';
+    'Return for Revision: what to fix, by when, which criteria, and the first version''s grade for Before and After. Read and written only through the functions of 2026111120 (and closed as done by 2026111121''s trigger).';
 
 -- ── 4. feedback_reflection ──────────────────────────────────────────────────
 create table if not exists public.feedback_reflection (
@@ -448,11 +461,18 @@ create table if not exists public.feedback_reflection (
     plan_at       timestamptz,
     went_well     text        constraint feedback_reflection_went_well_check check (char_length(went_well) <= 1000),
     sent_at       timestamptz not null default now(),
-    -- The teacher's answer (Send Answer). Sent to the student once written,
-    -- unless the teacher kept it to themselves (answer_only_me: Only Me).
+    -- The teacher's answer (Send Answer): always sent to the student.
     answer        text        constraint feedback_reflection_answer_check check (char_length(answer) <= 2000),
     answered_at   timestamptz,
-    answer_only_me boolean    not null default false,
+    -- The teacher's Only Me note on the reflection: theirs alone. It is
+    -- never sent, and no function a student calls reads it, so nothing a
+    -- student is told differs for a reflection with a note. It is not an
+    -- answer: a real answer can still be sent, and the student can still
+    -- change their reflection. It clears the question from the teacher's
+    -- list until the student changes the reflection (sent_at after
+    -- noted_at).
+    note          text        constraint feedback_reflection_note_check check (char_length(note) <= 2000),
+    noted_at      timestamptz,
     -- When the student's page showed the answer (answer_seen: What Changed's
     -- "answered your question" until then).
     answer_seen_at timestamptz,
@@ -462,13 +482,18 @@ create table if not exists public.feedback_reflection (
     follow_up     text        constraint feedback_reflection_follow_up_check check (char_length(follow_up) <= 1000),
     follow_up_answer text     constraint feedback_reflection_follow_up_answer_check check (char_length(follow_up_answer) <= 2000),
     follow_up_answered_at timestamptz,
-    follow_up_only_me boolean not null default false,
+    -- The teacher's Only Me note on the follow-up, as note is on the reflection.
+    follow_up_note text       constraint feedback_reflection_follow_up_note_check check (char_length(follow_up_note) <= 2000),
+    follow_up_noted_at timestamptz,
     follow_up_answer_seen_at timestamptz,
     updated_at    timestamptz not null default now(),
     constraint feedback_reflection_plan_has_time check ((plan is null) = (plan_at is null)),
     constraint feedback_reflection_answer_has_time check ((answer is null) = (answered_at is null)),
     constraint feedback_reflection_follow_up_answer_has_time check ((follow_up_answer is null) = (follow_up_answered_at is null)),
     constraint feedback_reflection_follow_up_after_answer check (follow_up is null or answer is not null),
+    constraint feedback_reflection_note_has_time check ((note is null) = (noted_at is null)),
+    constraint feedback_reflection_follow_up_note_has_time check ((follow_up_note is null) = (follow_up_noted_at is null)),
+    constraint feedback_reflection_follow_up_note_after_follow_up check (follow_up_note is null or follow_up is not null),
     constraint feedback_reflection_one unique (assessment_id, enrollment_id)
 );
 create index if not exists feedback_reflection_enrollment_idx on public.feedback_reflection (enrollment_id);
@@ -636,56 +661,6 @@ begin
 end;
 $function$;
 
--- Three stand-ins the second file (C2) replaces. Made only when they are
--- not there, so running this file again after C2 leaves C2's in place.
---   _revision_hide_available()  whether a grade can be hidden during a
---                               revision: here, no
---   _revision_hide_grade(id)    hide the grade of a request from its
---                               student (called under the class's lock):
---                               here, nothing is hidden
---   _revision_unhide_grade(id)  give a hidden grade back: here, there is
---                               none to give
-do $stand_ins$
-begin
-    if to_regprocedure('public._revision_hide_available()') is null then
-        execute $f$
-create function public._revision_hide_available()
- returns boolean
- language sql
- immutable
- set search_path to 'public', 'pg_temp'
-as $function$
-    select false;
-$function$
-        $f$;
-    end if;
-    if to_regprocedure('public._revision_hide_grade(uuid)') is null then
-        execute $f$
-create function public._revision_hide_grade(p_request_id uuid)
- returns boolean
- language sql
- stable
- set search_path to 'public', 'pg_temp'
-as $function$
-    select false;
-$function$
-        $f$;
-    end if;
-    if to_regprocedure('public._revision_unhide_grade(uuid)') is null then
-        execute $f$
-create function public._revision_unhide_grade(p_request_id uuid)
- returns boolean
- language sql
- stable
- set search_path to 'public', 'pg_temp'
-as $function$
-    select false;
-$function$
-        $f$;
-    end if;
-end
-$stand_ins$;
-
 -- The student's handed-in work for one piece: the latest version first.
 -- (Batch B's tables; versions above 1 are revisions.)
 create or replace function public._piece_latest(p_assessment_id uuid, p_enrollment_id uuid)
@@ -700,16 +675,19 @@ as $function$
      order by s.version desc limit 1;
 $function$;
 
--- Where an open revision request stands, read from the submissions and
--- grade_return (never kept, so a deleted revision or a grade saved by any
--- path is read right):
+-- Where a revision request stands:
+--   cancelled  the teacher took it back (stored)
+--   returned   kept as done (stored: _revision_settle), or a grade was
+--              returned after the revision came in: returned_at is not
+--              what it was when the revision came in (in_returned_at,
+--              stored then under the class's lock, so a revision whose
+--              photos are deleted afterwards is still read as returned)
 --   open       nothing newer than the version it was asked of is in
 --   sent       the revision is in; grading it has not started
 --   grading    the revision is in and the grade has changed since, or the
 --              teacher's marks are on one of its pages (section 2b's rule)
---   returned   the revision is in and a grade was returned after it (and
---              so for every request kept as done)
---   cancelled  the teacher took it back
+-- The last three are read live from the submissions and grade_return, so
+-- a grade saved by any path is read right.
 create or replace function public._revision_state(p_request_id uuid)
  returns jsonb
  language sql
@@ -720,8 +698,10 @@ as $function$
     select jsonb_build_object(
                'state', case when r.state = 'cancelled' then 'cancelled'
                              when r.state = 'done' then 'returned'
+                             -- returned since the revision came in (a draft on it since does not take that back)
+                             when r.revision_in_at is not null and g.returned_at is not null
+                                  and g.returned_at is distinct from r.in_returned_at then 'returned'
                              when v.id is null then 'open'
-                             when g.returned_at is not null and not g.is_draft and g.returned_at > v.sent_at then 'returned'
                              when md5(coalesce(g.working_copy::text, '')) is distinct from r.grade_mark then 'grading'
                              when exists (select 1 from markup m join submission_file f on f.id = m.file_id
                                            where f.submission_id = v.id
@@ -738,6 +718,35 @@ as $function$
      where r.id = p_request_id;
 $function$;
 
+-- A request whose revision's grade has been returned is closed as done, a
+-- stored fact: whatever is done to the work or the grade afterwards (its
+-- photos deleted, the grade cleared and that returned), it stays done.
+-- Called under the class's lock by every Batch C function that writes a
+-- piece's requests or returns its work, and by the second file's trigger
+-- each time a grade is returned by any path.
+-- p_returned: the teacher has just returned this student's work on the
+-- piece (return_work: Return, Return and Next, Return N Graded). Then a
+-- request whose revision is in is done too, even when its grade did not
+-- change: the teacher read the revision and returned it as it was.
+-- Returns how many requests it closed (0 or 1).
+create or replace function public._revision_settle(p_enrollment_id uuid, p_assessment_id uuid, p_returned boolean)
+ returns integer
+ language plpgsql
+ security definer
+ set search_path to 'public', 'pg_temp'
+as $function$
+declare
+    _n int;
+begin
+    update revision_request r
+       set state = 'done', closed_at = now(), updated_at = now()
+     where r.assessment_id = p_assessment_id and r.enrollment_id = p_enrollment_id and r.state = 'open'
+       and _revision_state(r.id)->>'state' in ('returned', case when p_returned then 'sent' end, case when p_returned then 'grading' end);
+    get diagnostics _n = row_count;
+    return _n;
+end;
+$function$;
+
 -- One revision request as the teacher's screens read it.
 create or replace function public._revision_json(p_request_id uuid)
  returns jsonb
@@ -749,7 +758,7 @@ as $function$
     select jsonb_build_object(
                'id', r.id, 'assessment_id', r.assessment_id, 'enrollment_id', r.enrollment_id,
                'what_to_fix', r.what_to_fix, 'revise_by', r.revise_by, 'criterion_ids', to_jsonb(r.criterion_ids),
-               'keep_grade', r.keep_grade, 'grade_hidden', r.grade_hidden,
+               'keep_grade', r.keep_grade, 'grade_hidden', false,
                'first_submission_id', r.first_submission_id, 'first_version', r.first_version,
                'first_grade', r.first_grade, 'first_returned_at', r.first_returned_at,
                'created_at', r.created_at, 'updated_at', r.updated_at, 'closed_at', r.closed_at)
@@ -770,12 +779,14 @@ as $function$
     select jsonb_build_object(
                'id', f.id, 'assessment_id', f.assessment_id, 'enrollment_id', f.enrollment_id,
                'makes_sense', f.makes_sense, 'question', f.question, 'plan', f.plan, 'plan_at', f.plan_at, 'went_well', f.went_well,
-               'sent_at', f.sent_at, 'answer', f.answer, 'answered_at', f.answered_at, 'only_me', f.answer_only_me,
+               'sent_at', f.sent_at, 'answer', f.answer, 'answered_at', f.answered_at, 'note', f.note, 'noted_at', f.noted_at,
                'answer_seen_at', f.answer_seen_at,
                'sense_now', f.sense_now, 'sense_now_at', f.sense_now_at,
                'follow_up', f.follow_up, 'follow_up_answer', f.follow_up_answer, 'follow_up_answered_at', f.follow_up_answered_at,
-               'follow_up_only_me', f.follow_up_only_me, 'follow_up_answer_seen_at', f.follow_up_answer_seen_at,
-               'waiting', (f.question is not null and f.answer is null) or (f.follow_up is not null and f.follow_up_answer is null))
+               'follow_up_note', f.follow_up_note, 'follow_up_noted_at', f.follow_up_noted_at,
+               'follow_up_answer_seen_at', f.follow_up_answer_seen_at,
+               'waiting', (f.question is not null and f.answer is null and (f.noted_at is null or f.noted_at < f.sent_at))
+                          or (f.follow_up is not null and f.follow_up_answer is null and f.follow_up_note is null))
       from feedback_reflection f where f.id = p_reflection_id;
 $function$;
 
@@ -924,7 +935,9 @@ $function$;
 -- given the marks on their pages of the piece. A student with no draft and
 -- no marks waiting is passed over, as return_grades passes them over.
 -- Returns return_grades' answer with marks_given (pages) and
--- marks_enrollment_ids.
+-- marks_enrollment_ids: the pages waiting when it began that the student
+-- has now, however they were given (here, or by the second file's trigger
+-- inside return_grades).
 create or replace function public.return_work(p_assessment_id uuid, p_enrollment_ids uuid[], p_idempotency_key uuid default null)
  returns jsonb
  language plpgsql
@@ -934,11 +947,11 @@ as $function$
 declare
     _cached jsonb;
     _course uuid;
-    _r      jsonb;
-    _e      uuid;
-    _n      int;
-    _pages  int := 0;
-    _who    uuid[] := '{}';
+    _r       jsonb;
+    _e       uuid;
+    _pages   int := 0;
+    _who     uuid[] := '{}';
+    _waiting uuid[];
 begin
     if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
     if not fv_owns_assessment(p_assessment_id) then
@@ -952,7 +965,22 @@ begin
     -- return_grades, unchanged. It asks who is signed in and whether they
     -- own the assessment again, and takes the lock this call holds. No key:
     -- this call remembers the whole answer under its own.
+    -- A revision returned since by another path is closed first, so this
+    -- Return cannot read it as anything else.
+    perform _revision_settle(e.id, p_assessment_id, false)
+       from enrollment e where e.id = any (coalesce(p_enrollment_ids, '{}')) and e.course_id = _course;
+    -- The listed students' pages with marks waiting (as _markup_give reads
+    -- them), counted at the end once given.
+    select coalesce(array_agg(m.file_id), '{}') into _waiting
+      from markup m join enrollment e on e.id = m.enrollment_id
+     where m.assessment_id = p_assessment_id and e.id = any (coalesce(p_enrollment_ids, '{}')) and e.course_id = _course
+       and m.given_rev is distinct from m.working_rev
+       and not (m.given is null and jsonb_array_length(coalesce(m.working->'marks', '[]'::jsonb)) = 0);
     _r := return_grades(p_assessment_id, p_enrollment_ids, null);
+    -- Then Return ends each listed student's request whose revision is in,
+    -- graded or left at the same grade.
+    perform _revision_settle(e.id, p_assessment_id, true)
+       from enrollment e where e.id = any (coalesce(p_enrollment_ids, '{}')) and e.course_id = _course;
     for _e in
         select e.id from enrollment e
          where e.id = any (coalesce(p_enrollment_ids, '{}')) and e.course_id = _course
@@ -960,11 +988,12 @@ begin
                             where g.enrollment_id = e.id and g.assessment_id = p_assessment_id and g.is_draft)
          order by e.id
     loop
-        _n := _markup_give(_e, p_assessment_id);
-        if _n > 0 then
-            _pages := _pages + _n; _who := _who || _e;
-        end if;
+        perform _markup_give(_e, p_assessment_id);
     end loop;
+    select count(*)::int, coalesce(array_agg(distinct m.enrollment_id order by m.enrollment_id), '{}')
+      into _pages, _who
+      from markup m
+     where m.file_id = any (_waiting) and m.given_rev = m.working_rev;
     _cached := _r || jsonb_build_object('marks_given', _pages, 'marks_enrollment_ids', to_jsonb(_who));
     perform fv_idem_store(p_idempotency_key, 'return_work', _cached);
     return _cached;
@@ -976,13 +1005,12 @@ $function$;
 --   { "what_to_fix": "...",           1 to 2000 characters, required
 --     "revise_by": "YYYY-MM-DD"|null,
 --     "criterion_ids": [ ... ],       criteria of the piece's rubric; may be empty
---     "keep_grade": true|false }      false: hide the grade (needs C2)
+--     "keep_grade": true|false }      false (hide the grade) is not in Batch C
 -- Answers (not errors; only made is remembered):
---   made               { result, request, returned }
+--   made               { result, request, returned, hidden } (hidden: false)
 --   already_open       an open request exists for the piece: { result, request }
---   hide_not_available keep_grade false and the second file is not applied
---   hide_needs_holding keep_grade false in a class that does not hold grades
---                      (a hidden grade is a draft, and such a class shows none)
+--   hide_not_available keep_grade false: Hide is not in Batch C. Nothing is
+--                      written. (A later change that adds Hide answers here.)
 --   not_for_dibels     a DIBELS benchmark is not revised
 -- Raises P0002 for an assessment or a student that is not the teacher's, a
 -- student of another class or a withdrawn one; 22023 for a wrong shape.
@@ -1007,7 +1035,6 @@ declare
     _g       grade_return%rowtype;
     _ret     jsonb;
     _id      uuid;
-    _hidden  boolean := false;
 begin
     if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
     if not fv_owns_assessment(p_assessment_id) then
@@ -1072,21 +1099,14 @@ begin
         return jsonb_build_object('result', 'not_for_dibels');
     end if;
     -- A request whose revision's grade has since been returned is done.
-    update revision_request r set state = 'done', closed_at = now(), updated_at = now()
-     where r.assessment_id = p_assessment_id and r.enrollment_id = p_enrollment_id and r.state = 'open'
-       and _revision_state(r.id)->>'state' = 'returned';
+    perform _revision_settle(p_enrollment_id, p_assessment_id, false);
     select * into _open from revision_request
      where assessment_id = p_assessment_id and enrollment_id = p_enrollment_id and state = 'open';
     if found then
         return jsonb_build_object('result', 'already_open', 'request', _revision_json(_open.id));
     end if;
     if not _keep then
-        if not _revision_hide_available() then
-            return jsonb_build_object('result', 'hide_not_available');
-        end if;
-        if not _grade_return_holds(p_enrollment_id) then
-            return jsonb_build_object('result', 'hide_needs_holding');
-        end if;
+        return jsonb_build_object('result', 'hide_not_available');
     end if;
 
     -- The work is returned first, as Return would return it.
@@ -1102,17 +1122,14 @@ begin
             case when _g.returned_at is not null and not _g.is_draft then _g.returned_at end,
             (select auth.uid()))
     returning id into _id;
-    if not _keep then
-        _hidden := _revision_hide_grade(_id);
-    end if;
-    _cached := jsonb_build_object('result', 'made', 'request', _revision_json(_id), 'returned', _ret, 'hidden', _hidden);
+    _cached := jsonb_build_object('result', 'made', 'request', _revision_json(_id), 'returned', _ret, 'hidden', false);
     perform fv_idem_store(p_idempotency_key, 'return_for_revision', _cached);
     return _cached;
 end;
 $function$;
 
 -- Change an open request: any of what_to_fix, revise_by, criterion_ids.
--- Keep or Hide is not changed here (take the request back and ask again).
+-- keep_grade is not changed here.
 -- Answers { result: 'saved', request } or { result: 'not_open', request }.
 create or replace function public.set_revision_request(p_request_id uuid, p_patch jsonb, p_idempotency_key uuid default null)
  returns jsonb
@@ -1184,7 +1201,8 @@ end;
 $function$;
 
 -- Take a request back. A revision already sent stays, as a later version of
--- the work. A hidden grade is given back (C2).
+-- the work. No grade row is written (unhidden: always false; no grade is
+-- hidden in Batch C).
 -- Answers { result: 'cancelled', request, unhidden } or { result: 'not_open', request }.
 create or replace function public.cancel_revision(p_request_id uuid, p_idempotency_key uuid default null)
  returns jsonb
@@ -1196,7 +1214,6 @@ declare
     _cached   jsonb;
     _course   uuid;
     _r        revision_request%rowtype;
-    _unhidden boolean := false;
 begin
     if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
     select r.course_id into _course from revision_request r where r.id = p_request_id and fv_owns_course(r.course_id);
@@ -1212,21 +1229,21 @@ begin
     if _r.state <> 'open' then
         return jsonb_build_object('result', 'not_open', 'request', _revision_json(_r.id));
     end if;
-    if _r.grade_hidden then
-        _unhidden := _revision_unhide_grade(_r.id);
-    end if;
     update revision_request set state = 'cancelled', closed_at = now(), updated_at = now() where id = _r.id;
-    _cached := jsonb_build_object('result', 'cancelled', 'request', _revision_json(_r.id), 'unhidden', _unhidden);
+    _cached := jsonb_build_object('result', 'cancelled', 'request', _revision_json(_r.id), 'unhidden', false);
     perform fv_idem_store(p_idempotency_key, 'cancel_revision', _cached);
     return _cached;
 end;
 $function$;
 
--- Send Answer. It answers what is waiting: the question (or, with none, the
--- reflection itself), then the follow-up. 1 to 2000 characters. p_only_me
--- true (Only Me): the answer is the teacher's own note, never sent to the
--- student; it clears the question as an answer does, and the student can
--- then neither say whether it makes sense nor ask a follow-up.
+-- Send Answer. It answers what is open: the question (or, with none, the
+-- reflection itself) until it has an answer, then the follow-up once the
+-- student asks one. 1 to 2000 characters. p_only_me true (Only Me): the
+-- text is the teacher's own note on what is open (note, or follow_up_note;
+-- a second note takes the place of the first), never sent to the student,
+-- and nothing a student calls tells them there is one. A note is not an
+-- answer: it clears the question from the teacher's list, and a real
+-- answer can still be sent after it.
 -- Answers { result: 'answered', reflection } (remembered),
 -- { result: 'already_answered', reflection }, or { result: 'reflect_off' }
 -- while the class has Reflect on Feedback off.
@@ -1262,12 +1279,14 @@ begin
     if not (select c.reflect_on_feedback from course c where c.id = _course) then
         return jsonb_build_object('result', 'reflect_off');
     end if;
-    if _f.answer is null then
-        update feedback_reflection set answer = btrim(p_answer), answered_at = now(), answer_only_me = p_only_me, updated_at = now()
-         where id = _f.id;
+    if _f.answer is null and p_only_me then
+        update feedback_reflection set note = btrim(p_answer), noted_at = now(), updated_at = now() where id = _f.id;
+    elsif _f.answer is null then
+        update feedback_reflection set answer = btrim(p_answer), answered_at = now(), updated_at = now() where id = _f.id;
+    elsif _f.follow_up is not null and _f.follow_up_answer is null and p_only_me then
+        update feedback_reflection set follow_up_note = btrim(p_answer), follow_up_noted_at = now(), updated_at = now() where id = _f.id;
     elsif _f.follow_up is not null and _f.follow_up_answer is null then
-        update feedback_reflection set follow_up_answer = btrim(p_answer), follow_up_answered_at = now(), follow_up_only_me = p_only_me,
-                                       updated_at = now()
+        update feedback_reflection set follow_up_answer = btrim(p_answer), follow_up_answered_at = now(), updated_at = now()
          where id = _f.id;
     else
         return jsonb_build_object('result', 'already_answered', 'reflection', _reflection_json(_f.id));
@@ -1352,7 +1371,7 @@ $function$;
 -- work has, and how many notes (only when the work was returned with marks,
 -- the piece shows marks, and no Missing or Excused is on it), the revision
 -- request, and the reflection with the teacher's answer once sent (never
--- one the teacher kept to themselves) and whether the student has seen it;
+-- an Only Me note, nor that there is one) and whether the student has seen it;
 -- and the last plan the student made in the class (Your Plan From Last
 -- Time). Reflections and the last plan only while Reflect on Feedback is
 -- on. Read-only.
@@ -1411,13 +1430,12 @@ begin
                           select jsonb_build_object(
                                      'state', st->>'state', 'what_to_fix', r.what_to_fix, 'revise_by', r.revise_by,
                                      'criterion_ids', to_jsonb(r.criterion_ids), 'keep_grade', r.keep_grade,
-                                     'grade_hidden', r.grade_hidden,
+                                     'grade_hidden', false,
                                      'first_version', r.first_version,
                                      'first_sent_at', (select x.sent_at from submission x where x.id = r.first_submission_id),
-                                     -- the first version's grade as the student had it: not while it is hidden, and
-                                     -- not while Missing or Excused is on the piece
-                                     'first_grade', case when r.grade_hidden and st->>'state' <> 'returned' then null
-                                                         when coalesce(s.status, '') in ('NS', 'EXC') then null
+                                     -- the first version's grade as the student had it: not while Missing or
+                                     -- Excused is on the piece
+                                     'first_grade', case when coalesce(s.status, '') in ('NS', 'EXC') then null
                                                          else public._grade_copy_in_use(r.first_grade, a.id) end,
                                      'revision_version', st->'revision_version', 'revision_sent_at', st->'revision_sent_at',
                                      'revision_note', case when st->>'revision_sent_by' = 'student' then st->'revision_note' end,
@@ -1431,16 +1449,13 @@ begin
                           select jsonb_build_object(
                                      'makes_sense', f.makes_sense, 'question', f.question, 'plan', f.plan, 'went_well', f.went_well,
                                      'sent_at', f.sent_at,
-                                     -- an answer the teacher kept to themselves is not sent, nor that there is one
-                                     'answer', case when not f.answer_only_me then f.answer end,
-                                     'answered_at', case when not f.answer_only_me then f.answered_at end,
+                                     -- the teacher's Only Me notes (note, follow_up_note) are never read here
+                                     'answer', f.answer, 'answered_at', f.answered_at,
                                      'sense_now', f.sense_now, 'follow_up', f.follow_up,
-                                     'follow_up_answer', case when not f.follow_up_only_me then f.follow_up_answer end,
-                                     'follow_up_answered_at', case when not f.follow_up_only_me then f.follow_up_answered_at end,
+                                     'follow_up_answer', f.follow_up_answer, 'follow_up_answered_at', f.follow_up_answered_at,
                                      -- What Changed: an answer the page has not shown yet (answer_seen)
-                                     'answer_new', (f.answer is not null and not f.answer_only_me and f.answer_seen_at is null)
-                                                   or (f.follow_up_answer is not null and not f.follow_up_only_me
-                                                       and f.follow_up_answer_seen_at is null)) as j
+                                     'answer_new', (f.answer is not null and f.answer_seen_at is null)
+                                                   or (f.follow_up_answer is not null and f.follow_up_answer_seen_at is null)) as j
                             from feedback_reflection f
                            where f.assessment_id = a.id and f.enrollment_id = p_enrollment_id
                              and _course.reflect_on_feedback) rf on true
@@ -1602,8 +1617,8 @@ $function$;
 --     "follow_up": "...",   1 to 1000 characters, only with not_sure, once
 --     "plan": "..." }       1 to 1000 characters, only with yes: Make My
 --                           Plan (it takes the place of a plan made before)
--- Only after the teacher answered (an answer they kept to themselves is not
--- an answer here), only while Reflect on Feedback is on. The same reply
+-- Only after the teacher answered (an Only Me note is not an answer), only
+-- while Reflect on Feedback is on. The same reply
 -- twice is the same reply. Answers: ok with the reflection; reflect_off,
 -- not_found, not_answered, already_asked (a second follow-up). A wrong
 -- shape raises 22023.
@@ -1669,7 +1684,7 @@ begin
     if not found then
         return jsonb_build_object('ok', false, 'error', 'not_found');
     end if;
-    if _f.answer is null or _f.answer_only_me then
+    if _f.answer is null then
         return jsonb_build_object('ok', false, 'error', 'not_answered');
     end if;
     if _more is not null and _f.follow_up is not null and _f.follow_up is distinct from _more then
@@ -1686,7 +1701,7 @@ begin
     returning * into _f;
     return jsonb_build_object('ok', true, 'reflection', jsonb_build_object(
         'sense_now', _f.sense_now, 'follow_up', _f.follow_up, 'plan', _f.plan, 'answer', _f.answer,
-        'follow_up_answer', case when not _f.follow_up_only_me then _f.follow_up_answer end));
+        'follow_up_answer', _f.follow_up_answer));
 end;
 $function$;
 
@@ -1711,15 +1726,15 @@ begin
     end if;
     perform public._grade_return_lock_first((_in->>'course_id')::uuid);
     update feedback_reflection f
-       set answer_seen_at = case when f.answer is not null and not f.answer_only_me then coalesce(f.answer_seen_at, clock_timestamp())
+       set answer_seen_at = case when f.answer is not null then coalesce(f.answer_seen_at, clock_timestamp())
                                  else f.answer_seen_at end,
-           follow_up_answer_seen_at = case when f.follow_up_answer is not null and not f.follow_up_only_me
+           follow_up_answer_seen_at = case when f.follow_up_answer is not null
                                            then coalesce(f.follow_up_answer_seen_at, clock_timestamp())
                                            else f.follow_up_answer_seen_at end
      where f.enrollment_id = p_enrollment_id and f.course_id = (_in->>'course_id')::uuid
        and f.assessment_id = any (coalesce(p_assessment_ids, '{}'))
-       and ((f.answer is not null and not f.answer_only_me and f.answer_seen_at is null)
-            or (f.follow_up_answer is not null and not f.follow_up_only_me and f.follow_up_answer_seen_at is null));
+       and ((f.answer is not null and f.answer_seen_at is null)
+            or (f.follow_up_answer is not null and f.follow_up_answer_seen_at is null));
     get diagnostics _n = row_count;
     return jsonb_build_object('ok', true, 'seen', _n);
 end;
@@ -1809,6 +1824,7 @@ begin
                                   'files', case when _sub.state = 'sending' then public._work_upload_json(_sub.id) else '[]'::jsonb end);
     end if;
 
+    perform public._revision_settle(p_enrollment_id, _a.id, false);
     select * into _r from revision_request where assessment_id = _a.id and enrollment_id = p_enrollment_id and state = 'open';
     if _r.id is null then
         return jsonb_build_object('ok', false, 'error', 'no_revision');
@@ -1857,8 +1873,11 @@ $function$;
 -- revision is handed in, taking the place of a revision in that is not yet
 -- being graded. The arguments are send_finish's.
 -- Answers as send_finish's, plus no_revision (the request was taken back
--- or is done: the pages are dropped) and grading_started (the revision in
--- began to be graded while these pages went up: they are dropped).
+-- or is done: the pages are dropped), grading_started (the revision in
+-- began to be graded while these pages went up: they are dropped) and
+-- request_changed (the request was taken back and asked again while these
+-- pages went up, so they are not the version it now takes: they are
+-- dropped, and a fresh send is the next version).
 create or replace function student_submit.revision_finish(
     p_session_token text, p_enrollment_id uuid, p_submission_id uuid, p_files jsonb, p_ip_hash text)
  returns jsonb
@@ -1875,6 +1894,7 @@ declare
     _state   jsonb;
     _expired boolean;
     _old     uuid;
+    _version smallint;
 begin
     if p_submission_id is null then
         raise exception 'a submission is needed' using errcode = '22023';
@@ -1923,6 +1943,7 @@ begin
                                    where f.submission_id = _sub.id and f.id = (x->>'file_id')::uuid)) then
         raise exception 'a file is not one of this send''s' using errcode = '22023';
     end if;
+    perform public._revision_settle(p_enrollment_id, _sub.assessment_id, false);
     select * into _r from revision_request
      where assessment_id = _sub.assessment_id and enrollment_id = p_enrollment_id and state = 'open';
     _st := case when _r.id is null then null else public._revision_state(_r.id) end;
@@ -1931,6 +1952,19 @@ begin
         delete from submission where id = _sub.id;
         perform set_config('fv.work_removal_reason', '', true);
         return jsonb_build_object('ok', false, 'error', case when _r.id is null then 'no_revision' else 'grading_started' end);
+    end if;
+    -- The version this request takes now, as revision_start reckons it: the
+    -- revision in (replaced), else the next. A send begun under a request
+    -- taken back and asked again is not it: dropped, with an answer.
+    _version := coalesce((_st->>'revision_version')::smallint,
+                         (select max(s.version) from submission s
+                           where s.assessment_id = _sub.assessment_id and s.enrollment_id = p_enrollment_id and s.state = 'sent') + 1,
+                         _r.first_version + 1);
+    if _sub.version <> _version then
+        perform set_config('fv.work_removal_reason', 'abandoned', true);
+        delete from submission where id = _sub.id;
+        perform set_config('fv.work_removal_reason', '', true);
+        return jsonb_build_object('ok', false, 'error', 'request_changed');
     end if;
 
     _state := public._work_files_state(_sub.id, p_files);
@@ -1967,10 +2001,16 @@ begin
            is_late = _r.revise_by is not null and (now() at time zone public._fv_timezone(_course.timezone))::date > _r.revise_by
      where id = _sub.id
     returning * into _sub;
-    -- Grading of the revision starts when the grade next changes.
+    -- Grading of the revision starts when the grade next changes; it is
+    -- returned by the next Return that gives a grade (returned_at as it is
+    -- now, read under the class's lock: a Return that held the class while
+    -- this send waited came before it).
     update revision_request
        set grade_mark = (select md5(coalesce(g.working_copy::text, '')) from (select 1) one
                            left join grade_return g on g.enrollment_id = p_enrollment_id and g.assessment_id = _sub.assessment_id),
+           revision_in_at = _sub.sent_at,
+           in_returned_at = (select g.returned_at from grade_return g
+                              where g.enrollment_id = p_enrollment_id and g.assessment_id = _sub.assessment_id),
            updated_at = now()
      where id = _r.id;
     return jsonb_build_object('ok', true, 'replayed', false, 'submission_id', _sub.id, 'version', _sub.version,
@@ -2021,9 +2061,18 @@ begin
     get diagnostics _cancelled = row_count;
     perform set_config('fv.work_removal_reason', '', true);
 
+    perform public._revision_settle(p_enrollment_id, p_assessment_id, false);
     select * into _r from revision_request where assessment_id = p_assessment_id and enrollment_id = p_enrollment_id and state = 'open';
     _st := case when _r.id is null then null else public._revision_state(_r.id) end;
     _old := (_st->>'revision_submission_id')::uuid;
+    if _r.id is null
+       and (select r.state from revision_request r where r.assessment_id = p_assessment_id and r.enrollment_id = p_enrollment_id
+             order by r.created_at desc, r.id limit 1) = 'done'
+       and exists (select 1 from submission s
+                    where s.assessment_id = p_assessment_id and s.enrollment_id = p_enrollment_id and s.state = 'sent' and s.version > 1) then
+        -- the revision was returned: it is the teacher's now, as a graded first version is
+        return jsonb_build_object('ok', false, 'error', 'grading_started');
+    end if;
     if _old is null then
         return jsonb_build_object('ok', true, 'unsent', false, 'cancelled', _cancelled > 0, 'pages', 0);
     end if;
@@ -2038,7 +2087,7 @@ begin
     perform set_config('fv.work_removal_reason', 'unsend', true);
     delete from submission where id = _old;
     perform set_config('fv.work_removal_reason', '', true);
-    update revision_request set grade_mark = null, updated_at = now() where id = _r.id;
+    update revision_request set grade_mark = null, revision_in_at = null, in_returned_at = null, updated_at = now() where id = _r.id;
     return jsonb_build_object('ok', true, 'unsent', true, 'cancelled', _cancelled > 0, 'pages', _pages);
 end;
 $function$;
@@ -2149,11 +2198,9 @@ revoke all on function public._work_feedback_gone() from public, anon, authentic
 revoke all on function public._work_feedback_truncated() from public, anon, authenticated, service_role;
 revoke all on function public._markup_check(jsonb) from public, anon, authenticated, service_role;
 revoke all on function public._markup_give(uuid, uuid) from public, anon, authenticated, service_role;
-revoke all on function public._revision_hide_available() from public, anon, authenticated, service_role;
-revoke all on function public._revision_hide_grade(uuid) from public, anon, authenticated, service_role;
-revoke all on function public._revision_unhide_grade(uuid) from public, anon, authenticated, service_role;
 revoke all on function public._piece_latest(uuid, uuid) from public, anon, authenticated, service_role;
 revoke all on function public._revision_state(uuid) from public, anon, authenticated, service_role;
+revoke all on function public._revision_settle(uuid, uuid, boolean) from public, anon, authenticated, service_role;
 revoke all on function public._revision_json(uuid) from public, anon, authenticated, service_role;
 revoke all on function public._reflection_json(uuid) from public, anon, authenticated, service_role;
 
@@ -2197,31 +2244,29 @@ begin
             ('public._work_feedback_truncated()',                                  '450e3b27b73c51d01f4c431adb402bbd', '450e3b27b73c51d01f4c431adb402bbd'),
             ('public._markup_check(jsonb)',                                        'd5fac66f176bf8f23391a7c6c19b053a', 'd5fac66f176bf8f23391a7c6c19b053a'),
             ('public._markup_give(uuid,uuid)',                                     'f0f07a1b879ff038e2f0afe020233c29', 'f0f07a1b879ff038e2f0afe020233c29'),
-            ('public._revision_hide_available()',                                  'cd50f4c6493a73b3c42ae51f7580f970', 'a4b4e942de351d6849702b96f25c7356'),
-            ('public._revision_hide_grade(uuid)',                                  '247080f6572bb45951cef807a2b849bd', '295f0e5f94eeb8492af2c205b641377b'),
-            ('public._revision_unhide_grade(uuid)',                                '26d2861325edf27f95d090ebd590eb0f', '3c0ff04195505dacf40b55217f8fe839'),
             ('public._piece_latest(uuid,uuid)',                                    'fee319ef4d87447eeac9b4d53a1f1b50', 'fee319ef4d87447eeac9b4d53a1f1b50'),
-            ('public._revision_state(uuid)',                                       'd8103c802e246bfac948fa620d06fe09', 'd8103c802e246bfac948fa620d06fe09'),
-            ('public._revision_json(uuid)',                                        '969f930b121a6714edfde8052a4d876b', '969f930b121a6714edfde8052a4d876b'),
-            ('public._reflection_json(uuid)',                                      '89f6847f6ab6a468284ea1df003391a6', '89f6847f6ab6a468284ea1df003391a6'),
+            ('public._revision_state(uuid)',                                       '808f6944ea937a32576729e48115e58d', '808f6944ea937a32576729e48115e58d'),
+            ('public._revision_settle(uuid,uuid,boolean)',                         '5abc02afbaa29294cdb317838657b37c', '5abc02afbaa29294cdb317838657b37c'),
+            ('public._revision_json(uuid)',                                        '4ea85d4b58243fc0d6512b31ac6d165e', '4ea85d4b58243fc0d6512b31ac6d165e'),
+            ('public._reflection_json(uuid)',                                      'f089277294adaf7d7834b41a1e93d5fa', 'f089277294adaf7d7834b41a1e93d5fa'),
             ('public.set_course_feedback_options(uuid,jsonb,uuid)',                '1954af2eef430d63baa91d38e74106d2', '1954af2eef430d63baa91d38e74106d2'),
             ('public.save_markup(uuid,jsonb,integer,uuid)',                        '808290a14511b137bc5c1a4574016429', '808290a14511b137bc5c1a4574016429'),
             ('public.list_assessment_markup(uuid)',                                '5e64579a923a0f0c02791b6428e54d98', '5e64579a923a0f0c02791b6428e54d98'),
-            ('public.return_work(uuid,uuid[],uuid)',                               '9175f90ed1158790acef376c98319295', '9175f90ed1158790acef376c98319295'),
-            ('public.return_for_revision(uuid,uuid,jsonb,uuid)',                   'f66c0fdd60dd969203a345125280d760', 'f66c0fdd60dd969203a345125280d760'),
+            ('public.return_work(uuid,uuid[],uuid)',                               '13f1d5ec77567d5909c49c493ad77b64', '13f1d5ec77567d5909c49c493ad77b64'),
+            ('public.return_for_revision(uuid,uuid,jsonb,uuid)',                   '0f3cc087f25815ba377919f68b870f36', '0f3cc087f25815ba377919f68b870f36'),
             ('public.set_revision_request(uuid,jsonb,uuid)',                       '6f9fb14cc1c8ced04cca7e0302c40b13', '6f9fb14cc1c8ced04cca7e0302c40b13'),
-            ('public.cancel_revision(uuid,uuid)',                                  '03f508a459eb621f868b699a0ea3f076', '03f508a459eb621f868b699a0ea3f076'),
-            ('public.answer_reflection(uuid,text,uuid,boolean)',                   'b384f9b1c729f42733db290a0f4ddae5', 'b384f9b1c729f42733db290a0f4ddae5'),
+            ('public.cancel_revision(uuid,uuid)',                                  '15fb7d84333ed19b362e778b6667f377', '15fb7d84333ed19b362e778b6667f377'),
+            ('public.answer_reflection(uuid,text,uuid,boolean)',                   '3dc0da991f10c092ae0a80202310d56f', '3dc0da991f10c092ae0a80202310d56f'),
             ('public.list_course_feedback(uuid)',                                  '7fbe6b367a0c28fd4dd2b894f0dc7711', '7fbe6b367a0c28fd4dd2b894f0dc7711'),
             ('student_submit._group_members(uuid,uuid)',                           'b38b1af6f2dc142c94ce1cca454fd0fb', 'b38b1af6f2dc142c94ce1cca454fd0fb'),
-            ('student_submit.feedback(text,uuid,text)',                            'c45a01cc31eab1111dc89994008ba4d4', 'c45a01cc31eab1111dc89994008ba4d4'),
+            ('student_submit.feedback(text,uuid,text)',                            '4ee8ebfb4b2af25698d2fb3eafc7f9ea', '4ee8ebfb4b2af25698d2fb3eafc7f9ea'),
             ('student_submit.markup(text,uuid,uuid,text)',                         '6cc78118aa4e98252514826aabf957a9', '6cc78118aa4e98252514826aabf957a9'),
             ('student_submit.reflect(text,uuid,uuid,jsonb,text)',                  '7a4e2ab29d369ef159dce65e1e1e8f77', '7a4e2ab29d369ef159dce65e1e1e8f77'),
-            ('student_submit.reply(text,uuid,uuid,jsonb,text)',                    '51e8f1db4f92885e8e310b255fa7aa70', '51e8f1db4f92885e8e310b255fa7aa70'),
-            ('student_submit.answer_seen(text,uuid,uuid[],text)',                  'a32cc8e5329954ac909969269afc2518', 'a32cc8e5329954ac909969269afc2518'),
-            ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)', 'aa5207487f67fe4fbc7dcbf803276f6b', 'aa5207487f67fe4fbc7dcbf803276f6b'),
-            ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',          'a86921ac1689264c2db5dea1e081f276', 'a86921ac1689264c2db5dea1e081f276'),
-            ('student_submit.revision_unsend(text,uuid,uuid,text)',                '763f31c96e1ee07ac5477762db0f7784', '763f31c96e1ee07ac5477762db0f7784'),
+            ('student_submit.reply(text,uuid,uuid,jsonb,text)',                    '264a736a722cf19022c20c343ecb01fb', '264a736a722cf19022c20c343ecb01fb'),
+            ('student_submit.answer_seen(text,uuid,uuid[],text)',                  'da85d013a0511618c989d7bb44eac2f3', 'da85d013a0511618c989d7bb44eac2f3'),
+            ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)', '43ca2e50ff067a4fb51762367895ee84', '43ca2e50ff067a4fb51762367895ee84'),
+            ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',          'a04e2d62a76b00a7f6ad03a76a0ede74', 'a04e2d62a76b00a7f6ad03a76a0ede74'),
+            ('student_submit.revision_unsend(text,uuid,uuid,text)',                '73ac162e56dde98d11ffcd03aa4b5ffa', '73ac162e56dde98d11ffcd03aa4b5ffa'),
             ('student_submit.group_work(text,uuid,text)',                          '1db83448b1b3d7ae998870bdb07c4f36', '1db83448b1b3d7ae998870bdb07c4f36'),
             ('student_submit.group_file_links(text,uuid,uuid,text)',               '1c034fa5647b5808209b0ef9b31e8e4d', '1c034fa5647b5808209b0ef9b31e8e4d')
             -- FINGERPRINTS-END

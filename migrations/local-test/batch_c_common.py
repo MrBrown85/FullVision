@@ -70,8 +70,7 @@ def build():
 # Every function C1 makes, by signature, and the three C2 replaces.
 C1_FUNCTIONS = [
     'public._work_feedback_gone()', 'public._work_feedback_truncated()', 'public._markup_check(jsonb)',
-    'public._markup_give(uuid,uuid)', 'public._revision_hide_available()', 'public._revision_hide_grade(uuid)',
-    'public._revision_unhide_grade(uuid)', 'public._piece_latest(uuid,uuid)', 'public._revision_state(uuid)',
+    'public._markup_give(uuid,uuid)', 'public._piece_latest(uuid,uuid)', 'public._revision_state(uuid)', 'public._revision_settle(uuid,uuid,boolean)',
     'public._revision_json(uuid)', 'public._reflection_json(uuid)',
     'public.set_course_feedback_options(uuid,jsonb,uuid)', 'public.save_markup(uuid,jsonb,integer,uuid)',
     'public.list_assessment_markup(uuid)', 'public.return_work(uuid,uuid[],uuid)',
@@ -84,7 +83,7 @@ C1_FUNCTIONS = [
     'student_submit.revision_finish(text,uuid,uuid,jsonb,text)', 'student_submit.revision_unsend(text,uuid,uuid,text)',
     'student_submit.group_work(text,uuid,text)', 'student_submit.group_file_links(text,uuid,uuid,text)']
 # The one existing function C1 replaces (Batch B's): a page with the teacher's marks counts as
-# grading started (C1 section 2b; the owner has not decided it).
+# grading started (C1 section 2b; ruling 109).
 C1_REPLACES = ['student_submit._grading_started(uuid,uuid)']
 C1_PUBLIC_RPCS = ['public.set_course_feedback_options(uuid,jsonb,uuid)', 'public.save_markup(uuid,jsonb,integer,uuid)',
                   'public.list_assessment_markup(uuid)', 'public.return_work(uuid,uuid[],uuid)',
@@ -96,7 +95,8 @@ C1_STUDENT = ['student_submit.feedback(text,uuid,text)', 'student_submit.markup(
               'student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)',
               'student_submit.revision_finish(text,uuid,uuid,jsonb,text)', 'student_submit.revision_unsend(text,uuid,uuid,text)',
               'student_submit.group_work(text,uuid,text)', 'student_submit.group_file_links(text,uuid,uuid,text)']
-C2_REPLACES = ['public._revision_hide_available()', 'public._revision_hide_grade(uuid)', 'public._revision_unhide_grade(uuid)']
+# C2 replaces no function (Hide, which replaced three stand-ins of C1's, is not in Batch C).
+C2_REPLACES = []
 C2_NEW = ['public._markup_on_return()']
 # Existing functions the new ones call (or, for C2, that its trigger's
 # work depends on), and so rely on.
@@ -117,8 +117,11 @@ C1_RELIED = ['public.fv_owns_course(uuid)', 'public.fv_owns_enrollment(uuid)', '
              # fixes are in first (the apply order is Batch B's two files, the fixes, then C1)
              'public.finish_work_upload(uuid,jsonb,uuid)', 'student_submit.send_finish(text,uuid,uuid,jsonb,text)',
              'student_submit.unsend(text,uuid,uuid,text)']
-C2_RELIED = ['public._grade_copy(uuid,uuid)', 'public._markup_give(uuid,uuid)', 'public.return_for_revision(uuid,uuid,jsonb,uuid)',
-             'public.cancel_revision(uuid,uuid)', 'public._grade_return_apply(uuid,uuid,jsonb,jsonb)',
+# C2's trigger calls the first two; the last two are every Return's writers of
+# returned_at, whose stamping a new date on a Return (and only then) the
+# trigger relies on.
+C2_RELIED = ['public._markup_give(uuid,uuid)', 'public._revision_settle(uuid,uuid,boolean)',
+             'public._grade_return_apply(uuid,uuid,jsonb,jsonb)',
              'public._grade_return_one(uuid,uuid,timestamp with time zone)']
 
 MARK = re.compile(r'(-- FINGERPRINTS-BEGIN[^\n]*\n)(.*?)(\n[ \t]*-- FINGERPRINTS-END)', re.S)

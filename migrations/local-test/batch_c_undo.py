@@ -2,8 +2,9 @@
 
     PGDATABASE=<template> BATCH_B_DIR=... python3 batch_c_undo.py
 
-- batch-c2-undo.sql: every hidden grade comes back exactly; the catalog is
-  the one C1 alone left, line for line; C2 can be applied again.
+- batch-c2-undo.sql: no row changes; the catalog is the one C1 alone left,
+  line for line; marks are given only by return_work again; C2 can be
+  applied again.
 - batch-c1-undo.sql PART 1: nothing of Batch C runs, no row changes, and
   grades, Return and sending work still do; PART 1b puts it back.
 - PART 2: refuses while C2 is in, and while the tables hold rows unless
@@ -25,19 +26,24 @@ def undo2():
         ok('undo2: C1 applies', d.apply1() == 'ok')
         cat_c1 = catalog(d.c)
         ok('undo2: C2 applies', d.apply2() == 'ok')
-        d.score(ENR1, k['lab'], 6); d.return_work(k['lab'], [ENR1])
-        g_before = gr(d, ENR1, k['lab'])
+        # marks given by the trigger, a request stored done by it, a request open, marks waiting
         d.save_markup(files[0], marks('n'))
-        r = d.rfr(k['lab'], ENR1, {'what_to_fix': 'x', 'keep_grade': False})
-        ok('undo2: a grade is hidden', r['hidden'] is True and piece(d.page(t1, ENR1), k['lab'])['grade'] is None)
-        rows_other = row_checksums(d.c, {t: c for t, c in table_columns(d.c).items() if t not in ('public.grade_return', 'public.revision_request')})
+        d.score(ENR1, k['lab'], 6); d.rpc('return_grades(:a, :e, :k)', a=k['lab'], e=[ENR1], k=nid())
+        ok('undo2: the trigger gave the marks', len(d.marks(t1, ENR1, k['lab'])['files']) == 1)
+        rid = d.rfr(k['lab'], ENR1, {'what_to_fix': 'x'})['request']['id']
+        s, f = d.revise(t1, ENR1, k['lab']); d.score(ENR1, k['lab'], 8)
+        d.rpc('return_grades(:a, :e, :k)', a=k['lab'], e=[ENR1], k=nid())
+        ok('undo2: the trigger stored the request done', d.one('select state from revision_request where id = :r', r=rid) == 'done')
+        d.save_markup(files[0], marks('n', 'later'))
+        rows = row_checksums(d.c)
         r = d.undo2(); ok('undo2: the undo runs', r == 'ok', r)
-        ok('undo2: the hidden grade comes back exactly', gr(d, ENR1, k['lab']) == g_before, (gr(d, ENR1, k['lab']), g_before))
-        ok('undo2: the student sees it again', piece(d.page(t1, ENR1), k['lab'])['grade']['value'] == 6)
-        ok('undo2: no other table\'s rows change', row_checksums(d.c, {t: c for t, c in table_columns(d.c).items() if t not in ('public.grade_return', 'public.revision_request')}) == rows_other)
+        ok('undo2: no row of any table changes (marks given stay given, the request stays done, no grade row)', row_checksums(d.c) == rows)
         gone, new = differences(cat_c1, catalog(d.c))
         ok('undo2: the catalog is the one C1 alone left, line for line', gone == [] and new == [], (gone[:3], new[:3]))
-        ok('undo2: Hide answers hide_not_available again', d.rfr(k['rub'], ENR1, {'what_to_fix': 'x', 'keep_grade': False})['result'] == 'hide_not_available')
+        ok('undo2: Hide answers hide_not_available, as before', d.rfr(k['rub'], ENR1, {'what_to_fix': 'x', 'keep_grade': False})['result'] == 'hide_not_available')
+        d.score(ENR1, k['lab'], 9); d.rpc('return_grades(:a, :e, :k)', a=k['lab'], e=[ENR1], k=nid())
+        ok('undo2: a Return through return_grades gives no marks again (C1 alone)', 'later' not in json.dumps(d.marks(t1, ENR1, k['lab'])))
+        ok('undo2: return_work still gives them', d.return_work(k['lab'], [ENR1])['marks_given'] == 1)
         r = d.undo2(); ok('undo2: run again, it stops: nothing to take back', r.startswith('STOPPED') and 'not applied' in r, r)
         ok('undo2: C2 can be applied again', d.apply2() == 'ok' and postcheck(d, 'batch-c2-live-postcheck.sql') == [])
     finally:

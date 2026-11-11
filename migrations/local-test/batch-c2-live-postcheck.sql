@@ -3,10 +3,7 @@
 -- catalog only. Expected: no rows.
 with made(fn, becomes) as (values
     -- FINGERPRINTS-BEGIN c2new (written by migrations/local-test/batch_c_fingerprints.py)
-    ('public._revision_hide_available()',   'a4b4e942de351d6849702b96f25c7356'),
-    ('public._revision_hide_grade(uuid)',   '295f0e5f94eeb8492af2c205b641377b'),
-    ('public._revision_unhide_grade(uuid)', '3c0ff04195505dacf40b55217f8fe839'),
-    ('public._markup_on_return()',          '7aee1528f49c74565268dd37d191afd0')
+    ('public._markup_on_return()', 'ce8ceaa830617aa9caf935b161d7e379')
     -- FINGERPRINTS-END
 )
 select 'a function is not as C2 leaves it' as problem, m.fn as detail,
@@ -21,6 +18,22 @@ union all
 select 'a trigger C2 adds is missing or off', x.trg, 'absent or off', 'enabled'
   from (values ('markup_given_on_insert'), ('markup_given_on_return')) x(trg)
  where not exists (select 1 from pg_trigger t where t.tgrelid = 'public.grade_return'::regclass and t.tgname = x.trg and t.tgenabled = 'O')
+union all
+-- Each trigger as C2 makes it: when it fires (its events, columns and
+-- condition, read from the definition with the function cut off, since how
+-- the function is named depends on the search path) and what it runs.
+select 'a trigger C2 adds is not as C2 makes it', x.trg,
+       coalesce(regexp_replace(pg_get_triggerdef(t.oid), ' EXECUTE FUNCTION .*$', ''), 'absent'), x.fires
+  from (values
+        ('markup_given_on_insert',
+         'CREATE TRIGGER markup_given_on_insert AFTER INSERT ON public.grade_return FOR EACH ROW WHEN (((new.returned_at IS NOT NULL) AND (NOT new.is_draft)))'),
+        ('markup_given_on_return',
+         'CREATE TRIGGER markup_given_on_return AFTER UPDATE OF returned_at ON public.grade_return FOR EACH ROW WHEN (((new.returned_at IS NOT NULL) AND (NOT new.is_draft) AND (old.returned_at IS DISTINCT FROM new.returned_at)))')
+       ) x(trg, fires)
+  left join pg_trigger t on t.tgrelid = 'public.grade_return'::regclass and t.tgname = x.trg and not t.tgisinternal
+ where t.oid is null
+    or regexp_replace(pg_get_triggerdef(t.oid), ' EXECUTE FUNCTION .*$', '') <> x.fires
+    or t.tgfoid <> coalesce(to_regprocedure('public._markup_on_return()'), 0)
 union all
 select 'a SECURITY DEFINER function does not name pg_temp last', n.nspname || '.' || p.proname, coalesce(p.proconfig::text, ''), 'search_path=…, pg_temp'
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace

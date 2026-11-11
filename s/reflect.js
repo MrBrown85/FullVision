@@ -67,10 +67,6 @@
       null
     );
   }
-  function teacherOf() {
-    var v = view();
-    return String((v && v.course && v.course.teacherName) || '').trim();
-  }
   function day(iso) {
     var t = iso ? new Date(iso) : null;
     return t && !isNaN(t) ? t.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }) : '';
@@ -124,11 +120,11 @@
 
   /* ── Sending ───────────────────────────────────────────────── */
 
-  function said(res, teacher) {
+  function said(res) {
     var e = res && res.error;
     if (e === 'reflect_off') return 'Reflect on Feedback is turned off for this class now.';
     if (e === 'not_returned' || e === 'not_found') return 'This piece can’t take a reflection now.';
-    if (e === 'already_asked') return 'You’ve already asked about this. ' + teacher + ' will answer it here.';
+    if (e === 'already_asked') return 'You’ve already asked about this. Your teacher will answer it here.';
     return NETWORK;
   }
 
@@ -188,7 +184,6 @@
       // The student left, or another student signed in, while it was on its way.
       if (!current(r)) return;
       r.busy = false;
-      var teacher = teacherOf() || 'Your teacher';
       if (res && res.ok === true && res.reflection && typeof res.reflection === 'object') {
         StudentPage.paint(done());
         return;
@@ -199,7 +194,7 @@
         StudentPage.paint('#sp-reflect-title');
         return;
       }
-      r.message = said(res, teacher);
+      r.message = said(res);
       StudentPage.paint('#sp-reflect-msg');
     });
   }
@@ -303,11 +298,11 @@
     );
   }
 
-  function saidHtml(p, teacher) {
+  function saidHtml(p) {
     if (!p.comment) return '';
     return (
       '<section class="sp-fb-card sp-reflect-said"><h2 class="sp-fb-label">' +
-      esc((teacher || 'Your Teacher') + ' Said') +
+      'Your Teacher Said' +
       '</h2><p class="sp-fb-comment-words">' +
       esc(p.comment) +
       '</p></section>'
@@ -321,11 +316,11 @@
   }
 
   // Reflect on Feedback and Reflect, Not Sure (the boards).
-  function formHtml(r, p, v, teacher) {
-    var who = teacher || 'your teacher';
+  function formHtml(r, p, v) {
+    var who = 'your teacher';
     var body =
       head('Reflect on Feedback', p.title) +
-      saidHtml(p, teacher) +
+      saidHtml(p) +
       stepHtml(
         1,
         'Does the Feedback Make Sense?',
@@ -371,16 +366,16 @@
         '<button type="button" class="sp-btn sp-btn-primary sp-btn-big sp-reflect-send" data-act="reflect-send"' +
         (!ready(r) || r.busy ? ' disabled' : '') +
         '>' +
-        esc(r.busy ? 'Sending…' : r.sense === 'yes' ? 'Send Reflection' : 'Ask ' + (teacher || 'Your Teacher')) +
+        esc(r.busy ? 'Sending…' : r.sense === 'yes' ? 'Send Reflection' : 'Ask Your Teacher') +
         '</button>';
     }
     return body;
   }
 
   // Reflection Sent (the board), and its question form (mine).
-  function sentHtml(r, p, v, teacher) {
+  function sentHtml(r, p, v) {
     var mine = p.reflection || {};
-    var who = teacher || 'Your teacher';
+    var who = 'Your teacher';
     var plan = mine.makesSense === 'yes';
     return (
       head(plan ? 'Reflection Sent' : 'Question Sent', '') +
@@ -401,12 +396,11 @@
     );
   }
 
-  function bubbleHtml(who, when, words, theirs, teacher) {
+  function bubbleHtml(who, when, words, theirs) {
     return (
       '<div class="sp-bubble' +
       (theirs ? ' sp-bubble-theirs' : ' sp-bubble-mine') +
       '"><p class="sp-bubble-who">' +
-      (theirs && teacher && StudentPageView.initialsHtml ? StudentPageView.initialsHtml(teacher) : '') +
       '<span>' +
       esc(who + (when ? ', ' + when : '')) +
       '</span></p><p class="sp-bubble-words">' +
@@ -416,17 +410,17 @@
   }
 
   // Your Teacher Answered (the board): the question and the answer, then Does It Make Sense Now?
-  function answerHtml(r, p, teacher) {
+  function answerHtml(r, p) {
     var mine = p.reflection || {};
-    var who = teacher || 'Your Teacher';
+    var who = 'Your Teacher';
     var asked = mine.makesSense === 'not_sure';
     var talk =
       (asked
         ? bubbleHtml('You Asked', day(mine.sentAt), mine.question, false)
         : bubbleHtml('Your Plan', day(mine.sentAt), mine.plan, false)) +
-      (mine.answer ? bubbleHtml(who, day(mine.answeredAt), mine.answer, true, teacher) : '') +
+      (mine.answer ? bubbleHtml(who, day(mine.answeredAt), mine.answer, true) : '') +
       (mine.followUp ? bubbleHtml('You Asked', '', mine.followUp, false) : '') +
-      (mine.followUpAnswer ? bubbleHtml(who, day(mine.followUpAnsweredAt), mine.followUpAnswer, true, teacher) : '');
+      (mine.followUpAnswer ? bubbleHtml(who, day(mine.followUpAnsweredAt), mine.followUpAnswer, true) : '');
     var after = '';
     if (asked && mine.answer) {
       var sense = mine.senseNow || (r.asking ? 'not_sure' : '');
@@ -448,7 +442,7 @@
       } else if (!mine.senseNow && r.asking) {
         after +=
           '<section class="sp-reflect-step">' +
-          boxHtml('follow', r.follow, 'Your question for ' + (teacher || 'your teacher')) +
+          boxHtml('follow', r.follow, 'Your question for your teacher') +
           '</section>' +
           messageHtml(r) +
           '<button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="reflect-follow"' +
@@ -457,7 +451,7 @@
           esc(r.busy ? 'Sending…' : 'Ask ' + who) +
           '</button>';
       } else if (mine.followUp && !mine.followUpAnswer) {
-        after += '<p class="sp-reflect-line">' + esc((teacher || 'Your teacher') + ' will answer it here.') + '</p>';
+        after += '<p class="sp-reflect-line">' + 'Your teacher will answer it here.' + '</p>';
       }
       if (!r.asking) after += messageHtml(r);
     }
@@ -471,15 +465,9 @@
     if (!p || !canReflect(v, p)) {
       return '<main class="sp-main sp-main-center"><p class="sp-lead" role="status">Opening your page…</p></main>';
     }
-    var teacher = teacherOf();
     // What the page holds now decides the step, once something was sent (or answered meanwhile).
     if (r.step === 'form' && p.reflection) r.step = stepFor(p);
-    var body =
-      r.step === 'answer'
-        ? answerHtml(r, p, teacher)
-        : r.step === 'sent'
-          ? sentHtml(r, p, v, teacher)
-          : formHtml(r, p, v, teacher);
+    var body = r.step === 'answer' ? answerHtml(r, p) : r.step === 'sent' ? sentHtml(r, p, v) : formHtml(r, p, v);
     return (
       '<main class="sp-main sp-reflect"><div class="sp-view sp-reflect-view"><section class="sp-feedback">' +
       body +

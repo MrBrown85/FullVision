@@ -8,12 +8,11 @@ A list sits between `-- FINGERPRINTS-BEGIN <which>` and `-- FINGERPRINTS-END`,
 as rows of a VALUES list. <which>:
     relied     (fn, md5)                 existing functions C1 calls, as the template has them
     new        (fn, becomes, or_c2)      every function C1 makes; or_c2 is what C2 leaves (the
-                                         same, except for the three C2 replaces)
+                                         same: C2 replaces none)
     absent     (fn, 'absent')            the same functions: none may exist before C1
-    c2relied   (fn, first_run, later_run) what C2's guard compares: the functions it calls and
-                                         the three it replaces, after C1 alone and after C2
-    c2new      (fn, becomes)             the four functions C2 leaves
-    c1stand    (fn, md5)                 the three C2 replaces, as C1 leaves them (C2's undo)
+    c2relied   (fn, first_run, later_run) what C2's guard compares: the functions it relies on and
+                                         its own, after C1 alone and after C2
+    c2new      (fn, becomes)             the function C2 leaves
     replaces   (fn, before, becomes)     the existing function C1 replaces, before C1 and after it
     replbefore (fn, md5)                 the same, before C1 (the pre-check; C1's undo puts it back)
     replafter  (fn, md5)                 the same, after C1 (the post-check)
@@ -49,7 +48,6 @@ def measured():
         'absent': [(k, 'absent') for k in C1_FUNCTIONS],
         'c2relied': [(k, a(after1[k]), a(after2[k])) for k in dict.fromkeys(c2fns)],
         'c2new': [(k, after2[k]) for k in C2_REPLACES + C2_NEW],
-        'c1stand': [(k, after1[k]) for k in C2_REPLACES],
         'replaces': [(k, relied[k], after1[k]) for k in C1_REPLACES],
         'replbefore': [(k, relied[k]) for k in C1_REPLACES],
         'replafter': [(k, after2[k]) for k in C1_REPLACES],
