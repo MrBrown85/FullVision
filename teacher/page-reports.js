@@ -24,6 +24,7 @@ window.PageReports = (function () {
   _measureBlockSizes = _inReportScores(_measureBlockSizes);
   _classSummary = _inReportScores(_classSummary);
   _blockHtml = _inReportScores(_blockHtml);
+  _draftsInPrint = _inReportScores(_draftsInPrint);
   function _reportSet() {
     return ReportScores.reportScoreSet('progress');
   }
@@ -524,8 +525,23 @@ window.PageReports = (function () {
     var t = _tab();
     // A tab with no comment box of its own lets go of the last tab's.
     if (!t.longForm) _syncLongFormAuthContext();
+    /* Every tab reads returned grades in a class that holds them. Until
+       they can be read (ReportScores.ready) the page waits with the
+       class's loading line and draws nothing else: Print Reports then has
+       nothing to print, and the data layer's redraw once the rows load
+       reaches this page through render(). */
+    if (!ReportScores.ready(cid)) {
+      _waitingForReturns = true;
+      _lastSummary = null;
+      _lastSummarySet = '';
+      // html-safe: ReportScores.WAITING_HTML is fixed markup
+      if (output) output.innerHTML = ReportScores.WAITING_HTML;
+      return;
+    }
+    _waitingForReturns = false;
     t.render(cid, output);
   }
+  var _waitingForReturns = false; // the page drew the waiting line, not the tab
 
   function _renderQuestionnaireTab(cid, output) {
     // The sentence bank loads the first time Reports needs it.
@@ -626,6 +642,10 @@ window.PageReports = (function () {
       _showIssue(viewingIssue.id);
       return;
     }
+    // A render with nothing to print ("No report data yet", no students) leaves no summary behind:
+    // Print Reports must not open on the last render's students.
+    _lastSummary = null;
+    _lastSummarySet = '';
     Preview.renderReportPreview({
       cid: activeCourse,
       students: _previewStudents(),
@@ -1232,6 +1252,7 @@ window.PageReports = (function () {
   /* keepEveryone: the dialog closes to print, so the canvas stays on
      Everyone and the Name chosen in it stays. Any other close is a cancel. */
   function closeIssueDialog(keepEveryone) {
+    DraftsBeforePrint.close();
     var overlay = document.getElementById(ISSUE_OVERLAY_ID);
     if (overlay && overlay.remove) overlay.remove();
     if (_issueState && _issueState.nameChanged && !keepEveryone) {
@@ -1263,10 +1284,72 @@ window.PageReports = (function () {
     }
   }
 
+  /* The drafts a print of these students would leave out, on the work the
+     report counts (the year to date as of the report's term), or null
+     when the class does not hold grades or none is a draft
+     (teacher/drafts-before-print.js). */
+  function _draftsInPrint(ids) {
+    var cid = activeCourse;
+    if (!DraftsBeforePrint.holds(cid)) return null;
+    var aids = (getAssessments(cid) || [])
+      .filter(function (a) {
+        return assessmentInYearToDate(cid, a);
+      })
+      .map(function (a) {
+        return a.id;
+      });
+    return DraftsBeforePrint.find(cid, aids, ids);
+  }
+
+  /* Print in the dialog. In a class that holds grades, when a student in
+     the print has a draft the report would show, it asks first (S2-F1):
+     Return Them, Then Print returns exactly those drafts and prints with
+     them in; Print Without Them prints the returned grades; Cancel goes
+     back to the dialog and does nothing. */
   function _issueFromDialog(overlay) {
     var c = _issueState && _issueState.counts;
     if (!c) return;
     var who = (overlay.querySelector('input[name="issue-who"]:checked') || {}).value || 'all';
+    var found = _draftsInPrint(who === 'changed' ? c.changed : c.ids);
+    if (!found) return _issueAndPrint(c, who);
+    // The question belongs to this Print dialog, for this class and this report.
+    var owner = {
+      el: overlay,
+      still: function () {
+        return _issueState !== null && _issueState.counts === c && activeCourse === found.cid;
+      },
+    };
+    DraftsBeforePrint.ask(
+      found,
+      'reports',
+      function (choice) {
+        if (choice === 'cancel') return;
+        if (choice === 'return') {
+          // Every draft it named is returned, or nothing prints and no copy is saved.
+          if (!DraftsBeforePrint.returnAll(found).all) {
+            // Some may have returned: what Print Without Them prints is drawn again from them.
+            renderReportPreview();
+            if (_issueState) {
+              var again = _issueCounts();
+              if (who === 'changed') again.changed = c.changed;
+              _issueState.counts = again;
+            }
+            DraftsBeforePrint.showFailed(overlay);
+            return;
+          }
+          // Drawn again from the grades now returned, so what prints and the copy kept hold them.
+          renderReportPreview();
+          var now = _issueCounts();
+          if (who === 'changed') now.changed = c.changed;
+          c = now;
+        }
+        _issueAndPrint(c, who);
+      },
+      owner,
+    );
+  }
+
+  function _issueAndPrint(c, who) {
     var doPrint = true;
     closeIssueDialog(true);
     var ids = who === 'changed' ? c.changed : c.ids;
@@ -2013,6 +2096,8 @@ window.PageReports = (function () {
 
   /* ── Course switching ────────────────────────────────────────── */
   async function switchCourse(cid) {
+    // The Print dialog and any question over it are this class's.
+    closeIssueDialog();
     RQ.tqSaveCurrentIfNeeded();
     // A pending Undo belongs to the class being left.
     if (typeof dismissUndoToast === 'function') dismissUndoToast();
@@ -2697,6 +2782,13 @@ window.PageReports = (function () {
     init: init,
     destroy: destroy,
     switchCourse: switchCourse,
+    /* The data layer's redraw (_invalidateAndRerender) after the class's
+       returned grades load: the page draws what it was waiting for. While
+       nothing was waiting it does nothing, as before this page had a
+       render(), so no other change of data redraws Reports. */
+    render: function () {
+      if (_waitingForReturns && document.getElementById('report-output')) renderReports();
+    },
     // A redraw from elsewhere (Sent to Phones) only while the page is up.
     renderReports: function () {
       if (document.getElementById('report-output')) renderReports();

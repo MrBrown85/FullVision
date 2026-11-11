@@ -670,11 +670,14 @@ describe('the session: one token, kept until midnight, Done or fifteen idle minu
   });
 
   it('a device opened after midnight asks nothing and says the student is signed out', async () => {
-    const dev = school({ lasts: 50 });
+    // Ten minutes long, so its end comes before the fifteen idle minutes do.
+    const dev = school({ lasts: 10 * 60 * 1000 });
     await signIn(dev);
     expect(dev.store[KEY]).toBeTruthy();
-    await new Promise(r => setTimeout(r, 80));
-    const page = await dev.open('');
+    const page = openStudentPage({ store: dev.store });
+    page.server = body => dev.fn.handle(body);
+    page.advance(11 * 60 * 1000); // opened again eleven minutes later
+    await page.start('');
     expect(page.calls).toEqual([]);
     expect(page.root().querySelector('.sp-msg').textContent).toBe(SIGNED_OUT);
     expect(page.root().querySelector('form[data-form="card"]')).toBeTruthy();

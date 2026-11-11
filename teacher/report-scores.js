@@ -9,7 +9,13 @@
    - 'all': the teacher's working copy, drafts included;
    - 'returned': only what students have been given (shared/calc.js,
      withReturnedOnly).
-   Today every surface is 'all'. Nothing else in the app decides this.
+   Nothing else in the app decides this.
+
+   'returned' changes something only in a class that holds grades (its
+   student page on and Return Grades set to When I Return Them). In any
+   other class the data layer's returned set is the working copy itself
+   (getReturnedScores, getReturnedRubricCheckIds), so such a class prints
+   exactly what it printed before (tests/report-surfaces-other-classes.test.js).
 
    Three things go through here, and tests/report-score-seam.test.js fails
    when a report file goes around any of them:
@@ -30,14 +36,16 @@ window.ReportScores = (function () {
 
   /* Which grades each surface uses (plan 1.3, "Which grades each screen
      uses"; DECISIONS, "Student page build answers" 6). To put a surface on
-     returned grades, change its row to 'returned'.
-     The rubric handout printed from the grader (teacher/rubric-print.js)
-     is not a surface: the plan's table has no row for it. Its sheet reads
-     through the readers below, and is drawn on all work unless a report
-     surface draws it (a Feedback Page). */
+     returned grades, change its row to 'returned'. */
   var SURFACES = {
-    // Progress Reports on Page Studio, and the Quick Report with its Feedback Pages. S2-F1 makes it 'returned'.
-    progress: 'all',
+    // Progress Reports on Page Studio, and the Quick Report with its Feedback Pages (S2-F1).
+    progress: 'returned',
+    /* The rubric handout (teacher/rubric-print.js), from each door that
+       prints it: the grader, Class Results and the gradebook's column menu.
+       It is handed to students (DECISIONS, "Student page build rulings
+       (2026-11-10)" 6; S2-F1). Drawn inside a Feedback Page it takes that
+       report's set, as any report drawn inside another does. */
+    handout: 'returned',
     // The Term Questionnaire's facts, At a Glance and Generate. S2-F2 makes it 'returned'.
     questionnaire: 'all',
     // Sent to Phones: each student's phone copy. S2-F2 makes it 'returned'.
@@ -106,7 +114,7 @@ window.ReportScores = (function () {
     };
   }
 
-  // The surface whose function is running now, or null outside every report.
+  // The surface whose function is running now, or null outside every report ('ready' while ready() asks).
   function running() {
     return _running;
   }
@@ -253,7 +261,44 @@ window.ReportScores = (function () {
     return statuses(cid)[sid + ':' + aid] || null;
   }
 
+  /* ── Ready, or waiting ─────────────────────────────────────────
+     The one question a page asks before it draws or acts on anything that
+     reads returned grades: can this class's returned grades be read now?
+     Always yes in a class that does not hold grades (its returned set is
+     the working copy). In a signed-in class that holds grades, no until
+     its Draft and Returned rows have loaded this session (the first draw
+     of a session, or offline): the data layer then refuses, rightly, to
+     call anything returned, with an error whose code is
+     RETURNED_NOT_LOADED. Any other error from building the returned set
+     is a fault, and is thrown, not waited out. While the answer is no, a surface draws
+     WAITING_HTML instead of itself, and a button that needs the returned
+     grades does nothing. Once the rows load, the data layer redraws the
+     page on screen (_invalidateAndRerender, which calls the page's
+     render()). */
+  function ready(cid) {
+    if (typeof getReturnedScores !== 'function') return false;
+    // The seam's own read, not a report's: it draws nothing (running() says 'ready' meanwhile).
+    var was = _running;
+    if (!was) _running = 'ready';
+    try {
+      getReturnedScores(cid);
+      return true;
+    } catch (e) {
+      // Only the data layer's not-loaded refusal is waited out; any other error is a fault and surfaces.
+      if (e && e.code === 'RETURNED_NOT_LOADED') return false;
+      throw e;
+    } finally {
+      _running = was;
+    }
+  }
+
+  // html-safe: fixed markup; the words are Class Settings' own loading line
+  var WAITING_HTML =
+    '<div class="empty-state report-waiting" role="status"><div class="empty-state-text">Loading this class\u2026</div></div>';
+
   var api = {
+    ready: ready,
+    WAITING_HTML: WAITING_HTML,
     reportScoreSet: reportScoreSet,
     withReportScores: withReportScores,
     scoped: scoped,

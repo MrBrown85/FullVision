@@ -224,6 +224,27 @@ describe('the class’s two settings come from the server with the class', () =>
     expect(state(NOOR, CAUSES)).toBe('draft');
   });
 
+  it('the first time a class’s rows are in this session, the page on screen is drawn again (S2)', async () => {
+    await openClass();
+    const drawn = [];
+    const was = Router.getCurrentPage;
+    Router.getCurrentPage = () => ({ render: () => drawn.push('render') });
+    try {
+      // As at the start of a session: the class's rows not yet read.
+      delete _gradeReturnsLoadedFor[CID];
+      delete _gradeReturnsReadThisSession[CID];
+      expect(ReportScores.ready(CID)).toBe(false);
+      await _loadServerGradeReturns(CID, true);
+      expect(ReportScores.ready(CID)).toBe(true);
+      expect(drawn.length).toBe(1);
+      // Read again, nothing changed: no redraw.
+      await _loadServerGradeReturns(CID, true);
+      expect(drawn.length).toBe(1);
+    } finally {
+      Router.getCurrentPage = was;
+    }
+  });
+
   it('turned off from another device: the class reads off again and its rows are no longer read', async () => {
     await openClass();
     expect(callsTo('list_course_grade_returns').length).toBe(1);
