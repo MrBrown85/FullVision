@@ -302,7 +302,8 @@ describe('the gradebook and the phone keep no copy', () => {
       expect(src, file).not.toMatch(/function _(returnTogether|draftsReturned|draftsSentence|draftNames)\b/);
       expect(src, file).not.toMatch(/Grades?' \+|' Grades? Now|Now\?'/);
       expect(src, file).not.toMatch(/can(’|\\u2019)t see (it|them) yet/);
-      expect(src, file).toMatch(/GradeState\.draftsReturned\(/);
+      // GraderWork.draftsReturned is GradeState's, less the work out for revision (S11).
+      expect(src, file).toMatch(/(GradeState|GraderWork)\.draftsReturned\(/);
       expect(src, file).toMatch(/GradeState\.returnTogether\(/);
       expect(src, file).toMatch(/GradeState\.returnQuestion\(/);
     });

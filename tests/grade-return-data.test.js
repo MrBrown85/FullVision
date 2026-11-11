@@ -1767,6 +1767,9 @@ describe('the grader’s gradebook, phone and Assignments page actions follow th
       'backToGroupGrade',
       'undo',
       'returnGrades',
+      // Return for Revision and Take Back (S11): tests/grader-revision.test.js walks them.
+      'returnForRevision',
+      'cancelRevision',
     ];
     expect(Object.keys(Grader).sort()).toEqual(names.concat(dialog).sort());
   });
