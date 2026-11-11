@@ -313,3 +313,44 @@ test('the Advanced Rubric a criterion at a time: pager, groups of boxes, Next: c
   await card.getByRole('button', { name: 'Previous criterion' }).click();
   await expect(card.locator('.m-crit-pager .m-crit-name')).toHaveText(crits[0]);
 });
+
+test('Grade From Paper on a not-in card: Set Logan To, a level, then Handed in on paper', async ({ page }) => {
+  await openPhone(page);
+  const sid = (await notIn(page))[0];
+  await page.evaluate(
+    ({ sid, LAB }) => {
+      const a = getAssessments('sci8').find(x => x.id === LAB);
+      const keys = [...new Set((getScores('sci8')[sid] || []).filter(e => e.assessmentId === LAB).map(e => e.tagId))];
+      Grader.setOverallComment('sci8', sid, LAB, '');
+      getRubricCheckIds('sci8', sid, LAB).forEach(id => Grader.setTick('sci8', sid, LAB, id, false));
+      if (keys.length) Grader.clearScore('sci8', getScores('sci8'), sid, a, keys);
+    },
+    { sid, LAB },
+  );
+  await openLab(page);
+  await page.locator('#m-thumb-strip .m-thumb[data-sid="' + sid + '"]').click();
+  const card = page.locator('.m-swiper-card[data-sid="' + sid + '"]');
+  const first = await page.evaluate(sid => displayNameFirst(getStudents('sci8').find(s => s.id === sid)), sid);
+  await expect(card.locator('.m-work-paper-head')).toHaveText('Grade From Paper');
+  const setTo = card.locator('[data-action="m-work-setto-menu"]');
+  await expect(setTo).toHaveText('Set ' + first + ' To');
+  await setTo.scrollIntoViewIfNeeded();
+  await shot(page, 'S7-F3-grade-from-paper');
+  await setTo.click();
+  const sheet = page.locator('#m-sheet-container .m-setto-menu');
+  await expect(sheet.locator('.m-tg-menu-name')).toHaveText('Set ' + first + ' To');
+  await expect(sheet.locator('[data-action="m-work-setto"]')).toHaveCount(4);
+  await shot(page, 'S7-F3-set-to-sheet');
+  await sheet.locator('[data-action="m-work-setto"][data-level="3"]').click();
+  await expect(page.locator('#m-toast')).toContainText(first + ' set to Proficient');
+  await expect(card.locator('.m-work-sent')).toHaveText('Handed in on paper');
+  const levels = await page.evaluate(
+    ({ sid, LAB }) =>
+      (getScores('sci8')[sid] || []).filter(e => e.assessmentId === LAB && e.score > 0).map(e => e.score),
+    { sid, LAB },
+  );
+  expect(levels.length).toBeGreaterThan(0);
+  expect(levels.every(l => l === 3)).toBe(true);
+  await expect(page.locator('#m-sheet-container .m-sheet')).toHaveCount(0);
+  await shot(page, 'S7-F3-set-to-done');
+});

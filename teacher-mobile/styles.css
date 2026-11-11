@@ -5343,6 +5343,63 @@ body.fv-switching-course::after {
   font-size: 13px;
   color: var(--text-2);
 }
+/* Grade From Paper: Set Logan To, and its sheet of levels. */
+.m-work-paper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 0.5px solid var(--divider-subtle);
+}
+.m-work-paper-head {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.m-work-setto {
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--link);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.m-work-setto:disabled {
+  color: var(--text-2);
+  cursor: default;
+}
+.m-tg-menu-item.m-setto-item {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+.m-setto-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+}
+.m-setto-dot[data-score='1'] {
+  background: var(--score-1);
+}
+.m-setto-dot[data-score='2'] {
+  background: var(--score-2);
+}
+.m-setto-dot[data-score='3'] {
+  background: var(--score-3);
+}
+.m-setto-dot[data-score='4'] {
+  background: var(--score-4);
+}
 
 /* A student's To Grade list: on the card and on View Profile (S7-F4). */
 .m-scard-tograde {

@@ -229,7 +229,40 @@ window.MGradePhotos = (function () {
       MC.esc('Add Work for ' + first) +
       '</button>' +
       '<div class="m-work-add-hint">Photos or PDFs. Photos are made smaller before they upload.</div>' +
+      paperHtml(cid, a, st) +
       '</div>'
+    );
+  }
+
+  /* Grade From Paper (S7-F3 follow-up): Set Logan To, on a piece scored by
+     level. The rule is the desktop's, GraderWork.setToFromPaper in
+     shared/grader.js; this only says whether there is anything it could set
+     (a criterion or competency on the piece). Off under Missing, as the
+     levels are. */
+  function paperLevels(cid, a) {
+    if (!a || isPointsScored(a) || isCompletionScored(a) || isDibelsScored(a)) return 0;
+    if (a.rubricId) {
+      var rubric = getRubricById(cid, a.rubricId);
+      return rubric ? (rubric.criteria || []).length : 0;
+    }
+    return scoreTagIds(a, cid).length;
+  }
+
+  // html-safe: the name goes through MC.esc; ids are ours
+  function paperHtml(cid, a, st) {
+    if (!paperLevels(cid, a)) return '';
+    var first = displayNameFirst(st) || displayName(st);
+    return (
+      '<div class="m-work-paper"><div class="m-work-paper-head">Grade From Paper</div>' +
+      '<button type="button" class="m-work-setto" data-action="m-work-setto-menu" aria-haspopup="dialog" data-sid="' +
+      st.id +
+      '" data-aid="' +
+      a.id +
+      '"' +
+      (isScoreLocked(cid, st.id, a.id) ? ' disabled' : '') +
+      '>' +
+      MC.esc('Set ' + first + ' To') +
+      '</button></div>'
     );
   }
 
@@ -467,6 +500,7 @@ window.MGradePhotos = (function () {
     notInLine: notInLine,
     notInState: notInState,
     daysLate: daysLate,
+    paperLevels: paperLevels,
     studentListHtml: studentListHtml,
     syncTabBadge: syncTabBadge,
     releaseUnused: _letGo,
