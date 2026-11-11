@@ -4898,3 +4898,284 @@ body.fv-switching-course::after {
   color: #fff;
   font-weight: 600;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   STUDENT WORK on the Grade tab and the grading card (S7)
+   Drawn only in a class whose student page and Send Work are on
+   (teacher-mobile/grade-photos.js).
+   ═══════════════════════════════════════════════════════════════ */
+.m-tg-row {
+  align-items: center;
+  padding-right: 4px;
+}
+.m-tg-counts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 4px 0 2px;
+}
+.m-tg-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 13px;
+  background: var(--active);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+}
+.m-tg-notin {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--priority);
+}
+.m-tg-done {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--score-3-text);
+}
+.m-tg-more {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 22px;
+  background: transparent;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.m-tg-more:active {
+  background: var(--overlay-pressed);
+}
+.m-tg-caught {
+  padding-top: 64px;
+}
+.m-tg-menu {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0 8px;
+}
+.m-tg-menu-head {
+  padding: 6px 16px 10px;
+}
+.m-tg-menu-name {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+}
+.m-tg-menu-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 56px;
+  padding: 8px 16px;
+  border: 0;
+  border-top: 0.5px solid var(--divider-subtle);
+  background: transparent;
+  text-align: left;
+  font: inherit;
+}
+.m-tg-menu-title {
+  font-size: 17px;
+  color: var(--link);
+}
+.m-tg-menu-sub {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.m-tg-menu-cancel {
+  margin: 10px 16px 0;
+  height: 50px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--surface-2);
+  color: var(--link);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 600;
+}
+.m-live-filter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.m-live-filter-head .m-filter-sheet-heading {
+  margin: 0;
+}
+.m-live-filter-done {
+  font-weight: 700;
+}
+.m-live-filter-count {
+  margin: 4px 0 10px;
+  font-size: 13px;
+  color: var(--text-2);
+  text-align: center;
+}
+
+/* The grading card's work: when it came, the pages, the note. */
+.m-work {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: -6px 0 18px;
+}
+.m-work-sent {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--link);
+}
+.m-work-pages {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #2c2c2e;
+  padding: 8px 8px 0;
+}
+.m-work-scroller {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.m-work-scroller::-webkit-scrollbar {
+  display: none;
+}
+.m-work-page {
+  flex: 0 0 100%;
+  height: 188px;
+  overflow: hidden;
+  border-radius: 4px 4px 0 0;
+  background: #fff;
+  scroll-snap-align: start;
+}
+.m-work-page img {
+  display: block;
+  width: 100%;
+}
+.m-work-full {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.m-work-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+.m-work-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 4px;
+  background: var(--border);
+}
+.m-work-dot.is-on {
+  background: var(--text);
+}
+.m-work-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 11px;
+  border-radius: 12px;
+  background: #fff8e1;
+  box-shadow: inset 0 0 0 1px #f2d27a;
+  color: #1d1d1f;
+  font-size: 14px;
+}
+.m-work-note svg {
+  flex: none;
+  margin-top: 3px;
+  color: #7a5900;
+}
+/* Pinned at the top of the card once the pages have scrolled past. */
+.m-work-pin {
+  position: sticky;
+  top: -16px;
+  z-index: 2;
+  height: 0;
+  overflow: visible;
+  visibility: hidden;
+}
+.m-work-pin.is-on {
+  visibility: visible;
+}
+.m-work-pin-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: calc(100% + 40px);
+  margin: 0 -20px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 0 0 14px 14px;
+  background: #2c2c2e;
+  color: #fff;
+  font: inherit;
+  text-align: left;
+}
+.m-work-pin-thumb {
+  flex: none;
+  width: 40px;
+  height: 52px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #fff;
+}
+.m-work-pin-thumb img {
+  display: block;
+  width: 100%;
+}
+.m-work-pin-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m-work-sheet {
+  margin: 0;
+  gap: 12px;
+}
+.m-work-sheet-title {
+  font-size: 17px;
+  font-weight: 700;
+}
+.m-work-sheet-page {
+  display: block;
+  width: 100%;
+  border-radius: 6px;
+  background: #fff;
+}
+/* A camera mark on a student's circle when their work is in. */
+.m-thumb.m-thumb-work::before {
+  content: '';
+  position: absolute;
+  right: -3px;
+  top: -3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 7px;
+  background: var(--active);
+  box-shadow: 0 0 0 2px var(--surface);
+}
