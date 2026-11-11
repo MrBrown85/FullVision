@@ -588,7 +588,8 @@ def scen_main():
 
     # ── Batch A goes in again ──────────────────────────────────────────
     ok('the four files apply again, with S0-M5 still in place; S0-M5 can be run again after them, and S0-M4b applies again on top', d.apply() == 'ok' and d.one(JOB) == 1)
-    cat3 = [l for l in catalog(d.c) if not l.startswith(('dropped columns ', 'depends '))]
+    # (Only course's slots are new the second time. phone_report has one from before Batch A: 20261107 dropped its reply column.)
+    cat3 = [l for l in catalog(d.c) if not l.startswith(('dropped columns public.course ', 'depends '))]
     first = [l for l in cat1 if not l.startswith('depends ')]
     ok('and give the same database as the first time (the three class settings are new columns again, so their position differs, and the three old slots remain)',
        no_attnum(cat3) == no_attnum(first), trace(no_attnum(first), no_attnum(cat3)))

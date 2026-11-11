@@ -130,8 +130,12 @@ and both kind checks rebuilt. `_phone_report_json` came back without
 `reply_questionnaire_id` or `replied_at`, no function still named the
 column, a `report_reply` template insert failed the check, and an unknown
 token to `submit` still returned `expired`. A read afterwards showed nothing
-had changed. `phone_reports.py` and `questionnaires.py` test the Oct 25
-migrations as they were and still expect the reply.
+had changed. `phone_reports.py` and `questionnaires.py` were written for the
+Oct 25 migrations and expected the reply. Since 2026-11-10 they read which
+database they are given: with this migration loaded (as live has it)
+`phone_reports.py` checks the reply is gone (35 checks; 37 where it still
+exists) and `questionnaires.py` counts 17 templates, not 18 (42 either way).
+See "S3-M1" below for why the harness now loads this file.
 
 ## Score RPCs (2026-11-09)
 
@@ -1071,7 +1075,8 @@ on live):
     A**, the only tables that differ are the eleven the teacher's own saves,
     new pieces, rubric move and restore wrote in between. The suites from
     before Batch A pass (`student_submit.py` 79, `questionnaire_identity.py`
-    47, `phone_reports.py` 37, `questionnaires.py` 42), and `score_rpcs.py`
+    47, `phone_reports.py` 35 since its template is built as live has it,
+    37 before; `questionnaires.py` 42), and `score_rpcs.py`
     passes 182 of its 183 checks on this database: the one that fails
     compares the score tables with `docs/schema.generated.sql`, which
     describes the live database with Batch A in it. That is the snapshot
@@ -1165,8 +1170,11 @@ on live):
   leave no trace. Everything, S3-M1 included, applies again.
 
 Result on 2026-11-10: **169 of 169 on PostgreSQL 17.11 (port 54331), which is what
-production runs, and 169 of 169 on 18.6 (port 54329)**, the same checks with the
-same results (158 before the `s3-m1` scenario was added).
+production runs, and on 18.6 (port 54329)**, the same checks with the same
+results (158 before the `s3-m1` scenario was added). Its template now loads
+the two migrations live has and the earlier lists left out (see "S3-M1"
+below), so `student_submit`'s `_norm`, `check` and `submit` are the live
+functions here too.
 
 `batch_a_undo_load.py`: six connections saving in a loop (points, a rubric
 fill, one criterion, a comment, a clear, a change to the class itself: the
@@ -1226,10 +1234,33 @@ code and password), so it is tested here only and waits for the owner.
 
 It is tested on the database as live is since 2026-11-10 17:12 UTC: the
 harness, S0-M4, Batch A's four files, S0-M5, S0-M4b. `card_codes.py build`
-loads exactly that into an empty database (`card_codes_common.LIVE`, the
-list under "S0-M4b" above with that file added). That database is only a
-template: every scenario copies it (`<PGDATABASE>_<scenario>`, made and
-dropped by the script), so the scripts can be run again and again.
+loads exactly that into an empty database (`card_codes_common.LIVE`: the
+list under "S0-M4b" above with that file added, and two more migrations,
+below). That database is only a template: every scenario copies it
+(`<PGDATABASE>_<scenario>`, made and dropped by the script), so the scripts
+can be run again and again.
+
+**Two migrations the earlier lists leave out.** The read-only pre-check
+(`s3-m1-live-precheck.sql`) was run on `gradebook-prod` on 2026-11-10 by
+the orchestrator. Everything the migration changes matched. It listed
+three functions the migration does not touch, `student_submit._norm`,
+`check` and `submit`, as differing from the harness. The cause was the
+harness: the lists under "Batch A" and "S0-M4b" above never loaded
+`../20261102_housekeeping_fk_indexes.sql` (it gives `_norm` an empty
+`search_path`) or `../20261107_no_report_reply.sql` (it rewrites `check` and
+`submit`: a report is for reading), both applied to live before Batch A.
+`card_codes_common.LIVE` and `batch_a_undo.py`'s list now load both, after
+`20261103_slip_password_kept_for_live_slips.sql`. Three statements of the
+first are left out, by name, because they touch things this stand-in does
+not have (two indexes on the report-issue tables, and
+`fv_check_reporting_terms`). With them the three functions come out with
+the live fingerprints exactly (`276ee00a…`, `cc54e80c…`, `90ace3c1…`,
+recorded in `live-function-md5.txt`; `card_codes.py` checks them on every
+run). No earlier record carried these three, so no recorded fingerprint was
+wrong; but every database built from the earlier lists has the older
+`check` and `submit`. Owed: the same two files in the lists under
+"Batch A" and "S0-M4b" and in `search_path.py`'s own list, with those
+suites rerun.
 
 ```bash
 PGPORT=54331 PGDATABASE=s3m1_live python3 card_codes.py build    # an empty database: live as it is now, without S3-M1
@@ -1323,9 +1354,12 @@ The database is sent tags and nothing else, as it will be.
   the same idempotency key twice at once, and 25 rounds of four requests
   at once for two students listed in either order. One live card each,
   the rest told `changed`, no deadlock, no error.
-- **suites.** With the file applied, `student_submit.py` 79,
-  `questionnaire_identity.py` 47, `phone_reports.py` 37 and
-  `questionnaires.py` 42 pass untouched. `score_rpcs.py` passes 235 of 236
+- **suites.** `student_submit.py` 79, `questionnaire_identity.py` 47,
+  `phone_reports.py` 35 and `questionnaires.py` 42 are run before the file
+  and again with it applied: the same result each time. The first two are
+  untouched; the other two now read whether the report reply exists (see
+  above), and 35 is what `phone_reports.py` has on a database built as
+  live. `score_rpcs.py` passes 235 of 236
   until `docs/schema.generated.sql` is refreshed after the apply (its one
   comparison with the live snapshot, which does not have the three new
   argument lists yet), then 236. `grade_return.py` 284 and
@@ -1359,7 +1393,7 @@ The database is sent tags and nothing else, as it will be.
   three card calls' rows S3-M1 deleted).
 - **suites.** After an apply and an undo, Batch A's own suites pass as
   before: `student_page.py` 216, `grade_return.py` 284, `score_rpcs.py`
-  236, and the slip suites 79, 47, 37, 42.
+  236, and the slip suites 79, 47, 35, 42.
 
 The undo makes `student_card` again from Batch A's own `create table`
 rather than adding the four columns back, so the table has the same columns
@@ -1375,9 +1409,11 @@ PART 2, and that PART 1, 1A and 1B run with S3-M1 applied and leave it
 alone.
 
 Result on 2026-11-10, on PostgreSQL 17.11 (port 54331, what production
-runs) and on 18.6 (port 54329), the same on both: `card_codes.py` 278 of 278;
-`card_codes_undo.py` 67 of 67; `batch_a_undo.py` 169 of 169 (158 before
-its `s3-m1` scenario was added).
+runs) and on 18.6 (port 54329), the same on both, on databases built as
+live has them (the two migrations above loaded): `card_codes.py` 283 of 283;
+`card_codes_undo.py` 67 of 67; `batch_a_undo.py` 169 of 169 (158 before its `s3-m1`
+scenario was added). Before the two migrations were loaded the same three
+gave 278, 67 and 169.
 
 Which older suites still run where. `student_page.py`, `grade_return_race.py`
 and `batch_a_undo.py`'s other scenarios make cards with `issue_student_cards`
