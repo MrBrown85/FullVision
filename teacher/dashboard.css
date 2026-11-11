@@ -7450,3 +7450,37 @@ label.cm-cr-row {
     margin-left: 42px;
   }
 }
+
+/* ── The photo reminder (S8-F1) ────────────────────────────── */
+/* The week before a class's photos of student work are deleted: at the top
+   of its Dashboard and of Class Settings › Student Page. */
+.photo-reminder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--divider-strong);
+  border-left: 4px solid var(--late);
+  border-radius: 12px;
+}
+.page-dashboard .photo-reminder {
+  flex-shrink: 0;
+  margin-bottom: 12px;
+}
+.sp-card .photo-reminder {
+  margin: 8px 0 4px;
+}
+.photo-reminder-text {
+  flex: 1 1 320px;
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-base);
+  line-height: 1.4;
+}
+.photo-reminder-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
