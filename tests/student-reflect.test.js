@@ -94,8 +94,10 @@ describe('S10-F1: reflecting, on returned work only', () => {
     expect(qa(page, '[data-act="reflect-sense"]').map(words)).toEqual(['Yes', 'Not Sure']);
     expect(q(page, '[data-act="reflect-send"]')).toBeNull();
     await page.click('[data-act="reflect-sense"][data-value="yes"]');
+    expect(q(page, '.sp-reflect-n-done')).toBeTruthy();
     expect(qa(page, '.sp-reflect-step-title').map(words)).toEqual([
-      '1Does the Feedback Make Sense?',
+      // Step 1 answered Yes: its number is a green check (the board).
+      'Does the Feedback Make Sense?',
       '2What Will You Do Next Time?',
       '3What Went Well?Optional',
     ]);
@@ -196,7 +198,7 @@ describe('S10-F1: reflecting, on returned work only', () => {
 });
 
 describe('S10-F1: Your Teacher Answered', () => {
-  it('the question and the answer; Yes: "Then make your plan for next time."', async () => {
+  it('the question and the answer; Yes: "Your teacher will see that it makes sense now."', async () => {
     const page = await demo();
     await openReflect(page, 'Energy Transfer Investigation');
     expect(words(q(page, '#sp-reflect-title'))).toBe('Your Teacher Answered');
@@ -208,7 +210,9 @@ describe('S10-F1: Your Teacher Answered', () => {
     expect(words(bubbles[1].querySelector('.sp-bubble-who span:last-child'))).toMatch(/^Your Teacher, \S+ \d+$/);
     expect(q(page, '[role="radiogroup"]').getAttribute('aria-label')).toBe('Does it make sense now?');
     await page.click('[data-act="reflect-sense-now"][data-value="yes"]');
-    expect(page.root().textContent).toMatch(/Then make your plan for next time\./);
+    // Not the board's "Then make your plan for next time.": there is no Make My Plan to press yet.
+    expect(page.root().textContent).toMatch(/Your teacher will see that it makes sense now\./);
+    expect(page.root().textContent).not.toMatch(/make your plan/);
     expect(q(page, '[data-act="reflect-sense-now"][data-value="yes"]').getAttribute('aria-checked')).toBe('true');
     expect(q(page, '[data-act="reflect-sense-now"]').hasAttribute('disabled')).toBe(true);
   });

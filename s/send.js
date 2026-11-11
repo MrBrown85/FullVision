@@ -1522,18 +1522,23 @@
      it" is the student's, Nov 8, decision 11): Yes, Partly or Not This
      Time, or none. */
   var FOLLOWED = { yes: 'Yes', partly: 'Partly', no: 'Not This Time' };
+  var PLAN_ARROW =
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
   function planAskHtml(send, p) {
     if (!p.plan || !p.plan.text) return '';
     return (
-      '<section class="sp-send-plan" aria-labelledby="sp-send-plan-title"><h2 class="sp-plan-title" id="sp-send-plan-title">Your Plan From Last Time</h2><p class="sp-plan-words">' +
+      '<section class="sp-send-plan" aria-labelledby="sp-send-plan-title"><h2 class="sp-plan-title" id="sp-send-plan-title">' +
+      PLAN_ARROW +
+      'Your Plan From Last Time</h2><p class="sp-plan-words">' +
       esc(p.plan.text) +
-      '</p><h3 class="sp-send-plan-ask" id="sp-send-plan-ask">Did You Do It?</h3><div class="sp-seg sp-seg-3" role="radiogroup" aria-label="Did you follow your plan?">' +
+      '</p><h3 class="sp-send-plan-ask" id="sp-send-plan-ask">Did You Do It?</h3><div class="sp-choices" role="radiogroup" aria-label="Did you follow your plan?">' +
       Object.keys(FOLLOWED)
         .map(function (k) {
           var on = send.followed === k;
           return (
-            '<button type="button" class="sp-seg-btn' +
-            (on ? ' sp-seg-on' : '') +
+            // Yes green when chosen, as the board; Partly and Not This Time blue.
+            '<button type="button" class="sp-choice' +
+            (k === 'yes' ? ' sp-choice-green' : '') +
             '" role="radio" aria-checked="' +
             on +
             '" tabindex="' +
