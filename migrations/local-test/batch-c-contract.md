@@ -181,7 +181,7 @@ Send My Revision, as Batch B's `send_start`, `send_finish` and `unsend`, with th
 - Sent again before grading starts, a revision takes the place of the one in (the student's pages go, for good; pages the teacher added move to the new one).
 - `revision_unsend`: `{ ok, unsent, cancelled, pages }`. THE PHOTOS ARE DELETED. Errors `grading_started`, `cannot_change`.
 
-**The edge function must route a revision to these.** Batch B's `send_start` answers `already_sent` for a piece with work in; Batch B's `send_finish` on a revision's send answers `already_sent` and drops it; Batch B's `unsend` and `replace` on a piece with a revision in answer `grading_started` (the first version's grade was returned). Nothing is lost by a wrong route; it is refused.
+**The edge function must route a revision to these.** Batch B's `send_start` answers `already_sent` for a piece with work in; Batch B's `send_finish` on a revision's send answers `already_sent` and drops it; Batch B's `unsend` and `replace` on a piece with a revision in answer `grading_started` (the first version's grade was returned). Nothing is lost by a wrong route; it is refused. Batch B's `work` lists a revision's unfinished send as that piece's `sending`, and a revision handed in as its `sent` (the latest version): tell them apart with `feedback`'s `revision`. A wrong request id is the caller's bug: one Batch B's `send_start` used before is answered by `revision_start` as a replay of that send.
 
 ### `group_work(p_session_token, p_enrollment_id, p_ip_hash)`
 
