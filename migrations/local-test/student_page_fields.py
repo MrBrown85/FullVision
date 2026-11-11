@@ -24,23 +24,29 @@ new reply with the new keys taken out must be the old reply: every key,
 every value, a number compared as it is printed. A new key that is not
 there fails the comparison.
 
-  apply    The file's shape. Each check stops it with nothing changed. The
-           apply on a database in use: the only catalog lines that differ
-           are the two functions', no row of any table changes, a signed-in
-           phone stays signed in. What it does when a table is held. A
-           second run changes nothing; a run after one of the two functions
-           was changed again stops.
-  same     Old reply against new, on a class that uses every kind of work
-           and every new key: after every step of every case in
-           tests/fixtures/grade-state-cases.json, for both students; through
-           300 random saves, clears, returns, statuses and setting changes;
-           and for every refusal. A class whose page is off is compared too
-           (the switch is turned on for the comparison and put back).
+  apply    The file's shape. The read-only queries written for the live
+           database (s4-m1-live-precheck.sql, s4-m1-live-postcheck.sql),
+           run here before and after, and what each notices. Each check
+           stops the file with nothing changed. The apply on a database in
+           use: the only catalog lines that differ are the two functions',
+           no row of any table changes, a signed-in phone stays signed in.
+           What it does when a table is held. A second run changes nothing;
+           a run after one of the two functions was changed again stops.
+  same     Old reply against new, and the To Do count three ways, on a class
+           that uses every kind of work and every new key: after every step
+           of every case in tests/fixtures/grade-state-cases.json, for both
+           students; through 300 random saves, clears, returns, statuses
+           and setting changes; with a returned piece's scoring changed and
+           things deleted; and for every refusal. A class whose page is off
+           is compared too (the switch is turned on for the comparison and
+           put back).
   fields   Each new key: what it holds, when it is null or empty, and that a
            key reads only its own class.
   todo     The To Do count: what counts, that a draft never moves it, that it
-           is the count shared/student-view.js gives (To Do plus Missing),
-           and that it follows the class's own time zone.
+           is the count shared/student-view.js gives (To Do plus Missing:
+           the real file, run in node on the database's replies, here and
+           for every page of `same`), and that it follows the class's own
+           time zone.
   privacy  What the two functions read: the tables they name, the columns
            they must not, and that nothing a teacher keeps to themselves or
            that belongs to another student is anywhere in a reply.
@@ -52,13 +58,13 @@ there fails the comparison.
            Batch B is merged, or in a checkout named by BATCH_B_DIR.
   suites   The older suites that run on a database with S3-M1, before the
            file and with it applied: the same result.
-  cost     How long page takes before and after, on a class of 60 pieces
-           in a session of four classes. Printed, with a loose ceiling.
+  cost     How long one page takes before and after, for a session of one,
+           two and four classes. Printed, with a loose ceiling.
 
 PGPORT=54351 PGDATABASE=s4m1_live python3 student_page_fields.py build
 PGPORT=54351 PGDATABASE=s4m1_live python3 student_page_fields.py
 """
-import copy, random, threading, time
+import copy, random, shutil, threading, time
 from card_codes_common import *
 import card_codes_common as cc
 
@@ -74,8 +80,9 @@ PAGE = 'student_submit.page(text,uuid,text)'
 CLASSES = 'student_submit._session_classes(uuid)'
 READER = 'student_submit._returned_grade(uuid,uuid)'
 SESSION_CLASS = 'student_submit._session_class(text,uuid)'
-# As gradebook-prod has them: 2026110905's header (page), s3-m1-live-postcheck.sql (the others),
-# each compared with live read-only on 2026-11-10 by the orchestrator.
+# As gradebook-prod has them. All four were on the list s3-m1-live-precheck.sql compared with the live
+# database when the orchestrator ran it, read-only, on 2026-11-10, and none was among the three it
+# listed as different (README, "S3-M1"); S3-M1 itself changed none of them.
 LIVE_MD5 = {PAGE: 'e744f2a27bcfd6fef662bbddeb9659c7', CLASSES: '6ef848f90721affa406d2b7fef89d285',
             READER: '21706ae9eec783107d9da24e52e1855a', SESSION_CLASS: '1ae94981ff32f804d12079a24bd7b41a'}
 # Where Batch B's files are: this checkout once it is merged, or another one.
@@ -172,6 +179,7 @@ class PageDb(Db):
     def both(self, token, e):
         """(the new reply, the old reply) for one page, asked in one statement, each exactly as printed."""
         r = self.c.run("select student_submit.page(:t, :e, 'ip-1')::text, student_submit.page_old(:t, :e, 'ip-1')::text", t=token, e=e)[0]
+        self.new_text = r[0]
         return exact(r[0]), exact(r[1])
     def session(self, enrollment, birthday='2012-05-15', course=COURSE_A, teacher=A, token=None, add=False):
         """A card made for the student and a phone signed in with it: the session token."""
@@ -210,6 +218,25 @@ def waiting(page):
         n += kind in ('due', 'missing')
     return n
 
+def js_counts(texts):
+    """What the real shared/student-view.js counts for each reply (texts: replies as the database printed
+    them): build()'s { toDo, sent, back, missing }, from student_view_counts.mjs. None where there is no node."""
+    node = shutil.which('node')
+    if not node: return None
+    r = subprocess.run([node, os.path.join(HERE, 'student_view_counts.mjs')], input='[' + ','.join(texts) + ']', capture_output=True, text=True)
+    if r.returncode != 0: raise SystemExit('student_view_counts.mjs failed: ' + r.stderr[-400:])
+    return json.loads(r.stdout)
+
+def js_agrees(queue, label):
+    """queue: (where, a reply's text, the to_do the database sent for that reply's own class). One check:
+    the real student-view.js counts To Do plus Missing as that to_do, for every one."""
+    counts = js_counts([q[1] for q in queue])
+    if counts is None:
+        print('SKIPPED %s: node is not on the PATH, so shared/student-view.js itself was not run (the same rule, written out in this file, was)' % label); return
+    wrong = [(q[0], q[2], c) for q, c in zip(queue, counts) if c['toDo'] + c['missing'] != q[2]]
+    ok("%s: for each of those %d pages the real shared/student-view.js, run in node on the database's own reply, counts To Do plus Missing as the to_do the database sent"
+       % (label, len(queue)), not wrong and len(counts) == len(queue) and len(queue) > 0, wrong[:3])
+
 def from_tables(d, e):
     """The To Do count read straight from the tables, as the owner, not through any function under test:
     the listed pieces that take a grade, marked Missing or not Excused and never returned. A DIBELS
@@ -229,6 +256,7 @@ class Compare:
     that reply, and the count read straight from the tables. Counts what was compared and keeps the
     differences."""
     pages = 0; differences = 0                    # over the whole run
+    queue = []                                    # every page compared, for the real student-view.js: js_agrees
     def __init__(self, d, sessions):
         self.d = d; self.sessions = sessions; self.n = 0; self.good = 0; self.opened = 0; self.bad = []
     def once(self, where):
@@ -262,6 +290,7 @@ class Compare:
         want = waiting(json.loads(json.dumps(new)))
         if len(mine) != 1 or mine[0]['to_do'] != str(want) or want != from_tables(self.d, e):
             self.bad.append((where, e[-4:], 'to_do', mine, want, from_tables(self.d, e)))
+        Compare.queue.append((where, self.d.new_text, int(mine[0]['to_do']) if len(mine) == 1 else None))
         Compare.differences += len(self.bad) > was
 
 # ── The class the scenarios use ─────────────────────────────────────────────
@@ -443,7 +472,6 @@ def scen_apply():
         d.teacher('upsert_score(:e, :a, 9)', e=ENR1, a=k['a_pts'])                       # a draft over the returned grade
         d.teacher('upsert_score(:e, :a, 4)', e=ENR2, a=k['a_pts'])                       # a draft, never returned
         page_before = d.page(tok1, ENR1)
-        cat0, rows0 = catalog_and_rows(d)
 
         # ── The two read-only queries written for the live database ─────
         ok('apply: the pre-check lists nothing on the database as live is', d.all(PRE1) == [], d.all(PRE1))
@@ -514,12 +542,11 @@ def scen_apply():
            r.startswith('STOPPED') and 'lock timeout' in r and 4 < took < 9 and fingerprints(d, [PAGE, CLASSES]) == {PAGE: LIVE_MD5[PAGE], CLASSES: LIVE_MD5[CLASSES]}, (r, took))
         o.run('rollback')
         o.run('begin'); o.run("update assessment set title = title where id = :a", a=k['a_pts'])     # an ordinary save, not committed
-        t0 = time.time()
 
         # ── The apply ───────────────────────────────────────────────────
         d.keep_old()
         cat0, rows0 = catalog_and_rows(d)
-        r = d.apply(); took = time.time() - t0
+        t0 = time.time(); r = d.apply(); took = time.time() - t0
         o.run('rollback'); o.close()
         ok('apply: the file applies, at once, while a teacher is in the middle of a save', r == 'ok' and took < 3, (r, took))
         cat1, rows1 = catalog_and_rows(d)
@@ -741,6 +768,7 @@ def scen_same():
             r = d.verify(d.make(ENR2)[0], birthday='2012-06-16')
             ok('same: in all, %d whole pages were compared, old against new, and %d differed' % (Compare.pages, Compare.differences),
                Compare.pages > 1500 and Compare.differences == 0)
+            js_agrees(Compare.queue, 'same')
             ok("same: verify_card's list of classes is the page's own list, To Do count and all", r['classes'] == d.page(r['session_token'], ENR2)['classes']
                and set(r['classes'][0]) == OLD_CLASS | set(NEW_CLASS), r['classes'])
     finally:
@@ -893,9 +921,11 @@ def scen_todo():
             def counts(token=tok1, e=ENR1):
                 """{enrollment: to_do} as the page for this class lists the session's classes."""
                 return {c['enrollment_id']: c['to_do'] for c in one_page(d, token, e)['classes']}
+            seen = []
             def mine(e=ENR1, token=None):
                 p = one_page(d, token or (tok1 if e != ENR2 else tok2), e)
                 got = [c['to_do'] for c in p['classes'] if c['enrollment_id'] == e][0]
+                seen.append(('count %d' % (len(seen) + 1), json.dumps(p), got))
                 return got if got == waiting(p) == from_tables(d, e) else ('DISAGREE', got, waiting(p), from_tables(d, e))
             grade = lambda e, a, v: d.teacher('upsert_score(:e, :a, :v)', e=e, a=a, v=v)
             give = lambda e, a: d.teacher('return_grades(:a, :ids::uuid[], :k)', a=a, ids='{%s}' % e, k=nid())
@@ -990,6 +1020,7 @@ def scen_todo():
             d.teacher('return_grades(:a, :ids::uuid[], :k)', a=k['c2_assess'], ids='{%s}' % k['enr_a2'], k=nid())
             ok('todo: returned there, the second class has nothing waiting and the first is as it was', counts() == {ENR1: 4, k['enr_a2']: 0} and mine(k['enr_a2']) == 0, counts())
             ok("todo: one class's count never includes another's pieces", mine(ENR2) == 6, mine(ENR2))
+            js_agrees(seen, 'todo')
 
         # ── The class's own time zone ───────────────────────────────────
         with tx(d):
@@ -1003,7 +1034,8 @@ def scen_todo():
                 d.run('update student_card set works_until = :d::date + 30', d=there)
                 p = one_page(d, tok1, ENR1)
                 got = [c['to_do'] for c in p['classes'] if c['enrollment_id'] == ENR1][0]
-                # Listed: the four still dated in the past or undated that take a grade, less Quiz 2 (tomorrow there), plus Pop Quiz (today there).
+                # Waiting: Class Discussion, Density Lab, Lab Report, Quiz 1 and Safety Contract as before, and Pop Quiz
+                # (today there); not Quiz 2 (tomorrow there).
                 ok('todo: in a class %s, a piece dated today where the class is waits and one dated tomorrow there does not: the count follows the page' % label,
                    'Pop Quiz' in [a['title'] for a in p['assessments']] and 'Quiz 2' not in [a['title'] for a in p['assessments']] and got == waiting(p) == 6, (got, waiting(p)))
                 d.run('rollback to savepoint z')
@@ -1185,13 +1217,15 @@ def scen_batchb():
         r = apply_b(d)
         ok("batchb: Batch B's two files apply to the database as live is (with the storage stand-in)", r == 'ok', r)
         ok('batchb: Batch B leaves the two functions this file replaces, and the two it leans on, exactly as live has them', fingerprints(d, list(LIVE_MD5)) == LIVE_MD5, fingerprints(d, list(LIVE_MD5)))
+        ok('batchb: with Batch B applied the pre-check still lists nothing', d.all(PRE1) == [], d.all(PRE1))
         d.keep_old()
         fb = b_functions(d); cat0, rows0 = catalog_and_rows(d)
         r = d.apply()
         ok('batchb: this file applies after Batch B', r == 'ok', r)
+        if not MUTATED: ok('batchb: and the post-check lists nothing', d.all(POST) == [], d.all(POST))
         fa = b_functions(d)
-        ok('batchb: and of the %d functions there, the only two that differ are this file\'s' % len(fb), sorted(f for f in fa if fa[f] != fb.get(f)) == sorted([PAGE.replace(',', ', ').replace('student_submit.', 'student_submit.'), CLASSES])
-           or sorted(f for f in fa if fa[f] != fb.get(f)) == ['student_submit._session_classes(uuid)', 'student_submit.page(text,uuid,text)'], sorted(f for f in fa if fa[f] != fb.get(f)))
+        differ = sorted(f for f in fa if fa[f] != fb.get(f))
+        ok("batchb: and of the %d functions there, Batch B's 39 among them, the only two that differ are this file's" % len(fb), differ == sorted([PAGE, CLASSES]) and len(fa) == len(fb), differ)
         cat1, rows1 = catalog_and_rows(d)
         gone, came = differences(cat0, cat1)
         ok("batchb: no other catalog line differs (Batch B's tables, columns, triggers, policies and grants are untouched) and no row", len(gone) == 4 and len(came) == 4 and rows1 == rows0, (len(gone), len(came)))
@@ -1216,6 +1250,7 @@ def scen_batchb():
         r = apply_b(d)
         ok("batchb: Batch B's two files apply after this one", r == 'ok', r)
         ok("batchb: and leave this file's two functions exactly as it left them", fingerprints(d, [PAGE, CLASSES]) == mine)
+        if not MUTATED: ok('batchb: the post-check lists nothing this way round either', d.all(POST) == [], d.all(POST))
         cat1, rows1 = catalog_and_rows(d)
         r = d.apply()
         ok('batchb: this file runs again after Batch B and changes nothing', r == 'ok' and catalog_and_rows(d) == (cat1, rows1), r)
@@ -1254,7 +1289,7 @@ def scen_suites():
 def scen_cost():
     """How long one page takes, before and after. The count beside each class asks the one reader of a
     grade once for every piece of every class in the session, so the page costs more the more classes
-    and pieces there are. Three sizes, the last the most a student is likely to have."""
+    and pieces there are. Three sizes, the last a full timetable late in a term."""
     d, k = ready('cost')
     try:
         d.run("insert into student (id, teacher_id, first_name) select gen_random_uuid(), :t, 'S' || g from generate_series(1, 28) g", t=A)

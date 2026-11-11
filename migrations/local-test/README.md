@@ -1229,7 +1229,8 @@ another pull request adds at the end of this file, do not collide.)
 
 `../2026111103_student_page_fields.sql` replaces two functions,
 `student_submit.page` and `student_submit._session_classes`, and nothing
-else: no table, column, row, trigger, policy or grant. The reply gains keys
+else: no table, column, row, trigger or policy, and who may run the two is
+as it was. The reply gains keys
 to read (the contract, with a worked example, is `s4-m1-contract.md`): the
 teacher's name, each competency's I Can statements, the competencies each
 rubric row counts toward, and for each assessment its description, module,
@@ -1259,7 +1260,7 @@ PGPORT=54351 PGDATABASE=s4m1_live python3 student_page_fields.py fingerprints wr
 ```
 
 `batchb` needs Batch B's two files and its storage stand-in. They are in
-this folder once Batch B is merged; until then name a checkout that has
+this checkout once Batch B is merged; until then name a checkout that has
 them: `BATCH_B_DIR=<path to a checkout of batch-b-submissions>`. Without
 them the scenario prints `SKIPPED` and checks nothing.
 
@@ -1271,10 +1272,12 @@ One statement then asks both for the same page, and the new reply with the
 nine new keys taken out must be the old reply: every key and every value, a
 number compared as it is printed (7 and 7.0 differ). A new key that is
 missing fails the comparison too. Alongside it, each class's `to_do` must
-equal the count `shared/student-view.js` gives for the same reply
-(`counts.toDo + counts.missing`, worked out here in Python from the reply's
-own pieces) and a third count read straight from `score` and `grade_return`
-as the owner.
+equal three other counts: the one `shared/student-view.js` gives for the
+same reply (`counts.toDo + counts.missing`), from the real file, run in
+node on the database's own reply (`student_view_counts.mjs`; skipped with
+a `SKIPPED` line where there is no node); that same rule written out in
+Python; and a count read straight from `score` and `grade_return` as the
+owner.
 
 `student_page_fields.py`, by scenario:
 
@@ -1361,8 +1364,9 @@ as the owner.
 - **batchb.** Batch B's two files first, then this one; and this one first,
   then Batch B's. Either way both apply, each leaves the other's functions
   exactly as they were, a second run of either changes nothing, the old
-  reply and the new agree, and this file's undo runs with Batch B applied
-  and touches nothing of Batch B's.
+  reply and the new agree, the pre-check and the post-check list nothing,
+  and this file's undo runs with Batch B applied and touches nothing of
+  Batch B's.
 - **suites.** `student_submit.py` 79, `questionnaire_identity.py` 47,
   `phone_reports.py` 35, `questionnaires.py` 42, `grade_return.py` 284,
   `grade_return_limits.py` 74 and `score_rpcs.py` 236 give the same result
@@ -1407,8 +1411,8 @@ day S3-M1 was applied. That is expected; `s4-m1-live-postcheck.sql` is the
 one to run.
 
 Result on 2026-11-11, on PostgreSQL 17.11 (what production runs), from a
-clean clone on a database built from empty: `student_page_fields.py` 253 of
-253 (with Batch B's files named by `BATCH_B_DIR`; 237 of 237 and one
+clean clone on a database built from empty: `student_page_fields.py` 258 of
+258 (with Batch B's files named by `BATCH_B_DIR`; 239 of 239 and one
 `SKIPPED` line without them); `student_page_fields_undo.py` 28 of 28;
 `student_page_fields_mutate.py` 33 of 33 noticed. `npm test` gains
 `tests/student-page-fields.test.js` (8 tests: the Core Competency names
