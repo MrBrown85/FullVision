@@ -36,7 +36,7 @@ The app persists teacher data through Supabase Auth plus a public RPC surface. I
 - Main page modules:
   - `page-dashboard.js`
   - `page-assignments.js`
-  - `page-student.js`
+  - `page-student.js`; its Work tab, and the Work Wall (one assessment's work side by side), are `work-wall.js`, with every picture of student work loaded through `shared/work-thumbs.js`
   - `page-gradebook.js`
   - `page-observations.js`
   - `page-starters.js`: Observations › Starters (`/observations/starters`)
