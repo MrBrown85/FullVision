@@ -290,6 +290,7 @@ describe('work', () => {
             pages: 2,
             grading: false,
             can_change: true,
+            can_send: false,
             files: [{ path: 'x' }],
           },
           sending: null,
@@ -318,6 +319,7 @@ describe('work', () => {
             pages: 2,
             grading: false,
             can_change: true,
+            can_send: false,
           },
           sending: null,
         },
@@ -580,6 +582,9 @@ describe('send-start and replace', () => {
       expired: {},
       work_closed: { closed_on: '2026-11-13' },
       already_sent: {},
+      // PR 1095, ruling 107: a send onto the teacher's pages asks these at the start too.
+      grading_started: {},
+      too_many_pages: { room: 4 },
       too_many: { retry_after_s: 1200 },
       class_full: {},
       signed_out: {},
@@ -592,8 +597,6 @@ describe('send-start and replace', () => {
       ...START,
       nothing_sent: {},
       cannot_change: {},
-      grading_started: {},
-      too_many_pages: { room: 4 },
     };
     delete REPLACE.already_sent;
     for (const [route, list] of [

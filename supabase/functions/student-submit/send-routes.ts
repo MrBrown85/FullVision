@@ -141,6 +141,9 @@ const ERRORS = {
     'expired',
     'work_closed',
     'already_sent',
+    // PR 1095, ruling 107: a send onto the teacher's pages asks these at the start.
+    'grading_started',
+    'too_many_pages',
     'too_many',
     'class_full',
   ],
@@ -306,6 +309,8 @@ function work(r: Json): Json {
               'pages',
               'grading',
               'can_change',
+              // PR 1095, ruling 107: whether a send would be taken now.
+              'can_send',
             ])
           : null,
         sending: isObject(x.sending)
