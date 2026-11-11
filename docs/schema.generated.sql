@@ -1132,26 +1132,34 @@ table public.student_access_code (rls on)
   enrollment_id uuid not null
   questionnaire_id uuid
   report_issue_id uuid
-  code_hash text not null
-  salt text not null
+  code_hash text
+  salt text
   expires_at timestamp with time zone not null
   opened_at timestamp with time zone
   used_at timestamp with time zone
   revoked_at timestamp with time zone
   created_at timestamp with time zone not null default now()
   phone_report_id uuid
+  code_hmac text
+  pw_hmac text
+  key_id text
+  converted_at timestamp with time zone
   constraint student_access_code_code_hash_key UNIQUE (code_hash)
   constraint student_access_code_enrollment_id_fkey FOREIGN KEY (enrollment_id) REFERENCES public.enrollment(id) ON DELETE CASCADE
+  constraint student_access_code_keyed CHECK ((((code_hmac IS NULL) OR (code_hmac ~ '^[0-9a-f]{64}$'::text)) AND ((pw_hmac IS NULL) OR (pw_hmac ~ '^[0-9a-f]{64}$'::text)) AND ((key_id IS NULL) OR (key_id ~ '^[0-9a-f]{8}$'::text)) AND ((code_hash IS NULL) OR (code_hmac IS NULL)) AND ((code_hash IS NULL) = (salt IS NULL)) AND ((code_hmac IS NULL) OR (key_id IS NOT NULL)) AND ((pw_hmac IS NULL) OR (code_hmac IS NOT NULL)) AND ((converted_at IS NULL) OR (code_hmac IS NOT NULL))))
   constraint student_access_code_phone_report_id_fkey FOREIGN KEY (phone_report_id) REFERENCES public.phone_report(id) ON DELETE CASCADE
   constraint student_access_code_pkey PRIMARY KEY (id)
   constraint student_access_code_questionnaire_id_fkey FOREIGN KEY (questionnaire_id) REFERENCES public.questionnaire(id) ON DELETE CASCADE
   constraint student_access_code_target CHECK ((num_nonnulls(questionnaire_id, report_issue_id, phone_report_id) >= 1))
   CREATE UNIQUE INDEX student_access_code_code_hash_key ON public.student_access_code USING btree (code_hash)
+  CREATE UNIQUE INDEX student_access_code_code_hmac ON public.student_access_code USING btree (code_hmac) WHERE (code_hmac IS NOT NULL)
   CREATE INDEX student_access_code_enrollment ON public.student_access_code USING btree (enrollment_id)
   CREATE INDEX student_access_code_live ON public.student_access_code USING btree (expires_at) WHERE ((used_at IS NULL) AND (revoked_at IS NULL))
   CREATE INDEX student_access_code_phone_report_id_idx ON public.student_access_code USING btree (phone_report_id)
   CREATE UNIQUE INDEX student_access_code_pkey ON public.student_access_code USING btree (id)
   CREATE INDEX student_access_code_questionnaire_id_idx ON public.student_access_code USING btree (questionnaire_id)
+  CREATE INDEX student_access_code_unconverted ON public.student_access_code USING btree (expires_at) WHERE ((code_hash IS NOT NULL) AND (revoked_at IS NULL))
+  CREATE TRIGGER student_access_code_slip_password AFTER UPDATE OF used_at, revoked_at, pw_hmac ON public.student_access_code FOR EACH ROW WHEN ((new.questionnaire_id IS NOT NULL)) EXECUTE FUNCTION public._slip_password_on_change()
   policy student_access_code_via_enrollment for all to public using (public.fv_owns_enrollment(enrollment_id)) with check (public.fv_owns_enrollment(enrollment_id))
 table public.student_card (rls on)
   id uuid not null default gen_random_uuid()
@@ -1590,14 +1598,11 @@ function public._grade_return_repair_lost() returns integer security definer
 function public._grade_return_repoint() returns trigger security definer
 function public._grade_return_settle(p_enrollment_id uuid, p_assessment_id uuid) returns integer security definer
 function public._grade_return_truncated() returns trigger security definer
-function public._issue_access_code(p_enrollment_id uuid, p_questionnaire_id uuid, p_expires_at timestamp with time zone) returns text security definer
-function public._issue_report_code(p_enrollment_id uuid, p_report_id uuid, p_expires_at timestamp with time zone) returns text security definer
 function public._keep_photos_day(p_choice text, p_terms jsonb, p_on date) returns date
 function public._markup_check(p_marks jsonb) returns void
 function public._markup_give(p_enrollment_id uuid, p_assessment_id uuid) returns integer security definer
 function public._markup_on_release() returns trigger security definer
 function public._markup_on_return() returns trigger security definer
-function public._new_access_code() returns text
 function public._phone_report_json(p_id uuid) returns jsonb
 function public._phone_report_put(p_report_id uuid, p_course_id uuid, p_students jsonb) returns void
 function public._photo_keep_class(p_course_id uuid, p_now timestamp with time zone) returns jsonb security definer
@@ -1615,7 +1620,8 @@ function public._revision_json(p_request_id uuid) returns jsonb security definer
 function public._revision_settle(p_enrollment_id uuid, p_assessment_id uuid, p_returned boolean) returns integer security definer
 function public._revision_state(p_request_id uuid) returns jsonb security definer
 function public._score_audit_diff(p_score_id uuid, p_old_value numeric, p_new_value numeric, p_old_status text, p_new_status text) returns void security definer
-function public._slip_password(p_enrollment_id uuid) returns text security definer
+function public._slip_password_on_change() returns trigger security definer
+function public._slip_password_settle(p_student_id uuid) returns void security definer
 function public._student_card_json(p_card_id uuid) returns jsonb security definer
 function public._submission_file_removed() returns trigger security definer
 function public._submission_gone() returns trigger security definer
@@ -1722,8 +1728,6 @@ function public.get_withdrawn_student_records(p_enrollment_id uuid) returns json
 function public.import_json_restore(p_payload jsonb, p_idempotency_key uuid) returns jsonb
 function public.import_roster_csv(p_course_id uuid, p_rows jsonb, p_idempotency_key uuid) returns jsonb
 function public.import_teams_class(p_payload jsonb, p_idempotency_key uuid) returns jsonb
-function public.issue_access_codes(p_questionnaire_id uuid, p_enrollment_ids uuid[], p_idempotency_key uuid) returns jsonb
-function public.issue_report_codes(p_report_id uuid, p_enrollment_ids uuid[], p_idempotency_key uuid) returns jsonb
 function public.list_assessment_copies(p_copy_group uuid) returns TABLE(assessment_id uuid, course_id uuid, course_name text, title text)
 function public.list_assessment_markup(p_assessment_id uuid) returns jsonb security definer
 function public.list_categories(p_course_id uuid) returns TABLE(id uuid, course_id uuid, name text, weight numeric, display_order integer, calc_mode text, created_at timestamp with time zone, updated_at timestamp with time zone)
@@ -1845,6 +1849,7 @@ function student_submit._send_begin(p_intent text, p_session_token text, p_enrol
 function student_submit._send_session(p_session_token text, p_enrollment_id uuid) returns jsonb security definer
 function student_submit._session_class(p_session_token text, p_enrollment_id uuid) returns jsonb security definer
 function student_submit._session_classes(p_session_id uuid) returns jsonb security definer
+function student_submit._slip_old_until() returns timestamp with time zone
 function student_submit._work_window(p_assessment_id uuid) returns jsonb security definer
 function student_submit._write_limit(p_card_id uuid, p_kind text, p_per_hour integer) returns jsonb security definer
 function student_submit.answer(p_session_token text, p_enrollment_id uuid, p_questionnaire_id uuid, p_answers jsonb, p_ip_hash text) returns jsonb security definer
@@ -1859,8 +1864,9 @@ function student_submit.forms(p_session_token text, p_enrollment_id uuid, p_ip_h
 function student_submit.group_file_links(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) returns jsonb security definer
 function student_submit.group_work(p_session_token text, p_enrollment_id uuid, p_ip_hash text) returns jsonb security definer
 function student_submit.issue_cards(p_teacher_id uuid, p_course_id uuid, p_items jsonb, p_key_id text, p_idempotency_key uuid) returns jsonb security definer
+function student_submit.issue_slips(p_teacher_id uuid, p_kind text, p_target_id uuid, p_items jsonb, p_key_id text, p_idempotency_key uuid) returns jsonb security definer
 function student_submit.markup(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) returns jsonb security definer
-function student_submit.open(p_code text, p_ip_hash text) returns jsonb security definer
+function student_submit.open(p_code_hmac text, p_key_id text, p_code text, p_ip_hash text) returns jsonb security definer
 function student_submit.page(p_session_token text, p_enrollment_id uuid, p_ip_hash text) returns jsonb security definer
 function student_submit.reflect(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_reflection jsonb, p_ip_hash text) returns jsonb security definer
 function student_submit.removal_batch(p_limit integer) returns jsonb security definer
@@ -1875,8 +1881,9 @@ function student_submit.seen(p_session_token text, p_enrollment_id uuid, p_asses
 function student_submit.send_finish(p_session_token text, p_enrollment_id uuid, p_submission_id uuid, p_files jsonb, p_ip_hash text) returns jsonb security definer
 function student_submit.send_paths(p_session_token text, p_enrollment_id uuid, p_submission_id uuid, p_ip_hash text) returns jsonb security definer
 function student_submit.send_start(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_pages jsonb, p_note text, p_followed_plan text, p_request_id uuid, p_ip_hash text) returns jsonb security definer
+function student_submit.slip_roster(p_teacher_id uuid, p_kind text, p_target_id uuid) returns jsonb security definer
 function student_submit.submit(p_token text, p_answers jsonb, p_ip_hash text) returns jsonb security definer
 function student_submit.unsend(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text) returns jsonb security definer
-function student_submit.verify(p_token text, p_birthday text, p_student_number text, p_password text, p_ip_hash text) returns jsonb security definer
+function student_submit.verify(p_token text, p_birthday text, p_student_number text, p_password text, p_code_hmac text, p_pw_hmac text, p_ip_hash text) returns jsonb security definer
 function student_submit.verify_card(p_code_hmac text, p_key_id text, p_birthday text, p_student_number text, p_password_hmac text, p_session_token text, p_ip_hash text, p_add boolean) returns jsonb security definer
 function student_submit.work(p_session_token text, p_enrollment_id uuid, p_ip_hash text) returns jsonb security definer
