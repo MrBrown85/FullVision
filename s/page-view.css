@@ -2753,3 +2753,64 @@
 .sp-view .sp-piece-card .sp-send-thumbs {
   justify-content: flex-start;
 }
+
+/* The Chromebook frame (Your Feedback on a Chromebook): To Do, Sent and
+   Back and the list in a full-height sidebar flush to the window's left
+   edge; the card or Your Feedback fills the rest. The split's two parts
+   become the page's grid items, so the sidebar is one white column from
+   the header to the bottom, whatever the segment holds. */
+@container sp-view (min-width: 760px) {
+  .sp-view.sp-on-deck .sp-page {
+    display: grid;
+    grid-template-columns: 300px minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    align-items: start;
+    gap: 0;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+  .sp-view.sp-on-deck .sp-page::before {
+    content: '';
+    grid-column: 1;
+    /* Down past the last row too (Demo Mode's line under the card). */
+    grid-row: 1 / span 20;
+    align-self: stretch;
+    background: var(--sp-card);
+    border-right: 1px solid var(--sp-line);
+  }
+  .sp-view.sp-on-deck .sp-page > * {
+    grid-column: 2;
+    margin-left: 28px;
+    margin-right: 28px;
+  }
+  .sp-view.sp-on-deck .sp-page > .sp-segments,
+  .sp-view.sp-on-deck .sp-page > .sp-fb-segments {
+    grid-column: 1;
+    grid-row: 1;
+    margin: 16px 12px 8px;
+  }
+  .sp-view.sp-on-deck .sp-page > .sp-split {
+    display: contents;
+  }
+  .sp-view.sp-on-deck .sp-split > .sp-side {
+    grid-column: 1;
+    grid-row: 2;
+    margin: 0;
+    padding: 0 12px 16px;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+  }
+  .sp-view.sp-on-deck .sp-split > :not(.sp-side) {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    width: auto;
+    max-width: 960px;
+    margin: 24px 28px;
+  }
+  .sp-view.sp-on-deck .sp-page > :not(.sp-split):not(.sp-segments):not(.sp-fb-segments) {
+    grid-row: auto;
+    margin-top: 24px;
+  }
+}
