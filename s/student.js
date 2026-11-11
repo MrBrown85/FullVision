@@ -110,6 +110,11 @@ var StudentPage = (function () {
       pick: '', // the Assignments tab: the card showing
       search: '', // All Assignments: the search words
       filter: 'all', // All Assignments: all | todo | sent | back
+      feedback: '', // the Assignments tab: the piece Your Feedback is open on
+      whole: false, // the Assignments tab: The Whole Rubric is showing for that piece
+      levels: false, // Your Feedback: What the Levels Mean is open
+      form: '', // Questionnaires and My Reports: the one picked on a Chromebook
+      back: '', // a questionnaire or report opened from a card's page: the tab to go back to
     };
   }
 
@@ -1077,6 +1082,8 @@ var StudentPage = (function () {
     saveDraft: saveDraft,
     clearDraft: clearDraft,
     demoReport: demoReport,
+    demoData: demoData,
+    loadDemoTemplates: loadDemoTemplates,
     paint: paint,
     grow: grow,
     _test: {

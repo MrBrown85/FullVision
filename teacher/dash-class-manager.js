@@ -1054,6 +1054,21 @@ window.DashClassManager = (function () {
     if (reenrolStudent(cmSelectedCourse, sid)) renderClassManager();
   }
 
+  /* S8-F1: who in class `cid` has photos of their work sent, { sid: true },
+     from the read side in shared/data.js (getCourseSubmissions): a submission
+     with at least one page. Empty, so every delete reads as it always has,
+     while the class's build switch or Send Work is off. */
+  function _cmStudentsWithPhotos(cid) {
+    var who = {};
+    if (typeof getCourseSubmissions !== 'function' || typeof getCourseSendWork !== 'function') return who;
+    if (typeof getReturnSettings !== 'function' || !getReturnSettings(cid).student_page) return who;
+    if (!getCourseSendWork(cid).send_work) return who;
+    (getCourseSubmissions(cid).submissions || []).forEach(function (s) {
+      if (s && Array.isArray(s.files) && s.files.length) who[s.enrollment_id] = true;
+    });
+    return who;
+  }
+
   /* The second step: only a withdrawn student can be deleted, and the
      delete cannot be undone, so there is no Undo. */
   function cmDeleteWithdrawn(sid) {
@@ -1064,9 +1079,13 @@ window.DashClassManager = (function () {
     });
     if (!entry) return;
     var name = fullName(entry.student);
+    // Photos of their work go too (S8-F1, Colin's ruling 102).
+    var photos = !!_cmStudentsWithPhotos(cid)[sid];
     showConfirm(
       'Delete ' + name + ' Permanently?',
-      'Their scores, observations, goals, reflections and reports in this class are deleted. This cannot be undone.',
+      photos
+        ? 'Their scores, observations, goals, reflections, reports and photos of their work in this class are deleted. This cannot be undone.'
+        : 'Their scores, observations, goals, reflections and reports in this class are deleted. This cannot be undone.',
       'Delete Permanently',
       'danger',
       function () {
@@ -1086,7 +1105,9 @@ window.DashClassManager = (function () {
       esc(name) +
       '’s scores and observations in ' +
       esc((COURSES[cid] && COURSES[cid].name) || 'this class') +
-      '.</span></span>' +
+      '.</span>' +
+      (photos ? '<span>Photos of their work are not in this file.</span>' : '') +
+      '</span>' +
       '<button type="button" class="cm-action-btn" id="cm-keep-copy-btn">Download Records</button>';
     card.insertBefore(keep, actions);
     keep.querySelector('#cm-keep-copy-btn').addEventListener('click', function (e) {
@@ -7975,11 +7996,17 @@ window.DashClassManager = (function () {
   function cmDeleteCourse(cid) {
     var course = COURSES[cid];
     if (!course || !isCourseArchived(cid)) return;
+    // Photos of student work go too (S8-F1, Colin's ruling 102).
+    var photos = Object.keys(_cmStudentsWithPhotos(cid)).length > 0;
     showConfirm(
       'Delete Class',
-      'Permanently delete ' +
-        course.name +
-        ' with all its students, assessments, and scores? It disappears now and is erased for good after 30 days.',
+      photos
+        ? 'Permanently delete ' +
+            course.name +
+            " with all its students, assessments, scores and photos of student work? It disappears now and is erased for good after 30 days. Deleted photos can't come back."
+        : 'Permanently delete ' +
+            course.name +
+            ' with all its students, assessments, and scores? It disappears now and is erased for good after 30 days.',
       'Delete Class',
       'danger',
       async function () {
@@ -8012,6 +8039,8 @@ window.DashClassManager = (function () {
     var data = {
       course: cid,
       savedAt: new Date().toISOString(),
+      // "Photos of student work are not in this file." once the class's student page is on (S8-F2).
+      photos: typeof FVBackupRestore !== 'undefined' ? FVBackupRestore.photosNote(cid) : undefined,
       courseInfo: structuredClone(COURSES[cid]),
       students: getStudents(cid),
       categories: getCategories(cid),
@@ -8054,7 +8083,12 @@ window.DashClassManager = (function () {
     overlay.innerHTML =
       '<div class="confirm-card cm-restore-card">' +
       '<div class="confirm-title" id="cm-restore-title">Restore Class from Backup</div>' +
-      '<div class="confirm-message">Choose a file saved by Download Class Backup. It becomes a new class with its students, competencies, assessments, scores and reports. Your other classes are not changed.</div>' +
+      '<div class="confirm-message">Choose a file saved by Download Class Backup. It becomes a new class with its students, competencies, assessments, scores and reports. ' +
+      // Fixed text, said once any class takes work (S8-F2; wording approved, ruling 102).
+      (typeof FVBackupRestore !== 'undefined' && FVBackupRestore.anyClassTakesWork()
+        ? esc(FVBackupRestore.PHOTOS_NOT_IN_BACKUP) + ' '
+        : '') +
+      'Your other classes are not changed.</div>' +
       '<div class="cm-field"><label class="cm-label" for="cm-restore-file">Backup File</label>' +
       '<input type="file" id="cm-restore-file" accept=".json,application/json"></div>' +
       '<div class="cm-restore-summary" id="cm-restore-summary" role="status"></div>' +

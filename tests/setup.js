@@ -218,6 +218,19 @@ function load(file) {
 
 load('shared/html.js');
 load('shared/constants.js');
+// Demo Mode's class (DEFAULT_COURSES, LEARNING_MAP) lives in seed-data.js.
+// Only those two are taken from it here, run inside a function so nothing
+// else of the file becomes global: seeding stays the stub above, and a test
+// that wants the sample class runs seed-data.js and seedIfNeeded itself.
+Object.assign(
+  globalThis,
+  runInThisContext(
+    '(function () {\n' +
+      readFileSync(resolve(root, 'shared/seed-data.js'), 'utf-8') +
+      '\nreturn { DEFAULT_COURSES: DEFAULT_COURSES, LEARNING_MAP: LEARNING_MAP };\n})()',
+    { filename: 'shared/seed-data.js' },
+  ),
+);
 load('shared/reporting-term-presets.js');
 load('shared/data.js');
 load('shared/calc.js');

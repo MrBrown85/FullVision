@@ -412,7 +412,12 @@ describe.each(STYLES)('a %s class: the page from the cache is the page from the 
         getAssessments(CID).find(a => a.id === 'a-essay'),
       ),
     );
-    expect(by['a-essay'].result).toEqual({ kind: 'level', text: essay.text, word: levelWord(CID, essay.value) });
+    expect(by['a-essay'].result).toEqual({
+      kind: 'level',
+      text: essay.text,
+      word: levelWord(CID, essay.value),
+      level: essay.level,
+    });
     expect(by['a-essay'].competencies).toEqual([
       { id: 't1', name: 'Questioning and Predicting', level: 3, text: scoreLevelText(3, 1), comment: '' },
       { id: 't2', name: 'Communicating', level: 4, text: scoreLevelText(4, 0), comment: '' },
@@ -421,6 +426,11 @@ describe.each(STYLES)('a %s class: the page from the cache is the page from the 
       kind: 'points',
       text: formatPoints(8) + ' / ' + formatPoints(10),
       word: '',
+      level: pointsToProf(8, 10, getGradingScale(CID)),
+      points: formatPoints(8),
+      outOf: formatPoints(10),
+      percent: formatPointsPercent(8, 10),
+      bar: 80,
     });
     expect(by['a-quick'].updated).toBe(true);
     expect(by['a-contract'].result.text).toBe('Complete');
@@ -454,6 +464,46 @@ describe.each(STYLES)('a %s class: the page from the cache is the page from the 
         ['a-reflect', 'back'],
       ].sort(),
     );
+  });
+});
+
+describe('what Your Feedback and The Whole Rubric draw (S4-F3), the same through both doors', () => {
+  beforeEach(() => seed('proficiency'));
+
+  it('each criterion: the level given by name, what it means here, what the next level asks, every level marked', () => {
+    const { view } = StudentView.fromCache(CID, S1);
+    const lab = view.work.find(p => p.id === 'a-lab');
+    const [method, drawing] = lab.rubric.rows;
+    expect([method.levelName, method.descriptor]).toEqual([scoreLevelText(3, 0), LEVELS[3]]);
+    expect(method.next).toEqual({ level: 4, name: scoreLevelText(4, 0), descriptor: LEVELS[4], checks: [] });
+    expect(drawing.next.name).toBe(scoreLevelText(3, 0));
+    expect(method.goal).toBe(LEVELS[3]);
+    expect(method.whole.map(l => [l.level, l.name, l.descriptor, l.you])).toEqual([
+      [1, scoreLevelText(1, 0), LEVELS[1], false],
+      [2, scoreLevelText(2, 0), LEVELS[2], false],
+      [3, scoreLevelText(3, 0), LEVELS[3], true],
+      [4, scoreLevelText(4, 0), LEVELS[4], false],
+    ]);
+    expect(view.levels).toEqual([1, 2, 3, 4].map(l => ({ level: l, name: scoreLevelText(l, 0) })));
+  });
+
+  it('an Advanced Rubric: the boxes ticked in the grade returned, and the next level’s boxes not ticked', () => {
+    const { view } = StudentView.fromCache(CID, S1);
+    const row = view.work.find(p => p.id === 'a-micro').rubric.rows[0];
+    // The returned copy ticks k1 at Proficient; the draft over it ticks k2 too, and is not here.
+    expect(row.shown.map(k => k.id)).toEqual(['k1']);
+    expect(row.next.checks.map(k => k.id)).toEqual(['k2']);
+  });
+
+  it('work not back yet: what it is graded on by name, and no level, comment or rubric level anywhere', () => {
+    const { view } = StudentView.fromCache(CID, S1);
+    const draft = view.work.find(p => p.id === 'a-draft');
+    expect(draft.gradedOn).toEqual([
+      { id: 't1', name: 'Questioning and Predicting' },
+      { id: 't2', name: 'Communicating' },
+    ]);
+    expect(JSON.stringify(draft)).not.toMatch(SECRET);
+    expect(draft.rubric).toBeNull();
   });
 });
 

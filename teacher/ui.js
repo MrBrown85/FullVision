@@ -1656,7 +1656,7 @@ function _avatarColor(sid) {
   return _AVATAR_COLORS[Math.abs(h) % _AVATAR_COLORS.length];
 }
 
-// The roster's order, remembered per class on this computer.
+// The roster's order, remembered per class for the teacher (getViewPref).
 const ROSTER_SORTS = [
   ['firstName', 'First Name'],
   ['lastName', 'Last Name'],
@@ -1665,10 +1665,7 @@ const ROSTER_SORTS = [
   ['flagged', 'Flagged First'],
 ];
 function _rosterSortMode(cid) {
-  let mode = null;
-  try {
-    mode = localStorage.getItem('gb-roster-sort-' + cid);
-  } catch (e) {}
+  const mode = getViewPref('gb-roster-sort-' + cid);
   return ROSTER_SORTS.some(o => o[0] === mode) ? mode : 'lastName';
 }
 function _rosterSortLabel(mode) {
@@ -1680,7 +1677,7 @@ function _sortedRoster(cid, mode) {
   return mode === 'lastName' ? byLast : sortStudents(byLast, mode, cid);
 }
 
-// Which grades show beside each name, remembered per class on this computer.
+// Which grades show beside each name, remembered per class for the teacher.
 // A Proficiency class has no percentage, so it offers Proficiency or None.
 const ROSTER_SHOWS = [
   ['grade', 'Grade'],
@@ -1696,10 +1693,7 @@ function _rosterShowOptions(cid) {
   return courseGradeMode(cid) === 'proficiency' ? ROSTER_SHOWS_PROFICIENCY : ROSTER_SHOWS;
 }
 function _rosterShowMode(cid) {
-  let mode = null;
-  try {
-    mode = localStorage.getItem('gb-roster-show-' + cid);
-  } catch (e) {}
+  const mode = getViewPref('gb-roster-show-' + cid);
   const opts = _rosterShowOptions(cid);
   return opts.some(o => o[0] === mode) ? mode : opts === ROSTER_SHOWS ? 'both' : 'grade';
 }
@@ -1837,9 +1831,7 @@ function _closeRosterSortMenu() {
 function _applyRosterShow(mode) {
   const cid = _sidebarCid;
   if (!cid || !document.getElementById('gb-roster-list')) return;
-  try {
-    localStorage.setItem('gb-roster-show-' + cid, mode);
-  } catch (e) {}
+  saveViewPref('gb-roster-show-' + cid, mode);
   const btn = document.getElementById('sb-show-btn');
   btn.title = 'Show: ' + _rosterShowLabel(cid, mode);
   btn.setAttribute('aria-label', btn.title);
@@ -1854,9 +1846,7 @@ function _applyRosterSort(mode) {
   const cid = _sidebarCid;
   const list = document.getElementById('gb-roster-list');
   if (!cid || !list) return;
-  try {
-    localStorage.setItem('gb-roster-sort-' + cid, mode);
-  } catch (e) {}
+  saveViewPref('gb-roster-sort-' + cid, mode);
   const sel = list.querySelector('.student-row.selected');
   list.innerHTML = _sidebarRowsHtml(cid, _sortedRoster(cid, mode), sel ? sel.dataset.sid : null, _sidebarClickFnName);
   document.getElementById('sb-sort-label').textContent = _rosterSortLabel(mode);
@@ -2214,11 +2204,10 @@ function refreshSidebar() {
 }
 
 /* ── Collapsible sidebar (shared across all pages) ─────────── */
-let _sidebarVisible = true;
-try {
-  _sidebarVisible = localStorage.getItem('gb-sidebar-vis') !== 'false';
-} catch (e) {
-  console.warn('Sidebar state read error:', e);
+// Read when used, not at load: after signing in, the teacher's preferences
+// arrive after this file runs.
+function _sidebarIsVisible() {
+  return getViewPref('gb-sidebar-vis') !== 'false';
 }
 
 /* At 1024px and below there is no room for the student list beside the
@@ -2236,8 +2225,7 @@ function toggleSidebar() {
     setSidebarOverlay(!(layout && layout.classList.contains('sidebar-overlay')));
     return;
   }
-  _sidebarVisible = !_sidebarVisible;
-  localStorage.setItem('gb-sidebar-vis', _sidebarVisible);
+  saveViewPref('gb-sidebar-vis', !_sidebarIsVisible());
   applySidebarState();
 }
 
@@ -2280,7 +2268,7 @@ if (window.matchMedia) {
 function applySidebarState() {
   const layout = document.getElementById('page-layout');
   if (!layout) return;
-  layout.classList.toggle('sidebar-hidden', !_sidebarVisible);
+  layout.classList.toggle('sidebar-hidden', !_sidebarIsVisible());
 }
 
 function initSidebarToggle() {

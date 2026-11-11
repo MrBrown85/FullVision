@@ -1509,6 +1509,7 @@ describe('Print New Card', () => {
       press('spCardsNewCard', LIVE, { student: U(12) });
       expect(asked[0].title).toBe('Print a New Card for Avery?');
       asked[0].onOk();
+      await StudentCards._making(LIVE);
       await afterDraw();
       expect(t.fn.posts.length).toBe(1);
       expect(t.fn.posts[0].body.items).toEqual([{ enrollment_id: U(12), replaces: U(901) }]);
@@ -1655,6 +1656,7 @@ describe('Print New Card', () => {
       const before = reads();
       press('spCardsNewCard', LIVE, { student: U(13) });
       asked[0].onOk();
+      await StudentCards._making(LIVE);
       await afterDraw();
       expect(sheets).toEqual([]);
       expect(reads()).toBe(before + 1);
@@ -1782,6 +1784,7 @@ describe('New Codes for This Class', () => {
       press('spCardsNewCodes', LIVE);
       expect(asked[0].message.startsWith('2 cards stop working now. 1 student gets their first card.')).toBe(true);
       asked[0].onOk();
+      await StudentCards._making(LIVE);
       await afterDraw();
       expect(t.fn.posts.length).toBe(1);
       expect(t.fn.posts[0].body.items).toEqual([
@@ -1865,6 +1868,7 @@ describe('New Codes for This Class', () => {
       const before = reads();
       press('spCardsNewCodes', LIVE);
       asked[0].onOk();
+      await StudentCards._making(LIVE);
       await afterDraw();
       expect(t.fetcher.count()).toBe(3);
       expect(sheets.length).toBe(1);
@@ -1882,6 +1886,7 @@ describe('New Codes for This Class', () => {
       globalThis.fetch = fetchFrom(t.fn);
       press('spCardsNewCard', LIVE, { student: U(12) });
       asked[1].onOk();
+      await StudentCards._making(LIVE);
       await afterDraw();
       expect(notesOf(parse(StudentCards.render(LIVE)))).toEqual([
         '1 card went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
@@ -1921,6 +1926,7 @@ describe('New Codes for This Class', () => {
       t.fn.markPrinted([U(970)]);
       press('spCardsNewCodes', LIVE);
       asked[0].onOk();
+      await StudentCards._making(LIVE);
       await afterDraw();
       expect(sheets[0].names).toEqual(['Jordan Abel', 'Avery Byrne']);
       // Read again: Cam has the other tab's printed card. Nothing is said about him.
@@ -1978,6 +1984,7 @@ describe('New Codes for This Class', () => {
     press('spCardsNewCodes', CID);
     expect(asked[0].title).toBe('New Codes for All 3 Students?');
     asked[0].onOk();
+    await StudentCards._making(CID);
     await afterDraw();
     expect(sheets.length).toBe(2);
     expect(sheets[1].numbers).toEqual(['Card 2', 'Card 2', 'Card 2']);
@@ -2336,6 +2343,7 @@ describe('an old card stopped and the new one not printed', () => {
       t.session.fake.on('list_student_cards', () => new Promise(r => (land = r)));
       press('spCardsNewCard', LIVE, { student: U(11) });
       asked[0].onOk();
+      await StudentCards._making(LIVE);
       await afterDraw();
       expect(sheets).toEqual([]);
       // The server stopped the old card and made a new one nobody printed.
@@ -2379,6 +2387,9 @@ describe('an old card stopped and the new one not printed', () => {
       await shown(LIVE);
       press('spCardsNewCodes', LIVE);
       asked[0].onOk();
+      // Seven requests, one after another, each card's key made by WebCrypto off the event loop: wait for
+      // the press itself to finish, not a fixed number of turns.
+      await StudentCards._making(LIVE);
       await afterDraw();
       expect(t.fetcher.count()).toBe(7);
       expect(sheets[0].names).toEqual(['Jordan Abel']);
@@ -2473,6 +2484,91 @@ describe('a read and a press never cross', () => {
       t.session.signOut();
     }
   });
+
+  // S3-F2 follow-up: the screen is never silent after Yes. A reviewer of PR 1014 saw no word while the Yes waited.
+  it.each([
+    ['Print New Card', 'spCardsNewCard', { student: U(11) }, 1],
+    ['New Codes for This Class', 'spCardsNewCodes', undefined, 3],
+  ])(
+    '%s: a Yes waiting on the list read says Making cards… until the cards are made',
+    async (what, action, data, n) => {
+      const t = await signedIn();
+      try {
+        printedCard(t, U(901), U(11));
+        await shown(LIVE);
+        press(action, LIVE, data);
+        let land;
+        t.session.fake.on('list_student_cards', () => new Promise(r => (land = r)));
+        StudentCards.load(LIVE);
+        const drawn = [];
+        DashClassManager.renderClassManager = () => drawn.push(parse(StudentCards.render(LIVE)));
+        asked[0].onOk();
+        // Drawn at once with the line, and every button that acts on the list off.
+        expect(drawn.length).toBe(1);
+        expect(notesOf(drawn[0])).toEqual(['Making cards…']);
+        await afterDraw();
+        let box = parse(StudentCards.render(LIVE));
+        expect(notesOf(box)).toEqual(['Making cards…']);
+        expect(
+          Array.from(box.querySelectorAll('button[data-action^="spCards"]:not([data-action="spCardsFilter"])')).every(
+            b => b.hasAttribute('disabled'),
+          ),
+        ).toBe(true);
+        expect(t.fn.posts).toEqual([]);
+        t.session.fake.on('list_student_cards', () => ({ data: t.fn.cardsListed(), error: null }));
+        land({ data: t.fn.cardsListed(), error: null });
+        await settle();
+        await StudentCards._making(LIVE);
+        await afterDraw();
+        expect(t.fn.posts.length).toBe(1);
+        expect(sheets.length).toBe(1);
+        expect(sheets[0].names.length).toBe(n);
+        box = parse(StudentCards.render(LIVE));
+        expect(notesOf(box) || []).not.toContain('Making cards…');
+      } finally {
+        t.session.signOut();
+      }
+    },
+  );
+
+  it.each([
+    [
+      'Class Settings closes',
+      () => (DashClassManager.classManagerOpen = false),
+      () => (DashClassManager.classManagerOpen = true),
+    ],
+    ['another tab is shown', () => (onPage = null), () => (onPage = LIVE)],
+    ['another class is shown', () => (onPage = CID), () => (onPage = LIVE)],
+  ])(
+    'a Yes waiting on the read, and then %s: the line goes, and nothing is made when the read lands',
+    async (what, leave, back) => {
+      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+      const t = await signedIn();
+      try {
+        printedCard(t, U(901), U(11));
+        await shown(LIVE);
+        press('spCardsNewCard', LIVE, { student: U(11) });
+        let land;
+        t.session.fake.on('list_student_cards', () => new Promise(r => (land = r)));
+        StudentCards.load(LIVE);
+        asked[0].onOk();
+        expect(notesOf(parse(StudentCards.render(LIVE)))).toEqual(['Making cards…']);
+        leave();
+        vi.advanceTimersByTime(1000); // the watch sees the screen gone
+        back();
+        // Back on the list before the read lands: the Yes came to nothing, so nothing says cards are being made.
+        expect(notesOf(parse(StudentCards.render(LIVE))) || []).not.toContain('Making cards…');
+        land({ data: t.fn.cardsListed(), error: null });
+        await afterDraw();
+        expect(t.fn.posts).toEqual([]);
+        expect(sheets).toEqual([]);
+        expect(notesOf(parse(StudentCards.render(LIVE))) || []).not.toContain('Making cards…');
+      } finally {
+        vi.useRealTimers();
+        t.session.signOut();
+      }
+    },
+  );
 
   it('an answer to a read begun before a press finished is dropped, and the list read again', async () => {
     let release;

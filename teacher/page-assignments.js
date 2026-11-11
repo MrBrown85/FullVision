@@ -3123,6 +3123,10 @@ window.PageAssignments = (function () {
       '<div id="collab-panel-mount"></div>' +
       '</section>';
 
+    // Student Work (S5-F1): only in a class with Send Work on.
+    _formWork = _formWorkOffered(cid) ? _formWorkFor(cid, assess) : null;
+    if (_formWork) html += _formWorkCardHtml(cid);
+
     // Actions, in a footer that stays at the bottom of the window while the
     // form is in view, with what the work counts toward beside them.
     html +=
@@ -3146,6 +3150,198 @@ window.PageAssignments = (function () {
       '</div>';
 
     return html;
+  }
+
+  /* ── Student Work on the assessment form (S5-F1) ───────────
+     Board "Teacher: Student Work Settings on an Assessment", without Keep
+     Photos Until (per class only, Q15). The card is drawn only while the
+     class's Send Work is on (CmStudentPage.workSettings), which is Demo
+     Mode only until S5-W1: a signed-in class never has it, and nothing
+     here is sent. The choices are kept with Demo Mode's student work
+     (getAssessmentStudentWork, saveDemoStudentWork in shared/data.js),
+     by the assessment's id, not on the assessment: so Copy Assessment,
+     Duplicate, Copy to Another Class and Duplicate Class all start the
+     copy at Nothing (Colin). After the Due Date starts at Keep Accepting
+     (Colin); Until is the last day work is taken, a week after the due
+     date until the teacher picks another. */
+  var _formWork = null; // the open form's Student Work choices, or null when the card is not drawn
+
+  var WORK_SEND = [
+    { value: 'nothing', label: 'Nothing' },
+    { value: 'photos', label: 'Photos' },
+    { value: 'photos_files', label: 'Photos and Files' },
+  ];
+  var WORK_GROUP = [
+    { value: 'each', label: 'Each Student' },
+    { value: 'group', label: 'One per Group' },
+  ];
+  var WORK_MARKUP = [
+    { value: 'yes', label: 'Yes' },
+    { value: 'no', label: 'No' },
+  ];
+
+  function _hasChoice(list, value) {
+    return list.some(function (c) {
+      return c.value === value;
+    });
+  }
+
+  function _formWorkOffered(cid) {
+    return (
+      typeof CmStudentPage !== 'undefined' &&
+      typeof CmStudentPage.workSettings === 'function' &&
+      CmStudentPage.workSettings(cid).send_work === true &&
+      typeof getAssessmentStudentWork === 'function'
+    );
+  }
+
+  function _formWorkFor(cid, assess) {
+    var w = assess
+      ? getAssessmentStudentWork(cid, assess.id)
+      : {
+          students_send: 'nothing',
+          after_due: 'keep',
+          accept_until: null,
+          group_work: 'each',
+          students_see_markup: true,
+        };
+    return {
+      students_send: w.students_send,
+      after_due: w.after_due,
+      accept_until: w.accept_until,
+      group_work: w.group_work,
+      students_see_markup: w.students_see_markup !== false,
+    };
+  }
+
+  // The day Until starts at: a week after the due date (or today).
+  function _formWorkUntilDefault(cid) {
+    var due = (document.getElementById('af-due') || {}).value;
+    return _weekAfter(due || courseToday(cid));
+  }
+
+  // html-safe: fixed labels and values; the date goes through esc
+  function _formWorkSegHtml(field, label, choices, chosen) {
+    return (
+      '<div class="af-work-field">' +
+      '<span class="af-work-label" id="af-work-' +
+      field +
+      '-label">' +
+      label +
+      '</span>' +
+      '<div class="seg af-type-toggle af-work-seg" role="radiogroup" aria-labelledby="af-work-' +
+      field +
+      '-label">' +
+      choices
+        .map(function (c) {
+          var on = c.value === chosen;
+          return (
+            '<button type="button" class="seg-btn af-type-btn' +
+            (on ? ' active' : '') +
+            '" role="radio" aria-checked="' +
+            on +
+            '" data-action="setFormWork" data-field="' +
+            field +
+            '" data-value="' +
+            c.value +
+            '">' +
+            esc(c.label) +
+            '</button>'
+          );
+        })
+        .join('') +
+      '</div>' +
+      '</div>'
+    );
+  }
+
+  // html-safe: built from fixed labels by _formWorkSegHtml; the date through esc
+  function _formWorkCardHtml(cid) {
+    var w = _formWork;
+    var until = w.after_due === 'until' && w.accept_until ? w.accept_until : '';
+    var afterChoices = [
+      { value: 'keep', label: 'Keep Accepting' },
+      { value: 'until', label: until ? 'Until ' + formatShortDate(until) : 'Until a Date' },
+      { value: 'stop', label: 'Stop' },
+    ];
+    return (
+      '<section class="af-card af-card-work" aria-labelledby="af-work-title">' +
+      '<div class="af-card-head"><span class="af-card-title" id="af-work-title">Student Work</span></div>' +
+      '<div class="af-work-body">' +
+      _formWorkSegHtml('students_send', 'Students Send', WORK_SEND, w.students_send) +
+      _formWorkSegHtml('after_due', 'After the Due Date', afterChoices, w.after_due) +
+      (w.after_due === 'until'
+        ? '<div class="af-work-field af-work-until"><label class="af-work-label" for="af-accept-until">Last Day</label>' +
+          '<input type="date" class="cm-input af-work-date" id="af-accept-until" data-action-change="setFormWorkUntil" value="' +
+          esc(until) +
+          '"></div>'
+        : '') +
+      _formWorkSegHtml('group_work', 'Group Work', WORK_GROUP, w.group_work) +
+      _formWorkSegHtml(
+        'students_see_markup',
+        'Students See Your Mark Up',
+        WORK_MARKUP,
+        w.students_see_markup ? 'yes' : 'no',
+      ) +
+      '</div>' +
+      '</section>'
+    );
+  }
+
+  // Redraws the card where it is; the rest of the form is left as typed.
+  function _refreshFormWorkCard(focusSel) {
+    var card = document.querySelector('.af-card-work');
+    if (!card || !_formWork) return;
+    var tpl = document.createElement('template');
+    // html-safe: built by _formWorkCardHtml
+    tpl.innerHTML = _formWorkCardHtml(activeCourse);
+    card.replaceWith(tpl.content.firstChild);
+    var to = focusSel && document.querySelector(focusSel);
+    if (to) to.focus({ preventScroll: true });
+  }
+
+  function _setFormWork(field, value) {
+    if (!_formWork) return;
+    if (field === 'students_send' && _hasChoice(WORK_SEND, value)) _formWork.students_send = value;
+    else if (field === 'group_work' && _hasChoice(WORK_GROUP, value)) _formWork.group_work = value;
+    else if (field === 'students_see_markup' && (value === 'yes' || value === 'no'))
+      _formWork.students_see_markup = value === 'yes';
+    else if (field === 'after_due' && ['keep', 'until', 'stop'].indexOf(value) >= 0) {
+      _formWork.after_due = value;
+      if (value === 'until' && !_formWork.accept_until) _formWork.accept_until = _formWorkUntilDefault(activeCourse);
+    } else return;
+    _refreshFormWorkCard('.af-card-work [data-field="' + field + '"][data-value="' + value + '"]');
+  }
+
+  function _setFormWorkUntil(el) {
+    if (!_formWork || !el) return;
+    var v = String(el.value || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+    _formWork.accept_until = v;
+    _refreshFormWorkCard('#af-accept-until');
+  }
+
+  /* After a save: the card's choices for `aid`, kept with Demo Mode's
+     student work. Nothing when the card was not drawn. `w` is the card's
+     choices as read before the save: saving the assessment can draw the
+     form again from what is stored. */
+  function _saveFormWork(cid, aid, w) {
+    if (!w || !aid || !_formWorkOffered(cid) || typeof saveDemoStudentWork !== 'function') return;
+    var work = getCourseSubmissions(cid);
+    var row = {
+      id: aid,
+      students_send: w.students_send,
+      after_due: w.after_due,
+      accept_until: w.after_due === 'until' ? w.accept_until : null,
+      group_work: w.group_work,
+      students_see_markup: w.students_see_markup,
+    };
+    work.assessments = (work.assessments || [])
+      .filter(function (x) {
+        return x && x.id !== aid;
+      })
+      .concat([row]);
+    saveDemoStudentWork(cid, work);
   }
 
   /* ── Assessment Form Helpers ────────────────────────────── */
@@ -6043,9 +6239,11 @@ window.PageAssignments = (function () {
     // Read before render() replaces the form.
     var copyTargets = window.AssessmentCopy ? AssessmentCopy.readTargets(activeCourse) : [];
     if (copyTargets.length) newAssess.copyGroup = AssessmentCopy.newCopyGroup();
+    var formWork = _formWork;
     var srcCid = activeCourse;
     assessments.push(newAssess);
     saveAssessments(activeCourse, assessments);
+    _saveFormWork(activeCourse, id, formWork);
     var keep = addAnother ? _formKeepForNext() : null;
     openAssessIds.clear();
     openAssessIds.add(id);
@@ -6480,6 +6678,8 @@ window.PageAssignments = (function () {
     var copyTargets = window.AssessmentCopy ? AssessmentCopy.readTargets(activeCourse) : [];
     if (copyTargets.length && !next.copyGroup) next.copyGroup = AssessmentCopy.newCopyGroup();
     if (!edited && !copyTargets.length) {
+      // Only the Student Work card changed, or nothing: it is kept apart.
+      _saveFormWork(activeCourse, aid, _formWork);
       hideNewForm();
       render();
       return;
@@ -6491,8 +6691,10 @@ window.PageAssignments = (function () {
     });
     Object.assign(cur, next);
     var after = structuredClone(cur);
+    var formWork = _formWork;
     var srcCid = activeCourse;
     saveAssessments(activeCourse, assessments);
+    _saveFormWork(activeCourse, aid, formWork);
     var move = _scoreMoveAfterSave;
     _scoreMoveAfterSave = null;
     if (move && move.aid === aid && after.rubricId === move.rubricId) Grader.moveToRubric(activeCourse, aid, move);
@@ -6562,6 +6764,25 @@ window.PageAssignments = (function () {
     render();
   }
 
+  /* Said only when students have sent photos for it (Colin, ruling 102):
+     the photos go with the assessment. Counts students, not pages. Demo
+     Mode's sample work only until S5-W1. */
+  function _photosGoNote(cid, aid) {
+    if (typeof getCourseSubmissions !== 'function') return '';
+    var who = {};
+    (getCourseSubmissions(cid).submissions || []).forEach(function (sub) {
+      if (sub.assessment_id === aid && sub.files && sub.files.length) who[sub.enrollment_id] = true;
+    });
+    var n = Object.keys(who).length;
+    if (!n) return '';
+    return (
+      ' The photos ' +
+      n +
+      (n === 1 ? ' student' : ' students') +
+      " sent for it are deleted too. Deleted photos can't come back."
+    );
+  }
+
   function deleteAssess(aid) {
     var target = getAssessments(activeCourse).find(function (a) {
       return a.id === aid;
@@ -6569,7 +6790,7 @@ window.PageAssignments = (function () {
     var note = window.AssessmentCopy && target ? AssessmentCopy.deleteNote(activeCourse, target) : '';
     showConfirm(
       'Delete Assessment',
-      'Delete this assessment and all its scores?' + note,
+      'Delete this assessment and all its scores?' + _photosGoNote(activeCourse, aid) + note,
       'Delete',
       'danger',
       function () {
@@ -10863,6 +11084,9 @@ window.PageAssignments = (function () {
       setCollaboration: function () {
         setCollaboration(el.dataset.collab);
       },
+      setFormWork: function () {
+        _setFormWork(el.dataset.field, el.dataset.value);
+      },
       setScoreMode: function () {
         _askBeforeScoredChange(
           'scoring',
@@ -11215,6 +11439,10 @@ window.PageAssignments = (function () {
     }
     if (el.dataset.actionChange === 'onRubricSelect') {
       onRubricSelect(el.value);
+      return;
+    }
+    if (el.dataset.actionChange === 'setFormWorkUntil') {
+      _setFormWorkUntil(el);
       return;
     }
     if (el.dataset.actionChange === 'autoSetDueDate') {
@@ -12130,46 +12358,8 @@ window.PageAssignments = (function () {
     // The toolbar and student header are drawn once and only updated, so a
     // save that redraws the controls (a points box on blur) doesn't swap out
     // the button being clicked.
-    if (!dialog.firstChild)
-      // html-safe: fixed markup and icon constants; text is set with textContent below
-      dialog.innerHTML =
-        '<div class="grader-toolbar">' +
-        '<div class="grader-toolbar-start"></div>' +
-        '<div class="grader-title-wrap"><h2 class="grader-title" id="grader-title"></h2>' +
-        '<span class="type-badge type-badge-needs grader-needs-category" hidden></span>' +
-        '<p class="grader-counts-as"></p></div>' +
-        '<div class="grader-toolbar-end"><button type="button" class="grader-done" data-grader="close">Done</button></div>' +
-        '</div>' +
-        '<div class="grader-scroll">' +
-        '<div class="grader-student-row">' +
-        '<button type="button" class="grader-step" data-grader="prev" aria-label="Previous student">' +
-        _GRADER_CHEVRON_LEFT +
-        '</button>' +
-        '<h1 class="grader-student"></h1>' +
-        '<button type="button" class="grader-step" data-grader="next" aria-label="Next student">' +
-        _GRADER_CHEVRON_RIGHT +
-        '</button>' +
-        '<span class="grader-print-mark"></span>' +
-        '<span class="grader-spacer"></span>' +
-        '<div class="grader-status" role="group" aria-label="Status"></div>' +
-        '</div>' +
-        '<div class="grader-separate-line" hidden></div>' +
-        '<section class="grader-members" aria-labelledby="grader-members-title" hidden></section>' +
-        '<div class="grader-body"></div>' +
-        '<section class="grader-report-note" aria-labelledby="grader-report-note-title">' +
-        '<div class="grader-report-note-head"><h2 id="grader-report-note-title">Note for the Report</h2>' +
-        '<p>Optional. One line about what the student did, written about them, not to them.</p></div>' +
-        '<div class="grader-report-note-body">' +
-        '<input type="text" class="grader-report-note-input" aria-label="Note for the report" ' +
-        'aria-describedby="grader-report-note-preview" maxlength="300" autocomplete="off">' +
-        '<p class="grader-report-note-preview" id="grader-report-note-preview"></p>' +
-        '</div>' +
-        '</section>' +
-        '</div>' +
-        '<div class="grader-foot">' +
-        '<span class="grader-hint">← → change student · Esc closes</span>' +
-        '<span class="grader-grade-label">Grade</span><span class="grader-grade"></span>' +
-        '</div>';
+    // html-safe: fixed markup and icon constants; text is set with textContent below
+    if (!dialog.firstChild) dialog.innerHTML = _graderShellHtml();
     // Group work shows the group: its grade is drawn from (and saved for)
     // the member it copies from, so that member is the focus.
     var view = _graderGroupView(cid, a, st.id);
@@ -12179,32 +12369,191 @@ window.PageAssignments = (function () {
         return x.id === view.source;
       });
     }
-    var i = _grader.studentIds.indexOf(st.id);
-    var steps = _graderSteps(cid, a);
-    var u = steps ? _graderUnitIndex(steps, st.id) : -1;
-    dialog.querySelector('.grader-title').textContent = a.title || 'Assessment';
-    dialog.querySelector('.grader-counts-as').textContent = _countsAsText(cid, a);
-    var needsCat = dialog.querySelector('.grader-needs-category');
+    _drawGraderToolbar(dialog, cid, a);
+    _drawGraderHead(_graderPart(dialog, 'head'), cid, a, st, view);
+    _grader.source = view ? view.source : null;
+    _drawGraderPanel(_graderPart(dialog, 'panel'), cid, a, st);
+    _refreshGraderChrome();
+  }
+
+  /* ── Grader parts (S6-T1) ─────────────────────────────────
+     The dialog is put together from four parts, each with its own markup
+     and its own drawing, so a work pane can sit beside the scoring
+     without either knowing where the other is:
+     - the toolbar: Print, the title, Needs a Category, Counts As, Done;
+     - the head: ← the student's (or group's) name →, Printed, and the
+       Missing | Excused | Late control;
+     - the panel: Graded Separately From, the members card, the grading
+       controls and the Note for the Report;
+     - the foot: the hint and the grade.
+     Today they sit as they always have: the head and the panel share the
+     part that scrolls, between the toolbar and the foot, and the markup is
+     the same to the byte (tests/fixtures/assignments-switch-off.json).
+     Each part is drawn and refreshed through its own root, found by
+     _graderPart, so a layout that moves the head above a work pane, or the
+     panel into a column of its own, changes the shell and nothing else.
+     The panel is four siblings, not one box: its root is the element that
+     holds them (today the scrolling part). */
+  // html-safe: fixed markup
+  function _graderToolbarHtml() {
+    return (
+      '<div class="grader-toolbar">' +
+      '<div class="grader-toolbar-start"></div>' +
+      '<div class="grader-title-wrap"><h2 class="grader-title" id="grader-title"></h2>' +
+      '<span class="type-badge type-badge-needs grader-needs-category" hidden></span>' +
+      '<p class="grader-counts-as"></p></div>' +
+      '<div class="grader-toolbar-end"><button type="button" class="grader-done" data-grader="close">Done</button></div>' +
+      '</div>'
+    );
+  }
+
+  // html-safe: fixed markup and icon constants
+  function _graderHeadHtml() {
+    return (
+      '<div class="grader-student-row">' +
+      '<button type="button" class="grader-step" data-grader="prev" aria-label="Previous student">' +
+      _GRADER_CHEVRON_LEFT +
+      '</button>' +
+      '<h1 class="grader-student"></h1>' +
+      '<button type="button" class="grader-step" data-grader="next" aria-label="Next student">' +
+      _GRADER_CHEVRON_RIGHT +
+      '</button>' +
+      '<span class="grader-print-mark"></span>' +
+      '<span class="grader-spacer"></span>' +
+      '<div class="grader-status" role="group" aria-label="Status"></div>' +
+      '</div>'
+    );
+  }
+
+  // html-safe: fixed markup
+  function _graderPanelHtml() {
+    return (
+      '<div class="grader-separate-line" hidden></div>' +
+      '<section class="grader-members" aria-labelledby="grader-members-title" hidden></section>' +
+      '<div class="grader-body"></div>' +
+      '<section class="grader-report-note" aria-labelledby="grader-report-note-title">' +
+      '<div class="grader-report-note-head"><h2 id="grader-report-note-title">Note for the Report</h2>' +
+      '<p>Optional. One line about what the student did, written about them, not to them.</p></div>' +
+      '<div class="grader-report-note-body">' +
+      '<input type="text" class="grader-report-note-input" aria-label="Note for the report" ' +
+      'aria-describedby="grader-report-note-preview" maxlength="300" autocomplete="off">' +
+      '<p class="grader-report-note-preview" id="grader-report-note-preview"></p>' +
+      '</div>' +
+      '</section>'
+    );
+  }
+
+  // html-safe: fixed markup
+  function _graderFootHtml() {
+    return (
+      '<div class="grader-foot">' +
+      '<span class="grader-hint">← → change student · Esc closes</span>' +
+      '<span class="grader-grade-label">Grade</span><span class="grader-grade"></span>' +
+      '</div>'
+    );
+  }
+
+  // The dialog as it has always been laid out.
+  // html-safe: the parts' fixed markup
+  function _graderShellHtml() {
+    return (
+      _graderToolbarHtml() +
+      '<div class="grader-scroll">' +
+      _graderHeadHtml() +
+      _graderPanelHtml() +
+      '</div>' +
+      _graderFootHtml()
+    );
+  }
+
+  /* A part's root in the dialog: the head's row; the element holding the
+     panel's pieces; the toolbar; the foot. Null when the dialog has none. */
+  function _graderPart(dialog, part) {
+    if (!dialog) return null;
+    if (part === 'head') return dialog.querySelector('.grader-student-row');
+    if (part === 'panel') {
+      var body = dialog.querySelector('.grader-body');
+      return body ? body.parentNode : null;
+    }
+    if (part === 'toolbar') return dialog.querySelector('.grader-toolbar');
+    if (part === 'foot') return dialog.querySelector('.grader-foot');
+    return null;
+  }
+
+  function _drawGraderToolbar(dialog, cid, a) {
+    var bar = _graderPart(dialog, 'toolbar');
+    bar.querySelector('.grader-title').textContent = a.title || 'Assessment';
+    bar.querySelector('.grader-counts-as').textContent = _countsAsText(cid, a);
+    var needsCat = bar.querySelector('.grader-needs-category');
     needsCat.hidden = !assessmentNeedsCategory(cid, a);
     needsCat.textContent = NEEDS_CATEGORY_LABEL;
     needsCat.title = NEEDS_CATEGORY_TIP;
-    dialog.querySelector('.grader-student').textContent = view ? view.label : displayNameWithLast(st);
-    dialog.querySelector('[data-grader="prev"]').disabled = steps ? !(u > 0) : !(i > 0);
-    dialog.querySelector('[data-grader="next"]').disabled = steps
-      ? !(u >= 0 && u < steps.length - 1)
-      : !(i >= 0 && i < _grader.studentIds.length - 1);
-    dialog.querySelector('[data-grader="prev"]').setAttribute('aria-label', view ? 'Previous' : 'Previous student');
-    dialog.querySelector('[data-grader="next"]').setAttribute('aria-label', view ? 'Next' : 'Next student');
-    _grader.source = view ? view.source : null;
-    dialog.querySelector('.grader-toolbar-start').innerHTML = _graderPrintButton(cid, a);
+    // html-safe: _graderPrintButton is fixed labels and our id
+    bar.querySelector('.grader-toolbar-start').innerHTML = _graderPrintButton(cid, a);
+  }
+
+  /* The head for `st` (the member a group's grade is drawn from, when
+     `view` is a group): the name, and ← → off at either end. */
+  function _drawGraderHead(head, cid, a, st, view) {
+    var i = _grader.studentIds.indexOf(st.id);
+    var steps = _graderSteps(cid, a);
+    var u = steps ? _graderUnitIndex(steps, st.id) : -1;
+    var prev = head.querySelector('[data-grader="prev"]');
+    var next = head.querySelector('[data-grader="next"]');
+    head.querySelector('.grader-student').textContent = view ? view.label : displayNameWithLast(st);
+    prev.disabled = steps ? !(u > 0) : !(i > 0);
+    next.disabled = steps ? !(u >= 0 && u < steps.length - 1) : !(i >= 0 && i < _grader.studentIds.length - 1);
+    prev.setAttribute('aria-label', view ? 'Previous' : 'Previous student');
+    next.setAttribute('aria-label', view ? 'Next' : 'Next student');
+  }
+
+  // The grading controls for `st`.
+  function _drawGraderPanel(panel, cid, a, st) {
     // html-safe: a.id is our id; _graderHtml is reviewed
-    dialog.querySelector('.grader-body').innerHTML =
+    panel.querySelector('.grader-body').innerHTML =
       '<div class="assess-card open active" id="ac-' +
       a.id +
       '"><div class="assess-body">' +
       _graderHtml(cid, a, _scoreTagObjs(cid, a), [st], getScores(cid), true) +
       '</div></div>';
-    _refreshGraderChrome();
+  }
+
+  /* The head after a click: the Missing | Excused | Late control (none on
+     a group, whose members each have their own) and Printed beside the
+     name. Each is redrawn only when it changes: pressing a button moves
+     focus, which runs this, and new buttons under the mouse before it is
+     released lose the click. */
+  function _refreshGraderHead(head, cid, a, sid, view) {
+    var status = getAssignmentStatus(cid, sid, a.id);
+    // A DIBELS benchmark is given on the day or not at all: no Late.
+    var statusHtml = _graderStatusButtons(a.id, sid, status, isDibelsScored(a) ? ['NS', 'EXC'] : ['NS', 'EXC', 'LATE']);
+    var statusBox = head.querySelector('.grader-status');
+    if (_grader.statusHtml !== statusHtml) {
+      // html-safe: statusHtml is built by _graderStatusButtons
+      if (!_patchStatusButtons(statusBox, statusHtml)) statusBox.innerHTML = statusHtml;
+      _grader.statusHtml = statusHtml;
+    }
+    statusBox.hidden = !!view;
+    // Printed / Changed Since Printed beside the name (teacher/rubric-print.js).
+    var markHtml = view ? '' : _printMarkHtml(cid, a.id, sid);
+    var markBox = head.querySelector('.grader-print-mark');
+    if (markBox && _grader.markHtml !== markHtml) {
+      // html-safe: _printMarkHtml is RubricPrint.markHtml, which escapes its text
+      markBox.innerHTML = markHtml;
+      _grader.markHtml = markHtml;
+    }
+  }
+
+  /* The panel after a click: the members card and the Graded Separately
+     From line, the controls set aside under Missing or Excused, and the
+     Note for the Report (one student's; the group view has none). */
+  function _refreshGraderPanel(panel, cid, a, sid, view) {
+    _refreshGroupChrome(panel, cid, a, sid, view);
+    var status = getAssignmentStatus(cid, sid, a.id);
+    // Missing and Excused set the grading controls aside, as the grids do.
+    panel.querySelector('.grader-body').classList.toggle('is-locked', status === 'NS' || status === 'EXC');
+    _refreshReportNote(panel, cid, a, sid);
+    if (view) panel.querySelector('.grader-report-note').hidden = true;
   }
 
   var _GRADER_CHEVRON_LEFT =
@@ -12599,57 +12948,35 @@ window.PageAssignments = (function () {
     // The member the group's grade comes from changed (Missing, Excused or
     // Grade Separately): draw the group again from the new one.
     if ((view ? view.source : null) !== (_grader.source || null)) return render();
-    _refreshGroupChrome(dialog, cid, a, sid, view);
-    var status = getAssignmentStatus(cid, sid, a.id);
-    // A DIBELS benchmark is given on the day or not at all: no Late.
-    var statusHtml = _graderStatusButtons(a.id, sid, status, isDibelsScored(a) ? ['NS', 'EXC'] : ['NS', 'EXC', 'LATE']);
-    // Redrawn only when it changes: pressing a button moves focus, which
-    // runs this, and new buttons under the mouse before it is released
-    // lose the click.
-    if (_grader.statusHtml !== statusHtml) {
-      var statusBox = dialog.querySelector('.grader-status');
-      // html-safe: statusHtml is built by _graderStatusButtons
-      if (!_patchStatusButtons(statusBox, statusHtml)) statusBox.innerHTML = statusHtml;
-      _grader.statusHtml = statusHtml;
-    }
-    // Missing and Excused set the grading controls aside, as the grids do.
-    dialog.querySelector('.grader-body').classList.toggle('is-locked', status === 'NS' || status === 'EXC');
-    dialog.querySelector('.grader-status').hidden = !!view;
+    _refreshGraderPanel(_graderPart(dialog, 'panel'), cid, a, sid, view);
+    _refreshGraderHead(_graderPart(dialog, 'head'), cid, a, sid, view);
+    var foot = _graderPart(dialog, 'foot');
     // Points work's box takes Return to the next student, so the hint says
     // so; ← → step while nothing new is typed in it (_graderCardKey).
     var returnStep = isPointsScored(a) && !isCompletionScored(a) ? 'Return next student \u00B7 ' : '';
-    dialog.querySelector('.grader-hint').textContent = view
+    foot.querySelector('.grader-hint').textContent = view
       ? returnStep + '\u2190 \u2192 change group \u00B7 Esc closes'
       : returnStep + '\u2190 \u2192 change student \u00B7 Esc closes';
-    _refreshReportNote(dialog, cid, a, sid);
     _refreshGraderReturn(dialog, cid, a, sid, view);
     // To Return, Returned and All, and Return N Graded (S1-F2). It draws
     // the dialog again itself when what Show lists has run out.
     if (_refreshGraderShow(dialog, cid, a)) return;
-    // Printed / Changed Since Printed beside the name (teacher/rubric-print.js).
-    var markHtml = view ? '' : _printMarkHtml(cid, a.id, sid);
-    var markBox = dialog.querySelector('.grader-print-mark');
-    if (markBox && _grader.markHtml !== markHtml) {
-      // html-safe: _printMarkHtml is RubricPrint.markHtml, which escapes its text
-      markBox.innerHTML = markHtml;
-      _grader.markHtml = markHtml;
-    }
-    // The Note for the Report is one student's; the group view has none.
-    if (view) dialog.querySelector('.grader-report-note').hidden = true;
     var grade = _graderGrade(cid, a, sid);
-    var pill = dialog.querySelector('.grader-grade');
+    // The foot's: a member graded separately has a grade of her own in the
+    // members card, above it.
+    var pill = foot.querySelector('.grader-grade');
     pill.textContent = grade.text;
     pill.className = 'grader-grade' + (grade.tone ? ' tone-' + grade.tone : '');
     // A DIBELS benchmark has no grade: its footer shows the ORF and Maze levels.
     var dibels = isDibelsScored(a);
-    dialog.querySelector('.grader-grade-label').hidden = dibels;
+    foot.querySelector('.grader-grade-label').hidden = dibels;
     pill.hidden = dibels;
-    var levels = dialog.querySelector('.grader-dibels-levels');
+    var levels = foot.querySelector('.grader-dibels-levels');
     if (dibels) {
       if (!levels) {
         levels = document.createElement('span');
         levels.className = 'grader-dibels-levels';
-        dialog.querySelector('.grader-foot').appendChild(levels);
+        foot.appendChild(levels);
       }
       levels.innerHTML = _dibelsLevelPillsHtml(cid, a, sid);
     } else if (levels) levels.remove();

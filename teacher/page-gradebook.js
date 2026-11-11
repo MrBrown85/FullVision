@@ -14,30 +14,22 @@ window.PageGradebook = (function () {
   var viewMode = 'scores';
   /* The Competencies view shows a rubric assessment as one column per
      criterion ('criteria', the default: no score repeated across columns)
-     or one per competency ('competencies'). Remembered per class on this
-     device. */
+     or one per competency ('competencies'). Remembered per class for the
+     teacher (getViewPref). */
   function rubricColumnsMode(cid) {
-    return localStorage.getItem('gb_rubricColumns_' + cid) === 'competencies' ? 'competencies' : 'criteria';
+    return getViewPref('gb_rubricColumns_' + cid) === 'competencies' ? 'competencies' : 'criteria';
   }
   function setRubricColumns(mode) {
-    localStorage.setItem('gb_rubricColumns_' + activeCourse, mode === 'criteria' ? 'criteria' : 'competencies');
+    saveViewPref('gb_rubricColumns_' + activeCourse, mode === 'criteria' ? 'criteria' : 'competencies');
     render();
   }
   /* Newest First puts the latest assessments on the left, in both views.
-     On unless the teacher turned it off; remembered on this device. */
-  var _newestFirst = true;
-  try {
-    _newestFirst = localStorage.getItem('gb_newestFirst') !== '0';
-  } catch (e) {
-    /* storage blocked: newest first */
+     On unless the teacher turned it off; remembered for the teacher. */
+  function _isNewestFirst() {
+    return getViewPref('gb_newestFirst') !== '0';
   }
   function toggleNewestFirst() {
-    _newestFirst = !_newestFirst;
-    try {
-      localStorage.setItem('gb_newestFirst', _newestFirst ? '1' : '0');
-    } catch (e) {
-      /* storage blocked: the order still changes until the page reloads */
-    }
+    saveViewPref('gb_newestFirst', _isNewestFirst() ? '0' : '1');
     render();
   }
   var _pinnedCols = { name: true, final: true }; // pinnable: name, categories, final
@@ -283,7 +275,7 @@ window.PageGradebook = (function () {
       .sort(function (a, b) {
         return (a.date || '').localeCompare(b.date || '');
       });
-    if (_newestFirst) allAssessments.reverse();
+    if (_isNewestFirst()) allAssessments.reverse();
     var sections = getSections(cid);
     var course = COURSES[cid];
     var isLetter = courseShowsLetterGrades(course);
@@ -770,9 +762,9 @@ window.PageGradebook = (function () {
   function _newestFirstButton() {
     return (
       '<button class="tb-toggle-btn gb-newest-first' +
-      (_newestFirst ? ' active' : '') +
+      (_isNewestFirst() ? ' active' : '') +
       '" data-action="toggleNewestFirst" aria-pressed="' +
-      _newestFirst +
+      _isNewestFirst() +
       '" title="Put the latest assessments on the left">Newest First</button>'
     );
   }
@@ -1103,14 +1095,12 @@ window.PageGradebook = (function () {
 
   /* ── Header row height resize (Scores view) ─────────────── */
   /* The slanted header's height: the one the teacher dragged to, kept on
-     this device, or else just tall enough for the longest title, up to
+     the teacher's preferences, or else just tall enough for the longest title, up to
      170px (a longer title ends in an ellipsis and shows whole on hover). */
-  var _savedHeaderHeight = 0;
-  try {
-    _savedHeaderHeight = parseInt(localStorage.getItem('gb_headerHeight') || '0', 10) || 0;
-  } catch (e) {
-    /* storage blocked: fit the titles */
+  function _headerHeightPref() {
+    return parseInt(getViewPref('gb_headerHeight') || '0', 10) || 0;
   }
+  var _savedHeaderHeight = _headerHeightPref();
   var _headerHeight = _savedHeaderHeight || 170;
 
   var _measureCtx = null;
@@ -1134,6 +1124,9 @@ window.PageGradebook = (function () {
   function initHeaderResize() {
     var colheads = document.getElementById('gb-colheads');
     if (!colheads) return;
+    // After signing in, the saved height arrives after this file loads.
+    _savedHeaderHeight = _headerHeightPref();
+    if (_savedHeaderHeight) _headerHeight = _savedHeaderHeight;
     // Add resize handle at bottom of colheads container
     var handle = colheads.querySelector('.gb-header-resize-handle');
     if (!handle) {
@@ -1158,11 +1151,7 @@ window.PageGradebook = (function () {
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
         _savedHeaderHeight = _headerHeight;
-        try {
-          localStorage.setItem('gb_headerHeight', _headerHeight);
-        } catch (e) {
-          /* storage blocked: the height holds until the page reloads */
-        }
+        saveViewPref('gb_headerHeight', _headerHeight);
       }
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onUp);
@@ -3453,11 +3442,20 @@ window.PageGradebook = (function () {
         var title = assess && assess.title ? assess.title : 'this assessment';
         // A linked copy in another class stays; say so, as Assignments does.
         var copyNote = window.AssessmentCopy && assess ? AssessmentCopy.deleteNote(activeCourse, assess) : '';
+        // Photos students sent for it go too (S8-F1, Colin's ruling 102).
+        var sentPhotos = _studentsWithSentPhotos(activeCourse, aid);
         showConfirm(
           'Delete “' + title + '”?',
-          'All scores, statuses, and observations linked to this assessment will be removed.' +
-            copyNote +
-            ' You can undo this for a few seconds.',
+          sentPhotos
+            ? 'All scores, statuses, and observations linked to this assessment will be removed, and the photos ' +
+                sentPhotos +
+                (sentPhotos === 1 ? ' student' : ' students') +
+                ' sent for it.' +
+                copyNote +
+                " You can undo this for a few seconds. After that, deleted photos can't come back."
+            : 'All scores, statuses, and observations linked to this assessment will be removed.' +
+                copyNote +
+                ' You can undo this for a few seconds.',
           'Delete',
           'danger',
           function () {
@@ -3467,6 +3465,22 @@ window.PageGradebook = (function () {
       }
       _dismissContextMenu();
     });
+  }
+
+  /* S8-F1: how many students have photos sent for `aid`, which Delete
+     Assessment deletes with it. Counted from the read side in shared/data.js
+     (getCourseSubmissions), students not pages: a submission with at least one
+     page, whoever sent it. 0, and the dialog reads as it always has, while the
+     class's build switch or Send Work is off or nothing has been sent. */
+  function _studentsWithSentPhotos(cid, aid) {
+    if (typeof getCourseSubmissions !== 'function' || typeof getCourseSendWork !== 'function') return 0;
+    if (typeof getReturnSettings !== 'function' || !getReturnSettings(cid).student_page) return 0;
+    if (!getCourseSendWork(cid).send_work) return 0;
+    var who = {};
+    (getCourseSubmissions(cid).submissions || []).forEach(function (s) {
+      if (s && s.assessment_id === aid && Array.isArray(s.files) && s.files.length) who[s.enrollment_id] = true;
+    });
+    return Object.keys(who).length;
   }
 
   /* Delete Assignment hides the column and offers Undo (the toast's button or
