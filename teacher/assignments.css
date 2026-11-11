@@ -9761,3 +9761,215 @@ button.grader-member-name {
 .grader-reflect-msg:empty {
   display: none;
 }
+
+/* ── Revisions in the grader (S11-F1, S11-F3) ────────────────────────── */
+/* Return for Revision beside Return; Take Back while a revision is out;
+   the Revising mark in the row and in a gradebook cell; the Revision card
+   with Before and After; "Was … on the Oct 30 version" on a criterion;
+   the Return for Revision sheet over the grader. */
+.grader-revise-btn,
+.grader-takeback-btn {
+  height: 34px;
+  padding: 0 16px;
+  border: 1px solid var(--divider-heavy);
+  border-radius: 17px;
+  background: var(--surface);
+  color: var(--active);
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+}
+.grader-revise-btn:hover,
+.grader-takeback-btn:hover {
+  background: var(--seg-track);
+}
+.grader-revise-btn:disabled,
+.grader-takeback-btn:disabled {
+  color: var(--text-3);
+  cursor: default;
+}
+.grader-revision-line:empty {
+  display: none;
+}
+.grader-revising-mark,
+.gb-revising {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 12px;
+  background: var(--seg-track);
+  color: var(--text-2);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.grader-revising-mark {
+  height: 24px;
+  padding: 0 10px;
+  font-size: var(--text-sm);
+}
+.gb-revising {
+  display: block;
+  width: fit-content;
+  margin: 2px auto 0;
+  padding: 0 6px;
+  font-size: 10px;
+  line-height: 16px;
+}
+.gb-key-item .gb-revising {
+  display: inline-flex;
+  margin: 0 4px 0 0;
+}
+.grader-revision-msg {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.grader-revision {
+  background: var(--surface);
+  border: 1px solid var(--divider-heavy);
+  border-left: 4px solid var(--active);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 14px;
+  font-size: 14px;
+}
+.grader-revision-title {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.grader-revision-who {
+  margin: 6px 0 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+.grader-revision-said {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.grader-revision-ba {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--divider-heavy);
+}
+.grader-revision-ba-title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.grader-revision-ba dl {
+  margin: 0;
+}
+.grader-revision-ba-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  padding: 3px 0;
+  align-items: baseline;
+}
+.grader-revision-ba-row dt,
+.grader-revision-ba-row dd {
+  margin: 0;
+}
+.grader-revision-before {
+  color: var(--text-2);
+}
+.grader-revision-after {
+  font-weight: 600;
+}
+.grader-revision-ba-row.is-result {
+  font-weight: 700;
+}
+.grader-revision-ba-row .grader-draft-mark {
+  height: 20px;
+  padding: 0 6px;
+  font-size: 11px;
+}
+.grader-was {
+  margin-top: 6px;
+}
+.grader-was-line,
+.grader-was-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.grader-was-line {
+  font-weight: 600;
+}
+.grader-work-versions {
+  flex-shrink: 0;
+}
+.grader-sheet-back {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.32);
+}
+.grader-sheet {
+  width: min(480px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 20px 22px;
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+}
+.grader-sheet-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+.grader-sheet-sub {
+  margin: 2px 0 12px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.grader-sheet-label {
+  display: block;
+  margin: 12px 0 4px;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+.grader-sheet-fix,
+.grader-sheet-by,
+.grader-sheet-crit {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--divider-heavy);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+.grader-sheet-fix {
+  resize: vertical;
+}
+.grader-sheet-keep {
+  margin: 0;
+  font-size: 14px;
+}
+.grader-sheet-msg {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.grader-sheet-msg:empty {
+  display: none;
+}
+.grader-sheet-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}

@@ -234,6 +234,8 @@ window.DashOverview = (function () {
     } else {
       if (c.groups && c.groups === c.tograde)
         parts.push('<b>' + c.groups + '</b> ' + (c.groups === 1 ? 'Group' : 'Groups'));
+      // Revisions sent in (S11): "1 Revised", work to grade again.
+      if (c.revised) parts.push('<b>' + c.revised + '</b> Revised');
       parts.push('<b>' + c.toreturn + '</b> Not Returned');
       var days = c.oldest
         ? Math.floor((Date.parse(courseToday(cid)) - Date.parse(String(c.oldest).slice(0, 10))) / 86400000)
@@ -249,6 +251,7 @@ window.DashOverview = (function () {
       esc(
         c.tograde +
           ' to grade, ' +
+          (c.revised ? c.revised + ' revised, ' : '') +
           c.toreturn +
           ' not returned' +
           (asked ? ', ' + asked + (asked === 1 ? ' question' : ' questions') : '') +

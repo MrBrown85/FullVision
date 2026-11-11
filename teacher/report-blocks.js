@@ -1815,6 +1815,34 @@ window.ReportBlocks = (function () {
     return { score: '\u2014', percent: '', word: '' };
   }
 
+  /* The Assignment Grades groups ({ name, grade?, rows: [row html] }) laid
+     in one column or two. Also lays out each part of a table too long for
+     one side (ReportSheets cuts it at its rows), so a part reads as the
+     whole table does. */
+  function gradeColumnsHtml(groups, one) {
+    const groupHtml = g =>
+      `<div class="report-grades-head"><span>${esc(g.name)}</span>${g.grade ? `<span class="report-grades-headgrade">${esc(g.grade)}</span>` : ''}</div>${g.rows.join('')}`;
+    if (one) return `<div class="report-grades-col">${groups.map(groupHtml).join('')}</div>`;
+    // The rows split evenly between the columns, read down the left and
+    // then the right. A group cut by the split carries on at the top of the
+    // right column under its name again; a heading never ends a column.
+    const total = groups.reduce((t, g) => t + g.rows.length + 1, 0);
+    const cut = Math.ceil(total / 2);
+    const left = [];
+    const right = [];
+    let used = 0;
+    groups.forEach(g => {
+      const room = cut - used;
+      if (room >= g.rows.length + 1) left.push(g);
+      else if (room >= 2 && !right.length) {
+        left.push(Object.assign({}, g, { rows: g.rows.slice(0, room - 1) }));
+        right.push({ name: g.name + ' (continued)', rows: g.rows.slice(room - 1) });
+      } else right.push(g);
+      used += g.rows.length + 1;
+    });
+    return `<div class="report-grades-cols"><div class="report-grades-col">${left.map(groupHtml).join('')}</div><div class="report-grades-col">${right.map(groupHtml).join('')}</div></div>`;
+  }
+
   function renderBlockGradeTable(cid, student, options, ctx) {
     options = options || {};
     const sid = student.id;
@@ -1923,30 +1951,7 @@ window.ReportBlocks = (function () {
     }
     if (!groups.length) return '';
 
-    const groupHtml = g =>
-      `<div class="report-grades-head"><span>${esc(g.name)}</span>${g.grade ? `<span class="report-grades-headgrade">${esc(g.grade)}</span>` : ''}</div>${g.rows.join('')}`;
-    let body;
-    if (one) body = `<div class="report-grades-col">${groups.map(groupHtml).join('')}</div>`;
-    else {
-      // The rows split evenly between the columns, read down the left and
-      // then the right. A group cut by the split carries on at the top of the
-      // right column under its name again; a heading never ends a column.
-      const total = groups.reduce((t, g) => t + g.rows.length + 1, 0);
-      const cut = Math.ceil(total / 2);
-      const left = [];
-      const right = [];
-      let used = 0;
-      groups.forEach(g => {
-        const room = cut - used;
-        if (room >= g.rows.length + 1) left.push(g);
-        else if (room >= 2 && !right.length) {
-          left.push(Object.assign({}, g, { rows: g.rows.slice(0, room - 1) }));
-          right.push({ name: g.name + ' (continued)', rows: g.rows.slice(room - 1) });
-        } else right.push(g);
-        used += g.rows.length + 1;
-      });
-      body = `<div class="report-grades-cols"><div class="report-grades-col">${left.map(groupHtml).join('')}</div><div class="report-grades-col">${right.map(groupHtml).join('')}</div></div>`;
-    }
+    const body = gradeColumnsHtml(groups, one);
     const n = pool.length;
     const meta = half
       ? 'Last 10'
@@ -2418,6 +2423,7 @@ window.ReportBlocks = (function () {
     renderBlockTeacherNarrative: renderBlockTeacherNarrative,
     renderCommentBox: renderCommentBox,
     printableComment: printableComment,
+    gradeColumnsHtml: gradeColumnsHtml,
     renderBlockCompetencyTable: renderBlockCompetencyTable,
     renderBlockObservations: renderBlockObservations,
     renderBlockSectionOutcomes: renderBlockSectionOutcomes,

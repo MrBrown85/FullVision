@@ -103,6 +103,10 @@ var StudentPage = (function () {
       demoReflect: false,
       demoGroup: false, // #demo-card-group: a piece sent as One per Group (s/feedback.js, S12-F1)
       demoReflections: null,
+      // Revisions (S11-F2): #demo-card-revise, and what the sample has asked and been sent (s/feedback.js).
+      demoRevise: false,
+      demoRevisions: null,
+      compare: false, // Before and After is open on the piece Your Feedback names
       reflect: null,
       sendAsk: null,
       ident: null, // what matched on a questionnaire slip, kept to open again if the session runs out
