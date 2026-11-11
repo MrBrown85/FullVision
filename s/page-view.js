@@ -1763,49 +1763,107 @@ window.StudentPageView = (function () {
      returned work when the class shows My Learning. Every level, letter
      and % is the view's text. ───────────────────────────────── */
 
-  // A skill's level as its row shows it: its words and code, or Not Yet.
-  function skillLevelHtml(s) {
-    if (!s.text) return '<span class="sp-ml-level sp-ml-none">Not Yet</span>';
+  var ML_ICON = {
+    next: '<path d="M4 12h15M13 6l6 6-6 6"/>',
+    star: '<path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z" fill="currentColor" stroke="none"/>',
+    up: '<path d="M12 19V6M6.5 11.5L12 6l5.5 5.5"/>',
+    down: '<path d="M12 5v13M6.5 12.5L12 18l5.5-5.5"/>',
+    target: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"/>',
+  };
+  function mlIcon(name, size) {
     return (
-      '<span class="sp-ml-level"><span class="sp-ml-word">' +
-      esc(s.text) +
-      '</span>' +
-      (s.code ? chipHtml(s.code, s.level) : '') +
-      '</span>'
+      '<svg class="sp-ml-icon sp-ml-icon-' +
+      name +
+      '" viewBox="0 0 24 24" width="' +
+      (size || 16) +
+      '" height="' +
+      (size || 16) +
+      '" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+      ML_ICON[name] +
+      '</svg>'
     );
   }
 
-  /* The four steps, Emerging to Extending, with You on the one reached.
+  /* A small four-bar picture of a level (the boards' skill rows): the bars
+     up to it in its colour. Words say the level; the picture only repeats it. */
+  function miniBarsHtml(level) {
+    var at = lvClass(level);
+    var out = '<span class="sp-ml-mini sp-ml-at-' + at + '" aria-hidden="true">';
+    for (var i = 1; i <= 4; i++) out += '<i' + (i <= at ? ' class="sp-ml-mini-on"' : '') + '></i>';
+    return out + '</span>';
+  }
+
+  // A skill's level as its row shows it: the little ladder and its word (or %) in a chip, or Not Yet.
+  function skillLevelHtml(s) {
+    if (!s.text) return '<span class="sp-ml-level sp-ml-none">Not Yet</span>';
+    return '<span class="sp-ml-level">' + miniBarsHtml(s.level) + chipHtml(s.text, s.level) + '</span>';
+  }
+
+  /* The four steps, Emerging to Extending, rising, every step reached in
+     the student's own level's colour, You outlined on the one reached.
      `label` names the ladder for a screen reader; `named` writes each
-     step's name and code under it (One Skill). */
+     step's name under it (One Skill). */
   function ladderHtml(steps, at, label, named) {
     return (
-      '<div class="sp-ml-ladder" role="img" aria-label="' +
+      '<div class="sp-ml-ladder sp-ml-at-' +
+      lvClass(at) +
+      (named ? ' sp-ml-ladder-named' : '') +
+      '" role="img" aria-label="' +
       esc(label) +
       '">' +
       steps
         .map(function (st) {
           var on = st.level === at;
           return (
-            '<span class="sp-ml-step' +
+            '<span class="sp-ml-step sp-ml-step-' +
+            lvClass(st.level) +
             (on ? ' sp-ml-step-on' : '') +
-            '"><span class="sp-ml-bar sp-lv-' +
-            (st.level <= at ? lvClass(st.level) : 0) +
             '">' +
             (on ? '<span class="sp-ml-you">You</span>' : '') +
-            '</span>' +
-            (named
-              ? '<span class="sp-ml-step-name">' +
-                esc(st.name) +
-                '</span><span class="sp-ml-step-code">' +
-                esc(st.code) +
-                '</span>'
-              : '') +
+            '<span class="sp-ml-bar' +
+            (st.level <= at ? ' sp-ml-bar-on' : '') +
+            '"></span>' +
+            (named ? '<span class="sp-ml-step-name">' + esc(st.name) + '</span>' : '') +
             '</span>'
           );
         })
         .join('') +
       '</div>'
+    );
+  }
+
+  // "Up from Developing a month ago" (calc.js's gradeMonthChange, through the view).
+  function trendHtml(l) {
+    var t = l.trend;
+    if (!t || !t.from) return '';
+    var up = t.dir > 0;
+    return (
+      '<p class="sp-ml-trend ' +
+      (up ? 'sp-ml-trend-up' : 'sp-ml-trend-down') +
+      '">' +
+      mlIcon(up ? 'up' : 'down', 14) +
+      esc((up ? 'Up from ' : 'Down from ') + t.from + ' a month ago') +
+      '</p>'
+    );
+  }
+
+  /* Next Step: the comment bank's step for the skill Generate would name,
+     opening that skill. */
+  function nextHtml(l) {
+    var n = l.next;
+    if (!n) return '';
+    return (
+      '<button type="button" class="sp-ml-card sp-ml-next" data-act="skill" data-skill="' +
+      esc(n.id) +
+      '">' +
+      mlIcon('next', 20) +
+      '<span class="sp-ml-next-text"><span class="sp-ml-next-title">' +
+      esc('Next Step: ' + n.name) +
+      '</span><span class="sp-ml-next-line">' +
+      esc(n.text) +
+      '</span></span>' +
+      NEXT_ARROW +
+      '</button>'
     );
   }
 
@@ -1830,15 +1888,21 @@ window.StudentPageView = (function () {
         (ie ? '<span class="sp-ml-ie">In Progress</span>' : '') +
         '<span class="sp-ml-pct">' +
         esc(o.letter.pct) +
-        '</span></span></section>'
+        '</span>' +
+        trendHtml(l) +
+        '</span></section>'
       );
     }
     if (!o.word) return '';
     return (
-      '<section class="sp-ml-card sp-ml-overall"><p class="sp-ml-at"><span class="sp-ml-at-lead">You’re at</span>' +
-      '<span class="sp-ml-at-word">' +
+      '<section class="sp-ml-card sp-ml-overall"><div class="sp-ml-overall-text"><p class="sp-ml-at"><span class="sp-ml-at-lead">You’re at</span>' +
+      '<span class="sp-ml-at-word sp-ml-ink-' +
+      lvClass(o.level) +
+      '">' +
       esc(o.word) +
       '</span></p>' +
+      trendHtml(l) +
+      '</div>' +
       ladderHtml(l.steps, o.level, 'Step ' + o.level + ' of 4: ' + stepName(l, o.level), false) +
       '</section>'
     );
@@ -1848,9 +1912,17 @@ window.StudentPageView = (function () {
     var s = l.strongest;
     if (!s || l.mode === 'letter') return '';
     return (
-      '<section class="sp-ml-card"><h2 class="sp-ml-card-title">Your Strongest</h2><ul class="sp-ml-rows">' +
-      skillRowHtml(s) +
-      '</ul></section>'
+      '<button type="button" class="sp-ml-card sp-ml-strongest" data-act="skill" data-skill="' +
+      esc(s.id) +
+      '">' +
+      mlIcon('star', 18) +
+      '<span class="sp-ml-next-text"><span class="sp-ml-strongest-title">Your Strongest</span><span class="sp-ml-strongest-line"><span class="sp-ml-strongest-name">' +
+      esc(s.name) +
+      '</span>' +
+      (s.text ? chipHtml(s.text, s.level) : '') +
+      '</span></span>' +
+      NEXT_ARROW +
+      '</button>'
     );
   }
 
@@ -1976,7 +2048,7 @@ window.StudentPageView = (function () {
             ? r.kind === 'points'
               ? '<span class="sp-ml-word">' + esc(r.text) + '</span>' + chipHtml(r.percent, r.level)
               : chipHtml(r.text, r.level)
-            : '<span class="sp-ml-word">' + esc(p.text) + '</span>' + (p.code ? chipHtml(p.code, p.level) : '');
+            : chipHtml(p.text, p.level);
           return (
             '<li class="sp-ml-row sp-ml-row-still"><span class="sp-row-text"><span class="sp-row-title">' +
             esc(p.title) +
@@ -2014,7 +2086,7 @@ window.StudentPageView = (function () {
   /* How It's Going: the last four pieces, oldest on the left, each placed
      at its mark (a + or − a third of a step), the four steps up the side.
      Shown from the second piece on. */
-  var CHART = { w: 300, h: 128, left: 40 };
+  var CHART = { w: 300, h: 128, left: 70 };
   function chartY(v) {
     return Math.round(8 + ((4 - Math.max(1, Math.min(4, Number(v) || 1))) / 3) * (CHART.h - 16));
   }
@@ -2049,7 +2121,7 @@ window.StudentPageView = (function () {
           '" class="sp-ml-grid"/><text x="0" y="' +
           (y + 4) +
           '" class="sp-ml-axis">' +
-          esc(st.code) +
+          esc(st.name) +
           '</text>'
         );
       })
@@ -2059,13 +2131,20 @@ window.StudentPageView = (function () {
         return (i ? 'L' : 'M') + chartX(i, pts.length) + ' ' + chartY(p.value);
       })
       .join(' ');
+    // Each dot in its own level's colour; the latest ringed.
+    var last = pts.length - 1;
     var dots = pts
       .map(function (p, i) {
+        var x = chartX(i, pts.length);
+        var y = chartY(p.value);
         return (
+          (i === last
+            ? '<circle cx="' + x + '" cy="' + y + '" r="8.5" class="sp-ml-ring sp-ml-ring-' + lvClass(p.level) + '"/>'
+            : '') +
           '<circle cx="' +
-          chartX(i, pts.length) +
+          x +
           '" cy="' +
-          chartY(p.value) +
+          y +
           '" r="5" class="sp-ml-dot sp-ml-dot-' +
           lvClass(p.level) +
           '"/>'
@@ -2083,15 +2162,36 @@ window.StudentPageView = (function () {
       grid +
       '<path d="' +
       path +
-      '" class="sp-ml-path"/>' +
+      '" class="sp-ml-path sp-ml-path-' +
+      lvClass(s.level) +
+      '"/>' +
       dots +
       '</svg><div class="sp-ml-dates" aria-hidden="true">' +
       pts
-        .map(function (p) {
-          return '<span>' + esc(fmtDate(p.date, DAY)) + '</span>';
+        .map(function (p, i) {
+          return '<span' + (i === last ? ' class="sp-ml-date-last"' : '') + '>' + esc(fmtDate(p.date, DAY)) + '</span>';
         })
         .join('') +
       '</div></section>'
+    );
+  }
+
+  /* One Skill's Next Step (the comment bank's step for the level it shows),
+     or at Extending "You've Reached the Top Step". */
+  function skillNextHtml(l, s) {
+    var n = s.next;
+    if (n && n.top) {
+      // The top step is a step of the ladder, so only where the ladder shows (not a Letter class).
+      if (l.mode === 'letter') return '';
+      return '<p class="sp-ml-card sp-ml-top">' + mlIcon('star', 18) + '<span>You’ve Reached the Top Step</span></p>';
+    }
+    if (!n || !n.text) return '';
+    return (
+      '<section class="sp-ml-card sp-ml-next sp-ml-next-still">' +
+      mlIcon('next', 20) +
+      '<span class="sp-ml-next-text"><h2 class="sp-ml-next-title">Next Step</h2><span class="sp-ml-next-line">' +
+      esc(n.text) +
+      '</span></span></section>'
     );
   }
 
@@ -2114,16 +2214,16 @@ window.StudentPageView = (function () {
       esc(s.name) +
       '</h1>' +
       (s.iCan.length
-        ? '<ul class="sp-ml-ican">' +
+        ? '<ul class="sp-ml-card sp-ml-ican">' +
           s.iCan
             .map(function (t) {
-              return '<li>' + esc(t) + '</li>';
+              return '<li>' + mlIcon('target', 18) + '<span>' + esc(t) + '</span></li>';
             })
             .join('') +
           '</ul>'
         : '') +
       where +
-      (levels && s.level === 4 ? '<p class="sp-ml-card sp-ml-top">You’ve Reached the Top Step</p>' : '') +
+      skillNextHtml(l, s) +
       (levels ? goingHtml(l, s) : '') +
       (s.pieces.length ? workHtml(s.pieces) : '<p class="sp-lead sp-empty">Nothing marked on this skill yet.</p>') +
       '</div>'
@@ -2142,15 +2242,22 @@ window.StudentPageView = (function () {
     });
     // A Letter class whose work is marked by points alone shows its work, not its skills.
     var showWork = l.mode === 'letter' && !anySkill;
+    /* The boards' order: the grade, Next Step, Your Strongest (three across
+       on a Chromebook), What Makes Up Your Grade, Missing, the skills. A
+       falling grade puts its Missing work straight under the grade. */
+    var falling = !!(l.trend && l.trend.dir < 0);
     return (
-      '<div class="sp-ml"><h1 class="sp-page-title sp-ml-title" tabindex="-1">My Learning</h1><div class="sp-ml-cols"><div class="sp-ml-col">' +
+      '<div class="sp-ml"><h1 class="sp-page-title sp-ml-title" tabindex="-1">My Learning</h1><div class="sp-ml-head">' +
       overallHtml(l) +
+      (falling ? missingHtml(l) : '') +
+      nextHtml(l) +
       strongestHtml(l) +
-      missingHtml(l) +
-      categoriesHtml(l) +
-      '</div><div class="sp-ml-col">' +
+      '</div>' +
+      // A Letter and Skills class leads with its skills, as its board does; a Letter class with its categories.
+      (l.mode === 'letter' ? categoriesHtml(l) : '') +
+      (falling ? '' : missingHtml(l)) +
       (showWork ? workHtml(l.work) : skillsHtml(l)) +
-      '</div></div></div>'
+      '</div>'
     );
   }
 

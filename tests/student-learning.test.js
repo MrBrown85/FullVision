@@ -248,6 +248,37 @@ describe('the parts of My Learning', () => {
     expect(learningOf().categories).toEqual([]);
   });
 
+  it('the month’s change is calc.js’s gradeMonthChange, shown only when the word or letter moved', () => {
+    ['proficiency', 'letter'].forEach(system => {
+      [false, true].forEach(a3Returned => {
+        seed(system, { show: true, a3Returned });
+        const m = withReturnedOnly(() => gradeMonthChange(CID, S1, courseToday(CID)));
+        const want = m && m.dir ? { dir: m.dir, from: m.from } : null;
+        expect(learningOf().trend).toEqual(want);
+      });
+    });
+    // Returning the November draft pulls Priya's letter down from a month ago, so the test above can fail.
+    seed('letter', { show: true, a3Returned: true });
+    expect(learningOf().trend).toMatchObject({ dir: -1 });
+  });
+
+  it('Next Step: the skill Generate names, with the comment bank’s step for its level, word for word', () => {
+    seed('proficiency', { show: true });
+    const ev = getLearningMap(CID).sections.find(s => s.id === 'ev');
+    ev.tags[0].bank_id = 'bc.acct11.cc.1';
+    const l = learningOf();
+    const n = withReturnedOnly(() => nextStepLevel(CID, S1, 'ev'));
+    const step = CommentBank.bankEntry('bc.acct11.cc.1').steps[n.key];
+    const said = step.charAt(0).toUpperCase() + step.slice(1) + '.';
+    expect(skill(l, 'ev').next).toEqual({ top: false, text: said });
+    // Evidence is the only skill with two returned pieces, so it is the one named.
+    expect(l.next).toEqual({ id: 'ev', name: 'Evidence', text: said });
+    // A skill whose competencies are not from the bank has no step.
+    expect(skill(l, 'per').next).toBeNull();
+    // Nothing returned on a skill: no step.
+    expect(skill(l, 'com').next).toBeNull();
+  });
+
   it('nothing marked yet is empty', () => {
     seed('proficiency', { show: true });
     // Every grade of Priya's waits as a draft.
@@ -296,6 +327,49 @@ describe('the My Learning screens (s/page-view.js)', () => {
     expect(StudentPageView.press(out.ui, view, 'tab', el({ 'data-tab': 'assignments' })).ui.skill).toBe('');
     // A skill the view does not hold opens nothing.
     expect(StudentPageView.press({}, view, 'skill', el({ 'data-skill': 'nope' }))).toBeNull();
+  });
+
+  it('the boards’ month line, Next Step and Top Step, from the view', () => {
+    seed('proficiency', { show: true });
+    const view = StudentView.fromCache(CID, S1).view;
+    const l = view.learning;
+    l.trend = { dir: 1, from: 'Developing' };
+    l.next = { id: 'per', name: 'Perspective', text: 'Explain which beliefs or values shaped that point of view.' };
+    let out = html(view);
+    expect(out).toContain('Up from Developing a month ago</p>');
+    expect(out).toContain('data-act="skill" data-skill="per"');
+    expect(out).toContain('>Next Step: Perspective</span>');
+    expect(out).toContain('Explain which beliefs or values shaped that point of view.');
+    l.trend = { dir: -1, from: 'C' };
+    expect(html(view)).toContain('Down from C a month ago</p>');
+    // Nothing to compare, nothing to step to: neither shows.
+    l.trend = null;
+    l.next = null;
+    out = html(view);
+    expect(out).not.toContain('a month ago');
+    expect(out).not.toContain('Next Step');
+    // One Skill: its own step, or the Top Step at Extending.
+    const ev = skill(l, 'ev');
+    ev.next = { top: false, text: 'Weigh accounts that disagree.' };
+    out = html(view, { skill: 'ev' });
+    expect(out).toContain('>Next Step</h2>');
+    expect(out).toContain('Weigh accounts that disagree.');
+    expect(out).not.toContain('Top Step');
+    ev.next = { top: true, text: '' };
+    out = html(view, { skill: 'ev' });
+    expect(out).toContain('You’ve Reached the Top Step');
+    expect(out).not.toContain('>Next Step<');
+  });
+
+  it('the ladder: every step reached in the student’s own level’s colour, You on theirs', () => {
+    seed('proficiency', { show: true });
+    const view = StudentView.fromCache(CID, S1).view;
+    const out = html(view, { skill: 'ev' });
+    const ev = skill(view.learning, 'ev');
+    const ladder = out.slice(out.indexOf('sp-ml-ladder'), out.indexOf('</div>', out.indexOf('sp-ml-ladder')));
+    expect(ladder).toContain('sp-ml-ladder sp-ml-at-' + ev.level);
+    expect((ladder.match(/sp-ml-bar-on/g) || []).length).toBe(ev.level);
+    expect((ladder.match(/sp-ml-you/g) || []).length).toBe(1);
   });
 
   it('nothing marked yet', () => {
