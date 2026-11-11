@@ -78,6 +78,7 @@
       filter: state.filter,
       feedback: state.feedback,
       whole: state.whole,
+      compare: state.compare,
       levels: state.levels,
       work: state.work,
       workPage: state.workPage,

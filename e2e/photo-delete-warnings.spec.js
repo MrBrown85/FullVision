@@ -16,7 +16,7 @@ const CECE = 'st1';
 async function openDemo(page) {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
-  await page.waitForFunction(cid => getCourseSubmissions(cid).submissions.length === 10, CID, { timeout: 15000 });
+  await page.waitForFunction(cid => getCourseSubmissions(cid).submissions.length === 16, CID, { timeout: 15000 });
 }
 
 // The hidden build switch on; Send Work as `send` (the sample starts it off).

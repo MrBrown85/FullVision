@@ -698,6 +698,130 @@ window.StudentView = (function () {
     return out;
   }
 
+  /* The student's own revision request on one piece (S11-F2), from the
+     `feedback` reply (Batch C's contract: the student's shape of
+     revision_request, shared/data.js's _studentRevisionOf), or null. The
+     state is the student's: open (Needs Revision), sent (the revision is
+     in; a draft regrade also reads as sent, since a draft is never theirs
+     to see) or returned. A request taken back is not sent at all. Anything
+     of the wrong shape reads as none. first_thumbs and thumbs are the
+     pages to show (Demo Mode's own, as `work`'s thumbs are), checked to be
+     a picture this page made or ships. */
+  var REVISION_STATES = { open: 'open', sent: 'sent', returned: 'returned' };
+  var REVISION_PAGE = /^(blob:|data:image\/jpeg|\/assets\/sample-work\/|\.\.\/assets\/sample-work\/)[^"'<>\s]*$/;
+  function revisionOf(r) {
+    if (!r || typeof r !== 'object' || !REVISION_STATES[r.state] || !text(r.what_to_fix).trim()) return null;
+    var pages = function (v) {
+      return list(v).filter(function (u) {
+        return typeof u === 'string' && REVISION_PAGE.test(u);
+      });
+    };
+    var by = text(r.revise_by).slice(0, 10);
+    return {
+      state: REVISION_STATES[r.state],
+      whatToFix: text(r.what_to_fix),
+      reviseBy: /^\d{4}-\d{2}-\d{2}$/.test(by) ? by : '',
+      criterionIds: list(r.criterion_ids).filter(function (id) {
+        return typeof id === 'string';
+      }),
+      firstGrade: r.first_grade && typeof r.first_grade === 'object' ? r.first_grade : null,
+      firstSentAt: text(r.first_sent_at),
+      sentAt: r.state === 'open' ? '' : text(r.revision_sent_at),
+      note: r.state === 'open' ? '' : text(r.revision_note),
+      late: r.state !== 'open' && r.revision_late === true,
+      askedAt: text(r.asked_at),
+      firstThumbs: pages(r.first_thumbs),
+      thumbs: r.state === 'open' ? [] : pages(r.thumbs),
+    };
+  }
+
+  function revisionsBy(feedback) {
+    var out = {};
+    if (!feedback || typeof feedback !== 'object' || feedback.ok !== true) return out;
+    list(feedback.assessments).forEach(function (entry) {
+      if (!entry || typeof entry.id !== 'string') return;
+      var r = revisionOf(entry.revision);
+      if (r) out[entry.id] = r;
+    });
+    return out;
+  }
+
+  /* The rows of a grade as the page names them: a rubric's criteria, or the
+     piece's competencies (an Overall level alone under the first), each
+     with its level's words (constants.js's scoreLevelText). */
+  function gradeRows(row, grade, tags, rubric) {
+    if (rubric) return rubricView(rubric, grade, tags).rows;
+    if (row.score_mode === 'points' || row.score_mode === 'complete') return [];
+    var parts = grade.tags || {};
+    var ids = row.tag_ids || [];
+    if (!Object.keys(parts).length && num(grade.value) > 0 && ids.length) {
+      parts = {};
+      parts[ids[0]] = { value: grade.value, modifier: grade.modifier, comment: null };
+    }
+    return ids
+      .filter(function (id) {
+        return parts[id];
+      })
+      .map(function (id) {
+        return levelRow(id, (tags[id] || {}).label, parts[id]);
+      });
+  }
+
+  /* What the piece's card and screens draw of its revision: the request,
+     the criteria by name, and once the revision's grade is returned, Before
+     and After: the first version's result (calc.js's, through cellOf) and
+     each row's level then and now. Nothing is worked out here. */
+  function revisionView(piece, rev, row, tags, rubric, cid, cellOf) {
+    var names = {};
+    (rubric ? rubricView(rubric, null, tags).rows : []).forEach(function (r) {
+      names[r.id] = r.name;
+    });
+    var out = {
+      state: rev.state,
+      whatToFix: rev.whatToFix,
+      reviseBy: rev.reviseBy,
+      criteria: rev.criterionIds
+        .filter(function (id) {
+          return names[id];
+        })
+        .map(function (id) {
+          return names[id];
+        }),
+      firstSentAt: rev.firstSentAt,
+      sentAt: rev.sentAt,
+      note: rev.note,
+      late: rev.late,
+      askedAt: rev.askedAt,
+      firstThumbs: rev.firstThumbs,
+      thumbs: rev.thumbs,
+      before: null,
+    };
+    if (rev.state !== 'returned' || !rev.firstGrade || piece.result.kind === 'none') return out;
+    var first = resultOf(cid, row, typeof cellOf === 'function' ? cellOf(piece.id, rev.firstGrade) : null);
+    var then = {};
+    gradeRows(row, rev.firstGrade, tags, rubric).forEach(function (r) {
+      if (r.text) then[r.id] = r;
+    });
+    var now = (piece.rubric ? piece.rubric.rows : piece.competencies || []).filter(function (r) {
+      return r.text;
+    });
+    out.before = {
+      result: first,
+      rows: now.map(function (r) {
+        var was = then[r.id] || null;
+        return {
+          name: r.name,
+          before: was ? was.text : '',
+          beforeLevel: was ? was.level : null,
+          after: r.text,
+          level: r.level,
+          same: !!was && was.text === r.text,
+        };
+      }),
+    };
+    return out;
+  }
+
   /* Your Plan From Last Time (S10-F2): the plan from the student's latest
      reflection in this class, and the piece it goes on: the next piece
      still to do, the one due soonest on or after the day the plan was
@@ -729,10 +853,16 @@ window.StudentView = (function () {
      Missing or Excused is on it). Before that reader exists, none. */
   function feedbackReply(cid, sid, page) {
     var counts = typeof getStudentMarkCounts === 'function' ? getStudentMarkCounts : null;
+    // The student's own revision on each piece (S11-F2): getStudentRevision, the student's shape.
+    var revisionFor = typeof getStudentRevision === 'function' ? getStudentRevision : null;
     var assessments = [];
     list(page && page.assessments).forEach(function (row) {
       var m = counts && row && row.id ? counts(cid, sid, row.id) : null;
-      if (m) assessments.push({ id: str(row.id), marks: { pages: m.pages, notes: m.notes } });
+      var rev = revisionFor && row && row.id ? revisionFor(cid, sid, row.id) : null;
+      if (!m && !rev) return;
+      var entry = { id: str(row.id), marks: m ? { pages: m.pages, notes: m.notes } : null };
+      if (rev) entry.revision = rev;
+      assessments.push(entry);
     });
     var cfg = (typeof getCourseConfig === 'function' && getCourseConfig(cid)) || {};
     // Reflect on Feedback, the class's switch (Batch C's course column): the preview shows its button.
@@ -771,6 +901,7 @@ window.StudentView = (function () {
     var grouped = groupsBy(groups);
     var marked = marksBy(feedback);
     var reflections = reflectionsBy(feedback);
+    var revisions = revisionsBy(feedback);
     var sending = {};
     if (work && typeof work === 'object' && work.send_work === true) {
       list(work.assessments).forEach(function (entry) {
@@ -815,6 +946,9 @@ window.StudentView = (function () {
         plan: null,
         // One per Group (S12-F1): { members, sent, pages, youSent, sentAt }, counts only.
         group: null,
+        // A revision asked for (S11-F2): revisionView's, or null.
+        revision: null,
+        reviseUnseen: false,
       };
       Object.assign(piece, aboutOf(row));
       // Sending: what this piece takes, and what is in. Work sent and not back yet is Sent.
@@ -861,6 +995,26 @@ window.StudentView = (function () {
         }
         if (piece.updated) markWas(piece, row);
       }
+      /* A revision asked for (S11-F2): Needs Revision while nothing is in,
+         Sent again once the revision is in, and Back with Before and After
+         once its grade is returned. Missing and Excused show their status. */
+      var rev = hidden ? null : revisions[piece.id] || null;
+      if (rev && (rev.state !== 'returned' || grade)) {
+        piece.revision = revisionView(
+          piece,
+          rev,
+          row,
+          tags,
+          row.rubric_id ? rubrics[row.rubric_id] : null,
+          cid,
+          cellOf,
+        );
+        if (rev.state === 'open') piece.kind = 'revise';
+        else if (rev.state === 'sent') piece.kind = 'sent';
+        var asked = when(rev.askedAt);
+        var seenAt = when(row.seen_at);
+        piece.reviseUnseen = rev.state === 'open' && asked != null && !(seenAt != null && seenAt >= asked);
+      }
       work.push(piece);
     });
     work = inOrder(work);
@@ -875,10 +1029,10 @@ window.StudentView = (function () {
     };
     var changes = work
       .filter(function (p) {
-        return p.kind === 'back' && p.result.kind !== 'none' && (p.updated || p.unseen);
+        return (p.kind === 'back' && p.result.kind !== 'none' && (p.updated || p.unseen)) || p.reviseUnseen;
       })
       .map(function (p) {
-        return { id: p.id, title: p.title, why: p.updated ? 'updated' : 'back' };
+        return { id: p.id, title: p.title, why: p.reviseUnseen ? 'revise' : p.updated ? 'updated' : 'back' };
       });
     return {
       student: { id: str(student.enrollment_id), firstName: str(student.first_name) },
@@ -891,7 +1045,13 @@ window.StudentView = (function () {
             : 'proficiency',
         // course.teacher_name is never read (Colin's ruling 112, "Leave the name off.").
       },
-      counts: { toDo: count('due'), sent: count('sent'), back: count('back'), missing: count('missing') },
+      // To Do holds work still to hand in, a revision asked for among it (S11-F2).
+      counts: {
+        toDo: count('due') + count('revise'),
+        sent: count('sent'),
+        back: count('back'),
+        missing: count('missing'),
+      },
       work: work,
       changes: changes,
       levels: levelsLegend(),
@@ -1231,7 +1391,11 @@ window.StudentView = (function () {
       var v = build(
         page,
         cid,
-        function (aid) {
+        function (aid, firstGrade) {
+          // Before and After's first version (S11-F2): the data layer's own reading of it, for the student.
+          if (firstGrade) {
+            return typeof getRevisionFirstCell === 'function' ? getRevisionFirstCell(cid, sid, aid, true) : null;
+          }
           var a = pieceOf(cid, aid);
           return a ? assessmentCellValue(cid, sid, a) : null;
         },
@@ -1246,6 +1410,40 @@ window.StudentView = (function () {
     return { ready: true, reply: page, feedback: feedback, view: view };
   }
 
+  /* Before and After's first version on the student's own device (S11-F2):
+     calc.js's cell for one piece read with the first version's grade in
+     place of the one returned, exactly as the rest of the page's results
+     are worked out (s/student-data.js reads the reply; calc.js works the
+     cell out). The page in use is put back at once, whatever happens, so
+     every other result is as it was. Only on the page in use, and only for
+     a piece that came back: nothing for anything else. */
+  function firstCellOnPage(serverReply, p, aid, firstGrade) {
+    if (typeof StudentData === 'undefined' || !StudentData || StudentData.page() !== p) return null;
+    var cid = p.course.id;
+    var sid = p.student.id;
+    var swapped = Object.assign({}, serverReply, {
+      assessments: list(serverReply && serverReply.assessments).map(function (row) {
+        return row && row.id === aid && row.returned_at ? Object.assign({}, row, { grade: firstGrade }) : row;
+      }),
+    });
+    var other = StudentData.fromServer(swapped);
+    if (!other.grades[aid]) return null;
+    var a = other.assessments.find(function (x) {
+      return x.id === aid;
+    });
+    var clear = function () {
+      if (typeof clearProfCache === 'function') clearProfCache();
+    };
+    try {
+      StudentData.use(other);
+      clear();
+      return a ? assessmentCellValue(cid, sid, a) : null;
+    } finally {
+      StudentData.use(p);
+      clear();
+    }
+  }
+
   /* The student page: the view of the server's reply, once
      s/student-data.js holds it (StudentData.use(StudentData.fromServer(
      reply))). Results come from calc.js on that page's own readers; with
@@ -1258,8 +1456,9 @@ window.StudentView = (function () {
     return build(
       serverReply,
       cid,
-      function (aid) {
+      function (aid, firstGrade) {
         if (!ready || !p) return null;
+        if (firstGrade) return firstCellOnPage(serverReply, p, aid, firstGrade);
         var a = (p.assessments || []).find(function (x) {
           return x.id === aid;
         });
