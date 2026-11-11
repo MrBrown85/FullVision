@@ -227,6 +227,8 @@ async function serverWithStudentPage(page, start, cardOpts) {
         }
         if (name === 'mark_student_cards_printed') {
           window.__e2eRpcLog.push({ name, params, at: Date.now() });
+          // A test can hold Mark Printed back: the server never hears it.
+          if (window.__e2eHoldMarks) return new Promise(() => {});
           return window.__e2eCardsPrinted(params.p_card_ids || []).then(data => ({ data, error: null }));
         }
         return real(name, params);
@@ -594,5 +596,32 @@ test('Make and Print offline says so and makes nothing; an answer after Class Se
   await page.goto('/dashboard?manage=student-page');
   await expect(page.locator('.sc-card .sc-status')).toHaveText(['Not Printed', 'Not Printed', 'Not Printed']);
   await expect(page.locator('.sc-card').getByRole('button')).toHaveText(['Make and Print 3 Cards']);
+  expect(errors).toEqual([]);
+});
+
+/* The review of Nov 10: a list read again before Mark Printed reaches the
+   server must not show just-printed cards as Not Printed, or the next
+   press would replace them without asking. */
+test('Make and Print with Mark Printed held back: a list read again keeps the cards printed', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  const cards = await serverWithStudentPage(page, {
+    course: { student_page_enabled: true, return_grades: 'on_return' },
+  });
+  await page.goto('/dashboard?manage=student-page');
+  const card = page.locator('.sc-card');
+  await page.evaluate(() => (window.__e2eHoldMarks = true));
+  await catchPrints(page);
+  await card.getByRole('button', { name: 'Make and Print 3 Cards' }).click();
+  await expect.poll(async () => (await sheets(page)).length).toBe(1);
+  await expect(card.locator('.sc-status', { hasText: /^Printed / })).toHaveCount(3);
+  // The server still says Not Printed; the list is read again from it.
+  expect(cards.fake.cardsListed().every(c => c.printed_at === null)).toBe(true);
+  const reads = (await calls(page, 'list_student_cards')).length;
+  await page.evaluate(cid => StudentCards.load(cid), CID);
+  expect((await calls(page, 'list_student_cards')).length).toBe(reads + 1);
+  await expect(card.locator('.sc-status', { hasText: /^Printed / })).toHaveCount(3);
+  await expect(card.getByRole('button', { name: /^Make and Print/ })).toHaveCount(0);
+  expect(cards.posts.length).toBe(1);
   expect(errors).toEqual([]);
 });

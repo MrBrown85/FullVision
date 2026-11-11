@@ -295,6 +295,11 @@ test('Student Cards: Make and Print, no code kept, and Print Again until the scr
   const now = await page.evaluate(cid => JSON.parse(localStorage.getItem('gb-student-cards-' + cid)), at.cid);
   expect(now.slice(0, at.count).map(c => c.id)).toEqual(before.map(c => c.id));
 
+  // The page going (pagehide) lets go of the codes at once.
+  expect(await page.evaluate(() => StudentCards._holding())).toBe(true);
+  await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+  expect(await page.evaluate(() => StudentCards._holding())).toBe(false);
+
   // A reload: Print Again is gone.
   await page.reload();
   await expect(page.locator('.sc-card .sc-status', { hasText: /^Printed / })).toHaveCount(at.count + 1);
