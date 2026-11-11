@@ -6063,13 +6063,12 @@ body:has(#page-layout.sidebar-hidden) .rsg-descriptor-bar {
 .grader-status-btn.is-late {
   background: var(--score-2);
 }
-/* Group work (Group grading): the members card, one tile per member with
-   their own Missing | Excused | Late and a ⋯ menu; a member graded
-   separately shows their grade and Back to Group Grade instead. The card
-   sits in the dialog's lane like the Overall Comment and Note for the
-   Report cards. */
+/* Group work (Group grading): Students in This Group (TGroupGrade), after
+   the criteria. One row per member: the name, "Same as group" (or what was
+   changed for them) at the right, their own Missing | Excused | Late and a
+   ⋯ menu; a member graded separately shows their grade and Back to Group
+   Grade instead. The card sits in the lane like the criteria cards. */
 .grader-members {
-  margin: 0 16px;
   background: var(--surface);
   border-radius: 16px;
   padding: 14px 16px 16px;
@@ -6083,38 +6082,43 @@ body:has(#page-layout.sidebar-hidden) .rsg-descriptor-bar {
   display: none;
 }
 .grader-members-title {
-  margin: 0 0 12px;
+  margin: 0 0 6px;
   font-size: var(--text-md);
   font-weight: 700;
   color: var(--text);
 }
 .grader-members-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
 }
 .grader-member {
   position: relative;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 10px 12px;
-  border-radius: 12px;
-  background: rgba(118, 118, 128, 0.08);
-}
-.grader-member-top {
-  align-self: stretch;
-  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  min-height: 28px;
+  gap: 6px 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--divider-subtle);
 }
 .grader-member-name {
+  flex: 0 1 auto;
+  min-width: 0;
   font-size: var(--text-base);
   font-weight: 600;
   color: var(--text);
+}
+.grader-member > .grader-member-same,
+.grader-member > .grader-member-separate {
+  flex: 1 1 auto;
+  margin: 0;
+  text-align: right;
+}
+.grader-member-changes {
+  flex: 1 0 100%;
+  text-align: right;
+}
+.grader-member-changes .grader-member-same {
+  margin: 0;
 }
 button.grader-member-name {
   padding: 0;
@@ -6145,8 +6149,8 @@ button.grader-member-name {
 }
 .grader-member-menu {
   position: absolute;
-  top: 44px;
-  right: 6px;
+  top: calc(100% - 4px);
+  right: 0;
   z-index: 5;
   min-width: 200px;
   padding: 5px;
@@ -6181,9 +6185,9 @@ button.grader-member-name {
 }
 .grader-member-separate {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
   font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text);
@@ -9281,6 +9285,127 @@ button.grader-member-name {
   content: 'EXT';
 }
 
+/* The scoring column beside the work (half the dialog, or 380px in Focus
+   on Work): every row puts its label over its control, as on the boards,
+   so nothing is squeezed into a side column or runs past the edge. */
+.grader-panel-col .grdl-card,
+.grader-panel-col .grdp-card {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+}
+.grader-panel-col .grdp-card {
+  padding: 16px;
+}
+.grader-panel-col .grdl-seg {
+  min-width: 0;
+}
+.grader-panel-col .grdl-level {
+  min-width: 0;
+  padding: 0 8px;
+}
+.grader-panel-col .grdt-note-row,
+.grader-panel-col .grader-report-note {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+.grader-panel-col .grdt-note-label {
+  padding: 0;
+}
+/* The Overall Comment is a text box here, as on the boards. */
+.grader-panel-col .grdt-overall .grdt-note {
+  height: calc(3 * 1.4em + 16px);
+}
+/* Rubric tiles: the name and codes over the four tiles, so each tile has a
+   quarter of the column rather than a quarter of what is left beside the
+   name; the chosen tile keeps its level's name whole, − | + going under it
+   when the tile is too narrow for both. */
+.grader-panel-col .grdt-legend,
+.grader-panel-col .grdt-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.grader-panel-col .grdt-legend > span:first-child {
+  display: none;
+}
+.grader-panel-col .grdt-crit-side {
+  grid-column: 1 / -1;
+  padding: 0 2px;
+}
+.grader-panel-col .grdt-tile-head {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+.grader-panel-col .grdt-chosen-label {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+/* Points: the box, "/ 10" and the percent on their own line. */
+.grader-panel-col .grdp-entry {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.grader-panel-col .grdp-pct {
+  margin-left: auto;
+}
+/* Single-point: name and codes, the Proficient Standard box, the levels,
+   then Work On and Went Beyond, one under the next. */
+.grader-panel-col .grsp-legend {
+  display: none;
+}
+.grader-panel-col .grdt-crit.grsp-crit {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+.grader-panel-col .grsp-standard {
+  order: -1;
+  padding: 0;
+  align-items: stretch;
+  text-align: left;
+}
+.grader-panel-col .grsp-standard .grdt-codes {
+  justify-content: flex-start;
+}
+.grader-panel-col .grsp-words {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(118, 118, 128, 0.08);
+  font-size: var(--text-sm);
+}
+.grader-panel-col .grsp-words::before {
+  content: 'Proficient Standard';
+  display: block;
+  margin-bottom: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--score-3);
+}
+.grader-panel-col .grsp-controls,
+.grader-panel-col .grsp-controls .grdl-seg {
+  justify-content: stretch;
+  width: 100%;
+}
+.grader-panel-col .grsp-controls .grdl-level,
+.grader-panel-col .grsp-controls .grdl-pick {
+  flex: 1 1 0;
+}
+.grader-panel-col .grsp-standard .grdt-not-scored {
+  align-self: flex-start;
+}
+.grader-panel-col .grsp-note {
+  padding: 0;
+  background: none;
+}
+.grader-panel-col .grsp-note .grdt-note,
+.grader-panel-col .grsp-note .grdt-note:focus,
+.grader-panel-col .grsp-note .grdt-note.has-text {
+  flex: none;
+  min-height: 44px;
+}
+
 /* ── Work to grade on the Assignments page and in the gradebook (S6-F4).
    The gradebook's marks live here with the rest of this slice's styles. */
 .assess-to-grade {
@@ -9764,17 +9889,17 @@ button.grader-member-name {
 
 /* ── Group work in the grader (S12-F2): Students in This Group ───────── */
 .grader-members-hint {
-  margin: -4px 0 10px;
+  margin: 0 0 8px;
   font-size: 13px;
   color: var(--text-2);
 }
 .grader-member-same {
-  margin: 2px 0 4px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-2);
 }
+/* What was changed for one member: amber, as on the board. */
 .grader-member-same.is-changed {
-  color: var(--text);
+  color: var(--score-2-dark);
   font-weight: 600;
 }
 .grader-change-one {
