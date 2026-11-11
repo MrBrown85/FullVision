@@ -75,7 +75,9 @@ window.DashOverview = (function () {
       showFlaggedOnly +
       '" aria-label="Show flagged students only' +
       (flagCount > 0 ? ', ' + flagCount + ' flagged' : '') +
-      '">\u2691 Flagged' +
+      '">' +
+      LINE_ICONS.flag +
+      'Flagged' +
       (flagCount > 0 ? ' (' + flagCount + ')' : '') +
       '</button>'
     );

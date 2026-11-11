@@ -1410,17 +1410,28 @@ a.dash-ins-name:hover {
   text-decoration: underline;
 }
 
-/* Students heading: search, sort, Flagged and Cards | Grid. */
+/* Students heading: a white bar like every other dashboard section, the
+   title 21px in, level with the card titles above. Cards | Grid sits beside
+   the title (it changes what the section shows); search, sort and Flagged,
+   which narrow the list, sit on the right. */
 .dash-students-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   margin-top: 12px;
+  padding: 10px 10px 10px 20px;
+  background: var(--surface);
+  border: 1px solid var(--divider-strong);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
 }
-/* Every control in the heading is one height (--control-h). On the page
-   background the search is a white field, like the sort menu beside it,
-   and Flagged is a button of the same shape. */
+.dash-students-head .dash-view-toggle {
+  margin-right: auto;
+}
+/* Every control in the heading is one height (--control-h): the search a
+   white field like the sort menu beside it, Flagged a button of the same
+   shape with a line icon. */
 .dash-students-head .dash-search-input {
   background: var(--surface);
   border-color: var(--border);
@@ -1430,17 +1441,27 @@ a.dash-ins-name:hover {
   padding: 0 12px;
   font-size: var(--text-base);
   border-radius: 8px;
-}
-/* On the page background the track is darker than in a card. */
-.dash-view-toggle .seg-btn:not([aria-pressed='true']) {
   color: var(--text);
 }
+.dash-students-head .dash-filter-chip svg {
+  color: var(--text-3);
+}
+.dash-students-head .dash-filter-chip.active,
+.dash-students-head .dash-filter-chip.active svg {
+  color: #fff;
+}
 .dash-students-title {
-  margin: 0 auto 0 2px;
+  margin: 0 6px 0 0;
   font-family: var(--font-base);
   font-size: var(--text-lg);
   font-weight: 600;
   color: var(--text);
+}
+.dash-students-count {
+  margin-left: 4px;
+  font-weight: 500;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
 }
 
 /* The student grid: a row per student, a column per competency with a count

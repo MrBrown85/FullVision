@@ -428,6 +428,7 @@ window.PageDashboard = (function () {
           showFlaggedOnly: showFlaggedOnly,
           flagCount: flagCount,
         }),
+        allStudents.length,
       );
     if (studentView === 'grid' && students.length)
       html += DashInsights.studentGridHtml(cid, students, allStudents, shownSort);
