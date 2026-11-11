@@ -23,7 +23,7 @@
    - S8-F1: the "photos go for good" line on Keep Photos Until, and the
      one-week reminder (below), here and on the Dashboard.
    - S13-F1: Show My Learning and See What They'd See, in Demo Mode (below).
-   - Then Reflect on Feedback (S10).
+   - S10 follow-up: the Reflect on Feedback switch, in Demo Mode (below).
 
    DashClassManager asks isShown(cid) before it draws the tab, opens it or
    builds its panel, and while the tab is shown hands over every sp* action,
@@ -607,6 +607,64 @@ var CmStudentPage = (function () {
     if (typeof el.focus === 'function') el.focus({ preventScroll: true });
   }
 
+  /* ── Reflect on Feedback (S10 follow-up) ───────────────────────
+     The class's switch for Reflect on Feedback (courseConfig.
+     reflect_on_feedback, off until the teacher turns it on): after work
+     comes back, students say if it made sense, ask a question and make a
+     plan. The screens built in S10 read it through getReflectOnFeedback.
+
+     Demo Mode first, as Show My Learning: the server's column comes with
+     Batch C, which is not applied. So the row is drawn in Demo Mode only;
+     for a signed-in teacher it is not drawn and nothing is asked of the
+     server. Its one writer is setCourseFeedbackOptions (shared/data.js),
+     which in Demo Mode keeps it in the class's settings and sends nothing. */
+
+  // { offered, on }: offered only in Demo Mode with the student page on; on only where offered.
+  function reflectSettings(cid) {
+    var s = _settings(cid);
+    var offered = !!s && s.student_page === true && _demo() && typeof setCourseFeedbackOptions === 'function';
+    var cfg = offered ? getCourseConfig(cid) || {} : {};
+    return { offered: offered, on: offered && cfg.reflect_on_feedback === true };
+  }
+
+  function _reflectRow(cid) {
+    var r = reflectSettings(cid);
+    if (!r.offered) return '';
+    return (
+      // Drawn as Send Work's row is: Class Settings' own switch row.
+      '<div class="sp-row sp-send sp-reflect">' +
+      '<div class="cm-recent-limit sp-send-row">' +
+      '<span class="cm-recent-text"><label class="sp-row-title" for="sp-reflect-switch">Reflect on Feedback</label>' +
+      '<span class="cm-hint" id="sp-reflect-hint">' +
+      esc(
+        'After you return work, students can say if it made sense, ask you a question and make a plan for next time.',
+      ) +
+      '</span></span>' +
+      '<span class="gpd-switch"><input type="checkbox" role="switch" id="sp-reflect-switch" data-action-change="spReflect" aria-describedby="sp-reflect-hint"' +
+      (r.on ? ' checked' : '') +
+      '><span class="gpd-switch-ui" aria-hidden="true"></span></span>' +
+      '</div>' +
+      '</div>'
+    );
+  }
+
+  function _turnReflect(cid, el) {
+    if (!cid || !reflectSettings(cid).offered) return;
+    var on = !!(el && el.checked);
+    if (on === reflectSettings(cid).on) return;
+    var key =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : 'rf-' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+    var done = function () {
+      // Drawn again only while Class Settings is still on this class.
+      if (!_stillHere(cid)) return;
+      _rerender();
+      _focus('sp-reflect-switch');
+    };
+    setCourseFeedbackOptions(cid, { reflect_on_feedback: on }, key).then(done, done);
+  }
+
   /* ── Show My Learning (S13-F1) ─────────────────────────────────
      Show My Learning is the class's switch for the student page's My
      Learning tab (DECISIONS, My Learning on the student page 1), off until
@@ -827,6 +885,7 @@ var CmStudentPage = (function () {
           photoReminderHtml(cid, 'sp') +
           _returnGradesRow(cid) +
           _sendWorkRows(cid) +
+          _reflectRow(cid) +
           _learningRow(cid) +
           '</div>' +
           (typeof StudentCards !== 'undefined' ? StudentCards.render(cid) : '') +
@@ -881,6 +940,10 @@ var CmStudentPage = (function () {
       if (on) _previewFor[on] = el.value;
       return true;
     }
+    if (el && el.dataset && el.dataset.actionChange === 'spReflect') {
+      _turnReflect(_cid(el), el);
+      return true;
+    }
     if (el && el.dataset && el.dataset.actionChange === 'spShowLearning') {
       _turnLearning(_cid(el), el);
       return true;
@@ -915,6 +978,7 @@ var CmStudentPage = (function () {
     render: render,
     workSettings: workSettings,
     learningSettings: learningSettings,
+    reflectSettings: reflectSettings,
     keepPhotosDate: keepPhotosDate,
     classHasPhotos: classHasPhotos,
     photoReminder: photoReminder,
