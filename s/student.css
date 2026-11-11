@@ -1041,3 +1041,10 @@ button {
   margin: 0 auto;
   padding: 12px 16px 0;
 }
+
+/* Your Classes: how many pieces wait in each class (S4-W1). */
+.sp-class-todo {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sp-blue-text, #0066cc);
+}

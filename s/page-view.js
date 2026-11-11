@@ -55,6 +55,50 @@ window.StudentPageView = (function () {
     return /^[A-Za-z0-9]{1,2}$/.test(b) ? 'Block ' + b.toUpperCase() : b;
   }
 
+  /* ── What the server also tells (S4-M1) ────────────────────────
+     Each part below draws only when the view holds it: until the server
+     sends the teacher's name, a unit, a category, a Description, Core
+     Competencies or I Can lines, the page is as it was. */
+
+  // The teacher's name as the view gives it (as they signed up with it), or ''.
+  function teacherOf(view) {
+    return String((view && view.course && view.course.teacherName) || '').trim();
+  }
+
+  // The teacher's initials, for the small mark beside their words: "Colin Brown" is CB.
+  function initialsOf(name) {
+    var words = String(name || '')
+      .split(/\s+/)
+      .filter(Boolean);
+    if (!words.length) return '';
+    var first = Array.from(words[0])[0] || '';
+    var last = words.length > 1 ? Array.from(words[words.length - 1])[0] || '' : '';
+    return (first + last).toUpperCase();
+  }
+
+  function initialsHtml(name) {
+    var mark = initialsOf(name);
+    return mark ? '<span class="sp-from-mark" aria-hidden="true">' + esc(mark) + '</span>' : '';
+  }
+
+  /* A category and what it counts: "Practice Questions · counts 40% of your
+     grade"; "Practice · doesn't count toward your grade" for a category
+     that counts toward nothing; the name alone where no percent is true. */
+  function categoryLine(category) {
+    if (!category || !category.name) return '';
+    var pct = category.percent;
+    if (pct === 0) return category.name + SEP + 'doesn’t count toward your grade';
+    if (typeof pct === 'number' && pct > 0) return category.name + SEP + 'counts ' + pct + '% of your grade';
+    return category.name;
+  }
+
+  // "Counts toward Perspective", "Counts toward Evidence and Ethical Judgment".
+  function towardLine(names) {
+    if (!names || !names.length) return '';
+    var all = names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] : names[0];
+    return 'Counts toward ' + all;
+  }
+
   /* ── One row ───────────────────────────────────────────────── */
 
   /* What one row says, from one piece of the view:
@@ -205,17 +249,20 @@ window.StudentPageView = (function () {
     );
   }
 
-  /* What changed on an updated grade, under its rows: when, and each level
-     that moved. "Mr. Brown updated your result" waits on the server
-     sending the teacher's name. */
-  function updatedNoteHtml(p) {
+  /* What changed on an updated grade, under its rows: who and when, and
+     each level that moved. With no teacher's name from the server: "Your
+     result was updated on Nov 12". */
+  function updatedNoteHtml(p, teacher) {
     var moved = (p.rubric ? p.rubric.rows : p.competencies || []).filter(function (r) {
       return r.was && r.text;
     });
     if (!p.updated || !moved.length) return '';
     return (
       '<div class="sp-updated-note"><p class="sp-updated-title">' +
-      esc('Your result was updated on ' + fmtDate(p.updatedAt || p.returnedAt, DAY)) +
+      esc(
+        (teacher ? teacher + ' updated your result on ' : 'Your result was updated on ') +
+          fmtDate(p.updatedAt || p.returnedAt, DAY),
+      ) +
       '</p>' +
       moved
         .map(function (r) {
@@ -254,8 +301,8 @@ window.StudentPageView = (function () {
   }
 
   /* What You're Graded On, on work not back yet (the To Do card board): its
-     competencies by name, and See the Rubric when it has one. The I Can
-     statements under each name wait on the server. */
+     competencies by name, each with its I Can lines when the server sends
+     them, and See the Rubric when it has one. */
   function gradedOnHtml(p) {
     var names = p.gradedOn || [];
     if (!names.length && !p.rubric) return '';
@@ -263,7 +310,16 @@ window.StudentPageView = (function () {
       '<div class="sp-graded-on"><span class="sp-graded-on-title">What You’re Graded On</span>' +
       names
         .map(function (g) {
-          return '<span class="sp-graded-on-name">' + esc(g.name) + '</span>';
+          return (
+            '<span class="sp-graded-on-name">' +
+            esc(g.name) +
+            '</span>' +
+            (g.iCan || [])
+              .map(function (line) {
+                return '<span class="sp-graded-on-ican">' + esc(line) + '</span>';
+              })
+              .join('')
+          );
         })
         .join('') +
       (p.rubric
@@ -285,7 +341,35 @@ window.StudentPageView = (function () {
   /* One card. A returned piece not opened since it came back carries its
      id as data-unseen: the student page counts it opened once the card has
      been on screen. */
-  function cardHtml(p, picked) {
+  // The Core Competencies a piece is for, under What You're Graded On.
+  function coreHtml(p) {
+    var list = p.coreCompetencies || [];
+    if (!list.length) return '';
+    return (
+      '<div class="sp-core"><span class="sp-graded-on-title">' +
+      (list.length === 1 ? 'Core Competency' : 'Core Competencies') +
+      '</span>' +
+      list
+        .map(function (c) {
+          return '<span class="sp-core-name">' + esc(c.name) + '</span>';
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+
+  // The teacher's comment on a returned card, under their name when the server sends it.
+  function cardCommentHtml(p, teacher) {
+    if (!p.comment) return '';
+    return (
+      (teacher ? '<p class="sp-piece-from">' + initialsHtml(teacher) + '<span>' + esc(teacher) + '</span></p>' : '') +
+      '<p class="sp-piece-comment">' +
+      esc(p.comment) +
+      '</p>'
+    );
+  }
+
+  function cardHtml(p, picked, teacher) {
     var unseen = p.kind === 'back' && p.unseen && p.result && p.result.text;
     var todo = p.kind === 'due' || p.kind === 'missing';
     return (
@@ -298,16 +382,20 @@ window.StudentPageView = (function () {
       (unseen ? ' data-unseen="' + esc(p.id) + '"' : '') +
       ' aria-labelledby="' +
       domId(p.id) +
-      '"><div class="sp-piece-card"><div class="sp-piece-tags">' +
+      '"><div class="sp-piece-card">' +
+      (p.unit ? '<p class="sp-piece-unit">' + esc(p.unit) + '</p>' : '') +
+      '<div class="sp-piece-tags">' +
       pills(p) +
       '</div><h2 class="sp-piece-title" id="' +
       domId(p.id) +
       '" tabindex="-1">' +
       esc(p.title) +
       '</h2>' +
-      (p.kind === 'back' ? resultRows(p) + updatedNoteHtml(p) : '') +
-      (p.kind === 'back' && p.comment ? '<p class="sp-piece-comment">' + esc(p.comment) + '</p>' : '') +
-      (todo ? gradedOnHtml(p) : '') +
+      (todo && p.category ? '<p class="sp-piece-category">' + esc(p.category.name) + '</p>' : '') +
+      (todo && p.description ? '<p class="sp-piece-about">' + esc(p.description) + '</p>' : '') +
+      (p.kind === 'back' ? resultRows(p) + updatedNoteHtml(p, teacher) : '') +
+      (p.kind === 'back' ? cardCommentHtml(p, teacher) : '') +
+      (todo ? gradedOnHtml(p) + coreHtml(p) : '') +
       (hasFeedback(p)
         ? '<button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="feedback" data-piece="' +
           esc(p.id) +
@@ -327,7 +415,8 @@ window.StudentPageView = (function () {
      side and the student swipes between them ("1 of 3"); on a Chromebook
      the list is on the left and the card picked on the right (the
      Chromebook board). page-view.css shows one or the other. */
-  function deckHtml(ui, pieces) {
+  function deckHtml(ui, pieces, view) {
+    var teacher = teacherOf(view);
     var picked = pieceIn(pieces, ui.pick);
     return (
       '<div class="sp-split">' +
@@ -335,7 +424,7 @@ window.StudentPageView = (function () {
       '<div class="sp-deck">' +
       pieces
         .map(function (p) {
-          return cardHtml(p, p === picked);
+          return cardHtml(p, p === picked, teacher);
         })
         .join('') +
       '</div></div>' +
@@ -411,6 +500,12 @@ window.StudentPageView = (function () {
     return hasFeedback(p) ? p : null;
   }
 
+  // Under Your Result: the piece's category and what it counts, when the server sends it.
+  function categoryHtml(p) {
+    var line = categoryLine(p.category);
+    return line ? '<p class="sp-fb-category">' + esc(line) + '</p>' : '';
+  }
+
   /* Your Result: the level's word, large, with the result beside it, then a
      row per criterion or competency; or points with their percent and a
      bar; or Complete. Every word and figure is the view's (calc.js's). */
@@ -430,7 +525,9 @@ window.StudentPageView = (function () {
         lvClass(r.level) +
         '" style="width:' +
         Math.max(0, Math.min(100, Number(r.bar) || 0)) +
-        '%"></span></span></span></section>'
+        '%"></span></span></span>' +
+        categoryHtml(p) +
+        '</section>'
       );
     }
     var big = r.word || r.text;
@@ -447,6 +544,7 @@ window.StudentPageView = (function () {
       '</span>' +
       (beside ? '<span class="sp-fb-beside">' + esc(beside) + '</span>' : '') +
       '</span>' +
+      categoryHtml(p) +
       (rows.length
         ? '<ul class="sp-fb-rows">' +
           rows
@@ -545,7 +643,7 @@ window.StudentPageView = (function () {
      Single-Point Rubric: the goal, then Went Beyond or Work On. Then the
      teacher's comment on the criterion (on a Single-Point Rubric that is
      Work On). */
-  function criterionHtml(style, row) {
+  function criterionHtml(style, row, teacher) {
     var parts = '';
     var lv = lvClass(row.level);
     if (style === 'single_point') {
@@ -572,7 +670,7 @@ window.StudentPageView = (function () {
           parts += partHtml('amber', 'To Reach ' + row.next.name, wordsHtml(row.next.descriptor), TO_ARROW);
         }
       }
-      if (row.comment) parts += '<p class="sp-fb-note">' + esc(row.comment) + '</p>';
+      if (row.comment) parts += '<p class="sp-fb-note">' + initialsHtml(teacher) + esc(row.comment) + '</p>';
     }
     return (
       '<section class="sp-fb-card sp-fb-criterion"><div class="sp-fb-crit-head"><h3 class="sp-fb-crit-name">' +
@@ -580,6 +678,7 @@ window.StudentPageView = (function () {
       '</h3>' +
       (row.text ? chipHtml(row.text, row.level) : '') +
       '</div>' +
+      (towardLine(row.toward) ? '<p class="sp-fb-toward">' + esc(towardLine(row.toward)) + '</p>' : '') +
       parts +
       '</section>'
     );
@@ -618,6 +717,21 @@ window.StudentPageView = (function () {
     );
   }
 
+  // The Overall Comment on Your Feedback: "From Colin Brown" over it when the server sends the name.
+  function fbCommentHtml(p, teacher) {
+    if (!p.comment) return '';
+    if (!teacher) return '<p class="sp-fb-comment">' + esc(p.comment) + '</p>';
+    return (
+      '<div class="sp-fb-comment sp-fb-comment-from"><p class="sp-fb-from">' +
+      initialsHtml(teacher) +
+      '<span>' +
+      esc('From ' + teacher) +
+      '</span></p><p class="sp-fb-comment-words">' +
+      esc(p.comment) +
+      '</p></div>'
+    );
+  }
+
   function feedbackHtml(view, ui, p) {
     var rubric = p.rubric;
     var style = rubric ? rubric.style : '';
@@ -628,7 +742,7 @@ window.StudentPageView = (function () {
             return row.text || row.comment || row.beyond;
           })
           .map(function (row) {
-            return criterionHtml(style, row);
+            return criterionHtml(style, row, teacherOf(view));
           })
           .join('')
       : '';
@@ -646,7 +760,7 @@ window.StudentPageView = (function () {
       (p.comment ? ' sp-fb-top-two' : '') +
       '">' +
       yourResultHtml(p) +
-      (p.comment ? '<p class="sp-fb-comment">' + esc(p.comment) + '</p>' : '') +
+      fbCommentHtml(p, teacherOf(view)) +
       '</div>' +
       (crits
         ? '<h2 class="sp-fb-section">Your Rubric</h2>' +
@@ -749,7 +863,7 @@ window.StudentPageView = (function () {
       (!view.work.length
         ? '<p class="sp-lead sp-empty">No assignments yet.</p>'
         : pieces.length
-          ? deckHtml(ui, pieces)
+          ? deckHtml(ui, pieces, view)
           : seg === 'todo'
             ? caughtUpHtml()
             : EMPTY[seg])
@@ -790,7 +904,15 @@ window.StudentPageView = (function () {
     var bits = [];
     if (back) bits.push(back === 1 ? '1 piece came back' : back + ' pieces came back');
     if (updated) bits.push(updated === 1 ? '1 result was updated' : updated + ' results were updated');
+    var teacher = teacherOf(view);
     var line = bits.join(' and ') + '.';
+    // With the teacher's name, the board's pattern: "Colin Brown returned 5 pieces and updated 1 result."
+    if (teacher) {
+      var did = [];
+      if (back) did.push(back === 1 ? 'returned 1 piece' : 'returned ' + back + ' pieces');
+      if (updated) did.push(updated === 1 ? 'updated 1 result' : 'updated ' + updated + ' results');
+      line = teacher + ' ' + did.join(' and ') + '.';
+    }
     return (
       '<div class="sp-since"><p class="sp-since-title">' +
       esc(changes.length === 1 ? '1 Thing Since You Last Looked' : changes.length + ' Things Since You Last Looked') +
