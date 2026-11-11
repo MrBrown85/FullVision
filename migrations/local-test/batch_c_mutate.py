@@ -18,8 +18,8 @@ refuses to apply is reported as caught by the file.
 import subprocess, tempfile
 from batch_c_common import *
 
-C1S = 'teacher markup started contract reflect revision group grants race closes only_me round2 put_back hide_out same_rows revision_deleted'
-C2S = 'given closes round2 put_back hide_out same_rows revision_deleted'
+C1S = 'teacher markup started contract reflect revision group grants race closes only_me round2 put_back hide_out same_rows revision_deleted leave_holds'
+C2S = 'given closes round2 put_back hide_out same_rows revision_deleted leave_holds'
 CHANGES = [
     # ── C1 ──
     ("_grading_started: marks do not count (Batch B's rule only)", C1,
@@ -246,6 +246,25 @@ CHANGES = [
     ("C1 round 3 F1: a deleted revision's dates are cleared (the teacher's Replace then loses the revision)", C1,
      "    perform _revision_settle(old.enrollment_id, old.assessment_id, false);\n    return old;",
      "    perform _revision_settle(old.enrollment_id, old.assessment_id, false);\n    update revision_request set grade_mark = null, revision_in_at = null, in_returned_at = null\n     where assessment_id = old.assessment_id and enrollment_id = old.enrollment_id and state = 'open';\n    return old;", 'revision_deleted'),
+    # ── review round 3, F2: marks waiting when a class stops holding grades ──
+    ("C2 round 3 F2: nothing runs when the class stops holding grades (the reviewed C2)", C2,
+     "create or replace trigger markup_given_on_release after update of student_page_enabled, return_grades on public.course",
+     "create or replace trigger markup_given_on_release after update of reflect_on_feedback on public.course", 'leave_holds'),
+    ("C2 round 3 F2: every waiting mark in the class is given, graded or not", C2,
+     "               join grade_return g on g.enrollment_id = m.enrollment_id and g.assessment_id = m.assessment_id\n              where m.course_id = new.id and m.given_rev is distinct from m.working_rev\n                and g.returned_at is not null and not g.is_draft) p;",
+     "               left join grade_return g on g.enrollment_id = m.enrollment_id and g.assessment_id = m.assessment_id\n              where m.course_id = new.id and m.given_rev is distinct from m.working_rev) p;", 'leave_holds'),
+    ("C2 round 3 F2: every class's waiting marks are given", C2,
+     "               join enrollment e on e.id = m.enrollment_id and e.course_id = new.id\n               join grade_return g on g.enrollment_id = m.enrollment_id and g.assessment_id = m.assessment_id\n              where m.course_id = new.id and m.given_rev",
+     "               join enrollment e on e.id = m.enrollment_id\n               join grade_return g on g.enrollment_id = m.enrollment_id and g.assessment_id = m.assessment_id\n              where m.given_rev", 'leave_holds'),
+    ("C2 round 3 F2: it runs on every change of the two settings (also into or staying in When I Return Them)", C2,
+     "    for each row when (old.student_page_enabled and old.return_grades is not distinct from 'on_return'\n                       and not (new.student_page_enabled and new.return_grades is not distinct from 'on_return'))\n    execute function public._markup_on_release();",
+     "    for each row\n    execute function public._markup_on_release();", 'leave_holds'),
+    ("C2 round 3 F2: a piece set not to show marks is passed over (not as a Return does)", C2,
+     "                and g.returned_at is not null and not g.is_draft) p;",
+     "                and g.returned_at is not null and not g.is_draft\n                and exists (select 1 from assessment a where a.id = m.assessment_id and a.students_see_markup)) p;", 'leave_holds'),
+    ("C2 round 3 F2: a Missing or Excused piece is passed over (not as a Return does)", C2,
+     "                and g.returned_at is not null and not g.is_draft) p;",
+     "                and g.returned_at is not null and not g.is_draft\n                and not exists (select 1 from score x where x.enrollment_id = m.enrollment_id and x.assessment_id = m.assessment_id and x.status is not null)) p;", 'leave_holds'),
 ]
 
 def run(i, desc, rel, old, new, scen):

@@ -254,12 +254,13 @@ Copy each reply field by field, as the card routes do.
 
 - Every Return, by any path (Return, Return N Graded, `return_grades` from an older screen, the class leaving When I Return Them or turning the Student Page off, a save in a class that returns at once), gives the marks on that piece and stores a finished revision request as done (a trigger on `grade_return`). `return_work` stays the call to use; its answers are the same with C2 or without.
 - A Return is a write that stamps a new returned date. A grade changed and changed back, or a comment typed and deleted, with no Return pressed, is not one: waiting marks stay waiting (`waiting` true) and no request closes.
+- When a class stops holding grades (it leaves When I Return Them, or its Student Page is turned off), marks drawn after a grade was already returned are given then, for every piece of the class whose grade is returned, as a Return gives them (`waiting` turns false; while Students See Your Mark Up is off, or the piece is Missing or Excused, the student sees none, as after any Return). Marks on a piece with no grade yet still wait for its grade, or for the next save of marks. With C1 alone they wait until `return_work` or a save of marks on that page.
 - No grade row is written by C2, and no answer of any call changes shape.
 - Hide is not in C2 or anywhere in Batch C.
 
 ## Changes
 
-- 2026-11-11, review round 3 (`batch-c-review-3.md`): a revision the teacher deletes before its grade is returned leaves the request open (it was closed as `returned` by the next Return, and the student got `no_revision`). No answer changes shape.
+- 2026-11-11, review round 3 (`batch-c-review-3.md`): a revision the teacher deletes before its grade is returned leaves the request open (it was closed as `returned` by the next Return, and the student got `no_revision`). With C2, marks waiting on returned work are given when the class stops holding grades (they stayed `waiting`). No answer changes shape.
 
 - 2026-11-11, Hide taken out (Colin: "Take hide out and we'll work on it later"). Return for Revision keeps the grade; `keep_grade: false` answers `hide_not_available` with C2 or without, and writes nothing; `hide_needs_holding` is gone. `keep_grade` (always true), `grade_hidden`, `hidden` and `unhidden` (always false) stay in the answers so a later change that adds Hide changes no caller. `cancel_revision` writes no grade row. C2 is now only the trigger that gives marks and stores a finished request as done.
 

@@ -971,7 +971,8 @@ def apply2():
         before = catalog(d.c); rows = row_checksums(d.c)
         for name, sql in [('_revision_settle changed', "create or replace function public._revision_settle(p_enrollment_id uuid, p_assessment_id uuid, p_returned boolean) returns integer language plpgsql security definer set search_path to 'public', 'pg_temp' as $f$ begin return 0; end; $f$"),
                           ('_markup_give changed', "create or replace function public._markup_give(p_enrollment_id uuid, p_assessment_id uuid) returns integer language plpgsql security definer set search_path to 'public', 'pg_temp' as $f$ begin return 0; end; $f$"),
-                          ('a trigger of that name already there', "create trigger markup_given_on_insert after insert on public.grade_return for each row execute function public._grade_return_gone()")]:
+                          ('a trigger of that name already there', "create trigger markup_given_on_insert after insert on public.grade_return for each row execute function public._grade_return_gone()"),
+                          ('a trigger of that name already on course', "create trigger markup_given_on_release after update on public.course for each row execute function public._grade_return_release()")]:
             d.begin(); d.run(sql)
             r = d.statements(split(text_at(C2_USED))); d.in_tx = False
             ok('apply2: the guard stops on ' + name, r.startswith('STOPPED') and d.at == 2, r)
@@ -983,15 +984,19 @@ def apply2():
         changed_fns = sorted({fname(l) for l in gone if l.startswith('function ') and not l.startswith('function more')})
         ok('apply2: no existing function changes', changed_fns == [], changed_fns)
         new_fns = sorted({fname(l) for l in new if l.startswith('function ') and not l.startswith('function more')} - set(changed_fns))
-        ok('apply2: and one function is new', new_fns == C2_NEW, new_fns)
+        ok('apply2: and two functions are new', new_fns == sorted(C2_NEW), new_fns)
         new_trg = sorted(l.split(' | ')[1] for l in new if l.startswith('trigger ') and not l.startswith('trigger comment'))
-        ok('apply2: and two triggers on grade_return', new_trg == ['markup_given_on_insert', 'markup_given_on_return'], new_trg)
+        ok('apply2: and two triggers on grade_return and one on course', new_trg == ['markup_given_on_insert', 'markup_given_on_release', 'markup_given_on_return'], new_trg)
         other = [l for l in gone if not l.startswith(('function', 'depends', 'comments on'))]
         ok('apply2: nothing else in the catalog changes', other == [], other)
         ok('apply2: the apply changes no row', row_checksums(d.c) == rows)
         ok('apply2: the post-check is clean', postcheck(d, 'batch-c2-live-postcheck.sql') == [], postcheck(d, 'batch-c2-live-postcheck.sql'))
         d.begin(); d.run('alter table public.grade_return disable trigger markup_given_on_return')
         ok('apply2: the post-check notices a trigger off', postcheck(d, 'batch-c2-live-postcheck.sql') != []); d.rollback()
+        d.begin(); d.run('alter table public.course disable trigger markup_given_on_release')
+        ok('apply2: the post-check notices the course trigger off', postcheck(d, 'batch-c2-live-postcheck.sql') != []); d.rollback()
+        d.begin(); d.run('create or replace trigger markup_given_on_release after update on public.course for each row execute function public._markup_on_release()')
+        ok('apply2: the post-check notices the course trigger recreated to fire on every update', postcheck(d, 'batch-c2-live-postcheck.sql') != []); d.rollback()
         d.begin(); d.run('grant execute on function public._markup_on_return() to authenticated')
         ok('apply2: the post-check notices a grant', postcheck(d, 'batch-c2-live-postcheck.sql') != []); d.rollback()
         cat2 = catalog(d.c); rows2 = row_checksums(d.c)
