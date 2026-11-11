@@ -230,6 +230,108 @@
     return r;
   }
 
+  /* ── Demo Mode's sample: revisions (S11-F2) ────────────────────
+     At #demo-card-revise (Send Work on, a class graded by both). Ms.
+     Rivera returned Cece's Cell Microscope Lab for revision yesterday,
+     keeping its grade: Labelled Drawing, by the end of the week. How Vaccines
+     Work came back for revision earlier; Cece sent her revision and its
+     grade was returned two days ago: Developing + and Proficient before,
+     Proficient and Proficient after (s/app.js has the grade returned, and
+     this keeps the first version's). What Cece sends or unsends is kept in
+     memory until Done. The stand-in answers as Batch C's student functions
+     are written to (shared/data.js, "Revisions"): a revision only on an open
+     request, Unsend and Replace only until grading starts, Late after
+     Revise By. The grade is always kept: there is no Hide in this build
+     (Colin, Nov 11). */
+  function isoDay(offset) {
+    var t = new Date(Date.now() + offset * 864e5);
+    return (
+      t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0')
+    );
+  }
+  function demoRevisions() {
+    return {
+      'demo-lab': {
+        what_to_fix: 'Write the magnification beside each drawing, then send it again.',
+        revise_by: isoDay(3),
+        criterion_ids: ['demo-crit-drawing'],
+        asked_at: at(-1),
+        first_sent_at: at(-15, 19),
+        first_thumbs: [SAMPLE + 'cell-lab-cece-1-thumb.jpg'],
+        first_grade: null, // the grade Cece has on the page, kept
+        revision: null, // once sent: { at, note, late, pages: [{ url, thumbUrl }], grading }
+        returned: false,
+      },
+      'demo-vaccine': {
+        what_to_fix: 'Add a third example of how the body remembers a germ.',
+        revise_by: isoDay(-3),
+        criterion_ids: [],
+        asked_at: at(-9),
+        first_sent_at: at(-11, 19),
+        first_thumbs: [SAMPLE + 'cell-lab-cece-1-thumb.jpg'],
+        first_grade: {
+          v: 1,
+          value: null,
+          modifier: 0,
+          comment: 'Two clear examples. The task asks for three.',
+          tags: {
+            'demo-com': { value: 2, modifier: 1, comment: null },
+            'demo-qp': { value: 3, modifier: 0, comment: null },
+          },
+          criteria: {},
+          checks: [],
+        },
+        revision: {
+          at: at(-3, 19),
+          note: 'I added how a booster shot reminds the body about a germ it has met before.',
+          late: false,
+          pages: [{ url: SAMPLE + 'cell-lab-cece-1.jpg', thumbUrl: SAMPLE + 'cell-lab-cece-1-thumb.jpg' }],
+          grading: true,
+        },
+        returned: true,
+      },
+    };
+  }
+  function revisions(state) {
+    if (!state || !state.demo || !state.demoRevise) return null;
+    if (!state.demoRevisions) state.demoRevisions = demoRevisions();
+    return state.demoRevisions;
+  }
+
+  /* The student's revision on piece `id` as the server sends it
+     (`feedback`'s `revision`, shared/data.js's _studentRevisionOf shape),
+     or null: none on a piece not on the page, or with Missing or Excused on
+     it. A regrade still a draft reads as sent. first_thumbs and thumbs are
+     Demo Mode's own (the pages to show). */
+  function revisionReply(state, id, r) {
+    var row = rowOf(state, id);
+    if (!row || row.status === 'NS' || row.status === 'EXC') return null;
+    var rec = r.revision;
+    var stateNow = r.returned && rec ? 'returned' : rec ? 'sent' : 'open';
+    return {
+      state: stateNow,
+      what_to_fix: r.what_to_fix,
+      revise_by: r.revise_by || null,
+      criterion_ids: r.criterion_ids.slice(),
+      keep_grade: true,
+      grade_hidden: false,
+      first_version: 1,
+      first_sent_at: r.first_sent_at,
+      first_grade: r.first_grade || row.grade || null,
+      revision_version: rec ? 2 : null,
+      revision_sent_at: rec ? rec.at : null,
+      revision_note: rec ? rec.note || null : null,
+      revision_late: rec ? !!rec.late : null,
+      asked_at: r.asked_at,
+      first_thumbs: r.first_thumbs.slice(),
+      thumbs: rec
+        ? rec.pages.map(function (pg) {
+            return pg.thumbUrl || pg.url;
+          })
+        : [],
+    };
+  }
+
   /* ── The replies, in the contract's shapes ─────────────────── */
 
   /* `feedback` (Batch C): { ok, v, reflect_on_feedback, show_my_learning,
@@ -237,7 +339,7 @@
      last_plan }. Mark Up (S9-F3) with Send Work on; reflections and the
      last plan (S10) with Reflect on Feedback on. null outside Demo Mode's
      #demo-card-send and #demo-card-reflect: the server does not send it
-     yet. Revisions (S11) are not built. */
+     yet. Revisions (S11-F2) at #demo-card-revise only. */
   function feedbackOf(state) {
     if (!demoOn(state)) return null;
     var byId = {};
@@ -255,6 +357,14 @@
           });
         });
         entry(id).marks = { pages: pages.length, notes: notes };
+      });
+    }
+    // Revisions (S11-F2), at #demo-card-revise only.
+    var revs = revisions(state);
+    if (revs) {
+      Object.keys(revs).forEach(function (id) {
+        var r = revisionReply(state, id, revs[id]);
+        if (r) entry(id).revision = r;
       });
     }
     var lastPlan = null;
@@ -441,7 +551,10 @@
     if (act === 'card-done' || act === 'class-open' || act === 'card-add') {
       S.work = '';
       S.workPages = null;
-      if (act === 'card-done') S.demoReflections = null;
+      if (act === 'card-done') {
+        S.demoReflections = null;
+        S.demoRevisions = null;
+      }
       return;
     }
     // app.js has opened See Your Work (StudentPageView.press); fetch its pages unless they are here.
@@ -479,6 +592,8 @@
 
   StudentPage.feedbackOf = feedbackOf;
   StudentPage.groupOf = groupOf;
+  // The sample's revisions, by piece (s/send.js sends a revision into them), or null off #demo-card-revise.
+  StudentPage.demoRevisions = revisions;
   // The one way s/reflect.js asks `reflect` and `reply` (Demo Mode's answers until Batch C is wired).
   StudentPage.feedbackAsk = answerOf;
 
@@ -498,6 +613,7 @@
       demoReflections: function (state) {
         return reflections(state);
       },
+      demoRevisions: revisions,
       // Tests answer `markup` and `file-links` themselves (to hold one, or fail it); null puts Demo Mode back.
       setFeedbackAnswer: function (fn) {
         answerFn = fn;
