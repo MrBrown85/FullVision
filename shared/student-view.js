@@ -1531,7 +1531,7 @@ window.StudentView = (function () {
     var cid = p && p.course ? p.course.id : '';
     var sid = p && p.student ? p.student.id : '';
     var ready = typeof assessmentCellValue === 'function';
-    return build(
+    var v = build(
       serverReply,
       cid,
       function (aid, firstGrade) {
@@ -1546,6 +1546,16 @@ window.StudentView = (function () {
       feedback,
       groups,
     );
+    // My Learning on the student's own device (S13-W1): only when the class shows it and the
+    // page carries what calc.js needs (s/student-data.js's `learning`), worked out as Preview does.
+    if (v && ready && p && p.learning) {
+      try {
+        v.learning = learning(cid, sid, v);
+      } catch (e) {
+        v.learning = null;
+      }
+    }
+    return v;
   }
 
   return {
