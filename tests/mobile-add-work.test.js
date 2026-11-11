@@ -179,6 +179,8 @@ describe('with the student page and Send Work on', () => {
     const spy = vi.spyOn(globalThis, 'courseToday');
     spy.mockReturnValue('2026-01-10');
     expect(MGradePhotos.notInState(CID, a)).toBe('Not In');
+    spy.mockReturnValue('2026-01-07');
+    expect(MGradePhotos.notInState(CID, a)).toBe('Not In');
     spy.mockReturnValue('2026-01-11');
     expect(MGradePhotos.notInState(CID, a)).toBe('Not In · 1 day late');
     spy.mockReturnValue('2026-01-17');

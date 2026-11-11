@@ -238,7 +238,8 @@ window.MGradePhotos = (function () {
      '' when there is nothing, or the class takes no work. */
   // html-safe: titles and lines go through MC.esc; ids are ours
   function studentListHtml(cid, st) {
-    if (!st || !on(cid)) return '';
+    if (!st) return '';
+    // Empty unless the class takes work (studentList asks on()).
     var rows = studentList(cid, st.id);
     if (!rows.length) return '';
     return (
