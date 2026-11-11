@@ -536,6 +536,36 @@ describe('a draft is nowhere on the page', () => {
     expect(by['a-reflect'].result.text).toBe(returnedOnly.text);
     expect(by['a-draft'].result.text).toBe('');
   });
+
+  /* A grade the server sent by mistake (no return date, or under Missing or
+     Excused) is not drawn: not its comment, a level or a tick. These are
+     build's own guards; the reply's twin in s/student-data.js feeds only
+     the result line. */
+  const mistaken = extra => {
+    const page = serverPage('proficiency');
+    const lab = page.assessments.find(a => a.id === 'a-lab');
+    Object.assign(lab, {
+      grade: copy({ comment: 'DRAFT-SECRET lab', criteria: { c1: cv(4, 0, 'DRAFT-SECRET c1') } }),
+      returned_at: '2026-11-04T18:00:00Z',
+      status: null,
+      ...extra,
+    });
+    const piece = StudentView.build(page, CID, () => null).work.find(p => p.id === 'a-lab');
+    return piece;
+  };
+
+  it.each([
+    ['never returned', { returned_at: null }],
+    ['Missing', { status: 'NS' }],
+    ['Excused', { status: 'EXC' }],
+  ])('a grade sent on a piece %s is not drawn', (name, extra) => {
+    const piece = mistaken(extra);
+    expect(JSON.stringify(piece)).not.toMatch(SECRET);
+    expect(piece.comment).toBe('');
+    expect((piece.rubric ? piece.rubric.rows : []).every(r => !r.level)).toBe(true);
+    // The same piece, returned, is drawn: the test can fail.
+    expect(JSON.stringify(mistaken({}))).toMatch(SECRET);
+  });
 });
 
 /* ── 3. Making a grade a draft changes nothing ──────────────── */
