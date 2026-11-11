@@ -369,7 +369,7 @@ test('switch on at the build address, a draft, Return, and a card for each stude
   await expect(card.locator('.sc-table tbody tr')).toHaveCount(3);
   await expect(card.locator('.sc-which')).toHaveText(['No Card Yet', 'No Card Yet', 'No Card Yet']);
   expect((await calls(page, 'list_student_cards')).pop()).toEqual({ p_course_id: CID });
-  await expect(card.getByRole('button')).toHaveText(['Make and Print 3 Cards']);
+  await expect(card.locator('.sc-actions button')).toHaveText(['Make and Print 3 Cards']);
 
   // Make and Print: one request to teacher-cards with the teacher's sign-in, then the print dialog.
   await catchPrints(page);
@@ -421,7 +421,7 @@ test('switch on at the build address, a draft, Return, and a card for each stude
   await page.reload();
   await expect(page.locator('.sc-card .sc-status', { hasText: /^Printed / })).toHaveCount(3);
   await expect(page.locator('.sc-card .sc-which')).toHaveText(Array(3).fill(/^Card 1 · Made /));
-  await expect(page.locator('.sc-card').getByRole('button')).toHaveCount(0);
+  await expect(page.locator('.sc-card .sc-actions button')).toHaveText(['New Codes for This Class']);
 
   // The sync dot is quiet, and nothing asked for a count of drafts.
   await expect(page.locator('#sync-indicator-dot').first()).toHaveClass(/idle/);
@@ -531,7 +531,7 @@ test('Make and Print: a lost reply ends with printed cards and no message', asyn
   );
   await page.goto('/dashboard?manage=student-page');
   const card = page.locator('.sc-card');
-  await expect(card.getByRole('button')).toHaveText(['Make and Print 3 Cards']);
+  await expect(card.locator('.sc-actions button')).toHaveText(['Make and Print 3 Cards']);
   await catchPrints(page);
   await card.getByRole('button', { name: 'Make and Print 3 Cards' }).click();
   await expect.poll(async () => (await sheets(page)).length).toBe(1);
@@ -555,6 +555,82 @@ test('Make and Print: a lost reply ends with printed cards and no message', asyn
     '3 cards went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
   );
   await expect(page.locator('.toast, [role="alert"]')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+/* S3-F2 signed in: New Codes for This Class names each student's live card
+   in `replaces`; when part of the run gets no answer, what was made is
+   printed and a line names the students still on their old card; Print
+   New Card on one of them asks first and takes them off the line. No code
+   on the page or the device afterwards. The class goes one student to a
+   request here so a part-failed run can be made; a real class goes 250 to
+   a request. Set S3F2_SHOTS to a folder for a picture of the line. */
+test('New Codes for This Class: a part-failed run names who still has their old card; Print New Card fixes one', async ({
+  page,
+}) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  // 1: Make and Print. 2: Alice's new code. 3 and its retry 4: Bob's, lost. Charlie's is never sent.
+  const cards = await serverWithStudentPage(
+    page,
+    { course: { student_page_enabled: true, return_grades: 'on_return' } },
+    { fail: (post, n) => n === 3 || n === 4 },
+  );
+  await page.goto('/dashboard?manage=student-page');
+  const card = page.locator('.sc-card');
+  await catchPrints(page);
+  await card.getByRole('button', { name: 'Make and Print 3 Cards' }).click();
+  await expect.poll(async () => (await sheets(page)).length).toBe(1);
+  await expect(card.locator('.sc-status', { hasText: /^Printed / })).toHaveCount(3);
+  const firstCards = [ALICE, BOB, CHARLIE].map(sid => cards.fake.live(sid).id);
+
+  await page.evaluate(() => StudentCards._setBatch(1));
+  await card.getByRole('button', { name: 'New Codes for This Class' }).click();
+  const ask = page.getByRole('dialog', { name: 'New Codes for All 3 Students?' });
+  await expect(ask.locator('.confirm-message')).toHaveText(
+    "3 cards stop working now. Print the new cards and hand them out. Students can't open their page until they have their new card. Everything they have sent stays.",
+  );
+  await ask.getByRole('button', { name: 'Make 3 New Cards' }).click();
+  await expect.poll(async () => (await sheets(page)).length).toBe(2);
+  const two = (await sheets(page))[1];
+  expect(two.names).toEqual(['Alice Anderson']);
+  expect(cards.posts.length).toBe(4);
+  expect(cards.posts[1].body.items).toEqual([{ enrollment_id: ALICE, replaces: firstCards[0] }]);
+  await expect(card.locator('.sc-note .sc-note-line')).toHaveText([
+    '1 card went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
+    '2 students still have their old card: Bob Baker, Charlie Chen. Use Print New Card on their rows to try again.',
+  ]);
+  expect(cards.fake.live(BOB).id).toBe(firstCards[1]);
+  expect(cards.fake.live(CHARLIE).id).toBe(firstCards[2]);
+  if (process.env.S3F2_SHOTS) {
+    await page.waitForTimeout(400);
+    await card.screenshot({ path: process.env.S3F2_SHOTS + '/s3f2-part-failed.png' });
+  }
+
+  // Print New Card for Bob: asked first (his card was printed), then printed.
+  await card.getByRole('button', { name: 'Print a New Card for Bob Baker' }).click();
+  const one = page.getByRole('dialog', { name: 'Print a New Card for Bob?' });
+  await expect(one.locator('.confirm-message')).toHaveText(
+    'The card Bob has now stops working as soon as the new one is made. Everything Bob has sent stays.',
+  );
+  await one.getByRole('button', { name: 'Print New Card' }).click();
+  await expect.poll(async () => (await sheets(page)).length).toBe(3);
+  expect(cards.posts[cards.posts.length - 1].body.items).toEqual([{ enrollment_id: BOB, replaces: firstCards[1] }]);
+  await expect(card.locator('.sc-note .sc-note-line')).toHaveText([
+    '1 card went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
+    '1 student still has their old card: Charlie Chen. Use Print New Card on their row to try again.',
+  ]);
+
+  const all = await sheets(page);
+  const shownText = await page.locator('body').innerText();
+  const kept = await heldAnywhere(page);
+  for (const sheet of all) {
+    for (const code of sheet.codes.concat(sheet.passwords)) {
+      expect(shownText).not.toContain(code);
+      expect(kept).not.toContain(code);
+      expect(kept).not.toContain(code.replace('-', ''));
+    }
+  }
   expect(errors).toEqual([]);
 });
 
@@ -595,7 +671,7 @@ test('Make and Print offline says so and makes nothing; an answer after Class Se
   // Back on the screen: the cards that were made show Not Printed, and Make and Print replaces them.
   await page.goto('/dashboard?manage=student-page');
   await expect(page.locator('.sc-card .sc-status')).toHaveText(['Not Printed', 'Not Printed', 'Not Printed']);
-  await expect(page.locator('.sc-card').getByRole('button')).toHaveText(['Make and Print 3 Cards']);
+  await expect(page.locator('.sc-card .sc-actions button')).toHaveText(['Make and Print 3 Cards']);
   expect(errors).toEqual([]);
 });
 
