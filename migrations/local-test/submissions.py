@@ -724,6 +724,10 @@ def scen_storage():
            == [['fv_student_photos_fence', '*', False, '{authenticated}'], ['fv_student_photos_read', 'r', True, '{authenticated}'],
                ['fv_student_photos_teachers_only', '*', False, '{-}'], ['fv_student_photos_upload', 'a', True, '{authenticated}']])
 
+        ok('the four policies are, word for word, the ones the live post-check expects, and so is the bucket',
+           [r for r in d.all(POST) if r[0].startswith(('policy ', 'another policy', 'the bucket', 'row security'))] == [],
+           [r for r in d.all(POST) if r[0].startswith(('policy ', 'another policy', 'the bucket', 'row security'))][:2])
+
         # ── A student's upload link (the Storage API's part, as modelled) ──
         with tx(d):
             s = d.send_start(tok, ENR1, a, pages=1); f = s['files'][0]
@@ -1461,6 +1465,18 @@ def scen_grants():
                     ok('grants: %s cannot %s %s, though this copy gives every new table to everyone' % (role, what, t), e is not None and 'permission denied' in e[0], e)
         e = refused(d, lambda: d.role('anon', "select set_course_send_work('%s', '{}'::jsonb, null)" % COURSE_A))
         ok('grants: anon is refused a teacher RPC', e is not None and 'permission denied for function' in e[0], e)
+        # Row security, behind the revokes: were a grant ever given by mistake, the rows would still not be read.
+        ok('grants: row security is on for all four tables, with no policy',
+           d.all("""select c.relrowsecurity, (select count(*) from pg_policy p where p.polrelid = c.oid) from pg_class c
+                     where c.oid in ('public.submission'::regclass, 'public.submission_file'::regclass, 'public.submission_file_removal'::regclass,
+                                     'student_submit.send_log'::regclass)""") == [[True, 0]] * 4)
+        d.teacher_upload(k['takes'], ENR1, 1); d.rpc('delete_submission(:s, :k)', s=d.teacher_upload(k['takes'], ENR2, 1)[0]['submission_id'], k=nid())
+        d.run('insert into student_submit.send_log (card_id) values (gen_random_uuid())')
+        for t in ('public.submission', 'public.submission_file', 'public.submission_file_removal', 'student_submit.send_log'):
+            d.run('grant select on %s to authenticated' % t)
+            ok('grants: with SELECT on %s granted by mistake, its own teacher still reads no row of it (%d are there)' % (t, d.one('select count(*) from ' + t)),
+               d.one('select count(*) from ' + t) > 0 and d.role('authenticated', 'select count(*) from ' + t, uid=A)[0][0] == 0)
+            d.run('revoke select on %s from authenticated' % t)
         ok("grants: the post-check, on this copy, still lists nothing about who can run or read what", [r for r in d.all(POST) if r[0].startswith(('who can', 'what '))] == [], d.all(POST)[:3])
     finally:
         d.close()
@@ -1495,6 +1511,10 @@ def scen_suites():
 
 SCENARIOS = {'apply': scen_apply, 'teacher': scen_teacher, 'student': scen_student, 'storage': scen_storage, 'race': scen_race, 'grants': scen_grants, 'suites': scen_suites}
 if __name__ == '__main__':
+    import traceback
     for name in (sys.argv[1:] or list(SCENARIOS)):
-        SCENARIOS[name]()
+        try: SCENARIOS[name]()
+        except Exception:
+            # A scenario that cannot go on (a call it relies on answered something else) is a failure, not a crash.
+            ok('the %s scenario ran to its end' % name, False, ' | '.join(traceback.format_exc().strip().splitlines()[-3:]))
     finish()

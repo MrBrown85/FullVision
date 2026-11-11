@@ -1,4 +1,99 @@
--- HEADER-PLACEHOLDER
+-- Students send work: the bucket and who may touch its files (2026-11-11).
+-- Student page build plan, S5-M2 (Batch B).
+-- docs/plans/student-page-build-plan.md 1.7; DECISIONS, "Grades, photos and
+-- sign-in on the student page" 6 to 8 and "Student page build answers" 2.
+-- Apply after 2026111101_student_work_submissions.sql; its first check stops
+-- it otherwise.
+--
+-- ── What it adds ────────────────────────────────────────────────────────────
+-- 1. ONE BUCKET, student-photos: private, 2 MB a file (2097152 bytes),
+--    JPEG only. Every page of student work and its thumbnail go there, one
+--    folder per class. A PDF never arrives: the browser turns each page
+--    into a JPEG and the PDF is not kept (DECISIONS, "Student page build
+--    answers" 2), so there is no second bucket for files. (The plan's line
+--    for this file still says "the two buckets"; its section 1.7 and that
+--    decision say one. Raised with the owner in the pull request.)
+--    The bucket is in the project's region, ca-central-1: Supabase Storage
+--    keeps a project's files where the project is.
+-- 2. FOUR POLICIES on storage.objects, all for this bucket only.
+--    Two that allow, for signed-in teachers:
+--      fv_student_photos_read    read any file under a class they own (the
+--                                path's first folder is the class's id)
+--      fv_student_photos_upload  write one exact path: a page, or its
+--                                thumbnail, of an upload that teacher has
+--                                started (start_work_upload) and not
+--                                finished
+--    Two that restrict, whatever other policy is ever added to
+--    storage.objects (policies that allow are added together, so without
+--    these one careless policy would open the bucket):
+--      fv_student_photos_teachers_only  in this bucket nobody but a
+--                                signed-in teacher gets past row security
+--      fv_student_photos_fence   and a signed-in teacher only as the two
+--                                policies above say
+--    NOTHING lets a teacher's browser change, move or delete a file, and
+--    nothing lets anyone who is not signed in as a teacher read, list or
+--    write one.
+--
+-- ── How each kind of access is decided ──────────────────────────────────────
+-- (From Supabase's documentation and the Storage service's source, read
+-- 2026-11-10. The service is not run in the local tests: see "What the
+-- local tests cannot prove" in migrations/local-test/README.md, Batch B.)
+--   A STUDENT'S UPLOAD. Students have no storage role. The edge function,
+--     holding the service key, asks the Storage API for a signed upload
+--     link for one path the database named (student_submit.send_start).
+--     The link is bound to that bucket and path and is good for two hours.
+--     The upload itself is carried out by the Storage service under its own
+--     role, so none of the policies here is asked: what limits it is the
+--     link (one path), the bucket (2 MB; a Content-Type of image/jpeg) and
+--     that a path already holding a file is refused. The type is what the
+--     upload says it is; the service does not look at the bytes. The edge
+--     function looks at them before it calls send_finish (S5-F4).
+--   A STUDENT'S READ. The edge function makes a short-lived download link
+--     for each path student_submit.file_links returns, and for no other.
+--   A TEACHER'S READ AND UPLOAD. The browser asks the Storage API signed
+--     in; the service runs the query as that teacher, and the policies
+--     decide.
+--   DELETING. Only through the Storage API with the service key, for paths
+--     in public.submission_file_removal. No policy allows a delete, and SQL
+--     cannot delete a file at all.
+-- The service key (the service_role) passes row security on Supabase, so
+-- the policies do not limit the edge functions; what limits them is which
+-- paths the database hands them.
+--
+-- ── What it does to existing rows ───────────────────────────────────────────
+-- Nothing. The project has never used storage: no bucket, no file, no
+-- policy (the pre-check counts them).
+--
+-- ── The checks it makes first ───────────────────────────────────────────────
+-- It stops, with nothing changed, unless:
+--   the first file is applied, and the three functions the policies call
+--     are exactly the ones tested (the list is in the first check below);
+--   storage.buckets and storage.objects have the columns it uses, and row
+--     security is ON for storage.objects;
+--   a bucket named student-photos, if there is one, is already private,
+--     2097152 bytes and image/jpeg only; and on a first run it holds no
+--     file.
+-- Its last step checks the bucket and the four policies are there.
+--
+-- Can be run again: the bucket is left as it is and the four policies are
+-- made again, the same. If the bucket's settings were changed by hand since,
+-- it stops and says so rather than leave them or quietly put them back.
+--
+-- ── What it needs that only the live database can show ──────────────────────
+-- That the role applying it may create a policy on storage.objects and a row
+-- in storage.buckets (Supabase's guide and its changelog of 2025-04-21 say
+-- it may), and that the service role passes row security (the pre-check
+-- reads both roles). If either statement is refused the file stops there
+-- and nothing of it is applied.
+--
+-- ── Taking it back out ──────────────────────────────────────────────────────
+-- migrations/local-test/batch-b-undo.sql, PART 2: the four policies are
+-- dropped. The bucket is left, empty and private, to be deleted in the
+-- Supabase dashboard (a bucket, like a file, is deleted through the Storage
+-- API).
+--
+-- One transaction: begin first, commit last; every check that can stop it
+-- runs before anything is created.
 begin;
 
 set local lock_timeout = '5s';

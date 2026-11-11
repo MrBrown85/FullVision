@@ -1,4 +1,265 @@
--- HEADER-PLACEHOLDER
+-- Students send work: submissions (2026-11-11). Student page build plan,
+-- S5-M1 (Batch B). docs/plans/student-page-build-plan.md 1.6, 1.7, 1.8 and
+-- slice S5; DECISIONS, "Grades, photos and sign-in on the student page" 6
+-- and 8, "Student page build answers" 1, 2 and 7, "Student page build
+-- rulings (2026-11-09, evening)" 17 and 18. The second file of the batch is
+-- 2026111102_student_work_storage.sql (the bucket and its policies). What
+-- the edge function and the browser code against is
+-- migrations/local-test/batch-b-contract.md.
+--
+-- THIS FILE MAKES IT POSSIBLE TO DELETE STUDENTS' PHOTOS (project rule 2: the
+-- owner reviews it). It deletes nothing itself and changes no existing row.
+-- But once it is applied and a class sends work, these delete photos, and a
+-- deleted photo cannot be brought back (no second copy is kept; DECISIONS,
+-- "Grades, photos and sign-in" 6):
+--   a student's Unsend and Replace (new here);
+--   the teacher's Replace Them and delete_submission (new here);
+--   deleting an assessment, permanently deleting a withdrawn student, and
+--     the 30-day purge of a deleted class. These exist today. From this
+--     file on they also take the work handed in for what they delete, and
+--     its photos (section 5).
+--
+-- ── What is needed ──────────────────────────────────────────────────────────
+-- A student signed in with their card sends photos of their work for an
+-- assessment the teacher has set to take work. The teacher sees what came
+-- in, adds work themselves (a paper pile photographed on the phone), or
+-- marks a piece handed in on paper. Before grading starts the student can
+-- unsend or replace what they sent.
+--
+-- ── What it adds ────────────────────────────────────────────────────────────
+-- 1. course.send_work            boolean, default false. Send Work, in Class
+--                                Settings, Student Page.
+--    course.keep_photos_until    'end_of_year' (the default) or
+--                                'end_of_term'. Only stored here: the job
+--                                that acts on it is Batch D.
+-- 2. assessment.students_send    'nothing' (the default), 'photos',
+--                                'photos_files'. The last also lets the
+--                                page offer a PDF; it arrives as JPEG pages
+--                                like any photo, so the database treats the
+--                                two alike.
+--    assessment.after_due        'keep' (Keep Accepting, the default),
+--                                'until' (accept_until is the last day),
+--                                'stop' (the due date is the last day).
+--    assessment.accept_until     date; there exactly when after_due is until.
+--    assessment.group_work       'each' (the default) or 'group'. Only
+--                                stored here: one submission serving a
+--                                group is Batch C.
+--    assessment.students_see_markup  boolean, default true. Only stored
+--                                here: Mark Up is Batch C.
+-- 3. public.submission: work handed in for one assessment by one student.
+--      state    'sending' (rows made, upload links out, nothing handed in:
+--               only its sender ever sees it) or 'sent' (handed in).
+--      intent   what a sending row does when finished: 'new', 'replace' the
+--               one sent, or 'add' its pages to it; target_id is that one.
+--      sent_by 'student' or 'teacher'; on_paper; note (1000 characters at
+--      most); followed_plan ('yes', 'partly', 'no': Did You Do It?, the
+--      student's own word); is_late; version (always 1 here; a revision is
+--      Batch C); card_id (the card that sent it); request_id; created_at,
+--      sent_at, updated_at.
+--      One handed in per student per assessment per version; one unfinished
+--      send per student per assessment from each side.
+--    public.submission_file: one page. page, path, thumb_path, bytes and
+--      thumb_bytes (as storage recorded them), width, height, sha256,
+--      rotation. The file's name is the row's own id.
+--    public.submission_file_removal: every file to delete from storage, and
+--      the ones already deleted (section 4).
+--    student_submit.send_log: one row each time a card is given upload
+--      links, for the hourly limit.
+--    None of the four can be read or written through the API: row security
+--    is on with no policy, and anon and signed-in teachers have no grant.
+--    The removal queue is closed to the service role too.
+-- 4. WHERE A FILE GOES AND HOW IT IS DELETED.
+--    A page is a JPEG in the private bucket student-photos (the second
+--    file), at
+--      <course>/<assessment>/<enrollment>/<submission>/<page id>.jpg
+--    with its thumbnail beside it as <page id>-thumb.jpg. The path is made
+--    here, from ids the server made, when the row is made, and never
+--    changes. (<submission> is the submission the page was first made for:
+--    a page added later keeps its path.)
+--    SQL CANNOT DELETE A FILE. On Supabase a DELETE on storage.objects is
+--    refused (its own trigger; the Storage service's migration 0055), and
+--    on an older storage it would delete the row and leave the bytes with
+--    nothing pointing at them. Only the Storage API deletes a file. So:
+--      a trigger on submission_file writes both of a page's paths to
+--        submission_file_removal when the page's row is deleted, in the
+--        same transaction, whoever deleted it and however;
+--      a caller with the service key asks student_submit.removal_batch for
+--        paths, deletes them through the Storage API, and tells
+--        student_submit.removal_done, which believes it only when
+--        storage's own table no longer has the file;
+--      a file removed while its upload link could still be used is offered
+--        once more after the link has died (2 hours 10 minutes after the
+--        page's row was made), so a file put back through an old link goes
+--        too.
+--    A path enters the queue only when its page row is gone, and a new page
+--    can never be given an old path (its name is its own new id), so the
+--    worker cannot delete a file that a page still has. Who runs the worker:
+--    the student-submit edge function after an Unsend or a send (S5-F4),
+--    and a schedule (Batch D). Until one runs, a queued file stays in
+--    storage; nothing shows it to anyone.
+-- 5. TRIGGERS on two existing tables, as grade_return has (2026110902):
+--      submission_gone      after delete on assessment and on enrollment,
+--                           each row: takes the class's lock, then deletes
+--                           that assessment's or student's submissions.
+--      submission_truncate  after truncate on each: removes submissions
+--                           left without their student or assessment.
+--    submission has NO FOREIGN KEY to assessment, enrollment or course, for
+--    the reason grade_return has none: every change to a submission is made
+--    under the class's lock (the class's row in course_sync_cursor), taken
+--    first, and a cascade or a foreign-key check would take row locks in
+--    the other order and deadlock with a send or a save. Instead these
+--    triggers delete the rows, and a trigger on submission refuses a row
+--    whose student and assessment are not both in its class.
+--    On its own tables: submission_same_class (that check),
+--    submission_target_gone (an unfinished send goes with the work it was
+--    to replace or add to), submission_file_removed (the queue).
+-- 6. THE TEACHER'S RPCs (public; signed-in teachers; each checks the caller
+--    owns the class, and each write takes p_idempotency_key):
+--      set_course_send_work(course, patch, key)
+--      set_assessment_student_work(assessment, patch, key)
+--        A patch writes only the settings it names.
+--      list_course_submissions(course)
+--        The class's settings, each assessment's settings, every submission
+--        handed in with its pages, and the teacher's own unfinished uploads.
+--      start_work_upload(assessment, enrollment, pages, mode, key)
+--      finish_work_upload(submission, files, key)
+--        Add Work. start makes the rows and names the paths; the teacher's
+--        browser uploads each file itself, signed in (the second file's
+--        policy lets it write exactly those paths); finish checks every
+--        file is in storage and hands the work in. mode 'new', 'add' (Add
+--        as More Pages) or 'replace' (Replace Them: the old photos are
+--        deleted).
+--      mark_handed_in_paper(assessment, enrollments, key)
+--      delete_submission(submission, key)      the photos are deleted
+--      rotate_submission_page(page, rotation, key)
+-- 7. THE STUDENT'S SIDE (schema student_submit, not served by the API;
+--    service_role only; called by the student-submit edge function):
+--      work(session, enrollment, address)
+--        What the page shows about sending: for each assessment that takes
+--        work or has work in, whether it is open, when it closes, what was
+--        sent, whether it is being graded, whether it can be changed.
+--      send_start(session, enrollment, assessment, pages, note,
+--                 followed_plan, request_id, address)
+--      replace(the same arguments)
+--        Make the rows and name the paths. The edge function then makes an
+--        upload link for each path.
+--      send_finish(session, enrollment, submission, files, address)
+--        Every page and thumbnail must be in storage, read from storage's
+--        own table; then the work is handed in. For a replace, the old
+--        work goes in the same step.
+--      unsend(session, enrollment, assessment, address)
+--      file_links(session, enrollment, assessment, address)
+--        The paths of the student's own pages, for the edge function to
+--        make short-lived links to.
+--      removal_batch(limit), removal_done(ids)        the worker (4)
+--    A STUDENT ACTS ONLY
+--      through a live session of their own card: no such session, past its
+--        midnight, or after Done: signed_out; a card replaced, past its
+--        last day, or locked: card_stopped, card_expired, card_locked; the
+--        class's Student Page off: closed;
+--      for their own enrollment: any other is not_found;
+--      on an assessment of that class that is on their page, set to take
+--        work, in a class with Send Work on: else not_found,
+--        not_taking_work, send_off;
+--      while it is open: else work_closed. Whether it is open, and late, is
+--        judged by the class's own date when the send starts;
+--      twenty times an hour for one card (counted when links are given, so
+--        unsending gives none back): else too_many;
+--      and Unsend and Replace only on work the student sent themselves,
+--        only until grading starts: else cannot_change, grading_started.
+--    GRADING HAS STARTED when the piece holds a draft or a returned grade
+--    for that student (student_submit._grading_started). It reads two
+--    columns of grade_return, is_draft and returned_at, and nothing else.
+--    NO FUNCTION HERE READS OR WRITES A GRADE: none names a score table, a
+--    copy of a grade, or student_submit._returned_grade
+--    (migrations/local-test/submissions.py fails if one does).
+--    An Unsend and a grade being saved take turns on the class's lock:
+--    whichever is second sees what the first did.
+--
+-- Functions this file leaves callable by signed-in teachers through the
+-- API: the eight in 6. Three more can be run by signed-in teachers and are
+-- NOT served by the API (schema fv_private): work_path_course,
+-- work_upload_allowed and work_read_allowed, which the second file's
+-- storage policies call. Everything else is for the service role or for
+-- nobody but the functions' owner.
+--
+-- ── What it does to existing rows ───────────────────────────────────────────
+-- Nothing. Every class gets Send Work off and End of Year; every assessment
+-- gets nothing, keep, each, and Mark Up shown. No student can send anything
+-- until a teacher turns Send Work on for a class and sets an assessment to
+-- take work.
+--
+-- ── What it changes in what exists ──────────────────────────────────────────
+-- No existing function is changed, dropped or replaced. No existing trigger,
+-- policy or grant is touched. course and assessment gain the columns above;
+-- assessment and enrollment gain the two triggers in 5. For a class with no
+-- work handed in those triggers take the lock grade_return_gone has just
+-- taken and delete no row.
+--
+-- ── The checks it makes first ───────────────────────────────────────────────
+-- It stops, with nothing changed, unless:
+--   Batch A, S0-M4b (2026110905), S0-M5 (2026111002) and S3-M1 (2026111003)
+--     are applied;
+--   the five functions a send leans on for who is asking and for the
+--     class's lock are exactly the definitions the tests ran against
+--     (md5 of pg_get_functiondef on PostgreSQL 17):
+--       student_submit._session_class(text,uuid)  1ae94981ff32f804d12079a24bd7b41a
+--       student_submit._device_session(text)      fa1e510e4ccd3bccbf91e29540a837bb
+--       student_submit._card_refusal(uuid)        cb88af0a6bf62c22ff6c636b291b1a25
+--       public._grade_return_lock(uuid)           530dca441198b1546a4ec4967cd83b9f
+--       public._grade_return_lock_first(uuid)     4d85813e08aaeb108cda95d85f3d66e4
+--   storage.objects and storage.buckets are there, and the role applying
+--     the file reads storage.objects past its row security (it is a
+--     superuser, has BYPASSRLS, or owns the table). Otherwise send_finish
+--     would see no file and refuse every send;
+--   on a first run, none of its names is taken: its 39 functions, four
+--     tables, seven columns and two trigger names.
+-- ON A LATER RUN (public.submission exists) every one of its 39 functions
+-- must be exactly as this file leaves it, or it stops. Batch C will replace
+-- some of them; running this file again after that must not put the old
+-- ones back. The fingerprints are in the first check below, written by
+-- migrations/local-test/submissions_fingerprints.py.
+-- Its last step checks the same list again, and that every SECURITY DEFINER
+-- function in public, student_submit and fv_private still names pg_temp
+-- last in its search_path (S0-M5's check).
+--
+-- ── Locks ───────────────────────────────────────────────────────────────────
+-- Adding the columns takes course and then assessment whole for an instant
+-- (no table is rewritten: each default is a constant), and adding the
+-- triggers takes assessment and enrollment against writes for an instant.
+-- If a long transaction holds one of them the file gives up after five
+-- seconds with nothing applied: run it again.
+--
+-- ── Before and after the apply (read-only) ──────────────────────────────────
+-- migrations/local-test/batch-b-live-precheck.sql   expected: no rows from
+--   its first query; its second describes this project's storage.
+-- migrations/local-test/batch-b-live-postcheck.sql  expected: no rows, once
+--   both files are applied.
+--
+-- ── Taking it back out ──────────────────────────────────────────────────────
+-- migrations/local-test/batch-b-undo.sql (not a migration; proved by
+-- submissions_undo.py). PART 1 turns Send Work off for every class and
+-- deletes nothing. PART 2 removes everything both files made; it refuses
+-- while the bucket holds a file, because SQL cannot delete one.
+--
+-- ── What it does not do ─────────────────────────────────────────────────────
+-- Batch C: Mark Up, reflections, revisions (version 2), one submission for
+--   a group. Batch D: the scheduled removal worker, Keep Photos Until and
+--   its reminder, the nightly check for a file with no row and a row with
+--   no file, and clearing sends that were started and never finished (until
+--   then such a send is dropped when its student or teacher next starts
+--   one for the same piece, and is otherwise inert: nobody is shown it).
+-- A submission changing does not move the class's sync cursor: the
+--   teacher's screens read list_course_submissions.
+-- The size and type of an upload are enforced by the Storage service
+--   against the bucket's settings, and where the edge function hands out a
+--   link is the edge function's doing. This file names the paths and checks
+--   afterwards what storage recorded.
+--
+-- One transaction: the file opens with begin and ends with commit, so it is
+-- all or nothing whether it is pasted into the SQL editor or sent through
+-- apply_migration. Every check that can stop it runs first, before anything
+-- is created or changed.
 begin;
 
 -- Give up after five seconds rather than queue behind a long transaction and
@@ -162,7 +423,7 @@ comment on column public.course.send_work is
 comment on column public.course.keep_photos_until is
     'Keep Photos Until: end_of_year or end_of_term. Stored here; the job that acts on it is a later migration (Batch D).';
 
--- ── 2. The assessment form's Student Work card ─ ──────────────────────────────
+-- ── 2. The assessment form's Student Work card ──────────────────────────────
 alter table public.assessment
     add column if not exists students_send text not null default 'nothing'
         constraint assessment_students_send_check check (students_send in ('nothing', 'photos', 'photos_files')),
