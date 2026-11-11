@@ -5,7 +5,7 @@ gradebook-prod will be once Batch B is applied (batch_c_common.build).
     PGDATABASE=<template> BATCH_B_DIR=<Batch B's migrations/> python3 batch_c.py            every scenario
     PGDATABASE=...                                            python3 batch_c.py teacher    only those named
 
-Scenarios: apply1 teacher markup started contract gone reflect revision group grants race apply2 hide given closes only_me hide_round1 round2 put_back
+Scenarios: apply1 teacher markup started contract gone reflect revision group grants race apply2 hide given closes only_me hide_round1 round2 put_back hide_out same_rows
 """
 import threading, time
 from batch_c_common import *
@@ -1642,9 +1642,117 @@ def put_back():
             finally:
                 d.close()
 
+# ── hide_out: Hide is not in Batch C (Colin, Nov 11) ───────────────────────
+def hide_out():
+    """Return for Revision with Hide is refused, as C1 alone refused it, with C2 too; nothing of Hide is in the catalog."""
+    for c2 in (False, True):
+        tag = ' (C1 and C2)' if c2 else ' (C1 alone)'
+        for on_return in (True, False):
+            ctag = 'a class that holds grades' if on_return else 'a class that returns at once'
+            d = scenario_db('hideout', with_c2=c2)
+            try:
+                k = seed(d, on_return=on_return); a = k['lab']
+                tok = d.session(ENR1); sub, files = d.send(tok, ENR1, a, 1)
+                d.score(ENR1, a, 6); d.return_work(a, [ENR1])
+                d.save_markup(files[0], marks('later')); d.score(ENR1, a, 7)
+                rows = fingerprint_rows(d); mk = d.all('select file_id, given_rev, working_rev from markup order by 1')
+                key = nid()
+                r = d.rfr(a, ENR1, {'what_to_fix': 'Fix', 'keep_grade': False}, key=key)
+                ok('hide_out%s, %s: Hide answers hide_not_available' % (tag, ctag), r == {'result': 'hide_not_available'}, r)
+                ok('hide_out%s, %s: and writes nothing: no request, no grade row, no mark given, nothing remembered' % (tag, ctag),
+                   d.one('select count(*) from revision_request') == 0 and fingerprint_rows(d) == rows
+                   and d.all('select file_id, given_rev, working_rev from markup order by 1') == mk
+                   and d.one('select count(*) from fv_idempotency where key = :k', k=key) == 0)
+                ok('hide_out%s, %s: the student is shown the grade they had' % (tag, ctag), shown(d, ENR1, a) == (6 if on_return else 7))
+                m = d.rfr(a, ENR1, {'what_to_fix': 'Fix', 'keep_grade': True})
+                ok('hide_out%s, %s: Keep is made, its shape as before (keep_grade true, grade_hidden false, hidden false)' % (tag, ctag),
+                   m['result'] == 'made' and m['hidden'] is False and m['request']['keep_grade'] is True and m['request']['grade_hidden'] is False, m)
+                rv = piece(d.feedback(tok, ENR1), a)['revision']
+                ok('hide_out%s, %s: the student\'s revision as before (grade_hidden false, first_grade there)' % (tag, ctag),
+                   rv['grade_hidden'] is False and rv['first_grade'] is not None, rv)
+                c = d.rpc('cancel_revision(:r, :k)', r=m['request']['id'], k=nid())
+                ok('hide_out%s, %s: Take Back answers as before (unhidden false)' % (tag, ctag), c['result'] == 'cancelled' and c['unhidden'] is False, c)
+            finally:
+                d.close()
+        d = scenario_db('hideout', with_c2=c2)
+        try:
+            cols = d.all("select attname from pg_attribute where attrelid = 'public.revision_request'::regclass and attnum > 0 and not attisdropped and attname in ('grade_hidden', 'hidden_state', 'hide_ended_at', 'hide_ended_by')")
+            ok('hide_out%s: revision_request has no hide columns' % tag, cols == [], cols)
+            fns = d.all("select p.oid::regprocedure::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname in ('public', 'student_submit') and p.proname ~ 'hide'")
+            ok('hide_out%s: no hide function' % tag, fns == [], fns)
+            uses = d.all("select p.oid::regprocedure::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname in ('public', 'student_submit') and (prosrc ~ 'revision_unhide' or prosrc ~ 'grade_hidden' or prosrc ~ 'hidden_state')")
+            ok('hide_out%s: no function reads a hide setting or column' % tag, uses == [], uses)
+        finally:
+            d.close()
+    for rel in (C2_USED,):
+        body = '\n'.join(l for l in text_at(rel).split('\n') if not l.lstrip().startswith('--'))
+        ok('hide_out: C2 writes no grade_return row (no update or insert of it in the file)',
+           not re.search(r'(update|insert\s+into)\s+(public\.)?grade_return\b', body, re.I))
+
+# ── same_rows: outside giving marks and closing requests, C2 writes no grade row ──
+def same_rows():
+    """One script of marks, Keep requests (and a Hide request, refused), revisions, every kind of Return, put-backs,
+    the repair and a restore, on C1 alone and on C1 and C2: every grade_return and score row the same."""
+    def script(c2):
+        d = scenario_db('samerows', with_c2=c2)
+        n = [0]
+        def fixed():
+            n[0] += 1; return 'd0000000-0000-4000-8000-%012d' % n[0]
+        import batch_c_common as bcc
+        real = bcc.nid; bcc.nid = fixed
+        try: k = seed(d)
+        finally: bcc.nid = real
+        a = k['lab']; b = k['rub']
+        ret = lambda a_, es: d.rpc('return_grades(:a, :e, :k)', a=a_, e=es, k=nid())
+        try:
+            tok = d.session(ENR1); tok2 = d.session(ENR2, '2012-06-16')
+            sub, files = d.send(tok, ENR1, a, 2); sub2, files2 = d.send(tok2, ENR2, a, 1)
+            d.save_markup(files[0], marks('one')); d.save_markup(files2[0], marks('two'))
+            d.score(ENR1, a, 5); d.score(ENR2, a, 6)
+            ret(a, [ENR1]); d.return_work(a, [ENR2])
+            d.service("student_submit.seen(:t, :e, :a, 'ip-1')", t=tok, e=ENR1, a=[a])
+            d.save_markup(files[0], marks('one', 'more'))
+            d.score(ENR1, a, 6); d.score(ENR1, a, 5)                                   # put back: no Return
+            d.rpc("save_score_comment(:e, :a, 'x')", e=ENR1, a=a); d.rpc("save_score_comment(:e, :a, null)", e=ENR1, a=a)
+            d.rfr(a, ENR2, {'what_to_fix': 'Fix', 'keep_grade': False})                # Hide: refused
+            r1 = d.rfr(a, ENR1, {'what_to_fix': 'Fix'})['request']['id']; r2 = d.rfr(a, ENR2, {'what_to_fix': 'Fix'})['request']['id']
+            s, f = d.revise(tok, ENR1, a); s2, f2 = d.revise(tok2, ENR2, a)
+            d.save_markup(files[1], marks('three'))
+            d.score(ENR1, a, 7); d.score(ENR2, a, 6.5)
+            ret(a, [ENR1])                                                             # the released app's Return
+            d.rpc('update_course(:c, :p::jsonb)', c=COURSE_A, p=json.dumps({'return_grades': 'on_save'}))     # leaving: returns ENR2's
+            d.score(ENR1, a, 8); d.rpc('clear_score(:e, :a)', e=ENR2, a=a); d.score(ENR2, a, 4)
+            d.rpc('upsert_rubric_score(:e, :a, :x, 3, 0::smallint, null, null)', e=ENR1, a=b, x=k['crit1'])
+            r3 = d.rfr(b, ENR1, {'what_to_fix': 'Fix'})['request']['id']
+            d.rpc('update_course(:c, :p::jsonb)', c=COURSE_A, p=json.dumps({'return_grades': 'on_return'}))
+            s3, f3 = d.revise(tok, ENR1, b)
+            d.rpc('upsert_rubric_score(:e, :a, :x, 4, 0::smallint, null, null)', e=ENR1, a=b, x=k['crit1'])
+            d.rpc('cancel_revision(:r, :k)', r=r3, k=nid())
+            d.return_work(b, [ENR1, ENR2])
+            d.run('update course set student_page_enabled = false where id = :c', c=COURSE_A)   # the page off: drafts returned
+            d.run('update course set student_page_enabled = true where id = :c', c=COURSE_A)
+            d.score(ENR2, a, 9); ret(a, [ENR2])
+            d.run('call public.grade_return_repair_nightly()')
+            d.rpc('import_json_restore(:p::jsonb, :k)', k=nid(), p=json.dumps({'courses': [{'id': COURSE_A, 'name': 'Science 8', 'student_page_enabled': True, 'return_grades': 'on_return'}],
+                  'scores': [{'enrollment_id': ENR1, 'assessment_id': a, 'value': 9}], 'grade_returns': [{'enrollment_id': ENR1, 'assessment_id': a, 'is_draft': False}]}))
+            g = d.all("""select enrollment_id, assessment_id, is_draft, returned_at is not null, returned_copy, previous_copy, updated_at is not null,
+                                updated_at = returned_at, seen_at is not null, seen_at >= returned_at, working_copy from grade_return order by 1, 2""")
+            sc = (d.all('select enrollment_id, assessment_id, value, status, comment from score order by 1, 2')
+                  + d.all('select enrollment_id, assessment_id, criterion_id, value from rubric_score order by 1, 2, 3'))
+            reqs = d.all('select assessment_id, enrollment_id, state from revision_request order by created_at, enrollment_id')
+            given = d.all('select enrollment_id, given_rev, working_rev from markup order by enrollment_id, working_rev, given_rev')
+            return json.dumps(g, default=str, sort_keys=True), json.dumps(sc, default=str), reqs, given
+        finally:
+            d.close()
+    g1, s1, q1, m1 = script(False); g2, s2, q2, m2 = script(True)
+    ok('same_rows: every grade_return row is the same with C2 as without', g1 == g2, (g1[:700], g2[:700]))
+    ok('same_rows: and every score row', s1 == s2)
+    ok('same_rows: C2 differs only in marks given and requests closed', len(q1) == len(q2) and [x[:2] for x in q1] == [x[:2] for x in q2]
+       and all(x == y or (x[2] == 'open' and y[2] == 'done') for x, y in zip(q1, q2)), (q1, q2))
+
 SCENARIOS = {'apply1': apply1, 'teacher': teacher, 'markup': markup, 'started': started, 'contract': contract, 'gone': gone, 'reflect': reflect, 'revision': revision, 'group': group,
              'grants': grants, 'race': race, 'apply2': apply2, 'hide': hide, 'given': given,
-             'closes': closes, 'only_me': only_me, 'hide_round1': hide_round1, 'round2': round2, 'put_back': put_back}
+             'closes': closes, 'only_me': only_me, 'hide_round1': hide_round1, 'round2': round2, 'put_back': put_back, 'hide_out': hide_out, 'same_rows': same_rows}
 if __name__ == '__main__':
     for name in (sys.argv[1:] or list(SCENARIOS)):
         try: SCENARIOS[name]()
