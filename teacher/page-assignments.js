@@ -12214,6 +12214,11 @@ window.PageAssignments = (function () {
       // The student's work beside the scoring (S6-F1): its page, the fit,
       // each page's turn, and Focus on Work.
       work: { page: 0, fit: 'page', turns: {}, focus: false },
+      // A reflection's answer being written, by reflection (S10-F3), the
+      // one being sent, and a line about it.
+      reflectDrafts: {},
+      reflectBusy: null,
+      reflectMsg: null,
     };
     overlay.addEventListener('mousedown', function (e) {
       if (e.target === overlay) closeGrader();
@@ -12231,6 +12236,7 @@ window.PageAssignments = (function () {
       else if (what === 'show') _graderSetShow(btn.dataset.show);
       else if (what === 'returnAll') _graderReturnAll(btn);
       else if (what.indexOf('work-') === 0) _graderWorkAction(what, btn);
+      else if (what.indexOf('reflect-') === 0) _graderReflectAction(what, btn);
       else _graderGroupAction(what, btn.dataset.sid);
     });
     // Add Work's Choose Files (S6-F2).
@@ -12252,6 +12258,9 @@ window.PageAssignments = (function () {
     // on Enter or leaving the box (and so before Done, a step or closing).
     overlay.addEventListener('input', function (e) {
       if (e.target.classList.contains('grader-report-note-input')) _reportNotePreview(e.target);
+      // An answer being written is kept while the dialog redraws (S10-F3).
+      if (e.target.classList.contains('grader-reflect-input') && _grader)
+        _grader.reflectDrafts[e.target.dataset.id] = e.target.value;
     });
     overlay.addEventListener('change', function (e) {
       if (e.target.classList.contains('grader-report-note-input')) _saveReportNote(e.target);
@@ -12443,6 +12452,7 @@ window.PageAssignments = (function () {
     _grader.source = view ? view.source : null;
     _drawGraderPanel(_graderPart(dialog, 'panel'), cid, a, st);
     if (work) _drawGraderWork(dialog, cid, a, st, view);
+    _refreshGraderReflection(dialog, cid, a, st);
     _refreshGraderChrome();
   }
 
@@ -13982,11 +13992,19 @@ window.PageAssignments = (function () {
 
   // The shell changed under a drawn dialog: what it remembers drawing is gone.
   function _graderForgetDrawn() {
-    ['statusHtml', 'markHtml', 'membersHtml', 'lineHtml', 'returnHtml', 'showHtml', 'workHtml', 'workLineHtml'].forEach(
-      function (k) {
-        _grader[k] = null;
-      },
-    );
+    [
+      'statusHtml',
+      'markHtml',
+      'membersHtml',
+      'lineHtml',
+      'returnHtml',
+      'showHtml',
+      'workHtml',
+      'workLineHtml',
+      'reflectHtml',
+    ].forEach(function (k) {
+      _grader[k] = null;
+    });
     _graderReleasePage(_grader);
   }
 
@@ -14679,6 +14697,230 @@ window.PageAssignments = (function () {
         });
       },
     );
+  }
+
+  /* ── A student's reflection in the grader (S10-F3) ─────────
+     The board "Teacher: Grader, Returned Work With a Reflection". In a
+     class whose student page (the build switch) and Reflect on Feedback
+     are on, a student who has a grade back can say whether the feedback
+     makes sense, ask a question and make a plan (shared/data.js, "Reflect
+     on Feedback"). Their reflection shows above the scoring, on that
+     student's grader only:
+     - not sure: what they asked, a box for the answer and Send Answer;
+       then, once they say whether it makes sense now, the follow-up and a
+       second answer;
+     - makes sense: their plan and what went well, and Save as
+       Observation, which keeps their words as one of the teacher's notes
+       on them (addQuickOb), linked to the piece.
+     The student wrote it under "Only Mr. Brown sees this": their words
+     show on this student's grader only, and nothing here sends them
+     anywhere but the teacher's own notes. Send Answer's answer goes to
+     this student alone (answerReflection). Demo Mode only for now: signed
+     in no reflection is read (S10-W1). The row is made only when there is
+     a reflection, so with the switch off the dialog is as it was. */
+  function _graderReflection(cid, a, sid) {
+    // getStudentReflections lists none while Reflect on Feedback is off.
+    if (typeof getStudentReflections !== 'function' || isDibelsScored(a)) return null;
+    return (
+      getStudentReflections(cid, sid).find(function (r) {
+        return r.assessment_id === a.id;
+      }) || null
+    );
+  }
+
+  // "Nov 4, the day after you returned it"
+  function _reflectWhen(cid, a, sid, r) {
+    var day = String(r.sent_at || '').slice(0, 10);
+    if (!day) return '';
+    var out = formatShortDate(day);
+    var row = getGradeReturn(cid, sid, a.id);
+    var back = row && row.returned_at ? String(row.returned_at).slice(0, 10) : '';
+    if (!back || back > day) return out;
+    var days = Math.round((Date.parse(day) - Date.parse(back)) / 86400000);
+    if (days === 0) return out + ', the day you returned it';
+    if (days === 1) return out + ', the day after you returned it';
+    return out + ', ' + days + ' days after you returned it';
+  }
+
+  // The words Save as Observation keeps: the student's own, quoted.
+  function _reflectObservationText(a, r) {
+    var out = [];
+    if (r.plan) out.push('Plan after ' + (a.title || 'this work') + ': “' + r.plan.trim() + '”');
+    if (r.went_well) out.push('Went well: “' + r.went_well.trim() + '”');
+    return out.join(' ');
+  }
+  function _reflectSaved(cid, sid, a, r) {
+    var text = _reflectObservationText(a, r);
+    if (!text) return false;
+    return ((getQuickObs(cid) || {})[sid] || []).some(function (o) {
+      return o && o.text === text && o.assignmentContext && o.assignmentContext.assessmentId === a.id;
+    });
+  }
+
+  // html-safe: the student's words, names and dates go through esc; ids are escaped; labels are fixed words
+  function _graderReflectionHtml(cid, a, st) {
+    var r = _graderReflection(cid, a, st.id);
+    if (!r) return '';
+    var first = displayNameFirst(st);
+    var said = function (who, text) {
+      return '<p class="grader-reflect-who">' + esc(who) + '</p><p class="grader-reflect-said">' + esc(text) + '</p>';
+    };
+    var on = function (ts) {
+      return formatShortDate(String(ts || '').slice(0, 10));
+    };
+    var html =
+      '<section class="grader-reflect" aria-labelledby="grader-reflect-title">' +
+      '<div class="grader-reflect-head"><h3 id="grader-reflect-title" class="grader-reflect-title">' +
+      esc(first + '’s Reflection') +
+      '</h3><p class="grader-reflect-when">' +
+      esc(_reflectWhen(cid, a, st.id, r)) +
+      '</p></div>';
+    if (r.makes_sense === 'not_sure') {
+      html += '<p class="grader-reflect-sense is-unsure">Not sure about the feedback</p>';
+      html += said(first + ' asks:', r.question || '');
+    } else {
+      html += '<p class="grader-reflect-sense">The feedback makes sense</p>';
+    }
+    if (r.plan) html += said(first + '’s plan:', r.plan);
+    if (r.went_well) html += said('What went well:', r.went_well);
+    if (r.answer) html += said('You answered ' + on(r.answered_at) + ':', r.answer);
+    if (r.sense_now === 'yes')
+      html += '<p class="grader-reflect-now">' + esc(first + ' says it makes sense now.') + '</p>';
+    if (r.follow_up) html += said(first + ' is still not sure and asks:', r.follow_up);
+    if (r.follow_up_answer) html += said('You answered ' + on(r.follow_up_answered_at) + ':', r.follow_up_answer);
+    var busy = _grader.reflectBusy === r.id;
+    if (r.waiting) {
+      html +=
+        '<label class="grader-reflect-label" for="grader-reflect-answer">' +
+        esc('Your answer to ' + first) +
+        '</label>' +
+        '<textarea id="grader-reflect-answer" class="grader-reflect-input" rows="3" maxlength="2000" data-id="' +
+        esc(r.id) +
+        '"' +
+        (busy ? ' disabled' : '') +
+        '></textarea>' +
+        '<div class="grader-reflect-actions">' +
+        '<button type="button" class="btn btn-primary btn-sm grader-reflect-send" data-grader="reflect-send" data-id="' +
+        esc(r.id) +
+        '"' +
+        (busy ? ' disabled' : '') +
+        '>' +
+        (busy ? 'Sending…' : 'Send Answer') +
+        '</button>' +
+        '<span class="grader-reflect-only">' +
+        esc('Only ' + first + ' sees your answer.') +
+        '</span></div>';
+    }
+    if (r.plan || r.went_well) {
+      var saved = _reflectSaved(cid, st.id, a, r);
+      html +=
+        '<div class="grader-reflect-actions"><button type="button" class="btn btn-secondary btn-sm grader-reflect-obs" data-grader="reflect-observe" data-id="' +
+        esc(r.id) +
+        '"' +
+        (saved ? ' disabled' : '') +
+        '>' +
+        (saved ? 'Saved as Observation' : 'Save as Observation') +
+        '</button></div>';
+    }
+    var msg = _grader.reflectMsg && _grader.reflectMsg.id === r.id ? _grader.reflectMsg.text : '';
+    html += '<p class="grader-reflect-msg" role="status">' + esc(msg) + '</p>';
+    return html + '</section>';
+  }
+
+  /* The row sits above the scoring, in both layouts, and is made only when
+     there is a reflection. Redrawn only when it changes; an answer being
+     written goes back in its box. */
+  function _refreshGraderReflection(dialog, cid, a, st) {
+    var html = _graderReflectionHtml(cid, a, st);
+    var box = dialog.querySelector('.grader-reflect-host');
+    if (!html) {
+      if (box) box.remove();
+      _grader.reflectHtml = null;
+      return;
+    }
+    if (!box) {
+      var anchor = dialog.querySelector('.grader-separate-line');
+      if (!anchor) return;
+      box = document.createElement('div');
+      box.className = 'grader-reflect-host';
+      anchor.insertAdjacentElement('beforebegin', box);
+      _grader.reflectHtml = null;
+    }
+    if (_grader.reflectHtml === html) return;
+    _grader.reflectHtml = html;
+    var had = document.activeElement && box.contains(document.activeElement) ? document.activeElement : null;
+    var typing = !!had && had.classList.contains('grader-reflect-input');
+    // html-safe: built by _graderReflectionHtml
+    box.innerHTML = html;
+    var input = box.querySelector('.grader-reflect-input');
+    if (input) {
+      input.value = _grader.reflectDrafts[input.dataset.id] || '';
+      if (typing) input.focus({ preventScroll: true });
+    }
+  }
+
+  function _graderReflectAction(what, btn) {
+    if (!_grader) return;
+    var cid = activeCourse;
+    var a = _assessmentById(cid, _grader.aid);
+    var sid = focusStudentId;
+    if (!a || !sid) return;
+    var r = _graderReflection(cid, a, sid);
+    if (!r || r.id !== btn.dataset.id) return;
+    if (what === 'reflect-send') return _graderSendAnswer(cid, a, sid, r);
+    if (what === 'reflect-observe') return _graderSaveReflection(cid, a, sid, r);
+  }
+
+  function _reflectAnswerLine(res) {
+    if (res.result === 'already_answered') return 'This was answered already. The answer is shown.';
+    if (res.result === 'not_found') return 'This reflection is no longer here.';
+    if (res.result === 'not_available') return 'Answers can’t be sent from signed-in classes yet.';
+    return 'Write an answer first.';
+  }
+
+  /* Send Answer: the answer goes to this student alone. The data layer's
+     answer is drawn only while the dialog still shows this piece and
+     student; the box keeps what was typed when it was not sent. */
+  function _graderSendAnswer(cid, a, sid, r) {
+    var g = _grader;
+    if (g.reflectBusy) return;
+    var input = g.overlay.querySelector('.grader-reflect-input');
+    var text = input ? input.value : g.reflectDrafts[r.id] || '';
+    g.reflectDrafts[r.id] = text;
+    g.reflectMsg = null;
+    if (!text.trim()) {
+      g.reflectMsg = { id: r.id, text: 'Write an answer first.' };
+      render();
+      var box = g.overlay.querySelector('.grader-reflect-input');
+      if (box) box.focus({ preventScroll: true });
+      return;
+    }
+    g.reflectBusy = r.id;
+    render();
+    var key =
+      window.crypto && crypto.randomUUID
+        ? crypto.randomUUID()
+        : 'ra-' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+    answerReflection(cid, r.id, text.slice(0, 2000), key).then(function (res) {
+      g.reflectBusy = null;
+      if (res && res.result === 'answered') delete g.reflectDrafts[r.id];
+      if (_grader !== g || activeCourse !== cid || g.aid !== a.id || focusStudentId !== sid) return;
+      g.reflectMsg = res && res.result === 'answered' ? null : { id: r.id, text: _reflectAnswerLine(res || {}) };
+      render();
+    });
+  }
+
+  /* Save as Observation: the student's plan and what went well, quoted,
+     as a Note on them linked to the piece. Once only. */
+  function _graderSaveReflection(cid, a, sid, r) {
+    var text = _reflectObservationText(a, r);
+    if (!text || _reflectSaved(cid, sid, a, r)) return;
+    var ok = addQuickOb(cid, sid, text, [], 'note', null, { assessmentId: a.id, assessmentTitle: a.title || '' });
+    _grader.reflectMsg =
+      ok === false ? { id: r.id, text: 'The observation couldn’t be kept on this computer. Try again.' } : null;
+    render();
+    var b = _grader && _grader.overlay.querySelector('[data-grader="reflect-observe"]');
+    if (b) b.focus({ preventScroll: true });
   }
 
   /* ── Note for the Report ──────────────────────────────────

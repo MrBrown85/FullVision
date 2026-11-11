@@ -2059,7 +2059,8 @@
 
   function startDemo(hash) {
     // #demo-card-send: the sample class with Send Work on (S5-F2); off, as in every class, otherwise.
-    var m = /^demo-card(?:-(password|letter|both|send))?$/i.exec(hash || '');
+    // #demo-card-reflect: Send Work and Reflect on Feedback both on (S10).
+    var m = /^demo-card(?:-(password|letter|both|send|reflect))?$/i.exec(hash || '');
     if (!m) return false;
     var kind = (m[1] || '').toLowerCase();
     demo = {
@@ -2072,7 +2073,8 @@
     };
     adding = null;
     S.demo = true;
-    S.demoSend = kind === 'send';
+    S.demoSend = kind === 'send' || kind === 'reflect';
+    S.demoReflect = kind === 'reflect';
     S.typed = prettyCode(DEMO.code);
     S.screen = 'cardstart';
     setTitle();

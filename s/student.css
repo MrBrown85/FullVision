@@ -1270,3 +1270,137 @@ label.sp-btn:focus-within {
   background: transparent;
   color: var(--sp-blue, #007aff);
 }
+
+/* Reflect on Feedback (S10-F1; s/reflect.js) and Did You Do It? on Check
+   and Send (S10-F2). The screen reuses Your Feedback's look (page-view.css,
+   under .sp-view). */
+.sp-reflect {
+  max-width: 620px;
+  width: 100%;
+  margin: 0 auto;
+}
+.sp-reflect-view {
+  min-height: 0;
+  background: transparent;
+}
+.sp-reflect-view .sp-fb-back.sp-reflect-back {
+  display: inline-flex;
+}
+.sp-reflect-step {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: var(--sp-card);
+  border-radius: 18px;
+}
+.sp-reflect-step-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+.sp-reflect-n {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 13px;
+  background: var(--sp-text);
+  color: #fff;
+  font-size: 14px;
+}
+.sp-reflect-aside {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sp-text-2);
+}
+.sp-reflect-box {
+  width: 100%;
+  min-height: 84px;
+  padding: 10px 12px;
+  border: 1px solid var(--sp-field);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--sp-text);
+  font: inherit;
+  font-size: 16px;
+  resize: vertical;
+}
+.sp-reflect-line,
+.sp-reflect-private {
+  margin: 0;
+  font-size: 15px;
+  color: var(--sp-text-2);
+}
+.sp-reflect-sent {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+.sp-seg-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.sp-seg-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.sp-talk {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sp-bubble {
+  max-width: 88%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: var(--sp-card);
+}
+.sp-bubble-mine {
+  align-self: flex-end;
+  background: #e8f1ff;
+}
+.sp-bubble-who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sp-text-2);
+}
+.sp-bubble-words {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.sp-send-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-left: 4px solid var(--sp-green-line);
+  border-radius: 12px;
+  background: #f0f7f1;
+}
+.sp-send-plan .sp-plan-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sp-green);
+}
+.sp-send-plan .sp-plan-words {
+  margin: 0;
+  font-size: 16px;
+}
+.sp-send-plan-ask {
+  margin: 4px 0 0;
+  font-size: 15px;
+  font-weight: 700;
+}
