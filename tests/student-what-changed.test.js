@@ -80,7 +80,12 @@ describe('All Assignments: N Things Since You Last Looked', () => {
         .sort(),
     );
     expect(words(q(page, '.sp-row-flag'))).toBe('Returned');
-    expect(page.calls.filter(c => c.body.route !== 'seen').map(c => c.body.route)).toEqual(['card', 'verify', 'page']);
+    expect(page.calls.filter(c => c.body.route !== 'seen').map(c => c.body.route)).toEqual([
+      'card',
+      'verify',
+      'page',
+      'work',
+    ]);
   });
 
   it('one thing reads in the singular', async () => {

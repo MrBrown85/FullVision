@@ -2020,7 +2020,19 @@
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') cover();
       arm();
       watchRows();
+      // What the class takes, asked once the page is up (s/send.js): a class that takes no work stays as drawn.
+      if (!S.demo && typeof StudentPage.pageOpened === 'function') StudentPage.pageOpened();
     });
+  }
+
+  /* The routes s/send.js asks for the class on screen (S5-W1): work,
+     send-start, replace, send-finish, unsend and file-links. The device's
+     session is added here, in the body as every card route sends it, and
+     the token goes nowhere else. A real card only. */
+  var CLASS_ROUTES = { work: 1, 'send-start': 1, replace: 1, 'send-finish': 1, unsend: 1, 'file-links': 1 };
+  function askClass(route, body) {
+    if (S.demo || !session || !has(CLASS_ROUTES, route)) return Promise.resolve({ ok: false, error: 'signed_out' });
+    return ask(route, Object.assign({}, body, { session: session.token, enrollment_id: session.enrollment }));
   }
 
   // Try Again on a list whose results didn't load.
@@ -2296,6 +2308,9 @@
   StudentPage.classesSheet = classesSheet;
   StudentPage.demoForms = demoForms;
   StudentPage.pageBack = pageBack;
+  StudentPage.askClass = askClass;
+  // A send route that says the session or the class is over: as `page` saying it.
+  StudentPage.sessionRefused = pageRefused;
 
   StudentPage.addScreens({
     file: 'app',

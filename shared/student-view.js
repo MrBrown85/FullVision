@@ -593,13 +593,13 @@ window.StudentView = (function () {
      sent counts work sent and not back yet; it is 0 without a `work` reply
      (S5-F2). A piece's send: null, or { takes, open, closesOn, lateNow,
      sent: null | { at, pages, late, note, byTeacher, onPaper, grading,
-     canChange, teacherPages, thumbs } } (sendOf). */
+     canChange, canSend, teacherPages, thumbs } } (sendOf). */
   /* What the `work` reply says about sending one piece (S5-F2; the
      contract is migrations/local-test/batch-b-contract.md, `work`), or null
      when the class takes no work or the piece takes none and has none in.
      Read as the contract types it; anything else reads as none. thumbs is
      the student's own pages to show, as addresses on this device (Demo
-     Mode's; the real page will fetch them through `file_links`). */
+     Mode's, or fetched through `file-links` by s/send.js). */
   var TAKES = { photos: 'photos', photos_files: 'photos_files' };
   function sendOf(entry) {
     if (!entry || typeof entry !== 'object') return null;
@@ -624,6 +624,8 @@ window.StudentView = (function () {
             onPaper: sent.on_paper === true,
             grading: sent.grading === true,
             canChange: sent.can_change === true,
+            // Work the teacher added that the student can send onto (ruling 107: their pages go first).
+            canSend: sent.sent_by === 'teacher' && sent.can_send === true,
             // How many of the pages the teacher added. Not in the contract's `work` yet (Demo Mode's own):
             // the Unsend line that names them needs it from the server.
             teacherPages: whole(sent.teacher_pages),

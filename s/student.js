@@ -99,6 +99,7 @@ var StudentPage = (function () {
       demoSend: false,
       send: null,
       demoSent: {},
+      realWork: null, // a real card: { student, reply }, the `work` reply for a class with Send Work on
       // Reflect on Feedback (s/reflect.js, S10): Demo Mode's switch, what the sample has sent (s/feedback.js), the screen.
       demoReflect: false,
       demoGroup: false, // #demo-card-group: a piece sent as One per Group (s/feedback.js, S12-F1)

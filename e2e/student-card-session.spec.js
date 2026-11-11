@@ -300,7 +300,7 @@ test.describe('before the page knows whether a code is a card or a slip', () => 
     await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
     await showAll(page);
     // One wrong try was counted, not two.
-    expect(fn.logs.map(l => l.outcome)).toEqual(['ok', 'wrong_identity', 'ok', 'ok']);
+    await expect.poll(() => fn.logs.map(l => l.outcome)).toEqual(['ok', 'wrong_identity', 'ok', 'ok', 'ok']);
   });
 
   test('a card that asks for its password opens with the password box in focus', async ({ page }) => {
@@ -756,7 +756,7 @@ test.describe('"opened" means the row was on screen', () => {
     await expect(page.locator('.sp-row')).toHaveCount(6);
     await expect(page.locator('#app')).toHaveCSS('visibility', 'hidden');
     await page.waitForTimeout(1500);
-    expect(routes(posts)).toEqual(['page']);
+    expect(routes(posts)).toEqual(['page', 'work']);
     // It is switched to.
     await page.evaluate(() => {
       window.__hidden = false;

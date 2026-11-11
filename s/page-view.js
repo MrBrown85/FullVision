@@ -444,16 +444,27 @@ window.StudentPageView = (function () {
   function sentBlockHtml(p) {
     var sent = (p.send && p.send.sent) || {};
     var who = 'Your teacher';
+    // Work the teacher added, open for the student's own pages too (ruling 107): theirs go first.
+    var join = !!(sent.canSend && !sent.grading && p.send.takes && p.send.open);
     var line = sent.onPaper
       ? 'Handed in on paper'
       : sent.grading
         ? who + ' is grading this'
         : sent.canChange
           ? who + ' hasn’t started grading it. You can still change it.'
-          : '';
+          : join
+            ? 'Your photos go before the ' +
+              (sent.pages === 1 ? 'page' : sent.pages + ' pages') +
+              ' your teacher added.'
+            : '';
     return (
       thumbsHtml(sent.thumbs, 'Your page') +
       (line ? '<p class="sp-send-line">' + esc(line) + '</p>' : '') +
+      (join
+        ? '<button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="send-open" data-piece="' +
+          esc(p.id) +
+          '">Send My Work</button>'
+        : '') +
       (sent.canChange && !sent.grading
         ? '<div class="sp-send-change"><button type="button" class="sp-btn sp-btn-tint" data-act="send-replace" data-piece="' +
           esc(p.id) +
