@@ -1222,6 +1222,215 @@ Not verified: pg_cron and Supabase's real migration record (stand-ins
 here); S0-M4b's own undo against looping saves (its own tests' business); the edge function and the app against a database after PART 2;
 anything on `gradebook-prod` itself.
 
+## S4-M1: what a student's page can also be told (2026-11-11)
+
+(This section sits ahead of S3-M1's so that it and Batch B's section, which
+another pull request adds at the end of this file, do not collide.)
+
+`../2026111103_student_page_fields.sql` replaces two functions,
+`student_submit.page` and `student_submit._session_classes`, and nothing
+else: no table, column, row, trigger or policy, and who may run the two is
+as it was. The reply gains keys
+to read (the contract, with a worked example, is `s4-m1-contract.md`): the
+teacher's name, each competency's I Can statements, the competencies each
+rubric row counts toward, and for each assessment its description, module,
+category, what the category counts for, and its Core Competencies; and
+beside each class in the session's list, how many pieces wait (`to_do`).
+Every key the reply had before keeps its value. It changes no grade and
+deletes nothing; it is tested here only and waits for the owner.
+
+**The edge function does not pass the new keys on.** `student-submit`
+copies a reply field by field (`card-routes.ts`), so until its lists are
+extended and it is redeployed a phone is sent what it is sent today.
+
+It is tested on the database as live is since S3-M1 was applied: everything
+`card_codes_common.LIVE` loads, then `../2026111003_card_codes_keyed.sql`.
+`student_page_fields.py build` loads exactly that into an empty database,
+and every scenario runs on a copy of it. The four functions the file checks
+come out of that build with the fingerprints live has (`e744f2a2…` for
+`page`, `6ef848f9…` for `_session_classes`, `21706ae9…` for
+`_returned_grade`, `1ae94981…` for `_session_class`).
+
+```bash
+PGPORT=54351 PGDATABASE=s4m1_live python3 student_page_fields.py build     # an empty database: live as it is now, without S4-M1
+PGPORT=54351 PGDATABASE=s4m1_live python3 student_page_fields.py           # the migration, a little over a minute
+PGPORT=54351 PGDATABASE=s4m1_live python3 student_page_fields_undo.py      # its undo
+PGPORT=54351 PGDATABASE=s4m1_live python3 student_page_fields_mutate.py    # 33 wrong versions of the file, about a quarter of an hour
+PGPORT=54351 PGDATABASE=s4m1_live python3 student_page_fields.py fingerprints write   # after any edit to either function
+```
+
+`batchb` needs Batch B's two files and its storage stand-in. They are in
+this checkout once Batch B is merged; until then name a checkout that has
+them: `BATCH_B_DIR=<path to a checkout of batch-b-submissions>`. Without
+them the scenario prints `SKIPPED` and checks nothing.
+
+**How "nothing about grades changes" is shown.** Before the file is applied
+to a scenario's copy, the two functions as live has them are kept beside
+the new ones under other names (`page_old`, `_session_classes_old`: their
+definitions as `pg_get_functiondef` prints them, only the names changed).
+One statement then asks both for the same page, and the new reply with the
+nine new keys taken out must be the old reply: every key and every value, a
+number compared as it is printed (7 and 7.0 differ). A new key that is
+missing fails the comparison too. Alongside it, each class's `to_do` must
+equal three other counts: the one `shared/student-view.js` gives for the
+same reply (`counts.toDo + counts.missing`), from the real file, run in
+node on the database's own reply (`student_view_counts.mjs`; skipped with
+a `SKIPPED` line where there is no node); that same rule written out in
+Python; and a count read straight from `score` and `grade_return` as the
+owner.
+
+`student_page_fields.py`, by scenario:
+
+- **apply.** The file's shape (one transaction, a lock timeout, the check
+  first; it makes two functions and drops, alters and deletes nothing). The
+  two read-only queries for the live database (`s4-m1-live-precheck.sql`)
+  and the one for afterwards (`s4-m1-live-postcheck.sql`) are run here:
+  nothing listed before, the counts right, the two functions listed by the
+  post-check before the apply and nothing after it; and each notices what
+  it should (a function changed, a column missing or of another type, a
+  grant, a lost `pg_temp`). The twenty columns the pre-check lists are the
+  ones the file itself checks for, each with the type
+  `docs/schema.generated.sql` gives it. Each of the file's checks stops it
+  at the check with nothing changed: each of the four functions with one space more in
+  its body; `page` missing; Batch A, S0-M4b, S0-M5 or S3-M1 missing; each of
+  five columns the new lines read renamed (`page` is PL/pgSQL, which would
+  otherwise fail only when a student opened their page). **What it waits
+  for:** making `_session_classes`, an SQL function, reads the definitions
+  of the six tables it names, so while another session holds one of them
+  whole the file gives up after five seconds with nothing changed; an
+  ordinary save in progress does not hold it up. Then the apply, on a class
+  in use with two phones signed in: of about 2,400 catalog lines the only
+  ones that differ are the two functions' own, and in those only the text
+  (owner, grants, STABLE, SECURITY DEFINER, `search_path`, result and
+  arguments are as they were); **no row of any table changes**; the phones
+  stay signed in and their pages are what they were with the new keys
+  added. A second run changes no catalog line and no row. A run after
+  `page` was changed again stops and puts nothing back.
+- **same.** Old reply against new, on a class that uses every kind of work
+  and every new key (two weighted categories, two modules, I Can
+  statements, a rubric whose rows are linked to competencies, a competency
+  taken off the class, Core Competencies, descriptions, a DIBELS benchmark,
+  a piece dated tomorrow, two pieces on one date in the class's own order),
+  for both of its students and for the first student's second class: after
+  **every step of every case in `tests/fixtures/grade-state-cases.json`**
+  (all 45, each on a piece decorated with a different mix of the new
+  things, the class's grading style turning through Both, Letter and
+  Proficiency); through 300 seeded random saves, comments, clears, returns,
+  statuses, setting changes, opens, and competencies removed and put back;
+  with a returned piece changed to points, to DIBELS, to Complete, to a
+  rubric, and the rubric, a category, a module and a piece then deleted;
+  and for every refusal (`signed_out` five ways, `not_found` five ways,
+  `closed`, `card_expired`, `card_stopped`). 1,548 whole pages compared,
+  none different. Where a case turns the class's
+  Student Page off, both functions refuse alike; the switch is then turned
+  on for the comparison alone, with every trigger asleep so no grade's
+  state moves, and put back. `verify_card`'s list of classes is the page's
+  own list.
+- **fields.** The exact set of keys at every level (the old ones, the new
+  ones, no other). Each new key: what it holds; when it is `null` or `[]`;
+  that text is sent as stored; that a competency taken off the class is in
+  no list; that a criterion, a module or a category wrongly pointing at
+  another class's row sends nothing of it. `category_percent` in a Both, a
+  Letter and a Proficiency class, for a category that weighs 0, for a
+  DIBELS benchmark, for a class whose weights do not total 100, and with a
+  fraction. The seven Core Competencies in the Ministry's order, each once,
+  named as `shared/constants.js` names them. A class with nothing in it.
+- **todo.** What counts: a draft never moves the count (saved over
+  nothing, saved over a returned grade, a returned grade cleared); with
+  every `grade_return` row made a draft and then none, and with every
+  score wiped behind the triggers, every count is what it was; Missing,
+  Excused and Late on returned and on ungraded work; a DIBELS benchmark; a
+  piece dated today and tomorrow; a piece that came back with nothing left
+  to show; As Soon As I Save; the session's second class; another student.
+  In a class fourteen hours ahead of UTC and one eleven hours behind, the
+  count follows the class's own date, as the page does.
+- **privacy.** Of every table and view in `public` and `student_submit`,
+  `page` names fourteen and `_session_classes` six, and no other (comments
+  and quoted text set aside first). Neither names a score table,
+  `grade_return`, a stored copy, the draft flag or a copy maker, and in the
+  whole schema `_returned_grade` is still the only function that does
+  (`student_page.py`'s rule). Neither names any of 37 columns and tables a
+  student is not shown. Of the teacher's row, one column. Then with real
+  rows: a draft's comment, the Note for the Report, a teacher's note, goal
+  and observation, another student's name, number, birthday, email and
+  grade, another teacher's class, and every id of a teacher, student or
+  class are nowhere in the reply; what one student has had returned moves
+  nothing in another's page.
+- **grants.** On a copy where a new function is runnable by everyone by
+  default and anon and signed-in teachers are let into the schema: `page`
+  is the service role's alone and `_session_classes` its owner's, before
+  and after, to the letter; anon and a signed-in teacher who owns the class
+  are refused both by the function itself. Temporary tables named
+  `teacher`, `category`, `module` and `assessment`, made by the caller,
+  change nothing in the reply.
+- **batchb.** Batch B's two files first, then this one; and this one first,
+  then Batch B's. Either way both apply, each leaves the other's functions
+  exactly as they were, a second run of either changes nothing, the old
+  reply and the new agree, the pre-check and the post-check list nothing,
+  and this file's undo runs with Batch B applied and touches nothing of
+  Batch B's.
+- **suites.** `student_submit.py` 79, `questionnaire_identity.py` 47,
+  `phone_reports.py` 35, `questionnaires.py` 42, `grade_return.py` 284,
+  `grade_return_limits.py` 74 and `score_rpcs.py` 236 give the same result
+  with the file applied as before it.
+- **cost.** One page, timed before and after, for three sizes of session.
+  The count beside each class asks `_returned_grade` once for every piece
+  of every class in the session, and that function costs about a third of
+  a millisecond a piece here, so the page costs more the more classes a
+  student has. On this Mac, before and after: one class of 30 pieces, 13
+  and 25 ms; two classes of 30, 13 and 37 ms; four classes of 60, 25 and
+  123 ms. The cheaper ways (a count that reads `score` and `grade_return`
+  itself, or a faster `_returned_grade`) each change the one-reader rule or
+  Batch A's function, and are not done here.
+
+`student_page_fields_mutate.py` makes 33 wrong versions of the file, one
+change each (the To Do count forgetting Missing work, counting Excused
+work, a DIBELS benchmark, pieces not yet dated, another class's or another
+student's; the teacher's email sent for their name; a removed or a foreign
+competency listed; a percent given where none is true; a draft coming
+back; the list or its order changed; `v` changed), gives each its own
+fingerprints so the file does not refuse itself for that alone, and runs
+the suite. All 33 are noticed: 31 by a check of what the functions do
+(from 1 check to 81), and two by the file itself, which refuses to apply
+them (`page` without `pg_temp`; `page` granted to signed-in teachers).
+
+`s4-m1-undo.sql` (not a migration) and its proof,
+`student_page_fields_undo.py`: the undo refuses a database S4-M1 is not
+applied to, a second run, and a database where either function has been
+changed since; otherwise it puts both back, and **the catalog is the one
+from before S4-M1, line for line**, the two fingerprints are live's, no
+row differs, the phones are still signed in, and each page is the page
+S4-M1 gave with the new keys gone. S4-M1 then applies again to the same
+catalog as the first time. With a migration record, the optional statement
+in the undo's header removes S4-M1's row and no other. **Order:** this undo
+goes before S0-M4b's (`s0-m4b-undo.sql` PART 2 puts `page` back as Batch A
+made it, and refuses while `page` is S4-M1's; proved both ways). S3-M1's
+undo runs with S4-M1 applied and leaves these two functions alone.
+
+After the apply, S3-M1's own post-check (`s3-m1-live-postcheck.sql`) lists
+`page` and `_session_classes` as changed, because it was written for the
+day S3-M1 was applied. That is expected; `s4-m1-live-postcheck.sql` is the
+one to run.
+
+Result on 2026-11-11, on PostgreSQL 17.11 (what production runs), from a
+clean clone on a database built from empty: `student_page_fields.py` 259 of
+259 (with Batch B's files named by `BATCH_B_DIR`; 240 of 240 and one
+`SKIPPED` line without them); `student_page_fields_undo.py` 28 of 28;
+`student_page_fields_mutate.py` 33 of 33 noticed. `npm test` gains
+`tests/student-page-fields.test.js` (8 tests: the Core Competency names
+are `shared/constants.js`'s, and the percent rule is what `calc.js` does).
+
+Not verified here: anything on `gradebook-prod` itself (the pre-check is
+written, with the expected answers, and has not been run); the edge
+function, which this pull request does not change and which drops the new
+keys until it is extended; `shared/student-view.js` building the same keys
+from a teacher's cache (the contract gives the rule for each); the time
+`page` takes on `gradebook-prod`'s own machine; and the first run of
+`page`'s main statement on live, which happens when a student next opens a
+page (the file checks that every column it reads is there, the pre-check
+compares their types, and the stand-in's tables are generated from the
+snapshot of live).
+
 ## S3-M1: card codes the database cannot read (2026-11-10)
 
 `../2026111003_card_codes_keyed.sql` stops every card, drops the readable

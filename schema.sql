@@ -824,6 +824,17 @@ create table student_submit.card_key (
 -- deleted; any card scan deletes rows past their midnight). card,
 -- verify_card, page, seen and done are the edge function's; _returned_grade
 -- is the only function in the schema that reads a grade.
+-- page also sends, to read (2026111103_student_page_fields; the contract is
+-- migrations/local-test/s4-m1-contract.md): course.teacher_name
+-- (teacher.display_name); each competency's i_can (tag.i_can_statements);
+-- each rubric criterion's tag_ids (criterion_tag, competencies still on the
+-- class); each assessment's description, module_name, category_name,
+-- category_percent (the category's weight where it is a true share of the
+-- course grade, else null) and core_competencies; and, in the session's
+-- list of classes (_session_classes, which verify_card sends too), each
+-- class's to_do: pieces on the page that take a grade and are Missing, or
+-- not Excused and never returned, asked of _returned_grade. It adds no
+-- table, column or grant.
 create table student_submit.device_session (
   id uuid primary key default gen_random_uuid(),
   token_hash text not null unique,                                    -- the phone holds the token
