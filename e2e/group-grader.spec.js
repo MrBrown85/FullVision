@@ -56,7 +56,7 @@ test('a member’s cell opens their group, and grading it fills every member', a
   await openCell(page, info, info.ids[2]);
   const dialog = page.locator('#grader-overlay .grader-dialog');
   await expect(dialog.locator('.grader-student')).toHaveText('Group 1');
-  await expect(dialog.locator('.grader-members-title')).toHaveText('Group Members');
+  await expect(dialog.locator('.grader-members-title')).toHaveText('Students in This Group');
   await expect(dialog.locator('.grader-member-name')).toHaveText(info.names);
   await expect(dialog.locator('.grader-hint')).toHaveText('← → change group · Esc closes');
   await expect(dialog.locator('.grader-student-row .grader-status')).toBeHidden();
