@@ -586,9 +586,6 @@ describe('the grader on one student’s work', () => {
     MGrade.refreshSwiper(CID, LAB);
     expect(stack().querySelector('.m-work-tabs')).not.toBeNull();
     expect(GradeState.draftsIn(CID, LAB, ['st2'])).toEqual(['st2']);
-    // The lab's Advanced Rubric shows a criterion at a time: to the last one first.
-    const crits = getRubricById(CID, lab().rubricId).criteria;
-    crits.slice(1).forEach(() => MGrade.pageCriterion(CID, 'st2', LAB, 1));
     expect(text(stack().querySelector('.m-grade-return-btn'))).toBe('Return and Next');
     MGrade.returnAndNext();
     expect(GradeState.draftsIn(CID, LAB, ['st2'])).toEqual([]);
@@ -596,11 +593,9 @@ describe('the grader on one student’s work', () => {
   });
 });
 
-describe('the Advanced Rubric a criterion at a time', () => {
-  const text = el => el.textContent.trim();
+describe('the Advanced Rubric, all in a list (ruling 145)', () => {
   const crits = () => getRubricById(CID, lab().rubricId).criteria;
   const card = sid => stack().querySelector('.m-swiper-card[data-sid="' + sid + '"]');
-  const bar = () => stack().querySelector('#m-grade-return');
   const open = () => {
     // html-safe: MGrade.renderSwiper escapes names and text; a test page
     stack().innerHTML = MGrade.renderSwiper(CID, LAB);
@@ -608,96 +603,42 @@ describe('the Advanced Rubric a criterion at a time', () => {
   };
 
   it('the lab is an Advanced Rubric with boxes, more than one criterion', () => {
-    const rubric = getRubricById(CID, lab().rubricId);
-    expect(rubricStyle(rubric)).toBe('advanced');
+    expect(rubricStyle(getRubricById(CID, lab().rubricId))).toBe('advanced');
     expect(crits().length).toBeGreaterThan(1);
     expect(RubricChecks.hasChecks(crits()[0])).toBe(true);
   });
 
-  // The board "Phone Grader, Advanced Rubric" in every class (Nov 11 drift check).
-  it('with no student page, or Send Work off, a criterion at a time too, Next on the bar', () => {
-    open();
-    expect(card('st1').querySelectorAll('.m-crit-group').length).toBe(1);
-    expect(card('st1').querySelector('.m-crit-pager')).not.toBeNull();
-    expect(text(bar().querySelector('.m-grade-return-btn'))).toBe('Next: ' + crits()[1].name);
-    setStudentPageSwitch(CID, true, 'on_return');
-    open();
-    expect(card('st1').querySelector('.m-crit-pager')).not.toBeNull();
-  });
-
-  it('one criterion with its pager, levels, a group of boxes per level, ± and Comment', () => {
-    turnOn();
-    open();
-    const c = card('st1');
-    expect(c.querySelectorAll('.m-crit-group').length).toBe(1);
-    const pager = c.querySelector('.m-crit-pager');
-    const first = crits()[0];
-    expect(text(pager.querySelector('.m-crit-name'))).toBe(first.name);
-    expect(pager.querySelector('.m-crit-pager-dots').getAttribute('aria-label')).toBe(
-      'Criterion 1 of ' + crits().length,
-    );
-    expect(pager.querySelector('[aria-label="Previous criterion"]').disabled).toBe(true);
-    expect(pager.querySelector('[aria-label="Next criterion"]').disabled).toBe(false);
-    expect(pager.querySelector('[role="radiogroup"]').getAttribute('aria-label')).toBe('Level for ' + first.name);
-    // A group for each level that has boxes, with how many are ticked.
-    const ticked = getRubricCheckIds(CID, 'st1', LAB);
-    const levels = levelOrderFor(CID).filter(lv => RubricChecks.checksAt(first, lv).length);
-    const heads = [...pager.querySelectorAll('.m-check-group-head')];
-    expect(heads.map(h => text(h.querySelector('.m-check-group-name')))).toEqual(levels.map(lv => PROF_LABELS[lv]));
-    heads.forEach((h, i) => {
-      const boxes = RubricChecks.checksAt(first, levels[i]);
-      const n = boxes.filter(b => ticked.includes(b.id)).length;
-      expect(text(h.querySelector('.m-check-group-count'))).toBe(n + ' of ' + boxes.length);
+  for (const [what, setUp] of [
+    ['with the student page and Send Work on', () => turnOn()],
+    ['with Send Work off', () => setStudentPageSwitch(CID, true, 'on_return')],
+    ['with no student page', () => setStudentPageSwitch(CID, false)],
+  ]) {
+    it(what + ': every criterion on one screen, each with its Checklist chip and Comment; no pager', () => {
+      setUp();
+      open();
+      const c = card('st1');
+      expect(c.querySelector('.m-crit-pager')).toBeNull();
+      const groups = [...c.querySelectorAll('.m-crit-group')];
+      expect(groups.map(g => g.querySelector('.m-crit-name').textContent)).toEqual(crits().map(k => k.name));
+      groups.forEach((g, i) => {
+        expect(!!g.querySelector('[data-action="m-grade-checks"]')).toBe(RubricChecks.hasChecks(crits()[i]));
+        expect(g.querySelector('[data-action="m-grade-crit-comment"]')).not.toBeNull();
+      });
+      expect(stack().querySelector('[data-action="m-crit-page"]')).toBeNull();
     });
-    // The chosen level's group is open, and only it.
-    const openHeads = heads.filter(h => h.getAttribute('aria-expanded') === 'true');
-    expect(openHeads.length).toBeLessThanOrEqual(1);
-    expect(pager.querySelectorAll('.m-check-group:not(.is-open) input').length).toBe(0);
-    expect(pager.querySelector('.m-score-mods [data-mod="-1"]').textContent).toBe('\u2212Minus');
-    expect(pager.querySelector('.m-crit-comment-btn')).not.toBeNull();
-    // The bar goes on to the next criterion.
-    expect(text(bar().querySelector('.m-grade-return-btn'))).toBe('Next: ' + crits()[1].name);
-    expect(bar().querySelector('.m-grade-return-btn').getAttribute('data-action')).toBe('m-crit-page');
-  });
+  }
 
-  it('Next and Previous step through the criteria; the last has no Next', () => {
-    turnOn();
-    open();
-    const n = crits().length;
-    for (let i = 1; i < n; i++) MGrade.pageCriterion(CID, 'st1', LAB, 1);
-    expect(text(card('st1').querySelector('.m-crit-pager .m-crit-name'))).toBe(crits()[n - 1].name);
-    expect(card('st1').querySelector('[aria-label="Next criterion"]').disabled).toBe(true);
-    MGrade.pageCriterion(CID, 'st1', LAB, 1); // past the last: nothing
-    expect(text(card('st1').querySelector('.m-crit-pager .m-crit-name'))).toBe(crits()[n - 1].name);
-    expect(bar().querySelector('.m-crit-next-btn')).toBeNull();
-    MGrade.pageCriterion(CID, 'st1', LAB, -1);
-    expect(text(card('st1').querySelector('.m-crit-pager .m-crit-name'))).toBe(crits()[n - 2].name);
-    // Each student keeps their own place.
-    expect(text(card('st2').querySelector('.m-crit-pager .m-crit-name'))).toBe(crits()[0].name);
-    // Opened afresh, every card starts on the first criterion.
-    open();
-    expect(text(card('st1').querySelector('.m-crit-pager .m-crit-name'))).toBe(crits()[0].name);
-  });
-
-  it('a group opens and closes, and a box ticked in it is counted', () => {
-    turnOn();
-    open();
+  it('a criterion whose ticks suggest a level says so over its levels', () => {
+    setStudentPageSwitch(CID, false);
     const first = crits()[0];
     const lv = levelOrderFor(CID).find(l => RubricChecks.checksAt(first, l).length);
-    const head = () => card('st1').querySelector('.m-check-group-head[data-level="' + lv + '"]');
-    if (head().getAttribute('aria-expanded') === 'true') MGrade.toggleCritGroup(CID, 'st1', LAB, first.id, lv);
-    expect(head().getAttribute('aria-expanded')).toBe('false');
-    MGrade.toggleCritGroup(CID, 'st1', LAB, first.id, lv);
-    expect(head().getAttribute('aria-expanded')).toBe('true');
-    expect(card('st1').querySelectorAll('.m-check-group-head[aria-expanded="true"]').length).toBe(1);
-    const box = RubricChecks.checksAt(first, lv)[0];
-    const was = getRubricCheckIds(CID, 'st1', LAB).includes(box.id);
-    MGrade.tickCheck(CID, 'st1', LAB, first.id, box.id, !was);
-    expect(getRubricCheckIds(CID, 'st1', LAB).includes(box.id)).toBe(!was);
-    const input = card('st1').querySelector('input[data-checkid="' + box.id + '"]');
-    expect(input.hasAttribute('checked')).toBe(!was);
-    MGrade.toggleCritGroup(CID, 'st1', LAB, first.id, lv);
-    expect(head().getAttribute('aria-expanded')).toBe('false');
+    getRubricCheckIds(CID, 'st1', LAB).forEach(id => Grader.setTick(CID, 'st1', LAB, id, false));
+    RubricChecks.checksAt(first, lv).forEach(k => Grader.setTick(CID, 'st1', LAB, k.id, true));
+    open();
+    const line = card('st1').querySelector('.m-crit-group .m-crit-suggested');
+    expect(line.textContent).toBe(
+      'Suggested: ' + scoreLevelText(RubricChecks.suggestedLevel(first, getRubricCheckIds(CID, 'st1', LAB))),
+    );
   });
 });
 

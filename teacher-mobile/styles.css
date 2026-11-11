@@ -4474,11 +4474,25 @@ body.fv-switching-course::after {
 .m-crit-comment-btn[hidden] {
   display: none;
 }
+/* A criterion's name wraps between words, never inside one ("Commun
+   ication" at 390 px). Beside its buttons it is never narrower than its
+   longest word: when that word doesn't fit, the buttons drop under the
+   name instead. */
 .m-crit-name {
   min-width: 0;
   font-weight: 600;
   color: var(--text);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+}
+.m-crit-label {
+  flex-wrap: wrap;
+}
+.m-crit-label .m-crit-name {
+  flex: 1 1 0;
+  min-width: min-content;
+}
+.m-crit-label .m-crit-tools {
+  margin-left: auto;
 }
 /* Competencies that disagree show the lowest level, outlined. */
 .m-score-btn.m-score-mixed {
@@ -4605,103 +4619,19 @@ body.fv-switching-course::after {
   accent-color: var(--active);
 }
 
-/* The Advanced Rubric a criterion at a time (S7-F2): the pager, a group of
-   boxes per level with its count, then ± and Comment. */
-.m-crit-pager-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
+/* Missing | Excused | Late fits beside the avatar on a narrow phone. */
+.m-status-row {
+  max-width: 100%;
 }
-.m-crit-pager-mid {
-  flex: 1;
+.m-status-row .m-status-pill {
+  flex: 1 1 auto;
   min-width: 0;
-  text-align: center;
 }
-.m-crit-pager-mid .m-crit-name {
-  font-size: 17px;
-}
-.m-crit-pager-dots {
-  display: flex;
-  justify-content: center;
-  gap: 5px;
-  margin-top: 6px;
-}
-.m-crit-pager-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--border);
-}
-.m-crit-pager-dot.is-on {
-  background: var(--active);
-}
-.m-crit-pager-btn {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 22px;
-  border: 1.5px solid var(--border);
-  background: var(--surface);
-  color: var(--link);
-  -webkit-tap-highlight-color: transparent;
-}
-.m-crit-pager-btn:disabled {
-  color: var(--text-3);
-  opacity: 0.5;
-}
-.m-check-groups {
-  margin-top: 12px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  overflow: hidden;
-}
-.m-check-group + .m-check-group {
-  border-top: 1px solid var(--border);
-}
-.m-check-group-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  min-height: 44px;
-  padding: 0 14px;
-  border: none;
-  background: transparent;
-  font: inherit;
-  font-size: 15px;
-  font-weight: 700;
-  -webkit-tap-highlight-color: transparent;
-}
-.m-check-group-name.l4 {
-  color: var(--score-4-text);
-}
-.m-check-group-name.l3 {
-  color: var(--score-3-text);
-}
-.m-check-group-name.l2 {
-  color: var(--score-2-text);
-}
-.m-check-group-name.l1 {
-  color: var(--score-1-text);
-}
-.m-check-group-count {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-3);
-}
-.m-check-group.is-open .m-check {
-  padding: 0 14px;
-}
-.m-check-group.is-open {
-  padding-bottom: 6px;
-}
-.m-crit-pager .m-crit-comment {
-  margin-top: 10px;
+@media (max-width: 359px) {
+  .m-status-row .m-status-pill {
+    padding: 0 8px;
+    font-size: 13px;
+  }
 }
 
 /* Group work (Group grading): a group's card names the group and lists its
@@ -4997,23 +4927,6 @@ body.fv-switching-course::after {
   font-weight: 600;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-}
-/* Next: <criterion> ›, on one line however long the name. */
-.m-crit-next-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 0 14px;
-}
-.m-crit-next-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.m-crit-next-btn svg {
-  flex: none;
 }
 .m-grade-return-btn:active:not(:disabled) {
   opacity: 0.8;
@@ -5732,6 +5645,7 @@ body.fv-switching-course::after {
   min-width: 0;
   font-size: 16px;
   font-weight: 600;
+  overflow-wrap: break-word;
 }
 .m-paper-crit-now {
   font-size: 14px;
@@ -6413,6 +6327,17 @@ body.fv-switching-course::after {
 .m-grade-return-act:has(.m-grade-revise-btn) {
   display: flex;
   gap: 8px;
+}
+/* For Revision a third, the blue button two thirds, on any phone (the board). */
+.m-grade-return-act:has(.m-grade-revise-btn) .m-grade-revise-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 10px;
+}
+.m-grade-return-act:has(.m-grade-revise-btn) .m-grade-return-btn {
+  flex: 2 1 0;
+  min-width: 0;
+  width: auto;
 }
 .m-grade-revise-btn {
   flex: none;

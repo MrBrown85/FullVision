@@ -125,32 +125,67 @@ test.describe('Phone grading by rubric criterion', () => {
     expect(new Set(behind)).toEqual(new Set([Number(target)]));
   });
 
-  // An Advanced Rubric shows a criterion at a time in every class (the board
-  // "Phone Grader, Advanced Rubric"): its boxes in a group per level.
   test('an Advanced Rubric ticks its way to a level', async ({ page }) => {
     await openLab(page, true);
-    const group = () => firstCard(page).locator('.m-crit-pager');
-    const head = lv => group().locator(`.m-check-group-head[data-level="${lv}"]`);
-    const open = async lv => {
-      if ((await head(lv).getAttribute('aria-expanded')) !== 'true') await head(lv).click();
-    };
+    const group = () => firstCard(page).locator('.m-crit-group').first();
     // Start from no level so the boxes decide it.
     if (await group().locator('.m-score-btn.m-score-active').count())
       await group().locator('.m-score-btn.m-score-active').click();
     await expect(group().locator('.m-score-btn.m-score-active')).toHaveCount(0);
 
-    await open(4);
-    await expect(head(4).locator('.m-check-group-count')).toHaveText('0 of 2');
+    await group().locator('.m-checks-btn').click();
+    await expect(group().locator('.m-checklist-head')).toHaveText('No Level Suggested Yet');
     await group().getByLabel('Repeats trials').check();
     await expect(group().locator('.m-score-btn.m-score-active')).toHaveCount(0);
     await group().getByLabel('Explains an odd result').check();
     await expect(group().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText('4');
-    await expect(head(4).locator('.m-check-group-count')).toHaveText('2 of 2');
+    await expect(group().locator('.m-checklist-head')).toHaveText('Suggested: Extending');
+    await expect(group().locator('.m-checks-btn')).toHaveText('2');
 
     // A level picked by hand stays.
     await group().locator('.m-score-btn[data-score="2"]').click();
-    await open(3);
     await group().getByLabel('Records units').check();
     await expect(group().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText('2');
   });
 });
+
+/* A long criterion name wraps between words, never inside one ("Commun
+   ication" at 390 px), beside its Checklist chip and Comment, at 390 and
+   320 px; the buttons stay on the card. */
+for (const width of [390, 320]) {
+  test(`criterion names wrap only between words at ${width} px`, async ({ page }) => {
+    await openLab(page, true);
+    await page.setViewportSize({ width, height: 812 });
+    const LONG = 'Communication of Interdisciplinary Representations';
+    await page.evaluate(long => {
+      const cid = Object.keys(COURSES)[0];
+      const rubrics = structuredClone(getRubrics(cid));
+      rubrics.forEach(r => r.criteria.forEach(c => (c.name = long)));
+      saveRubrics(cid, rubrics);
+      _invalidateAndRerender();
+    }, LONG);
+    await expect(page.locator('.m-swiper-card .m-crit-group .m-crit-name').first()).toHaveText(LONG);
+    const seen = await page.evaluate(() => {
+      const card = document.querySelector('.m-swiper-card');
+      const split = [];
+      card.querySelectorAll('.m-crit-name').forEach(el => {
+        const text = el.firstChild;
+        if (!text || text.nodeType !== 3) return;
+        let at = 0;
+        for (const word of text.data.split(' ')) {
+          const r = document.createRange();
+          r.setStart(text, at);
+          r.setEnd(text, at + word.length);
+          if (new Set([...r.getClientRects()].map(q => Math.round(q.top))).size > 1) split.push(word);
+          at += word.length + 1;
+        }
+      });
+      const edge = card.querySelector('.m-grade-card-surface').getBoundingClientRect().right;
+      const out = [...card.querySelectorAll('.m-crit-tools button')].filter(
+        b => b.getBoundingClientRect().right > edge + 0.5,
+      ).length;
+      return { split, out };
+    });
+    expect(seen).toEqual({ split: [], out: 0 });
+  });
+}

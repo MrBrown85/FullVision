@@ -127,7 +127,9 @@ describe('with the student page and Send Work on', () => {
     expect(card(sid).querySelector('.m-score-btn')).toBeNull();
     MGrade.openPaperCriterion(CID, sid, LAB, 1);
     expect(card(sid).querySelector('[data-action="m-paper-crit"]')).toBeNull();
-    expect(card(sid).querySelector('.m-crit-pager .m-crit-name').textContent).toBe(crits[1].name);
+    expect([...card(sid).querySelectorAll('.m-crit-group .m-crit-name')].map(n => n.textContent)).toEqual(
+      crits.map(c => c.name),
+    );
   });
 
   it('under Missing, Set Logan To is off and does nothing', () => {
