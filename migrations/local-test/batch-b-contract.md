@@ -292,6 +292,7 @@ Read-only, for the `send-finish` route: the pages of this student's own unfinish
 | `unsend`                | `unsend`                        | Then the worker                                                                                                                                      |
 | `file-links`            | `file_links`                    | A 300-second download link for each path returned, and for no other                                                                                  |
 | `sweep`                 | `removal_batch`, `removal_done` | The worker alone. Called by the teacher's browser after `delete_submission`, `finish_work_upload` and `start_work_upload`                            |
+| `scheduled-sweep`       | `removal_batch`, `removal_done` | The worker alone, for up to 40 s, for the database's timer (`2026111140`): the body's `secret` must equal `PHOTO_SWEEP_SECRET` (64 lower-case hex)   |
 
 ## The teacher's side: `public` RPCs
 
@@ -424,6 +425,8 @@ For good; no second copy is kept anywhere.
 - **Batch D**: the removal worker on a schedule; the Keep Photos Until job and its reminder; the nightly check for a file with no row and a row with no file; clearing expired sends in a class nobody is using; trimming the removal queue's history. The tables need no change for any of it: deleting `submission_file` rows is all a purge has to do, and the queue does the rest.
 
 ## Changes
+
+- 2026-11-11, `2026111140` (Batch D, not applied): Keep Photos Until deletes each page row of a class's handed-in work made before midnight after the class's day (the submission row stays, with no pages, like work Handed In on Paper; `list_course_submissions` then lists it with no `files`, and `file_links` names none); a page's Mark Up is copied to `markup_kept` first. The queue gains the reasons `keep_photos_until`, `stray` and `expired` (nightly). The edge function gains `scheduled-sweep`. No function here changes.
 
 - 2026-11-11, after the second review (2026111104, not yet applied): the 30 pages are asked again when a Replace or an Add as More Pages is finished (`too_many_pages`, with `room`, from `send_finish` and `finish_work_upload`); a student's Unsend or finished Replace no longer drops the teacher's unfinished Add as More Pages (it moves to the new work, or becomes the teacher's own new upload). Nothing else changes.
 
