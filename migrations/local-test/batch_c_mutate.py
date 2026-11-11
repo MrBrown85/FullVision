@@ -1,0 +1,298 @@
+"""Does the suite notice when Batch C's SQL is wrong? Each entry is one small
+change to one of the two files: a check taken out, a limit moved, a grant
+left on, the wrong copy sent. For each, the changed file (and the other,
+unchanged) are applied, with their fingerprint lists stood aside, to fresh
+copies of the template, and batch_c.py's behaviour scenarios are run on
+them. A change no check notices is a hole in the suite.
+
+    PGDATABASE=<template> BATCH_B_DIR=... python3 batch_c_mutate.py          every change
+    PGDATABASE=...                         python3 batch_c_mutate.py 3 17    only those (by number)
+
+The fingerprint lists are stood aside so the files' own "is every function
+what I expect" checks, the second run and the live post-check do not catch
+the change for the suite (with the lists in place each change to a function
+is caught three more times). The scenarios run are the behaviour ones, not
+apply1 and apply2, which compare fingerprints. A change the file itself
+refuses to apply is reported as caught by the file.
+"""
+import subprocess, tempfile
+from batch_c_common import *
+
+C1S = 'teacher markup started contract reflect revision group grants race closes only_me round2 put_back hide_out same_rows revision_deleted leave_holds'
+C2S = 'given closes round2 put_back hide_out same_rows revision_deleted leave_holds'
+CHANGES = [
+    # ── C1 ──
+    ("_grading_started: marks do not count (Batch B's rule only)", C1,
+     "        -- Mark Up (2026111120): the teacher's marks on a page of this student's work for the piece\n        or exists (select 1 from markup m",
+     "        -- Mark Up (2026111120): the teacher's marks on a page of this student's work for the piece\n        or false and exists (select 1 from markup m", 'markup started'),
+    ("_grading_started: a page whose marks were all erased still counts", C1,
+     "                      and jsonb_array_length(coalesce(m.working->'marks', '[]'::jsonb)) > 0);\n$function$;",
+     "                      and true);\n$function$;", 'markup started'),
+    ("_grading_started: a group-mate's marks count for every member", C1,
+     "                    where m.enrollment_id = p_enrollment_id and m.assessment_id = p_assessment_id\n                      and jsonb_array_length",
+     "                    where m.assessment_id = p_assessment_id\n                      and jsonb_array_length", 'started'),
+    ("_revision_state: marks on a revision's pages do not count as grading", C1,
+     "                                             and jsonb_array_length(coalesce(m.working->'marks', '[]'::jsonb)) > 0) then 'grading'",
+     "                                             and false) then 'grading'", 'started'),
+    ("_markup_check: a place off the page is taken", C1,
+     "                or (_m->>'x')::numeric not between 0 and 1 or (_m->>'y')::numeric not between 0 and 1) then",
+     "                or false) then", 'contract'),
+    ("_markup_check: a stroke's points are not looked at", C1,
+     "               or jsonb_array_length(_m->'points') not between 1 and 5000\n               or exists",
+     "               or false\n               and exists", 'contract'),
+    ("_markup_check: any key is kept", C1,
+     "        if exists (select 1 from jsonb_object_keys(_m) k\n                    where k not in ('id', 'type', 'color')",
+     "        if false and exists (select 1 from jsonb_object_keys(_m) k\n                    where k not in ('id', 'type', 'color')", 'contract'),
+    ("feedback: the Only Me note is sent as the answer", C1,
+     "                                     'answer', f.answer, 'answered_at', f.answered_at,",
+     "                                     'answer', coalesce(f.answer, f.note), 'answered_at', coalesce(f.answered_at, f.noted_at),", 'contract only_me'),
+    ("reply: an Only Me note can be replied to", C1,
+     "    if _f.answer is null then\n        return jsonb_build_object('ok', false, 'error', 'not_answered');",
+     "    if _f.answer is null and _f.note is null then\n        return jsonb_build_object('ok', false, 'error', 'not_answered');", 'contract only_me'),
+    ("reply: Reflect on Feedback off is not asked", C1,
+     "    if not (select c.reflect_on_feedback from course c where c.id = (_in->>'course_id')::uuid) then\n        return jsonb_build_object('ok', false, 'error', 'reflect_off');",
+     "    if false then\n        return jsonb_build_object('ok', false, 'error', 'reflect_off');", 'contract'),
+    ("reply: the plan is not kept", C1, "           plan = coalesce(_plan, plan),", "           plan = plan,", 'contract'),
+    ("list_course_feedback: reflections whatever the switch", C1,
+     "             where f.course_id = p_course_id and c.reflect_on_feedback), '[]'::jsonb));",
+     "             where f.course_id = p_course_id), '[]'::jsonb));", 'contract'),
+    ("feedback: reflections whatever the switch", C1,
+     "                           where f.assessment_id = a.id and f.enrollment_id = p_enrollment_id\n                             and _course.reflect_on_feedback) rf on true",
+     "                           where f.assessment_id = a.id and f.enrollment_id = p_enrollment_id) rf on true", 'contract'),
+    ("feedback: the last plan by when the reflection was sent", C1,
+     "                       order by f.plan_at desc, f.id limit 1));", "                       order by f.sent_at desc, f.id limit 1));", 'contract'),
+    ("answer_seen: another student's answers marked", C1,
+     "     where f.enrollment_id = p_enrollment_id and f.course_id = (_in->>'course_id')::uuid\n       and f.assessment_id = any",
+     "     where f.course_id = (_in->>'course_id')::uuid\n       and f.assessment_id = any", 'contract'),
+    ("save_markup: waiting ignores Students See Your Mark Up", C1,
+     "                              and a.students_see_markup) order by m.enrollment_id, m.file_id)",
+     "                              and true) order by m.enrollment_id, m.file_id)", 'contract'),
+    ("_markup_give: a page with nothing to give is given", C1,
+     "       and not (given is null and jsonb_array_length(coalesce(working->'marks', '[]'::jsonb)) = 0);",
+     "       and true;", 'contract'),
+    ("save_markup: another teacher's page is saved (ownership not asked)", C1,
+     "     where f.id = p_file_id and fv_owns_course(s.course_id);\n    if _course is not null then\n        perform _grade_return_lock_first(_course);\n    end if;\n    -- Asked under the lock (when there is a class to lock).\n    _cached := fv_idem_check(p_idempotency_key, 'save_markup');",
+     "     where f.id = p_file_id;\n    if _course is not null then\n        perform _grade_return_lock_first(_course);\n    end if;\n    -- Asked under the lock (when there is a class to lock).\n    _cached := fv_idem_check(p_idempotency_key, 'save_markup');", 'teacher'),
+    ("save_markup: a page of a send not handed in can be marked", C1,
+     "     where f.id = p_file_id and s.course_id = _course and s.state = 'sent';", "     where f.id = p_file_id and s.course_id = _course;", 'teacher'),
+    ("save_markup: marks are given at once in a class that holds grades", C1,
+     "    if not _grade_return_holds(_s.enrollment_id) then\n        _given := _markup_give", "    if true then\n        _given := _markup_give", 'teacher markup'),
+    ("save_markup: a stale screen overwrites another device's marks", C1,
+     "    if p_base_rev is not null and coalesce(_m.working_rev, 0) <> p_base_rev then", "    if false then", 'teacher'),
+    ("_markup_check: any mark type is taken", C1,
+     "           or _m->>'type' not in ('pen', 'highlight', 'note', 'tick', 'cross') then", "           then", 'teacher'),
+    ("_markup_check: no size limit", C1, "    if octet_length(p_marks::text) > 262144 then", "    if octet_length(p_marks::text) > 26214400 then", 'teacher'),
+    ("_markup_give: a page given once is never given again", C1,
+     "       set given = working, given_rev = working_rev, given_at = clock_timestamp()",
+     "       set given = coalesce(given, working), given_rev = working_rev, given_at = clock_timestamp()", 'teacher markup'),
+    ("return_work: the marks are not given", C1, "        perform _markup_give(_e, p_assessment_id);", "        null;", 'teacher markup'),
+    ("student markup: the teacher's working copy is sent", C1,
+     "        select jsonb_agg(jsonb_build_object('file_id', m.file_id, 'marks', m.given, 'given_at', m.given_at) order by m.file_id)",
+     "        select jsonb_agg(jsonb_build_object('file_id', m.file_id, 'marks', m.working, 'given_at', m.given_at) order by m.file_id)", 'markup'),
+    ("student markup: Students See Your Mark Up is not asked", C1,
+     "    if not _a.students_see_markup\n       or exists", "    if exists", 'markup'),
+    ("student markup: Missing does not hide the marks", C1,
+     "       or exists (select 1 from score s where s.enrollment_id = p_enrollment_id and s.assessment_id = _a.id and s.status in ('NS', 'EXC')) then",
+     "       or false then", 'markup'),
+    ("student markup: every student's marks on the piece", C1,
+     "         where m.assessment_id = _a.id and m.given is not null\n           and m.enrollment_id = any (coalesce(_group_members(_a.id, p_enrollment_id), array[p_enrollment_id]))), '[]'::jsonb));",
+     "         where m.assessment_id = _a.id and m.given is not null), '[]'::jsonb));", 'markup group'),
+    ("feedback: the teacher's working marks are counted", C1,
+     "                           where m.assessment_id = a.id and m.given is not null\n                             and m.enrollment_id = any (coalesce(_group_members(a.id, p_enrollment_id), array[p_enrollment_id]))\n                             and jsonb_array_length(coalesce(m.given->'marks', '[]'::jsonb)) > 0",
+     "                           where m.assessment_id = a.id and m.working is not null\n                             and m.enrollment_id = any (coalesce(_group_members(a.id, p_enrollment_id), array[p_enrollment_id]))\n                             and jsonb_array_length(coalesce(m.working->'marks', '[]'::jsonb)) > 0", 'markup'),
+    ("reflect: Reflect on Feedback off is not asked", C1,
+     "    if not _course.reflect_on_feedback then\n        return jsonb_build_object('ok', false, 'error', 'reflect_off');\n    end if;", "", 'reflect'),
+    ("reflect: work never returned can be reflected on", C1,
+     "                    where g.enrollment_id = p_enrollment_id and g.assessment_id = _a.id and g.returned_at is not null) then",
+     "                    where g.enrollment_id = p_enrollment_id and g.assessment_id = _a.id) then", 'reflect'),
+    ("reflect: an answered reflection can be changed", C1,
+     "    if found and _f.answer is not null then\n        return jsonb_build_object('ok', false, 'error', 'already_answered');\n    end if;\n    insert into feedback_reflection",
+     "    insert into feedback_reflection", 'reflect'),
+    ("reflect: another class's assessment is taken", C1,
+     "    select * into _a from assessment\n     where id = p_assessment_id and course_id = _course.id\n       and (date_assigned",
+     "    select * into _a from assessment\n     where id = p_assessment_id\n       and (date_assigned", 'reflect'),
+    ("reply: before the teacher answered", C1,
+     "    if _f.answer is null then\n        return jsonb_build_object('ok', false, 'error', 'not_answered');\n    end if;", "", 'reflect'),
+    ("answer_reflection: another teacher's reflection is answered", C1,
+     "    select f.course_id into _course from feedback_reflection f where f.id = p_reflection_id and fv_owns_course(f.course_id);",
+     "    select f.course_id into _course from feedback_reflection f where f.id = p_reflection_id;", 'reflect'),
+    ("return_for_revision: DIBELS is revised", C1,
+     "    if _a.score_mode = 'dibels' then\n        return jsonb_build_object('result', 'not_for_dibels');\n    end if;", "", 'revision'),
+    ("return_for_revision: a criterion of another rubric is taken", C1,
+     "                    where not exists (select 1 from criterion cr where cr.id = c and cr.rubric_id = _a.rubric_id)) then",
+     "                    where not exists (select 1 from criterion cr where cr.id = c)) then", 'revision'),
+    ("return_for_revision: Hide is not refused", C1,
+     "    if not _keep then\n        return jsonb_build_object('result', 'hide_not_available');", "    if false then\n        return jsonb_build_object('result', 'hide_not_available');", 'revision hide_out'),
+    ("return_for_revision: the work is not returned first", C1,
+     "    _ret := return_work(p_assessment_id, array[p_enrollment_id], null);", "    _ret := '{}'::jsonb;", 'revision'),
+    ("revision_start: no open request is needed", C1,
+     "    if _r.id is null then\n        return jsonb_build_object('ok', false, 'error', 'no_revision');\n    end if;\n    _st := public._revision_state(_r.id);",
+     "    _st := public._revision_state(_r.id);", 'revision'),
+    ("revision_start: a revision being graded can be sent again", C1,
+     "    if _st->>'state' in ('grading', 'returned') then\n        return jsonb_build_object('ok', false, 'error', 'grading_started');\n    end if;\n    -- A revision in",
+     "    -- A revision in", 'revision'),
+    ("revision_finish: another student's send is handed in", C1,
+     "     where id = p_submission_id and enrollment_id = p_enrollment_id and course_id = _course.id\n       and sent_by = 'student' and version > 1",
+     "     where id = p_submission_id and course_id = _course.id\n       and sent_by = 'student' and version > 1", 'revision'),
+    ("revision_finish: handed in with a page missing", C1,
+     "    _state := public._work_files_state(_sub.id, p_files);\n    if _state->'missing' <> '[]'::jsonb then",
+     "    _state := public._work_files_state(_sub.id, p_files);\n    if false then", 'revision'),
+    ("revision_unsend: during grading", C1, "    if _st->>'state' <> 'sent' then", "    if false then", 'revision'),
+    ("_revision_state: grading is never noticed", C1,
+     "                             when md5(coalesce(g.working_copy::text, '')) is distinct from r.grade_mark then 'grading'\n", "", 'revision race'),
+    ("revision_start: the hourly limit is 21", C1, "    if _n >= 20 then\n        return jsonb_build_object('ok', false, 'error', 'too_many',\n                                  'retry_after_s', greatest(1, ceil(extract(epoch from (_oldest + interval '1 hour' - now())))::int));\n    end if;\n\n    -- A send this student started for the piece and never finished goes.\n    perform set_config('fv.work_removal_reason', 'abandoned', true);\n    delete from submission\n     where assessment_id = _a.id and enrollment_id = p_enrollment_id and state = 'sending' and sent_by = 'student';\n    perform set_config('fv.work_removal_reason', '', true);\n    if public._work_class_full",
+     "    if _n >= 21 then\n        return jsonb_build_object('ok', false, 'error', 'too_many',\n                                  'retry_after_s', greatest(1, ceil(extract(epoch from (_oldest + interval '1 hour' - now())))::int));\n    end if;\n\n    -- A send this student started for the piece and never finished goes.\n    perform set_config('fv.work_removal_reason', 'abandoned', true);\n    delete from submission\n     where assessment_id = _a.id and enrollment_id = p_enrollment_id and state = 'sending' and sent_by = 'student';\n    perform set_config('fv.work_removal_reason', '', true);\n    if public._work_class_full", 'revision'),
+    ("_group_members: a withdrawn member counts", C1,
+     "              join enrollment e on e.id::text = lower(m) and e.course_id = a.course_id and e.withdrawn_at is null)",
+     "              join enrollment e on e.id::text = lower(m) and e.course_id = a.course_id)", 'group'),
+    ("group_file_links: every student's pages on the piece", C1,
+     "               and s.enrollment_id = any (coalesce(_group_members(p_assessment_id, p_enrollment_id), array[p_enrollment_id]))), '[]'::jsonb));",
+     "               ), '[]'::jsonb));", 'group'),
+    ("a deleted assessment leaves its reflections", C1,
+     "        delete from revision_request where assessment_id = old.id;\n        delete from feedback_reflection where assessment_id = old.id;",
+     "        delete from revision_request where assessment_id = old.id;", 'reflect'),
+    ("a student function is granted to signed-in teachers", C1,
+     "grant execute on function student_submit.reflect(text, uuid, uuid, jsonb, text) to service_role;", "grant execute on function student_submit.reflect(text, uuid, uuid, jsonb, text) to service_role, authenticated;", 'grants'),
+    ("a teacher RPC is granted to anon", C1,
+     "grant execute on function public.save_markup(uuid, jsonb, integer, uuid) to authenticated, service_role;", "grant execute on function public.save_markup(uuid, jsonb, integer, uuid) to authenticated, service_role, anon;", 'grants teacher'),
+    ("a helper is left runnable by the service role", C1,
+     "revoke all on function public._markup_give(uuid, uuid) from public, anon, authenticated, service_role;\n", "", 'grants'),
+    ("markup readable by signed-in teachers", C1,
+     "revoke all on table public.markup, public.revision_request, public.feedback_reflection from public, anon, authenticated;",
+     "revoke all on table public.markup, public.revision_request, public.feedback_reflection from public, anon, authenticated;\ngrant select on public.markup to authenticated;", 'grants'),
+    ("reflect without pg_temp in its search path", C1,
+     " returns jsonb\n language plpgsql\n security definer\n set search_path to 'public', 'student_submit', 'pg_temp'\nas $function$\ndeclare\n    _in     jsonb;\n    _course course%rowtype;\n    _a      assessment%rowtype;",
+     " returns jsonb\n language plpgsql\n security definer\n set search_path to 'public', 'student_submit'\nas $function$\ndeclare\n    _in     jsonb;\n    _course course%rowtype;\n    _a      assessment%rowtype;", 'grants'),
+    # ── C2 ──
+    ("C2: the trigger gives nothing", C2, "    perform _markup_give(new.enrollment_id, new.assessment_id);\n", "", C2S),
+    ("C2: the trigger writes the grade row it fires on (an Updated date)", C2,
+     "    -- The revision's grade returned: the request is done, for good.\n    perform _revision_settle(new.enrollment_id, new.assessment_id, false);",
+     "    update grade_return set updated_at = new.returned_at where enrollment_id = new.enrollment_id and assessment_id = new.assessment_id;\n    perform _revision_settle(new.enrollment_id, new.assessment_id, false);", 'same_rows'),
+    ("C2: the trigger mixes up student and piece", C2, "    perform _markup_give(new.enrollment_id, new.assessment_id);", "    perform _markup_give(new.assessment_id, new.enrollment_id);", C2S),
+    ("C2: the trigger fires on a draft change", C2,
+     "    for each row when (new.returned_at is not null and not new.is_draft\n                       and old.returned_at is distinct from new.returned_at)",
+     "    for each row when (new.returned_at is not null)", C2S),
+    ("C2: no trigger on a new row", C2,
+     "create or replace trigger markup_given_on_insert after insert on public.grade_return\n    for each row when (new.returned_at is not null and not new.is_draft)\n    execute function public._markup_on_return();\n", "", C2S),
+    ("C2: the update trigger watches only is_draft", C2, "after update of returned_at on public.grade_return", "after update of is_draft on public.grade_return", C2S),
+    ("C2: the trigger function left runnable", C2, "revoke all on function public._markup_on_return() from public, anon, authenticated, service_role;\n", "", C2S),
+    ("C2 (b) 1: the trigger does not close the request", C2, "    perform _revision_settle(new.enrollment_id, new.assessment_id, false);\n    return null;", "    return null;", C2S),
+    ("C1 (b) 1: the state reads 'returned' from the revision's photos", C1,
+     "                             when v.id is null then 'open'\n                             -- the revision in, returned since it came in (a draft on it since does not take that back)\n                             when r.revision_in_at is not null and g.returned_at is not null\n                                  and g.returned_at is distinct from r.in_returned_at then 'returned'",
+     "                             when v.id is null then 'open'\n                             when g.returned_at is not null and not g.is_draft and g.returned_at > v.sent_at then 'returned'", 'closes revision round2'),
+    ("C1 (b) 1: revision_finish does not keep when the revision came in", C1, "           revision_in_at = _sub.sent_at,\n", "", 'closes revision'),
+    ("C1 round 2 (b) 1: a revision is returned by a grade returned after its send began (two clocks)", C1,
+     "                             when r.revision_in_at is not null and g.returned_at is not null\n                                  and g.returned_at is distinct from r.in_returned_at then 'returned'",
+     "                             when r.revision_in_at is not null and g.returned_at > r.revision_in_at then 'returned'", 'round2 closes'),
+    ("C1 round 2 (b) 1: the returned date is read at the start of the send, before the class", C1,
+     "           in_returned_at = (select g.returned_at from grade_return g\n                              where g.enrollment_id = p_enrollment_id and g.assessment_id = _sub.assessment_id),",
+     "           in_returned_at = (select max(g.returned_at) from grade_return g\n                              where g.enrollment_id = p_enrollment_id and g.assessment_id = _sub.assessment_id and g.returned_at < now()),", 'round2 closes'),
+    ("C1 round 2 (b) 2: a send begun under a request asked again is not checked", C1,
+     "    if _sub.version <> _version then\n", "    if false then\n", 'round2 revision'),
+    ("C1 round 2 (b) 2: a send under a request asked again is refused but kept", C1,
+     "        delete from submission where id = _sub.id;\n        perform set_config('fv.work_removal_reason', '', true);\n        return jsonb_build_object('ok', false, 'error', 'request_changed');",
+     "        perform set_config('fv.work_removal_reason', '', true);\n        return jsonb_build_object('ok', false, 'error', 'request_changed');", 'round2 revision'),
+    ("C1 round 2 (b) 4: return_work counts only the pages it gave itself", C1,
+     "    loop\n        perform _markup_give(_e, p_assessment_id);\n    end loop;\n    select count(*)::int, coalesce(array_agg(distinct m.enrollment_id order by m.enrollment_id), '{}')\n      into _pages, _who\n      from markup m\n     where m.file_id = any (_waiting) and m.given_rev = m.working_rev;",
+     "    loop\n        if _markup_give(_e, p_assessment_id) > 0 then _pages := _pages + 1; _who := _who || _e; end if;\n    end loop;", 'round2'),
+    ("C1 round 2 (b) 4: return_work counts every page with marks, waiting or not", C1,
+     "     where m.file_id = any (_waiting) and m.given_rev = m.working_rev;",
+     "     where m.assessment_id = p_assessment_id and m.enrollment_id = any (coalesce(p_enrollment_ids, '{}')) and m.given_rev = m.working_rev;", 'round2 teacher'),
+    ("C2 round 2 (a) 1: a draft put back to the returned grade is taken for a Return (the reviewed trigger)", C2,
+     "after update of returned_at on public.grade_return\n    for each row when (new.returned_at is not null and not new.is_draft\n                       and old.returned_at is distinct from new.returned_at)",
+     "after update of returned_at, is_draft on public.grade_return\n    for each row when (new.returned_at is not null and not new.is_draft\n                       and (old.returned_at is distinct from new.returned_at or old.is_draft))", 'put_back given'),
+    ("C2 round 2 (a) 1: the trigger fires on any write of a returned row", C2,
+     "after update of returned_at on public.grade_return\n    for each row when (new.returned_at is not null and not new.is_draft\n                       and old.returned_at is distinct from new.returned_at)",
+     "after update on public.grade_return\n    for each row when (new.returned_at is not null and not new.is_draft)", 'put_back given'),
+    # (Round 1's "return_work does not settle before it returns" went out in round 3: with revision_gone
+    # settling a revision before it is deleted, and a request read open only with no revision in,
+    # return_work's settle after return_grades closes everything the first one would. The call stays.)
+    ("C1 (b) 2: Return does not end a revision at the same grade", C1,
+     "_revision_state(r.id)->>'state' in ('returned', case when p_returned then 'sent' end, case when p_returned then 'grading' end);",
+     "_revision_state(r.id)->>'state' = 'returned';", 'closes revision'),
+    ("C1 (b) 2: return_work does not settle after it returns", C1,
+     "    perform _revision_settle(e.id, p_assessment_id, true)\n", "    perform _revision_settle(e.id, p_assessment_id, false)\n", 'closes'),
+    ("C1 (b) 2: a returned revision can still be unsent", C1,
+     "        -- the revision was returned: it is the teacher's now, as a graded first version is\n        return jsonb_build_object('ok', false, 'error', 'grading_started');",
+     "        null;", 'closes'),
+    ("C1 (b) 3: a note blocks the student changing their reflection", C1,
+     "    if found and _f.answer is not null then\n        return jsonb_build_object('ok', false, 'error', 'already_answered');",
+     "    if found and (_f.answer is not null or _f.note is not null) then\n        return jsonb_build_object('ok', false, 'error', 'already_answered');", 'only_me reflect'),
+    ("C1 (b) 3: no real answer after a note", C1,
+     "    elsif _f.answer is null then\n        update feedback_reflection set answer",
+     "    elsif _f.answer is null and _f.note is null then\n        update feedback_reflection set answer", 'only_me reflect'),
+    ("C1 (b) 3: a changed reflection does not wait again", C1,
+     "(f.noted_at is null or f.noted_at < f.sent_at)", "f.noted_at is null", 'only_me reflect'),
+    ("C1 (b) 3: a note reads as a new answer on the page", C1,
+     "                                     'answer_new', (f.answer is not null and f.answer_seen_at is null)",
+     "                                     'answer_new', (coalesce(f.answer, f.note) is not null and f.answer_seen_at is null)", 'only_me reflect'),
+    ("C1 (b) 3: a follow-up note is sent", C1,
+     "                                     'follow_up_answer', f.follow_up_answer, 'follow_up_answered_at', f.follow_up_answered_at,",
+     "                                     'follow_up_answer', coalesce(f.follow_up_answer, f.follow_up_note), 'follow_up_answered_at', f.follow_up_answered_at,", 'only_me reflect'),
+    # ── review round 3, F1: a revision the teacher deleted ──
+    ("C1 round 3 F1: a request reads returned with no revision in (the reviewed _revision_state)", C1,
+     "                             when v.id is null then 'open'\n                             -- the revision in, returned since it came in (a draft on it since does not take that back)\n                             when r.revision_in_at is not null and g.returned_at is not null\n                                  and g.returned_at is distinct from r.in_returned_at then 'returned'",
+     "                             when r.revision_in_at is not null and g.returned_at is not null\n                                  and g.returned_at is distinct from r.in_returned_at then 'returned'\n                             when v.id is null then 'open'", 'revision_deleted'),
+    ("C1 round 3 F1: nothing settles a revision before it is deleted", C1,
+     "    perform _revision_settle(old.enrollment_id, old.assessment_id, false);\n    return old;", "    return old;", 'closes revision_deleted'),
+    ("C1 round 3 F1: the settle runs after the revision is deleted", C1,
+     "create or replace trigger revision_gone before delete on public.submission",
+     "create or replace trigger revision_gone after delete on public.submission", 'closes revision_deleted'),
+    ("C1 round 3 F1: a deleted revision settles as a Return (a waiting revision deleted closes the request)", C1,
+     "    perform _revision_settle(old.enrollment_id, old.assessment_id, false);\n    return old;",
+     "    perform _revision_settle(old.enrollment_id, old.assessment_id, true);\n    return old;", 'revision_deleted'),
+    ("C1 round 3 F1: only a third version or later is settled before it goes", C1,
+     "    for each row when (old.state = 'sent' and old.version > 1)", "    for each row when (old.state = 'sent' and old.version > 2)", 'closes revision_deleted'),
+    ("C1 round 3 F1: a deleted revision's dates are cleared (the teacher's Replace then loses the revision)", C1,
+     "    perform _revision_settle(old.enrollment_id, old.assessment_id, false);\n    return old;",
+     "    perform _revision_settle(old.enrollment_id, old.assessment_id, false);\n    update revision_request set grade_mark = null, revision_in_at = null, in_returned_at = null\n     where assessment_id = old.assessment_id and enrollment_id = old.enrollment_id and state = 'open';\n    return old;", 'revision_deleted'),
+    # ── review round 3, F2: marks waiting when a class stops holding grades ──
+    ("C2 round 3 F2: nothing runs when the class stops holding grades (the reviewed C2)", C2,
+     "create or replace trigger markup_given_on_release after update of student_page_enabled, return_grades on public.course",
+     "create or replace trigger markup_given_on_release after update of reflect_on_feedback on public.course", 'leave_holds'),
+    ("C2 round 3 F2: every waiting mark in the class is given, graded or not", C2,
+     "               join grade_return g on g.enrollment_id = m.enrollment_id and g.assessment_id = m.assessment_id\n              where m.course_id = new.id and m.given_rev is distinct from m.working_rev\n                and g.returned_at is not null and not g.is_draft) p;",
+     "               left join grade_return g on g.enrollment_id = m.enrollment_id and g.assessment_id = m.assessment_id\n              where m.course_id = new.id and m.given_rev is distinct from m.working_rev) p;", 'leave_holds'),
+    ("C2 round 3 F2: every class's waiting marks are given", C2,
+     "               join enrollment e on e.id = m.enrollment_id and e.course_id = new.id\n               join grade_return g on g.enrollment_id = m.enrollment_id and g.assessment_id = m.assessment_id\n              where m.course_id = new.id and m.given_rev",
+     "               join enrollment e on e.id = m.enrollment_id\n               join grade_return g on g.enrollment_id = m.enrollment_id and g.assessment_id = m.assessment_id\n              where m.given_rev", 'leave_holds'),
+    ("C2 round 3 F2: it runs on every change of the two settings (also into or staying in When I Return Them)", C2,
+     "    for each row when (old.student_page_enabled and old.return_grades is not distinct from 'on_return'\n                       and not (new.student_page_enabled and new.return_grades is not distinct from 'on_return'))\n    execute function public._markup_on_release();",
+     "    for each row\n    execute function public._markup_on_release();", 'leave_holds'),
+    ("C2 round 3 F2: a piece set not to show marks is passed over (not as a Return does)", C2,
+     "                and g.returned_at is not null and not g.is_draft) p;",
+     "                and g.returned_at is not null and not g.is_draft\n                and exists (select 1 from assessment a where a.id = m.assessment_id and a.students_see_markup)) p;", 'leave_holds'),
+    ("C2 round 3 F2: a Missing or Excused piece is passed over (not as a Return does)", C2,
+     "                and g.returned_at is not null and not g.is_draft) p;",
+     "                and g.returned_at is not null and not g.is_draft\n                and not exists (select 1 from score x where x.enrollment_id = m.enrollment_id and x.assessment_id = m.assessment_id and x.status is not null)) p;", 'leave_holds'),
+]
+
+def run(i, desc, rel, old, new, scen):
+    text = text_at(rel)
+    n = text.count(old)
+    if n != 1: return '%2d  NOT APPLIED (the text is there %d times): %s' % (i, n, desc)
+    tmp = tempfile.mkdtemp()
+    c1 = os.path.join(tmp, 'c1.sql'); c2 = os.path.join(tmp, 'c2.sql')
+    open(c1, 'w').write(neutral(text.replace(old, new) if rel == C1 else text_at(C1)))
+    open(c2, 'w').write(neutral(text.replace(old, new) if rel == C2 else text_at(C2)))
+    names = scen.split()
+    if rel == C2: names = [x for x in names] + []
+    r = subprocess.run([sys.executable, os.path.join(HERE, 'batch_c.py')] + names, capture_output=True, text=True, cwd=HERE,
+                       env=dict(os.environ, BATCH_C1=c1, BATCH_C2=c2))
+    fails = [l[5:] for l in r.stdout.splitlines() if l.startswith('FAIL ')]
+    if not fails: return '%2d  MISSED: %s' % (i, desc)
+    first = fails[0].split(' :: ')[0]
+    by_file = 'AssertionError: STOPPED' in fails[0]
+    broke = first.endswith('ran to the end') and not by_file
+    how = ', the file refused to apply' if by_file else (', the scenario stopped on an answer it did not expect' if broke else '')
+    return '%2d  caught (%d checks%s): %s  [first: %s]' % (i, len(fails), how, desc, first[:110])
+
+if __name__ == '__main__':
+    pick = [int(x) for x in sys.argv[1:]] or range(1, len(CHANGES) + 1)
+    missed = 0
+    for i in pick:
+        line = run(i, *CHANGES[i - 1]); print(line, flush=True)
+        if 'MISSED' in line or 'NOT APPLIED' in line: missed += 1
+    c1n = sum(1 for c in CHANGES if c[1] == C1); c2n = len(CHANGES) - c1n
+    print('%d changes (%d to C1, %d to C2); %d missed or not applied' % (len(list(pick)), c1n, c2n, missed))
+    sys.exit(1 if missed else 0)
