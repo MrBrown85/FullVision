@@ -1843,17 +1843,16 @@ def scen_scale():
         a = k['takes']; st = d.storage
         tok, _ = d.session(ENR1)
         plan = lambda sql, **kw: '\n'.join(r[0] for r in d.run('explain ' + sql, **kw))
-        def each_ms(n, fn):
-            t = time.time()
-            for _ in range(n): fn()
-            return (time.time() - t) / n * 1000
         def delete_one():
             x = nid()
             d.run("insert into assessment (id, course_id, title, score_mode, max_points) values (:a, :c, 'T', 'points', 10)", a=x, c=COURSE_B)
             return x
-        def timed_deletes(n=25):
-            ids = [delete_one() for _ in range(n)]; it = iter(ids)
-            return each_ms(n, lambda: d.rpc('delete_assessment(:a)', uid=B, a=next(it)))
+        def timed_deletes(n=25, warm=5):
+            """The middle one of n calls, after a few to warm up: one slow call (the server writing out the load) does not decide it."""
+            took = []
+            for x in [delete_one() for _ in range(n + warm)]:
+                t = time.time(); d.rpc('delete_assessment(:a)', uid=B, a=x); took.append((time.time() - t) * 1000)
+            return sorted(took[warm:])[n // 2]
         empty_ms = timed_deletes()
         # A million submissions of other classes (the checks a real insert makes are stood aside for the load only).
         d.run("set session_replication_role = replica")
@@ -1866,7 +1865,7 @@ def scen_scale():
            'submission_assessment_idx' in p1 and 'Seq Scan' not in p1 and 'submission_enrollment_idx' in p2 and 'Seq Scan' not in p2, (p1, p2))
         ok('and delete_assessment, for a teacher who has never used photos, takes single-digit milliseconds as it did with the table empty (the number is printed below)',
            full_ms < 10 and empty_ms < 10, (empty_ms, full_ms))
-        print('# delete_assessment, teacher with no photos: %.2f ms each with submission empty, %.2f ms each with 1,000,000 rows' % (empty_ms, full_ms))
+        print('# delete_assessment, teacher with no photos (the middle of 25 calls): %.2f ms with submission empty, %.2f ms with 1,000,000 rows' % (empty_ms, full_ms))
         d.run('delete from public.submission where course_id not in (select id from course)')
 
         # 300,000 files in the bucket, half of them under this teacher's class folder.

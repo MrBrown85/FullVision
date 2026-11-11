@@ -133,9 +133,9 @@
 --    or a student runs one more trigger, which takes the lock
 --    grade_return_gone has just taken and deletes no row, by an index
 --    (submission_assessment_idx, submission_enrollment_idx). On the test
---    machine delete_assessment took about 2 ms with the table empty and
---    the same with a million submissions of other classes in it (the scale
---    scenario prints both).
+--    machine delete_assessment took a few milliseconds with the table empty
+--    and with a million submissions of other classes in it (the scale
+--    scenario checks it stays under ten and prints both).
 -- 6. THREE RULES EVERY START AND FINISH KEEPS (student's and teacher's).
 --    A STARTED SEND HOLDS ITS PLACE FOR TWO HOURS FROM ITS FIRST START
 --      (public._work_hold, the one place the number is written). It can be
@@ -145,11 +145,13 @@
 --      dropped, its files queued for deletion, by the next call that
 --      starts, finishes or unsends work in its class (its own late finish
 --      among them). A class nobody uses again keeps such a send, row and
---      files, until Batch D's schedule: no teacher and no student can read
---      those files. The edge function may make upload links for a send
---      only while it holds its place, and a link lasts two hours; so the
---      last link for a page is dead 4 hours after the first start, and
---      link_dies_at says 4 hours 10 minutes (ten for clocks that disagree).
+--      files, until Batch D's schedule: the files of a student's send can
+--      be read by no teacher and no student, those of a teacher's own
+--      upload only by that teacher. The edge function may make upload
+--      links for a send only while it holds its place, and a link lasts two
+--      hours; so the last link for a page is dead 4 hours after the first
+--      start, and link_dies_at says 4 hours 10 minutes (ten for clocks that
+--      disagree).
 --    WHO ADDED A PAGE IS KEPT (submission_file.added_by). A student's Unsend
 --      or Replace removes only the pages the student added. Pages the
 --      teacher added (Add as More Pages) stay: after an Unsend the work
