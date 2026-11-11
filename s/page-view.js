@@ -110,6 +110,14 @@ window.StudentPageView = (function () {
       view.sub = [p.kind === 'missing' ? 'Missing' : 'Excused', due].filter(Boolean).join(SEP);
       return view;
     }
+    // Sent and not back yet: "Sent Nov 4 · 3 photos" (the board's).
+    if (p.kind === 'sent') {
+      var sent = (p.send && p.send.sent) || {};
+      view.sub = ['Sent ' + fmtDate(sent.at, DAY), p.late ? 'Late' : '', photosWord(sent.pages)]
+        .filter(Boolean)
+        .join(SEP);
+      return view;
+    }
     if (p.kind !== 'back') {
       if (p.late) view.sub = ['Late', due].filter(Boolean).join(SEP);
       return view;
@@ -124,15 +132,21 @@ window.StudentPageView = (function () {
     return view;
   }
 
-  // A piece's kind as a class name: one of the four, whatever the view held.
+  // A piece's kind as a class name: one of the five, whatever the view held.
   function kindOf(p) {
-    return /^(due|back|missing|excused)$/.test(p.kind) ? p.kind : 'due';
+    return /^(due|sent|back|missing|excused)$/.test(p.kind) ? p.kind : 'due';
+  }
+
+  // "1 photo", "3 photos"; nothing for none.
+  function photosWord(n) {
+    n = Number(n) || 0;
+    return n > 0 ? (n === 1 ? '1 photo' : n + ' photos') : '';
   }
 
   /* ── To Do, Sent and Back ──────────────────────────────────── */
 
   /* To Do is what is still to hand in: work not back yet, and work marked
-     Missing. Sent is work sent and waiting (nothing can be sent until S5).
+     Missing. Sent is work sent and waiting for its grade (S5-F2).
      Back is work that came back. */
   var SEGMENTS = [
     { id: 'todo', label: 'To Do' },
@@ -143,7 +157,7 @@ window.StudentPageView = (function () {
     return view.work.filter(function (p) {
       if (id === 'todo') return p.kind === 'due' || p.kind === 'missing';
       if (id === 'back') return p.kind === 'back';
-      return false;
+      return id === 'sent' && p.kind === 'sent';
     });
   }
   function counts(view) {
@@ -281,7 +295,8 @@ window.StudentPageView = (function () {
     if (p.kind === 'back' && p.updated) out.push(['updated', 'Updated ' + fmtDate(p.updatedAt || p.returnedAt, DAY)]);
     else if (p.kind === 'back') out.push(['back', 'Returned ' + fmtDate(p.returnedAt, DAY)]);
     else if (p.kind === 'missing') out.push(['missing', 'Missing']);
-    if (p.kind !== 'back' && due) out.push(['due', due]);
+    else if (p.kind === 'sent') out.push(['sent', 'Sent ' + fmtDate(p.send && p.send.sent && p.send.sent.at, DAY)]);
+    if (p.kind !== 'back' && p.kind !== 'sent' && due) out.push(['due', due]);
     if (p.late) out.push(['quiet', 'Late']);
     return out
       .map(function (x) {
@@ -358,6 +373,68 @@ window.StudentPageView = (function () {
     );
   }
 
+  /* ── Sending (S5-F2, S5-F3; the artboard's "To Do Card", "Closed
+     Assignment", "Sent, Being Graded" and "Unsend or Replace") ───── */
+
+  /* On a card still to do that takes work: Send My Work while the piece is
+     open; "Closed Nov 13" and "Hand this one in on paper" once its last
+     day has passed. Nothing when the class takes no work. */
+  function sendBlockHtml(p) {
+    var send = p.send;
+    if (!send || !send.takes) return '';
+    if (!send.open) {
+      return (
+        '<div class="sp-send-closed"><p class="sp-send-closed-title">' +
+        esc(send.closesOn ? 'Closed ' + fmtDate(send.closesOn, DAY) : 'Closed') +
+        '</p><p class="sp-send-closed-line">Hand this one in on paper</p></div>'
+      );
+    }
+    return (
+      '<button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="send-open" data-piece="' +
+      esc(p.id) +
+      '">Send My Work</button>'
+    );
+  }
+
+  // The student's own pages, small, as this device has them.
+  function thumbsHtml(thumbs, label) {
+    if (!thumbs || !thumbs.length) return '';
+    return (
+      '<div class="sp-send-thumbs">' +
+      thumbs
+        .map(function (url, i) {
+          return '<img class="sp-send-thumb" src="' + esc(url) + '" alt="' + esc(label + ' ' + (i + 1)) + '">';
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+
+  /* On a card sent and not back yet: the pages, and either who is grading
+     it, or that it can still be changed with Replace Photos and Unsend. */
+  function sentBlockHtml(p, teacher) {
+    var sent = (p.send && p.send.sent) || {};
+    var who = teacher || 'Your teacher';
+    var line = sent.onPaper
+      ? 'Handed in on paper'
+      : sent.grading
+        ? who + ' is grading this'
+        : sent.canChange
+          ? who + ' hasn’t started grading it. You can still change it.'
+          : '';
+    return (
+      thumbsHtml(sent.thumbs, 'Your page') +
+      (line ? '<p class="sp-send-line">' + esc(line) + '</p>' : '') +
+      (sent.canChange && !sent.grading
+        ? '<div class="sp-send-change"><button type="button" class="sp-btn sp-btn-tint" data-act="send-replace" data-piece="' +
+          esc(p.id) +
+          '">Replace Photos</button><button type="button" class="sp-btn sp-btn-quiet" data-act="send-unsend" data-piece="' +
+          esc(p.id) +
+          '">Unsend</button></div>'
+        : '')
+    );
+  }
+
   // The teacher's comment on a returned card, under their name when the server sends it.
   function cardCommentHtml(p, teacher) {
     if (!p.comment) return '';
@@ -395,7 +472,8 @@ window.StudentPageView = (function () {
       (todo && p.description ? '<p class="sp-piece-about">' + esc(p.description) + '</p>' : '') +
       (p.kind === 'back' ? resultRows(p) + updatedNoteHtml(p, teacher) : '') +
       (p.kind === 'back' ? cardCommentHtml(p, teacher) : '') +
-      (todo ? gradedOnHtml(p) + coreHtml(p) : '') +
+      (p.kind === 'sent' ? sentBlockHtml(p, teacher) : '') +
+      (todo ? gradedOnHtml(p) + coreHtml(p) + sendBlockHtml(p) : '') +
       (hasFeedback(p)
         ? '<button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="feedback" data-piece="' +
           esc(p.id) +
@@ -943,7 +1021,13 @@ window.StudentPageView = (function () {
 
   // Which of To Do, Sent and Back a piece is in, or '' (Excused).
   function segmentOf(p) {
-    return p.kind === 'back' ? 'back' : p.kind === 'due' || p.kind === 'missing' ? 'todo' : '';
+    return p.kind === 'back'
+      ? 'back'
+      : p.kind === 'sent'
+        ? 'sent'
+        : p.kind === 'due' || p.kind === 'missing'
+          ? 'todo'
+          : '';
   }
 
   var BACK_ARROW =
@@ -1907,5 +1991,7 @@ window.StudentPageView = (function () {
     inSegment: inSegment,
     matching: matching,
     segmentOf: segmentOf,
+    photosWord: photosWord,
+    thumbsHtml: thumbsHtml,
   };
 })();

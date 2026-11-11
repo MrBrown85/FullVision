@@ -94,6 +94,12 @@ var StudentPage = (function () {
       message: '',
       sending: false,
       demo: false,
+      // Sending work (s/send.js): Demo Mode's Send Work switch, the send under way, what the sample has
+      // in (by piece), and the question over a card (Unsend Your Work?, Replace Your Photos?).
+      demoSend: false,
+      send: null,
+      demoSent: {},
+      sendAsk: null,
       ident: null, // what matched on a questionnaire slip, kept to open again if the session runs out
       number: '', // the student number or slip password as typed
       bday: { m: '', d: '', y: '' }, // the pickers as chosen
@@ -907,6 +913,14 @@ var StudentPage = (function () {
     });
   }
 
+  // A file chosen (s/send.js's camera and file buttons).
+  function onChange(e) {
+    var el = e.target;
+    files.forEach(function (f) {
+      if (f.change) f.change(el);
+    });
+  }
+
   function onSubmit(e) {
     var form = e.target.closest('[data-form]');
     if (!form) return;
@@ -964,6 +978,7 @@ var StudentPage = (function () {
     root.addEventListener('click', onClick);
     root.addEventListener('input', onInput);
     root.addEventListener('submit', onSubmit);
+    root.addEventListener('change', onChange);
     root.addEventListener('keydown', onKeydown);
     var h = String(hash || '').replace(/^#/, '');
     // A screen file's own address (app.js: #demo-card).
