@@ -13985,7 +13985,10 @@ function updateQuickOb(cid, sid, obId, updates) {
   if (updates.text !== undefined) ob.text = updates.text.trim();
   if (updates.dims !== undefined) ob.dims = updates.dims;
   if (updates.sentiment !== undefined) ob.sentiment = updates.sentiment || null;
-  if (updates.context !== undefined) ob.context = updates.context || null;
+  // An observation from a reflection keeps that context for good: it is
+  // what keeps the student's words out of every report (ruling 110,
+  // isReflectionObservation in shared/constants.js). No screen can lift it.
+  if (updates.context !== undefined && !isReflectionObservation(ob)) ob.context = updates.context || null;
   var competencyChanged = false;
   if (updates.competencyId !== undefined) {
     var nextComp = updates.competencyId || null;
