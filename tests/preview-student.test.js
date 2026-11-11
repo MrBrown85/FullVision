@@ -103,6 +103,11 @@ function key(target, k, opts) {
 function click(target) {
   target.dispatchEvent(new doc.defaultView.Event('click', { bubbles: true, cancelable: true }));
 }
+// All Assignments, pressed inside the device: every piece and its result in one list.
+function showAll(el) {
+  const b = el.querySelector('.ps-screen [data-act="all-open"]');
+  if (b && b.getAttribute('aria-pressed') !== 'true') click(b);
+}
 // Chooses a student in the list (linkedom's select has no value setter).
 function pick(select, value) {
   [...select.querySelectorAll('option')].forEach(o => {
@@ -216,6 +221,7 @@ describe('the preview', () => {
   it('draws the page StudentView builds: returned grades only, worded by calc.js', () => {
     const el = openJordan();
     const { view } = StudentView.fromCache(CID, S1);
+    showAll(el);
     const rows = [...el.querySelectorAll('.sp-row')].map(r => ({
       title: text(r.querySelector('.sp-row-title')),
       result: text(r.querySelector('.sp-row-result')),
@@ -230,6 +236,36 @@ describe('the preview', () => {
     expect(el.innerHTML).not.toMatch(SECRET);
     expect(text(el.querySelector('.sp-head-title'))).toBe('Socials 10');
     expect(text(el.querySelector('.sp-pill'))).toBe('Block C');
+  });
+
+  it('the page inside the device answers presses as the student’s does: tabs, To Do, Sent and Back, search, a card', () => {
+    const el = openJordan();
+    const screen = () => el.querySelector('.ps-screen');
+    const { view } = StudentView.fromCache(CID, S1);
+    // It opens as the student's does: Assignments, To Do.
+    expect(screen().querySelector('.sp-segment[aria-pressed="true"]').textContent).toMatch(/^To Do \d+$/);
+    click(screen().querySelector('[data-segment="back"]'));
+    const back = view.work.filter(p => p.kind === 'back').map(p => p.title);
+    expect([...screen().querySelectorAll('.sp-deck .sp-piece-title')].map(t => text(t))).toEqual(back);
+    // The page inside the device is the student page's own drawing for that choice.
+    const same = doc.createElement('div');
+    same.innerHTML = StudentPageView.html(view, { tab: 'assignments', segment: 'back', all: false, pick: '' });
+    expect(screen().innerHTML === same.innerHTML).toBe(true);
+    click(screen().querySelector('.sp-tabs-bottom [data-tab="reports"]'));
+    expect(text(screen().querySelector('.sp-page-title'))).toBe('Reports');
+    click(screen().querySelector('[data-act="all-open"]'));
+    const box = screen().querySelector('#sp-search');
+    box.value = 'reflection';
+    box.dispatchEvent(new doc.defaultView.Event('input', { bubbles: true }));
+    expect([...screen().querySelectorAll('.sp-row-title')].map(t => text(t))).toEqual(
+      view.work.filter(p => /reflection/i.test(p.title)).map(p => p.title),
+    );
+    // Done and Your Classes reach for the student's session: here they do nothing.
+    const before = screen().innerHTML;
+    click(screen().querySelector('[data-act="card-done"]'));
+    click(screen().querySelector('[data-act="classes-open"]'));
+    expect(screen().innerHTML).toBe(before);
+    expect(overlay()).toBeTruthy();
   });
 
   it('lists what Jordan sees and doesn’t see, in the board’s words', () => {
@@ -278,7 +314,10 @@ describe('the preview', () => {
     expect(el.querySelector('.ps-device-chromebook')).toBeTruthy();
     expect(el.querySelector('.ps-device-phone')).toBeNull();
     expect(el.querySelector('[data-ps-device="chromebook"]').getAttribute('aria-checked')).toBe('true');
-    // The same page in either.
+    // The same page in either, and what the student chose to look at is kept.
+    showAll(el);
+    click(el.querySelector('[data-ps-device="phone"]'));
+    expect(el.querySelector('.ps-screen [data-act="all-open"]').getAttribute('aria-pressed')).toBe('true');
     expect(el.querySelectorAll('.sp-row').length).toBe(4);
   });
 
@@ -348,6 +387,7 @@ describe('a signed-in class whose Draft and Returned rows have not loaded', () =
     expect(text(el.querySelectorAll('.ps-item-line')[1])).toBe('Drafts never reach the student page.');
     _loadGradeReturns(CID, structuredClone(_cache.gradeReturns[CID] || {}));
     CmStudentPage.render(CID);
+    showAll(overlay());
     expect(overlay().querySelectorAll('.sp-row').length).toBe(4);
     expect(overlay().innerHTML).not.toMatch(SECRET);
   });

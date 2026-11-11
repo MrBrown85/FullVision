@@ -55,6 +55,8 @@ test('Preview as Student: the page from returned grades, Phone and Chromebook, a
   await open.click();
   const dialog = page.getByRole('dialog', { name: 'Previewing as ' + at.name });
   await expect(dialog).toBeVisible();
+  // The page opens as the student's does, on To Do; All Assignments lists every piece.
+  await dialog.getByRole('button', { name: 'All assignments' }).click();
   const row = dialog.locator('.sp-row', { hasText: at.title });
   await expect(row.locator('.sp-row-result')).toHaveText(at.returned);
   await expect(dialog.getByRole('radio', { name: 'Phone' })).toHaveAttribute('aria-checked', 'true');

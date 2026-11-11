@@ -39,27 +39,27 @@ for (const size of [
 
       await expect(page.locator('.sp-segment')).toHaveText(['To Do 3', 'Sent 0', 'Back 6']);
       await expect(page.getByRole('button', { name: 'To Do 3' })).toHaveAttribute('aria-pressed', 'true');
-      await expect(page.locator('.sp-row-title')).toHaveText([
+      await expect(page.locator('.sp-deck .sp-piece-title')).toHaveText([
         'Science Fair Proposal',
         'Disease Research Poster',
         'Immune System Quick Check',
       ]);
       // A draft is in To Do with no result, as work never graded is.
-      await expect(page.locator('.sp-row-result')).toHaveCount(0);
+      await expect(page.locator('.sp-piece-rows')).toHaveCount(0);
       await fits(page);
       await named(page);
       await contrast(page);
       await shot(page, size.tag + '-s4f1-to-do');
 
-      // The last row is not hidden behind the tabs.
+      // The card is not hidden behind the tabs.
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-      const last = await page.locator('.sp-row').last().boundingBox();
+      const last = await page.locator('.sp-piece.sp-picked .sp-piece-card').boundingBox();
       const tabs = await nav.boundingBox();
       if (size.tag === 'phone') expect(last.y + last.height).toBeLessThanOrEqual(tabs.y);
 
       await page.getByRole('button', { name: 'Back 6' }).click();
-      await expect(page.locator('.sp-row')).toHaveCount(6);
-      await expect(page.locator('.sp-row', { hasText: 'Cell Structure Quiz' }).locator('.sp-row-result')).toHaveText(
+      await expect(page.locator('.sp-deck .sp-piece')).toHaveCount(6);
+      await expect(page.locator('.sp-piece', { hasText: 'Cell Structure Quiz' }).locator('.sp-level')).toHaveText(
         '8 / 10',
       );
       await fits(page);
@@ -72,7 +72,7 @@ for (const size of [
       await page.getByRole('button', { name: 'All assignments' }).click();
       await expect(page.getByRole('heading', { name: 'All Assignments' })).toBeFocused();
       await expect(page.locator('.sp-row')).toHaveCount(9);
-      await page.getByRole('button', { name: 'Back to Assignments' }).click();
+      await page.getByRole('button', { name: 'Back to cards' }).click();
       await expect(page.locator('.sp-segment[aria-pressed="true"]')).toHaveText('Sent 0');
 
       for (const [tab, line] of [

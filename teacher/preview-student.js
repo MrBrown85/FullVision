@@ -13,13 +13,13 @@
    saved: the preview reads the cache and writes nothing, in Demo Mode or
    signed in.
 
-   PLACEHOLDER. The student page's real screens (S4-F1 to F3, in s/) are
-   being built. Until they land, the device draws what a student has on
-   main today: the class, Assignments, and one row per piece with its date
-   and, once returned, its result, as s/assignments.js draws them. When
-   the real screens land, drawPage() is the one function they replace: it
-   is handed the view StudentView builds and draws the page inside the
-   device.
+   The device draws the student page itself: s/page-view.js
+   (StudentPageView), the same code the student's phone runs, handed the
+   same kind of view. Its tabs, To Do, Sent and Back, All Assignments with
+   its search and filters, and each piece's card answer presses here as
+   they do on the phone (StudentPageView.press); what the student chose to
+   look at is kept while the preview is open. Nothing that would reach the
+   network (Done, Your Classes) does anything here.
 
    Not ready: a signed-in class whose Draft and Returned rows have not
    loaded draws "Loading this class…" in the device. When the rows load the
@@ -36,9 +36,6 @@ window.PreviewStudent = (function () {
   var _onLeave = null;
 
   var STYLE_NAMES = { proficiency: 'Proficiency', letter: 'Letter', both: 'Both' };
-  var DAY = { month: 'short', day: 'numeric' };
-  var DUE_DAY = { weekday: 'short', month: 'short', day: 'numeric' };
-  var SEP = ' · ';
 
   function _student(cid, sid) {
     return (getStudents(cid) || []).find(function (s) {
@@ -46,66 +43,14 @@ window.PreviewStudent = (function () {
     });
   }
 
-  // A date as the student page shows it (s/student.js, fmtDate).
-  function fmtDate(iso, opts) {
-    if (!iso) return '';
-    var t = new Date(String(iso).length === 10 ? iso + 'T12:00:00' : iso);
-    return isNaN(t) ? '' : t.toLocaleDateString('en-CA', opts || { month: 'long', day: 'numeric' });
-  }
+  /* ── The student's page ────────────────────────────────────── */
 
-  // The class as the student page names it: "Science 9 · Block B" (s/student.js, className).
-  function className(course) {
-    var name = (course && course.name) || '';
-    var b = String((course && course.block) || '').trim();
-    if (!b) return name;
-    var label = /^[A-Za-z0-9]{1,2}$/.test(b) ? 'Block ' + b.toUpperCase() : b;
-    return name.toLowerCase().indexOf(label.toLowerCase()) >= 0 ? name : name + SEP + label;
-  }
-
-  /* ── The student's page (placeholder until S4-F1 to F3) ─────── */
-
-  /* One row, as s/assignments.js words it: { kind, title, sub, result }. */
-  function rowView(p) {
-    var due = p.dueDate ? 'Due ' + fmtDate(p.dueDate, DUE_DAY) : p.date ? fmtDate(p.date, DAY) : '';
-    var view = { kind: p.kind === 'excused' ? 'excused' : p.kind, title: p.title, sub: due, result: '' };
-    if (p.kind === 'missing' || p.kind === 'excused') {
-      view.sub = [p.kind === 'missing' ? 'Missing' : 'Excused', due].filter(Boolean).join(SEP);
-      return view;
-    }
-    if (p.kind !== 'back') {
-      if (p.late) view.sub = ['Late', due].filter(Boolean).join(SEP);
-      return view;
-    }
-    var bits = ['Back ' + fmtDate(p.returnedAt, DAY)];
-    if (p.result.word) bits.push(p.result.word);
-    view.result = p.result.text;
-    if (p.late) bits.push('Late');
-    if (p.updated) bits.push('Updated');
-    view.sub = bits.join(SEP);
-    return view;
-  }
-
-  function rowHtml(v) {
-    return (
-      '<li class="ps-row"><span class="ps-dot ps-dot-' +
-      esc(v.kind) +
-      '" aria-hidden="true"></span><span class="ps-row-text"><span class="ps-row-title">' +
-      esc(v.title) +
-      '</span>' +
-      (v.sub ? '<span class="ps-row-sub">' + esc(v.sub) + '</span>' : '') +
-      '</span>' +
-      (v.result ? '<span class="ps-row-result">' + esc(v.result) + '</span>' : '') +
-      '</li>'
-    );
-  }
-
-  /* The page inside the device, from StudentView's view. The real
-     student page's screens replace this one function. */
-  function drawPage(view) {
-    /* The student page's own drawing (s/page-view.js, S4-F1): the same HTML
-       the student's phone draws for this view, opened on All Assignments so
-       every piece and its result is in sight. */
-    return StudentPageView.html(view, { all: true });
+  /* The page inside the device: the student page's own drawing
+     (s/page-view.js), the same HTML the student's device draws for this
+     view and these choices (`ui`: the tab, To Do, Sent or Back, All
+     Assignments, the card showing). */
+  function drawPage(view, ui) {
+    return StudentPageView.html(view, ui || {});
   }
 
   /* ── The two lists ─────────────────────────────────────────── */
@@ -163,7 +108,7 @@ window.PreviewStudent = (function () {
 
   /* ── The preview ───────────────────────────────────────────── */
 
-  // html-safe: every name, title, date line and result goes through esc() (rowHtml, drawPage, _item); the device and the rest are fixed markup
+  // html-safe: every name goes through esc() (_item and here); drawPage is s/page-view.js, which escapes every title, date line and result; the device and the rest are fixed markup
   function _previewHtml() {
     var cid = _open.cid;
     var sid = _open.sid;
@@ -172,7 +117,7 @@ window.PreviewStudent = (function () {
     var full = displayNameWithLast(st) || first;
     var built = StudentView.fromCache(cid, sid);
     var screen = built.ready
-      ? drawPage(built.view)
+      ? drawPage(built.view, _open.ui)
       : // html-safe: fixed markup
         '<div class="ps-waiting" role="status">Loading this class…</div>';
     var device = _open.device;
@@ -240,6 +185,7 @@ window.PreviewStudent = (function () {
           : null
       : null;
     el.innerHTML = _previewHtml();
+    _settle(el.querySelector('.ps-screen'));
     if (focusKey) {
       var again = el.querySelector(focusKey);
       if (again) again.focus();
@@ -252,7 +198,15 @@ window.PreviewStudent = (function () {
   function open(cid, sid, trigger, returnFocusId) {
     if (!cid || !sid || !_student(cid, sid)) return false;
     close();
-    _open = { cid: cid, sid: sid, device: 'phone', trigger: trigger || null, returnTo: returnFocusId || null };
+    _open = {
+      cid: cid,
+      sid: sid,
+      device: 'phone',
+      trigger: trigger || null,
+      returnTo: returnFocusId || null,
+      // What the student looks at, as on the phone: the page opens on Assignments, To Do.
+      ui: {},
+    };
     var el = document.createElement('div');
     el.id = OVERLAY_ID;
     el.className = 'ps-overlay';
@@ -265,7 +219,19 @@ window.PreviewStudent = (function () {
       if (!t) return;
       if (t.closest('[data-ps-close]')) return close();
       var d = t.closest('[data-ps-device]');
-      if (d) setDevice(d.dataset.psDevice);
+      if (d) return setDevice(d.dataset.psDevice);
+      var a = t.closest('.ps-screen [data-act]');
+      if (a) _press(a.getAttribute('data-act'), a);
+    });
+    // All Assignments' search, as on the phone.
+    el.addEventListener('input', function (e) {
+      var t = e.target;
+      if (!_open || !t || t.id !== 'sp-search') return;
+      _open.ui = Object.assign({}, _open.ui, { search: String(t.value || '').slice(0, 100) });
+      var at = typeof t.selectionStart === 'number' ? t.selectionStart : 0;
+      _drawScreen('#sp-search');
+      var box = _overlay() && _overlay().querySelector('#sp-search');
+      if (box && typeof box.setSelectionRange === 'function') box.setSelectionRange(at, at);
     });
     _onKey = function (e) {
       if (!_open) return;
@@ -275,7 +241,7 @@ window.PreviewStudent = (function () {
         close();
       } else if (e.key === 'Tab') {
         var box = _overlay();
-        var all = box ? Array.prototype.slice.call(box.querySelectorAll('button')) : [];
+        var all = box ? Array.prototype.slice.call(box.querySelectorAll('button, input')) : [];
         if (!all.length) return;
         var first = all[0];
         var last = all[all.length - 1];
@@ -318,6 +284,41 @@ window.PreviewStudent = (function () {
     if (back && back.isConnected && typeof back.focus === 'function') back.focus();
   }
 
+  /* A press on the student's page inside the device: what it changes is
+     the student page's own answer (StudentPageView.press). Only the page
+     inside the device is drawn again. */
+  function _press(act, el) {
+    if (!_open) return;
+    var built = StudentView.fromCache(_open.cid, _open.sid);
+    if (!built.ready) return;
+    var out = StudentPageView.press(_open.ui, built.view, act, el);
+    if (!out) return;
+    _open.ui = out.ui;
+    _drawScreen(out.focus);
+  }
+
+  function _drawScreen(focus) {
+    var box = _overlay();
+    var screen = box && box.querySelector('.ps-screen');
+    if (!screen || !_open) return;
+    var built = StudentView.fromCache(_open.cid, _open.sid);
+    if (!built.ready) return _draw();
+    // html-safe: drawPage is s/page-view.js, which escapes every title, date line and result
+    screen.innerHTML = drawPage(built.view, _open.ui);
+    _settle(screen);
+    var to = focus ? screen.querySelector(focus) : null;
+    if (to && typeof to.focus === 'function') to.focus();
+  }
+
+  // The phone's cards start at the one picked, and the count follows the swipe.
+  function _settle(screen) {
+    if (!screen || !_open) return;
+    var mine = _open;
+    StudentPageView.settle(screen, function (id) {
+      if (_open === mine) _open.ui = Object.assign({}, _open.ui, { pick: id });
+    });
+  }
+
   function setDevice(device) {
     if (!_open || (device !== 'phone' && device !== 'chromebook') || _open.device === device) return;
     _open.device = device;
@@ -342,8 +343,7 @@ window.PreviewStudent = (function () {
     isOpen: function () {
       return !!_open;
     },
-    // The one function the student page's real screens replace (see the top).
+    // The student page's own drawing, as the device draws it.
     drawPage: drawPage,
-    _test: { rowView: rowView, className: className },
   };
 })();

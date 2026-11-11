@@ -608,6 +608,14 @@
     };
   }
 
+  var DEMO_TAGS = {
+    'demo-qp': { label: 'Questioning and Predicting', code: 'QP' },
+    'demo-pc': { label: 'Planning and Conducting', code: 'PC' },
+    'demo-pa': { label: 'Processing and Analyzing Data', code: 'PA' },
+    'demo-com': { label: 'Communicating', code: 'COM' },
+    'demo-hum-evidence': { label: 'Evidence', code: 'EV' },
+  };
+
   /* The second sample class, for Add Another Card (Switching Classes): one
      piece returned, one a draft, one not graded yet. */
   var DEMO_SECOND = 'demo-cece-hum';
@@ -741,7 +749,8 @@
         round_percent: null,
       }),
       classes: demoClasses(),
-      tags: {},
+      // The sample classes' competencies, by the names a card shows beside each level.
+      tags: DEMO_TAGS,
       rubrics: cls.rubrics,
       assessments: cls.work.map(function (w) {
         var rows = returnedGrade(w);
@@ -1237,7 +1246,7 @@
     stopWatchingRows();
     if (!S.page || !session || S.screen !== 'assignments') return;
     if (typeof IntersectionObserver !== 'function' || typeof document === 'undefined') return;
-    var rows = document.querySelectorAll('.sp-row[data-unseen]');
+    var rows = document.querySelectorAll('[data-unseen]');
     if (!rows.length) return;
     var w = { page: S.page, observer: null, since: {}, timer: 0 };
     // The header stays over the top of the list: a row under it is not on screen.
@@ -1522,32 +1531,33 @@
   /* A tab, one of To Do, Sent and Back, or All Assignments. The page's data
      is already here: nothing is asked. The rows on screen change, so what
      is watched for "opened" starts again. */
-  var TAB_IDS = { assignments: 1, learning: 1, questionnaires: 1, reports: 1 };
-  var SEGMENT_IDS = { todo: 1, sent: 1, back: 1 };
+  /* What the student looks at on the page, as s/page-view.js reads it. */
+  var UI_KEYS = ['tab', 'segment', 'all', 'pick', 'search', 'filter'];
+  function uiOf() {
+    var ui = {};
+    UI_KEYS.forEach(function (k) {
+      ui[k] = S[k];
+    });
+    return ui;
+  }
+
+  /* A tab, one of To Do, Sent and Back, All Assignments, a filter, or a
+     piece's card. s/page-view.js says what each press changes (the preview
+     answers the same presses the same way); the page's data is already
+     here, so nothing is asked. The rows and cards on screen change, so
+     what is watched for "opened" starts again. */
   function showPart(act, el) {
-    if (!S.page || S.screen !== 'assignments') return;
-    var focus = '.sp-page-title';
-    if (act === 'tab') {
-      var tab = el.getAttribute('data-tab') || '';
-      if (!has(TAB_IDS, tab)) return;
-      S.tab = tab;
-      S.all = false;
-      // The focus stays on the tab pressed, in the bar it was pressed in.
-      focus = (el.closest && el.closest('.sp-tabs-top') ? '.sp-tabs-top' : '.sp-tabs-bottom') + ' .sp-tab-on';
-    } else if (act === 'segment') {
-      var seg = el.getAttribute('data-segment') || '';
-      if (!has(SEGMENT_IDS, seg)) return;
-      S.segment = seg;
-      S.all = false;
-      focus = '.sp-segment-on';
-    } else {
-      S.tab = 'assignments';
-      S.all = act === 'all-open';
-    }
+    if (!S.page || S.screen !== 'assignments' || typeof StudentPageView === 'undefined') return;
+    var view = StudentPage.viewOf ? StudentPage.viewOf(S) : null;
+    var out = StudentPageView.press(uiOf(), view, act, el);
+    if (!out) return;
+    UI_KEYS.forEach(function (k) {
+      S[k] = out.ui[k];
+    });
     S.sheet = false;
     stopWatchingRows();
-    paint(focus);
-    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') window.scrollTo(0, 0);
+    paint(out.focus);
+    if (!out.piece && typeof window !== 'undefined' && typeof window.scrollTo === 'function') window.scrollTo(0, 0);
     watchRows();
   }
 
@@ -1690,6 +1700,9 @@
         S.tab = 'assignments';
         S.segment = 'todo';
         S.all = false;
+        S.pick = '';
+        S.search = '';
+        S.filter = 'all';
       }
       S.reply = res;
       S.page = StudentData.fromServer(res);
@@ -1882,7 +1895,7 @@
       }
     } else if (act === 'card-back') {
       backToPage();
-    } else if (act === 'tab' || act === 'segment' || act === 'all-open' || act === 'all-close') {
+    } else if (/^(tab|segment|all-open|all-close|filter|pick|open-piece)$/.test(act)) {
       showPart(act, el);
     } else if (act === 'page-retry') {
       openPage();
