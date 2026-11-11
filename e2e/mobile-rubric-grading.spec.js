@@ -55,7 +55,7 @@ test.describe('Phone grading by rubric criterion', () => {
     const group = card.locator('.m-crit-group').first();
     const target = (await group.locator('.m-score-btn.m-score-active').count()) ? '1' : '4';
     await group.locator(`.m-score-btn[data-score="${target}"]`).click();
-    await expect(card.locator('.m-crit-group').first().locator('.m-score-btn.m-score-active')).toHaveText(target);
+    await expect(card.locator('.m-crit-group').first().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText(target);
     const saved = await page.evaluate(() => {
       const cid = Object.keys(COURSES)[0];
       const a = getAssessments(cid).find(x => x.title === 'Science Fair Proposal');
@@ -101,13 +101,13 @@ test.describe('Phone grading by rubric criterion', () => {
     const row = card.locator('.m-score-group').first();
     const target =
       (await row
-        .locator('.m-score-btn.m-score-active')
+        .locator('.m-score-btn.m-score-active .m-level-fig')
         .textContent()
         .catch(() => '')) === '4'
         ? '1'
         : '4';
     await row.locator(`.m-score-btn[data-score="${target}"]`).click();
-    await expect(firstCard(page).locator('.m-score-group').first().locator('.m-score-btn.m-score-active')).toHaveText(
+    await expect(firstCard(page).locator('.m-score-group').first().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText(
       target,
     );
     const behind = await page.evaluate(tid => {
@@ -136,13 +136,13 @@ test.describe('Phone grading by rubric criterion', () => {
     await group().getByLabel('Repeats trials').check();
     await expect(group().locator('.m-score-btn.m-score-active')).toHaveCount(0);
     await group().getByLabel('Explains an odd result').check();
-    await expect(group().locator('.m-score-btn.m-score-active')).toHaveText('4');
+    await expect(group().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText('4');
     await expect(group().locator('.m-checklist-head')).toHaveText('Suggested: Extending');
     await expect(group().locator('.m-checks-btn')).toHaveText('2');
 
     // A level picked by hand stays.
     await group().locator('.m-score-btn[data-score="2"]').click();
     await group().getByLabel('Records units').check();
-    await expect(group().locator('.m-score-btn.m-score-active')).toHaveText('2');
+    await expect(group().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText('2');
   });
 });

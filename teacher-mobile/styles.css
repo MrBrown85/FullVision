@@ -2208,7 +2208,65 @@ body.fv-switching-course::after {
   color: #fff;
 }
 
-/* + / − under the levels */
+/* A level button: its figure over its word, four to a row that fits a
+   375 px phone (the board "Phone Speed Grader With Photos";
+   MComponents.levelButtonsHTML). */
+.m-score-btn.m-level-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 84px;
+  width: auto;
+  height: auto;
+  min-height: 56px;
+  padding: 6px 2px;
+  border-radius: 14px;
+  flex-direction: column;
+  gap: 2px;
+}
+.m-level-fig {
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.m-level-word {
+  max-width: 100%;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m-score-btns:has(.m-level-btn) {
+  gap: 6px;
+}
+/* The chosen level's tick sits on the top corner, clear of its word. */
+.m-score-btn.m-level-btn.m-score-active::after {
+  top: -5px;
+  bottom: auto;
+  right: -5px;
+}
+@media (max-width: 359px) {
+  .m-score-btn.m-level-btn {
+    padding: 6px 0;
+    border-width: 2px;
+  }
+  .m-level-word {
+    font-size: 9.5px;
+    letter-spacing: -0.02em;
+  }
+}
+/* "Suggested: Proficient" over a criterion's levels, from its ticks. */
+.m-crit-suggested {
+  margin: -2px 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-align: center;
+}
+
+/* Fine-tune: − Minus and + Plus under the levels */
 .m-score-mods {
   display: flex;
   gap: 8px;
@@ -2216,16 +2274,25 @@ body.fv-switching-course::after {
   margin-top: 10px;
 }
 .m-mod-btn {
-  width: 52px;
+  flex: 1 1 0;
+  max-width: 140px;
   height: 36px;
   border-radius: 18px;
   border: 2px solid var(--border);
   background: var(--surface);
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+}
+.m-mod-sign {
+  font-size: 18px;
+  font-weight: 700;
 }
 .m-mod-btn.m-mod-active {
   background: var(--text);
@@ -2333,19 +2400,6 @@ body.fv-switching-course::after {
   font-size: 13px;
   color: var(--text-2);
   text-align: center;
-}
-/* The level numbers' names, under the score rows. */
-.m-level-key {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 4px 12px;
-  margin: 4px 16px 12px;
-  font-size: 12px;
-  color: var(--text-2);
-}
-.m-level-key b {
-  color: var(--text);
 }
 .m-grade-view-hint {
   width: 100%;

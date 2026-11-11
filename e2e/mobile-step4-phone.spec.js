@@ -230,8 +230,11 @@ test('Grade tab uses the desktop words', async ({ page }) => {
   await page.waitForTimeout(500);
   const card = page.locator('.m-swiper-card').first();
   await expect(card.locator('.m-status-pill')).toHaveText(['Missing', 'Excused', 'Late']);
-  await expect(card.locator('.m-level-key')).toContainText('Proficient');
-  await expect(card.locator('.m-score-btn[data-score="3"]').first()).toHaveAttribute('aria-label', '3, Proficient');
+  await expect(card.locator('.m-score-btn[data-score="3"] .m-level-word').first()).toHaveText('Proficient');
+  await expect(card.locator('.m-score-btn[data-score="3"]').first()).toHaveAttribute(
+    'aria-label',
+    /^3[+\u2212]?, Proficient$/,
+  );
 
   // Each card's hint shows exactly when Missing can't be picked.
   const hints = await page.evaluate(() =>

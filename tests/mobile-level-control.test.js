@@ -181,3 +181,60 @@ describe('a tap on the level buttons writes what it did before', () => {
     `);
   });
 });
+
+describe('the level control is drawn the same on both graders', () => {
+  const lab = () => getAssessments(CID).find(a => a.id === LAB);
+  const firstCrit = () => getRubricById(CID, lab().rubricId).criteria[0];
+  // The first criterion's levels and Fine-tune on Sam's card.
+  function control() {
+    const group = card('st3').querySelector('.m-crit-group[data-critid="' + firstCrit().id + '"]');
+    return { levels: group.querySelector('.m-score-btns'), fine: group.querySelector('.m-score-mods') };
+  }
+  const faces = levels =>
+    [...levels.querySelectorAll('.m-score-btn')].map(
+      b => b.querySelector('.m-level-fig').textContent + ' ' + b.querySelector('.m-level-word').textContent,
+    );
+
+  it('classic and with photos: figure and word, − Minus and + Plus, in the class’s order', () => {
+    // History 12's case: a Letter class, highest level first.
+    updateCourse(CID, { gradingSystem: 'letter' });
+    saveCourseConfig(CID, { ...getCourseConfig(CID), levelOrder: 'desc' });
+    open(LAB);
+    MGrade.setCriterionScore(CID, 'st3', LAB, firstCrit().id, 3);
+    MGrade.setCriterionMod(CID, 'st3', LAB, firstCrit().id, 1);
+    const classic = control();
+    expect(card('st3').querySelector('.m-crit-pager')).toBeNull();
+    expect(faces(classic.levels)).toEqual(['4 Extending', '3+ Proficient', '2 Developing', '1 Emerging']);
+    expect(classic.levels.getAttribute('aria-label')).toBe('Level for ' + firstCrit().name);
+    expect(classic.fine.getAttribute('aria-label')).toBe('Fine-tune Proficient');
+    expect([...classic.fine.querySelectorAll('.m-mod-btn')].map(b => b.textContent)).toEqual(['−Minus', '+Plus']);
+    expect(classic.fine.querySelector('[data-mod="1"]').getAttribute('aria-pressed')).toBe('true');
+
+    photosOn();
+    open(LAB);
+    expect(card('st3').querySelector('.m-crit-pager')).not.toBeNull();
+    const photos = control();
+    expect(photos.levels.outerHTML).toBe(classic.levels.outerHTML);
+    expect(photos.fine.outerHTML).toBe(classic.fine.outerHTML);
+
+    // Lowest first when the class says so.
+    saveCourseConfig(CID, { ...getCourseConfig(CID), levelOrder: 'asc' });
+    open(LAB);
+    expect(faces(control().levels)).toEqual(['1 Emerging', '2 Developing', '3+ Proficient', '4 Extending']);
+  });
+
+  it('a competency row shows its level and + or − after a tap, and none once cleared', () => {
+    open(QUICK);
+    const tid = getAssessments(CID).find(a => a.id === QUICK).tagIds[0];
+    const fine = () => card('st3').querySelector('.m-score-mods[data-tid="' + tid + '"]');
+    const row = () => fine().closest('.m-score-group');
+    tap(row().querySelector('[data-score="2"]'));
+    tap(fine().querySelector('[data-mod="-1"]'));
+    expect(row().querySelector('.m-score-active .m-level-fig').textContent).toBe('2−');
+    expect(fine().getAttribute('aria-label')).toBe('Fine-tune Developing');
+    tap(row().querySelector('[data-score="2"]'));
+    expect(row().querySelector('.m-score-active')).toBeNull();
+    expect([...row().querySelectorAll('.m-level-fig')].map(f => f.textContent)).toEqual(levelOrderFor(CID).map(String));
+    expect(fine().querySelectorAll('.m-mod-btn[disabled]').length).toBe(2);
+  });
+});

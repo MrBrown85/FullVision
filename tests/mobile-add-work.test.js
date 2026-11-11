@@ -649,7 +649,7 @@ describe('the Advanced Rubric a criterion at a time', () => {
     const openHeads = heads.filter(h => h.getAttribute('aria-expanded') === 'true');
     expect(openHeads.length).toBeLessThanOrEqual(1);
     expect(pager.querySelectorAll('.m-check-group:not(.is-open) input').length).toBe(0);
-    expect(pager.querySelector('.m-score-mods [aria-label="Minus"]')).not.toBeNull();
+    expect(pager.querySelector('.m-score-mods [data-mod="-1"]').textContent).toBe('\u2212Minus');
     expect(pager.querySelector('.m-crit-comment-btn')).not.toBeNull();
     // The bar goes on to the next criterion.
     expect(text(bar().querySelector('.m-grade-return-btn'))).toBe('Next: ' + crits()[1].name);

@@ -2126,7 +2126,7 @@ window.MGrade = (function () {
       if (idx > 0) jumpToStudent(idx, true);
     }
 
-    // html-safe: names, labels and criterion text go through MC.esc; colours through cssColor or avatarColor's constants; ids, levels and points are ours or numbers; _criterionGroupHtml, _completionBtnsHtml, _modBtnsHtml and pointsPctHtml are checked.
+    // html-safe: names, labels and criterion text go through MC.esc; colours through cssColor or avatarColor's constants; ids, levels and points are ours or numbers; _criterionGroupHtml, _completionBtnsHtml, _fineTuneHtml, MC.levelButtonsHTML and pointsPctHtml are checked.
     function _renderStudentCard(cid, st, assessment, allScores, allStatuses, unit) {
       var color = MC.avatarColor(st.id);
       var initials = MC.avatarInitials(st);
@@ -2245,32 +2245,9 @@ window.MGrade = (function () {
             // ungraded state AND a deliberate No-Evidence choice, which the
             // graded-count / calc / report layers already treat identically
             // (all use `score > 0`).
-            var btns = '';
-            // In the class's Rubric Levels order, like the desktop card.
-            levelOrderFor(cid).forEach(function (level) {
-              var active =
-                current !== null && roundLevel(current) === level
-                  ? ' m-score-active' + (currentMixed ? ' m-score-mixed' : '')
-                  : '';
-              btns +=
-                '<button class="m-score-btn' +
-                active +
-                '" data-action="m-grade-score" data-score="' +
-                level +
-                '" data-sid="' +
-                st.id +
-                '" data-aid="' +
-                assessment.id +
-                '" data-tid="' +
-                tid +
-                '" aria-label="' +
-                level +
-                ', ' +
-                PROF_LABELS[level] +
-                '">' +
-                level +
-                '</button>';
-            });
+            // The board's level buttons, in the class's level order (MC.levelButtonsHTML).
+            var lvNow = current !== null ? roundLevel(current) : 0;
+            var rowIds = ' data-sid="' + st.id + '" data-aid="' + assessment.id + '" data-tid="' + tid + '"';
             tagGroups +=
               '<div class="m-score-group">' +
               '<div class="m-score-tag-label"><span class="m-score-tag-dot" style="background:' +
@@ -2278,20 +2255,19 @@ window.MGrade = (function () {
               '"></span>' +
               MC.esc(tagLabel) +
               '</div>' +
-              '<div class="m-score-btns" role="radiogroup" aria-label="Score for ' +
+              '<div class="m-score-btns" role="radiogroup" aria-label="Level for ' +
               MC.esc(tagLabel) +
               '">' +
-              btns +
+              MC.levelButtonsHTML({
+                order: levelOrderFor(cid),
+                level: lvNow,
+                mod: currentMod,
+                mixed: currentMixed,
+                action: 'm-grade-score',
+                attrs: rowIds,
+              }) +
               '</div>' +
-              '<div class="m-score-mods" data-sid="' +
-              st.id +
-              '" data-aid="' +
-              assessment.id +
-              '" data-tid="' +
-              tid +
-              '">' +
-              _modBtnsHtml(currentMixed ? 0 : current, currentMod) +
-              '</div>' +
+              _fineTuneHtml(rowIds, currentMixed ? 0 : lvNow, currentMod, tagLabel) +
               '</div>';
           }
         },
@@ -2393,19 +2369,6 @@ window.MGrade = (function () {
       // A group's members each have their own status, in the list above.
       if (unit && unit.view) statusRow = '';
 
-      // What the level numbers mean, in the class's order.
-      var levelKey = '';
-      if (rubric || /m-score-btns/.test(tagGroups)) {
-        levelKey =
-          '<div class="m-level-key">' +
-          levelOrderFor(cid)
-            .map(function (lv) {
-              return '<span><b>' + lv + '</b> ' + MC.esc(PROF_LABELS[lv]) + '</span>';
-            })
-            .join('') +
-          '</div>';
-      }
-
       // The Overall Comment: the one feedback box on the work, as on the
       // desktop (score.comment; it prints on the rubric handout).
       var commentText = getScoreComment(cid, st.id, assessment.id);
@@ -2439,7 +2402,6 @@ window.MGrade = (function () {
         // The student's work, under who it is (teacher-mobile/grade-photos.js).
         MGradePhotos.cardHtml(cid, assessment, st, unit) +
         tagGroups +
-        levelKey +
         statusRow +
         commentRow +
         '</div></div>'
@@ -2719,17 +2681,7 @@ window.MGrade = (function () {
         _critLevelBtnsHtml(cid, st, assessment, crit, state) +
         '</div>' +
         (groups ? '<div class="m-check-groups">' + groups + '</div>' : '') +
-        '<div class="m-score-mods" data-sid="' +
-        st.id +
-        '" data-aid="' +
-        assessment.id +
-        '" data-critid="' +
-        crit.id +
-        '" role="group" aria-label="Fine-tune ' +
-        MC.esc(state.level && !state.mixed ? _levelName(state.level) : name) +
-        '">' +
-        _modBtnsHtml(state.mixed ? 0 : state.level, state.mod) +
-        '</div>' +
+        _critFineTuneHtml(st, assessment, crit, state) +
         '<div class="m-crit-pager-tools">' +
         _critCommentBtnHtml(cid, st.id, assessment.id, crit) +
         '</div>' +
@@ -2765,32 +2717,26 @@ window.MGrade = (function () {
       _refreshCard(cid, sid, aid);
     }
 
-    // A criterion's four level buttons.
-    // html-safe: levels are numbers, labels constants, ids ours
+    // A criterion's four level buttons (MC.levelButtonsHTML).
     function _critLevelBtnsHtml(cid, st, assessment, crit, state) {
-      var btns = '';
-      levelOrderFor(cid).forEach(function (level) {
-        btns +=
-          '<button class="m-score-btn' +
-          (state.level === level ? ' m-score-active' : '') +
-          (state.level === level && state.mixed ? ' m-score-mixed' : '') +
-          '" data-action="m-grade-crit" data-score="' +
-          level +
-          '" data-sid="' +
-          st.id +
-          '" data-aid="' +
-          assessment.id +
-          '" data-critid="' +
-          crit.id +
-          '" aria-label="' +
-          level +
-          ', ' +
-          PROF_LABELS[level] +
-          '">' +
-          level +
-          '</button>';
+      return MC.levelButtonsHTML({
+        order: levelOrderFor(cid),
+        level: state.level || 0,
+        mod: state.mod,
+        mixed: state.mixed,
+        action: 'm-grade-crit',
+        attrs: ' data-sid="' + st.id + '" data-aid="' + assessment.id + '" data-critid="' + crit.id + '"',
       });
-      return btns;
+    }
+
+    // A criterion's Fine-tune row.
+    function _critFineTuneHtml(st, assessment, crit, state) {
+      return _fineTuneHtml(
+        ' data-sid="' + st.id + '" data-aid="' + assessment.id + '" data-critid="' + crit.id + '"',
+        state.mixed ? 0 : state.level,
+        state.mod,
+        crit.name || 'Criterion',
+      );
     }
 
     /* One criterion: its name, the four levels, ± and, on an Advanced
@@ -2821,6 +2767,13 @@ window.MGrade = (function () {
           (count.ticked ? count.ticked : 'Checklist') +
           '</button>';
       }
+      // The board's "Suggested: Proficient" over the levels, from the ticks;
+      // an open checklist says it in its own head.
+      var suggested =
+        advanced && !open ? RubricChecks.suggestedLevel(crit, getRubricCheckIds(cid, st.id, assessment.id)) : 0;
+      var suggestedLine = suggested
+        ? '<div class="m-crit-suggested">' + MC.esc('Suggested: ' + scoreLevelText(suggested)) + '</div>'
+        : '';
       return (
         '<div class="m-score-group m-crit-group" data-critid="' +
         crit.id +
@@ -2833,20 +2786,13 @@ window.MGrade = (function () {
         checksBtn +
         '</span>' +
         '</div>' +
-        '<div class="m-score-btns" role="radiogroup" aria-label="Score for ' +
-        MC.esc(crit.name || 'criterion') +
+        suggestedLine +
+        '<div class="m-score-btns" role="radiogroup" aria-label="Level for ' +
+        MC.esc(crit.name || 'Criterion') +
         '">' +
         btns +
         '</div>' +
-        '<div class="m-score-mods" data-sid="' +
-        st.id +
-        '" data-aid="' +
-        assessment.id +
-        '" data-critid="' +
-        crit.id +
-        '">' +
-        _modBtnsHtml(state.mixed ? 0 : state.level, state.mod) +
-        '</div>' +
+        _critFineTuneHtml(st, assessment, crit, state) +
         (open ? _checklistHtml(cid, st.id, assessment.id, crit, state) : '') +
         _critCommentHtml(cid, st.id, assessment.id, crit) +
         '</div>'
@@ -3187,27 +3133,20 @@ window.MGrade = (function () {
       _syncReturnBar();
     }
 
-    /* ── + / − on a level ──────────────────────────────────────── */
-    // html-safe: fixed markup; m is -1 or 1 and scoreModSuffix returns '+' or '\u2212'.
-    function _modBtnsHtml(level, mod) {
-      return [-1, 1]
-        .map(function (m) {
-          var allowed = level > 0 && normalizeScoreMod(level, m) === m;
-          return (
-            '<button class="m-mod-btn' +
-            (allowed && mod === m ? ' m-mod-active' : '') +
-            '" data-action="m-grade-mod" data-mod="' +
-            m +
-            '" aria-label="' +
-            (m > 0 ? 'Plus' : 'Minus') +
-            '"' +
-            (allowed ? '' : ' disabled') +
-            '>' +
-            scoreModSuffix(m) +
-            '</button>'
-          );
-        })
-        .join('');
+    /* ── + / − on a level: Fine-tune <level>, − Minus and + Plus ── */
+    // html-safe: attrs are our ids; the label goes through MC.esc; the buttons are MC.fineTuneButtonsHTML's fixed markup
+    function _fineTuneHtml(attrs, level, mod, name) {
+      return (
+        '<div class="m-score-mods"' +
+        attrs +
+        ' data-name="' +
+        MC.esc(name) +
+        '" role="group" aria-label="' +
+        MC.esc(MC.fineTuneLabel(level, name)) +
+        '">' +
+        MC.fineTuneButtonsHTML(level, mod) +
+        '</div>'
+      );
     }
 
     function _currentEntry(cid, sid, aid, tid) {
@@ -3217,14 +3156,23 @@ window.MGrade = (function () {
       return matches.length ? matches[matches.length - 1] : null;
     }
 
+    // A competency row after a save or an undo: its levels and Fine-tune.
     function _syncModBtns(cid, sid, aid, tid) {
-      var box = document.querySelector(
-        '.m-swiper-card[data-sid="' + sid + '"] .m-score-mods[data-aid="' + aid + '"][data-tid="' + tid + '"]',
-      );
-      if (!box) return;
+      var card = document.querySelector('.m-swiper-card[data-sid="' + sid + '"]');
+      if (!card) return;
       var e = _currentEntry(cid, sid, aid, tid);
-      var level = e ? e.score : 0;
-      box.innerHTML = _modBtnsHtml(level, e ? normalizeScoreMod(level, e.mod) : 0);
+      var level = e && e.score > 0 ? roundLevel(e.score) : 0;
+      var mod = level ? normalizeScoreMod(level, e.mod) : 0;
+      MC.paintLevelButtons(
+        card.querySelectorAll('.m-score-btn[data-aid="' + aid + '"][data-tid="' + tid + '"]'),
+        level,
+        mod,
+      );
+      var box = card.querySelector('.m-score-mods[data-aid="' + aid + '"][data-tid="' + tid + '"]');
+      if (!box) return;
+      box.setAttribute('aria-label', MC.fineTuneLabel(level, box.getAttribute('data-name')));
+      // html-safe: MC.fineTuneButtonsHTML is fixed markup
+      box.innerHTML = MC.fineTuneButtonsHTML(level, mod);
     }
 
     // Tapping the active + or − again clears it.
@@ -3276,15 +3224,7 @@ window.MGrade = (function () {
       clearProfCache();
       MC.haptic();
 
-      // Update button states. When cleared (score=0), no btn matches so all
-      // buttons become inactive — which is exactly what we want visually.
-      var card = document.querySelector('.m-swiper-card[data-sid="' + sid + '"]');
-      if (card) {
-        var btns = card.querySelectorAll('.m-score-btn[data-tid="' + tid + '"]');
-        btns.forEach(function (btn) {
-          btn.classList.toggle('m-score-active', parseInt(btn.getAttribute('data-score')) === score);
-        });
-      }
+      // The row's buttons; when cleared (score=0) none is chosen.
       _syncModBtns(cid, sid, aid, tid);
 
       // Update thumbnail graded state
@@ -3315,11 +3255,11 @@ window.MGrade = (function () {
         // After auto-zero, deactivate every score button under this (sid, aid)
         // so the UI reflects the zeroed state (no button matches score=0).
         if (newStatus === 'NS' && clearsScores) {
-          card.querySelectorAll('.m-score-btn[data-aid="' + aid + '"]').forEach(function (btn) {
-            btn.classList.remove('m-score-active');
-          });
+          MC.paintLevelButtons(card.querySelectorAll('.m-score-btn[data-aid="' + aid + '"]'), 0, 0);
           card.querySelectorAll('.m-score-mods[data-aid="' + aid + '"]').forEach(function (box) {
-            box.innerHTML = _modBtnsHtml(0, 0);
+            box.setAttribute('aria-label', MC.fineTuneLabel(0, box.getAttribute('data-name')));
+            // html-safe: MC.fineTuneButtonsHTML is fixed markup
+            box.innerHTML = MC.fineTuneButtonsHTML(0, 0);
           });
         }
         // Dim the score rows when the assessment is flagged NS or EXC (not
@@ -3374,16 +3314,6 @@ window.MGrade = (function () {
       Grader.undoOnPhone(entry.cid, entry.sid, entry.aid, beforeScores, allScores);
       clearProfCache();
 
-      // Update UI
-      var card = document.querySelector('.m-swiper-card[data-sid="' + entry.sid + '"]');
-      if (card) {
-        var btns = card.querySelectorAll('.m-score-btn[data-tid="' + entry.tid + '"]');
-        var lastScore = prev.length ? prev[prev.length - 1].score : null;
-        btns.forEach(function (btn) {
-          var lvl = parseInt(btn.getAttribute('data-score'));
-          btn.classList.toggle('m-score-active', lastScore !== null && roundLevel(lastScore) === lvl);
-        });
-      }
       _syncModBtns(entry.cid, entry.sid, entry.aid, entry.tid);
       _updateThumbGraded(entry.cid, entry.aid);
       MC.showToast('Score reverted');

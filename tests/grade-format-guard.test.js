@@ -40,7 +40,7 @@ const TO_FIXED_1 = {
 const PROF_LABELS_USES = {
   'teacher-mobile/card-widgets.js': 1,
   'teacher-mobile/student-detail.js': 7,
-  'teacher-mobile/tab-grade.js': 7, // + the grading card's level key and its level buttons' names (Step 4 sweep, Nov 3)
+  'teacher-mobile/tab-grade.js': 4, // the checklist's level names; the level buttons' words are scoreLevelText's (MComponents.levelButtonsHTML)
   'teacher/comment-bank.js': 1,
   'teacher/comment-personal.js': 1,
   // The level word as a line's label ("Developing: …").
