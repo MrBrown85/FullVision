@@ -96,10 +96,14 @@ describe('single students: the answers as they were (pin)', () => {
     expect(c.ids.tograde).toEqual(['st1']);
     expect(c.ids.notin).toEqual(['st11']);
     const all = GraderWork.classWorkCounts(CID);
-    expect([all.tograde, all.notin, all.groups]).toEqual([1, 2, 0]);
+    // Light Refraction Lab (ruling 115) adds its own: 6 to grade (Ines,
+    // Sofia, Marcus, Maya, Liv, and Aiden's pair once; no drafts here, as
+    // the class did not hold grades when it was seeded), 20 not in, 1 group.
+    expect([all.tograde, all.notin, all.groups]).toEqual([7, 22, 1]);
     expect(all.pieces).toEqual([
       { aid: LAB, tograde: 1, toreturn: 0, notin: 1 },
       { aid: 'sci8a4', tograde: 0, toreturn: 0, notin: 1 },
+      { aid: 'sci8a21', tograde: 6, toreturn: 0, notin: 20 },
     ]);
   });
 });
