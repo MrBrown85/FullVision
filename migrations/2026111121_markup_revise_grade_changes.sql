@@ -318,9 +318,16 @@ $function$;
 create or replace trigger markup_given_on_insert after insert on public.grade_return
     for each row when (new.returned_at is not null and not new.is_draft)
     execute function public._markup_on_return();
-create or replace trigger markup_given_on_return after update of returned_at, is_draft on public.grade_return
+-- A Return is a write that stamps a new returned date: every Return in
+-- Batch A does (return_grades and the class leaving When I Return Them
+-- through _grade_return_one, a save in a class that returns at once
+-- through _grade_return_apply). A draft put back to the returned grade
+-- (a grade changed and changed back, a comment typed and deleted) is
+-- Returned again with its old date: not a Return, so nothing is given
+-- and no request closes.
+create or replace trigger markup_given_on_return after update of returned_at on public.grade_return
     for each row when (new.returned_at is not null and not new.is_draft
-                       and (old.returned_at is distinct from new.returned_at or old.is_draft))
+                       and old.returned_at is distinct from new.returned_at)
     execute function public._markup_on_return();
 
 revoke all on function public._revision_hide_available() from public, anon, authenticated, service_role;

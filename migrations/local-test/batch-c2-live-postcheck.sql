@@ -31,7 +31,7 @@ select 'a trigger C2 adds is not as C2 makes it', x.trg,
         ('markup_given_on_insert',
          'CREATE TRIGGER markup_given_on_insert AFTER INSERT ON public.grade_return FOR EACH ROW WHEN (((new.returned_at IS NOT NULL) AND (NOT new.is_draft)))'),
         ('markup_given_on_return',
-         'CREATE TRIGGER markup_given_on_return AFTER UPDATE OF returned_at, is_draft ON public.grade_return FOR EACH ROW WHEN (((new.returned_at IS NOT NULL) AND (NOT new.is_draft) AND ((old.returned_at IS DISTINCT FROM new.returned_at) OR old.is_draft)))')
+         'CREATE TRIGGER markup_given_on_return AFTER UPDATE OF returned_at ON public.grade_return FOR EACH ROW WHEN (((new.returned_at IS NOT NULL) AND (NOT new.is_draft) AND (old.returned_at IS DISTINCT FROM new.returned_at)))')
        ) x(trg, fires)
   left join pg_trigger t on t.tgrelid = 'public.grade_return'::regclass and t.tgname = x.trg and not t.tgisinternal
  where t.oid is null

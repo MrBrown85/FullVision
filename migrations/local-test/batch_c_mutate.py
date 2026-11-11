@@ -18,8 +18,8 @@ refuses to apply is reported as caught by the file.
 import subprocess, tempfile
 from batch_c_common import *
 
-C1S = 'teacher markup started contract reflect revision group grants race closes only_me round2'
-C2S = 'hide given hide_round1 closes round2'
+C1S = 'teacher markup started contract reflect revision group grants race closes only_me round2 put_back'
+C2S = 'hide given hide_round1 closes round2 put_back'
 CHANGES = [
     # ── C1 ──
     ("_grading_started: marks do not count (Batch B's rule only)", C1,
@@ -250,6 +250,12 @@ CHANGES = [
     ("C1 round 2 (b) 4: return_work counts every page with marks, waiting or not", C1,
      "     where m.file_id = any (_waiting) and m.given_rev = m.working_rev;",
      "     where m.assessment_id = p_assessment_id and m.enrollment_id = any (coalesce(p_enrollment_ids, '{}')) and m.given_rev = m.working_rev;", 'round2 teacher'),
+    ("C2 round 2 (a) 1: a draft put back to the returned grade is taken for a Return (the reviewed trigger)", C2,
+     "after update of returned_at on public.grade_return\n    for each row when (new.returned_at is not null and not new.is_draft\n                       and old.returned_at is distinct from new.returned_at)",
+     "after update of returned_at, is_draft on public.grade_return\n    for each row when (new.returned_at is not null and not new.is_draft\n                       and (old.returned_at is distinct from new.returned_at or old.is_draft))", 'put_back given'),
+    ("C2 round 2 (a) 1: the trigger fires on any write of a returned row", C2,
+     "after update of returned_at on public.grade_return\n    for each row when (new.returned_at is not null and not new.is_draft\n                       and old.returned_at is distinct from new.returned_at)",
+     "after update on public.grade_return\n    for each row when (new.returned_at is not null and not new.is_draft)", 'put_back given'),
     ("C1 (b) 1: return_work does not settle before it returns", C1,
      "    perform _revision_settle(e.id, p_assessment_id, false)\n       from enrollment e where e.id = any (coalesce(p_enrollment_ids, '{}')) and e.course_id = _course;\n    _r := return_grades",
      "    _r := return_grades", 'closes'),
