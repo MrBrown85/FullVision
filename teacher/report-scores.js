@@ -46,10 +46,16 @@ window.ReportScores = (function () {
        (2026-11-10)" 6; S2-F1). Drawn inside a Feedback Page it takes that
        report's set, as any report drawn inside another does. */
     handout: 'returned',
-    // The Term Questionnaire's facts, At a Glance and Generate. S2-F2 makes it 'returned'.
-    questionnaire: 'all',
-    // Sent to Phones: each student's phone copy. S2-F2 makes it 'returned'.
-    phones: 'all',
+    // The Term Questionnaire's facts, At a Glance, its checks and Generate (S2-F2; Colin's answer 6).
+    questionnaire: 'returned',
+    // Sent to Phones: each student's phone copy (S2-F2; Colin's answer 6).
+    phones: 'returned',
+    /* The grader's own use of a report's reading: the Note for the Report's
+       preview under the grader (teacher/page-assignments.js), which asks
+       the questionnaire's facts. The grader is the teacher's screen, so all
+       work: run inside this, the facts take this set (the outermost
+       surface decides). */
+    grader: 'all',
     // Print Grades: the teacher's own class sheet. All work, by the artboard; it stays.
     printGrades: 'all',
     // Export (Download All My Data): the teacher's own records. All work, by the artboard; it stays.

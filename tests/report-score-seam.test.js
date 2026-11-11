@@ -491,7 +491,9 @@ describe('report files read scores only through ReportScores', () => {
 
   it('every surface a file names is in the one table', () => {
     const named = Object.keys(DOORS).map(file => DOORS[file].surface);
-    expect(ReportScores.surfaces().slice().sort()).toEqual(Array.from(new Set(named)).sort());
+    // 'grader' is named by the grader, not a report file: the Note for the Report's preview (S2-F2).
+    expect(ReportScores.surfaces().slice().sort()).toEqual(Array.from(new Set(named.concat(['grader']))).sort());
+    expect(read('teacher/page-assignments.js')).toContain("ReportScores.withReportScores('grader', function () {");
   });
 });
 
@@ -540,21 +542,23 @@ describe('ReportScores', () => {
       'handout',
       'questionnaire',
       'phones',
+      'grader',
       'printGrades',
       'exportData',
     ]);
     ReportScores.surfaces().forEach(surface => expect(ReportScores.reportScoreSet(surface), surface).toBe('all'));
   });
 
-  it('the table as written: Progress Reports and the rubric handout on returned grades (S2-F1), the rest on all work', () => {
+  it('the table as written: what a family or a student reads on returned grades (S2-F1, S2-F2), the teacher’s own on all work', () => {
     loadSeam(null, true);
     expect(
       Object.fromEntries(ReportScores.surfaces().map(surface => [surface, ReportScores.reportScoreSet(surface)])),
     ).toEqual({
       progress: 'returned',
       handout: 'returned',
-      questionnaire: 'all',
-      phones: 'all',
+      questionnaire: 'returned',
+      phones: 'returned',
+      grader: 'all',
       printGrades: 'all',
       exportData: 'all',
     });
