@@ -271,7 +271,14 @@
   }
 }
 
-/* The door, in Class Settings › Student Page. */
+/* The door, in Class Settings › Student Page: a card laid out as the tab's others (.sp-card). */
+.sp-preview {
+  display: flex;
+  flex-direction: column;
+}
+.sp-preview > .cm-grade-title {
+  margin-bottom: 14px;
+}
 .sp-preview-row {
   display: flex;
   flex-wrap: wrap;

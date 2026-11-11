@@ -391,7 +391,7 @@ var CmStudentPage = (function () {
     )
       chosen = students[0].id;
     return (
-      '<div class="cm-section sp-card sp-preview" data-cid="' +
+      '<div class="cm-section sp-preview" data-cid="' +
       esc(cid) +
       '">' +
       '<h2 class="cm-grade-title">Preview as Student</h2>' +
