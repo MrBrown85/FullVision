@@ -209,6 +209,25 @@ window.MGradePhotos = (function () {
 
   /* ── The card ───────────────────────────────────────────────── */
 
+  /* When the work came, under the student's name on the card: "Submitted
+     Oct 30 · 2 photos", or "Not In · 7 days late" (not on an Excused piece,
+     which is not owed). */
+  // html-safe: the line goes through MC.esc; CAMERA_SVG is fixed markup
+  function sentHtml(cid, a, st, unit) {
+    var w = _cardWork(cid, a, st, unit);
+    if (w.skip) return '';
+    if (w.sub)
+      return (
+        '<div class="m-work-sent">' +
+        CAMERA_SVG +
+        '<span>' +
+        MC.esc(sentLine(w.sub, 'Submitted', cid)) +
+        '</span></div>'
+      );
+    if (getAssignmentStatus(cid, st.id, a.id) === 'EXC') return '';
+    return '<div class="m-work-sent m-work-sent-notin"><span>' + MC.esc(notInState(cid, a)) + '</span></div>';
+  }
+
   // html-safe: the note, names and dates go through MC.esc; ids and counts are ours or numbers
   function cardHtml(cid, a, st, unit) {
     var w = _cardWork(cid, a, st, unit);
@@ -217,17 +236,7 @@ window.MGradePhotos = (function () {
     if (!sub) return notInHtml(cid, a, st);
     var files = sub.files || [];
     var first = displayNameFirst(st) || displayName(st);
-    var html =
-      '<div class="m-work" data-sid="' +
-      st.id +
-      '" data-aid="' +
-      a.id +
-      '">' +
-      '<div class="m-work-sent">' +
-      CAMERA_SVG +
-      '<span>' +
-      MC.esc(sentLine(sub, 'Submitted', cid)) +
-      '</span></div>';
+    var html = '<div class="m-work" data-sid="' + st.id + '" data-aid="' + a.id + '">';
     if (files.length) {
       html +=
         '<div class="m-work-pages" data-action="m-work-full">' +
@@ -291,11 +300,6 @@ window.MGradePhotos = (function () {
       '" data-aid="' +
       a.id +
       '">' +
-      '<div class="m-work-sent">' +
-      CAMERA_SVG +
-      '<span>' +
-      MC.esc(notInState(cid, a)) +
-      '</span></div>' +
       '<button type="button" class="m-work-add" data-action="m-add-work" data-sid="' +
       st.id +
       '" data-aid="' +
@@ -344,7 +348,7 @@ window.MGradePhotos = (function () {
   /* One student's To Grade list (S7-F4): the work waiting, with Grade, then
      the pieces not in, with Add Work. On the student card and View Profile.
      '' when there is nothing, or the class takes no work. */
-  // html-safe: titles and lines go through MC.esc; ids are ours
+  // html-safe: titles and lines go through MC.esc; ids are ours; CAMERA_SVG is fixed markup
   function studentListHtml(cid, st) {
     if (!st) return '';
     // Empty unless the class takes work (studentList asks on()).
@@ -366,10 +370,22 @@ window.MGradePhotos = (function () {
             (grade ? ' data-only="student"' : ' data-then="grade"') +
             '><span class="m-scard-return-body"><span class="m-scard-return-title">' +
             MC.esc(r.a.title) +
-            '</span><span class="m-scard-return-sub">' +
-            MC.esc(grade ? sentLine(r.sub, null, cid) : notInLine(cid, r.a, st.id)) +
-            '</span></span><span class="m-scard-tograde-act">' +
-            (grade ? 'Grade' : 'Add Work') +
+            '</span>' +
+            // Sent in blue with the camera; Missing in amber (the board "Student Card With To Grade").
+            (grade
+              ? '<span class="m-scard-return-sub m-scard-sent">' +
+                CAMERA_SVG +
+                MC.esc(sentLine(r.sub, null, cid)) +
+                '</span>'
+              : '<span class="m-scard-return-sub' +
+                (getAssignmentStatus(cid, st.id, r.a.id) === 'NS' ? ' m-scard-missing' : '') +
+                '">' +
+                MC.esc(notInLine(cid, r.a, st.id)) +
+                '</span>') +
+            '</span><span class="m-scard-tograde-act' +
+            (grade ? '' : ' m-scard-add') +
+            '">' +
+            (grade ? 'Grade' : CAMERA_SVG + 'Add Work') +
             '</span></button>'
           );
         })
@@ -598,6 +614,7 @@ window.MGradePhotos = (function () {
     syncTabBadge: syncTabBadge,
     releaseUnused: _letGo,
     cardHtml: cardHtml,
+    sentHtml: sentHtml,
     pinHtml: pinHtml,
     hydrate: hydrate,
     wire: wire,

@@ -4998,6 +4998,23 @@ body.fv-switching-course::after {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
+/* Next: <criterion> ›, on one line however long the name. */
+.m-crit-next-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 14px;
+}
+.m-crit-next-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m-crit-next-btn svg {
+  flex: none;
+}
 .m-grade-return-btn:active:not(:disabled) {
   opacity: 0.8;
 }
@@ -5367,6 +5384,42 @@ body.fv-switching-course::after {
   font-size: 17px;
   font-weight: 600;
 }
+/* An action sheet: its cards float over the screen, Cancel a card of its
+   own (the board "Grade Tab, Row Menu"). */
+.m-sheet.m-sheet-action {
+  left: 8px;
+  right: 8px;
+  bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.m-sheet-action .m-sheet-handle {
+  display: none;
+}
+.m-sheet-action .m-sheet-content {
+  padding: 0;
+}
+.m-tg-menu.m-tg-action {
+  gap: 8px;
+  padding: 0;
+}
+.m-tg-action-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.m-tg-action .m-tg-menu-head {
+  padding: 14px 16px 10px;
+}
+.m-tg-action .m-tg-menu-cancel {
+  margin: 0;
+  height: 56px;
+  border-radius: 16px;
+  background: var(--surface);
+}
 /* The board "Grade Tab, Filter That Applies As You Tap": Filter on the
    left, Clear All and Done on the right; "Showing 6 of 18" in green; a
    chosen chip blue-tinted with a tick. */
@@ -5427,6 +5480,10 @@ body.fv-switching-course::after {
   font-size: 13px;
   font-weight: 600;
   color: var(--link);
+}
+/* "Not In · 7 days late" under the name (the board "Add Work for a Student"). */
+.m-work-sent.m-work-sent-notin {
+  color: var(--text-2);
 }
 .m-work-pages {
   position: relative;
@@ -5684,12 +5741,62 @@ body.fv-switching-course::after {
 }
 .m-scard-tograde-act {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 7px 14px;
   border-radius: 18px;
   background: var(--active);
   color: #fff;
   font-size: 15px;
   font-weight: 600;
+}
+/* Sent in blue with the camera, Missing in amber, Add Work pale blue with
+   the camera (the boards "Student Card With To Grade" and "View Profile,
+   To Grade First"). */
+.m-scard-tograde-row .m-scard-return-sub.m-scard-sent {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--link);
+}
+.m-scard-sent svg {
+  flex: none;
+  width: 12px;
+  height: 12px;
+}
+.m-scard-tograde-row .m-scard-return-sub.m-scard-missing {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--score-2-dark);
+}
+.m-scard-tograde-act.m-scard-add {
+  background: var(--active-light);
+  color: var(--link);
+}
+/* On View Profile: "To Grade" over a white list card. */
+#m-screen-student-detail .m-scard-tograde {
+  background: transparent;
+  border-radius: 0;
+}
+#m-screen-student-detail .m-scard-tograde .m-scard-return-head {
+  padding: 0 2px 6px;
+}
+#m-screen-student-detail .m-scard-tograde-row {
+  min-height: 60px;
+  padding: 8px 12px;
+  background: var(--surface);
+}
+#m-screen-student-detail .m-scard-tograde-row:first-of-type {
+  border-radius: 12px 12px 0 0;
+}
+#m-screen-student-detail .m-scard-tograde-row:last-of-type {
+  border-radius: 0 0 12px 12px;
+}
+#m-screen-student-detail .m-scard-tograde-row:only-of-type {
+  border-radius: 12px;
 }
 
 /* The Grade tab's red count. */
@@ -6135,10 +6242,11 @@ body.fv-switching-course::after {
   flex: none;
   min-height: 48px;
   padding: 0 16px;
-  border: 1px solid var(--divider-heavy);
+  border: 0;
   border-radius: 14px;
-  background: var(--surface);
-  color: var(--active);
+  /* Grey filled beside the blue button (the board "Phone Grader, Advanced Rubric"). */
+  background: var(--surface-2);
+  color: var(--text);
   font: inherit;
   font-size: 17px;
   font-weight: 600;

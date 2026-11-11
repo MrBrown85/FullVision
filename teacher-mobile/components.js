@@ -92,7 +92,9 @@ window.MComponents = (function () {
     opts = opts || {};
     var backdrop = document.getElementById('m-sheet-backdrop');
     var container = document.getElementById('m-sheet-container');
-    var halfClass = opts.half ? ' m-sheet-half' : '';
+    // opts.action: an action sheet, its cards floating over the screen (the
+    // board "Grade Tab, Row Menu"); the content draws its own cards.
+    var halfClass = (opts.half ? ' m-sheet-half' : '') + (opts.action ? ' m-sheet-action' : '');
     // html-safe: every presentSheet caller (tab-observe, tab-grade, tab-students, card-widget-editor, card-widgets commentSheetHtml, shell settings) builds html with MC.esc on its text.
     container.innerHTML =
       '<div class="m-sheet' +

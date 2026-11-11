@@ -514,9 +514,9 @@ window.MGrade = (function () {
       };
       // html-safe: every text goes through MC.esc in item() or here; ids are ours
       MC.presentSheet(
-        '<div class="m-tg-menu" role="dialog" aria-label="' +
+        '<div class="m-tg-menu m-tg-action" role="dialog" aria-label="' +
           MC.esc(a.title) +
-          '"><div class="m-tg-menu-head"><div class="m-tg-menu-name">' +
+          '"><div class="m-tg-action-card"><div class="m-tg-menu-head"><div class="m-tg-menu-name">' +
           MC.esc(a.title) +
           '</div><div class="m-tg-menu-sub">' +
           MC.esc(meta.join(' · ')) +
@@ -541,9 +541,10 @@ window.MGrade = (function () {
             : '') +
           (wall ? item('', 'Work Wall', 'Everyone’s work side by side', 'm-work-wall', 'grid') : '') +
           item('', 'Grade Everyone', 'All ' + students.length + ', in roster order', null, 'pencil') +
-          '<button type="button" class="m-tg-menu-cancel" data-action="m-sheet-cancel">Cancel</button>' +
+          // Cancel is a card of its own (the board "Grade Tab, Row Menu").
+          '</div><button type="button" class="m-tg-menu-cancel" data-action="m-sheet-cancel">Cancel</button>' +
           '</div>',
-        { half: true },
+        { action: true },
       );
     }
 
@@ -1556,17 +1557,23 @@ window.MGrade = (function () {
       var parts = holds ? _returnBarOwn(cid, a, unit, last) : { state: '', act: '' };
       // An Advanced Rubric shown a criterion at a time (S7-F2): on to the
       // next criterion first; the line still says where the grade stands.
-      var nextCrit = !holds || parts.act || parts.state ? _pagerNext(cid, a, unit) : null;
-      if (!nextCrit) return parts;
+      // For Revision or Take Back stays beside it (the board "Phone Grader,
+      // Advanced Rubric").
+      var lead = parts.lead || '';
+      var nextCrit = !holds || lead || parts.act || parts.state ? _pagerNext(cid, a, unit) : null;
+      if (!nextCrit) return { state: parts.state, act: lead + parts.act };
       return {
         state: parts.state,
         act:
+          lead +
           '<button type="button" class="m-grade-return-btn m-crit-next-btn" data-action="m-crit-page" data-dir="1" data-sid="' +
           unit.st.id +
           '" data-aid="' +
           a.id +
           '">' +
+          '<span class="m-crit-next-text">' +
           MC.esc('Next: ' + (nextCrit.name || 'Criterion')) +
+          '</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>' +
           '</button>',
       };
     }
@@ -1647,12 +1654,12 @@ window.MGrade = (function () {
       if (area.revise) {
         return {
           state: parts.state,
-          act:
+          lead:
             '<button type="button" class="m-grade-revise-btn" data-action="m-grade-revision"' +
             ids +
             (_revisionBusy ? ' disabled' : '') +
-            '>For Revision</button>' +
-            parts.act,
+            '>For Revision</button>',
+          act: parts.act,
         };
       }
       var r = area.revision;
@@ -1667,7 +1674,7 @@ window.MGrade = (function () {
       if (_revisionMsg) state += '<span class="m-grade-return-still">' + MC.esc(_revisionMsg) + '</span>';
       return {
         state: state,
-        act:
+        lead:
           '<button type="button" class="m-grade-revise-btn" data-action="m-grade-revision-takeback"' +
           ids +
           ' data-id="' +
@@ -1676,8 +1683,8 @@ window.MGrade = (function () {
           (_revisionBusy ? ' disabled' : '') +
           '>' +
           (_revisionBusy ? 'Taking Back…' : 'Take Back') +
-          '</button>' +
-          parts.act,
+          '</button>',
+        act: parts.act,
       };
     }
 
@@ -2027,6 +2034,9 @@ window.MGrade = (function () {
 
       // A group's members each have their own status, in the list above.
       if (unit && unit.view) statusRow = '';
+      // Under the name: when the work came, then the status (the board
+      // "Phone Speed Grader With Photos").
+      var sent = MGradePhotos.sentHtml(cid, assessment, st, unit);
 
       var header =
         '<div class="m-grade-student-header">' +
@@ -2039,6 +2049,7 @@ window.MGrade = (function () {
         MC.esc(name) +
         badges +
         '</div>' +
+        sent +
         statusRow +
         '</div></div>';
       // One student's work: the card is named by the piece (the bar names the student).
@@ -2047,9 +2058,10 @@ window.MGrade = (function () {
           '<div class="m-grade-student-header"><div class="m-grade-student-main"><div class="m-grade-student-name">' +
           MC.esc(assessment.title) +
           '</div>' +
+          sent +
           statusRow +
           '</div></div>';
-      if (unit && unit.view) header = _groupCardHeadHtml(cid, assessment, unit.view);
+      if (unit && unit.view) header = _groupCardHeadHtml(cid, assessment, unit.view) + sent;
       else if (unit && unit.separateFrom) header += _separateLineHtml(assessment.id, st.id, unit.separateFrom);
 
       // Score selectors for each tag
