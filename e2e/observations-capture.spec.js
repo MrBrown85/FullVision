@@ -54,6 +54,8 @@ test.describe('Observations — keyboard, undo and views', () => {
   });
 
   test('Undo brings a deleted observation back', async ({ page }) => {
+    // The six-second undo window runs on a fake clock.
+    await page.clock.install();
     await pickStudent(page, 'Bob');
     await page.locator('#capture-input').fill('Kept the group on task');
     await page.keyboard.press('Enter');
@@ -70,12 +72,13 @@ test.describe('Observations — keyboard, undo and views', () => {
     await expect(toast).toHaveCount(0);
 
     // Past the undo window it is still there.
-    await page.waitForTimeout(6500);
+    await page.clock.runFor(6500);
     await expect(card).toBeVisible();
     expect((await storedObs(page)).map(o => o.text)).toContain('Kept the group on task');
   });
 
   test('without Undo the delete happens when the toast closes', async ({ page }) => {
+    await page.clock.install();
     await pickStudent(page, 'Bob');
     await page.locator('#capture-input').fill('Left the bench tidy');
     await page.keyboard.press('Enter');
@@ -86,7 +89,8 @@ test.describe('Observations — keyboard, undo and views', () => {
     // Held for the undo window, not deleted yet.
     expect((await storedObs(page)).map(o => o.text)).toContain('Left the bench tidy');
 
-    await expect(page.locator('#undo-toast')).toHaveCount(0, { timeout: 8000 });
+    await page.clock.runFor(7000);
+    await expect(page.locator('#undo-toast')).toHaveCount(0);
     expect((await storedObs(page)).map(o => o.text)).not.toContain('Left the bench tidy');
     await expect(page.locator('#obs-count')).toHaveText('0 observations');
   });

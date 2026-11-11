@@ -22,11 +22,6 @@ async function openNew(page) {
 }
 const RED = 'rgb(211, 47, 47)';
 
-test('New Assessment puts the cursor in the title', async ({ page }) => {
-  await openNew(page);
-  await expect(page.locator('#af-title')).toBeFocused();
-});
-
 test('a missing category shows red while focused, and the hint turns red', async ({ page }) => {
   await openNew(page);
   await page.fill('#af-title', 'Needs A Category');
@@ -40,8 +35,9 @@ test('a missing category shows red while focused, and the hint turns red', async
 
 test('a missing title shows red and clears as soon as one is typed', async ({ page }) => {
   await openNew(page);
-  await page.locator('[data-action="saveNewAssess"]').click();
   const title = page.locator('#af-title');
+  await expect(title).toBeFocused(); // New Assessment opens with the cursor in the title
+  await page.locator('[data-action="saveNewAssess"]').click();
   await expect(title).toBeFocused();
   await expect(title).toHaveAttribute('aria-invalid', 'true');
   await expect(title).toHaveCSS('border-top-color', RED);

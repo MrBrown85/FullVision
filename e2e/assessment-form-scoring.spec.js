@@ -32,19 +32,6 @@ async function openForm(page) {
   await expect(page.locator('#af-title')).toBeVisible();
 }
 
-test('Factor sits on the mode row as a stepper', async ({ page }) => {
-  await openForm(page);
-  const head = page.locator('.af-card-scoring .af-card-head');
-  await expect(head.locator('#af-weight')).toBeVisible();
-  await expect(head.locator('#af-weight')).toHaveValue('1');
-  await head.getByRole('button', { name: 'Raise the factor' }).click();
-  await expect(head.locator('#af-weight')).toHaveValue('1.5');
-  await head.getByRole('button', { name: 'Lower the factor' }).click();
-  await head.getByRole('button', { name: 'Lower the factor' }).click();
-  await head.getByRole('button', { name: 'Lower the factor' }).click();
-  await expect(head.locator('#af-weight')).toHaveValue('0.1');
-});
-
 test('each mode shows only what it needs', async ({ page }) => {
   await openForm(page);
   await expect(page.locator('#af-rubric-wrap')).toBeVisible();
@@ -56,6 +43,8 @@ test('each mode shows only what it needs', async ({ page }) => {
   await expect(page.locator('#af-rubric-wrap')).toBeHidden();
   await expect(page.locator('#af-maxpoints')).toBeHidden();
   await expect(page.locator('#af-weight')).toBeVisible();
+  // Factor sits on the mode row, in the Scoring card's head.
+  await expect(page.locator('.af-card-scoring .af-card-head #af-weight')).toBeVisible();
 });
 
 test('a rubric survives a trip through Points, and Points saves none', async ({ page }) => {

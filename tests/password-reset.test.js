@@ -4,7 +4,7 @@
  * the gradebook, saves the new password, then opens FullVision. A used or
  * expired link goes back to Sign In and says why.
  */
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseHTML } from 'linkedom';
 import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
@@ -93,14 +93,20 @@ describe('choose a new password', () => {
   it('saves the new password, then opens FullVision', async () => {
     const { document, location, calls } = load({ search: '?reset=1' });
     await settle();
-    document.getElementById('rs-password').value = 'new-secret-1';
-    document.getElementById('rs-confirm').value = 'new-secret-1';
-    document.getElementById('form-reset').dispatchEvent(new document.defaultView.Event('submit'));
-    await settle();
-    expect(calls.updateUser).toEqual([{ password: 'new-secret-1' }]);
-    expect(document.getElementById('auth-success').textContent).toMatch(/password is changed/);
-    await new Promise(r => setTimeout(r, 1300));
-    expect(location.href).toBe('/dashboard');
+    // The page waits before it opens FullVision: the clock is moved, not slept through.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      document.getElementById('rs-password').value = 'new-secret-1';
+      document.getElementById('rs-confirm').value = 'new-secret-1';
+      document.getElementById('form-reset').dispatchEvent(new document.defaultView.Event('submit'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(calls.updateUser).toEqual([{ password: 'new-secret-1' }]);
+      expect(document.getElementById('auth-success').textContent).toMatch(/password is changed/);
+      await vi.advanceTimersByTimeAsync(1300);
+      expect(location.href).toBe('/dashboard');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('asks again when the two passwords differ', async () => {

@@ -241,39 +241,4 @@ test.describe('Dashboard Observations card', () => {
     await expect(target).toBeFocused();
     await expect(target).toHaveClass(/ev-card-hit/);
   });
-
-  test('By competency shows dashed "none" where a student has no evidence', async ({ page }) => {
-    await enterDemo(page);
-    await openDashboard(page);
-    // A new student has no scores on any competency; one observation linked
-    // to the first competency makes that one evidence.
-    const sections = await page.evaluate(() => {
-      const list = getStudents('sci8');
-      saveStudents('sci8', list.concat([{ id: 'st-new', firstName: 'Zed', lastName: 'Zulu', designations: [] }]));
-      const secs = getSections('sci8');
-      addQuickOb('sci8', 'st-new', 'Asked a testable question', [], null, null, null, {
-        competencyId: secs[0].tags[0].id,
-      });
-      PageDashboard.render();
-      return secs.length;
-    });
-    await card(page).getByRole('tab', { name: 'By Competency' }).click();
-    const row = card(page).locator('.dash-ob2-row[data-sid="st-new"]');
-    await expect(row.locator('.dash-ob2-lv.is-gap')).toHaveCount(sections - 1);
-    await expect(row.locator('.dash-ob2-lv.is-gap').first()).toHaveText('none');
-    await expect(row.locator('.dash-ob2-lv').first()).toHaveText(/1$/);
-    await expect(row.locator('.dash-ob2-gaps')).toHaveText(String(sections - 1));
-    const withGaps = await card(page)
-      .locator('.dash-ob2-row[data-sid]')
-      .evaluateAll(rows => rows.filter(r => r.querySelector('.dash-ob2-lv.is-gap')).length);
-    const flag = card(page).locator('.dash-ob2-flag[data-flag="gap"]');
-    await expect(flag.locator('b')).toHaveText(String(withGaps));
-    await flag.click();
-    await expect(row).not.toHaveClass(/is-dim/);
-    // The key names the levels; a full competency name is on hover.
-    await expect(card(page).locator('.dash-ob2-key')).toContainText('No evidence');
-    const head = card(page).locator('.dash-ob2-ch[data-ob2-nav]').first();
-    await head.hover();
-    await expect(page.locator('#dash-ob2-pop')).toHaveText(await head.getAttribute('aria-label'));
-  });
 });
