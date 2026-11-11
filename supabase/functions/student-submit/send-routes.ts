@@ -12,10 +12,11 @@
 //    request_id, pages, note?, followed_plan?}
 //        -> student_submit.send_start | student_submit.replace; then one
 //           upload link for each path the database named, and the worker.
-//   {route: 'send-finish', the same fields as the start, submission_id,
+//   {route: 'send-finish', session, enrollment_id, submission_id,
 //    files: [file_id, …]}
-//        -> student_submit.work, the start again (a replay), every file read
-//           and checked, then student_submit.send_finish; then the worker.
+//        -> student_submit.send_paths (read-only: this student's own
+//           unfinished send's paths), every file read and checked, then
+//           student_submit.send_finish; then the worker.
 //   {route: 'unsend', session, enrollment_id, assessment_id}
 //        -> student_submit.unsend; then the worker.
 //   {route: 'file-links', session, enrollment_id, assessment_id}
@@ -108,6 +109,8 @@ export const SQL = {
     'select student_submit.send_start($1::text, $2::uuid, $3::uuid, $4::jsonb, $5::text, $6::text, $7::uuid, $8::text) as r',
   replace:
     'select student_submit.replace($1::text, $2::uuid, $3::uuid, $4::jsonb, $5::text, $6::text, $7::uuid, $8::text) as r',
+  // PR 1095, section 4: read-only, the paths of this student's own unfinished send, by its id.
+  sendPaths: 'select student_submit.send_paths($1::text, $2::uuid, $3::uuid, $4::text) as r',
   sendFinish: 'select student_submit.send_finish($1::text, $2::uuid, $3::uuid, $4::jsonb, $5::text) as r',
   unsend: 'select student_submit.unsend($1::text, $2::uuid, $3::uuid, $4::text) as r',
   fileLinks: 'select student_submit.file_links($1::text, $2::uuid, $3::uuid, $4::text) as r',
@@ -222,8 +225,8 @@ function plan(v: unknown): string | null | undefined {
 
 type Start = { session: string; enrollment: string; assessment: string; request: string; params: Param[] };
 
-/* A start (send-start, replace, and send-finish, which sends the start
-   again): the parameters before the hashed address, or null. */
+/* A start (send-start, replace): the parameters before the hashed
+   address, or null. */
 function readStart(body: Json): Start | null {
   const s = session(body);
   const e = uuid(body.enrollment_id);
@@ -428,61 +431,40 @@ export function makeSendRoutes(opts: SendOptions) {
     return ok(answer);
   }
 
-  /* send-finish. The contract's send_finish takes file ids and their hashes,
-     and the function must read every file first (1), with a path from the
-     database's answer in this request (7). send_finish names no path, so
-     the paths come from the start sent again: a replay with the same request
-     id makes nothing, counts nothing and gives back the same send and its
-     paths (the contract, send_start). Before that, work() says whether this
-     student has that send open for that piece, so a request id that is no
-     longer a live send is not sent to the start at all. */
+  /* send-finish. The function must read every file before send_finish (the
+     contract, 1), with a path from the database's answer in this request
+     (7). send_finish names no path, so they come from send_paths (PR 1095,
+     section 4): read-only, the pages of this student's own unfinished send
+     by its id, exactly as the start named them, and nothing for a send that
+     is another student's, the teacher's, handed in, dropped or past its two
+     hours. The start is never sent again here: nothing is made, dropped or
+     counted before send_finish. Until send_paths is on the database, the
+     call raises and the route is a plain server error.
+     Ruling 106: whether the piece is open now is not asked; a send that
+     holds its place can be finished, and send_finish says whether it is
+     Late or refused. */
   async function finish(body: Json, hash: string): Promise<SendAnswer> {
-    const asked = readStart(body);
+    const s = session(body);
+    const enrollment = uuid(body.enrollment_id);
     const submission = uuid(body.submission_id);
     const ids = fileIds(body.files);
-    if (!asked || !submission || !ids) return bad();
+    if (!s || !enrollment || !submission || !ids) return bad();
     if (!store) return server();
 
-    const w = await db.call(SQL.work, [asked.session, asked.enrollment, hash]);
-    if (!good(w)) return ok(refusal(w, ERRORS['send-finish']));
-    const piece = list(w.assessments).find(a => isObject(a) && a.id === asked.assessment) as Json | undefined;
-    const sending =
-      piece && isObject(piece.sending) && piece.sending.submission_id === submission ? piece.sending : null;
-    const sent = piece && isObject(piece.sent) && piece.sent.submission_id === submission ? piece.sent : null;
-    if (!sending) {
-      // Handed in already: the same finish again, answered as send_finish answers it, with nothing read.
-      if (sent) {
-        return ok({
-          ok: true,
-          replayed: true,
-          ...pick(sent, ['submission_id', 'sent_at']),
-          late: plain(sent.is_late),
-          ...pick(sent, ['pages']),
-        });
-      }
-      return ok({ ok: false, error: 'not_found' });
-    }
-    if (sending.intent !== 'new' && sending.intent !== 'replace') throw new TypeError('reply');
-
-    const r = await db.call(sending.intent === 'replace' ? SQL.replace : SQL.sendStart, [...asked.params, hash]);
+    const r = await db.call(SQL.sendPaths, [s, enrollment, submission, hash]);
     if (!good(r)) {
       const answer = refusal(r, ERRORS['send-finish']);
-      await after('send-finish');
+      // Not an unfinished send of this student's. If it is their work, handed in, this is the same finish
+      // again: answered as send_finish answers it, from work(), with nothing read.
+      if (answer.error === 'not_found') return ok(await handedIn(s, enrollment, submission, hash));
       return ok(answer);
     }
-    if (r.replayed !== true || uuid(r.submission_id) !== submission || r.state !== 'sending') {
-      // Not this send: the request id was not the one it was started with.
-      log({ route: 'send-finish', outcome: 'replay_mismatch' });
-      await after('send-finish');
-      return ok({ ok: false, error: 'not_found' });
-    }
-    const byId = new Map(sendFiles(r, asked.enrollment, asked.assessment, submission).map(f => [f.id, f]));
+    const assessment = uuid(r.assessment_id);
+    if (uuid(r.submission_id) !== submission || !assessment) throw new TypeError('reply');
+    const byId = new Map(sendFiles(r, enrollment, assessment, submission).map(f => [f.id, f]));
     const chosen = ids.map(id => byId.get(id));
     // A file that is not one of this send's: the phone's mistake. Nothing is read and send_finish is not asked.
-    if (chosen.includes(undefined)) {
-      await after('send-finish');
-      return bad();
-    }
+    if (chosen.includes(undefined)) return bad();
 
     // Every page and its thumbnail, read and checked (the contract, 1).
     const reasons = new Set<string>();
@@ -524,18 +506,32 @@ export function makeSendRoutes(opts: SendOptions) {
     }
 
     const files = checked.map(c => ({ file_id: c.id, sha256: (c as { sha256: string }).sha256 }));
-    const done = await db.call(SQL.sendFinish, [
-      asked.session,
-      asked.enrollment,
-      submission,
-      JSON.stringify(files),
-      hash,
-    ]);
+    const done = await db.call(SQL.sendFinish, [s, enrollment, submission, JSON.stringify(files), hash]);
     const answer = good(done)
       ? { ok: true, ...pick(done, ['replayed', 'submission_id', 'sent_at', 'late', 'pages']) }
       : refusal(done, ERRORS['send-finish']);
     await after('send-finish');
     return ok(answer);
+  }
+
+  /* The same finish again after it went through: the student's own work for
+     a piece, handed in, under that id. Anything else is not_found. */
+  async function handedIn(s: string, enrollment: string, submission: string, hash: string): Promise<Json> {
+    const w = await db.call(SQL.work, [s, enrollment, hash]);
+    if (!good(w)) return refusal(w, ERRORS['send-finish']);
+    for (const a of list(w.assessments)) {
+      const sent = isObject(a) && isObject(a.sent) ? a.sent : null;
+      if (sent && sent.submission_id === submission && sent.sent_by === 'student') {
+        return {
+          ok: true,
+          replayed: true,
+          ...pick(sent, ['submission_id', 'sent_at']),
+          late: plain(sent.is_late),
+          ...pick(sent, ['pages']),
+        };
+      }
+    }
+    return { ok: false, error: 'not_found' };
   }
 
   async function unsend(body: Json, hash: string): Promise<SendAnswer> {

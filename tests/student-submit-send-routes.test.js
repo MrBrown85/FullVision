@@ -223,7 +223,7 @@ describe('every route: Canada first, then the session, then the database', () =>
     await t.send({ route: 'unsend', session: CECE_PHONE, enrollment_id: CECE, assessment_id: LAB });
     const student = t.world.calls.filter(c => !c[0].startsWith('removal_'));
     expect(new Set(student.map(c => c[0]))).toEqual(
-      new Set(['send_start', 'work', 'send_finish', 'file_links', 'unsend']),
+      new Set(['send_start', 'send_paths', 'send_finish', 'file_links', 'unsend']),
     );
     for (const [, params] of student) {
       expect(params[0]).toBe(CECE_PHONE);
@@ -636,13 +636,8 @@ describe('send-finish', () => {
     const reads = t.world.storeCalls.filter(c => c[0] === 'read');
     expect(reads.map(c => c[1]).sort()).toEqual(sub.files.flatMap(f => [f.path, f.thumb_path]).sort());
     expect(reads.every(c => c[2] === 2_000_000)).toBe(true);
-    // The order: work, the start again, then send_finish (then the worker).
-    expect(names(t.world).filter(n => !n.startsWith('removal_'))).toEqual([
-      'send_start',
-      'work',
-      'send_start',
-      'send_finish',
-    ]);
+    // The order: the start, then at the finish send_paths and send_finish (then the worker).
+    expect(names(t.world).filter(n => !n.startsWith('removal_'))).toEqual(['send_start', 'send_paths', 'send_finish']);
     const [, params] = t.world.calls.find(c => c[0] === 'send_finish');
     expect(params.slice(0, 3)).toEqual([CECE_PHONE, CECE, s.submission_id]);
     // The hashes are of the files as stored: the pages had nothing to cut, so the bytes the phone sent.
@@ -650,6 +645,149 @@ describe('send-finish', () => {
       { file_id: s.files[0].file_id, sha256: sha(PAGE_JPEG) },
       { file_id: s.files[1].file_id, sha256: sha(PAGE2_JPEG) },
     ]);
+  });
+
+  describe('the paths come from send_paths, read-only: the start is never sent again (review M1)', () => {
+    const sendsOf = t => [...t.world.subs.values()].filter(x => x.state === 'sending');
+
+    it('asks send_paths with the session, the enrollment, the send and the hashed address, then send_finish', async () => {
+      const hash = await addressHash();
+      const t = setup();
+      const s = await started(t);
+      const before = t.world.calls.length;
+      expect((await t.send(finishBody(s))).body.ok).toBe(true);
+      const mine = t.world.calls.slice(before).filter(c => !c[0].startsWith('removal_'));
+      expect(mine.map(c => c[0])).toEqual(['send_paths', 'send_finish']);
+      expect(mine[0][1]).toEqual([CECE_PHONE, CECE, s.submission_id, hash]);
+    });
+
+    it('a wrong request id at the finish is not read: the open send is kept, nothing is started, it is handed in', async () => {
+      const t = setup();
+      const s = await started(t);
+      const r = await t.send(finishBody(s, { request_id: REQ2, pages: 'anything', assessment_id: ESSAY }));
+      expect(r.body).toMatchObject({ ok: true, submission_id: s.submission_id, pages: 2 });
+      expect(t.world.calls.filter(c => c[0] === 'send_start' || c[0] === 'replace').length).toBe(1);
+      expect([...t.world.subs.values()].filter(x => x.request_id === REQ2)).toEqual([]);
+      expect(t.world.queue).toEqual([]);
+    });
+
+    it('an Unsend from another tab while the finish is under way never brings the send back', async () => {
+      const t = setup();
+      const s = await started(t);
+      // The other tab's Unsend lands right after the finish's first question to the database, whichever it is.
+      for (const name of ['work', 'send_paths']) {
+        t.world.override[name] = (params, fns) => {
+          const r = JSON.parse(JSON.stringify(fns[name](params)));
+          t.world.override.work = t.world.override.send_paths = null;
+          fns.unsend([CECE_PHONE, CECE, LAB]);
+          return r;
+        };
+      }
+      const r = await t.send(finishBody(s));
+      expect(r.body).toEqual({ ok: false, error: 'not_found' });
+      expect(sendsOf(t)).toEqual([]);
+      expect(t.world.calls.filter(c => c[0] === 'send_start').length).toBe(1);
+    });
+
+    it('a stale send (a newer start took its place), an unsent one, another student’s or another class’s: not_found, nothing read, signed or made', async () => {
+      const t = setup();
+      const omar = await t.send({ ...startBody(), session: OMAR_PHONE, enrollment_id: OMAR, request_id: REQ2 });
+      const liam = await t.send({
+        ...startBody(),
+        session: LIAM_PHONE,
+        enrollment_id: LIAM,
+        assessment_id: MAP,
+        request_id: REQ2,
+      });
+      const old = await started(t);
+      const newer = await started(t, { request_id: REQ2 });
+      await t.send({ ...startBody({ assessment_id: ESSAY, request_id: REQ }) });
+      const essay = [...t.world.subs.values()].find(x => x.assessment === ESSAY);
+      await t.send({ route: 'unsend', session: CECE_PHONE, enrollment_id: CECE, assessment_id: ESSAY });
+      const UNKNOWN = '0e0e0e0e-0000-4000-8000-000000000009';
+      for (const id of [old.submission_id, essay.id, omar.body.submission_id, liam.body.submission_id, UNKNOWN]) {
+        const subs = JSON.stringify([...t.world.subs.values()]);
+        const before = t.world.calls.length;
+        const storeBefore = t.world.storeCalls.length;
+        const r = await t.send(finishBody(newer, { submission_id: id }));
+        expect(r.body, id).toEqual({ ok: false, error: 'not_found' });
+        expect(t.world.calls.slice(before).map(c => c[0])).toEqual(['send_paths', 'work']);
+        expect(t.world.storeCalls.slice(storeBefore)).toEqual([]);
+        expect(JSON.stringify([...t.world.subs.values()])).toBe(subs);
+      }
+    });
+
+    it('until send_paths is on the database: a plain server error, and nothing read, started or handed in', async () => {
+      const t = setup();
+      const s = await started(t);
+      t.world.override.send_paths = () => {
+        const e = new Error('function student_submit.send_paths does not exist');
+        e.name = 'PostgresError';
+        e.code = '42883';
+        throw e;
+      };
+      const before = t.world.calls.length;
+      const storeBefore = t.world.storeCalls.length;
+      const r = await t.send(finishBody(s));
+      expect(r).toEqual({ status: 500, body: { ok: false, error: 'server' } });
+      expect(t.world.calls.slice(before).map(c => c[0])).toEqual(['send_paths']);
+      expect(t.world.storeCalls.slice(storeBefore)).toEqual([]);
+      expect(t.world.subs.get(s.submission_id).state).toBe('sending');
+    });
+
+    it('a send_paths answer that is not this send’s: a server error, nothing read', async () => {
+      const OTHER = '0e0e0e0e-0000-4000-8000-000000000009';
+      for (const change of [
+        r => ({ ...r, submission_id: OTHER }),
+        r => ({ ...r, assessment_id: ESSAY }),
+        r => ({ ...r, assessment_id: 'lab' }),
+        r => ({ ...r, bucket: 'other' }),
+        r => ({ ...r, files: r.files.map(f => ({ ...f, path: f.path.replace(LAB, ESSAY) })) }),
+        r => ({ ...r, files: r.files.map(f => ({ ...f, thumb_path: f.thumb_path.replace(CECE, OMAR) })) }),
+      ]) {
+        const t = setup();
+        const s = await started(t);
+        t.world.override.send_paths = (params, fns) => change(fns.send_paths(params));
+        const r = await t.send(finishBody(s));
+        expect(r.status).toBe(500);
+        expect(t.world.storeCalls.filter(c => c[0] === 'read')).toEqual([]);
+        expect(names(t.world)).not.toContain('send_finish');
+      }
+    });
+
+    it.each(['card_locked', 'closed', 'signed_out', 'card_stopped', 'card_expired'])(
+      'send_paths answers %s: passed on, nothing read',
+      async error => {
+        const t = setup();
+        const s = await started(t);
+        t.world.override.send_paths = () => ({ ok: false, error });
+        expect((await t.send(finishBody(s))).body).toEqual({ ok: false, error });
+        expect(t.world.storeCalls.filter(c => c[0] === 'read')).toEqual([]);
+        expect(names(t.world)).not.toContain('send_finish');
+      },
+    );
+
+    it('ruling 106: work() says the piece is no longer open, the send is still under sending, the finish is taken, Late', async () => {
+      const t = setup();
+      const s = await started(t);
+      t.world.assessments[LAB].open = false;
+      const w = await t.send({ route: 'work', session: CECE_PHONE, enrollment_id: CECE });
+      const lab = w.body.assessments.find(a => a.id === LAB);
+      expect(lab.open).toBe(false);
+      expect(lab.sending.submission_id).toBe(s.submission_id);
+      const r = await t.send(finishBody(s));
+      expect(r.body).toMatchObject({ ok: true, late: true, submission_id: s.submission_id });
+      // The teacher moved the last day to before the day it started: the database refuses, and the route passes it on.
+      const t2 = setup();
+      const s2 = await started(t2);
+      t2.world.assessments[LAB].open = false;
+      t2.world.assessments[LAB].closed_before_start = true;
+      expect((await t2.send(finishBody(s2))).body).toEqual({
+        ok: false,
+        error: 'work_closed',
+        closed_on: '2026-11-10',
+      });
+    });
   });
 
   it('the hash the phone sends is never used', async () => {
@@ -760,7 +898,7 @@ describe('send-finish', () => {
     expect(names(t.world)).not.toContain('send_finish');
   });
 
-  it('another student’s send, or another class’s, through this session: not_found, nothing read, the start never sent again', async () => {
+  it('another student’s send, or another class’s, through this session: not_found, nothing read, no start sent', async () => {
     const t = setup();
     const omar = await t.send({ ...startBody(), session: OMAR_PHONE, enrollment_id: OMAR, request_id: REQ2 });
     const liam = await t.send({
@@ -776,7 +914,7 @@ describe('send-finish', () => {
       const storeBefore = t.world.storeCalls.length;
       const r = await t.send(finishBody(other));
       expect(r.body).toEqual({ ok: false, error: 'not_found' });
-      expect(t.world.calls.slice(before).map(c => c[0])).toEqual(['work']);
+      expect(t.world.calls.slice(before).map(c => c[0])).toEqual(['send_paths', 'work']);
       expect(t.world.storeCalls.slice(storeBefore)).toEqual([]);
     }
     // Naming Omar's class with Cece's session: the database's not_found.
@@ -792,43 +930,26 @@ describe('send-finish', () => {
     const storeBefore = t.world.storeCalls.length;
     const again = await t.send(finishBody(s));
     expect(again.body).toEqual({ ...first.body, replayed: true });
-    expect(t.world.calls.slice(before).map(c => c[0])).toEqual(['work']);
+    expect(t.world.calls.slice(before).map(c => c[0])).toEqual(['send_paths', 'work']);
     expect(t.world.storeCalls.slice(storeBefore)).toEqual([]);
   });
 
-  it('a request id that is not the send’s: not_found, nothing read, send_finish never asked', async () => {
+  it('the same finish again after the work became the teacher’s (an Unsend that kept their pages): not_found', async () => {
     const t = setup();
     const s = await started(t);
-    const r = await t.send(finishBody(s, { request_id: REQ2 }));
-    expect(r.body).toEqual({ ok: false, error: 'not_found' });
-    expect(t.world.storeCalls.filter(c => c[0] === 'read')).toEqual([]);
-    expect(names(t.world)).not.toContain('send_finish');
-    expect(t.logs).toContainEqual({ route: 'send-finish', outcome: 'replay_mismatch' });
+    await t.send(finishBody(s));
+    t.world.subs.get(s.submission_id).sent_by = 'teacher';
+    expect((await t.send(finishBody(s))).body).toEqual({ ok: false, error: 'not_found' });
   });
 
-  it('the start sent again must say it is a replay, of this send: otherwise nothing is read', async () => {
-    for (const change of [
-      r => ({ ...r, replayed: false }),
-      r => ({ ...r, submission_id: REQ2 }),
-      r => ({ ...r, state: 'sent' }),
-    ]) {
-      const t = setup();
-      const s = await started(t);
-      t.world.override.send_start = (params, fns) => change(fns.send_start(params));
-      const r = await t.send(finishBody(s));
-      expect(r.body).toEqual({ ok: false, error: 'not_found' });
-      expect(t.world.storeCalls.filter(c => c[0] === 'read')).toEqual([]);
-      expect(names(t.world)).not.toContain('send_finish');
-    }
-  });
-
-  it('a send that lost its place: the start answers expired, and so does the route', async () => {
+  it('a send that lost its place: send_paths answers expired, and so does the route, with nothing read', async () => {
     const t = setup();
     const s = await started(t);
     t.world.subs.get(s.submission_id).expired = true;
     const r = await t.send(finishBody(s));
     expect(r.body).toEqual({ ok: false, error: 'expired' });
     expect(names(t.world)).not.toContain('send_finish');
+    expect(t.world.storeCalls.filter(c => c[0] === 'read')).toEqual([]);
   });
 
   it('the files list is checked: 1 to 30 ids, each once', async () => {
@@ -884,7 +1005,7 @@ describe('replace, start to finish', () => {
     expect(oldPaths.every(p => t.world.objects.has(p))).toBe(true);
     const r = await t.send({ ...finishBody(n, { request_id: REQ2, files: [n.files[0].file_id] }) });
     expect(r.body).toMatchObject({ ok: true, pages: 1 });
-    expect(t.world.calls.filter(c => c[0] === 'replace').length).toBe(2);
+    expect(t.world.calls.filter(c => c[0] === 'replace').length).toBe(1);
     expect(oldPaths.some(p => t.world.objects.has(p))).toBe(false);
     expect(t.world.queue.every(q => q.done)).toBe(true);
   });
@@ -1065,7 +1186,7 @@ describe('the removal worker and sweep', () => {
     const s = await started(t);
     const before = t.world.calls.length;
     await t.send(finishBody(s));
-    expect(t.world.calls.slice(before).map(c => c[0])).toEqual(['work', 'send_start', 'send_finish', 'removal_batch']);
+    expect(t.world.calls.slice(before).map(c => c[0])).toEqual(['send_paths', 'send_finish', 'removal_batch']);
   });
 
   it('deletes exactly the queued paths, then reports them done; asks for 200 at a time', async () => {

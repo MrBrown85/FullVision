@@ -2,10 +2,11 @@
  * A stand-in for Batch B's student_submit functions and for the
  * student-photos bucket, for tests/student-submit-send-routes.test.js.
  *
- * The database half answers the eight statements send-routes.ts makes
- * (work, send_start, replace, send_finish, unsend, file_links,
+ * The database half answers the statements send-routes.ts makes (work,
+ * send_start, replace, send_paths, send_finish, unsend, file_links,
  * removal_batch, removal_done) as migrations/local-test/batch-b-contract.md
- * says they answer, for a small world: two classes of two teachers, three
+ * says they answer, and send_paths as PR 1095 defines it
+ * (migrations/2026111130_student_send_rules.sql, section 4), for a small world: two classes of two teachers, three
  * students, a session per phone. It RAISES { code: '22023' } for every
  * shape the contract says raises, so a test fails if the function ever
  * sends one. It is not the SQL: the SQL's own rules are proven by Batch B's
@@ -59,6 +60,7 @@ export const STATEMENTS = {
     'select student_submit.send_start($1::text, $2::uuid, $3::uuid, $4::jsonb, $5::text, $6::text, $7::uuid, $8::text) as r',
   replace:
     'select student_submit.replace($1::text, $2::uuid, $3::uuid, $4::jsonb, $5::text, $6::text, $7::uuid, $8::text) as r',
+  send_paths: 'select student_submit.send_paths($1::text, $2::uuid, $3::uuid, $4::text) as r',
   send_finish: 'select student_submit.send_finish($1::text, $2::uuid, $3::uuid, $4::jsonb, $5::text) as r',
   unsend: 'select student_submit.unsend($1::text, $2::uuid, $3::uuid, $4::text) as r',
   file_links: 'select student_submit.file_links($1::text, $2::uuid, $3::uuid, $4::text) as r',
@@ -140,7 +142,7 @@ export function fakeWorld() {
                     sent_at: s.sent_at,
                     sent_by: s.sent_by,
                     on_paper: false,
-                    is_late: false,
+                    is_late: !!s.late,
                     note: s.note,
                     pages: s.files.length,
                     grading: false,
@@ -244,6 +246,36 @@ export function fakeWorld() {
       return fns.begin('replace', params);
     },
 
+    /* PR 1095, section 4: the pages of THIS student's OWN unfinished send,
+       by its id, as the start gives them. Read-only. A send that is
+       another student's, another class's, the teacher's, handed in or
+       dropped is not_found; one past its two hours is expired. */
+    send_paths([token, e, subId]) {
+      if (!subId) raise();
+      const err = sessionError(token, e);
+      if (err) return err;
+      const sub = subs.get(subId);
+      if (
+        !sub ||
+        sub.enrollment !== e ||
+        sub.course !== enrollments[e].course ||
+        sub.sent_by !== 'student' ||
+        sub.state !== 'sending'
+      ) {
+        return { ok: false, error: 'not_found' };
+      }
+      if (sub.expired) return { ok: false, error: 'expired' };
+      return {
+        ok: true,
+        submission_id: sub.id,
+        assessment_id: sub.assessment,
+        version: 1,
+        finish_by: sub.finish_by,
+        bucket: 'student-photos',
+        files: uploadJson(sub),
+      };
+    },
+
     send_finish([token, e, subId, filesJson]) {
       if (!subId) raise();
       const files = JSON.parse(filesJson);
@@ -267,11 +299,15 @@ export function fakeWorld() {
           replayed: true,
           submission_id: sub.id,
           sent_at: sub.sent_at,
-          late: false,
+          late: !!sub.late,
           pages: sub.files.length,
         };
       }
       if (files.some(f => !sub.files.some(x => x.id === f.file_id))) raise();
+      // Ruling 106 (PR 1095): refused only when the teacher moved the last day to before the day the send
+      // started; a send started while the piece was open and finished after its last day is taken, Late.
+      const piece = assessments[sub.assessment];
+      if (piece.closed_before_start) return { ok: false, error: 'work_closed', closed_on: '2026-11-10' };
       const missing = files
         .filter(f => {
           const x = sub.files.find(y => y.id === f.file_id);
@@ -298,12 +334,13 @@ export function fakeWorld() {
       sub.state = 'sent';
       sub.intent = 'new';
       sub.sent_at = '2026-11-11T17:30:00+00:00';
+      sub.late = !piece.open;
       return {
         ok: true,
         replayed: false,
         submission_id: sub.id,
         sent_at: sub.sent_at,
-        late: false,
+        late: sub.late,
         pages: sub.files.length,
       };
     },
