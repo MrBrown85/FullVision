@@ -13313,29 +13313,12 @@ window.PageAssignments = (function () {
   function _graderReturnHtml(cid, a, sid, view, attrs) {
     // The dialog's Return; one student's view on the page passes its own.
     var act = attrs || 'data-grader="return"';
-    var klass = getReturnSettings(cid);
-    if (!klass.student_page || isDibelsScored(a)) return '';
-    // A Missing or Excused piece is never a draft (GradeState.stateOf).
-    var waiting = _graderReturnIds(sid, view)
-      .filter(function (id) {
-        return GradeState.stateOf(cid, id, a.id) === GradeState.DRAFT;
-      })
-      .map(function (id) {
-        return getGradeReturn(cid, id, a.id);
-      });
-    // As Soon As I Save: nothing waits, so there is nothing to return.
-    if (!waiting.length && !GradeState.holds(klass)) return '';
-    var row = getGradeReturn(cid, sid, a.id);
+    // What the row says is worked out once for both layouts (S11-T1).
     // Marks made since the last Return wait for one too (S9-F1), on a grade
     // already returned: Return gives them (Grader.returnGrades).
-    var marksWait =
-      !waiting.length &&
-      typeof studentMarkupWaiting === 'function' &&
-      GradeState.stateOf(cid, sid, a.id) === GradeState.RETURNED &&
-      _graderReturnIds(sid, view).some(function (id) {
-        return studentMarkupWaiting(cid, id, a.id);
-      });
-    if (marksWait) {
+    var area = GraderWork.returnArea(cid, a, sid, _graderReturnIds(sid, view), { marks: true });
+    if (!area) return '';
+    if (area.kind === 'marks') {
       return (
         '<button type="button" class="grader-return-btn" ' +
         act +
@@ -13345,26 +13328,21 @@ window.PageAssignments = (function () {
         '</p></div>'
       );
     }
-    if (!waiting.length) {
-      if (GradeState.stateOf(cid, sid, a.id) !== GradeState.RETURNED) {
-        // Missing, Excused or Late with nothing in: there is nothing to return.
-        if (getAssignmentStatus(cid, sid, a.id)) return '';
-        return '<button type="button" class="grader-return-btn" ' + act + ' disabled>Return</button>';
-      }
-      var on = row && row.returned_at ? formatShortDate(row.returned_at) : '';
+    if (area.kind === 'empty') {
+      return '<button type="button" class="grader-return-btn" ' + act + ' disabled>Return</button>';
+    }
+    if (area.kind === 'returned') {
+      var on = area.returnedAt ? formatShortDate(area.returnedAt) : '';
       return '<span class="grader-returned">' + esc(on ? 'Returned ' + on : 'Returned') + '</span>';
     }
-    // The grade the student was given before this change, if there was one.
-    var given = waiting.find(function (r) {
-      return r.returned_copy;
-    });
+    var given = area.given;
     var still = '';
     if (given) {
       var st = getStudents(cid).find(function (x) {
         return x.id === sid;
       });
       var who = view ? view.label : st ? displayNameFirst(st) : 'The student';
-      var when = given.returned_at ? ' ' + formatShortDate(given.returned_at) : '';
+      var when = given.returnedAt ? ' ' + formatShortDate(given.returnedAt) : '';
       still = '<p class="grader-draft-still">' + esc(who + ' still sees the grade you returned' + when + '.') + '</p>';
     }
     return (

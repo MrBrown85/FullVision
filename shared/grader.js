@@ -555,9 +555,61 @@ window.Grader = (function () {
     return { set: set, paper: markStudentWorkOnPaper(cid, aid, [sid]) };
   }
 
+  /* ── The Return area (S11-T1) ───────────────────────────────────
+     What the place beside Return says for one student's piece, worked out
+     once for both layouts: the desktop grader's row above its footer
+     (teacher/page-assignments.js, _graderReturnHtml) and the phone's bar
+     under its cards (teacher-mobile/tab-grade.js, _returnBarOwn). Each
+     draws it its own way. `ids` are the students its Return returns (a
+     group's linked members, or the one student); `opts.marks`: marks made
+     since the last Return wait for one too (S9-F1; the desktop asks).
+     Answers null (nothing to draw: no student page, a DIBELS benchmark, a
+     class that returns as soon as it saves with nothing waiting, or a
+     status with nothing in), or one of:
+       { kind: 'empty' }     Return, greyed out: nothing graded yet
+       { kind: 'returned', returnedAt }
+       { kind: 'marks' }     Draft: Marks saved. Not returned yet.
+       { kind: 'draft', given }  Draft: Saved. Not returned yet; `given` is
+         { returnedAt } when the student still sees a grade returned before. */
+  function returnArea(cid, a, sid, ids, opts) {
+    if (!a || isDibelsScored(a) || typeof getReturnSettings !== 'function') return null;
+    var klass = getReturnSettings(cid);
+    if (!klass.student_page) return null;
+    // A Missing or Excused piece is never a draft (GradeState.stateOf).
+    var waiting = GradeState.draftsIn(cid, a.id, ids).map(function (id) {
+      return getGradeReturn(cid, id, a.id);
+    });
+    // As Soon As I Save: nothing waits, so there is nothing to return.
+    if (!waiting.length && !GradeState.holds(klass)) return null;
+    var state = GradeState.stateOf(cid, sid, a.id);
+    if (!waiting.length) {
+      var marks =
+        opts &&
+        opts.marks &&
+        typeof studentMarkupWaiting === 'function' &&
+        state === GradeState.RETURNED &&
+        ids.some(function (id) {
+          return studentMarkupWaiting(cid, id, a.id);
+        });
+      if (marks) return { kind: 'marks' };
+      if (state !== GradeState.RETURNED) {
+        // Missing, Excused or Late with nothing in: there is nothing to return.
+        return getAssignmentStatus(cid, sid, a.id) ? null : { kind: 'empty' };
+      }
+      var row = getGradeReturn(cid, sid, a.id);
+      return { kind: 'returned', returnedAt: (row && row.returned_at) || null };
+    }
+    // The grade the student was given before this change, if there was one.
+    var given = waiting.find(function (r) {
+      return r && r.returned_copy;
+    });
+    return { kind: 'draft', given: given ? { returnedAt: given.returned_at || null } : null };
+  }
+
   /* Reads, and Delete Work, which writes no grade, so they sit apart from
      the grade actions (tests/grader.test.js holds Grader to those). */
   window.GraderWork = {
+    returnArea: returnArea,
     workOnInClass: workOnInClass,
     workOn: workOn,
     workStateOf: workStateOf,
