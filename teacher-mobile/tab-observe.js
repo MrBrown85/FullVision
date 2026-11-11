@@ -287,8 +287,18 @@ window.MObserve = (function () {
     );
   }
 
-  // html-safe: _rowHtml escapes the value; id, kind and key are our constants.
+  // html-safe: _rowHtml escapes the value; id, kind and key are our constants; obsPrivateLabelHtml is constant markup.
   function _contextRowHtml() {
+    // An observation from a reflection keeps its context for good
+    // (updateQuickOb refuses to change it): a fixed row, no picker.
+    if (_contextFixed()) {
+      return (
+        '<div class="m-edit-row m-edit-row-fixed" id="m-obs-ctx-row">' +
+        '<span class="m-edit-row-k">Context</span><span class="m-edit-row-v">' +
+        obsPrivateLabelHtml({ context: _selectedContext }) +
+        '</span></div>'
+      );
+    }
     var c = _selectedContext && OBS_CONTEXTS[_selectedContext];
     return _rowHtml('m-obs-ctx-row', 'context', 'Context', c ? c.label : '');
   }
@@ -525,6 +535,7 @@ window.MObserve = (function () {
 
   /* A picker inside the sheet, in place of the form. */
   function openPicker(kind) {
+    if (kind === 'context' && _contextFixed()) return;
     var form = document.querySelector('#m-obs-edit .m-edit-form');
     var pick = document.getElementById('m-obs-edit-picker');
     if (!form || !pick) return;
@@ -551,10 +562,16 @@ window.MObserve = (function () {
     if (first) first.focus();
   }
 
+  /* Editing an observation from a reflection: its context stays. */
+  function _contextFixed() {
+    return !!_editingObId && isReflectionObservation({ context: _selectedContext });
+  }
+
   /* A tap in a picker: one-choice pickers close, the others tick. */
   function pick(kind, val, btn) {
-    if (kind === 'context') _selectedContext = val || null;
-    else if (kind === 'assessment') _selectedAssessment = val || null;
+    if (kind === 'context') {
+      if (!_contextFixed()) _selectedContext = val || null;
+    } else if (kind === 'assessment') _selectedAssessment = val || null;
     else if (kind === 'competency') {
       if (_selectedCompetency !== (val || null)) _selectedLevel = null;
       _selectedCompetency = val || null;
@@ -754,6 +771,7 @@ window.MObserve = (function () {
   }
 
   function setContext(val) {
+    if (_contextFixed()) return;
     _selectedContext = _selectedContext === val ? null : val;
     var row = document.getElementById('m-obs-ctx-row');
     if (row) row.outerHTML = _contextRowHtml();

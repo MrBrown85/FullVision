@@ -16,6 +16,12 @@ the file's last step, by a second run, and by the live post-check.) Two
 entries are caught by the file itself, which refuses to apply; they say so.
 
 It prints one line per change: how many checks failed, and the first.
+
+With BATCH_B_WITH_FIXES=1 the suite runs with the review fixes applied
+after the two files (2026111104). Each change is then made to the fixes'
+copy of a function too, where that copy holds the same text, so a change to
+finish_work_upload, send_finish or unsend lands in the body that is live;
+the fixes' lists are stood aside the same way.
 """
 import subprocess, tempfile
 from submissions_common import *
@@ -286,6 +292,11 @@ CHANGES = [
      "            raise exception 'a submission keeps its student, assessment and class' using errcode = '23514';", "            null;", FAST),
 ]
 
+# With the fixes applied: the same change in the fixes' copy where its text there differs (the fix put
+# lines inside the text the change matches).
+IN_FIXES = {"a student's Unsend removes the pages the teacher added too":
+            ("    if _kept = 0 then\n        -- An Add as More Pages", "    if true then\n        -- An Add as More Pages")}
+
 def neutral(text):
     return MARK.sub(lambda m: m.group(1) + "            ('public.no_such_function_at_all()', 'absent')" + m.group(3), text)
 
@@ -302,10 +313,15 @@ if __name__ == '__main__':
             # M2's guard compares the three policy functions with its list; stood aside like the rest.
             body = neutral(texts[f].replace(old, new) if f == which else texts[f])
             paths[f] = os.path.join(tmp, os.path.basename(f)); open(paths[f], 'w').write(body)
-        r = subprocess.run([sys.executable, os.path.join(HERE, 'submissions.py')] + scenarios.split(), capture_output=True, text=True, cwd=HERE,
-                           env=dict(os.environ, BATCH_B_M1=paths[M1], BATCH_B_M2=paths[M2]))
+        env = dict(os.environ, BATCH_B_M1=paths[M1], BATCH_B_M2=paths[M2]); ported = False
+        if WITH_FIXES:
+            ft = text_of(FIXES); fo, fn_ = IN_FIXES.get(label, (old, new)); ported = ft.count(fo) == 1 and which == M1
+            env['BATCH_B_FIXES_FILE'] = os.path.join(tmp, 'fixes.sql')
+            open(env['BATCH_B_FIXES_FILE'], 'w').write(neutral(ft.replace(fo, fn_) if ported else ft))
+        r = subprocess.run([sys.executable, os.path.join(HERE, 'submissions.py')] + scenarios.split(), capture_output=True, text=True, cwd=HERE, env=env)
         fails = [l[5:].split(' :: ')[0] for l in r.stdout.splitlines() if l.startswith('FAIL ')]
         crashed = r.returncode != 0 and not fails
+        if ported: label += '  [made in the fixes\' copy too]'
         if fails: print('%2d  noticed by %3d checks  %s\n      first: %s' % (n, len(fails), label, fails[0][:170]))
         elif crashed: print('%2d  noticed: the suite stopped  %s\n      %s' % (n, label, (r.stderr.strip().splitlines() or ['?'])[-1][:170]))
         else: print('%2d  NOT NOTICED  %s' % (n, label)); unnoticed.append(n)

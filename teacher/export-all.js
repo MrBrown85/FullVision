@@ -399,7 +399,14 @@
             day(ob.date || ob.created),
             cname,
             studentName(st),
-            kind ? kind.label : text(ob.sentiment),
+            // One saved from a student's reflection says so here, as it
+            // does in the app's lists (ruling 110).
+            [
+              kind ? kind.label : text(ob.sentiment),
+              isReflectionObservation(ob) ? 'From a reflection. Not used in reports.' : '',
+            ]
+              .filter(Boolean)
+              .join(' · '),
             text(linked),
             comp,
             text(ob.text),

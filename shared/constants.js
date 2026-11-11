@@ -702,8 +702,9 @@ const OBS_SENTIMENTS = {
    where it is saved by its context, 'reflection' (observation.context_type,
    which takes any text and is sent and read back with the observation; no
    context the teacher picks is called that). The mark holds whatever the
-   teacher later makes its type; choosing another context in the edit
-   screens replaces it. */
+   teacher later makes its type, and for good: the edit screens show the
+   context as fixed, and updateQuickOb (shared/data.js) refuses to change
+   it. */
 const REFLECTION_OBS_CONTEXT = 'reflection';
 function isReflectionObservation(ob) {
   return !!ob && ob.context === REFLECTION_OBS_CONTEXT;
