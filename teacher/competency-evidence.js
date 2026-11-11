@@ -121,7 +121,7 @@ window.CompetencyEvidence = (function () {
   // html-safe: titles and criterion names are escaped; ids, levels, dates and PROF_COLORS are ours.
   function scoreRowHtml(cid, sid, sc, assessMap) {
     var assess = assessMap[sc.assessmentId];
-    var sColor = PROF_COLORS[sc.level || roundLevel(sc.score)] || PROF_COLORS[0];
+    var sColor = PROF_COLORS[sc.level || sc.score] || PROF_COLORS[0];
     var href = assess ? '/assignments?course=' + cid + '&open=' + assess.id + '&student=' + sid : '';
     var title = assess ? esc(assess.title) : 'Unknown';
     // A rubric criterion's score names its criterion: two on one competency

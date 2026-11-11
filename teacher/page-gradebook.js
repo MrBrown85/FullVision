@@ -3911,7 +3911,7 @@ window.PageGradebook = (function () {
       // levels. Anything else that isn't a score (a typo, 3.5 or 9 as a
       // proficiency) leaves the saved score alone.
       if (typed === '') val = isPts ? null : 0;
-      else if (isPts ? val == null || isNaN(val) : !(val >= 1 && val <= 4 && val === Math.round(val))) return;
+      else if (isPts ? val == null || isNaN(val) : !(val >= 1 && val <= 4 && Number.isInteger(val))) return;
       var undo = _pushUndo(cid, sid, aid, tagIds);
       // Apply score to all tags in this assessment. A save this device
       // couldn't keep shows on the sync dot (data.js), not here.

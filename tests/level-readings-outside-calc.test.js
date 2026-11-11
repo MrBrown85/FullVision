@@ -247,6 +247,28 @@ describe.each(VALUES)('a level of %s', v => {
   });
 });
 
+describe('the phone’s Focus Areas: competencies below Proficient, by the figure shown', () => {
+  // 2.94 prints 2.9 and is listed; 2.95, even a hair under, prints 3.0 and is not.
+  it.each([
+    [2.4, true],
+    [2.94, true],
+    [hair(2.95), false],
+    [2.95, false],
+    [2.97, false],
+    [3, false],
+  ])('%s listed: %s', (v, listed) => {
+    seed();
+    const real = globalThis.getFocusAreas;
+    globalThis.getFocusAreas = () => [{ prof: v, tag: { label: 'Evidence' }, section: { color: '#336699' } }];
+    try {
+      const detail = MStudentDetail.renderDetail({ cid: CID, sid: ME, renderBadges: () => '' });
+      expect(detail.indexOf('Focus Areas') >= 0).toBe(listed);
+    } finally {
+      globalThis.getFocusAreas = real;
+    }
+  });
+});
+
 describe('Download All My Data names a rubric level as its figure says', () => {
   it('the word and the figure are the same step', () => {
     if (typeof ExportAll === 'undefined')

@@ -113,7 +113,7 @@ describe('grades are formatted only in calc.js', () => {
 const ROUND_EXEMPT = new Set(['shared/calc.js', 'shared/seed-data.js']);
 // An argument that looks like a level or a % by its names.
 const LEVELISH =
-  /level|lvl|prof|avg|overall|score|mean|median|pct|percent|grade|\bsp\b|\bgp\b|\bv\b|value|\bnow\b|\bstart\b|\bthen\b|\bval\b|\bR\b/i;
+  /level|lvl|prof|avg|overall|score|mean|median|pct|percent|grade|current|\bsp\b|\bgp\b|\bv\b|value|\bnow\b|\bstart\b|\bthen\b|\bval\b|\bR\b|\*\s*100\b/i;
 // Rounding what a calc.js reader gave (tenths of a printed figure) is fine.
 const READ_FIRST = /^(printedLevel|roundLevel|oneDecimal|wholePercent)\(/;
 
@@ -122,6 +122,15 @@ const READ_FIRST = /^(printedLevel|roundLevel|oneDecimal|wholePercent)\(/;
 const NOT_A_GRADE = {
   'shared/backup-restore.js floor v': 'a whole-number check on a restored setting',
   'shared/constants.js round v * 100': 'formatPoints: points to two decimals',
+  'shared/constants.js round n * 100': 'a points score as saved, to two decimals',
+  'teacher/class-results.js round (n / total) * 100': 'a share of students',
+  'teacher/cm-questionnaires.js round (answered / students.length) * 100': 'a share answered',
+  'teacher/dash-class-manager.js round dw * 100': 'a Decaying Average weight, a setting',
+  'teacher/dash-class-manager.js round ((e.clientX - d.rect.left) / d.rect.width) * 100 * (1 / snap)':
+    'a Counts As % dragged on its slider',
+  'teacher/grading-setup-copy.js round calc.decayWeight * 100': 'a Decaying Average weight, a setting',
+  'teacher/rubric-print.js round (f - 0.05) * 100': 'a print scale',
+  'teacher/rubric-print.js round out.scale * 100': 'a print scale',
   'shared/data.js floor Number(v)': 'a whole-number setting',
   'shared/data.js floor v': 'a whole-number check (a habit rating, a count)',
   'shared/phone-report-view.js round Number(level) || 0':
@@ -145,7 +154,6 @@ const NOT_A_GRADE = {
   'teacher/page-assignments.js round r.left + r.width / 2 - boxRect.left - 8': 'a pointer’s position',
   'teacher/page-assignments.js round (parseLocalDate(r.revise_by) - day) / 86400000': 'days',
   'teacher/page-dashboard.js round r.bottom - c.top + 2': 'a tip’s position',
-  'teacher/page-gradebook.js round val': 'checks a typed level is whole',
   'teacher/page-student.js round p.R - lg.R': 'points between two course % as shown',
   'teacher/page-student.js round one.R - lg.R': 'points between two course % as shown',
   'teacher/page-student.js round (Math.min(e.score, 4) / 4) * 28': 'a bar’s height',
@@ -253,6 +261,19 @@ describe('a level or % is read only through calc.js', () => {
       .filter(([, n, cap]) => n > cap)
       .map(([rel, n, cap]) => rel + ': ' + n + ' > ' + cap);
     expect(over).toEqual([]);
+  });
+
+  it('prints a one-decimal figure only from calc.js (oneDecimal(…).toFixed(1))', () => {
+    const hits = [];
+    files.forEach(({ rel, src }) => {
+      let at = src.indexOf('.toFixed(1)');
+      while (at >= 0) {
+        const line = src.slice(src.lastIndexOf('\n', at) + 1, at);
+        if (!/oneDecimal\([^;]*\)$/.test(line)) hits.push(rel + ': ' + line.trim());
+        at = src.indexOf('.toFixed(1)', at + 1);
+      }
+    });
+    expect(hits).toEqual([]);
   });
 
   it('catches the old ways of reading a level', () => {
