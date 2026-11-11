@@ -352,6 +352,21 @@ describe('Grader: each action passes through to one data.js writer', () => {
       [CID, 'essay', ['s1', 's2']],
       [CID, null, 'essay', 'return'],
     ],
+    // Return for Revision and Take Back (S11): the data layer's Demo-only writers.
+    [
+      'returnForRevision',
+      [CID, 's1', 'essay', { what_to_fix: 'Add a reason.', keep_grade: true }, 'k1'],
+      'returnForRevision',
+      [CID, 's1', 'essay', { what_to_fix: 'Add a reason.', keep_grade: true }, 'k1'],
+      [CID, 's1', 'essay', 'returnForRevision'],
+    ],
+    [
+      'cancelRevision',
+      [CID, 's1', 'essay', 'rv1', 'k2'],
+      'cancelRevision',
+      [CID, 'rv1', 'k2'],
+      [CID, 's1', 'essay', 'cancelRevision'],
+    ],
   ];
 
   it.each(cases)('%s%j', (action, args, writer, writerArgs, heardArgs) => {

@@ -57,6 +57,8 @@ window.PageGradebook = (function () {
   // questions waiting on each cell (getQuestionsWaiting, shared/data.js).
   var _questionsOnly = false;
   var _questions = null;
+  // Revisions (S11): true while the class's revisions show (GraderWork.revisionsOnInClass).
+  var _revisions = false;
   var _drafts = null;
   var _scrollShadowCleanup = null;
   var _scrollKey = null; // class and view of the last render, so a redraw keeps the table's scroll
@@ -350,6 +352,7 @@ window.PageGradebook = (function () {
     // count as the grader's Show bar and the dashboard's To Grade cell.
     _work = _countWork(cid, students, assessments);
     if (!_work || !_work.total) _toGradeOnly = false;
+    _revisions = !!window.GraderWork && GraderWork.revisionsOnInClass(cid);
     // Questions From Students (S10-F4), over the students and columns shown.
     _questions = _countQuestions(cid, students, assessments);
     if (!_questions || !_questions.total) _questionsOnly = false;
@@ -837,6 +840,9 @@ window.PageGradebook = (function () {
           WORK_CAMERA +
           'Has photos</span>'
         : '') +
+      (_revisions
+        ? '<span class="gb-key-item"><span class="gb-revising">Revising</span>Returned for revision</span>'
+        : '') +
       (_questions ? '<span class="gb-key-item">' + QUESTION_DOT + 'Question waiting</span>' : '') +
       '</div>';
     return html;
@@ -877,10 +883,10 @@ window.PageGradebook = (function () {
     });
     var out = { byAid: {}, bySid: {}, total: 0, returns: {} };
     assessments.forEach(function (a) {
-      var waiting = GradeState.draftsIn(cid, a.id, ids);
+      var waiting = GraderWork.draftsIn(cid, a.id, ids);
       if (!waiting.length) return;
       out.byAid[a.id] = waiting;
-      out.returns[a.id] = GradeState.draftsReturned(cid, a.id, ids);
+      out.returns[a.id] = GraderWork.draftsReturned(cid, a.id, ids);
       waiting.forEach(function (sid) {
         out.bySid[sid] = true;
       });
@@ -1067,7 +1073,7 @@ window.PageGradebook = (function () {
     var cid = activeCourse;
     var klass = getReturnSettings(cid);
     if (!klass.student_page || !GradeState.holds(klass)) return false;
-    var waiting = GradeState.draftsIn(cid, aid, _rowIds());
+    var waiting = GraderWork.draftsIn(cid, aid, _rowIds());
     if (!waiting.length) return false;
     Grader.returnGrades(cid, aid, GradeState.returnTogether(cid, aid, waiting));
     clearProfCache();
@@ -1086,7 +1092,7 @@ window.PageGradebook = (function () {
   function _askReturnDrafts(button) {
     var cid = activeCourse;
     var aid = button.dataset.aid;
-    var waiting = _drafts ? GradeState.draftsReturned(cid, aid, _rowIds()) : [];
+    var waiting = _drafts ? GraderWork.draftsReturned(cid, aid, _rowIds()) : [];
     var n = waiting.length;
     if (!n) return;
     // The dialog gives the focus back to what had it when it opened. Safari
@@ -2291,6 +2297,9 @@ window.PageGradebook = (function () {
           display = '<span class="gb-to-grade">To Grade</span>';
         }
         if (work && work.photos) display += WORK_CAMERA;
+        // Out for revision (S11): "Revising" under the grade, nothing in yet.
+        var revising = _revisions && GraderWork.revisionStateOf(cid, s.id, a.id) === 'revising';
+        if (revising) display += '<span class="gb-revising">Revising</span>';
         // A question waiting (S10-F4): the yellow dot and its hover line.
         var question = _questionCell(a.id, s.id);
         if (question) display += QUESTION_DOT;
@@ -2333,6 +2342,7 @@ window.PageGradebook = (function () {
           (cell.late && !statusMark ? ', Late' : '') +
           (draft ? DRAFT_CELL_WORDS : '') +
           (work ? esc(work.words) : '') +
+          (revising ? ', returned for revision' : '') +
           (question ? ', question waiting' : '') +
           '"' +
           (cellTitle ? ' title="' + esc(cellTitle) + '"' : '') +
@@ -3564,7 +3574,7 @@ window.PageGradebook = (function () {
     // Print Rubrics (or Print Scores), as on Class Results and the grader.
     var printLabel = window.RubricPrint ? RubricPrint.printLabel(activeCourse, assess) : '';
     // Return N Graded and who is waiting, when the column has drafts (S1-F1).
-    var waiting = _drafts ? GradeState.draftsReturned(activeCourse, aid, _rowIds()) : [];
+    var waiting = _drafts ? GraderWork.draftsReturned(activeCourse, aid, _rowIds()) : [];
     // html-safe: the hint is a figure from calc.js, escaped; the drafts line's names go through esc
     menu.innerHTML =
       (waiting.length

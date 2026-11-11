@@ -1734,40 +1734,32 @@ window.MGrade = (function () {
 
     function _returnBarOwn(cid, a, unit, last) {
       var none = { state: '', act: '' };
-      if (!unit || isDibelsScored(a)) return none;
-      var sid = unit.st.id;
+      if (!unit) return none;
       var label = last ? 'Return' : 'Return and Next';
-      // A Missing or Excused piece is never a draft (GradeState.stateOf).
-      var waiting = GradeState.draftsIn(cid, a.id, _cardReturnIds(unit)).map(function (id) {
-        return getGradeReturn(cid, id, a.id);
-      });
-      if (!waiting.length) {
-        if (GradeState.stateOf(cid, sid, a.id) !== GradeState.RETURNED) {
-          // Missing, Excused or Late with nothing in: there is nothing to return.
-          if (getAssignmentStatus(cid, sid, a.id)) return none;
-          return {
-            state: '',
-            act:
-              '<button type="button" class="m-grade-return-btn" data-action="m-grade-return-next" disabled>' +
-              label +
-              '</button>',
-          };
-        }
-        var row = getGradeReturn(cid, sid, a.id);
-        var on = row && row.returned_at ? formatShortDate(row.returned_at) : '';
+      // What the bar says is worked out once for both layouts (S11-T1).
+      var area = GraderWork.returnArea(cid, a, unit.st.id, _cardReturnIds(unit));
+      if (!area) return none;
+      if (area.kind === 'empty') {
+        return {
+          state: '',
+          act:
+            '<button type="button" class="m-grade-return-btn" data-action="m-grade-return-next" disabled>' +
+            label +
+            '</button>',
+        };
+      }
+      if (area.kind === 'returned') {
+        var on = area.returnedAt ? formatShortDate(area.returnedAt) : '';
         return {
           state: '<span class="m-returned-mark">' + MC.esc(on ? 'Returned ' + on : 'Returned') + '</span>',
           act: '',
         };
       }
-      // The grade the student was given before this change, if there was one.
-      var given = waiting.find(function (r) {
-        return r && r.returned_copy;
-      });
+      var given = area.given;
       var still = '';
       if (given) {
         var who = unit.view ? collabGroupLabel(unit.view.group) : displayNameFirst(unit.st) || 'The student';
-        var when = given.returned_at ? ' ' + formatShortDate(given.returned_at) : '';
+        var when = given.returnedAt ? ' ' + formatShortDate(given.returnedAt) : '';
         still =
           '<span class="m-grade-return-still">' +
           MC.esc(who + ' still sees the grade you returned' + when + '.') +
