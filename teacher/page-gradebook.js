@@ -53,6 +53,10 @@ window.PageGradebook = (function () {
   // student has in (GraderWork, shared/grader.js).
   var _toGradeOnly = false;
   var _work = null;
+  // Questions From Students (S10-F4): the "N questions" filter, and the
+  // questions waiting on each cell (getQuestionsWaiting, shared/data.js).
+  var _questionsOnly = false;
+  var _questions = null;
   var _drafts = null;
   var _scrollShadowCleanup = null;
   var _scrollKey = null; // class and view of the last render, so a redraw keeps the table's scroll
@@ -104,6 +108,7 @@ window.PageGradebook = (function () {
     if (!(await switchActiveCourse(cid))) return;
     _toReturnOnly = false;
     _toGradeOnly = false;
+    _questionsOnly = false;
     filterStudentIds = [];
     filterSections = [];
     filterModules = [];
@@ -345,6 +350,17 @@ window.PageGradebook = (function () {
     // count as the grader's Show bar and the dashboard's To Grade cell.
     _work = _countWork(cid, students, assessments);
     if (!_work || !_work.total) _toGradeOnly = false;
+    // Questions From Students (S10-F4), over the students and columns shown.
+    _questions = _countQuestions(cid, students, assessments);
+    if (!_questions || !_questions.total) _questionsOnly = false;
+    if (_questionsOnly) {
+      students = students.filter(function (s) {
+        return _questions.bySid[s.id];
+      });
+      assessments = assessments.filter(function (a) {
+        return _questions.byAid[a.id];
+      });
+    }
     if (_toGradeOnly) {
       students = students.filter(function (s) {
         return _work.bySid[s.id];
@@ -439,6 +455,7 @@ window.PageGradebook = (function () {
 
     html += _toGradeButton();
     html += _toReturnButton();
+    html += _questionsButton();
 
     html +=
       '<div style="margin-left:auto;display:flex;align-items:center;gap:12px">' +
@@ -820,6 +837,7 @@ window.PageGradebook = (function () {
           WORK_CAMERA +
           'Has photos</span>'
         : '') +
+      (_questions ? '<span class="gb-key-item">' + QUESTION_DOT + 'Question waiting</span>' : '') +
       '</div>';
     return html;
   }
@@ -926,6 +944,70 @@ window.PageGradebook = (function () {
       words: (tograde ? ', sent, not graded' : '') + (n > 0 ? ', has photos' : ''),
       title: what + '. Click to open in the grader.',
     };
+  }
+
+  /* ── Questions From Students (S10-F4) ───────────────────────
+     In a class whose student page and Reflect on Feedback are on: a yellow
+     dot on the cell of a piece whose student asked a question not answered
+     yet, its hover line ("Asked you a question Nov 4"), "Question waiting"
+     in the key, and the toolbar's "N questions", which pressed leaves only
+     the students and columns with one. Every count is getQuestionsWaiting
+     (shared/data.js), the list the dashboard's Questions From Students and
+     the Learner Profile read, so one answer in the grader clears all three.
+     With the switch off none of it is drawn. */
+  var QUESTION_DOT = '<span class="gb-question" aria-hidden="true"></span>';
+
+  function _countQuestions(cid, students, assessments) {
+    if (typeof getReflectOnFeedback !== 'function' || !getReflectOnFeedback(cid)) return null;
+    var shownS = {};
+    students.forEach(function (s) {
+      shownS[s.id] = true;
+    });
+    var shownA = {};
+    assessments.forEach(function (a) {
+      shownA[a.id] = true;
+    });
+    var out = { total: 0, byAid: {}, bySid: {}, cells: {} };
+    getQuestionsWaiting(cid).forEach(function (r) {
+      if (!shownS[r.enrollment_id] || !shownA[r.assessment_id]) return;
+      out.total++;
+      out.byAid[r.assessment_id] = true;
+      out.bySid[r.enrollment_id] = true;
+      out.cells[r.assessment_id + '|' + r.enrollment_id] = r;
+    });
+    return out;
+  }
+
+  // The question waiting on this cell, or null.
+  function _questionCell(aid, sid) {
+    return (_questions && _questions.cells[aid + '|' + sid]) || null;
+  }
+
+  // When the question waiting was asked: a follow-up's day, or the reflection's.
+  function _askedOn(r) {
+    var at = r.follow_up && !r.follow_up_answer ? r.sense_now_at || r.sent_at : r.sent_at;
+    return at ? formatShortDate(String(at).slice(0, 10)) : '';
+  }
+
+  // html-safe: a number and fixed words
+  function _questionsButton() {
+    if (!_questions || !_questions.total) return '';
+    return (
+      '<button type="button" class="gb-to-return gb-questions-btn' +
+      (_questionsOnly ? ' active' : '') +
+      '" data-action="toggleQuestions" aria-pressed="' +
+      _questionsOnly +
+      '" title="' +
+      (_questionsOnly
+        ? 'Showing only the work with a question waiting. Click to show everything.'
+        : 'Show only the students and assessments with a question waiting for you.') +
+      '">' +
+      QUESTION_DOT +
+      _questions.total +
+      (_questions.total === 1 ? ' question' : ' questions') +
+      (_questionsOnly ? ' <span aria-hidden="true">×</span>' : '') +
+      '</button>'
+    );
   }
 
   // html-safe: a number and fixed words
@@ -2209,6 +2291,18 @@ window.PageGradebook = (function () {
           display = '<span class="gb-to-grade">To Grade</span>';
         }
         if (work && work.photos) display += WORK_CAMERA;
+        // A question waiting (S10-F4): the yellow dot and its hover line.
+        var question = _questionCell(a.id, s.id);
+        if (question) display += QUESTION_DOT;
+        var cellTitle = work ? work.title : '';
+        if (question) {
+          var asked = _askedOn(question);
+          cellTitle =
+            'Asked you a question' +
+            (asked ? ' ' + asked : '') +
+            '. ' +
+            (work && work.title ? work.title : 'Click to open in the grader.');
+        }
         var isScoreModeCell = _scoreMode && _scoreMode.assessmentId === a.id && si === _scoreMode.studentIdx;
         var isScoreModeCol = _scoreMode && _scoreMode.assessmentId === a.id;
         html +=
@@ -2239,8 +2333,9 @@ window.PageGradebook = (function () {
           (cell.late && !statusMark ? ', Late' : '') +
           (draft ? DRAFT_CELL_WORDS : '') +
           (work ? esc(work.words) : '') +
+          (question ? ', question waiting' : '') +
           '"' +
-          (work ? ' title="' + esc(work.title) + '"' : '') +
+          (cellTitle ? ' title="' + esc(cellTitle) + '"' : '') +
           ' data-action="editScoreCell" data-aid="' +
           a.id +
           '" data-sid="' +
@@ -4520,6 +4615,13 @@ window.PageGradebook = (function () {
         var again = document.querySelector('.gb-to-grade-btn');
         if (again) again.focus({ preventScroll: true });
       },
+      toggleQuestions: function () {
+        _flushActiveScoreEditor();
+        _questionsOnly = !_questionsOnly;
+        render();
+        var again = document.querySelector('.gb-questions-btn');
+        if (again) again.focus({ preventScroll: true });
+      },
       toggleToReturn: function () {
         _flushActiveScoreEditor();
         _toReturnOnly = !_toReturnOnly;
@@ -4594,6 +4696,7 @@ window.PageGradebook = (function () {
     filterStudentIds = params.students ? String(params.students).split(',').filter(Boolean) : [];
     _toReturnOnly = false;
     _toGradeOnly = false;
+    _questionsOnly = false;
     _drafts = null;
     var linkedSection = params.section;
     if (
