@@ -620,6 +620,7 @@
     else if (desc.kind === 'swiper')
       html = MGrade.renderSwiper(_cid, desc.aid, {
         only: desc.only,
+        ids: desc.ids,
         student: desc.student,
         aids: desc.aids,
         kinds: desc.kinds,
@@ -1009,6 +1010,27 @@
      (wantAid). Back returns to the page. */
   /* `oneStudent` (Grade on a To Grade row, Save and Grade): the grader on
      that student's work only, a tab for each piece (S7-F4). */
+  function _openWorkWall(cid, aid) {
+    if (!window.WorkWall) return false;
+    return WorkWall.open(cid, aid, {
+      onGrade: function (sid, ids) {
+        // The wall answers for the class it was opened on, while it still shows.
+        if (_cid !== cid || !WorkWall.isOpen()) return;
+        WorkWall.close(true);
+        _gradeInOrder(aid, sid, ids);
+      },
+    });
+  }
+
+  // The grader on `ids`, in that order, at `sid`, from the Grade tab's list.
+  function _gradeInOrder(aid, sid, ids) {
+    var html = MGrade.renderSwiper(_cid, aid, { ids: ids });
+    _pushScreen(html, { kind: 'swiper', aid: aid, ids: ids.slice() });
+    MGrade.setupSwiper(_cid, aid);
+    var idx = MGrade.studentCardIndex(_cid, aid, sid);
+    if (idx > 0) MGrade.jumpToStudent(idx, true);
+  }
+
   function _openGraderAt(gradeSid, wantAid, oneStudent) {
     var newest = wantAid
       ? getAssessments(_cid).find(function (a) {
@@ -1078,6 +1100,8 @@
       // Add Work (S7-F3): from a not-in card, the students with nothing in;
       // from a student's To Grade list, that student, then the grader.
       if (action === 'm-add-work') {
+        // From the row menu: its sheet goes first.
+        if (target.closest('#m-sheet-container')) MC.dismissSheet();
         MAddWork.open(_cid, target.getAttribute('data-aid'), target.getAttribute('data-sid'), {
           then: target.getAttribute('data-then') === 'grade' ? 'grade' : 'next',
         });
@@ -1490,6 +1514,14 @@
       // Student work (S7): the row menu, the live filter's Done, the pages.
       if (action === 'm-grade-row-menu') {
         MGrade.openRowMenu(_cid, target.getAttribute('data-aid'), target);
+        return;
+      }
+      // The row menu's Work Wall (S14): teacher/work-wall.js over the Grade
+      // tab. Grade in This Order closes it and opens the phone's grader on
+      // the students the wall showed, in its order, at the one picked.
+      if (action === 'm-work-wall') {
+        if (target.closest('#m-sheet-container')) MC.dismissSheet();
+        _openWorkWall(_cid, target.getAttribute('data-aid'));
         return;
       }
       if (action === 'm-grade-filter-done') {
