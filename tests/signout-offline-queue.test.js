@@ -129,6 +129,8 @@ describe('signOut and unsent offline changes', () => {
 
   it('deletes the printed report copies in IndexedDB before leaving', async () => {
     loadSupabase({ queued: 0, deadLettered: 0 });
+    const queue = globalThis.PhotoQueue;
+    delete globalThis.PhotoQueue;
     const deleted = [];
     globalThis.indexedDB = {
       deleteDatabase(name) {
@@ -142,10 +144,41 @@ describe('signOut and unsent offline changes', () => {
     };
     try {
       await window.signOut();
-      expect(deleted).toEqual(['fv-report-issues']);
+      // The photo queue's database goes too, on a page without photo-queue.js.
+      expect(deleted).toEqual(['fv-report-issues', 'fv-photo-queue']);
       expect(window.location.href).toBe('/login.html');
     } finally {
       delete globalThis.indexedDB;
+      if (queue) globalThis.PhotoQueue = queue;
+    }
+  });
+
+  it('empties the photo queue through PhotoQueue.wipe before leaving', async () => {
+    loadSupabase({ queued: 0, deadLettered: 0 });
+    const order = [];
+    globalThis.PhotoQueue = {
+      async wipe() {
+        order.push('wipe');
+        return { ok: true, error: null };
+      },
+    };
+    try {
+      await window.signOut({ force: true });
+      expect(order).toEqual(['wipe']);
+      expect(window.location.href).toBe('/login.html');
+    } finally {
+      delete globalThis.PhotoQueue;
+    }
+  });
+
+  it('still leaves when the photo queue cannot be emptied', async () => {
+    loadSupabase({ queued: 0, deadLettered: 0 });
+    globalThis.PhotoQueue = { wipe: () => Promise.reject(new Error('blocked')) };
+    try {
+      await window.signOut();
+      expect(window.location.href).toBe('/login.html');
+    } finally {
+      delete globalThis.PhotoQueue;
     }
   });
 
