@@ -2485,6 +2485,91 @@ describe('a read and a press never cross', () => {
     }
   });
 
+  // S3-F2 follow-up: the screen is never silent after Yes. A reviewer of PR 1014 saw no word while the Yes waited.
+  it.each([
+    ['Print New Card', 'spCardsNewCard', { student: U(11) }, 1],
+    ['New Codes for This Class', 'spCardsNewCodes', undefined, 3],
+  ])(
+    '%s: a Yes waiting on the list read says Making cards… until the cards are made',
+    async (what, action, data, n) => {
+      const t = await signedIn();
+      try {
+        printedCard(t, U(901), U(11));
+        await shown(LIVE);
+        press(action, LIVE, data);
+        let land;
+        t.session.fake.on('list_student_cards', () => new Promise(r => (land = r)));
+        StudentCards.load(LIVE);
+        const drawn = [];
+        DashClassManager.renderClassManager = () => drawn.push(parse(StudentCards.render(LIVE)));
+        asked[0].onOk();
+        // Drawn at once with the line, and every button that acts on the list off.
+        expect(drawn.length).toBe(1);
+        expect(notesOf(drawn[0])).toEqual(['Making cards…']);
+        await afterDraw();
+        let box = parse(StudentCards.render(LIVE));
+        expect(notesOf(box)).toEqual(['Making cards…']);
+        expect(
+          Array.from(box.querySelectorAll('button[data-action^="spCards"]:not([data-action="spCardsFilter"])')).every(
+            b => b.hasAttribute('disabled'),
+          ),
+        ).toBe(true);
+        expect(t.fn.posts).toEqual([]);
+        t.session.fake.on('list_student_cards', () => ({ data: t.fn.cardsListed(), error: null }));
+        land({ data: t.fn.cardsListed(), error: null });
+        await settle();
+        await StudentCards._making(LIVE);
+        await afterDraw();
+        expect(t.fn.posts.length).toBe(1);
+        expect(sheets.length).toBe(1);
+        expect(sheets[0].names.length).toBe(n);
+        box = parse(StudentCards.render(LIVE));
+        expect(notesOf(box) || []).not.toContain('Making cards…');
+      } finally {
+        t.session.signOut();
+      }
+    },
+  );
+
+  it.each([
+    [
+      'Class Settings closes',
+      () => (DashClassManager.classManagerOpen = false),
+      () => (DashClassManager.classManagerOpen = true),
+    ],
+    ['another tab is shown', () => (onPage = null), () => (onPage = LIVE)],
+    ['another class is shown', () => (onPage = CID), () => (onPage = LIVE)],
+  ])(
+    'a Yes waiting on the read, and then %s: the line goes, and nothing is made when the read lands',
+    async (what, leave, back) => {
+      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+      const t = await signedIn();
+      try {
+        printedCard(t, U(901), U(11));
+        await shown(LIVE);
+        press('spCardsNewCard', LIVE, { student: U(11) });
+        let land;
+        t.session.fake.on('list_student_cards', () => new Promise(r => (land = r)));
+        StudentCards.load(LIVE);
+        asked[0].onOk();
+        expect(notesOf(parse(StudentCards.render(LIVE)))).toEqual(['Making cards…']);
+        leave();
+        vi.advanceTimersByTime(1000); // the watch sees the screen gone
+        back();
+        // Back on the list before the read lands: the Yes came to nothing, so nothing says cards are being made.
+        expect(notesOf(parse(StudentCards.render(LIVE))) || []).not.toContain('Making cards…');
+        land({ data: t.fn.cardsListed(), error: null });
+        await afterDraw();
+        expect(t.fn.posts).toEqual([]);
+        expect(sheets).toEqual([]);
+        expect(notesOf(parse(StudentCards.render(LIVE))) || []).not.toContain('Making cards…');
+      } finally {
+        vi.useRealTimers();
+        t.session.signOut();
+      }
+    },
+  );
+
   it('an answer to a read begun before a press finished is dropped, and the list read again', async () => {
     let release;
     const gate = new Promise(r => (release = r));
