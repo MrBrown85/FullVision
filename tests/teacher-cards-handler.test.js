@@ -905,7 +905,13 @@ describe('teacher-cards: no log line holds a secret', () => {
       }
       return h;
     };
-    const h = await run();
+    // Known draws, so every secret this test looks for is known: four students, then four more for the replay.
+    const rep = ch => ch.repeat(8);
+    const known = ['E', 'F', '9358', 'G', 'H', '6204', 'J', 'K', '7716', 'M', 'N', '8493'];
+    const again = ['P', 'Q', '2222', 'R', 'T', '3333', 'U', 'V', '4444', 'W', 'X', '6666'];
+    const h = await run({ random: draws(...[...known, ...again].map(v => (v.length === 1 ? rep(v) : v))) });
+    for (const v of [...known, ...again])
+      secrets.add(v.length === 1 ? rep(v) : v).add(v.length === 1 ? v.repeat(4) : v);
     // The same request again, on the same database: a replay.
     await send(h, ask([first(CECE), first(OMAR), first(NOOR), first(GONE)]));
     logs.push(h.logs.at(-1));
