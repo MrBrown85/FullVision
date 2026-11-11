@@ -404,15 +404,7 @@ describe('an offline student or assessment gets its server id', () => {
   });
 });
 
-describe('nothing reaches the server, and the phone has the photo modules', () => {
-  it('data.js names none of the Add Work functions the server will have', () => {
-    const src = readFileSync('shared/data.js', 'utf-8');
-    // Named in comments only, never as a call.
-    expect(src).not.toMatch(
-      /['"`](start_work_upload|finish_work_upload|mark_handed_in_paper|delete_submission|sweep)['"`]/,
-    );
-  });
-
+describe('the phone has the photo modules', () => {
   it('the phone, its offline copy and its tests load photo-shrink.js and photo-queue.js', () => {
     const phone = readFileSync('teacher-mobile/index.html', 'utf-8');
     const sw = readFileSync('sw.js', 'utf-8');

@@ -2483,6 +2483,8 @@ window.PageAssignments = (function () {
     var cid = activeCourse;
     var course = COURSES[cid];
     if (!course) return;
+    // A signed-in class's student work, read again now and then (S6-W1).
+    if (typeof refreshStudentWork === 'function') refreshStudentWork(cid);
     _loadDibelsOnce(cid);
     var sections = getSections(cid);
     var allAssessments = sortAssessmentsForList(getAssessments(cid));
@@ -3186,10 +3188,12 @@ window.PageAssignments = (function () {
   /* ── Student Work on the assessment form (S5-F1) ───────────
      Board "Teacher: Student Work Settings on an Assessment", without Keep
      Photos Until (per class only, Q15). The card is drawn only while the
-     class's Send Work is on (CmStudentPage.workSettings), which is Demo
-     Mode only until S5-W1: a signed-in class never has it, and nothing
-     here is sent. The choices are kept with Demo Mode's student work
-     (getAssessmentStudentWork, saveDemoStudentWork in shared/data.js),
+     class's Send Work is on (CmStudentPage.workSettings), in Demo Mode or
+     a signed-in class with its student page on (S5-W1). The choices are
+     saved by saveAssessmentStudentWork (shared/data.js): Demo Mode keeps
+     them with its sample work, a signed-in class sends what changed
+     (set_assessment_student_work). Group Work and Students See Your Mark
+     Up are drawn in Demo Mode only until Batch C is wired. They are kept
      by the assessment's id, not on the assessment: so Copy Assessment,
      Duplicate, Copy to Another Class and Duplicate Class all start the
      copy at Nothing (Colin). After the Due Date starts at Keep Accepting
@@ -3307,13 +3311,15 @@ window.PageAssignments = (function () {
           esc(until) +
           '"></div>'
         : '') +
-      _formWorkSegHtml('group_work', 'Group Work', WORK_GROUP, w.group_work) +
-      _formWorkSegHtml(
-        'students_see_markup',
-        'Students See Your Mark Up',
-        WORK_MARKUP,
-        w.students_see_markup ? 'yes' : 'no',
-      ) +
+      (_formWorkDemo()
+        ? _formWorkSegHtml('group_work', 'Group Work', WORK_GROUP, w.group_work) +
+          _formWorkSegHtml(
+            'students_see_markup',
+            'Students See Your Mark Up',
+            WORK_MARKUP,
+            w.students_see_markup ? 'yes' : 'no',
+          )
+        : '') +
       '</div>' +
       '</section>'
     );
@@ -3352,27 +3358,18 @@ window.PageAssignments = (function () {
     _refreshFormWorkCard('#af-accept-until');
   }
 
-  /* After a save: the card's choices for `aid`, kept with Demo Mode's
-     student work. Nothing when the card was not drawn. `w` is the card's
-     choices as read before the save: saving the assessment can draw the
-     form again from what is stored. */
+  // Group Work and Students See Your Mark Up do something only in Demo Mode yet.
+  function _formWorkDemo() {
+    return typeof isDemoMode === 'function' && isDemoMode();
+  }
+
+  /* After a save: the card's choices for `aid` (saveAssessmentStudentWork).
+     Nothing when the card was not drawn. `w` is the card's choices as read
+     before the save: saving the assessment can draw the form again from
+     what is stored. */
   function _saveFormWork(cid, aid, w) {
-    if (!w || !aid || !_formWorkOffered(cid) || typeof saveDemoStudentWork !== 'function') return;
-    var work = getCourseSubmissions(cid);
-    var row = {
-      id: aid,
-      students_send: w.students_send,
-      after_due: w.after_due,
-      accept_until: w.after_due === 'until' ? w.accept_until : null,
-      group_work: w.group_work,
-      students_see_markup: w.students_see_markup,
-    };
-    work.assessments = (work.assessments || [])
-      .filter(function (x) {
-        return x && x.id !== aid;
-      })
-      .concat([row]);
-    saveDemoStudentWork(cid, work);
+    if (!w || !aid || !_formWorkOffered(cid) || typeof saveAssessmentStudentWork !== 'function') return;
+    saveAssessmentStudentWork(cid, aid, w);
   }
 
   /* ── Assessment Form Helpers ────────────────────────────── */
@@ -12182,6 +12179,8 @@ window.PageAssignments = (function () {
   function openGrader(cid, aid, sid, opts) {
     if (_grader) closeGrader();
     opts = opts || {};
+    // What came in since the class was read (S6-W1); the dialog is drawn again when it changes.
+    if (typeof refreshStudentWork === 'function') refreshStudentWork(cid, { force: true });
     activeCourse = cid;
     _loadDibelsOnce(cid);
     openAssessIds = new Set([aid]);
