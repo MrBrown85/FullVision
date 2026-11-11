@@ -730,22 +730,23 @@ var CmStudentPage = (function () {
       (l.on ? ' checked' : '') +
       '><span class="gpd-switch-ui" aria-hidden="true"></span></span>' +
       '</div>' +
-      '<div class="cm-hint" id="sp-learning-would">' +
+      // The board's grey panel: what they would see, and See What They'd See after it as a link.
+      '<div class="sp-learning-panel">' +
+      '<span id="sp-learning-would">' +
       esc(
         'Students would see their level on each skill and their grade in this class’s grading style (' +
           style +
           "), only from work you've returned.",
       ) +
+      '</span> ' +
+      '<button type="button" class="sp-link-btn" id="sp-learning-see" data-action="spSeeLearning" aria-describedby="sp-learning-would">' +
+      esc("See What They'd See") +
+      '</button>' +
       '</div>' +
       '<div class="cm-hint" id="sp-learning-device">' +
       esc(
         "Students' own phones and Chromebooks can't show My Learning yet, even with this on. For now only Preview as Student shows it.",
       ) +
-      '</div>' +
-      '<div class="sp-learning-see">' +
-      '<button type="button" class="btn btn-secondary" id="sp-learning-see" data-action="spSeeLearning" aria-describedby="sp-learning-would">' +
-      esc("See What They'd See") +
-      '</button>' +
       '</div>' +
       '</div>'
     );
@@ -869,7 +870,7 @@ var CmStudentPage = (function () {
         })
         .join('') +
       '</select>' +
-      '<button type="button" class="btn btn-secondary" id="sp-preview-open" data-action="spPreview">Open Preview</button>' +
+      '<button type="button" class="btn sp-tint-btn" id="sp-preview-open" data-action="spPreview">Open Preview</button>' +
       '</div>' +
       '</div>'
     );
@@ -883,6 +884,22 @@ var CmStudentPage = (function () {
     if (!sid) return;
     _previewFor[cid] = sid;
     PreviewStudent.open(cid, sid, el, 'sp-preview-open');
+  }
+
+  /* ── Questionnaires and Reports ────────────────────────────── */
+
+  // Nothing to choose here: the row says where they are set up (the board's last row).
+  function _questionnairesRow() {
+    return (
+      '<div class="sp-row sp-questionnaires">' +
+      '<div class="sp-row-head">' +
+      '<div class="sp-row-title">Questionnaires and Reports</div>' +
+      '<div class="cm-hint">' +
+      esc('Open with the same card. Set them up on the Questionnaires tab and in Reports.') +
+      '</div>' +
+      '</div>' +
+      '</div>'
+    );
   }
 
   /* ── The panel ─────────────────────────────────────────────── */
@@ -900,18 +917,29 @@ var CmStudentPage = (function () {
     return (
       (_buildFlag ? _buildSwitchCard(cid) : '') +
       (on
-        ? '<div class="cm-section sp-card" data-cid="' +
+        ? '<div class="sp-layout"><div class="sp-main">' +
+          '<div class="cm-section sp-card" data-cid="' +
           esc(cid) +
           '">' +
           '<h2 class="cm-grade-title">Student Page</h2>' +
+          '<div class="cm-hint sp-intro">' +
+          esc('What students can do when they open their page with their card. Each one is off until you turn it on.') +
+          '</div>' +
           photoReminderHtml(cid, 'sp') +
           _returnGradesRow(cid) +
           _sendWorkRows(cid) +
           _reflectRow(cid) +
           _learningRow(cid) +
+          _questionnairesRow() +
           '</div>' +
           (typeof StudentCards !== 'undefined' ? StudentCards.render(cid) : '') +
-          _previewCard(cid)
+          '</div>' +
+          // The board's right column: the cards in short, and Preview as Student.
+          '<div class="sp-aside">' +
+          (typeof StudentCards !== 'undefined' ? StudentCards.summaryHtml(cid) : '') +
+          _previewCard(cid) +
+          '</div>' +
+          '</div>'
         : '')
     );
   }

@@ -122,6 +122,7 @@ describe('Reflect on Feedback in Class Settings › Student Page', () => {
       'Keep Photos Until',
       'Reflect on Feedback',
       'Show My Learning',
+      'Questionnaires and Reports',
     ]);
     expect(doc.querySelector('label[for="sp-reflect-switch"]').textContent).toBe('Reflect on Feedback');
     expect(doc.getElementById('sp-reflect-hint').textContent).toBe(HINT);

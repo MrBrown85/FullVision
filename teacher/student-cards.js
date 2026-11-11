@@ -53,9 +53,9 @@
    answer draws nothing and prints nothing, a Yes to a question makes
    nothing, and held codes are let go.
 
-   teacher/cm-student-page.js draws render(cid) under Return Grades, only
-   for a class whose student page is on, and hands over the spCards*
-   actions.
+   teacher/cm-student-page.js draws render(cid) under the Student Page
+   card and summaryHtml(cid) beside it, only for a class whose student page
+   is on, and hands over the spCards* actions.
 
    cardItems and cardHtml are pure and exposed for tests. */
 var StudentCards = (function () {
@@ -1080,7 +1080,7 @@ var StudentCards = (function () {
       '<div class="cm-section sc-card" data-cid="' +
       esc(cid) +
       '">' +
-      '<div class="sc-head"><div class="sc-titles"><h2 class="cm-grade-title">Student Cards</h2>' +
+      '<div class="sc-head"><div class="sc-titles"><h2 class="cm-grade-title" id="sc-title" tabindex="-1">Student Cards</h2>' +
       '<div class="cm-hint">' +
       esc('One card for each student. They scan it, or type its code, to open their page.') +
       '</div></div>' +
@@ -1131,11 +1131,72 @@ var StudentCards = (function () {
     );
   }
 
+  /* ── The summary, beside the Student Page card ──────────────── */
+
+  /* "Cards work until Jan 26, the end of the course.": the class's Cards
+     Work Until, named as the end of the course when it is the default (the
+     class's last reporting date). */
+  function _untilLine(cid) {
+    var until = getCardsWorkUntil(cid);
+    if (!until.date) return '';
+    var day = _fmtDay(until.date);
+    if (until.date < _today(cid)) return 'Cards stopped working after ' + day + '.';
+    return 'Cards work until ' + day + (!until.chosen && until.reporting ? ', the end of the course.' : '.');
+  }
+
+  /* The Student Cards summary (board "Teacher: Class Settings, Student
+     Page"): how many cards are printed and locked, the last day they work,
+     and Manage Cards, which goes to the full list (render). It reads the
+     same list render does and asks for nothing itself. */
+  function summaryHtml(cid) {
+    var st = _st(cid);
+    var students = _roster(cid);
+    var byStudent = _byStudent(st.cards);
+    var line;
+    if (st.cards === null) line = st.failed && !st.loading ? 'Could not load the cards.' : 'Loading cards…';
+    else if (!students.length) line = 'No students yet.';
+    else {
+      var printed = students.filter(function (s) {
+        return _handedOut(byStudent[s.id]);
+      }).length;
+      var locked = students.filter(function (s) {
+        return byStudent[s.id] && byStudent[s.id].locked_at;
+      }).length;
+      line = printed + ' of ' + students.length + ' printed' + (locked ? ' · ' + locked + ' locked' : '');
+    }
+    var until = _untilLine(cid);
+    return (
+      '<div class="cm-section sc-summary" data-cid="' +
+      esc(cid) +
+      '">' +
+      '<h2 class="cm-grade-title">Student Cards</h2>' +
+      '<div class="sc-summary-count">' +
+      esc(line) +
+      '</div>' +
+      (until ? '<div class="cm-hint">' + esc(until) + '</div>' : '') +
+      '<button type="button" class="btn btn-primary sc-summary-btn" data-action="spCardsManage">Manage Cards</button>' +
+      '</div>'
+    );
+  }
+
+  // Manage Cards: the full list comes into view, with the focus on its heading.
+  function _manage() {
+    if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return;
+    var title = document.getElementById('sc-title');
+    if (!title) return;
+    if (typeof title.scrollIntoView === 'function') title.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    if (typeof title.focus === 'function') title.focus({ preventScroll: true });
+  }
+
   // True when the click was one of this card's.
   function handleAction(action, el) {
     var box = el && el.closest ? el.closest('[data-cid]') : null;
     var cid = box ? box.dataset.cid : null;
     var data = (el && el.dataset) || {};
+    if (action === 'spCardsManage') {
+      _manage();
+      return true;
+    }
     if (action === 'spCardsMake') {
       if (cid) makeAndPrint(cid);
       return true;
@@ -1214,6 +1275,7 @@ var StudentCards = (function () {
 
   return {
     render: render,
+    summaryHtml: summaryHtml,
     handleAction: handleAction,
     handleChange: handleChange,
     workUntil: workUntil,
