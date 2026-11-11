@@ -276,8 +276,8 @@ var StudentData = (function () {
         block: str(course.block),
         gradingSystem: SYSTEMS[course.grading_system] || 'proficiency',
         gradingScale: course.grading_scale && typeof course.grading_scale === 'object' ? course.grading_scale : null,
-        // The teacher's name as they signed up with it, '' when the server sends none.
-        teacherName: text(course.teacher_name),
+        // course.teacher_name is never read: the page never names the
+        // teacher (Colin's ruling 112, "Leave the name off.").
       },
       // The class's competencies: name, code and I Can statements (blanks kept, as sent).
       tags: tagsFrom(res.tags),

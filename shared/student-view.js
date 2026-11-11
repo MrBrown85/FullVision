@@ -334,8 +334,7 @@ window.StudentView = (function () {
         grading_system: courseGradeMode(cid),
         // The class's own Counts As percents and points bands, or the defaults (calc.js reads them).
         grading_scale: getGradingScale(cid) || null,
-        // The teacher's name as they signed up with it (bootstrap_teacher's display_name), as the server sends it.
-        teacher_name: textOrNull(((typeof getConfig === 'function' && getConfig()) || {}).displayName),
+        // No teacher_name: the student page never names the teacher (Colin's ruling 112).
       },
       tags: tags,
       rubrics: rubrics,
@@ -890,8 +889,7 @@ window.StudentView = (function () {
           course.grading_system === 'letter' || course.grading_system === 'both'
             ? course.grading_system
             : 'proficiency',
-        // The teacher's name as the server sends it ('' until it does): shown as sent, never made into "Mr.".
-        teacherName: text(course.teacher_name),
+        // course.teacher_name is never read (Colin's ruling 112, "Leave the name off.").
       },
       counts: { toDo: count('due'), sent: count('sent'), back: count('back'), missing: count('missing') },
       work: work,

@@ -306,7 +306,6 @@ function serverPage(gradingSystem) {
       block: 'B',
       grading_system: gradingSystem,
       grading_scale: getGradingScale(CID),
-      teacher_name: TEACHER,
     },
     tags: {
       t1: {
@@ -1091,7 +1090,6 @@ describe('shared/student-view.js reads grades only through the seam', () => {
 // The same reply with the nine keys taken out: what a phone gets until the function passes them.
 function withoutNew(reply) {
   const out = JSON.parse(JSON.stringify(reply));
-  delete out.course.teacher_name;
   (out.classes || []).forEach(c => delete c.to_do);
   Object.values(out.tags).forEach(t => delete t.i_can);
   out.rubrics.forEach(r => r.criteria.forEach(c => delete c.tag_ids));
@@ -1162,19 +1160,33 @@ describe.each(STYLES)('a %s class: Preview as Student and the real page draw the
 describe('the parts the server now sends, drawn (S4-W1)', () => {
   beforeEach(() => seed('letter'));
 
-  it('the teacher’s name as sent, never made into "Mr.": over the comment, on Your Feedback, and in what changed', () => {
+  it('no teacher’s name anywhere, from Preview or from a reply that carries one (Colin’s ruling 112)', () => {
+    // The teacher has a name on this device (displayName is TEACHER).
+    expect(StudentView.reply(CID, S1).course).not.toHaveProperty('teacher_name');
     const { view } = StudentView.fromCache(CID, S1);
-    expect(view.course.teacherName).toBe('Colin Brown');
-    const essay = cardIn(drawn(view, UIS[1]), 'a-essay');
-    expect(words(essay.querySelector('.sp-piece-from .sp-from-mark'))).toBe('CB');
-    expect(words(essay.querySelector('.sp-piece-from span:last-child'))).toBe('Colin Brown');
-    expect(essay.querySelector('.sp-from-mark').getAttribute('aria-hidden')).toBe('true');
-    expect(words(drawn(view, UIS[2]).querySelector('.sp-fb-from span:last-child'))).toBe('From Colin Brown');
-    expect(words(drawn(view, UIS[6]).querySelector('.sp-since-line'))).toBe(
-      // Preview: every returned piece as unopened, none Updated (ruling 116).
-      'Colin Brown returned 8 pieces.',
+    expect(view.course).not.toHaveProperty('teacherName');
+    UIS.forEach(ui => expect(StudentPageView.html(view, ui)).not.toContain('Colin'));
+    // A reply that carries teacher_name, as the database may send it: the
+    // phone draws exactly what it draws without it, and never the name.
+    const side = studentSide();
+    const plain = serverPage('letter');
+    const named = JSON.parse(JSON.stringify(plain));
+    named.course.teacher_name = TEACHER;
+    side.page.ctx.__reply = named;
+    expect(JSON.parse(side.page.run('JSON.stringify(StudentData.fromServer(__reply))')).course).not.toHaveProperty(
+      'teacherName',
     );
-    expect(StudentPageView.html(view, UIS[2])).not.toMatch(/Mr\.|Ms\./);
+    UIS.forEach(ui => {
+      const html = phoneHtml(side, named, ui);
+      expect(html).not.toContain('Colin');
+      expect(html).not.toContain('Brown');
+      expect(html).not.toContain('CB<');
+      expect(html).toBe(phoneHtml(side, plain, ui));
+    });
+    const box = DOC.createElement('div');
+    box.innerHTML = phoneHtml(side, named, UIS[6]);
+    expect(words(box.querySelector('.sp-since-line'))).toBe('5 pieces came back and 1 result was updated.');
+    expect(box.querySelector('.sp-piece-from, .sp-fb-from, .sp-from-mark')).toBe(null);
   });
 
   it('the unit, and the category with what it counts as the class is set up', () => {
@@ -1250,7 +1262,6 @@ describe('the parts the server now sends, drawn (S4-W1)', () => {
     const side = studentSide();
     const good = withoutNew(serverPage('letter'));
     const bad = JSON.parse(JSON.stringify(good));
-    bad.course.teacher_name = 42;
     bad.classes = [{ enrollment_id: S1, course: { name: 'Science 9', block: 'B' }, to_do: '3' }];
     good.classes = [{ enrollment_id: S1, course: { name: 'Science 9', block: 'B' } }];
     Object.values(bad.tags).forEach(t => (t.i_can = 'I can ask.'));
@@ -1267,7 +1278,6 @@ describe('the parts the server now sends, drawn (S4-W1)', () => {
     UIS.forEach(ui => expect(phoneHtml(side, bad, ui)).toBe(phoneHtml(side, good, ui)));
     side.page.ctx.__reply = bad;
     const kept = JSON.parse(side.page.run('JSON.stringify(StudentData.fromServer(__reply))'));
-    expect(kept.course.teacherName).toBe('');
     expect(kept.classes[0].toDo).toBeNull();
     expect(kept.assessments[0]).toMatchObject({
       description: '',
