@@ -2428,7 +2428,9 @@ button.ced-obs-row {
 
 @media (max-width: 900px) {
   .stu-tabs {
-    grid-template-columns: repeat(6, minmax(150px, 1fr));
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(150px, 1fr);
     overflow-x: auto;
   }
   .stu-comp button.dash-tag-row.stu-comp-row,
@@ -5119,5 +5121,36 @@ button.stu-bd-row:focus-visible {
 @media (prefers-color-scheme: dark) {
   .sh-stat-val.sh-stat-att {
     color: #ff9f45;
+  }
+}
+
+/* iPad and touch (redesign R7): 44pt targets wherever the redesigned tabs
+   take a tap (design rule 11). The capture strip keeps its own file; its
+   chips grow here, on the student page only. */
+@media (pointer: coarse) {
+  .stu-gr button,
+  .stu-gr .stu-ov-chip,
+  .ev-panel .obsc-chip,
+  .ev-panel .note-capture button,
+  .lp-layout .stu-chip,
+  .lp-layout .id-jump a {
+    min-height: 44px;
+  }
+  .lp-layout .id-jump a {
+    display: inline-flex;
+    align-items: center;
+  }
+}
+/* Chart marks keep their size; on touch each gets a 44pt tap area. */
+@media (pointer: coarse) {
+  .ev-tl-mark::after,
+  .stu-lane-dot::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
   }
 }
