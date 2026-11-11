@@ -24,9 +24,18 @@
 // but the server does not rely on it. Every segment that can carry who took
 // a photo, where, or with what is cut: APP1 to APP15 (EXIF and its GPS
 // block, XMP, IPTC, a second picture in an MPF segment, maker notes) and
-// comments, and any bytes after the end-of-image marker. Kept: APP0 only as
-// a JFIF header, APP2 only as an ICC colour profile, APP14 only as Adobe's
-// colour flag; none of the three has room for a place or a person. The
+// comments, and any bytes after the end-of-image marker. Kept, because a
+// browser draws colours from them:
+//   - APP0 only as a JFIF header of its fixed 16 bytes (version 1, units 0
+//     to 2, no thumbnail of its own): every byte of it is a fixed field, so
+//     it carries nothing else;
+//   - APP14 only as Adobe's colour flag of its fixed 14 bytes: the same;
+//   - APP2 as an ICC colour profile, whole. A profile can hold any bytes:
+//     its description and copyright tags are text, and a writer could put
+//     anything there. Cameras and phones do not write a place or a person
+//     in it, and the phone's redraw writes none; the file is only ever
+//     given back as image/jpeg, which a browser does not read as a page.
+// A JFIF or Adobe segment of any other length or shape is cut. The
 // picture data is not touched. `clean` is the file as it must be stored,
 // and `stripped` says whether that differs from what was read.
 //
@@ -61,11 +70,23 @@ const ascii = (b: Uint8Array, from: number, n: number): string => {
 };
 
 /* Whether an application segment is one of the three kept. `body` is where
-   its data starts (after the length). */
+   its data starts (after the length); `len` counts the two length bytes.
+   JFIF: "JFIF\0", version 1.x, units 0 to 2, two densities, and a thumbnail
+   of 0 x 0, 16 bytes in all. Adobe: "Adobe", version, two flags and the
+   colour transform, 14 bytes in all. */
 function kept(bytes: Uint8Array, marker: number, body: number, len: number): boolean {
-  if (marker === 0xe0) return len >= 7 && ascii(bytes, body, 5) === 'JFIF\0';
+  if (marker === 0xe0) {
+    return (
+      len === 16 &&
+      ascii(bytes, body, 5) === 'JFIF\0' &&
+      bytes[body + 5] === 1 &&
+      bytes[body + 7] <= 2 &&
+      bytes[body + 12] === 0 &&
+      bytes[body + 13] === 0
+    );
+  }
   if (marker === 0xe2) return len >= 14 && ascii(bytes, body, 12) === 'ICC_PROFILE\0';
-  if (marker === 0xee) return len >= 7 && ascii(bytes, body, 5) === 'Adobe';
+  if (marker === 0xee) return len === 14 && ascii(bytes, body, 5) === 'Adobe';
   return false;
 }
 

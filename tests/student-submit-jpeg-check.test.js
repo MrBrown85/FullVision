@@ -130,6 +130,39 @@ describe('what is cut out before a page is stored', () => {
     expect(r).toMatchObject({ ok: true, stripped: false });
   });
 
+  describe('a kept segment is kept only at its fixed shape: anything more is cut (review L2)', () => {
+    const html = text('<html><script>alert(1)</script></html>');
+    const gps = text('GPS 49.1913N 122.8490W');
+    const JFIF_BODY = [...text('JFIF\0'), 1, 1, 0, 0, 1, 0, 1, 0, 0];
+    it.each([
+      ['a JFIF header with HTML after it', seg(0xe0, [...JFIF_BODY, ...html])],
+      ['a JFIF header with a place after it', seg(0xe0, [...JFIF_BODY, ...gps])],
+      ['a JFIF header carrying its own thumbnail', seg(0xe0, [...JFIF_BODY.slice(0, -2), 1, 1, 9, 9, 9])],
+      ['a JFIF header cut short', seg(0xe0, JFIF_BODY.slice(0, 7))],
+      ['a JFIF header that says it has a thumbnail but is 16 bytes', seg(0xe0, [...JFIF_BODY.slice(0, -2), 1, 1])],
+      ['a JFIF header of version 2', seg(0xe0, [...text('JFIF\0'), 2, 0, 0, 0, 1, 0, 1, 0, 0])],
+      ['a JFIF header of unknown units', seg(0xe0, [...text('JFIF\0'), 1, 2, 7, 0, 1, 0, 1, 0, 0])],
+      ['an Adobe segment with more after it', seg(0xee, [...text('Adobe'), 0, 100, 0, 0, 0, 0, 1, ...gps])],
+      ['an Adobe segment cut short', seg(0xee, text('Adobe'))],
+    ])('%s', (_, segment) => {
+      const r = inspectJpeg(jpeg(segment, DQT, sof(0xc0, 64, 48), DHT, SOS, DATA, EOI), LIMITS);
+      expect(r).toMatchObject({ ok: true, stripped: true });
+      expect([...r.clean]).toEqual([...jpeg(DQT, sof(0xc0, 64, 48), DHT, SOS, DATA, EOI)]);
+    });
+
+    it('a colour profile is kept whole, text in it included: ICC profiles carry text tags by design', () => {
+      const icc = seg(0xe2, [...text('ICC_PROFILE\0'), 1, 1, ...text('desc sRGB')]);
+      const r = inspectJpeg(jpeg(JFIF, icc, DQT, sof(0xc0, 64, 48), DHT, SOS, DATA, EOI), LIMITS);
+      expect(r).toMatchObject({ ok: true, stripped: false });
+    });
+
+    it('the sample thumbnails’ JFIF header and colour profile are of the kept shape', () => {
+      const kept = Buffer.from(inspectJpeg(THUMB, { maxBytes: 2_000_000, maxSide: 400 }).clean);
+      expect(kept.includes(Buffer.from('JFIF'))).toBe(true);
+      expect(kept.includes(Buffer.from('ICC_PROFILE'))).toBe(true);
+    });
+  });
+
   it('several at once, the picture data untouched', () => {
     const dirty = jpeg(GPS_EXIF, JFIF, XMP, DQT, COMMENT, sof(0xc0, 64, 48), IPTC, DHT, SOS, DATA, EOI, [1, 2, 3]);
     const r = inspectJpeg(dirty, LIMITS);
