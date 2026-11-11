@@ -5,6 +5,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { mockAuth, seedCourse, seedStudents, seedScores, gotoApp, TEST_COURSE } from './helpers.js';
+import { cardMenuItem } from './card-menu.js';
 
 const LAB = {
   id: 'rubric-001',
@@ -412,10 +413,10 @@ test.describe('Rubric Bank, Print Rubrics window', () => {
     });
     const title = page.locator('text=Rubric Lab Report').first();
     await expect(title).toBeVisible();
-    if (!(await page.locator('[data-action="printRubrics"]').first().isVisible())) await title.click();
-    // A closed card shows its buttons on hover.
-    await page.locator('.assess-header').first().hover();
-    await page.locator('[data-action="printRubrics"]').first().click();
+    // A closed card shows its ⋯ on hover.
+    const card = page.locator('.assess-card').filter({ hasText: 'Rubric Lab Report' }).first();
+    await card.locator('.assess-header').hover();
+    await (await cardMenuItem(card, 'printRubrics')).click();
     const dialog = page.getByRole('dialog', { name: 'Print Rubrics' });
     await expect(dialog.getByRole('radio', { name: /Completed Rubrics/ })).toBeChecked();
     await expect(dialog.getByRole('radio', { name: /Blank Rubric/ })).toBeEnabled();

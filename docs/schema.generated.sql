@@ -534,6 +534,31 @@ table public.markup (rls on)
   CREATE INDEX markup_enrollment_idx ON public.markup USING btree (enrollment_id)
   CREATE INDEX markup_piece_idx ON public.markup USING btree (assessment_id, enrollment_id)
   CREATE UNIQUE INDEX markup_pkey ON public.markup USING btree (file_id)
+table public.markup_kept (rls on)
+  file_id uuid not null
+  submission_id uuid not null
+  course_id uuid not null
+  assessment_id uuid not null
+  enrollment_id uuid not null
+  page smallint not null
+  width integer
+  height integer
+  rotation smallint not null
+  added_by text not null
+  working jsonb
+  working_rev integer not null
+  working_at timestamp with time zone
+  given jsonb
+  given_rev integer
+  given_at timestamp with time zone
+  marked_at timestamp with time zone not null
+  photo_removed_at timestamp with time zone not null default now()
+  constraint markup_kept_pkey PRIMARY KEY (file_id)
+  constraint markup_kept_submission_id_fkey FOREIGN KEY (submission_id) REFERENCES public.submission(id) ON DELETE CASCADE
+  CREATE INDEX markup_kept_course_idx ON public.markup_kept USING btree (course_id)
+  CREATE INDEX markup_kept_piece_idx ON public.markup_kept USING btree (assessment_id, enrollment_id)
+  CREATE UNIQUE INDEX markup_kept_pkey ON public.markup_kept USING btree (file_id)
+  CREATE INDEX markup_kept_submission_idx ON public.markup_kept USING btree (submission_id)
 table public.module (rls on)
   id uuid not null default gen_random_uuid()
   course_id uuid not null
@@ -683,6 +708,25 @@ table public.phone_report_student (rls on)
   WHERE ((r.id = phone_report_student.report_id) AND public.fv_owns_course(r.course_id))))) with check ((EXISTS ( SELECT 1
    FROM public.phone_report r
   WHERE ((r.id = phone_report_student.report_id) AND public.fv_owns_course(r.course_id)))))
+table public.photo_check_log (rls on)
+  id bigint not null
+  at timestamp with time zone not null default now()
+  course_id uuid
+  kind text not null
+  n integer not null
+  detail jsonb
+  constraint photo_check_log_kind_check CHECK ((kind = ANY (ARRAY['keep_photos_until'::text, 'expired'::text, 'stray_queued'::text, 'stray_other_name'::text, 'missing_file'::text, 'error'::text])))
+  constraint photo_check_log_pkey PRIMARY KEY (id)
+  CREATE INDEX photo_check_log_at ON public.photo_check_log USING btree (at)
+  CREATE UNIQUE INDEX photo_check_log_pkey ON public.photo_check_log USING btree (id)
+table public.photo_keep_check (rls on)
+  course_id uuid not null
+  checked_through date not null
+  judged_choice text
+  judged_terms jsonb
+  at timestamp with time zone not null default now()
+  constraint photo_keep_check_pkey PRIMARY KEY (course_id)
+  CREATE UNIQUE INDEX photo_keep_check_pkey ON public.photo_keep_check USING btree (course_id)
 table public.question (rls on)
   id uuid not null default gen_random_uuid()
   questionnaire_id uuid not null
@@ -1536,6 +1580,7 @@ function public._grade_return_settle(p_enrollment_id uuid, p_assessment_id uuid)
 function public._grade_return_truncated() returns trigger security definer
 function public._issue_access_code(p_enrollment_id uuid, p_questionnaire_id uuid, p_expires_at timestamp with time zone) returns text security definer
 function public._issue_report_code(p_enrollment_id uuid, p_report_id uuid, p_expires_at timestamp with time zone) returns text security definer
+function public._keep_photos_day(p_choice text, p_terms jsonb, p_on date) returns date
 function public._markup_check(p_marks jsonb) returns void
 function public._markup_give(p_enrollment_id uuid, p_assessment_id uuid) returns integer security definer
 function public._markup_on_release() returns trigger security definer
@@ -1543,6 +1588,12 @@ function public._markup_on_return() returns trigger security definer
 function public._new_access_code() returns text
 function public._phone_report_json(p_id uuid) returns jsonb
 function public._phone_report_put(p_report_id uuid, p_course_id uuid, p_students jsonb) returns void
+function public._photo_keep_class(p_course_id uuid, p_now timestamp with time zone) returns jsonb security definer
+function public._photo_keep_cutoff(p_course_id uuid, p_now timestamp with time zone) returns timestamp with time zone security definer
+function public._photo_log(p_course_id uuid, p_kind text, p_n integer, p_detail jsonb) returns void security definer
+function public._photo_missing(p_course_id uuid) returns jsonb security definer
+function public._photo_strays(p_course_id uuid, p_now timestamp with time zone) returns jsonb security definer
+function public._photo_stuck() returns jsonb security definer
 function public._piece_latest(p_assessment_id uuid, p_enrollment_id uuid) returns public.submission security definer
 function public._questionnaire_json(p_id uuid) returns jsonb
 function public._reflection_json(p_reflection_id uuid) returns jsonb security definer
@@ -1688,6 +1739,8 @@ function public.list_teacher_courses() returns TABLE(id uuid, name text, grade_l
 function public.mark_handed_in_paper(p_assessment_id uuid, p_enrollment_ids uuid[], p_idempotency_key uuid) returns jsonb security definer
 function public.mark_student_cards_printed(p_card_ids uuid[], p_idempotency_key uuid) returns jsonb security definer
 function public.move_rubric_scores(p_assessment_id uuid, p_rubric_id uuid, p_criterion_map jsonb, p_check_map jsonb, p_idempotency_key uuid) returns jsonb
+function public.photo_removal_call() returns bigint
+function public.photo_removal_due() returns boolean security definer
 function public.reenrol_student(p_enrollment_id uuid, p_idempotency_key uuid) returns jsonb
 function public.relink_student(p_ghost_student_id uuid, p_canonical_student_id uuid) returns jsonb
 function public.remove_section(p_id uuid, p_idempotency_key uuid) returns jsonb

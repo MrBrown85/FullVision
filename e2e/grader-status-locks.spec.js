@@ -43,18 +43,19 @@ test('Missing and Excused follow the score and feedback in the grader dialog', a
   const dialog = page.locator('#grader-overlay .grader-dialog');
   const btn = key => dialog.locator('.grader-status [data-status="' + key + '"]');
 
-  await expect(dialog.locator('.grdt-tile.is-chosen')).toContainText('Proficient');
+  await expect(dialog.locator('.grdl-level.is-on')).toContainText('Proficient');
   await expect(btn('NS')).toBeDisabled();
   await expect(btn('EXC')).toBeDisabled();
   await expect(btn('LATE')).toBeEnabled();
 
   // No level and no feedback: free again.
-  await dialog.locator('.grdt-chosen-label').click();
-  await expect(dialog.locator('.grdt-tile.is-chosen')).toHaveCount(0);
+  await dialog.locator('.grdl-level.is-on').click();
+  await expect(dialog.locator('.grdl-level.is-on')).toHaveCount(0);
   await expect(btn('NS')).toBeEnabled();
   await expect(btn('EXC')).toBeEnabled();
 
-  // A criterion note is feedback.
+  // A criterion note is feedback (its box opens from the Comment chip).
+  await dialog.locator('[data-action="graderNote"]').first().click();
   const note = dialog.locator('textarea[data-action-blur="graderCritNote"]');
   await note.fill('Check your variables.');
   await dialog.locator('.grader-title').click();

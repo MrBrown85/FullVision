@@ -6,6 +6,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { mockAuth, seedCourse, seedStudents, gotoApp, TEST_COURSE } from './helpers.js';
+import { cardMenuItem } from './card-menu.js';
 
 const RUBRIC = {
   id: 'rub-adv',
@@ -54,6 +55,12 @@ function row(page, sid, critId) {
   return page.locator(
     `.rsg-criterion-row[data-assess="assess-adv"][data-student="${sid}"][data-criterion="${critId}"]`,
   );
+}
+
+// Show or Hide Checklists, from the open card's ⋯ menu.
+async function checklists(page, mode) {
+  const card = page.locator('.assess-card.open').first();
+  await (await cardMenuItem(card, 'setChecklistMode', '[data-mode="' + mode + '"]')).click();
 }
 
 async function openCard(page) {
@@ -129,7 +136,7 @@ test.describe('Scoring an Advanced Rubric', () => {
     await row(page, 'stu-001', 'crit-safe').locator('.rsg-checks-btn').click();
     await expect(page.locator('.rsg-checklist')).toHaveCount(5);
 
-    await page.getByRole('button', { name: 'Hide', exact: true }).click();
+    await checklists(page, 'hide');
     await openCard(page);
     await expect(page.locator('.rsg-checklist')).toHaveCount(0);
     expect(await page.evaluate(() => localStorage.getItem('rsg-checklists'))).toBe('hide');
@@ -137,13 +144,13 @@ test.describe('Scoring an Advanced Rubric', () => {
     await row(page, 'stu-002', 'crit-data').locator('.rsg-checks-btn').click();
     await expect(page.locator('.rsg-checklist')).toHaveCount(2);
 
-    await page.getByRole('button', { name: 'Show', exact: true }).click();
+    await checklists(page, 'show');
     await openCard(page);
     await expect(page.locator('.rsg-checklist')).toHaveCount(6);
   });
 
   test('K opens the focused row’s checklist', async ({ page }) => {
-    await page.getByRole('button', { name: 'Hide', exact: true }).click();
+    await checklists(page, 'hide');
     await openCard(page);
     const safety = row(page, 'stu-001', 'crit-safe');
     await safety.locator('.rsg-level', { hasText: 'Proficient' }).click();
@@ -164,6 +171,6 @@ test.describe('Scoring an Advanced Rubric', () => {
     });
     await openCard(page);
     await expect(page.locator('.rsg-checks-btn')).toHaveCount(0);
-    await expect(page.locator('.rsg-checklist-mode')).toHaveCount(0);
+    await expect(page.locator('[data-action="setChecklistMode"]')).toHaveCount(0);
   });
 });

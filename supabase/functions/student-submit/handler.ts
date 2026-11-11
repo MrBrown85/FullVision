@@ -9,7 +9,8 @@
 // and the student card's routes, in card-routes.ts: card, verify (with a
 // code in place of a token), add-card, page, seen and done; and the routes
 // a student sends work through, in send-routes.ts: work, send-start,
-// replace, send-finish, unsend, file-links, and the teacher's sweep.
+// replace, send-finish, unsend, file-links, the teacher's sweep, and the
+// database timer's scheduled-sweep.
 // The SQL functions (migrations/20261025_student_submit.sql, and
 // migrations/2026110904_student_sessions_page.sql for a card) hold every
 // rule; this file only checks the request's shape, refuses to run outside
@@ -54,6 +55,8 @@ export type Options = {
   now?: () => number;
   // Runs the removal worker after the answer (EdgeRuntime.waitUntil in index.ts); absent, before it.
   defer?: ((work: Promise<void>) => void) | null;
+  // PHOTO_SWEEP_SECRET, for scheduled-sweep (the database's timer). Null or absent: that route answers a server error.
+  sweepSecret?: string | null;
   log?: (entry: Record<string, unknown>) => void;
 };
 
@@ -222,6 +225,7 @@ export function makeHandler(opts: Options) {
     log,
     now: opts.now || Date.now,
     defer: opts.defer || null,
+    sweepSecret: opts.sweepSecret || null,
   });
 
   return async function handle(req: Request): Promise<Response> {

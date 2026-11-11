@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { cardMenuItem } from './card-menu.js';
 
 // Print Rubrics lists the class by last name with full names ("Cece
 // Adeyemi"), as the roster and gradebook do, and prints in that order.
@@ -18,7 +19,7 @@ test('Print Rubrics lists students by last name with full names', async ({ page 
   const card = page.locator('#ac-sci8a19');
   await card.waitFor();
   if (!(await card.evaluate(el => el.classList.contains('open')))) await card.locator('.assess-title').click();
-  await card.locator('[data-action="printRubrics"]').first().click();
+  await (await cardMenuItem(card, 'printRubrics')).click();
   const rows = page.locator('.rp-pick .rp-pick-option > span');
   await expect(rows.first()).toBeVisible();
   const shown = await rows.evaluateAll(spans =>

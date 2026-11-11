@@ -371,8 +371,9 @@ var CmStudentPage = (function () {
   /* The day photos are deleted for a choice, 'YYYY-MM-DD'. End of Year is
      June 30 of the school year the class is in today. End of Term is the
      last day of the reporting term the class is in today, else the next
-     to end; with every term past, the last one (a day already gone); with
-     no reporting terms, June 30. */
+     to end; with no term end ahead (every term past, or none), June 30, as
+     End of Year. The server's nightly job (migrations/2026111140,
+     public._keep_photos_day) uses this same rule. */
   function _today(cid) {
     return typeof courseToday === 'function' ? courseToday(cid) : new Date().toISOString().slice(0, 10);
   }
@@ -393,7 +394,7 @@ var CmStudentPage = (function () {
     var ahead = ends.filter(function (d) {
       return d >= today;
     });
-    return ahead.length ? ahead[0] : ends[ends.length - 1];
+    return ahead.length ? ahead[0] : june;
   }
   function _day(iso, month) {
     var d = new Date(iso + 'T12:00:00Z');

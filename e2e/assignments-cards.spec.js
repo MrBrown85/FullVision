@@ -2,7 +2,8 @@ import { test, expect } from '@playwright/test';
 import { mockAuth, seedCourse, seedStudents, gotoApp, TEST_COURSE } from './helpers.js';
 
 // Assessment cards: a grip, the title and chips; the open card adds
-// Competencies | Rubric, Print Rubrics and edit / duplicate / delete.
+// Set Everyone To and a ⋯ menu with Class Results, Print Rubrics, Grade by,
+// Edit Assessment, Duplicate and Delete (the AssignmentsPage board).
 const RUBRIC = {
   id: 'rubric-card',
   name: 'Lab Report Rubric',
@@ -22,7 +23,7 @@ const ASSESSMENT = {
   created: new Date('2026-03-21').toISOString(),
 };
 
-test('a card opens to Competencies | Rubric and its actions', async ({ page }) => {
+test('a card opens to Set Everyone To and a ⋯ menu that holds its actions', async ({ page }) => {
   await mockAuth(page);
   await seedCourse(page);
   await seedStudents(page);
@@ -41,12 +42,29 @@ test('a card opens to Competencies | Rubric and its actions', async ({ page }) =
 
   if (!(await card.evaluate(el => el.classList.contains('open')))) await card.locator('.assess-title').click();
   await expect(card).toHaveClass(/open/);
-  const view = card.locator('.rubric-view-toggle .rubric-view-btn');
-  await expect(view).toHaveText(['Competencies', 'Rubric']);
-  await expect(card.locator('.rubric-print-btn')).toHaveText('Print Rubrics');
-  await expect(card.locator('.assess-header-action-btn')).toHaveCount(3);
   await expect(card.locator('.assess-header-actions')).toHaveCSS('opacity', '1');
+  await expect(card.locator('.assess-setto-btn')).toHaveText('Set Everyone To');
+  const more = card.locator('.assess-more-btn');
+  await expect(more).toHaveAttribute('aria-label', 'More for ' + ASSESSMENT.title);
+  await more.click();
+  await expect(more).toHaveAttribute('aria-expanded', 'true');
+  const menu = card.locator('.assess-more .assess-menu');
+  await expect(menu.getByRole('menuitem')).toHaveText([
+    'Class Results',
+    'Print Rubrics',
+    'Grade by Competencies',
+    'Edit Assessment',
+    'Duplicate',
+    'Delete…',
+  ]);
+  // Esc closes it and goes back to ⋯.
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+  await expect(more).toBeFocused();
 
-  await view.filter({ hasText: 'Competencies' }).click();
-  await expect(view.filter({ hasText: 'Competencies' })).toHaveAttribute('aria-pressed', 'true');
+  await more.click();
+  await menu.getByRole('menuitem', { name: 'Grade by Competencies' }).click();
+  await expect(menu).toBeHidden();
+  await more.click();
+  await expect(menu.getByRole('menuitem', { name: 'Grade by Rubric' })).toBeVisible();
 });

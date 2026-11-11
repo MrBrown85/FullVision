@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { mockAuth, seedCourse, seedStudents, gotoApp, TEST_COURSE } from './helpers.js';
+import { cardMenuItem } from './card-menu.js';
 
 // The whole-class rubric grid: "Set Everyone To" capsules, then per student
 // the name with Missing | Excused | Late and Comment, and each criterion's
@@ -41,8 +42,9 @@ test('the whole-class rubric grid scores, fine-tunes and sets a status', async (
   const card = page.locator('#ac-assess-grid');
   if (!(await card.evaluate(el => el.classList.contains('open')))) await card.locator('.assess-title').click();
 
-  await expect(card.locator('.rsg-header-label')).toHaveText('Set Everyone To');
-  await expect(card.locator('.rsg-header-level')).toHaveCount(4);
+  // Set Everyone To ▾ in the card's header, the four levels in its menu.
+  await expect(card.locator('.assess-setto-btn')).toHaveText('Set Everyone To');
+  await expect(card.locator('.assess-setto .assess-menu-item')).toHaveCount(4);
 
   const alice = card.locator('.rsg-student[data-status-student="stu-001"]');
   await expect(alice.locator('.rsg-student-name')).toContainText('Alice');
@@ -95,7 +97,7 @@ test('Undo on Set Everyone To puts back only the fill', async ({ page }) => {
   }, cid);
   const hyp = card.locator('.rsg-student[data-status-student="stu-001"] .rsg-criterion-row[data-criterion="crit-hyp"]');
   await hyp.locator('.rsg-level.l2').click();
-  await card.locator('[data-action="confirmFillRubricAll"][data-score="4"]').click();
+  await (await cardMenuItem(card, 'confirmFillRubricAll', '[data-score="4"]')).click();
   await page.locator('#confirm-ok-btn').click();
   // Alice's scored criterion is left alone; her other one is set.
   await expect(hyp.locator('.rsg-level.l2')).toHaveClass(/active/);
@@ -148,7 +150,7 @@ test('Set Everyone To sets only unscored criteria, skips Missing, and Cmd+Z undo
   // Alice has Developing on Hypothesis; Bob is Missing; Carol has nothing.
   await row('stu-001', 'crit-hyp').locator('.rsg-level.l2').click();
 
-  await card.locator('[data-action="confirmFillRubricAll"][data-score="4"]').click();
+  await (await cardMenuItem(card, 'confirmFillRubricAll', '[data-score="4"]')).click();
   await expect(page.locator('#confirm-title')).toHaveText('Set Everyone To Extending');
   await expect(page.locator('.confirm-message')).toHaveText(
     'Set 3 criteria with no score yet, for 2 students, to Extending? Criteria already scored stay as they are. 1 student is marked Missing or Excused and left out.',
