@@ -8,10 +8,11 @@
  *
  * Each sends the RPC the migration defines with the parameters it expects,
  * every write carries an idempotency key, lists come back as arrays, and
- * slip codes go straight to the server, never through the outbox.
+ * slip codes come from teacher-cards (plan S3-S1), never through the outbox.
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { signedIn, slipsFetch } from './helpers/teacher-cards-slips-fetch.js';
 
 const CID = '11111111-1111-4111-8111-111111111111';
 const QID = '22222222-2222-4222-8222-222222222222';
@@ -99,19 +100,41 @@ describe('questionnaires v2 dispatch', () => {
     expect((await window.v2.listCourseResponses(CID)).data).toEqual({ [QID]: { [ENR]: [] } });
   });
 
-  it('issueAccessCodes goes straight to the server with a key and only server ids', async () => {
-    use({ issue_access_codes: [{ enrollment_id: ENR, code: 'K7M-4QX' }] });
-    var res = await window.v2.issueAccessCodes(QID, [ENR, 'local-id']);
-    expect(res.data).toEqual([{ enrollment_id: ENR, code: 'K7M-4QX' }]);
-    var call = client.calls.find(c => c.name === 'issue_access_codes');
-    expect(call.payload).toMatchObject({ p_questionnaire_id: QID, p_enrollment_ids: [ENR] });
-    expect(call.payload.p_idempotency_key).toBeTruthy();
-    var queued = JSON.parse(localStorage.getItem('fv-outbox') || '[]');
-    expect(JSON.stringify(queued)).not.toContain('issue_access_codes');
+  // Since plan S3-S1 slips are made by teacher-cards: the database keeps only their tags.
+  it('issueAccessCodes asks teacher-cards for the named students, with only server ids, and nothing is queued', async () => {
+    const fake = slipsFetch({ passwords: { [ENR]: '4821' } });
+    globalThis.getSupabase = () => signedIn(client);
+    try {
+      var res = await window.v2.issueAccessCodes(QID, [ENR, 'local-id']);
+      expect(res.data).toEqual([{ enrollment_id: ENR, code: 'K7M-4QX', password: '4821' }]);
+      expect(fake.bodies).toHaveLength(1);
+      expect(fake.bodies[0].url).toContain('/functions/v1/teacher-cards?forceFunctionRegion=ca-central-1');
+      expect(fake.bodies[0].body).toMatchObject({
+        route: 'slips',
+        kind: 'questionnaire',
+        id: QID,
+        enrollment_ids: [ENR],
+      });
+      expect(fake.bodies[0].body.request_id).toBeTruthy();
+      expect(client.calls).toEqual([]);
+      var queued = localStorage.getItem('fv-outbox') || '';
+      expect(queued).not.toContain('K7M');
+    } finally {
+      fake.restore();
+    }
   });
 
-  it('issueAccessCodes asks for every student when none are named', async () => {
-    await window.v2.issueAccessCodes(QID);
-    expect(client.calls[0].payload.p_enrollment_ids).toBeNull();
+  it('issueAccessCodes asks for every student when none are named, and asks again after a lost reply', async () => {
+    const fake = slipsFetch({ roster: [ENR], replayFirst: true });
+    globalThis.getSupabase = () => signedIn(client);
+    try {
+      var res = await window.v2.issueAccessCodes(QID);
+      expect(fake.bodies[0].body.enrollment_ids).toBeNull();
+      expect(fake.bodies).toHaveLength(2);
+      expect(fake.bodies[1].body.request_id).not.toBe(fake.bodies[0].body.request_id);
+      expect(res.data).toEqual([{ enrollment_id: ENR, code: 'K7M-4QX' }]);
+    } finally {
+      fake.restore();
+    }
   });
 });

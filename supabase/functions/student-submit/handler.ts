@@ -2,10 +2,12 @@
 //
 // A student's phone posts here; nothing else does. Four routes for a slip:
 //   {route: 'open', code}             -> student_submit.open
-//   {route: 'verify', token, birthday | student_number | password}
+//   {route: 'verify', token, code?, birthday | student_number | password}
 //                                     -> student_submit.verify (questionnaires)
 //   {route: 'check', token, birthday} -> student_submit.check (phone reports)
 //   {route: 'submit', token, answers} -> student_submit.submit
+// open and verify turn a slip's code and password into tags, as a card's
+// are (slip-routes.ts, plan S3-S1).
 // and the student card's routes, in card-routes.ts: card, verify (with a
 // code in place of a token), add-card, page, seen and done; and the routes
 // a student sends work through, in send-routes.ts: work, send-start,
@@ -14,9 +16,9 @@
 // The SQL functions (migrations/20261025_student_submit.sql, and
 // migrations/2026110904_student_sessions_page.sql for a card) hold every
 // rule; this file only checks the request's shape, refuses to run outside
-// ca-central-1, turns the caller's IP into a keyed hash, turns a card's
-// code into its tag (the database cannot read a card's code), and answers
-// with what the database said.
+// ca-central-1, turns the caller's IP into a keyed hash, turns a card's or
+// a slip's code into its tag (the database cannot read either), and
+// answers with what the database said.
 //
 // Kept free of Deno and database imports so the tests run it under Node
 // with stand-in database calls. index.ts wires the real ones.
@@ -29,8 +31,13 @@ import { FEEDBACK_ROUTES, makeFeedbackRoutes } from './feedback-routes.ts';
 import { REVISION_ROUTES, makeRevisionRoutes } from './revision-routes.ts';
 // Batch E's: questionnaires and phone reports from a card (forms-routes.ts).
 import { FORM_ROUTES, makeFormRoutes } from './forms-routes.ts';
+// A slip's open and verify, with the key (plan S3-S1).
+import { openSlip, verifySlip } from './slip-routes.ts';
 
 export type Db = {
+  /* A slip's open and verify as the database had them before 2026111160 (the plain code, the plain password).
+     slip-routes.ts sends them only while that migration is not applied; after it, open and verify go through
+     call, with tags. */
   open: (code: string, ipHash: string) => Promise<Record<string, unknown>>;
   verify: (token: string, who: Identity, ipHash: string) => Promise<Record<string, unknown>>;
   check: (token: string, birthday: string, ipHash: string) => Promise<Record<string, unknown>>;
@@ -46,8 +53,9 @@ export type Options = {
   db: Db;
   region: string | undefined; // SB_REGION
   ipKey: string; // HMAC key for IP hashes
-  // STUDENT_CARD_KEY as readCardKey gives it: null or absent when it is missing or malformed. Only card, a
-  // card's verify and add-card use it. Without it they answer a server error and every other route carries on.
+  // STUDENT_CARD_KEY as readCardKey gives it: null or absent when it is missing or malformed. card, a card's
+  // verify, add-card and a slip's open need it: without it they answer a server error. A slip's verify uses it
+  // when it is there. Every other route carries on without it.
   cardKey?: CardKey | null;
   // The student-photos bucket with the service key, for send-routes.ts. Without it those routes answer a
   // server error and ask the database nothing; every other route carries on.
@@ -305,13 +313,18 @@ export function makeHandler(opts: Options) {
         if (typeof body.code !== 'string' || body.code.length > 32) {
           return reply(400, { ok: false, error: 'bad_request' }, origin);
         }
-        result = await opts.db.open(body.code, hash);
+        // A slip's code goes to the database as its tag: no key, no slip.
+        if (!opts.cardKey) {
+          log({ route, outcome: 'no_card_key', ms: Date.now() - started });
+          return reply(500, { ok: false, error: 'server' }, origin);
+        }
+        result = await openSlip(opts.db, opts.cardKey, body.code, hash);
       } else if (route === 'verify') {
         const who = identity(body);
         if (typeof body.token !== 'string' || body.token.length > 128 || !who) {
           return reply(400, { ok: false, error: 'bad_request' }, origin);
         }
-        result = await opts.db.verify(body.token, who, hash);
+        result = await verifySlip(opts.db, opts.cardKey || null, body, body.token, who, hash);
       } else if (route === 'check') {
         if (
           typeof body.token !== 'string' ||

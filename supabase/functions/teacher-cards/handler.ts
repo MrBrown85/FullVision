@@ -1,7 +1,9 @@
-// The teacher-cards request handler: making student cards.
+// The teacher-cards request handler: making student cards, and printing
+// questionnaire and phone-report slips (slips.ts, plan S3-S1).
 //
 // A signed-in teacher's browser posts here, and nothing else does:
 //   { course_id, items: [{ enrollment_id, replaces: <card id or null> }], request_id }
+//   { route: 'slips', kind, id, enrollment_ids, request_id }   (slips.ts)
 // One request covers every button. Make Cards is the students with no card
 // (replaces null). Print New Card is one student, naming their live card.
 // New Codes for This Class is every student.
@@ -37,6 +39,7 @@
 // Kept free of Deno and database imports so the tests run it under Node.
 // index.ts wires the real database and the real Auth.
 import { type CardKey, type RandomSource, drawCode, drawPassword, prettyCode } from '../_shared/card-key.ts';
+import { type SlipDb, makeSlips, readSlipRequest } from './slips.ts';
 
 type Json = Record<string, unknown>;
 
@@ -59,7 +62,7 @@ export type Db = {
     keyId: string,
     requestId: string,
   ) => Promise<unknown>;
-};
+} & Partial<SlipDb>;
 
 export type Options = {
   db: Db;
@@ -273,13 +276,33 @@ export function makeHandler(opts: Options) {
   return async function handle(req: Request): Promise<Response> {
     const origin = req.headers.get('origin');
     const started = Date.now();
-    // Route, outcome, how many cards and time. Never a code, a tag, the key, a password, the token or a name.
+    // Which route the log line names: 'issue' (cards) until a slip request is read.
+    let named = 'issue';
+    // Route, outcome, how many cards or slips and time. Never a code, a tag, the key, a password, the token or a name.
     const done = (status: number, outcome: string, body: unknown, cards?: number): Response => {
-      log({ route: 'issue', outcome, ...(cards == null ? {} : { cards }), ms: Date.now() - started });
+      const counted = cards == null ? {} : named === 'slips' ? { slips: cards } : { cards };
+      log({ route: named, outcome, ...counted, ms: Date.now() - started });
       return reply(status, body, origin);
     };
     const refuse = (status: number, error: string, outcome?: string) =>
       done(status, outcome || error, { ok: false, error });
+    // The database refuses a whole request by raising. Its SQLSTATE says why; its message is never read,
+    // since a message can quote a value.
+    const refused = (e: unknown): Response => {
+      const state = isObject(e) && typeof e.code === 'string' && /^[0-9A-Z]{5}$/.test(e.code) ? e.code : null;
+      if (state === 'PT401') return refuse(401, 'unauthorized', 'not_a_teacher');
+      if (state === 'P0002') return refuse(404, 'not_found');
+      // A phone report the teacher closed takes no new slips.
+      if (state === 'FVS01' && named === 'slips') return refuse(409, 'closed');
+      log({
+        route: named,
+        outcome: 'error',
+        kind: e instanceof Error ? e.name : typeof e,
+        ...(state ? { sqlstate: state } : {}),
+        ms: Date.now() - started,
+      });
+      return reply(500, { ok: false, error: 'server' }, origin);
+    };
 
     if (req.method === 'OPTIONS') {
       return new Response(null, { status: allowedOrigin(origin) ? 204 : 403, headers: cors(origin) });
@@ -315,14 +338,36 @@ export function makeHandler(opts: Options) {
 
     const length = Number(req.headers.get('content-length') || 0);
     if (length > MAX_BODY) return refuse(413, 'too_large');
-    let asked: Asked | null;
+    let asked: Asked | null = null;
+    let parsed: unknown = null;
     try {
       const text = await req.text();
       if (text.length > MAX_BODY) return refuse(413, 'too_large');
-      asked = readRequest(JSON.parse(text));
+      parsed = JSON.parse(text);
     } catch {
-      asked = null;
+      parsed = null;
     }
+    // A slip request names its route; a card request names none.
+    if (isObject(parsed) && parsed.route === 'slips') {
+      named = 'slips';
+      const slipAsked = readSlipRequest(parsed);
+      const db = opts.db;
+      if (!slipAsked) return refuse(400, 'bad_request');
+      if (typeof db.roster !== 'function' || typeof db.slips !== 'function') return refuse(500, 'server', 'no_slip_db');
+      try {
+        const out = await makeSlips(
+          { roster: db.roster.bind(db), slips: db.slips.bind(db) },
+          key,
+          teacherId,
+          slipAsked,
+          opts.random,
+        );
+        return done(out.status, out.outcome, out.body, out.slips);
+      } catch (e) {
+        return refused(e);
+      }
+    }
+    if (!isObject(parsed) || parsed.route == null) asked = readRequest(parsed);
     if (!asked) return refuse(400, 'bad_request');
 
     // The new codes and passwords, by student. They live in this one request's memory and nowhere else.
@@ -334,19 +379,7 @@ export function makeHandler(opts: Options) {
       if (!out) throw new TypeError('reply');
       return done(200, out.replayed ? 'replayed' : 'ok', { replayed: out.replayed, results: out.results }, out.made);
     } catch (e) {
-      // The database refuses a whole request by raising. Its SQLSTATE says why; its message is never read,
-      // since a message can quote a value.
-      const state = isObject(e) && typeof e.code === 'string' && /^[0-9A-Z]{5}$/.test(e.code) ? e.code : null;
-      if (state === 'PT401') return refuse(401, 'unauthorized', 'not_a_teacher');
-      if (state === 'P0002') return refuse(404, 'not_found');
-      log({
-        route: 'issue',
-        outcome: 'error',
-        kind: e instanceof Error ? e.name : typeof e,
-        ...(state ? { sqlstate: state } : {}),
-        ms: Date.now() - started,
-      });
-      return reply(500, { ok: false, error: 'server' }, origin);
+      return refused(e);
     } finally {
       // Whatever happened, the function lets go of every code it drew. The reply already holds the ones it is to carry.
       drawn.clear();

@@ -723,9 +723,11 @@
             S.data.token = again.token;
             // A slip that asks who you are asks again on the new session.
             if (again.check && S.ident) {
-              return call(Object.assign({ route: 'verify', token: again.token }, S.ident)).then(function (ok) {
-                return ok && ok.ok ? attempt(true) : ok;
-              });
+              return call(Object.assign({ route: 'verify', token: again.token, code: S.code }, S.ident)).then(
+                function (ok) {
+                  return ok && ok.ok ? attempt(true) : ok;
+                },
+              );
             }
             return attempt(true);
           });

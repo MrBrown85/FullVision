@@ -26,7 +26,8 @@
  */
 import { readCardKey } from '../../supabase/functions/_shared/card-key.ts';
 import { makeHandler } from '../../supabase/functions/student-submit/handler.ts';
-import { FAKE_KEY, codeTag, passwordTag } from './card-key-fake.js';
+import { SLIP_SQL } from '../../supabase/functions/student-submit/slip-routes.ts';
+import { FAKE_KEY, codeTag, passwordTag, slipCodeTag } from './card-key-fake.js';
 import { C1, fakeWorld } from './fake-send-world.js';
 
 const clone = v => JSON.parse(JSON.stringify(v));
@@ -433,6 +434,12 @@ export function fakeStudentSubmit(opts = {}) {
       submit: slip('submit'),
       async call(text, params) {
         if (state.down) throw new Error('down');
+        // A slip's open and verify with tags (slip-routes.ts, plan S3-S1): the slip whose code has this tag.
+        if (text === SLIP_SQL.open) {
+          const code = Object.keys(state.slips).find(c => slipCodeTag(norm(c)) === params[0]);
+          return code ? slip('open')(code) : (sql.push({ fn: 'open', params: [null] }), no('not_found'));
+        }
+        if (text === SLIP_SQL.verify) return slip('verify')(params[0]);
         const fn = /^select student_submit\.(\w+)\(/.exec(text)[1];
         const add = /, p_add => (true|false)\) as r$/.exec(text);
         if (world && WORKER_FNS.includes(fn)) return world.db.call(text, params);

@@ -93,8 +93,6 @@ describe('FV_IDEMPOTENT_RPCS', () => {
       'import_json_restore',
       'import_roster_csv',
       'import_teams_class',
-      'issue_access_codes',
-      'issue_report_codes',
       'move_rubric_scores',
       'reenrol_student',
       'remove_section',

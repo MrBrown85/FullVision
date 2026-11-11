@@ -361,9 +361,11 @@ describe('student page: who are you? (a questionnaire slip)', () => {
     replies.push({ ok: false, error: 'wrong_identity', tries_left: 4 });
     click('[data-act="start"]');
     for (let i = 0; i < 3; i++) await tick();
+    // The slip's code goes with its verify, so a password can be checked by its tag (plan S3-S1).
     expect(calls[1].body).toEqual({
       route: 'verify',
       token: 'a'.repeat(64),
+      code: 'K7M4QX',
       birthday: '2012-05-16',
       student_number: null,
       password: null,

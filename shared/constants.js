@@ -917,8 +917,6 @@ const FV_IDEMPOTENT_RPCS = {
   import_json_restore: true,
   import_roster_csv: true,
   import_teams_class: true,
-  issue_access_codes: true,
-  issue_report_codes: true,
   reenrol_student: true,
   remove_section: true,
   restore_section: true,

@@ -866,13 +866,14 @@ var StudentPage = (function () {
     }
     S.sending = true;
     paint();
-    return call(Object.assign({ route: 'verify', token: S.data.token }, ident))
+    // The code goes with the token, so the function can check a password by its tag (plan S3-S1).
+    return call(Object.assign({ route: 'verify', token: S.data.token, code: S.code }, ident))
       .then(function (res) {
         if (res && res.error === 'expired') {
           return call({ route: 'open', code: S.code }).then(function (again) {
             if (!again || !again.ok) return again;
             S.data.token = again.token;
-            return call(Object.assign({ route: 'verify', token: again.token }, ident));
+            return call(Object.assign({ route: 'verify', token: again.token, code: S.code }, ident));
           });
         }
         return res;

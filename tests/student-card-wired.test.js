@@ -259,9 +259,11 @@ describe('a slip still opens: the card is asked first, then open', () => {
     expect(page.root().querySelector('.sp-big').textContent).toBe('Hi Cece!');
     page.type('#sp-ident', '0123456');
     await page.click('[data-act="start"]');
+    // The slip's code goes with its verify, so a password can be checked by its tag (plan S3-S1).
     expect(page.calls[2].body).toEqual({
       route: 'verify',
       token: 'a'.repeat(64),
+      code: 'K7M4QX',
       birthday: null,
       student_number: '0123456',
       password: null,
