@@ -1,16 +1,17 @@
 import { test, expect } from '@playwright/test';
+import { catchPrints, heldAnywhere, sheets } from './student-card-fake.js';
 
-// S0-W1: the student page's build switch and a bare Student Cards list in
-// Class Settings › Student Page, in Demo Mode.
+// S0-W1 and S3-W1: the student page's build switch and the Student Cards
+// list in Class Settings › Student Page, in Demo Mode.
 //
 // The switch is offered nowhere in the app. It shows only when the app was
 // opened at an address that carries ?build=student-page: a Student Page
 // switch in a card of its own. Turning it off with grades waiting asks
-// first. With the student page on, Student Cards makes a card for each
-// student, lists them, and prints them eight to a page on the sheet the
-// questionnaire slips use.
+// first. With the student page on, Student Cards lists each student's card
+// with no code, and Make and Print makes the cards and prints them eight to
+// a page on the sheet the questionnaire slips use.
 
-const CODE = /^[ABCDEFGHJKMNPQRTUVWXYZ2346789]{3}-[ABCDEFGHJKMNPQRTUVWXYZ2346789]{3}$/;
+const CODE = /^[ABCDEFGHJKMNPQRTUVWXYZ2346789]{4}-[ABCDEFGHJKMNPQRTUVWXYZ2346789]{4}$/;
 
 async function demo(page) {
   await page.goto('/login.html?demo=1');
@@ -164,7 +165,15 @@ test('the build switch shows only at the build address, and turning it off asks 
   expect(errors).toEqual([]);
 });
 
-test('Student Cards: Make Cards, the list, and Print All eight to a page', async ({ page }) => {
+/* Make and Print in Demo Mode (S3-W1; the card-codes design, sections 4,
+   8 and 10): the list shows no code, ever; one press makes every card and
+   opens the print dialog; the code is printed and kept nowhere on the
+   device; Print Again prints the same codes until Class Settings closes or
+   the page reloads. Set S3W1_SHOTS to a folder to save the list before and
+   after. */
+const SHOTS = process.env.S3W1_SHOTS || '';
+
+test('Student Cards: Make and Print, no code kept, and Print Again until the screen goes', async ({ page }) => {
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   page.on('console', m => {
@@ -177,7 +186,6 @@ test('Student Cards: Make Cards, the list, and Print All eight to a page', async
   const card = page.locator('.sc-card');
   await expect(card.getByRole('heading', { name: 'Student Cards' })).toBeVisible();
   await expect(card).toContainText('One card for each student. They scan it, or type its code, to open their page.');
-  // Under Return Grades.
   const order = await page.evaluate(() => {
     var a = document.querySelector('.sp-card').getBoundingClientRect();
     var b = document.querySelector('.sc-card').getBoundingClientRect();
@@ -185,74 +193,113 @@ test('Student Cards: Make Cards, the list, and Print All eight to a page', async
   });
   expect(order).toBe(true);
 
-  // Every student, A to Z, with no card yet; nothing to print.
+  // Every student, A to Z, with no card yet; one button.
   const rows = card.locator('.sc-table tbody tr');
   await expect(rows).toHaveCount(at.count);
-  await expect(card.locator('.sc-table thead th')).toHaveText(['Student', 'Card Code', 'Status']);
+  await expect(card.locator('.sc-table thead th')).toHaveText(['Student', 'Card', 'Status']);
   await expect(card.locator('.sc-name')).toHaveText(at.names);
-  await expect(card.locator('.sc-code').first()).toHaveText('No Card Yet');
-  await expect(card.getByRole('button')).toHaveText(['Make Cards']);
+  await expect(card.locator('.sc-which')).toHaveText(at.names.map(() => 'No Card Yet'));
+  await expect(card.getByRole('button')).toHaveText(['Make and Print ' + at.count + ' Cards']);
+  if (SHOTS) {
+    // Once the loading screen has faded.
+    await page
+      .waitForFunction(
+        () =>
+          ![...document.querySelectorAll('.app-loading')].some(
+            e => e.offsetParent && getComputedStyle(e).opacity !== '0',
+          ),
+        null,
+        { timeout: 5000 },
+      )
+      .catch(() => {});
+    await page.waitForTimeout(500);
+    await card.screenshot({ path: SHOTS + '/s3w1-demo-before.png' });
+  }
 
-  // Make Cards: a code for each, none printed.
-  await card.getByRole('button', { name: 'Make Cards' }).click();
-  await expect(card.getByRole('button')).toHaveText(['Print All']);
-  const codes = await card.locator('.sc-code').allTextContents();
-  expect(codes.length).toBe(at.count);
-  codes.forEach(code => expect(code).toMatch(CODE));
-  expect(new Set(codes).size).toBe(at.count);
-  await expect(card.locator('.sc-status').first()).toHaveText('Not Printed');
-  await expect(card.locator('.sc-status', { hasText: 'Not Printed' })).toHaveCount(at.count);
-
-  // The list fits the panel: no sideways scroll.
-  const fits = await page.evaluate(() => {
-    var t = document.querySelector('.sc-table');
-    var box = document.querySelector('.sc-card');
-    return t.getBoundingClientRect().right <= box.getBoundingClientRect().right + 1;
-  });
-  expect(fits).toBe(true);
-
-  // Print All: every card on the slips' sheet, eight to a page.
-  const sheet = await printed(page, () => card.getByRole('button', { name: 'Print All' }).click());
-  expect(sheet.active).toBe(true);
+  // One press: the cards are made and the print dialog opens.
+  await catchPrints(page);
+  await card.getByRole('button', { name: 'Make and Print ' + at.count + ' Cards' }).click();
+  await expect.poll(async () => (await sheets(page)).length).toBe(1);
+  const [sheet] = await sheets(page);
   expect(sheet.pages.length).toBe(Math.ceil(at.count / 8));
   expect(sheet.pages.reduce((a, b) => a + b, 0)).toBe(at.count);
-  sheet.pages.slice(0, -1).forEach(n => expect(n).toBe(8));
   expect(sheet.names).toEqual(at.names);
-  expect(sheet.codes).toEqual(codes);
+  expect(sheet.numbers).toEqual(at.names.map(() => 'Card 1'));
+  sheet.codes.forEach(code => expect(code).toMatch(CODE));
+  expect(new Set(sheet.codes).size).toBe(at.count);
   expect(sheet.qrs).toBe(at.count);
-  expect(sheet.titles).toEqual(['Student Card']);
   expect(sheet.classes.length).toBe(1);
   expect(sheet.classes[0]).toContain('Science 8');
   expect(sheet.text).toContain('Scan with your phone camera.');
   expect(sheet.text).toContain('No camera? Go to localhost:');
-  // A card is kept: it never says a code works once.
   expect(sheet.text).not.toMatch(/once/i);
-
-  // The sheet comes off the page, and the cards are marked printed.
+  // The sheet comes off the page.
   await expect(page.locator('#qr-slips-root .qs-page')).toHaveCount(0);
-  await expect(card.locator('.sc-status', { hasText: /^Printed / })).toHaveCount(at.count);
-  await expect(card.locator('.sc-status', { hasText: 'Not Printed' })).toHaveCount(0);
 
-  // A reload keeps the same cards.
-  await page.reload();
-  await expect(page.locator('.sc-card .sc-code')).toHaveText(codes);
-  await expect(page.locator('.sc-card .sc-status', { hasText: /^Printed / })).toHaveCount(at.count);
-  // A student added later gets a card with Make Cards; the others keep theirs.
+  // The list: no code anywhere, each card printed, the line and Print Again.
+  await expect(card.locator('.sc-status', { hasText: /^Printed / })).toHaveCount(at.count);
+  await expect(card.locator('.sc-which').first()).toHaveText(/^Card 1 · Made \w+ \d+$/);
+  const line =
+    at.count +
+    ' cards went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.';
+  await expect(card.locator('.sc-note')).toHaveText(line);
+  await expect(card.getByRole('button')).toHaveText(['Print Again']);
+  if (SHOTS) await card.screenshot({ path: SHOTS + '/s3w1-demo-after.png' });
+  const secrets = sheet.codes.concat(sheet.passwords);
+  const shownText = await page.locator('body').innerText();
+  const kept = await heldAnywhere(page);
+  for (const code of secrets) {
+    expect(shownText).not.toContain(code);
+    expect(kept).not.toContain(code);
+    expect(kept).not.toContain(code.replace('-', ''));
+  }
+  const saved = await page.evaluate(cid => localStorage.getItem('gb-student-cards-' + cid), at.cid);
+  expect(JSON.parse(saved).length).toBe(at.count);
+  expect(saved).not.toMatch(/"(code|password)":/);
+
+  // Print Again: the same codes.
+  await card.getByRole('button', { name: 'Print Again' }).click();
+  await expect.poll(async () => (await sheets(page)).length).toBe(2);
+  const again = (await sheets(page))[1];
+  expect(again.codes).toEqual(sheet.codes);
+  expect(again.passwords).toEqual(sheet.passwords);
+
+  // Class Settings closes and opens again: Print Again is gone, the cards show as printed.
+  await page.locator('[data-action="closeClassManager"]').first().click();
+  await expect(page.locator('.sc-card')).toHaveCount(0);
+  await page.goto('/dashboard?manage=student-page');
+  const back = page.locator('.sc-card');
+  await expect(back.locator('.sc-status', { hasText: /^Printed / })).toHaveCount(at.count);
+  await expect(back.getByRole('button')).toHaveCount(0);
+  await expect(back.locator('.sc-note')).toHaveCount(0);
+
+  // A student added later: Make and Print 1 Card, and the others keep theirs.
+  const before = await page.evaluate(cid => JSON.parse(localStorage.getItem('gb-student-cards-' + cid)), at.cid);
   await page.evaluate(cid => {
     saveStudents(cid, getStudents(cid).concat([{ id: 'e2e-new', firstName: 'Zed', lastName: 'Zzyzx' }]));
     DashClassManager.renderClassManager();
   }, at.cid);
-  const again = page.locator('.sc-card');
-  await expect(again.getByRole('button')).toHaveText(['Make Cards', 'Print All']);
-  await expect(again.locator('.sc-code').last()).toHaveText('No Card Yet');
-  await again.getByRole('button', { name: 'Make Cards' }).click();
-  await expect(again.getByRole('button')).toHaveText(['Print All']);
-  expect((await again.locator('.sc-code').allTextContents()).slice(0, at.count)).toEqual(codes);
-  await expect(again.locator('.sc-code').last()).toHaveText(CODE);
+  await expect(back.getByRole('button')).toHaveText(['Make and Print 1 Card']);
+  await expect(back.locator('.sc-which').last()).toHaveText('No Card Yet');
+  await catchPrints(page);
+  await back.getByRole('button', { name: 'Make and Print 1 Card' }).click();
+  await expect.poll(async () => (await sheets(page)).length).toBe(1);
+  const zed = (await sheets(page))[0];
+  expect(zed.names).toEqual(['Zed Zzyzx']);
   // Zed has no birthday or student number on file: his card prints a password.
-  const second = await printed(page, () => again.getByRole('button', { name: 'Print All' }).click());
-  expect(second.names[second.names.length - 1]).toBe('Zed Zzyzx');
-  expect(second.text).toMatch(/Password\d{4}/);
+  expect(zed.passwords.length).toBe(1);
+  expect(zed.passwords[0]).toMatch(/^\d{4}$/);
+  await expect(back.locator('.sc-note')).toHaveText(
+    '1 card went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
+  );
+  const now = await page.evaluate(cid => JSON.parse(localStorage.getItem('gb-student-cards-' + cid)), at.cid);
+  expect(now.slice(0, at.count).map(c => c.id)).toEqual(before.map(c => c.id));
+
+  // A reload: Print Again is gone.
+  await page.reload();
+  await expect(page.locator('.sc-card .sc-status', { hasText: /^Printed / })).toHaveCount(at.count + 1);
+  await expect(page.locator('.sc-card').getByRole('button')).toHaveCount(0);
+  expect(await heldAnywhere(page)).not.toContain(zed.codes[0]);
 
   // Nothing went to a server, and nothing waits to.
   expect(await page.evaluate(() => localStorage.getItem('fv-sync-queue-v1'))).toBe(null);
