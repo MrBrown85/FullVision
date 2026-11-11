@@ -227,8 +227,9 @@
 --        midnight, or after Done: signed_out; a card replaced, past its
 --        last day, or locked: card_stopped, card_expired, card_locked; the
 --        class's Student Page off: closed;
---      for their own enrollment, not withdrawn (asked again once the call
---        has the class's lock): any other is not_found;
+--      for their own enrollment, not withdrawn (for a send's start and its
+--        finish, asked again once the call has the class's lock): any other
+--        is not_found;
 --      on an assessment of that class that is on their page, set to take
 --        work, in a class with Send Work on: else not_found,
 --        not_taking_work, send_off;
@@ -752,7 +753,8 @@ create or replace trigger submission_same_class before insert or update on publi
 
 -- A page's row goes: both its files are queued for deletion, in the same
 -- transaction, whoever deleted it and however (Unsend, Replace, a teacher's
--- delete, an assessment or a student being deleted, a class being purged).
+-- delete, a send that lost its place, an assessment or a student being
+-- deleted, a class being purged).
 create or replace function public._submission_file_removed()
  returns trigger
  language plpgsql
@@ -1176,8 +1178,10 @@ $function$;
 -- that still has its row, in a class they own, and is either handed in or
 -- part of an upload of the teacher's own. So a file a student unsent, or
 -- one of a send a student has not finished, can be read by no teacher: its
--- row is gone, or is not handed in. (Such a file stays in storage until the
--- removal worker deletes it; until then only the service key reaches it.)
+-- row is gone, or is not handed in. (A file whose row is gone stays in
+-- storage until the removal worker deletes it. Until then the service key
+-- reaches it, and so does a download link the edge function signed for it
+-- earlier, for as long as that link lasts.)
 create or replace function fv_private.work_read_allowed(p_name text)
  returns boolean
  language sql
