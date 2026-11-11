@@ -1333,6 +1333,12 @@ def hide_round1():
         ok('(a) 2: a Return (Return N Graded) ends the hide: the student has the 6 again', shown(d, ENR1, lab) == 6)
         ok('(a) 2: and the request says so: the hide is over, stored', req(d, rid) == ['open', False, 'returned'], req(d, rid))
         ok('(a) 2: both sides are told it is no longer hidden', d.rpc('list_course_feedback(:c)', c=COURSE_A)['revisions'][0]['grade_hidden'] is False)
+        # the two helpers themselves, past cancel_revision's own check: an ended hide can neither begin again nor give back
+        fp = fingerprint_rows(d)
+        ok('(a) 2: a hide that has ended cannot begin again on the request', d.one('select public._revision_hide_grade(:r)', r=rid) is False
+           and req(d, rid) == ['open', False, 'returned'] and fingerprint_rows(d) == fp)
+        ok('(a) 2: and gives nothing back when asked directly', d.one('select public._revision_unhide_grade(:r)', r=rid) is False
+           and fingerprint_rows(d) == fp)
         d.rpc('clear_score(:e, :a)', e=ENR1, a=lab); d.rpc('return_grades(:a, :e, :k)', a=lab, e=[ENR1], k=nid())
         ok('(a) 2: the grade cleared and the clear returned: no result', shown(d, ENR1, lab) is None)
         d.score(ENR1, lab, 9)
@@ -1356,6 +1362,27 @@ def hide_round1():
            r['returned'] == 0 and req(d, rid) == ['open', True, None] and shown(d, ENR1, lab) is None, (r, req(d, rid)))
         c = d.rpc('cancel_revision(:r, :k)', r=rid, k=nid())
         ok('(a) 2: and Take Back still gives the 6 back', c['unhidden'] is True and shown(d, ENR1, lab) == 6)
+    finally:
+        d.close()
+
+    # (a) 1: the whole row the student had comes back, previous_copy and updated_at included, after a clear and a new grade
+    d = scenario_db('hr1', with_c2=True)
+    try:
+        k = seed(d); lab = k['lab']; t1 = d.session(ENR1)
+        d.score(ENR1, lab, 5); d.return_work(lab, [ENR1])
+        d.page(t1, ENR1); d.service("student_submit.seen(:t, :e, :a, 'ip-1')", t=t1, e=ENR1, a=[lab])
+        d.score(ENR1, lab, 6); d.return_work(lab, [ENR1])
+        before = gr(d, ENR1, lab)[0]
+        ok('(a) 1: before the hide the student has a 6 that was a 5 (previous_copy and updated_at set)',
+           before[3] is not None and before[3]['value'] == 5 and before[4] is not None, before)
+        rid = d.rfr(lab, ENR1, {'what_to_fix': 'Fix', 'keep_grade': False})['request']['id']
+        d.rpc('clear_score(:e, :a)', e=ENR1, a=lab); d.score(ENR1, lab, 3)
+        c = d.rpc('cancel_revision(:r, :k)', r=rid, k=nid())
+        after = gr(d, ENR1, lab)[0]
+        ok('(a) 1: cleared, a new grade, then Take Back: returned_at, updated_at, previous_copy and seen_at are as before the hide',
+           c['unhidden'] is True and [after[1], after[3], after[4], after[5]] == [before[1], before[3], before[4], before[5]], (after, before))
+        ok('(a) 1: the student has the 6 (was 5), and the 3 waits as a draft', shown(d, ENR1, lab) == 6 and after[0] is True and after[2]['value'] == 6
+           and d.one('select student_submit._returned_grade(:e, :a)', e=ENR1, a=lab)['previous']['value'] == 5, after)
     finally:
         d.close()
 

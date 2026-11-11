@@ -1664,9 +1664,13 @@ enrollment that delete the new rows with their student or piece. It changes
 no existing row, function, trigger, policy or grant.
 `../2026111121_markup_revise_grade_changes.sql` (C2) changes how a grade is
 returned or stored: it hides a student's grade during a revision (writing
-their `grade_return` row) and adds a trigger on `grade_return` that gives the
-marks whenever a grade is returned. C2 waits for the owner. The contract for
-the edge routes and the browser is `batch-c-contract.md`.
+their `grade_return` row) and adds a trigger on `grade_return` that, whenever
+a grade is returned, gives the marks, ends a hide on the piece and stores a
+finished revision request as done. A hide is a stored fact on the request
+(`grade_hidden`, `hidden_state`, `hide_ended_at`, `hide_ended_by`, columns of
+C1's own table): it ends when a Return gives the student a grade for the
+piece, or when Take Back gives the kept grade back. C2 waits for the owner.
+The contract for the edge routes and the browser is `batch-c-contract.md`.
 
 Batch C applies only after Batch B, so the harness builds the database as
 live will be when Batch C is applied, in the apply order: everything
@@ -1684,7 +1688,7 @@ export BATCH_B_DIR=/tmp/bb/migrations
 PGPORT=54361 PGDATABASE=bc python3 batch_c_common.py build        # an empty database: live as it will be with Batch B
 PGPORT=54361 PGDATABASE=bc python3 batch_c.py                     # both files, about two minutes
 PGPORT=54361 PGDATABASE=bc python3 batch_c_undo.py                # both undo scripts
-PGPORT=54361 PGDATABASE=bc python3 batch_c_mutate.py              # 59 wrong versions of the SQL, about twenty minutes
+PGPORT=54361 PGDATABASE=bc python3 batch_c_mutate.py              # 99 wrong versions of the SQL, about thirty minutes
 PGPORT=54361 PGDATABASE=bc python3 batch_c_fingerprints.py check  # are the fingerprint lists in the eight files current
 ```
 
@@ -1755,8 +1759,9 @@ for those three new rows.
   `file_id` and `page`. (a) Make My Plan through `reply` (its refusals; kept
   by a reply without a plan; the newest plan is Your Plan From Last Time).
   (k) `answer_new` and `answer_seen` (no session, another student, twice, no
-  grade row changed). (g) Only Me: kept, clears the question, in no student
-  answer, no reply to it, a follow-up answered Only Me. (c, d) the switch
+  grade row changed). (g) Only Me: kept as the teacher's note, clears the
+  question, in no student answer, no reply to it, a follow-up noted Only
+  Me. (c, d) the switch
   off: `reply` and `answer_reflection` answer `reflect_off`, both sides list
   no reflection, nothing is deleted, all back when it is on.
 - **gone** (what C1's delete triggers do). With a marked page, a
@@ -1820,8 +1825,48 @@ for those three new rows.
   once, and when a grade's row is first made returned; not by a draft or a
   `seen()` row; the C2 helpers are runnable by nobody but their owner.
 
+Review round 1 (`batch-c-review.md`; each scenario was committed first and
+failed on the reviewed code, `73ba899e`):
+
+- **closes** (C1's (b) 1 and 2), with C1 alone and with C2. The revision's
+  grade returned by `return_work`, by `return_grades` and by a save in a
+  class that returns at once: both sides told returned; stored as done
+  (with C2 at once, by the trigger; with C1 alone at `return_work` or the
+  next Batch C call); the revision's photos then deleted, still returned
+  and no new revision; the grade then cleared and the clear returned,
+  still returned. One way is left open with C1 alone: a revision's grade
+  returned by a save, its photos deleted and its grade cleared by saves,
+  with no Batch C call between, reads open (C2's trigger closes it). A
+  revision returned at the same grade: `return_work` returns no grade and
+  changes no grade row but ends the request; `revision_unsend` then
+  answers `grading_started` and removes nothing; a Return with no revision
+  in leaves a request open.
+- **only_me** (C1's (b) 3). A note is kept for the teacher, not as the
+  answer, and clears the question. A student with a note and one with
+  nothing are told the same, call by call (`feedback`, `reply` with and
+  without a follow-up, `answer_seen`, the same reflection again, a changed
+  one); a changed question waits again; a real answer can then be sent and
+  reaches the student; a follow-up noted Only Me is not sent, and a real
+  follow-up answer can follow it.
+- **hide_round1** (C2's (a) 1 to 3 and (b) 9). Hidden, then each of
+  eleven things done to the score (`clear_score`, `upsert_score` with
+  nothing, `clear_row_scores`, `clear_column_scores`, a rubric level and
+  box cleared, the box alone, a change, Set Everyone To, two restores, the
+  nightly repair): the hide stays on, and Take Back gives back what the
+  student had with the change waiting as a draft (or, regraded and
+  returned, the new grade and the hide over). A Return ends the hide for
+  good: stored, told to both sides, and a later Take Back (after the
+  grade was cleared and that returned, and a new draft) gives nothing. A
+  Return that gives no grade (the hidden grade cleared) leaves it on.
+  Take Back gives no mark drawn while hidden; the next Return does. The
+  hidden revision's grade returned is Updated, "was" the grade the student
+  had; the same grade returned is not.
+
 `batch_c_undo.py`: C2's undo gives every hidden grade back exactly and
 leaves the catalog C1 alone left, line for line; C2 applies again after it.
+With one request whose hide ended long ago (it held a 5) and one hiding a 7
+now, in both id orders, it gives back the 7 and marks only that hide
+ended by the undo; it gives no mark drawn while the grade was hidden.
 C1's PART 1 stops every Batch C function and changes no row, while Return
 and sending work still work; PART 1b puts every permission back. PART 2
 refuses while C2 is in and while the tables hold rows unless told to
@@ -1830,9 +1875,10 @@ two dropped columns' slots on `course`; no row of a table that existed
 before changes; a revision a student sent stays as Batch B's version 2,
 which Batch B reads as the latest version. C1 applies again after it.
 
-`batch_c_mutate.py`: 59 wrong versions (38 of C1, 21 of C2), each applied
-with its fingerprint lists stood aside and run against the behaviour
-scenarios. Results are in the pull request.
+`batch_c_mutate.py`: 99 wrong versions (67 of C1, 32 of C2; 23 of them
+wrong versions of review round 1's fixes), each applied with its
+fingerprint lists stood aside and run against the behaviour scenarios.
+Results are in the pull request.
 
 The earlier suites with Batch C applied (2026-11-11; scratch copies of the
 suites, each with one hook that applies C1 and C2 after Batch B and its
