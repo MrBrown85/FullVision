@@ -18,7 +18,7 @@ refuses to apply is reported as caught by the file.
 import subprocess, tempfile
 from batch_c_common import *
 
-C1S = 'teacher markup started reflect revision group grants race'
+C1S = 'teacher markup started contract reflect revision group grants race'
 C2S = 'hide given'
 CHANGES = [
     # ── C1 ──
@@ -34,6 +34,41 @@ CHANGES = [
     ("_revision_state: marks on a revision's pages do not count as grading", C1,
      "                                             and jsonb_array_length(coalesce(m.working->'marks', '[]'::jsonb)) > 0) then 'grading'",
      "                                             and false) then 'grading'", 'started'),
+    ("_markup_check: a place off the page is taken", C1,
+     "                or (_m->>'x')::numeric not between 0 and 1 or (_m->>'y')::numeric not between 0 and 1) then",
+     "                or false) then", 'contract'),
+    ("_markup_check: a stroke's points are not looked at", C1,
+     "               or jsonb_array_length(_m->'points') not between 1 and 5000\n               or exists",
+     "               or false\n               and exists", 'contract'),
+    ("_markup_check: any key is kept", C1,
+     "        if exists (select 1 from jsonb_object_keys(_m) k\n                    where k not in ('id', 'type', 'color')",
+     "        if false and exists (select 1 from jsonb_object_keys(_m) k\n                    where k not in ('id', 'type', 'color')", 'contract'),
+    ("feedback: an Only Me answer is sent", C1,
+     "                                     'answer', case when not f.answer_only_me then f.answer end,",
+     "                                     'answer', f.answer,", 'contract'),
+    ("reply: an Only Me answer can be replied to", C1,
+     "    if _f.answer is null or _f.answer_only_me then", "    if _f.answer is null then", 'contract'),
+    ("reply: Reflect on Feedback off is not asked", C1,
+     "    if not (select c.reflect_on_feedback from course c where c.id = (_in->>'course_id')::uuid) then\n        return jsonb_build_object('ok', false, 'error', 'reflect_off');",
+     "    if false then\n        return jsonb_build_object('ok', false, 'error', 'reflect_off');", 'contract'),
+    ("reply: the plan is not kept", C1, "           plan = coalesce(_plan, plan),", "           plan = plan,", 'contract'),
+    ("list_course_feedback: reflections whatever the switch", C1,
+     "             where f.course_id = p_course_id and c.reflect_on_feedback), '[]'::jsonb));",
+     "             where f.course_id = p_course_id), '[]'::jsonb));", 'contract'),
+    ("feedback: reflections whatever the switch", C1,
+     "                           where f.assessment_id = a.id and f.enrollment_id = p_enrollment_id\n                             and _course.reflect_on_feedback) rf on true",
+     "                           where f.assessment_id = a.id and f.enrollment_id = p_enrollment_id) rf on true", 'contract'),
+    ("feedback: the last plan by when the reflection was sent", C1,
+     "                       order by f.plan_at desc, f.id limit 1));", "                       order by f.sent_at desc, f.id limit 1));", 'contract'),
+    ("answer_seen: another student's answers marked", C1,
+     "     where f.enrollment_id = p_enrollment_id and f.course_id = (_in->>'course_id')::uuid\n       and f.assessment_id = any",
+     "     where f.course_id = (_in->>'course_id')::uuid\n       and f.assessment_id = any", 'contract'),
+    ("save_markup: waiting ignores Students See Your Mark Up", C1,
+     "                              and a.students_see_markup) order by m.enrollment_id, m.file_id)",
+     "                              and true) order by m.enrollment_id, m.file_id)", 'contract'),
+    ("_markup_give: a page with nothing to give is given", C1,
+     "       and not (given is null and jsonb_array_length(coalesce(working->'marks', '[]'::jsonb)) = 0);",
+     "       and true;", 'contract'),
     ("save_markup: another teacher's page is saved (ownership not asked)", C1,
      "     where f.id = p_file_id and fv_owns_course(s.course_id);\n    if _course is not null then\n        perform _grade_return_lock_first(_course);\n    end if;\n    -- Asked under the lock (when there is a class to lock).\n    _cached := fv_idem_check(p_idempotency_key, 'save_markup');",
      "     where f.id = p_file_id;\n    if _course is not null then\n        perform _grade_return_lock_first(_course);\n    end if;\n    -- Asked under the lock (when there is a class to lock).\n    _cached := fv_idem_check(p_idempotency_key, 'save_markup');", 'teacher'),

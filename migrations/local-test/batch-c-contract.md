@@ -2,7 +2,7 @@
 
 What the database gives the edge routes (`reflect`, `reply`, the Mark Up, revision and group reads) and the browser (`S9-W1` to `S13`) to code against, once `migrations/2026111120_markup_reflect_revise.sql` (C1) is applied, and what changes when `migrations/2026111121_markup_revise_grade_changes.sql` (C2) is. Written from the SQL in this pull request; `migrations/local-test/batch_c.py` checks every shape and refusal below.
 
-Batch C applies only after Batch B (`2026111101`, `2026111102`), and builds on its contract (`batch-b-contract.md` on the `batch-b-submissions` branch). If you must depart from anything here, add a dated line under "Changes" at the bottom.
+Batch C applies only after Batch B (`2026111101`, `2026111102`) and Batch B's review fixes (`2026111104`), and builds on its contract (`batch-b-contract.md` on the `batch-b-review-fixes` branch). If you must depart from anything here, add a dated line under "Changes" at the bottom.
 
 ## The settled rules
 
@@ -29,24 +29,34 @@ Signed-in teachers. Each checks the caller owns the class. RAISE `PT401` (not si
 
 ### `save_markup(p_file_id uuid, p_marks jsonb, p_base_rev integer, p_idempotency_key uuid)`
 
-`p_marks`: `{ "v": 1, "marks": [ … ] }`, at most 500 marks and 256 KB. A mark is an object whose `type` is `pen`, `highlight`, `note`, `tick` or `cross`; a `note` has a `text` of 1 to 500 characters. Everything else on a mark (position, colour, points) is kept as sent. The Eraser removes marks from the list; it is not a mark. Send the whole page's marks each time.
+`p_marks`: `{ "v": 1, "marks": [ … ] }` and no other key, at most 500 marks and 256 KB. **A place is a fraction of the page from its top left: `x` and `y` from 0 to 1** (as `shared/markup-draw.js` and Demo Mode's sample store them). A mark is one of these, with no other key:
+
+| `type`             | Keys                                                                                                                           |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `pen`, `highlight` | `points`: 1 to 5000 `[x, y]` pairs, each from 0 to 1; `width` (optional): a fraction of the page's width, above 0, at most 0.2 |
+| `note`             | `x`, `y`; `text`: 1 to 500 characters                                                                                          |
+| `tick`, `cross`    | `x`, `y`                                                                                                                       |
+
+Any mark may have `id` (a string of 1 to 64 characters) and `color` (`red`, `green` or `blue`). Anything else raises `22023`. A page that is turned is drawn in the page's own frame (`MarkupDraw.toPage`): the numbers do not change when it turns. The Eraser removes marks from the list; it is not a mark. Send the whole page's marks each time.
 
 `p_base_rev`: the `rev` the screen last read (0 for a page with no marks), or null to skip the check.
 
-| `result`  | Meaning                                                                                                                                      |
-| --------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `saved`   | `{ result, file_id, rev, given }`. Remembered. `given` is true when the student already has these marks (a class that does not hold grades). |
-| `changed` | Another device saved since `p_base_rev`. `{ result, file_id, rev, marks }`: what is there now. Nothing written; not remembered.              |
+| `result`  | Meaning                                                                                                                                                                                       |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `saved`   | `{ result, file_id, rev, given_rev, waiting }`. Remembered. `waiting` as `list_assessment_markup` has it: false when the student already has these marks (a class that does not hold grades). |
+| `changed` | Another device saved since `p_base_rev`. `{ result, file_id, rev, marks }`: what is there now. Nothing written; not remembered.                                                               |
 
 `P0002` for a page that is not handed in (a send not finished, an upload not finished), not the teacher's, or gone.
 
 ### `list_assessment_markup(p_assessment_id uuid)`
 
-`[ { file_id, enrollment_id, rev, marks, saved_at, given, given_rev, given_at, waiting } ]`. `waiting`: the student has not been given the latest marks.
+`[ { file_id, enrollment_id, rev, marks, saved_at, given, given_rev, given_at, waiting } ]`. `marks` is the teacher's copy; `given` is always the student's copy of the marks (an object, or null before the first Return), never true or false. `waiting`: the next Return would give the student a change they can see: the latest marks are not given, the page is not one whose marks were all erased before it was ever given, and the piece shows marks (Students See Your Mark Up on).
 
 ### `return_work(p_assessment_id uuid, p_enrollment_ids uuid[], p_idempotency_key uuid)`
 
-Use in place of `return_grades` wherever Mark Up can be on screen (Return, Return and Next, Return N Graded). It runs `return_grades` unchanged, then gives each listed student of the class the marks on their pages of the piece. Returns `return_grades`' answer plus `marks_given` (pages) and `marks_enrollment_ids`. Remembered. A student whose grade is not a draft but whose marks changed is given the marks (the To Return count should count marks waiting, from `list_course_feedback`).
+Use in place of `return_grades` wherever Mark Up can be on screen (Return, Return and Next, Return N Graded). It runs `return_grades` unchanged, then gives each listed student of the class the marks on their pages of the piece. Returns `return_grades`' answer plus `marks_given` (pages) and `marks_enrollment_ids`. Remembered. A student whose grade is not a draft but whose marks changed is given the marks.
+
+**To Return** counts, for a piece, each student who has a draft or a page with `waiting` true (`list_course_feedback.markup`, or `list_assessment_markup` for one piece), once. No server answer changes for that: the screens put the two together, and Return N Graded passes those students to `return_work`. The phone's and desktop's counts (`GraderWork.workCounts`) need it when they are wired.
 
 Until C2 is applied, a Return through `return_grades` alone (an older screen), a class leaving When I Return Them, or a restore returns grades but not marks.
 
@@ -107,7 +117,9 @@ Take Back. A revision already sent stays as a later version. With C2, a hidden g
 
 ### `answer_reflection(p_reflection_id uuid, p_answer text, p_idempotency_key uuid)`
 
-Send Answer, 1 to 2000 characters. Answers what is waiting: the question (or, with none, the reflection), then the follow-up. Answers `answered` with the reflection (remembered) or `already_answered`.
+`answer_reflection(p_reflection_id uuid, p_answer text, p_idempotency_key uuid, p_only_me boolean default false)`
+
+Send Answer, 1 to 2000 characters. Answers what is waiting: the question (or, with none, the reflection), then the follow-up. `p_only_me` true (the grader's Only Me): the answer is the teacher's own note, never sent to the student, nor that there is one; it clears the question as an answer does; the student can then not reply to it (`not_answered`). It applies to the answer it writes (the first, or the follow-up's). Answers `answered` with the reflection (remembered), `already_answered`, or `reflect_off` while the class has Reflect on Feedback off (not remembered).
 
 ### `list_course_feedback(p_course_id uuid)`
 
@@ -116,13 +128,13 @@ Send Answer, 1 to 2000 characters. Answers what is waiting: the question (or, wi
   "course": { "reflect_on_feedback": true, "show_my_learning": false },
   "markup": [ { "file_id", "assessment_id", "enrollment_id", "rev", "given_rev", "given_at", "waiting" } ],
   "revisions": [ request, … ],
-  "reflections": [ { "id", "assessment_id", "enrollment_id", "makes_sense", "question", "plan", "went_well", "sent_at",
-                     "answer", "answered_at", "sense_now", "sense_now_at", "follow_up", "follow_up_answer",
-                     "follow_up_answered_at", "waiting" } ]
+  "reflections": [ { "id", "assessment_id", "enrollment_id", "makes_sense", "question", "plan", "plan_at", "went_well", "sent_at",
+                     "answer", "answered_at", "only_me", "answer_seen_at", "sense_now", "sense_now_at", "follow_up",
+                     "follow_up_answer", "follow_up_answered_at", "follow_up_only_me", "follow_up_answer_seen_at", "waiting" } ]
 }
 ```
 
-`waiting` on a reflection: a question or follow-up has no answer. It is what the dashboard's Questions From Students, the gradebook's mark and the profile's mark count; one answer clears all three. Nothing here moves the class's sync cursor: read it when the screens open.
+`waiting` on a reflection: a question or follow-up has no answer (an Only Me answer is an answer). It is what the dashboard's Questions From Students, the gradebook's mark and the profile's mark count; one answer clears all three. **`reflections` is empty while the class has Reflect on Feedback off**: the rows are kept and come back when it is turned on. `answer_seen_at`: when the student's page showed the answer. Nothing here moves the class's sync cursor: read it when the screens open.
 
 ## The student's side: `student_submit` functions
 
@@ -138,23 +150,24 @@ Read-only. For the student's page, beside `page` and Batch B's `work`:
   "reflect_on_feedback": true, "show_my_learning": false,
   "assessments": [
     { "id": "…",
-      "marks": { "pages": 1, "notes": 3 },
+      "marks": { "pages": 1, "work_pages": 2, "notes": 3 },
       "revision": { "state": "open", "what_to_fix": "…", "revise_by": "…", "criterion_ids": [], "keep_grade": true,
                     "grade_hidden": false, "first_version": 1, "first_sent_at": "…", "first_grade": { … },
                     "revision_version": null, "revision_sent_at": null, "revision_note": null, "revision_late": null,
                     "asked_at": "…" },
       "reflection": { "makes_sense": "not_sure", "question": "…", "plan": null, "went_well": null, "sent_at": "…",
                       "answer": "…", "answered_at": "…", "sense_now": null, "follow_up": null,
-                      "follow_up_answer": null, "follow_up_answered_at": null } }
+                      "follow_up_answer": null, "follow_up_answered_at": null, "answer_new": true } }
   ],
   "last_plan": { "assessment_id": "…", "plan": "…", "sent_at": "…" }
 }
 ```
 
 - Lists only pieces on the page that have marks given, a revision asked, or a reflection.
-- `marks`: pages carrying given marks and how many are notes ("3 notes on your work"), the student's and their group's. Null before the work is returned with marks.
+- `marks`: `pages` is the pages carrying given marks, `work_pages` every page of the work (each member's latest handed-in version), `notes` how many marks are notes ("2 pages · 3 notes on your work"), the student's and their group's. Null before the work is returned with marks.
+- `reflection` and `last_plan` only while Reflect on Feedback is on (null otherwise). `answer` and `answered_at` (and the follow-up's) are null for an answer the teacher kept Only Me. `answer_new`: an answer sent to the student that the page has not yet shown (What Changed's "Mr. Brown answered your question"); `answer_seen` clears it.
 - `revision.first_grade`: the first version's grade as the student had it, cut to what the work's scoring uses now (as `page` cuts grades). Null while the grade is hidden, or Missing or Excused is on the piece. The new grade is `page`'s.
-- `last_plan`: Your Plan From Last Time for the next send's "Did You Do It?" (Batch B's `followed_plan`).
+- `last_plan`: Your Plan From Last Time for the next send's "Did You Do It?" (Batch B's `followed_plan`): the plan written most recently, with the reflection or later with Make My Plan (`sent_at` is when the plan was written).
 - `show_my_learning`: the My Learning tab shows grades only when true. Its numbers come from `page`'s returned grades through `calc.js`.
 
 ### `markup(p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_ip_hash text)`
@@ -163,11 +176,33 @@ Read-only. For the student's page, beside `page` and Batch B's `work`:
 
 ### `reflect(…, p_assessment_id uuid, p_reflection jsonb, …)`
 
-`p_reflection`: `{ "makes_sense": "yes" | "not_sure", "question": "…", "plan": "…", "went_well": "…" }`. `not_sure` needs a question; `yes` needs a plan; each 1000 characters at most. Sent again before the teacher answers, it takes the place of the first; the same reflection twice is the same. Errors: `reflect_off`, `not_found` (not the class's, or not yet on the page), `not_returned` (no grade has been returned for the piece), `already_answered`. Returns `{ ok, reflection }`.
+`p_reflection`: `{ "makes_sense": "yes" | "not_sure", "question": "…", "plan": "…", "went_well": "…" }`, no other key. `not_sure` needs a question; `yes` needs a plan; each 1000 characters at most; `null` or `""` is the same as leaving one out. Sent again before the teacher answers, it takes the place of the first; the same reflection twice is the same. Errors: `reflect_off`, `not_found` (not the class's, or not yet on the page), `not_returned` (no grade has been returned for the piece), `already_answered`. Returns `{ ok, reflection: { makes_sense, question, plan, went_well, sent_at } }`.
 
 ### `reply(…, p_assessment_id uuid, p_reply jsonb, …)`
 
-`p_reply`: `{ "sense_now": "yes" | "not_sure", "follow_up": "…" }` (follow_up only with not_sure, once, 1000 at most). Errors: `not_found`, `not_answered`, `already_asked`.
+`p_reply`: `{ "sense_now": "yes" | "not_sure", "follow_up": "…", "plan": "…" }`, no other key. `follow_up` only with `not_sure`, once, 1000 at most. **`plan` only with `yes`, 1000 at most: Make My Plan** after the teacher's answer; it takes the place of a plan made before (a reply without one keeps it). Errors: `reflect_off`, `not_found`, `not_answered` (no answer yet, or the answer was Only Me), `already_asked`. Returns `{ ok, reflection: { sense_now, follow_up, plan, answer, follow_up_answer } }`.
+
+### `answer_seen(p_session_token, p_enrollment_id, p_assessment_ids uuid[], p_ip_hash)`
+
+The page showed the teacher's answers on these pieces (as Batch A's `seen` for a returned grade): call it when a piece whose `reflection.answer_new` is true has been on screen. Marks only answers sent to the student, only the student's own. A locked card may call it (a read). `{ ok, seen }` (how many reflections it marked).
+
+### The bodies the page sends
+
+The page sends each route a JSON body: the card's session as for every card route, then
+
+| Route                       | Body                                                                                          |
+| --------------------------- | --------------------------------------------------------------------------------------------- |
+| `reflect`                   | `{ enrollment_id, assessment_id, reflection: { makes_sense, question?, plan?, went_well? } }` |
+| `reply`                     | `{ enrollment_id, assessment_id, reply: { sense_now, follow_up?, plan? } }`                   |
+| `answer-seen`               | `{ enrollment_id, assessment_ids: [ … ] }`                                                    |
+| `markup`                    | `{ enrollment_id, assessment_id }`                                                            |
+| `file-links`, `group-links` | `{ enrollment_id, assessment_id }`                                                            |
+
+The function passes `reflection` and `reply` to the SQL as they came (the SQL checks them) and never takes an enrollment id from anywhere but the body it checks against the session.
+
+### What `file-links` and `group-links` answer the page
+
+`{ "ok": true, "files": [ { "file_id", "page", "url" } ] }`, in the order the SQL gives them, with `url` a 300-second download link the function made for that row's `path` (and `thumb_url` for its `thumb_path`, when the page asks for thumbnails). `group-links` adds `mine` to each. The function never sends a path, and sends the other SQL fields (`width`, `height`, `rotation`, `version`) only if the page reads them. A refusal is `{ ok: false, error }` as the SQL gave it.
 
 ### `revision_start(p_session_token, p_enrollment_id, p_assessment_id, p_pages jsonb, p_note text, p_request_id uuid, p_ip_hash)`
 
@@ -186,7 +221,7 @@ Send My Revision, as Batch B's `send_start`, `send_finish` and `unsend`, with th
 
 ### `group_work(p_session_token, p_enrollment_id, p_ip_hash)`
 
-`{ "ok": true, "assessments": [ { "id", "members": 3, "sent": true, "pages": 4, "you_sent": false, "first_sent_at": "…" } ] }` for each piece on the page set to One per Group that the student's group is on. No names. ("Sent by Leo for the group" needs a name: see the PR's decisions.)
+`{ "ok": true, "assessments": [ { "id", "members": 3, "sent": true, "pages": 4, "you_sent": false, "first_sent_at": "…" } ] }` for each piece on the page set to One per Group that the student's group is on. **Counts only: no group-mate's name** (the rule forbids another student's name on a student's page; "Sent by Leo for the group" waits for Colin's word).
 
 ### `group_file_links(p_session_token, p_enrollment_id, p_assessment_id, p_ip_hash)`
 
@@ -201,6 +236,7 @@ Add a Page on a group piece is the member's own Batch B `send_start` (their own 
 | `page`          | `page`, Batch B's `work`, and `feedback` (and `group_work`)                       |
 | `reflect`       | `reflect`                                                                         |
 | `reply`         | `reply`                                                                           |
+| `answer-seen`   | `answer_seen`                                                                     |
 | `markup`        | `markup`                                                                          |
 | `revise-start`  | `revision_start`, then upload links as `send-start`                               |
 | `revise-finish` | the file checks as `send-finish`, then `revision_finish`, then the removal worker |
@@ -216,4 +252,4 @@ Copy each reply field by field, as the card routes do.
 
 ## Changes
 
-None yet.
+- 2026-11-11, refresh round (before anything was built on the server side; the Demo screens already match unless named): marks have a stated place (fractions of the page) and are bounded; `save_markup` answers `given_rev` and `waiting` in place of a true/false `given` (the Demo data layer's `saveMarkup` answers `given`: change it at S9-W1); `waiting` passes over a page with nothing to give and a piece that shows no marks; `reply` takes `plan` (Make My Plan) and answers `reflect_off`; the switch off hides reflections from both sides; `answer_reflection` takes `p_only_me`; `feedback` sends `marks.work_pages` and `reflection.answer_new`; `answer_seen` is new; the route bodies and `file-links`' answer are written down; marks on a page count as grading started (not yet decided by Colin).

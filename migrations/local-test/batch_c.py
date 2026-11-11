@@ -5,7 +5,7 @@ gradebook-prod will be once Batch B is applied (batch_c_common.build).
     PGDATABASE=<template> BATCH_B_DIR=<Batch B's migrations/> python3 batch_c.py            every scenario
     PGDATABASE=...                                            python3 batch_c.py teacher    only those named
 
-Scenarios: apply1 teacher markup started reflect revision group grants race apply2 hide given
+Scenarios: apply1 teacher markup started contract reflect revision group grants race apply2 hide given
 """
 import threading, time
 from batch_c_common import *
@@ -176,7 +176,7 @@ def teacher():
         ok('teacher: settings: nobody signed in', err(d, lambda: d.rpc('set_course_feedback_options(:c, :p::jsonb, :k)', '', c=COURSE_A, p='{}', k=nid())) == 'PT401')
         # save_markup
         r = d.save_markup(files[0], marks('Is this a reason?'), 0)
-        ok('teacher: save_markup saves the first rev', r['result'] == 'saved' and r['rev'] == 1 and r['given'] is False, r)
+        ok('teacher: save_markup saves the first rev, waiting for Return', r == {'result': 'saved', 'file_id': files[0], 'rev': 1, 'given_rev': None, 'waiting': True}, r)
         key = nid()
         r = d.save_markup(files[0], marks('Is this a reason?', 'Where is the third?'), 1, key=key)
         r2 = d.save_markup(files[0], marks('Something else'), 1, key=key)
@@ -239,11 +239,11 @@ def teacher():
         # As Soon As I Save: marks are given at once
         d.run("update course set return_grades = 'on_save' where id = :c", c=COURSE_A)
         r = d.save_markup(files[0], marks('now'))
-        ok('teacher: in a class that returns at once, marks are given at once', r['given'] is True and
+        ok('teacher: in a class that returns at once, marks are given at once', r['waiting'] is False and r['given_rev'] == r['rev'] and
            'now' in json.dumps(d.marks(t1, ENR1, k['lab'])), r)
         d.run("update course set return_grades = 'on_return', student_page_enabled = false where id = :c", c=COURSE_A)
         r = d.save_markup(files[0], marks('page off'))
-        ok('teacher: with the Student Page off, marks are given at once (as a save is returned)', r['given'] is True)
+        ok('teacher: with the Student Page off, marks are given at once (as a save is returned)', r['waiting'] is False and r['given_rev'] == r['rev'])
         d.run("update course set student_page_enabled = true where id = :c", c=COURSE_A)
         # anon cannot reach any of it
         for fn in C1_PUBLIC_RPCS:
@@ -275,7 +275,7 @@ def markup():
         ok('markup: after Return the student has the marks on their page', len(m['files']) == 1 and m['files'][0]['file_id'] == files[0]
            and m['files'][0]['marks']['marks'][0]['text'] == 'SECRET-DRAFT-NOTE', m)
         f = d.feedback(t1, ENR1)['assessments']
-        ok('markup: feedback counts the pages and notes', f[0]['id'] == k['lab'] and f[0]['marks'] == {'pages': 1, 'notes': 1}, f)
+        ok('markup: feedback counts the pages with marks, the pages of the work, and the notes', f[0]['id'] == k['lab'] and f[0]['marks'] == {'pages': 1, 'work_pages': 2, 'notes': 1}, f)
         # a draft change of marks is not given
         d.save_markup(files[0], marks('NEWER-DRAFT'))
         ok('markup: a later change waits', 'NEWER-DRAFT' not in json.dumps(d.marks(t1, ENR1, k['lab'])))
@@ -388,6 +388,148 @@ def started():
         ok('started: and revision_unsend works', r.get('unsent') is True, r)
         ok('started: the helper stays granted to nobody', not any(d.one("select has_function_privilege(:r, 'student_submit._grading_started(uuid,uuid)'::regprocedure, 'execute')", r=r)
                                                                 for r in ('anon', 'authenticated', 'service_role')))
+    finally:
+        d.close()
+
+# ── contract: the points the Demo screens' builders found unclear (a to k) ──
+# The Demo Mode sample's marks, as shared/seed-data.js and shared/markup-draw.js have them.
+DEMO_MARKS = {'v': 1, 'marks': [
+    {'id': 'm1', 'type': 'note', 'x': 0.72, 'y': 0.18, 'text': 'Which cell is this? Label it onion or cheek.'},
+    {'id': 'm2', 'type': 'tick', 'x': 0.12, 'y': 0.42, 'color': 'green'},
+    {'id': 'm4', 'type': 'pen', 'color': 'red', 'width': 0.004, 'points': [[0.2, 0.71], [0.34, 0.7], [0.48, 0.72]]},
+    {'id': 'm5', 'type': 'highlight', 'color': 'blue', 'width': 0.03, 'points': [[0, 0], [1, 1]]},
+    {'id': 'm6', 'type': 'cross', 'x': 0, 'y': 1, 'color': 'red'}]}
+
+def contract():
+    d = scenario_db('contract')
+    try:
+        k = seed(d); t1 = d.session(ENR1); t2 = d.session(ENR2, '2012-06-16')
+        sub, files = d.send(t1, ENR1, k['lab'], 2)
+        # (f) where a mark sits: fractions of the page, bounded
+        r = d.save_markup(files[0], DEMO_MARKS, 0)
+        ok("(f) save_markup takes Demo Mode's marks as the screens store them", r['result'] == 'saved', r)
+        ok('(f) and keeps them exactly as sent', d.one('select working from markup where file_id = :f', f=files[0]) == DEMO_MARKS)
+        note = {'type': 'note', 'x': 0.5, 'y': 0.5, 'text': 'n'}
+        pen = {'type': 'pen', 'points': [[0.5, 0.5]]}
+        bad = [('v 2', {'v': 2, 'marks': []}), ('no v', {'marks': []}), ('a key beside v and marks', {'v': 1, 'marks': [], 'x': 1}),
+               ('a note at x 1.1', dict(note, x=1.1)), ('a note at y -0.1', dict(note, y=-0.1)), ('a note with no x', {'type': 'note', 'y': 0.5, 'text': 'n'}),
+               ('a tick with no y', {'type': 'tick', 'x': 0.5}), ('x as text', dict(note, x='0.5')),
+               ('flat points', {'type': 'pen', 'points': [0.1, 0.2]}), ('a point off the page', {'type': 'pen', 'points': [[0.5, 1.01]]}),
+               ('a point of three numbers', {'type': 'pen', 'points': [[0.1, 0.2, 0.3]]}), ('no points', {'type': 'pen', 'points': []}),
+               ('a pen with no points', {'type': 'highlight'}), ('5001 points', {'type': 'pen', 'points': [[0.5, 0.5]] * 5001}),
+               ('width 0', dict(pen, width=0)), ('width 0.5', dict(pen, width=0.5)), ('a colour not offered', dict(pen, color='purple')),
+               ('an unknown key', dict(note, size=3)), ('text on a tick', {'type': 'tick', 'x': 0.1, 'y': 0.1, 'text': 'x'}),
+               ('x on a pen', dict(pen, x=0.1)), ('an id of 65 characters', dict(note, id='i' * 65)), ('an id that is a number', dict(note, id=7))]
+        for name, m in bad:
+            body = m if 'marks' in m else {'v': 1, 'marks': [m]}
+            ok('(f) save_markup refuses ' + name, err(d, lambda: d.rpc('save_markup(:f, :m::jsonb, null, :k)', f=files[1], m=json.dumps(body), k=nid())) == '22023')
+        ok('(f) the edges of the page are on it (0 and 1)', d.save_markup(files[1], {'v': 1, 'marks': [dict(note, x=0, y=1), {'type': 'pen', 'points': [[1, 0]], 'width': 0.2}]})['result'] == 'saved')
+        # (b) given means the marks everywhere; waiting the same everywhere
+        r = d.save_markup(files[1], {'v': 1, 'marks': [note]})
+        ok("(b) save_markup's answer has no given, and given_rev and waiting as the lists have them", set(r) == {'result', 'file_id', 'rev', 'given_rev', 'waiting'} and r['waiting'] is True, r)
+        L = {x['file_id']: x for x in d.rpc('list_assessment_markup(:a)', a=k['lab'])}
+        ok("(b) list_assessment_markup's given is the student's copy of the marks (null before Return)", L[files[1]]['given'] is None and L[files[1]]['waiting'] is True)
+        d.score(ENR1, k['lab'], 7); d.return_work(k['lab'], [ENR1])
+        L = {x['file_id']: x for x in d.rpc('list_assessment_markup(:a)', a=k['lab'])}
+        ok('(b) after Return given is the marks, an object', L[files[1]]['given'] == {'v': 1, 'marks': [note]} and L[files[1]]['waiting'] is False)
+        # (e) waiting is what To Return counts beside drafts; a page with nothing to give does not wait
+        sub2, files2 = d.send(t2, ENR2, k['lab'], 1)
+        d.save_markup(files2[0], marks('x')); d.save_markup(files2[0], {'v': 1, 'marks': []})
+        C = {x['file_id']: x for x in d.rpc('list_course_feedback(:c)', c=COURSE_A)['markup']}
+        ok('(e) marks drawn and all erased before any Return: not waiting', C[files2[0]]['waiting'] is False, C[files2[0]])
+        r = d.return_work(k['lab'], [ENR2])
+        ok('(e) and Return gives nothing for it', r['marks_given'] == 0 and d.one('select given from markup where file_id = :f', f=files2[0]) is None, r)
+        d.save_markup(files[0], marks('later'))
+        C = {x['file_id']: x for x in d.rpc('list_course_feedback(:c)', c=COURSE_A)['markup']}
+        ok('(e) a change after Return waits (To Return counts it with the grade not a draft)', C[files[0]]['waiting'] is True)
+        d.run('update assessment set students_see_markup = false where id = :a', a=k['lab'])
+        C = {x['file_id']: x for x in d.rpc('list_course_feedback(:c)', c=COURSE_A)['markup']}
+        ok('(e) with Students See Your Mark Up off nothing waits (the student would see no change)', not any(x['waiting'] for x in C.values())
+           and not any(x['waiting'] for x in d.rpc('list_assessment_markup(:a)', a=k['lab'])))
+        d.run('update assessment set students_see_markup = true where id = :a', a=k['lab'])
+        d.save_markup(files2[0], {'v': 1, 'marks': []})
+        d.return_work(k['lab'], [ENR1])
+        # (i) pages: pages with marks; work_pages: every page of the work
+        f = piece(d.feedback(t1, ENR1), k['lab'])
+        ok('(i) feedback sends pages with marks and every page of the work', f['marks']['pages'] == 2 and f['marks']['work_pages'] == 2, f['marks'])
+        d.save_markup(files[1], {'v': 1, 'marks': []}); d.return_work(k['lab'], [ENR1])
+        f = piece(d.feedback(t1, ENR1), k['lab'])
+        ok('(i) marks on one page of two: pages 1, work_pages 2', f['marks']['pages'] == 1 and f['marks']['work_pages'] == 2, f['marks'])
+        # (h) the rows file-links and group-links make links from carry file_id and page
+        g = d.service("student_submit.group_file_links(:t, :e, :a, 'ip-1')", t=t1, e=ENR1, a=k['lab'])
+        ok('(h) group_file_links: every row has file_id and page, in order', [(x['file_id'], x['page']) for x in g['files']] == [(files[0], 1), (files[1], 2)], g)
+
+        # (a) Make My Plan after an answer; (c) reply and the switch; (d) the switch hides; (g) Only Me; (k) seen
+        unsure = {'makes_sense': 'not_sure', 'question': 'What counts as a reason?'}
+        ok('reflect: not sure with a question', d.reflect(t1, ENR1, k['lab'], unsure)['ok'])
+        rid = d.rpc('list_course_feedback(:c)', c=COURSE_A)['reflections'][0]['id']
+        d.rpc('answer_reflection(:r, :a, :k)', r=rid, a='A reason says why.', k=nid())
+        f = piece(d.feedback(t1, ENR1), k['lab'])['reflection']
+        ok("(k) an answer the page has not shown: answer_new", f['answer_new'] is True, f)
+        ok('(a) after the answer, reflect still answers already_answered', d.reflect(t1, ENR1, k['lab'], {'makes_sense': 'yes', 'plan': 'p'})['error'] == 'already_answered')
+        for name, rp in [('a plan with not_sure', {'sense_now': 'not_sure', 'follow_up': 'q', 'plan': 'p'}), ('a plan of 1001', {'sense_now': 'yes', 'plan': 'x' * 1001}),
+                         ('a plan that is a number', {'sense_now': 'yes', 'plan': 3})]:
+            ok('(a) reply refuses ' + name, err(d, lambda: d.reply(t1, ENR1, k['lab'], rp)) == '22023')
+        r = d.reply(t1, ENR1, k['lab'], {'sense_now': 'yes', 'plan': 'Find all three reasons before I write.'})
+        ok('(a) Make My Plan: reply takes a plan with yes', r['ok'] and r['reflection']['plan'] == 'Find all three reasons before I write.' and r['reflection']['sense_now'] == 'yes', r)
+        lp = d.feedback(t1, ENR1)['last_plan']
+        ok('(a) it is Your Plan From Last Time', lp['plan'] == 'Find all three reasons before I write.' and lp['assessment_id'] == k['lab'] and lp['sent_at'] is not None, lp)
+        ok('(a) the teacher sees the plan', d.rpc('list_course_feedback(:c)', c=COURSE_A)['reflections'][0]['plan'] == 'Find all three reasons before I write.')
+        r = d.reply(t1, ENR1, k['lab'], {'sense_now': 'yes'})
+        ok('(a) a reply without a plan keeps the plan', r['reflection']['plan'] == 'Find all three reasons before I write.', r)
+        # a plan made later on an older piece is the newest plan
+        d.run("update assessment set score_mode = 'points', max_points = 10 where id = :a", a=k['rub'])
+        d.score(ENR1, k['rub'], 3); d.return_work(k['rub'], [ENR1])
+        d.reflect(t1, ENR1, k['rub'], {'makes_sense': 'yes', 'plan': 'Use a quote for each point.'})
+        ok('(a) a newer reflection with a plan is the last plan', d.feedback(t1, ENR1)['last_plan']['plan'] == 'Use a quote for each point.')
+        d.reply(t1, ENR1, k['lab'], {'sense_now': 'yes', 'plan': 'Check the rubric first.'})
+        ok('(a) then Make My Plan on the older piece is the newest', d.feedback(t1, ENR1)['last_plan']['plan'] == 'Check the rubric first.')
+        # (k) answer_seen
+        ok('(k) answer_seen: no session', d.service("student_submit.answer_seen(:t, :e, :a, 'ip-1')", t='0' * 64, e=ENR1, a=[k['lab']])['error'] == 'signed_out')
+        ok("(k) answer_seen: another student's pieces mark nothing", d.service("student_submit.answer_seen(:t, :e, :a, 'ip-1')", t=t2, e=ENR2, a=[k['lab']]) == {'ok': True, 'seen': 0})
+        fp = fingerprint_rows(d)
+        r = d.service("student_submit.answer_seen(:t, :e, :a, 'ip-1')", t=t1, e=ENR1, a=[k['lab'], k['rub']])
+        ok('(k) answer_seen marks the answered reflection seen', r == {'ok': True, 'seen': 1}, r)
+        ok('(k) answer_new is then false', piece(d.feedback(t1, ENR1), k['lab'])['reflection']['answer_new'] is False)
+        ok('(k) a second time marks nothing', d.service("student_submit.answer_seen(:t, :e, :a, 'ip-1')", t=t1, e=ENR1, a=[k['lab']]) == {'ok': True, 'seen': 0})
+        ok('(k) and changes no grade row', fingerprint_rows(d) == fp)
+        ok('(k) the teacher sees when it was seen', d.rpc('list_course_feedback(:c)', c=COURSE_A)['reflections'][0]['answer_seen_at'] is not None)
+        # (g) Only Me
+        d.score(ENR2, k['lab'], 4); d.return_work(k['lab'], [ENR2])
+        d.reflect(t2, ENR2, k['lab'], {'makes_sense': 'not_sure', 'question': 'Why was number 4 wrong?'})
+        rid2 = [x for x in d.rpc('list_course_feedback(:c)', c=COURSE_A)['reflections'] if x['enrollment_id'] == ENR2][0]['id']
+        ok('(g) only_me must be true or false', err(d, lambda: d.rpc('answer_reflection(:r, :a, :k, null)', r=rid2, a='x', k=nid())) == '22023')
+        a = d.rpc('answer_reflection(:r, :a, :k, true)', r=rid2, a='ONLY-ME-NOTE: go over question 4 on Monday.', k=nid())
+        ok('(g) Only Me: kept as the answer, marked only_me, the question no longer waiting', a['result'] == 'answered' and a['reflection']['only_me'] is True
+           and a['reflection']['waiting'] is False, a)
+        f = piece(d.feedback(t2, ENR2), k['lab'])['reflection']
+        ok('(g) the student is not sent it, nor that there is one', f['answer'] is None and f['answered_at'] is None and f['answer_new'] is False, f)
+        ok('(g) it is in no student answer', 'ONLY-ME-NOTE' not in json.dumps([d.page(t2, ENR2), d.feedback(t2, ENR2), d.marks(t2, ENR2, k['lab']),
+                                                                             d.service("student_submit.work(:t, :e, 'ip-1')", t=t2, e=ENR2),
+                                                                             d.reply(t2, ENR2, k['lab'], {'sense_now': 'yes'})]))
+        ok('(g) the student cannot reply to it', d.reply(t2, ENR2, k['lab'], {'sense_now': 'yes'}) == {'ok': False, 'error': 'not_answered'})
+        ok('(g) answer_seen marks nothing for it', d.service("student_submit.answer_seen(:t, :e, :a, 'ip-1')", t=t2, e=ENR2, a=[k['lab']]) == {'ok': True, 'seen': 0})
+        # a follow-up answered Only Me
+        d.reply(t1, ENR1, k['lab'], {'sense_now': 'not_sure', 'follow_up': 'Can you show me one?'})
+        a = d.rpc('answer_reflection(:r, :a, :k, true)', r=rid, a='ONLY-ME-FOLLOW', k=nid())
+        f = piece(d.feedback(t1, ENR1), k['lab'])['reflection']
+        ok('(g) a follow-up answered Only Me: the first answer is still sent, the follow-up answer is not', f['answer'] == 'A reason says why.'
+           and f['follow_up_answer'] is None and f['follow_up_answered_at'] is None and 'ONLY-ME-FOLLOW' not in json.dumps(d.feedback(t1, ENR1)), f)
+        # (c) and (d): the switch off
+        d.run('update course set reflect_on_feedback = false where id = :c', c=COURSE_A)
+        n = d.one('select count(*) from feedback_reflection')
+        ok('(c) reply answers reflect_off while the switch is off', d.reply(t1, ENR1, k['lab'], {'sense_now': 'yes'}) == {'ok': False, 'error': 'reflect_off'})
+        ok('(d) list_course_feedback lists no reflection while the switch is off', d.rpc('list_course_feedback(:c)', c=COURSE_A)['reflections'] == [])
+        key = nid()
+        ok('(d) answer_reflection answers reflect_off, not remembered', d.rpc('answer_reflection(:r, :a, :k)', r=rid2, a='x', k=key) == {'result': 'reflect_off'})
+        f = d.feedback(t1, ENR1)
+        ok('(d) the student is sent no reflection and no last plan while it is off', all(x['reflection'] is None for x in f['assessments']) and f['last_plan'] is None, f)
+        ok('(d) nothing is deleted', d.one('select count(*) from feedback_reflection') == n)
+        d.run('update course set reflect_on_feedback = true where id = :c', c=COURSE_A)
+        ok('(d) turned on again, every reflection is back', len(d.rpc('list_course_feedback(:c)', c=COURSE_A)['reflections']) == n
+           and d.feedback(t1, ENR1)['last_plan']['plan'] == 'Check the rubric first.')
+        ok('(d) the key of the refused answer works once the switch is on', d.rpc('answer_reflection(:r, :a, :k)', r=rid2, a='x', k=key)['result'] == 'already_answered')
+        ok('(k) answer_seen is for the service role only', not d.one("select has_function_privilege('authenticated', 'student_submit.answer_seen(text,uuid,uuid[],text)'::regprocedure, 'execute') or has_function_privilege('anon', 'student_submit.answer_seen(text,uuid,uuid[],text)'::regprocedure, 'execute')"))
     finally:
         d.close()
 
@@ -935,7 +1077,7 @@ def given():
     finally:
         d.close()
 
-SCENARIOS = {'apply1': apply1, 'teacher': teacher, 'markup': markup, 'started': started, 'reflect': reflect, 'revision': revision, 'group': group,
+SCENARIOS = {'apply1': apply1, 'teacher': teacher, 'markup': markup, 'started': started, 'contract': contract, 'reflect': reflect, 'revision': revision, 'group': group,
              'grants': grants, 'race': race, 'apply2': apply2, 'hide': hide, 'given': given}
 if __name__ == '__main__':
     for name in (sys.argv[1:] or list(SCENARIOS)):

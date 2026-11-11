@@ -5,7 +5,7 @@
 with relied(fn, first_run, later_run) as (values
     -- FINGERPRINTS-BEGIN c2relied (written by migrations/local-test/batch_c_fingerprints.py)
     ('public._grade_copy(uuid,uuid)',                                '3a8e0dfbc873176692a1160150a8d43b', '3a8e0dfbc873176692a1160150a8d43b'),
-    ('public._markup_give(uuid,uuid)',                               '4f7cd1dcddcf2f94b94ca4e441e4803c', '4f7cd1dcddcf2f94b94ca4e441e4803c'),
+    ('public._markup_give(uuid,uuid)',                               'f0f07a1b879ff038e2f0afe020233c29', 'f0f07a1b879ff038e2f0afe020233c29'),
     ('public.return_for_revision(uuid,uuid,jsonb,uuid)',             'f66c0fdd60dd969203a345125280d760', 'f66c0fdd60dd969203a345125280d760'),
     ('public.cancel_revision(uuid,uuid)',                            '03f508a459eb621f868b699a0ea3f076', '03f508a459eb621f868b699a0ea3f076'),
     ('public._grade_return_apply(uuid,uuid,jsonb,jsonb)',            '89899f9dbc1569f7f1cc4216e252eb32', '89899f9dbc1569f7f1cc4216e252eb32'),

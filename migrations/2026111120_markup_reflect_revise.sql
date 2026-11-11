@@ -59,7 +59,7 @@
 --      return_for_revision(assessment, enrollment, request, key)
 --      set_revision_request(request id, patch, key)
 --      cancel_revision(request id, key)
---      answer_reflection(reflection id, answer, key)
+--      answer_reflection(reflection id, answer, key, only_me)
 --      list_course_feedback(course)
 -- 7. The student's side (schema student_submit; service_role only; the
 --    student-submit edge function calls them):
@@ -67,6 +67,7 @@
 --      markup(session, enrollment, assessment, address)  the given marks
 --      reflect(session, enrollment, assessment, reflection, address)
 --      reply(session, enrollment, assessment, reply, address)
+--      answer_seen(session, enrollment, assessments, address)
 --      revision_start(session, enrollment, assessment, pages, note,
 --                     request id, address)
 --      revision_finish(session, enrollment, submission, files, address)
@@ -82,7 +83,8 @@
 --
 -- ── What a student is never sent ────────────────────────────────────────────
 -- markup.working (only markup.given); a reflection's answer before the
--- teacher sends it; another student's name; another student's enrollment
+-- teacher sends it, or one the teacher kept to themselves (Only Me);
+-- another student's name; another student's enrollment
 -- id as a field (a group-mate's page path, which the edge function turns
 -- into a link, has that student's enrollment id in it: an opaque id, never
 -- a name); a grade other than their own returned one
@@ -227,29 +229,30 @@ begin
             -- FINGERPRINTS-BEGIN new (written by migrations/local-test/batch_c_fingerprints.py)
             ('public._work_feedback_gone()',                                       '5c760a38a7675c1d49ef95ab994b76e5', '5c760a38a7675c1d49ef95ab994b76e5'),
             ('public._work_feedback_truncated()',                                  '450e3b27b73c51d01f4c431adb402bbd', '450e3b27b73c51d01f4c431adb402bbd'),
-            ('public._markup_check(jsonb)',                                        '882cf50301891b5a06854756b11462a2', '882cf50301891b5a06854756b11462a2'),
-            ('public._markup_give(uuid,uuid)',                                     '4f7cd1dcddcf2f94b94ca4e441e4803c', '4f7cd1dcddcf2f94b94ca4e441e4803c'),
+            ('public._markup_check(jsonb)',                                        'd5fac66f176bf8f23391a7c6c19b053a', 'd5fac66f176bf8f23391a7c6c19b053a'),
+            ('public._markup_give(uuid,uuid)',                                     'f0f07a1b879ff038e2f0afe020233c29', 'f0f07a1b879ff038e2f0afe020233c29'),
             ('public._revision_hide_available()',                                  'cd50f4c6493a73b3c42ae51f7580f970', 'a4b4e942de351d6849702b96f25c7356'),
             ('public._revision_hide_grade(uuid)',                                  '247080f6572bb45951cef807a2b849bd', '295f0e5f94eeb8492af2c205b641377b'),
             ('public._revision_unhide_grade(uuid)',                                '26d2861325edf27f95d090ebd590eb0f', '3c0ff04195505dacf40b55217f8fe839'),
             ('public._piece_latest(uuid,uuid)',                                    'fee319ef4d87447eeac9b4d53a1f1b50', 'fee319ef4d87447eeac9b4d53a1f1b50'),
             ('public._revision_state(uuid)',                                       'd8103c802e246bfac948fa620d06fe09', 'd8103c802e246bfac948fa620d06fe09'),
             ('public._revision_json(uuid)',                                        '969f930b121a6714edfde8052a4d876b', '969f930b121a6714edfde8052a4d876b'),
-            ('public._reflection_json(uuid)',                                      '39bd36ae13b6f2f3a19beabcb223b787', '39bd36ae13b6f2f3a19beabcb223b787'),
+            ('public._reflection_json(uuid)',                                      '89f6847f6ab6a468284ea1df003391a6', '89f6847f6ab6a468284ea1df003391a6'),
             ('public.set_course_feedback_options(uuid,jsonb,uuid)',                '1954af2eef430d63baa91d38e74106d2', '1954af2eef430d63baa91d38e74106d2'),
-            ('public.save_markup(uuid,jsonb,integer,uuid)',                        '4816f564c5ab6367c97eff4732b167b0', '4816f564c5ab6367c97eff4732b167b0'),
-            ('public.list_assessment_markup(uuid)',                                '0dc1eb8215153e782de811ea3185ed5f', '0dc1eb8215153e782de811ea3185ed5f'),
+            ('public.save_markup(uuid,jsonb,integer,uuid)',                        '808290a14511b137bc5c1a4574016429', '808290a14511b137bc5c1a4574016429'),
+            ('public.list_assessment_markup(uuid)',                                '5e64579a923a0f0c02791b6428e54d98', '5e64579a923a0f0c02791b6428e54d98'),
             ('public.return_work(uuid,uuid[],uuid)',                               '9175f90ed1158790acef376c98319295', '9175f90ed1158790acef376c98319295'),
             ('public.return_for_revision(uuid,uuid,jsonb,uuid)',                   'f66c0fdd60dd969203a345125280d760', 'f66c0fdd60dd969203a345125280d760'),
             ('public.set_revision_request(uuid,jsonb,uuid)',                       '6f9fb14cc1c8ced04cca7e0302c40b13', '6f9fb14cc1c8ced04cca7e0302c40b13'),
             ('public.cancel_revision(uuid,uuid)',                                  '03f508a459eb621f868b699a0ea3f076', '03f508a459eb621f868b699a0ea3f076'),
-            ('public.answer_reflection(uuid,text,uuid)',                           '0973e5823482794e4eb5e91b2163cd01', '0973e5823482794e4eb5e91b2163cd01'),
-            ('public.list_course_feedback(uuid)',                                  '38b7007c6fb7e8ba0df54077721a4892', '38b7007c6fb7e8ba0df54077721a4892'),
+            ('public.answer_reflection(uuid,text,uuid,boolean)',                   'b384f9b1c729f42733db290a0f4ddae5', 'b384f9b1c729f42733db290a0f4ddae5'),
+            ('public.list_course_feedback(uuid)',                                  '7fbe6b367a0c28fd4dd2b894f0dc7711', '7fbe6b367a0c28fd4dd2b894f0dc7711'),
             ('student_submit._group_members(uuid,uuid)',                           'b38b1af6f2dc142c94ce1cca454fd0fb', 'b38b1af6f2dc142c94ce1cca454fd0fb'),
-            ('student_submit.feedback(text,uuid,text)',                            'e30ec0025b0835601021bd0a5041551c', 'e30ec0025b0835601021bd0a5041551c'),
+            ('student_submit.feedback(text,uuid,text)',                            'c45a01cc31eab1111dc89994008ba4d4', 'c45a01cc31eab1111dc89994008ba4d4'),
             ('student_submit.markup(text,uuid,uuid,text)',                         '6cc78118aa4e98252514826aabf957a9', '6cc78118aa4e98252514826aabf957a9'),
-            ('student_submit.reflect(text,uuid,uuid,jsonb,text)',                  '0c81dcf49383cd33d148c0908e3e72f2', '0c81dcf49383cd33d148c0908e3e72f2'),
-            ('student_submit.reply(text,uuid,uuid,jsonb,text)',                    '87f9c3d1b9d035ac368828347473c5c2', '87f9c3d1b9d035ac368828347473c5c2'),
+            ('student_submit.reflect(text,uuid,uuid,jsonb,text)',                  '7a4e2ab29d369ef159dce65e1e1e8f77', '7a4e2ab29d369ef159dce65e1e1e8f77'),
+            ('student_submit.reply(text,uuid,uuid,jsonb,text)',                    '51e8f1db4f92885e8e310b255fa7aa70', '51e8f1db4f92885e8e310b255fa7aa70'),
+            ('student_submit.answer_seen(text,uuid,uuid[],text)',                  'a32cc8e5329954ac909969269afc2518', 'a32cc8e5329954ac909969269afc2518'),
             ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)', 'aa5207487f67fe4fbc7dcbf803276f6b', 'aa5207487f67fe4fbc7dcbf803276f6b'),
             ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',          'a86921ac1689264c2db5dea1e081f276', 'a86921ac1689264c2db5dea1e081f276'),
             ('student_submit.revision_unsend(text,uuid,uuid,text)',                '763f31c96e1ee07ac5477762db0f7784', '763f31c96e1ee07ac5477762db0f7784'),
@@ -440,18 +443,29 @@ create table if not exists public.feedback_reflection (
     makes_sense   text        not null constraint feedback_reflection_makes_sense_check check (makes_sense in ('yes', 'not_sure')),
     question      text        constraint feedback_reflection_question_check check (char_length(question) <= 1000),
     plan          text        constraint feedback_reflection_plan_check check (char_length(plan) <= 1000),
+    -- When the plan was last written: with the reflection, or later with
+    -- Make My Plan (reply). Your Plan From Last Time is the newest.
+    plan_at       timestamptz,
     went_well     text        constraint feedback_reflection_went_well_check check (char_length(went_well) <= 1000),
     sent_at       timestamptz not null default now(),
-    -- The teacher's answer (Send Answer). Sent to the student once written.
+    -- The teacher's answer (Send Answer). Sent to the student once written,
+    -- unless the teacher kept it to themselves (answer_only_me: Only Me).
     answer        text        constraint feedback_reflection_answer_check check (char_length(answer) <= 2000),
     answered_at   timestamptz,
+    answer_only_me boolean    not null default false,
+    -- When the student's page showed the answer (answer_seen: What Changed's
+    -- "answered your question" until then).
+    answer_seen_at timestamptz,
     -- Does It Make Sense Now?, and one more question if not.
     sense_now     text        constraint feedback_reflection_sense_now_check check (sense_now in ('yes', 'not_sure')),
     sense_now_at  timestamptz,
     follow_up     text        constraint feedback_reflection_follow_up_check check (char_length(follow_up) <= 1000),
     follow_up_answer text     constraint feedback_reflection_follow_up_answer_check check (char_length(follow_up_answer) <= 2000),
     follow_up_answered_at timestamptz,
+    follow_up_only_me boolean not null default false,
+    follow_up_answer_seen_at timestamptz,
     updated_at    timestamptz not null default now(),
+    constraint feedback_reflection_plan_has_time check ((plan is null) = (plan_at is null)),
     constraint feedback_reflection_answer_has_time check ((answer is null) = (answered_at is null)),
     constraint feedback_reflection_follow_up_answer_has_time check ((follow_up_answer is null) = (follow_up_answered_at is null)),
     constraint feedback_reflection_follow_up_after_answer check (follow_up is null or answer is not null),
@@ -521,11 +535,16 @@ create or replace trigger work_feedback_truncate after truncate on public.assess
 
 -- ── 6. Shared pieces ────────────────────────────────────────────────────────
 -- Marks, as save_markup takes them: { "v": 1, "marks": [ mark, ... ] }, 500
--- marks at most, 256 KB at most. A mark is an object with a "type" of pen,
--- highlight, note, tick or cross (the Eraser removes marks; it is not one),
--- and, for a note, a "text" of 1 to 500 characters. Anything else a mark
--- holds (where it is, its colour, its points) is the drawing's own and is
--- kept as sent. Raises 22023 when it is anything else.
+-- marks at most, 256 KB at most. A place is a fraction of the page from its
+-- top left: x and y from 0 to 1 (as the screens and Demo Mode store them,
+-- shared/markup-draw.js). A mark is one of
+--   { "id"?, "type": "pen" | "highlight", "color"?, "width"?, "points": [[x, y], ...] }
+--       1 to 5000 points; width a fraction of the page's width, above 0, at most 0.2
+--   { "id"?, "type": "note", "x", "y", "text" }   text 1 to 500 characters
+--   { "id"?, "type": "tick" | "cross", "x", "y", "color"? }
+-- with color one of red, green, blue and id a string of 1 to 64 characters.
+-- No other key. The Eraser removes marks; it is not one. Raises 22023 when
+-- it is anything else.
 create or replace function public._markup_check(p_marks jsonb)
  returns void
  language plpgsql
@@ -535,7 +554,9 @@ as $function$
 declare
     _m jsonb;
 begin
-    if p_marks is null or jsonb_typeof(p_marks) <> 'object' or jsonb_typeof(p_marks->'marks') is distinct from 'array' then
+    if p_marks is null or jsonb_typeof(p_marks) <> 'object' or jsonb_typeof(p_marks->'marks') is distinct from 'array'
+       or p_marks->'v' is distinct from '1'::jsonb
+       or exists (select 1 from jsonb_object_keys(p_marks) k where k not in ('v', 'marks')) then
         raise exception 'marks must be { "v": 1, "marks": [ ... ] }' using errcode = '22023';
     end if;
     if octet_length(p_marks::text) > 262144 then
@@ -553,6 +574,38 @@ begin
                                      or char_length(btrim(_m->>'text')) not between 1 and 500) then
             raise exception 'a note needs a text of 1 to 500 characters' using errcode = '22023';
         end if;
+        if exists (select 1 from jsonb_object_keys(_m) k
+                    where k not in ('id', 'type', 'color')
+                      and not (k in ('x', 'y') and _m->>'type' in ('note', 'tick', 'cross'))
+                      and not (k = 'text' and _m->>'type' = 'note')
+                      and not (k in ('points', 'width') and _m->>'type' in ('pen', 'highlight'))) then
+            raise exception 'a mark has a key its type does not take' using errcode = '22023';
+        end if;
+        if _m ? 'id' and (jsonb_typeof(_m->'id') <> 'string' or char_length(_m->>'id') not between 1 and 64) then
+            raise exception 'a mark''s id is 1 to 64 characters' using errcode = '22023';
+        end if;
+        if _m ? 'color' and (jsonb_typeof(_m->'color') <> 'string' or _m->>'color' not in ('red', 'green', 'blue')) then
+            raise exception 'a mark''s color is red, green or blue' using errcode = '22023';
+        end if;
+        if _m->>'type' in ('note', 'tick', 'cross')
+           and (jsonb_typeof(_m->'x') is distinct from 'number' or jsonb_typeof(_m->'y') is distinct from 'number'
+                or (_m->>'x')::numeric not between 0 and 1 or (_m->>'y')::numeric not between 0 and 1) then
+            raise exception 'a note, tick or cross needs x and y, each from 0 to 1' using errcode = '22023';
+        end if;
+        if _m->>'type' in ('pen', 'highlight') then
+            if jsonb_typeof(_m->'points') is distinct from 'array'
+               or jsonb_array_length(_m->'points') not between 1 and 5000
+               or exists (select 1 from jsonb_array_elements(_m->'points') pt
+                           where jsonb_typeof(pt) <> 'array' or jsonb_array_length(pt) <> 2
+                              or jsonb_typeof(pt->0) <> 'number' or jsonb_typeof(pt->1) <> 'number'
+                              or (pt->>0)::numeric not between 0 and 1 or (pt->>1)::numeric not between 0 and 1) then
+                raise exception 'a pen or highlight needs 1 to 5000 points [x, y], each from 0 to 1' using errcode = '22023';
+            end if;
+            if _m ? 'width' and (jsonb_typeof(_m->'width') <> 'number'
+                                 or (_m->>'width')::numeric <= 0 or (_m->>'width')::numeric > 0.2) then
+                raise exception 'a stroke''s width is above 0 and at most 0.2 of the page' using errcode = '22023';
+            end if;
+        end if;
     end loop;
 end;
 $function$;
@@ -562,7 +615,8 @@ $function$;
 -- return_work, by save_markup in a class that does not hold grades, and by
 -- the second file's trigger when a grade is returned by any path. Returns
 -- how many pages changed. An erased mark is gone from working, so it is
--- never given.
+-- never given. A page never given whose marks were all erased has nothing
+-- to give and is passed over (it is not waiting either).
 create or replace function public._markup_give(p_enrollment_id uuid, p_assessment_id uuid)
  returns integer
  language plpgsql
@@ -575,7 +629,8 @@ begin
     update markup
        set given = working, given_rev = working_rev, given_at = clock_timestamp()
      where enrollment_id = p_enrollment_id and assessment_id = p_assessment_id
-       and given_rev is distinct from working_rev;
+       and given_rev is distinct from working_rev
+       and not (given is null and jsonb_array_length(coalesce(working->'marks', '[]'::jsonb)) = 0);
     get diagnostics _n = row_count;
     return _n;
 end;
@@ -714,10 +769,12 @@ create or replace function public._reflection_json(p_reflection_id uuid)
 as $function$
     select jsonb_build_object(
                'id', f.id, 'assessment_id', f.assessment_id, 'enrollment_id', f.enrollment_id,
-               'makes_sense', f.makes_sense, 'question', f.question, 'plan', f.plan, 'went_well', f.went_well,
-               'sent_at', f.sent_at, 'answer', f.answer, 'answered_at', f.answered_at,
+               'makes_sense', f.makes_sense, 'question', f.question, 'plan', f.plan, 'plan_at', f.plan_at, 'went_well', f.went_well,
+               'sent_at', f.sent_at, 'answer', f.answer, 'answered_at', f.answered_at, 'only_me', f.answer_only_me,
+               'answer_seen_at', f.answer_seen_at,
                'sense_now', f.sense_now, 'sense_now_at', f.sense_now_at,
                'follow_up', f.follow_up, 'follow_up_answer', f.follow_up_answer, 'follow_up_answered_at', f.follow_up_answered_at,
+               'follow_up_only_me', f.follow_up_only_me, 'follow_up_answer_seen_at', f.follow_up_answer_seen_at,
                'waiting', (f.question is not null and f.answer is null) or (f.follow_up is not null and f.follow_up_answer is null))
       from feedback_reflection f where f.id = p_reflection_id;
 $function$;
@@ -824,8 +881,14 @@ begin
     if not _grade_return_holds(_s.enrollment_id) then
         _given := _markup_give(_s.enrollment_id, _s.assessment_id);
     end if;
-    _cached := jsonb_build_object('result', 'saved', 'file_id', p_file_id, 'rev', _m.working_rev,
-                                  'given', (select m.given_rev is not distinct from m.working_rev from markup m where m.file_id = p_file_id));
+    -- given_rev and waiting as list_assessment_markup has them (given, there,
+    -- is the student's copy of the marks; it is not repeated here).
+    select jsonb_build_object('result', 'saved', 'file_id', p_file_id, 'rev', m.working_rev, 'given_rev', m.given_rev,
+                              'waiting', m.given_rev is distinct from m.working_rev
+                                         and not (m.given is null and jsonb_array_length(coalesce(m.working->'marks', '[]'::jsonb)) = 0)
+                                         and a.students_see_markup)
+      into _cached
+      from markup m join assessment a on a.id = m.assessment_id where m.file_id = p_file_id;
     perform fv_idem_store(p_idempotency_key, 'save_markup', _cached);
     return _cached;
 end;
@@ -848,8 +911,10 @@ begin
         select jsonb_agg(jsonb_build_object(
                    'file_id', m.file_id, 'enrollment_id', m.enrollment_id, 'rev', m.working_rev, 'marks', m.working,
                    'saved_at', m.working_at, 'given', m.given, 'given_rev', m.given_rev, 'given_at', m.given_at,
-                   'waiting', m.given_rev is distinct from m.working_rev) order by m.enrollment_id, m.file_id)
-          from markup m
+                   'waiting', m.given_rev is distinct from m.working_rev
+                              and not (m.given is null and jsonb_array_length(coalesce(m.working->'marks', '[]'::jsonb)) = 0)
+                              and a.students_see_markup) order by m.enrollment_id, m.file_id)
+          from markup m join assessment a on a.id = m.assessment_id
          where m.assessment_id = p_assessment_id), '[]'::jsonb);
 end;
 $function$;
@@ -1158,9 +1223,15 @@ end;
 $function$;
 
 -- Send Answer. It answers what is waiting: the question (or, with none, the
--- reflection itself), then the follow-up. 1 to 2000 characters.
--- Answers { result: 'answered', reflection } or { result: 'already_answered', reflection }.
-create or replace function public.answer_reflection(p_reflection_id uuid, p_answer text, p_idempotency_key uuid default null)
+-- reflection itself), then the follow-up. 1 to 2000 characters. p_only_me
+-- true (Only Me): the answer is the teacher's own note, never sent to the
+-- student; it clears the question as an answer does, and the student can
+-- then neither say whether it makes sense nor ask a follow-up.
+-- Answers { result: 'answered', reflection } (remembered),
+-- { result: 'already_answered', reflection }, or { result: 'reflect_off' }
+-- while the class has Reflect on Feedback off.
+create or replace function public.answer_reflection(p_reflection_id uuid, p_answer text, p_idempotency_key uuid default null,
+                                                    p_only_me boolean default false)
  returns jsonb
  language plpgsql
  security definer
@@ -1175,6 +1246,9 @@ begin
     if p_answer is null or char_length(btrim(p_answer)) not between 1 and 2000 then
         raise exception 'the answer must be 1 to 2000 characters' using errcode = '22023';
     end if;
+    if p_only_me is null then
+        raise exception 'only_me must be true or false' using errcode = '22023';
+    end if;
     select f.course_id into _course from feedback_reflection f where f.id = p_reflection_id and fv_owns_course(f.course_id);
     if _course is not null then
         perform _grade_return_lock_first(_course);
@@ -1185,10 +1259,16 @@ begin
     if not found then
         raise exception 'reflection not found' using errcode = 'P0002';
     end if;
+    if not (select c.reflect_on_feedback from course c where c.id = _course) then
+        return jsonb_build_object('result', 'reflect_off');
+    end if;
     if _f.answer is null then
-        update feedback_reflection set answer = btrim(p_answer), answered_at = now(), updated_at = now() where id = _f.id;
+        update feedback_reflection set answer = btrim(p_answer), answered_at = now(), answer_only_me = p_only_me, updated_at = now()
+         where id = _f.id;
     elsif _f.follow_up is not null and _f.follow_up_answer is null then
-        update feedback_reflection set follow_up_answer = btrim(p_answer), follow_up_answered_at = now(), updated_at = now() where id = _f.id;
+        update feedback_reflection set follow_up_answer = btrim(p_answer), follow_up_answered_at = now(), follow_up_only_me = p_only_me,
+                                       updated_at = now()
+         where id = _f.id;
     else
         return jsonb_build_object('result', 'already_answered', 'reflection', _reflection_json(_f.id));
     end if;
@@ -1200,7 +1280,10 @@ $function$;
 
 -- Everything the teacher's screens need about Mark Up, revisions and
 -- reflections in one class. Marks are counted here; list_assessment_markup
--- has the drawings.
+-- has the drawings. waiting on a page: the student would be given a change
+-- at the next Return (To Return counts a student with a draft or such a
+-- page). Reflections are listed only while Reflect on Feedback is on (they
+-- are kept, and come back when it is turned on again).
 create or replace function public.list_course_feedback(p_course_id uuid)
  returns jsonb
  language plpgsql
@@ -1220,14 +1303,17 @@ begin
             select jsonb_agg(jsonb_build_object(
                        'file_id', m.file_id, 'assessment_id', m.assessment_id, 'enrollment_id', m.enrollment_id,
                        'rev', m.working_rev, 'given_rev', m.given_rev, 'given_at', m.given_at,
-                       'waiting', m.given_rev is distinct from m.working_rev) order by m.assessment_id, m.enrollment_id, m.file_id)
-              from markup m where m.course_id = p_course_id), '[]'::jsonb),
+                       'waiting', m.given_rev is distinct from m.working_rev
+                                  and not (m.given is null and jsonb_array_length(coalesce(m.working->'marks', '[]'::jsonb)) = 0)
+                                  and a.students_see_markup) order by m.assessment_id, m.enrollment_id, m.file_id)
+              from markup m join assessment a on a.id = m.assessment_id where m.course_id = p_course_id), '[]'::jsonb),
         'revisions', coalesce((
             select jsonb_agg(_revision_json(r.id) order by r.created_at, r.id)
               from revision_request r where r.course_id = p_course_id), '[]'::jsonb),
         'reflections', coalesce((
             select jsonb_agg(_reflection_json(f.id) order by f.sent_at, f.id)
-              from feedback_reflection f where f.course_id = p_course_id), '[]'::jsonb));
+              from feedback_reflection f join course c on c.id = f.course_id
+             where f.course_id = p_course_id and c.reflect_on_feedback), '[]'::jsonb));
 end;
 $function$;
 
@@ -1262,11 +1348,14 @@ $function$;
 
 -- What the student's page shows about feedback, for one class: the two
 -- switches; for each piece on the page that has marks given, a revision
--- asked, or a reflection: how many pages carry marks and how many notes
--- (only when the work was returned with marks, the piece shows marks, and
--- no Missing or Excused is on it), the revision request, and the
--- reflection with the teacher's answer once sent; and the last plan the
--- student made in the class (Your Plan From Last Time). Read-only.
+-- asked, or a reflection: how many pages carry marks, how many pages the
+-- work has, and how many notes (only when the work was returned with marks,
+-- the piece shows marks, and no Missing or Excused is on it), the revision
+-- request, and the reflection with the teacher's answer once sent (never
+-- one the teacher kept to themselves) and whether the student has seen it;
+-- and the last plan the student made in the class (Your Plan From Last
+-- Time). Reflections and the last plan only while Reflect on Feedback is
+-- on. Read-only.
 create or replace function student_submit.feedback(p_session_token text, p_enrollment_id uuid, p_ip_hash text)
  returns jsonb
  language plpgsql
@@ -1302,6 +1391,13 @@ begin
                       left join lateral (
                           select case when count(*) = 0 then null else jsonb_build_object(
                                      'pages', count(*),
+                                     -- every page of the work: each member's latest handed-in version
+                                     'work_pages', (select count(*) from submission_file wf
+                                                     where wf.submission_id in (
+                                                         select distinct on (ws.enrollment_id) ws.id from submission ws
+                                                          where ws.assessment_id = a.id and ws.state = 'sent'
+                                                            and ws.enrollment_id = any (coalesce(_group_members(a.id, p_enrollment_id), array[p_enrollment_id]))
+                                                          order by ws.enrollment_id, ws.version desc)),
                                      'notes', sum((select count(*) from jsonb_array_elements(coalesce(m.given->'marks', '[]'::jsonb)) k
                                                     where k->>'type' = 'note'))) end as j
                             from markup m
@@ -1334,18 +1430,28 @@ begin
                       left join lateral (
                           select jsonb_build_object(
                                      'makes_sense', f.makes_sense, 'question', f.question, 'plan', f.plan, 'went_well', f.went_well,
-                                     'sent_at', f.sent_at, 'answer', f.answer, 'answered_at', f.answered_at,
+                                     'sent_at', f.sent_at,
+                                     -- an answer the teacher kept to themselves is not sent, nor that there is one
+                                     'answer', case when not f.answer_only_me then f.answer end,
+                                     'answered_at', case when not f.answer_only_me then f.answered_at end,
                                      'sense_now', f.sense_now, 'follow_up', f.follow_up,
-                                     'follow_up_answer', f.follow_up_answer, 'follow_up_answered_at', f.follow_up_answered_at) as j
+                                     'follow_up_answer', case when not f.follow_up_only_me then f.follow_up_answer end,
+                                     'follow_up_answered_at', case when not f.follow_up_only_me then f.follow_up_answered_at end,
+                                     -- What Changed: an answer the page has not shown yet (answer_seen)
+                                     'answer_new', (f.answer is not null and not f.answer_only_me and f.answer_seen_at is null)
+                                                   or (f.follow_up_answer is not null and not f.follow_up_only_me
+                                                       and f.follow_up_answer_seen_at is null)) as j
                             from feedback_reflection f
-                           where f.assessment_id = a.id and f.enrollment_id = p_enrollment_id) rf on true
+                           where f.assessment_id = a.id and f.enrollment_id = p_enrollment_id
+                             and _course.reflect_on_feedback) rf on true
                      where a.course_id = _course.id
                        and (a.date_assigned is null or a.date_assigned <= _today)
                        and (mk.j is not null or rv.j is not null or rf.j is not null)) x), '[]'::jsonb),
-        'last_plan', (select jsonb_build_object('assessment_id', f.assessment_id, 'plan', f.plan, 'sent_at', f.sent_at)
+        'last_plan', (select jsonb_build_object('assessment_id', f.assessment_id, 'plan', f.plan, 'sent_at', f.plan_at)
                         from feedback_reflection f
                        where f.enrollment_id = p_enrollment_id and f.course_id = _course.id and f.plan is not null
-                       order by f.sent_at desc, f.id limit 1));
+                         and _course.reflect_on_feedback
+                       order by f.plan_at desc, f.id limit 1));
 end;
 $function$;
 
@@ -1474,10 +1580,13 @@ begin
     if found and _f.answer is not null then
         return jsonb_build_object('ok', false, 'error', 'already_answered');
     end if;
-    insert into feedback_reflection (course_id, assessment_id, enrollment_id, makes_sense, question, plan, went_well)
-    values (_course.id, _a.id, p_enrollment_id, _sense, _q, _plan, _well)
+    insert into feedback_reflection (course_id, assessment_id, enrollment_id, makes_sense, question, plan, plan_at, went_well)
+    values (_course.id, _a.id, p_enrollment_id, _sense, _q, _plan, case when _plan is not null then now() end, _well)
     on conflict (assessment_id, enrollment_id) do update
        set makes_sense = excluded.makes_sense, question = excluded.question, plan = excluded.plan, went_well = excluded.went_well,
+           plan_at = case when excluded.plan is null then null
+                          when excluded.plan is not distinct from feedback_reflection.plan then feedback_reflection.plan_at
+                          else now() end,
            sent_at = case when (feedback_reflection.makes_sense, feedback_reflection.question, feedback_reflection.plan, feedback_reflection.went_well)
                                is not distinct from (excluded.makes_sense, excluded.question, excluded.plan, excluded.went_well)
                           then feedback_reflection.sent_at else now() end,
@@ -1488,11 +1597,16 @@ begin
 end;
 $function$;
 
--- Does It Make Sense Now? p_reply: { "sense_now": "yes" | "not_sure",
--- "follow_up": "..." } (follow_up, 1 to 1000 characters, only with
--- not_sure, once). Only after the teacher answered. The same reply twice is
--- the same reply. Answers: ok with the reflection; not_found, not_answered,
--- already_asked (a second follow-up). A wrong shape raises 22023.
+-- Does It Make Sense Now?, and Make My Plan. p_reply:
+--   { "sense_now": "yes" | "not_sure",
+--     "follow_up": "...",   1 to 1000 characters, only with not_sure, once
+--     "plan": "..." }       1 to 1000 characters, only with yes: Make My
+--                           Plan (it takes the place of a plan made before)
+-- Only after the teacher answered (an answer they kept to themselves is not
+-- an answer here), only while Reflect on Feedback is on. The same reply
+-- twice is the same reply. Answers: ok with the reflection; reflect_off,
+-- not_found, not_answered, already_asked (a second follow-up). A wrong
+-- shape raises 22023.
 create or replace function student_submit.reply(
     p_session_token text, p_enrollment_id uuid, p_assessment_id uuid, p_reply jsonb, p_ip_hash text)
  returns jsonb
@@ -1505,6 +1619,7 @@ declare
     _k     text;
     _sense text;
     _more  text;
+    _plan  text;
     _f     feedback_reflection%rowtype;
 begin
     if p_assessment_id is null then
@@ -1514,7 +1629,7 @@ begin
         raise exception 'the reply must be an object' using errcode = '22023';
     end if;
     for _k in select jsonb_object_keys(p_reply) loop
-        if _k not in ('sense_now', 'follow_up') then
+        if _k not in ('sense_now', 'follow_up', 'plan') then
             raise exception 'unknown field %', _k using errcode = '22023';
         end if;
     end loop;
@@ -1529,6 +1644,13 @@ begin
     if _more is not null and (_sense <> 'not_sure' or char_length(_more) > 1000) then
         raise exception 'a follow_up of 1 to 1000 characters goes only with not_sure' using errcode = '22023';
     end if;
+    if p_reply ? 'plan' and jsonb_typeof(p_reply->'plan') not in ('string', 'null') then
+        raise exception 'plan must be text' using errcode = '22023';
+    end if;
+    _plan := nullif(btrim(p_reply->>'plan'), '');
+    if _plan is not null and (_sense <> 'yes' or char_length(_plan) > 1000) then
+        raise exception 'a plan of 1 to 1000 characters goes only with yes' using errcode = '22023';
+    end if;
 
     _in := _send_session(p_session_token, p_enrollment_id);
     if _in ? 'error' then
@@ -1538,13 +1660,16 @@ begin
     if not exists (select 1 from enrollment e where e.id = p_enrollment_id and e.withdrawn_at is null) then
         return jsonb_build_object('ok', false, 'error', 'not_found');
     end if;
+    if not (select c.reflect_on_feedback from course c where c.id = (_in->>'course_id')::uuid) then
+        return jsonb_build_object('ok', false, 'error', 'reflect_off');
+    end if;
     select * into _f from feedback_reflection
      where assessment_id = p_assessment_id and enrollment_id = p_enrollment_id and course_id = (_in->>'course_id')::uuid
        for update;
     if not found then
         return jsonb_build_object('ok', false, 'error', 'not_found');
     end if;
-    if _f.answer is null then
+    if _f.answer is null or _f.answer_only_me then
         return jsonb_build_object('ok', false, 'error', 'not_answered');
     end if;
     if _more is not null and _f.follow_up is not null and _f.follow_up is distinct from _more then
@@ -1554,11 +1679,49 @@ begin
        set sense_now = _sense,
            sense_now_at = case when sense_now is distinct from _sense then now() else coalesce(sense_now_at, now()) end,
            follow_up = coalesce(follow_up, _more),
+           plan_at = case when _plan is null then plan_at when _plan is distinct from plan then now() else plan_at end,
+           plan = coalesce(_plan, plan),
            updated_at = now()
      where id = _f.id
     returning * into _f;
     return jsonb_build_object('ok', true, 'reflection', jsonb_build_object(
-        'sense_now', _f.sense_now, 'follow_up', _f.follow_up, 'answer', _f.answer, 'follow_up_answer', _f.follow_up_answer));
+        'sense_now', _f.sense_now, 'follow_up', _f.follow_up, 'plan', _f.plan, 'answer', _f.answer,
+        'follow_up_answer', case when not _f.follow_up_only_me then _f.follow_up_answer end));
+end;
+$function$;
+
+-- The student's page showed the teacher's answers on these pieces (What
+-- Changed stops saying "answered your question"), as Batch A's seen does
+-- for a returned grade: only answers sent to the student, only their own,
+-- only their class's pieces. A locked card may still say so (a read).
+-- Answers { ok, seen } (how many reflections it marked).
+create or replace function student_submit.answer_seen(
+    p_session_token text, p_enrollment_id uuid, p_assessment_ids uuid[], p_ip_hash text)
+ returns jsonb
+ language plpgsql
+ security definer
+ set search_path to 'public', 'student_submit', 'pg_temp'
+as $function$
+declare
+    _in jsonb := _session_class(p_session_token, p_enrollment_id);
+    _n  int;
+begin
+    if _in ? 'error' then
+        return jsonb_build_object('ok', false, 'error', _in->>'error');
+    end if;
+    perform public._grade_return_lock_first((_in->>'course_id')::uuid);
+    update feedback_reflection f
+       set answer_seen_at = case when f.answer is not null and not f.answer_only_me then coalesce(f.answer_seen_at, clock_timestamp())
+                                 else f.answer_seen_at end,
+           follow_up_answer_seen_at = case when f.follow_up_answer is not null and not f.follow_up_only_me
+                                           then coalesce(f.follow_up_answer_seen_at, clock_timestamp())
+                                           else f.follow_up_answer_seen_at end
+     where f.enrollment_id = p_enrollment_id and f.course_id = (_in->>'course_id')::uuid
+       and f.assessment_id = any (coalesce(p_assessment_ids, '{}'))
+       and ((f.answer is not null and not f.answer_only_me and f.answer_seen_at is null)
+            or (f.follow_up_answer is not null and not f.follow_up_only_me and f.follow_up_answer_seen_at is null));
+    get diagnostics _n = row_count;
+    return jsonb_build_object('ok', true, 'seen', _n);
 end;
 $function$;
 
@@ -1969,7 +2132,7 @@ revoke all on function public.return_work(uuid, uuid[], uuid) from public, anon;
 revoke all on function public.return_for_revision(uuid, uuid, jsonb, uuid) from public, anon;
 revoke all on function public.set_revision_request(uuid, jsonb, uuid) from public, anon;
 revoke all on function public.cancel_revision(uuid, uuid) from public, anon;
-revoke all on function public.answer_reflection(uuid, text, uuid) from public, anon;
+revoke all on function public.answer_reflection(uuid, text, uuid, boolean) from public, anon;
 revoke all on function public.list_course_feedback(uuid) from public, anon;
 grant execute on function public.set_course_feedback_options(uuid, jsonb, uuid) to authenticated, service_role;
 grant execute on function public.save_markup(uuid, jsonb, integer, uuid) to authenticated, service_role;
@@ -1978,7 +2141,7 @@ grant execute on function public.return_work(uuid, uuid[], uuid) to authenticate
 grant execute on function public.return_for_revision(uuid, uuid, jsonb, uuid) to authenticated, service_role;
 grant execute on function public.set_revision_request(uuid, jsonb, uuid) to authenticated, service_role;
 grant execute on function public.cancel_revision(uuid, uuid) to authenticated, service_role;
-grant execute on function public.answer_reflection(uuid, text, uuid) to authenticated, service_role;
+grant execute on function public.answer_reflection(uuid, text, uuid, boolean) to authenticated, service_role;
 grant execute on function public.list_course_feedback(uuid) to authenticated, service_role;
 
 -- Helpers in public: nobody is granted them, the service role included.
@@ -2003,6 +2166,7 @@ revoke all on function student_submit.feedback(text, uuid, text) from public, an
 revoke all on function student_submit.markup(text, uuid, uuid, text) from public, anon, authenticated;
 revoke all on function student_submit.reflect(text, uuid, uuid, jsonb, text) from public, anon, authenticated;
 revoke all on function student_submit.reply(text, uuid, uuid, jsonb, text) from public, anon, authenticated;
+revoke all on function student_submit.answer_seen(text, uuid, uuid[], text) from public, anon, authenticated;
 revoke all on function student_submit.revision_start(text, uuid, uuid, jsonb, text, uuid, text) from public, anon, authenticated;
 revoke all on function student_submit.revision_finish(text, uuid, uuid, jsonb, text) from public, anon, authenticated;
 revoke all on function student_submit.revision_unsend(text, uuid, uuid, text) from public, anon, authenticated;
@@ -2012,6 +2176,7 @@ grant execute on function student_submit.feedback(text, uuid, text) to service_r
 grant execute on function student_submit.markup(text, uuid, uuid, text) to service_role;
 grant execute on function student_submit.reflect(text, uuid, uuid, jsonb, text) to service_role;
 grant execute on function student_submit.reply(text, uuid, uuid, jsonb, text) to service_role;
+grant execute on function student_submit.answer_seen(text, uuid, uuid[], text) to service_role;
 grant execute on function student_submit.revision_start(text, uuid, uuid, jsonb, text, uuid, text) to service_role;
 grant execute on function student_submit.revision_finish(text, uuid, uuid, jsonb, text) to service_role;
 grant execute on function student_submit.revision_unsend(text, uuid, uuid, text) to service_role;
@@ -2030,29 +2195,30 @@ begin
             -- FINGERPRINTS-BEGIN new (written by migrations/local-test/batch_c_fingerprints.py)
             ('public._work_feedback_gone()',                                       '5c760a38a7675c1d49ef95ab994b76e5', '5c760a38a7675c1d49ef95ab994b76e5'),
             ('public._work_feedback_truncated()',                                  '450e3b27b73c51d01f4c431adb402bbd', '450e3b27b73c51d01f4c431adb402bbd'),
-            ('public._markup_check(jsonb)',                                        '882cf50301891b5a06854756b11462a2', '882cf50301891b5a06854756b11462a2'),
-            ('public._markup_give(uuid,uuid)',                                     '4f7cd1dcddcf2f94b94ca4e441e4803c', '4f7cd1dcddcf2f94b94ca4e441e4803c'),
+            ('public._markup_check(jsonb)',                                        'd5fac66f176bf8f23391a7c6c19b053a', 'd5fac66f176bf8f23391a7c6c19b053a'),
+            ('public._markup_give(uuid,uuid)',                                     'f0f07a1b879ff038e2f0afe020233c29', 'f0f07a1b879ff038e2f0afe020233c29'),
             ('public._revision_hide_available()',                                  'cd50f4c6493a73b3c42ae51f7580f970', 'a4b4e942de351d6849702b96f25c7356'),
             ('public._revision_hide_grade(uuid)',                                  '247080f6572bb45951cef807a2b849bd', '295f0e5f94eeb8492af2c205b641377b'),
             ('public._revision_unhide_grade(uuid)',                                '26d2861325edf27f95d090ebd590eb0f', '3c0ff04195505dacf40b55217f8fe839'),
             ('public._piece_latest(uuid,uuid)',                                    'fee319ef4d87447eeac9b4d53a1f1b50', 'fee319ef4d87447eeac9b4d53a1f1b50'),
             ('public._revision_state(uuid)',                                       'd8103c802e246bfac948fa620d06fe09', 'd8103c802e246bfac948fa620d06fe09'),
             ('public._revision_json(uuid)',                                        '969f930b121a6714edfde8052a4d876b', '969f930b121a6714edfde8052a4d876b'),
-            ('public._reflection_json(uuid)',                                      '39bd36ae13b6f2f3a19beabcb223b787', '39bd36ae13b6f2f3a19beabcb223b787'),
+            ('public._reflection_json(uuid)',                                      '89f6847f6ab6a468284ea1df003391a6', '89f6847f6ab6a468284ea1df003391a6'),
             ('public.set_course_feedback_options(uuid,jsonb,uuid)',                '1954af2eef430d63baa91d38e74106d2', '1954af2eef430d63baa91d38e74106d2'),
-            ('public.save_markup(uuid,jsonb,integer,uuid)',                        '4816f564c5ab6367c97eff4732b167b0', '4816f564c5ab6367c97eff4732b167b0'),
-            ('public.list_assessment_markup(uuid)',                                '0dc1eb8215153e782de811ea3185ed5f', '0dc1eb8215153e782de811ea3185ed5f'),
+            ('public.save_markup(uuid,jsonb,integer,uuid)',                        '808290a14511b137bc5c1a4574016429', '808290a14511b137bc5c1a4574016429'),
+            ('public.list_assessment_markup(uuid)',                                '5e64579a923a0f0c02791b6428e54d98', '5e64579a923a0f0c02791b6428e54d98'),
             ('public.return_work(uuid,uuid[],uuid)',                               '9175f90ed1158790acef376c98319295', '9175f90ed1158790acef376c98319295'),
             ('public.return_for_revision(uuid,uuid,jsonb,uuid)',                   'f66c0fdd60dd969203a345125280d760', 'f66c0fdd60dd969203a345125280d760'),
             ('public.set_revision_request(uuid,jsonb,uuid)',                       '6f9fb14cc1c8ced04cca7e0302c40b13', '6f9fb14cc1c8ced04cca7e0302c40b13'),
             ('public.cancel_revision(uuid,uuid)',                                  '03f508a459eb621f868b699a0ea3f076', '03f508a459eb621f868b699a0ea3f076'),
-            ('public.answer_reflection(uuid,text,uuid)',                           '0973e5823482794e4eb5e91b2163cd01', '0973e5823482794e4eb5e91b2163cd01'),
-            ('public.list_course_feedback(uuid)',                                  '38b7007c6fb7e8ba0df54077721a4892', '38b7007c6fb7e8ba0df54077721a4892'),
+            ('public.answer_reflection(uuid,text,uuid,boolean)',                   'b384f9b1c729f42733db290a0f4ddae5', 'b384f9b1c729f42733db290a0f4ddae5'),
+            ('public.list_course_feedback(uuid)',                                  '7fbe6b367a0c28fd4dd2b894f0dc7711', '7fbe6b367a0c28fd4dd2b894f0dc7711'),
             ('student_submit._group_members(uuid,uuid)',                           'b38b1af6f2dc142c94ce1cca454fd0fb', 'b38b1af6f2dc142c94ce1cca454fd0fb'),
-            ('student_submit.feedback(text,uuid,text)',                            'e30ec0025b0835601021bd0a5041551c', 'e30ec0025b0835601021bd0a5041551c'),
+            ('student_submit.feedback(text,uuid,text)',                            'c45a01cc31eab1111dc89994008ba4d4', 'c45a01cc31eab1111dc89994008ba4d4'),
             ('student_submit.markup(text,uuid,uuid,text)',                         '6cc78118aa4e98252514826aabf957a9', '6cc78118aa4e98252514826aabf957a9'),
-            ('student_submit.reflect(text,uuid,uuid,jsonb,text)',                  '0c81dcf49383cd33d148c0908e3e72f2', '0c81dcf49383cd33d148c0908e3e72f2'),
-            ('student_submit.reply(text,uuid,uuid,jsonb,text)',                    '87f9c3d1b9d035ac368828347473c5c2', '87f9c3d1b9d035ac368828347473c5c2'),
+            ('student_submit.reflect(text,uuid,uuid,jsonb,text)',                  '7a4e2ab29d369ef159dce65e1e1e8f77', '7a4e2ab29d369ef159dce65e1e1e8f77'),
+            ('student_submit.reply(text,uuid,uuid,jsonb,text)',                    '51e8f1db4f92885e8e310b255fa7aa70', '51e8f1db4f92885e8e310b255fa7aa70'),
+            ('student_submit.answer_seen(text,uuid,uuid[],text)',                  'a32cc8e5329954ac909969269afc2518', 'a32cc8e5329954ac909969269afc2518'),
             ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)', 'aa5207487f67fe4fbc7dcbf803276f6b', 'aa5207487f67fe4fbc7dcbf803276f6b'),
             ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',          'a86921ac1689264c2db5dea1e081f276', 'a86921ac1689264c2db5dea1e081f276'),
             ('student_submit.revision_unsend(text,uuid,uuid,text)',                '763f31c96e1ee07ac5477762db0f7784', '763f31c96e1ee07ac5477762db0f7784'),

@@ -971,16 +971,21 @@ create table feedback_reflection (
   enrollment_id uuid        not null,                               -- unique with assessment_id: one per student per piece
   makes_sense   text        not null,                               -- yes | not_sure: the student's own words from here down to went_well
   question      text,                                               -- with not_sure; 1000 characters at most
-  plan          text,                                               -- with yes: What Will You Do Next Time (Your Plan From Last Time on the next piece)
+  plan          text,                                               -- with yes, or later with Make My Plan (reply): Your Plan From Last Time on the next piece
+  plan_at       timestamptz,                                        -- when the plan was last written; the newest is Your Plan From Last Time
   went_well     text,
   sent_at       timestamptz not null default now(),
-  answer        text,                                               -- the teacher's answer (Send Answer); sent to the student once written
+  answer        text,                                               -- the teacher's answer (Send Answer); sent to the student once written, unless answer_only_me
   answered_at   timestamptz,
+  answer_only_me boolean    not null default false,                 -- Only Me: the teacher's own note, never sent
+  answer_seen_at timestamptz,                                       -- the student's page showed the answer (answer_seen)
   sense_now     text,                                               -- Does It Make Sense Now?: yes | not_sure
   sense_now_at  timestamptz,
   follow_up     text,                                               -- one more question, with not_sure
   follow_up_answer text,
   follow_up_answered_at timestamptz,
+  follow_up_only_me boolean not null default false,
+  follow_up_answer_seen_at timestamptz,
   updated_at    timestamptz not null default now()
 );
 

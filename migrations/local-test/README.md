@@ -1744,6 +1744,21 @@ for those three new rows.
   `revision_unsend`, no second `revision_start`) until erased. apply1 also
   checks C1's body is Batch B's text with one condition added, and that
   only that function's body changes; the undo puts Batch B's back exactly.
+- **contract** (the points the Demo screens' builders found unclear). (f)
+  Demo Mode's marks are taken and kept exactly; 22 wrong places and shapes
+  are refused (off the page, a missing place, flat points, a colour not
+  offered, an unknown key, v 2); the page's edges are on it. (b) `given` is
+  the marks everywhere; `save_markup` answers `given_rev` and `waiting`.
+  (e) a page drawn on and erased before any Return does not wait and is not
+  given; a change after Return waits; nothing waits while the piece shows
+  no marks. (i) `pages` and `work_pages`. (h) `group_file_links` rows carry
+  `file_id` and `page`. (a) Make My Plan through `reply` (its refusals; kept
+  by a reply without a plan; the newest plan is Your Plan From Last Time).
+  (k) `answer_new` and `answer_seen` (no session, another student, twice, no
+  grade row changed). (g) Only Me: kept, clears the question, in no student
+  answer, no reply to it, a follow-up answered Only Me. (c, d) the switch
+  off: `reply` and `answer_reflection` answer `reflect_off`, both sides list
+  no reflection, nothing is deleted, all back when it is on.
 - **reflect**. Every refusal (not returned, no grade, the switch off,
   another student, another class, not yet on the page, no session, a locked
   card, eight wrong shapes); yes with a plan; the same twice; sent again

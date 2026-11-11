@@ -76,10 +76,10 @@ C1_FUNCTIONS = [
     'public.set_course_feedback_options(uuid,jsonb,uuid)', 'public.save_markup(uuid,jsonb,integer,uuid)',
     'public.list_assessment_markup(uuid)', 'public.return_work(uuid,uuid[],uuid)',
     'public.return_for_revision(uuid,uuid,jsonb,uuid)', 'public.set_revision_request(uuid,jsonb,uuid)',
-    'public.cancel_revision(uuid,uuid)', 'public.answer_reflection(uuid,text,uuid)', 'public.list_course_feedback(uuid)',
+    'public.cancel_revision(uuid,uuid)', 'public.answer_reflection(uuid,text,uuid,boolean)', 'public.list_course_feedback(uuid)',
     'student_submit._group_members(uuid,uuid)', 'student_submit.feedback(text,uuid,text)',
     'student_submit.markup(text,uuid,uuid,text)', 'student_submit.reflect(text,uuid,uuid,jsonb,text)',
-    'student_submit.reply(text,uuid,uuid,jsonb,text)',
+    'student_submit.reply(text,uuid,uuid,jsonb,text)', 'student_submit.answer_seen(text,uuid,uuid[],text)',
     'student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)',
     'student_submit.revision_finish(text,uuid,uuid,jsonb,text)', 'student_submit.revision_unsend(text,uuid,uuid,text)',
     'student_submit.group_work(text,uuid,text)', 'student_submit.group_file_links(text,uuid,uuid,text)']
@@ -89,9 +89,10 @@ C1_REPLACES = ['student_submit._grading_started(uuid,uuid)']
 C1_PUBLIC_RPCS = ['public.set_course_feedback_options(uuid,jsonb,uuid)', 'public.save_markup(uuid,jsonb,integer,uuid)',
                   'public.list_assessment_markup(uuid)', 'public.return_work(uuid,uuid[],uuid)',
                   'public.return_for_revision(uuid,uuid,jsonb,uuid)', 'public.set_revision_request(uuid,jsonb,uuid)',
-                  'public.cancel_revision(uuid,uuid)', 'public.answer_reflection(uuid,text,uuid)', 'public.list_course_feedback(uuid)']
+                  'public.cancel_revision(uuid,uuid)', 'public.answer_reflection(uuid,text,uuid,boolean)', 'public.list_course_feedback(uuid)']
 C1_STUDENT = ['student_submit.feedback(text,uuid,text)', 'student_submit.markup(text,uuid,uuid,text)',
               'student_submit.reflect(text,uuid,uuid,jsonb,text)', 'student_submit.reply(text,uuid,uuid,jsonb,text)',
+              'student_submit.answer_seen(text,uuid,uuid[],text)',
               'student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)',
               'student_submit.revision_finish(text,uuid,uuid,jsonb,text)', 'student_submit.revision_unsend(text,uuid,uuid,text)',
               'student_submit.group_work(text,uuid,text)', 'student_submit.group_file_links(text,uuid,uuid,text)']
@@ -202,7 +203,7 @@ class CDb(Db):
 def marks(*notes, pen=0):
     """Marks: one note per text given, and some pen strokes."""
     return {'v': 1, 'marks': [{'type': 'note', 'text': t, 'x': 0.4, 'y': 0.6} for t in notes]
-                             + [{'type': 'pen', 'points': [0.1, 0.2, 0.3, 0.4]} for _ in range(pen)]}
+                             + [{'type': 'pen', 'color': 'red', 'width': 0.004, 'points': [[0.1, 0.2], [0.3, 0.4]]} for _ in range(pen)]}
 
 def seed(d, on_return=True, reflect=True):
     """Teacher A's class: Student Page on, Send Work on, Reflect on Feedback on. Cece (ENR1) and Stu2
