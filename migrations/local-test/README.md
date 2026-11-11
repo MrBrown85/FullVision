@@ -1324,7 +1324,8 @@ The database is sent tags and nothing else, as it will be.
   nothing and returns no tag; another teacher's id, an id that is no
   teacher, a deleted teacher, a deleted class; anon, a signed-in teacher
   and even the service role kept from `_as_teacher`; the caller's id put
-  back as it was found, with the harness's `auth.uid()`, with Supabase's
+  back as it was found, after a call that made a card and after a replay
+  (which returns early), with the harness's `auth.uid()`, with Supabase's
   own (it reads either setting) and with one that reads only
   `request.jwt.claims`; a stale `replaces` in four forms gives `changed`
   and changes nothing; a withdrawn student, another class's and nobody's
@@ -1354,6 +1355,15 @@ The database is sent tags and nothing else, as it will be.
   the same idempotency key twice at once, and 25 rounds of four requests
   at once for two students listed in either order. One live card each,
   the rest told `changed`, no deadlock, no error.
+- **grants.** The file's own revokes and grants, where nothing else would
+  hide a missing one. This stand-in, like live, gives a new function to its
+  owner alone by default, and anon and signed-in teachers cannot enter the
+  `student_submit` schema at all; with both in place a dropped `revoke`
+  changes nothing anyone can see. On this copy both are taken away first
+  (a new function is runnable by everyone, as in a plain Postgres): the
+  three helpers are still left to nobody, `card`, `verify_card` and
+  `issue_cards` to the service role alone, and anon and a signed-in
+  teacher are refused each of the six by the function itself.
 - **suites.** `student_submit.py` 79, `questionnaire_identity.py` 47,
   `phone_reports.py` 35 and `questionnaires.py` 42 are run before the file
   and again with it applied: the same result each time. The first two are
@@ -1410,10 +1420,13 @@ alone.
 
 Result on 2026-11-10, on PostgreSQL 17.11 (port 54331, what production
 runs) and on 18.6 (port 54329), the same on both, on databases built as
-live has them (the two migrations above loaded): `card_codes.py` 283 of 283;
+live has them (the two migrations above loaded): `card_codes.py` 306 of 306;
 `card_codes_undo.py` 67 of 67; `batch_a_undo.py` 169 of 169 (158 before its `s3-m1`
 scenario was added). Before the two migrations were loaded the same three
-gave 278, 67 and 169.
+gave 278, 67 and 169; `card_codes.py` has since gained the `grants`
+scenario and three checks on the replay path, after an independent review
+showed two mutations no check saw (the `revoke` on `_as_teacher` removed;
+the caller's id not put back on a replay). Both are caught now.
 
 Which older suites still run where. `student_page.py`, `grade_return_race.py`
 and `batch_a_undo.py`'s other scenarios make cards with `issue_student_cards`

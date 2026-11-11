@@ -732,7 +732,7 @@ callable_ = sorted(r[0] for r in rows("""select n.nspname || '.' || p.proname fr
        and (p.proname ~ 'grade_return|return_grades|student_card|cards_work|draft_count|_cell$|work_is_scored|_fv_|_grade_copy'
             or n.nspname in ('fv_private', 'student_submit'))"""))
 # 2026111003 (S3-M1) takes issue_student_cards and reissue_student_card away: cards are then made by
-# student_submit.issue_cards, which only the edge function can call.
+# student_submit.issue_cards, which no signed-in teacher can call (the teacher-cards edge function does).
 card_makers = [] if keyed_cards() else ['public.issue_student_cards', 'public.reissue_student_card']
 ok('what Batch A leaves a signed-in teacher able to run: %d RPCs and policy helpers in public, 2 helpers outside the API' % (12 + len(card_makers)),
    callable_ == sorted(['public.return_grades', 'public.list_course_grade_returns', 'public.course_draft_count',

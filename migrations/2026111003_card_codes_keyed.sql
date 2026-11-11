@@ -48,9 +48,14 @@
 --     last opened, its wrong tries.
 --   the columns code, code_hash, salt and password are dropped, and the
 --     table is rewritten in the same transaction, so the old values leave
---     the table's file when the file commits instead of lingering in it
---     until rows are next rewritten. (Backups taken before this file still
---     hold them; they are codes of stopped cards.)
+--     the table's own file when the file commits instead of lingering in it
+--     until rows are next rewritten. That file only. The old codes of
+--     these stopped cards can still be found, by someone with the server's
+--     files, in the write-ahead log, in backups taken before this file,
+--     and, if student_card was ever analyzed, in Postgres's own statistics
+--     table (pg_statistic: its rows for the dropped columns are deleted
+--     with them, and the deleted rows stay in its file until it is next
+--     vacuumed).
 --   every card gets a card number, seq: 1, 2, 3 for each student in the
 --     order their cards were made.
 -- fv_idempotency, the same once only: the remembered answers of
@@ -77,9 +82,13 @@
 --                            characters; it gives nothing away).
 --                seq         the card number.
 --                Each tag column is checked to be exactly 64 hex
---                characters, so a plain code can never be stored there by
---                mistake. A live card must have a tag and a key id; no two
---                cards of one student share a number.
+--                characters, so a plain code or a typed password can never
+--                be stored there by mistake. (The key is another matter:
+--                it is 64 hex characters itself, and the database cannot
+--                tell a key from a tag. What keeps it out is that no
+--                statement in either edge function sends it.) A live card
+--                must have a tag and a key id; no two cards of one student
+--                share a number.
 --      the read policy student_card_read is dropped and SELECT is revoked
 --        from authenticated. Until now a teacher's browser could read its
 --        own class's rows straight from the table. Nothing in the app did
@@ -88,7 +97,13 @@
 -- 2. student_submit.card_key, one row: the id of the key the edge functions
 --    last called with. A card made under another key cannot be recognised
 --    any more; the teacher's list marks it (needs_new).
--- 3. New functions, for the edge functions only (service_role):
+-- 3. New functions. No signed-in teacher and no anonymous caller can run
+--    them: the schema is not exposed through the API and they are granted
+--    to service_role only. They can be run by the service role and by the
+--    database owner's login, which is what both edge functions connect
+--    with. Of the two, only teacher-cards has a statement that names
+--    issue_cards, and only student-submit one that names card or
+--    verify_card.
 --      student_submit.issue_cards(p_teacher_id, p_course_id, p_items,
 --                                 p_key_id, p_idempotency_key)
 --        Makes cards. p_items is a list, at most 250:
@@ -203,16 +218,22 @@
 --
 -- ── Order, and what works in between ────────────────────────────────────────
 -- 1. The owner creates the key (STUDENT_CARD_KEY), in his own terminal.
--- 2. The new student-submit and the teacher-cards functions are deployed.
+-- 2. The two edge functions are deployed: teacher-cards first, and its
+--    start line in the log is read (it shows the deploy carries the shared
+--    key module and the key's id, with no slip at risk: nothing calls it
+--    yet). Then student-submit, and a slip is opened straight after.
 --    From here no card opens: the new function asks by tag, and this
 --    database, without this file, has no function with those arguments.
 --    Slips are untouched: the function answers not_found for a six-character
 --    code without asking the database, and the page then opens the slip.
--- 3. This file. Slips still open, and new slips can be issued (the two
---    issuers are back to their bodies from before Batch A). No live card
---    exists. The site as released still calls issue_student_cards, which is
---    gone: Make Cards fails with its usual line until the release.
--- 4. The release. Make and Print works; a new card opens by its tag.
+-- 3. This file, and not before the teacher's new card screens (S3-W1) are
+--    merged. Slips still open, and new slips can be issued (the two issuers
+--    are back to their bodies from before Batch A). No live card exists.
+--    The site as released still calls issue_student_cards, which is gone:
+--    Make Cards fails with its usual line until the release.
+-- 4. The release. Make and Print works; a new card opens by its tag. A
+--    teacher's tab left open from before the release still runs the old
+--    screens, and its Make Cards fails until the tab is reloaded.
 -- The step that can be undone (2: redeploy the previous function) comes
 -- before the step that erases (3).
 --
@@ -247,9 +268,11 @@
 -- migrations/local-test/s3-m1-undo.sql (not a migration; proved by
 -- card_codes_undo.py). It puts the table, the functions, the policy and the
 -- grant back as Batch A made them. It cannot restore a code: every card is
--- left stopped and teachers make new ones. To stop cards at once without
--- it: unset STUDENT_CARD_KEY (every class), or turn one class's Student Page
--- off (which also returns that class's waiting drafts, as it always does).
+-- left stopped and teachers make new ones. To stop cards without it: unset
+-- STUDENT_CARD_KEY and then redeploy both edge functions (every class; a
+-- function reads the key once, when it starts, so unsetting it alone stops
+-- nothing), or turn one class's Student Page off (at once; it also returns
+-- that class's waiting drafts, as it always does).
 -- Batch A's own undo (batch-a-undo.sql, PART 2) refuses while this file is
 -- applied: this file's undo goes first.
 --
@@ -525,8 +548,9 @@ revoke all on function public._student_card_json(uuid) from public, anon, authen
 
 -- ── 4. The old ways in go ───────────────────────────────────────────────────
 -- Each read or wrote a column that is gone. The teacher's two are replaced
--- by student_submit.issue_cards, which only the teacher-cards edge function
--- can call; the student path's three by the same names with new arguments.
+-- by student_submit.issue_cards, which no signed-in teacher can call (the
+-- teacher-cards edge function calls it for them, over the database owner's
+-- login); the student path's three by the same names with new arguments.
 drop function if exists public.issue_student_cards(uuid, uuid[], uuid);
 drop function if exists public.reissue_student_card(uuid, uuid);
 drop function if exists public._issue_student_card(uuid, text);

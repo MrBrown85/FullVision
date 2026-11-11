@@ -784,8 +784,9 @@ create table student_submit.attempt (                                 -- rate li
 -- into a code. A card's code is eight characters and a slip's six, so the
 -- two can never read the same. Nobody reads the table through the API (no
 -- policy, no grant): teachers use list_student_cards, which returns no code.
--- Written only by student_submit.issue_cards (called by the teacher-cards
--- edge function, acting as the teacher), mark_student_cards_printed,
+-- Written only by student_submit.issue_cards (no signed-in teacher can run
+-- it: the teacher-cards edge function calls it for them, over the database
+-- owner's login, acting as the teacher), mark_student_cards_printed,
 -- unlock_student_card, unlock_all_student_cards, set_cards_work_until and
 -- the student path (student_submit.card, verify_card).
 create table student_card (

@@ -31,6 +31,8 @@ and the database is sent tags only, as it will be.
            new way.
   race     Two requests for the same student at once, on connections of
            their own: one live card, never two.
+  grants   The file's own revokes and grants, on a copy where a new function
+           is runnable by everyone unless the file says otherwise.
   suites   The slip suites and the score suites, untouched, on a database
            with the file applied; and the two grade_return suites, which
            read which way the database makes cards.
@@ -487,6 +489,22 @@ def scen_cards():
             ok('issue_cards acts as the teacher it is given whoever the session was before (the card is made for Teacher A)', new_reply['results'][0]['result'] == 'made', new_reply)
             ok('and puts the caller back as it found it before it returns',
                d.one("select current_setting('request.jwt.claim.sub', true)") == B and json.loads(d.one("select current_setting('request.jwt.claims', true)"))['sub'] == B)
+        with tx(d):
+            d.run("select set_config('request.jwt.claim.sub', :u, true)", u=B)
+            d.run("select set_config('request.jwt.claims', :j, true)", j='{"sub": "%s", "role": "authenticated"}' % B)
+            again = raw(p.items, idem=first_key)
+            ok('a replay puts the caller back as well: it returns early, and still leaves no teacher id behind',
+               again['replayed'] is True and d.one("select current_setting('request.jwt.claim.sub', true)") == B
+               and json.loads(d.one("select current_setting('request.jwt.claims', true)"))['sub'] == B, again)
+        with tx(d):
+            again = raw(p.items, idem=first_key)
+            ok('and a replay on a connection with no caller leaves none: auth.uid() is null for the rest of the transaction',
+               again['replayed'] is True and d.one('select auth.uid()') is None and (d.one("select current_setting('request.jwt.claim.sub', true)") or '') == ''
+               and (d.one("select current_setting('request.jwt.claims', true)") or '') == '', again)
+        with tx(d):
+            made_now, _ = d.issue([(ENR1, stored[ENR1][6])])
+            ok('the same after a call that made a card', made_now['results'][0]['result'] == 'made' and d.one('select auth.uid()') is None
+               and (d.one("select current_setting('request.jwt.claims', true)") or '') == '')
         ok('on a connection with no caller at all, none is left behind: auth.uid() is null after a call',
            raw([]) == {'replayed': False, 'results': []} and d.one('select auth.uid()') is None
            and (d.one("select current_setting('request.jwt.claim.sub', true)") or '') == '')
@@ -966,6 +984,50 @@ def scen_race():
         d.close()
 
 # ════════════════════════════════════════════════════════════════════════════
+def scen_grants():
+    """The file's own revokes and grants, where nothing else would hide a missing one. This stand-in, like
+    gradebook-prod, has a default that gives a new function to its owner alone, and anon and signed-in
+    teachers cannot enter the student_submit schema at all: with both in place a dropped revoke would
+    change nothing anyone could see. Here both are taken away first, as in a plain Postgres."""
+    d = Db('grants')
+    try:
+        d.run('alter default privileges for role postgres grant execute on functions to public')
+        d.run('grant usage on schema student_submit to anon, authenticated')
+        d.run("create function student_submit.probe() returns int language sql as $f$ select 1 $f$")
+        ok('grants: on this copy a new function is runnable by everyone unless something revokes it (the built-in default)',
+           d.role('anon', 'select student_submit.probe()')[0][0] == 1 and d.role('authenticated', 'select student_submit.probe()')[0][0] == 1)
+        d.run('drop function student_submit.probe()')
+        r = d.migrate()
+        ok('grants: the file applies', r == 'ok', r)
+        who = {}
+        for name, by in d.all("""select p.proname, array(select r from unnest(array['public', 'anon', 'authenticated', 'service_role']) r where has_function_privilege(r, p.oid, 'execute'))
+                                   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                                  where n.nspname = 'student_submit' and p.proname in ('card', 'verify_card', 'issue_cards', '_card_lookup', '_as_teacher', '_card_key_seen')"""):
+            who[name] = sorted(by)
+        ok('grants: the three helpers are left to nobody but their owner, by the file\'s own revokes: not the public, not anon, not a signed-in teacher, not the service role',
+           [who[n] for n in ('_as_teacher', '_card_key_seen', '_card_lookup')] == [[], [], []], who)
+        ok('grants: card, verify_card and issue_cards are left to the service role and nobody else', [who[n] for n in ('card', 'verify_card', 'issue_cards')] == [['service_role']] * 3, who)
+        for role in ('anon', 'authenticated'):
+            for name, sql in (('_as_teacher', "select student_submit._as_teacher('%s')" % A), ('_card_key_seen', "select student_submit._card_key_seen('%s')" % KEY_ID),
+                              ('_card_lookup', "select student_submit._card_lookup('%s', '%s', 'x')" % ('a' * 64, KEY_ID)),
+                              ('issue_cards', "select student_submit.issue_cards('%s', '%s', '[]'::jsonb, '%s', null)" % (A, COURSE_A, KEY_ID)),
+                              ('card', "select student_submit.card('%s', '%s', 'x')" % ('a' * 64, KEY_ID)),
+                              ('verify_card', "select student_submit.verify_card('%s', '%s', null, null, null, null, 'x', false)" % ('a' * 64, KEY_ID))):
+                e = refused(d, lambda: d.role(role, sql, uid=B if role == 'authenticated' else None))
+                ok('grants: let into the schema, %s is still refused %s, by the function itself' % (role, name), e is not None and 'permission denied for function' in e[0], e)
+        ok('grants: no function in student_submit can be run by the public, anon or a signed-in teacher',
+           d.one("""select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'student_submit'
+                     and (has_function_privilege('public', p.oid, 'execute') or has_function_privilege('anon', p.oid, 'execute')
+                          or has_function_privilege('authenticated', p.oid, 'execute'))""") == 0)
+        ok('grants: nor the one function in public the file replaces', d.one("""select not has_function_privilege('public', p.oid, 'execute') and not has_function_privilege('anon', p.oid, 'execute')
+                     and not has_function_privilege('authenticated', p.oid, 'execute') from pg_proc p where p.oid = 'public._student_card_json(uuid)'::regprocedure"""))
+        for role in ('anon', 'authenticated'):
+            e = refused(d, lambda: d.role(role, 'select * from student_submit.card_key'))
+            ok('grants: let into the schema, %s still cannot read the key id table' % role, e is not None and 'permission denied for table' in e[0], e)
+    finally:
+        d.close()
+
+# ════════════════════════════════════════════════════════════════════════════
 def scen_suites():
     """The suites that make no cards, untouched, on a database with the file applied."""
     d = Db('suites')
@@ -995,7 +1057,7 @@ def scen_suites():
     finally:
         d.close()
 
-SCENARIOS = {'apply': scen_apply, 'cards': scen_cards, 'lookup': scen_lookup, 'race': scen_race, 'suites': scen_suites}
+SCENARIOS = {'apply': scen_apply, 'cards': scen_cards, 'lookup': scen_lookup, 'race': scen_race, 'grants': scen_grants, 'suites': scen_suites}
 if __name__ == '__main__':
     if sys.argv[1:] == ['build']:
         build(); sys.exit(0)

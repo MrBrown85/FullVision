@@ -15,14 +15,17 @@
 -- left stopped, a phone that was signed in is told its card was replaced,
 -- and each teacher presses Make Cards and prints again.
 --
--- ── To stop cards at once, without this script ──────────────────────────────
+-- ── To stop cards without this script ───────────────────────────────────────
 -- S3-M1 adds no trigger and touches no save, so there is nothing in the
--- database to switch off. Cards stop the moment either of these is done:
---   the key is unset (supabase secrets unset STUDENT_CARD_KEY): the card
---     routes answer a server error; slips and signed-in pages carry on;
+-- database to switch off. Cards stop when either of these is done:
+--   the key is unset (supabase secrets unset STUDENT_CARD_KEY) AND both
+--     edge functions are then redeployed. A function reads the key once,
+--     when it starts, so unsetting it alone stops nothing. After the
+--     redeploy the card routes answer a server error; slips and signed-in
+--     pages carry on;
 --   a class's Student Page is turned off in Class Settings: its cards
---     answer "closed". (Turning it off also returns that class's grades
---     that were waiting to be returned; the screen asks first.)
+--     answer "closed" at once. (Turning it off also returns that class's
+--     grades that were waiting to be returned; the screen asks first.)
 -- Neither loses a card, a grade or a setting. This script is for taking
 -- the change itself out.
 --
