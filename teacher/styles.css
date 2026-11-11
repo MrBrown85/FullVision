@@ -1678,7 +1678,8 @@ body.offline-active #app-dock {
   height: 44px;
   border-radius: var(--radius);
   background: var(--text);
-  color: #fff;
+  /* The surface colour, so the initials read in dark mode too. */
+  color: var(--surface);
   font-family: var(--font-mono);
   font-size: var(--text-lg);
   font-weight: 600;

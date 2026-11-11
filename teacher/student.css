@@ -4528,7 +4528,12 @@ button.stu-bd-row:focus-visible {
 .rf-grade {
   font-size: var(--text-sm);
   font-weight: 600;
+}
+.rf-grade:not(.stu-level) {
   color: var(--text-2);
+}
+.rf-grade.stu-level {
+  border-radius: 4px;
 }
 .rf-sense {
   font-size: 11px;
@@ -4576,4 +4581,14 @@ button.stu-bd-row:focus-visible {
   padding-left: 14px;
   font-size: var(--text-sm);
   color: var(--text-2);
+}
+
+/* The header's Missing count: attention orange (design rule 3). */
+.sh-stat-val.sh-stat-att {
+  color: #c2410c;
+}
+@media (prefers-color-scheme: dark) {
+  .sh-stat-val.sh-stat-att {
+    color: #ff9f45;
+  }
 }
