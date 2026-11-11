@@ -956,6 +956,100 @@
   }
 }
 
+/* Questionnaires and My Reports (S4-F4): on a phone the open one as a
+   card and the rest as a list; on a Chromebook the list on the left and
+   the one picked on the right. */
+.sp-view .sp-forms-desk {
+  display: none;
+}
+.sp-view .sp-forms-phone {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 16px;
+}
+.sp-view .sp-form-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 16px;
+  background: var(--sp-card);
+  border-radius: 18px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+.sp-view .sp-form-card .sp-btn-big {
+  align-self: stretch;
+}
+.sp-view .sp-form-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.sp-view .sp-form-title:focus {
+  outline: none;
+}
+.sp-view .sp-form-sub {
+  margin: 0;
+  font-size: 14px;
+  color: #3a3a3c;
+}
+.sp-view .sp-form-line {
+  margin: 0;
+  font-size: 17px;
+}
+.sp-view .sp-form-mark {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sp-fill);
+  color: #58585d;
+}
+.sp-view .sp-form-mark-done {
+  background: var(--sp-green-soft);
+  color: var(--sp-green);
+}
+.sp-view .sp-report-head {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sp-view .sp-report-head .sp-form-title {
+  flex: 1;
+  font-size: 18px;
+}
+.sp-view .sp-report-result {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--sp-bg);
+  font-size: 15px;
+  font-weight: 600;
+}
+.sp-view .sp-report-result .sp-level {
+  font-size: 14px;
+}
+.sp-view .sp-report-comment {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.sp-view .sp-dot-new {
+  background: var(--sp-blue);
+}
+
 /* The four tabs: along the bottom on a phone. The header's copy shows on a
    Chromebook instead. */
 .sp-view .sp-tabs {
@@ -1093,6 +1187,25 @@
   }
   .sp-view .sp-page-title {
     font-size: 26px;
+  }
+  .sp-view .sp-forms-phone {
+    display: none;
+  }
+  .sp-view .sp-forms-desk {
+    display: block;
+  }
+  .sp-view .sp-forms-desk .sp-form-card {
+    gap: 14px;
+    padding: 24px 28px;
+    box-shadow: var(--sp-shadow);
+  }
+  .sp-view .sp-forms-desk .sp-form-title {
+    font-size: 28px;
+    font-weight: 800;
+  }
+  .sp-view .sp-forms-desk .sp-btn-big {
+    align-self: flex-start;
+    padding: 0 28px;
   }
   /* Your Feedback on a Chromebook: the list stays; no way back is needed. */
   .sp-view .sp-fb-back {

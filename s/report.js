@@ -63,6 +63,9 @@
   function renderReport(state) {
     return (
       '<div class="pr-view">' +
+      (state.back
+        ? '<div class="sp-report-back"><button type="button" class="sp-btn sp-btn-line" data-act="page-back">Back to Your Page</button></div>'
+        : '') +
       (typeof PhoneReportView !== 'undefined' ? PhoneReportView.html(state.report) : '') +
       '</div>'
     );

@@ -85,7 +85,7 @@ describe('the four tabs', () => {
     expect(lines).toEqual({
       'My Learning': 'Your teacher hasn’t turned on My Learning for this class.',
       Questionnaires: 'Questionnaires from your teacher will show here.',
-      Reports: 'Reports from your teacher will show here.',
+      'My Reports': 'Reports from your teacher will show here.',
     });
     // No grade anywhere on them.
     await page.click('[data-tab="learning"]');
