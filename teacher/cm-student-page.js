@@ -330,11 +330,10 @@ var CmStudentPage = (function () {
      while Send Work is on.
 
      Demo Mode first: the server's columns come with Batch B, which is not
-     applied. So the two rows are drawn only where nothing is sent (Demo
-     Mode, and the app with no sign-in); for a signed-in teacher they are
-     not drawn at all and nothing is asked of the server. They are kept in
-     the class's settings on this device (send_work, keep_photos_until),
-     read through workSettings. The line under Keep Photos Until and the
+     applied. So the two rows are drawn in Demo Mode only; for a signed-in
+     teacher they are not drawn at all and nothing is asked of the server.
+     They are kept with Demo Mode's student work (getCourseSendWork,
+     saveDemoStudentWork in shared/data.js), read through workSettings. The line under Keep Photos Until and the
      Delete Photos Now? question are Colin's (ruling 102); the reminder it
      promises and the deleting itself come with S8. */
   var KEEP_CHOICES = [
@@ -342,23 +341,24 @@ var CmStudentPage = (function () {
     { value: 'end_of_year', label: 'End of Year' },
   ];
 
-  function _sendsNothing() {
-    return !(typeof _writesEnabled === 'function' && _writesEnabled());
+  // Demo Mode: the one place the two rows are drawn until S5-W1.
+  function _demo() {
+    return typeof isDemoMode === 'function' && isDemoMode();
   }
 
   /* The class's Send Work and Keep Photos Until, as the screens read them:
-     { offered, send_work, keep_photos_until }. `offered` is false where
-     the rows are not drawn (a signed-in teacher, or the student page
-     off), and then send_work is false too: nothing about student work
-     shows anywhere. */
+     { offered, send_work, keep_photos_until }, from getCourseSendWork
+     (shared/data.js, S5-F5). `offered` is false where the rows are not
+     drawn (a signed-in teacher, or the student page off), and then
+     send_work is false too: nothing about student work shows anywhere. */
   function workSettings(cid) {
     var s = _settings(cid);
-    var offered = !!s && s.student_page === true && _sendsNothing();
-    var cfg = (offered && typeof getCourseConfig === 'function' && getCourseConfig(cid)) || {};
+    var offered = !!s && s.student_page === true && _demo() && typeof getCourseSendWork === 'function';
+    var w = offered ? getCourseSendWork(cid) : { send_work: false, keep_photos_until: 'end_of_year' };
     return {
       offered: offered,
-      send_work: offered && cfg.send_work === true,
-      keep_photos_until: cfg.keep_photos_until === 'end_of_term' ? 'end_of_term' : 'end_of_year',
+      send_work: offered && w.send_work === true,
+      keep_photos_until: w.keep_photos_until === 'end_of_term' ? 'end_of_term' : 'end_of_year',
     };
   }
 
@@ -397,9 +397,12 @@ var CmStudentPage = (function () {
     return _day(iso, 'long');
   }
 
+  // Demo Mode's one writer of student work (saveDemoStudentWork), with the
+  // class's two settings changed and everything else as it was.
   function _saveWork(cid, change) {
-    var cfg = Object.assign({}, getCourseConfig(cid) || {}, change);
-    saveCourseConfig(cid, cfg);
+    var work = getCourseSubmissions(cid);
+    work.course = Object.assign({}, work.course, change);
+    saveDemoStudentWork(cid, work);
     _rerender();
   }
 
