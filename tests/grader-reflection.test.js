@@ -234,7 +234,7 @@ describe('Send Answer', () => {
     click(card(overlay).querySelector('[data-grader="reflect-send"]'));
     await settle();
     expect(card(overlay).querySelector('.grader-reflect-msg').textContent).toBe(
-      'Answers can’t be sent from signed-in classes yet.',
+      'Answers can’t be sent from this class.',
     );
     expect(card(overlay).querySelector('.grader-reflect-input').value).toBe('Because.');
   });

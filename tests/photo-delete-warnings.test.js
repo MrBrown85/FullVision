@@ -164,6 +164,44 @@ describe('Gradebook: Delete Assessment', () => {
     });
   });
 
+  describe('a signed-in class whose work this session has not read (S9-W1)', () => {
+    const NOTE = 'All scores, statuses, and observations linked to this assessment will be removed';
+    const asked = async known => {
+      const was = globalThis.readStudentWorkForDelete;
+      let release;
+      globalThis.readStudentWorkForDelete = vi.fn(() => new Promise(r => (release = r)));
+      try {
+        mount(() => seed({ sent: [] }), { course: CID });
+        const head = document.querySelector('.gb-grid-colhead[data-aid="' + LAB + '"]');
+        const heads = Array.from(head.parentNode.querySelectorAll('.gb-grid-colhead'));
+        head.parentNode.getBoundingClientRect = () => ({ left: 0, top: 0, width: 100 * heads.length, height: 0 });
+        heads[0].getBoundingClientRect = () => ({ left: 0, top: 0, width: 100, height: 0 });
+        rightClick(head, 100 * heads.indexOf(head) + 10);
+        click(document.querySelector('.gb-ctx-menu [data-ctx="deleteAssess"]'));
+        // Nothing is said until the class's work has been read.
+        expect(document.querySelector('.confirm-card')).toBeNull();
+        release({ known });
+        await Promise.resolve();
+        await Promise.resolve();
+        const card = document.querySelector('.confirm-card');
+        return card && card.querySelector('.confirm-message').textContent;
+      } finally {
+        globalThis.readStudentWorkForDelete = was;
+      }
+    };
+
+    it('waits for the read, and says photos go when that read failed', async () => {
+      expect(await asked(false)).toBe(
+        NOTE +
+          ", and any photos students sent for it. You can undo this for a few seconds. After that, deleted photos can't come back.",
+      );
+    });
+
+    it('waits for the read, and reads as it always has when nothing was sent', async () => {
+      expect(await asked(true)).toBe(TODAY_ASSESS);
+    });
+  });
+
   describe('names the photos when students have sent work for it', () => {
     it('counts students, not pages or versions, and a paper copy is no photo', () => {
       mount(() => seed(), { course: CID });

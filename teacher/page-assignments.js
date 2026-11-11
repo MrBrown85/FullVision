@@ -3239,9 +3239,9 @@ window.PageAssignments = (function () {
           esc(until) +
           '"></div>'
         : '') +
-      (_formWorkDemo()
-        ? _formWorkSegHtml('group_work', 'Group Work', WORK_GROUP, w.group_work) +
-          _formWorkSegHtml(
+      (_formWorkDemo() ? _formWorkSegHtml('group_work', 'Group Work', WORK_GROUP, w.group_work) : '') +
+      (_formWorkDemo() || _formWorkLive()
+        ? _formWorkSegHtml(
             'students_see_markup',
             'Students See Your Mark Up',
             WORK_MARKUP,
@@ -3286,9 +3286,13 @@ window.PageAssignments = (function () {
     _refreshFormWorkCard('#af-accept-until');
   }
 
-  // Group Work and Students See Your Mark Up do something only in Demo Mode yet.
+  // Group Work does something only in Demo Mode yet.
   function _formWorkDemo() {
     return typeof isDemoMode === 'function' && isDemoMode();
+  }
+  // Students See Your Mark Up works in a signed-in class the server keeps rows for too (S9-W1).
+  function _formWorkLive() {
+    return typeof studentWorkLive === 'function' && studentWorkLive(activeCourse);
   }
 
   /* After a save: the card's choices for `aid` (saveAssessmentStudentWork).
@@ -6726,13 +6730,15 @@ window.PageAssignments = (function () {
   /* Said only when students have sent photos for it (Colin, ruling 102):
      the photos go with the assessment. Counts students, not pages. Demo
      Mode's sample work only until S5-W1. */
-  function _photosGoNote(cid, aid) {
+  function _photosGoNote(cid, aid, maybe) {
     if (typeof getCourseSubmissions !== 'function') return '';
     var who = {};
     (getCourseSubmissions(cid).submissions || []).forEach(function (sub) {
       if (sub.assessment_id === aid && sub.files && sub.files.length) who[sub.enrollment_id] = true;
     });
     var n = Object.keys(who).length;
+    // The class's work could not be read: photos may go, so it says so rather than miss them.
+    if (!n && maybe) return " Any photos students sent for it are deleted too. Deleted photos can't come back.";
     if (!n) return '';
     return (
       ' The photos ' +
@@ -6742,14 +6748,27 @@ window.PageAssignments = (function () {
     );
   }
 
+  /* A signed-in class whose work this session has not read is read first
+     (readStudentWorkForDelete; Send Work off reads nothing else), then
+     the dialog: if that read failed it says photos may go. At once when
+     nothing needs reading. */
   function deleteAssess(aid) {
+    var cid0 = activeCourse;
+    var read = typeof readStudentWorkForDelete === 'function' ? readStudentWorkForDelete(cid0) : null;
+    if (!read) return _confirmDeleteAssess(aid, false);
+    return read.then(function (res) {
+      if (activeCourse === cid0) _confirmDeleteAssess(aid, !(res && res.known));
+    });
+  }
+
+  function _confirmDeleteAssess(aid, maybe) {
     var target = getAssessments(activeCourse).find(function (a) {
       return a.id === aid;
     });
     var note = window.AssessmentCopy && target ? AssessmentCopy.deleteNote(activeCourse, target) : '';
     showConfirm(
       'Delete Assessment',
-      'Delete this assessment and all its scores?' + _photosGoNote(activeCourse, aid) + note,
+      'Delete this assessment and all its scores?' + _photosGoNote(activeCourse, aid, maybe) + note,
       'Delete',
       'danger',
       function () {
@@ -15496,7 +15515,8 @@ window.PageAssignments = (function () {
   function _reflectAnswerLine(res) {
     if (res.result === 'already_answered') return 'This was answered already. The answer is shown.';
     if (res.result === 'not_found') return 'This reflection is no longer here.';
-    if (res.result === 'not_available') return 'Answers can’t be sent from signed-in classes yet.';
+    if (res.result === 'not_available') return 'Answers can’t be sent from this class.';
+    if (res.result === 'failed') return 'The answer couldn’t be sent. Try again.';
     return 'Write an answer first.';
   }
 

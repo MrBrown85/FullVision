@@ -323,6 +323,18 @@ describe('reading a signed-in class’s marks and reflections', () => {
     expect(getStudentMarkup(CID, NOOR, CAUSES).files).toEqual([]);
   });
 
+  it('Preview as Student shows Reflect on Feedback from the server’s switch, and the marks the student was given', async () => {
+    fb.marks[PAGE1].given = tick(0.5, 0.5);
+    fb.marks[PAGE1].given_rev = 2;
+    await openClass();
+    const reply = StudentView.feedbackReply(CID, NOOR, { assessments: [{ id: CAUSES }] });
+    expect(reply.reflect_on_feedback).toBe(true);
+    expect(reply.assessments).toEqual([{ id: CAUSES, marks: { pages: 1, notes: 0 } }]);
+    fb.reflect = false;
+    await refreshCourseFeedback(CID, { force: true });
+    expect(StudentView.feedbackReply(CID, NOOR, { assessments: [] }).reflect_on_feedback).toBe(false);
+  });
+
   it('with Send Work and Reflect on Feedback both off, the class load asks nothing about feedback', async () => {
     course.send_work = false;
     work.course.send_work = false;
