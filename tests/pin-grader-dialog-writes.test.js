@@ -176,7 +176,13 @@ const tagPlusMinus = (tag, mod) => at('[data-action="graderTagMod"][data-tag="' 
 const box = id => at('[data-action="graderTick"][data-checkid="' + id + '"]');
 const statusButton = which => at('[data-action="toggleStudentStatus"][data-status="' + which + '"]');
 const mark = which => at('[data-action="graderMark"][data-mark="' + which + '"]');
-const criterionNote = criterion => at('[data-action-blur="graderCritNote"][data-critid="' + criterion + '"]');
+// A rubric criterion's comment box opens from its Comment chip.
+const criterionNote = criterion => {
+  const sel = '[data-action-blur="graderCritNote"][data-critid="' + criterion + '"]';
+  if (!document.querySelector('#grader-overlay ' + sel))
+    click(at('[data-action="graderNote"][data-critid="' + criterion + '"]'));
+  return at(sel);
+};
 const tagNote = tag => at('[data-action-blur="graderTagNote"][data-tag="' + tag + '"]');
 const overallComment = () => at('[data-action-blur="rsgOverallComment"]');
 const pointsBox = () => at('.grdp-input');

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { cardMenuItem } from './card-menu.js';
 
 /* Class Results (docs/plans/class-results-plan.md): the Class Average card
    and the panel, in Demo Mode's Science 8. sci8a4 is a lab rubric with a
@@ -84,7 +85,6 @@ test('the Assignments page opens it from a card', async ({ page }) => {
   await page.evaluate(() => window.Router.navigate('/assignments?course=sci8'));
   // A closed card shows its actions on hover.
   await page.locator('#ac-sci8q1 .assess-header').hover();
-  const btn = page.locator('.cr-card-btn[data-aid="sci8q1"]');
-  await btn.click();
+  await (await cardMenuItem(page.locator('#ac-sci8q1'), 'classResults')).click();
   await expect(page.locator('#cr-title')).toHaveText('Cell Structure Quiz');
 });

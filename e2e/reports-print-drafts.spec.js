@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { findLowContrastText } from './contrast-check.js';
+import { cardMenuItem } from './card-menu.js';
 
 /* S2-F1: a family never sees a draft, and the teacher is asked, not
    surprised. In a class whose student page is on (the hidden build switch)
@@ -183,7 +184,7 @@ test.describe('Print Rubrics with a draft, from each door', () => {
     const card = page.locator('#ac-sci8a4');
     await card.waitFor();
     if (!(await card.evaluate(el => el.classList.contains('open')))) await card.locator('.assess-title').click();
-    await card.locator('[data-action="printRubrics"]').first().click();
+    await (await cardMenuItem(card, 'printRubrics')).click();
     await printThere(page);
     const dialog = drafts(page);
     await expect(dialog.locator('.confirm-title')).toHaveText('1 Grade Isn’t Returned Yet');

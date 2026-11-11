@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { mockAuth, seedCourse, seedStudents, gotoApp, TEST_COURSE } from './helpers.js';
+import { cardMenuItem } from './card-menu.js';
 
 // A DIBELS 8 benchmark records each window's raw reading scores. The whole
 // class goes in a table; one student goes in the grade editor's card. The
@@ -137,7 +138,7 @@ test.describe('who is offered DIBELS', () => {
     await gotoApp(page, '/assignments');
     // A closed card shows its buttons on hover.
     await page.locator('#ac-assess-dibels .assess-header').first().hover();
-    await page.locator('#ac-assess-dibels [data-action="editAssess"]').first().click();
+    await (await cardMenuItem(page.locator('#ac-assess-dibels'), 'editAssess')).click();
     await expect(dibelsCard(page)).toHaveAttribute('aria-checked', 'true');
   });
 });

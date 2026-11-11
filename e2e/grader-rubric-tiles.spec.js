@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { mockAuth, seedCourse, seedStudents, gotoApp, TEST_COURSE } from './helpers.js';
 
-// The grade editor draws a rubric for one student as tiles with the full
-// wording: picking a tile scores the criterion, the chosen tile's − | +
-// fine-tunes it, 1–4 on a focused criterion scores it, and the feedback box
-// saves to the criterion's comment.
+// The grade editor draws a rubric for one student as the board's compact
+// rows: the level bar scores the criterion (a level's wording is its hover,
+// never on the grid), the chosen level's − | + fine-tunes it, 1–4 on a
+// focused criterion scores it, and the Comment chip opens the box that saves
+// to the criterion's comment.
 const RUBRIC = {
   id: 'rubric-gt',
   name: 'Lab Report Rubric',
@@ -57,21 +58,26 @@ test('rubric tiles score, fine-tune and take feedback', async ({ page }) => {
 
   const dialog = page.locator('#grader-overlay .grader-dialog');
   const hyp = dialog.locator('.grdt-crit[data-critid="crit-hyp"]');
-  await expect(hyp).toContainText('Clear and testable');
-  await expect(hyp.locator('.grdt-not-scored')).toBeVisible();
+  // Descriptors stay off the scoring grid: the wording is the level's hover.
+  await expect(hyp).not.toContainText('Clear and testable');
+  await expect(hyp.locator('[data-action="graderLevel"][data-level="3"]')).toHaveAttribute(
+    'title',
+    /^Proficient: Clear and testable/,
+  );
+  await expect(hyp.locator('.grdl-level.is-on')).toHaveCount(0);
 
-  await hyp.locator('.grdt-tile[data-level="3"]').click();
-  await expect(hyp.locator('.grdt-tile.is-chosen')).toContainText('Proficient');
-  await hyp.locator('.grdt-stepper [data-mod="1"]').click();
+  await hyp.locator('[data-action="graderLevel"][data-level="3"]').click();
+  await expect(hyp.locator('.grdl-level.is-on')).toHaveText('Proficient');
+  await hyp.locator('[data-action="graderMod"][data-mod="1"]').click();
   // The + shows on its own button; the label stays the level's name (mockup).
-  await expect(hyp.locator('.grdt-stepper [data-mod="1"]')).toHaveAttribute('aria-pressed', 'true');
-  await expect(hyp.locator('.grdt-chosen-label')).toHaveText('Proficient');
+  await expect(hyp.locator('[data-action="graderMod"][data-mod="1"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(hyp.locator('.grdl-level.is-on')).toHaveText('Proficient');
 
   await hyp.focus();
   await page.keyboard.press('4');
-  await expect(hyp.locator('.grdt-chosen-label')).toHaveText(/Extending/);
+  await expect(hyp.locator('.grdl-level.is-on')).toHaveText(/Extending/);
 
-  await expect(hyp.locator('.grdt-note-label')).toHaveText('Comment (Optional)');
+  await hyp.locator('[data-action="graderNote"]').first().click();
   await hyp.locator('.grdt-note').fill('Clear question.');
   await dialog.locator('.grader-student').click();
   // The Overall Comment is a field under the tiles; the observations list is gone.

@@ -101,15 +101,15 @@ test('a click anywhere on a chosen rubric level clears it', async ({ page }) => 
   await page.locator('.gb-scores-cell[data-sid="stu-001"][data-aid="assess-001"]').click();
   const dialog = page.locator('#grader-overlay .grader-dialog');
 
-  await dialog.locator('.grdt-tile[data-level="3"]').click();
-  const chosen = dialog.locator('.grdt-tile.is-chosen');
+  await dialog.locator('[data-action="graderLevel"][data-level="3"]').click();
+  const chosen = dialog.locator('.grdl-pick');
   await expect(chosen).toContainText('Proficient');
   // − | + fine-tunes without clearing.
   await chosen.locator('[data-mod="1"]').click();
   // The + shows on its own button; the label stays the level's name (mockup).
   await expect(chosen.locator('[data-mod="1"]')).toHaveAttribute('aria-pressed', 'true');
-  await expect(dialog.locator('.grdt-chosen-label')).toHaveText('Proficient');
-  await slowClick(page, dialog.locator('.grdt-tile.is-chosen .grdt-words'));
-  await expect(dialog.locator('.grdt-tile.is-chosen')).toHaveCount(0);
+  await expect(dialog.locator('.grdl-level.is-on')).toHaveText('Proficient');
+  await slowClick(page, dialog.locator('.grdl-level.is-on'));
+  await expect(dialog.locator('.grdl-level.is-on')).toHaveCount(0);
   await expect(dialog.locator('.grader-grade')).toHaveText('Not Graded');
 });

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { cardMenuItem } from './card-menu.js';
 
 /* Grading an assessment in Assignments (Demo Mode, Science 8). An
    assessment linked to no competency is scored on one Overall row, and it
@@ -56,7 +57,7 @@ test('Fill row and fill column show the new levels at once', async ({ page }) =>
   await menu.locator('[data-action="fillScoresAndClose"][data-score="2"]').click();
   await expect(rows.nth(1).locator('.rsg-level.active .rsg-level-name')).toHaveText('Developing');
 
-  await page.locator(`.rsg-header-level.hl4[data-aid="${AID}"]`).click();
+  await (await cardMenuItem(page.locator('#ac-' + AID), 'confirmFillAll', '[data-score="4"]')).click();
   await page.locator('#confirm-ok-btn').click();
   await expect(rows.first().locator('.rsg-level.active .rsg-level-name')).toHaveText('Extending');
   await expect(rows.last().locator('.rsg-level.active .rsg-level-name')).toHaveText('Extending');

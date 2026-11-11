@@ -77,19 +77,19 @@ test('picking or hovering a rubric level moves nothing', async ({ page }) => {
       const crits = dialog.locator('.grdt-crit');
       const first = crits.nth(0);
       // Start from no level on the first criterion.
-      const chosen = first.locator('.grdt-tile.is-chosen');
-      if (await chosen.count()) await chosen.locator('.grdt-chosen-label').click();
-      await expect(first.locator('.grdt-tile.is-chosen')).toHaveCount(0);
+      const chosen = first.locator('.grdl-level.is-on');
+      if (await chosen.count()) await chosen.click();
+      await expect(first.locator('.grdl-level.is-on')).toHaveCount(0);
       const before = [await box(first), await box(crits.nth(1))];
-      const tile = first.locator('.grdt-tile[data-level="2"]');
-      await tile.hover();
+      const level = first.locator('[data-action="graderLevel"][data-level="2"]');
+      await level.hover();
       expect([await box(first), await box(crits.nth(1))]).toEqual(before);
-      await tile.click({ position: { x: 20, y: 6 } });
-      await expect(first.locator('.grdt-tile.is-chosen')).toHaveCount(1);
+      await level.click();
+      await expect(first.locator('.grdl-level.is-on')).toHaveCount(1);
       expect([await box(first), await box(crits.nth(1))]).toEqual(before);
-      // The chosen tile's − | + stay on the name's line.
-      const head = first.locator('.grdt-tile.is-chosen .grdt-tile-head');
-      expect((await box(head)).height).toBeLessThanOrEqual(28);
+      // The chosen level's − | + stay on the bar's one line.
+      const pick = first.locator('.grdl-pick');
+      expect((await box(pick)).height).toBeLessThanOrEqual(36);
       await dialog.locator('.grader-done').click();
     }
   }
