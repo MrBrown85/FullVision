@@ -718,6 +718,7 @@ The session that hands out the work keeps one list of who holds each of these fi
 - S8 before the release that opens Send Work.
 - S15 after S4 works.
 - S16 and S18 need only `S0-F1`.
+- The teacher student-page redesign runs as its own track (`docs/plans/teacher-student-page-redesign-plan.md`). R6 (Learner Profile) merges before S10 is handed out. R4 (Grades) waits for PR 1004. R2 (Competencies) lands the trend and Next Step helper in `calc.js` that S13 reuses.
 
 ### A first night, as an example
 
