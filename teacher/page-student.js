@@ -755,31 +755,30 @@ window.PageStudent = (function () {
   function _tabBarHtml(sums) {
     return (
       '<div class="stu-tabs" role="tablist" aria-label="Student details">' +
-      _shownTabs()
-        .map(function (t) {
-          var on = t.id === _tab;
-          var sm = sums[t.id];
-          return (
-            '<button type="button" role="tab" class="stu-tab' +
-            (on ? ' active' : '') +
-            '" id="stu-tab-' +
-            t.id +
-            '" data-action="stuTab" data-tab="' +
-            t.id +
-            '" aria-selected="' +
-            on +
-            '" aria-controls="stu-panel" tabindex="' +
-            (on ? '0' : '-1') +
-            '"><span class="stu-tab-label">' +
-            esc(t.label) +
-            '</span><span class="stu-tab-stat">' +
-            esc(sm.stat) +
-            '</span><span class="stu-tab-sub">' +
-            esc(sm.sub) +
-            '</span></button>'
-          );
-        })
-        .join('') +
+      TABS.map(function (t) {
+        if (!sums[t.id]) return ''; // Work, while the class has it off
+        var on = t.id === _tab;
+        var sm = sums[t.id];
+        return (
+          '<button type="button" role="tab" class="stu-tab' +
+          (on ? ' active' : '') +
+          '" id="stu-tab-' +
+          t.id +
+          '" data-action="stuTab" data-tab="' +
+          t.id +
+          '" aria-selected="' +
+          on +
+          '" aria-controls="stu-panel" tabindex="' +
+          (on ? '0' : '-1') +
+          '"><span class="stu-tab-label">' +
+          esc(t.label) +
+          '</span><span class="stu-tab-stat">' +
+          esc(sm.stat) +
+          '</span><span class="stu-tab-sub">' +
+          esc(sm.sub) +
+          '</span></button>'
+        );
+      }).join('') +
       '</div>'
     );
   }
