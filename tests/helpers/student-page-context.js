@@ -12,7 +12,7 @@
  *
  * openStudentPage() returns { ctx, T, root(), calls, replies, probes, fetched,
  * net, store, start, click, type, choose, submit, tick, settle, run,
- * watchGlobals }.
+ * watchGlobals, showAll }.
  * fetch is a stand-in for the student-submit function. It records every
  * call and answers from `replies`, with one exception. Since S0-W1 the page
  * puts every typed or scanned code to the function's `card` route before it
@@ -337,6 +337,14 @@ export function openStudentPage(opts = {}) {
     click: async sel => {
       find(sel).dispatchEvent(new window.Event('click', { bubbles: true }));
       await settle();
+    },
+    /* All Assignments (the header's list button, S4-F1): every piece in one
+       list, as the page drew it before To Do, Sent and Back. A tab's
+       switch draws at once, so nothing needs waiting for. Nothing happens
+       when it is already showing, or when no card's page is up. */
+    showAll: () => {
+      const b = root().querySelector('[data-act="all-open"]');
+      if (b && b.getAttribute('aria-pressed') !== 'true') b.dispatchEvent(new window.Event('click', { bubbles: true }));
     },
     // A click that is not waited for: what it started is still on its way.
     tap: sel => {

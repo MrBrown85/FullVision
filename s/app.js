@@ -400,24 +400,77 @@
   /* The class's name is the way to Switching Classes: pressed, it opens
      Your Classes, every class this device's session has opened, and Add
      Another Card. */
+  /* The page's frame (S4-F1; the artboard's "To Do Card" on a phone and
+     "Page on a Chromebook"): the class's name with its block, Done and the
+     All Assignments button in a header that stays in reach, the tab's own
+     body, and the four tabs. On a phone the tabs sit along the bottom; on a
+     Chromebook in the middle of the header. */
+  var TABS = [
+    {
+      id: 'assignments',
+      label: 'Assignments',
+      icon: '<rect x="4" y="5" width="16" height="14" rx="3"/><path d="M8 10h8M8 14h5"/>',
+    },
+    { id: 'learning', label: 'My Learning', icon: '<path d="M4 20h4v-6H4zM10 20h4V9h-4zM16 20h4V4h-4z"/>' },
+    {
+      id: 'questionnaires',
+      label: 'Questionnaires',
+      icon: '<circle cx="12" cy="12" r="8"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5M12 16.5v.01"/>',
+    },
+    { id: 'reports', label: 'Reports', icon: '<path d="M7 3h7l4 4v14H7z"/><path d="M10 12h5M10 16h5"/>' },
+  ];
+  var MENU =
+    '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
+
+  function tabBarHtml(state) {
+    var on = state.tab || 'assignments';
+    return (
+      '<nav class="sp-tabs" aria-label="Your Page">' +
+      TABS.map(function (t) {
+        return (
+          '<button type="button" class="sp-tab' +
+          (t.id === on ? ' sp-tab-on' : '') +
+          '" data-act="tab" data-tab="' +
+          t.id +
+          '"' +
+          (t.id === on ? ' aria-current="page"' : '') +
+          '><svg class="sp-tab-icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+          t.icon +
+          '</svg><span>' +
+          esc(t.label) +
+          '</span></button>'
+        );
+      }).join('') +
+      '</nav>'
+    );
+  }
+
   function pageFrame(state, body) {
     var course = (state.page && state.page.course) || {};
+    var block = String(course.block || '').trim();
     return (
-      '<header class="sp-head sp-head-page"><div class="sp-head-words">' +
-      '<button type="button" class="sp-head-title sp-head-switch" data-act="classes-open" aria-haspopup="dialog" aria-expanded="' +
+      '<header class="sp-head sp-head-page">' +
+      '<button type="button" class="sp-head-switch" data-act="classes-open" aria-haspopup="dialog" aria-expanded="' +
       (state.sheet ? 'true' : 'false') +
-      '">' +
-      esc(className(course)) +
+      '"><span class="sp-head-title">' +
+      esc(course.name || '') +
+      '</span>' +
+      (block ? '<span class="sp-pill">' + esc(blockLabel(block)) + '</span>' : '') +
       CHEVRON +
-      '</button><div class="sp-head-sub">' +
-      esc(TITLE) +
-      '</div></div>' +
+      '</button>' +
+      '<span class="sp-head-gap"></span>' +
       '<button type="button" class="sp-btn sp-btn-quiet sp-btn-small sp-done" data-act="card-done">Done</button>' +
+      '<button type="button" class="sp-head-icon" data-act="all-open" aria-label="All assignments"' +
+      (state.all && (state.tab || 'assignments') === 'assignments' ? ' aria-pressed="true"' : '') +
+      '>' +
+      MENU +
+      '</button>' +
       '</header>' +
       '<main class="sp-main sp-page">' +
       body +
       demoNote(state, 'This is Demo Mode. Cece and her results are samples.') +
       '</main>' +
+      tabBarHtml(state) +
       (state.sheet ? classesSheet(state.page) : '')
     );
   }
@@ -1085,6 +1138,7 @@
     forget();
     if (typeof StudentData !== 'undefined') StudentData.use(null);
     S.page = null;
+    S.reply = null;
   }
 
   /* Signed out: the session is forgotten, the page's data is dropped and
@@ -1269,6 +1323,11 @@
     // The header stays over the top of the list: a row under it is not on screen.
     var head = document.querySelector('.sp-head');
     var under = (head && head.offsetHeight) || 0;
+    // On a phone the tabs sit over the bottom of the list: a row under them is not on screen either.
+    var bar = document.querySelector('.sp-tabs');
+    var rect = bar && typeof bar.getBoundingClientRect === 'function' ? bar.getBoundingClientRect() : null;
+    var over =
+      rect && typeof window.innerHeight === 'number' && rect.top > window.innerHeight / 2 ? bar.offsetHeight || 0 : 0;
     w.observer = new IntersectionObserver(
       function (entries) {
         entries.forEach(function (entry) {
@@ -1278,7 +1337,7 @@
         });
         if (watching === w) shown();
       },
-      { rootMargin: '-' + under + 'px 0px 0px 0px', threshold: 0.6 },
+      { rootMargin: '-' + under + 'px 0px -' + over + 'px 0px', threshold: 0.6 },
     );
     Array.prototype.forEach.call(rows, function (row) {
       w.observer.observe(row);
@@ -1533,10 +1592,42 @@
     session.enrollment = enrollment;
     if (session.kept) keep(session);
     S.page = null;
+    S.reply = null;
     if (typeof StudentData !== 'undefined') StudentData.use(null);
     S.heading = TITLE;
     S.screen = 'loading';
     return openPage();
+  }
+
+  /* A tab, one of To Do, Sent and Back, or All Assignments. The page's data
+     is already here: nothing is asked. The rows on screen change, so what
+     is watched for "opened" starts again. */
+  var TAB_IDS = { assignments: 1, learning: 1, questionnaires: 1, reports: 1 };
+  var SEGMENT_IDS = { todo: 1, sent: 1, back: 1 };
+  function showPart(act, el) {
+    if (!S.page || S.screen !== 'assignments') return;
+    var focus = '.sp-page-title';
+    if (act === 'tab') {
+      var tab = el.getAttribute('data-tab') || '';
+      if (!has(TAB_IDS, tab)) return;
+      S.tab = tab;
+      S.all = false;
+      focus = '.sp-tab-on';
+    } else if (act === 'segment') {
+      var seg = el.getAttribute('data-segment') || '';
+      if (!has(SEGMENT_IDS, seg)) return;
+      S.segment = seg;
+      S.all = false;
+      focus = '.sp-segment-on';
+    } else {
+      S.tab = 'assignments';
+      S.all = act === 'all-open';
+    }
+    S.sheet = false;
+    stopWatchingRows();
+    paint(focus);
+    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') window.scrollTo(0, 0);
+    watchRows();
   }
 
   function openSheet() {
@@ -1575,6 +1666,13 @@
       '../shared/calc.js',
       function () {
         return typeof assessmentCellValue === 'function';
+      },
+    ],
+    // What the page draws from (S4-F1); index.html names it, so it is fetched only for an older copy.
+    [
+      '../shared/student-view.js',
+      function () {
+        return typeof StudentView !== 'undefined';
       },
     ],
   ];
@@ -1626,6 +1724,7 @@
       forget();
     }
     S.page = null;
+    S.reply = null;
     if (typeof StudentData !== 'undefined') StudentData.use(null);
     S.message = MESSAGES[words || 'card_network'];
     S.again = !words;
@@ -1659,6 +1758,13 @@
         mine.expires = String(res.expires_at);
         if (mine.kept) keep(mine);
       }
+      // A class opened afresh starts on Assignments, To Do.
+      if (!S.page) {
+        S.tab = 'assignments';
+        S.segment = 'todo';
+        S.all = false;
+      }
+      S.reply = res;
       S.page = StudentData.fromServer(res);
       StudentData.use(S.page);
       // What the student typed to get in is not kept once they are in.
@@ -1728,6 +1834,7 @@
     session.active = Date.now();
     if (!S.demo) keep(session);
     S.page = null;
+    S.reply = null;
     if (typeof StudentData !== 'undefined') StudentData.use(null);
     return openPage();
   }
@@ -1848,6 +1955,8 @@
       }
     } else if (act === 'card-back') {
       backToPage();
+    } else if (act === 'tab' || act === 'segment' || act === 'all-open' || act === 'all-close') {
+      showPart(act, el);
     } else if (act === 'page-retry') {
       openPage();
     } else if (act === 'grades-retry') {

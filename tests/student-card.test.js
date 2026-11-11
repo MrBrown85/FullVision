@@ -18,8 +18,9 @@ import { asServerSends, openStudentPage, studentPageScripts } from './helpers/st
 const CID = 'demo-science-8';
 const SID = 'demo-cece';
 
+// Every piece, as All Assignments lists it (S4-F1: the tab opens on To Do).
 const rows = page =>
-  [...page.root().querySelectorAll('.sp-row')].map(li => ({
+  (page.showAll(), [...page.root().querySelectorAll('.sp-row')]).map(li => ({
     title: li.querySelector('.sp-row-title').textContent,
     sub: (li.querySelector('.sp-row-sub') || {}).textContent || '',
     result: (li.querySelector('.sp-row-result') || {}).textContent || '',
@@ -48,6 +49,7 @@ describe('the student page fetches calc.js only when a grade is about to show', 
       'shared/phone-report-view.js',
       'shared/loading-screen.js',
       's/student-data.js',
+      'shared/student-view.js',
       's/student.js',
       's/questionnaire.js',
       's/report.js',
@@ -173,13 +175,14 @@ describe('the student page fetches calc.js only when a grade is about to show', 
 
   it('a class with nothing returned says nothing about results', () => {
     const page = openStudentPage();
-    const read = page.run('StudentData.fromServer')({
+    const reply = {
       student: { enrollment_id: 'e1', first_name: 'Sam' },
       course: { id: 'c1', name: 'Socials 10', block: 'C' },
       assessments: [{ id: 'a1', title: 'Map Quiz', date: '2026-10-20', due_date: '2026-10-22' }],
-    });
+    };
+    const read = page.run('StudentData.fromServer')(reply);
     page.run('StudentData.use')(read);
-    const html = page.T.render({ screen: 'assignments', page: read, demo: false });
+    const html = page.T.render({ screen: 'assignments', page: read, reply, all: true, demo: false });
     expect(html).toContain('Map Quiz');
     expect(html).not.toContain('sp-no-results');
   });
@@ -238,7 +241,8 @@ describe('student card: the demo walk', () => {
     page.choose('#sp-by', y);
     await page.click('[data-act="card-yes"]');
     expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
-    expect(page.root().querySelector('.sp-head-title').textContent).toBe('Science 8 · Block B');
+    expect(page.root().querySelector('.sp-head-title').textContent).toBe('Science 8');
+    expect(page.root().querySelector('.sp-pill').textContent).toBe('Block B');
     expect(rows(page).map(r => r.title)).toEqual([
       'Science Fair Proposal',
       'Disease Research Poster',
@@ -560,11 +564,8 @@ describe('student-data.js: the one adapter', () => {
     page.run('StudentData.use')(read);
     page.T.whenGradesAreIn();
     await page.settle();
-    const view = id =>
-      page.T.rowView(
-        read,
-        read.assessments.find(a => a.id === id),
-      );
+    const v = page.T.viewOf({ page: read, reply: REPLY });
+    const view = id => page.T.rowView(v.work.find(p => p.id === id));
     expect(view('a1')).toMatchObject({ kind: 'back', result: '3.3 · 83%' });
     expect(view('a1').sub).toMatch(/^Back \S+ \d+ · Proficient$/);
     expect(view('a2')).toMatchObject({ kind: 'due', result: '' });
@@ -574,7 +575,15 @@ describe('student-data.js: the one adapter', () => {
     expect(view('a6')).toMatchObject({ kind: 'back', result: '0 / 5' });
     expect(view('a7')).toMatchObject({ kind: 'due', result: '' });
     expect(view('a7').sub).toMatch(/^Late · Due \S+ \S+ \d+$/);
-    expect(page.T.listHtml(Object.assign({}, read, { assessments: [] }))).toContain('No assignments yet.');
+    const none = Object.assign({}, REPLY, { assessments: [] });
+    expect(
+      page.T.render({
+        screen: 'assignments',
+        page: page.run('StudentData.fromServer')(none),
+        reply: none,
+        demo: false,
+      }),
+    ).toContain('No assignments yet.');
   });
 
   it('answers calc.js for this student and this class only', async () => {
@@ -621,7 +630,14 @@ describe('student-data.js: the one adapter', () => {
    lacks throws, or, behind a `typeof` guard, quietly changes a result. */
 describe('calc.js on the student page reads only what student-data.js gives it', () => {
   // The files whose reads are watched: the math, its helpers, and the page's own.
-  const WATCHED = ['shared/calc.js', 'shared/constants.js', 's/student-data.js', 's/assignments.js', 's/app.js'];
+  const WATCHED = [
+    'shared/calc.js',
+    'shared/constants.js',
+    'shared/student-view.js',
+    's/student-data.js',
+    's/assignments.js',
+    's/app.js',
+  ];
   const at = '2026-11-03T20:00:00Z';
   const level = (tag_id, value, modifier) => ({ tag_id, value, modifier: modifier || 0, comment: null });
   // Every kind of piece the list can show, in a class of the given style.
@@ -808,8 +824,9 @@ describe('calc.js on the student page reads only what student-data.js gives it',
     const list = reply => {
       const read = page.run('StudentData.fromServer')(reply);
       page.run('StudentData.use')(read);
-      const html = page.T.render({ screen: 'assignments', page: read, demo: false });
-      return Object.fromEntries(read.assessments.map(a => [a.id, page.T.rowView(read, a)]).concat([['html', html]]));
+      const html = page.T.render({ screen: 'assignments', page: read, reply, all: true, demo: false });
+      const v = page.T.viewOf({ page: read, reply });
+      return Object.fromEntries(v.work.map(p => [p.id, page.T.rowView(p)]).concat([['html', html]]));
     };
     return { page, reached, used, list };
   }

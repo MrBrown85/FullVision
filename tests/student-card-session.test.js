@@ -32,7 +32,9 @@ const MIN = 60 * 1000;
 const text = page => page.root().textContent;
 const routes = page => page.calls.map(c => c.body.route);
 const alertText = page => (page.root().querySelector('[role="alert"]') || {}).textContent || '';
+// Every piece, as All Assignments lists it (S4-F1: the tab opens on To Do).
 const rowSubs = page =>
+  (page.showAll(), 0) ||
   Object.fromEntries(
     [...page.root().querySelectorAll('.sp-row')].map(li => [
       li.querySelector('.sp-row-title').textContent,
@@ -94,7 +96,8 @@ async function signIn(dev, server) {
   const page = await dev.open('#P3R8-WDK4', server);
   page.type('#sp-ident', '0123456');
   await page.click('[data-act="card-yes"]');
-  expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+  expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
+  page.showAll();
   return page;
 }
 
@@ -638,7 +641,7 @@ describe('a session’s end is checked before the list can be drawn again', () =
     page.advance(10 * MIN);
     page.fire('pointerdown'); // still in use
     page.runTicks();
-    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
     page.advance(4 * 60 * MIN); // asleep four hours
     page.runTicks();
     await page.settle();
@@ -654,7 +657,7 @@ describe('a session’s end is checked before the list can be drawn again', () =
     const token = JSON.parse(dev.store[KEY]).t;
     page.advance(14 * MIN);
     page.runTicks();
-    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
     page.advance(2 * MIN);
     page.runTicks();
     page.runTicks();
@@ -708,7 +711,7 @@ describe('a session’s end is checked before the list can be drawn again', () =
     expect(covered()).toBe(true);
     page.show();
     expect(covered()).toBe(false);
-    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
   });
 
   it.each(['pageshow', 'show', 'focus'])(
@@ -763,7 +766,7 @@ describe('fifteen minutes with no activity ends the session, as Done does', () =
     const token = JSON.parse(dev.store[KEY]).t;
     page.advance(14 * MIN);
     page.T.checkSession();
-    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
     expect(dev.store[KEY]).toBeTruthy();
 
     page.advance(1 * MIN);
@@ -796,7 +799,7 @@ describe('fifteen minutes with no activity ends the session, as Done does', () =
       page.fire(name);
       page.advance(10 * MIN); // twenty minutes since the sign-in, ten since the activity
       page.T.checkSession();
-      expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+      expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
       page.advance(5 * MIN);
       page.T.checkSession();
       expect(page.root().querySelector('.sp-row')).toBeNull();
@@ -811,7 +814,7 @@ describe('fifteen minutes with no activity ends the session, as Done does', () =
     const again = dev.tab();
     again.advance(10 * MIN);
     await again.start('');
-    expect(again.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(again.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
     again.advance(5 * MIN);
     // The first thing that happens is a touch.
     again.fire('pointerdown');
@@ -881,7 +884,7 @@ describe('fifteen minutes with no activity ends the session, as Done does', () =
     const dev = school();
     const one = await signIn(dev);
     const two = await dev.open('');
-    expect(two.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(two.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
     const token = JSON.parse(dev.store[KEY]).t;
 
     // Ten minutes on, the student is working in tab one.
@@ -893,8 +896,8 @@ describe('fifteen minutes with no activity ends the session, as Done does', () =
     two.advance(10 * MIN);
     two.T.checkSession();
     one.T.checkSession();
-    expect(two.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
-    expect(one.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(two.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
+    expect(one.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
 
     // Five more with nothing in either.
     one.advance(5 * MIN);
@@ -923,7 +926,7 @@ describe('fifteen minutes with no activity ends the session, as Done does', () =
     page.fire('pointerdown');
     page.hide();
     page.show();
-    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
     expect(page.calls).toEqual([]);
     expect(page.store).toEqual({});
   });
@@ -968,6 +971,7 @@ describe('"opened" means the row was on screen in a visible tab', () => {
     expect(rowSubs(page)['Lab Safety Contract']).toMatch(/· Updated$/);
     // The list loaded again: every one of them can still be opened, and the mark is still there.
     const next = await dev.open('');
+    next.showAll();
     expect(next.root().querySelectorAll('[data-unseen]')).toHaveLength(6);
     expect(rowSubs(next)['Lab Safety Contract']).toMatch(/· Updated$/);
   });
@@ -1076,7 +1080,8 @@ describe('"opened" means the row was on screen in a visible tab', () => {
     const page = dev.tab();
     page.hide();
     await page.start('');
-    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    page.showAll();
+    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
     // The browser reports the rows in view, but nobody is looking.
     page.onScreen(() => true);
     await readFor(page, 2000);
@@ -1092,6 +1097,7 @@ describe('"opened" means the row was on screen in a visible tab', () => {
     const page = dev.tab();
     page.hide();
     await page.start('');
+    page.showAll();
     page.onScreen(() => true);
     page.onScreen(el => el.getAttribute('data-unseen') === WORK.quiz);
     page.show();
@@ -1141,12 +1147,14 @@ describe('"opened" means the row was on screen in a visible tab', () => {
     await page.start('#P3R8-WDK4');
     page.type('#sp-ident', '0123456');
     await page.click('[data-act="card-yes"]');
+    page.showAll();
     expect(page.root().querySelector('.sp-no-results')).toBeTruthy();
     expect(unseenRows(page)).toEqual([]);
     await scrollThroughAll(page);
     expect(routes(page)).toEqual(['card', 'verify', 'page']);
     page.net.fail = () => false;
     await page.click('[data-act="grades-retry"]');
+    page.showAll();
     expect(unseenRows(page)).toHaveLength(6);
     await scrollThroughAll(page);
     expect(seenCalls(page)).toHaveLength(1);
