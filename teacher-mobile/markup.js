@@ -38,9 +38,6 @@ window.MMarkUp = (function () {
   };
   var MAX_MARKS = 500;
   var MAX_NOTE = 500;
-  var PEN_WIDTH = 0.006; // a fraction of the page's width
-  var HIGHLIGHT_WIDTH = 0.03;
-  var GLYPH = 0.035; // a tick's or cross's size, as a fraction of the width
   var TAP_SLOP = 10; // screen pixels a tap may move
   var HIT = 16; // screen pixels the Eraser reaches
   var MIN_SCALE = 1;
@@ -393,38 +390,20 @@ window.MMarkUp = (function () {
     return _base().w * _s.view.s;
   }
 
-  /* The marks a point touches, the Eraser's reach in screen pixels. Distances
-     are measured in page widths, the height scaled by the page's shape. */
+  /* The marks a point touches, top first, within `reach` (a fraction of the
+     page's width): shared/markup-draw.js's hit test, the desktop's, asked
+     again without each mark it finds. Answers their ids. */
   function hitTest(marks, pt, reach, ratio) {
-    var r = ratio || 1;
-    var d2 = function (ax, ay, bx, by) {
-      var dx = ax - bx;
-      var dy = (ay - by) * r;
-      return dx * dx + dy * dy;
-    };
-    var seg = function (p, a, b) {
-      var vx = b[0] - a[0];
-      var vy = (b[1] - a[1]) * r;
-      var len = vx * vx + vy * vy;
-      var t = len ? ((p[0] - a[0]) * vx + (p[1] - a[1]) * r * vy) / len : 0;
-      t = Math.max(0, Math.min(1, t));
-      return d2(p[0], p[1], a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t);
-    };
-    return marks
-      .filter(function (m) {
-        if (m.type === 'pen' || m.type === 'highlight') {
-          var pts = m.points || [];
-          var w = (m.width || 0) / 2 + reach;
-          if (pts.length === 1) return d2(pt[0], pt[1], pts[0][0], pts[0][1]) <= w * w;
-          for (var i = 1; i < pts.length; i++) if (seg(pt, pts[i - 1], pts[i]) <= w * w) return true;
-          return false;
-        }
-        var near = (m.type === 'note' ? 0.03 : GLYPH / 2) + reach;
-        return d2(pt[0], pt[1], m.x, m.y) <= near * near;
-      })
-      .map(function (m) {
-        return m.id;
+    var left = marks.slice();
+    var out = [];
+    for (;;) {
+      var id = MarkupDraw.hitTest({ v: 1, marks: left }, { x: pt[0], y: pt[1] }, ratio, reach);
+      if (!id) return out;
+      out.push(id);
+      left = left.filter(function (m) {
+        return m.id !== id;
       });
+    }
   }
 
   /* ── Fingers: one draws, two move the page ──────────────────── */
@@ -524,8 +503,8 @@ window.MMarkUp = (function () {
       _s.stroke = { type: t, points: [_toPage(cx, cy)] };
       if (t === 'pen') {
         _s.stroke.color = 'red';
-        _s.stroke.width = PEN_WIDTH;
-      } else _s.stroke.width = HIGHLIGHT_WIDTH;
+        _s.stroke.width = MarkupDraw.PEN_WIDTH;
+      } else _s.stroke.width = MarkupDraw.HIGHLIGHT_WIDTH;
     } else if (t === 'eraser') {
       _s.erasing = {};
       _erase(cx, cy);
@@ -635,85 +614,31 @@ window.MMarkUp = (function () {
     _ro.observe(stage);
   }
 
-  // html-safe: note text goes through MC.esc; numbers are ours
+  /* The marks as shared/markup-draw.js draws them for the desktop and the
+     student (the same SVG), and on the phone each note's words beside its
+     pin, as the phone board shows them. */
+  // html-safe: MarkupDraw.svgHtml escapes a note's words; the words here go through MC.esc; places are numbers
   function _marksHtml() {
-    var W = _s.size.w;
-    var H = _s.size.h;
     var hidden = _s.erasing || {};
     var shown = _s.marks.filter(function (m) {
       return !hidden[m.id];
     });
     if (_s.stroke) shown = shown.concat([_s.stroke]);
-    var color = function (m) {
-      return m.color === 'green' ? 'green' : m.color === 'blue' ? 'blue' : 'red';
-    };
-    var svg = '';
-    var pins = '';
-    var noteNo = 0;
-    shown.forEach(function (m) {
-      if (m.type === 'pen' || m.type === 'highlight') {
-        var pts = (m.points || [])
-          .map(function (p) {
-            return Math.round(p[0] * W * 10) / 10 + ',' + Math.round(p[1] * H * 10) / 10;
-          })
-          .join(' ');
-        svg +=
-          '<polyline class="m-mk-' +
-          m.type +
-          (m.type === 'pen' ? ' m-mk-' + color(m) : '') +
-          '" points="' +
-          pts +
-          '" stroke-width="' +
-          Math.max(1, Math.round((m.width || PEN_WIDTH) * W * 10) / 10) +
-          '"/>';
-      } else if (m.type === 'tick' || m.type === 'cross') {
-        var x = m.x * W;
-        var y = m.y * H;
-        var g = (GLYPH * W) / 2;
-        var d =
-          m.type === 'tick'
-            ? 'M' + (x - g) + ',' + y + ' L' + (x - g / 3) + ',' + (y + g * 0.7) + ' L' + (x + g) + ',' + (y - g * 0.8)
-            : 'M' +
-              (x - g) +
-              ',' +
-              (y - g) +
-              ' L' +
-              (x + g) +
-              ',' +
-              (y + g) +
-              ' M' +
-              (x + g) +
-              ',' +
-              (y - g) +
-              ' L' +
-              (x - g) +
-              ',' +
-              (y + g);
-        svg += '<path class="m-mk-glyph m-mk-' + color(m) + '" d="' + d + '"/>';
-      } else if (m.type === 'note') {
-        noteNo++;
-        pins +=
+    var marks = { v: 1, marks: shown };
+    var words = MarkupDraw.notes(marks)
+      .map(function (n) {
+        return (
           '<div class="m-mk-note" style="left:' +
-          m.x * 100 +
+          Number(n.x) * 100 +
           '%;top:' +
-          m.y * 100 +
-          '%"><span class="m-mk-pin">' +
-          noteNo +
-          '</span><span class="m-mk-note-text">' +
-          MC.esc(m.text) +
-          '</span></div>';
-      }
-    });
-    return (
-      '<svg class="m-markup-svg" viewBox="0 0 ' +
-      W +
-      ' ' +
-      H +
-      '" preserveAspectRatio="none" aria-hidden="true">' +
-      svg +
-      '</svg>' +
-      pins
-    );
+          Number(n.y) * 100 +
+          '%"><span class="m-mk-note-text">' +
+          MC.esc(n.text) +
+          '</span></div>'
+        );
+      })
+      .join('');
+    return MarkupDraw.svgHtml(marks, _s.size.h / _s.size.w) + words;
   }
 
   function _drawPage() {

@@ -46,7 +46,7 @@ test('Mark Up from the photos full screen: draw, a tick, a note, two fingers zoo
   const mk = page.locator('#m-markup');
   await expect(mk.locator('.m-markup-title')).toHaveText('Mark Up');
   await expect(mk.locator('.m-markup-hint')).toHaveText('One finger draws. Two fingers move the page.');
-  await expect(mk.locator('.m-mk-pin')).toHaveCount(3);
+  await expect(mk.locator('.markup-pin text')).toHaveCount(3);
   await expect(mk).toHaveAttribute('data-page-shown', /.+/);
   const before = await page.evaluate(() => MMarkUp.marks().length);
   await shot(page, 'S9-F2-phone-markup');
@@ -67,7 +67,7 @@ test('Mark Up from the photos full screen: draw, a tick, a note, two fingers zoo
   await page.mouse.click(...at(0.3, 0.9));
   await mk.locator('.m-markup-note-text').fill('Show your scale bar.');
   await mk.getByRole('button', { name: 'Add Note' }).click();
-  await expect(mk.locator('.m-mk-pin')).toHaveCount(4);
+  await expect(mk.locator('.markup-pin text')).toHaveCount(4);
   expect(await page.evaluate(() => MMarkUp.marks().length)).toBe(before + 3);
 
   // Two fingers spread: the page zooms and nothing is drawn.
@@ -99,7 +99,7 @@ test('Mark Up from the photos full screen: draw, a tick, a note, two fingers zoo
   await shot(page, 'S9-F2-phone-markup-zoomed');
 
   await mk.getByRole('button', { name: 'Undo' }).click();
-  await expect(mk.locator('.m-mk-pin')).toHaveCount(3);
+  await expect(mk.locator('.markup-pin text')).toHaveCount(3);
   await mk.getByRole('button', { name: 'Redo' }).click();
   await mk.getByRole('button', { name: 'Done' }).click();
   await expect(mk).toHaveCount(0);

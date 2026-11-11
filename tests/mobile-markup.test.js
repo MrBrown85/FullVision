@@ -136,7 +136,7 @@ describe('with the student page and Send Work on', () => {
     );
     expect(q('.m-markup-hint').textContent).toBe('One finger draws. Two fingers move the page.');
     // The sample's notes are numbered pins with their words, escaped.
-    expect([...root().querySelectorAll('.m-mk-pin')].map(p => p.textContent)).toEqual(['1', '2', '3']);
+    expect([...root().querySelectorAll('.markup-pin text')].map(p => p.textContent)).toEqual(['1', '2', '3']);
     expect(q('.m-mk-note-text').textContent).toBe('Which cell is this? Label it onion or cheek.');
     await Promise.resolve();
     expect(q('.m-markup-img').getAttribute('src')).toBe('blob:' + files(jordan)[0].id);
@@ -219,7 +219,7 @@ describe('with the student page and Send Work on', () => {
     q('[data-mk="note-save"]').click();
     const note = MMarkUp.marks().pop();
     expect(note).toMatchObject({ type: 'note', text: '<b>Units?</b>' });
-    expect([...root().querySelectorAll('.m-mk-pin')].pop().textContent).toBe('4');
+    expect([...root().querySelectorAll('.markup-pin text')].pop().textContent).toBe('4');
     expect(root().innerHTML).not.toContain('<b>Units?</b>');
     tap(60, 330);
     expect(q('[data-mk="note-save"]').textContent).toBe('Save Note');

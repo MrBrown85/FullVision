@@ -5762,57 +5762,34 @@ body.fv-switching-course::after {
   position: absolute;
   inset: 0;
 }
-.m-markup-svg {
+.m-markup-marks .markup-layer {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
+  overflow: visible;
 }
-.m-markup-svg polyline,
-.m-markup-svg path {
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+/* A note's pin: shared/markup-draw.js draws it, as on the desktop. */
+.m-markup .markup-pin circle {
+  fill: #d93025;
+  stroke: #fff;
+  stroke-width: 3;
 }
-.m-markup-svg .m-mk-highlight {
-  stroke: #ffd60a;
-  stroke-opacity: 0.4;
+.m-markup .markup-pin text {
+  fill: #fff;
+  font-weight: 700;
+  font-family: inherit;
 }
-.m-markup-svg .m-mk-glyph {
-  stroke-width: 6;
-}
-.m-markup-svg .m-mk-red {
-  stroke: #e5332a;
-}
-.m-markup-svg .m-mk-green {
-  stroke: #1f9d3a;
-}
-.m-markup-svg .m-mk-blue {
-  stroke: #1d64d8;
-}
+/* Beside each pin, its words (the phone board). */
 .m-mk-note {
   position: absolute;
-  display: flex;
-  align-items: flex-start;
-  gap: 4px;
   max-width: 55%;
-  transform: translate(-11px, -11px);
+  transform: translate(14px, -50%);
   pointer-events: none;
 }
-.m-mk-pin {
-  flex: none;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #e5332a;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 22px;
-  text-align: center;
-}
 .m-mk-note-text {
+  display: block;
   padding: 3px 7px;
   border-radius: 8px;
   background: #fff8c5;
