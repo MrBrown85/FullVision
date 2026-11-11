@@ -1691,7 +1691,7 @@ export BATCH_B_DIR=/tmp/bb/migrations
 PGPORT=54361 PGDATABASE=bc python3 batch_c_common.py build        # an empty database: live as it will be with Batch B
 PGPORT=54361 PGDATABASE=bc python3 batch_c.py                     # both files, about a minute
 PGPORT=54361 PGDATABASE=bc python3 batch_c_undo.py                # both undo scripts
-PGPORT=54361 PGDATABASE=bc python3 batch_c_mutate.py              # 94 wrong versions of the SQL, about fifteen minutes
+PGPORT=54361 PGDATABASE=bc python3 batch_c_mutate.py              # 93 wrong versions of the SQL, about fifteen minutes
 PGPORT=54361 PGDATABASE=bc python3 batch_c_fingerprints.py check  # are the fingerprint lists in the eight files current
 ```
 
@@ -1917,7 +1917,7 @@ failed on the reviewed code, `b26cf1c7`):
   class staying in it gives nothing. With C1 alone nothing is given until
   `return_work` or a save of marks.
 
-`batch_c_mutate.py`: 94 wrong versions (78 of C1, 16 of C2), each applied
+`batch_c_mutate.py`: 93 wrong versions (77 of C1, 16 of C2), each applied
 with its fingerprint lists stood aside and run against the behaviour
 scenarios. Hide's 26 went out with Hide; 12 are wrong versions of review
 round 2's fixes, 12 of round 3's. One (C2's trigger firing on a draft)
@@ -1925,7 +1925,10 @@ behaves as the right one and is noticed only by the post-check's comparison
 of the trigger. Round 1's "the state reads returned from the revision's
 photos" is now noticed by `round2`'s race checks (the new trigger settles
 a revision before its photos go, so `closes` no longer tells the two
-apart).
+apart). Round 1's "return_work does not settle before it returns" went
+out: with the new trigger and a request read open only with no revision
+in, the settle after `return_grades` closes whatever the first would, so
+that wrong version behaves as the right one (the call stays, as a guard).
 
 Review round 2 (2026-11-11, PostgreSQL 17.11, from a clean clone of
 `b3e5ad13`, Batch B from `origin/main` at `6137c856`): `batch_c.py` 634 of
@@ -1948,6 +1951,16 @@ fails is listed:
 - `student_page_fields.py` (S4-M1): 259 of 259 without; 255 with. The 4:
   the same inventory, and three `batchb` checks that apply Batch B to a
   base that already has it. Every key and refusal of `page` is as before.
+
+Review round 3 (2026-11-11, PostgreSQL 17.11, from a clean clone of
+`batch-c-round3`, Batch B from `origin/main` at `6137c856`): `batch_c.py`
+723 of 723 (`revision_deleted` 46, 18 of them failing on `b26cf1c7`;
+`leave_holds` 32, 8 failing on `b26cf1c7`), the undo 36 of 36, every
+fingerprint list current, all 93 wrong versions noticed. The earlier
+suites, with the same hook: `submissions.py` 562 of 563 without Batch C
+and 561 with it, `submissions_fixes.py` 188 of 188 both ways,
+`student_page_fields.py` 259 of 259 without and 255 with, the same
+failures as listed above.
 
 ## Batch B: students send work (S5-M1, S5-M2, 2026-11-11)
 

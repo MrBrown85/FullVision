@@ -28,3 +28,19 @@ The third independent review (`batch-c-review-3.md`, of `b26cf1c7`) found C1 and
 **Left as built, for Colin:** marks on a piece with no grade yet are not given by the switch. They go with the grade (its first save, now a Return), or at the next save of marks on that page. Giving them too would mean marks reach a student before any grade on that piece, which a class that holds grades never did. (With C1 alone, marks waiting on returned work stay waiting after the switch until `return_work` or a save of marks: C1 alone gives marks only those two ways, as before.)
 
 **Checks:** `leave_holds`, 32 checks, with C1 alone and with C2; 8 failed on `b26cf1c7`. Wrong versions: 6 new (no trigger, every waiting mark given graded or not, every class's, on every change of the two settings, a piece not showing marks passed over, Missing passed over). `apply2` also checks the new trigger and function, and that the post-check notices the course trigger off or recreated to fire on every update.
+
+## How it was tested
+
+Locally only, PostgreSQL 17.11 (embedded, a throwaway data folder), from a clean clone of `batch-c-round3`, on a database built as live will be when Batch C is applied (Batch B and its fixes from `origin/main` at `6137c856`). No Supabase project was touched.
+
+- `batch_c.py`: 723 of 723 (634 before this round; new: `revision_deleted` 46, `leave_holds` 32, and checks in `apply1` and `apply2` for the new triggers' guards and post-checks).
+- `batch_c_undo.py`: 36 of 36. C2's undo now also drops the course trigger and its function, and still leaves C1's catalog line for line; C1's PART 2 also drops `revision_gone`.
+- `batch_c_mutate.py`: 93 wrong versions (77 of C1, 16 of C2), every one noticed. 12 are new this round. One older one went out: with the new trigger, `return_work`'s first settle can no longer change the outcome, so leaving it out behaves the same (the call stays).
+- `batch_c_fingerprints.py check`: every list current.
+- Batch B's and S4-M1's own suites with C1 and C2 applied (the same hook as before), without Batch C in brackets: `submissions.py` 561 of 563 (562), `submissions_fixes.py` 188 of 188 (188), `student_page_fields.py` 255 of 259 (259). The failures are the ones listed before: the stale live-snapshot expectation, the "only `_returned_grade` reads grades" inventory (`feedback` and `markup` read `score.status`), and three checks that re-apply Batch B to a base that already has it.
+
+## What applying now means, in addition
+
+- C1 adds a trigger to `submission` (Batch B's table), beside its triggers on `assessment` and `enrollment`. On the day of the apply it changes no row; adding it holds `submission` against writes for an instant (the five-second give-up covers it). Afterwards it runs only when a sent revision is deleted.
+- C2 adds a trigger to `course`. It runs only when a class leaves When I Return Them or turns its Student Page off, once per such change, after Batch A's own trigger for the same change.
+- The guarded statements in `apply-bc3/` were for `b26cf1c7`'s files; they do not match these. Build new ones from the new files.

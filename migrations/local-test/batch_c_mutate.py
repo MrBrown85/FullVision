@@ -204,9 +204,9 @@ CHANGES = [
     ("C2 round 2 (a) 1: the trigger fires on any write of a returned row", C2,
      "after update of returned_at on public.grade_return\n    for each row when (new.returned_at is not null and not new.is_draft\n                       and old.returned_at is distinct from new.returned_at)",
      "after update on public.grade_return\n    for each row when (new.returned_at is not null and not new.is_draft)", 'put_back given'),
-    ("C1 (b) 1: return_work does not settle before it returns", C1,
-     "    perform _revision_settle(e.id, p_assessment_id, false)\n       from enrollment e where e.id = any (coalesce(p_enrollment_ids, '{}')) and e.course_id = _course;\n    -- The listed students' pages",
-     "    -- The listed students' pages", 'closes'),
+    # (Round 1's "return_work does not settle before it returns" went out in round 3: with revision_gone
+    # settling a revision before it is deleted, and a request read open only with no revision in,
+    # return_work's settle after return_grades closes everything the first one would. The call stays.)
     ("C1 (b) 2: Return does not end a revision at the same grade", C1,
      "_revision_state(r.id)->>'state' in ('returned', case when p_returned then 'sent' end, case when p_returned then 'grading' end);",
      "_revision_state(r.id)->>'state' = 'returned';", 'closes revision'),
