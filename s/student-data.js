@@ -169,6 +169,143 @@ var StudentData = (function () {
         }),
       updated: false, // set by fromServer, with `unseen`
       unseen: false,
+      // My Learning's What Makes Up Your Grade groups pieces by it (S13-W1); null when not sent.
+      categoryId: row.category_id ? str(row.category_id) : null,
+    };
+  }
+
+  /* ── My Learning (S13-W1) ──────────────────────────────────────
+     With Show My Learning on, `page` sends `show_my_learning: true` and
+     `learning`: the class's calculation settings, categories, folders and
+     learning map, in get_class_bundle's own shapes (my-learning-contract.md,
+     Batch E E9). They are turned here into the shapes shared/data.js gives
+     the teacher's apps, so calc.js and shared/student-view.js work My
+     Learning out on the device exactly as Preview as Student does. The
+     student's returned scores are the ones the page already holds. With the
+     switch off nothing of this is kept, and the readers below are not on
+     the page at all. */
+  function obj(v) {
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : null;
+  }
+  function order(v, i) {
+    var n = num(v);
+    return n == null ? i : n;
+  }
+  function byOrder(x, y) {
+    return x.sortOrder - y.sortOrder;
+  }
+  function learningFrom(l) {
+    var c = obj(l.course) || {};
+    var config = { show_my_learning: true };
+    config.calcMethod = text(c.calc_method) || 'mostRecent';
+    if (num(c.decay_weight) != null) config.decayWeight = num(c.decay_weight);
+    if (num(c.recent_score_limit) >= 1) config.recentScoreLimit = num(c.recent_score_limit);
+    if (typeof c.round_percent === 'boolean') config.roundPercent = c.round_percent;
+    config.levelOrder = c.level_order === 'asc' ? 'asc' : 'desc';
+    if (obj(c.grading_scale)) config.gradingScale = c.grading_scale;
+    if (obj(c.category_weights)) config.categoryWeights = c.category_weights;
+    if (Array.isArray(c.reporting_terms)) config.reportingTerms = c.reporting_terms;
+    if (c.folders_count_as_one === false) config.foldersCountAsOne = false;
+    if (c.courses_count_equally === true) config.coursesCountEqually = true;
+    var groups = (Array.isArray(l.competency_groups) ? l.competency_groups : [])
+      .filter(function (g) {
+        return g && g.id;
+      })
+      .map(function (g, i) {
+        return {
+          id: str(g.id),
+          name: str(g.name),
+          color: str(g.color) || '#6366f1',
+          sortOrder: order(g.display_order, i),
+          displayOrder: order(g.display_order, i),
+          countsAsOne: g.counts_as_one !== false,
+        };
+      })
+      .sort(byOrder);
+    var subjects = [];
+    var sections = [];
+    (Array.isArray(l.subjects) ? l.subjects : []).forEach(function (subject, si) {
+      if (!subject || !subject.id) return;
+      subjects.push({ id: str(subject.id), name: str(subject.name), sortOrder: order(subject.display_order, si) });
+      (Array.isArray(subject.sections) ? subject.sections : []).forEach(function (sec, i) {
+        if (!sec || !sec.id) return;
+        var name = str(sec.name) || 'Standard';
+        var tags = (Array.isArray(sec.tags) ? sec.tags : [])
+          .filter(function (t) {
+            return t && t.id;
+          })
+          .map(function (t, ti) {
+            return {
+              id: str(t.id),
+              code: str(t.code),
+              label: str(t.label) || str(t.code) || name,
+              text: text(t.i_can_text),
+              i_can_statements: textList(t.i_can_statements),
+              bank_id: t.bank_id ? str(t.bank_id) : null,
+              subject: str(subject.id),
+              name: name,
+              sortOrder: order(t.display_order, ti),
+            };
+          })
+          .sort(byOrder);
+        var folder = sec.competency_group_id ? str(sec.competency_group_id) : null;
+        sections.push({
+          id: str(sec.id),
+          subject: str(subject.id),
+          name: name,
+          shortName: name,
+          groupId: folder,
+          competencyGroupId: folder,
+          tags: tags,
+          sortOrder: order(sec.display_order, i),
+          outcome: tags[0] || null,
+        });
+      });
+    });
+    subjects.sort(byOrder);
+    var categories = (Array.isArray(l.categories) ? l.categories : [])
+      .filter(function (k) {
+        return k && k.id;
+      })
+      .map(function (k, i) {
+        return {
+          id: str(k.id),
+          name: str(k.name),
+          weight: num(k.weight),
+          displayOrder: order(k.display_order, i),
+          calcMode: k.calc_mode === 'percent' ? 'percent' : 'points',
+        };
+      });
+    // This student's own hand-set levels, by section (no reason is sent), and the class's Next Step sentences.
+    var overrides = {};
+    var so = obj(l.section_overrides) || {};
+    Object.keys(so).forEach(function (id) {
+      var o = obj(so[id]);
+      if (o && num(o.level) > 0) overrides[id] = { level: num(o.level), date: text(o.date) };
+    });
+    var steps = {};
+    var ns = obj(l.next_steps) || {};
+    Object.keys(ns).forEach(function (id) {
+      var x = obj(ns[id]);
+      if (!x) return;
+      steps[id] = {
+        Emerging: text(x.Emerging),
+        Developing: text(x.Developing),
+        Proficient: text(x.Proficient),
+        sensitive: x.sensitive === true,
+      };
+    });
+    return {
+      overrides: overrides,
+      nextSteps: steps,
+      config: config,
+      calcMethod: config.calcMethod,
+      decayWeight: config.decayWeight,
+      timezone: text(c.timezone) || 'America/Vancouver',
+      groups: groups,
+      subjects: subjects,
+      sections: sections,
+      categories: categories,
     };
   }
 
@@ -279,6 +416,8 @@ var StudentData = (function () {
         // course.teacher_name is never read: the page never names the
         // teacher (Colin's ruling 112, "Leave the name off.").
       },
+      // My Learning (S13-W1): only when the class shows it and the server sent what it needs.
+      learning: res.show_my_learning === true && obj(res.learning) ? learningFrom(res.learning) : null,
       // The class's competencies: name, code and I Can statements (blanks kept, as sent).
       tags: tagsFrom(res.tags),
       assessments: assessments,
@@ -305,6 +444,16 @@ var StudentData = (function () {
     Object.keys(G.COURSES).forEach(function (id) {
       delete G.COURSES[id];
     });
+    // My Learning's readers are on the page only while its class shows My Learning.
+    Object.keys(LEARNING_READERS).forEach(function (name) {
+      if (page && page.learning) {
+        G[name] = LEARNING_READERS[name];
+        return;
+      }
+      // Taken off only if it is this file's own (looked at without reading it).
+      var own = Object.getOwnPropertyDescriptor(G, name);
+      if (own && own.value === LEARNING_READERS[name]) delete G[name];
+    });
     if (!page) return;
     page.assessments.forEach(function (a) {
       if (a.status) statuses[page.student.id + ':' + a.id] = a.status;
@@ -315,6 +464,11 @@ var StudentData = (function () {
       block: page.course.block,
       gradingSystem: page.course.gradingSystem,
     };
+    if (page.learning) {
+      G.COURSES[page.course.id].calcMethod = page.learning.calcMethod;
+      if (page.learning.decayWeight != null) G.COURSES[page.course.id].decayWeight = page.learning.decayWeight;
+      G.COURSES[page.course.id].timezone = page.learning.timezone;
+    }
   }
 
   function isThis(cid) {
@@ -362,10 +516,168 @@ var StudentData = (function () {
     G[name] = READERS[name];
   });
 
+  /* What calc.js and shared/student-view.js read for My Learning (S13-W1),
+     answered from `learning` as shared/data.js answers them from the
+     teacher's cache. Set by use() only for a class that shows My Learning. */
+  function L() {
+    return page && page.learning;
+  }
+  // The folders (competency groups) come only through getGroupedSections: calc.js reads no other way to them.
+  /* Next Step on the card (Batch E, E9): the comment bank's two readers My
+     Learning uses (shared/student-view.js), over the class's own sentences
+     `page` sends (learning.next_steps), as teacher/comment-bank.js answers
+     them in Preview: bankEntry's steps, and nextStepOf's rule word for word
+     (the lowest skill with 2 or more returned pieces, not among the
+     strongest, never a sensitive set's), copied from teacher/comment-bank.js
+     (strongestOf, nextStepOf, with its constants): change both together. */
+  var STRONGEST_PIECES = 3;
+  var NEXT_STEP_PIECES = 2;
+  var STRONGEST_GAP = 0.5;
+  function atLeast(change, step) {
+    return change != null && Math.round(change * 1000) >= Math.round(step * 1000);
+  }
+  function strongestOf(comps) {
+    var xs = (comps || [])
+      .filter(function (c) {
+        return c.level > 0;
+      })
+      .sort(function (a, b) {
+        return b.level - a.level;
+      });
+    for (var k = 1; k <= 2 && xs.length > k; k++) {
+      var top = xs.slice(0, k);
+      var enough = top.every(function (c) {
+        return (c.scores || []).length >= STRONGEST_PIECES;
+      });
+      if (enough && atLeast(top[k - 1].level - xs[k].level, STRONGEST_GAP)) return top;
+    }
+    return [];
+  }
+  var CARD_BANK = {
+    bankEntry: function (bankId) {
+      var e = L() && L().nextSteps ? L().nextSteps[bankId] : null;
+      return e
+        ? {
+            key: 'bank.' + bankId,
+            phrase: '',
+            steps: { Emerging: e.Emerging, Developing: e.Developing, Proficient: e.Proficient },
+          }
+        : null;
+    },
+    nextStepOf: function (comps) {
+      var strong = strongestOf(comps);
+      var low = null;
+      (comps || []).forEach(function (c) {
+        if (!(c.level > 0) || (c.scores || []).length < NEXT_STEP_PIECES || strong.indexOf(c) >= 0) return;
+        var e = c.bankId && L() && L().nextSteps ? L().nextSteps[c.bankId] : null;
+        if (e && e.sensitive) return;
+        if (!low || c.level < low.level) low = c;
+      });
+      return low;
+    },
+  };
+
+  var LEARNING_READERS = {
+    CommentBank: CARD_BANK,
+    getCourseConfig: function (cid) {
+      return isThis(cid) && L() ? L().config : {};
+    },
+    getAssessments: function (cid) {
+      return isThis(cid) ? page.assessments : [];
+    },
+    getSections: function (cid) {
+      return isThis(cid) && L() ? L().sections : [];
+    },
+    getSubjects: function (cid) {
+      return isThis(cid) && L() ? L().subjects : [];
+    },
+    getGroupedSections: function (cid) {
+      var byId = {};
+      var groups = (isThis(cid) && L() ? L().groups : []).map(function (g) {
+        return (byId[g.id] = { group: g, sections: [] });
+      });
+      var ungrouped = [];
+      LEARNING_READERS.getSections(cid).forEach(function (sec) {
+        if (sec.groupId && byId[sec.groupId]) byId[sec.groupId].sections.push(sec);
+        else ungrouped.push(sec);
+      });
+      return { groups: groups, ungrouped: ungrouped };
+    },
+    getAllTags: function (cid) {
+      var out = [];
+      LEARNING_READERS.getSections(cid).forEach(function (sec) {
+        Array.prototype.push.apply(out, sec.tags);
+      });
+      return out;
+    },
+    getSectionForTag: function (cid, tagId) {
+      return LEARNING_READERS.getSections(cid).filter(function (sec) {
+        return sec.tags.some(function (t) {
+          return t.id === tagId;
+        });
+      })[0];
+    },
+    getCategories: function (cid) {
+      return isThis(cid) && L() ? L().categories : [];
+    },
+    getCategoryById: function (cid, id) {
+      if (!id) return null;
+      return (
+        LEARNING_READERS.getCategories(cid).filter(function (k) {
+          return k.id === id;
+        })[0] || null
+      );
+    },
+    // Every score on this page is a returned one: calc.js's returned-only set is the page's own.
+    getReturnedScores: function (cid) {
+      return READERS.getScores(cid);
+    },
+    // A category's Calculation: 'percent', or 'points' (the default), as shared/data.js reads it.
+    categoryCalcMode: function (category) {
+      var mode = category && (category.calcMode || category.calc_mode);
+      return mode === 'percent' ? 'percent' : 'points';
+    },
+    // Today in the class's time zone (America/Vancouver unless the class says otherwise), YYYY-MM-DD.
+    courseToday: function (cid) {
+      var tz = (isThis(cid) && L() && L().timezone) || 'America/Vancouver';
+      var at = new Date();
+      try {
+        var parts = new Intl.DateTimeFormat('en-CA', {
+          timeZone: tz,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        })
+          .formatToParts(at)
+          .reduce(function (o, x) {
+            o[x.type] = x.value;
+            return o;
+          }, {});
+        if (parts.year && parts.month && parts.day) return parts.year + '-' + parts.month + '-' + parts.day;
+      } catch (e) {
+        /* an unknown time zone: the device's own day below */
+      }
+      return (
+        at.getFullYear() +
+        '-' +
+        String(at.getMonth() + 1).padStart(2, '0') +
+        '-' +
+        String(at.getDate()).padStart(2, '0')
+      );
+    },
+    // A teacher's level set by hand on a competency: this student's own, as `page` sends them with My Learning.
+    getOverrides: function (cid) {
+      var out = {};
+      if (isThis(cid) && L()) out[page.student.id] = L().overrides || {};
+      return out;
+    },
+  };
+
   return {
     fromServer: fromServer,
     use: use,
     readers: Object.keys(READERS),
+    learningReaders: Object.keys(LEARNING_READERS),
     page: function () {
       return page;
     },

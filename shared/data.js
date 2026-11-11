@@ -6171,6 +6171,15 @@ function saveScoreReportNote(cid, sid, aid, text) {
   });
   if (!entries.length) return false;
   if (getScoreReportNote(cid, sid, aid) === note) return true;
+  // Batch E, E3: a regrade of a returned grade is open: the note it went out with is kept first.
+  var gradeRow = getGradeReturn(cid, sid, aid);
+  var heldRow = gradeRow ? GradeState.afterNote(gradeRow, getScoreReportNote(cid, sid, aid)) : null;
+  if (heldRow && heldRow !== gradeRow) {
+    var rows = Object.assign({}, getGradeReturns(cid));
+    rows[aid] = Object.assign({}, rows[aid]);
+    rows[aid][sid] = heldRow;
+    _saveGradeReturns(cid, rows);
+  }
   entries.forEach(function (e) {
     if (note) e.reportNote = note;
     else delete e.reportNote;
@@ -11645,6 +11654,11 @@ function _serverGradeRows(list) {
       });
       if (r.updated_at != null) row.updated_at = r.updated_at;
       if (r.seen_at != null) row.seen_at = r.seen_at;
+      // Batch E, E3: the Note for the Report the returned grade went out with, while a regrade is open.
+      if (typeof r.held_note_at === 'string') {
+        row.held_note_at = r.held_note_at;
+        if (typeof r.held_note === 'string' && r.held_note) row.held_note = r.held_note;
+      }
       of[sid] = row;
     });
     if (Object.keys(of).length) out[aid] = of;
@@ -11682,6 +11696,8 @@ function _gradeRowsLook(rows) {
                 copy(r.returned_copy),
                 copy(r.previous_copy),
                 day(r.updated_at),
+                // Batch E, E3: a report prints the held note while it counts.
+                GradeState.heldNote(r).held ? GradeState.heldNote(r).note : null,
               ];
             }),
         ];
@@ -12767,10 +12783,12 @@ async function _askTeacherCards(url, token, body) {
    twice; a sign-in that ran out is renewed once and asked again, the same
    way. */
 async function _teacherCardsRequest(cid, items) {
+  return _teacherCardsAsk({ course_id: cid, items: items, request_id: _newEntryId() });
+}
+async function _teacherCardsAsk(body) {
   var url = _teacherCardsUrl();
   var token = await _teacherToken();
   if (!url || !token) return { data: null, error: { status: 401, error: 'unauthorized' } };
-  var body = { course_id: cid, items: items, request_id: _newEntryId() };
   var got = await _askTeacherCards(url, token, body);
   if (got.status === 0) got = await _askTeacherCards(url, token, body);
   if (got.status === 401 && typeof refreshSupabaseSession === 'function') {
@@ -15435,25 +15453,47 @@ window.v2.deleteQuestionnaire = function (id) {
   if (!_isUuid(id)) return Promise.resolve({ data: null, error: null });
   return _rpcOrNoop('delete_questionnaire', { p_id: id });
 };
-/* New slip codes: [{ enrollment_id, code }], every enrolled student when
-   enrollmentIds is empty. Online only and never through the outbox: the
-   plain codes come back once and a replay returns none, so a failed call is
-   simply issued again. */
-window.v2.issueAccessCodes = function (questionnaireId, enrollmentIds) {
-  if (!_isUuid(questionnaireId)) return Promise.resolve({ data: null, error: null });
+/* New slips: [{ enrollment_id, code, password? }], every enrolled student
+   when enrollmentIds is empty. teacher-cards makes them (plan S3-S1): it
+   draws each code (and, for a student with no birthday or student number,
+   a password), and the database keeps only their keyed tags. Online only
+   and never through the outbox: the codes come back once, and nothing here
+   keeps them. A reply lost on the way (a replay, which carries no codes)
+   is asked for once more under a new request id: those slips are made
+   again, which takes back the ones nobody printed. A reprint always has a
+   new code, and a new password where there is one. */
+function _issueSlips(kind, id, enrollmentIds) {
+  if (!_isUuid(id)) return Promise.resolve({ data: null, error: null });
   var sb = getSupabase();
   if (!sb || _isDemoSession()) return Promise.resolve({ data: null, error: null });
   var ids = (enrollmentIds || []).filter(_isUuid);
-  var rpcParams = { p_questionnaire_id: questionnaireId, p_enrollment_ids: ids.length ? ids : null };
-  _stampIdempotencyKey('issue_access_codes', rpcParams);
-  return _trackWriteSync(
-    'issue_access_codes',
-    _callRpcWithAuthGuard('issue_access_codes', rpcParams).then(function (res) {
-      if (res.error && !res.error.handledSessionExpired) console.warn('issue_access_codes failed:', res.error);
-      var rows = res && Array.isArray(res.data) ? res.data : null;
-      return { data: rows, error: res.error || null };
-    }),
+  var ask = function () {
+    return _teacherCardsAsk({
+      route: 'slips',
+      kind: kind,
+      id: id,
+      enrollment_ids: ids.length ? ids : null,
+      request_id: _newEntryId(),
+    });
+  };
+  return _trackPendingSync(
+    (async function () {
+      var got = await ask();
+      if (got.data && got.data.replayed) got = await ask();
+      if (!got.data) return { data: null, error: got.error };
+      var rows = [];
+      got.data.results.forEach(function (r) {
+        if (!r || r.result !== 'made' || typeof r.code !== 'string') return;
+        var row = { enrollment_id: r.enrollment_id, code: r.code };
+        if (typeof r.password === 'string') row.password = r.password;
+        rows.push(row);
+      });
+      return { data: rows, error: null };
+    })(),
   );
+}
+window.v2.issueAccessCodes = function (questionnaireId, enrollmentIds) {
+  return _issueSlips('questionnaire', questionnaireId, enrollmentIds);
 };
 
 /* Reports on students' phones (migrations/20261025_phone_reports.sql).
@@ -15510,17 +15550,9 @@ window.v2.closePhoneReport = function (reportId) {
   if (!_isUuid(reportId)) return Promise.resolve({ data: null, error: null });
   return _phoneReportCall('close_phone_report', { p_id: reportId }, _phoneReportObject);
 };
-/* [{ enrollment_id, code }]: the plain codes come back once. */
+/* [{ enrollment_id, code }]: the codes come back once, from teacher-cards (_issueSlips). */
 window.v2.issueReportCodes = function (reportId, enrollmentIds) {
-  if (!_isUuid(reportId)) return Promise.resolve({ data: null, error: null });
-  var ids = (enrollmentIds || []).filter(_isUuid);
-  return _phoneReportCall(
-    'issue_report_codes',
-    { p_report_id: reportId, p_enrollment_ids: ids.length ? ids : null },
-    function (d) {
-      return Array.isArray(d) ? d : null;
-    },
-  );
+  return _issueSlips('report', reportId, enrollmentIds);
 };
 window.v2.listPhoneReports = function (courseId) {
   if (!_isUuid(courseId)) return Promise.resolve({ data: null, error: null });

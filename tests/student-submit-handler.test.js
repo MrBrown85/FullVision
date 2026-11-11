@@ -8,6 +8,13 @@
  */
 import { describe, expect, it } from 'vitest';
 import { makeHandler, ipHash, allowedOrigin } from '../supabase/functions/student-submit/handler.ts';
+import { SLIP_SQL } from '../supabase/functions/student-submit/slip-routes.ts';
+import { readCardKey } from '../supabase/functions/_shared/card-key.ts';
+import { FAKE_KEY, slipCodeTag } from './helpers/card-key-fake.js';
+
+// Since plan S3-S1 a slip's open and verify go to the database as tagged statements (slip-routes.ts).
+const KEY = await readCardKey(FAKE_KEY);
+const K7M = slipCodeTag('K7M4QX');
 
 function setup(overrides) {
   const calls = [];
@@ -17,8 +24,22 @@ function setup(overrides) {
       {
         region: 'ca-central-1',
         ipKey: 'test-key',
+        cardKey: KEY,
         log: entry => logs.push(entry),
         db: {
+          async call(text, p) {
+            if (text === SLIP_SQL.open) {
+              calls.push({ route: 'open', tag: p[0], code: p[2], hash: p[3] });
+              return p[0] === K7M
+                ? { ok: true, token: 'a'.repeat(64), student: { first_name: 'Cece' } }
+                : { ok: false, error: 'not_found' };
+            }
+            const who = { birthday: p[1], studentNumber: p[2], password: p[3] };
+            calls.push({ route: 'verify', token: p[0], who, hash: p[6] });
+            return who.studentNumber === '0123456' || who.password === '4821'
+              ? { ok: true, parts: [] }
+              : { ok: false, error: 'wrong_identity', tries_left: 4 };
+          },
           async open(code, hash) {
             calls.push({ route: 'open', code, hash });
             return code === 'K7M-4QX'
@@ -70,7 +91,8 @@ describe('student-submit handler', () => {
     const res = await handle(post({ route: 'open', code: 'K7M-4QX' }));
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ ok: true, student: { first_name: 'Cece' } });
-    expect(calls[0]).toMatchObject({ route: 'open', code: 'K7M-4QX' });
+    // The code goes as its tag, and the plain code is not sent (no fallback was asked for).
+    expect(calls[0]).toMatchObject({ route: 'open', tag: K7M, code: null });
     expect(res.headers.get('access-control-allow-origin')).toBe('https://fullvision.ca');
     expect(res.headers.get('cache-control')).toBe('no-store');
   });

@@ -136,14 +136,16 @@
           designations, notes or another student's information.
         </li>
         <li>
-          Each code works once, only for that student, and only while the questionnaire is open. FullVision stores a
-          slip's code scrambled (as a hash), not as printed. A slip's code is short, so someone with a copy of the
-          database could work the codes out from it.
+          Each code works once, only for that student, and only while the questionnaire is open. FullVision does not
+          keep a slip's code. The database keeps only a keyed fingerprint of it, as for a student card, made with a key
+          the database never holds, so a copy of the database cannot be used to work the codes out. A slip printed
+          before this change is changed over to a fingerprint the first time it is scanned; one never scanned stops
+          working after June 30, 2027.
         </li>
         <li>
           Before the questions open, the student shows the slip is theirs: their birthday or student number, checked
           against what the teacher entered, or, for a student with neither, a four-digit password FullVision prints on
-          the slip and keeps, as printed, with the student's record. After five wrong tries the slip stops working.
+          the slip and keeps only as a keyed fingerprint, like the code. After five wrong tries the slip stops working.
         </li>
         <li>
           The answers go to the teacher's gradebook and nowhere else. A question the teacher marks as private, such as
@@ -242,8 +244,9 @@
             <td>
               Name, preferred name, pronouns, student number, email address, date of birth, learning designations (such
               as an IEP), and parents' or guardians' email addresses. Only a first name is required; the teacher chooses
-              whether to add the rest. For a student with no birthday or student number, the questionnaire slip
-              password.
+              whether to add the rest. For a student with no birthday or student number, a questionnaire slip password
+              printed before this change is kept as printed until no unscanned slip from before the change needs it (at
+              the latest June 30, 2027); every slip password since is kept only as a keyed fingerprint, with its slip.
             </td>
           </tr>
           <tr>
@@ -368,8 +371,9 @@
         <li>Database rules restrict every request to the signed-in teacher's own data.</li>
         <li>
           Student card codes and passwords are kept only as keyed fingerprints, made with a key the database never
-          holds. Slip codes are stored as hashes, and slip passwords as printed. Every code is blocked after repeated
-          wrong tries.
+          holds. Slip codes and passwords are kept the same way; a slip printed before this change is changed over when
+          it is first scanned, and one never scanned stops working after June 30, 2027. Every code is blocked after
+          repeated wrong tries.
         </li>
         <li>The pages only run scripts from FullVision itself and from Sentry's error-reporting service.</li>
       </ul>

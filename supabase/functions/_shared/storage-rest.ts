@@ -14,7 +14,7 @@
 //                  (supabase/storage, src/storage/renderer/renderer.ts:
 //                  with `expires` set, only no-transform is passed on). So a
 //                  copy cached from a link can live at most to the link's
-//                  end, 300 seconds; whether Supabase's CDN keeps one at all
+//                  end, 60 seconds (E8); whether Supabase's CDN keeps one at all
 //                  is a live check.
 //   read           the file's bytes, stopping at `maxBytes` + 1: a larger
 //                  file is never read whole, it is answered 'too_large'.

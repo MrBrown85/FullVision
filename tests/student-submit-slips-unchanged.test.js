@@ -15,12 +15,31 @@
  *   1. requests the old handler refused with 400 and today's serves (the
  *      card's routes), and
  *   2. an IPv6 caller's rate-limit key (PR 975).
+ *
+ * Plan S3-S1 (migrations/2026111160_slips_keyed.sql) changed this on
+ * purpose: a slip's open and verify now hand the database tags, and open
+ * needs the card key. So each request is checked twice:
+ *   - against the database BEFORE that migration (its new statements do not
+ *     exist, SQLSTATE 42883): everything is exactly as before, what the
+ *     database was asked included. Deploying the function first changes
+ *     nothing for a slip.
+ *   - against the database AFTER it: the phone sees exactly what it saw
+ *     before and the log is the same, but open and verify reach the database
+ *     as tagged statements, and the plain code never does.
+ * The codes below are six characters of the slip alphabet, as the real
+ * database requires (they once held letters no slip has: S, O, 0).
  */
 import { describe, expect, it } from 'vitest';
 import { readCardKey } from '../supabase/functions/_shared/card-key.ts';
 import { makeHandler as today } from '../supabase/functions/student-submit/handler.ts';
 import { makeHandler as before } from './fixtures/student-submit-handler-2026-11-03.ts';
-import { FAKE_KEY } from './helpers/card-key-fake.js';
+import { SLIP_SQL } from '../supabase/functions/student-submit/slip-routes.ts';
+import { FAKE_KEY, slipCodeTag } from './helpers/card-key-fake.js';
+
+const KEY = await readCardKey(FAKE_KEY);
+// The database before 2026111160 (the deploy goes first), and after it.
+const BEFORE = { before: true, cardKey: KEY };
+const AFTER = { cardKey: KEY };
 
 const TOKEN = 'a'.repeat(64);
 const URL_ = 'https://x.supabase.co/functions/v1/student-submit?forceFunctionRegion=ca-central-1';
@@ -37,7 +56,7 @@ const ANSWERS = {
       check: 'identity',
       also_password: false,
     },
-    R3P0RT: {
+    R3PQRT: {
       ok: true,
       kind: 'report',
       token: TOKEN,
@@ -46,10 +65,10 @@ const ANSWERS = {
       report: { title: 'Report 1', expires_on: '2027-01-31' },
       has_birthday: true,
     },
-    USED22: { ok: false, error: 'used' },
-    SOON22: { ok: false, error: 'not_open_yet', opens_on: '2026-11-20' },
-    BUSY22: { ok: false, error: 'busy' },
-    LOCK22: { ok: false, error: 'locked' },
+    UXED22: { ok: false, error: 'used' },
+    WAYT22: { ok: false, error: 'not_open_yet', opens_on: '2026-11-20' },
+    BUZY22: { ok: false, error: 'busy' },
+    KNCK22: { ok: false, error: 'locked' },
   },
   verify: {
     [TOKEN]: { ok: true, parts: [{ id: 'p1', title: 'November Reflection', questions: [] }], context: { n: 1 } },
@@ -86,11 +105,30 @@ function side(make, opts) {
     cardKey: opts && opts.cardKey,
     log: entry => logs.push(Object.assign({}, entry, { ms: 0 })),
     db: {
-      open: async (code, hash) => (asked.push(['open', code, hash]), answer('open', code)),
+      // The database tidies what was typed, as the real one does.
+      open: async (code, hash) => (
+        asked.push(['open', code, hash]),
+        answer(
+          'open',
+          String(code)
+            .replace(/[^A-Za-z0-9]/g, '')
+            .toUpperCase(),
+        )
+      ),
       verify: async (token, who, hash) => (asked.push(['verify', token, who, hash]), answer('verify', token)),
       check: async (token, birthday, hash) => (asked.push(['check', token, birthday, hash]), answer('check', token)),
       submit: async (token, answers, hash) => (asked.push(['submit', token, answers, hash]), answer('submit', token)),
-      call: async (sql, params) => (asked.push(['call', sql, params]), { ok: false, error: 'not_found' }),
+      call: async (sql, params) => {
+        if (sql === SLIP_SQL.open || sql === SLIP_SQL.verify) {
+          // Before the migration the statement's function does not exist: the handler then asks the old way.
+          if (opts && opts.before) throw Object.assign(new Error('function does not exist'), { code: '42883' });
+          asked.push(['call', sql, params]);
+          if (sql === SLIP_SQL.verify) return answer('verify', params[0]);
+          return answer('open', Object.keys(ANSWERS.open).find(c => slipCodeTag(c) === params[0]) || '');
+        }
+        asked.push(['call', sql, params]);
+        return { ok: false, error: 'not_found' };
+      },
     },
   });
   return { handle, asked, logs };
@@ -123,13 +161,13 @@ const post = (body, headers) => ({ body, headers });
 // Every request a slip page sends, and every way one can be wrong.
 const SLIP_REQUESTS = {
   'open: a questionnaire slip': post({ route: 'open', code: 'K7M4QX' }),
-  'open: a report slip': post({ route: 'open', code: 'R3P0RT' }),
+  'open: a report slip': post({ route: 'open', code: 'R3PQRT' }),
   'open: with a dash and lower case, as typed': post({ route: 'open', code: 'k7m-4qx' }),
   'open: a code nobody holds': post({ route: 'open', code: 'ABC234' }),
-  'open: used': post({ route: 'open', code: 'USED22' }),
-  'open: not open yet': post({ route: 'open', code: 'SOON22' }),
-  'open: busy': post({ route: 'open', code: 'BUSY22' }),
-  'open: locked': post({ route: 'open', code: 'LOCK22' }),
+  'open: used': post({ route: 'open', code: 'UXED22' }),
+  'open: not open yet': post({ route: 'open', code: 'WAYT22' }),
+  'open: busy': post({ route: 'open', code: 'BUZY22' }),
+  'open: locked': post({ route: 'open', code: 'KNCK22' }),
   'open: no code': post({ route: 'open' }),
   'open: a code that is not text': post({ route: 'open', code: 123456 }),
   'open: a code too long': post({ route: 'open', code: 'K'.repeat(33) }),
@@ -221,7 +259,7 @@ describe('a slip’s requests get the same answer from the function with and wit
   it.each(Object.keys(SLIP_REQUESTS))('%s', async name => {
     const r = SLIP_REQUESTS[name];
     const was = await seenBy(before, r);
-    const is = await seenBy(today, r);
+    const is = await seenBy(today, r, BEFORE);
     expect(is.status).toBe(was.status);
     expect(is.headers).toEqual(was.headers);
     expect(is.text).toBe(was.text);
@@ -235,7 +273,7 @@ describe('a slip’s requests get the same answer from the function with and wit
     const reached = new Set();
     const said = new Set();
     for (const r of Object.values(SLIP_REQUESTS)) {
-      const is = await seenBy(today, r);
+      const is = await seenBy(today, r, BEFORE);
       is.asked.forEach(a => reached.add(a[0]));
       said.add(is.status + ' ' + is.text.replace(/^.*"error":"(\w+)".*$/, '$1').replace(/^\{"ok":true.*$/, 'ok'));
     }
@@ -266,7 +304,7 @@ describe('a slip’s requests get the same answer from the function with and wit
     const body = { route, code: 'K7M4QX', token: TOKEN, birthday: '2012-05-15', answers: { q1: 'a' } };
     for (const opts of [{ region: 'us-east-1' }, { region: undefined }, { down: true }]) {
       const was = await seenBy(before, post(body), opts);
-      const is = await seenBy(today, post(body), opts);
+      const is = await seenBy(today, post(body), { ...BEFORE, ...opts });
       expect(is).toEqual(was);
       expect(is.status).toBe(opts.down ? 500 : 421);
     }
@@ -299,21 +337,43 @@ describe('what deploying does change, and nothing else', () => {
   });
 
   it('an IPv4 caller’s rate-limit key is the same; an IPv6 caller is now counted by network', async () => {
-    const hashOf = async (make, address) =>
-      (await seenBy(make, post({ route: 'open', code: 'ABC234' }, address))).asked[0][2];
+    const hashOf = async (make, address, opts) =>
+      (await seenBy(make, post({ route: 'open', code: 'ABC234' }, address), opts)).asked[0][2];
     for (const address of ['203.0.113.7', '10.0.0.1', ' 198.51.100.20 ']) {
       const headers = { 'cf-connecting-ip': address };
-      expect(await hashOf(today, headers), address).toBe(await hashOf(before, headers));
+      expect(await hashOf(today, headers, BEFORE), address).toBe(await hashOf(before, headers));
     }
     // Two devices on one IPv6 network: two keys before, one now (PR 975).
     const a = { 'cf-connecting-ip': '2001:db8:1:2:aaaa::1' };
     const b = { 'cf-connecting-ip': '2001:db8:1:2:bbbb::2' };
     expect(await hashOf(before, a)).not.toBe(await hashOf(before, b));
-    expect(await hashOf(today, a)).toBe(await hashOf(today, b));
-    expect(await hashOf(today, a)).not.toBe(await hashOf(before, a));
+    expect(await hashOf(today, a, BEFORE)).toBe(await hashOf(today, b, BEFORE));
+    expect(await hashOf(today, a, BEFORE)).not.toBe(await hashOf(before, a));
     // The reply itself is the same either way.
     const was = await seenBy(before, post({ route: 'open', code: 'K7M4QX' }, a));
-    const is = await seenBy(today, post({ route: 'open', code: 'K7M4QX' }, a));
+    const is = await seenBy(today, post({ route: 'open', code: 'K7M4QX' }, a), BEFORE);
     expect([is.status, is.headers, is.text, is.logs]).toEqual([was.status, was.headers, was.text, was.logs]);
+  });
+});
+
+describe('after the migration (2026111160): the phone sees the same, the database is handed tags', () => {
+  it.each(Object.keys(SLIP_REQUESTS))('%s', async name => {
+    const r = SLIP_REQUESTS[name];
+    const was = await seenBy(before, r);
+    const is = await seenBy(today, r, AFTER);
+    expect(is.status).toBe(was.status);
+    expect(is.headers).toEqual(was.headers);
+    expect(is.text).toBe(was.text);
+    expect(is.logs).toEqual(was.logs);
+    // open and verify are tagged statements now; check and submit are as they were.
+    const kind = a =>
+      a[0] === 'call' ? (a[1] === SLIP_SQL.open ? 'open' : a[1] === SLIP_SQL.verify ? 'verify' : 'card') : a[0];
+    expect(is.asked.map(kind)).toEqual(was.asked.map(a => a[0]));
+    expect(is.asked.filter(a => a[0] === 'open' || a[0] === 'verify')).toEqual([]);
+    // The plain code never reaches the database (no fallback is asked for here).
+    const code =
+      r.body && typeof r.body.code === 'string' ? r.body.code.replace(/[^A-Za-z0-9]/g, '').toUpperCase() : '';
+    if (code.length === 6) expect(JSON.stringify(is.asked)).not.toContain(code);
+    for (const a of is.asked.filter(x => kind(x) === 'open')) expect(a[2][2]).toBeNull();
   });
 });

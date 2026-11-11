@@ -18,6 +18,7 @@
  *
  * The four slip routes are in tests/student-submit-handler.test.js.
  */
+import { SLIP_SQL } from '../supabase/functions/student-submit/slip-routes.ts';
 import { describe, expect, it } from 'vitest';
 import { readCardKey } from '../supabase/functions/_shared/card-key.ts';
 import { makeHandler } from '../supabase/functions/student-submit/handler.ts';
@@ -237,6 +238,9 @@ function setup(answers, overrides) {
           check: untouched('check'),
           submit: untouched('submit'),
           async call(text, params) {
+            // A slip's open and verify, with tags since plan S3-S1: a slip's, not a card's.
+            if (text === SLIP_SQL.open) return untouched('open')();
+            if (text === SLIP_SQL.verify) return untouched('verify')();
             calls.push({ sql: text, params });
             const fn = /^select student_submit\.(\w+)\(/.exec(text)[1];
             const add = /, p_add => (true|false)\) as r$/.exec(text);
@@ -554,7 +558,8 @@ describe('student-submit: verify for a card', () => {
   });
 
   it("still passes busy on from a slip's open", async () => {
-    const { handle } = setup(null, { db: { open: async () => ({ ok: false, error: 'busy' }) } });
+    // Since plan S3-S1 a slip's open is a tagged statement (slip-routes.ts).
+    const { handle } = setup(null, { db: { call: async () => ({ ok: false, error: 'busy' }) } });
     const res = await handle(post({ route: 'open', code: SLIP }));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: false, error: 'busy' });
