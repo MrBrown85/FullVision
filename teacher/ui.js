@@ -1604,15 +1604,16 @@ function renderStudentHeader(cid, sid, opts) {
   html += `<div class="sh-spacer"></div>`;
 
   const work = [
-    [nsAssignments, 'Missing', 'var(--score-1)'],
+    // Missing is attention, so orange (design rule 3), not a level's red.
+    [nsAssignments, 'Missing', '', 'sh-stat-att'],
     [excAssignments, 'Excused', ''],
     [lateAssignments, 'Late', 'var(--score-2)'],
   ].filter(w => w[0].length);
   if (work.length) {
     html += `<div class="sh-stats">`;
-    work.forEach(([list, label, color]) => {
+    work.forEach(([list, label, color, cls]) => {
       html += `<div class="sh-stat" title="${list.map(t => esc(t)).join('\n')}">
-      <div class="sh-stat-val"${color ? ` style="color:${color}"` : ''}>${list.length}</div>
+      <div class="sh-stat-val${cls ? ' ' + cls : ''}"${color ? ` style="color:${color}"` : ''}>${list.length}</div>
       <div class="sh-stat-label">${label}</div>
     </div>`;
     });
