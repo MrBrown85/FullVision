@@ -198,3 +198,53 @@ test.describe('Reports and Assignments while the rows load', () => {
     expect(errors).toEqual([]);
   });
 });
+
+test.describe('Sent to Phones pressed while the rows are not loaded (S2-F2)', () => {
+  const sent = page =>
+    page.evaluate(() => (JSON.parse(localStorage.getItem('gb-phone-reports-sci8') || '[]') || []).length);
+  const msg = page => page.evaluate(() => (document.querySelector('.pp-msg') || { innerText: '' }).innerText);
+
+  test('Send does nothing and never stays on Sending…; once loaded it sends', async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', e => errors.push(String(e.message)));
+    await demo(page);
+    await go(page, '/reports?course=sci8&tab=progress');
+    await page.getByRole('button', { name: 'Sent to Phones' }).click();
+    const send = page.getByRole('button', { name: 'Send to Phones and Print Slips' });
+    await expect(send).toBeVisible();
+    await notLoaded(page);
+    await send.click();
+    await page.waitForTimeout(800);
+    expect(await sent(page)).toBe(0);
+    expect(await msg(page)).not.toContain('Sending…');
+    expect(await busy(page)).toEqual([]);
+    await loaded(page);
+    await page.evaluate(() => PageReports.renderReports());
+    await page.getByRole('button', { name: 'Send to Phones and Print Slips' }).click();
+    await expect(page.locator('.pp-row')).toHaveCount(27);
+    expect(await sent(page)).toBe(1);
+    expect(errors).toEqual([]);
+  });
+
+  test('Update Issued Copy does nothing and never stays on Updating…; once loaded it updates', async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', e => errors.push(String(e.message)));
+    await demo(page);
+    await go(page, '/reports?course=sci8&tab=progress');
+    await page.getByRole('button', { name: 'Sent to Phones' }).click();
+    await page.getByRole('button', { name: 'Send to Phones and Print Slips' }).click();
+    await expect(page.locator('.pp-row')).toHaveCount(27);
+    const update = page.getByRole('button', { name: 'Update Issued Copy' });
+    await expect(update).toBeVisible();
+    await notLoaded(page);
+    await update.click();
+    await page.waitForTimeout(600);
+    expect(await msg(page)).not.toContain('Updating…');
+    expect(errors).toEqual([]);
+    await loaded(page);
+    await page.evaluate(() => PageReports.renderReports());
+    await page.getByRole('button', { name: 'Update Issued Copy' }).click();
+    await expect(page.locator('.pp-msg')).toContainText('Updated.');
+    expect(errors).toEqual([]);
+  });
+});
