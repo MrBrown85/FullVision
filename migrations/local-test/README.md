@@ -2511,7 +2511,7 @@ against the file as it was before the review (`75ee95fd`,
 `PHOTO_LIFECYCLE_FILE=...`), 14 of `review`'s 30 checks fail.
 
 Results (2026-11-11, PostgreSQL 17.11, embedded-postgres, file md5
-`240245baeab9650ba0edfc5f7c8ad792`): `photo_lifecycle.py` 242 of 242, of which 37 ran on the base without
+`240245baeab9650ba0edfc5f7c8ad792`): `photo_lifecycle.py` 243 of 243 (after merging main and review 2's pre-check fix), of which 37 ran on the base without
 the file and 17 of those are the checks the file must change (each failed
 there, as required); `mutate` 41 wrong versions, 41 noticed (a 42nd, taking out `f.created_at < _cutoff` alone, changes nothing, since a page made after the cutoff is on work handed in after it, which the ruling-106 test keeps anyway, and was dropped); `fingerprints check` every list current.
 Taking out the stray check's "already waiting" test alone changes nothing (the
