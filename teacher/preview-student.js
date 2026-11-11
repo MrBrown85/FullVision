@@ -37,6 +37,13 @@ window.PreviewStudent = (function () {
 
   var STYLE_NAMES = { proficiency: 'Proficiency', letter: 'Letter', both: 'Both' };
 
+  /* The view the device draws. Opened by See What They'd See (S13-F1),
+     My Learning is worked out as if the class showed it, for this preview
+     only: nothing is saved, and every other screen reads the class as it is. */
+  function _fromCache(cid, sid) {
+    return StudentView.fromCache(cid, sid, { learning: !!(_open && _open.learning) });
+  }
+
   function _student(cid, sid) {
     return (getStudents(cid) || []).find(function (s) {
       return s && s.id === sid;
@@ -73,7 +80,23 @@ window.PreviewStudent = (function () {
     }).length;
   }
 
-  function _seesHtml(first, cid) {
+  /* The teacher's Mark Up the student sees: the notes on returned work,
+     over every piece the student was given marks on ("3 notes on his
+     work", the board's, by the student's name here), or null. */
+  function _marksSeen(view) {
+    var pages = 0;
+    var notes = 0;
+    ((view && view.work) || []).forEach(function (p) {
+      if (p && p.marks) {
+        pages += p.marks.pages;
+        notes += p.marks.notes;
+      }
+    });
+    return pages ? { pages: pages, notes: notes } : null;
+  }
+
+  function _seesHtml(first, cid, view) {
+    var marks = _marksSeen(view);
     return (
       '<section class="ps-card" aria-labelledby="ps-sees-title"><h3 class="ps-card-title" id="ps-sees-title">' +
       esc(first + ' Sees') +
@@ -82,8 +105,16 @@ window.PreviewStudent = (function () {
         'Your Result',
         'Each returned piece, in this class’s grading style (' + STYLE_NAMES[courseGradeMode(cid)] + ').',
       ) +
-      (StudentView.learningOn(cid)
+      (StudentView.learningOn(cid) || (_open && _open.learning)
         ? _item('My Learning', 'Their level on each skill and their grade, only from work you’ve returned.')
+        : '') +
+      (marks
+        ? _item(
+            marks.notes
+              ? (marks.notes === 1 ? '1 note' : marks.notes + ' notes') + ' on ' + first + '’s work'
+              : 'Your Mark Up',
+            marks.notes ? 'Your Mark Up, on the photos.' : 'On the photos of work you’ve returned.',
+          )
         : '') +
       '</ul></section>'
     );
@@ -118,7 +149,7 @@ window.PreviewStudent = (function () {
     var st = _student(cid, sid) || {};
     var first = displayNameFirst(st) || 'The student';
     var full = displayNameWithLast(st) || first;
-    var built = StudentView.fromCache(cid, sid);
+    var built = _fromCache(cid, sid);
     var screen = built.ready
       ? drawPage(built.view, _open.ui)
       : // html-safe: fixed markup
@@ -156,7 +187,7 @@ window.PreviewStudent = (function () {
       '</div>' +
       '<div class="ps-body">' +
       '<div class="ps-side ps-side-left">' +
-      _seesHtml(first, cid) +
+      _seesHtml(first, cid, built.ready ? built.view : null) +
       '</div>' +
       '<div class="ps-stage"><div class="ps-device ps-device-' +
       device +
@@ -197,8 +228,9 @@ window.PreviewStudent = (function () {
 
   /* Opens the preview of student `sid` in class `cid`. `trigger` is the
      control that opened it; the focus goes back to `returnFocusId` (or the
-     trigger) when it closes. */
-  function open(cid, sid, trigger, returnFocusId) {
+     trigger) when it closes. `opts.tab` is the tab it opens on;
+     `opts.learning` shows My Learning before the class turns it on (S13-F1). */
+  function open(cid, sid, trigger, returnFocusId, opts) {
     if (!cid || !sid || !_student(cid, sid)) return false;
     close();
     _open = {
@@ -208,7 +240,8 @@ window.PreviewStudent = (function () {
       trigger: trigger || null,
       returnTo: returnFocusId || null,
       // What the student looks at, as on the phone: the page opens on Assignments, To Do.
-      ui: {},
+      ui: opts && opts.tab ? { tab: opts.tab } : {},
+      learning: !!(opts && opts.learning),
     };
     var el = document.createElement('div');
     el.id = OVERLAY_ID;
@@ -278,6 +311,7 @@ window.PreviewStudent = (function () {
     var el = _overlay();
     var was = _open;
     _open = null;
+    if (was) _letGo(was);
     if (_onKey) document.removeEventListener('keydown', _onKey, true);
     if (_onLeave && typeof window.removeEventListener === 'function') window.removeEventListener('popstate', _onLeave);
     _onKey = _onLeave = null;
@@ -292,19 +326,92 @@ window.PreviewStudent = (function () {
      inside the device is drawn again. */
   function _press(act, el) {
     if (!_open) return;
-    var built = StudentView.fromCache(_open.cid, _open.sid);
+    var built = _fromCache(_open.cid, _open.sid);
     if (!built.ready) return;
+    if (act === 'work-retry') {
+      if (_open.ui.work) _loadWork(_open.ui.work);
+      return;
+    }
     var out = StudentPageView.press(_open.ui, built.view, act, el);
     if (!out) return;
     _open.ui = out.ui;
+    var have = out.ui.workPages;
+    if (out.work && !(have && have.id === out.work && have.state === 'ready')) return _loadWork(out.work);
     _drawScreen(out.focus);
+  }
+
+  /* ── See Your Work (S9-F3) ─────────────────────────────────── */
+
+  // The pictures this preview holds open (a photo still in the photo queue holds its bytes until let go).
+  function _letGo(open) {
+    (open.releases || []).forEach(function (release) {
+      try {
+        release();
+      } catch (e) {
+        /* already gone */
+      }
+    });
+    open.releases = [];
+  }
+
+  /* The pages of piece `aid` as the student sees them: the newest work
+     handed in, in page order, each with the marks the student was given
+     on it (getStudentMarkup: the given copy only, none while the piece
+     hides its Mark Up or Missing or Excused is on it). The pictures come
+     through openStudentWorkPage. The answer draws only while the preview
+     is still open on this student with See Your Work on this piece. */
+  function _loadWork(aid) {
+    var mine = _open;
+    if (!mine) return;
+    var cid = mine.cid;
+    var sid = mine.sid;
+    _letGo(mine);
+    mine.ui = Object.assign({}, mine.ui, { workPages: { id: aid, state: 'loading', pages: [] } });
+    _drawScreen('#sp-work-title');
+    var sub = typeof getStudentSubmission === 'function' ? getStudentSubmission(cid, sid, aid) : null;
+    var files = ((sub && sub.files) || []).filter(Boolean).slice();
+    files.sort(function (x, y) {
+      return (Number(x.page) || 0) - (Number(y.page) || 0);
+    });
+    var given = typeof getStudentMarkup === 'function' ? getStudentMarkup(cid, sid, aid) : null;
+    var byFile = {};
+    ((given && given.ok && given.files) || []).forEach(function (f) {
+      if (f && f.file_id) byFile[f.file_id] = f.marks || null;
+    });
+    var opening = files.map(function (f) {
+      return typeof openStudentWorkPage === 'function'
+        ? Promise.resolve(openStudentWorkPage(cid, f, 'page')).then(null, function () {
+            return null;
+          })
+        : Promise.resolve(null);
+    });
+    Promise.all(opening).then(function (opened) {
+      var still = _open === mine && mine.ui.work === aid;
+      if (!still) {
+        opened.forEach(function (o) {
+          if (o && typeof o.release === 'function') o.release();
+        });
+        return;
+      }
+      var pages = [];
+      mine.releases = [];
+      opened.forEach(function (o, i) {
+        if (!o || !o.url) return;
+        if (typeof o.release === 'function') mine.releases.push(o.release);
+        pages.push({ url: o.url, marks: byFile[files[i].id] || null });
+      });
+      mine.ui = Object.assign({}, mine.ui, {
+        workPages: { id: aid, state: files.length && !pages.length ? 'failed' : 'ready', pages: pages },
+      });
+      _drawScreen('#sp-work-title');
+    });
   }
 
   function _drawScreen(focus) {
     var box = _overlay();
     var screen = box && box.querySelector('.ps-screen');
     if (!screen || !_open) return;
-    var built = StudentView.fromCache(_open.cid, _open.sid);
+    var built = _fromCache(_open.cid, _open.sid);
     if (!built.ready) return _draw();
     // html-safe: drawPage is s/page-view.js, which escapes every title, date line and result
     screen.innerHTML = drawPage(built.view, _open.ui);

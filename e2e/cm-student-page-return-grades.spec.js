@@ -76,9 +76,16 @@ test('Return Grades: the question on leaving When I Return Them, Cancel, then Re
   ]);
   const card = page.locator('.sp-card');
   await expect(card.getByRole('heading', { name: 'Student Page' })).toBeVisible();
-  // Return Grades, then Send Work (S5-F1, Demo Mode), off: no Keep Photos Until.
-  await expect(card.locator('.sp-row')).toHaveCount(2);
-  await expect(card.locator('.sp-row-title')).toHaveText(['Return Grades', 'Send Work']);
+  // Return Grades, then Send Work (S5-F1, Demo Mode), off: no Keep Photos
+  // Until; then Reflect on Feedback (S10 follow-up, Demo Mode) and Show My
+  // Learning (S13-F1, Demo Mode).
+  await expect(card.locator('.sp-row')).toHaveCount(4);
+  await expect(card.locator('.sp-row-title')).toHaveText([
+    'Return Grades',
+    'Send Work',
+    'Reflect on Feedback',
+    'Show My Learning',
+  ]);
   await expect(card.locator('#sp-return-hint')).toHaveText(
     "When a grade shows on a student's page. Until then it's a draft only you can see.",
   );

@@ -71,6 +71,14 @@
     MC.setupOfflineDetection();
     _renderTab('students');
     _bindEvents();
+    // Add Work, Then Grade It opens the grader on the work just filed (S7-F3).
+    if (window.MAddWork) {
+      MAddWork.configure({
+        onGrade: function (cid, aid, sid) {
+          if (cid === _cid) _openGraderAt(sid, aid, true);
+        },
+      });
+    }
     _bindEdgeSwipe();
 
     _hideLoader();
@@ -609,7 +617,14 @@
     var desc = p.desc;
     var html;
     if (desc.kind === 'detail') html = MStudents.renderDetail(_cid, desc.sid);
-    else if (desc.kind === 'swiper') html = MGrade.renderSwiper(_cid, desc.aid, { only: desc.only });
+    else if (desc.kind === 'swiper')
+      html = MGrade.renderSwiper(_cid, desc.aid, {
+        only: desc.only,
+        ids: desc.ids,
+        student: desc.student,
+        aids: desc.aids,
+        kinds: desc.kinds,
+      });
     else if (desc.kind === 'sweep') html = MSweep.render(_cid, { keep: true });
     if (!html) return;
     var stack = document.getElementById('m-nav-stack');
@@ -703,6 +718,8 @@
   function _renderTab(tab) {
     // Clean up previous tab's resources
     if (MStudents.destroyCardStack) MStudents.destroyCardStack();
+    // The Grade tab's red count follows the class's work waiting (S7-F4).
+    if (window.MGradePhotos) MGradePhotos.syncTabBadge(_cid);
 
     var stack = document.getElementById('m-nav-stack');
     stack.innerHTML = '';
@@ -988,6 +1005,63 @@
     );
   }
 
+  /* Grade on a student page: the newest assessment's grading screen on the
+     Grade tab, at that student's card; a row names its own assessment
+     (wantAid). Back returns to the page. */
+  /* `oneStudent` (Grade on a To Grade row, Save and Grade): the grader on
+     that student's work only, a tab for each piece (S7-F4). */
+  function _openWorkWall(cid, aid) {
+    if (!window.WorkWall) return false;
+    return WorkWall.open(cid, aid, {
+      onGrade: function (sid, ids) {
+        // The wall answers for the class it was opened on, while it still shows.
+        if (_cid !== cid || !WorkWall.isOpen()) return;
+        WorkWall.close(true);
+        _gradeInOrder(aid, sid, ids);
+      },
+    });
+  }
+
+  // The grader on `ids`, in that order, at `sid`, from the Grade tab's list.
+  function _gradeInOrder(aid, sid, ids) {
+    var html = MGrade.renderSwiper(_cid, aid, { ids: ids });
+    _pushScreen(html, { kind: 'swiper', aid: aid, ids: ids.slice() });
+    MGrade.setupSwiper(_cid, aid);
+    var idx = MGrade.studentCardIndex(_cid, aid, sid);
+    if (idx > 0) MGrade.jumpToStudent(idx, true);
+  }
+
+  function _openGraderAt(gradeSid, wantAid, oneStudent) {
+    var newest = wantAid
+      ? getAssessments(_cid).find(function (a) {
+          return a.id === wantAid;
+        })
+      : getAssessments(_cid)
+          .slice()
+          .sort(function (a, b) {
+            return (b.date || '').localeCompare(a.date || '');
+          })[0];
+    // The Grade tab opens on its list. A grading screen left open there
+    // would come back under this one with the same ids, and the handlers
+    // would bind to the hidden copy.
+    _tabState.grade = null;
+    _switchTab('grade');
+    if (!newest) return;
+    _gradeReturnSid = gradeSid;
+    var html = MGrade.renderSwiper(_cid, newest.id, oneStudent ? { student: gradeSid } : null);
+    var work = oneStudent && MGrade.studentWork ? MGrade.studentWork() : null;
+    _pushScreen(
+      html,
+      work
+        ? { kind: 'swiper', aid: newest.id, student: work.sid, aids: work.aids, kinds: work.kinds }
+        : { kind: 'swiper', aid: newest.id },
+    );
+    // On group work the student's group card.
+    var gradeIdx = MGrade.studentCardIndex(_cid, newest.id, gradeSid);
+    MGrade.setupSwiper(_cid, newest.id);
+    if (gradeIdx > 0) MGrade.jumpToStudent(gradeIdx, true);
+  }
+
   /* ── Event delegation ───────────────────────────────────────── */
   function _bindEvents() {
     document.addEventListener('click', function (e) {
@@ -1010,31 +1084,27 @@
       // Grade on a student page: the newest assessment's grading screen on
       // the Grade tab, at that student's card. Back returns to the page.
       if (action === 'm-student-grade' || action === 'm-assess-grade') {
-        var gradeSid = target.getAttribute('data-sid');
-        // A row on the student screen opens its own assessment; the Grade
-        // button opens the newest.
-        var wantAid = target.getAttribute('data-aid');
-        var newest = wantAid
-          ? getAssessments(_cid).find(function (a) {
-              return a.id === wantAid;
-            })
-          : getAssessments(_cid)
-              .slice()
-              .sort(function (a, b) {
-                return (b.date || '').localeCompare(a.date || '');
-              })[0];
-        // The Grade tab opens on its list. A grading screen left open there
-        // would come back under this one with the same ids, and the handlers
-        // would bind to the hidden copy.
-        _tabState.grade = null;
-        _switchTab('grade');
-        if (!newest) return;
-        _gradeReturnSid = gradeSid;
-        _pushScreen(MGrade.renderSwiper(_cid, newest.id), { kind: 'swiper', aid: newest.id });
-        // On group work the student's group card.
-        var gradeIdx = MGrade.studentCardIndex(_cid, newest.id, gradeSid);
-        MGrade.setupSwiper(_cid, newest.id);
-        if (gradeIdx > 0) MGrade.jumpToStudent(gradeIdx, true);
+        _openGraderAt(
+          target.getAttribute('data-sid'),
+          target.getAttribute('data-aid'),
+          target.getAttribute('data-only') === 'student',
+        );
+        return;
+      }
+      // A tab on the grader on one student's work: that piece, in place.
+      if (action === 'm-grade-student-piece') {
+        MGrade.showStudentPiece(_cid, target.getAttribute('data-aid'));
+        return;
+      }
+
+      // Add Work (S7-F3): from a not-in card, the students with nothing in;
+      // from a student's To Grade list, that student, then the grader.
+      if (action === 'm-add-work') {
+        // From the row menu: its sheet goes first.
+        if (target.closest('#m-sheet-container')) MC.dismissSheet();
+        MAddWork.open(_cid, target.getAttribute('data-aid'), target.getAttribute('data-sid'), {
+          then: target.getAttribute('data-then') === 'grade' ? 'grade' : 'next',
+        });
         return;
       }
 
@@ -1160,9 +1230,20 @@
       if (action === 'm-demo-reset-confirm') {
         MC.dismissSheet();
         if (typeof resetDemoData === 'function') {
-          resetDemoData().then(function () {
-            window.location.reload();
-          });
+          resetDemoData()
+            .then(function () {
+              // Photos added in Demo Mode are kept on the device in the photo
+              // queue, not in the class data: delete them too. Demo Mode only
+              // (resetDemoData does nothing outside it), and entering Demo Mode
+              // already erased this device's unsent work.
+              var q = window.PhotoQueue;
+              if (typeof isDemoMode === 'function' && isDemoMode() && q && typeof q.wipe === 'function') {
+                return q.wipe();
+              }
+            })
+            .then(function () {
+              window.location.reload();
+            });
         }
         return;
       }
@@ -1435,12 +1516,45 @@
         MGrade.openRowMenu(_cid, target.getAttribute('data-aid'), target);
         return;
       }
+      // The row menu's Work Wall (S14): teacher/work-wall.js over the Grade
+      // tab. Grade in This Order closes it and opens the phone's grader on
+      // the students the wall showed, in its order, at the one picked.
+      if (action === 'm-work-wall') {
+        if (target.closest('#m-sheet-container')) MC.dismissSheet();
+        _openWorkWall(_cid, target.getAttribute('data-aid'));
+        return;
+      }
       if (action === 'm-grade-filter-done') {
         MGrade.doneFilterSheet();
         return;
       }
       if (action === 'm-work-full') {
         MGradePhotos.openFull(_cid, target);
+        return;
+      }
+      // Grade From Paper on a not-in card: Set Logan To, then a level.
+      if (action === 'm-work-setto-menu') {
+        MGrade.openSetTo(_cid, target.getAttribute('data-aid'), target.getAttribute('data-sid'));
+        return;
+      }
+      if (action === 'm-work-setto') {
+        MGrade.setToFromPaper(
+          _cid,
+          target.getAttribute('data-aid'),
+          target.getAttribute('data-sid'),
+          parseInt(target.getAttribute('data-level'), 10),
+        );
+        return;
+      }
+      // Mark Up a page (S9-F2), from the photos full screen.
+      if (action === 'm-markup-open') {
+        if (target.closest('#m-sheet-container')) MC.dismissSheet();
+        MMarkUp.open(
+          _cid,
+          target.getAttribute('data-aid'),
+          target.getAttribute('data-sid'),
+          parseInt(target.getAttribute('data-page'), 10) || 0,
+        );
         return;
       }
       if (action === 'm-work-top') {
@@ -1532,6 +1646,28 @@
           target.getAttribute('data-sid'),
           target.getAttribute('data-aid'),
           target.getAttribute('data-critid'),
+        );
+        return;
+      }
+
+      // The Advanced Rubric a criterion at a time (S7-F2): the pager, Next:
+      // <criterion> on the bar, and a level's group of boxes.
+      if (action === 'm-crit-page') {
+        MGrade.pageCriterion(
+          _cid,
+          target.getAttribute('data-sid'),
+          target.getAttribute('data-aid'),
+          parseInt(target.getAttribute('data-dir'), 10),
+        );
+        return;
+      }
+      if (action === 'm-crit-group') {
+        MGrade.toggleCritGroup(
+          _cid,
+          target.getAttribute('data-sid'),
+          target.getAttribute('data-aid'),
+          target.getAttribute('data-critid'),
+          parseInt(target.getAttribute('data-level'), 10),
         );
         return;
       }

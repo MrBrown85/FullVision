@@ -13,11 +13,17 @@
    side"). Anywhere else on() is false, every count is empty, cardHtml is ''
    and the phone is exactly what it was. Nothing here writes or sends.
 
-   Words used here:
-   - to grade: a student sent work (or handed it in on paper) and grading
-     has not started (studentWorkGradingStarted: a draft or returned grade or
-     an Overall Comment for that student);
-   - not in: nothing sent, and not Excused. */
+   Every count and list of sent work here is GraderWork's (shared/grader.js:
+   workOn, workStateOf, workCounts, classWorkCounts), the one count the
+   dashboard, the gradebook, the Assignments page, the desktop grader and
+   the Work Wall use, so the phone gives the same numbers (S6/S7). Its
+   words: a student is in exactly one state on a piece:
+   - to grade: work is in (their own, or on a One per Group piece a
+     group-mate's) and grading has not started;
+   - to return: a draft grade; returned: a returned grade, so a student
+     graded from paper with nothing sent is neither to grade nor not in;
+   - not in: nothing in, no grade, and not Excused (Missing counts).
+   A pair or group still graded together is one piece to grade. */
 
 window.MGradePhotos = (function () {
   'use strict';
@@ -36,59 +42,64 @@ window.MGradePhotos = (function () {
 
   // The build switch and Send Work, both on for the class.
   function on(cid) {
-    if (!cid || typeof getReturnSettings !== 'function' || typeof getCourseSendWork !== 'function') return false;
-    return !!getReturnSettings(cid).student_page && !!getCourseSendWork(cid).send_work;
+    return !!window.GraderWork && GraderWork.workOnInClass(cid);
   }
 
   // The piece takes work: Students Send is Photos, or Photos and Files.
   function takes(cid, a) {
-    if (!on(cid) || !a || typeof getAssessmentStudentWork !== 'function') return false;
-    return getAssessmentStudentWork(cid, a.id).students_send !== 'nothing';
+    return !!a && !!window.GraderWork && GraderWork.workOn(cid, a);
   }
 
   function submission(cid, sid, aid) {
     return typeof getStudentSubmission === 'function' ? getStudentSubmission(cid, sid, aid) : null;
   }
 
+  // The work `sid` has in on `aid`: their own, or their group's (S12-F2).
+  function workIn(cid, sid, aid) {
+    var own = submission(cid, sid, aid);
+    if (own || typeof getGroupSubmissions !== 'function') return own;
+    return getGroupSubmissions(cid, sid, aid)[0] || null;
+  }
+
   function isToGrade(cid, a, sid) {
-    if (!takes(cid, a)) return false;
-    return !!submission(cid, sid, a.id) && !studentWorkGradingStarted(cid, sid, a.id);
+    return takes(cid, a) && GraderWork.workStateOf(cid, a.id, sid) === 'tograde';
   }
 
+  // The class in the grader's order.
   function _roster(cid) {
-    return sortStudents(getStudents(cid).slice(), 'alpha');
+    return sortStudents(getStudents(cid).slice(), 'alpha').map(function (st) {
+      return st.id;
+    });
   }
 
-  // The students whose work waits to be graded, in the grader's order.
+  // GraderWork's counts for the piece, its lists in the grader's order; null when it takes no work.
+  function counts(cid, a) {
+    if (!takes(cid, a)) return null;
+    return GraderWork.workCounts(cid, a.id, _roster(cid));
+  }
+
+  // The students whose work waits to be graded, in the grader's order (a group's members each).
   function toGrade(cid, a) {
-    if (!takes(cid, a)) return [];
-    return _roster(cid)
-      .map(function (st) {
-        return st.id;
-      })
-      .filter(function (sid) {
-        return isToGrade(cid, a, sid);
-      });
+    var c = counts(cid, a);
+    return c ? c.ids.tograde : [];
   }
 
-  // The students with nothing in, in the grader's order. An Excused piece is not owed.
+  // How many pieces of work wait: a pair or group graded together counts once.
+  function toGradeCount(cid, a) {
+    var c = counts(cid, a);
+    return c ? c.tograde : 0;
+  }
+
+  // The students with nothing in, in the grader's order.
   function notIn(cid, a) {
-    if (!takes(cid, a)) return [];
-    return _roster(cid)
-      .map(function (st) {
-        return st.id;
-      })
-      .filter(function (sid) {
-        return !submission(cid, sid, a.id) && getAssignmentStatus(cid, sid, a.id) !== 'EXC';
-      });
+    var c = counts(cid, a);
+    return c ? c.ids.notin : [];
   }
 
-  // Every student's to-grade count across the class: the Grade tab's badge.
+  // The work waiting across the class: the Grade tab's badge and its To Grade count.
   function classToGrade(cid) {
     if (!on(cid)) return 0;
-    return (getAssessments(cid) || []).reduce(function (n, a) {
-      return n + toGrade(cid, a).length;
-    }, 0);
+    return GraderWork.classWorkCounts(cid, _roster(cid)).tograde;
   }
 
   // The pieces `sid` has to grade, then the ones not in, newest first.
@@ -97,9 +108,9 @@ window.MGradePhotos = (function () {
     var rows = [];
     (getAssessments(cid) || []).forEach(function (a) {
       if (!takes(cid, a)) return;
-      if (isToGrade(cid, a, sid)) rows.push({ a: a, kind: 'grade', sub: submission(cid, sid, a.id) });
-      else if (!submission(cid, sid, a.id) && getAssignmentStatus(cid, sid, a.id) !== 'EXC')
-        rows.push({ a: a, kind: 'notin' });
+      var state = GraderWork.workStateOf(cid, a.id, sid);
+      if (state === 'tograde') rows.push({ a: a, kind: 'grade', sub: workIn(cid, sid, a.id) });
+      else if (state === 'notin') rows.push({ a: a, kind: 'notin' });
     });
     return rows.sort(function (x, y) {
       if (x.kind !== y.kind) return x.kind === 'grade' ? -1 : 1;
@@ -139,7 +150,7 @@ window.MGradePhotos = (function () {
   function cardHtml(cid, a, st, unit) {
     if (!st || (unit && unit.view) || !takes(cid, a)) return '';
     var sub = submission(cid, st.id, a.id);
-    if (!sub) return '';
+    if (!sub) return notInHtml(cid, a, st);
     var files = sub.files || [];
     var first = displayNameFirst(st) || displayName(st);
     var html =
@@ -188,6 +199,143 @@ window.MGradePhotos = (function () {
     return html + '</div>';
   }
 
+  // Days past the due date, by the class's own day; 0 when not late.
+  function daysLate(cid, a) {
+    var due = a && (a.dueDate || a.due_date);
+    if (!due || typeof courseToday !== 'function') return 0;
+    var d0 = Date.parse(String(due).slice(0, 10) + 'T00:00:00Z');
+    var d1 = Date.parse(String(courseToday(cid)).slice(0, 10) + 'T00:00:00Z');
+    if (!isFinite(d0) || !isFinite(d1) || d1 <= d0) return 0;
+    return Math.round((d1 - d0) / 86400000);
+  }
+
+  // "Not In · 7 days late", "Not In · 1 day late", or "Not In".
+  function notInState(cid, a) {
+    var n = daysLate(cid, a);
+    return 'Not In' + (n ? ' · ' + n + (n === 1 ? ' day late' : ' days late') : '');
+  }
+
+  /* A card with nothing in: where it stands, and Add Work for the student
+     (S7-F3). Not on an Excused piece, which is not owed. */
+  // html-safe: the name goes through MC.esc; ids are ours
+  function notInHtml(cid, a, st) {
+    if (getAssignmentStatus(cid, st.id, a.id) === 'EXC') return '';
+    var first = displayNameFirst(st) || displayName(st);
+    return (
+      '<div class="m-work m-work-notin" data-sid="' +
+      st.id +
+      '" data-aid="' +
+      a.id +
+      '">' +
+      '<div class="m-work-sent">' +
+      CAMERA_SVG +
+      '<span>' +
+      MC.esc(notInState(cid, a)) +
+      '</span></div>' +
+      '<button type="button" class="m-work-add" data-action="m-add-work" data-sid="' +
+      st.id +
+      '" data-aid="' +
+      a.id +
+      '">' +
+      MC.esc('Add Work for ' + first) +
+      '</button>' +
+      '<div class="m-work-add-hint">Photos or PDFs. Photos are made smaller before they upload.</div>' +
+      paperHtml(cid, a, st) +
+      '</div>'
+    );
+  }
+
+  /* Grade From Paper (S7-F3 follow-up): Set Logan To, on a piece scored by
+     level. The rule is the desktop's, GraderWork.setToFromPaper in
+     shared/grader.js; this only says whether there is anything it could set
+     (a criterion or competency on the piece). Off under Missing, as the
+     levels are. */
+  function paperLevels(cid, a) {
+    if (!a || isPointsScored(a) || isCompletionScored(a) || isDibelsScored(a)) return 0;
+    if (a.rubricId) {
+      var rubric = getRubricById(cid, a.rubricId);
+      return rubric ? (rubric.criteria || []).length : 0;
+    }
+    return scoreTagIds(a, cid).length;
+  }
+
+  // html-safe: the name goes through MC.esc; ids are ours
+  function paperHtml(cid, a, st) {
+    if (!paperLevels(cid, a)) return '';
+    var first = displayNameFirst(st) || displayName(st);
+    return (
+      '<div class="m-work-paper"><div class="m-work-paper-head">Grade From Paper</div>' +
+      '<button type="button" class="m-work-setto" data-action="m-work-setto-menu" aria-haspopup="dialog" data-sid="' +
+      st.id +
+      '" data-aid="' +
+      a.id +
+      '"' +
+      (isScoreLocked(cid, st.id, a.id) ? ' disabled' : '') +
+      '>' +
+      MC.esc('Set ' + first + ' To') +
+      '</button></div>'
+    );
+  }
+
+  /* One student's To Grade list (S7-F4): the work waiting, with Grade, then
+     the pieces not in, with Add Work. On the student card and View Profile.
+     '' when there is nothing, or the class takes no work. */
+  // html-safe: titles and lines go through MC.esc; ids are ours
+  function studentListHtml(cid, st) {
+    if (!st) return '';
+    // Empty unless the class takes work (studentList asks on()).
+    var rows = studentList(cid, st.id);
+    if (!rows.length) return '';
+    return (
+      '<div class="m-scard-tograde"><div class="m-scard-return-head">To Grade</div>' +
+      rows
+        .map(function (r) {
+          var grade = r.kind === 'grade';
+          return (
+            '<button type="button" class="m-scard-tograde-row" data-action="' +
+            (grade ? 'm-assess-grade' : 'm-add-work') +
+            '" data-sid="' +
+            st.id +
+            '" data-aid="' +
+            r.a.id +
+            '"' +
+            (grade ? ' data-only="student"' : ' data-then="grade"') +
+            '><span class="m-scard-return-body"><span class="m-scard-return-title">' +
+            MC.esc(r.a.title) +
+            '</span><span class="m-scard-return-sub">' +
+            MC.esc(grade ? sentLine(r.sub) : notInLine(cid, r.a, st.id)) +
+            '</span></span><span class="m-scard-tograde-act">' +
+            (grade ? 'Grade' : 'Add Work') +
+            '</span></button>'
+          );
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+
+  /* The red count on the Grade tab's button: every piece of work waiting in
+     the class. Hidden at 0, and in a class that takes no work. */
+  function syncTabBadge(cid) {
+    var tab = document.querySelector('.m-tab-item[data-tab="grade"]');
+    if (!tab) return;
+    var n = on(cid) ? classToGrade(cid) : 0;
+    var badge = tab.querySelector('.m-tab-badge');
+    if (!n) {
+      if (badge) badge.remove();
+      tab.removeAttribute('aria-description');
+      return;
+    }
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'm-tab-badge';
+      badge.setAttribute('aria-hidden', 'true');
+      tab.appendChild(badge);
+    }
+    badge.textContent = n > 99 ? '99+' : String(n);
+    tab.setAttribute('aria-description', n + ' to grade');
+  }
+
   /* The strip pinned at the top of a card once its pages have scrolled
      past: drawn first in the card, so it can stick to the card's top. */
   // html-safe: the name goes through MC.esc; ids are ours
@@ -224,7 +372,7 @@ window.MGradePhotos = (function () {
      drawn only if the same student's work for the same piece is still the
      one on that element (the screen may have changed meanwhile). */
   function hydrate(root, cid) {
-    if (!root || !on(cid) || typeof studentWorkPageUrl !== 'function') return;
+    if (!root || !on(cid) || typeof openStudentWorkPage !== 'function') return;
     root.querySelectorAll('.m-work, .m-work-pin').forEach(function (box) {
       var sid = box.getAttribute('data-sid');
       var aid = box.getAttribute('data-aid');
@@ -235,13 +383,38 @@ window.MGradePhotos = (function () {
         var file = (sub.files || [])[Number(img.getAttribute('data-fv-page'))];
         var which = img.getAttribute('data-fv-which');
         var asked = sub.id;
-        studentWorkPageUrl(cid, file, which).then(function (url) {
-          if (!url || !img.isConnected) return;
+        var askedFile = file && file.id;
+        openStudentWorkPage(cid, file, which).then(function (page) {
+          if (!page) return;
           var now = submission(cid, sid, aid);
-          if (!now || now.id !== asked || box.getAttribute('data-sid') !== sid) return;
-          img.setAttribute('src', url);
+          var nowFile = now && (now.files || [])[Number(img.getAttribute('data-fv-page'))];
+          if (
+            !img.isConnected ||
+            !now ||
+            now.id !== asked ||
+            !nowFile ||
+            nowFile.id !== askedFile ||
+            box.getAttribute('data-sid') !== sid
+          ) {
+            page.release();
+            return;
+          }
+          img.setAttribute('src', page.url);
+          _held.push({ img: img, page: page });
         });
       });
+    });
+    _letGo();
+  }
+
+  /* A photo still on the device is shown from an address that holds its
+     bytes: let it go once its picture has left the page. */
+  var _held = [];
+  function _letGo() {
+    _held = _held.filter(function (h) {
+      if (h.img.isConnected) return true;
+      h.page.release();
+      return false;
     });
   }
 
@@ -310,12 +483,26 @@ window.MGradePhotos = (function () {
         '</div>' +
         (sub.files || [])
           .map(function (f, i) {
+            // Mark Up on each page (S9-F2), where the page can keep marks.
+            var mark =
+              window.MMarkUp && MMarkUp.can(cid, aid, sid, i)
+                ? '<button type="button" class="m-work-markup" data-action="m-markup-open" data-sid="' +
+                  sid +
+                  '" data-aid="' +
+                  aid +
+                  '" data-page="' +
+                  i +
+                  '"' +
+                  ((sub.files || []).length > 1 ? ' aria-label="' + MC.esc('Mark Up page ' + (i + 1)) + '"' : '') +
+                  '>Mark Up</button>'
+                : '';
             return (
               '<img class="m-work-sheet-page" alt="' +
               MC.esc('Page ' + (i + 1) + ' of ' + first + '’s work') +
               '" data-fv-page="' +
               i +
-              '" data-fv-which="page">'
+              '" data-fv-which="page">' +
+              mark
             );
           })
           .join('') +
@@ -330,12 +517,19 @@ window.MGradePhotos = (function () {
     submission: submission,
     isToGrade: isToGrade,
     toGrade: toGrade,
+    toGradeCount: toGradeCount,
     notIn: notIn,
     classToGrade: classToGrade,
     studentList: studentList,
     photosText: photosText,
     sentLine: sentLine,
     notInLine: notInLine,
+    notInState: notInState,
+    daysLate: daysLate,
+    paperLevels: paperLevels,
+    studentListHtml: studentListHtml,
+    syncTabBadge: syncTabBadge,
+    releaseUnused: _letGo,
     cardHtml: cardHtml,
     pinHtml: pinHtml,
     hydrate: hydrate,

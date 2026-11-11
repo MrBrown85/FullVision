@@ -7362,3 +7362,125 @@ label.cm-cr-row {
     min-height: 0;
   }
 }
+
+/* ── Questions From Students (S10-F4) ──────────────────────── */
+/* #main is a flex column: the card keeps its height, as Observations does. */
+.page-dashboard .dash-questions {
+  flex-shrink: 0;
+  margin-top: 12px;
+}
+.dash-questions-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.page-dashboard .dash-questions-head .dash-section-title {
+  margin-bottom: 0;
+}
+.dash-questions-count {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 11px;
+  background: #f5b800;
+  color: #3b2a00;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-align: center;
+}
+.dash-questions-hint {
+  margin: 4px 0 8px;
+  color: var(--text-2);
+  font-size: var(--text-sm);
+}
+.dash-questions-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.dash-questions-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--divider);
+}
+.dash-questions-av {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--active);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+.dash-questions-body {
+  flex: 1;
+  min-width: 0;
+}
+.dash-questions-name {
+  font-weight: 600;
+  color: var(--text);
+}
+.dash-questions-meta {
+  color: var(--text-2);
+  font-size: var(--text-sm);
+}
+.dash-questions-text {
+  margin: 6px 0 0;
+  padding: 6px 10px;
+  border-left: 3px solid #f5b800;
+  border-radius: 0 6px 6px 0;
+  background: var(--bg);
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.dash-questions-answer {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+@media (max-width: 600px) {
+  .dash-questions-row {
+    flex-wrap: wrap;
+  }
+  .dash-questions-answer {
+    margin-left: 42px;
+  }
+}
+
+/* ── The photo reminder (S8-F1) ────────────────────────────── */
+/* The week before a class's photos of student work are deleted: at the top
+   of its Dashboard and of Class Settings › Student Page. */
+.photo-reminder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--divider-strong);
+  border-left: 4px solid var(--late);
+  border-radius: 12px;
+}
+.page-dashboard .photo-reminder {
+  flex-shrink: 0;
+  margin-bottom: 12px;
+}
+.sp-card .photo-reminder {
+  margin: 8px 0 4px;
+}
+.photo-reminder-text {
+  flex: 1 1 320px;
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-base);
+  line-height: 1.4;
+}
+.photo-reminder-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}

@@ -55,6 +55,50 @@ window.StudentPageView = (function () {
     return /^[A-Za-z0-9]{1,2}$/.test(b) ? 'Block ' + b.toUpperCase() : b;
   }
 
+  /* ── What the server also tells (S4-M1) ────────────────────────
+     Each part below draws only when the view holds it: until the server
+     sends the teacher's name, a unit, a category, a Description, Core
+     Competencies or I Can lines, the page is as it was. */
+
+  // The teacher's name as the view gives it (as they signed up with it), or ''.
+  function teacherOf(view) {
+    return String((view && view.course && view.course.teacherName) || '').trim();
+  }
+
+  // The teacher's initials, for the small mark beside their words: "Colin Brown" is CB.
+  function initialsOf(name) {
+    var words = String(name || '')
+      .split(/\s+/)
+      .filter(Boolean);
+    if (!words.length) return '';
+    var first = Array.from(words[0])[0] || '';
+    var last = words.length > 1 ? Array.from(words[words.length - 1])[0] || '' : '';
+    return (first + last).toUpperCase();
+  }
+
+  function initialsHtml(name) {
+    var mark = initialsOf(name);
+    return mark ? '<span class="sp-from-mark" aria-hidden="true">' + esc(mark) + '</span>' : '';
+  }
+
+  /* A category and what it counts: "Practice Questions · counts 40% of your
+     grade"; "Practice · doesn't count toward your grade" for a category
+     that counts toward nothing; the name alone where no percent is true. */
+  function categoryLine(category) {
+    if (!category || !category.name) return '';
+    var pct = category.percent;
+    if (pct === 0) return category.name + SEP + 'doesn’t count toward your grade';
+    if (typeof pct === 'number' && pct > 0) return category.name + SEP + 'counts ' + pct + '% of your grade';
+    return category.name;
+  }
+
+  // "Counts toward Perspective", "Counts toward Evidence and Ethical Judgment".
+  function towardLine(names) {
+    if (!names || !names.length) return '';
+    var all = names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] : names[0];
+    return 'Counts toward ' + all;
+  }
+
   /* ── One row ───────────────────────────────────────────────── */
 
   /* What one row says, from one piece of the view:
@@ -64,6 +108,14 @@ window.StudentPageView = (function () {
     var view = { kind: p.kind, title: p.title, sub: due, result: '' };
     if (p.kind === 'missing' || p.kind === 'excused') {
       view.sub = [p.kind === 'missing' ? 'Missing' : 'Excused', due].filter(Boolean).join(SEP);
+      return view;
+    }
+    // Sent and not back yet: "Sent Nov 4 · 3 photos" (the board's).
+    if (p.kind === 'sent') {
+      var sent = (p.send && p.send.sent) || {};
+      view.sub = ['Sent ' + fmtDate(sent.at, DAY), p.late ? 'Late' : '', photosWord(sent.pages)]
+        .filter(Boolean)
+        .join(SEP);
       return view;
     }
     if (p.kind !== 'back') {
@@ -80,15 +132,21 @@ window.StudentPageView = (function () {
     return view;
   }
 
-  // A piece's kind as a class name: one of the four, whatever the view held.
+  // A piece's kind as a class name: one of the five, whatever the view held.
   function kindOf(p) {
-    return /^(due|back|missing|excused)$/.test(p.kind) ? p.kind : 'due';
+    return /^(due|sent|back|missing|excused)$/.test(p.kind) ? p.kind : 'due';
+  }
+
+  // "1 photo", "3 photos"; nothing for none.
+  function photosWord(n) {
+    n = Number(n) || 0;
+    return n > 0 ? (n === 1 ? '1 photo' : n + ' photos') : '';
   }
 
   /* ── To Do, Sent and Back ──────────────────────────────────── */
 
   /* To Do is what is still to hand in: work not back yet, and work marked
-     Missing. Sent is work sent and waiting (nothing can be sent until S5).
+     Missing. Sent is work sent and waiting for its grade (S5-F2).
      Back is work that came back. */
   var SEGMENTS = [
     { id: 'todo', label: 'To Do' },
@@ -99,7 +157,7 @@ window.StudentPageView = (function () {
     return view.work.filter(function (p) {
       if (id === 'todo') return p.kind === 'due' || p.kind === 'missing';
       if (id === 'back') return p.kind === 'back';
-      return false;
+      return id === 'sent' && p.kind === 'sent';
     });
   }
   function counts(view) {
@@ -205,17 +263,20 @@ window.StudentPageView = (function () {
     );
   }
 
-  /* What changed on an updated grade, under its rows: when, and each level
-     that moved. "Mr. Brown updated your result" waits on the server
-     sending the teacher's name. */
-  function updatedNoteHtml(p) {
+  /* What changed on an updated grade, under its rows: who and when, and
+     each level that moved. With no teacher's name from the server: "Your
+     result was updated on Nov 12". */
+  function updatedNoteHtml(p, teacher) {
     var moved = (p.rubric ? p.rubric.rows : p.competencies || []).filter(function (r) {
       return r.was && r.text;
     });
     if (!p.updated || !moved.length) return '';
     return (
       '<div class="sp-updated-note"><p class="sp-updated-title">' +
-      esc('Your result was updated on ' + fmtDate(p.updatedAt || p.returnedAt, DAY)) +
+      esc(
+        (teacher ? teacher + ' updated your result on ' : 'Your result was updated on ') +
+          fmtDate(p.updatedAt || p.returnedAt, DAY),
+      ) +
       '</p>' +
       moved
         .map(function (r) {
@@ -234,7 +295,13 @@ window.StudentPageView = (function () {
     if (p.kind === 'back' && p.updated) out.push(['updated', 'Updated ' + fmtDate(p.updatedAt || p.returnedAt, DAY)]);
     else if (p.kind === 'back') out.push(['back', 'Returned ' + fmtDate(p.returnedAt, DAY)]);
     else if (p.kind === 'missing') out.push(['missing', 'Missing']);
-    if (p.kind !== 'back' && due) out.push(['due', due]);
+    else if (p.kind === 'sent') {
+      var at = (p.send && p.send.sent && p.send.sent.at) || (p.group && p.group.sentAt) || '';
+      out.push(['sent', at ? 'Sent ' + fmtDate(at, DAY) : 'Sent']);
+    }
+    // One per Group (S12-F1, the board's "Group" tag).
+    if (p.group) out.push(['quiet', 'Group']);
+    if (p.kind !== 'back' && p.kind !== 'sent' && due) out.push(['due', due]);
     if (p.late) out.push(['quiet', 'Late']);
     return out
       .map(function (x) {
@@ -254,8 +321,8 @@ window.StudentPageView = (function () {
   }
 
   /* What You're Graded On, on work not back yet (the To Do card board): its
-     competencies by name, and See the Rubric when it has one. The I Can
-     statements under each name wait on the server. */
+     competencies by name, each with its I Can lines when the server sends
+     them, and See the Rubric when it has one. */
   function gradedOnHtml(p) {
     var names = p.gradedOn || [];
     if (!names.length && !p.rubric) return '';
@@ -263,7 +330,16 @@ window.StudentPageView = (function () {
       '<div class="sp-graded-on"><span class="sp-graded-on-title">What You’re Graded On</span>' +
       names
         .map(function (g) {
-          return '<span class="sp-graded-on-name">' + esc(g.name) + '</span>';
+          return (
+            '<span class="sp-graded-on-name">' +
+            esc(g.name) +
+            '</span>' +
+            (g.iCan || [])
+              .map(function (line) {
+                return '<span class="sp-graded-on-ican">' + esc(line) + '</span>';
+              })
+              .join('')
+          );
         })
         .join('') +
       (p.rubric
@@ -285,7 +361,130 @@ window.StudentPageView = (function () {
   /* One card. A returned piece not opened since it came back carries its
      id as data-unseen: the student page counts it opened once the card has
      been on screen. */
-  function cardHtml(p, picked) {
+  // The Core Competencies a piece is for, under What You're Graded On.
+  function coreHtml(p) {
+    var list = p.coreCompetencies || [];
+    if (!list.length) return '';
+    return (
+      '<div class="sp-core"><span class="sp-graded-on-title">' +
+      (list.length === 1 ? 'Core Competency' : 'Core Competencies') +
+      '</span>' +
+      list
+        .map(function (c) {
+          return '<span class="sp-core-name">' + esc(c.name) + '</span>';
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+
+  /* ── Sending (S5-F2, S5-F3; the artboard's "To Do Card", "Closed
+     Assignment", "Sent, Being Graded" and "Unsend or Replace") ───── */
+
+  /* On a card still to do that takes work: Send My Work while the piece is
+     open; "Closed Nov 13" and "Hand this one in on paper" once its last
+     day has passed. Nothing when the class takes no work. */
+  function sendBlockHtml(p) {
+    var send = p.send;
+    if (!send || !send.takes) return '';
+    if (!send.open) {
+      return (
+        '<div class="sp-send-closed"><p class="sp-send-closed-title">' +
+        esc(send.closesOn ? 'Closed ' + fmtDate(send.closesOn, DAY) : 'Closed') +
+        '</p><p class="sp-send-closed-line">Hand this one in on paper</p></div>'
+      );
+    }
+    return (
+      '<button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="send-open" data-piece="' +
+      esc(p.id) +
+      '">Send My Work</button>'
+    );
+  }
+
+  // The student's own pages, small, as this device has them.
+  function thumbsHtml(thumbs, label) {
+    if (!thumbs || !thumbs.length) return '';
+    return (
+      '<div class="sp-send-thumbs">' +
+      thumbs
+        .map(function (url, i) {
+          return '<img class="sp-send-thumb" src="' + esc(url) + '" alt="' + esc(label + ' ' + (i + 1)) + '">';
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+
+  /* A piece sent as One per Group (S12-F1, the board "Student: Group
+     Work"): when the group's work went in and how many photos, how many
+     are in the group, whether the student sent any of it, and Add a Page
+     while the piece still takes work and the student has sent none of
+     their own (their own send, added to the group's). Counts only: the
+     server sends no group-mate's name, so the board's name chips are not
+     drawn. Before anyone has sent it, the usual Send My Work. */
+  function groupBlockHtml(p) {
+    var g = p.group;
+    var size = g.members + ' in your group';
+    if (!g.sent) {
+      return (
+        '<p class="sp-group-line">' +
+        esc(size + '. One of you sends it for the whole group.') +
+        '</p>' +
+        sendBlockHtml(p)
+      );
+    }
+    var open = p.send && p.send.takes && p.send.open && !(p.send.sent && p.send.sent.pages);
+    return (
+      '<div class="sp-group"><p class="sp-group-sent">' +
+      esc([g.sentAt ? 'Sent ' + fmtDate(g.sentAt, DAY) : 'Sent', photosWord(g.pages)].filter(Boolean).join(SEP)) +
+      '</p><p class="sp-group-line">' +
+      esc(size + '. ' + (g.youSent ? 'You sent pages for your group.' : 'Someone in your group sent it.')) +
+      '</p></div>' +
+      (open
+        ? '<button type="button" class="sp-btn sp-btn-tint sp-btn-big" data-act="send-open" data-piece="' +
+          esc(p.id) +
+          '">Add a Page</button>'
+        : '')
+    );
+  }
+
+  /* On a card sent and not back yet: the pages, and either who is grading
+     it, or that it can still be changed with Replace Photos and Unsend. */
+  function sentBlockHtml(p, teacher) {
+    var sent = (p.send && p.send.sent) || {};
+    var who = teacher || 'Your teacher';
+    var line = sent.onPaper
+      ? 'Handed in on paper'
+      : sent.grading
+        ? who + ' is grading this'
+        : sent.canChange
+          ? who + ' hasn’t started grading it. You can still change it.'
+          : '';
+    return (
+      thumbsHtml(sent.thumbs, 'Your page') +
+      (line ? '<p class="sp-send-line">' + esc(line) + '</p>' : '') +
+      (sent.canChange && !sent.grading
+        ? '<div class="sp-send-change"><button type="button" class="sp-btn sp-btn-tint" data-act="send-replace" data-piece="' +
+          esc(p.id) +
+          '">Replace Photos</button><button type="button" class="sp-btn sp-btn-quiet" data-act="send-unsend" data-piece="' +
+          esc(p.id) +
+          '">Unsend</button></div>'
+        : '')
+    );
+  }
+
+  // The teacher's comment on a returned card, under their name when the server sends it.
+  function cardCommentHtml(p, teacher) {
+    if (!p.comment) return '';
+    return (
+      (teacher ? '<p class="sp-piece-from">' + initialsHtml(teacher) + '<span>' + esc(teacher) + '</span></p>' : '') +
+      '<p class="sp-piece-comment">' +
+      esc(p.comment) +
+      '</p>'
+    );
+  }
+
+  function cardHtml(p, picked, teacher) {
     var unseen = p.kind === 'back' && p.unseen && p.result && p.result.text;
     var todo = p.kind === 'due' || p.kind === 'missing';
     return (
@@ -298,16 +497,22 @@ window.StudentPageView = (function () {
       (unseen ? ' data-unseen="' + esc(p.id) + '"' : '') +
       ' aria-labelledby="' +
       domId(p.id) +
-      '"><div class="sp-piece-card"><div class="sp-piece-tags">' +
+      '"><div class="sp-piece-card">' +
+      (p.unit ? '<p class="sp-piece-unit">' + esc(p.unit) + '</p>' : '') +
+      '<div class="sp-piece-tags">' +
       pills(p) +
       '</div><h2 class="sp-piece-title" id="' +
       domId(p.id) +
       '" tabindex="-1">' +
       esc(p.title) +
       '</h2>' +
-      (p.kind === 'back' ? resultRows(p) + updatedNoteHtml(p) : '') +
-      (p.kind === 'back' && p.comment ? '<p class="sp-piece-comment">' + esc(p.comment) + '</p>' : '') +
-      (todo ? gradedOnHtml(p) : '') +
+      (todo && p.category ? '<p class="sp-piece-category">' + esc(p.category.name) + '</p>' : '') +
+      (todo && p.description ? '<p class="sp-piece-about">' + esc(p.description) + '</p>' : '') +
+      (p.kind === 'due' ? planHtml(p) : '') +
+      (p.kind === 'back' ? resultRows(p) + updatedNoteHtml(p, teacher) : '') +
+      (p.kind === 'back' ? cardCommentHtml(p, teacher) : '') +
+      (p.kind === 'sent' ? (p.group ? groupBlockHtml(p) : sentBlockHtml(p, teacher)) : '') +
+      (todo ? gradedOnHtml(p) + coreHtml(p) + (p.group ? groupBlockHtml(p) : sendBlockHtml(p)) : '') +
       (hasFeedback(p)
         ? '<button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="feedback" data-piece="' +
           esc(p.id) +
@@ -327,7 +532,8 @@ window.StudentPageView = (function () {
      side and the student swipes between them ("1 of 3"); on a Chromebook
      the list is on the left and the card picked on the right (the
      Chromebook board). page-view.css shows one or the other. */
-  function deckHtml(ui, pieces) {
+  function deckHtml(ui, pieces, view) {
+    var teacher = teacherOf(view);
     var picked = pieceIn(pieces, ui.pick);
     return (
       '<div class="sp-split">' +
@@ -335,7 +541,7 @@ window.StudentPageView = (function () {
       '<div class="sp-deck">' +
       pieces
         .map(function (p) {
-          return cardHtml(p, p === picked);
+          return cardHtml(p, p === picked, teacher);
         })
         .join('') +
       '</div></div>' +
@@ -411,6 +617,12 @@ window.StudentPageView = (function () {
     return hasFeedback(p) ? p : null;
   }
 
+  // Under Your Result: the piece's category and what it counts, when the server sends it.
+  function categoryHtml(p) {
+    var line = categoryLine(p.category);
+    return line ? '<p class="sp-fb-category">' + esc(line) + '</p>' : '';
+  }
+
   /* Your Result: the level's word, large, with the result beside it, then a
      row per criterion or competency; or points with their percent and a
      bar; or Complete. Every word and figure is the view's (calc.js's). */
@@ -430,7 +642,9 @@ window.StudentPageView = (function () {
         lvClass(r.level) +
         '" style="width:' +
         Math.max(0, Math.min(100, Number(r.bar) || 0)) +
-        '%"></span></span></span></section>'
+        '%"></span></span></span>' +
+        categoryHtml(p) +
+        '</section>'
       );
     }
     var big = r.word || r.text;
@@ -447,6 +661,7 @@ window.StudentPageView = (function () {
       '</span>' +
       (beside ? '<span class="sp-fb-beside">' + esc(beside) + '</span>' : '') +
       '</span>' +
+      categoryHtml(p) +
       (rows.length
         ? '<ul class="sp-fb-rows">' +
           rows
@@ -545,7 +760,7 @@ window.StudentPageView = (function () {
      Single-Point Rubric: the goal, then Went Beyond or Work On. Then the
      teacher's comment on the criterion (on a Single-Point Rubric that is
      Work On). */
-  function criterionHtml(style, row) {
+  function criterionHtml(style, row, teacher) {
     var parts = '';
     var lv = lvClass(row.level);
     if (style === 'single_point') {
@@ -572,7 +787,7 @@ window.StudentPageView = (function () {
           parts += partHtml('amber', 'To Reach ' + row.next.name, wordsHtml(row.next.descriptor), TO_ARROW);
         }
       }
-      if (row.comment) parts += '<p class="sp-fb-note">' + esc(row.comment) + '</p>';
+      if (row.comment) parts += '<p class="sp-fb-note">' + initialsHtml(teacher) + esc(row.comment) + '</p>';
     }
     return (
       '<section class="sp-fb-card sp-fb-criterion"><div class="sp-fb-crit-head"><h3 class="sp-fb-crit-name">' +
@@ -580,6 +795,7 @@ window.StudentPageView = (function () {
       '</h3>' +
       (row.text ? chipHtml(row.text, row.level) : '') +
       '</div>' +
+      (towardLine(row.toward) ? '<p class="sp-fb-toward">' + esc(towardLine(row.toward)) + '</p>' : '') +
       parts +
       '</section>'
     );
@@ -618,6 +834,21 @@ window.StudentPageView = (function () {
     );
   }
 
+  // The Overall Comment on Your Feedback: "From Colin Brown" over it when the server sends the name.
+  function fbCommentHtml(p, teacher) {
+    if (!p.comment) return '';
+    if (!teacher) return '<p class="sp-fb-comment">' + esc(p.comment) + '</p>';
+    return (
+      '<div class="sp-fb-comment sp-fb-comment-from"><p class="sp-fb-from">' +
+      initialsHtml(teacher) +
+      '<span>' +
+      esc('From ' + teacher) +
+      '</span></p><p class="sp-fb-comment-words">' +
+      esc(p.comment) +
+      '</p></div>'
+    );
+  }
+
   function feedbackHtml(view, ui, p) {
     var rubric = p.rubric;
     var style = rubric ? rubric.style : '';
@@ -628,7 +859,7 @@ window.StudentPageView = (function () {
             return row.text || row.comment || row.beyond;
           })
           .map(function (row) {
-            return criterionHtml(style, row);
+            return criterionHtml(style, row, teacherOf(view));
           })
           .join('')
       : '';
@@ -642,11 +873,12 @@ window.StudentPageView = (function () {
         p.unseen ? p.id : '',
         'sp-fb-title',
       ) +
+      seeWorkHtml(p) +
       '<div class="sp-fb-top' +
       (p.comment ? ' sp-fb-top-two' : '') +
       '">' +
       yourResultHtml(p) +
-      (p.comment ? '<p class="sp-fb-comment">' + esc(p.comment) + '</p>' : '') +
+      fbCommentHtml(p, teacherOf(view)) +
       '</div>' +
       (crits
         ? '<h2 class="sp-fb-section">Your Rubric</h2>' +
@@ -662,6 +894,45 @@ window.StudentPageView = (function () {
         : withLevels
           ? levelsHtml(view, ui)
           : '') +
+      reflectButtonHtml(view, p) +
+      '</section>'
+    );
+  }
+
+  /* Reflect on Feedback (S10-F1), under Your Feedback and See Your Work:
+     only on returned work, and only while the class's switch is on. Once
+     the student has reflected, the same place opens what they sent, and
+     the teacher's answer when it has come ("Ms. Rivera Answered"). The
+     screens themselves are the student page's (s/reflect.js); in Preview
+     as Student the button is shown and opens nothing. */
+  function reflectButtonHtml(view, p) {
+    if (!view || !view.reflectOn || !hasFeedback(p)) return '';
+    var r = p.reflection;
+    var teacher = teacherOf(view) || 'Your Teacher';
+    var open =
+      '<button type="button" class="sp-btn sp-btn-tint sp-btn-big sp-fb-reflect" data-act="reflect-open" data-piece="' +
+      esc(p.id) +
+      '">';
+    if (!r) return open + 'Reflect on Feedback</button>';
+    var answered = !!(r.answer || r.followUpAnswer);
+    return open + esc(answered ? teacher + ' Answered' : 'Your Reflection') + '</button>';
+  }
+
+  /* Your Plan From Last Time (S10-F2), on the next piece to do: the
+     student's own words, from their reflection on an earlier piece. */
+  function planHtml(p) {
+    if (!p.plan || !p.plan.text) return '';
+    return (
+      '<section class="sp-plan" aria-labelledby="' +
+      domId(p.id) +
+      '-plan"><h3 class="sp-plan-title" id="' +
+      domId(p.id) +
+      '-plan">Your Plan From Last Time</h3><p class="sp-plan-words">' +
+      esc(p.plan.text) +
+      '</p>' +
+      (p.plan.fromTitle
+        ? '<p class="sp-plan-from">' + esc('From your reflection on ' + p.plan.fromTitle) + '</p>'
+        : '') +
       '</section>'
     );
   }
@@ -720,6 +991,229 @@ window.StudentPageView = (function () {
     );
   }
 
+  /* ── See Your Work, with Show Marks (S9-F3) ────────────────────
+     The artboard's "Student: Returned Photo With Marks" and the See Your
+     Work row on Your Feedback ("2 pages · 3 notes on your work"). Only a
+     returned piece whose `feedback` reply says the student was given marks
+     has it (the view's piece.marks). The pages themselves are fetched by
+     whoever draws the page (s/feedback.js on the student's device, the
+     preview from the teacher's cache) and handed in as ui.workPages:
+     { id, state: 'loading' | 'ready' | 'failed', pages: [ { url, marks } ] },
+     the marks being the copy the student was given, never the teacher's
+     working copy. A mark is drawn over the photo, never into it: the
+     photo is shown as it was sent. */
+
+  // "2 pages · 3 notes on your work" (the board's); with no note, "1 page with marks" (mine).
+  function marksLine(m) {
+    if (!m) return '';
+    var pages = m.pages === 1 ? '1 page' : m.pages + ' pages';
+    if (!m.notes) return pages + ' with marks';
+    return pages + SEP + (m.notes === 1 ? '1 note' : m.notes + ' notes') + ' on your work';
+  }
+
+  function seeWorkHtml(p) {
+    if (!p.marks) return '';
+    return (
+      '<button type="button" class="sp-fb-card sp-fb-work" data-act="work" data-piece="' +
+      esc(p.id) +
+      '"><span class="sp-fb-work-words"><span class="sp-fb-work-title">See Your Work</span><span class="sp-fb-work-line">' +
+      esc(marksLine(p.marks)) +
+      '</span></span>' +
+      NEXT_ARROW +
+      '</button>'
+    );
+  }
+
+  function workOpen(ui, p) {
+    return !!(ui.work && p && ui.work === p.id && p.marks);
+  }
+
+  // Only a picture this page made or ships: a blob: address, or a drawn sample page.
+  var PAGE_URL = /^(blob:|\/assets\/sample-work\/|\.\.\/assets\/sample-work\/)[^"'<>\s]*$/;
+
+  // The pages fetched for piece `p`, when they are in: [ { url, marks } ], or null.
+  function readyPages(ui, p) {
+    var got = ui.workPages && p && ui.workPages.id === p.id ? ui.workPages : null;
+    if (!got || got.state !== 'ready') return null;
+    return (Array.isArray(got.pages) ? got.pages : []).filter(function (pg) {
+      return pg && typeof pg.url === 'string' && PAGE_URL.test(pg.url);
+    });
+  }
+
+  var INKS = { red: 'red', green: 'green', blue: 'blue' };
+  var MARK_TYPES = { pen: 1, highlight: 1, note: 1, tick: 1, cross: 1 };
+
+  // A place on the page, 0 to 1 from its top left, as a percent; null when it is not one.
+  function placeOf(v) {
+    return typeof v === 'number' && isFinite(v) && v >= 0 && v <= 1 ? Math.round(v * 10000) / 100 : null;
+  }
+  function inkOf(m, fallback) {
+    return 'sp-ink-' + (INKS[m.color] || fallback);
+  }
+  function placed(x, y) {
+    return ' style="left:' + x + '%;top:' + y + '%"';
+  }
+
+  /* One page's marks, drawn over the photo: lines and highlights in one
+     drawing the size of the page; ticks, crosses and numbered notes placed
+     on it. The notes' words are listed under the page, by number. Anything
+     that is not a mark of the contract's five kinds, or has no place on
+     the page, is left out. */
+  function marksHtml(marks) {
+    var all = marks && typeof marks === 'object' && Array.isArray(marks.marks) ? marks.marks.slice(0, 500) : [];
+    var lines = '';
+    var over = '';
+    var notes = [];
+    all.forEach(function (m) {
+      if (!m || typeof m !== 'object' || !MARK_TYPES[m.type]) return;
+      if (m.type === 'pen' || m.type === 'highlight') {
+        var pts = (Array.isArray(m.points) ? m.points : [])
+          .map(function (pt) {
+            var x = Array.isArray(pt) ? placeOf(pt[0]) : null;
+            var y = Array.isArray(pt) ? placeOf(pt[1]) : null;
+            return x == null || y == null ? null : x + ',' + y;
+          })
+          .filter(Boolean);
+        if (pts.length < 2) return;
+        lines +=
+          '<polyline class="sp-work-' +
+          m.type +
+          ' ' +
+          inkOf(m, m.type === 'highlight' ? 'blue' : 'red') +
+          '" points="' +
+          pts.join(' ') +
+          '" vector-effect="non-scaling-stroke"/>';
+        return;
+      }
+      var x = placeOf(m.x);
+      var y = placeOf(m.y);
+      if (x == null || y == null) return;
+      if (m.type === 'note') {
+        var words = typeof m.text === 'string' ? m.text.trim().slice(0, 500) : '';
+        if (!words) return;
+        notes.push(words);
+        over += '<span class="sp-work-pin"' + placed(x, y) + '>' + notes.length + '</span>';
+        return;
+      }
+      over +=
+        '<span class="sp-work-mark ' +
+        inkOf(m, m.type === 'tick' ? 'green' : 'red') +
+        '"' +
+        placed(x, y) +
+        '>' +
+        (m.type === 'tick' ? '✓' : '✗') +
+        '</span>';
+    });
+    return {
+      over:
+        (lines
+          ? '<svg class="sp-work-ink" viewBox="0 0 100 100" preserveAspectRatio="none" focusable="false">' +
+            lines +
+            '</svg>'
+          : '') + over,
+      notes: notes,
+    };
+  }
+
+  function workPageHtml(view, ui, pages) {
+    var n = pages.length;
+    var i = Math.max(0, Math.min(n - 1, Number(ui.workPage) || 0));
+    var page = pages[i];
+    var showing = !ui.marksOff;
+    var teacher = teacherOf(view);
+    var drawn = showing ? marksHtml(page.marks) : { over: '', notes: [] };
+    var alt =
+      'Your page ' +
+      (i + 1) +
+      (showing && drawn.over ? ' with ' + (teacher ? teacher + '’s' : 'your teacher’s') + ' marks' : '');
+    var dots = '';
+    for (var k = 0; k < n; k++) dots += '<span class="sp-work-dot' + (k === i ? ' sp-work-dot-on' : '') + '"></span>';
+    return (
+      '<figure class="sp-work-page"><img class="sp-work-img" src="' +
+      esc(page.url) +
+      '" alt="' +
+      esc(alt) +
+      '"><div class="sp-work-over" aria-hidden="true">' +
+      drawn.over +
+      '</div></figure>' +
+      (drawn.notes.length
+        ? '<ol class="sp-work-notes" aria-label="Notes on This Page">' +
+          drawn.notes
+            .map(function (t, k) {
+              return (
+                '<li><span class="sp-work-pin sp-work-pin-in" aria-hidden="true">' +
+                (k + 1) +
+                '</span><span>' +
+                esc(t) +
+                '</span></li>'
+              );
+            })
+            .join('') +
+          '</ol>'
+        : '') +
+      '<div class="sp-work-bar">' +
+      (n > 1
+        ? '<button type="button" class="sp-head-icon" data-act="work-page" data-page="' +
+          (i - 1) +
+          '" aria-label="Previous Page"' +
+          (i === 0 ? ' disabled' : '') +
+          '>' +
+          BACK_ARROW +
+          '</button><span class="sp-work-dots" role="img" aria-label="' +
+          esc('Page ' + (i + 1) + ' of ' + n) +
+          '">' +
+          dots +
+          '</span><button type="button" class="sp-head-icon sp-work-next" data-act="work-page" data-page="' +
+          (i + 1) +
+          '" aria-label="Next Page"' +
+          (i === n - 1 ? ' disabled' : '') +
+          '>' +
+          BACK_ARROW +
+          '</button>'
+        : '') +
+      '<button type="button" class="sp-work-switch" role="switch" data-act="work-marks" aria-checked="' +
+      (showing ? 'true' : 'false') +
+      '"><span class="sp-work-track" aria-hidden="true"><span class="sp-work-knob"></span></span><span>Show Marks</span></button>' +
+      '</div>'
+    );
+  }
+
+  /* See Your Work: the way back to Your Feedback, the piece's title, which
+     page this is, the page with the marks the student was given over it,
+     Show Marks, and a way between the pages. */
+  function seeWorkPaneHtml(view, ui, p) {
+    var got = ui.workPages && ui.workPages.id === p.id ? ui.workPages : null;
+    var pages = readyPages(ui, p) || [];
+    var i = Math.max(0, Math.min(pages.length - 1, Number(ui.workPage) || 0));
+    var body;
+    if (got && got.state === 'failed') {
+      body =
+        '<p class="sp-lead sp-msg" role="alert">Your work didn’t load. Check your internet and try again.</p>' +
+        '<button type="button" class="sp-btn sp-btn-tint sp-work-retry" data-act="work-retry" data-piece="' +
+        esc(p.id) +
+        '">Try Again</button>';
+    } else if (!got || got.state !== 'ready') {
+      body = '<p class="sp-lead sp-msg-calm" role="status">Getting your work…</p>';
+    } else if (!pages.length) {
+      body = '<p class="sp-lead sp-msg-calm">Your pages can’t be shown here.</p>';
+    } else {
+      body = workPageHtml(view, ui, pages);
+    }
+    return (
+      '<section class="sp-feedback sp-work" aria-labelledby="sp-work-title">' +
+      '<div class="sp-work-head"><button type="button" class="sp-head-icon" data-act="work-close" aria-label="Back">' +
+      BACK_ARROW +
+      '</button><div class="sp-work-words"><h1 class="sp-work-title" id="sp-work-title" tabindex="-1">' +
+      esc(p.title) +
+      '</h1>' +
+      (pages.length ? '<p class="sp-fb-sub">' + esc('Page ' + (i + 1) + ' of ' + pages.length) + '</p>' : '') +
+      '</div></div>' +
+      body +
+      reflectButtonHtml(view, p) +
+      '</section>'
+    );
+  }
+
   /* Your Feedback, or The Whole Rubric, in place of the cards. On a
      Chromebook the list stays on the left, as on the board; on a phone the
      screen is the feedback alone. */
@@ -733,7 +1227,7 @@ window.StudentPageView = (function () {
       noResultsHtml(ui, view) +
       '<div class="sp-split sp-split-feedback">' +
       sideHtml(pieces, p) +
-      (ui.whole ? wholeHtml(view, p) : feedbackHtml(view, ui, p)) +
+      (ui.whole ? wholeHtml(view, p) : workOpen(ui, p) ? seeWorkPaneHtml(view, ui, p) : feedbackHtml(view, ui, p)) +
       '</div>'
     );
   }
@@ -749,7 +1243,7 @@ window.StudentPageView = (function () {
       (!view.work.length
         ? '<p class="sp-lead sp-empty">No assignments yet.</p>'
         : pieces.length
-          ? deckHtml(ui, pieces)
+          ? deckHtml(ui, pieces, view)
           : seg === 'todo'
             ? caughtUpHtml()
             : EMPTY[seg])
@@ -790,7 +1284,15 @@ window.StudentPageView = (function () {
     var bits = [];
     if (back) bits.push(back === 1 ? '1 piece came back' : back + ' pieces came back');
     if (updated) bits.push(updated === 1 ? '1 result was updated' : updated + ' results were updated');
+    var teacher = teacherOf(view);
     var line = bits.join(' and ') + '.';
+    // With the teacher's name, the board's pattern: "Colin Brown returned 5 pieces and updated 1 result."
+    if (teacher) {
+      var did = [];
+      if (back) did.push(back === 1 ? 'returned 1 piece' : 'returned ' + back + ' pieces');
+      if (updated) did.push(updated === 1 ? 'updated 1 result' : 'updated ' + updated + ' results');
+      line = teacher + ' ' + did.join(' and ') + '.';
+    }
     return (
       '<div class="sp-since"><p class="sp-since-title">' +
       esc(changes.length === 1 ? '1 Thing Since You Last Looked' : changes.length + ' Things Since You Last Looked') +
@@ -821,7 +1323,13 @@ window.StudentPageView = (function () {
 
   // Which of To Do, Sent and Back a piece is in, or '' (Excused).
   function segmentOf(p) {
-    return p.kind === 'back' ? 'back' : p.kind === 'due' || p.kind === 'missing' ? 'todo' : '';
+    return p.kind === 'back'
+      ? 'back'
+      : p.kind === 'sent'
+        ? 'sent'
+        : p.kind === 'due' || p.kind === 'missing'
+          ? 'todo'
+          : '';
   }
 
   var BACK_ARROW =
@@ -1644,7 +2152,18 @@ window.StudentPageView = (function () {
   var TAB_IDS = { assignments: 1, learning: 1, questionnaires: 1, reports: 1 };
   var SEGMENT_IDS = { todo: 1, sent: 1, back: 1 };
   var FILTER_IDS = { all: 1, todo: 1, sent: 1, back: 1, new: 1 };
-  var FEEDBACK_ACTS = { feedback: 1, whole: 1, 'feedback-close': 1, 'whole-close': 1, levels: 1, 'form-pick': 1 };
+  var FEEDBACK_ACTS = {
+    feedback: 1,
+    whole: 1,
+    'feedback-close': 1,
+    'whole-close': 1,
+    levels: 1,
+    'form-pick': 1,
+    work: 1,
+    'work-close': 1,
+    'work-page': 1,
+    'work-marks': 1,
+  };
   function has(map, key) {
     return typeof key === 'string' && Object.prototype.hasOwnProperty.call(map, key);
   }
@@ -1664,6 +2183,48 @@ window.StudentPageView = (function () {
     if (!has(FEEDBACK_ACTS, act)) {
       next.feedback = '';
       next.whole = false;
+    }
+    // See Your Work goes with any press but its own.
+    if (!/^work/.test(act)) {
+      next.work = '';
+      next.workPage = 0;
+      next.marksOff = false;
+    }
+    if (act === 'work') {
+      var wid = attr('data-piece');
+      var w = view && pieceIn(view.work, wid);
+      if (!w || w.id !== wid || !w.marks || !hasFeedback(w)) return null;
+      next.tab = 'assignments';
+      next.all = false;
+      next.feedback = w.id;
+      next.whole = false;
+      next.segment = segmentOf(w);
+      next.pick = w.id;
+      next.work = w.id;
+      next.workPage = 0;
+      next.marksOff = false;
+      // Pages fetched for another piece are not this one's.
+      if (next.workPages && next.workPages.id !== w.id) next.workPages = null;
+      return { ui: next, focus: '#sp-work-title', work: w.id };
+    }
+    if (act === 'work-close') {
+      next.work = '';
+      next.workPage = 0;
+      next.marksOff = false;
+      return { ui: next, focus: '[data-act="work"]' };
+    }
+    if (act === 'work-page' || act === 'work-marks') {
+      var on = view && next.work ? pieceIn(view.work, next.work) : null;
+      if (!on || on.id !== next.work || !on.marks) return null;
+      if (act === 'work-marks') {
+        next.marksOff = !next.marksOff;
+        return { ui: next, focus: '[data-act="work-marks"]' };
+      }
+      var count = (readyPages(next, on) || []).length;
+      var to = Number(attr('data-page'));
+      if (!count || !(to >= 0 && to < count) || Math.floor(to) !== to) return null;
+      next.workPage = to;
+      return { ui: next, focus: '#sp-work-title' };
     }
     if (act === 'skill') {
       var l = view && view.learning;
@@ -1785,5 +2346,10 @@ window.StudentPageView = (function () {
     inSegment: inSegment,
     matching: matching,
     segmentOf: segmentOf,
+    photosWord: photosWord,
+    thumbsHtml: thumbsHtml,
+    marksLine: marksLine,
+    planHtml: planHtml,
+    initialsHtml: initialsHtml,
   };
 })();

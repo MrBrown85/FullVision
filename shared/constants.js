@@ -767,6 +767,7 @@ function obsTagColor(key) {
 /* ── Card Widget Registry ─────────────────────────────────── */
 const WIDGET_REGISTRY = [
   { key: 'hero', label: 'Name & Proficiency', defaultOn: true },
+  { key: 'toGrade', label: 'To Grade', defaultOn: true },
   { key: 'sectionBars', label: 'Section Progress', defaultOn: true },
   { key: 'completion', label: 'Evidence Coverage', defaultOn: true },
   { key: 'missingWork', label: 'Missing Work', defaultOn: false },

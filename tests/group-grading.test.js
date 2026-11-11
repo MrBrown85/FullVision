@@ -1,362 +1,183 @@
 /**
- * Group grading — shared/data.js (Group grading section). A grade saved for
- * one member of a pair or group is copied to every member still graded with
- * it; Grade Separately takes a member out; Missing and Excused stay per
- * student and keep the group grade off that member.
+ * S12-F2: grading group work (the board "Teacher: Grading Group Work").
+ * On a One per Group piece one member sends for the group: the grader shows
+ * the group's work on one pane, Students in This Group and Change One
+ * Student, and the one counting function (GraderWork.workCounts) counts a
+ * group once. The plan's test: To Grade 4 means four groups; a member
+ * graded separately returns on their own; a missing or excused member is
+ * left out, as today.
  */
+import './setup.js';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { U, seedClass, clearClass, openGrader, closePages, settle } from './helpers/pin-save-paths.js';
+import { click } from './helpers/gradebook-dom.js';
 
-const CID = 'test';
+const CID = U(1);
+const PIECE = U(31);
+const Q = U(41);
+// Twelve students in four groups of three; the first of each sends.
+const S = Array.from({ length: 12 }, (_, i) => U(101 + i));
+const GROUPS = [S.slice(0, 3), S.slice(3, 6), S.slice(6, 9), S.slice(9, 12)];
+const NAMES = ['Priya', 'Ava', 'Leo', 'Bea', 'Cal', 'Dee', 'Eli', 'Fay', 'Gus', 'Hal', 'Ida', 'Jo'];
+let wasDemo;
 
-function levels(sid, aid) {
-  return (getScores(CID)[sid] || [])
-    .filter(e => e.assessmentId === aid)
-    .map(e => [e.tagId, e.score, e.mod || 0])
-    .sort();
+function seed({ groupWork = 'group', sendWork = true } = {}) {
+  seedClass(CID, {
+    students: S.map((id, i) => ({ id, firstName: NAMES[i], lastName: String.fromCharCode(65 + i) + 'son' })),
+    learningMaps: {
+      subjects: [],
+      sections: [{ id: U(51), name: 'Manor', tags: [{ id: Q, label: 'Manor Layout', text: 'Lay it out' }] }],
+      _customized: true,
+      _version: 1,
+      _flatVersion: 2,
+    },
+    assessments: [
+      { id: PIECE, title: 'Manor', tagIds: [Q], date: '2026-11-03', collaboration: 'group', groups: GROUPS },
+    ],
+    courseConfigs: { student_page_enabled: true, return_grades: 'on_return' },
+  });
+  saveDemoStudentWork(CID, {
+    course: { send_work: sendWork },
+    assessments: [{ id: PIECE, students_send: 'photos', group_work: groupWork }],
+    submissions: GROUPS.map((g, i) => ({
+      id: 'w' + i,
+      assessment_id: PIECE,
+      enrollment_id: g[0],
+      version: 1,
+      state: 'sent',
+      sent_by: 'student',
+      sent_at: '2026-11-03T18:0' + i + ':00Z',
+      note: i === 0 ? 'Leo drew the cottages.' : null,
+      files: [1, 2].map(n => ({ id: 'g' + i + 'p' + n, page: n, path: 'lab-p' + n + '.jpg', sha256: 'h' + i + n })),
+    })),
+  });
 }
 
 beforeEach(() => {
-  ['assessments', 'scores', 'statuses', 'observations', 'rubricChecks'].forEach(function (field) {
-    if (_cache[field]) _cache[field][CID] = undefined;
-  });
+  wasDemo = window.isDemoMode;
+  window.isDemoMode = () => true;
   localStorage.clear();
-  saveAssessments(CID, [
-    {
-      id: 'grp',
-      title: 'Group Lab',
-      date: '2026-10-31',
-      type: 'summative',
-      tagIds: ['t1', 't2'],
-      collaboration: 'group',
-      groups: [
-        ['a', 'b', 'c'],
-        ['d', 'e'],
-      ],
-    },
-    {
-      id: 'pr',
-      title: 'Pair Quiz',
-      date: '2026-10-31',
-      type: 'summative',
-      tagIds: [],
-      scoreMode: 'points',
-      maxPoints: 10,
-      collaboration: 'pair',
-      pairs: [['a', 'b']],
-    },
-    { id: 'solo', title: 'Essay', date: '2026-10-31', type: 'summative', tagIds: ['t1'] },
-  ]);
-  saveScores(CID, {});
+});
+afterEach(() => {
+  closePages();
+  clearClass(CID);
+  localStorage.clear();
+  window.isDemoMode = wasDemo;
 });
 
-describe('graded together', () => {
-  it('copies a level and its + / − to the rest of the group only', () => {
-    upsertScore(CID, 'a', 'grp', 't1', 3, '2026-10-31', 'summative', '', 1);
-    expect(levels('b', 'grp')).toEqual([['t1', 3, 1]]);
-    expect(levels('c', 'grp')).toEqual([['t1', 3, 1]]);
-    expect(levels('d', 'grp')).toEqual([]);
+describe('the one count', () => {
+  it('To Grade 4 means four groups', () => {
+    seed();
+    const c = GraderWork.workCounts(CID, PIECE);
+    expect([c.tograde, c.groups, c.notin]).toEqual([4, 4, 0]);
+    // Every member is to grade: none who sent nothing is Not In.
+    expect(c.ids.tograde.length).toBe(12);
+    expect(GraderWork.classWorkCounts(CID).tograde).toBe(4);
   });
 
-  it('copies from whichever member was graded last', () => {
-    upsertScore(CID, 'a', 'grp', 't1', 3, '', 'summative', '');
-    upsertScore(CID, 'c', 'grp', 't1', 2, '', 'summative', '');
-    expect(levels('a', 'grp')).toEqual([['t1', 2, 0]]);
-    expect(levels('b', 'grp')).toEqual([['t1', 2, 0]]);
+  it('on Each Student the members who sent nothing are Not In, as before', () => {
+    seed({ groupWork: 'each' });
+    const c = GraderWork.workCounts(CID, PIECE);
+    expect(c.ids.notin.length).toBe(8);
   });
 
-  it('copies the Overall Comment, and clearing it clears it for everyone', () => {
-    upsertScore(CID, 'a', 'grp', 't1', 3, '', 'summative', '');
-    saveScoreComment(CID, 'b', 'grp', 'Clear procedure.');
-    expect(getScoreComment(CID, 'a', 'grp')).toBe('Clear procedure.');
-    expect(getScoreComment(CID, 'c', 'grp')).toBe('Clear procedure.');
-    saveScoreComment(CID, 'a', 'grp', '');
-    expect(getScoreComment(CID, 'b', 'grp')).toBe('');
-    expect(getScoreComment(CID, 'c', 'grp')).toBe('');
+  it('a member graded separately counts and returns on their own', () => {
+    seed();
+    Grader.gradeSeparately(CID, PIECE, S[2]);
+    expect(GraderWork.workCounts(CID, PIECE).tograde).toBe(5);
+    Grader.setLevel(CID, S[2], PIECE, Q, 2);
+    let c = GraderWork.workCounts(CID, PIECE);
+    expect([c.tograde, c.toreturn]).toEqual([4, 1]);
+    expect(c.ids.toreturn).toEqual([S[2]]);
+    Grader.returnGrades(CID, PIECE, [S[2]]);
+    c = GraderWork.workCounts(CID, PIECE);
+    expect([c.tograde, c.toreturn, c.returned]).toEqual([4, 0, 1]);
+    expect(c.ids.returned).toEqual([S[2]]);
   });
 
-  it('keeps each member their own Note for the Report', () => {
-    upsertScore(CID, 'a', 'grp', 't1', 3, '', 'summative', '');
-    saveScoreReportNote(CID, 'b', 'grp', 'Away for two classes.');
-    upsertScore(CID, 'a', 'grp', 't2', 4, '', 'summative', '');
-    expect(getScoreReportNote(CID, 'b', 'grp')).toBe('Away for two classes.');
-    expect(getScoreReportNote(CID, 'a', 'grp')).toBe('');
+  it('a member marked Missing or Excused is left out; the group still counts once', () => {
+    seed();
+    Grader.setStatus(CID, S[1], PIECE, 'NS');
+    Grader.setStatus(CID, S[4], PIECE, 'EXC');
+    const c = GraderWork.workCounts(CID, PIECE);
+    expect([c.tograde, c.notin]).toEqual([4, 0]);
+    expect(c.ids.tograde).not.toContain(S[1]);
+    expect(c.ids.tograde).not.toContain(S[4]);
   });
 
-  it('copies points on pair work, and a clear clears the pair', () => {
-    setPointsScore(CID, 'a', 'pr', 8);
-    expect(getPointsScore(CID, 'b', 'pr')).toBe(8);
-    setPointsScore(CID, 'b', 'pr', null);
-    expect(getPointsScore(CID, 'a', 'pr')).toBe(null);
-  });
-
-  it('copies a whole-blob save such as a cleared cell', () => {
-    upsertScore(CID, 'a', 'grp', 't1', 3, '', 'summative', '');
-    var scores = getScores(CID);
-    scores.b = scores.b.filter(e => e.assessmentId !== 'grp');
-    saveScores(CID, scores);
-    expect(levels('a', 'grp')).toEqual([]);
-    expect(levels('c', 'grp')).toEqual([]);
-  });
-
-  it('leaves individual work alone', () => {
-    upsertScore(CID, 'a', 'solo', 't1', 3, '', 'summative', '');
-    expect(levels('b', 'solo')).toEqual([]);
+  it('the group’s own pages are not "the same photo" as a group-mate’s', () => {
+    seed();
+    expect(GraderWork.samePhotoAs(CID, PIECE, S[1])).toEqual([]);
   });
 });
 
-describe('Grade Separately', () => {
-  it('keeps the member their copy and stops later changes reaching them', () => {
-    upsertScore(CID, 'a', 'grp', 't1', 3, '', 'summative', '');
-    expect(setGradedSeparately(CID, 'grp', 'b', true)).toBe(true);
-    expect(isLinkedGroupMember(CID, 'grp', 'b')).toBe(false);
-    expect(levels('b', 'grp')).toEqual([['t1', 3, 0]]);
-    upsertScore(CID, 'a', 'grp', 't1', 2, '', 'summative', '');
-    expect(levels('b', 'grp')).toEqual([['t1', 3, 0]]);
-    expect(levels('c', 'grp')).toEqual([['t1', 2, 0]]);
-    upsertScore(CID, 'b', 'grp', 't1', 4, '', 'summative', '');
-    expect(levels('a', 'grp')).toEqual([['t1', 2, 0]]);
-  });
-
-  it('Back to Group Grade replaces their grade with the group’s', () => {
-    upsertScore(CID, 'a', 'grp', 't1', 3, '', 'summative', '');
-    setGradedSeparately(CID, 'grp', 'b', true);
-    upsertScore(CID, 'b', 'grp', 't2', 4, '', 'summative', '');
-    saveScoreComment(CID, 'b', 'grp', 'Strong controls.');
-    setGradedSeparately(CID, 'grp', 'b', false);
-    expect(levels('b', 'grp')).toEqual([['t1', 3, 0]]);
-    expect(getScoreComment(CID, 'b', 'grp')).toBe('');
-  });
-
-  it('is saved in collab_config and read back', () => {
-    setGradedSeparately(CID, 'grp', 'b', true);
-    var a = getAssessments(CID).find(x => x.id === 'grp');
-    expect(_collabConfigFromAssessment(a).gradedSeparately).toEqual(['b']);
-    var back = _assessmentFromDetail(
-      {},
-      {
-        assessment: {
-          id: 'grp',
-          collab_mode: 'groups',
-          collab_config: { groups: [['a', 'b']], gradedSeparately: ['b'] },
-        },
-      },
+describe('the grader on a group', () => {
+  it('one work pane for the group, whoever sent it, with the board’s words', async () => {
+    const overlay = openGrader(seed, CID, PIECE, S[1]);
+    await settle();
+    expect(overlay.querySelector('.grader-work-what').textContent).toBe(
+      'Sent by Priya A. for the group, Nov 3 · 2 photos',
     );
-    expect(back.gradedSeparately).toEqual(['b']);
+    expect(overlay.querySelector('.grader-work-at').textContent).toBe('1 of 2');
+    expect(overlay.querySelector('.grader-work-note-title').textContent).toBe('Priya’s Note, Sent for the Group');
+    expect(overlay.querySelector('.grader-work-delete')).toBeNull();
+    const strip = overlay.querySelector('.grader-work-strip');
+    expect(strip.getAttribute('aria-label')).toBe('Groups to grade');
+    expect([...strip.querySelectorAll('button')].map(b => b.getAttribute('aria-label'))).toEqual([
+      'Group 1',
+      'Group 2',
+      'Group 3',
+      'Group 4',
+    ]);
+    expect(strip.querySelector('[aria-current="true"]').getAttribute('aria-label')).toBe('Group 1');
+    click(strip.querySelectorAll('button')[2]);
+    expect(overlay.querySelector('.grader-work-what').textContent).toMatch(/^Sent by Eli G\. for the group/);
   });
 
-  it('refuses students in no group', () => {
-    expect(setGradedSeparately(CID, 'grp', 'z', true)).toBe(false);
-    expect(setGradedSeparately(CID, 'solo', 'a', true)).toBe(false);
-  });
-});
-
-describe('Missing, Excused and Late stay per student', () => {
-  it('a Missing member gets no group grade', () => {
-    setAssignmentStatus(CID, 'c', 'grp', 'NS');
-    upsertScore(CID, 'a', 'grp', 't1', 3, '', 'summative', '');
-    expect(levels('b', 'grp')).toEqual([['t1', 3, 0]]);
-    expect(levels('c', 'grp')).toEqual([]);
-    expect(getAssignmentStatus(CID, 'a', 'grp')).toBe(null);
-  });
-
-  it('marking a graded member Excused clears their copy; taking it off copies it back', () => {
-    upsertScore(CID, 'a', 'grp', 't1', 3, '', 'summative', '');
-    saveScoreComment(CID, 'a', 'grp', 'Good work.');
-    expect(canSetAssignmentStatus(CID, 'c', 'grp', 'EXC')).toBe(true);
-    setAssignmentStatus(CID, 'c', 'grp', 'EXC');
-    expect(getAssignmentStatus(CID, 'c', 'grp')).toBe('EXC');
-    expect(levels('c', 'grp')).toEqual([]);
-    expect(getScoreComment(CID, 'c', 'grp')).toBe('');
-    expect(levels('a', 'grp')).toEqual([['t1', 3, 0]]);
-    setAssignmentStatus(CID, 'c', 'grp', null);
-    expect(levels('c', 'grp')).toEqual([['t1', 3, 0]]);
-    expect(getScoreComment(CID, 'c', 'grp')).toBe('Good work.');
-  });
-
-  it('Missing through applyAssignmentStatus never wipes the group', () => {
-    upsertScore(CID, 'a', 'grp', 't1', 3, '', 'summative', '');
-    applyAssignmentStatus(CID, 'b', 'grp', 'NS');
-    expect(levels('a', 'grp')).toEqual([['t1', 3, 0]]);
-    expect(levels('c', 'grp')).toEqual([['t1', 3, 0]]);
-  });
-
-  it('Late keeps the group grade', () => {
-    setAssignmentStatus(CID, 'b', 'grp', 'LATE');
-    upsertScore(CID, 'a', 'grp', 't1', 3, '', 'summative', '');
-    expect(levels('b', 'grp')).toEqual([['t1', 3, 0]]);
-  });
-
-  it('a member graded separately keeps the old rule', () => {
-    upsertScore(CID, 'a', 'grp', 't1', 3, '', 'summative', '');
-    setGradedSeparately(CID, 'grp', 'b', true);
-    expect(canSetAssignmentStatus(CID, 'b', 'grp', 'NS')).toBe(false);
-  });
-});
-
-describe('rubric checkboxes', () => {
-  it('copies ticks and unticks', () => {
-    setRubricCheck(CID, 'a', 'grp', 'k1', true);
-    expect(getRubricCheckIds(CID, 'b', 'grp')).toEqual(['k1']);
-    setRubricCheck(CID, 'c', 'grp', 'k1', false);
-    expect(getRubricCheckIds(CID, 'a', 'grp')).toEqual([]);
-  });
-});
-
-describe('review fixes (Nov 1 2026)', () => {
-  it('moves a member with a grade of their own to Graded Separately instead of writing over it', () => {
-    // b and c were graded before the groups were made: b differs from a.
-    saveScores(CID, {
-      a: [{ assessmentId: 'grp', tagId: 't1', score: 3, type: 'summative', date: '2026-10-31' }],
-      b: [{ assessmentId: 'grp', tagId: 't1', score: 1, type: 'summative', date: '2026-10-31' }],
-      c: [{ assessmentId: 'grp', tagId: 't1', score: 3, type: 'summative', date: '2026-10-31' }],
-    });
-    upsertScore(CID, 'a', 'grp', 't2', 4, '', 'summative', '');
-    expect(levels('b', 'grp')).toEqual([['t1', 1, 0]]);
-    expect(isLinkedGroupMember(CID, 'grp', 'b')).toBe(false);
-    expect(levels('c', 'grp')).toEqual([
-      ['t1', 3, 0],
-      ['t2', 4, 0],
+  it('Students in This Group: one grade for all three, each Same as group', () => {
+    const overlay = openGrader(seed, CID, PIECE, S[0]);
+    const card = overlay.querySelector('.grader-members');
+    expect(card.querySelector('.grader-members-title').textContent).toBe('Students in This Group');
+    expect(card.querySelector('.grader-members-hint').textContent).toBe(
+      'One grade for all three. Change one student only when their part was different.',
+    );
+    expect([...card.querySelectorAll('.grader-member-same')].map(p => p.textContent)).toEqual([
+      'Same as group',
+      'Same as group',
+      'Same as group',
     ]);
   });
 
-  it('a status taken off through a bulk save copies the group grade back', () => {
-    var st = getAssignmentStatuses(CID);
-    st['c:grp'] = 'NS';
-    saveAssignmentStatuses(CID, st);
-    upsertScore(CID, 'a', 'grp', 't1', 3, '', 'summative', '');
-    expect(levels('c', 'grp')).toEqual([]);
-    st = getAssignmentStatuses(CID);
-    delete st['c:grp'];
-    saveAssignmentStatuses(CID, st);
-    expect(levels('c', 'grp')).toEqual([['t1', 3, 0]]);
-  });
-
-  it('a bulk Missing on a graded member clears their copy', () => {
-    upsertScore(CID, 'a', 'grp', 't1', 3, '', 'summative', '');
-    var st = getAssignmentStatuses(CID);
-    st['b:grp'] = 'EXC';
-    saveAssignmentStatuses(CID, st);
-    expect(levels('b', 'grp')).toEqual([]);
-    expect(levels('c', 'grp')).toEqual([['t1', 3, 0]]);
-  });
-
-  it('old rubric keys in storage are not read as changed grades', () => {
-    var list = getAssessments(CID);
-    var rub = list.find(x => x.id === 'grp');
-    rub.rubricId = 'r1';
-    rub.tagIds = ['t1'];
-    saveAssessments(CID, list);
-    saveRubrics(CID, [{ id: 'r1', name: 'R', criteria: [{ id: 'c1', name: 'C', tagIds: ['t1'], levels: {} }] }]);
-    // Stored before criteria had their own keys; a and b already differ.
-    _cache.scores[CID] = undefined;
-    localStorage.setItem(
-      'gb-scores-' + CID,
-      JSON.stringify({
-        a: [{ assessmentId: 'grp', tagId: 't1', score: 3, type: 'summative', date: '2026-10-31' }],
-        b: [{ assessmentId: 'grp', tagId: 't1', score: 2, type: 'summative', date: '2026-10-31' }],
-      }),
+  it('Change One Student: the member keeps the group’s grade as their own, opens, and the change is named', () => {
+    const overlay = openGrader(seed, CID, PIECE, S[0]);
+    Grader.setLevel(CID, S[0], PIECE, Q, 3);
+    window.PageAssignments.render();
+    click(overlay.querySelector('.grader-change-one-btn'));
+    const items = [...overlay.querySelectorAll('[data-grader="change-one"]')];
+    expect(items.map(b => b.textContent)).toEqual(['Priya Ason', 'Ava Bson', 'Leo Cson']);
+    click(items[2]);
+    const a = getAssessments(CID).find(x => x.id === PIECE);
+    expect(isGradedSeparately(a, S[2])).toBe(true);
+    expect(overlay.querySelector('.grader-separate-line').textContent).toMatch(/^Graded Separately From Group 1/);
+    // Leo's own grade starts as the group's: nothing is named as changed.
+    click(overlay.querySelector('[data-grader="prev"]'));
+    expect(overlay.querySelector('.grader-member-same.is-changed')).toBeNull();
+    // Then it changes.
+    Grader.setLevel(CID, S[2], PIECE, Q, 1);
+    window.PageAssignments.render();
+    const card = overlay.querySelector('.grader-members');
+    expect(card.querySelector('.grader-members-title').textContent).toBe('Students in This Group');
+    expect(card.querySelector('.grader-member-same.is-changed').textContent).toBe(
+      'Manor Layout: Emerging · changed for Leo',
     );
-    var scores = getScores(CID);
-    scores.d = [{ assessmentId: 'solo', tagId: 't1', score: 3, type: 'summative', date: '2026-10-31' }];
-    saveScores(CID, scores);
-    expect(isLinkedGroupMember(CID, 'grp', 'b')).toBe(true);
-    expect(levels('b', 'grp')).toEqual([['c1', 2, 0]]);
   });
 
-  it('never grades DIBELS work by group, and keeps its Missing rule', () => {
-    var list = getAssessments(CID);
-    list.push({
-      id: 'dib',
-      title: 'DIBELS',
-      date: '2026-10-31',
-      type: 'summative',
-      tagIds: [],
-      scoreMode: 'dibels',
-      collaboration: 'group',
-      groups: [['a', 'b']],
-    });
-    saveAssessments(CID, list);
-    expect(getCollabGroupOf(list[list.length - 1], 'a')).toBe(null);
-    saveDibelsScore(CID, 'a', 'dib', 'boy', { orfWrc: 120 });
-    expect(canSetAssignmentStatus(CID, 'a', 'dib', 'NS')).toBe(false);
-  });
-
-  it('Back to Group Grade has nobody to copy from when the rest are Excused', () => {
-    setGradedSeparately(CID, 'pr', 'b', true);
-    setAssignmentStatus(CID, 'a', 'pr', 'EXC');
-    expect(backToGroupGradeSource(CID, 'pr', 'b')).toBe(null);
-    setAssignmentStatus(CID, 'a', 'pr', null);
-    expect(backToGroupGradeSource(CID, 'pr', 'b')).toBe('a');
-  });
-
-  it('groupGradingUnits lists groups, then separated members, then the rest', () => {
-    setGradedSeparately(CID, 'grp', 'b', true);
-    var a = getAssessments(CID).find(x => x.id === 'grp');
-    var units = groupGradingUnits(CID, a, ['a', 'b', 'c', 'd', 'e', 'z']);
-    expect(units.map(u => (u.linked ? 'G' + (u.group.index + 1) + ':' + u.source : u.sid))).toEqual([
-      'G1:a',
-      'b',
-      'G2:d',
-      'z',
-    ]);
-    expect(
-      groupGradingUnits(
-        CID,
-        getAssessments(CID).find(x => x.id === 'solo'),
-        ['a'],
-      ),
-    ).toBe(null);
-  });
-});
-
-describe('a status sets the group grade aside (Nov 3 2026 sweep)', () => {
-  it('marking every member Missing keeps the grade and comment, and taking a status off brings them back', () => {
-    upsertScore(CID, 'd', 'grp', 't1', 3, '', 'summative', '');
-    saveScoreComment(CID, 'd', 'grp', 'Great lab');
-    applyAssignmentStatus(CID, 'd', 'grp', 'NS');
-    expect(canSetAssignmentStatus(CID, 'e', 'grp', 'EXC')).toBe(true);
-    applyAssignmentStatus(CID, 'e', 'grp', 'EXC');
-    expect(levels('e', 'grp')).toEqual([]);
-    expect(getAssessments(CID).find(x => x.id === 'grp').groupGradeAside).toBeTruthy();
-    expect(_collabConfigFromAssessment(getAssessments(CID).find(x => x.id === 'grp')).groupGradeAside).toBeTruthy();
-    setAssignmentStatus(CID, 'd', 'grp', null);
-    expect(levels('d', 'grp')).toEqual([['t1', 3, 0]]);
-    expect(getScoreComment(CID, 'd', 'grp')).toBe('Great lab');
-    expect(getAssessments(CID).find(x => x.id === 'grp').groupGradeAside).toBeUndefined();
-    setAssignmentStatus(CID, 'e', 'grp', null);
-    expect(levels('e', 'grp')).toEqual([['t1', 3, 0]]);
-    expect(getScoreComment(CID, 'e', 'grp')).toBe('Great lab');
-  });
-
-  it('a points pair keeps its points when both are Excused and both come off at once', () => {
-    setPointsScore(CID, 'a', 'pr', 8);
-    setAssignmentStatus(CID, 'a', 'pr', 'EXC');
-    setAssignmentStatus(CID, 'b', 'pr', 'EXC');
-    expect(getPointsScore(CID, 'b', 'pr')).toBe(null);
-    var st = getAssignmentStatuses(CID);
-    delete st['a:pr'];
-    delete st['b:pr'];
-    saveAssignmentStatuses(CID, st);
-    expect(getPointsScore(CID, 'a', 'pr')).toBe(8);
-    expect(getPointsScore(CID, 'b', 'pr')).toBe(8);
-  });
-
-  it('a member whose grade is their own is not marked Missing, and keeps it', () => {
-    // Graded one by one, then made Group work: e is still linked.
-    var list = getAssessments(CID);
-    list.find(x => x.id === 'grp').collaboration = 'individual';
-    saveAssessments(CID, list);
-    saveScores(CID, {
-      d: [{ assessmentId: 'grp', tagId: 't1', score: 3, type: 'summative', date: '2026-10-31' }],
-      e: [{ assessmentId: 'grp', tagId: 't1', score: 2, type: 'summative', date: '2026-10-31', note: 'Own comment' }],
-    });
-    list = getAssessments(CID);
-    list.find(x => x.id === 'grp').collaboration = 'group';
-    saveAssessments(CID, list);
-    expect(isLinkedGroupMember(CID, 'grp', 'e')).toBe(true);
-    expect(canSetAssignmentStatus(CID, 'e', 'grp', 'NS')).toBe(false);
-    expect(applyAssignmentStatus(CID, 'e', 'grp', 'NS')).toBe(false);
-    expect(levels('e', 'grp')).toEqual([['t1', 2, 0]]);
-    expect(getScoreComment(CID, 'e', 'grp')).toBe('Own comment');
-    expect(canSetAssignmentStatus(CID, 'd', 'grp', 'NS')).toBe(false);
+  it('without Send Work the members card is as it was', () => {
+    const overlay = openGrader(() => seed({ sendWork: false }), CID, PIECE, S[0]);
+    const card = overlay.querySelector('.grader-members');
+    expect(card.querySelector('.grader-members-title').textContent).toBe('Group Members');
+    expect(card.querySelector('.grader-members-hint')).toBeNull();
+    expect(card.querySelector('.grader-member-same')).toBeNull();
+    expect(overlay.querySelector('.grader-change-one-btn')).toBeNull();
   });
 });
