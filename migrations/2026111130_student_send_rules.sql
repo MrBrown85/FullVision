@@ -1,11 +1,12 @@
 -- Students send work: two of Colin's rulings of Nov 11, 2026 (106 and 107).
 -- Apply AFTER, in this order: 2026111101_student_work_submissions.sql and
--- 2026111102_student_work_storage.sql (Batch B, on live), then
--- 2026111104_student_work_review_fixes.sql (PR 1053), then Batch C's
--- 2026111120_markup_reflect_revise.sql and
--- 2026111121_markup_revise_grade_changes.sql (PR 1043). None of those is
--- changed. This file replaces three functions, adds one (section 4, its
--- own commit, NOT DECIDED BY COLIN), and changes nothing else:
+-- 2026111102_student_work_storage.sql (Batch B) and
+-- 2026111104_student_work_review_fixes.sql (its review fixes), all three on
+-- live, then Batch C's 2026111120_markup_reflect_revise.sql (C1) and
+-- 2026111121_markup_revise_grade_changes.sql (C2), PR 1043 as of b26cf1c7.
+-- None of those is changed. This file replaces three functions, adds one
+-- (section 4, its own commit, approved by Colin on Nov 11), and changes
+-- nothing else:
 --   student_submit._send_begin(text, text, uuid, uuid, jsonb, text, text, uuid)
 --                                   a student's send or Replace, first half
 --   student_submit.send_finish(text, uuid, uuid, jsonb, text)
@@ -135,7 +136,12 @@
 -- exists and every function in the two lists below carries the fingerprint
 -- (md5(pg_get_functiondef), PostgreSQL 17) it has once the files above are
 -- applied: the three it replaces (or, on a second run, as this file leaves
--- them) and the ones their new lines rely on. The lists are written by
+-- them), the ones their new lines rely on, and four that pin Batch C as
+-- tested (C1's _revision_state, revision_start and revision_finish, which
+-- decide what a version 2 is and when a revision is open, and C2's trigger
+-- function _markup_on_return; none is called here). So it stops on a
+-- database with C1 and not C2, and on a Batch C other than the one tested.
+-- The lists are written by
 -- migrations/local-test/send_rules.py fingerprints, never by hand. Its last
 -- step checks that the three are as this file leaves them, the others
 -- untouched, and that every SECURITY DEFINER function in public,
@@ -207,7 +213,8 @@ begin
             raise exception '% already exists, and is not as this file leaves it (found %): something else made it. Nothing was changed.', _f.fn, _md5;
         end if;
     end loop;
-    -- What the new lines rely on, as the files before this one leave it.
+    -- What the new lines rely on, and Batch C as tested (C1's revision rules,
+    -- C2's trigger function), as the files before this one leave it.
     for _f in
         select * from (values
             -- FINGERPRINTS-BEGIN relied (written by migrations/local-test/send_rules.py)
@@ -231,7 +238,11 @@ begin
             ('public._work_files_state(uuid,jsonb)',                                                '8fe968ca61404cfb4c8706d722c9c9a8'),
             ('public._work_settle_files(uuid,jsonb)',                                               '215b8fe4cc3eada5c45e8c86c847ef19'),
             ('public._work_upload_json(uuid)',                                                      '63982ca7888b11ce9b80e962f674c98a'),
-            ('public._submission_target_gone()',                                                    'f4f03a728aa0937ff0d89d9e5b62cc67')
+            ('public._submission_target_gone()',                                                    'f4f03a728aa0937ff0d89d9e5b62cc67'),
+            ('public._revision_state(uuid)',                                                        '808f6944ea937a32576729e48115e58d'),
+            ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)',                  '43ca2e50ff067a4fb51762367895ee84'),
+            ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',                           'a04e2d62a76b00a7f6ad03a76a0ede74'),
+            ('public._markup_on_return()',                                                          'ce8ceaa830617aa9caf935b161d7e379')
             -- FINGERPRINTS-END
         ) as v(fn, md5)
     loop
@@ -681,7 +692,7 @@ begin
 end;
 $function$;
 
--- ── 4. send_paths (NOT DECIDED BY COLIN; its own commit) ───────────────────
+-- ── 4. send_paths (approved by Colin, Nov 11; its own commit) ──────────────
 -- A read for the edge function's send-finish route, which must read every
 -- page before it calls send_finish and may give Storage only paths the
 -- database named in that request (batch-b-contract.md, duties 1 and 7).
@@ -779,7 +790,11 @@ begin
             ('public._work_files_state(uuid,jsonb)',                                                '8fe968ca61404cfb4c8706d722c9c9a8'),
             ('public._work_settle_files(uuid,jsonb)',                                               '215b8fe4cc3eada5c45e8c86c847ef19'),
             ('public._work_upload_json(uuid)',                                                      '63982ca7888b11ce9b80e962f674c98a'),
-            ('public._submission_target_gone()',                                                    'f4f03a728aa0937ff0d89d9e5b62cc67')
+            ('public._submission_target_gone()',                                                    'f4f03a728aa0937ff0d89d9e5b62cc67'),
+            ('public._revision_state(uuid)',                                                        '808f6944ea937a32576729e48115e58d'),
+            ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)',                  '43ca2e50ff067a4fb51762367895ee84'),
+            ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',                           'a04e2d62a76b00a7f6ad03a76a0ede74'),
+            ('public._markup_on_return()',                                                          'ce8ceaa830617aa9caf935b161d7e379')
             -- FINGERPRINTS-END
         ) as v(fn, md5)
     loop

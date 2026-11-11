@@ -25,10 +25,16 @@
 -- after the undo it is answered already_sent and its pages are dropped, as
 -- before the file.
 --
--- WHEN IT IS NEEDED BEFORE AN EARLIER WAY BACK. The undo of the fixes file
--- (batch-b-fixes-undo.sql), Batch B's undo PART 2, and running 2026111104,
+-- WHEN IT IS NEEDED BEFORE AN EARLIER WAY BACK. Run this file first, before
+-- the undo of Batch C (batch-c2-undo.sql, then batch-c1-undo.sql), of the
+-- fixes file (batch-b-fixes-undo.sql) or of Batch B. Batch C's undo does not
+-- check this file's functions: C1's PART 2 drops revision_request, which
+-- work, _send_begin and send_finish read, so the student's page would fail.
+-- The undo of the fixes file, Batch B's undo PART 2, and running 2026111104,
 -- 2026111120 or 2026111101 again each check fingerprints of functions this
--- file replaces, and refuse while it is applied. Run this file first.
+-- file replaces, and refuse while it is applied. And this file checks C2's
+-- trigger function and C1's revision functions, so it refuses once C2's
+-- undo has run.
 --
 -- It stops, with nothing changed, unless each of the three is as
 -- 2026111130 leaves it or as it was before (then it changes nothing), and
@@ -98,7 +104,11 @@ begin
             ('public._work_files_state(uuid,jsonb)',                                                '8fe968ca61404cfb4c8706d722c9c9a8'),
             ('public._work_settle_files(uuid,jsonb)',                                               '215b8fe4cc3eada5c45e8c86c847ef19'),
             ('public._work_upload_json(uuid)',                                                      '63982ca7888b11ce9b80e962f674c98a'),
-            ('public._submission_target_gone()',                                                    'f4f03a728aa0937ff0d89d9e5b62cc67')
+            ('public._submission_target_gone()',                                                    'f4f03a728aa0937ff0d89d9e5b62cc67'),
+            ('public._revision_state(uuid)',                                                        '808f6944ea937a32576729e48115e58d'),
+            ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)',                  '43ca2e50ff067a4fb51762367895ee84'),
+            ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',                           'a04e2d62a76b00a7f6ad03a76a0ede74'),
+            ('public._markup_on_return()',                                                          'ce8ceaa830617aa9caf935b161d7e379')
             -- FINGERPRINTS-END
         ) as v(fn, md5)
     loop
@@ -520,7 +530,11 @@ begin
             ('public._work_files_state(uuid,jsonb)',                                                '8fe968ca61404cfb4c8706d722c9c9a8'),
             ('public._work_settle_files(uuid,jsonb)',                                               '215b8fe4cc3eada5c45e8c86c847ef19'),
             ('public._work_upload_json(uuid)',                                                      '63982ca7888b11ce9b80e962f674c98a'),
-            ('public._submission_target_gone()',                                                    'f4f03a728aa0937ff0d89d9e5b62cc67')
+            ('public._submission_target_gone()',                                                    'f4f03a728aa0937ff0d89d9e5b62cc67'),
+            ('public._revision_state(uuid)',                                                        '808f6944ea937a32576729e48115e58d'),
+            ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)',                  '43ca2e50ff067a4fb51762367895ee84'),
+            ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',                           'a04e2d62a76b00a7f6ad03a76a0ede74'),
+            ('public._markup_on_return()',                                                          'ce8ceaa830617aa9caf935b161d7e379')
             -- FINGERPRINTS-END
         ) as v(fn, md5)
     loop

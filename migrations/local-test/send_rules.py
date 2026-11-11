@@ -66,7 +66,7 @@ POST = 'send-rules-live-postcheck.sql'
 LIST_FILES = [FILE, UNDO, PRE, POST]
 REPLACED = ['student_submit._send_begin(text,text,uuid,uuid,jsonb,text,text,uuid)',
             'student_submit.send_finish(text,uuid,uuid,jsonb,text)', 'student_submit.work(text,uuid,text)']
-NEW = ['student_submit.send_paths(text,uuid,uuid,text)']   # section 4, not decided by Colin
+NEW = ['student_submit.send_paths(text,uuid,uuid,text)']   # section 4, approved by Colin Nov 11
 RELIED = ['student_submit._work_window(uuid)', 'student_submit._grading_started(uuid,uuid)', 'student_submit._send_session(text,uuid)',
           'student_submit._session_class(text,uuid)', 'student_submit.send_start(text,uuid,uuid,jsonb,text,text,uuid,text)',
           'student_submit.replace(text,uuid,uuid,jsonb,text,text,uuid,text)', 'student_submit.unsend(text,uuid,uuid,text)',
@@ -74,7 +74,11 @@ RELIED = ['student_submit._work_window(uuid)', 'student_submit._grading_started(
           'public._work_hold()', 'public._work_bucket()', 'public._work_check_pages(jsonb)', 'public._work_check_files(jsonb)',
           'public._work_begin(uuid,uuid,uuid,text,text,uuid,jsonb,text,text,boolean,uuid,uuid)', 'public._work_drop_expired(uuid)',
           'public._work_class_full(uuid,jsonb)', 'public._work_files_state(uuid,jsonb)', 'public._work_settle_files(uuid,jsonb)',
-          'public._work_upload_json(uuid)', 'public._submission_target_gone()']
+          'public._work_upload_json(uuid)', 'public._submission_target_gone()',
+          # Batch C as tested (b26cf1c7): what makes a version 2 and when a request is open (C1), and C2's trigger
+          # function. The new lines call none of them; listed so the file stops unless C1 and C2 are both in, as tested.
+          'public._revision_state(uuid)', 'student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)',
+          'student_submit.revision_finish(text,uuid,uuid,jsonb,text)', 'public._markup_on_return()']
 BEGIN = re.compile(r'^([ \t]*)-- FINGERPRINTS-BEGIN[ \t]*(\w*)[^\n]*$', re.M)
 LISTS = re.compile(r'-- FINGERPRINTS-BEGIN[ \t]*(\w*)[^\n]*\n(.*?)\n[ \t]*-- FINGERPRINTS-END', re.S)
 last = lambda st: st.split('\n')[-1].strip().lower()
@@ -832,7 +836,7 @@ def scen_fuzz(seeds=(1, 2, 3, 4), steps=250):
         d.close()
 
 # ════════════════════════════════════════════════════════════════════════════
-# send_paths (not decided by Colin): the paths of this student's own unfinished send, and nothing else.
+# send_paths (approved by Colin, Nov 11): the paths of this student's own unfinished send, and nothing else.
 def scen_paths():
     d, k, t1, t2 = world('paths', True); a = k['takes']
     P = lambda tok, e, sid: d.service("student_submit.send_paths(:t, :e, :s, 'ip-1')", t=tok, e=e, s=sid)
@@ -978,6 +982,9 @@ def scen_apply():
             ok('on a database with Batch B and the fixes but not Batch C, it stops at its first check, nothing changed', r.startswith('STOPPED') and base.at == 2 and 'not both applied' in r, r)
         finally:
             base.close()
+        c2_out = [st for st in split(text_at(UNDO_C2)) if last(st) not in ('begin', 'commit')]
+        good, said = stopped_at_guard(d, c2_out, 'public._markup_on_return()', S)
+        ok("with C1 in and C2 taken out (C2's undo), it stops at its first check, naming C2's function, nothing changed", good, said)
         bad = []
         for fn in REPLACED + RELIED:
             good, said = stopped_at_guard(d, [retouched(d, fn)], fn, S)
@@ -1129,6 +1136,9 @@ def scen_undo():
         finally:
             d.rollback()
         ok('(that was rolled back)', catalog(d.c) == cat4)
+        good, said = stopped_at_guard(d, [st for st in split(text_at(UNDO_C2)) if last(st) not in ('begin', 'commit')], 'public._markup_on_return()', US)
+        ok("after C2's undo, this undo stops at its check, naming C2's function, nothing changed: run it first", good, said)
+        ok('(that was rolled back too)', catalog(d.c) == cat4)
         r0 = d.file(UNDO); r = d.file(UNDO_C2); r1 = d.file(UNDO_C1)
         w = d.work(t1, ENR1)
         ok("the order out: this undo, then C2's, then C1's: each runs, and the student's page works on Batch B and the fixes alone", (r0, r, r1) == ('ok', 'ok', 'ok') and g(w, 'ok') is True, (r0, r[:120], r1[:120], w))

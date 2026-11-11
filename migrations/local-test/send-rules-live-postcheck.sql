@@ -8,10 +8,11 @@
 -- have left it: what it is, what was expected, what was found. It proves
 -- the three functions are the ones tested and are run as before
 -- (SECURITY DEFINER, search_path, volatility, owner, who can run them),
--- the functions they rely on are untouched, and no SECURITY DEFINER
+-- the functions they rely on (and the four that pin Batch C: C1's
+-- revision rules, C2's trigger function) are untouched, and no SECURITY DEFINER
 -- function lost pg_temp.
 -- It also covers student_submit.send_paths, the one function the file adds
--- (section 4, not decided by Colin): absent before, as the file leaves it
+-- (section 4, approved by Colin Nov 11): absent before, as the file leaves it
 -- after, run by the service role only.
 -- The fingerprints are md5(pg_get_functiondef(...)) from the local harness
 -- on PostgreSQL 17.11. Written by migrations/local-test/send_rules.py,
@@ -44,7 +45,11 @@ with replaces(fn, before, becomes) as (values
     ('public._work_files_state(uuid,jsonb)',                                                '8fe968ca61404cfb4c8706d722c9c9a8'),
     ('public._work_settle_files(uuid,jsonb)',                                               '215b8fe4cc3eada5c45e8c86c847ef19'),
     ('public._work_upload_json(uuid)',                                                      '63982ca7888b11ce9b80e962f674c98a'),
-    ('public._submission_target_gone()',                                                    'f4f03a728aa0937ff0d89d9e5b62cc67')
+    ('public._submission_target_gone()',                                                    'f4f03a728aa0937ff0d89d9e5b62cc67'),
+    ('public._revision_state(uuid)',                                                        '808f6944ea937a32576729e48115e58d'),
+    ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)',                  '43ca2e50ff067a4fb51762367895ee84'),
+    ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',                           'a04e2d62a76b00a7f6ad03a76a0ede74'),
+    ('public._markup_on_return()',                                                          'ce8ceaa830617aa9caf935b161d7e379')
     -- FINGERPRINTS-END
 ), new(fn, becomes) as (values
     -- FINGERPRINTS-BEGIN new
