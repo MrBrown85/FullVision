@@ -122,12 +122,13 @@ jobs:
 
   # Browser tests against dist/ served with the production CSP
   # (scripts/e2e-server.mjs) and a fake Supabase (e2e/helpers.js). They run
-  # on every pull request and again after a merge to main (2026-11-05). Four
-  # runners with four workers each (playwright.config.js) take about four
-  # minutes; two runners with two workers took about twelve, which is why
-  # they once ran on main only. Not a required check: a red run shows on the
-  # PR before merging but doesn't block it.
+  # on main after each merge, and by hand on a branch (Run workflow), not on
+  # pull requests (2026-11-11, Colin: a PR waited ten to fifteen minutes on
+  # about 1,300 browser tests, and a busy day queued them for an hour). A PR
+  # needs test-and-format only; its author runs the one browser spec for the
+  # change locally. A release needs main's latest browser run green.
   e2e:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # Only the newest commit on a branch is tested: a new push or merge
