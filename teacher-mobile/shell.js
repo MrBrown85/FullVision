@@ -609,7 +609,7 @@
     var desc = p.desc;
     var html;
     if (desc.kind === 'detail') html = MStudents.renderDetail(_cid, desc.sid);
-    else if (desc.kind === 'swiper') html = MGrade.renderSwiper(_cid, desc.aid);
+    else if (desc.kind === 'swiper') html = MGrade.renderSwiper(_cid, desc.aid, { only: desc.only });
     else if (desc.kind === 'sweep') html = MSweep.render(_cid, { keep: true });
     if (!html) return;
     var stack = document.getElementById('m-nav-stack');
@@ -1430,6 +1430,24 @@
         return;
       }
 
+      // Student work (S7): the row menu, the live filter's Done, the pages.
+      if (action === 'm-grade-row-menu') {
+        MGrade.openRowMenu(_cid, target.getAttribute('data-aid'), target);
+        return;
+      }
+      if (action === 'm-grade-filter-done') {
+        MGrade.doneFilterSheet();
+        return;
+      }
+      if (action === 'm-work-full') {
+        MGradePhotos.openFull(_cid, target);
+        return;
+      }
+      if (action === 'm-work-top') {
+        MGradePhotos.toTop(target);
+        return;
+      }
+
       if (action === 'm-grade-filter-clear') {
         MGrade.clearFilterSheet(_cid);
         return;
@@ -1437,8 +1455,14 @@
 
       if (action === 'm-grade-assess') {
         var aid = target.closest('[data-aid]').getAttribute('data-aid');
-        var swiperHTML = MGrade.renderSwiper(_cid, aid);
-        _pushScreen(swiperHTML, { kind: 'swiper', aid: aid });
+        // A To Grade row, or the row menu's Grade the N Waiting: only the
+        // work waiting (S7-F2). The menu's sheet goes first.
+        var only = target.getAttribute('data-only') || null;
+        if (!only && target.classList.contains('m-tg-row') && MGrade.segment && MGrade.segment() === 'tograde')
+          only = 'tograde';
+        if (target.closest('#m-sheet-container')) MC.dismissSheet();
+        var swiperHTML = MGrade.renderSwiper(_cid, aid, { only: only });
+        _pushScreen(swiperHTML, only ? { kind: 'swiper', aid: aid, only: only } : { kind: 'swiper', aid: aid });
         // Wired at once, as when grading from a student: a score typed or an
         // avatar tapped while the screen slides in is not lost.
         MGrade.setupSwiper(_cid, aid);

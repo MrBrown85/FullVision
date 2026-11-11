@@ -360,6 +360,166 @@ window.MGrade = (function () {
       then();
     }
 
+    /* ── Student work on the list (S7-F1) ────────────────────────
+       In a class whose students send work (MGradePhotos.on: the build
+       switch and Send Work), the list opens on To Grade: the pieces with
+       work waiting, each saying how many are waiting and how many are not
+       in, with a ⋯ menu. With nothing waiting it says All Caught Up. The
+       filter sheet applies as it is tapped. In any other class none of
+       this is drawn. */
+    var _MORE_ROW_ICON =
+      '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>';
+    var _CAMERA_ICON =
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+
+    // html-safe: n is a number
+    function _toGradeSegHtml(cid, active, holds) {
+      var n = MGradePhotos.classToGrade(cid);
+      return (
+        '<button class="m-seg-btn' +
+        (active ? ' m-seg-active' : '') +
+        '" data-action="m-grade-seg" data-val="tograde"' +
+        (holds ? ' aria-pressed="' + active + '"' : '') +
+        ' aria-label="To Grade, ' +
+        n +
+        '">To Grade<span class="m-seg-count" aria-hidden="true">' +
+        n +
+        '</span></button>'
+      );
+    }
+
+    // html-safe: the title and category go through MC.esc; ids are ours; counts are numbers; dateStr is a date
+    function _workRowHtml(cid, a, dateStr, graded, total, pct, shown) {
+      var waiting = MGradePhotos.toGrade(cid, a).length;
+      var out = MGradePhotos.notIn(cid, a).length;
+      var takes = MGradePhotos.takes(cid, a);
+      var meta = [];
+      if (showsCategoryBadge(cid, a)) meta.push(getAssessmentCategoryName(cid, a));
+      meta.push(dateStr, graded + '/' + total + ' graded');
+      var counts = '';
+      if (waiting) counts += '<span class="m-tg-pill">' + _CAMERA_ICON + waiting + ' to grade</span>';
+      if (out) counts += '<span class="m-tg-notin">' + out + ' not in</span>';
+      if (!counts && takes && graded >= total && total > 0) counts = '<span class="m-tg-done">All graded</span>';
+      return (
+        '<div class="m-cell m-tg-row" data-action="m-grade-assess" data-aid="' +
+        a.id +
+        '" data-tg="' +
+        waiting +
+        '"' +
+        (shown ? '' : ' style="display:none"') +
+        '>' +
+        '<div class="m-cell-body">' +
+        '<div class="m-cell-title m-grade-title">' +
+        MC.esc(a.title) +
+        '</div>' +
+        (counts ? '<div class="m-tg-counts">' + counts + '</div>' : '') +
+        '<div class="m-cell-subtitle"><span>' +
+        MC.esc(meta.join(' · ')) +
+        '</span></div>' +
+        '<div class="m-progress-bar"><div class="m-progress-fill" style="width:' +
+        pct +
+        '%"></div></div>' +
+        '</div>' +
+        '<button type="button" class="m-tg-more" data-action="m-grade-row-menu" data-aid="' +
+        a.id +
+        '" aria-label="' +
+        MC.esc('More for ' + a.title) +
+        '">' +
+        _MORE_ROW_ICON +
+        '</button></div>'
+      );
+    }
+
+    // html-safe: the class name goes through MC.esc
+    function _caughtUpHtml(cid, sorted, ctx) {
+      var any = sorted.some(function (a) {
+        return _matchesAllFilters(a, ctx);
+      });
+      var course = COURSES[cid];
+      return (
+        '<div class="m-empty m-tg-caught" id="m-grade-caught"' +
+        (_segmentMode === 'tograde' && !any ? '' : ' hidden') +
+        '><div class="m-empty-title">All Caught Up</div>' +
+        '<div class="m-empty-subtitle">' +
+        MC.esc('Nothing is waiting to grade in ' + ((course && course.name) || 'this class') + '.') +
+        '</div>' +
+        '<button type="button" class="m-btn-ghost" data-action="m-grade-seg" data-val="all">See All Assessments</button>' +
+        '</div>'
+      );
+    }
+
+    // "Logan F., Olivia M."
+    function _shortNames(cid, sids) {
+      var byId = {};
+      getStudents(cid).forEach(function (st) {
+        byId[st.id] = st;
+      });
+      return sids
+        .map(function (sid) {
+          var st = byId[sid];
+          if (!st) return '';
+          var last = String(st.lastName || '');
+          return (displayNameFirst(st) || '') + (last ? ' ' + last.charAt(0) + '.' : '');
+        })
+        .filter(Boolean)
+        .join(', ');
+    }
+
+    /* The ⋯ on a row: Grade the N Waiting (from the first waiting) and
+       Grade Everyone (the whole class, in roster order). */
+    function openRowMenu(cid, aid, from) {
+      var a = _assessmentById(cid, aid);
+      if (!a) return;
+      var waiting = MGradePhotos.toGrade(cid, a);
+      var students = getStudents(cid);
+      var graded = _gradedCountFor(a, students, getScores(cid));
+      var dateStr = a.date
+        ? parseLocalDate(a.date).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })
+        : 'No Date';
+      var meta = [];
+      if (showsCategoryBadge(cid, a)) meta.push(getAssessmentCategoryName(cid, a));
+      meta.push(dateStr, graded + '/' + students.length + ' graded');
+      var firstSt = waiting.length
+        ? students.find(function (st) {
+            return st.id === waiting[0];
+          })
+        : null;
+      var item = function (attrs, title, sub) {
+        return (
+          '<button type="button" class="m-tg-menu-item" data-action="m-grade-assess" data-aid="' +
+          a.id +
+          '"' +
+          attrs +
+          '><span class="m-tg-menu-title">' +
+          MC.esc(title) +
+          '</span><span class="m-tg-menu-sub">' +
+          MC.esc(sub) +
+          '</span></button>'
+        );
+      };
+      // html-safe: every text goes through MC.esc in item() or here; ids are ours
+      MC.presentSheet(
+        '<div class="m-tg-menu" role="dialog" aria-label="' +
+          MC.esc(a.title) +
+          '"><div class="m-tg-menu-head"><div class="m-tg-menu-name">' +
+          MC.esc(a.title) +
+          '</div><div class="m-tg-menu-sub">' +
+          MC.esc(meta.join(' · ')) +
+          '</div></div>' +
+          (waiting.length
+            ? item(
+                ' data-only="tograde"',
+                'Grade the ' + waiting.length + ' Waiting',
+                firstSt ? 'Starts with ' + displayNameWithLast(firstSt) : '',
+              )
+            : '') +
+          item('', 'Grade Everyone', 'All ' + students.length + ', in roster order') +
+          '<button type="button" class="m-tg-menu-cancel" data-action="m-sheet-cancel">Cancel</button>' +
+          '</div>',
+        { half: true },
+      );
+    }
+
     /* ── Assessment Picker Screen ───────────────────────────────── */
     var _pickerCid = null;
     function renderPicker(cid) {
@@ -387,8 +547,11 @@ window.MGrade = (function () {
       var holds = _holdsGrades(cid);
       var onToReturn = holds && _segmentMode === 'toreturn' && _pickerCid === cid;
       _pickerCid = cid;
-      // Saved filters cover the whole list; with none, the list opens on Recent.
-      _segmentMode = onToReturn ? 'toreturn' : _activeFilterCount() > 0 ? 'all' : 'recent';
+      // Saved filters cover the whole list; with none, the list opens on
+      // Recent, or on To Grade in a class whose students send work (S7-F1).
+      var work = MGradePhotos.on(cid);
+      var first = work ? 'tograde' : 'recent';
+      _segmentMode = onToReturn ? 'toreturn' : _activeFilterCount() > 0 ? 'all' : first;
       var ctx = _filterCtx(cid);
 
       // Sort by date, newest first
@@ -414,11 +577,13 @@ window.MGrade = (function () {
         '<div class="m-segmented' +
         (holds ? ' m-seg-three' : '') +
         '">' +
-        '<button class="m-seg-btn' +
-        (_segmentMode === 'recent' ? ' m-seg-active' : '') +
-        '" data-action="m-grade-seg" data-val="recent"' +
-        pressed('recent') +
-        '>Recent</button>' +
+        (work
+          ? _toGradeSegHtml(cid, _segmentMode === 'tograde', holds)
+          : '<button class="m-seg-btn' +
+            (_segmentMode === 'recent' ? ' m-seg-active' : '') +
+            '" data-action="m-grade-seg" data-val="recent"' +
+            pressed('recent') +
+            '>Recent</button>') +
         (holds
           ? '<button class="m-seg-btn' +
             (onToReturn ? ' m-seg-active' : '') +
@@ -435,7 +600,9 @@ window.MGrade = (function () {
         pressed('all') +
         '>All</button>' +
         '</div>' +
-        '<button class="m-grade-filter-btn" data-action="m-grade-filter-open" aria-label="Filter assessments">' +
+        '<button class="m-grade-filter-btn" data-action="m-grade-filter-open" aria-label="Filter assessments"' +
+        (work ? ' aria-haspopup="dialog"' : '') +
+        '>' +
         _FILTER_ICON_SVG +
         '<span class="m-grade-filter-badge"' +
         (activeN > 0 ? '' : ' hidden') +
@@ -470,6 +637,10 @@ window.MGrade = (function () {
           var total = students.length;
           var pct = total > 0 ? Math.min(100, Math.max(0, Math.round((gradedCount / total) * 100))) : 0;
 
+          if (work) {
+            cells += _workRowHtml(cid, a, dateStr, gradedCount, total, pct, _matchesAllFilters(a, ctx));
+            return;
+          }
           cells +=
             '<div class="m-cell" data-action="m-grade-assess" data-aid="' +
             a.id +
@@ -509,6 +680,8 @@ window.MGrade = (function () {
         });
         cells += '</div>';
       }
+      // To Grade with nothing waiting (S7-F1).
+      if (work) cells += _caughtUpHtml(cid, sorted, ctx);
       // The To Return list has its own box beside the list of assessments;
       // the segment shows one or the other (_showSegment).
       if (holds)
@@ -582,6 +755,8 @@ window.MGrade = (function () {
       if (_segmentMode === 'recent') {
         if (ctx.recentCutoff && (!a.date || parseLocalDate(a.date) < ctx.recentCutoff)) return false;
       }
+      // To Grade: only the pieces with work waiting (S7-F1).
+      if (_segmentMode === 'tograde' && !MGradePhotos.toGrade(ctx.cid, a).length) return false;
       // Category: '__none' sentinel matches assessments with no categoryId.
       if (_filters.category.length > 0) {
         var cat = a.categoryId || '__none';
@@ -620,6 +795,7 @@ window.MGrade = (function () {
     function _filterCtx(cid) {
       var now = new Date();
       return {
+        cid: cid,
         students: getStudents(cid),
         allScores: getScores(cid),
         recentCutoff: new Date(now.getTime() - 30 * 86400000),
@@ -634,6 +810,8 @@ window.MGrade = (function () {
     function filterAssessments(cid, mode) {
       // To Return is a segment only in a class that holds grades (S1-F3).
       if (mode === 'toreturn' && !_holdsGrades(cid)) mode = null;
+      // To Grade is a segment only in a class whose students send work (S7-F1).
+      if (mode === 'tograde' && !MGradePhotos.on(cid)) mode = 'recent';
       if (mode) _segmentMode = mode;
       // Recent is itself a date range, so it replaces the sheet's.
       if (mode === 'recent' && _filters.dateRange !== 'all') {
@@ -663,8 +841,23 @@ window.MGrade = (function () {
         }
         cell.style.display = _matchesAllFilters(a, ctx) ? '' : 'none';
       });
+      _syncWorkList(cid, assessments, ctx);
 
       _updateFilterBadge();
+    }
+
+    /* All Caught Up, and the live filter sheet's "Showing 6 of 18", for the
+       list as it is now. Nothing happens in a class whose students send no
+       work. */
+    function _syncWorkList(cid, assessments, ctx) {
+      if (!MGradePhotos.on(cid)) return;
+      var shown = assessments.filter(function (a) {
+        return _matchesAllFilters(a, ctx);
+      }).length;
+      var caught = document.getElementById('m-grade-caught');
+      if (caught) _setHidden(caught, !(_segmentMode === 'tograde' && !shown));
+      var count = document.querySelector('#m-sheet-container .m-live-filter-count');
+      if (count) count.textContent = 'Showing ' + shown + ' of ' + assessments.length;
     }
 
     /* ── Filter sheet ───────────────────────────────────────────── */
@@ -788,7 +981,127 @@ window.MGrade = (function () {
       );
     }
 
+    /* The filter that applies as it is tapped (S7-F1), in a class whose
+       students send work: Status, Date and Category chips, "Showing 6 of
+       18", Clear All and Done. Each tap changes the list under the sheet
+       at once and is kept, as the sheet's Apply keeps it. */
+    var _live = false;
+
+    // html-safe: labels go through MC.esc; values are ours or category ids through MC.esc
+    function _renderLiveFilterSheet(cid) {
+      var categories = typeof getCategories === 'function' ? getCategories(cid) : [];
+      var chip = function (action, kind, value, label, on) {
+        return (
+          '<button type="button" class="m-filter-pill' +
+          (on ? ' m-filter-active' : '') +
+          '" data-action="' +
+          action +
+          '" data-kind="' +
+          kind +
+          '" data-val="' +
+          MC.esc(value) +
+          '" aria-pressed="' +
+          (on ? 'true' : 'false') +
+          '">' +
+          MC.esc(label) +
+          '</button>'
+        );
+      };
+      var one = function (kind, value, label) {
+        return chip('m-grade-filter-seg', kind, value, label, _filters[kind] === value);
+      };
+      var section = function (title, chips) {
+        return (
+          '<div class="m-filter-sheet-section"><div class="m-filter-sheet-title">' +
+          title +
+          '</div><div class="m-filter-strip m-filter-strip-wrap">' +
+          chips +
+          '</div></div>'
+        );
+      };
+      var assessments = getAssessments(cid);
+      var ctx = _filterCtx(cid);
+      var shown = assessments.filter(function (a) {
+        return _matchesAllFilters(a, ctx);
+      }).length;
+      return (
+        '<div class="m-filter-sheet m-live-filter" role="dialog" aria-label="Filter">' +
+        '<div class="m-live-filter-head">' +
+        '<button type="button" class="m-btn-ghost" data-action="m-grade-filter-clear">Clear All</button>' +
+        '<div class="m-filter-sheet-heading">Filter</div>' +
+        '<button type="button" class="m-btn-ghost m-live-filter-done" data-action="m-grade-filter-done">Done</button>' +
+        '</div>' +
+        '<div class="m-live-filter-count" role="status">' +
+        MC.esc('Showing ' + shown + ' of ' + assessments.length) +
+        '</div>' +
+        section(
+          'Status',
+          one('gradedStatus', 'has-ungraded', 'Needs Grading') + one('gradedStatus', 'fully-graded', 'All Graded'),
+        ) +
+        section(
+          'Date',
+          one('dateRange', 'week', 'This Week') +
+            one('dateRange', '30d', 'Last 30 Days') +
+            _terms(cid)
+              .map(function (t) {
+                return one('dateRange', _termValue(t), t.label);
+              })
+              .join(''),
+        ) +
+        ((categories || []).length
+          ? section(
+              'Category',
+              categories
+                .map(function (c) {
+                  return chip('m-grade-filter-toggle', 'category', c.id, c.name, _filters.category.indexOf(c.id) >= 0);
+                })
+                .join('') +
+                chip(
+                  'm-grade-filter-toggle',
+                  'category',
+                  '__none',
+                  'No Category',
+                  _filters.category.indexOf('__none') >= 0,
+                ),
+            )
+          : '') +
+        '</div>'
+      );
+    }
+
+    // The live sheet's chips, drawn again from the filters as they are.
+    function _syncLiveChips() {
+      document.querySelectorAll('#m-sheet-container .m-live-filter .m-filter-pill').forEach(function (btn) {
+        var kind = btn.getAttribute('data-kind');
+        var val = btn.getAttribute('data-val');
+        var on = kind === 'category' ? _filters.category.indexOf(val) >= 0 : _filters[kind] === val;
+        btn.classList.toggle('m-filter-active', on);
+        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+    }
+
+    function _liveChanged() {
+      _saveFilters(_pickerCid);
+      _syncLiveChips();
+      filterAssessments(_pickerCid);
+    }
+
+    function doneFilterSheet() {
+      _live = false;
+      MC.dismissSheet();
+    }
+
     function openFilterSheet(cid) {
+      if (MGradePhotos.on(cid)) {
+        _live = true;
+        _sheetStaged = null;
+        MC.presentSheet(_renderLiveFilterSheet(cid), {
+          onClose: function () {
+            _live = false;
+          },
+        });
+        return;
+      }
       MC.presentSheet(_renderFilterSheet(cid), {
         onClose: function () {
           _sheetStaged = null;
@@ -799,6 +1112,14 @@ window.MGrade = (function () {
     /* ── Action dispatch from shell.js ──────────────────────────── */
 
     function onFilterTogglePill(kind, value) {
+      if (_live) {
+        var list = _filters[kind];
+        if (!Array.isArray(list)) return;
+        var at = list.indexOf(value);
+        if (at >= 0) list.splice(at, 1);
+        else list.push(value);
+        return _liveChanged();
+      }
       if (!_sheetStaged) return;
       var arr = _sheetStaged[kind];
       if (!Array.isArray(arr)) return;
@@ -812,6 +1133,11 @@ window.MGrade = (function () {
     }
 
     function onFilterSegChange(kind, value) {
+      if (_live) {
+        // A chip tapped again lets go of it.
+        _filters[kind] = _filters[kind] === value ? 'all' : value;
+        return _liveChanged();
+      }
       if (!_sheetStaged) return;
       _sheetStaged[kind] = value;
       // Update the segmented control inside the sheet
@@ -836,6 +1162,10 @@ window.MGrade = (function () {
 
     function clearFilterSheet(cid) {
       _filters = _cloneFilters(_FILTER_DEFAULTS);
+      if (_live) {
+        _saveFilters(cid);
+        return _liveChanged();
+      }
       _sheetStaged = null;
       _saveFilters(cid);
       MC.dismissSheet();
@@ -854,6 +1184,11 @@ window.MGrade = (function () {
       askReturnAll: askReturnAll,
       studentDrafts: studentDrafts,
       returnFromCard: returnFromCard,
+      openRowMenu: openRowMenu,
+      doneFilterSheet: doneFilterSheet,
+      segment: function () {
+        return _segmentMode;
+      },
     };
   })();
 
@@ -885,7 +1220,26 @@ window.MGrade = (function () {
     // the member its grade comes from), each followed by its members graded
     // separately, then the students in no group (groupGradingUnits, shared
     // with the desktop); on other work a card per student.
+    /* Grading only the work waiting (S7-F2: the row menu's Grade the N
+       Waiting, a To Grade row): the students are fixed when the screen
+       opens, so a card graded on the way stays in the strip and Return and
+       Next goes to the next student in it. */
+    var _onlyAid = null;
+    var _onlyIds = null;
+
     function _swiperUnits(cid, a) {
+      var all = _allUnits(cid, a);
+      if (!_onlyIds || !a || a.id !== _onlyAid) return all;
+      return all.filter(function (u) {
+        if (u.view)
+          return u.view.members.some(function (m) {
+            return _onlyIds.indexOf(m) !== -1;
+          });
+        return _onlyIds.indexOf(u.st.id) !== -1;
+      });
+    }
+
+    function _allUnits(cid, a) {
       var students = sortStudents(getStudents(cid).slice(), 'alpha');
       var byId = {};
       students.forEach(function (st) {
@@ -929,7 +1283,7 @@ window.MGrade = (function () {
     // "3 of 27"; on group work the card's name first: "Group 2 · 2 of 9".
     function _subtitleText(idx, total) {
       var label = _swiperLabels && _swiperLabels[idx];
-      return (label ? label + ' · ' : '') + (idx + 1) + ' of ' + total;
+      return (label ? label + ' · ' : '') + (idx + 1) + ' of ' + total + (_onlyIds ? ' to grade' : '');
     }
 
     // html-safe: names go through MC.esc; ids are ours; labels are constants
@@ -1018,12 +1372,13 @@ window.MGrade = (function () {
       var idx = _currentIdx;
       var tmp = document.createElement('div');
       // html-safe: renderSwiper escapes its text (see _renderStudentCard)
-      tmp.innerHTML = renderSwiper(cid, aid);
+      tmp.innerHTML = renderSwiper(cid, aid, { keep: true });
       // html-safe: copied from the checked renderSwiper markup above
       swiper.innerHTML = tmp.querySelector('#m-swiper').innerHTML;
       // html-safe: copied from the checked renderSwiper markup above
       strip.innerHTML = tmp.querySelector('#m-thumb-strip').innerHTML;
       _fitCritComments(swiper);
+      MGradePhotos.hydrate(swiper, cid);
       var total = strip.querySelectorAll('.m-thumb').length;
       jumpToStudent(Math.min(idx, total - 1), true);
     }
@@ -1095,7 +1450,8 @@ window.MGrade = (function () {
       _redrawSwiper(cid, aid);
     }
 
-    function renderSwiper(cid, aid) {
+    // opts.only 'tograde': the students whose work waits, as it is now (S7-F2).
+    function renderSwiper(cid, aid, opts) {
       _swiperCid = cid;
       _swiperAid = aid;
       var assessments = getAssessments(cid);
@@ -1103,6 +1459,18 @@ window.MGrade = (function () {
         return a.id === aid;
       });
       if (!assessment) return '<div class="m-screen"><div class="m-empty">Assessment not found</div></div>';
+      // A redraw in place (opts.keep) keeps the students it had.
+      if (!(opts && opts.keep && _onlyAid === aid)) {
+        _onlyAid = null;
+        _onlyIds = null;
+      }
+      if (opts && opts.only === 'tograde') {
+        var waiting = MGradePhotos.toGrade(cid, assessment);
+        if (waiting.length) {
+          _onlyAid = aid;
+          _onlyIds = waiting;
+        }
+      }
 
       var units = _swiperUnits(cid, assessment);
       var students = units.map(function (u) {
@@ -1140,6 +1508,9 @@ window.MGrade = (function () {
         });
         var currentClass = idx === 0 ? ' m-thumb-current' : '';
         var gradedClass = isGraded ? ' m-thumb-graded' : '';
+        // Work sent: a camera on the student's circle (S7-F2).
+        if (!unit.view && MGradePhotos.takes(cid, assessment) && MGradePhotos.submission(cid, st.id, aid))
+          gradedClass += ' m-thumb-work';
         // A real button with the student's (or group's) name, so it can be
         // reached with Tab and read aloud.
         var thumbName = unit.view ? unit.view.label : displayNameWithLast(st);
@@ -2012,6 +2383,7 @@ window.MGrade = (function () {
       var fresh = document.querySelector('.m-swiper-card[data-sid="' + sid + '"]');
       if (!fresh) return;
       _fitCritComments(fresh);
+      MGradePhotos.hydrate(fresh, cid);
       fresh.scrollTop = top;
     }
 
@@ -2122,6 +2494,7 @@ window.MGrade = (function () {
         })
         .join('');
       _fitCritComments(swiper);
+      MGradePhotos.hydrate(swiper, cid);
       swiper.scrollLeft = left;
     }
 
@@ -2388,6 +2761,8 @@ window.MGrade = (function () {
       if (hasBank && window.CompetencyWording) CompetencyWording.loadBank();
       _fitCritComments(swiper);
       _noteReturnBar(cid, aid);
+      // The work's pages, the pinned strip and the page dots (S7-F2).
+      MGradePhotos.wire(swiper, cid);
 
       // Points field: tapping selects the number so typing replaces it; Done
       // or tapping away saves. The tap's mouseup would put the caret back, so
@@ -2861,6 +3236,10 @@ window.MGrade = (function () {
       getCurrentIndex: function () {
         return _currentIdx;
       },
+      // 'tograde' while the screen grades only the work waiting.
+      gradingOnly: function () {
+        return _onlyIds ? 'tograde' : null;
+      },
       // Each student card scrolls on its own; a redraw puts them back.
       getCardScrolls: function () {
         var tops = {};
@@ -2918,8 +3297,13 @@ window.MGrade = (function () {
     jumpToFirstDraft: Speed.jumpToFirstDraft,
     studentDrafts: List.studentDrafts,
     returnFromCard: List.returnFromCard,
+    // Student work (S7)
+    segment: List.segment,
+    openRowMenu: List.openRowMenu,
+    doneFilterSheet: List.doneFilterSheet,
     getCurrentIndex: Speed.getCurrentIndex,
     getCardScrolls: Speed.getCardScrolls,
+    gradingOnly: Speed.gradingOnly,
     setCardScrolls: Speed.setCardScrolls,
   };
 })();
