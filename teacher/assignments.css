@@ -9296,6 +9296,7 @@ button.grader-member-name {
   white-space: nowrap;
 }
 .assess-grade-work-btn,
+.assess-work-wall-btn,
 .assess-add-work-btn {
   height: 28px;
   padding: 0 12px;

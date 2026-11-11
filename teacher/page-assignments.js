@@ -1724,6 +1724,7 @@ window.PageAssignments = (function () {
         '</div>' +
         '<div class="assess-header-actions" data-stop-prop="true">' +
         _gradeSubmissionsHtml(cid, a, shownIds) +
+        _workWallButtonHtml(cid, a) +
         (holds && !isDibelsScored(a)
           ? '<span class="assess-return-slot" data-return-slot-aid="' +
             a.id +
@@ -11144,6 +11145,9 @@ window.PageAssignments = (function () {
       gradeSubmissions: function () {
         _openGraderOnWork(el.dataset.aid, el.dataset.sid || null);
       },
+      openWorkWall: function () {
+        if (window.WorkWall && activeCourse) WorkWall.open(activeCourse, el.dataset.aid);
+      },
       returnDrafts: function () {
         _askReturnDrafts(el.dataset.aid, el);
       },
@@ -13085,6 +13089,19 @@ window.PageAssignments = (function () {
       '<button type="button" class="assess-grade-work-btn" data-action="gradeSubmissions" data-aid="' +
       a.id +
       '">Grade Submissions</button>'
+    );
+  }
+
+  /* Work Wall (S14, teacher/work-wall.js): every student's work on the
+     piece side by side. Its door on the card, only while the piece takes
+     work (the build switch and Send Work on, Students Send not Nothing). */
+  // html-safe: ids are ours; fixed words
+  function _workWallButtonHtml(cid, a) {
+    if (focusStudentId || !window.WorkWall || !GraderWork.workOn(cid, a)) return '';
+    return (
+      '<button type="button" class="assess-work-wall-btn" data-action="openWorkWall" data-aid="' +
+      a.id +
+      '">Work Wall</button>'
     );
   }
 
