@@ -190,10 +190,36 @@ test('the student card’s To Grade list, View Profile’s, the red count, and A
   await expect(detail.locator('.m-scard-tograde .m-scard-return-head')).toHaveText('To Grade');
   await shot(page, 'S7-F4-view-profile-to-grade');
 
-  // Grade opens the grader on that work, at Noor's card.
+  // Grade opens the grader on Noor's work only, a tab for each piece, the lab first.
+  const pieces = await detail.locator('.m-scard-tograde-row').count();
   await detail.locator('.m-scard-tograde-row[data-action="m-assess-grade"][data-aid="' + LAB + '"]').click();
-  await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
-  await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('Cell Microscope Lab');
+  const grader = page.locator('#m-screen-grade-swiper');
+  await expect(grader).toBeVisible();
+  const noor = await fullName(page, 'st2');
+  const first = noor.split(' ')[0];
+  await expect(page.locator('#m-nav-bar-grade-swiper .m-nav-bar-back')).toHaveText(first);
+  await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText(noor);
+  await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('1 of ' + pieces + ' for ' + first);
+  const tabs = grader.locator('.m-work-tabs [role="tab"]');
+  await expect(tabs).toHaveCount(pieces);
+  await expect(tabs.first()).toHaveText('Cell Microscope Lab');
+  await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
+  await expect(grader.locator('.m-swiper-card')).toHaveCount(1);
+  await expect(grader.locator('#m-thumb-strip')).toBeHidden();
+  await expect(grader.locator('.m-swiper-card .m-grade-student-name')).toHaveText('Cell Microscope Lab');
+  await expect(grader.locator('.m-work-sent')).toHaveText(/^Submitted .+ · 2 photos$/);
+  await shot(page, 'S7-F4-grader-one-student');
+  if (pieces > 1) {
+    // A tab shows that piece in place.
+    await tabs.nth(1).click();
+    await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('2 of ' + pieces + ' for ' + first);
+    await expect(grader.locator('.m-work-tab-on')).toHaveCount(1);
+    await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');
+    await expect(grader.locator('.m-swiper-card [data-action="m-add-work"]')).toBeVisible();
+  }
+  // Back goes back to Noor.
+  await page.locator('#m-nav-bar-grade-swiper .m-nav-bar-back').click();
+  await expect(page.locator('#m-screen-student-detail')).toBeVisible();
 });
 
 test('Add Work, Then Grade It from a student with nothing in', async ({ page }) => {

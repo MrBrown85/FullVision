@@ -1226,6 +1226,60 @@ window.MGrade = (function () {
        Next goes to the next student in it. */
     var _onlyAid = null;
     var _onlyIds = null;
+    /* The grader on one student's work (S7-F4: Grade on a To Grade row):
+       { cid, sid, aids, kinds } with the student's pieces fixed when it
+       opens, a tab for each, one card at a time. Null otherwise. */
+    var _student = null;
+
+    // "1 of 2 for Jordan"
+    function _studentSubtitle() {
+      var st =
+        _student &&
+        getStudents(_student.cid).find(function (x) {
+          return x.id === _student.sid;
+        });
+      var i = _student ? _student.aids.indexOf(_swiperAid) : -1;
+      if (!st || i < 0) return '';
+      return i + 1 + ' of ' + _student.aids.length + ' for ' + (displayNameFirst(st) || displayName(st));
+    }
+
+    // Is this the last card: in one student's work, the last piece.
+    function _lastCard(units, idx) {
+      if (_student) return _student.aids.indexOf(_swiperAid) >= _student.aids.length - 1;
+      return idx >= units.length - 1;
+    }
+
+    // html-safe: titles go through MC.esc; ids are ours
+    function _studentTabsHtml(cid, st) {
+      var first = displayNameFirst(st) || displayName(st);
+      return (
+        '<div class="m-work-tabs" role="tablist" aria-label="' +
+        MC.esc(first + '\u2019s work to grade') +
+        '">' +
+        _student.aids
+          .map(function (aid, i) {
+            var a = _assessmentById(cid, aid);
+            if (!a) return '';
+            var on = aid === _swiperAid;
+            var tail = '';
+            if (_student.kinds[i] === 'notin')
+              tail = ' \u00b7 ' + (getAssignmentStatus(cid, st.id, aid) === 'NS' ? 'Missing' : 'Not In');
+            return (
+              '<button type="button" role="tab" class="m-work-tab' +
+              (on ? ' m-work-tab-on' : '') +
+              '" aria-selected="' +
+              on +
+              '" data-action="m-grade-student-piece" data-aid="' +
+              aid +
+              '">' +
+              MC.esc(a.title + tail) +
+              '</button>'
+            );
+          })
+          .join('') +
+        '</div>'
+      );
+    }
 
     function _swiperUnits(cid, a) {
       var all = _allUnits(cid, a);
@@ -1282,6 +1336,7 @@ window.MGrade = (function () {
 
     // "3 of 27"; on group work the card's name first: "Group 2 · 2 of 9".
     function _subtitleText(idx, total) {
+      if (_student) return _studentSubtitle();
       var label = _swiperLabels && _swiperLabels[idx];
       return (label ? label + ' · ' : '') + (idx + 1) + ' of ' + total + (_onlyIds ? ' to grade' : '');
     }
@@ -1463,6 +1518,31 @@ window.MGrade = (function () {
       if (!(opts && opts.keep && _onlyAid === aid)) {
         _onlyAid = null;
         _onlyIds = null;
+        _student = null;
+      }
+      if (opts && opts.student) {
+        // The student's pieces: the list given (a piece shown after another),
+        // or their To Grade list now. A piece no longer on it opens as usual.
+        var stuSid = opts.student;
+        var aids = opts.aids;
+        var kinds = opts.kinds;
+        if (!Array.isArray(aids) || !Array.isArray(kinds) || aids.length !== kinds.length) {
+          var rows = MGradePhotos.studentList(cid, stuSid);
+          aids = rows.map(function (r) {
+            return r.a.id;
+          });
+          kinds = rows.map(function (r) {
+            return r.kind;
+          });
+        }
+        var known = getStudents(cid).some(function (x) {
+          return x.id === stuSid;
+        });
+        if (known && aids.indexOf(aid) !== -1) {
+          _student = { cid: cid, sid: stuSid, aids: aids.slice(), kinds: kinds.slice() };
+          _onlyAid = aid;
+          _onlyIds = [stuSid];
+        }
       }
       if (opts && opts.only === 'tograde') {
         var waiting = MGradePhotos.toGrade(cid, assessment);
@@ -1484,11 +1564,12 @@ window.MGrade = (function () {
       var allScores = getScores(cid);
       _currentIdx = 0;
 
+      var stuSt = _student ? students[0] : null;
       var nav = MC.navBar({
         id: 'grade-swiper',
-        title: assessment.title,
+        title: stuSt ? displayName(stuSt) : assessment.title,
         subtitle: _subtitleText(0, students.length),
-        backLabel: 'Grade',
+        backLabel: stuSt ? displayNameFirst(stuSt) || displayName(stuSt) : 'Grade',
         // The sync dot is the only place sync problems show, so the grading
         // screen carries it too.
         rightHTML:
@@ -1497,7 +1578,9 @@ window.MGrade = (function () {
 
       // Student thumbnail strip: a group's circle says G1, G2 … (P1 … for pairs).
       var chipText = _thumbTexts(students, units);
-      var thumbs = '<div class="m-thumb-strip" id="m-thumb-strip">';
+      // One student's work has no strip of students (it is kept, hidden, for
+      // the card count), and a tab for each piece instead.
+      var thumbs = '<div class="m-thumb-strip' + (stuSt ? ' m-thumb-strip-off' : '') + '" id="m-thumb-strip">';
       students.forEach(function (st, idx) {
         var unit = units[idx];
         var color = unit.view ? _GROUP_THUMB_COLOR : MC.avatarColor(st.id);
@@ -1536,6 +1619,7 @@ window.MGrade = (function () {
           '</button>';
       });
       thumbs += '</div>';
+      if (stuSt) thumbs += _studentTabsHtml(cid, stuSt);
 
       // Swiper cards. In a class that holds grades the Draft and Return bar
       // sits under them, above the tab bar (S1-F3).
@@ -1634,12 +1718,12 @@ window.MGrade = (function () {
     // The card on screen's parts.
     function _returnBarNow(cid, a) {
       var units = _swiperUnits(cid, a);
-      return _returnBarParts(cid, a, units[_currentIdx], _currentIdx >= units.length - 1);
+      return _returnBarParts(cid, a, units[_currentIdx], _lastCard(units, _currentIdx));
     }
 
     // html-safe: built by _returnBarParts
     function _returnBarHtml(cid, a, units, idx) {
-      var parts = _returnBarParts(cid, a, units[idx], idx >= units.length - 1);
+      var parts = _returnBarParts(cid, a, units[idx], _lastCard(units, idx));
       return (
         '<div class="m-grade-return' +
         (parts.state || parts.act ? '' : ' is-empty') +
@@ -1738,12 +1822,45 @@ window.MGrade = (function () {
       Grader.returnGrades(cid, a.id, ids);
       clearProfCache();
       MC.haptic();
+      // One student's work: on to their next piece.
+      if (_student) {
+        var at = _student.aids.indexOf(a.id);
+        if (at >= 0 && at < _student.aids.length - 1) return showStudentPiece(cid, _student.aids[at + 1]);
+        return _syncReturnBar();
+      }
       if (_currentIdx >= units.length - 1) return _syncReturnBar();
       jumpToStudent(_currentIdx + 1);
       _returnSliding = setTimeout(function () {
         _returnSliding = null;
         _syncReturnBar();
       }, RETURN_SLIDE_MS);
+    }
+
+    /* One student's work: show another of their pieces in place (a tab, or
+       Return and Next). What was typed is saved first; the screen keeps its
+       place in the stack, and its restore entry names the new piece. */
+    function showStudentPiece(cid, aid) {
+      if (!_student || _student.cid !== cid || _student.aids.indexOf(aid) === -1) return false;
+      var screen = document.getElementById('m-screen-grade-swiper');
+      if (!screen) return false;
+      if (aid === _swiperAid) return true;
+      var sid = _student.sid;
+      _saveTyped(cid, sid);
+      var desc = { kind: 'swiper', aid: aid, student: sid, aids: _student.aids, kinds: _student.kinds };
+      var tmp = document.createElement('div');
+      // html-safe: renderSwiper escapes its text (see _renderStudentCard)
+      tmp.innerHTML = renderSwiper(cid, aid, { student: sid, aids: _student.aids, kinds: _student.kinds });
+      var next = tmp.firstElementChild;
+      next.classList.remove('m-screen-hidden');
+      if (screen.hasAttribute('data-restore')) next.setAttribute('data-restore', JSON.stringify(desc));
+      screen.parentNode.replaceChild(next, screen);
+      MGradePhotos.releaseUnused();
+      var navBar = next.querySelector('.m-nav-bar');
+      if (navBar && MC.setupScrollTitle) MC.setupScrollTitle(next, navBar.id);
+      setupSwiper(cid, aid);
+      var tab = next.querySelector('.m-work-tab-on');
+      if (tab) tab.focus({ preventScroll: true });
+      return true;
     }
 
     /* The card to open a To Return row on: the first with a draft. */
@@ -1791,6 +1908,12 @@ window.MGrade = (function () {
         badges +
         '</div>' +
         '</div></div>';
+      // One student's work: the card is named by the piece (the bar names the student).
+      if (_student && _student.sid === st.id && !(unit && unit.view))
+        header =
+          '<div class="m-grade-student-header"><div class="m-grade-student-name">' +
+          MC.esc(assessment.title) +
+          '</div></div>';
       if (unit && unit.view) header = _groupCardHeadHtml(cid, assessment, unit.view);
       else if (unit && unit.separateFrom) header += _separateLineHtml(assessment.id, st.id, unit.separateFrom);
 
@@ -3233,6 +3356,10 @@ window.MGrade = (function () {
       confirmBackToGroup: confirmBackToGroup,
       backToGroup: backToGroup,
       returnAndNext: returnAndNext,
+      showStudentPiece: showStudentPiece,
+      studentWork: function () {
+        return _student ? { sid: _student.sid, aids: _student.aids.slice(), kinds: _student.kinds.slice() } : null;
+      },
       jumpToFirstDraft: jumpToFirstDraft,
       // Draw the grading screen again in place, if it shows this piece (Add Work, S7-F3).
       refreshSwiper: function (cid, aid) {
@@ -3301,6 +3428,8 @@ window.MGrade = (function () {
     refreshToReturn: List.refreshToReturn,
     askReturnAll: List.askReturnAll,
     returnAndNext: Speed.returnAndNext,
+    showStudentPiece: Speed.showStudentPiece,
+    studentWork: Speed.studentWork,
     jumpToFirstDraft: Speed.jumpToFirstDraft,
     studentDrafts: List.studentDrafts,
     returnFromCard: List.returnFromCard,

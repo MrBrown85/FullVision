@@ -75,7 +75,7 @@
     if (window.MAddWork) {
       MAddWork.configure({
         onGrade: function (cid, aid, sid) {
-          if (cid === _cid) _openGraderAt(sid, aid);
+          if (cid === _cid) _openGraderAt(sid, aid, true);
         },
       });
     }
@@ -617,7 +617,13 @@
     var desc = p.desc;
     var html;
     if (desc.kind === 'detail') html = MStudents.renderDetail(_cid, desc.sid);
-    else if (desc.kind === 'swiper') html = MGrade.renderSwiper(_cid, desc.aid, { only: desc.only });
+    else if (desc.kind === 'swiper')
+      html = MGrade.renderSwiper(_cid, desc.aid, {
+        only: desc.only,
+        student: desc.student,
+        aids: desc.aids,
+        kinds: desc.kinds,
+      });
     else if (desc.kind === 'sweep') html = MSweep.render(_cid, { keep: true });
     if (!html) return;
     var stack = document.getElementById('m-nav-stack');
@@ -1001,7 +1007,9 @@
   /* Grade on a student page: the newest assessment's grading screen on the
      Grade tab, at that student's card; a row names its own assessment
      (wantAid). Back returns to the page. */
-  function _openGraderAt(gradeSid, wantAid) {
+  /* `oneStudent` (Grade on a To Grade row, Save and Grade): the grader on
+     that student's work only, a tab for each piece (S7-F4). */
+  function _openGraderAt(gradeSid, wantAid, oneStudent) {
     var newest = wantAid
       ? getAssessments(_cid).find(function (a) {
           return a.id === wantAid;
@@ -1018,7 +1026,14 @@
     _switchTab('grade');
     if (!newest) return;
     _gradeReturnSid = gradeSid;
-    _pushScreen(MGrade.renderSwiper(_cid, newest.id), { kind: 'swiper', aid: newest.id });
+    var html = MGrade.renderSwiper(_cid, newest.id, oneStudent ? { student: gradeSid } : null);
+    var work = oneStudent && MGrade.studentWork ? MGrade.studentWork() : null;
+    _pushScreen(
+      html,
+      work
+        ? { kind: 'swiper', aid: newest.id, student: work.sid, aids: work.aids, kinds: work.kinds }
+        : { kind: 'swiper', aid: newest.id },
+    );
     // On group work the student's group card.
     var gradeIdx = MGrade.studentCardIndex(_cid, newest.id, gradeSid);
     MGrade.setupSwiper(_cid, newest.id);
@@ -1047,7 +1062,16 @@
       // Grade on a student page: the newest assessment's grading screen on
       // the Grade tab, at that student's card. Back returns to the page.
       if (action === 'm-student-grade' || action === 'm-assess-grade') {
-        _openGraderAt(target.getAttribute('data-sid'), target.getAttribute('data-aid'));
+        _openGraderAt(
+          target.getAttribute('data-sid'),
+          target.getAttribute('data-aid'),
+          target.getAttribute('data-only') === 'student',
+        );
+        return;
+      }
+      // A tab on the grader on one student's work: that piece, in place.
+      if (action === 'm-grade-student-piece') {
+        MGrade.showStudentPiece(_cid, target.getAttribute('data-aid'));
         return;
       }
 

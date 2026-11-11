@@ -472,6 +472,97 @@ describe('with work waiting', () => {
   });
 });
 
+describe('the grader on one student’s work', () => {
+  let other;
+  const clearGrade = (sid, aid) => {
+    const a = getAssessments(CID).find(x => x.id === aid);
+    const keys = [...new Set((getScores(CID)[sid] || []).filter(e => e.assessmentId === aid).map(e => e.tagId))];
+    Grader.setOverallComment(CID, sid, aid, '');
+    getRubricCheckIds(CID, sid, aid).forEach(id => Grader.setTick(CID, sid, aid, id, false));
+    if (keys.length) Grader.clearScore(CID, getScores(CID), sid, a, keys);
+  };
+  beforeEach(() => {
+    // Noor's lab waits to grade. The sample's closed KMT & States of Matter
+    // Lab takes work too; she sent nothing for it, and it is marked Missing.
+    clearGrade('st2', LAB);
+    other = getAssessments(CID).find(x => x.id === 'sci8a4');
+    clearGrade('st2', other.id);
+    expect(setAssignmentStatus(CID, 'st2', other.id, 'NS')).not.toBe(false);
+    turnOn();
+  });
+  const open = aid => {
+    // html-safe: MGrade.renderSwiper escapes names and text; a test page
+    stack().innerHTML = MGrade.renderSwiper(CID, aid, { student: 'st2' });
+    MGrade.setupSwiper(CID, aid);
+    return stack().querySelector('#m-screen-grade-swiper');
+  };
+  const text = el => el.textContent.trim();
+
+  it('names the student, counts their pieces, and has a tab for each', () => {
+    expect(MGradePhotos.studentList(CID, 'st2').map(r => r.a.id)).toEqual([LAB, other.id]);
+    const screen = open(LAB);
+    const first = displayNameFirst(name('st2'));
+    expect(text(screen.querySelector('.m-nav-bar-back span'))).toBe(first);
+    const title = screen.querySelector('.m-nav-bar-title-inline');
+    expect(title.firstChild.textContent).toBe(displayName(name('st2')));
+    expect(text(title.querySelector('div'))).toBe('1 of 2 for ' + first);
+    expect(screen.querySelector('.m-work-tabs').getAttribute('aria-label')).toBe(first + '’s work to grade');
+    const tabs = [...screen.querySelectorAll('.m-work-tabs [role="tab"]')];
+    expect(tabs.map(text)).toEqual([lab().title, other.title + ' · Missing']);
+    expect(tabs.map(t => t.getAttribute('aria-selected'))).toEqual(['true', 'false']);
+    // One card, Noor's, named by the piece; the strip of students is hidden.
+    const cards = screen.querySelectorAll('.m-swiper-card');
+    expect(cards.length).toBe(1);
+    expect(cards[0].getAttribute('data-sid')).toBe('st2');
+    expect(text(cards[0].querySelector('.m-grade-student-name'))).toBe(lab().title);
+    expect(screen.querySelector('#m-thumb-strip').classList.contains('m-thumb-strip-off')).toBe(true);
+    expect(MGrade.studentWork()).toEqual({ sid: 'st2', aids: [LAB, other.id], kinds: ['grade', 'notin'] });
+  });
+
+  it('a tab shows that piece in place, with the list as it opened', () => {
+    open(LAB).setAttribute('data-restore', '{"kind":"swiper"}');
+    expect(MGrade.showStudentPiece(CID, other.id)).toBe(true);
+    expect(stack().querySelectorAll('#m-screen-grade-swiper').length).toBe(1);
+    const screen = stack().querySelector('#m-screen-grade-swiper');
+    expect(text(screen.querySelector('.m-nav-bar-title-inline div'))).toMatch(/^2 of 2 for /);
+    expect(screen.querySelector('.m-work-tab-on').getAttribute('data-aid')).toBe(other.id);
+    expect(screen.querySelector('.m-swiper-card [data-action="m-add-work"]')).not.toBeNull();
+    expect(JSON.parse(screen.getAttribute('data-restore'))).toEqual({
+      kind: 'swiper',
+      aid: other.id,
+      student: 'st2',
+      aids: [LAB, other.id],
+      kinds: ['grade', 'notin'],
+    });
+    // A piece not on the list is refused.
+    expect(MGrade.showStudentPiece(CID, 'sci8a2')).toBe(false);
+  });
+
+  it('a piece no longer on the student’s list opens the usual grader', () => {
+    expect(MGradePhotos.studentList(CID, 'st2').some(r => r.a.id === 'sci8a2')).toBe(false);
+    const screen = open('sci8a2');
+    expect(screen.querySelector('.m-work-tabs')).toBeNull();
+    expect(MGrade.studentWork()).toBeNull();
+    expect(screen.querySelectorAll('.m-swiper-card').length).toBeGreaterThan(1);
+  });
+
+  it('Return and Next returns the grade and goes on to the next piece', () => {
+    open(LAB);
+    getRubricCheckIds(CID, 'st1', LAB)
+      .slice(0, 1)
+      .forEach(id => Grader.setTick(CID, 'st2', LAB, id, true));
+    Grader.setOverallComment(CID, 'st2', LAB, 'Clear labels.');
+    // Redrawn in place, as after a save: still one student's work, though the lab no longer waits.
+    MGrade.refreshSwiper(CID, LAB);
+    expect(stack().querySelector('.m-work-tabs')).not.toBeNull();
+    expect(GradeState.draftsIn(CID, LAB, ['st2'])).toEqual(['st2']);
+    expect(text(stack().querySelector('.m-grade-return-btn'))).toBe('Return and Next');
+    MGrade.returnAndNext();
+    expect(GradeState.draftsIn(CID, LAB, ['st2'])).toEqual([]);
+    expect(stack().querySelector('.m-work-tab-on').getAttribute('data-aid')).toBe(other.id);
+  });
+});
+
 describe('the phone loads Add Work', () => {
   it('in its page, its offline copy and its tests', () => {
     expect(readFileSync('teacher-mobile/index.html', 'utf-8')).toContain(
