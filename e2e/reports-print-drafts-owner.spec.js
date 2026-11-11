@@ -324,7 +324,9 @@ test('the Assignments page draws while the Draft and Returned rows have not load
     // What shared/data.js does for a signed-in holding class before its rows have loaded.
     window.__real = window.getReturnedScores;
     window.getReturnedScores = function () {
-      throw new Error('which of its grades are returned has not loaded (a test)');
+      throw Object.assign(new Error('which of its grades are returned has not loaded (a test)'), {
+        code: 'RETURNED_NOT_LOADED',
+      });
     };
     window.Router.navigate('/assignments?course=sci8');
     return sid;

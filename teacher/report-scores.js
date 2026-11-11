@@ -268,7 +268,9 @@ window.ReportScores = (function () {
      the working copy). In a signed-in class that holds grades, no until
      its Draft and Returned rows have loaded this session (the first draw
      of a session, or offline): the data layer then refuses, rightly, to
-     call anything returned. While the answer is no, a surface draws
+     call anything returned, with an error whose code is
+     RETURNED_NOT_LOADED. Any other error from building the returned set
+     is a fault, and is thrown, not waited out. While the answer is no, a surface draws
      WAITING_HTML instead of itself, and a button that needs the returned
      grades does nothing. Once the rows load, the data layer redraws the
      page on screen (_invalidateAndRerender, which calls the page's
@@ -282,7 +284,9 @@ window.ReportScores = (function () {
       getReturnedScores(cid);
       return true;
     } catch (e) {
-      return false;
+      // Only the data layer's not-loaded refusal is waited out; any other error is a fault and surfaces.
+      if (e && e.code === 'RETURNED_NOT_LOADED') return false;
+      throw e;
     } finally {
       _running = was;
     }

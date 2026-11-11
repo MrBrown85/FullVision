@@ -251,8 +251,11 @@ describe('a holding class full of drafts', { timeout: 240000 }, () => {
       const real = window.getReturnedScores;
       // What shared/data.js does for a signed-in holding class whose rows have not loaded.
       window.getReturnedScores = () => {
-        throw new Error(
-          'This class holds grades until they are returned, and which of its grades are returned has not loaded.',
+        throw Object.assign(
+          new Error(
+            'This class holds grades until they are returned, and which of its grades are returned has not loaded.',
+          ),
+          { code: 'RETURNED_NOT_LOADED' },
         );
       };
       try {
@@ -399,7 +402,9 @@ describe('the Printed marks', { timeout: 120000 }, () => {
         doc.body.appendChild(host);
         expect(host.textContent).toContain('Printed');
         window.getReturnedScores = () => {
-          throw new Error('which of its grades are returned has not loaded');
+          throw Object.assign(new Error('which of its grades are returned has not loaded'), {
+            code: 'RETURNED_NOT_LOADED',
+          });
         };
         clearProfCache();
         const t0 = vi.getTimerCount();
@@ -419,6 +424,68 @@ describe('the Printed marks', { timeout: 120000 }, () => {
     } finally {
       vi.useRealTimers();
       window.getReturnedScores = real;
+    }
+  });
+});
+
+describe('ReportScores.ready', () => {
+  const withStub = (fn, body) => {
+    const real = window.getReturnedScores;
+    window.getReturnedScores = fn;
+    try {
+      return body();
+    } finally {
+      window.getReturnedScores = real;
+    }
+  };
+
+  it('answers no only for the data layer’s not-loaded refusal', () => {
+    const refusal = () => {
+      throw Object.assign(new Error('has not loaded'), { code: 'RETURNED_NOT_LOADED' });
+    };
+    expect(withStub(refusal, () => ReportScores.ready('c'))).toBe(false);
+    expect(
+      withStub(
+        () => ({}),
+        () => ReportScores.ready('c'),
+      ),
+    ).toBe(true);
+  });
+
+  it('lets any other error surface: a fault is never shown as loading', () => {
+    const fault = () => {
+      throw new TypeError("Cannot read properties of undefined (reading 'returned_copy')");
+    };
+    expect(() => withStub(fault, () => ReportScores.ready('c'))).toThrow(TypeError);
+    // Even one worded like the refusal, without its code.
+    const lookalike = () => {
+      throw new Error('which of its grades are returned has not loaded');
+    };
+    expect(() => withStub(lookalike, () => ReportScores.ready('c'))).toThrow(/has not loaded/);
+    expect(ReportScores.running()).toBe(null);
+  });
+
+  it('the data layer’s refusal carries the code', () => {
+    const LIVE = U(2);
+    seedClass(LIVE, { students: [{ id: U(12), firstName: 'Ava', lastName: 'Test' }] });
+    const session = signIn();
+    const was = globalThis.getReturnSettings;
+    globalThis.getReturnSettings = () => ({ student_page: true, return_grades: 'on_return' });
+    try {
+      delete _gradeReturnsLoadedFor[LIVE];
+      delete _returnedSets[LIVE];
+      let caught = null;
+      try {
+        getReturnedScores(LIVE);
+      } catch (e) {
+        caught = e;
+      }
+      expect(caught && caught.code).toBe('RETURNED_NOT_LOADED');
+      expect(ReportScores.ready(LIVE)).toBe(false);
+    } finally {
+      globalThis.getReturnSettings = was;
+      session.signOut();
+      clearClass(LIVE);
     }
   });
 });
