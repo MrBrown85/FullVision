@@ -26,6 +26,7 @@ import vm from 'node:vm';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { signIn, seedClass, clearClass } from './helpers/pin-save-paths.js';
 import { openStudentPage } from './helpers/student-page-context.js';
+import { parseHTML } from 'linkedom';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = file => readFileSync(resolve(ROOT, file), 'utf-8');
@@ -40,7 +41,19 @@ const S2 = 'sv-avery';
 const LEVELS = { 1: 'Starting out', 2: 'On the way', 3: 'Got it', 4: 'Beyond it' };
 const LEARNING_MAP = {
   sections: [
-    { id: 'sec1', name: 'Questioning', tags: [{ id: 't1', label: 'Questioning and Predicting', code: 'QP' }] },
+    {
+      id: 'sec1',
+      name: 'Questioning',
+      tags: [
+        {
+          id: 't1',
+          label: 'Questioning and Predicting',
+          code: 'QP',
+          // As the class has them: the reply keeps a blank and the spaces; the page shows neither.
+          i_can_statements: ['I can ask a question that can be tested.', '', ' I can say what I expect. '],
+        },
+      ],
+    },
     { id: 'sec2', name: 'Communicating', tags: [{ id: 't2', label: 'Communicating', code: 'COM' }] },
   ],
 };
@@ -79,18 +92,39 @@ const ASSESSMENTS = [
   piece('a-undated', 'Undated Notes', '', { tagIds: ['t1'] }),
   piece('a-future', 'Future Quiz', '2026-12-01', { tagIds: ['t1'] }),
   piece('a-draft', 'Draft Poster', '2026-10-20', { tagIds: ['t1', 't2'] }),
-  piece('a-essay', 'Returned Essay', '2026-10-01', { tagIds: ['t1', 't2'] }),
-  piece('a-lab', 'Lab Report', '2026-10-05', { tagIds: ['t1'], rubricId: 'r1' }),
+  piece('a-essay', 'Returned Essay', '2026-10-01', {
+    tagIds: ['t1', 't2'],
+    description: 'Explain how a cell gets what it needs.',
+    moduleId: 'm1',
+    categoryId: 'k-proj',
+    coreCompetencyIds: ['CRT', 'COM'],
+  }),
+  piece('a-lab', 'Lab Report', '2026-10-05', { tagIds: ['t1'], rubricId: 'r1', moduleId: 'm1' }),
   piece('a-reflect', 'Changed Reflection', '2026-10-08', { tagIds: ['t2'] }),
-  piece('a-quick', 'Quick Check', '2026-10-10', { scoreMode: 'points', maxPoints: 10, tagIds: ['t1'] }),
-  piece('a-contract', 'Safety Contract', '2026-09-10', { scoreMode: 'complete', tagIds: [] }),
+  piece('a-quick', 'Quick Check', '2026-10-10', {
+    scoreMode: 'points',
+    maxPoints: 10,
+    tagIds: ['t1'],
+    categoryId: 'k-tests',
+  }),
+  piece('a-contract', 'Safety Contract', '2026-09-10', { scoreMode: 'complete', tagIds: [], categoryId: 'k-prac' }),
   piece('a-missing', 'Cell Quiz', '2026-10-12', { scoreMode: 'points', maxPoints: 10, tagIds: ['t1'] }),
   piece('a-excused', 'Field Trip Form', '2026-10-14', { scoreMode: 'complete', tagIds: [] }),
   piece('a-late', 'Late Lab', '2026-10-16', { tagIds: ['t1'] }),
   piece('a-micro', 'Microscope Lab', '2026-10-18', { tagIds: ['t2'], rubricId: 'r2' }),
-  piece('a-bench', 'Reading Benchmark', '2026-10-02', { scoreMode: 'dibels', tagIds: [] }),
+  piece('a-bench', 'Reading Benchmark', '2026-10-02', { scoreMode: 'dibels', tagIds: [], categoryId: 'k-tests' }),
   piece('a-overall', 'Overall Piece', '2026-10-03', { tagIds: [] }),
 ];
+
+// The class's categories (weights total 100) and its one unit (S4-M1's category and module names).
+const CATEGORIES = [
+  { id: 'k-tests', name: 'Tests', weight: 40, displayOrder: 0 },
+  { id: 'k-proj', name: 'Projects', weight: 60, displayOrder: 1 },
+  { id: 'k-prac', name: 'Practice', weight: 0, displayOrder: 2 },
+];
+const MODULES = [{ id: 'm1', name: 'Unit 1: Cells' }];
+// The teacher's name as typed at sign-up (bootstrap_teacher's display_name).
+const TEACHER = 'Colin Brown';
 
 // The words a draft holds. None may reach the page.
 const SECRET = /DRAFT-SECRET/;
@@ -162,6 +196,15 @@ function cellOf(w) {
 
 const HELD = { student_page_enabled: true, return_grades: 'on_return' };
 
+/* What Preview draws from: the server's page with no piece's seen_at,
+   updated_at or previous, so a teacher never learns what the student has
+   opened (Colin's ruling 116; shared/student-view.js, unopened). */
+function unopened(page) {
+  const out = JSON.parse(JSON.stringify(page));
+  out.assessments.forEach(a => Object.assign(a, { updated_at: null, seen_at: null, previous: null }));
+  return out;
+}
+
 function seed(gradingSystem, working, rows) {
   working = working || WORKING;
   rows = rows || ROWS;
@@ -192,7 +235,10 @@ function seed(gradingSystem, working, rows) {
     learningMaps: structuredClone(LEARNING_MAP),
     courseConfigs: structuredClone(HELD),
     gradeReturns: returns,
+    categories: structuredClone(CATEGORIES),
+    modules: structuredClone(MODULES),
   });
+  _cache.config = Object.assign({}, _cache.config || {}, { displayName: TEACHER });
   COURSES[CID] = { id: CID, name: 'Science 9', block: 'B', gradingSystem, gradeLevel: '9' };
   delete _returnedSets[CID];
   clearProfCache();
@@ -207,7 +253,7 @@ function seed(gradingSystem, working, rows) {
    waits; the working copy otherwise; nothing under Missing or Excused),
    cut to what the piece is scored by (_grade_copy_in_use). */
 function serverPage(gradingSystem) {
-  const criterion = (id, name, checks) => ({
+  const criterion = (id, name, tagIds, checks) => ({
     id,
     name,
     weight: 1,
@@ -219,6 +265,7 @@ function serverPage(gradingSystem) {
     level_2_descriptor: LEVELS[2],
     level_3_descriptor: LEVELS[3],
     level_4_descriptor: LEVELS[4],
+    tag_ids: tagIds,
     checks: checks || [],
   });
   const row = (id, extra) => {
@@ -235,6 +282,11 @@ function serverPage(gradingSystem) {
         weight: 1,
         rubric_id: a.rubricId || null,
         tag_ids: a.tagIds.slice().sort(),
+        description: null,
+        module_name: null,
+        category_name: null,
+        category_percent: null,
+        core_competencies: [],
         status: null,
         returned_at: null,
         updated_at: null,
@@ -256,46 +308,67 @@ function serverPage(gradingSystem) {
       grading_scale: getGradingScale(CID),
     },
     tags: {
-      t1: { label: 'Questioning and Predicting', code: 'QP' },
-      t2: { label: 'Communicating', code: 'COM' },
+      t1: {
+        label: 'Questioning and Predicting',
+        code: 'QP',
+        i_can: ['I can ask a question that can be tested.', '', ' I can say what I expect. '],
+      },
+      t2: { label: 'Communicating', code: 'COM', i_can: [] },
     },
     rubrics: [
       {
         id: 'r1',
         name: 'Lab Report',
         style: 'standard',
-        criteria: [criterion('c1', 'Method'), criterion('c2', 'Labelled Drawing')],
+        criteria: [criterion('c1', 'Method', ['t1']), criterion('c2', 'Labelled Drawing', ['t1'])],
       },
       {
         id: 'r2',
         name: 'Microscope Skills',
         style: 'advanced',
         criteria: [
-          criterion('c3', 'Focusing', [
-            { id: 'k1', level: 3, label: 'Finds the cell' },
-            { id: 'k2', level: 4, label: 'Sharp at high power' },
-          ]),
+          criterion(
+            'c3',
+            'Focusing',
+            ['t2'],
+            [
+              { id: 'k1', level: 3, label: 'Finds the cell' },
+              { id: 'k2', level: 4, label: 'Sharp at high power' },
+            ],
+          ),
         ],
       },
     ],
     assessments: [
       row('a-undated'),
       row('a-contract', {
+        category_name: 'Practice',
+        category_percent: 0,
         returned_at: ROWS['a-contract'].returned_at,
         seen_at: ROWS['a-contract'].seen_at,
         grade: copy({ value: 1 }),
       }),
       row('a-essay', {
+        description: 'Explain how a cell gets what it needs.',
+        module_name: 'Unit 1: Cells',
+        category_name: 'Projects',
+        // A percent only where "counts 60% of your grade" is true: not in a Proficiency class.
+        category_percent: gradingSystem === 'proficiency' ? null : 60,
+        core_competencies: [
+          { id: 'COM', name: 'Communicating' },
+          { id: 'CRT', name: 'Critical & Reflective Thinking' },
+        ],
         returned_at: ROWS['a-essay'].returned_at,
         seen_at: ROWS['a-essay'].seen_at,
         grade: copy({ comment: 'Well argued.', tags: { t1: lv(3, 1), t2: lv(4) } }),
       }),
-      row('a-bench'),
+      row('a-bench', { category_name: 'Tests' }),
       row('a-overall', {
         returned_at: ROWS['a-overall'].returned_at,
         grade: copy({ value: 3, comment: 'A solid piece.' }),
       }),
       row('a-lab', {
+        module_name: 'Unit 1: Cells',
         returned_at: ROWS['a-lab'].returned_at,
         grade: copy({ comment: 'Careful focusing.', criteria: { c1: cv(3), c2: cv(2, 0, 'Label the axes.') } }),
       }),
@@ -304,6 +377,8 @@ function serverPage(gradingSystem) {
         grade: copy({ comment: 'Good start.', tags: { t2: lv(3) } }),
       }),
       row('a-quick', {
+        category_name: 'Tests',
+        category_percent: gradingSystem === 'proficiency' ? null : 40,
         returned_at: ROWS['a-quick'].returned_at,
         updated_at: ROWS['a-quick'].updated_at,
         seen_at: ROWS['a-quick'].seen_at,
@@ -388,7 +463,8 @@ describe.each(STYLES)('a %s class: the page from the cache is the page from the 
   it('what the page draws is the same, every result worked out by calc.js', () => {
     const cache = StudentView.fromCache(CID, S1);
     expect(cache.ready).toBe(true);
-    const phone = side.view(serverPage(system));
+    // Preview draws the page as a student who has opened nothing sees it (ruling 116).
+    const phone = side.view(unopened(serverPage(system)));
     expect(cache.view).toEqual(phone);
   });
 
@@ -412,7 +488,12 @@ describe.each(STYLES)('a %s class: the page from the cache is the page from the 
         getAssessments(CID).find(a => a.id === 'a-essay'),
       ),
     );
-    expect(by['a-essay'].result).toEqual({ kind: 'level', text: essay.text, word: levelWord(CID, essay.value) });
+    expect(by['a-essay'].result).toEqual({
+      kind: 'level',
+      text: essay.text,
+      word: levelWord(CID, essay.value),
+      level: essay.level,
+    });
     expect(by['a-essay'].competencies).toEqual([
       { id: 't1', name: 'Questioning and Predicting', level: 3, text: scoreLevelText(3, 1), comment: '' },
       { id: 't2', name: 'Communicating', level: 4, text: scoreLevelText(4, 0), comment: '' },
@@ -421,10 +502,21 @@ describe.each(STYLES)('a %s class: the page from the cache is the page from the 
       kind: 'points',
       text: formatPoints(8) + ' / ' + formatPoints(10),
       word: '',
+      level: pointsToProf(8, 10, getGradingScale(CID)),
+      points: formatPoints(8),
+      outOf: formatPoints(10),
+      percent: formatPointsPercent(8, 10),
+      bar: 80,
     });
-    expect(by['a-quick'].updated).toBe(true);
+    // Preview: no Updated mark, and every returned piece unopened, whatever
+    // the student has opened (ruling 116). The student's own page still
+    // marks them: below, the same reply drawn by the phone.
+    expect(by['a-quick'].updated).toBe(false);
     expect(by['a-contract'].result.text).toBe('Complete');
-    expect(by['a-contract'].unseen).toBe(false);
+    expect(by['a-contract'].unseen).toBe(true);
+    const own = Object.fromEntries(side.view(serverPage(system)).work.map(p => [p.id, p]));
+    expect(own['a-quick'].updated).toBe(true);
+    expect(own['a-contract'].unseen).toBe(false);
     // A draft over a returned grade: the returned grade, its comment and ticks.
     expect(by['a-reflect'].comment).toBe('Good start.');
     expect(by['a-reflect'].competencies.map(c => c.level)).toEqual([3]);
@@ -444,7 +536,13 @@ describe.each(STYLES)('a %s class: the page from the cache is the page from the 
     expect(by['a-late']).toMatchObject({ kind: 'back', late: true });
     expect(by['a-overall'].result.kind).toBe('level');
     expect(view.counts).toEqual({ toDo: 2, sent: 0, back: 8, missing: 1 });
-    expect(view.changes.map(c => [c.id, c.why]).sort()).toEqual(
+    // What Changed, on the student's own page: what they have not opened, and the update.
+    expect(
+      side
+        .view(serverPage(system))
+        .changes.map(c => [c.id, c.why])
+        .sort(),
+    ).toEqual(
       [
         ['a-lab', 'back'],
         ['a-late', 'back'],
@@ -454,6 +552,58 @@ describe.each(STYLES)('a %s class: the page from the cache is the page from the 
         ['a-reflect', 'back'],
       ].sort(),
     );
+    // In Preview: every returned piece, as if none were opened (ruling 116).
+    expect(view.changes.map(c => [c.id, c.why]).sort()).toEqual(
+      ['a-contract', 'a-essay', 'a-lab', 'a-late', 'a-micro', 'a-overall', 'a-quick', 'a-reflect'].map(id => [
+        id,
+        'back',
+      ]),
+    );
+  });
+});
+
+describe('what Your Feedback and The Whole Rubric draw (S4-F3), the same through both doors', () => {
+  beforeEach(() => seed('proficiency'));
+
+  it('each criterion: the level given by name, what it means here, what the next level asks, every level marked', () => {
+    const { view } = StudentView.fromCache(CID, S1);
+    const lab = view.work.find(p => p.id === 'a-lab');
+    const [method, drawing] = lab.rubric.rows;
+    expect([method.levelName, method.descriptor]).toEqual([scoreLevelText(3, 0), LEVELS[3]]);
+    expect(method.next).toEqual({ level: 4, name: scoreLevelText(4, 0), descriptor: LEVELS[4], checks: [] });
+    expect(drawing.next.name).toBe(scoreLevelText(3, 0));
+    expect(method.goal).toBe(LEVELS[3]);
+    expect(method.whole.map(l => [l.level, l.name, l.descriptor, l.you])).toEqual([
+      [1, scoreLevelText(1, 0), LEVELS[1], false],
+      [2, scoreLevelText(2, 0), LEVELS[2], false],
+      [3, scoreLevelText(3, 0), LEVELS[3], true],
+      [4, scoreLevelText(4, 0), LEVELS[4], false],
+    ]);
+    expect(view.levels).toEqual([1, 2, 3, 4].map(l => ({ level: l, name: scoreLevelText(l, 0) })));
+  });
+
+  it('an Advanced Rubric: the boxes ticked in the grade returned, and the next level’s boxes not ticked', () => {
+    const { view } = StudentView.fromCache(CID, S1);
+    const row = view.work.find(p => p.id === 'a-micro').rubric.rows[0];
+    // The returned copy ticks k1 at Proficient; the draft over it ticks k2 too, and is not here.
+    expect(row.shown.map(k => k.id)).toEqual(['k1']);
+    expect(row.next.checks.map(k => k.id)).toEqual(['k2']);
+  });
+
+  it('work not back yet: what it is graded on by name, and no level, comment or rubric level anywhere', () => {
+    const { view } = StudentView.fromCache(CID, S1);
+    const draft = view.work.find(p => p.id === 'a-draft');
+    expect(draft.gradedOn).toEqual([
+      // Each with its I Can lines (S4-M1), blanks left out and trimmed.
+      {
+        id: 't1',
+        name: 'Questioning and Predicting',
+        iCan: ['I can ask a question that can be tested.', 'I can say what I expect.'],
+      },
+      { id: 't2', name: 'Communicating', iCan: [] },
+    ]);
+    expect(JSON.stringify(draft)).not.toMatch(SECRET);
+    expect(draft.rubric).toBeNull();
   });
 });
 
@@ -485,6 +635,36 @@ describe('a draft is nowhere on the page', () => {
     expect(allWork.text).not.toBe(returnedOnly.text);
     expect(by['a-reflect'].result.text).toBe(returnedOnly.text);
     expect(by['a-draft'].result.text).toBe('');
+  });
+
+  /* A grade the server sent by mistake (no return date, or under Missing or
+     Excused) is not drawn: not its comment, a level or a tick. These are
+     build's own guards; the reply's twin in s/student-data.js feeds only
+     the result line. */
+  const mistaken = extra => {
+    const page = serverPage('proficiency');
+    const lab = page.assessments.find(a => a.id === 'a-lab');
+    Object.assign(lab, {
+      grade: copy({ comment: 'DRAFT-SECRET lab', criteria: { c1: cv(4, 0, 'DRAFT-SECRET c1') } }),
+      returned_at: '2026-11-04T18:00:00Z',
+      status: null,
+      ...extra,
+    });
+    const piece = StudentView.build(page, CID, () => null).work.find(p => p.id === 'a-lab');
+    return piece;
+  };
+
+  it.each([
+    ['never returned', { returned_at: null }],
+    ['Missing', { status: 'NS' }],
+    ['Excused', { status: 'EXC' }],
+  ])('a grade sent on a piece %s is not drawn', (name, extra) => {
+    const piece = mistaken(extra);
+    expect(JSON.stringify(piece)).not.toMatch(SECRET);
+    expect(piece.comment).toBe('');
+    expect((piece.rubric ? piece.rubric.rows : []).every(r => !r.level)).toBe(true);
+    // The same piece, returned, is drawn: the test can fail.
+    expect(JSON.stringify(mistaken({}))).toMatch(SECRET);
   });
 });
 
@@ -740,6 +920,7 @@ function asShown(grade, work) {
 }
 
 describe('every state the SQL triggers also run: the page gives what the file says', () => {
+  let side;
   afterAll(() => clearClass(CASE_CID));
 
   SUITE.cases
@@ -750,9 +931,13 @@ describe('every state the SQL triggers also run: the page gives what the file sa
         runCase(c, (want, sid, state, at) => {
           if (!('student' in want) && !('previous' in want) && !('status' in want)) return;
           seedCase(c.work, state);
+          // The server's page, field for field (StudentView.reply), drawn
+          // as the student's own page draws it: Preview hides Updated
+          // (ruling 116), the student's page does not.
           const out = StudentView.fromCache(CASE_CID, sid);
           expect(out.ready, 'step ' + at).toBe(true);
-          const piece = out.reply.assessments.find(x => x.id === CASE_AID);
+          const sent = StudentView.reply(CASE_CID, sid);
+          const piece = sent.assessments.find(x => x.id === CASE_AID);
           if ('student' in want)
             expect(asShown(piece.grade, c.work), 'step ' + at + ': the grade given').toEqual(
               asShown(want.student, c.work),
@@ -763,7 +948,8 @@ describe('every state the SQL triggers also run: the page gives what the file sa
             );
           if ('status' in want) expect(piece.status, 'step ' + at + ': the status').toBe(want.status);
           // Marked Updated only where the file says the page marks it.
-          const drawn = out.view.work.find(p => p.id === CASE_AID);
+          const drawn = (side = side || studentSide()).view(sent).work.find(p => p.id === CASE_AID);
+          expect(out.view.work.find(p => p.id === CASE_AID).updated, 'step ' + at + ': Preview').toBe(false);
           if (drawn.updated) expect(want.updated, 'step ' + at + ': Updated').toBe(true);
           // Nothing the student is not given is drawn: no result without a grade.
           if (!piece.grade) expect(drawn.result.kind, 'step ' + at).toBe('none');
@@ -893,5 +1079,286 @@ describe('shared/student-view.js reads grades only through the seam', () => {
     }
     expect(sets.length).toBeGreaterThan(0);
     expect([...new Set(sets)]).toEqual(['returned']);
+  });
+});
+
+/* ── 7. What the server also tells (S4-M1, S4-W1) ──────────────
+   The nine keys of migrations/local-test/s4-m1-contract.md: the page draws
+   each where it is sent, draws nothing of it where it is not (the function
+   on main does not pass them yet, PR 1050), and reads a wrong type as none. */
+
+// The same reply with the nine keys taken out: what a phone gets until the function passes them.
+function withoutNew(reply) {
+  const out = JSON.parse(JSON.stringify(reply));
+  (out.classes || []).forEach(c => delete c.to_do);
+  Object.values(out.tags).forEach(t => delete t.i_can);
+  out.rubrics.forEach(r => r.criteria.forEach(c => delete c.tag_ids));
+  out.assessments.forEach(a =>
+    ['description', 'module_name', 'category_name', 'category_percent', 'core_competencies'].forEach(k => delete a[k]),
+  );
+  return out;
+}
+
+const NEW_PARTS = [
+  '.sp-piece-unit',
+  '.sp-piece-category',
+  '.sp-piece-about',
+  '.sp-graded-on-ican',
+  '.sp-core',
+  '.sp-piece-from',
+  '.sp-fb-from',
+  '.sp-fb-category',
+  '.sp-fb-toward',
+  '.sp-from-mark',
+];
+
+// A document to draw into (tests run with no DOM of their own).
+const DOC = parseHTML('<!doctype html><html><body></body></html>').document;
+
+// What one choice of the student's draws, from a view, as an element to look in.
+function drawn(view, ui) {
+  const box = DOC.createElement('div');
+  box.innerHTML = StudentPageView.html(view, ui);
+  return box;
+}
+const words = el => (el ? el.textContent.replace(/\s+/g, ' ').trim() : null);
+const cardIn = (box, id) => [...box.querySelectorAll('.sp-piece')].find(c => c.getAttribute('data-piece') === id);
+
+// The choices that show every part: To Do, Back, Your Feedback on four pieces, All Assignments.
+const UIS = [
+  { tab: 'assignments', segment: 'todo' },
+  { tab: 'assignments', segment: 'back' },
+  { tab: 'assignments', segment: 'back', feedback: 'a-essay', pick: 'a-essay' },
+  { tab: 'assignments', segment: 'back', feedback: 'a-lab', pick: 'a-lab' },
+  { tab: 'assignments', segment: 'back', feedback: 'a-quick', pick: 'a-quick' },
+  { tab: 'assignments', segment: 'back', feedback: 'a-contract', pick: 'a-contract' },
+  { tab: 'assignments', all: true },
+];
+
+// The page a phone draws for a reply and a choice: s/student-data.js, student-view.js and page-view.js on their own.
+function phoneHtml(side, reply, ui) {
+  side.page.ctx.__reply = JSON.parse(JSON.stringify(reply));
+  side.page.ctx.__ui = ui;
+  return side.page.run(
+    'StudentData.use(StudentData.fromServer(__reply)); StudentPageView.html(StudentView.fromPage(__reply, StudentData.page()), __ui)',
+  );
+}
+
+describe.each(STYLES)('a %s class: Preview as Student and the real page draw the same HTML (S4-W1)', system => {
+  let side;
+  beforeEach(() => {
+    seed(system);
+    side = side || studentSide();
+  });
+
+  it.each(UIS.map(ui => [JSON.stringify(ui), ui]))('for %s', (_, ui) => {
+    const { view } = StudentView.fromCache(CID, S1);
+    expect(StudentPageView.html(view, ui)).toBe(phoneHtml(side, unopened(serverPage(system)), ui));
+  });
+});
+
+describe('the parts the server now sends, drawn (S4-W1)', () => {
+  beforeEach(() => seed('letter'));
+
+  it('no teacher’s name anywhere, from Preview or from a reply that carries one (Colin’s ruling 112)', () => {
+    // The teacher has a name on this device (displayName is TEACHER).
+    expect(StudentView.reply(CID, S1).course).not.toHaveProperty('teacher_name');
+    const { view } = StudentView.fromCache(CID, S1);
+    expect(view.course).not.toHaveProperty('teacherName');
+    UIS.forEach(ui => expect(StudentPageView.html(view, ui)).not.toContain('Colin'));
+    // A reply that carries teacher_name, as the database may send it: the
+    // phone draws exactly what it draws without it, and never the name.
+    const side = studentSide();
+    const plain = serverPage('letter');
+    const named = JSON.parse(JSON.stringify(plain));
+    named.course.teacher_name = TEACHER;
+    side.page.ctx.__reply = named;
+    expect(JSON.parse(side.page.run('JSON.stringify(StudentData.fromServer(__reply))')).course).not.toHaveProperty(
+      'teacherName',
+    );
+    UIS.forEach(ui => {
+      const html = phoneHtml(side, named, ui);
+      expect(html).not.toContain('Colin');
+      expect(html).not.toContain('Brown');
+      expect(html).not.toContain('CB<');
+      expect(html).toBe(phoneHtml(side, plain, ui));
+    });
+    const box = DOC.createElement('div');
+    box.innerHTML = phoneHtml(side, named, UIS[6]);
+    expect(words(box.querySelector('.sp-since-line'))).toBe('5 pieces came back and 1 result was updated.');
+    expect(box.querySelector('.sp-piece-from, .sp-fb-from, .sp-from-mark')).toBe(null);
+  });
+
+  it('the unit, and the category with what it counts as the class is set up', () => {
+    const { view } = StudentView.fromCache(CID, S1);
+    expect(words(cardIn(drawn(view, UIS[1]), 'a-essay').querySelector('.sp-piece-unit'))).toBe('Unit 1: Cells');
+    expect(words(drawn(view, UIS[2]).querySelector('.sp-fb-category'))).toBe('Projects · counts 60% of your grade');
+    expect(words(drawn(view, UIS[4]).querySelector('.sp-fb-category'))).toBe('Tests · counts 40% of your grade');
+    expect(words(drawn(view, UIS[5]).querySelector('.sp-fb-category'))).toBe(
+      'Practice · doesn’t count toward your grade',
+    );
+    // A piece with no category says nothing of one.
+    expect(drawn(view, UIS[3]).querySelector('.sp-fb-category')).toBeNull();
+  });
+
+  it('in a Proficiency class a weighted category shows its name alone; one that weighs 0 still says so', () => {
+    seed('proficiency');
+    const { view } = StudentView.fromCache(CID, S1);
+    expect(words(drawn(view, UIS[2]).querySelector('.sp-fb-category'))).toBe('Projects');
+    expect(words(drawn(view, UIS[5]).querySelector('.sp-fb-category'))).toBe(
+      'Practice · doesn’t count toward your grade',
+    );
+  });
+
+  it('a percent only where the class’s weights total 100', () => {
+    _cache.categories[CID][0].weight = 30; // Tests 30, Projects 60, Practice 0: 90 in all
+    const reply = StudentView.reply(CID, S1);
+    const by = Object.fromEntries(reply.assessments.map(a => [a.id, a]));
+    expect(by['a-essay'].category_percent).toBeNull();
+    expect(by['a-quick'].category_percent).toBeNull();
+    expect(by['a-contract'].category_percent).toBe(0);
+    expect(by['a-bench'].category_percent).toBeNull();
+    expect(by['a-lab']).toMatchObject({ category_name: null, category_percent: null });
+  });
+
+  it('each rubric row says what it counts toward; work not back yet lists its I Can lines and Core Competencies', () => {
+    _cache.assessments[CID].find(a => a.id === 'a-draft').coreCompetencyIds = ['PAR', 'COM'];
+    const { view } = StudentView.fromCache(CID, S1);
+    expect(
+      [...drawn(view, UIS[3]).querySelectorAll('.sp-fb-criterion')].map(c => words(c.querySelector('.sp-fb-toward'))),
+    ).toEqual(['Counts toward Questioning and Predicting', 'Counts toward Questioning and Predicting']);
+    const draft = cardIn(drawn(view, UIS[0]), 'a-draft');
+    expect([...draft.querySelectorAll('.sp-graded-on-ican')].map(words)).toEqual([
+      'I can ask a question that can be tested.',
+      'I can say what I expect.',
+    ]);
+    expect(words(draft.querySelector('.sp-core .sp-graded-on-title'))).toBe('Core Competencies');
+    expect([...draft.querySelectorAll('.sp-core-name')].map(words)).toEqual([
+      'Communicating',
+      'Personal Awareness & Responsibility',
+    ]);
+    // Only work still to do carries its Description, category name, I Can lines and Core Competencies.
+    const back = drawn(view, UIS[1]);
+    ['.sp-piece-about', '.sp-piece-category', '.sp-graded-on-ican', '.sp-core'].forEach(sel =>
+      expect(back.querySelector(sel)).toBeNull(),
+    );
+  });
+
+  it('none of it draws when the server does not send the keys: the page is as it was', () => {
+    const side = studentSide();
+    const reply = withoutNew(serverPage('letter'));
+    UIS.forEach(ui => {
+      const box = DOC.createElement('div');
+      box.innerHTML = phoneHtml(side, reply, ui);
+      NEW_PARTS.forEach(sel => expect(box.querySelector(sel), sel).toBeNull());
+    });
+    // And the line of what changed is the one with no name.
+    const box = DOC.createElement('div');
+    box.innerHTML = phoneHtml(side, reply, UIS[6]);
+    expect(words(box.querySelector('.sp-since-line'))).toBe('5 pieces came back and 1 result was updated.');
+  });
+
+  it('a key of the wrong type reads as none: no throw, nothing drawn, the rest of the page as it was', () => {
+    const side = studentSide();
+    const good = withoutNew(serverPage('letter'));
+    const bad = JSON.parse(JSON.stringify(good));
+    bad.classes = [{ enrollment_id: S1, course: { name: 'Science 9', block: 'B' }, to_do: '3' }];
+    good.classes = [{ enrollment_id: S1, course: { name: 'Science 9', block: 'B' } }];
+    Object.values(bad.tags).forEach(t => (t.i_can = 'I can ask.'));
+    bad.rubrics.forEach(r => r.criteria.forEach(c => (c.tag_ids = 't1')));
+    bad.assessments.forEach(a =>
+      Object.assign(a, {
+        description: ['Read this'],
+        module_name: { name: 'Unit 1' },
+        category_name: 7,
+        category_percent: '40',
+        core_competencies: 'COM',
+      }),
+    );
+    UIS.forEach(ui => expect(phoneHtml(side, bad, ui)).toBe(phoneHtml(side, good, ui)));
+    side.page.ctx.__reply = bad;
+    const kept = JSON.parse(side.page.run('JSON.stringify(StudentData.fromServer(__reply))'));
+    expect(kept.classes[0].toDo).toBeNull();
+    expect(kept.assessments[0]).toMatchObject({
+      description: '',
+      moduleName: '',
+      categoryName: '',
+      categoryPercent: null,
+      coreCompetencies: [],
+    });
+    expect(kept.rubrics[0].criteria[0].tagIds).toEqual([]);
+  });
+
+  it('a negative percent, and Core Competency entries of the wrong shape, are left out', () => {
+    const reply = serverPage('letter');
+    const essay = reply.assessments.find(a => a.id === 'a-essay');
+    essay.category_percent = -5;
+    essay.core_competencies = [{ id: 'COM', name: 'Communicating' }, null, { id: 'CT' }, 'CRT', { id: 3, name: 'X' }];
+    const p = StudentView.build(reply, CID, null).work.find(x => x.id === 'a-essay');
+    expect(p.category).toEqual({ name: 'Projects', percent: null });
+    expect(p.coreCompetencies).toEqual([{ id: 'COM', name: 'Communicating' }]);
+  });
+});
+
+describe('fromCache’s learning option (Preview’s See What They’d See, S13-F1)', () => {
+  it('works My Learning out for this view only: the class’s switch is neither read as on nor changed', () => {
+    seed('proficiency');
+    const before = getCourseConfig;
+    expect(StudentView.learningOn(CID)).toBe(false);
+    expect(StudentView.fromCache(CID, S1).view.learning).toBeNull();
+    const shown = StudentView.fromCache(CID, S1, { learning: true });
+    expect(shown.view.learning).not.toBeNull();
+    expect(shown.view.learning.mode).toBe('proficiency');
+    expect(getCourseConfig).toBe(before);
+    expect(getCourseConfig(CID).show_my_learning).toBeUndefined();
+    expect(StudentView.fromCache(CID, S1).view.learning).toBeNull();
+  });
+});
+
+/* ── Preview never shows what the student has opened (ruling 116) ──
+   DECISIONS, "Student page build rulings (2026-11-10)" 10: when a student
+   opens a piece is not shown to teachers. The same returned work, opened
+   by the student or not, draws the same Preview on every screen. */
+describe('Preview as Student: a returned piece looks the same whether or not the student opened it', () => {
+  // Nothing opened: no seen_at, so under As Soon As I Save no change is marked Updated either.
+  const NOT_OPENED = Object.fromEntries(
+    Object.entries(ROWS).map(([aid, row]) => {
+      const r = { ...row };
+      delete r.seen_at;
+      if (aid === 'a-quick') {
+        delete r.previous_copy;
+        delete r.updated_at;
+      }
+      return [aid, r];
+    }),
+  );
+  // Every returned piece opened, after it came back.
+  const ALL_OPENED = Object.fromEntries(
+    Object.entries(ROWS).map(([aid, row]) => [
+      aid,
+      row.returned_at ? { ...row, seen_at: '2026-11-09T18:00:00Z' } : { ...row },
+    ]),
+  );
+  const previewHtml = rows => {
+    seed('proficiency', null, rows);
+    const { view } = StudentView.fromCache(CID, S1);
+    return UIS.map(ui => StudentPageView.html(view, ui));
+  };
+
+  it('opened, opened with an update, or never opened: the same HTML on every screen', () => {
+    const never = previewHtml(NOT_OPENED);
+    expect(previewHtml(ROWS)).toEqual(never);
+    expect(previewHtml(ALL_OPENED)).toEqual(never);
+  });
+
+  it('the student’s own page still tells them what they have not opened', () => {
+    const side = studentSide();
+    seed('proficiency', null, NOT_OPENED);
+    const never = side.view(StudentView.reply(CID, S1));
+    seed('proficiency', null, ALL_OPENED);
+    const opened = side.view(StudentView.reply(CID, S1));
+    expect(never.changes.length).toBeGreaterThan(0);
+    expect(opened.changes).toEqual([]);
+    expect(opened.work.filter(p => p.unseen)).toEqual([]);
   });
 });

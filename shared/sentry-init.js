@@ -46,6 +46,9 @@
       replaysSessionSampleRate: 0,
       replaysOnErrorSampleRate: 0,
       sendDefaultPii: false,
+      // No screenshot of the page with an error: it could show a photo of
+      // student work (S8-F2).
+      attachScreenshot: false,
       beforeBreadcrumb: scrubBreadcrumb,
       beforeSend: scrubEvent,
     });
@@ -70,12 +73,22 @@
   var TOKEN_RE = /\b(?=[\w-]*\d)(?=[\w-]*[A-Za-z])[\w-]{24,}\b/g;
   var NUMBER_RE = /\b\d{6,}\b/g;
   var URL_RE = /\b(?:https?|wss?):\/\/[^\s"'<>()]+/gi;
+  /* An image never goes to Sentry (S8-F2): a photo of student work can show
+     a name, a face, a hand. A data: address carries the whole file in it;
+     a long run of base64 is a file's bytes written out. Both go before
+     anything else is looked at. */
+  var DATA_URL_RE = /\bdata:[^\s"'<>()]*/gi;
+  var BASE64_RE = /[A-Za-z0-9+/]{120,}={0,2}/g;
+
+  function dropImages(text) {
+    return text.replace(DATA_URL_RE, '[data]').replace(BASE64_RE, '[data]');
+  }
 
   /* Ids, emails, tokens, slip codes, dates and student numbers, wherever
      they appear. */
   function mask(text) {
     if (typeof text !== 'string') return text;
-    return text
+    return dropImages(text)
       .replace(EMAIL_RE, '[email]')
       .replace(JWT_RE, '[token]')
       .replace(SECRET_RE, '$1=[value]')
@@ -100,7 +113,7 @@
   function scrubText(text) {
     if (typeof text !== 'string') return text;
     return mask(
-      text
+      dropImages(text)
         .replace(URL_RE, scrubUrl)
         .replace(/^(Non-Error (?:promise rejection|exception) captured with value: )[\s\S]*$/, '$1[value]')
         .replace(/(captured as [a-z ]*with keys: )([\s\S]*)$/, function (m, lead, keys) {
@@ -181,8 +194,13 @@
     delete frame.post_context;
   }
 
-  function scrubEvent(event) {
+  function scrubEvent(event, hint) {
     if (!event) return event;
+    // No file rides along with a report: Sentry sends what is in
+    // hint.attachments (a screenshot, a file added to the scope) beside the
+    // event, so empty it in place.
+    if (hint && Array.isArray(hint.attachments)) hint.attachments.length = 0;
+    delete event.attachments;
     delete event.user;
     delete event.extra;
     delete event.tags;

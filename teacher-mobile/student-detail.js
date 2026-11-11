@@ -815,6 +815,8 @@ window.MStudentDetail = (function () {
       nav +
       '<div class="m-screen-content">' +
       hero +
+      // The work waiting, above the tabs (S7-F4).
+      (window.MGradePhotos ? MGradePhotos.studentListHtml(cid, st) : '') +
       tabsBlock +
       '<div class="m-scard-actions" style="padding:16px">' +
       (getAssessments(cid).length

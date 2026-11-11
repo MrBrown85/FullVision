@@ -93,6 +93,19 @@ function seed(config) {
 }
 const held = () => seed({ student_page_enabled: true, return_grades: 'on_return' });
 
+/* Revisions are Demo Mode only, behind Send Work (S11): `fn` runs as Demo
+   Mode with the class's Send Work on. */
+function asDemoWithSendWork(fn) {
+  const was = window.isDemoMode;
+  window.isDemoMode = () => true;
+  try {
+    saveDemoStudentWork(CID, { course: { send_work: true } });
+    fn();
+  } finally {
+    window.isDemoMode = was;
+  }
+}
+
 /* Each writer in a class that holds grades: what it does to a piece with no
    grade, and to one whose grade was returned. `on` is false for the run
    with the switch off, where the writes are made and nothing is checked. */
@@ -318,6 +331,46 @@ const WRITER_SCENARIOS = {
     const out = returnGrades(CID, 'essay', ['s1']);
     expect(out.returned).toBe(on ? 1 : 0);
     if (on) expect([state('s1', 'essay'), state('s2', 'essay')]).toEqual(['returned', 'draft']);
+  },
+  // Return with the marks on the pages (S9-F1): the grade part is returnGrades.
+  returnWork(on) {
+    level('s1', 'essay', 't1', 3);
+    level('s2', 'essay', 't1', 2);
+    const out = returnWork(CID, 'essay', ['s1']);
+    expect(out.returned).toBe(on ? 1 : 0);
+    expect(out.marks_given).toBe(0);
+    if (on) expect([state('s1', 'essay'), state('s2', 'essay')]).toEqual(['returned', 'draft']);
+  },
+  // Return for Revision (S11, Demo Mode only): returns the work, then Hide
+  // makes the grade a draft never returned.
+  returnForRevision(on) {
+    asDemoWithSendWork(() => {
+      level('s1', 'essay', 't1', 3);
+      give('essay', 's1');
+      level('s2', 'essay', 't1', 2);
+      const ask = { what_to_fix: 'Add a reason.', revise_by: null, criterion_ids: [], keep_grade: false };
+      returnForRevision(CID, 's1', 'essay', ask, 'k1');
+      returnForRevision(CID, 's2', 'essay', Object.assign({}, ask, { keep_grade: true }), 'k2');
+      if (!on) return;
+      expect(row('s1', 'essay')).toEqual({ is_draft: true });
+      expect(row('s2', 'essay').returned_at).toBeTruthy();
+      expect([state('s1', 'essay'), state('s2', 'essay')]).toEqual(['draft', 'returned']);
+    });
+  },
+  // Take Back (S11): a hidden grade is given back as the student had it.
+  cancelRevision(on) {
+    asDemoWithSendWork(() => {
+      level('s1', 'essay', 't1', 3);
+      give('essay', 's1');
+      const before = row('s1', 'essay');
+      const ask = { what_to_fix: 'Add a reason.', revise_by: null, criterion_ids: [], keep_grade: false };
+      returnForRevision(CID, 's1', 'essay', ask, 'k1');
+      const made = getRevisionRequest(CID, 's1', 'essay');
+      if (made) cancelRevision(CID, made.id, 'k2');
+      if (!on) return;
+      expect(row('s1', 'essay')).toEqual(before);
+      expect(state('s1', 'essay')).toBe('returned');
+    });
   },
   moveRubricScores(on) {
     // Edit a Copy on scored work: each grade keeps its state.

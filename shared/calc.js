@@ -250,7 +250,8 @@ function getActiveTerm(cid) {
 
 function _termKey(cid) {
   var t = _activeTerm[cid];
-  return t ? '@' + t.ordinal : '';
+  // A day in place of a term (_readAsOfDate) keys by that day.
+  return t ? '@' + (t.asOf ? 'd' + t.asOf : t.ordinal) : '';
 }
 
 /* Cache key prefix for a class: the class id, the active term and the score
@@ -3200,6 +3201,137 @@ function classGradeChange(cid, studentIds) {
   };
 }
 
+/* ── A month ago, and the Next Step (My Learning) ─────────────────────
+   GRADE MATH (docs/plans/student-page-build-plan.md S13; for Colin's
+   review). "Up from Developing a month ago" sets two of a student's grades
+   side by side, both from returned work only:
+   - now: the year so far, as My Learning shows it;
+   - a month ago: the same calculation, as of the day 30 days before
+     `today`, the way a report reads the year to date as of its term's end
+     (assessmentInYearToDate): work dated on or before that day counts, work
+     dated after it does not, undated work counts in both, and a hand-set
+     section level counts from its own date. The class's method, decay,
+     most-recent-N, categories and Missing and Excused rules are the ones
+     every grade uses; nothing here works a level out itself.
+   `today` ('YYYY-MM-DD') is always given by the caller (courseToday(cid)
+   on a screen); nothing here reads the clock. */
+var MONTH_AGO_DAYS = 30;
+
+/** The day "a month ago" is, 30 days before `today` ('YYYY-MM-DD'), or null
+ * when `today` is not a real day. Work dated on it counts a month ago. */
+function monthAgoDate(today) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(today == null ? '' : today));
+  if (!m) return null;
+  var t = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  // 2026-02-30 is no day: Date would roll it on to March 2.
+  if (new Date(t).toISOString().slice(0, 10) !== m[0]) return null;
+  return new Date(t - MONTH_AGO_DAYS * 86400000).toISOString().slice(0, 10);
+}
+
+/* Read something with a class's grades as of one day: the year to date as
+   of a term ending that day (assessmentInYearToDate, getTagScores,
+   sectionOverrideInView read it as they read a term). What was in view is
+   put back after, also when `read` throws. */
+function _readAsOfDate(cid, day, read) {
+  var had = Object.prototype.hasOwnProperty.call(_activeTerm, cid);
+  var was = _activeTerm[cid];
+  _activeTerm[cid] = { ordinal: null, label: '', startsOn: '', endsOn: day, asOf: day };
+  try {
+    return read();
+  } finally {
+    if (had) _activeTerm[cid] = was;
+    else delete _activeTerm[cid];
+  }
+}
+
+/* `read()` now and a month ago, on returned work only. { now, then, since }
+   or null when `today` is not a day. */
+function _nowAndMonthAgo(cid, today, read) {
+  var since = monthAgoDate(today);
+  if (!since) return null;
+  return withReturnedOnly(function () {
+    return readAsOfTerm(cid, null, function () {
+      return { now: read(), then: _readAsOfDate(cid, since, read), since: since };
+    });
+  });
+}
+
+/* The whole level a level's word comes from (levelWord), 1 to 4. */
+function _wordLevel(value) {
+  return Math.max(1, Math.min(4, Math.round(value)));
+}
+
+/** How one skill (a section of the learning map) has moved in a month, from
+ * returned work only. null when there is nothing to compare: nothing
+ * returned on it as of a month ago, or no `today`. Otherwise
+ * { now, then: the 0–4 levels; from: the level a month ago as the skill
+ * shows it (its word, or its % in a Letter class); dir: 1 up, -1 down, 0
+ * when it shows the same; since: the day a month ago }. */
+function skillMonthChange(cid, sid, sectionId, today) {
+  var r = _nowAndMonthAgo(cid, today, function () {
+    return getSectionProficiency(cid, sid, sectionId);
+  });
+  // Whatever counted a month ago still counts now, so then > 0 means now > 0.
+  if (!r || !(r.then > 0)) return null;
+  var letter = courseGradeMode(cid) === 'letter';
+  var shown = function (v) {
+    return letter ? Math.round(levelToPercent(cid, v)) : _wordLevel(v);
+  };
+  var d = shown(r.now) - shown(r.then);
+  return {
+    now: r.now,
+    then: r.then,
+    from: letter ? formatLevel(cid, r.then) : levelWord(cid, r.then),
+    dir: d > 0 ? 1 : d < 0 ? -1 : 0,
+    since: r.since,
+  };
+}
+
+/** How a student's overall grade has moved in a month, from returned work
+ * only, in the grade My Learning leads with: the overall level's word in a
+ * Proficiency class, the letter in a Letter or Both class. null when there
+ * is nothing to compare (as skillMonthChange). Otherwise { now, then: the
+ * overall level (Proficiency) or the course % as shown (Letter, Both);
+ * from: the word or letter a month ago; dir: 1 up, -1 down, 0 when the word
+ * or letter is the same; since }. */
+function gradeMonthChange(cid, sid, today) {
+  var byLetter = courseGradeMode(cid) !== 'proficiency';
+  var r = _nowAndMonthAgo(cid, today, function () {
+    if (!byLetter) return { value: getOverallProficiency(cid, sid) };
+    var lg = getCourseLetterData(cid, sid);
+    return { value: lg && lg.R != null ? lg.R : null, letter: lg ? lg.S : '' };
+  });
+  if (!r) return null;
+  var now = r.now.value;
+  var then = r.then.value;
+  if (byLetter ? then == null : !(then > 0)) return null;
+  var d = byLetter ? (r.now.letter === r.then.letter ? 0 : now - then) : _wordLevel(now) - _wordLevel(then);
+  return {
+    now: now,
+    then: then,
+    from: byLetter ? r.then.letter : levelWord(cid, then),
+    dir: d > 0 ? 1 : d < 0 ? -1 : 0,
+    since: r.since,
+  };
+}
+
+/** Which level's Next Step applies to one skill, from returned work only:
+ * the level the skill shows now (its word's level, as the comment bank's
+ * Generate reads it), so the step is the comment bank's sentence for that
+ * level. { level: 1–3, key: 'Emerging' | 'Developing' | 'Proficient', top:
+ * false }, or at Extending { level: 4, key: 'Extending', top: true }: there is no
+ * step above it. null with nothing returned on the skill. */
+function nextStepLevel(cid, sid, sectionId) {
+  var v = withReturnedOnly(function () {
+    return readAsOfTerm(cid, null, function () {
+      return getSectionProficiency(cid, sid, sectionId);
+    });
+  });
+  if (!(v > 0)) return null;
+  var level = _wordLevel(v);
+  return { level: level, key: PROF_LABELS[level], top: level === 4 };
+}
+
 /* How a class sits on one competency: each student's proficiency on a
    section (`which.sectionId`) or a group of sections (`which.groupId`),
    banded by its rounded level the way the cards colour it. Returns
@@ -4146,6 +4278,10 @@ window.Calc = {
   studentGradeSummary,
   classGradeSummary,
   classGradeChange,
+  monthAgoDate,
+  skillMonthChange,
+  gradeMonthChange,
+  nextStepLevel,
   reportName,
   classGradeDistribution,
   competencyDistribution,

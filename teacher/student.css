@@ -4210,3 +4210,116 @@ button.stu-bd-row:focus-visible {
   color: var(--text-2);
   text-align: center;
 }
+
+/* ── Reflect on Feedback on the Learner Profile (S10-F4) ────── */
+.lp-card {
+  background: var(--surface);
+  border: 0.5px solid var(--divider-medium);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lp-card h3 {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text);
+}
+.lp-card .qw-b {
+  font-size: var(--text-md);
+  padding: 10px 14px;
+}
+.lp-card-note {
+  font-size: var(--text-xs);
+  color: var(--text-2);
+  line-height: 1.45;
+}
+.lp-so-far ul {
+  margin: 0;
+  padding: 0 0 0 18px;
+  font-size: var(--text-sm);
+  color: var(--text);
+  line-height: 1.6;
+}
+.lp-so-far-ask {
+  font-weight: 700;
+}
+.rf-filter {
+  font-size: var(--text-sm);
+}
+.rf-card {
+  background: var(--surface);
+  border: 0.5px solid var(--divider-medium);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.rf-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+}
+.rf-title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--text);
+}
+.rf-grade {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.rf-sense {
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+.rf-sense.is-yes {
+  background: var(--score-3-bg, var(--bg));
+  color: var(--score-3-text, var(--text));
+}
+.rf-sense.is-unsure {
+  background: #fff3c4;
+  color: #6b4e00;
+}
+.rf-day {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--text-3);
+}
+.rf-wait {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding-left: 14px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: #7a5900;
+}
+.rf-you {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rf-you-text {
+  padding-left: 14px;
+  font-size: var(--text-md);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text);
+}
+.rf-line {
+  padding-left: 14px;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}

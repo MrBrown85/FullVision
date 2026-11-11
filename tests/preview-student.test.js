@@ -103,6 +103,11 @@ function key(target, k, opts) {
 function click(target) {
   target.dispatchEvent(new doc.defaultView.Event('click', { bubbles: true, cancelable: true }));
 }
+// All Assignments, pressed inside the device: every piece and its result in one list.
+function showAll(el) {
+  const b = el.querySelector('.ps-screen [data-act="all-open"]');
+  if (b && b.getAttribute('aria-pressed') !== 'true') click(b);
+}
 // Chooses a student in the list (linkedom's select has no value setter).
 function pick(select, value) {
   [...select.querySelectorAll('option')].forEach(o => {
@@ -216,9 +221,10 @@ describe('the preview', () => {
   it('draws the page StudentView builds: returned grades only, worded by calc.js', () => {
     const el = openJordan();
     const { view } = StudentView.fromCache(CID, S1);
-    const rows = [...el.querySelectorAll('.ps-row')].map(r => ({
-      title: text(r.querySelector('.ps-row-title')),
-      result: text(r.querySelector('.ps-row-result')),
+    showAll(el);
+    const rows = [...el.querySelectorAll('.sp-row')].map(r => ({
+      title: text(r.querySelector('.sp-row-title')),
+      result: text(r.querySelector('.sp-row-result')),
     }));
     expect(rows).toEqual(view.work.map(p => ({ title: p.title, result: p.result.text })));
     expect(rows.find(r => r.title === 'Draft Poster').result).toBe('');
@@ -228,7 +234,38 @@ describe('the preview', () => {
     expect(rows.find(r => r.title === 'Changed Reflection').result).toBe(returned);
     expect(assessmentCellValue(CID, S1, reflect).text).not.toBe(returned);
     expect(el.innerHTML).not.toMatch(SECRET);
-    expect(text(el.querySelector('.ps-page-class'))).toBe('Socials 10 · Block C');
+    expect(text(el.querySelector('.sp-head-title'))).toBe('Socials 10');
+    expect(text(el.querySelector('.sp-pill'))).toBe('Block C');
+  });
+
+  it('the page inside the device answers presses as the student’s does: tabs, To Do, Sent and Back, search, a card', () => {
+    const el = openJordan();
+    const screen = () => el.querySelector('.ps-screen');
+    const { view } = StudentView.fromCache(CID, S1);
+    // It opens as the student's does: Assignments, To Do.
+    expect(screen().querySelector('.sp-segment[aria-pressed="true"]').textContent).toMatch(/^To Do \d+$/);
+    click(screen().querySelector('[data-segment="back"]'));
+    const back = view.work.filter(p => p.kind === 'back').map(p => p.title);
+    expect([...screen().querySelectorAll('.sp-deck .sp-piece-title')].map(t => text(t))).toEqual(back);
+    // The page inside the device is the student page's own drawing for that choice.
+    const same = doc.createElement('div');
+    same.innerHTML = StudentPageView.html(view, { tab: 'assignments', segment: 'back', all: false, pick: '' });
+    expect(screen().innerHTML === same.innerHTML).toBe(true);
+    click(screen().querySelector('.sp-tabs-bottom [data-tab="reports"]'));
+    expect(text(screen().querySelector('.sp-page-title'))).toBe('My Reports');
+    click(screen().querySelector('[data-act="all-open"]'));
+    const box = screen().querySelector('#sp-search');
+    box.value = 'reflection';
+    box.dispatchEvent(new doc.defaultView.Event('input', { bubbles: true }));
+    expect([...screen().querySelectorAll('.sp-row-title')].map(t => text(t))).toEqual(
+      view.work.filter(p => /reflection/i.test(p.title)).map(p => p.title),
+    );
+    // Done and Your Classes reach for the student's session: here they do nothing.
+    const before = screen().innerHTML;
+    click(screen().querySelector('[data-act="card-done"]'));
+    click(screen().querySelector('[data-act="classes-open"]'));
+    expect(screen().innerHTML).toBe(before);
+    expect(overlay()).toBeTruthy();
   });
 
   it('lists what Jordan sees and doesn’t see, in the board’s words', () => {
@@ -277,8 +314,11 @@ describe('the preview', () => {
     expect(el.querySelector('.ps-device-chromebook')).toBeTruthy();
     expect(el.querySelector('.ps-device-phone')).toBeNull();
     expect(el.querySelector('[data-ps-device="chromebook"]').getAttribute('aria-checked')).toBe('true');
-    // The same page in either.
-    expect(el.querySelectorAll('.ps-row').length).toBe(4);
+    // The same page in either, and what the student chose to look at is kept.
+    showAll(el);
+    click(el.querySelector('[data-ps-device="phone"]'));
+    expect(el.querySelector('.ps-screen [data-act="all-open"]').getAttribute('aria-pressed')).toBe('true');
+    expect(el.querySelectorAll('.sp-row').length).toBe(4);
   });
 
   it('Back to Class Settings and Escape close it, and the focus goes back to Open Preview', () => {
@@ -341,13 +381,14 @@ describe('a signed-in class whose Draft and Returned rows have not loaded', () =
     expect(PreviewStudent.open(CID, S1, null)).toBe(true);
     const el = overlay();
     expect(text(el.querySelector('.ps-waiting'))).toBe('Loading this class…');
-    expect(el.querySelectorAll('.ps-row').length).toBe(0);
+    expect(el.querySelectorAll('.sp-row').length).toBe(0);
     expect(el.innerHTML).not.toMatch(SECRET);
     // No draft count is said while the rows are not known.
     expect(text(el.querySelectorAll('.ps-item-line')[1])).toBe('Drafts never reach the student page.');
     _loadGradeReturns(CID, structuredClone(_cache.gradeReturns[CID] || {}));
     CmStudentPage.render(CID);
-    expect(overlay().querySelectorAll('.ps-row').length).toBe(4);
+    showAll(overlay());
+    expect(overlay().querySelectorAll('.sp-row').length).toBe(4);
     expect(overlay().innerHTML).not.toMatch(SECRET);
   });
 });
@@ -373,5 +414,76 @@ describe('Demo Mode', () => {
     expect(calls).toEqual([]);
     // Nothing was saved either.
     expect(localStorage.getItem('gb-grade-returns-' + CID)).toBe(JSON.stringify(_cache.gradeReturns[CID]));
+  });
+});
+
+describe('S9-F3: See Your Work in the preview, from the marks the student was given', () => {
+  const MARKS = { v: 1, marks: [{ type: 'note', x: 0.4, y: 0.3, text: 'Name your source.' }] };
+  const READERS = ['getStudentMarkCounts', 'getStudentMarkup', 'getStudentSubmission', 'openStudentWorkPage'];
+  let saved;
+  // The data layer's Mark Up readers (PR 1063's), answering for Jordan's essay only.
+  function stubMarkup(opts) {
+    saved = {};
+    READERS.forEach(n => (saved[n] = globalThis[n]));
+    const given = (cid, sid, aid) => cid === CID && sid === S1 && aid === 'essay';
+    globalThis.getStudentMarkCounts = (cid, sid, aid) => (given(cid, sid, aid) ? { pages: 1, notes: 1 } : null);
+    globalThis.getStudentMarkup = (cid, sid, aid) => ({
+      ok: true,
+      files: given(cid, sid, aid) ? [{ file_id: 'f1', marks: MARKS, given_at: '2026-11-03T18:00:00Z' }] : [],
+    });
+    globalThis.getStudentSubmission = (cid, sid, aid) =>
+      given(cid, sid, aid) ? { id: 's1', files: [{ id: 'f1', page: 1, path: 'cell-lab-jordan-1.jpg' }] } : null;
+    globalThis.openStudentWorkPage = (cid, file) =>
+      (opts && opts.hold) || Promise.resolve({ url: '/assets/sample-work/' + file.path, release() {} });
+  }
+  afterEach(() => {
+    Object.keys(saved || {}).forEach(n => (globalThis[n] = saved[n]));
+    saved = null;
+  });
+  const screen = () => overlay().querySelector('.ps-screen');
+  function openEssayFeedback() {
+    PreviewStudent.open(CID, S1, null);
+    click(screen().querySelector('[data-segment="back"]'));
+    click(screen().querySelector('.sp-piece[data-piece="essay"] [data-act="feedback"]'));
+  }
+
+  it('Jordan Sees names the notes; Your Feedback has See Your Work; it opens the page with the marks', async () => {
+    stubMarkup();
+    openEssayFeedback();
+    const sees = [...overlay().querySelectorAll('.ps-side-left .ps-item')].map(li => [
+      text(li.querySelector('.ps-item-title')),
+      text(li.querySelector('.ps-item-line')),
+    ]);
+    expect(sees).toContainEqual(['1 note on Jordan’s work', 'Your Mark Up, on the photos.']);
+    expect(text(screen().querySelector('.sp-fb-work-line'))).toBe('1 page · 1 note on your work');
+    click(screen().querySelector('[data-act="work"]'));
+    await vi.waitFor(() => expect(screen().querySelector('.sp-work-img')).toBeTruthy());
+    expect(screen().querySelector('.sp-work-img').getAttribute('src')).toBe(
+      '/assets/sample-work/cell-lab-jordan-1.jpg',
+    );
+    expect(text(screen().querySelector('.sp-work-notes li span:last-child'))).toBe('Name your source.');
+  });
+
+  it('with no marks given (no reader yet, or none), nothing of Mark Up shows', () => {
+    stubMarkup();
+    globalThis.getStudentMarkCounts = () => null;
+    openEssayFeedback();
+    expect(screen().querySelector('[data-act="work"]')).toBeNull();
+    expect(overlay().textContent).not.toMatch(/Mark Up/);
+  });
+
+  it('a page that arrives after See Your Work closed is let go and not drawn', async () => {
+    let settle;
+    const hold = new Promise(r => (settle = r));
+    stubMarkup({ hold });
+    openEssayFeedback();
+    click(screen().querySelector('[data-act="work"]'));
+    expect(text(screen().querySelector('.sp-work [role="status"]'))).toBe('Getting your work…');
+    click(screen().querySelector('[data-act="work-close"]'));
+    let released = 0;
+    settle({ url: '/assets/sample-work/x.jpg', release: () => (released += 1) });
+    await vi.waitFor(() => expect(released).toBe(1));
+    expect(screen().querySelector('.sp-work')).toBeNull();
+    expect(text(screen().querySelector('#sp-fb-title'))).toBe('Returned Essay');
   });
 });

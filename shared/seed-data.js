@@ -7,6 +7,177 @@
 const SEED_LAST_DAY = '2026-03-21';
 const _DATE_RE = /^\d{4}-\d{2}-\d{2}(T[\d:.]+Z?)?$/;
 
+/* ── The demo class ─────────────────────────────────────────────
+   Demo Mode's Science 8 class and its built-in learning map, the map used
+   only when the curriculum bank cannot load. They lived in constants.js,
+   which every page loads; they belong with the rest of the sample data
+   (S5-F5). Declared with var so this file can be run again in a page that
+   has already run it (the tests do). */
+var DEFAULT_COURSES = {
+  sci8: {
+    id: 'sci8',
+    name: 'Science 8',
+    block: 'A',
+    // Demo Mode's class: Proficiency, Mean, Emerging First (Colin, 2026-10-26).
+    gradingSystem: 'proficiency',
+    calcMethod: 'average',
+    decayWeight: 0.65,
+    levelOrder: 'asc',
+    curriculumTags: ['SCI8'],
+  },
+};
+
+/* ── Learning Map: Learning Standards (flat format) ─────────── */
+var LEARNING_MAP = {
+  sci8: {
+    _flatVersion: 2,
+    subjects: [{ id: 'SCI8', name: 'Science 8', color: '#0891b2' }],
+    sections: [
+      {
+        id: 'QAP',
+        subject: 'SCI8',
+        name: 'Questioning and Predicting',
+        shortName: 'Questioning',
+        color: '#0891b2',
+        tags: [
+          {
+            id: 'QAP',
+            label: 'Question and Predict',
+            text: '',
+            color: '#0891b2',
+            subject: 'SCI8',
+            name: 'Questioning and Predicting',
+            shortName: 'Questioning',
+            i_can_statements: [
+              'I can identify a scientific question that genuinely interests me and pursue it with curiosity.',
+              'I can make careful observations of the natural world and generate questions based on what I notice.',
+              'I can formulate a hypothesis and predict what I think will happen in an investigation.',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'PI',
+        subject: 'SCI8',
+        name: 'Planning and Conducting',
+        shortName: 'Planning',
+        color: '#0891b2',
+        tags: [
+          {
+            id: 'PI',
+            label: 'Plan Investigations',
+            text: '',
+            color: '#0891b2',
+            subject: 'SCI8',
+            name: 'Planning and Conducting',
+            shortName: 'Planning',
+            i_can_statements: [
+              'I can plan a fair test by identifying and controlling variables.',
+              'I can choose the right tools and methods to collect accurate and reliable data.',
+              'I can use appropriate SI units and convert between units when needed.',
+              'I can follow safety and ethical guidelines during investigations.',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'IP',
+        subject: 'SCI8',
+        name: 'Processing and Analyzing Data and Information',
+        shortName: 'Processing',
+        color: '#0891b2',
+        tags: [
+          {
+            id: 'IP',
+            label: 'Identify Patterns',
+            text: '',
+            color: '#0891b2',
+            subject: 'SCI8',
+            name: 'Processing and Analyzing Data and Information',
+            shortName: 'Processing',
+            i_can_statements: [
+              'I can organize data into tables and graphs to reveal patterns.',
+              'I can analyze my data to identify trends, patterns, and relationships.',
+              'I can apply First Peoples knowledge and perspectives as valid sources of scientific understanding.',
+              'I can use scientific understanding to draw conclusions supported by evidence.',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'EM',
+        subject: 'SCI8',
+        name: 'Evaluating',
+        shortName: 'Evaluating',
+        color: '#0891b2',
+        tags: [
+          {
+            id: 'EM',
+            label: 'Evaluate Methods',
+            text: '',
+            color: '#0891b2',
+            subject: 'SCI8',
+            name: 'Evaluating',
+            shortName: 'Evaluating',
+            i_can_statements: [
+              'I can identify sources of error in my investigation and suggest specific improvements.',
+              'I can evaluate the quality of my data and explain how it could be made more reliable.',
+              'I can consider the social, ethical, and environmental implications of a scientific issue.',
+              'I can exercise informed skepticism \u2014 questioning claims and demanding evidence.',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'CA',
+        subject: 'SCI8',
+        name: 'Applying and Innovating',
+        shortName: 'Applying',
+        color: '#0891b2',
+        tags: [
+          {
+            id: 'CA',
+            label: 'Community Applications',
+            text: '',
+            color: '#0891b2',
+            subject: 'SCI8',
+            name: 'Applying and Innovating',
+            shortName: 'Applying',
+            i_can_statements: [
+              "I can apply what I've learned in science to a new situation or problem.",
+              'I can design a project or solution that addresses a real need in my community or the world.',
+              'I can generate and refine creative ideas when problem-solving.',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'SC',
+        subject: 'SCI8',
+        name: 'Communicating',
+        shortName: 'Communicating',
+        color: '#0891b2',
+        tags: [
+          {
+            id: 'SC',
+            label: 'Scientific Communication',
+            text: '',
+            color: '#0891b2',
+            subject: 'SCI8',
+            name: 'Communicating',
+            shortName: 'Communicating',
+            i_can_statements: [
+              'I can communicate my scientific findings clearly using appropriate scientific vocabulary.',
+              'I can use digital tools to represent and share scientific information.',
+              "I can express how my local environment and First Peoples perspectives relate to the science I'm learning.",
+            ],
+          },
+        ],
+      },
+    ],
+  },
+};
+
 function _seedShiftDays() {
   var today = Date.parse(getTodayStr() + 'T00:00:00Z');
   var last = Date.parse(SEED_LAST_DAY + 'T00:00:00Z');
@@ -3678,6 +3849,12 @@ function seedIfNeeded() {
     });
   })();
 
+  // Sample student work, for a class seeded now or before it existed.
+  seedDemoStudentWork();
+  seedDemoMarkup();
+  seedDemoReflections();
+  seedDemoRevisions();
+
   // ── Migrate old gb-notes into gb-quick-obs (one-time) ──
   Object.keys(COURSES).forEach(cid => {
     const oldNotes = getNotes(cid);
@@ -3705,4 +3882,284 @@ function seedIfNeeded() {
     }
   });
   return _didSeed;
+}
+
+/* ── Sample student work (S5-F5) ─────────────────────────────────
+   Demo Mode's work sent for Cell Microscope Lab (sci8a1), in the shape the
+   server's list of a class's submissions has (shared/data.js, "Student
+   work"). The pages are drawn, not photographed: assets/sample-work, one
+   JPEG and a thumbnail each, made for Demo Mode and no real student's work.
+   bytes and sha256 are each file's own (tests/demo-student-work.test.js
+   checks them).
+
+   The spread, every grade left as it was seeded: sent on time (Cece, Liam,
+   Jas, Priya, Jordan), two pages (Noor; Fatima, sent late too), sent late
+   (Sam, with a note), added by the teacher (Mateo), handed in on paper
+   (Ethan), and nothing sent (everyone else). KMT & States of Matter Lab
+   (sci8a4) takes photos and files and closed a week after its date, with
+   nothing sent; every other piece takes no work. Send Work starts off, as
+   it does for every class (plan S5: the build switch, then Send Work, then
+   Students Send); the work is there for the screens that show it once a
+   teacher turns both on.
+
+   Seeded once per class: a class seeded before this existed gets it the
+   next time Demo Mode opens. */
+var DEMO_WORK_PAGES = {
+  // name: [bytes, sha256, thumbnail bytes]
+  'cell-lab-cece-1': [82220, 'c120c33f3d4bfb27cce2ef02ae2849501970794e62d4e767abe95c2843070ff7', 8645],
+  'cell-lab-noor-1': [77973, 'fd421eef95c3b0a12d0afbc11c6ecbd19ff970e919371d3a175fa6e40b0d70f1', 8478],
+  'cell-lab-noor-2': [61162, '2ec8fb1f358257a34be19605bf27bdf43f9ca4e37ebfb50e96ce3bba4d0e4ad3', 6920],
+  'cell-lab-sam-1': [70648, '87b1fcd4397aef096c49dabc5aeb01d492e53d0bcb05b75bf37f3611fc5d4607', 8195],
+  'cell-lab-liam-1': [79200, '2d40992134618544ee01bcea0d8f6dac54decc76afa1765d41ba9a0efa9311a1', 8602],
+  'cell-lab-mateo-1': [72147, '9de1b4d34f1f64c87a3d0506aa26610f1cf5f683659bb1197ae904007f5e9027', 8053],
+  'cell-lab-jas-1': [79637, 'bc8fe3c5bd96a287eedc75bf646da0f7774fbed148c02e5b59107f856b067ea9', 8230],
+  'cell-lab-fatima-1': [80633, '02d6af81e5124372011272c68a6056905c2e5842549282473fd174f5b9347dd1', 8353],
+  'cell-lab-fatima-2': [59536, 'f92077d830342cb19305e8f1a63858bd22f49eadd97f2b378d1e7518971afb94', 6855],
+  'cell-lab-priya-1': [85785, '5f43e2e52874e138e973dfa610ef8e02098af6d6466f4f33e055b1784058f088', 9615],
+  'cell-lab-jordan-1': [80109, '30d1232a08f3abb286e5311e68a9c12397d7206004c2566108d6343842e743e0', 8431],
+};
+
+// [student, pages, sent by, days after the lab's date, time (UTC), late, on paper, note]
+var DEMO_WORK_SENT = [
+  ['st1', ['cell-lab-cece-1'], 'student', 0, '16:20', false, false, null],
+  ['st2', ['cell-lab-noor-1', 'cell-lab-noor-2'], 'student', 0, '17:41', false, false, 'Page 2 has my answers.'],
+  ['st3', ['cell-lab-sam-1'], 'student', 3, '02:15', true, false, 'I was away Thursday.'],
+  ['st4', ['cell-lab-liam-1'], 'student', 0, '18:05', false, false, null],
+  ['st5', ['cell-lab-mateo-1'], 'teacher', 1, '22:30', false, false, null],
+  ['st6', [], 'teacher', 1, '22:34', false, true, null],
+  ['st7', ['cell-lab-jas-1'], 'student', 0, '19:12', false, false, 'I labelled both drawings.'],
+  ['st8', ['cell-lab-fatima-1', 'cell-lab-fatima-2'], 'student', 2, '03:48', true, false, null],
+  ['st9', ['cell-lab-priya-1'], 'student', 0, '16:58', false, false, null],
+  ['st10', ['cell-lab-jordan-1'], 'student', 0, '20:26', false, false, null],
+];
+
+function _demoDayAfter(day, n) {
+  return new Date(Date.parse(day + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+}
+
+function seedDemoStudentWork() {
+  if (typeof saveDemoStudentWork !== 'function' || !COURSES.sci8) return false;
+  if (localStorage.getItem('gb-student-work-sci8') != null) return false;
+  var pieces = getAssessments('sci8') || [];
+  var lab = pieces.find(function (a) {
+    return a && a.id === 'sci8a1';
+  });
+  var kmt = pieces.find(function (a) {
+    return a && a.id === 'sci8a4';
+  });
+  if (!lab || !lab.date) return false;
+  var roster = {};
+  getStudents('sci8').forEach(function (s) {
+    roster[s.id] = true;
+  });
+  var labDay = String(lab.date).slice(0, 10);
+  var submissions = DEMO_WORK_SENT.filter(function (row) {
+    return roster[row[0]];
+  }).map(function (row) {
+    var sid = row[0];
+    var sentAt = _demoDayAfter(labDay, row[3]) + 'T' + row[4] + ':00.000Z';
+    var id = 'demo-sub-' + sid + '-sci8a1';
+    return {
+      id: id,
+      assessment_id: 'sci8a1',
+      enrollment_id: sid,
+      version: 1,
+      state: 'sent',
+      sent_by: row[2],
+      on_paper: row[6],
+      is_late: row[5],
+      note: row[7],
+      followed_plan: null,
+      created_at: new Date(Date.parse(sentAt) - 120000).toISOString(),
+      sent_at: sentAt,
+      files: row[1].map(function (name, i) {
+        var page = DEMO_WORK_PAGES[name];
+        return {
+          id: id + '-p' + (i + 1),
+          page: i + 1,
+          path: name + '.jpg',
+          thumb_path: name + '-thumb.jpg',
+          bytes: page[0],
+          thumb_bytes: page[2],
+          width: 900,
+          height: 1200,
+          rotation: 0,
+          sha256: page[1],
+        };
+      }),
+    };
+  });
+  var assessments = [{ id: 'sci8a1', students_send: 'photos', after_due: 'keep', accept_until: null }];
+  if (kmt && kmt.date) {
+    assessments.push({
+      id: 'sci8a4',
+      students_send: 'photos_files',
+      after_due: 'until',
+      accept_until: _demoDayAfter(String(kmt.date).slice(0, 10), 7),
+    });
+  }
+  return saveDemoStudentWork('sci8', {
+    course: { send_work: false, keep_photos_until: 'end_of_year' },
+    assessments: assessments,
+    submissions: submissions,
+  });
+}
+
+/* ── Sample Mark Up (S9) ───────────────────────────────────────────
+   The teacher's marks on two pages of Cell Microscope Lab, given to the
+   students as a class that does not hold grades gives them (shared/data.js,
+   "Mark Up"). Places are fractions of the page from its top left. Jordan's
+   page has three notes, a tick and a pen line; Noor's second page has a
+   note and a cross. Seeded once per class, after the sample work: a class
+   seeded before this existed gets it the next time Demo Mode opens. */
+var DEMO_MARKUP = {
+  'demo-sub-st10-sci8a1-p1': {
+    v: 1,
+    marks: [
+      { id: 'm1', type: 'note', x: 0.72, y: 0.18, text: 'Which cell is this? Label it onion or cheek.' },
+      { id: 'm2', type: 'tick', x: 0.12, y: 0.42, color: 'green' },
+      { id: 'm3', type: 'note', x: 0.7, y: 0.46, text: 'Good: you noted the cell wall.' },
+      {
+        id: 'm4',
+        type: 'pen',
+        color: 'red',
+        width: 0.004,
+        points: [
+          [0.2, 0.71],
+          [0.34, 0.7],
+          [0.48, 0.72],
+        ],
+      },
+      { id: 'm5', type: 'note', x: 0.7, y: 0.74, text: 'Add the magnification you used.' },
+    ],
+  },
+  'demo-sub-st2-sci8a1-p2': {
+    v: 1,
+    marks: [
+      { id: 'm1', type: 'cross', x: 0.15, y: 0.36, color: 'red' },
+      { id: 'm2', type: 'note', x: 0.68, y: 0.36, text: 'Check this: cheek cells have no cell wall.' },
+    ],
+  },
+};
+
+function seedDemoMarkup() {
+  if (typeof saveDemoMarkup !== 'function' || !COURSES.sci8) return false;
+  var stored = null;
+  try {
+    stored = JSON.parse(localStorage.getItem('gb-student-feedback-sci8') || 'null');
+  } catch (e) {
+    stored = null;
+  }
+  if (stored && stored.markup && Object.keys(stored.markup).length) return false;
+  // Only the pages the sample still has (a student can be gone from the roster).
+  var pages = {};
+  Object.keys(DEMO_MARKUP).forEach(function (id) {
+    if (typeof getPageMarkup === 'function' && getPageMarkup('sci8', id)) pages[id] = DEMO_MARKUP[id];
+  });
+  return Object.keys(pages).length ? saveDemoMarkup('sci8', pages) : false;
+}
+
+/* ── Sample reflections (S10) ──────────────────────────────────────
+   Three students' reflections on Cell Microscope Lab, shown only once the
+   teacher turns on the student page and Reflect on Feedback (shared/
+   data.js, "Reflect on Feedback"): Jordan is not sure and his question
+   waits for an answer; Noor asked, was answered and says it makes sense
+   now; Liam says it makes sense and has a plan. Seeded once per class. */
+// [student, days after the lab's date, makes_sense, question, plan, went_well, answer]
+var DEMO_REFLECTIONS = [
+  ['st10', 3, 'not_sure', 'How do I know which cell is which? They look the same to me.', null, null, null],
+  [
+    'st2',
+    2,
+    'not_sure',
+    'Why is the cheek cell wrong? I saw a line around it.',
+    null,
+    null,
+    'That line is the cell membrane. Only plant cells, like the onion, have a cell wall as well.',
+  ],
+  [
+    'st4',
+    2,
+    'yes',
+    null,
+    "Next time I'll write the magnification beside each drawing.",
+    'I labelled the nucleus in both cells.',
+    null,
+  ],
+];
+
+function seedDemoReflections() {
+  if (typeof saveDemoReflections !== 'function' || !COURSES.sci8) return false;
+  var stored = null;
+  try {
+    stored = JSON.parse(localStorage.getItem('gb-student-feedback-sci8') || 'null');
+  } catch (e) {
+    stored = null;
+  }
+  if (stored && stored.reflections && Object.keys(stored.reflections).length) return false;
+  var lab = (getAssessments('sci8') || []).find(function (a) {
+    return a && a.id === 'sci8a1';
+  });
+  if (!lab || !lab.date) return false;
+  var roster = {};
+  getStudents('sci8').forEach(function (s) {
+    roster[s.id] = true;
+  });
+  var day = String(lab.date).slice(0, 10);
+  var list = DEMO_REFLECTIONS.filter(function (row) {
+    return roster[row[0]];
+  }).map(function (row) {
+    var sent = _demoDayAfter(day, row[1]) + 'T19:30:00.000Z';
+    var answered = row[6] ? _demoDayAfter(day, row[1] + 1) + 'T15:10:00.000Z' : null;
+    return {
+      assessment_id: 'sci8a1',
+      enrollment_id: row[0],
+      sent_at: sent,
+      makes_sense: row[2],
+      question: row[3],
+      plan: row[4],
+      went_well: row[5],
+      answer: row[6],
+      answered_at: answered,
+      sense_now: row[6] ? 'yes' : null,
+      sense_now_at: row[6] ? _demoDayAfter(day, row[1] + 1) + 'T20:05:00.000Z' : null,
+    };
+  });
+  return list.length ? saveDemoReflections('sci8', list) : false;
+}
+
+/* ── Sample revision (S11) ─────────────────────────────────────────
+   One piece returned for revision: Jas's Cell Microscope Lab, with What to
+   Fix and a Revise By date, the grade kept (shared/data.js, "Revisions").
+   Nothing is returned, hidden or sent, so no grade changes. Shown only once
+   the teacher turns on the student page and Send Work. Seeded once per
+   class. */
+function seedDemoRevisions() {
+  if (typeof saveDemoRevisions !== 'function' || !COURSES.sci8) return false;
+  var stored = null;
+  try {
+    stored = JSON.parse(localStorage.getItem('gb-student-feedback-sci8') || 'null');
+  } catch (e) {
+    stored = null;
+  }
+  if (stored && stored.revisions && Object.keys(stored.revisions).length) return false;
+  var lab = (getAssessments('sci8') || []).find(function (a) {
+    return a && a.id === 'sci8a1';
+  });
+  var jas = getStudents('sci8').some(function (s) {
+    return s.id === 'st7';
+  });
+  if (!lab || !lab.date || !jas) return false;
+  var day = String(lab.date).slice(0, 10);
+  return saveDemoRevisions('sci8', [
+    {
+      assessment_id: 'sci8a1',
+      enrollment_id: 'st7',
+      what_to_fix: 'Write the magnification beside each drawing, then send it again.',
+      // A week from today, so the sample is never overdue (the lab itself is months back).
+      revise_by: _demoDayAfter(getTodayStr(), 7),
+      criterion_ids: [],
+      created_at: _demoDayAfter(day, 2) + 'T21:15:00.000Z',
+    },
+  ]);
 }

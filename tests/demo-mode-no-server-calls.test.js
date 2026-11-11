@@ -187,7 +187,7 @@ describe('Demo Mode sends nothing from the student page', () => {
       page.type('#sp-ident', hash === '#demo-card-password' ? page.T.DEMO.password : page.T.DEMO.number);
       await page.click('[data-act="card-yes"]');
       expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
-      expect(page.root().querySelectorAll('.sp-row').length).toBeGreaterThan(0);
+      expect(page.root().querySelectorAll('.sp-row, .sp-piece').length).toBeGreaterThan(0);
       expect(page.calls).toEqual([]);
       // The only files fetched late are the site's own calc.js and constants.js.
       expect(page.fetched).toEqual(['../shared/constants.js', '../shared/calc.js']);
@@ -368,7 +368,8 @@ describe('Demo Mode sends nothing for Draft and Returned', () => {
   );
 
   it('the rule and the grader name no server function', () => {
-    ['shared/grade-state.js', 'shared/grader.js'].forEach(file => {
+    // Mark Up (S9-F1) too: it saves through data.js's saveMarkup only.
+    ['shared/grade-state.js', 'shared/grader.js', 'shared/markup-draw.js', 'teacher/markup.js'].forEach(file => {
       const src = readFileSync(new URL('../' + file, import.meta.url), 'utf-8');
       expect(src, file).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|sendBeacon|_writeRpc|\.rpc\(|getSupabase/);
     });

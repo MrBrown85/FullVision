@@ -132,3 +132,22 @@ test('from the gradebook, → follows the rows on screen', async ({ page }) => {
   await expect(dialog.locator('.grader-student')).toHaveText('Group 1');
   await expect(dialog.locator('[data-grader="next"]')).toBeDisabled();
 });
+
+// The footer's grade is the group's, and a member graded separately keeps
+// her own beside her name, after the group's grade changes.
+test("a member graded separately keeps her own grade; the footer shows the group's", async ({ page }) => {
+  const info = await setUp(page);
+  await openCell(page, info, info.ids[0]);
+  const dialog = page.locator('#grader-overlay .grader-dialog');
+  const foot = dialog.locator('.grader-foot .grader-grade');
+  await dialog.locator('.grdt-tile[data-action="graderLevel"][data-level="3"]').first().click();
+  const noor = dialog.locator('.grader-member').nth(1);
+  await noor.locator('.grader-member-more').click();
+  await noor.getByRole('menuitem', { name: 'Grade Separately' }).click();
+  const hers = await noor.locator('.grader-member-separate .grader-grade').textContent();
+  await expect(foot).toHaveText(hers);
+  await dialog.locator('.grdt-tile[data-action="graderLevel"][data-level="1"]').first().click();
+  await expect(noor.locator('.grader-member-separate .grader-grade')).toHaveText(hers);
+  await expect(foot).not.toHaveText(hers);
+  await expect(foot).toHaveText(/^Emerging/);
+});

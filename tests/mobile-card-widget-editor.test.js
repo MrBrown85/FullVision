@@ -46,8 +46,8 @@ describe('Card Widget Editor', () => {
     var config = getCardWidgetConfig();
     expect(config.order[0]).toBe('hero');
     expect(config.order[1]).toBe('obsSnippet');
-    expect(config.order[2]).toBe('sectionBars');
-    expect(config.order[3]).toBe('completion');
+    expect(config.order[2]).toBe('toGrade');
+    expect(config.order[3]).toBe('sectionBars');
   });
 
   it('resetToDefaults clears saved config', () => {
@@ -56,6 +56,7 @@ describe('Card Widget Editor', () => {
     var config = getCardWidgetConfig();
     expect(config.order).toEqual([
       'hero',
+      'toGrade',
       'sectionBars',
       'completion',
       'growth',
@@ -63,5 +64,13 @@ describe('Card Widget Editor', () => {
       'dispositions',
       'actions',
     ]);
+  });
+
+  it('To Grade is listed and turns on and off but has no drag handle', () => {
+    var html = MCardWidgetEditor.buildEditorHTML();
+    expect(html).toMatch(/data-widget="toGrade" data-enabled="true"><div class="m-wdg-editor-drag-spacer">/);
+    MCardWidgetEditor.toggleWidget('toGrade');
+    expect(getCardWidgetConfig().disabled).toContain('toGrade');
+    expect(getCardWidgetConfig().order).not.toContain('toGrade');
   });
 });

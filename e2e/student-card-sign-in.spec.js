@@ -13,6 +13,7 @@ import {
   shot,
   contrast,
   signIn,
+  showAll,
 } from './student-card-fake.js';
 
 /* The rest of the student's sign-in screens (S3-F3), against the built site
@@ -56,7 +57,7 @@ for (const size of [
       const token = JSON.parse((await stored(page)).local[KEY]).t;
 
       // The class's name opens Your Classes.
-      await page.getByRole('button', { name: 'Science 8 · Block B' }).click();
+      await page.getByRole('button', { name: 'Science 8 Block B' }).click();
       const sheet = page.getByRole('dialog', { name: 'Your Classes' });
       await expect(sheet).toBeVisible();
       await expect(page.getByRole('heading', { name: 'Your Classes' })).toBeFocused();
@@ -68,10 +69,10 @@ for (const size of [
       // Escape closes it and gives the focus back to the class's name.
       await page.keyboard.press('Escape');
       await expect(sheet).toHaveCount(0);
-      await expect(page.getByRole('button', { name: 'Science 8 · Block B' })).toBeFocused();
+      await expect(page.getByRole('button', { name: 'Science 8 Block B' })).toBeFocused();
 
       // Add Another Card.
-      await page.getByRole('button', { name: 'Science 8 · Block B' }).click();
+      await page.getByRole('button', { name: 'Science 8 Block B' }).click();
       await sheet.getByRole('button', { name: 'Add Another Card' }).click();
       await expect(page.getByRole('heading', { name: 'Add Another Card' })).toBeVisible();
       await expect(page.getByText('Type the code on the card for your other class.')).toBeVisible();
@@ -87,7 +88,8 @@ for (const size of [
       await page.getByLabel('Student Number').fill('0123456');
       await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
       await expect(page.getByRole('heading', { name: 'Assignments' })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Humanities 8 · Block A' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Humanities 8 Block A' })).toBeVisible();
+      await showAll(page);
       await expect(page.locator('.sp-row-title')).toHaveText(['Medieval Europe Map']);
       expect(routes(posts)).toEqual(['card', 'add-card', 'page']);
       // One session: the token is the same; the class it opens is the new one.
@@ -96,7 +98,7 @@ for (const size of [
       expect(kept.e).toBe(HUM);
 
       // Both classes listed; back to the first.
-      await page.getByRole('button', { name: 'Humanities 8 · Block A' }).click();
+      await page.getByRole('button', { name: 'Humanities 8 Block A' }).click();
       await expect(sheet.locator('.sp-class-name')).toHaveText(['Science 8', 'Humanities 8']);
       await expect(sheet.locator('.sp-class[aria-current="true"] .sp-class-name')).toHaveText('Humanities 8');
       await fits(page);
@@ -104,8 +106,8 @@ for (const size of [
       await contrast(page);
       await shot(page, size.tag + '-s3f3-two-classes');
       await sheet.locator('.sp-class', { hasText: 'Science 8' }).click();
-      await expect(page.getByRole('button', { name: 'Science 8 · Block B' })).toBeVisible();
-      await expect(page.locator('.sp-row-title').first()).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Science 8 Block B' })).toBeVisible();
+      await expect(page.locator('.sp-piece.sp-picked .sp-piece-title')).toBeVisible();
       expect(JSON.parse((await stored(page)).local[KEY]).e).toBe(CECE);
       expect(errors).toEqual([]);
     });
@@ -115,7 +117,7 @@ for (const size of [
       fn.state.cards.K7M4QX2P.locked = true;
       await serve(page, fn);
       await signIn(page);
-      await page.getByRole('button', { name: 'Science 8 · Block B' }).click();
+      await page.getByRole('button', { name: 'Science 8 Block B' }).click();
       await page.getByRole('button', { name: 'Add Another Card' }).click();
       await page.getByLabel('Card Code').fill('K7M4-QX2P');
       await page.getByRole('button', { name: 'Continue' }).click();
