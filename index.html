@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="FullVision is a gradebook and report writer for BC teachers: score on the Provincial Proficiency Scale, record observations, hear from students, and write Learning Updates from the evidence."
+      content="FullVision is a gradebook and report writer for BC teachers: grade on the Provincial Proficiency Scale, write report comments from the evidence, and hear from students without student accounts."
     />
     <title>FullVision — Gradebook and Report Cards for BC Teachers</title>
     <meta name="theme-color" content="#0071e3" />
@@ -18,7 +18,7 @@
     <meta property="og:title" content="FullVision — Gradebook and Report Cards for BC Teachers" />
     <meta
       property="og:description"
-      content="Score on the Provincial Proficiency Scale, record observations, hear from students, and write Learning Updates from the evidence."
+      content="Grade on the Provincial Proficiency Scale, write report comments from the evidence, and hear from students without student accounts."
     />
     <meta property="og:image" content="https://fullvision.ca/assets/splash/og.png" />
     <meta property="og:image:width" content="1200" />
@@ -26,39 +26,78 @@
     <meta name="twitter:card" content="summary_large_image" />
     <script src="shared/sentry-init.js"></script>
     <style>
+      :root {
+        --ink: #1d1d1f;
+        --ink-2: #48484d;
+        --ink-3: #6e6e73;
+        --blue: #0071e3;
+        --blue-ink: #0058b0;
+        --paper: #ffffff;
+        --mist: #f5f5f7;
+        --line: #e5e5ea;
+        --night: #0f1420;
+      }
       body {
         margin: 0;
-        background: #f5f5f7;
+        background: var(--mist);
         color-scheme: light;
       }
       a {
-        color: #0071e3;
+        color: var(--blue);
       }
       a:hover {
-        color: #0058b0;
+        color: var(--blue-ink);
       }
       .fv {
         font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
-        color: #1d1d1f;
+        color: var(--ink);
         -webkit-font-smoothing: antialiased;
       }
       .wrap {
-        max-width: 1240px;
+        max-width: 1200px;
         margin: 0 auto;
         padding: 0 32px;
       }
+      header.top {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        background: rgba(255, 255, 255, 0.86);
+        backdrop-filter: saturate(180%) blur(16px);
+        -webkit-backdrop-filter: saturate(180%) blur(16px);
+        border-bottom: 1px solid var(--line);
+      }
+      .bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        height: 68px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        text-decoration: none;
+        color: var(--ink);
+      }
+      .brand span {
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
       .navlinks {
         display: flex;
-        gap: 24px;
+        gap: 22px;
       }
       .navlink {
-        color: #1d1d1f;
+        color: var(--ink);
         text-decoration: none;
         font-size: 15px;
-        padding: 12px 4px;
+        padding: 12px 2px;
       }
       .navlink:hover {
-        color: #0071e3;
+        color: var(--blue);
       }
       .btn {
         display: inline-flex;
@@ -72,7 +111,14 @@
         text-decoration: none;
         box-sizing: border-box;
       }
+      .btn-sm {
+        min-height: 40px;
+        padding: 0 16px;
+        font-size: 15px;
+        border-radius: 10px;
+      }
       .btn-solid {
+        background: var(--blue);
         color: #ffffff;
       }
       .btn-solid:hover {
@@ -81,120 +127,94 @@
       }
       .btn-plain {
         background: #ffffff;
-        color: #1d1d1f;
+        color: var(--ink);
         box-shadow: inset 0 0 0 1px #d1d1d6;
       }
       .btn-plain:hover {
-        color: #1d1d1f;
+        color: var(--ink);
         background: #fafafa;
+      }
+      .eyebrow {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--blue-ink);
+      }
+      .h1 {
+        margin: 0;
+        font-size: 60px;
+        line-height: 1.04;
+        letter-spacing: -0.04em;
+        font-weight: 700;
+      }
+      .h2 {
+        margin: 0;
+        font-size: 38px;
+        line-height: 1.1;
+        letter-spacing: -0.03em;
+        font-weight: 700;
+      }
+      .lede {
+        margin: 0;
+        font-size: 19px;
+        line-height: 1.55;
+        color: var(--ink-2);
+      }
+      .stack {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+      .band {
+        padding: 104px 0;
+      }
+      .band-white {
+        background: var(--paper);
       }
       .shot {
         display: block;
         width: 100%;
         height: auto;
         border-radius: 14px;
+        background: #ffffff;
         box-shadow:
           0 24px 60px rgba(29, 29, 31, 0.12),
           0 0 0 1px rgba(29, 29, 31, 0.08);
-        background: #ffffff;
       }
       .phone {
         display: block;
         width: 100%;
         height: auto;
-        border-radius: 36px;
+        border-radius: 34px;
+        background: #ffffff;
         box-shadow:
-          0 24px 60px rgba(29, 29, 31, 0.16),
+          0 28px 64px rgba(29, 29, 31, 0.22),
           0 0 0 8px #1d1d1f;
       }
-      .hero-a {
+      /* Hero */
+      .hero {
+        background: var(--paper);
+        padding: 80px 0 96px;
+        overflow: hidden;
+      }
+      .hero-grid {
         display: grid;
         grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-        gap: 48px;
+        gap: 56px;
         align-items: center;
       }
       .collage {
         position: relative;
-        height: 580px;
+        padding: 0 0 56px;
       }
-      .collage-back {
-        position: absolute;
-        top: 40px;
-        left: 0;
-        width: 72%;
-        height: auto;
-        border-radius: 14px;
-        box-shadow:
-          0 24px 60px rgba(29, 29, 31, 0.14),
-          0 0 0 1px rgba(29, 29, 31, 0.08);
+      .collage .shot {
+        width: 88%;
       }
-      .collage-front {
+      .collage .phone-wrap {
         position: absolute;
-        right: 8px;
+        right: 0;
         bottom: 0;
-        width: 31%;
-        height: auto;
-        border-radius: 30px;
-        box-shadow:
-          0 30px 70px rgba(29, 29, 31, 0.25),
-          0 0 0 7px #1d1d1f;
-      }
-      .phones {
-        display: grid;
-        grid-template-columns: minmax(0, 8fr) minmax(0, 3fr);
-        gap: 56px;
-        align-items: center;
-      }
-      @media (max-width: 980px) {
-        .phones,
-        .hero-a {
-          grid-template-columns: minmax(0, 1fr);
-          gap: 32px;
-        }
-        .collage {
-          height: auto;
-          padding-bottom: 200px;
-        }
-        .collage-back {
-          position: static;
-          width: 100%;
-        }
-        .collage-front {
-          width: 38%;
-          top: auto;
-          bottom: 0;
-          border-radius: 22px;
-          box-shadow:
-            0 20px 50px rgba(29, 29, 31, 0.25),
-            0 0 0 5px #1d1d1f;
-        }
-        .phones .phone-wrap,
-        .phone-solo {
-          max-width: 260px;
-        }
-        .navlinks {
-          display: none;
-        }
-      }
-      @media (max-width: 620px) {
-        .wrap {
-          padding: 0 16px;
-        }
-        .h1 {
-          font-size: 40px !important;
-        }
-        .h2 {
-          font-size: 30px !important;
-        }
-        .navcta-demo {
-          display: none;
-        }
-        .phone {
-          border-radius: 28px;
-          box-shadow:
-            0 16px 40px rgba(29, 29, 31, 0.16),
-            0 0 0 6px #1d1d1f;
-        }
+        width: 27%;
       }
       .minis {
         display: flex;
@@ -202,33 +222,234 @@
         gap: 8px 22px;
         list-style: none;
         margin: 0;
-        padding: 8px 0 0;
+        padding: 4px 0 0;
       }
-      .minis li {
+      .minis li,
+      .ticks li {
         position: relative;
-        padding-left: 20px;
-        font-size: 14px;
-        line-height: 20px;
-        color: #48484d;
+        padding-left: 22px;
+        font-size: 15px;
+        line-height: 1.45;
+        color: var(--ink-2);
       }
-      .minis li::before {
+      .minis li::before,
+      .ticks li::before {
         content: '';
         position: absolute;
         left: 1px;
         top: 5px;
         width: 10px;
         height: 5px;
-        border-left: 2px solid #0071e3;
-        border-bottom: 2px solid #0071e3;
+        border-left: 2px solid var(--blue);
+        border-bottom: 2px solid var(--blue);
         transform: rotate(-45deg);
       }
-      .lede {
+      .ticks {
+        list-style: none;
+        margin: 0;
+        padding: 4px 0 0;
         display: flex;
         flex-direction: column;
+        gap: 10px;
+      }
+      .ticks li {
+        font-size: 16px;
+        padding-left: 26px;
+      }
+      /* Facts */
+      .facts {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .fact {
+        background: var(--paper);
+        border-radius: 16px;
+        padding: 22px 22px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .fact b {
+        font-size: 28px;
+        letter-spacing: -0.02em;
+      }
+      .fact span {
+        font-size: 15px;
+        line-height: 1.45;
+        color: var(--ink-2);
+      }
+      /* Feature rows */
+      .feat {
+        display: grid;
+        grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+        gap: 64px;
         align-items: center;
+      }
+      .feat.flip {
+        grid-template-columns: minmax(0, 7fr) minmax(0, 4fr);
+      }
+      .feat.flip .feat-text {
+        order: 2;
+      }
+      .feat.narrow {
+        grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+      }
+      .feat.phone-row {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      }
+      .phone-row .feat-text {
+        max-width: 480px;
+        justify-self: end;
+      }
+      .phone-row .phone-col {
+        justify-self: start;
+      }
+      .phone-col {
+        max-width: 300px;
+        justify-self: center;
+        width: 100%;
+      }
+      /* Student work */
+      .pilot {
+        align-self: flex-start;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: #fff4e0;
+        color: #8a5300;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .work {
+        display: grid;
+        grid-template-columns: minmax(0, 8fr) minmax(0, 3fr);
+        gap: 48px;
+        align-items: center;
+      }
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 32px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        counter-reset: step;
+      }
+      .steps li {
+        counter-increment: step;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 16px;
+        line-height: 1.5;
+        color: var(--ink-2);
+      }
+      .steps li::before {
+        content: counter(step);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: var(--blue);
+        color: #ffffff;
+        font-weight: 700;
+        font-size: 15px;
+        margin-bottom: 6px;
+      }
+      .steps b {
+        color: var(--ink);
+        font-size: 17px;
+      }
+      /* Report sheet */
+      .sheet-wrap {
+        background: linear-gradient(160deg, #e9edf5, #f6f7fa);
+        border-radius: 20px;
+        padding: 40px 48px 0;
+        overflow: hidden;
+        max-height: 520px;
+      }
+      .sheet-wrap img {
+        display: block;
+        width: 100%;
+        border-radius: 8px 8px 0 0;
+        box-shadow: 0 18px 50px rgba(29, 29, 31, 0.14);
+      }
+      /* For schools */
+      .schools {
+        background: var(--night);
+        color: #ffffff;
+        padding: 104px 0;
+      }
+      .schools .eyebrow {
+        color: #7cb8ff;
+      }
+      .schools .lede {
+        color: #b8bfcc;
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 14px;
-        max-width: 720px;
-        text-align: center;
+      }
+      .card {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .card h3 {
+        margin: 0;
+        font-size: 18px;
+      }
+      .card p {
+        margin: 0;
+        font-size: 15px;
+        line-height: 1.55;
+        color: #b8bfcc;
+      }
+      /* Questions */
+      .faq {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px 40px;
+      }
+      .faq details {
+        border-bottom: 1px solid var(--line);
+        padding: 18px 0;
+      }
+      .faq summary {
+        cursor: pointer;
+        font-size: 18px;
+        font-weight: 600;
+        list-style: none;
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+      }
+      .faq summary::-webkit-details-marker {
+        display: none;
+      }
+      .faq summary::after {
+        content: '+';
+        color: var(--ink-3);
+        font-weight: 400;
+      }
+      .faq details[open] summary::after {
+        content: '−';
+      }
+      .faq p {
+        margin: 12px 0 0;
+        font-size: 16px;
+        line-height: 1.55;
+        color: var(--ink-2);
       }
       .skip {
         position: absolute;
@@ -236,25 +457,92 @@
         top: -48px;
         padding: 10px 14px;
         background: #ffffff;
-        color: #1d1d1f;
+        color: var(--ink);
         border-radius: 10px;
-        box-shadow: 0 0 0 2px #0071e3;
+        box-shadow: 0 0 0 2px var(--blue);
         z-index: 10;
       }
       .skip:focus {
         top: 12px;
       }
+      @media (max-width: 1020px) {
+        .hero-grid,
+        .feat,
+        .feat.flip,
+        .feat.narrow,
+        .feat.phone-row,
+        .work {
+          grid-template-columns: minmax(0, 1fr);
+          gap: 40px;
+        }
+        .feat.flip .feat-text {
+          order: 0;
+        }
+        .phone-row .feat-text {
+          justify-self: start;
+        }
+        .facts,
+        .cards {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .navlinks {
+          display: none;
+        }
+        .work .phone-col {
+          max-width: 260px;
+        }
+      }
+      @media (max-width: 680px) {
+        .wrap {
+          padding: 0 16px;
+        }
+        .band,
+        .schools {
+          padding: 72px 0;
+        }
+        .hero {
+          padding: 48px 0 64px;
+        }
+        .h1 {
+          font-size: 40px;
+        }
+        .h2 {
+          font-size: 30px;
+        }
+        .lede {
+          font-size: 17px;
+        }
+        .facts,
+        .cards,
+        .steps,
+        .faq {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .navcta-demo {
+          display: none;
+        }
+        .collage .phone-wrap {
+          width: 34%;
+        }
+        .phone {
+          border-radius: 26px;
+          box-shadow:
+            0 16px 40px rgba(29, 29, 31, 0.2),
+            0 0 0 5px #1d1d1f;
+        }
+        .sheet-wrap {
+          padding: 24px 20px 0;
+          max-height: 360px;
+        }
+      }
     </style>
   </head>
   <body>
     <a class="skip" href="#top">Skip to Content</a>
-    <div class="fv" style="background: #f5f5f7; min-height: 100vh">
-      <header style="background: #ffffff; border-bottom: 1px solid #e5e5ea">
-        <div
-          class="wrap"
-          style="display: flex; align-items: center; justify-content: space-between; gap: 24px; height: 72px"
-        >
-          <a href="#top" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: #1d1d1f">
+    <div class="fv">
+      <header class="top">
+        <div class="wrap bar">
+          <a href="#top" class="brand">
             <svg width="32" height="32" viewBox="0 0 64 64" aria-hidden="true">
               <rect x="0" y="0" width="64" height="64" rx="15" fill="#0071e3"></rect>
               <rect x="13" y="38" width="8" height="10" rx="2" fill="#ffffff" opacity="0.55"></rect>
@@ -262,54 +550,34 @@
               <rect x="33" y="24" width="8" height="24" rx="2" fill="#ffffff" opacity="0.85"></rect>
               <rect x="43" y="17" width="8" height="31" rx="2" fill="#ffffff" opacity="1"></rect>
             </svg>
-            <span style="font-size: 20px; font-weight: 700; letter-spacing: -0.02em">FullVision</span>
+            <span>FullVision</span>
           </a>
           <nav class="navlinks" aria-label="Main">
-            <a class="navlink" href="#gradebook">Gradebook</a>
-            <a class="navlink" href="#curriculum">Curriculum</a>
+            <a class="navlink" href="#grading">Grading</a>
+            <a class="navlink" href="#student-work">Student Work</a>
             <a class="navlink" href="#reports">Reports</a>
-            <a class="navlink" href="#student-voice">Student Voice</a>
-            <a class="navlink" href="#privacy">Privacy</a>
+            <a class="navlink" href="#schools">For Schools</a>
+            <a class="navlink" href="#questions">Questions</a>
           </nav>
           <div style="display: flex; gap: 10px; align-items: center">
-            <a
-              class="btn btn-plain navcta-plain"
-              href="/login.html"
-              data-link="signin"
-              style="min-height: 44px; padding: 0 18px; font-size: 15px"
-              >Sign In</a
-            >
-            <a
-              class="btn btn-solid navcta-demo"
-              href="/login.html?demo=1"
-              data-link="demo"
-              style="min-height: 44px; padding: 0 18px; font-size: 15px; background: #0071e3"
-              >Try Demo Mode</a
-            >
+            <a class="btn btn-plain btn-sm" href="/login.html" data-link="signin">Sign In</a>
+            <a class="btn btn-solid btn-sm navcta-demo" href="/login.html?demo=1" data-link="demo">Try Demo Mode</a>
           </div>
         </div>
       </header>
 
       <main id="top">
-        <section style="background: #ffffff; padding: 72px 0 88px; overflow: hidden">
-          <div class="wrap hero-a">
-            <div style="display: flex; flex-direction: column; gap: 24px">
-              <p style="margin: 0; font-size: 15px; font-weight: 600; color: #0058b0">
-                The Gradebook for Communicating Student Learning in BC
-              </p>
-              <h1
-                class="h1"
-                style="margin: 0; font-size: 64px; line-height: 1.03; letter-spacing: -0.04em; font-weight: 700"
-              >
-                Make Every Student's Growth Visible
-              </h1>
-              <p style="margin: 0; font-size: 20px; line-height: 1.5; color: #48484d">
-                A gradebook and report writer for BC teachers, built on the Provincial Proficiency Scale.
+        <section class="hero">
+          <div class="wrap hero-grid">
+            <div class="stack" style="gap: 24px">
+              <p class="eyebrow">The Gradebook for Communicating Student Learning in BC</p>
+              <h1 class="h1">Make Every Student's Growth Visible</h1>
+              <p class="lede">
+                Grade on the Provincial Proficiency Scale, write report comments from the evidence you've gathered, and
+                give every student a clear picture of where they are and what comes next.
               </p>
               <div style="display: flex; flex-wrap: wrap; gap: 12px; padding-top: 4px">
-                <a class="btn btn-solid" href="/login.html?demo=1" data-link="demo" style="background: #0071e3"
-                  >Try Demo Mode</a
-                >
+                <a class="btn btn-solid" href="/login.html?demo=1" data-link="demo">Try Demo Mode</a>
                 <a class="btn btn-plain" href="/login.html#signup">Create an Account</a>
               </div>
               <ul class="minis">
@@ -320,66 +588,195 @@
             </div>
             <div class="collage">
               <img
-                class="collage-back"
-                src="/assets/splash/growth.jpg"
-                alt="A competency rising from 3.0 to 3.3, with its next step and the work behind it."
+                class="shot"
+                src="/assets/splash/grader.jpg"
+                alt="Grading a student's handwritten lab beside the rubric. FullVision suggests Proficient from the boxes ticked."
               />
-              <img
-                class="collage-front"
-                src="/assets/splash/phone-report.jpg"
-                alt="A student's progress report on her phone."
-              />
+              <div class="phone-wrap">
+                <img
+                  class="phone"
+                  src="/assets/splash/student-learning.jpg"
+                  alt="A student's My Learning page: Proficient, with a next step and her strongest skill."
+                />
+              </div>
             </div>
           </div>
         </section>
 
-        <section id="gradebook" style="background: #ffffff; padding: 88px 0">
-          <div class="wrap" style="display: flex; flex-direction: column; align-items: center; gap: 40px">
-            <div class="lede">
-              <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
-                Every Mark in One Gradebook
-              </h2>
-              <p style="margin: 0; font-size: 19px; line-height: 1.5; color: #48484d">
-                Score on the proficiency scale with + and −, in points, or with a rubric. Grades build across the whole
-                year.
+        <section aria-label="At a Glance" style="padding: 56px 0">
+          <div class="wrap facts">
+            <div class="fact">
+              <b>226</b>
+              <span>BC courses, grades 8 to 12, with every competency in the Ministry's own words.</span>
+            </div>
+            <div class="fact">
+              <b>Canada</b>
+              <span>Where class lists, marks and comments are stored, under FOIPPA.</span>
+            </div>
+            <div class="fact">
+              <b>Offline</b>
+              <span>Grade and observe on your phone without Wi-Fi. It sends when you reconnect.</span>
+            </div>
+            <div class="fact">
+              <b>No AI</b>
+              <span>Every comment is built from sentences you wrote and can read.</span>
+            </div>
+          </div>
+        </section>
+
+        <section id="grading" class="band band-white">
+          <div class="wrap feat">
+            <div class="feat-text stack">
+              <p class="eyebrow">Grading</p>
+              <h2 class="h2">Score What You See, Criterion by Criterion</h2>
+              <p class="lede">
+                Tick what the student showed on the rubric and FullVision suggests the level. You choose the final one.
+              </p>
+              <ul class="ticks">
+                <li>The Proficiency Scale with + and −, points, or letter grades for 10 to 12</li>
+                <li>Pair and group work, graded together or one by one</li>
+                <li>A graded rubric printed for every student</li>
+              </ul>
+            </div>
+            <img
+              class="shot"
+              loading="lazy"
+              src="/assets/splash/rubric.jpg"
+              alt="Rubric criteria with the boxes a teacher ticked and Suggested: Proficient beside each."
+            />
+          </div>
+        </section>
+
+        <section class="band">
+          <div class="wrap feat flip">
+            <div class="feat-text stack">
+              <p class="eyebrow">Gradebook</p>
+              <h2 class="h2">The Whole Year in One Grid</h2>
+              <p class="lede">
+                Grades build across the year, so each Learning Update shows the year to date. Missing work counts no
+                level, so one zero never drags down what a student has shown.
               </p>
             </div>
             <img
               class="shot"
               loading="lazy"
               src="/assets/splash/gradebook.jpg"
-              alt="The gradebook for a Science 8 class."
+              alt="The gradebook: each student's overall level beside their scores, newest first."
             />
           </div>
         </section>
 
-        <section id="rubrics" style="background: #f5f5f7; padding: 88px 0">
-          <div class="wrap" style="display: flex; flex-direction: column; align-items: center; gap: 40px">
-            <div class="lede">
-              <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
-                Score Against Clear Criteria
-              </h2>
-              <p style="margin: 0; font-size: 19px; line-height: 1.5; color: #48484d">
-                Attach a rubric, score each criterion, and print a graded copy for every student.
+        <section id="student-work" class="band band-white">
+          <div class="wrap stack" style="gap: 48px">
+            <div class="stack" style="max-width: 760px">
+              <span class="pilot">Piloting in Classrooms, January 2027</span>
+              <h2 class="h2">Paper Work In, Feedback Back, No Student Accounts</h2>
+              <p class="lede">
+                Each student gets a printed card. It opens their own page: no email, no password, nothing to install.
               </p>
+            </div>
+            <ol class="steps">
+              <li><b>They Send It</b>Students photograph their page, or upload a PDF, from their own page.</li>
+              <li><b>You Mark It Up</b>Tick, circle and leave notes on the page, then score the rubric beside it.</li>
+              <li>
+                <b>They Act On It</b>Students read your marks, say whether the feedback made sense, and ask you a
+                question.
+              </li>
+            </ol>
+            <div class="work">
+              <img
+                class="shot"
+                loading="lazy"
+                src="/assets/splash/markup.jpg"
+                alt="Marking up a student's lab: green ticks, a circled angle and a note asking why light bends."
+              />
+              <div class="phone-col">
+                <img
+                  class="phone"
+                  loading="lazy"
+                  src="/assets/splash/student-feedback.jpg"
+                  alt="A returned piece on a student's phone: Proficient on each criterion, with what the levels mean."
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="band">
+          <div class="wrap feat narrow">
+            <img
+              class="shot"
+              loading="lazy"
+              src="/assets/splash/dashboard.jpg"
+              alt="The dashboard: a student's question, work to grade, missing work and the class's competencies."
+            />
+            <div class="feat-text stack">
+              <p class="eyebrow">Dashboard</p>
+              <h2 class="h2">Know Who Needs You Today</h2>
+              <p class="lede">
+                Questions from students, work waiting to be graded, and missing work, across every class you teach.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section id="comments" class="band band-white">
+          <div class="wrap feat flip">
+            <div class="feat-text stack">
+              <p class="eyebrow">Report Comments</p>
+              <h2 class="h2">Comments Written From the Evidence</h2>
+              <p class="lede">
+                The student's year, your observations and their own self-assessment sit beside the comment you are
+                writing.
+              </p>
+              <ul class="ticks">
+                <li>A Comment Bank in BC's four parts, filled in for each student</li>
+                <li>Generate puts your own sentences together into a draft</li>
+                <li>Approve and Next moves through the class</li>
+              </ul>
             </div>
             <img
               class="shot"
               loading="lazy"
-              src="/assets/splash/advanced-rubric.jpg"
-              alt="Scoring a lab on a rubric, criterion by criterion."
+              src="/assets/splash/questionnaire.jpg"
+              alt="The Term Questionnaire: work habits, the student's year at a glance, and the teacher comment."
             />
           </div>
         </section>
 
-        <section id="curriculum" style="background: #ffffff; padding: 88px 0">
-          <div class="wrap" style="display: flex; flex-direction: column; align-items: center; gap: 40px">
-            <div class="lede">
-              <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
-                The BC Curriculum, in the Ministry’s Words
-              </h2>
-              <p style="margin: 0; font-size: 19px; line-height: 1.5; color: #48484d">
-                Every competency and I Can statement for 226 courses, grades 8 to 12, ready when you set up a class.
+        <section id="reports" class="band">
+          <div class="wrap feat">
+            <div class="feat-text stack">
+              <p class="eyebrow">Reports</p>
+              <h2 class="h2">Report Cards That Fill In for You</h2>
+              <p class="lede">
+                Start from a Report Card, Interim Update or Conference Pack. Every block fills in from your gradebook
+                for the whole class.
+              </p>
+              <ul class="ticks">
+                <li>Each competency group, and its change since the last report</li>
+                <li>Black and white, on Letter or Legal</li>
+                <li>Send a copy to each student's phone</li>
+              </ul>
+            </div>
+            <div class="sheet-wrap">
+              <img
+                loading="lazy"
+                src="/assets/splash/custom-report.jpg"
+                alt="A printed report card: proficiency by competency group, change since Report 1, and the teacher comment."
+              />
+            </div>
+          </div>
+        </section>
+
+        <section id="curriculum" class="band band-white">
+          <div class="wrap feat flip">
+            <div class="feat-text stack">
+              <p class="eyebrow">BC Curriculum</p>
+              <h2 class="h2">The Curriculum in the Ministry's Own Words</h2>
+              <p class="lede">
+                Pick a course when you make a class. Its competencies arrive word for word, with an I Can statement for
+                each one, 5,029 in all.
               </p>
             </div>
             <img
@@ -391,124 +788,121 @@
           </div>
         </section>
 
-        <section id="comments" style="background: #f5f5f7; padding: 88px 0">
-          <div class="wrap" style="display: flex; flex-direction: column; align-items: center; gap: 40px">
-            <div class="lede">
-              <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
-                Comments Written From the Evidence
-              </h2>
-              <p style="margin: 0; font-size: 19px; line-height: 1.5; color: #48484d">
-                The student’s year, your observations and their own words sit beside the comment you are writing.
+        <section id="phone" class="band">
+          <div class="wrap feat phone-row">
+            <div class="feat-text stack">
+              <p class="eyebrow">On Your Phone</p>
+              <h2 class="h2">Write Down What You See, As It Happens</h2>
+              <p class="lede">
+                Record a Strength, Growth or Concern from the lab bench or the field trip. Each note lands on the
+                student's profile, ready for the next report.
               </p>
             </div>
-            <img
-              class="shot"
-              loading="lazy"
-              src="/assets/splash/questionnaire.jpg"
-              alt="The Term Questionnaire, with the student’s year and observations beside the comment."
-            />
-          </div>
-        </section>
-
-        <section id="reports" style="background: #ffffff; padding: 88px 0">
-          <div class="wrap" style="display: flex; flex-direction: column; align-items: center; gap: 40px">
-            <div class="lede">
-              <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
-                Report Cards That Fill In for You
-              </h2>
-              <p style="margin: 0; font-size: 19px; line-height: 1.5; color: #48484d">
-                Pick the blocks you want. Each one fills in from your gradebook for every student.
-              </p>
-            </div>
-            <img
-              class="shot"
-              loading="lazy"
-              src="/assets/splash/custom-report.jpg"
-              alt="Building a report card from blocks."
-            />
-          </div>
-        </section>
-
-        <section id="student-voice" style="background: #f5f5f7; padding: 88px 0">
-          <div class="wrap" style="display: flex; flex-direction: column; align-items: center; gap: 40px">
-            <div class="lede">
-              <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
-                Hear From Students
-              </h2>
-              <p style="margin: 0; font-size: 19px; line-height: 1.5; color: #48484d">
-                Students answer your questions from a printed QR slip. They don’t need accounts.
-              </p>
-            </div>
-            <div class="phones">
+            <div class="phone-col">
               <img
-                class="shot"
+                class="phone"
                 loading="lazy"
-                src="/assets/splash/learner-profile.jpg"
-                alt="A student’s Learner Profile in her own words."
+                src="/assets/splash/phone-app.jpg"
+                alt="Observations on a phone: notes tagged Strength, Growth and Note."
               />
-              <div class="phone-wrap" style="width: 100%; justify-self: center">
-                <img
-                  class="phone"
-                  loading="lazy"
-                  src="/assets/splash/student-phone.jpg"
-                  alt="The student page on a phone."
-                />
+            </div>
+          </div>
+        </section>
+
+        <section id="schools" class="schools">
+          <div class="wrap stack" style="gap: 48px">
+            <div class="stack" style="max-width: 720px">
+              <p class="eyebrow">For Schools and Districts</p>
+              <h2 class="h2">Built Around BC's Reporting Policy</h2>
+              <p class="lede">What a principal, a superintendent or a privacy officer will ask, answered up front.</p>
+            </div>
+            <div class="cards">
+              <div class="card">
+                <h3>The K–12 Reporting Policy</h3>
+                <p>
+                  The Proficiency Scale, descriptive feedback, Core Competency self-assessment and goals, and Learning
+                  Updates through the year.
+                </p>
+              </div>
+              <div class="card">
+                <h3>Student Records Stay in Canada</h3>
+                <p>Stored in Canada under FOIPPA and seen only by the teacher who owns the class.</p>
+              </div>
+              <div class="card">
+                <h3>No Student Accounts</h3>
+                <p>Students open their page with a printed card. No student email, password or sign-up.</p>
+              </div>
+              <div class="card">
+                <h3>No AI Writing About Students</h3>
+                <p>Nothing is sent to an AI service. Every comment is the teacher's own words.</p>
+              </div>
+              <div class="card">
+                <h3>Photos Deleted on Schedule</h3>
+                <p>
+                  In the January pilot, photos of student work are deleted on a date the teacher sets, with a reminder a
+                  week before.
+                </p>
+              </div>
+              <div class="card">
+                <h3>Every Learner Seen</h3>
+                <p>Designations on the roster, Missing that never counts as a zero, and next steps for each student.</p>
               </div>
             </div>
+            <a href="/privacy.html" style="color: #7cb8ff; font-size: 17px; font-weight: 600; text-decoration: none"
+              >Read the Privacy Policy</a
+            >
           </div>
         </section>
 
-        <section id="observations" style="background: #ffffff; padding: 88px 0">
-          <div class="wrap" style="display: flex; flex-direction: column; align-items: center; gap: 40px">
-            <div class="lede">
-              <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
-                Write Down What You See
-              </h2>
-              <p style="margin: 0; font-size: 19px; line-height: 1.5; color: #48484d">
-                Record a Strength, Growth, Concern or Note in seconds, tagged to a competency.
-              </p>
-            </div>
-            <img class="shot" loading="lazy" src="/assets/splash/observations.jpg" alt="The Observations page." />
-          </div>
-        </section>
-
-        <section id="phone" style="background: #f5f5f7; padding: 88px 0">
-          <div class="wrap" style="display: flex; flex-direction: column; align-items: center; gap: 40px">
-            <div class="lede">
-              <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
-                Your Class on Your Phone
-              </h2>
-              <p style="margin: 0; font-size: 19px; line-height: 1.5; color: #48484d">
-                Grade and record observations from your phone, even offline.
-              </p>
-            </div>
-            <div class="phone-solo" style="width: 100%; max-width: 300px">
-              <img class="phone" loading="lazy" src="/assets/splash/phone-app.jpg" alt="FullVision on a phone." />
-            </div>
-          </div>
-        </section>
-
-        <section id="privacy" style="background: #ffffff; padding: 88px 0">
-          <div class="wrap" style="display: flex; flex-direction: column; align-items: center">
-            <div class="lede">
-              <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
-                Student Records Stay in Canada
-              </h2>
-              <p style="margin: 0; font-size: 19px; line-height: 1.5; color: #48484d">
-                Class lists and marks are stored in Canada and seen only by you. Nothing is sent to an AI service.
-              </p>
-              <a href="/privacy.html" style="font-size: 17px; font-weight: 600; text-decoration: none"
-                >Read the Privacy Policy</a
-              >
+        <section id="questions" class="band band-white">
+          <div class="wrap stack" style="gap: 32px">
+            <h2 class="h2">Questions Teachers Ask</h2>
+            <div class="faq">
+              <details>
+                <summary>Can I try it before I sign up?</summary>
+                <p>
+                  Yes. Demo Mode opens a Science 8 class with 27 sample students. Nothing you change is saved, and no
+                  account is needed.
+                </p>
+              </details>
+              <details>
+                <summary>Does it work with MyEducation BC?</summary>
+                <p>
+                  Import the class list you export from MyEducation BC as it is. Students are matched by student number,
+                  so a student in two of your classes is one student.
+                </p>
+              </details>
+              <details>
+                <summary>Which grades and courses?</summary>
+                <p>
+                  Grades 8 to 12, in 226 BC courses. Grades 8 and 9 use the Proficiency Scale; 10 to 12 can show letter
+                  grades and percent, or both.
+                </p>
+              </details>
+              <details>
+                <summary>Can I take my data with me?</summary>
+                <p>Download a backup of any class at any time from Class Settings, and restore it later.</p>
+              </details>
+              <details>
+                <summary>Does it work on an iPad or a Chromebook?</summary>
+                <p>
+                  Yes, in the browser. On a phone it opens as an app you can add to your home screen, and it works
+                  offline.
+                </p>
+              </details>
+              <details>
+                <summary>Who makes FullVision?</summary>
+                <p>A classroom teacher in Surrey, BC, who built it for the reports BC teachers write every term.</p>
+              </details>
             </div>
           </div>
         </section>
 
-        <section id="demo" style="padding: 88px 0 96px">
+        <section id="demo" style="padding: 96px 0">
           <div class="wrap">
             <div
               style="
-                background: #1d1d1f;
+                background: linear-gradient(135deg, #0a4fa8, #0071e3 60%, #3a8dff);
                 border-radius: 24px;
                 padding: 64px 48px;
                 display: flex;
@@ -518,27 +912,27 @@
                 text-align: center;
               "
             >
-              <h2
-                class="h2"
-                style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em; color: #ffffff"
-              >
-                Try It With a Sample Class
-              </h2>
-              <p style="margin: 0; font-size: 18px; line-height: 1.5; color: #c7c7cc; max-width: 560px">
-                A Science 8 class with 27 sample students. Nothing you change is saved.
+              <h2 class="h2" style="color: #ffffff">Try It With a Sample Class</h2>
+              <p style="margin: 0; font-size: 18px; line-height: 1.5; color: #dbe9ff; max-width: 560px">
+                Grade, write comments and print a report card in a few minutes. Nothing you change is saved.
               </p>
               <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; padding-top: 8px">
-                <a class="btn btn-solid" href="/login.html?demo=1" data-link="demo" style="background: #0071e3"
+                <a class="btn btn-plain" href="/login.html?demo=1" data-link="demo" style="box-shadow: none"
                   >Try Demo Mode</a
                 >
-                <a class="btn btn-plain" href="/login.html#signup" style="box-shadow: none">Create an Account</a>
+                <a
+                  class="btn"
+                  href="/login.html#signup"
+                  style="color: #ffffff; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6)"
+                  >Create an Account</a
+                >
               </div>
             </div>
           </div>
         </section>
       </main>
 
-      <footer style="border-top: 1px solid #e5e5ea; background: #ffffff">
+      <footer style="border-top: 1px solid var(--line); background: var(--paper)">
         <div
           class="wrap"
           style="
@@ -553,11 +947,14 @@
         >
           <span style="font-size: 14px; color: #636366">© 2026 Colin Brown · Made in British Columbia</span>
           <nav aria-label="Footer" style="display: flex; gap: 24px; flex-wrap: wrap">
-            <a href="/privacy.html" style="font-size: 14px; text-decoration: none; color: #48484d">Privacy Policy</a>
-            <a href="mailto:colin.brown04@gmail.com" style="font-size: 14px; text-decoration: none; color: #48484d"
+            <a href="/privacy.html" style="font-size: 14px; text-decoration: none; color: var(--ink-2)"
+              >Privacy Policy</a
+            >
+            <a href="/help/" style="font-size: 14px; text-decoration: none; color: var(--ink-2)">Help</a>
+            <a href="mailto:colin.brown04@gmail.com" style="font-size: 14px; text-decoration: none; color: var(--ink-2)"
               >Contact</a
             >
-            <a href="/login.html" data-link="signin" style="font-size: 14px; text-decoration: none; color: #48484d"
+            <a href="/login.html" data-link="signin" style="font-size: 14px; text-decoration: none; color: var(--ink-2)"
               >Sign In</a
             >
           </nav>
