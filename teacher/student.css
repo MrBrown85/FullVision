@@ -5031,6 +5031,16 @@ button.stu-bd-row:focus-visible {
   }
 }
 
+/* The header's Missing count: attention orange (design rule 3). */
+.sh-stat-val.sh-stat-att {
+  color: #c2410c;
+}
+@media (prefers-color-scheme: dark) {
+  .sh-stat-val.sh-stat-att {
+    color: #ff9f45;
+  }
+}
+
 /* Learner Profile: how the student sees their learning (redesign R6). One
    1–4 scale: the teacher's level filled in its colour, the student's own
    rating as the outline variant (design rule 5). */
@@ -5111,16 +5121,6 @@ button.stu-bd-row:focus-visible {
   .lp-calib-name,
   .lp-calib-note {
     grid-column: 1 / -1;
-  }
-}
-
-/* The header's Missing count: attention orange (design rule 3). */
-.sh-stat-val.sh-stat-att {
-  color: #c2410c;
-}
-@media (prefers-color-scheme: dark) {
-  .sh-stat-val.sh-stat-att {
-    color: #ff9f45;
   }
 }
 

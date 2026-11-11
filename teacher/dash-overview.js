@@ -95,14 +95,7 @@ window.DashOverview = (function () {
     // The To Grade cell (S6-F5) takes a column of its own; Upcoming
     // Birthdays then shows only the next birthday (the board's cost note).
     var toGrade = toGradeGlanceHtml(cid, studentIds);
-    var html =
-      '<section class="dash-glance' +
-      (toGrade ? ' has-to-grade' : '') +
-      '" aria-label="Class at a Glance"' +
-      (toGrade
-        ? ' style="grid-template-columns:minmax(0,1.25fr) minmax(0,0.8fr) minmax(0,0.85fr) minmax(0,1.1fr)"'
-        : '') +
-      '>';
+    var html = '<section class="dash-glance' + (toGrade ? ' has-to-grade' : '') + '" aria-label="Class at a Glance">';
 
     html +=
       '<div class="dash-glance-cell dash-glance-avg">' +
@@ -367,17 +360,18 @@ window.DashOverview = (function () {
         esc(initials(row.st)) +
         '</span>' +
         '<div class="dash-questions-body">' +
-        '<div class="dash-questions-name">' +
+        '<div class="dash-questions-who">' +
+        '<span class="dash-questions-name">' +
         esc(name) +
-        '</div>' +
-        '<div class="dash-questions-meta">' +
+        '</span>' +
+        '<span class="dash-questions-meta">' +
         esc([row.a.title, course.name, day].filter(Boolean).join(' · ')) +
+        '</span>' +
         '</div>' +
         '<blockquote class="dash-questions-text">' +
         esc(row.text) +
         '</blockquote>' +
-        '</div>' +
-        '<button type="button" class="btn btn-ghost dash-questions-answer" data-action="dashAnswerQuestion" data-cid="' +
+        '<button type="button" class="btn btn-primary dash-questions-answer" data-action="dashAnswerQuestion" data-cid="' +
         esc(row.cid) +
         '" data-aid="' +
         esc(row.a.id) +
@@ -386,6 +380,7 @@ window.DashOverview = (function () {
         '" aria-label="' +
         esc('Answer ' + name + ' in the grader') +
         '">Answer in the Grader</button>' +
+        '</div>' +
         '</li>';
     });
     return html + '</ul></section>';
