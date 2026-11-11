@@ -753,7 +753,9 @@ window.PageStudent = (function () {
     var fb = LearnerProfile.feedbackOf(cid, studentId);
     if (fb && fb.list.length) {
       out.profile.stat = _plural(fb.list.length, 'Reflection', 'Reflections');
-      if (fb.waiting) out.profile.sub = _plural(fb.waiting, 'question to answer', 'questions to answer');
+      out.profile.sub = fb.waiting
+        ? _plural(fb.waiting, 'question to answer', 'questions to answer')
+        : 'Last reflection ' + LearnerProfile.day(fb.list[0].sent_at);
     }
     return out;
   }

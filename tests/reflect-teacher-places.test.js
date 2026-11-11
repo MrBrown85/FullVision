@@ -319,6 +319,9 @@ describe('the Learner Profile', () => {
       expect(text(card.querySelector('.rf-next'))).toBe('Not yet shown');
       expect(card.querySelector('.rf-answer')).toBeNull();
       expect(text($(doc, '#stu-tab-profile .stu-tab-stat'))).toBe('1 Reflection');
+      expect(text($(doc, '#stu-tab-profile .stu-tab-sub'))).toBe(
+        'Last reflection ' + LearnerProfile.day(getStudentLastPlan(CID, LIAM).sent_at),
+      );
     });
   });
 
