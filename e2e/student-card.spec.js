@@ -53,7 +53,7 @@ for (const size of SIZES) {
         page.getByRole('heading', { name: wide ? 'Type the code on your card' : 'Scan the code on your card' }),
       ).toBeVisible();
       await expect(page).toHaveTitle(/Student Page/);
-      await expect(page.getByLabel('Card Code')).toHaveValue('P3R-8WD');
+      await expect(page.getByLabel('Card Code')).toHaveValue('P3R8-WDK4');
       await fits();
       await press('Continue');
 
