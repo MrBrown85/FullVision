@@ -641,6 +641,13 @@ export function fakeStudentSubmit(opts = {}) {
           return found.error ? no(found.error) : clone(state.groupWork || { ok: true, assessments: [] });
         }
         if (world && REVISION_FNS[fn]) return clone(REVISION_FNS[fn](params));
+        // Batch E's `forms` (E2): what state.forms holds, else no questionnaire and no report for the card.
+        if (fn === 'forms') {
+          const found = inSession(params[0], params[1]);
+          return found.error
+            ? no(found.error)
+            : clone(state.forms || { ok: true, v: 1, questionnaires: [], reports: [] });
+        }
         // Batch C's `feedback`: what state.feedback holds, else a class with no marks and Reflect on Feedback off.
         if (fn === 'feedback') {
           return clone(

@@ -104,8 +104,7 @@ describe('a real card: the code, Is This You?, the Assignments list', () => {
     expect(token).toMatch(/^[0-9a-f]{64}$/);
     expect(page.calls[2].body).toEqual({ route: 'page', session: token, enrollment_id: CECE });
     // Every request passed the handler's own checks.
-    // (`forms` excepted: the stand-in database has no forms function, so the handler answers a server error.)
-    expect(dev.fn.logs.map(l => l.outcome)).toEqual(['ok', 'ok', 'ok', 'ok', 'error', 'ok']);
+    expect(dev.fn.logs.map(l => l.outcome)).toEqual(['ok', 'ok', 'ok', 'ok', 'ok', 'ok']);
     expect(dev.fn.sql.map(q => q.fn)).toEqual(['card', 'verify_card', 'page', 'work', 'forms', 'seen']);
     expect(dev.fn.sql[1].add).toBe(false);
 
