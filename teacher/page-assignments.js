@@ -14588,9 +14588,11 @@ window.PageAssignments = (function () {
   function _addWorkRefusal(res) {
     var R = (window.PhotoShrink && PhotoShrink.REASONS) || {};
     if (res && res.reason === R.OFFICE) return 'Save it as a PDF first.';
-    // No PDF reader ships yet (vendor/ has none), so a PDF is refused.
+    // A PDF becomes pages through shared/photo-readers.js (pdf.js, PR 1073).
+    if (res && res.kind === 'pdf' && res.locked)
+      return 'That PDF has a password. Save a copy without one, then add it.';
     if (res && res.kind === 'pdf' && res.reason === R.NO_DECODER)
-      return "PDFs can't be added here yet. Add a photo of each page.";
+      return "The PDF reader couldn't load. Check the connection and try again.";
     if (res && (res.reason === R.TOO_MANY_PAGES || res.reason === R.PDF_TOO_LARGE))
       return 'That PDF is too long to add here.';
     return "That file couldn't be used. Try another photo.";
@@ -14623,11 +14625,13 @@ window.PageAssignments = (function () {
       .reduce(function (p, file) {
         return p.then(function () {
           if (said) return;
-          return PhotoShrink.prepare(file).then(function (res) {
-            if (!res || !res.ok) said = _addWorkRefusal(res);
-            else pages = pages.concat(res.pages);
-            if (!said && pages.length > STUDENT_WORK_MAX_PAGES) said = 'A piece of work can have 30 pages at most.';
-          });
+          return PhotoShrink.prepare(file, { openPdf: window.PhotoReaders && PhotoReaders.openPdf }).then(
+            function (res) {
+              if (!res || !res.ok) said = _addWorkRefusal(res);
+              else pages = pages.concat(res.pages);
+              if (!said && pages.length > STUDENT_WORK_MAX_PAGES) said = 'A piece of work can have 30 pages at most.';
+            },
+          );
         });
       }, Promise.resolve())
       .then(function () {
