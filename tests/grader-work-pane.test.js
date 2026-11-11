@@ -267,7 +267,7 @@ describe('Nothing in: Add Work and Grade From Paper', () => {
     }
   });
 
-  it('a Word file is refused with the plan’s line; a PDF says it can’t be added yet', async () => {
+  it('a Word file is refused with the plan’s line; a locked PDF, or no PDF reader, says so', async () => {
     const overlay = openGrader(seed, CID, PIECE, DEE);
     const input = () => $(overlay, '.grader-work-files');
     const choose = async answer => {
@@ -279,9 +279,27 @@ describe('Nothing in: Add Work and Grade From Paper', () => {
     };
     vi.spyOn(PhotoShrink, 'prepare');
     expect(await choose({ ok: false, reason: 'office', office: 'word' })).toBe('Save it as a PDF first.');
-    expect(await choose({ ok: false, reason: 'no_decoder', kind: 'pdf' })).toBe(
-      'PDFs can’t be added here yet. Add a photo of each page.'.replace('’', "'"),
+    expect(await choose({ ok: false, reason: 'unreadable', kind: 'pdf', locked: true })).toBe(
+      'That PDF has a password. Save a copy without one, then add it.',
     );
+    expect(await choose({ ok: false, reason: 'no_decoder', kind: 'pdf' })).toBe(
+      "The PDF reader couldn't load. Check the connection and try again.",
+    );
+    expect(await choose({ ok: false, reason: 'too_many_pages', kind: 'pdf' })).toBe(
+      'That PDF is too long to add here.',
+    );
+  });
+
+  it('Choose Files hands PhotoShrink the PDF reader, so a PDF becomes pages', async () => {
+    const pages = [{ blob: new Blob(['p']), thumb: new Blob(['t']), width: 2000, height: 1500, sha256: 'x' }];
+    const prepare = vi.spyOn(PhotoShrink, 'prepare').mockResolvedValue({ ok: true, kind: 'pdf', pages });
+    const overlay = openGrader(seed, CID, PIECE, DEE);
+    const input = $(overlay, '.grader-work-files');
+    Object.defineProperty(input, 'files', { value: [new Blob(['%PDF'])], configurable: true });
+    fire(input, 'change');
+    await settle();
+    expect(prepare.mock.calls[0][1]).toEqual({ openPdf: PhotoReaders.openPdf });
+    expect(typeof PhotoReaders.openPdf).toBe('function');
   });
 
   it('a file’s answer that comes back after the dialog moved on says nothing on the next student', async () => {

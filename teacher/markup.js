@@ -74,7 +74,10 @@ window.MarkUp = (function () {
       }) || null
     );
   }
+  // The pages: the group's on a One per Group piece (S12-F2), else the student's own.
   function _files(s) {
+    if (typeof getStudentWorkGroup === 'function' && getStudentWorkGroup(s.cid, s.sid, s.aid))
+      return getGroupWorkFiles(s.cid, s.sid, s.aid);
     var sub = getStudentSubmission(s.cid, s.sid, s.aid);
     return (sub && sub.files) || [];
   }

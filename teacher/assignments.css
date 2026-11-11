@@ -9296,6 +9296,7 @@ button.grader-member-name {
   white-space: nowrap;
 }
 .assess-grade-work-btn,
+.assess-work-wall-btn,
 .assess-add-work-btn {
   height: 28px;
   padding: 0 12px;
@@ -9625,6 +9626,47 @@ button.grader-member-name {
 }
 .markup-note-list + .markup-notes-hint {
   margin-top: 12px;
+}
+
+/* ── Group work in the grader (S12-F2): Students in This Group ───────── */
+.grader-members-hint {
+  margin: -4px 0 10px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.grader-member-same {
+  margin: 2px 0 4px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.grader-member-same.is-changed {
+  color: var(--text);
+  font-weight: 600;
+}
+.grader-change-one {
+  position: relative;
+  margin-top: 10px;
+}
+.grader-change-one .grader-member-menu {
+  top: 36px;
+  left: 0;
+  right: auto;
+}
+.grader-change-one-btn {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--active);
+  background: var(--bg);
+  color: var(--active);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.grader-change-one-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 /* ── A student's reflection in the grader (S10-F3) ───────────────────── */

@@ -8,7 +8,7 @@
  * caught up, graded but nothing returned, group work.
  */
 import './setup.js';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseHTML } from 'linkedom';
 import { mount, unmount } from './helpers/gradebook-dom.js';
 import { U, seedClass, clearClass, openGrader, openAssignments, closePages, click } from './helpers/pin-save-paths.js';
@@ -234,5 +234,18 @@ describe('the Assignments page', () => {
     expect(document.getElementById('grader-overlay')).toBeNull();
     click(document.querySelector('.assess-tograde-seg [data-show="all"]'));
     expect(document.querySelectorAll('.assess-card').length).toBe(3);
+  });
+
+  it('Work Wall on a piece that takes work opens the wall for it; none with Send Work off', () => {
+    const opened = vi.spyOn(WorkWall, 'open').mockImplementation(() => {});
+    openAssignments(() => seed(), CID, {});
+    const btn = document.querySelector('.assess-work-wall-btn[data-aid="' + LAB + '"]');
+    expect(btn.textContent).toBe('Work Wall');
+    click(btn);
+    expect(opened).toHaveBeenCalledWith(CID, LAB);
+    opened.mockRestore();
+    closePages();
+    openAssignments(() => seed({ sendWork: false }), CID, {});
+    expect(document.querySelector('.assess-work-wall-btn')).toBeNull();
   });
 });
