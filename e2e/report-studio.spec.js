@@ -137,9 +137,11 @@ async function overlapping(page) {
 }
 
 /* The rows of a side as "block" or "a+b" strings. */
+/* The blocks a stored side holds, row by row. A row carried onto it from
+   an earlier side (the rest of a table that went on) is that side's. */
 async function rowsOf(page, side) {
   return page
-    .locator(`.sheet-zoom[data-side="${side}"] .sheet-row`)
+    .locator(`.sheet-zoom[data-side="${side}"] .sheet-row:not(.sheet-row-carried)`)
     .evaluateAll(rows =>
       rows.map(r =>
         [...r.querySelectorAll('.sheet-cell')]
@@ -1321,19 +1323,29 @@ test.describe('Hands on the page', () => {
     page,
   }) => {
     await openStudio(page);
-    // Fill the Front past full: the grades move up from the Back.
+    // Fill the Front past full: the grades move up from the Back. With no
+    // room under the Front's blocks they go whole onto the Back, ahead of
+    // its own blocks, not onto a side of their own.
     await cellOf(page, 'grade-table').click();
     await bar(page).getByRole('button', { name: 'Move to Front' }).click();
-    expect(await rowsOf(page, 1)).not.toContain('grade-table');
-    // Next Steps has no room there: dropped on the Front, it goes to the Back.
+    await expect(
+      page.locator('.sheet-zoom[data-side="1"] .sheet-row-carried .sheet-cell[data-block="grade-table"]'),
+    ).toHaveCount(1);
+    await expect(page.locator('.sheet-zoom[data-from]')).toHaveCount(0);
+    expect(await rowsOf(page, 1)).toEqual(['self-assessment', 'parent-response']);
+    // Room on the Back for Next Steps.
+    await cellOf(page, 'self-assessment').click();
+    await bar(page).getByRole('button', { name: 'Remove' }).click();
+    expect(await rowsOf(page, 1)).toEqual(['parent-response']);
+    // Next Steps has no room on the Front: dropped there, it goes to the Back.
     const from = await center(page.locator('[data-action="studioBlock"][data-block="next-steps"]'));
     await dragStart(page, from, await gapAbove(page, 'legend'));
     await page.mouse.up();
     expect(await rowsOf(page, 0)).not.toContain('next-steps');
-    expect(await rowsOf(page, 1)).toEqual(['self-assessment', 'next-steps', 'parent-response']);
+    expect(await rowsOf(page, 1)).toEqual(['next-steps', 'parent-response']);
     await expect(page.locator('#undo-toast')).toContainText('Added Next Steps to the Back. The Front is full');
     await undo(page).click();
-    expect(await rowsOf(page, 1)).toEqual(['self-assessment', 'parent-response']);
+    expect(await rowsOf(page, 1)).toEqual(['parent-response']);
   });
 
   test('holding the pointer on a block in the palette shows it at print size for the previewed student', async ({
