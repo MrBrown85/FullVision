@@ -3123,6 +3123,10 @@ window.PageAssignments = (function () {
       '<div id="collab-panel-mount"></div>' +
       '</section>';
 
+    // Student Work (S5-F1): only in a class with Send Work on.
+    _formWork = _formWorkOffered(cid) ? _formWorkFor(cid, assess) : null;
+    if (_formWork) html += _formWorkCardHtml(cid);
+
     // Actions, in a footer that stays at the bottom of the window while the
     // form is in view, with what the work counts toward beside them.
     html +=
@@ -3146,6 +3150,198 @@ window.PageAssignments = (function () {
       '</div>';
 
     return html;
+  }
+
+  /* ── Student Work on the assessment form (S5-F1) ───────────
+     Board "Teacher: Student Work Settings on an Assessment", without Keep
+     Photos Until (per class only, Q15). The card is drawn only while the
+     class's Send Work is on (CmStudentPage.workSettings), which is Demo
+     Mode only until S5-W1: a signed-in class never has it, and nothing
+     here is sent. The choices are kept with Demo Mode's student work
+     (getAssessmentStudentWork, saveDemoStudentWork in shared/data.js),
+     by the assessment's id, not on the assessment: so Copy Assessment,
+     Duplicate, Copy to Another Class and Duplicate Class all start the
+     copy at Nothing (Colin). After the Due Date starts at Keep Accepting
+     (Colin); Until is the last day work is taken, a week after the due
+     date until the teacher picks another. */
+  var _formWork = null; // the open form's Student Work choices, or null when the card is not drawn
+
+  var WORK_SEND = [
+    { value: 'nothing', label: 'Nothing' },
+    { value: 'photos', label: 'Photos' },
+    { value: 'photos_files', label: 'Photos and Files' },
+  ];
+  var WORK_GROUP = [
+    { value: 'each', label: 'Each Student' },
+    { value: 'group', label: 'One per Group' },
+  ];
+  var WORK_MARKUP = [
+    { value: 'yes', label: 'Yes' },
+    { value: 'no', label: 'No' },
+  ];
+
+  function _hasChoice(list, value) {
+    return list.some(function (c) {
+      return c.value === value;
+    });
+  }
+
+  function _formWorkOffered(cid) {
+    return (
+      typeof CmStudentPage !== 'undefined' &&
+      typeof CmStudentPage.workSettings === 'function' &&
+      CmStudentPage.workSettings(cid).send_work === true &&
+      typeof getAssessmentStudentWork === 'function'
+    );
+  }
+
+  function _formWorkFor(cid, assess) {
+    var w = assess
+      ? getAssessmentStudentWork(cid, assess.id)
+      : {
+          students_send: 'nothing',
+          after_due: 'keep',
+          accept_until: null,
+          group_work: 'each',
+          students_see_markup: true,
+        };
+    return {
+      students_send: w.students_send,
+      after_due: w.after_due,
+      accept_until: w.accept_until,
+      group_work: w.group_work,
+      students_see_markup: w.students_see_markup !== false,
+    };
+  }
+
+  // The day Until starts at: a week after the due date (or today).
+  function _formWorkUntilDefault(cid) {
+    var due = (document.getElementById('af-due') || {}).value;
+    return _weekAfter(due || courseToday(cid));
+  }
+
+  // html-safe: fixed labels and values; the date goes through esc
+  function _formWorkSegHtml(field, label, choices, chosen) {
+    return (
+      '<div class="af-work-field">' +
+      '<span class="af-work-label" id="af-work-' +
+      field +
+      '-label">' +
+      label +
+      '</span>' +
+      '<div class="seg af-type-toggle af-work-seg" role="radiogroup" aria-labelledby="af-work-' +
+      field +
+      '-label">' +
+      choices
+        .map(function (c) {
+          var on = c.value === chosen;
+          return (
+            '<button type="button" class="seg-btn af-type-btn' +
+            (on ? ' active' : '') +
+            '" role="radio" aria-checked="' +
+            on +
+            '" data-action="setFormWork" data-field="' +
+            field +
+            '" data-value="' +
+            c.value +
+            '">' +
+            esc(c.label) +
+            '</button>'
+          );
+        })
+        .join('') +
+      '</div>' +
+      '</div>'
+    );
+  }
+
+  // html-safe: built from fixed labels by _formWorkSegHtml; the date through esc
+  function _formWorkCardHtml(cid) {
+    var w = _formWork;
+    var until = w.after_due === 'until' && w.accept_until ? w.accept_until : '';
+    var afterChoices = [
+      { value: 'keep', label: 'Keep Accepting' },
+      { value: 'until', label: until ? 'Until ' + formatShortDate(until) : 'Until a Date' },
+      { value: 'stop', label: 'Stop' },
+    ];
+    return (
+      '<section class="af-card af-card-work" aria-labelledby="af-work-title">' +
+      '<div class="af-card-head"><span class="af-card-title" id="af-work-title">Student Work</span></div>' +
+      '<div class="af-work-body">' +
+      _formWorkSegHtml('students_send', 'Students Send', WORK_SEND, w.students_send) +
+      _formWorkSegHtml('after_due', 'After the Due Date', afterChoices, w.after_due) +
+      (w.after_due === 'until'
+        ? '<div class="af-work-field af-work-until"><label class="af-work-label" for="af-accept-until">Last Day</label>' +
+          '<input type="date" class="cm-input af-work-date" id="af-accept-until" data-action-change="setFormWorkUntil" value="' +
+          esc(until) +
+          '"></div>'
+        : '') +
+      _formWorkSegHtml('group_work', 'Group Work', WORK_GROUP, w.group_work) +
+      _formWorkSegHtml(
+        'students_see_markup',
+        'Students See Your Mark Up',
+        WORK_MARKUP,
+        w.students_see_markup ? 'yes' : 'no',
+      ) +
+      '</div>' +
+      '</section>'
+    );
+  }
+
+  // Redraws the card where it is; the rest of the form is left as typed.
+  function _refreshFormWorkCard(focusSel) {
+    var card = document.querySelector('.af-card-work');
+    if (!card || !_formWork) return;
+    var tpl = document.createElement('template');
+    // html-safe: built by _formWorkCardHtml
+    tpl.innerHTML = _formWorkCardHtml(activeCourse);
+    card.replaceWith(tpl.content.firstChild);
+    var to = focusSel && document.querySelector(focusSel);
+    if (to) to.focus({ preventScroll: true });
+  }
+
+  function _setFormWork(field, value) {
+    if (!_formWork) return;
+    if (field === 'students_send' && _hasChoice(WORK_SEND, value)) _formWork.students_send = value;
+    else if (field === 'group_work' && _hasChoice(WORK_GROUP, value)) _formWork.group_work = value;
+    else if (field === 'students_see_markup' && (value === 'yes' || value === 'no'))
+      _formWork.students_see_markup = value === 'yes';
+    else if (field === 'after_due' && ['keep', 'until', 'stop'].indexOf(value) >= 0) {
+      _formWork.after_due = value;
+      if (value === 'until' && !_formWork.accept_until) _formWork.accept_until = _formWorkUntilDefault(activeCourse);
+    } else return;
+    _refreshFormWorkCard('.af-card-work [data-field="' + field + '"][data-value="' + value + '"]');
+  }
+
+  function _setFormWorkUntil(el) {
+    if (!_formWork || !el) return;
+    var v = String(el.value || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+    _formWork.accept_until = v;
+    _refreshFormWorkCard('#af-accept-until');
+  }
+
+  /* After a save: the card's choices for `aid`, kept with Demo Mode's
+     student work. Nothing when the card was not drawn. `w` is the card's
+     choices as read before the save: saving the assessment can draw the
+     form again from what is stored. */
+  function _saveFormWork(cid, aid, w) {
+    if (!w || !aid || !_formWorkOffered(cid) || typeof saveDemoStudentWork !== 'function') return;
+    var work = getCourseSubmissions(cid);
+    var row = {
+      id: aid,
+      students_send: w.students_send,
+      after_due: w.after_due,
+      accept_until: w.after_due === 'until' ? w.accept_until : null,
+      group_work: w.group_work,
+      students_see_markup: w.students_see_markup,
+    };
+    work.assessments = (work.assessments || [])
+      .filter(function (x) {
+        return x && x.id !== aid;
+      })
+      .concat([row]);
+    saveDemoStudentWork(cid, work);
   }
 
   /* ── Assessment Form Helpers ────────────────────────────── */
@@ -6043,9 +6239,11 @@ window.PageAssignments = (function () {
     // Read before render() replaces the form.
     var copyTargets = window.AssessmentCopy ? AssessmentCopy.readTargets(activeCourse) : [];
     if (copyTargets.length) newAssess.copyGroup = AssessmentCopy.newCopyGroup();
+    var formWork = _formWork;
     var srcCid = activeCourse;
     assessments.push(newAssess);
     saveAssessments(activeCourse, assessments);
+    _saveFormWork(activeCourse, id, formWork);
     var keep = addAnother ? _formKeepForNext() : null;
     openAssessIds.clear();
     openAssessIds.add(id);
@@ -6480,6 +6678,8 @@ window.PageAssignments = (function () {
     var copyTargets = window.AssessmentCopy ? AssessmentCopy.readTargets(activeCourse) : [];
     if (copyTargets.length && !next.copyGroup) next.copyGroup = AssessmentCopy.newCopyGroup();
     if (!edited && !copyTargets.length) {
+      // Only the Student Work card changed, or nothing: it is kept apart.
+      _saveFormWork(activeCourse, aid, _formWork);
       hideNewForm();
       render();
       return;
@@ -6491,8 +6691,10 @@ window.PageAssignments = (function () {
     });
     Object.assign(cur, next);
     var after = structuredClone(cur);
+    var formWork = _formWork;
     var srcCid = activeCourse;
     saveAssessments(activeCourse, assessments);
+    _saveFormWork(activeCourse, aid, formWork);
     var move = _scoreMoveAfterSave;
     _scoreMoveAfterSave = null;
     if (move && move.aid === aid && after.rubricId === move.rubricId) Grader.moveToRubric(activeCourse, aid, move);
@@ -6562,6 +6764,25 @@ window.PageAssignments = (function () {
     render();
   }
 
+  /* Said only when students have sent photos for it (Colin, ruling 102):
+     the photos go with the assessment. Counts students, not pages. Demo
+     Mode's sample work only until S5-W1. */
+  function _photosGoNote(cid, aid) {
+    if (typeof getCourseSubmissions !== 'function') return '';
+    var who = {};
+    (getCourseSubmissions(cid).submissions || []).forEach(function (sub) {
+      if (sub.assessment_id === aid && sub.files && sub.files.length) who[sub.enrollment_id] = true;
+    });
+    var n = Object.keys(who).length;
+    if (!n) return '';
+    return (
+      ' The photos ' +
+      n +
+      (n === 1 ? ' student' : ' students') +
+      " sent for it are deleted too. Deleted photos can't come back."
+    );
+  }
+
   function deleteAssess(aid) {
     var target = getAssessments(activeCourse).find(function (a) {
       return a.id === aid;
@@ -6569,7 +6790,7 @@ window.PageAssignments = (function () {
     var note = window.AssessmentCopy && target ? AssessmentCopy.deleteNote(activeCourse, target) : '';
     showConfirm(
       'Delete Assessment',
-      'Delete this assessment and all its scores?' + note,
+      'Delete this assessment and all its scores?' + _photosGoNote(activeCourse, aid) + note,
       'Delete',
       'danger',
       function () {
@@ -10863,6 +11084,9 @@ window.PageAssignments = (function () {
       setCollaboration: function () {
         setCollaboration(el.dataset.collab);
       },
+      setFormWork: function () {
+        _setFormWork(el.dataset.field, el.dataset.value);
+      },
       setScoreMode: function () {
         _askBeforeScoredChange(
           'scoring',
@@ -11215,6 +11439,10 @@ window.PageAssignments = (function () {
     }
     if (el.dataset.actionChange === 'onRubricSelect') {
       onRubricSelect(el.value);
+      return;
+    }
+    if (el.dataset.actionChange === 'setFormWorkUntil') {
+      _setFormWorkUntil(el);
       return;
     }
     if (el.dataset.actionChange === 'autoSetDueDate') {

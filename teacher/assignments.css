@@ -8909,3 +8909,41 @@ button.grader-member-name {
 .cr-ldg-link:hover {
   text-decoration: underline;
 }
+
+/* Class Settings › Student Page: the Send Work row (S5-F1,
+   teacher/cm-student-page.js). Class Settings' own switch row inside the
+   tab's row, which already draws the rule above. Kept here, not in
+   dashboard.css, because the student work settings are this track's. */
+.sp-send .sp-send-row {
+  align-self: stretch;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.sp-send .sp-keep-title {
+  font-size: var(--text-sm);
+  margin-top: 4px;
+}
+
+/* Assessment form: the Student Work card (S5-F1; board "Teacher: Student
+   Work Settings on an Assessment"). Drawn only while the class's Send Work
+   is on. A label over each row of choices, as the board draws them. */
+.af-work-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 640px;
+}
+.af-work-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.af-work-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+.af-work-until {
+  max-width: 220px;
+}
