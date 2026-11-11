@@ -1452,10 +1452,10 @@ backups; anything on `gradebook-prod` itself.
 `assessment`, Send Work and Keep Photos Until on `course`, eight teacher
 RPCs and the `student_submit` functions the edge function calls.
 `../2026111102_student_work_storage.sql` adds the bucket `student-photos`
-and four policies on `storage.objects`. Unsend, Replace and the teacher's
-delete **delete photos**, so both are tested here only and wait for the
-owner. The contract for the edge routes and the browser is
-`batch-b-contract.md`.
+and four policies on `storage.objects`. Unsend, Replace, the teacher's
+delete and a send left unfinished for two hours **delete photos**, so both
+are tested here only and wait for the owner. The contract for the edge
+routes and the browser is `batch-b-contract.md`.
 
 They are tested on the database as live is since 2026-11-11 02:02 UTC:
 everything `card_codes_common.LIVE` loads, then S3-M1, then a stand-in for
@@ -1466,24 +1466,28 @@ scenario copies it.
 
 ```bash
 PGPORT=54341 PGDATABASE=bb python3 submissions_common.py build   # an empty database: live as it is now, without Batch B
-PGPORT=54341 PGDATABASE=bb python3 submissions.py                # the two files, about two minutes
+PGPORT=54341 PGDATABASE=bb python3 submissions.py                # the two files, about six minutes
 PGPORT=54341 PGDATABASE=bb python3 submissions_undo.py           # their undo
-PGPORT=54341 PGDATABASE=bb python3 submissions_mutate.py         # 50 wrong versions of the SQL: does the suite notice? about five minutes
+PGPORT=54341 PGDATABASE=bb python3 submissions_mutate.py         # 103 wrong versions of the SQL: does the suite notice? about twenty-five minutes
 PGPORT=54341 PGDATABASE=bb python3 submissions_fingerprints.py check   # are the fingerprint lists in the five files current
 ```
 
-**The storage stand-in.** The harness had no `storage` schema, because
-nothing used storage. `storage-stand-in.sql` is copied from the Storage
-service's own published migrations (github.com/supabase/storage,
-`migrations/tenant`, read 2026-11-10): `storage.buckets` and
-`storage.objects` with their columns through migration 0055, row security
-on both, the index on `(bucket_id, name)`, every privilege on both tables
-to `anon`, `authenticated` and `service_role` (row security is the gate, as
-on Supabase), the tables owned by `supabase_storage_admin`, and 0055's
-trigger that refuses a `DELETE` unless the session has set
-`storage.allow_delete_query`. One scenario adds the columns of the newer
-shape (0062 on: several versions of one name) to show the functions read
-both.
+**The storage stand-in is the shape gradebook-prod has.** The harness had no
+`storage` schema, because nothing used storage. `storage-stand-in.sql` is
+written from what gradebook-prod answered on 2026-11-10 (read-only, by the
+orchestrator: its newest storage migration is
+`lifecycle-writer-coordination`) and from the Storage service's own
+published migrations (github.com/supabase/storage, `migrations/tenant`):
+`storage.objects` with its fifteen columns (`archived_at`,
+`is_delete_marker` and `is_versioned` among them: one name can have several
+rows) and its ten indexes, `storage.buckets` with `versioning_status` and
+the two lifecycle columns, row security on both, every privilege on both to
+`anon`, `authenticated` and `service_role` (row security is the gate, as on
+Supabase), the tables owned by `supabase_storage_admin`, and the triggers
+that matter to this batch: a `DELETE` on either table is refused unless the
+session has set `storage.allow_delete_query`; an insert into
+`storage.buckets` that sets a lifecycle column is refused; versioning, once
+on, cannot be turned off. What it leaves out, and why, is in its header.
 
 **The Storage API's part is played in Python** (`submissions_common.Storage`),
 written from the service's source (`src/http/routes/object/` and
@@ -1500,93 +1504,120 @@ written from the service's source (`src/http/routes/object/` and
 
 `submissions.py`, by scenario:
 
-- **apply** (61 checks). The files meet a database in use: the Student Page on,
-  a card and a signed-in phone, a returned grade and a draft. Their shape
-  (one transaction each, lock timeout, guard first). The fingerprint lists
-  the five files carry are the ones a fresh apply gives. Each guard stops
-  its file at the guard with nothing changed: each of the five functions
-  the first file compares, with one space more; Batch A, S0-M4b, S0-M5 or
-  S3-M1 missing; a function, helper, table, column or trigger name already
-  taken; `storage.objects` without its `metadata`, or no storage schema; a
-  role that cannot read `storage.objects` past its row security; the second
-  file without the first, with a policy function changed, with row security
-  off on `storage.objects`, with a bucket of that name that is public or
-  has another limit or already holds a file; an assessment row held by
-  another session (it gives up at five seconds). The read-only queries
+- **apply** (69 checks). The files meet a database in use: the Student
+  Page on, a card and a signed-in phone, a returned grade and a draft. Their
+  shape (one transaction each, lock timeout, guard first). The fingerprint
+  lists the five files carry are the ones a fresh apply gives. Each guard
+  stops its file at the guard with nothing changed: each of the five
+  functions the first file compares, with one space more; Batch A, S0-M4b,
+  S0-M5 or S3-M1 missing; a function, helper, table, column or trigger name
+  already taken; `storage.objects` without `metadata` or without
+  `is_delete_marker`, or no storage schema; a role that cannot read
+  `storage.objects` past its row security; the second file without the
+  first, with a policy function changed, with row security off on
+  `storage.objects`, with a bucket of that name that is public, has another
+  limit, keeps old versions or already holds a file, or with a
+  `storage.buckets` that has no `versioning_status`; an assessment row held
+  by another session (it gives up at five seconds). The read-only queries
   written for the live database are run here: what they say on this
-  database, and each kind of difference noticed. Then the apply: **no row
-  of any existing table changes in any column it had, and no existing
-  function changes**; every new catalog line is about the new things; 39
-  functions are new, with the fingerprints the file lists; grades and the
-  signed-in phone's page are as before; the post-check is empty, and
-  notices thirteen kinds of damage. Work is then sent, and **a second run
-  changes no catalog line and no row**. A second run after one of its
-  functions was replaced (as Batch C will) stops and puts nothing back.
-- **teacher** (101). The two settings RPCs (a patch writes only what it
-  names; shapes refused; replays; another teacher; nobody; anon).
-  `start_work_upload` and `finish_work_upload`: the paths; a replay;
-  nothing handed in until every file is up; a page left out; Add as More
-  Pages (the pages go on the end, nothing is queued), Replace Them (the old
-  files are queued), `already_sent`, `nothing_sent`, `on_paper`,
-  `too_many_pages`; another teacher's assessment or student, a student of
-  another class, a withdrawn student; a file storage holds too large or as
-  a PDF. `mark_handed_in_paper`, `delete_submission`,
+  database (storage as gradebook-prod's is), that a partial index alone
+  does not count as the index on `(bucket_id, name)`, and each kind of
+  difference noticed. **The first file alone is a safe state**: no upload
+  link, no upload, nothing handed in with photos, Handed In on Paper works.
+  Then the apply: **no row of any existing table changes in any column it
+  had, and no existing function changes**; every new catalog line is about
+  the new things; 44 functions are new, with the fingerprints the file
+  lists; grades and the signed-in phone's page are as before; the post-check
+  is empty, and notices each kind of damage (the bucket set to keep old
+  versions and the assessment index gone among them). Work is then sent, and
+  **a second run changes no catalog line and no row**. A second run after
+  one of its functions was replaced (as Batch C will) stops and puts nothing
+  back; so does one after the bucket's limit or versioning was changed.
+- **teacher** (103). The two settings RPCs (a patch writes only what
+  it names; shapes refused; replays; another teacher; nobody; anon).
+  `start_work_upload` and `finish_work_upload`: the paths; a replay; nothing
+  handed in until every file is up; a page left out; Add as More Pages (the
+  pages go on the end, marked the teacher's, nothing is queued), Replace
+  Them (the old files are queued), `already_sent`, `nothing_sent`,
+  `on_paper`, `too_many_pages`; another teacher's assessment or student, a
+  student of another class, a withdrawn student; a file storage holds too
+  large, as a PDF, or whose thumbnail is a PNG; a student's unfinished send
+  is not the teacher's to finish or delete. `mark_handed_in_paper` (a
+  withdrawn student is passed over), `delete_submission`,
   `rotate_submission_page`, `list_course_submissions`. The tables refuse a
   submission across two classes and a paper hand-in "from a student".
   Nothing a teacher does here touches a grade.
-- **student** (160). Every refusal, for each of the six functions: no
+- **student** (198). Every refusal, for each of the six functions: no
   session, a token never issued, another student's enrollment, another
   teacher's class, the Student Page off, a withdrawn student, a deleted
   class, a replaced card, a card past its last day, a session past
   midnight, a locked card, after Done; Send Work off; an assessment that
   takes nothing, of another class, or not yet on the page; the eight
   combinations of After the Due Date and the due date, by the class's own
-  time zone; thirteen wrong shapes (the call fails, 22023). Then a send
-  from start to finish: paths, a replay, missing pages, the hand-in, what
-  the teacher and the student each see, `file_links` for the student's own
-  pages only; Unsend and the worker; Remove the Page and a new page order;
-  starting again; an expired send; the switches changing between start and
-  finish; Replace; work the teacher added; grading under When I Return Them
-  and As Soon As I Save (a score, a comment, a Late mark, a cleared score,
-  a draft on unsent work, DIBELS); Replace during grading; the teacher
-  adding work under a student's send; twenty an hour; two classes in one
-  session. **No function reads or writes a grade**: the four score tables
-  and `grade_return` are byte for byte the same after the student's calls,
-  and the source of all 39 functions names no score table and no copy of a
-  grade.
-- **storage** (74). The bucket and the four policies, word for word. A
-  student's link, as modelled: another path, another student's folder, over
-  2 MB, a PNG, a PDF, after two hours, a second use. A teacher reads their
-  own classes' files and nobody else's; nobody signed in reads nothing; a
-  teacher writes only a path the database named for their own unfinished
-  upload; nobody changes, moves or deletes a file. **One careless policy
+  time zone; the wrong shapes (the call fails, 22023). Then a send from
+  start to finish: paths, a replay, missing pages, the hand-in, what the
+  teacher and the student each see, `file_links` for the student's own
+  handed-in pages only; Unsend and the worker; Remove the Page and a new
+  page order; starting again. **Two hours from the first start**: a repeat
+  one minute before still answers and gives no longer; past it the page
+  shows no send in progress, a repeat and a finish are both `expired`, the
+  files are queued, and one student's call clears the class's other expired
+  sends. **Open and late are asked again at the finish**: a send started on
+  the last day and finished after it is refused; one started before the due
+  date and finished after is Late. **Who added a page**: Unsend and Replace
+  remove only the student's pages and keep the teacher's. **What a class may
+  hold**: pages and bytes, unfinished pages counted, a file larger than was
+  said refused. The switches changing between start and finish; Replace;
+  work the teacher added; grading under When I Return Them and As Soon As I
+  Save (a score, a comment, a Late mark, a cleared score, a draft on unsent
+  work, DIBELS); Replace during grading; the teacher adding work under a
+  student's send; twenty an hour; two classes in one session. **No function
+  reads or writes a grade**: the four score tables and `grade_return` are
+  byte for byte the same after the student's calls, and the source of all 44
+  functions names no score table and no copy of a grade.
+- **storage** (85). The bucket (private, 2 MB, JPEG only, versioning
+  DISABLED, no lifecycle) and the four policies, word for word. A student's
+  link, as modelled: another path, another student's folder, over 2 MB, a
+  PNG, a PDF, after two hours, a second use. **A teacher reads handed-in
+  work of their own classes and their own uploads, and nothing else**: not a
+  file a student unsent (still in storage until the worker runs), not a page
+  of a send a student has not finished, not a stray file in the class's
+  folder; nobody signed in reads nothing; a teacher writes only a path the
+  database named for their own unfinished upload, and not after its two
+  hours; nobody changes, moves or deletes a file. **One careless policy
   added on top** (every role may do anything to `storage.objects`) opens
   another bucket and not this one. SQL cannot delete a file. The removal
   queue: not believed while the file is there; a file put back through a
   link that was still alive is removed again; newest first. Every way a row
   can go queues its files: Unsend, Replace, a teacher's delete, a page left
-  out, an abandoned send, `delete_assessment`, `delete_withdrawn_student`,
-  the 30-day purge, a row deleted by hand, `TRUNCATE`. After all of it and
-  the worker run to the end, **storage holds exactly the files of the pages
-  handed in**.
-- **race** (22). On connections of their own, the first held open so the
+  out, an abandoned send, `delete_assessment`,
+  `delete_withdrawn_student`, the 30-day purge, a row deleted by hand,
+  `TRUNCATE`. After all of it and the worker run to the end, **storage holds
+  exactly the files of the pages handed in**. Rows as a versioned bucket
+  would have them (an archived version, a delete marker) are read right. The
+  second file stops at a bucket that keeps old versions, at its first check
+  and at its last step.
+- **race** (33). On connections of their own, the first held open so the
   second is seen to wait: two sends at once, the same request twice, two
   finishes, Unsend against Replace, Unsend against a finish (both orders),
   **Unsend against a grade being saved** (both orders), **Replace during
   grading** (both orders), the student's finish against the teacher's Add
-  Work, a send against its assessment being deleted (both orders, then 30
-  unheld rounds), 30 sends at once against the hourly limit. Then twelve
-  seconds of everything at once in one class (10,000 to 35,000 calls,
-  depending on what else the machine is doing): two
-  students, the grade RPCs, Add Work in its three modes, deletes,
-  assessments made and deleted under a send, two workers. No error, no
-  deadlock; every rule that must always hold, holds; Batch A's
+  Work, **the same teacher request twice at once for each of the five
+  teacher writes that take the class** (the second waits and is given the
+  first's answer), a student withdrawn as their send starts, a send against
+  its assessment being deleted (both orders, then 30 unheld rounds), the
+  trigger on assessment taking the class's lock itself, 30 sends at once
+  against the hourly limit. Then twelve seconds of everything at once in one
+  class (10,000 to 35,000 calls, depending on what else the machine is
+  doing): two students, the grade RPCs, Add Work in its three modes,
+  deletes, assessments made and deleted under a send, two workers. No error,
+  no deadlock; every rule that must always hold, holds; Batch A's
   `working_copy` still matches the scores.
 - **grants** (54). On a copy where a new function and a new table are
   given to everyone by default and the `student_submit` schema is open: the
   eleven functions for teachers, the eight for the service role and the
-  twenty for nobody are exactly that, by the files' own revokes; the four
-  tables cannot be read; and with `SELECT` granted by mistake a teacher
+  twenty-five for nobody are exactly that, by the files' own revokes; the
+  four tables cannot be read; and with `SELECT` granted by mistake a teacher
   still reads no row (row security, no policy).
 - **suites** (14). `student_submit.py` 79, `questionnaire_identity.py`
   47, `phone_reports.py` 35, `questionnaires.py` 42, `grade_return.py` 284
@@ -1596,26 +1627,48 @@ written from the service's source (`src/http/routes/object/` and
   of 236 until `docs/schema.generated.sql` is refreshed after the apply
   (its comparison of `assessment` with the live snapshot, which has neither
   the five columns nor the two triggers yet), then 236.
+- **scale** (7). With 1,000,000 submissions of other classes in the
+  table: the trigger's two deletes go through an index, and
+  `delete_assessment` for a teacher who never used photos takes what it took
+  with the table empty (1.7 ms and 1.2 ms on the test machine, the middle of 25 calls each). With 300,000 files in the bucket: the
+  look-up every function makes goes through one of storage's indexes on
+  `(bucket_id, name)`, and through the plain one when the others are taken
+  away; handing in 30 pages, a teacher reading one page under the policies,
+  and an Unsend with one pass of the worker (3 ms, 0.8 ms and 8 ms on the test machine).
 
 `batch-b-undo.sql` (not a migration) and its proof, `submissions_undo.py`
-(47 checks): PART 2 refuses while the bucket holds a file or a page is listed,
-and at each of its other checks, with nothing changed; PART 1 turns Send
-Work off and deletes nothing; then, with the photos deleted the way its
-header says, PART 2 leaves **the catalog of before Batch B, line for line**,
-but that `course` keeps two and `assessment` five empty slots where the
-dropped columns were; no row of any earlier table differs but each class's
-changed mark; both files apply again.
+(60 checks). Three parts. PART 1 turns Send Work off and deletes
+nothing. PART 1B drops the four triggers on `assessment` and `enrollment`
+and nothing else, for when deleting an assessment or a student misbehaves:
+what a delete then leaves behind, the migration files run again putting the
+triggers back, and the one statement that clears what was left. PART 2
+refuses while the bucket holds a file, a page is listed, or **the removal
+queue is not finished** (a file could still arrive through an upload link
+that is alive: it says when the last one dies), and at each of its other
+checks, with nothing changed; then, with the photos deleted the way its
+header says, it leaves **the catalog of before Batch B, line for line**, but
+that `course` keeps two and `assessment` five empty slots where the dropped
+columns were; no row of any earlier table differs but each class's changed
+mark; both files apply again.
 
-`submissions_mutate.py`: 50 single changes to the SQL (a check taken out, a
-limit moved, a lock dropped, a policy loosened, a revoke left off), each
-applied to a fresh copy with the fingerprint lists stood aside, and the
-suite run against it. All 50 are noticed. An earlier run found one hole (a
-table left without row security: nothing checked it), closed since.
+`submissions_mutate.py`: 103 single changes to the SQL (a check taken out,
+a limit moved, a lock dropped, a policy loosened, a revoke left off, and
+nineteen of the twenty the first review made; its twentieth was about a
+column that is gone), each applied to a fresh copy with the
+fingerprint lists stood aside, and the suite run against it. All 103 are noticed.
+Two earlier runs found holes, closed since: a table left without row
+security that nothing checked, and the eight changes the first review found
+unnoticed (an unfinished send kept after the work it was to replace was
+deleted; a thumbnail that is not a JPEG; a teacher finishing or deleting a
+student's unfinished send; a withdrawn student's send or paper hand-in; the
+trigger's own lock; `file_links` for an unfinished send).
 
-Result on 2026-11-11, PostgreSQL 17.11 (what production runs), on a clean
-clone and empty databases: `submissions.py` 486 of 486;
-`submissions_undo.py` 47 of 47; `submissions_mutate.py` 50 of 50
-noticed. On PostgreSQL 18.6 the same: 486 and 47, and every fingerprint is the one 17.11 gives.
+Result on 2026-11-11 (UTC), PostgreSQL 17.11 (production runs 17.6), from a clean clone on empty databases:
+`submissions.py` 563 of 563; `submissions_undo.py` 60 of 60; `submissions_mutate.py` 103 of 103
+noticed. On PostgreSQL 18.6 the same: 563 and 60, and every fingerprint is the one 17.11 gives.
+(The 103 were run at commit `27d3025e`. The one commit after it, `da56ef84`, changed header
+comments and how the scale scenario takes its timing, and no function: the suites, the undo and the
+one change the scale scenario judges were run again at `da56ef84`, on both versions.)
 
 **What the local tests cannot prove.** The Storage service is not run here.
 Everything about it is from its documentation and its source, and is first
@@ -1630,15 +1683,19 @@ tried for real in the owner's test class after the apply:
   both; the policies rest on it, and if it were otherwise a teacher would
   be refused, not let in);
 - that the role applying the migration may create a policy on
-  `storage.objects` and a row in `storage.buckets` (if not, the second file
-  stops with nothing applied);
-- that `postgres` and `service_role` pass row security on gradebook-prod
-  (the pre-check reads both);
-- which version of the storage schema gradebook-prod has (the pre-check
-  says): whether SQL deletes are refused there, and whether it keeps old
-  versions. The functions never delete from a storage table and read both
-  shapes;
-- that removing a file through the API removes its bytes, and that the
-  bucket is stored in ca-central-1 with the project;
-- the edge routes themselves (`S5-F4`), which are not written yet;
+  `storage.objects` and a row in `storage.buckets` (gradebook-prod grants
+  `postgres` the insert, and policies through Supabase's own extension,
+  which plain Postgres cannot imitate; if either is refused, the second
+  file stops with nothing applied);
+- that the stand-in is what gradebook-prod has on the day of the apply: it
+  was written from one read-only look on 2026-11-10, and the pre-check's
+  second query says whether storage has moved on since;
+- that removing a file through the API removes its bytes, that a bucket
+  with versioning DISABLED keeps no copy, and that the bucket is stored in
+  ca-central-1 with the project;
+- how long the Storage service or anything in front of it goes on serving a
+  download link after the file is deleted;
+- the timings above on gradebook-prod's own machine;
+- the edge routes themselves (`S5-F4`), which are not written yet: every
+  requirement in `batch-b-contract.md`, "What the edge function must do";
 - anything on `gradebook-prod` itself.
