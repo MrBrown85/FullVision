@@ -43,6 +43,8 @@ from card_codes_common import *
 
 TEXT = text_of('../' + MIGRATION)
 STATEMENTS = split(TEXT)
+PRECHECK, COUNTS = split(text_of('s3-m1-live-precheck.sql'))      # the two read-only queries for the live database, before
+POSTCHECK, POSTCOUNTS = split(text_of('s3-m1-live-postcheck.sql'))  # and after
 HEX64 = re.compile(r'[0-9a-f]{64}')
 TODAY = None
 
@@ -163,6 +165,31 @@ def scen_apply():
         good, said = stopped_by(["create function public.card_note() returns int language sql as $f$ select 1 -- student_card is mentioned only here\n $f$"], 'never')
         ok('guard: a function that only mentions student_card in a comment does not stop it', said == 'it ran', said)
         ok('after every refusal the catalog and every row are what they were', catalog_and_rows(d) == (cat0, rows0))
+        # ── The read-only checks written for the live database, here ────
+        ok('the live pre-check lists nothing on this database: every function, the table and the earlier migrations are as tested', d.all(PRECHECK) == [], d.all(PRECHECK)[:3])
+        ok('its count query answers with what the migration will stop and delete: 3 live cards in 2 classes of 2 teachers, 1 signed-in phone, 4 remembered card answers, 1 live slip, 3 classes with the page on',
+           d.all(COUNTS) == [[3, 2, 2, 1, 4, 1, 3]], d.all(COUNTS))
+        def precheck_after(setup):
+            d.begin()
+            try:
+                for st in setup: d.run(st)
+                return [[r[0], r[3]] for r in d.all(PRECHECK)]
+            finally:
+                d.rollback()
+        got = precheck_after([retouched('student_submit.card(text,text)'), retouched('student_submit.page(text,uuid,text)')])
+        ok('the pre-check lists a function that is not the one tested, and says whether the migration would stop on it',
+           got == [['function student_submit.card(text,text)', 'yes'], ['function student_submit.page(text,uuid,text)', 'no']], got)
+        got = precheck_after(["create function public.card_report() returns bigint language sql as $f$ select count(*) from student_card $f$",
+                              'alter table public.student_card add column note text', 'create index later_idx on public.student_card (printed_at)',
+                              'alter function public.fv_owns_course(uuid) set search_path = public',
+                              "create function student_submit.issue_cards(uuid, uuid, jsonb, text, uuid) returns jsonb language sql as $f$ select '{}'::jsonb $f$"])
+        ok('and a function it does not know that reads the cards, a column or an index added since, S0-M5 undone, a name the migration needs already taken',
+           sorted(r[0] for r in got) == ['a function names student_card that the migration does not know', 'earlier migrations', 'function public.fv_owns_course(uuid)',
+                                         'function student_submit.issue_cards(uuid,uuid,jsonb,text,uuid)', 'something else on student_card: index', 'student_card columns'], got)
+        before_rows = d.all(POSTCHECK)
+        ok('the live post-check, run before the apply, lists what is not there yet (%d rows)' % len(before_rows),
+           len(before_rows) >= 20 and ['student_card policies', 'none', 'student_card_read'] in before_rows, before_rows[:3])
+        ok('neither check changed anything', catalog_and_rows(d) == (cat0, rows0))
         # A lock it cannot get.
         o = d.other(); o.run('begin'); o.run('select * from student_card for update')
         t0 = time.time(); r = d.statements(STATEMENTS); waited = time.time() - t0
@@ -235,6 +262,17 @@ def scen_apply():
         ok('and after the apply each is what the header says it leaves', all((now[fn] or 'absent') == becomes for fn, was, becomes in triples),
            [(fn, now[fn]) for fn, was, becomes in triples if (now[fn] or 'absent') != becomes])
 
+        ok('the live post-check lists nothing: the apply landed as tested', d.all(POSTCHECK) == [], d.all(POSTCHECK)[:4])
+        ok('and its second query counts no live card, no card with a tag, none without a number, no key id seen yet', d.all(POSTCOUNTS) == [[0, 0, 0, 0, 0, 0]], d.all(POSTCOUNTS))
+        d.begin()
+        d.run('grant select on public.student_card to authenticated'); d.run('create policy student_card_read on public.student_card for select using (true)')
+        d.run('grant execute on function student_submit._as_teacher(uuid) to service_role')
+        d.run(retouched('student_submit.issue_cards(uuid,uuid,jsonb,text,uuid)'))
+        got = sorted(r[0] for r in d.all(POSTCHECK)); d.rollback()
+        ok('the post-check notices a grant, a policy, a helper opened to the service role and a changed function',
+           got == ['function student_submit.issue_cards(uuid,uuid,jsonb,text,uuid)', "of this migration's six functions, the ones the service role can run",
+                   'student_card policies', 'who can read student_card through the API (anon, signed-in teachers)'], got)
+
         # ── Slips are untouched and still issue ─────────────────────────
         ok('the slip printed before still opens', d.service("student_submit.open(:c, 'ip-1')", c=slip).get('kind') == 'questionnaire')
         slip2 = d.teacher('issue_access_codes(:q, :ids::uuid[], :k)', q=q['id'], ids='{%s}' % ENR2, k=nid())[0]['code']
@@ -286,6 +324,8 @@ def scen_apply():
         # ── A card made since, and a second run ─────────────────────────
         code, pw, row = d.make(ENR1)
         ok('a card made the new way opens', d.card(code).get('ok') is True and row['seq'] == 3, row)
+        ok('the post-check still lists nothing, and its counts show the one new card: live, with a tag, under the one key id seen',
+           d.all(POSTCHECK) == [] and d.all(POSTCOUNTS) == [[1, 1, 0, 0, 0, 1]], (d.all(POSTCHECK)[:3], d.all(POSTCOUNTS)))
         token2 = d.verify(code, birthday='2012-05-15')['session_token']
         cat2, rows2 = catalog_and_rows(d)
         r = d.migrate()

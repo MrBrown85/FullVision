@@ -413,8 +413,7 @@ alter table public.student_card
     add column if not exists seq       smallint constraint student_card_seq_check check (seq >= 1);
 
 -- The card number: each student's cards count 1, 2, 3 in the order they were
--- made. Only rows that have none, so only the first run; it writes every row
--- there is after the columns above were dropped.
+-- made. Only rows that have none, so only on the first run.
 update public.student_card k
    set seq = n.seq
   from (select id, row_number() over (partition by enrollment_id order by created_at, id) as seq

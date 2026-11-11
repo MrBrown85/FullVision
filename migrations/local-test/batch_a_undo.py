@@ -61,6 +61,11 @@ some run other scripts of this folder against their copy.
               header's read-only pre-check lists the same; with S0-M4b on
               top and with it undone.
   without     The same script on a database without S0-M4b.
+  s3-m1       With S3-M1 (2026111003, card codes the database cannot read)
+              applied on top as well: PART 1, 1A and 1B run and leave it
+              alone; PART 2 stops for it, naming its objects, with nothing
+              changed; its own undo (s3-m1-undo.sql), then S0-M4b's, then
+              PART 2, and the catalog is the one from before Batch A.
   notices     The catalog notices each kind of thing it claims to cover.
 
 batch_a_undo_load.py runs PART 1 against looping saves.
@@ -86,6 +91,8 @@ S0_M4B_REF = None                                         # merged (PR 989, f2ee
 REPAIR = 'call public.grade_return_repair_nightly()'      # S0-M4b's; what its nightly job runs
 JOB = "select count(*) from cron.job where jobname = 'fv_grade_return_repair_daily'"
 THEIRS = [['assessment', 'grade_return_mode'], ['assessment', 'grade_return_truncate'], ['enrollment', 'grade_return_truncate']]
+S3_M1 = '2026111003_card_codes_keyed.sql'                  # stands on Batch A's student_card; its own undo goes first
+S3_M1_UNDO = 'local-test/s3-m1-undo.sql'
 S0_M5 = '2026111002_security_definer_search_path.sql'     # applied to gradebook-prod after Batch A, on Nov 10
 S0_M5_UNDO = 'local-test/s0-m5-undo.sql'
 S0_M5_REF = None                                          # merged (PR 991): its files are in this checkout
@@ -158,9 +165,10 @@ def precheck():
     body = open(os.path.join(HERE, UNDO)).read().split('-- precheck:\n')[1].split('-- end precheck')[0]
     return '\n'.join(l[5:] if l.startswith('--   ') else '' for l in body.splitlines()).strip().rstrip(';')
 def listed(d):
-    """(what the pre-check says of S0-M4b, [everything else it lists])."""
+    """(what the pre-check says of S0-M4b, [everything else it lists]). Its second row, on S3-M1, is kept in d.keyed."""
     r = d.run(precheck())
-    return r[0][1], [x[1] for x in r[1:]]
+    d.keyed = r[1][1]
+    return r[0][1], [x[1] for x in r[2:]]
 def their_fast_stop():
     """PART 1 of S0-M4b's own undo: its nightly job unscheduled, its three triggers dropped."""
     t = text_of(S0_M4B_UNDO, S0_M4B_REF)
@@ -793,7 +801,47 @@ def scen_without():
        back == 'ok' and s0_m5_and(cat0, catalog(d.c), ['dropped columns public.course | 3']), (back, trace(cat0, catalog(d.c))))
     d.close()
 
-# ── page-off: PART 1A at every point of PART 1 ──────────────────────────────
+# ── s3-m1: S3-M1 applied on top as well ─────────────────────────────────────
+def scen_s3_m1():
+    """Everything applied as on live, used, and then S3-M1 on top."""
+    d = Db('s3m1'); seed(d)
+    cat0, rows0, cols0 = before(d)
+    ok('s3-m1: everything applied as on live and used (cards made the old way, two signed-in phones)', d.apply() == 'ok' and bool(use(d)))
+    r = d.file(S3_M1)
+    d.run("insert into supabase_migrations.schema_migrations (version, name) values ('20261111000000', 'card_codes_keyed')")
+    ok('s3-m1: S3-M1 applies on top of it', r == 'ok', r)
+    keyed = lambda: [l for l in catalog(d.c) if re.search(r'student_card|card_key|student_submit\.(card|verify_card|_card_lookup|issue_cards|_as_teacher|_card_key_seen)\(', l)]
+    cat1 = catalog(d.c); sums1 = row_checksums(d.c); keyed1 = keyed()
+    said, others = listed(d)
+    ok("s3-m1: the header's pre-check says S0-M4b and S3-M1 are both on top of Batch A, and lists nothing else",
+       said.startswith('S0-M4b is applied on top of Batch A (') and d.keyed.startswith('S3-M1 is applied on top of Batch A (')
+       and 'PART 2 will stop until s3-m1-undo.sql has been run' in d.keyed and others == [], (said, d.keyed, others))
+    r = d.part('PART 2')
+    ok("s3-m1: PART 2 stops before it changes anything: it says S3-M1 is applied and to run its undo first, names what it found of it, then says the same of S0-M4b, and names nothing else",
+       r.startswith("STOPPED: S3-M1 (2026111003_card_codes_keyed.sql) is applied on top of Batch A. Run S3-M1's undo first (migrations/local-test/s3-m1-undo.sql), then this. Found of it: ")
+       and all(x in r for x in ('names Batch A: function student_submit.issue_cards(', 'names Batch A: function student_submit.card(p_code_hmac text', 'function student_submit._as_teacher(uuid)',
+                                'column student_card.code_hmac', 'column student_card.seq', 'index student_card_code_hmac_key', 'index student_card_enrollment_seq',
+                                'constraint student_card_live_has_tag', 'table student_submit.card_key'))
+       and "S0-M4b (2026110905_grade_return_limits.sql) is applied on top of Batch A" in r and 'Something else' not in r and r.endswith('Nothing was changed.')
+       and catalog(d.c) == cat1 and row_checksums(d.c) == sums1, r)
+    ok("s3-m1: PART 1 (the fast stop) runs with S3-M1 applied, and leaves everything of S3-M1's as it was", d.part('PART 1') == 'ok' and d.one(TRIGGERS) == 0 and keyed() == keyed1)
+    ok("s3-m1: so do S0-M4b's fast stop, PART 1A (the Student Page off) and PART 1B (the five policies)",
+       d.their_fast_stop() == 'ok' and d.part('PART 1A') == 'ok' and d.part('PART 1B') == 'ok' and keyed() == keyed1)
+    r = d.file(S3_M1_UNDO)
+    d.run("delete from supabase_migrations.schema_migrations where name = 'card_codes_keyed'")
+    said, others = listed(d)
+    ok("s3-m1: S3-M1's own undo runs, and the pre-check then says S3-M1 is not on top, S0-M4b still is, and nothing else",
+       r == 'ok' and d.keyed == 'S3-M1 is not on top of Batch A.' and said.startswith('S0-M4b is applied on top of Batch A (') and others == [], (r, said, d.keyed, others))
+    r = d.part('PART 2')
+    ok("s3-m1: PART 2 now stops for S0-M4b alone", r.startswith('STOPPED: S0-M4b (2026110905_grade_return_limits.sql)') and 'S3-M1' not in r and 'Something else' not in r, r)
+    ok("s3-m1: after S0-M4b's undo PART 2 runs", d.s0_m4b_out() == 'ok' and d.part('PART 2') == 'ok')
+    d.run(record_statement())
+    ok('s3-m1: the catalog is the one from before Batch A but for S0-M5, left in place, and the three dropped-column slots on course: S3-M1 and its undo left no trace',
+       s0_m5_and(cat0, catalog(d.c), ['dropped columns public.course | 3']), trace(cat0, catalog(d.c)))
+    ok('s3-m1: and all four of Batch A\'s files, S0-M5, S0-M4b and S3-M1 apply again', d.apply() == 'ok' and d.file(S3_M1) == 'ok')
+    d.close()
+
+# ── page-off ────────────────────────────────────────────────────────────────
 def scen_page_off():
     d = Db('pageoff'); seed(d)
     ok('page-off: everything applied and in use', d.apply() == 'ok'); k = use(d)
@@ -957,7 +1005,7 @@ if __name__ == '__main__':
     ok('the undo script: PART 1 (seven transactions and a query), PART 1A (a check and one UPDATE), PART 1B and PART 2 (one transaction each)',
        [len(transactions(PARTS[p])) for p in ('PART 1', 'PART 1B', 'PART 2')] == [8, 1, 1] and len(PARTS['PART 1A']) == 2
        and bare(PARTS['PART 1A'][1]).lower().startswith('update public.course'))
-    which = sys.argv[1:] or ['main', 'apply-only', 'partial', 'repair', 'back-on', 'half-way', 'page-off', 'fooled', 'without', 'notices']
+    which = sys.argv[1:] or ['main', 'apply-only', 'partial', 'repair', 'back-on', 'half-way', 'page-off', 'fooled', 'without', 's3-m1', 'notices']
     for name in which:
         globals()['scen_' + name.replace('-', '_')]()
     print('\n'.join('PASS ' + p for p in passed))
