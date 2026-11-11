@@ -5196,7 +5196,7 @@ function _loadCourseFromLS(cid) {
   if (lmRaw && lmRaw._customized) {
     _cache.learningMaps[cid] = lmRaw;
   } else {
-    _cache.learningMaps[cid] = LEARNING_MAP[cid] || { subjects: [], sections: [] };
+    _cache.learningMaps[cid] = _builtInLearningMap(cid);
   }
 
   // Modules: try new key, fall back to legacy 'gb-units-' key
@@ -5260,7 +5260,15 @@ function _loadCoursesFromLS() {
   } catch (e) {
     console.warn('Courses parse error:', e);
   }
-  return structuredClone(DEFAULT_COURSES);
+  // Demo Mode's class is in shared/seed-data.js, loaded only in Demo Mode:
+  // anywhere else nothing stored means no classes.
+  return typeof DEFAULT_COURSES !== 'undefined' ? structuredClone(DEFAULT_COURSES) : {};
+}
+
+// Demo Mode's built-in learning map for its class (LEARNING_MAP, in
+// shared/seed-data.js), else an empty map.
+function _builtInLearningMap(cid) {
+  return (typeof LEARNING_MAP !== 'undefined' && LEARNING_MAP[cid]) || { subjects: [], sections: [] };
 }
 
 /* Fields that affect proficiency calculations */
@@ -7406,7 +7414,7 @@ function getLearningMap(cid) {
   } catch (e) {
     console.warn('LearningMap parse error:', e);
   }
-  if (!map) map = structuredClone(LEARNING_MAP[cid] || { subjects: [], sections: [] });
+  if (!map) map = structuredClone(_builtInLearningMap(cid));
   // Migrate old nested section/tag format to flat format
   if (!map._flatVersion || map._flatVersion < 2) {
     var sectionToTag = {};
@@ -7478,7 +7486,7 @@ function withFreshLearningMapIds(map) {
 }
 
 function resetLearningMap(cid) {
-  _cache.learningMaps[cid] = LEARNING_MAP[cid] || { subjects: [], sections: [] }; // ref change auto-busts tag/section caches
+  _cache.learningMaps[cid] = _builtInLearningMap(cid); // ref change auto-busts tag/section caches
   // v2: local-only reset. The legacy config_learning_maps table was dropped;
   // the structural learning-map RPCs (upsert_subject / delete_section / etc.)
   // now live under window.v2.* and are called from the UI directly.
@@ -16724,7 +16732,9 @@ window.resetDemoData = async function () {
   Object.keys(COURSES).forEach(function (cid) {
     delete COURSES[cid];
   });
-  Object.assign(COURSES, structuredClone(DEFAULT_COURSES));
+  // seed-data.js has run by now (Demo Mode loads it at start); if it has
+  // not, seedIfNeeded puts the class back itself.
+  if (typeof DEFAULT_COURSES !== 'undefined') Object.assign(COURSES, structuredClone(DEFAULT_COURSES));
   saveCourses(COURSES);
   await window.loadSeedIfNeeded();
 };

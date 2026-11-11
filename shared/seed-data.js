@@ -7,6 +7,177 @@
 const SEED_LAST_DAY = '2026-03-21';
 const _DATE_RE = /^\d{4}-\d{2}-\d{2}(T[\d:.]+Z?)?$/;
 
+/* ── The demo class ─────────────────────────────────────────────
+   Demo Mode's Science 8 class and its built-in learning map, the map used
+   only when the curriculum bank cannot load. They lived in constants.js,
+   which every page loads; they belong with the rest of the sample data
+   (S5-F5). Declared with var so this file can be run again in a page that
+   has already run it (the tests do). */
+var DEFAULT_COURSES = {
+  sci8: {
+    id: 'sci8',
+    name: 'Science 8',
+    block: 'A',
+    // Demo Mode's class: Proficiency, Mean, Emerging First (Colin, 2026-10-26).
+    gradingSystem: 'proficiency',
+    calcMethod: 'average',
+    decayWeight: 0.65,
+    levelOrder: 'asc',
+    curriculumTags: ['SCI8'],
+  },
+};
+
+/* ── Learning Map: Learning Standards (flat format) ─────────── */
+var LEARNING_MAP = {
+  sci8: {
+    _flatVersion: 2,
+    subjects: [{ id: 'SCI8', name: 'Science 8', color: '#0891b2' }],
+    sections: [
+      {
+        id: 'QAP',
+        subject: 'SCI8',
+        name: 'Questioning and Predicting',
+        shortName: 'Questioning',
+        color: '#0891b2',
+        tags: [
+          {
+            id: 'QAP',
+            label: 'Question and Predict',
+            text: '',
+            color: '#0891b2',
+            subject: 'SCI8',
+            name: 'Questioning and Predicting',
+            shortName: 'Questioning',
+            i_can_statements: [
+              'I can identify a scientific question that genuinely interests me and pursue it with curiosity.',
+              'I can make careful observations of the natural world and generate questions based on what I notice.',
+              'I can formulate a hypothesis and predict what I think will happen in an investigation.',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'PI',
+        subject: 'SCI8',
+        name: 'Planning and Conducting',
+        shortName: 'Planning',
+        color: '#0891b2',
+        tags: [
+          {
+            id: 'PI',
+            label: 'Plan Investigations',
+            text: '',
+            color: '#0891b2',
+            subject: 'SCI8',
+            name: 'Planning and Conducting',
+            shortName: 'Planning',
+            i_can_statements: [
+              'I can plan a fair test by identifying and controlling variables.',
+              'I can choose the right tools and methods to collect accurate and reliable data.',
+              'I can use appropriate SI units and convert between units when needed.',
+              'I can follow safety and ethical guidelines during investigations.',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'IP',
+        subject: 'SCI8',
+        name: 'Processing and Analyzing Data and Information',
+        shortName: 'Processing',
+        color: '#0891b2',
+        tags: [
+          {
+            id: 'IP',
+            label: 'Identify Patterns',
+            text: '',
+            color: '#0891b2',
+            subject: 'SCI8',
+            name: 'Processing and Analyzing Data and Information',
+            shortName: 'Processing',
+            i_can_statements: [
+              'I can organize data into tables and graphs to reveal patterns.',
+              'I can analyze my data to identify trends, patterns, and relationships.',
+              'I can apply First Peoples knowledge and perspectives as valid sources of scientific understanding.',
+              'I can use scientific understanding to draw conclusions supported by evidence.',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'EM',
+        subject: 'SCI8',
+        name: 'Evaluating',
+        shortName: 'Evaluating',
+        color: '#0891b2',
+        tags: [
+          {
+            id: 'EM',
+            label: 'Evaluate Methods',
+            text: '',
+            color: '#0891b2',
+            subject: 'SCI8',
+            name: 'Evaluating',
+            shortName: 'Evaluating',
+            i_can_statements: [
+              'I can identify sources of error in my investigation and suggest specific improvements.',
+              'I can evaluate the quality of my data and explain how it could be made more reliable.',
+              'I can consider the social, ethical, and environmental implications of a scientific issue.',
+              'I can exercise informed skepticism \u2014 questioning claims and demanding evidence.',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'CA',
+        subject: 'SCI8',
+        name: 'Applying and Innovating',
+        shortName: 'Applying',
+        color: '#0891b2',
+        tags: [
+          {
+            id: 'CA',
+            label: 'Community Applications',
+            text: '',
+            color: '#0891b2',
+            subject: 'SCI8',
+            name: 'Applying and Innovating',
+            shortName: 'Applying',
+            i_can_statements: [
+              "I can apply what I've learned in science to a new situation or problem.",
+              'I can design a project or solution that addresses a real need in my community or the world.',
+              'I can generate and refine creative ideas when problem-solving.',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'SC',
+        subject: 'SCI8',
+        name: 'Communicating',
+        shortName: 'Communicating',
+        color: '#0891b2',
+        tags: [
+          {
+            id: 'SC',
+            label: 'Scientific Communication',
+            text: '',
+            color: '#0891b2',
+            subject: 'SCI8',
+            name: 'Communicating',
+            shortName: 'Communicating',
+            i_can_statements: [
+              'I can communicate my scientific findings clearly using appropriate scientific vocabulary.',
+              'I can use digital tools to represent and share scientific information.',
+              "I can express how my local environment and First Peoples perspectives relate to the science I'm learning.",
+            ],
+          },
+        ],
+      },
+    ],
+  },
+};
+
 function _seedShiftDays() {
   var today = Date.parse(getTodayStr() + 'T00:00:00Z');
   var last = Date.parse(SEED_LAST_DAY + 'T00:00:00Z');
