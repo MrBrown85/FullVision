@@ -523,6 +523,439 @@
   display: flex;
 }
 
+/* What You're Graded On, on a card not back yet (S4-F3). */
+.sp-view .sp-graded-on {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #eef5ee;
+}
+.sp-view .sp-graded-on-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1b5e20;
+}
+.sp-view .sp-graded-on-name {
+  font-size: 14px;
+}
+.sp-view .sp-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  margin: 0;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  color: #1b5e20;
+  font-size: 13px;
+  font-weight: 700;
+}
+.sp-view .sp-btn-primary {
+  background: var(--sp-blue);
+  color: #fff;
+}
+.sp-view .sp-btn-big {
+  min-height: 50px;
+  border-radius: 14px;
+  font-size: 17px;
+}
+.sp-view .sp-piece-card .sp-btn-big {
+  margin-top: auto;
+}
+
+/* Your Feedback and The Whole Rubric (S4-F3). On a phone the screen is the
+   feedback alone, with the way back at the top; on a Chromebook the list
+   stays on the left and the feedback takes the card's place. */
+.sp-view .sp-feedback {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.sp-view .sp-fb-back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 44px;
+  margin: -8px 0 0 -8px;
+  padding: 0 8px 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--sp-blue-text);
+  font-size: 16px;
+}
+.sp-view .sp-fb-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 2px;
+}
+.sp-view .sp-fb-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.sp-view .sp-fb-title:focus {
+  outline: none;
+}
+.sp-view .sp-fb-sub {
+  margin: 0;
+  font-size: 14px;
+  color: #58585d;
+}
+.sp-view .sp-fb-top {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sp-view .sp-fb-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 16px;
+  background: var(--sp-card);
+  border-radius: 18px;
+}
+.sp-view .sp-fb-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #58585d;
+}
+.sp-view .sp-fb-result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+}
+.sp-view .sp-fb-big {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.sp-view .sp-fb-beside {
+  font-size: 16px;
+  font-weight: 600;
+  color: #3a3a3c;
+  font-variant-numeric: tabular-nums;
+}
+.sp-view .sp-lvt-1 {
+  color: #8a1c1c;
+}
+.sp-view .sp-lvt-2 {
+  color: #8a4b00;
+}
+.sp-view .sp-lvt-3 {
+  color: #1b5e20;
+}
+.sp-view .sp-lvt-4 {
+  color: #1e40af;
+}
+.sp-view .sp-fb-rows {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+}
+.sp-view .sp-fb-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+.sp-view .sp-fb-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.sp-view .sp-feedback .sp-level {
+  font-size: 15px;
+  padding: 4px 12px;
+  white-space: nowrap;
+}
+.sp-view .sp-fb-points {
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  padding: 18px;
+}
+.sp-view .sp-fb-score {
+  flex: none;
+  font-size: 40px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.sp-view .sp-fb-outof {
+  color: #6e6e73;
+  font-weight: 600;
+}
+.sp-view .sp-fb-meter {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sp-view .sp-fb-pct {
+  font-size: 17px;
+  font-weight: 700;
+}
+.sp-view .sp-fb-bar {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--sp-fill);
+  overflow: hidden;
+}
+.sp-view .sp-fb-fill {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--sp-text-2);
+}
+.sp-view .sp-lvf-1 {
+  background: #b91c1c;
+}
+.sp-view .sp-lvf-2 {
+  background: #c07a00;
+}
+.sp-view .sp-lvf-3 {
+  background: #2e7d32;
+}
+.sp-view .sp-lvf-4 {
+  background: #1d4ed8;
+}
+.sp-view .sp-fb-comment {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: #e8f1ff;
+  font-size: 17px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.sp-view .sp-fb-levels {
+  padding: 4px 16px;
+  gap: 4px;
+}
+.sp-view .sp-fb-levels-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font-size: 15px;
+  font-weight: 700;
+}
+.sp-view .sp-fb-levels-btn span {
+  flex: 1;
+}
+.sp-view .sp-fb-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sp-view .sp-fb-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+}
+.sp-view .sp-fb-legend-chip {
+  flex: none;
+  width: 104px;
+}
+.sp-view .sp-fb-fine {
+  margin: 4px 0 10px;
+  font-size: 14px;
+  color: #3a3a3c;
+}
+.sp-view .sp-fb-section {
+  margin: 6px 2px 0;
+  font-size: 20px;
+  font-weight: 800;
+}
+.sp-view .sp-fb-crits {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sp-view .sp-fb-criterion {
+  gap: 12px;
+}
+.sp-view .sp-fb-crit-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.sp-view .sp-fb-crit-name {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.sp-view .sp-fb-part {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.sp-view .sp-fb-part-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.sp-view .sp-fb-part-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+.sp-view .sp-fb-amber,
+.sp-view .sp-fb-blue {
+  padding: 10px 12px;
+  border-radius: 12px;
+}
+.sp-view .sp-fb-amber {
+  background: #fff7e8;
+}
+.sp-view .sp-fb-amber .sp-fb-part-title,
+.sp-view .sp-fb-to-mark {
+  color: #8a4b00;
+}
+.sp-view .sp-fb-to-mark {
+  flex: none;
+  margin-top: 2px;
+}
+.sp-view .sp-fb-blue {
+  background: #e8f1ff;
+}
+.sp-view .sp-fb-blue .sp-fb-part-title {
+  color: #0c2d6b;
+}
+.sp-view .sp-fb-goal .sp-fb-part-title {
+  color: #1b5e20;
+}
+.sp-view .sp-fb-lvt-1 .sp-fb-part-title {
+  color: #8a1c1c;
+}
+.sp-view .sp-fb-lvt-2 .sp-fb-part-title {
+  color: #8a4b00;
+}
+.sp-view .sp-fb-lvt-3 .sp-fb-part-title {
+  color: #1b5e20;
+}
+.sp-view .sp-fb-lvt-4 .sp-fb-part-title {
+  color: #1e40af;
+}
+.sp-view .sp-fb-words {
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+.sp-view .sp-fb-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 15px;
+}
+.sp-view .sp-fb-box {
+  flex: none;
+  margin-top: 2px;
+  color: #2e7d32;
+}
+.sp-view .sp-fb-box-open {
+  color: #8e8e93;
+}
+.sp-view .sp-fb-note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #e8f1ff;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+.sp-view .sp-whole .sp-fb-card {
+  gap: 4px;
+}
+.sp-view .sp-fb-whole-levels {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sp-view .sp-fb-whole-level {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+}
+.sp-view .sp-fb-whole-name {
+  flex: none;
+  width: 104px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #58585d;
+}
+.sp-view .sp-fb-whole-words {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #3a3a3c;
+}
+.sp-view .sp-fb-you {
+  box-shadow: inset 0 0 0 2px currentColor;
+}
+.sp-view .sp-fb-you .sp-fb-whole-name {
+  font-weight: 800;
+  color: inherit;
+}
+.sp-view .sp-fb-you .sp-fb-whole-words {
+  color: var(--sp-text);
+}
+.sp-view .sp-fb-you-tag {
+  display: inline-block;
+  padding: 0 7px;
+  border-radius: 8px;
+  background: var(--sp-text);
+  color: #fff;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+/* On a phone, Your Feedback is a screen of its own: no class header, no
+   To Do, Sent and Back, no tabs along the bottom (the board). */
+@container sp-view (max-width: 759px) {
+  .sp-view.sp-on-feedback .sp-head,
+  .sp-view.sp-on-feedback .sp-tabs-bottom,
+  .sp-view.sp-on-feedback .sp-fb-segments {
+    display: none;
+  }
+  .sp-view .sp-split-feedback {
+    margin: 0;
+  }
+}
+
 /* The four tabs: along the bottom on a phone. The header's copy shows on a
    Chromebook instead. */
 .sp-view .sp-tabs {
@@ -660,5 +1093,28 @@
   }
   .sp-view .sp-page-title {
     font-size: 26px;
+  }
+  /* Your Feedback on a Chromebook: the list stays; no way back is needed. */
+  .sp-view .sp-fb-back {
+    display: none;
+  }
+  .sp-view .sp-fb-title {
+    font-size: 28px;
+  }
+  .sp-view .sp-fb-top-two {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 14px;
+    align-items: start;
+  }
+  .sp-view .sp-fb-crits {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 14px;
+    align-items: start;
+  }
+  .sp-view .sp-feedback > .sp-btn-big {
+    align-self: flex-start;
+    padding: 0 24px;
   }
 }

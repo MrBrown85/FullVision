@@ -484,9 +484,20 @@
           id: 'demo-rubric-lab',
           name: 'Lab Report',
           style: 'simple',
+          // What each level asks, as the teacher wrote it: Your Feedback and The Whole Rubric show it.
           criteria: [
-            { id: 'demo-crit-method', name: 'Method', weight: 1, checks: [] },
-            { id: 'demo-crit-drawing', name: 'Labelled Drawing', weight: 1, checks: [] },
+            demoCriterion('demo-crit-method', 'Method', [
+              'Lists a few of the steps.',
+              'Lists the steps, with some out of order.',
+              'Lists every step in order, so someone else could repeat it.',
+              'Lists every step in order and says why each one matters.',
+            ]),
+            demoCriterion('demo-crit-drawing', 'Labelled Drawing', [
+              'Draws the cell.',
+              'Draws the cell and labels some of its parts.',
+              'Draws the cell and labels every part.',
+              'Draws the cell to scale and labels every part.',
+            ]),
           ],
         },
       ],
@@ -606,6 +617,16 @@
         },
       ],
     };
+  }
+
+  // One criterion of a sample rubric, in the server's shape, with what each of its four levels asks.
+  function demoCriterion(id, name, words) {
+    var c = { id: id, name: name, weight: 1, checks: [] };
+    words.forEach(function (w, i) {
+      c['level_' + (i + 1) + '_value'] = i + 1;
+      c['level_' + (i + 1) + '_descriptor'] = w;
+    });
+    return c;
   }
 
   var DEMO_TAGS = {
@@ -1532,7 +1553,7 @@
      is already here: nothing is asked. The rows on screen change, so what
      is watched for "opened" starts again. */
   /* What the student looks at on the page, as s/page-view.js reads it. */
-  var UI_KEYS = ['tab', 'segment', 'all', 'pick', 'search', 'filter'];
+  var UI_KEYS = ['tab', 'segment', 'all', 'pick', 'search', 'filter', 'feedback', 'whole', 'levels'];
   function uiOf() {
     var ui = {};
     UI_KEYS.forEach(function (k) {
@@ -1703,6 +1724,9 @@
         S.pick = '';
         S.search = '';
         S.filter = 'all';
+        S.feedback = '';
+        S.whole = false;
+        S.levels = false;
       }
       S.reply = res;
       S.page = StudentData.fromServer(res);
@@ -1895,7 +1919,11 @@
       }
     } else if (act === 'card-back') {
       backToPage();
-    } else if (/^(tab|segment|all-open|all-close|filter|pick|open-piece)$/.test(act)) {
+    } else if (
+      /^(tab|segment|all-open|all-close|filter|pick|open-piece|feedback|feedback-close|whole|whole-close|levels)$/.test(
+        act,
+      )
+    ) {
       showPart(act, el);
     } else if (act === 'page-retry') {
       openPage();

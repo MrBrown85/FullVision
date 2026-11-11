@@ -285,7 +285,11 @@ window.StudentView = (function () {
 
   var STATUSES = { NS: 'NS', EXC: 'EXC', LATE: 'LATE' };
 
-  // The result line, worded by calc.js and constants.js as the student page's list words it.
+  /* The result line, worded by calc.js and constants.js as the student
+     page's list words it. A level or points result also carries the 1-4
+     band its colour comes from (calc.js's), and points their parts for
+     Your Feedback: the score, the most, the percent (formatPointsPercent)
+     and how full its bar is. */
   function resultOf(cid, a, cell) {
     var out = { kind: 'none', text: '', word: '' };
     if (!cell) return out;
@@ -293,14 +297,39 @@ window.StudentView = (function () {
       out.kind = 'level';
       out.text = str(cell.text);
       out.word = levelWord(cid, cell.value) || '';
+      out.level = num(cell.level) || 0;
     } else if (cell.kind === 'points') {
+      var max = num(a.max_points) || 100;
       out.kind = 'points';
-      out.text = formatPoints(cell.value) + ' / ' + formatPoints(num(a.max_points) || 100);
+      out.text = formatPoints(cell.value) + ' / ' + formatPoints(max);
+      out.level = num(cell.level) || 0;
+      out.points = formatPoints(cell.value);
+      out.outOf = formatPoints(max);
+      out.percent = formatPointsPercent(cell.value, max);
+      // A bar, not a grade: how much of it is filled, 0 to 100.
+      out.bar = Math.max(0, Math.min(100, (Number(cell.value) / max) * 100));
     } else if (cell.kind === 'complete') {
       out.kind = 'complete';
       out.text = cell.mark === 'complete' ? 'Complete' : 'Incomplete';
     }
     return out;
+  }
+
+  // A level's name alone, "Developing": constants.js's scoreLevelText with no + or −.
+  function levelName(level) {
+    var l = Number(level);
+    return [1, 2, 3, 4].indexOf(l) >= 0 && typeof scoreLevelText === 'function' ? scoreLevelText(l, 0) : '';
+  }
+
+  /* What the Levels Mean: the four levels by name, Emerging to Extending,
+     when constants.js is in to name them. */
+  function levelsLegend() {
+    var names = [1, 2, 3, 4].map(levelName);
+    return names[0]
+      ? names.map(function (name, i) {
+          return { level: i + 1, name: name };
+        })
+      : [];
   }
 
   // A level as one row's name for it, "Proficient +": constants.js's scoreLevelText.
@@ -316,9 +345,15 @@ window.StudentView = (function () {
     };
   }
 
-  /* The rubric rows of a returned piece: every criterion on its rubric, in
-     order, with the level given (or none), its comment and Went Beyond,
-     and each checkbox with whether it was ticked. */
+  /* The rubric rows of a piece: every criterion on its rubric, in order,
+     with the level given (or none), its comment and Went Beyond, and each
+     checkbox with whether it was ticked. With no grade (work not back yet)
+     the rows hold the rubric's own words and no level.
+     For Your Feedback, each row also says, by the level's name: what the
+     level given means here (its descriptor), and what the next level up
+     asks (its descriptor, and on an Advanced Rubric its boxes not ticked);
+     the Proficient wording (a Single-Point Rubric's goal); and each of the
+     four levels for The Whole Rubric, the one given marked. */
   function rubricView(rubric, grade) {
     var criteria = (grade && grade.criteria) || {};
     var ticked = {};
@@ -339,9 +374,46 @@ window.StudentView = (function () {
         row.checks = (c.checks || []).map(function (k) {
           return { id: k.id, level: num(k.level), label: str(k.label), ticked: !!ticked[k.id] };
         });
+        var given = row.level >= 1 && row.level <= 4 ? row.level : 0;
+        var at = function (l) {
+          return row.checks.filter(function (k) {
+            return k.level === l;
+          });
+        };
+        row.levelName = levelName(given);
+        row.descriptor = given ? row.descriptors[given - 1] : '';
+        row.shown = row.checks.filter(function (k) {
+          return k.ticked;
+        });
+        row.next =
+          given && given < 4
+            ? {
+                level: given + 1,
+                name: levelName(given + 1),
+                descriptor: row.descriptors[given],
+                checks: at(given + 1).filter(function (k) {
+                  return !k.ticked;
+                }),
+              }
+            : null;
+        row.goal = row.descriptors[2];
+        row.whole = [1, 2, 3, 4].map(function (l) {
+          return { level: l, name: levelName(l), descriptor: row.descriptors[l - 1], checks: at(l), you: l === given };
+        });
         return row;
       }),
     };
+  }
+
+  // What a piece is graded on: its competencies by name, in the reply's order.
+  function gradedOn(row, tags) {
+    return (row.tag_ids || [])
+      .filter(function (id) {
+        return tags[id] && tags[id].label;
+      })
+      .map(function (id) {
+        return { id: str(id), name: str(tags[id].label) };
+      });
   }
 
   /* The plain data the student page draws, from a `page` reply (the
@@ -354,14 +426,21 @@ window.StudentView = (function () {
        course:  { name, block, gradingSystem },
        counts:  { toDo, sent, back, missing },
        work:    [ piece ], newest first,
-       changes: [ { id, title, why: 'updated' | 'back' } ] }
+       changes: [ { id, title, why: 'updated' | 'back' } ],
+       levels:  [ { level, name } ], Emerging to Extending (What the
+                Levels Mean), or none while constants.js is not in }
      piece: { id, title, date, dueDate, kind: 'due' | 'back' | 'missing' |
               'excused', late, returnedAt, updated, unseen,
               result: { kind: 'level' | 'points' | 'complete' | 'none',
-                        text, word },
-              comment, competencies: [ row ], rubric: null | { id, name,
-              style, rows: [ row + beyond, descriptors, checks ] } }
+                        text, word, and for a level or points: level (its
+                        1-4 band); for points: points, outOf, percent,
+                        bar },
+              comment, competencies: [ row ], gradedOn: [ { id, name } ],
+              rubric: null | { id, name, style, rows: [ row + beyond,
+              descriptors, checks, levelName, descriptor, shown, next,
+              goal, whole ] } }
      row: { id, name, level, text, comment }
+     A piece not back yet has its rubric's words and no level in it.
      sent is 0: the page sends no work yet (S5). */
   function build(page, cid, cellOf) {
     page = page || {};
@@ -393,8 +472,13 @@ window.StudentView = (function () {
         comment: '',
         competencies: [],
         rubric: null,
+        gradedOn: gradedOn(row, tags),
         created_at: str(row.created_at),
       };
+      // Work not back yet shows its rubric's words (See the Rubric), with no level.
+      if (!grade && !hidden && row.rubric_id && rubrics[row.rubric_id]) {
+        piece.rubric = rubricView(rubrics[row.rubric_id], null);
+      }
       if (grade) {
         var returned = when(row.returned_at);
         var changed = when(row.updated_at);
@@ -450,6 +534,7 @@ window.StudentView = (function () {
       counts: { toDo: count('due'), sent: 0, back: count('back'), missing: count('missing') },
       work: work,
       changes: changes,
+      levels: levelsLegend(),
     };
   }
 

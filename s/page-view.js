@@ -1,6 +1,7 @@
 /* The student's page for one class, drawn from a view (S4-F1; the
    artboard's "To Do Card", "All Caught Up", "All Assignments" and "Page on
-   a Chromebook").
+   a Chromebook"; S4-F3: "Your Feedback" for each way of scoring, "The
+   Whole Rubric" and "Your Feedback on a Chromebook").
 
    One drawing for two places. The student page (s/assignments.js) and the
    teacher's Preview as Student (teacher/preview-student.js) both hand this
@@ -24,6 +25,9 @@
          showing, all: true for All Assignments, search and filter: All
          Assignments' search words and filter ('all' | 'todo' | 'sent' |
          'back'),
+         feedback: the id of the piece Your Feedback is open on, whole:
+         true for its The Whole Rubric (also for work not back yet, from
+         See the Rubric), levels: What the Levels Mean is open,
          noResults: the results didn't load (say so, with Try Again),
          sending: Try Again is under way, waiting: the view is not here yet,
          note: a line under the body (Demo Mode's), sheet: Your Classes is
@@ -215,11 +219,41 @@ window.StudentPageView = (function () {
     return 'sp-piece-' + String(id).replace(/[^A-Za-z0-9_-]/g, '');
   }
 
+  /* What You're Graded On, on work not back yet (the To Do card board): its
+     competencies by name, and See the Rubric when it has one. The I Can
+     statements under each name wait on the server. */
+  function gradedOnHtml(p) {
+    var names = p.gradedOn || [];
+    if (!names.length && !p.rubric) return '';
+    return (
+      '<div class="sp-graded-on"><span class="sp-graded-on-title">What You’re Graded On</span>' +
+      names
+        .map(function (g) {
+          return '<span class="sp-graded-on-name">' + esc(g.name) + '</span>';
+        })
+        .join('') +
+      (p.rubric
+        ? '<button type="button" class="sp-link-btn" data-act="whole" data-piece="' +
+          esc(p.id) +
+          '">See the Rubric' +
+          GO_ARROW +
+          '</button>'
+        : '') +
+      '</div>'
+    );
+  }
+
+  // A returned piece with a result opens Your Feedback.
+  function hasFeedback(p) {
+    return !!(p && p.kind === 'back' && p.result && p.result.text);
+  }
+
   /* One card. A returned piece not opened since it came back carries its
      id as data-unseen: the student page counts it opened once the card has
      been on screen. */
   function cardHtml(p, picked) {
     var unseen = p.kind === 'back' && p.unseen && p.result && p.result.text;
+    var todo = p.kind === 'due' || p.kind === 'missing';
     return (
       '<article class="sp-piece sp-piece-' +
       kindOf(p) +
@@ -239,6 +273,12 @@ window.StudentPageView = (function () {
       '</h2>' +
       (p.kind === 'back' ? resultRows(p) : '') +
       (p.kind === 'back' && p.comment ? '<p class="sp-piece-comment">' + esc(p.comment) + '</p>' : '') +
+      (todo ? gradedOnHtml(p) : '') +
+      (hasFeedback(p)
+        ? '<button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="feedback" data-piece="' +
+          esc(p.id) +
+          '">See Your Feedback</button>'
+        : '') +
       '</div></article>'
     );
   }
@@ -257,6 +297,25 @@ window.StudentPageView = (function () {
     var picked = pieceIn(pieces, ui.pick);
     return (
       '<div class="sp-split">' +
+      sideHtml(pieces, picked) +
+      '<div class="sp-deck">' +
+      pieces
+        .map(function (p) {
+          return cardHtml(p, p === picked);
+        })
+        .join('') +
+      '</div></div>' +
+      (pieces.length > 1
+        ? '<p class="sp-deck-count" aria-hidden="true">' +
+          esc(pieces.indexOf(picked) + 1 + ' of ' + pieces.length) +
+          '</p>'
+        : '')
+    );
+  }
+
+  // The Chromebook's list on the left, the piece picked marked.
+  function sideHtml(pieces, picked) {
+    return (
       '<ul class="sp-side">' +
       pieces
         .map(function (p) {
@@ -279,19 +338,363 @@ window.StudentPageView = (function () {
           );
         })
         .join('') +
-      '</ul>' +
-      '<div class="sp-deck">' +
-      pieces
-        .map(function (p) {
-          return cardHtml(p, p === picked);
-        })
-        .join('') +
-      '</div></div>' +
-      (pieces.length > 1
-        ? '<p class="sp-deck-count" aria-hidden="true">' +
-          esc(pieces.indexOf(picked) + 1 + ' of ' + pieces.length) +
-          '</p>'
-        : '')
+      '</ul>'
+    );
+  }
+
+  /* ── Your Feedback (the artboard's "Your Feedback" boards, one per way of
+     scoring, and "Your Feedback on a Chromebook") ───────────── */
+
+  // What the Levels Mean: the board's line for each level, Emerging to Extending.
+  var LEVEL_LINES = ['Just starting', 'Partly there', 'You met the goal', 'You went beyond the goal'];
+  var PLUS_MINUS = 'A + means a little past that level. A − means not quite all the way there.';
+
+  var GO_ARROW =
+    '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 6l6 6-6 6"/></svg>';
+  var TO_ARROW =
+    '<svg class="sp-fb-to-mark" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+  var TICKED =
+    '<svg class="sp-fb-box" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="M7.5 12.3l3 3 6-6.3" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var NOT_YET =
+    '<svg class="sp-fb-box sp-fb-box-open" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3"/></svg>';
+  var OPEN_CHEVRON =
+    '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6"/></svg>';
+  var CLOSE_CHEVRON =
+    '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 15l6-6 6 6"/></svg>';
+
+  // A level number, 1 to 4, for a class name; 0 for anything else.
+  function lvClass(level) {
+    var lv = Math.round(Number(level));
+    return lv >= 1 && lv <= 4 ? lv : 0;
+  }
+
+  // The piece Your Feedback or The Whole Rubric is open on, or null when it cannot be shown.
+  function feedbackPiece(view, ui) {
+    if (!view || !ui.feedback) return null;
+    var p = pieceIn(view.work, ui.feedback);
+    if (!p || p.id !== ui.feedback) return null;
+    if (ui.whole) return p.rubric && segmentOf(p) ? p : null;
+    return hasFeedback(p) ? p : null;
+  }
+
+  /* Your Result: the level's word, large, with the result beside it, then a
+     row per criterion or competency; or points with their percent and a
+     bar; or Complete. Every word and figure is the view's (calc.js's). */
+  function yourResultHtml(p) {
+    var r = p.result;
+    if (r.kind === 'points') {
+      return (
+        '<section class="sp-fb-card sp-fb-points" aria-label="Your Result"><span class="sp-fb-score">' +
+        esc(r.points) +
+        '<span class="sp-fb-outof">' +
+        esc(' / ' + r.outOf) +
+        '</span></span><span class="sp-fb-meter"><span class="sp-fb-pct sp-lvt-' +
+        lvClass(r.level) +
+        '">' +
+        esc(r.percent) +
+        '</span><span class="sp-fb-bar"><span class="sp-fb-fill sp-lvf-' +
+        lvClass(r.level) +
+        '" style="width:' +
+        Math.max(0, Math.min(100, Number(r.bar) || 0)) +
+        '%"></span></span></span></section>'
+      );
+    }
+    var big = r.word || r.text;
+    var beside = r.word ? r.text : '';
+    var rows = (p.rubric ? p.rubric.rows : p.competencies || []).filter(function (row) {
+      return row.text;
+    });
+    return (
+      '<section class="sp-fb-card" aria-labelledby="sp-fb-result"><span class="sp-fb-label" id="sp-fb-result">Your Result</span>' +
+      '<span class="sp-fb-result"><span class="sp-fb-big sp-lvt-' +
+      lvClass(r.level) +
+      '">' +
+      esc(big) +
+      '</span>' +
+      (beside ? '<span class="sp-fb-beside">' + esc(beside) + '</span>' : '') +
+      '</span>' +
+      (rows.length
+        ? '<ul class="sp-fb-rows">' +
+          rows
+            .map(function (row) {
+              return (
+                '<li class="sp-fb-row"><span class="sp-fb-row-name">' +
+                esc(row.name) +
+                '</span>' +
+                chipHtml(row.text, row.level) +
+                '</li>'
+              );
+            })
+            .join('') +
+          '</ul>'
+        : '') +
+      '</section>'
+    );
+  }
+
+  // Does this piece name levels by their words (a rubric, or competencies)?
+  function namesLevels(p) {
+    if (p.result.kind !== 'level') return false;
+    return (p.rubric ? p.rubric.rows : p.competencies || []).some(function (row) {
+      return !!row.text;
+    });
+  }
+
+  // What the Levels Mean, opened and closed by the student.
+  function levelsHtml(view, ui) {
+    var levels = view.levels || [];
+    if (!levels.length) return '';
+    var open = !!ui.levels;
+    return (
+      '<section class="sp-fb-card sp-fb-levels"><button type="button" class="sp-fb-levels-btn" data-act="levels" aria-expanded="' +
+      (open ? 'true' : 'false') +
+      '" aria-controls="sp-fb-levels-list"><span>What the Levels Mean</span>' +
+      (open ? CLOSE_CHEVRON : OPEN_CHEVRON) +
+      '</button>' +
+      (open
+        ? '<div id="sp-fb-levels-list"><ul class="sp-fb-legend">' +
+          levels
+            .map(function (l) {
+              return (
+                '<li class="sp-fb-legend-row"><span class="sp-fb-legend-chip">' +
+                chipHtml(l.name, l.level) +
+                '</span><span>' +
+                esc(LEVEL_LINES[l.level - 1] || '') +
+                '</span></li>'
+              );
+            })
+            .join('') +
+          '</ul><p class="sp-fb-fine">' +
+          esc(PLUS_MINUS) +
+          '</p></div>'
+        : '') +
+      '</section>'
+    );
+  }
+
+  // A part of a criterion's card: a heading and its words, in one of the board's tints.
+  function partHtml(tint, title, body, mark) {
+    return (
+      '<div class="sp-fb-part sp-fb-' +
+      tint +
+      '">' +
+      (mark || '') +
+      '<div class="sp-fb-part-text"><span class="sp-fb-part-title">' +
+      esc(title) +
+      '</span>' +
+      body +
+      '</div></div>'
+    );
+  }
+
+  function wordsHtml(text) {
+    return '<span class="sp-fb-words">' + esc(text) + '</span>';
+  }
+
+  function checksHtml(checks, mark) {
+    return checks
+      .map(function (k) {
+        return '<span class="sp-fb-check">' + mark + '<span>' + esc(k.label) + '</span></span>';
+      })
+      .join('');
+  }
+
+  /* One criterion's card under Your Rubric. A Standard rubric: what the
+     level given means here and what the next level up asks. An Advanced
+     Rubric: the boxes ticked, and the next level's boxes still to show. A
+     Single-Point Rubric: the goal, then Went Beyond or Work On. Then the
+     teacher's comment on the criterion (on a Single-Point Rubric that is
+     Work On). */
+  function criterionHtml(style, row) {
+    var parts = '';
+    var lv = lvClass(row.level);
+    if (style === 'single_point') {
+      if (row.goal) parts += partHtml('plain sp-fb-goal', 'The Goal', wordsHtml(row.goal));
+      if (row.beyond) parts += partHtml('blue', 'Went Beyond', wordsHtml(row.beyond));
+      if (row.comment) parts += partHtml('amber', 'Work On', wordsHtml(row.comment));
+    } else {
+      if (style === 'advanced') {
+        if (row.shown && row.shown.length) {
+          parts += partHtml('plain sp-fb-lvt-' + lv, 'What You Showed', checksHtml(row.shown, TICKED));
+        }
+        if (row.next && row.next.checks.length) {
+          parts += partHtml('amber', 'To Reach ' + row.next.name + ', Also Show', checksHtml(row.next.checks, NOT_YET));
+        }
+      } else {
+        if (row.descriptor && row.levelName) {
+          parts += partHtml(
+            'plain sp-fb-lvt-' + lv,
+            'What ' + row.levelName + ' Means Here',
+            wordsHtml(row.descriptor),
+          );
+        }
+        if (row.next && row.next.descriptor) {
+          parts += partHtml('amber', 'To Reach ' + row.next.name, wordsHtml(row.next.descriptor), TO_ARROW);
+        }
+      }
+      if (row.comment) parts += '<p class="sp-fb-note">' + esc(row.comment) + '</p>';
+    }
+    return (
+      '<section class="sp-fb-card sp-fb-criterion"><div class="sp-fb-crit-head"><h3 class="sp-fb-crit-name">' +
+      esc(row.name) +
+      '</h3>' +
+      (row.text ? chipHtml(row.text, row.level) : '') +
+      '</div>' +
+      parts +
+      '</section>'
+    );
+  }
+
+  // The piece's class and when it came back: "Science 8 · Returned Nov 3".
+  function feedbackSub(view, p) {
+    return [view.course && view.course.name, p.kind === 'back' ? 'Returned ' + fmtDate(p.returnedAt, DAY) : '']
+      .filter(Boolean)
+      .join(SEP);
+  }
+
+  /* The top of Your Feedback and The Whole Rubric: the way back (on a
+     phone; a Chromebook keeps its list on the left), the title and the line
+     under it. A piece not opened since it came back carries its id as
+     data-unseen on the title, which stays small enough to be wholly on
+     screen. */
+  function feedbackHead(back, act, title, sub, unseen, id) {
+    return (
+      '<button type="button" class="sp-fb-back" data-act="' +
+      act +
+      '">' +
+      BACK_ARROW +
+      '<span>' +
+      esc(back) +
+      '</span></button>' +
+      '<div class="sp-fb-head"' +
+      (unseen ? ' data-unseen="' + esc(unseen) + '"' : '') +
+      '><h1 class="sp-fb-title" id="' +
+      id +
+      '" tabindex="-1">' +
+      esc(title) +
+      '</h1>' +
+      (sub ? '<p class="sp-fb-sub">' + esc(sub) + '</p>' : '') +
+      '</div>'
+    );
+  }
+
+  function feedbackHtml(view, ui, p) {
+    var rubric = p.rubric;
+    var style = rubric ? rubric.style : '';
+    var withLevels = namesLevels(p);
+    var crits = rubric
+      ? rubric.rows
+          .filter(function (row) {
+            return row.text || row.comment || row.beyond;
+          })
+          .map(function (row) {
+            return criterionHtml(style, row);
+          })
+          .join('')
+      : '';
+    return (
+      '<section class="sp-feedback" aria-labelledby="sp-fb-title">' +
+      feedbackHead(
+        'Assignments',
+        'feedback-close',
+        p.title,
+        feedbackSub(view, p),
+        p.unseen ? p.id : '',
+        'sp-fb-title',
+      ) +
+      '<div class="sp-fb-top' +
+      (p.comment ? ' sp-fb-top-two' : '') +
+      '">' +
+      yourResultHtml(p) +
+      (p.comment ? '<p class="sp-fb-comment">' + esc(p.comment) + '</p>' : '') +
+      '</div>' +
+      (crits
+        ? '<h2 class="sp-fb-section">Your Rubric</h2>' +
+          (withLevels ? levelsHtml(view, ui) : '') +
+          '<div class="sp-fb-crits">' +
+          crits +
+          '</div>' +
+          (style !== 'single_point'
+            ? '<button type="button" class="sp-btn sp-btn-tint sp-btn-big" data-act="whole" data-piece="' +
+              esc(p.id) +
+              '">See the Whole Rubric</button>'
+            : '')
+        : withLevels
+          ? levelsHtml(view, ui)
+          : '') +
+      '</section>'
+    );
+  }
+
+  // An Advanced Rubric's boxes at one level on The Whole Rubric, the ones ticked marked.
+  function wholeChecksHtml(checks) {
+    return checks
+      .map(function (k) {
+        return (
+          '<span class="sp-fb-check">' + (k.ticked ? TICKED : NOT_YET) + '<span>' + esc(k.label) + '</span></span>'
+        );
+      })
+      .join('');
+  }
+
+  /* The Whole Rubric: every criterion with each of its levels, the level
+     given marked "You". A Single-Point Rubric has only its goal. */
+  function wholeHtml(view, p) {
+    var style = p.rubric.style;
+    var cards = p.rubric.rows
+      .map(function (row) {
+        var levels = row.whole.filter(function (l) {
+          if (style === 'single_point') return l.level === 3;
+          return l.you || l.descriptor || l.checks.length;
+        });
+        return (
+          '<section class="sp-fb-card sp-fb-whole"><h2 class="sp-fb-crit-name">' +
+          esc(row.name) +
+          '</h2><ul class="sp-fb-whole-levels">' +
+          levels
+            .map(function (l) {
+              var you = l.you && row.text;
+              return (
+                '<li class="sp-fb-whole-level' +
+                (you ? ' sp-fb-you sp-lv-' + lvClass(l.level) : '') +
+                '"><span class="sp-fb-whole-name">' +
+                esc(you ? row.text : style === 'single_point' ? 'The Goal' : l.name) +
+                (you ? '<span class="sp-fb-you-tag">You</span>' : '') +
+                '</span><span class="sp-fb-whole-words">' +
+                (l.descriptor ? wordsHtml(l.descriptor) : '') +
+                (style === 'advanced' ? wholeChecksHtml(l.checks) : '') +
+                '</span></li>'
+              );
+            })
+            .join('') +
+          '</ul></section>'
+        );
+      })
+      .join('');
+    var back = hasFeedback(p) ? 'Your Feedback' : 'Assignments';
+    return (
+      '<section class="sp-feedback sp-whole" aria-labelledby="sp-fb-title">' +
+      feedbackHead(back, 'whole-close', 'The Whole Rubric', p.title, '', 'sp-fb-title') +
+      cards +
+      '</section>'
+    );
+  }
+
+  /* Your Feedback, or The Whole Rubric, in place of the cards. On a
+     Chromebook the list stays on the left, as on the board; on a phone the
+     screen is the feedback alone. */
+  function feedbackBody(ui, view, p) {
+    var seg = segmentOf(p);
+    var pieces = inSegment(view, seg);
+    return (
+      '<div class="sp-fb-segments">' +
+      segmentsHtml(Object.assign({}, ui, { segment: seg }), view) +
+      '</div>' +
+      noResultsHtml(ui, view) +
+      '<div class="sp-split sp-split-feedback">' +
+      sideHtml(pieces, p) +
+      (ui.whole ? wholeHtml(view, p) : feedbackHtml(view, ui, p)) +
+      '</div>'
     );
   }
 
@@ -435,7 +838,9 @@ window.StudentPageView = (function () {
         '</p>'
       );
     }
-    return ui.all ? allBody(ui, view) : assignmentsBody(ui, view);
+    if (ui.all) return allBody(ui, view);
+    var fb = feedbackPiece(view, ui);
+    return fb ? feedbackBody(ui, view, fb) : assignmentsBody(ui, view);
   }
 
   /* ── The frame ─────────────────────────────────────────────── */
@@ -493,9 +898,13 @@ window.StudentPageView = (function () {
     ui = ui || {};
     var course = (view && view.course) || ui.course || {};
     var block = String(course.block || '').trim();
-    var all = !!ui.all && (TAB_BODIES[ui.tab] ? ui.tab : 'assignments') === 'assignments';
+    var onAssignments = (TAB_BODIES[ui.tab] ? ui.tab : 'assignments') === 'assignments';
+    var all = !!ui.all && onAssignments;
+    var fb = onAssignments && !all && !ui.waiting && feedbackPiece(view, ui);
     return (
-      '<div class="sp-view">' +
+      '<div class="sp-view' +
+      (fb ? ' sp-on-feedback' : '') +
+      '">' +
       '<header class="sp-head">' +
       '<button type="button" class="sp-head-switch" data-act="classes-open" aria-haspopup="dialog" aria-expanded="' +
       (ui.sheet ? 'true' : 'false') +
@@ -535,6 +944,7 @@ window.StudentPageView = (function () {
   var TAB_IDS = { assignments: 1, learning: 1, questionnaires: 1, reports: 1 };
   var SEGMENT_IDS = { todo: 1, sent: 1, back: 1 };
   var FILTER_IDS = { all: 1, todo: 1, sent: 1, back: 1 };
+  var FEEDBACK_ACTS = { feedback: 1, whole: 1, 'feedback-close': 1, 'whole-close': 1, levels: 1 };
   function has(map, key) {
     return typeof key === 'string' && Object.prototype.hasOwnProperty.call(map, key);
   }
@@ -550,6 +960,11 @@ window.StudentPageView = (function () {
     var attr = function (name) {
       return (el && el.getAttribute && el.getAttribute(name)) || '';
     };
+    // Any other press leaves Your Feedback and The Whole Rubric.
+    if (!has(FEEDBACK_ACTS, act)) {
+      next.feedback = '';
+      next.whole = false;
+    }
     if (act === 'tab') {
       if (!has(TAB_IDS, attr('data-tab'))) return null;
       next.tab = attr('data-tab');
@@ -574,6 +989,31 @@ window.StudentPageView = (function () {
       if (!has(FILTER_IDS, attr('data-filter'))) return null;
       next.filter = attr('data-filter');
       return { ui: next, focus: '.sp-filter-on' };
+    }
+    if (act === 'feedback' || act === 'whole') {
+      var fid = attr('data-piece');
+      var f = view && pieceIn(view.work, fid);
+      if (!f || f.id !== fid) return null;
+      next.feedback = f.id;
+      next.whole = act === 'whole';
+      if (!feedbackPiece(view, next)) return null;
+      next.tab = 'assignments';
+      next.all = false;
+      next.segment = segmentOf(f);
+      next.pick = f.id;
+      return { ui: next, focus: '#sp-fb-title' };
+    }
+    if (act === 'feedback-close' || act === 'whole-close') {
+      var open = view && feedbackPiece(view, next);
+      next.whole = false;
+      // From The Whole Rubric back to Your Feedback, when the piece has some; otherwise to its card.
+      if (act === 'whole-close' && open && hasFeedback(open)) return { ui: next, focus: '#sp-fb-title' };
+      next.feedback = '';
+      return { ui: next, focus: open ? '#' + domId(open.id) : '.sp-segment-on' };
+    }
+    if (act === 'levels') {
+      next.levels = !next.levels;
+      return { ui: next, focus: '.sp-fb-levels-btn' };
     }
     if (act === 'pick' || act === 'open-piece') {
       var id = attr('data-piece');
