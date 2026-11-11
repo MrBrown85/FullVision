@@ -143,10 +143,12 @@ describe('Show My Learning', () => {
     openSettings();
     const r = row();
     expect(r).toBeTruthy();
-    // After Return Grades and Send Work, inside the Student Page card.
+    // After Return Grades, Send Work and Reflect on Feedback (S10 follow-up),
+    // inside the Student Page card.
     expect([...doc.querySelectorAll('.sp-card .sp-row-title')].map(text)).toEqual([
       'Return Grades',
       'Send Work',
+      'Reflect on Feedback',
       'Show My Learning',
     ]);
     expect(text(r.querySelector('label[for="sp-learning-switch"]'))).toBe('Show My Learning');

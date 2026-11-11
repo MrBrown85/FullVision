@@ -28,7 +28,12 @@ async function openPhone(page, { on = true, clear = [] } = {}) {
       // Clear the grades first, with the switch off: no draft is made.
       const a = getAssessments(cid).find(x => x.id === LAB);
       // Clear the grades of the students named, so their work waits.
-      clear.forEach(sid => {
+      // The sample Lab has every grade returned; the students who sent nothing
+      // get theirs taken off too, so they are Not In (GraderWork's count).
+      const sentNothing = getStudents(cid)
+        .map(s => s.id)
+        .filter(sid => !getStudentSubmission(cid, sid, LAB) && clear.indexOf(sid) < 0);
+      clear.concat(sentNothing).forEach(sid => {
         const keys = [...new Set((getScores(cid)[sid] || []).filter(e => e.assessmentId === LAB).map(e => e.tagId))];
         Grader.setOverallComment(cid, sid, LAB, '');
         getRubricCheckIds(cid, sid, LAB).forEach(id => Grader.setTick(cid, sid, LAB, id, false));
