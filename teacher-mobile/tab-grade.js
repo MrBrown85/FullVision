@@ -172,7 +172,7 @@ window.MGrade = (function () {
        waiting now. True when any was returned. */
     function _returnDrafts(cid, aid, sids) {
       if (!_holdsGrades(cid)) return false;
-      var waiting = GradeState.draftsIn(cid, aid, sids);
+      var waiting = GraderWork.draftsIn(cid, aid, sids);
       if (!waiting.length) return false;
       Grader.returnGrades(cid, aid, GradeState.returnTogether(cid, aid, waiting));
       clearProfCache();
@@ -208,7 +208,7 @@ window.MGrade = (function () {
           return (b.date || '').localeCompare(a.date || '');
         })
         .map(function (a) {
-          return { a: a, waiting: GradeState.draftsReturned(cid, a.id, ids) };
+          return { a: a, waiting: GraderWork.draftsReturned(cid, a.id, ids) };
         })
         .filter(function (row) {
           return row.waiting.length > 0;
@@ -315,7 +315,7 @@ window.MGrade = (function () {
     function askReturnAll(cid, aid, button) {
       if (!_holdsGrades(cid)) return;
       var ids = _rosterIds(cid);
-      var waiting = GradeState.draftsReturned(cid, aid, ids);
+      var waiting = GraderWork.draftsReturned(cid, aid, ids);
       if (!waiting.length) return refreshToReturn(cid);
       _askReturn(cid, aid, waiting, ids, button, function () {
         var rows = Array.prototype.slice.call(document.querySelectorAll('#m-grade-to-return .m-to-return-row'));
@@ -340,7 +340,7 @@ window.MGrade = (function () {
       if (!_holdsGrades(cid)) return [];
       return getAssessments(cid)
         .filter(function (a) {
-          return GradeState.draftsIn(cid, a.id, [sid]).length > 0;
+          return GraderWork.draftsIn(cid, a.id, [sid]).length > 0;
         })
         .sort(function (a, b) {
           return (b.date || '').localeCompare(a.date || '');
@@ -353,7 +353,7 @@ window.MGrade = (function () {
        asks first and names everyone. `then` runs once the return is done. */
     function returnFromCard(cid, aid, sid, button, then) {
       if (!_holdsGrades(cid)) return;
-      var waiting = GradeState.draftsReturned(cid, aid, [sid]);
+      var waiting = GraderWork.draftsReturned(cid, aid, [sid]);
       if (!waiting.length) return then();
       if (waiting.length > 1) return _askReturn(cid, aid, waiting, [sid], button, then);
       if (_returnDrafts(cid, aid, [sid])) MC.haptic();
@@ -1735,11 +1735,19 @@ window.MGrade = (function () {
     function _returnBarOwn(cid, a, unit, last) {
       var none = { state: '', act: '' };
       if (!unit) return none;
-      var label = last ? 'Return' : 'Return and Next';
-      // What the bar says is worked out once for both layouts (S11-T1).
-      var area = GraderWork.returnArea(cid, a, unit.st.id, _cardReturnIds(unit));
+      // What the bar says is worked out once for both layouts (S11-T1),
+      // revisions with it (S11-F1, the board "Phone: Return for Revision").
+      var area = GraderWork.returnArea(cid, a, unit.st.id, _cardReturnIds(unit), { revisions: true });
       if (!area) return none;
-      if (area.kind === 'empty') {
+      return _revisionBarParts(cid, a, unit, area, _returnBarArea(cid, a, unit, last, area));
+    }
+
+    // html-safe: fixed labels; the name and the date go through MC.esc
+    function _returnBarArea(cid, a, unit, last, area) {
+      var label = last ? 'Return' : 'Return and Next';
+      // Out for revision: no Return until the revision is in.
+      if (area.kind === 'none' || area.kind === 'revising') return { state: '', act: '' };
+      if (area.kind === 'empty' || area.kind === 'revised') {
         return {
           state: '',
           act:
@@ -1772,6 +1780,191 @@ window.MGrade = (function () {
         act:
           '<button type="button" class="m-grade-return-btn" data-action="m-grade-return-next">' + label + '</button>',
       };
+    }
+
+    /* ── Revisions on the phone (S11-F1, the board "Phone: Return for
+       Revision") ──────────────────────────────────────────────────────
+       In a class whose revisions are on (Demo Mode, the build switch and
+       Send Work), on one student's own card: For Revision beside Return and
+       Next opens the Return for Revision sheet (What to Fix, Revise By,
+       which criterion, and the grade kept until the new version replaces
+       it; the board's Hide is left out, Colin, Nov 11). While the revision
+       is out the bar says so, with Take Back. Each answer acts only while
+       the grading screen still shows the same class, piece and student, and
+       the sheet's only while that sheet is still up. */
+    var _revisionBusy = false;
+    var _revisionMsg = null;
+
+    // "Tue, Nov 10" for a 'YYYY-MM-DD'.
+    function _reviseByText(day) {
+      var d = parseLocalDate(String(day || ''));
+      if (isNaN(d.getTime())) return '';
+      return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    }
+
+    // html-safe: fixed labels; dates through MC.esc; ids are ours or escaped
+    function _revisionBarParts(cid, a, unit, area, parts) {
+      var ids = ' data-sid="' + unit.st.id + '" data-aid="' + a.id + '"';
+      if (area.revise) {
+        return {
+          state: parts.state,
+          act:
+            '<button type="button" class="m-grade-revise-btn" data-action="m-grade-revision"' +
+            ids +
+            (_revisionBusy ? ' disabled' : '') +
+            '>For Revision</button>' +
+            parts.act,
+        };
+      }
+      var r = area.revision;
+      if (!r) return parts;
+      var state = parts.state;
+      if (area.kind === 'revising') {
+        state =
+          '<span class="m-revising-mark">Revising</span><span class="m-grade-return-text">' +
+          MC.esc('Returned for Revision' + (r.revise_by ? ' · Revise by ' + _reviseByText(r.revise_by) : '')) +
+          '</span>';
+      }
+      if (_revisionMsg) state += '<span class="m-grade-return-still">' + MC.esc(_revisionMsg) + '</span>';
+      return {
+        state: state,
+        act:
+          '<button type="button" class="m-grade-revise-btn" data-action="m-grade-revision-takeback"' +
+          ids +
+          ' data-id="' +
+          MC.esc(r.id) +
+          '"' +
+          (_revisionBusy ? ' disabled' : '') +
+          '>' +
+          (_revisionBusy ? 'Taking Back…' : 'Take Back') +
+          '</button>' +
+          parts.act,
+      };
+    }
+
+    // The grading screen still shows `sid`'s card on `aid` in `cid`.
+    function _stillOn(cid, aid, sid) {
+      if (_swiperCid !== cid || _swiperAid !== aid || !document.getElementById('m-screen-grade-swiper')) return false;
+      var a = _assessmentById(cid, aid);
+      var unit = a ? _swiperUnits(cid, a)[_currentIdx] : null;
+      return !!unit && unit.st.id === sid;
+    }
+
+    function _revisionKey(prefix) {
+      return window.crypto && crypto.randomUUID
+        ? crypto.randomUUID()
+        : prefix + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+    }
+
+    // html-safe: names, titles and criterion names go through MC.esc; ids are ours or escaped; labels are fixed words
+    function _revisionSheetHtml(cid, a, st) {
+      var rubric = a.rubricId ? getRubricById(cid, a.rubricId) : null;
+      var criteria = ((rubric && rubric.criteria) || []).filter(Boolean);
+      return (
+        '<div class="m-revision-sheet" role="dialog" aria-labelledby="m-revision-title">' +
+        '<div class="m-revision-head"><button type="button" class="m-revision-cancel" data-action="m-sheet-cancel">Cancel</button></div>' +
+        '<h2 class="m-revision-title" id="m-revision-title">Return for Revision</h2>' +
+        '<p class="m-revision-sub">' +
+        MC.esc(displayNameWithLast(st) + ' · ' + (a.title || 'Assessment')) +
+        '</p>' +
+        '<label class="m-revision-label" for="m-revision-fix">What to Fix</label>' +
+        '<textarea id="m-revision-fix" class="m-revision-fix" rows="3" maxlength="2000"></textarea>' +
+        '<label class="m-revision-label" for="m-revision-by">Revise By</label>' +
+        '<input type="date" id="m-revision-by" class="m-revision-by">' +
+        (criteria.length > 1
+          ? '<label class="m-revision-label" for="m-revision-crit">Revise</label>' +
+            '<select id="m-revision-crit" class="m-revision-crit"><option value="">The Whole Assignment</option>' +
+            criteria
+              .map(function (c) {
+                return (
+                  '<option value="' + MC.esc(c.id) + '">' + MC.esc((c.name || 'Criterion') + ' only') + '</option>'
+                );
+              })
+              .join('') +
+            '</select>'
+          : '') +
+        // The grade until then: kept. The board's Hide is left out (Colin, Nov 11).
+        '<h3 class="m-revision-label">Until the New Version Is Graded</h3>' +
+        '<p class="m-revision-keep">Keep this grade. The new version replaces it.</p>' +
+        '<p class="m-revision-msg" role="status"></p>' +
+        '<button type="button" class="m-revision-send" data-action="m-grade-revision-send" data-sid="' +
+        st.id +
+        '" data-aid="' +
+        a.id +
+        '">Return for Revision</button>' +
+        '</div>'
+      );
+    }
+
+    function openRevisionSheet(cid, aid, sid) {
+      var a = _assessmentById(cid, aid);
+      var st = (getStudents(cid) || []).find(function (x) {
+        return x.id === sid;
+      });
+      if (!a || !st || _revisionBusy || !_stillOn(cid, aid, sid)) return;
+      _saveTyped(cid, sid);
+      MC.presentSheet(_revisionSheetHtml(cid, a, st));
+      var fix = document.getElementById('m-revision-fix');
+      if (fix) fix.focus();
+    }
+
+    function sendRevision(cid, aid, sid, btn) {
+      var sheet = btn && btn.closest('.m-revision-sheet');
+      if (!sheet || sheet._fvBusy) return;
+      var say = function (text) {
+        sheet.querySelector('.m-revision-msg').textContent = text;
+      };
+      var fix = sheet.querySelector('.m-revision-fix');
+      if (!fix.value.trim()) {
+        say('Write what to fix first.');
+        fix.focus();
+        return;
+      }
+      var crit = sheet.querySelector('.m-revision-crit');
+      var request = {
+        what_to_fix: fix.value.slice(0, 2000),
+        revise_by: sheet.querySelector('.m-revision-by').value || null,
+        criterion_ids: crit && crit.value ? [crit.value] : [],
+      };
+      sheet._fvBusy = true;
+      btn.disabled = true;
+      btn.textContent = 'Returning…';
+      Grader.returnForRevision(cid, sid, aid, request, _revisionKey('rv')).then(function (res) {
+        sheet._fvBusy = false;
+        // The sheet went, or the screen moved on: nothing more happens here.
+        if (!sheet.isConnected || !_stillOn(cid, aid, sid)) return;
+        var result = res && res.result;
+        if (result === 'made' || result === 'already_open') {
+          MC.dismissSheet();
+          MC.haptic();
+          _revisionMsg = null;
+          _redrawSwiper(cid, aid);
+          return;
+        }
+        btn.disabled = false;
+        btn.textContent = 'Return for Revision';
+        say(
+          result === 'invalid'
+            ? 'Check What to Fix and the date, then try again.'
+            : 'This couldn’t be returned for revision. Try again.',
+        );
+      });
+    }
+
+    function takeBackRevision(cid, aid, sid, requestId) {
+      if (_revisionBusy || !_stillOn(cid, aid, sid)) return;
+      var r = getRevisionRequest(cid, sid, aid);
+      if (!r || r.id !== requestId) return;
+      _revisionBusy = true;
+      _revisionMsg = null;
+      _syncReturnBar();
+      Grader.cancelRevision(cid, sid, aid, r.id, _revisionKey('rc')).then(function (res) {
+        _revisionBusy = false;
+        var ok = res && (res.result === 'cancelled' || res.result === 'not_open');
+        if (!_stillOn(cid, aid, sid)) return;
+        _revisionMsg = ok ? null : 'This couldn’t be taken back. Try again.';
+        _redrawSwiper(cid, aid);
+      });
     }
 
     // The card on screen's parts.
@@ -1877,7 +2070,7 @@ window.MGrade = (function () {
       if (!unit) return;
       _saveTyped(cid, unit.st.id);
       var ids = _cardReturnIds(unit);
-      if (!GradeState.draftsIn(cid, a.id, ids).length) return _syncReturnBar();
+      if (!GraderWork.draftsIn(cid, a.id, ids).length) return _syncReturnBar();
       Grader.returnGrades(cid, a.id, ids);
       clearProfCache();
       MC.haptic();
@@ -1928,7 +2121,7 @@ window.MGrade = (function () {
       var a = _assessmentById(cid, aid);
       if (!a) return;
       var idx = _swiperUnits(cid, a).findIndex(function (unit) {
-        return GradeState.draftsIn(cid, aid, _cardReturnIds(unit)).length > 0;
+        return GraderWork.draftsIn(cid, aid, _cardReturnIds(unit)).length > 0;
       });
       if (idx > 0) jumpToStudent(idx, true);
     }
@@ -3705,6 +3898,9 @@ window.MGrade = (function () {
       confirmBackToGroup: confirmBackToGroup,
       backToGroup: backToGroup,
       returnAndNext: returnAndNext,
+      openRevisionSheet: openRevisionSheet,
+      sendRevision: sendRevision,
+      takeBackRevision: takeBackRevision,
       showStudentPiece: showStudentPiece,
       pageCriterion: pageCriterion,
       toggleCritGroup: toggleCritGroup,
@@ -3781,6 +3977,10 @@ window.MGrade = (function () {
     refreshToReturn: List.refreshToReturn,
     askReturnAll: List.askReturnAll,
     returnAndNext: Speed.returnAndNext,
+    // Revisions (S11-F1)
+    openRevisionSheet: Speed.openRevisionSheet,
+    sendRevision: Speed.sendRevision,
+    takeBackRevision: Speed.takeBackRevision,
     showStudentPiece: Speed.showStudentPiece,
     pageCriterion: Speed.pageCriterion,
     toggleCritGroup: Speed.toggleCritGroup,
