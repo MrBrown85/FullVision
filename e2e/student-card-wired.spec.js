@@ -133,9 +133,13 @@ for (const size of [
 
       // Done.
       await page.getByRole('button', { name: 'Done' }).click();
-      await expect(page.getByLabel('Card Code')).toBeVisible();
-      await expect(page.getByLabel('Card Code')).toHaveValue('');
-      await expect(page.locator('.sp-msg')).toHaveCount(0);
+      // After Done (the artboard's board): nothing of the student, and Scan a Card.
+      await expect(page.getByRole('heading', { name: 'You’re signed out' })).toBeFocused();
+      await expect(
+        page.getByText(
+          size.name === 'a phone' ? 'This phone no longer has your card.' : 'This computer no longer has your card.',
+        ),
+      ).toBeVisible();
       expect(await page.locator('body').innerText()).not.toMatch(/Cece|Science 8|Assignments|Extending|Quiz/);
       expect((await stored(page)).local).toEqual({});
       await expect.poll(() => routes(posts)).toEqual(['page', 'done']);
@@ -144,6 +148,10 @@ for (const size of [
       await named(page);
       await contrast(page);
       await shot(page, size.name === 'a phone' ? '04-after-done' : 'chromebook-04-after-done');
+      await page.getByRole('button', { name: 'Scan a Card' }).click();
+      await expect(page.getByLabel('Card Code')).toBeVisible();
+      await expect(page.getByLabel('Card Code')).toHaveValue('');
+      await expect(page.locator('.sp-msg')).toHaveCount(0);
 
       // The page again after Done is the page of a device nobody has used.
       posts.length = 0;
@@ -187,7 +195,12 @@ test.describe('a real card: the keyboard alone', () => {
     await page.keyboard.press('Enter');
     await expect(page.getByRole('heading', { name: 'Assignments' })).toBeFocused();
     await page.keyboard.press('Shift+Tab');
+    // The class's name (Your Classes) comes before Done.
     await expect(page.getByRole('button', { name: 'Done' })).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('heading', { name: 'You’re signed out' })).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('button', { name: 'Scan a Card' })).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page.getByLabel('Card Code')).toBeFocused();
     expect((await stored(page)).local).toEqual({});
@@ -283,6 +296,7 @@ test.describe('a real card: what stops it, and what each one says', () => {
     // On the card's screen (after Done): the card's words.
     await signIn(page);
     await page.getByRole('button', { name: 'Done' }).tap();
+    await page.getByRole('button', { name: 'Scan a Card' }).tap();
     await page.getByLabel('Card Code').fill('ABC-234');
     await page.getByRole('button', { name: 'Continue' }).tap();
     await expect(page.getByRole('alert')).toHaveText(
@@ -470,7 +484,7 @@ test.describe('a real card: a shared Chromebook', () => {
     await page.goto('/login.html');
     await signIn(page);
     await page.getByRole('button', { name: 'Done' }).click();
-    await expect(page.getByLabel('Card Code')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'You’re signed out' })).toBeVisible();
     posts.length = 0;
     await page.goBack();
     await page.goForward();
@@ -496,7 +510,7 @@ test.describe('a real card: a shared Chromebook', () => {
     await tab.goto('/s/');
     await expect(tab.getByRole('heading', { name: 'Assignments' })).toBeVisible();
     await tab.getByRole('button', { name: 'Done' }).click();
-    await expect(tab.getByLabel('Card Code')).toBeVisible();
+    await expect(tab.getByRole('heading', { name: 'You’re signed out' })).toBeVisible();
     await tab.close();
     // Back in the first tab: whatever the browser kept of the page, the list is not shown.
     await page.goBack();
