@@ -428,6 +428,11 @@ describe('the export stays complete', () => {
     getStudentSubmission: 'student work, kept out with its photos',
     getAssessmentStudentWork: 'student work settings, kept out with the photos',
     getStudentWork: 'the student page’s view of student work',
+    // Mark Up (S9): drawing data over the photos, kept out with them.
+    getPageMarkup: 'Mark Up on a page of student work, kept out with the photos',
+    getAssessmentMarkup: 'Mark Up on student work, kept out with the photos',
+    getStudentMarkup: 'the student page’s view of Mark Up',
+    getStudentMarkCounts: 'the student page’s count of Mark Up notes',
   };
 
   it('uses every per-class reader in shared/data.js, or says why not', () => {
