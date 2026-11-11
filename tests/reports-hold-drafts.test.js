@@ -202,6 +202,53 @@ describe('reports in a class that holds grades', { timeout: 120000 }, () => {
     // The teacher's own reader always had it.
     expect(getScoreReportNote(cid, cell.sid, cell.aid)).toBe('ZZNOTE linked the poster to the Act');
   });
+
+  it('a note changed while a regrade is open waits with its grade: reports keep the returned one until the Return (E3)', () => {
+    const cid = freshClass(HELD);
+    const cell = ungradedCell(cid);
+    const note = () =>
+      ReportScores.withReportScores('progress', () => ReportScores.getScoreReportNote(cid, cell.sid, cell.aid));
+    Grader.setLevel(cid, cell.sid, cell.aid, cell.key, 2, 0);
+    Grader.setReportNote(cid, cell.sid, cell.aid, 'ZZOLD explains the cycle');
+    Grader.returnGrades(cid, cell.aid, [cell.sid]);
+    expect(note()).toBe('ZZOLD explains the cycle');
+    // A note changed with no regrade open is not a draft: it prints at once.
+    Grader.setReportNote(cid, cell.sid, cell.aid, 'ZZOLD explains the cycle well');
+    expect(note()).toBe('ZZOLD explains the cycle well');
+    // A regrade, then the note changed twice: reports keep the note the returned grade went out with.
+    Grader.setLevel(cid, cell.sid, cell.aid, cell.key, 3, 0);
+    expect(GradeState.stateOf(cid, cell.sid, cell.aid)).toBe('draft');
+    Grader.setReportNote(cid, cell.sid, cell.aid, 'ZZNEW now names the stages');
+    Grader.setReportNote(cid, cell.sid, cell.aid, 'ZZNEW now names every stage');
+    expect(note()).toBe('ZZOLD explains the cycle well');
+    expect(getScoreReportNote(cid, cell.sid, cell.aid)).toBe('ZZNEW now names every stage');
+    // Returned: the new note prints.
+    Grader.returnGrades(cid, cell.aid, [cell.sid]);
+    expect(note()).toBe('ZZNEW now names every stage');
+    // The next regrade keeps its own returned note, not the old hold.
+    Grader.setLevel(cid, cell.sid, cell.aid, cell.key, 4, 0);
+    expect(note()).toBe('ZZNEW now names every stage');
+    Grader.setReportNote(cid, cell.sid, cell.aid, '');
+    expect(note()).toBe('ZZNEW now names every stage');
+  });
+
+  it('GradeState.heldNote counts a held note only for the returned date it was kept with (E3)', () => {
+    const at = '2026-11-01T10:00:00Z';
+    const draft = { is_draft: true, returned_at: at, returned_copy: { v: 1, value: 2 } };
+    expect(GradeState.heldNote(draft)).toEqual({ held: false });
+    const held = GradeState.afterNote(draft, 'Kept');
+    expect(GradeState.heldNote(held)).toEqual({ held: true, note: 'Kept' });
+    expect(GradeState.afterNote(held, 'Newer')).toBe(held);
+    expect(GradeState.heldNote(GradeState.afterNote(draft, ''))).toEqual({ held: true, note: '' });
+    expect(GradeState.heldNote(Object.assign({}, held, { returned_at: '2026-11-02T10:00:00Z' }))).toEqual({
+      held: false,
+    });
+    expect(GradeState.heldNote(Object.assign({}, held, { is_draft: false }))).toEqual({ held: false });
+    expect(GradeState.afterNote({ is_draft: false, returned_at: at }, 'x')).toEqual({
+      is_draft: false,
+      returned_at: at,
+    });
+  });
 });
 
 /* ── What Print asks about ───────────────────────────────────── */

@@ -4,22 +4,31 @@
 // HMAC-SHA-256 made with a key the database never sees, so a copy of the
 // table cannot be turned back into codes or even tested against a guess.
 // The key is the edge function secret STUDENT_CARD_KEY: 32 random bytes
-// written as 64 hex characters. student-submit uses it to check a card;
-// teacher-cards uses it to make one. Nothing else reads it.
+// written as 64 hex characters. student-submit uses it to check a card or
+// a slip; teacher-cards uses it to make one. Nothing else reads it. Slips
+// use the same key under labels of their own (plan S3-S1), so a slip's tag
+// can never be a card's.
 //
-// THE THREE MESSAGE FORMATS BELOW ARE PERMANENT. Every live card's tag was
-// made with them. A change to a label, to the newline between the parts, to
-// how a typed code is tidied, or to the hex of the output makes every card
-// in every class stop opening, with no error anywhere: the tags simply stop
-// matching. tests/card-key.test.js holds known answers for all three. If
+// THE MESSAGE FORMATS BELOW ARE PERMANENT. Every live card's tag, and every
+// questionnaire and phone-report slip's (plan S3-S1), was made with them. A
+// change to a label, to the newline between the parts, to how a typed code
+// is tidied, or to the hex of the output makes every card or slip in every
+// class stop opening, with no error anywhere: the tags simply stop
+// matching. tests/card-key.test.js holds known answers for all five. If
 // that test fails, this file is wrong; the answers are never regenerated.
+// A new kind of tag gets a new label; an existing label never changes.
 //
-//   code tag      HMAC(key, "fv.card.code.v1" + "\n" + CODE)
-//   password tag  HMAC(key, "fv.card.pass.v1" + "\n" + CODE + "\n" + DIGITS)
-//   key id        the first 8 hex characters of HMAC(key, "fv.card.keyid.v1")
+//   card code tag      HMAC(key, "fv.card.code.v1" + "\n" + CODE)
+//   card password tag  HMAC(key, "fv.card.pass.v1" + "\n" + CODE + "\n" + DIGITS)
+//   key id             the first 8 hex characters of HMAC(key, "fv.card.keyid.v1")
+//   slip code tag      HMAC(key, "fv.slip.code.v1" + "\n" + SLIP)
+//   slip password tag  HMAC(key, "fv.slip.pass.v1" + "\n" + SLIP + "\n" + DIGITS)
 //
-// CODE is the eight characters, tidied: upper case, letters and digits
-// only, no dash. Each tag is 64 lower-case hex characters.
+// CODE is a card's eight characters, tidied: upper case, letters and digits
+// only, no dash. SLIP is a slip's six, tidied the same way. DIGITS is the
+// password as typed, tidied the same way. Each tag is 64 lower-case hex
+// characters. A slip's password tag is bound to its slip's code, as a
+// card's is to its card's: the same digits on two slips are two tags.
 //
 // The key is never logged, never sent to the database and never put in a
 // reply. It is held as a CryptoKey that cannot be exported, so nothing in
@@ -32,10 +41,13 @@
 export const ALPHABET = 'ABCDEFGHJKMNPQRTUVWXYZ2346789';
 /** A card's code is eight characters; a slip's is six. That is how the two are told apart. */
 export const CODE_LENGTH = 8;
+export const SLIP_CODE_LENGTH = 6;
 
 const CODE_LABEL = 'fv.card.code.v1';
 const PASSWORD_LABEL = 'fv.card.pass.v1';
 const KEY_ID_LABEL = 'fv.card.keyid.v1';
+const SLIP_CODE_LABEL = 'fv.slip.code.v1';
+const SLIP_PASSWORD_LABEL = 'fv.slip.pass.v1';
 
 export type CardKey = {
   /** Which key this is, to tell a card made under another key. It gives nothing of the key away. */
@@ -44,6 +56,10 @@ export type CardKey = {
   codeTag: (code: string) => Promise<string>;
   /** The tag of a card's password, bound to its card. `typed` must already be tidied. */
   passwordTag: (code: string, typed: string) => Promise<string>;
+  /** The tag of a slip's code. `code` must already be tidied and six characters. */
+  slipCodeTag: (code: string) => Promise<string>;
+  /** The tag of a slip's password, bound to its slip. `typed` must already be tidied. */
+  slipPasswordTag: (code: string, typed: string) => Promise<string>;
 };
 
 const bytesOf = (n: number) => new Uint8Array(n);
@@ -65,6 +81,17 @@ export function tidy(typed: string): string {
 /** A code as it is printed and shown: K7M4-QX2P. */
 export function prettyCode(code: string): string {
   return code.length === CODE_LENGTH ? code.slice(0, 4) + '-' + code.slice(4) : code;
+}
+
+/** A slip's code as it is printed and shown: K7M-4QX, as the database's slips always were. */
+export function prettySlipCode(code: string): string {
+  return code.length === SLIP_CODE_LENGTH ? code.slice(0, 3) + '-' + code.slice(3) : code;
+}
+
+const SLIP_CODE = new RegExp('^[' + ALPHABET + ']{' + SLIP_CODE_LENGTH + '}$');
+/** Is this tidied code a slip's: six characters of the slip alphabet? Anything else is no slip. */
+export function isSlipCode(code: string): boolean {
+  return typeof code === 'string' && SLIP_CODE.test(code);
 }
 
 /* Reads the key. The value must be exactly 64 hex characters: no spaces, no
@@ -91,6 +118,10 @@ export async function readCardKey(value: string | null | undefined): Promise<Car
     if (typeof c !== 'string' || !/^[A-Z0-9]+$/.test(c) || c.length !== CODE_LENGTH) throw new TypeError('code');
     return c;
   };
+  const slip = (c: string): string => {
+    if (typeof c !== 'string' || !/^[A-Z0-9]+$/.test(c) || c.length !== SLIP_CODE_LENGTH) throw new TypeError('code');
+    return c;
+  };
   const typedPassword = (p: string): string => {
     if (typeof p !== 'string' || !/^[A-Z0-9]{0,32}$/.test(p)) throw new TypeError('password');
     return p;
@@ -101,6 +132,8 @@ export async function readCardKey(value: string | null | undefined): Promise<Car
     id,
     codeTag: (c: string) => tag(CODE_LABEL + '\n' + code(c)),
     passwordTag: (c: string, p: string) => tag(PASSWORD_LABEL + '\n' + code(c) + '\n' + typedPassword(p)),
+    slipCodeTag: (c: string) => tag(SLIP_CODE_LABEL + '\n' + slip(c)),
+    slipPasswordTag: (c: string, p: string) => tag(SLIP_PASSWORD_LABEL + '\n' + slip(c) + '\n' + typedPassword(p)),
   });
 }
 
@@ -154,7 +187,12 @@ export function drawCode(random: RandomSource = systemRandom): string {
   return draw(ALPHABET, CODE_LENGTH, random);
 }
 
-/** A new card's password: four digits. */
+/** A new card's password, or a new slip's: four digits. */
 export function drawPassword(random: RandomSource = systemRandom): string {
   return draw('0123456789', 4, random);
+}
+
+/** A new slip's code: six characters of the same alphabet, no dash. */
+export function drawSlipCode(random: RandomSource = systemRandom): string {
+  return draw(ALPHABET, SLIP_CODE_LENGTH, random);
 }

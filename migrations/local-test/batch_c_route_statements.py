@@ -3,7 +3,7 @@ taken from the route files themselves (feedback-routes.ts, revision-routes.ts,
 and the three send-routes.ts statements revise-finish reads), run as written
 as the service role with text parameters and the hashed address last, as
 postgres.js sends them from index.ts, on a database built as gradebook-prod
-is after Batch C (C1, C2) and the send rules (2026111130). It checks every
+is after Batch C (C1, C2), the send rules (2026111130), Batch D and Batch E. It checks every
 signature and cast, the answer fields the routes read, the revision replay
 path (send_paths, work, file_links), group links and the locked card.
 
@@ -43,6 +43,9 @@ name, why = applied_template(with_c2=True)
 assert name, why
 d = CDb('routes', template=name)
 r = d.file('../2026111130_student_send_rules.sql')
+# Then Batch D and Batch E, as live will be.
+for _rel in ('photo-lifecycle-stand-in.sql', '../2026111140_photo_lifecycle.sql', '../2026111150_student_page_last_changes.sql'):
+    assert d.file(_rel) == 'ok', _rel
 ok('send rules apply over C1 and C2', r == 'ok', r)
 k = seed(d)
 lab = k['lab']

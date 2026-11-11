@@ -80,9 +80,10 @@ export const SQL = {
 const ERRORS = {
   feedback: SESSION_ERRORS,
   markup: SESSION_ERRORS,
-  reflect: [...CHANGE_ERRORS, 'reflect_off', 'not_returned', 'already_answered'],
-  reply: [...CHANGE_ERRORS, 'reflect_off', 'not_answered', 'already_asked'],
-  'answer-seen': SESSION_ERRORS,
+  // too_many (E6): thirty reflections and replies an hour for a card, and sixty answer-seens.
+  reflect: [...CHANGE_ERRORS, 'reflect_off', 'not_returned', 'already_answered', 'too_many'],
+  reply: [...CHANGE_ERRORS, 'reflect_off', 'not_answered', 'already_asked', 'too_many'],
+  'answer-seen': [...SESSION_ERRORS, 'too_many'],
   'group-work': SESSION_ERRORS,
 } as const;
 
@@ -160,10 +161,11 @@ function reply(v: unknown): string | null {
   return JSON.stringify(out);
 }
 
-/* answer_seen's p_assessment_ids: 0 to 500 ids, as a Postgres array in
-   text. Null when anything is wrong. */
+/* answer_seen's p_assessment_ids: 1 to 500 ids, as a Postgres array in
+   text. Null when anything is wrong. An empty list marks nothing, so it is
+   the page's mistake (E6): refused here, the database never asked. */
 function assessmentIds(v: unknown): string | null {
-  if (!Array.isArray(v) || v.length > MAX_IDS) return null;
+  if (!Array.isArray(v) || v.length < 1 || v.length > MAX_IDS) return null;
   const ids = v.map(uuid);
   if (ids.includes(null)) return null;
   return '{' + ids.join(',') + '}';
@@ -344,9 +346,6 @@ export function makeFeedbackRoutes(opts: { db: { call: (sql: string, params: Par
     if (!r || !s || !e) return bad();
     const params = r.params(body, s, e);
     if (!params) return bad();
-    // answer-seen with no piece marks nothing: answered here, so an empty list never takes the class's lock
-    // (review of PR 1138, S1). The session is not asked; the answer says nothing about it.
-    if (route === 'answer-seen' && params[2] === '{}') return ok({ ok: true, seen: 0 });
     const answer = await opts.db.call(r.sql, [...params, hash]);
     return ok(good(answer) ? r.reply(answer) : refusal(answer, r.errors));
   };

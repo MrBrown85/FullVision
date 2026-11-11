@@ -2,9 +2,10 @@
 // its answers (docs/STUDENT-VOICE-PLAN.md, PR 6), and where a student's card
 // opens their page (docs/plans/student-page-build-plan.md 1.8). Deployed
 // with verify_jwt off, since the phone holds no key; the slip's or the
-// card's code is the credential. A slip's is checked in SQL. A card's is
-// turned into a tag here with STUDENT_CARD_KEY and the tag is checked in
-// SQL: the database never sees a card's code and never has the key.
+// card's code is the credential. Each is turned into a tag here with
+// STUDENT_CARD_KEY and the tag is checked in SQL: the database never has
+// the key, and sees a slip's plain code only once, to convert a slip
+// printed before it could be tagged (slip-routes.ts).
 //
 // The phone calls it with ?forceFunctionRegion=ca-central-1 so it runs
 // beside gradebook-prod; handler.ts refuses anywhere else. It reaches the
@@ -61,6 +62,8 @@ const handle = makeHandler({
   // limit windows.
   ipKey: Deno.env.get('STUDENT_SUBMIT_IP_KEY') || Deno.env.get('SUPABASE_DB_URL')!,
   db: {
+    // A slip's open and verify as the database had them before 2026111160. slip-routes.ts sends them only
+    // while that migration is not applied; after it, open and verify go through call.
     async open(code, ipHash) {
       const [row] = await sql`select student_submit.open(${code}, ${ipHash}) as r`;
       return row.r;
@@ -78,7 +81,8 @@ const handle = makeHandler({
       const [row] = await sql`select student_submit.submit(${token}, ${sql.json(answers)}, ${ipHash}) as r`;
       return row.r;
     },
-    // The card routes: one statement each, written in card-routes.ts.
+    // The card routes and a slip's open and verify: one statement each, written in card-routes.ts and
+    // slip-routes.ts.
     async call(text, params) {
       const [row] = await sql.unsafe(text, params);
       return row.r;

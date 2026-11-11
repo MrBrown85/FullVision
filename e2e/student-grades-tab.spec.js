@@ -1,8 +1,7 @@
 import { test, expect } from '@playwright/test';
 
-/* The Grades tab (redesign R4): Assessments and Grade Breakdown in one tab,
-   only while the class's student page build switch is on. Demo Mode, Mei
-   Wong (st23) in Science 8. */
+/* The Grades tab (redesign R4, R5): Assessments and Grade Breakdown in one
+   tab, for every class. Demo Mode, Mei Wong (st23) in Science 8. */
 
 async function open(page, on) {
   await page.goto('/login.html?demo=1');
@@ -13,13 +12,14 @@ async function open(page, on) {
   await page.locator('.stu-tabs').waitFor();
 }
 
-test('the Grades tab shows only with the build switch on', async ({ page }) => {
+test('the Grades tab shows with the build switch off, and the old tabs are gone', async ({ page }) => {
   await open(page, false);
-  await expect(page.locator('#stu-tab-grades')).toHaveCount(0);
+  await expect(page.locator('#stu-tab-grades')).toHaveCount(1);
+  await expect(page.locator('#stu-tab-assess, #stu-tab-breakdown')).toHaveCount(0);
 });
 
 test('Grades builds the course grade by category, groups the work, and opens a row in place', async ({ page }) => {
-  await open(page, true);
+  await open(page, false);
   await page.locator('#stu-tab-grades').click();
   const tab = page.locator('.stu-gr');
   await expect(tab.locator('.stu-gr-title')).toHaveText('Grades');

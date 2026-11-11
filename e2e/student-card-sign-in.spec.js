@@ -91,7 +91,7 @@ for (const size of [
       await expect(page.getByRole('button', { name: 'Humanities 8 Block A' })).toBeVisible();
       await showAll(page);
       await expect(page.locator('.sp-row-title')).toHaveText(['Medieval Europe Map']);
-      await expect.poll(() => routes(posts)).toEqual(['card', 'add-card', 'page', 'work']);
+      await expect.poll(() => routes(posts)).toEqual(['card', 'add-card', 'page', 'work', 'forms']);
       // One session: the token is the same; the class it opens is the new one.
       const kept = JSON.parse((await stored(page)).local[KEY]);
       expect(kept.t).toBe(token);

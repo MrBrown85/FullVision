@@ -2522,3 +2522,21 @@ likewise.
 
 Not verified here: pg_cron, pg_net and Vault themselves (stand-ins only: no job
 runs and no request is sent); the deployed edge function; gradebook-prod.
+
+## Batch E (2026111150), the last database change of the student page build
+
+`batch_e.py` exercises `../2026111150_student_page_last_changes.sql` on a database built as live is after Batch D:
+E1 (`work` says whether Reflect on Feedback is on), E2 (questionnaires and phone reports from a card: `forms`, `form`,
+`answer`, `report`, with a slip used first and the card answering first), E3 (a Note for the Report waits with its
+grade), E4 (a piece dated into the future serves nothing), E5 (an Excused group-mate's marks stay theirs), E6 (the
+per-card limits), the apply's guards, a second run, grants, the pre-check and post-check, and the undo. Checks marked
+differs are run again without the file and must fail there.
+
+```bash
+PGPORT=54331 PGDATABASE=fv_be python3 batch_c_common.py build
+PGPORT=54331 PGDATABASE=fv_be python3 batch_e.py
+PGPORT=54331 PGDATABASE=fv_be python3 batch_e.py fingerprints check
+```
+
+`batch_c_route_statements.py` and `batch_c_route_refusals.py` now run on top of Batch D and Batch E too; the three
+checks that were the review of PR 1138's KNOWN gaps (S3, S4) check Batch E's fix.

@@ -234,10 +234,16 @@ window.ReportScores = (function () {
      has no Draft or Returned state of its own, but it prints only once
      that piece's grade has been returned (DECISIONS, "Student page build
      rulings" 11): on returned grades it is given only where the returned
-     set holds a grade for the piece. */
+     set holds a grade for the piece. And it waits with its grade (rulings
+     of 2026-11-10, night, 2; Batch E, E3): while a regrade of the returned
+     grade is open, the note that grade went out with prints, and the new
+     one once the regrade is returned. */
   function reportNote(cid, sid, aid) {
     if (setInUse() === 'all') return getScoreReportNote(cid, sid, aid);
-    return _own(cid, sid, aid).length ? getScoreReportNote(cid, sid, aid) : '';
+    if (!_own(cid, sid, aid).length) return '';
+    var row = typeof getGradeReturn === 'function' ? getGradeReturn(cid, sid, aid) : null;
+    var held = typeof GradeState !== 'undefined' && GradeState.heldNote ? GradeState.heldNote(row) : { held: false };
+    return held.held ? held.note : getScoreReportNote(cid, sid, aid);
   }
 
   /* The ids of the Advanced Rubric checkboxes ticked for one student on one

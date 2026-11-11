@@ -12,7 +12,7 @@
  *   1  every file is read and checked before it is handed in, with the hash
  *      of what is stored, and location data cut out first;
  *   3  upload links only for the paths the database named in this request;
- *   4  download links of 300 seconds, only for paths file_links named;
+ *   4  download links of 60 seconds (Batch E, E8), only for paths file_links named;
  *   5  the removal worker after each route that can queue a file, and sweep;
  *   6  the Canada check before anything;
  *   7  no path from the request body, ever;
@@ -265,6 +265,33 @@ describe('every route: Canada first, then the session, then the database', () =>
 });
 
 describe('work', () => {
+  it('passes on reflect_on_feedback (Batch E, E1), true or false only', async () => {
+    for (const [said, sent] of [
+      [true, true],
+      [false, false],
+      ['yes', false],
+    ]) {
+      const t = setup();
+      t.world.override.work = () => ({ ok: true, v: 1, send_work: false, reflect_on_feedback: said, assessments: [] });
+      const r = await t.send({ route: 'work', session: CECE_PHONE, enrollment_id: CECE });
+      expect(r.body).toEqual({ ok: true, v: 1, send_work: false, reflect_on_feedback: sent, assessments: [] });
+    }
+  });
+
+  it('send-finish passes on too_many from send_paths (E6), with its wait, and reads nothing', async () => {
+    const t = setup();
+    t.world.override.send_paths = () => ({ ok: false, error: 'too_many', retry_after_s: 900 });
+    const r = await t.send({
+      route: 'send-finish',
+      session: CECE_PHONE,
+      enrollment_id: CECE,
+      submission_id: REQ2,
+      files: [REQ],
+    });
+    expect(r.body).toEqual({ ok: false, error: 'too_many', retry_after_s: 900 });
+    expect(t.world.storeCalls.filter(c => c[0] === 'read')).toEqual([]);
+  });
+
   it('copies what the page shows about sending, field by field', async () => {
     const t = setup();
     t.world.override.work = () => ({
@@ -1327,7 +1354,7 @@ describe('unsend', () => {
 });
 
 describe('file-links', () => {
-  it('a 300-second link for each path file_links named, and for no other', async () => {
+  it('a 60-second link (E8) for each path file_links named, and for no other', async () => {
     const t = setup();
     const s = await started(t);
     await t.send(finishBody(s));
@@ -1341,7 +1368,7 @@ describe('file-links', () => {
     });
     const sub = t.world.subs.get(s.submission_id);
     const signed = t.world.storeCalls.filter(c => c[0] === 'signDownloads');
-    expect(signed).toEqual([['signDownloads', sub.files.flatMap(f => [f.path, f.thumb_path]), 300]]);
+    expect(signed).toEqual([['signDownloads', sub.files.flatMap(f => [f.path, f.thumb_path]), 60]]);
     expect(r.body).toEqual({
       ok: true,
       files: sub.files.map((f, i) => ({

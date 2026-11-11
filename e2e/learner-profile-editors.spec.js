@@ -13,6 +13,8 @@ async function openStudent(page, first) {
   const sid = await page.evaluate(n => getStudents('sci8').find(s => s.firstName === n).id, first);
   await page.evaluate(r => window.Router.navigate(r), '/student?id=' + sid + '&course=sci8&tab=profile');
   await page.locator('.lp-layout').waitFor();
+  // Competencies with no goal or reflection fold into one line; open it.
+  await page.evaluate(() => document.querySelectorAll('details.gl-rest').forEach(d => (d.open = true)));
   return sid;
 }
 
@@ -101,7 +103,7 @@ test('a saved reflection counts on the ID card, in Reflections and on the tab', 
   await row.getByRole('button', { name: '+ Reflection' }).click();
   await page.keyboard.type('I can plan a fair test now.');
   await page.keyboard.press('Enter');
-  await expect(page.locator('.id-jump a').nth(2)).not.toContainText('Not yet');
+  await expect(page.locator('#lp-goals')).toContainText('I can plan a fair test now.');
   await expect(page.locator('#lp-refl .lp-none')).toHaveText(
     'No questionnaire reflections from Liam yet. 1 competency reflection is under Competency Goals.',
   );
@@ -112,9 +114,15 @@ test("Core Competencies in Cece's Words shows what she answered, without retypin
   await openStudent(page, 'Cece');
   await page.locator('#lp-core .seg-btn', { hasText: /1/ }).first().click();
   const row = name => page.locator('#lp-core .stu-core-trow', { hasText: name });
-  await expect(row('Personal Awareness & Responsibility').locator('.stu-core-step.on')).toHaveText('Growing');
+  await expect(row('Personal Awareness & Responsibility').locator('.stu-core-step.on')).toHaveAttribute(
+    'data-step',
+    'Growing',
+  );
   await expect(row('Personal Awareness & Responsibility')).toContainText('I set goals but I forget to check on them.');
-  await expect(row('Personal & Cultural Identity').locator('.stu-core-step.on')).toHaveText('Confident');
+  await expect(row('Personal & Cultural Identity').locator('.stu-core-step.on')).toHaveAttribute(
+    'data-step',
+    'Confident',
+  );
   await expect(row('Personal Awareness & Responsibility').locator('.stu-core-from')).toContainText('From Cece');
   await expect(row('Communicating').getByRole('button', { name: '+ Self-Assessment' })).toBeVisible();
 });
@@ -174,9 +182,9 @@ test('About Me turned off links straight to Class Settings › Questionnaires', 
 // The profile reads Cece's answers from the seeded class. How each section
 // draws them is pinned in tests/learner-profile.test.js; this checks the page
 // is wired to them, that the older profile stays below, and the jump link.
-test("Cece's answers reach the profile, the older profile stays below, and a jump link scrolls", async ({ page }) => {
+test("Cece's answers reach the profile, laid out as the redesign's board", async ({ page }) => {
   await openStudent(page, 'Cece');
-  const card = page.locator('.id-card');
+  const card = page.locator('.lp2-card');
   await expect(card.locator('.id-say strong')).toHaveText('SEE');
   await expect(page.locator('.id-private-text')).toContainText('My grandma is staying with us');
   await expect(page.locator('#lp-about')).toContainText('I ask a lot of questions');
@@ -187,9 +195,6 @@ test("Cece's answers reach the profile, the older profile stays below, and a jum
     'Relational and Identity',
   ]);
   await expect(page.locator('#lp-core .stu-core-table')).toBeVisible();
-
-  await card.getByRole('link', { name: /Reflections/ }).click();
-  await expect(page.locator('#lp-refl')).toBeInViewport();
 });
 
 test('a student with no answers gets no private note and a "No answers yet" tab', async ({ page }) => {

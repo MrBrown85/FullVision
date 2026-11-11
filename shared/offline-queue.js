@@ -243,12 +243,18 @@
      (another student's score or Return on the same work) holds nothing. */
   function _returnOf(entry) {
     var p = entry.payload || {};
-    if ((entry.endpoint !== 'return_grades' && entry.endpoint !== 'return_work') || !p.p_assessment_id) return null;
+    var gives =
+      entry.endpoint === 'return_grades' ||
+      entry.endpoint === 'return_work' ||
+      entry.endpoint === 'return_for_revision';
+    if (!gives || !p.p_assessment_id) return null;
     var ids = {};
     ids[p.p_assessment_id] = true;
     (Array.isArray(p.p_enrollment_ids) ? p.p_enrollment_ids : []).forEach(function (sid) {
       if (typeof sid === 'string') ids[sid] = true;
     });
+    // Return for Revision names its one student on its own.
+    if (typeof p.p_enrollment_id === 'string') ids[p.p_enrollment_id] = true;
     return ids;
   }
   function _isCellWrite(entry) {

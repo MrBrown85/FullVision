@@ -14,21 +14,35 @@
  * agreed: Node's crypto.createHmac, and
  *   printf 'fv.card.code.v1\nK7M4QX2P' |
  *     openssl dgst -sha256 -mac HMAC -macopt hexkey:000102…1e1f
+ * The slip answers (plan S3-S1) were worked out the same two ways on Nov 11
+ * 2026, with 'fv.slip.code.v1\nK7M4QX' and 'fv.slip.pass.v1\nK7M4QX\n4821'.
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   ALPHABET,
   CODE_LENGTH,
+  SLIP_CODE_LENGTH,
   drawCode,
   drawPassword,
+  drawSlipCode,
+  isSlipCode,
   keyLine,
   loadCardKey,
   prettyCode,
+  prettySlipCode,
   readCardKey,
   tidy,
 } from '../supabase/functions/_shared/card-key.ts';
-import { FAKE_KEY, bytesFrom, codeTag, keyId, passwordTag } from './helpers/card-key-fake.js';
+import {
+  FAKE_KEY,
+  bytesFrom,
+  codeTag,
+  keyId,
+  passwordTag,
+  slipCodeTag,
+  slipPasswordTag,
+} from './helpers/card-key-fake.js';
 
 // Never regenerate these (see the top of the file).
 const KNOWN = {
@@ -42,6 +56,16 @@ const KNOWN = {
     ['K7M4QX2P', '4821', 'cc968eefc4387a5a8cd44720e2e7875d9c426571a5d995ce93113703ba15d142'],
     ['K7M4QX2P', '0007', 'da09f2db98ab210d29aebf1cc5c47a5123094538bc10c9e04d0d305846de6bcf'],
     ['P3R8WD4K', '4821', '43487c36f9cc08d7fa149a65a96517d5a2f2ed0167e8665ab665fb7ffc6c3270'],
+  ],
+  // A slip's (plan S3-S1), Nov 11 2026.
+  slipCode: {
+    K7M4QX: 'b998c78a1f2907aae2d2f5fa92902434e5ad3c40a7f4c2202416e1238576e35f',
+    P3R8WD: '2f643d3d8831501835310c922d8ca9b7b373dbcd17015feed2554d32b9c86b19',
+  },
+  slipPassword: [
+    ['K7M4QX', '4821', 'fa89d139351a5cd912b32b5574b7dd0e228bb39836af5c83e75028b301d82812'],
+    ['K7M4QX', '0007', 'a126adaabff25785f7037fc045fc60fa522970f539a586278210bb1000aaf34c'],
+    ['P3R8WD', '4821', 'f5405539b7ad3eab7908959d7b7a3d0fefb8cc290a6027eebba5a1769f66548a'],
   ],
 };
 
@@ -68,7 +92,23 @@ describe('the card key: known answers (never regenerate them)', () => {
     expect((await readCardKey(KNOWN.key)).id).toBe(KNOWN.keyId);
   });
 
+  it('a slip code’s tag is HMAC-SHA-256 of "fv.slip.code.v1", a newline and the six characters', async () => {
+    const key = await readCardKey(KNOWN.key);
+    for (const [code, tag] of Object.entries(KNOWN.slipCode)) {
+      expect(await key.slipCodeTag(code), code).toBe(tag);
+    }
+  });
+
+  it('a slip password’s tag is HMAC-SHA-256 of "fv.slip.pass.v1", the slip’s code and the digits, a newline between', async () => {
+    const key = await readCardKey(KNOWN.key);
+    for (const [code, digits, tag] of KNOWN.slipPassword) {
+      expect(await key.slipPasswordTag(code, digits), code + ' ' + digits).toBe(tag);
+    }
+  });
+
   it('the tests’ second way of making a tag gives the same answers', () => {
+    expect(slipCodeTag('K7M-4QX')).toBe(KNOWN.slipCode.K7M4QX);
+    expect(slipPasswordTag('k7m4qx', '4821')).toBe(KNOWN.slipPassword[0][2]);
     expect(codeTag('K7M4QX2P')).toBe(KNOWN.code.K7M4QX2P);
     expect(codeTag('k7m4-qx2p')).toBe(KNOWN.code.K7M4QX2P);
     expect(passwordTag('K7M4-QX2P', '4821')).toBe(KNOWN.password[0][2]);
@@ -145,6 +185,38 @@ describe('the card key: tags', () => {
     expect(tidy('ß7ı4é')).toBe('74');
   });
 
+  it('a slip’s tag is never a card’s: other labels, and a slip is six characters', async () => {
+    const key = await readCardKey(FAKE_KEY);
+    for (const code of ['K7M4-QX', 'k7m4qx', 'K7M4QX2P', 'K7M4Q', '', 'K7M\n4Q', null, undefined, 123456]) {
+      await expect(async () => key.slipCodeTag(code), String(code)).rejects.toThrow(TypeError);
+      await expect(async () => key.slipPasswordTag(code, '4821'), String(code)).rejects.toThrow(TypeError);
+    }
+    await expect(async () => key.codeTag('K7M4QX')).rejects.toThrow(TypeError);
+    for (const typed of ['48 21', '4821\n', null, 4821, 'A'.repeat(33)]) {
+      await expect(async () => key.slipPasswordTag('K7M4QX', typed), String(typed)).rejects.toThrow(TypeError);
+    }
+    expect(await key.slipPasswordTag('K7M4QX', '4821')).not.toBe(await key.slipPasswordTag('P3R8WD', '4821'));
+    expect(await key.slipPasswordTag('K7M4QX', '')).not.toBe(await key.slipCodeTag('K7M4QX'));
+    // The same characters under the card's label are another tag.
+    expect(await key.slipCodeTag('K7M4QX')).not.toBe(codeTag('K7M4QX'));
+  });
+
+  it('knows a slip’s code: six characters of the slip alphabet once tidied', () => {
+    expect(SLIP_CODE_LENGTH).toBe(6);
+    for (const c of ['K7M4QX', 'ABC234', 'ZZZZZZ']) expect(isSlipCode(c), c).toBe(true);
+    for (const c of ['K7M-4QX', 'k7m4qx', 'K7M4QX2P', 'K7M4Q', 'K7M4Q1', 'K7M4QO', 'K7M4QS', 'K7M4Q5', '', null])
+      expect(isSlipCode(c), String(c)).toBe(false);
+    expect(prettySlipCode('K7M4QX')).toBe('K7M-4QX');
+    expect(prettySlipCode('K7M4QX2P')).toBe('K7M4QX2P');
+  });
+
+  it('draws a slip’s code from the alphabet, each character equally likely', () => {
+    expect(drawSlipCode(bytesFrom([0, 1, 2, 28, 29, 57, 0, 0, 0, 0, 0, 0]))).toBe('ABC9A9');
+    // 232 and up are thrown away (232 is 8 × 29), as for a card's code.
+    expect(drawSlipCode(bytesFrom([232, 255, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]))).toBe('ABCDEF');
+    for (let i = 0; i < 50; i++) expect(isSlipCode(drawSlipCode())).toBe(true);
+  });
+
   it('shows a code with a dash after four', () => {
     expect(prettyCode('K7M4QX2P')).toBe('K7M4-QX2P');
     expect(prettyCode('K7M4QX')).toBe('K7M4QX');
@@ -174,7 +246,8 @@ describe('the card key: reading it', () => {
 
   it('gives no way to read the key back', async () => {
     const key = await readCardKey(FAKE_KEY);
-    expect(Object.keys(key).sort()).toEqual(['codeTag', 'id', 'passwordTag']);
+    // A slip's two (plan S3-S1) are tags like the card's: still nothing that gives the key back.
+    expect(Object.keys(key).sort()).toEqual(['codeTag', 'id', 'passwordTag', 'slipCodeTag', 'slipPasswordTag']);
     expect(Object.isFrozen(key)).toBe(true);
     const seen = JSON.stringify(key) + String(key) + Object.values(key).join(' ');
     expect(seen).not.toContain(FAKE_KEY);

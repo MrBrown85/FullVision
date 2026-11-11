@@ -15,19 +15,22 @@ async function openCece(page) {
 }
 
 function row(page, title) {
-  return page.locator('.stu-assess-row', { has: page.getByRole('link', { name: title, exact: true }) });
+  return page.locator('.stu-gr .stu-ov-row', {
+    has: page.locator('.stu-ov-row-title', { hasText: new RegExp('^' + title + '$') }),
+  });
 }
 
-test('a points assessment shows its points out of the most', async ({ page }) => {
+test('a points assessment shows its percent and its points out of the most', async ({ page }) => {
   await openCece(page);
-  await page.locator('#stu-tab-assess').click();
-  await expect(row(page, 'Mid-Year Comprehensive Exam').locator('.stu-assess-score')).toHaveText('65/80 · 81%');
-  await expect(row(page, 'Data Reading Quiz').locator('.stu-assess-score')).toHaveText('8/10 · 80%');
+  await page.locator('#stu-tab-grades').click();
+  const exam = row(page, 'Mid-Year Comprehensive Exam');
+  await expect(exam.locator('.stu-ov-row-main-score')).toHaveText('81%');
+  await expect(exam.locator('.stu-ov-row-sub')).toHaveText('65 / 80');
+  await expect(row(page, 'Data Reading Quiz').locator('.stu-ov-row-sub')).toHaveText('8 / 10');
   await expect(page.locator('.stu-panel')).not.toContainText('65.0');
-  // The Points filter keeps only points work.
-  await page.locator('.stu-chip[data-filter="points"]').click();
-  await expect(row(page, 'Science Fair Proposal')).toHaveCount(0);
-  await expect(row(page, 'Data Reading Quiz')).toHaveCount(1);
+  // Missing narrows the list to missing work only.
+  await page.locator('[data-action="stuGrFilter"][data-filter="missing"]').click();
+  await expect(row(page, 'Data Reading Quiz')).toHaveCount(0);
 });
 
 test('a level keeps its + or −', async ({ page }) => {
@@ -37,6 +40,6 @@ test('a level keeps its + or −', async ({ page }) => {
   const observation = page.getByRole('button', { name: /^Observation / });
   await observation.click();
   await expect(observation.locator('~ .stu-comp-facts .stu-comp-latest')).toContainText('3− on Science Fair Proposal');
-  await page.locator('#stu-tab-assess').click();
-  await expect(row(page, 'Chemical Reactions Lab').locator('.stu-assess-score')).toHaveText('3.3');
+  await page.locator('#stu-tab-grades').click();
+  await expect(row(page, 'Chemical Reactions Lab').locator('.stu-ov-row-main-score')).toHaveText('3.3');
 });
