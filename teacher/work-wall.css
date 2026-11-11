@@ -1,0 +1,549 @@
+/* ── work-wall.css — the Work Wall and the student page's Work tab (S14) ── */
+
+.ww-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.ww-gap {
+  flex: 1;
+}
+
+/* The wall over the page, under the grader (3900). */
+.ww-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3800;
+  background: var(--bg);
+  padding: 24px;
+  box-sizing: border-box;
+  display: flex;
+}
+.ww-page {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 1px var(--divider-subtle),
+    0 8px 28px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+.ww-bar,
+.ww-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  box-shadow: inset 0 -0.5px 0 var(--divider-heavy);
+  flex-wrap: wrap;
+}
+.ww-bar {
+  gap: 12px;
+  padding: 12px 16px;
+}
+.ww-back {
+  width: 32px;
+  height: 32px;
+  border-radius: 16px;
+  border: 0;
+  background: var(--seg-track);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+}
+.ww-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ww-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+.ww-sub {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.ww-label {
+  font-size: 12px;
+  font-weight: 600;
+}
+.ww-seg {
+  display: flex;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--seg-track);
+}
+.ww-seg-btn {
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.ww-seg-btn.is-on {
+  background: var(--seg-thumb);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+.ww-grade {
+  height: 32px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--active);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.ww-grade:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ww-pill {
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--seg-track);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.ww-pill-work {
+  background: var(--active-light);
+  color: var(--link);
+}
+.ww-pill-all {
+  background: var(--seg-track);
+  color: var(--text);
+}
+.ww-pill.is-on {
+  background: var(--text);
+  color: var(--surface);
+}
+.ww-pill-lv.is-on.ww-lv-1 {
+  background: var(--score-1);
+  color: #fff;
+}
+.ww-pill-lv.is-on.ww-lv-2 {
+  background: var(--score-2);
+  color: #fff;
+}
+.ww-pill-lv.is-on.ww-lv-3 {
+  background: var(--score-3);
+  color: #fff;
+}
+.ww-pill-lv.is-on.ww-lv-4 {
+  background: var(--score-4);
+  color: #fff;
+}
+.ww-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 4px;
+  background: var(--score-0);
+  flex: none;
+}
+.ww-lv-1 > .ww-dot,
+.ww-dot.ww-lv-1 {
+  background: var(--score-1);
+}
+.ww-lv-2 > .ww-dot,
+.ww-dot.ww-lv-2 {
+  background: var(--score-2);
+}
+.ww-lv-3 > .ww-dot,
+.ww-dot.ww-lv-3 {
+  background: var(--score-3);
+}
+.ww-lv-4 > .ww-dot,
+.ww-dot.ww-lv-4 {
+  background: var(--score-4);
+}
+.ww-pill.is-on > .ww-dot {
+  background: #fff;
+}
+.ww-by {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ww-scroll {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+}
+.ww-group + .ww-group {
+  margin-top: 20px;
+}
+.ww-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.ww-group-head .ww-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 5px;
+}
+.ww-group-n {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-3);
+}
+.ww-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 16px;
+}
+.ww-empty {
+  color: var(--text-3);
+  padding: 24px 0;
+  text-align: center;
+}
+
+/* A student's card: the first page, the name, the level. */
+.ww-card,
+.sw-card {
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--divider-strong);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+}
+.ww-card:hover,
+.sw-card:hover {
+  box-shadow: 0 0 0 2px var(--active);
+}
+.ww-card:focus-visible,
+.sw-card:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--active);
+}
+.ww-pic,
+.sw-pic {
+  position: relative;
+  display: block;
+  height: 220px;
+  overflow: hidden;
+  background: var(--bg);
+  border-bottom: 1px solid var(--divider-medium);
+}
+.sw-pic {
+  height: 150px;
+}
+.ww-img {
+  width: 100%;
+  display: block;
+}
+.ww-nopic {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-3);
+}
+.ww-count {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 1px 7px;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+.ww-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+}
+.ww-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ww-chip {
+  flex: none;
+  min-width: 28px;
+  height: 22px;
+  padding: 0 6px;
+  box-sizing: border-box;
+  border-radius: 6px;
+  background: var(--seg-track);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+.ww-chip.ww-lv-1 {
+  background: var(--score-1-bg);
+  color: var(--score-1-text);
+}
+.ww-chip.ww-lv-2 {
+  background: var(--score-2-bg);
+  color: var(--score-2-text);
+}
+.ww-chip.ww-lv-3 {
+  background: var(--score-3-bg);
+  color: var(--score-3-text);
+}
+.ww-chip.ww-lv-4 {
+  background: var(--score-4-bg);
+  color: var(--score-4-text);
+}
+.ww-chip.is-tograde {
+  background: var(--active-light);
+  color: var(--link);
+}
+/* A draft: graded, not returned (the gradebook's dashed mark). */
+.ww-chip.is-draft {
+  outline: 1px dashed currentColor;
+  outline-offset: -1px;
+}
+
+/* The student page's Work tab. */
+.sw-tab {
+  padding-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.sw-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sw-chip {
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--seg-track);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sw-chip.is-on {
+  background: var(--text);
+  color: var(--surface);
+}
+.sw-head {
+  margin: 0 0 -6px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.sw-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+}
+.sw-card {
+  border-radius: 10px;
+}
+.sw-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+}
+.sw-title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sw-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sw-date {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.sw-card .ww-chip {
+  height: 20px;
+  font-size: 11px;
+  border-radius: 5px;
+}
+@media (max-width: 900px) {
+  .stu-tabs:has(#stu-tab-work) {
+    grid-template-columns: repeat(7, minmax(150px, 1fr));
+  }
+}
+
+/* A page full size, over the wall or the student page. */
+.wv-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3850;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+.wv-dialog {
+  width: min(960px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+.wv-head,
+.wv-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  flex-wrap: wrap;
+}
+.wv-head {
+  box-shadow: inset 0 -0.5px 0 var(--divider-heavy);
+}
+.wv-foot {
+  box-shadow: inset 0 0.5px 0 var(--divider-heavy);
+  justify-content: center;
+}
+.wv-foot:empty {
+  display: none;
+}
+.wv-titles {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.wv-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+.wv-sub {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.wv-gap {
+  flex: 1;
+}
+.wv-step {
+  width: 30px;
+  height: 30px;
+  border-radius: 15px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 16px;
+  cursor: pointer;
+}
+.wv-step:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.wv-at {
+  font-size: 13px;
+  font-weight: 600;
+}
+.wv-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--bg);
+  display: flex;
+  justify-content: center;
+}
+.wv-img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+.wv-note {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 13px;
+}
+
+@media (max-width: 600px) {
+  .ww-overlay {
+    padding: 0;
+  }
+  .ww-page {
+    border-radius: 0;
+  }
+  .ww-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+  }
+  .ww-pic {
+    height: 180px;
+  }
+  .wv-overlay {
+    padding: 0;
+  }
+}

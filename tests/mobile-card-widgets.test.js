@@ -45,6 +45,7 @@ describe('Card Widget Config', () => {
         'workHabits',
         'growthAreas',
         'narrative',
+        'toGrade',
       ],
     };
     localStorage.setItem('m-card-widgets', JSON.stringify(custom));
@@ -67,6 +68,7 @@ describe('Card Widget Config', () => {
         'workHabits',
         'growthAreas',
         'narrative',
+        'toGrade',
       ],
     };
     saveCardWidgetConfig(config);
@@ -78,7 +80,7 @@ describe('Card Widget Config', () => {
     _cache.config = {
       cardWidgetConfig: {
         order: ['hero', 'actions'],
-        disabled: ['sectionBars'],
+        disabled: WIDGET_KEYS.filter(k => k !== 'hero' && k !== 'actions'),
       },
     };
 
@@ -101,7 +103,10 @@ describe('Card Widget Config', () => {
     });
 
     try {
-      saveCardWidgetConfig({ order: ['hero', 'actions'], disabled: ['sectionBars'] });
+      saveCardWidgetConfig({
+        order: ['hero', 'actions'],
+        disabled: WIDGET_KEYS.filter(k => k !== 'hero' && k !== 'actions'),
+      });
       await waitForPendingSyncs(1000);
     } finally {
       globalThis.getSupabase = originalGetSupabase;
@@ -127,9 +132,14 @@ describe('Card Widget Config', () => {
     };
     localStorage.setItem('m-card-widgets', JSON.stringify(old));
     var config = getCardWidgetConfig();
-    expect(config.disabled).toContain('growth');
-    expect(config.disabled).toContain('dispositions');
+    // A widget on by default shows; one off by default stays off; the
+    // teacher's own choices stand (completion and missingWork off).
+    expect(config.order).toContain('growth');
+    expect(config.order).toContain('dispositions');
+    expect(config.order).toContain('toGrade');
     expect(config.disabled).toContain('narrative');
+    expect(config.disabled).toContain('completion');
+    expect(config.disabled).toContain('missingWork');
   });
 
   it('ignores unknown widget keys in localStorage', () => {

@@ -433,6 +433,13 @@ describe('the export stays complete', () => {
     getAssessmentMarkup: 'Mark Up on student work, kept out with the photos',
     getStudentMarkup: 'the student page’s view of Mark Up',
     getStudentMarkCounts: 'the student page’s count of Mark Up notes',
+    // Reflect on Feedback (S10): Demo Mode only until S10-W1; kept out with student work.
+    getReflectOnFeedback: 'a class switch, not student data',
+    getCourseFeedback: 'reflections on student work, Demo Mode only for now',
+    getQuestionsWaiting: 'a subset of getCourseFeedback',
+    getStudentReflections: 'a subset of getCourseFeedback',
+    getStudentLastPlan: 'a subset of getCourseFeedback',
+    getStudentFeedback: 'the student page’s view of its own feedback',
   };
 
   it('uses every per-class reader in shared/data.js, or says why not', () => {
