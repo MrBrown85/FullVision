@@ -3852,6 +3852,7 @@ function seedIfNeeded() {
   // Sample student work, for a class seeded now or before it existed.
   seedDemoStudentWork();
   seedDemoMarkup();
+  seedDemoReflections();
 
   // ── Migrate old gb-notes into gb-quick-obs (one-time) ──
   Object.keys(COURSES).forEach(cid => {
@@ -4055,4 +4056,73 @@ function seedDemoMarkup() {
     if (typeof getPageMarkup === 'function' && getPageMarkup('sci8', id)) pages[id] = DEMO_MARKUP[id];
   });
   return Object.keys(pages).length ? saveDemoMarkup('sci8', pages) : false;
+}
+
+/* ── Sample reflections (S10) ──────────────────────────────────────
+   Three students' reflections on Cell Microscope Lab, shown only once the
+   teacher turns on the student page and Reflect on Feedback (shared/
+   data.js, "Reflect on Feedback"): Jordan is not sure and his question
+   waits for an answer; Noor asked, was answered and says it makes sense
+   now; Liam says it makes sense and has a plan. Seeded once per class. */
+// [student, days after the lab's date, makes_sense, question, plan, went_well, answer]
+var DEMO_REFLECTIONS = [
+  ['st10', 3, 'not_sure', 'How do I know which cell is which? They look the same to me.', null, null, null],
+  [
+    'st2',
+    2,
+    'not_sure',
+    'Why is the cheek cell wrong? I saw a line around it.',
+    null,
+    null,
+    'That line is the cell membrane. Only plant cells, like the onion, have a cell wall as well.',
+  ],
+  [
+    'st4',
+    2,
+    'yes',
+    null,
+    "Next time I'll write the magnification beside each drawing.",
+    'I labelled the nucleus in both cells.',
+    null,
+  ],
+];
+
+function seedDemoReflections() {
+  if (typeof saveDemoReflections !== 'function' || !COURSES.sci8) return false;
+  var stored = null;
+  try {
+    stored = JSON.parse(localStorage.getItem('gb-student-feedback-sci8') || 'null');
+  } catch (e) {
+    stored = null;
+  }
+  if (stored && stored.reflections && Object.keys(stored.reflections).length) return false;
+  var lab = (getAssessments('sci8') || []).find(function (a) {
+    return a && a.id === 'sci8a1';
+  });
+  if (!lab || !lab.date) return false;
+  var roster = {};
+  getStudents('sci8').forEach(function (s) {
+    roster[s.id] = true;
+  });
+  var day = String(lab.date).slice(0, 10);
+  var list = DEMO_REFLECTIONS.filter(function (row) {
+    return roster[row[0]];
+  }).map(function (row) {
+    var sent = _demoDayAfter(day, row[1]) + 'T19:30:00.000Z';
+    var answered = row[6] ? _demoDayAfter(day, row[1] + 1) + 'T15:10:00.000Z' : null;
+    return {
+      assessment_id: 'sci8a1',
+      enrollment_id: row[0],
+      sent_at: sent,
+      makes_sense: row[2],
+      question: row[3],
+      plan: row[4],
+      went_well: row[5],
+      answer: row[6],
+      answered_at: answered,
+      sense_now: row[6] ? 'yes' : null,
+      sense_now_at: row[6] ? _demoDayAfter(day, row[1] + 1) + 'T20:05:00.000Z' : null,
+    };
+  });
+  return list.length ? saveDemoReflections('sci8', list) : false;
 }
