@@ -130,7 +130,7 @@ describe('Restore Class from Backup and photos of student work', () => {
     const at = src.indexOf('scores and reports. ');
     expect(at).toBeGreaterThan(0);
     expect(src.slice(at, at + 600)).toMatch(
-      /FVBackupRestore\.anyClassTakesWork\(\)\s*\?\s*FVBackupRestore\.PHOTOS_NOT_IN_BACKUP \+ ' '\s*:\s*''\)\s*\+\s*'Your other classes are not changed\./,
+      /FVBackupRestore\.anyClassTakesWork\(\)\s*\?\s*esc\(FVBackupRestore\.PHOTOS_NOT_IN_BACKUP\) \+ ' '\s*:\s*''\)\s*\+\s*'Your other classes are not changed\./,
     );
   });
 

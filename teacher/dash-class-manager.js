@@ -8059,7 +8059,7 @@ window.DashClassManager = (function () {
       '<div class="confirm-message">Choose a file saved by Download Class Backup. It becomes a new class with its students, competencies, assessments, scores and reports. ' +
       // Fixed text, said once any class takes work (S8-F2; wording approved, ruling 102).
       (typeof FVBackupRestore !== 'undefined' && FVBackupRestore.anyClassTakesWork()
-        ? FVBackupRestore.PHOTOS_NOT_IN_BACKUP + ' '
+        ? esc(FVBackupRestore.PHOTOS_NOT_IN_BACKUP) + ' '
         : '') +
       'Your other classes are not changed.</div>' +
       '<div class="cm-field"><label class="cm-label" for="cm-restore-file">Backup File</label>' +
