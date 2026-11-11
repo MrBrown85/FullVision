@@ -30,6 +30,7 @@
 
   var S = null; // the page's state (student.js)
   var MAX_PAGES = 30; // in one send (Colin's ruling 88)
+  var PDF_PAGES = 20; // in one PDF (ruling 18; PhotoShrink.MAX_PDF_PAGES)
   var HOLD_MS = 2 * 60 * 60 * 1000; // a started send can be finished for two hours (ruling 93)
   var NOTE_MAX = 1000;
   var urls = []; // object addresses made for pages on this device, let go after Done
@@ -225,34 +226,57 @@
     var R = {
       OFFICE: 'office',
       NO_DECODER: 'no_decoder',
+      UNREADABLE: 'unreadable',
       TOO_MANY_PAGES: 'too_many_pages',
       PDF_TOO_LARGE: 'pdf_too_large',
     };
     if (res.reason === R.OFFICE) return 'Save it as a PDF first, then choose the PDF.';
+    if (res.kind === 'pdf' && res.reason === R.UNREADABLE && res.locked) {
+      return 'This PDF has a password. Save a copy without one, then choose it here.';
+    }
     if (res.kind === 'pdf' && res.reason === R.NO_DECODER) {
-      return 'PDFs can’t be sent from this page yet. Take a photo of each page instead.';
+      return 'That PDF couldn’t be opened. Check your internet and try again.';
+    }
+    // A PDF over its own limit (20 pages, ruling 18), when more than that would still fit in the send.
+    if (res.reason === R.TOO_MANY_PAGES && res.kind === 'pdf' && res.limit === PDF_PAGES) {
+      return 'A PDF can have ' + PDF_PAGES + ' pages at most.';
     }
     if (res.reason === R.TOO_MANY_PAGES) return 'You can send ' + MAX_PAGES + ' pages at most.';
     if (res.reason === R.PDF_TOO_LARGE) return 'That PDF is too big to send. It can be 20 MB at most.';
     return 'That file couldn’t be used. Try another photo.';
   }
 
-  /* shared/photo-shrink.js is fetched only when a send opens, so a slip
-     or a page that sends nothing never loads it. → Promise. */
+  /* shared/photo-shrink.js and shared/photo-readers.js are fetched only
+     when a send opens, so a slip or a page that sends nothing never loads
+     them. photo-readers.js fetches pdf.js (vendor/pdfjs/) itself, and only
+     when a PDF is chosen. → Promise. */
   var fetching = null;
-  function whenShrinkIsIn() {
-    if (prepareFn || typeof PhotoShrink !== 'undefined' || typeof document === 'undefined') return Promise.resolve();
-    if (fetching) return fetching;
-    fetching = new Promise(function (done) {
+  function load(src) {
+    return new Promise(function (done) {
       var el = document.createElement('script');
-      el.src = '../shared/photo-shrink.js';
+      el.src = src;
       el.onload = el.onerror = function () {
-        fetching = null;
         done();
       };
       document.head.appendChild(el);
     });
+  }
+  function whenShrinkIsIn() {
+    var shrink = prepareFn || typeof PhotoShrink !== 'undefined';
+    var readers = typeof PhotoReaders !== 'undefined';
+    if ((shrink && readers) || typeof document === 'undefined') return Promise.resolve();
+    if (fetching) return fetching;
+    fetching = Promise.all([
+      shrink ? null : load('../shared/photo-shrink.js'),
+      readers ? null : load('../shared/photo-readers.js'),
+    ]).then(function () {
+      fetching = null;
+    });
     return fetching;
+  }
+  // What reads a PDF (shared/photo-readers.js), or none while it is not in: PhotoShrink then refuses the PDF.
+  function openPdf() {
+    return typeof PhotoReaders !== 'undefined' && PhotoReaders.openPdf ? PhotoReaders.openPdf : null;
   }
 
   /* Shrink each file and keep its pages, in order. `at` puts them in place
@@ -286,7 +310,9 @@
     files.forEach(function (file) {
       chain = chain.then(function () {
         if (why) return null;
-        return Promise.resolve(prepare(file, { maxPages: Math.max(1, room() - out.length) })).then(function (res) {
+        // A PDF is asked for no more pages than fit in the send, and never more than 20.
+        var fit = Math.max(1, Math.min(PDF_PAGES, room() - out.length));
+        return Promise.resolve(prepare(file, { maxPages: fit, openPdf: openPdf() })).then(function (res) {
           if (!res || !res.ok) {
             why = refusal(res || {});
             return;

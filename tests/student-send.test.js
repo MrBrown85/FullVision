@@ -22,7 +22,15 @@ const text = (page, sel) => words(page.root().querySelector(sel));
 function fakePrepare(calls) {
   return (file, opts) => {
     calls.push({ file, opts });
-    if (file.refuse) return Promise.resolve({ ok: false, reason: file.refuse, kind: file.kind });
+    if (file.refuse) {
+      return Promise.resolve({
+        ok: false,
+        reason: file.refuse,
+        kind: file.kind,
+        locked: file.locked,
+        limit: file.limit,
+      });
+    }
     const n = file.pages || 1;
     return Promise.resolve({
       ok: true,
@@ -103,6 +111,33 @@ describe('Send Work off (every class, and #demo-card): nothing about sending sho
     expect(sent.work[0].kind).toBe('sent');
     expect(sent.work[0].send.sent).toMatchObject({ pages: 0, grading: false, canChange: true, thumbs: [] });
     expect(sent.counts).toMatchObject({ toDo: 0, sent: 1 });
+  });
+});
+
+describe('a PDF becomes pages: the PDF reader is fetched only when a send opens', () => {
+  it.each(['', '#demo', '#demo-card-send'])('a page with no send open (%s) fetches neither file', async hash => {
+    const page = openStudentPage();
+    await page.start(hash);
+    expect(page.fetched.filter(src => /photo-(shrink|readers)|pdfjs/.test(src))).toEqual([]);
+  });
+
+  it('opening a send fetches photo-shrink.js and photo-readers.js, never pdf.js itself; prepare is given its openPdf', async () => {
+    const page = openStudentPage();
+    await page.start('#demo-card-send');
+    await page.submit('form[data-form="card"]');
+    page.type('#sp-ident', page.T.DEMO.number);
+    await page.click('[data-act="card-yes"]');
+    await page.click('.sp-piece[data-piece="demo-fair"] [data-act="send-open"]');
+    await page.settle();
+    expect(page.fetched.filter(src => /photo-|pdfjs/.test(src)).sort()).toEqual([
+      '../shared/photo-readers.js',
+      '../shared/photo-shrink.js',
+    ]);
+    const calls = [];
+    page.T.setPrepare(fakePrepare(calls));
+    await choose(page, [{ name: 'two.pdf', kind: 'pdf', pages: 2 }]);
+    expect(calls[0].opts.openPdf).toBe(page.run('PhotoReaders.openPdf'));
+    expect(page.fetched.some(src => /pdfjs/.test(src))).toBe(false);
   });
 });
 
@@ -209,11 +244,16 @@ describe('S5-F2: Send My Work, Check and Send, Sent, Sending Late, Closed', () =
     await choose(page, [{ name: 'essay.docx', refuse: 'office' }]);
     expect(text(page, '.sp-send-msg')).toBe('Save it as a PDF first, then choose the PDF.');
     await choose(page, [{ name: 'notes.pdf', kind: 'pdf', refuse: 'no_decoder' }]);
-    expect(text(page, '.sp-send-msg')).toBe(
-      'PDFs can’t be sent from this page yet. Take a photo of each page instead.',
-    );
-    await choose(page, [{ name: 'big.pdf', kind: 'pdf', pages: 29 }]);
-    expect(calls.at(-1).opts.maxPages).toBe(30);
+    expect(text(page, '.sp-send-msg')).toBe('That PDF couldn’t be opened. Check your internet and try again.');
+    await choose(page, [{ name: 'locked.pdf', kind: 'pdf', refuse: 'unreadable', locked: true }]);
+    expect(text(page, '.sp-send-msg')).toBe('This PDF has a password. Save a copy without one, then choose it here.');
+    await choose(page, [{ name: 'long.pdf', kind: 'pdf', refuse: 'too_many_pages', limit: 20 }]);
+    expect(text(page, '.sp-send-msg')).toBe('A PDF can have 20 pages at most.');
+    // A PDF is asked for 20 pages at most, even with 30 to fill (ruling 18).
+    await choose(page, [{ name: 'big.pdf', kind: 'pdf', pages: 20 }]);
+    expect(calls.at(-1).opts.maxPages).toBe(20);
+    await choose(page, [{ name: 'more.pdf', kind: 'pdf', pages: 9 }]);
+    expect(calls.at(-1).opts.maxPages).toBe(10);
     await choose(page, [{ name: 'two.pdf', kind: 'pdf', pages: 2 }]);
     // Only one more page fits: the PDF is asked for at most that many, and its two are refused.
     expect(calls.at(-1).opts.maxPages).toBe(1);
