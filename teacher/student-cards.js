@@ -64,6 +64,7 @@ var StudentCards = (function () {
   var STALE_MS = 60000; // the list is read again when it is drawn after this long
   var HOLD_MS = 10 * 60 * 1000; // Print Again works this long at most
   var BATCH = 250; // the most students teacher-cards takes in one request
+  var MAKING = 'Making cards…'; // said while a press is out, or while a Yes waits on the list read before it
   /* cid → { cards, at, loading, looking, making, failed, msg, replaced,
      reads, landed, pressed, again }.
 
@@ -108,6 +109,8 @@ var StudentCards = (function () {
         making: null,
         failed: false,
         msg: '',
+        // A Yes waiting on the list read: the screen (its watch number) that asked, else null.
+        waiting: null,
         replaced: null,
         reads: 0,
         landed: 0,
@@ -506,7 +509,7 @@ var StudentCards = (function () {
         failed: false,
       };
     }
-    st.msg = 'Making cards…';
+    st.msg = MAKING;
     var couldNot =
       (asked.length === 1 ? 'Could not make the card.' : 'Could not make the cards.') +
       ' Check the connection and try again.';
@@ -604,8 +607,16 @@ var StudentCards = (function () {
     var gen = _watchScreen(cid);
     var st = _st(cid);
     var yes = function () {
-      if (!_stillAsking(cid, gen) || st.making) return;
+      var waited = st.waiting === gen;
+      if (waited) st.waiting = null;
+      if (!_stillAsking(cid, gen) || st.making) {
+        if (waited) _rerender();
+        return;
+      }
       if (st.loading) {
+        // A Yes waiting on the read says so (see render), for as long as the screen that asked is showing.
+        st.waiting = gen;
+        if (!waited) _rerender();
         st.loading.then(yes);
         return;
       }
@@ -1019,6 +1030,11 @@ var StudentCards = (function () {
     return lines;
   }
 
+  // True while a Yes on this class waits on the list read, and the screen that asked it is this one.
+  function _waitingHere(st, cid) {
+    return st.waiting !== null && !!_watch && _watch.cid === cid && _watch.gen === st.waiting;
+  }
+
   // The Student Cards card for a class whose student page is on.
   function render(cid) {
     var st = _st(cid);
@@ -1046,6 +1062,7 @@ var StudentCards = (function () {
     var replaced = known ? _replacedLines(st, students, byStudent, n) : null;
     var notes = [];
     if (st.msg) notes.push(st.msg);
+    else if (_waitingHere(st, cid)) notes.push(MAKING);
     else if (held) notes.push(_heldLine(held.count));
     if (replaced) notes = notes.concat(replaced);
     else if (known && !st.making && !failed) notes.push('Checking which cards were made…');
