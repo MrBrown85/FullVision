@@ -83,8 +83,10 @@ export const SEND_ROUTES: Record<string, true> = {
 // ── The limits (the contract, "Storage" and "What the edge function must do", 1) ──
 /** A page or a thumbnail the function reads may be no larger than this. */
 export const MAX_FILE_BYTES = 2_000_000;
-/** A page is 1 to 20,000 pixels each way. */
-export const MAX_PAGE_SIDE = 20_000;
+/** A page is 1 to 4,096 pixels each way. The database allows 20,000; the phone makes pages of at most 2,000
+    (shared/photo-shrink.js). Stricter here (review L1): a page of a few hundred bytes can say 20,000 x 20,000,
+    and a browser opening it full size would have 400 million pixels to decode. */
+export const MAX_PAGE_SIDE = 4_096;
 /** A thumbnail is no larger than the phone is told to make it: 400 px on its long side (shared/photo-shrink.js). */
 export const MAX_THUMB_SIDE = 400;
 /** A download link lives 300 seconds. */

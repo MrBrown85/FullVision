@@ -903,6 +903,37 @@ describe('send-finish', () => {
       expect(t.logs).toContainEqual({ route: 'send-finish', refused: 1, reasons: expect.any(Array) });
     });
 
+    it('a page over 4,096 pixels a side (the phone makes 2,000), however small the file (review L1)', async () => {
+      const seg = (m, body) => [0xff, m, ((body.length + 2) >> 8) & 255, (body.length + 2) & 255, ...body];
+      const page = (w, h) =>
+        Uint8Array.from([
+          0xff,
+          0xd8,
+          ...seg(0xe0, [0x4a, 0x46, 0x49, 0x46, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0]),
+          ...seg(0xdb, [0, ...Array(64).fill(1)]),
+          ...seg(0xc0, [8, h >> 8, h & 255, w >> 8, w & 255, 3, 1, 0x11, 0, 2, 0x11, 0, 3, 0x11, 0]),
+          ...seg(0xc4, [0, ...Array(16).fill(0)]),
+          ...seg(0xda, [1, 1, 0, 0, 63, 0]),
+          0x12,
+          0x34,
+          0xff,
+          0xd9,
+        ]);
+      for (const [w, h, ok] of [
+        [4096, 4096, true],
+        [4097, 10, false],
+        [10, 4097, false],
+        [20000, 20000, false],
+      ]) {
+        const t = setup();
+        const s = await started(t, {}, [[page(w, h), THUMB_JPEG]]);
+        const r = await t.send(finishBody(s, { files: [s.files[0].file_id] }));
+        expect(r.body.ok ? true : r.body, `${w}x${h}`).toEqual(
+          ok ? true : { ok: false, error: 'bad_file', files: [s.files[0].file_id] },
+        );
+      }
+    });
+
     it('the stored file over 2,000,000 bytes is never read whole', async () => {
       const t = setup();
       const s = await started(t, {}, [cases['a page over 2,000,000 bytes'], [PAGE2_JPEG, THUMB2_JPEG]]);

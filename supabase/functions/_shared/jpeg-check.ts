@@ -12,9 +12,9 @@
 //     the marker after it. One frame of a kind a browser draws (baseline,
 //     extended or progressive Huffman, 8 bits, 1 or 3 colour channels), its
 //     tables before its picture data, and at least one scan;
-//   - its width and height are within what the caller allows (a page 1 to
-//     20,000 pixels each way, a thumbnail no larger than the phone is told
-//     to make it).
+//   - its width and height are within what the caller allows (send-routes.ts:
+//     a page 1 to 4,096 pixels each way, stricter than the database's
+//     20,000; a thumbnail no larger than the phone is told to make it).
 //
 // This reads the file's structure; it does not decode the pixels (no image
 // library runs here). A file that passes is one a JPEG decoder will start
