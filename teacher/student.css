@@ -3572,3 +3572,582 @@ button.stu-bd-row:focus-visible {
 .stu-email-copy.is-copied .stu-email-copied {
   display: inline;
 }
+
+/* ── Overview tab (teacher/page-student.js, "Overview tab") ──
+   Read across a desk: what the student reads is 16–20px and plain; the
+   teacher's controls are 13px. Blue is the grade "if handed in"; red is
+   Missing, as everywhere in the app. */
+.stu-ov {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 8px 4px;
+  background: var(--surface);
+}
+.stu-ov:fullscreen {
+  padding: 32px;
+  overflow-y: auto;
+}
+.stu-ov-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.stu-ov-title {
+  margin: 0;
+  font-size: 1.75rem;
+  line-height: 1.15;
+}
+.stu-ov-lede {
+  margin: 8px 0 0;
+  font-size: 1rem;
+  color: var(--text-2);
+}
+.stu-ov-btn {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.stu-ov-btn:hover {
+  background: var(--overlay-hover);
+}
+.stu-ov :focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+.stu-ov-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 24px;
+}
+.stu-ov-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.stu-ov-sub {
+  font-size: 1rem;
+  color: var(--text-2);
+  margin-top: 8px;
+}
+.stu-ov-read {
+  font-size: 1.1875rem;
+  line-height: 1.4;
+  margin-top: 4px;
+}
+.stu-ov-pre {
+  white-space: pre-line;
+}
+.stu-ov-h3 {
+  margin: 0 0 8px;
+  font-size: 1.375rem;
+}
+
+/* The grade and the Missing tile */
+.stu-ov-top,
+.stu-ov-mid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: stretch;
+}
+.stu-ov-grade {
+  flex: 2.4 1 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.stu-ov-pair {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+.stu-ov-now,
+.stu-ov-proj {
+  flex: 1 1 220px;
+}
+.stu-ov-proj {
+  padding-left: 24px;
+  border-left: 1px solid var(--border);
+}
+.stu-ov-big {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin-top: 4px;
+}
+.stu-ov-letter {
+  font-size: 4.75rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.stu-ov-pct {
+  font-size: 2.125rem;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.stu-ov-proj .stu-ov-label,
+.stu-ov-proj .stu-ov-letter,
+.stu-ov-proj .stu-ov-pct,
+.stu-ov-proj-note {
+  color: var(--score-4-text);
+}
+.stu-ov-proj-note {
+  margin-top: 16px;
+  font-size: 1rem;
+}
+.stu-ov-thin .stu-ov-label {
+  color: var(--text-2);
+}
+.stu-ov-thin-lede {
+  margin-top: 8px;
+  font-size: 1.1875rem;
+  font-weight: 600;
+}
+.stu-ov-level {
+  margin-top: 12px;
+}
+.stu-ov-strip {
+  position: relative;
+}
+.stu-ov-track {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.stu-ov-band {
+  background: var(--seg-track);
+}
+.stu-ov-band.now {
+  background: var(--text-3);
+}
+.stu-ov-gap {
+  position: absolute;
+  top: 0;
+  height: 10px;
+  background: repeating-linear-gradient(90deg, var(--score-4) 0 4px, transparent 4px 7px);
+  opacity: 0.6;
+}
+.stu-ov-pin {
+  position: absolute;
+  top: -5px;
+  width: 4px;
+  height: 20px;
+  margin-left: -2px;
+  border-radius: 3px;
+  background: var(--text);
+}
+.stu-ov-pin.proj {
+  width: 10px;
+  margin-left: -5px;
+  background: var(--surface);
+  border: 2px solid var(--score-4);
+  box-sizing: border-box;
+}
+.stu-ov-names {
+  display: flex;
+  gap: 2px;
+  margin-top: 8px;
+  font-size: 1rem;
+  color: var(--text-2);
+}
+.stu-ov-band-name {
+  text-align: center;
+}
+.stu-ov-band-name.now {
+  font-weight: 700;
+  color: var(--text);
+}
+.stu-ov-band-name.proj {
+  font-weight: 700;
+  color: var(--score-4-text);
+}
+.stu-ov-miss {
+  flex: 1 1 220px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: var(--score-1-bg);
+  border-color: transparent;
+}
+.stu-ov-miss .stu-ov-label,
+.stu-ov-miss .stu-ov-sub,
+.stu-ov-miss-n,
+.stu-ov-miss-cost {
+  color: var(--score-1-text);
+}
+.stu-ov-miss-n {
+  font-size: 4.75rem;
+  font-weight: 800;
+  line-height: 1.05;
+}
+.stu-ov-miss-cost {
+  font-size: 1.1875rem;
+  font-weight: 700;
+}
+
+/* Start With These Three, and To Get Better */
+.stu-ov-todo {
+  flex: 1.4 1 480px;
+  min-width: 0;
+}
+.stu-ov-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.stu-ov-todo-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+}
+.stu-ov-todo-item + .stu-ov-todo-item {
+  border-top: 1px solid var(--border);
+}
+.stu-ov-todo-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.stu-ov-todo-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.stu-ov-todo-title {
+  font-size: 1.1875rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.stu-ov-start {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--surface);
+}
+.stu-ov-todo-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin-top: 4px;
+  font-size: 1rem;
+  color: var(--text-2);
+}
+/* The teacher's controls on a missing item show when pointed at or
+   focused: the student reads the item, the teacher acts on it. */
+.stu-ov-tc {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: underline;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.stu-ov-todo-item:hover .stu-ov-tc,
+.stu-ov-todo-item:focus-within .stu-ov-tc {
+  opacity: 1;
+}
+@media (hover: none) {
+  .stu-ov-tc {
+    opacity: 1;
+  }
+}
+.stu-ov-gain {
+  flex: 0 0 auto;
+  font-size: 1rem;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--score-4-bg);
+  color: var(--score-4-text);
+  white-space: nowrap;
+}
+.stu-ov-more {
+  margin-top: 8px;
+}
+.stu-ov-none {
+  font-size: 1.1875rem;
+}
+.stu-ov-better {
+  flex: 1 1 300px;
+}
+.stu-ov-better-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 1.375rem;
+  font-weight: 700;
+}
+.stu-ov-better-note {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+/* All Your Work */
+.stu-ov-all-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 8px;
+}
+.stu-ov-all-head .stu-ov-h3 {
+  margin: 0;
+}
+.stu-ov-rows {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.stu-ov-row + .stu-ov-row {
+  border-top: 1px solid var(--border);
+}
+.stu-ov-row.open {
+  box-shadow: inset 3px 0 0 var(--text);
+}
+.stu-ov-row-btn {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 12px 24px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.stu-ov-row-btn:hover {
+  background: var(--overlay-hover);
+}
+.stu-ov .stu-ov-row-btn:focus-visible,
+.stu-ov .stu-ov-rub-row:focus-visible {
+  outline-offset: -3px;
+}
+.stu-ov-row-main {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.stu-ov-row-title {
+  display: block;
+  font-size: 1rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.stu-ov-row-date {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.stu-ov-row-score {
+  flex: 0 0 auto;
+  text-align: right;
+}
+.stu-ov-row-main-score {
+  display: block;
+  font-size: 1.1875rem;
+  font-weight: 700;
+}
+.stu-ov-row-score.miss .stu-ov-row-main-score {
+  color: var(--score-1);
+}
+.stu-ov-row-score.quiet .stu-ov-row-main-score {
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--text-2);
+}
+.stu-ov-row-sub {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.stu-ov-chev {
+  flex: 0 0 auto;
+  font-size: 1.25rem;
+  color: var(--text-2);
+  transition: transform 0.15s;
+}
+.stu-ov-row.open .stu-ov-chev {
+  transform: rotate(90deg);
+}
+.stu-ov-pill {
+  margin-left: 8px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  vertical-align: 1px;
+}
+.stu-ov-pill.miss {
+  background: var(--score-1-bg);
+  color: var(--score-1-text);
+}
+.stu-ov-pill.late {
+  background: var(--score-2-bg);
+  color: var(--score-2-text);
+}
+.stu-ov-pill.exc {
+  background: var(--seg-track);
+  color: var(--text-2);
+}
+
+/* An open piece: what the student reads beside the facts */
+.stu-ov-open {
+  padding: 8px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.stu-ov-open-cols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px 32px;
+  align-items: flex-start;
+}
+.stu-ov-open-main {
+  flex: 1.6 1 420px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.stu-ov-facts {
+  flex: 1 1 260px;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.stu-ov-fact {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 0 16px;
+  padding: 12px 16px;
+}
+.stu-ov-fact + .stu-ov-fact {
+  border-top: 1px solid var(--border);
+}
+.stu-ov-fact dt {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-2);
+  padding-top: 3px;
+}
+.stu-ov-fact dd {
+  margin: 0;
+  font-size: 1.1875rem;
+  font-weight: 700;
+}
+.stu-ov-fact dd.proj {
+  color: var(--score-4-text);
+}
+.stu-ov-rubric {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.stu-ov-rub-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(120px, 240px) 64px;
+  gap: 0 16px;
+  align-items: center;
+  padding: 12px 16px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.stu-ov-rub-row:hover,
+.stu-ov-rub-row.sel {
+  background: var(--overlay-hover);
+}
+.stu-ov-rub-head {
+  border-top: 0;
+  cursor: default;
+  padding: 8px 16px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-2);
+  background: var(--seg-track);
+}
+.stu-ov-rub-head:hover {
+  background: var(--seg-track);
+}
+.stu-ov-rub-name,
+.stu-ov-rub-lv {
+  font-size: 1rem;
+  font-weight: 600;
+}
+.stu-ov-rub-lv {
+  text-align: right;
+  font-weight: 700;
+}
+.stu-ov-cells {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  text-align: center;
+}
+.stu-ov-cell {
+  display: block;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--seg-track);
+}
+.stu-ov-cell.on {
+  background: var(--text-3);
+}
+.stu-ov-rub-row.sel .stu-ov-cell.on {
+  background: var(--text);
+}
+.stu-ov-next-text {
+  margin-top: 4px;
+  font-size: 1.375rem;
+  line-height: 1.35;
+}
+.stu-ov-teacher {
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font-size: var(--text-sm);
+}
+.stu-ov-foot {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  text-align: center;
+}

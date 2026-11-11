@@ -20,9 +20,9 @@ async function meiObs(page) {
 test.describe('Competency card evidence drawer', () => {
   test('lists scores, adds a linked observation with a level, and leaves the levels alone', async ({ page }) => {
     await enterDemo(page);
-    await page.goto('/student?id=st23&course=sci8');
+    await page.goto('/student?id=st23&course=sci8&tab=comps');
 
-    // The first competency row with scores (the Competencies tab opens first).
+    // The first competency row with scores (opened on the Competencies tab).
     const card = page
       .locator('.stu-comp')
       .filter({ has: page.locator('.dash-tag-evidence', { hasText: /score/ }) })
