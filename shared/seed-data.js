@@ -4216,7 +4216,8 @@ function seedDemoReflections() {
    grades (the student page on and Return Grades set to When I Return
    Them, shared/grade-state.js): in any other class every save is returned
    at once. So the drafts are made the first time Demo Mode opens with the
-   class holding grades, through the data layer's own Overall Comment
+   class holding grades and Send Work on (the drafts belong with the work
+   sent, which shows only then), through the data layer's own Overall Comment
    writer, which keeps the draft's row as for any teacher's save. Each is
    the Overall Comment alone, with no level: a level would change the
    student's grades on the teacher's screens, which is grade math for
@@ -4232,6 +4233,7 @@ var DEMO_DRAFTS = [
 function seedDemoDrafts() {
   if (typeof saveScoreComment !== 'function' || typeof getReturnSettings !== 'function' || !COURSES.sci8) return false;
   if (typeof GradeState === 'undefined' || !GradeState.holds(getReturnSettings('sci8'))) return false;
+  if (typeof getCourseSendWork !== 'function' || !getCourseSendWork('sci8').send_work) return false;
   var lightLab = (getAssessments('sci8') || []).find(function (a) {
     return a && a.id === 'sci8a21';
   });

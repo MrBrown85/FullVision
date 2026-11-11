@@ -32,12 +32,16 @@ function seedDemo() {
   seedIfNeeded();
 }
 
-// The build switch and Send Work on, then Demo Mode opened again.
-function turnOnAndReopen() {
+// The build switch (When I Return Them) and Send Work on, as Class Settings turns them on.
+function turnOn() {
   setStudentPageSwitch(CID, true, 'on_return');
   const work = getCourseSubmissions(CID);
   work.course.send_work = true;
   saveDemoStudentWork(CID, work);
+}
+// ...then Demo Mode opened again.
+function turnOnAndReopen() {
+  turnOn();
   seedIfNeeded();
 }
 
@@ -99,6 +103,13 @@ describe('the two drafts', () => {
     expect(getScoreComment(CID, 'st20', LIGHT)).toBe('');
   });
 
+  it('are not made while Send Work is off, the class holding grades or not', () => {
+    setStudentPageSwitch(CID, true, 'on_return');
+    seedIfNeeded();
+    expect(GradeState.draftsWaiting(CID)).toBe(0);
+    expect(getScoreComment(CID, 'st19', LIGHT)).toBe('');
+  });
+
   it('are made once the class holds grades: an Overall Comment each, no level', () => {
     turnOnAndReopen();
     expect(
@@ -121,7 +132,7 @@ describe('the two drafts', () => {
   });
 
   it('are never made over a teacher’s grading', () => {
-    setStudentPageSwitch(CID, true, 'on_return');
+    turnOn();
     Grader.setOverallComment(CID, 'st19', LIGHT, 'My own words.');
     seedIfNeeded();
     expect(getScoreComment(CID, 'st19', LIGHT)).toBe('My own words.');
@@ -131,7 +142,7 @@ describe('the two drafts', () => {
   it('move no grade: every student’s grades are what they were without them', () => {
     const grades = () =>
       getStudents(CID).map(s => [s.id, getOverallProficiency(CID, s.id), getCourseLetterData(CID, s.id)]);
-    setStudentPageSwitch(CID, true, 'on_return');
+    turnOn();
     clearProfCache();
     const before = JSON.stringify(grades());
     seedIfNeeded();
@@ -142,11 +153,11 @@ describe('the two drafts', () => {
 });
 
 describe('the counts, from GraderWork', () => {
-  it('Send Work off: nothing to grade and no one not in, the drafts still To Return', () => {
+  it('Send Work off: nothing to grade, to return or not in', () => {
     setStudentPageSwitch(CID, true, 'on_return');
     seedIfNeeded();
     const c = GraderWork.workCounts(CID, LIGHT);
-    expect([c.tograde, c.toreturn, c.notin]).toEqual([0, 2, 0]);
+    expect([c.tograde, c.toreturn, c.notin]).toEqual([0, 0, 0]);
   });
 
   it('on: To Grade 4 with the pair once, To Return 2, Not In 20, and the class’s To Grade is the piece’s', () => {

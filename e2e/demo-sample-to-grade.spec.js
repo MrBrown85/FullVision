@@ -65,9 +65,10 @@ test.describe('desktop, 1366 wide', () => {
     await page.goto('/gradebook');
     await page.waitForSelector('#dock-mount nav', { timeout: 10000 });
     await expect(page.locator('.gb-to-grade-btn')).toHaveText(new RegExp('^' + at.classToGrade + ' to grade'));
-    await expect(page.locator('.gb-scores-cell[data-aid="' + LIGHT + '"] .gb-to-grade')).toHaveCount(
-      at.ids.tograde.length,
-    );
+    const marked = page.locator('.gb-scores-cell[data-aid="' + LIGHT + '"]:has(.gb-to-grade)');
+    // One cell a piece of work: the pair's is on Aiden's row only.
+    await expect(marked).toHaveCount(at.piece.tograde);
+    expect(await marked.evaluateAll(cs => cs.map(c => c.dataset.sid))).toEqual(['st11', 'st12', 'st14', 'st16']);
 
     await page.goto('/assignments');
     await expect(page.locator('.assess-tograde-n')).toHaveText(String(at.classToGrade));
@@ -100,7 +101,9 @@ test.describe('desktop, 1366 wide', () => {
     await page.goto('/assignments');
     await page.evaluate(aid => WorkWall.open(getActiveCourse(), aid), LIGHT);
     const wall = page.locator('#work-wall-overlay');
-    await expect(wall.locator('.ww-pill[data-filter="tograde"]')).toHaveText('To Grade ' + at.piece.tograde);
+    // The Work Wall has a card a student, so it counts the pair's two
+    // students: GraderWork's list of them, not its count of pieces.
+    await expect(wall.locator('.ww-pill[data-filter="tograde"]')).toHaveText('To Grade ' + at.ids.tograde.length);
     await shot(page, 'Demo-sample-work-wall-1366');
     expect(errors).toEqual([]);
   });
@@ -140,8 +143,15 @@ test.describe('phone, 375 wide', () => {
     await row.locator('[data-action="m-grade-row-menu"]').click();
     await page.locator('#m-sheet-container .m-tg-menu [data-only="tograde"]').click();
     await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
-    const card = page.locator('.m-swiper-card').first();
+    await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('1 of ' + at.piece.tograde + ' to grade');
+    // The pair comes first; the next is Ines, with her page.
+    await page.locator('#m-thumb-strip .m-thumb').nth(1).click();
+    const card = page.locator('.m-swiper-card[data-sid="st11"]');
     await expect(card.locator('.m-work-sent')).toContainText('Submitted');
+    await expect(card.locator('.m-work-page img').first()).toHaveAttribute(
+      'src',
+      /sample-work\/light-lab-ines-1\.jpg$/,
+    );
     await page.waitForTimeout(400);
     await shot(page, 'Demo-sample-phone-speed-grader-375');
   });
