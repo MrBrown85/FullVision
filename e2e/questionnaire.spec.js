@@ -156,6 +156,9 @@ test('the screen: toolbar, hover titles, no overflow, shared next step, sources 
   await expect(page.locator('.qn-comment .qn-hint')).toContainText('Went home in');
   await expect(page.locator('#tq-narrative')).toHaveCount(0);
   await expect(page.locator('.qn-earlier')).toContainText('consistent, dependable student');
+  // Back to this report for the rest.
+  await page.locator('[data-action="tqCommentTab"]').nth(0).click();
+  await page.locator('#tq-narrative').waitFor();
 
   // The header: name, pronouns, the Student Dashboard link there and back, the grade and the count.
   await expect(page.locator('.qn-name')).toHaveText('Cece Adeyemi');
