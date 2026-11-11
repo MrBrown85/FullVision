@@ -679,9 +679,31 @@
      first draw of a session, or offline), what the handout would print
      now is not known (ReportScores.ready). Then there is no mark. The page
      is drawn again when the rows load (the data layer's redraw), and the
-     marks with it. A mark never stops a page drawing. */
+     marks with it. Any other fault in working it out is reported (the
+     console and Sentry, once for the page) and leaves no mark. A mark
+     never stops a page drawing. */
   function _markStateOrNone(cid, aid, sid) {
-    return ReportScores.ready(cid) ? _markState(cid, aid, sid) : null;
+    try {
+      return ReportScores.ready(cid) ? _markState(cid, aid, sid) : null;
+    } catch (e) {
+      _reportFault('The Printed marks could not be worked out', e);
+      return null;
+    }
+  }
+
+  /* A fault on the handout's side, reported without taking down the page
+     that asked: to the console and to Sentry, once for each kind of fault
+     until the page is drawn again. */
+  var _faultsReported = {};
+  function _reportFault(what, e) {
+    var key = what + ': ' + (e && e.message);
+    if (_faultsReported[key]) return;
+    _faultsReported[key] = true;
+    setTimeout(function () {
+      delete _faultsReported[key];
+    }, 0);
+    console.error(what + ':', e);
+    if (window.Sentry && typeof window.Sentry.captureException === 'function') window.Sentry.captureException(e);
   }
   function markHtml(cid, aid, sid) {
     var state = _markStateOrNone(cid, aid, sid) || { kind: 'unprinted', at: null };
@@ -1639,10 +1661,18 @@
   /* In a class that holds grades whose Draft and Returned rows have not
      loaded, what the handout would print is not known: the dialog does not
      open (no draft is printed), and the page it was opened from is left as
-     it was. */
+     it was. A fault in opening it stops that one action: it is reported
+     (the console and Sentry), the dialog is closed, and the page it was
+     opened from (Assignments, the gradebook, Class Results, the Rubric
+     Bank) goes on. */
   function _openSafely(cid, aid, openOpts) {
-    if (!ReportScores.ready(cid)) return;
-    _openNow(cid, aid, openOpts);
+    try {
+      if (!ReportScores.ready(cid)) return;
+      _openNow(cid, aid, openOpts);
+    } catch (e) {
+      close();
+      _reportFault('Print Rubrics could not open', e);
+    }
   }
 
   function _openNow(cid, aid, openOpts) {
