@@ -15,13 +15,13 @@
  *     cell edited many times while one write is out sends one more, not many.
  *   - A write sent once and accepted is never sent again.
  *
- * Key invariants tested:
- *   1. Failed writes don't retry without bound
- *   2. Retries back off after repeated failures
- *   3. Rapid saves for the same cell coalesce (fewer calls than saves)
- *   4. No calls after all syncs complete
- *   5. A 10-second failure storm stays under a hard request cap
- *   6. Several failing cells each retry on their own backoff
+ * The backoff schedule itself (1s, 5s, 30s, 60s, each write on its own clock)
+ * is pinned with a fake clock in tests/offline-queue-backoff.test.js.
+ *
+ * Key invariants tested here:
+ *   1. Rapid saves for the same cell coalesce (fewer calls than saves)
+ *   2. No calls after all syncs complete
+ *   3. A failure storm stays under a hard request cap
  */
 import { test, expect } from '@playwright/test';
 import {
@@ -103,80 +103,6 @@ test.describe('Sync Loop Detection', () => {
     await seedStudents(page, STUDENTS);
     await seedAssessments(page, [ASSESSMENT]);
     await bootApp(page);
-  });
-
-  test('a failed write does not retry without bound', async ({ page }) => {
-    await failWrites(page, true);
-    await saveCell(page, ENROLLMENT_A, 3);
-
-    await page.waitForTimeout(8000);
-
-    // Sent at about 0s, 1s and 6s; the next try is 30s after that.
-    const calls = await scoreCalls(page);
-    expect(calls.length).toBeGreaterThanOrEqual(2);
-    expect(calls.length).toBeLessThanOrEqual(3);
-    // Still waiting to be sent, not dropped.
-    expect(await queued(page)).toBe(1);
-  });
-
-  test('retries back off after repeated failures', async ({ page }) => {
-    await failWrites(page, true);
-    await saveCell(page, ENROLLMENT_A, 3);
-
-    await expect.poll(async () => (await scoreCalls(page)).length, { timeout: 10_000 }).toBe(3);
-    const [first, second, third] = (await scoreCalls(page)).map(c => c.at);
-
-    // 1s before the first retry, 5s before the second.
-    expect(second - first).toBeGreaterThanOrEqual(900);
-    expect(third - second).toBeGreaterThanOrEqual(4500);
-
-    // The third failure puts the next try 30s out.
-    const entry = await page.evaluate(() => JSON.parse(localStorage.getItem('fv-sync-queue-v1')).entries[0]);
-    expect(entry.attempts).toBe(3);
-    expect(Date.parse(entry.next_at) - Date.now()).toBeGreaterThan(25_000);
-
-    await page.waitForTimeout(3000);
-    expect((await scoreCalls(page)).length).toBe(3);
-  });
-
-  test('several failing cells each retry on their own backoff', async ({ page }) => {
-    test.setTimeout(45_000);
-    await failWrites(page, true);
-
-    // Staggered so each cell's retries fall between the others'.
-    await saveCell(page, ENROLLMENT_A, 3);
-    await page.waitForTimeout(2000);
-    await saveCell(page, ENROLLMENT_B, 2);
-    await page.waitForTimeout(1500);
-    await saveCell(page, ENROLLMENT_C, 4);
-
-    const cells = [ENROLLMENT_A, ENROLLMENT_B, ENROLLMENT_C];
-    const triesOf = (calls, id) => calls.filter(c => c.params.p_enrollment_id === id).map(c => c.at);
-    const tryCounts = async () => {
-      const calls = await scoreCalls(page);
-      return cells.map(id => triesOf(calls, id).length);
-    };
-    await expect.poll(tryCounts, { timeout: 15_000 }).toEqual([3, 3, 3]);
-
-    // Each cell waits 1s, then 5s, from its own last failure. Sending every
-    // failing cell whenever one came due would cut B's and C's first wait
-    // to A's 6s mark.
-    const calls = await scoreCalls(page);
-    for (const id of cells) {
-      const [first, second, third] = triesOf(calls, id);
-      expect(second - first, `${id} first wait`).toBeGreaterThanOrEqual(900);
-      expect(second - first, `${id} first wait`).toBeLessThan(2000);
-      expect(third - second, `${id} second wait`).toBeGreaterThanOrEqual(4500);
-      expect(third - second, `${id} second wait`).toBeLessThan(6000);
-    }
-
-    // The third failure puts every cell's next try 30s out.
-    const entries = await page.evaluate(() => JSON.parse(localStorage.getItem('fv-sync-queue-v1')).entries);
-    expect(entries).toHaveLength(3);
-    for (const entry of entries) {
-      expect(entry.attempts).toBe(3);
-      expect(Date.parse(entry.next_at) - Date.now()).toBeGreaterThan(20_000);
-    }
   });
 
   test('rapid saves to one cell coalesce', async ({ page }) => {

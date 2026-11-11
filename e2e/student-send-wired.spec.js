@@ -89,6 +89,7 @@ test('a real card sends a photo, sees it Sent from its own pages, and unsends it
     'page',
     'work',
     'feedback',
+    'group-work',
     'send-start',
     'send-finish',
     'work',

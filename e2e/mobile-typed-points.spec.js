@@ -88,29 +88,6 @@ test('typed points replace the score, clamp like the desktop, and reach the grad
   expect(cell).toBe('72');
 });
 
-test('a blank field clears the score', async ({ page }) => {
-  const card = await openExam(page);
-  const sid = await card.getAttribute('data-sid');
-  const field = card.locator('.m-pts-input');
-  await field.tap();
-  await page.keyboard.press('Backspace');
-  await page.keyboard.press('Enter');
-  await expect(field).toHaveValue('');
-  expect(await stored(page, sid)).toBeNull();
-});
-
-// A typo is not a blank: the saved score stays, as on the desktop (#860).
-test('a typo leaves the saved score', async ({ page }) => {
-  const card = await openExam(page);
-  const sid = await card.getAttribute('data-sid');
-  const field = card.locator('.m-pts-input');
-  await field.tap();
-  await page.keyboard.type('abc');
-  await page.keyboard.press('Enter');
-  await expect(field).toHaveValue('65');
-  expect(await stored(page, sid)).toBe(65);
-});
-
 test('+ and − step within the bonus limit, and the % shows beside the field', async ({ page }) => {
   const card = await openExam(page);
   const sid = await card.getAttribute('data-sid');

@@ -24,6 +24,7 @@
  *
  * Nothing here reaches a real database or a real function.
  */
+import { randomUUID } from 'node:crypto';
 import { readCardKey } from '../../supabase/functions/_shared/card-key.ts';
 import { makeHandler } from '../../supabase/functions/student-submit/handler.ts';
 import { FAKE_KEY, codeTag, passwordTag } from './card-key-fake.js';
@@ -238,6 +239,11 @@ export function sampleCard(today, more) {
  * calls: state.cards.P3R8WDK4.locked = true, state.addressLocked = true,
  * state.down = true (the database is unreachable). A card is added the same
  * way: state.cards.K7M4QX2P = sampleCard(today, { code: 'K7M4QX2P' }).
+ * Batch C: state.feedback is what `feedback` answers (a piece's `revision`
+ * there is its revision request, which revise-finish and revise-unsend
+ * change); state.groupWork what `group-work` answers. With `sendWork`,
+ * revise-start, revise-finish, revise-unsend and group-links run over the
+ * send world's submissions and bucket.
  */
 export function fakeStudentSubmit(opts = {}) {
   const now = opts.now || (() => Date.now());
@@ -416,6 +422,195 @@ export function fakeStudentSubmit(opts = {}) {
   const SEND_FNS = ['work', 'send_start', 'replace', 'send_paths', 'send_finish', 'unsend', 'file_links'];
   const WORKER_FNS = ['removal_batch', 'removal_done'];
 
+  /* Batch C's revisions over the send world (S11-W1). A submission there
+     may carry `version` (2 or more for a revision; a first send has none,
+     so 1). `work` lists the student's newest send of a piece as `sent`,
+     `file_links` and `send_paths` say each send's version, as Batch C's
+     SQL does. The revision request itself is the `revision` of the piece's
+     row in state.feedback, which revision_finish and revision_unsend
+     change as the SQL changes revision_request. state.refuse = { [fn]:
+     error } makes one of these functions refuse. */
+  const versionOf = sub => (sub && sub.version) || 1;
+  const versions = (fn, params, r) => {
+    if (!r || r.ok !== true) return r;
+    if (fn === 'send_paths') r.version = versionOf(world.subs.get(params[2]));
+    if (fn === 'file_links') r.files.forEach(f => (f.version = versionOf(world.subs.get(f.submission_id))));
+    if (fn === 'work') {
+      r.assessments.forEach(a => {
+        const newest = [...world.subs.values()]
+          .filter(s => s.assessment === a.id && s.enrollment === params[1] && s.state === 'sent')
+          .sort((x, y) => versionOf(y) - versionOf(x))[0];
+        if (a.sent && newest && newest.id !== a.sent.submission_id) {
+          Object.assign(a.sent, {
+            submission_id: newest.id,
+            sent_at: newest.sent_at,
+            note: newest.note,
+            pages: newest.files.length,
+          });
+        }
+      });
+    }
+    return r;
+  };
+  const revisionRow = a => ((state.feedback && state.feedback.assessments) || []).find(x => x.id === a) || null;
+  const revisionSubs = (a, e) =>
+    [...(world ? world.subs.values() : [])].filter(s => s.assessment === a && s.enrollment === e && versionOf(s) >= 2);
+  const uploadJson = sub =>
+    sub.files.map(f => ({ file_id: f.id, page: f.page, path: f.path, thumb_path: f.thumb_path }));
+  const REVISION_FNS = {
+    revision_start([token, e, a, pagesJson, note, req]) {
+      const found = inSession(token, e);
+      if (found.error) return no(found.error);
+      const mine = [...world.subs.values()].find(s => s.assessment === a && s.enrollment === e && s.request_id === req);
+      if (mine) {
+        return {
+          ok: true,
+          replayed: true,
+          submission_id: mine.id,
+          state: mine.state,
+          version: versionOf(mine),
+          bucket: 'student-photos',
+          late: false,
+          finish_by: mine.state === 'sending' ? mine.finish_by : null,
+          files: mine.state === 'sending' ? uploadJson(mine) : [],
+        };
+      }
+      if (state.refuse && state.refuse.revision_start) return no(state.refuse.revision_start);
+      const row = revisionRow(a);
+      const rv = row && row.revision;
+      if (!rv || rv.state === 'returned') return no('no_revision');
+      if (rv.state === 'grading') return no('grading_started');
+      revisionSubs(a, e)
+        .filter(s => s.state === 'sending')
+        .forEach(s => world.subs.delete(s.id));
+      const id = randomUUID();
+      const files = JSON.parse(pagesJson).map((_, i) => {
+        const f = randomUUID();
+        const base = `${C1}/${a}/${e}/${id}/${f}`;
+        return { id: f, page: i + 1, path: base + '.jpg', thumb_path: base + '-thumb.jpg', added_by: 'student' };
+      });
+      const sub = {
+        id,
+        course: C1,
+        assessment: a,
+        enrollment: e,
+        state: 'sending',
+        intent: 'new',
+        sent_by: 'student',
+        request_id: req,
+        note,
+        version: 2,
+        created_at: new Date(now()).toISOString(),
+        finish_by: new Date(now() + 7200e3).toISOString(),
+        files,
+      };
+      world.subs.set(id, sub);
+      return {
+        ok: true,
+        replayed: false,
+        submission_id: id,
+        state: 'sending',
+        version: 2,
+        bucket: 'student-photos',
+        late: false,
+        finish_by: sub.finish_by,
+        files: uploadJson(sub),
+      };
+    },
+    revision_finish([token, e, subId, filesJson]) {
+      const found = inSession(token, e);
+      if (found.error) return no(found.error);
+      const sub = world.subs.get(subId);
+      if (!sub || sub.enrollment !== e || versionOf(sub) < 2) return no('not_found');
+      const rv = (revisionRow(sub.assessment) || {}).revision;
+      if (sub.state === 'sent') {
+        return {
+          ok: true,
+          replayed: true,
+          submission_id: sub.id,
+          version: 2,
+          sent_at: sub.sent_at,
+          late: false,
+          pages: sub.files.length,
+        };
+      }
+      if (state.refuse && state.refuse.revision_finish) {
+        world.subs.delete(sub.id);
+        return no(state.refuse.revision_finish);
+      }
+      if (!rv) return no('no_revision');
+      const keep = JSON.parse(filesJson).map(f => f.file_id);
+      sub.files = keep.map((fid, i) => ({ ...sub.files.find(x => x.id === fid), page: i + 1 }));
+      // A revision sent again takes the place of the one in.
+      revisionSubs(sub.assessment, e)
+        .filter(s => s !== sub && s.state === 'sent')
+        .forEach(s => world.subs.delete(s.id));
+      sub.state = 'sent';
+      sub.sent_at = new Date(now()).toISOString();
+      Object.assign(rv, {
+        state: 'sent',
+        revision_version: 2,
+        revision_sent_at: sub.sent_at,
+        revision_note: sub.note || null,
+        revision_late: false,
+      });
+      return {
+        ok: true,
+        replayed: false,
+        submission_id: sub.id,
+        version: 2,
+        sent_at: sub.sent_at,
+        late: false,
+        pages: sub.files.length,
+      };
+    },
+    revision_unsend([token, e, a]) {
+      const found = inSession(token, e);
+      if (found.error) return no(found.error);
+      const rv = (revisionRow(a) || {}).revision;
+      if (!rv) return no('not_found');
+      if (rv.state === 'grading' || rv.state === 'returned') return no('grading_started');
+      const mine = revisionSubs(a, e);
+      const sent = mine.filter(s => s.state === 'sent');
+      mine.forEach(s => world.subs.delete(s.id));
+      Object.assign(rv, {
+        state: 'open',
+        revision_version: null,
+        revision_sent_at: null,
+        revision_note: null,
+        revision_late: null,
+      });
+      return {
+        ok: true,
+        unsent: sent.length > 0,
+        cancelled: mine.length > sent.length,
+        pages: sent.reduce((n, s) => n + s.files.length, 0),
+      };
+    },
+    // Every handed-in page of the piece, whoever in the group sent it: the student's own are `mine`.
+    group_file_links([token, e, a]) {
+      const found = inSession(token, e);
+      if (found.error) return no(found.error);
+      const files = [...world.subs.values()]
+        .filter(s => s.assessment === a && s.state === 'sent')
+        .flatMap(s =>
+          s.files.map(f => ({
+            file_id: f.id,
+            submission_id: s.id,
+            version: versionOf(s),
+            page: f.page,
+            path: f.path,
+            thumb_path: f.thumb_path,
+            width: 900,
+            height: 1200,
+            rotation: 0,
+            mine: s.enrollment === e,
+          })),
+        );
+      return { ok: true, bucket: 'student-photos', files };
+    },
+  };
+
   const slip = name => async code => {
     if (state.down) throw new Error('down');
     sql.push({ fn: name, params: [code] });
@@ -437,7 +632,15 @@ export function fakeStudentSubmit(opts = {}) {
         const add = /, p_add => (true|false)\) as r$/.exec(text);
         if (world && WORKER_FNS.includes(fn)) return world.db.call(text, params);
         sql.push({ fn, params: params.slice(0, -1), add: add ? add[1] === 'true' : undefined });
-        if (world && SEND_FNS.includes(fn)) return world.db.call(text, params);
+        if (world && SEND_FNS.includes(fn)) return versions(fn, params, await world.db.call(text, params));
+        // Batch C's revisions and group work (S11-W1, S12-W1), over the send world's submissions and bucket.
+        // `markup`: what state.markup holds, else no marks on any page.
+        if (fn === 'markup') return clone(state.markup || { ok: true, files: [] });
+        if (fn === 'group_work') {
+          const found = inSession(params[0], params[1]);
+          return found.error ? no(found.error) : clone(state.groupWork || { ok: true, assessments: [] });
+        }
+        if (world && REVISION_FNS[fn]) return clone(REVISION_FNS[fn](params));
         // Batch C's `feedback`: what state.feedback holds, else a class with no marks and Reflect on Feedback off.
         if (fn === 'feedback') {
           return clone(

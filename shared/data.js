@@ -894,6 +894,9 @@ var _ECHO_SAFE_RPCS = {
   return_work: true,
   save_markup: true,
   answer_reflection: true,
+  return_for_revision: true,
+  set_revision_request: true,
+  cancel_revision: true,
 };
 var _echoNeedsReload = false;
 
@@ -16902,17 +16905,21 @@ function studentWorkPageUrl(cid, file, which) {
 
    Shapes: getStudentGroupWork is the student's group_work(...),
    getGroupWorkFiles the files group_file_links(...) makes links for.
-   No answer here carries a group-mate's name. Demo Mode only, as the rest
-   of student work; signed in they answer empty. */
+   No answer here carries a group-mate's name. Demo Mode, and a signed-in
+   class the server keeps rows for (each member's own submission comes from
+   list_course_submissions); any other class answers empty. */
 
 /* The group `sid` sends with on `aid`: { kind: 'pair' | 'group', index,
    members, separate } (members on the roster, in the group's order;
    separate: `sid` is Graded Separately), or null when the student sends
    alone. */
 function getStudentWorkGroup(cid, sid, aid) {
-  // Group work is Demo Mode's until Batch C is wired (S12-W1).
-  if (!_isDemoSession()) return null;
-  var a = _assessmentById(cid, aid);
+  // Demo Mode, or a signed-in class the server keeps rows for (S12-W1): the groups are the teacher's own.
+  if (!_isDemoSession() && !_fbOn(cid)) return null;
+  // The class's own copy of the piece (pairs and groups as the teacher made them), not the server's raw row.
+  var a = (getAssessments(cid) || []).find(function (x) {
+    return x && x.id === aid;
+  });
   if (!a || getAssessmentStudentWork(cid, aid).group_work !== 'group') return null;
   var group = getCollabGroupOf(a, sid);
   if (!group) return null;
@@ -18515,7 +18522,9 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
    answer_reflection, list_course_feedback). Only for a class the server keeps
    student-page rows for (_workOnServer, as Send Work's wiring above): any
    other class is answered exactly as before and sent nothing new. Return
-   for Revision, revisions and group work are not here (Phase 3).
+   for Revision, its edit and Take Back are here (S7-W1, "Revisions" below);
+   a student's own revision (revision_start, revision_finish, revision_unsend)
+   and group work are not (Phase 3).
 
    What is read: list_course_feedback (the class's switches, a line for
    every marked page, every reflection) when the class loads with Send Work
@@ -18555,6 +18564,10 @@ var _FB_ENDPOINTS = {
   save_markup: true,
   return_work: true,
   answer_reflection: true,
+  // Revisions (S7-W1): Return for Revision, its edit and Take Back.
+  return_for_revision: true,
+  set_revision_request: true,
+  cancel_revision: true,
 };
 
 /* True when class `cid`'s marks and reflections are the server's (a
@@ -18764,6 +18777,78 @@ function _fbReflections(cid) {
   });
 }
 
+/* ── Revisions ── */
+
+// What the server does with a request's edit (set_revision_request) on a copy of the request.
+function _fbApplyPatch(r, patch) {
+  if (!_plainObject(patch)) return;
+  ['what_to_fix', 'revise_by', 'criterion_ids'].forEach(function (k) {
+    if (k in patch) r[k] = Array.isArray(patch[k]) ? patch[k].slice() : patch[k];
+  });
+}
+
+/* The class's revision requests as the server listed them, with this
+   device's unanswered Return for Revision, edits and Take Backs laid over
+   them. A request made here and not answered yet is shown open under a
+   made-up id (pending-rv:<key>): it can be neither edited nor taken back
+   until the server has answered. Each carries _live so the readers below
+   take the server's own state. */
+function _fbRevisions(cid) {
+  return _fbMemoized(cid, 'revisions', function () {
+    var list = (_studentWorkCopy((_fbServer[cid] || {}).revisions) || []).map(function (r) {
+      return Object.assign(r, { _live: true });
+    });
+    _fbQueuedWrites(['return_for_revision', 'set_revision_request', 'cancel_revision']).forEach(function (w) {
+      var p = w.payload;
+      var at = w.at || new Date().toISOString();
+      if (w.endpoint === 'return_for_revision') {
+        var req = _plainObject(p.p_request) ? p.p_request : {};
+        list.push({
+          _live: true,
+          id: 'pending-rv:' + p.p_idempotency_key,
+          assessment_id: p.p_assessment_id,
+          enrollment_id: p.p_enrollment_id,
+          what_to_fix: req.what_to_fix || '',
+          revise_by: req.revise_by || null,
+          criterion_ids: Array.isArray(req.criterion_ids) ? req.criterion_ids.slice() : [],
+          keep_grade: true,
+          grade_hidden: false,
+          first_submission_id: null,
+          first_version: 1,
+          first_grade: null,
+          first_returned_at: null,
+          created_at: at,
+          updated_at: at,
+          closed_at: null,
+          state: 'open',
+          revision_submission_id: null,
+          revision_version: null,
+          revision_sent_at: null,
+          revision_note: null,
+          revision_late: null,
+          revision_sent_by: null,
+        });
+        return;
+      }
+      var r = list.find(function (x) {
+        return x.id === p.p_request_id;
+      });
+      if (!r || r.state === 'cancelled' || r.state === 'returned') return;
+      if (w.endpoint === 'set_revision_request') {
+        _fbApplyPatch(r, p.p_patch);
+        r.updated_at = at;
+      } else {
+        r.state = 'cancelled';
+        r.closed_at = at;
+        r.updated_at = at;
+        r.revision_submission_id = r.revision_version = r.revision_sent_at = r.revision_note = null;
+        r.revision_late = r.revision_sent_by = null;
+      }
+    });
+    return list;
+  });
+}
+
 /* ── Reading ── */
 
 // A signature of the marked pages of one piece, from list_course_feedback's lines or list_assessment_markup's rows.
@@ -18777,7 +18862,7 @@ function _fbSignature(rows) {
 }
 
 function _fbLook(cid) {
-  return JSON.stringify([_fbCourseOptions(cid), _fbMarkupKept(cid), _fbReflections(cid)]);
+  return JSON.stringify([_fbCourseOptions(cid), _fbMarkupKept(cid), _fbReflections(cid), _fbRevisions(cid)]);
 }
 
 // list_assessment_markup for one piece: { file id → row }, or null when the read failed.
@@ -18895,7 +18980,11 @@ async function _fetchCourseFeedback(cid) {
   // One of this device's writes landed while the read was out: it is from before that write.
   if ((_fbWrites[cid] || 0) !== writes) return { skipped: true };
   var was = _fbLook(cid);
-  _fbServer[cid] = { markup: data.markup, reflections: data.reflections };
+  _fbServer[cid] = {
+    markup: data.markup,
+    reflections: data.reflections,
+    revisions: Array.isArray(data.revisions) ? data.revisions : [],
+  };
   if (_plainObject(data.course)) _noteCourseFeedbackOptions(cid, data.course);
   var rows = {};
   Object.keys(lines).forEach(function (aid) {
@@ -18961,6 +19050,15 @@ function _fbClassOfFile(fileId) {
   });
   return found;
 }
+function _fbClassOfRevision(id) {
+  return (
+    Object.keys(_fbServer).find(function (cid) {
+      return ((_fbServer[cid] && _fbServer[cid].revisions) || []).some(function (r) {
+        return r && r.id === id;
+      });
+    }) || null
+  );
+}
 function _fbClassOfReflection(id) {
   return (
     Object.keys(_fbServer).find(function (cid) {
@@ -18989,6 +19087,10 @@ function _onFeedbackWriteEvent(kind, endpoint, payload, data) {
     else if (endpoint === 'save_markup') cid = _fbClassOfFile(payload.p_file_id);
     else if (endpoint === 'return_work') cid = _classOfAssessment(payload.p_assessment_id);
     else if (endpoint === 'answer_reflection') cid = _fbClassOfReflection(payload.p_reflection_id);
+    else if (endpoint === 'return_for_revision') cid = _classOfAssessment(payload.p_assessment_id);
+    else if (endpoint === 'set_revision_request' || endpoint === 'cancel_revision') {
+      cid = _fbClassOfRevision(payload.p_request_id);
+    }
     if (kind !== 'flush:success') {
       if (cid) _fbWriteLanded(cid);
       else
@@ -19052,6 +19154,22 @@ function _onFeedbackWriteEvent(kind, endpoint, payload, data) {
         r.given_at = new Date().toISOString();
         r.waiting = false;
       });
+    } else if (
+      endpoint === 'return_for_revision' ||
+      endpoint === 'set_revision_request' ||
+      endpoint === 'cancel_revision'
+    ) {
+      // The request as the server now has it (a Return for Revision also returned the work: the rows are read again).
+      var all = (_fbServer[cid] && _fbServer[cid].revisions) || [];
+      if (_plainObject(data.request) && data.request.id) {
+        var found = all.findIndex(function (r) {
+          return r && r.id === data.request.id;
+        });
+        if (found >= 0) all[found] = data.request;
+        else all.push(data.request);
+        if (_fbServer[cid]) _fbServer[cid].revisions = all;
+      }
+      if (endpoint === 'return_for_revision') _refreshGradeReturnsSoon(cid);
     } else if (endpoint === 'answer_reflection') {
       var list = (_fbServer[cid] && _fbServer[cid].reflections) || [];
       var at = list.findIndex(function (r) {
@@ -20145,16 +20263,20 @@ function saveDemoReflections(cid, list) {
    says: with either off every reader here shows nothing and every writer
    answers revisions_off. DEMO MODE ONLY, in gb-student-feedback-<cid>
    (field `revisions`, by request id) and the student work's own
-   submissions (gb-student-work-<cid>). Signed in, the readers show none
-   and the writers answer { result: 'not_available' } (the student's,
-   { ok: false, error: 'not_available' }) with no RPC, until S11-W1. */
+   submissions (gb-student-work-<cid>). A signed-in class's requests are the
+   server's (_fbRevisions, from list_course_feedback with this device's
+   unanswered Return for Revision, edits and Take Backs laid over them): the
+   teacher's writers go to return_for_revision, set_revision_request and
+   cancel_revision through the outbox. The student's own writers here are
+   Demo Mode's and answer { ok: false, error: 'not_available' } signed in
+   (a real student sends through the revision routes: S11-W1, student side). */
 var REVISION_FIX_MAX = 2000;
 var _firstVersionScope = null; // { cid, sid, aid, entries } while getRevisionFirstCell reads
 
-/* True when the class's revisions show: Demo Mode, the build switch and
-   Send Work on. */
+/* True when the class's revisions show: Demo Mode, or a signed-in class the
+   server keeps rows for, with the build switch and Send Work on. */
 function revisionsOn(cid) {
-  if (!cid || !_isDemoSession()) return false;
+  if (!cid || !(_isDemoSession() || _fbOn(cid))) return false;
   return !!getReturnSettings(cid).student_page && getCourseSendWork(cid).send_work === true;
 }
 
@@ -20214,6 +20336,8 @@ function _revisionSubmission(cid, r) {
    open one is read live from the submissions, the grade_return row and
    the teacher's marks. */
 function _revisionState(cid, r) {
+  // A signed-in class's request: the server's own reading of it (_revision_state).
+  if (r._live) return r.state;
   if (r.cancelled_at) return 'cancelled';
   if (r.closed_at) return 'returned';
   var sub = _revisionSubmission(cid, r);
@@ -20240,6 +20364,7 @@ function _revisionIsOpen(state) {
    never-returned row away), the grade stays hidden and Take Back gives the
    student back what the request kept (hidden_row, first_grade). */
 function _revisionHidden(cid, r) {
+  if (r._live) return false; // Hide is not built: the grade is always kept
   if (!r.hidden || r.cancelled_at || r.hide_ended_at) return false;
   var row = getGradeReturn(cid, r.enrollment_id, r.assessment_id);
   return !row || !row.returned_at;
@@ -20247,6 +20372,7 @@ function _revisionHidden(cid, r) {
 
 // When a request closed: Take Back, or the return of the revision's grade.
 function _revisionClosedAt(cid, r, state) {
+  if (r._live) return r.closed_at || null;
   if (state === 'cancelled') return r.cancelled_at;
   if (state !== 'returned') return null;
   if (r.closed_at) return r.closed_at;
@@ -20293,10 +20419,13 @@ function _classRevisions(cid) {
   (getStudents(cid) || []).forEach(function (s) {
     if (s && s.id) students[s.id] = true;
   });
-  return Object.keys(all)
-    .map(function (id) {
-      return all[id];
-    })
+  return (
+    _isDemoSession()
+      ? Object.keys(all).map(function (id) {
+          return all[id];
+        })
+      : _fbRevisions(cid)
+  )
     .filter(function (r) {
       return _plainObject(r) && students[r.enrollment_id] && _assessmentById(cid, r.assessment_id);
     })
@@ -20323,6 +20452,11 @@ function _revisionOpen(cid, sid, aid) {
    ("Was Developing + on the Oct 30 version"). */
 function _revisionRow(cid, r) {
   var state = _revisionState(cid, r);
+  if (r._live) {
+    var kept = Object.assign({}, _studentWorkCopy(r));
+    delete kept._live;
+    return kept;
+  }
   return {
     id: r.id,
     assessment_id: r.assessment_id,
@@ -20538,6 +20672,97 @@ function _revisionSetRow(cid, sid, aid, row) {
   _saveGradeReturns(cid, out);
 }
 
+/* The server's answer to a revision write, a few seconds at most: null when
+   there is none (offline, slow), and the screen goes on as if it landed. */
+function _fbWaitAnswer(sent) {
+  var late = new Promise(function (resolve) {
+    setTimeout(resolve, _MARKUP_SAVE_WAIT_MS, null);
+  });
+  return Promise.race([Promise.resolve(sent), late]);
+}
+function _fbRefused(res) {
+  return !!(res && res.error && /P0002|not found/i.test(String(res.error.code || res.error.message || '')));
+}
+
+/* Return for Revision for a live class: the work is returned as Return
+   returns it (returnWork: the grade and the marks, one call), then
+   return_for_revision, which returns it again (nothing left to return) and
+   makes the request; both in the student's cell order. The request shows
+   open at once. The Promise answers as the Demo writer's does. */
+function _returnForRevisionLive(cid, sid, aid, req, key) {
+  if (!_isUuid(sid) || !_isUuid(aid)) return Promise.resolve({ result: 'not_found' });
+  var returned = returnWork(cid, aid, [sid]);
+  var sent = _writeRpc('return_for_revision', {
+    p_assessment_id: aid,
+    p_enrollment_id: sid,
+    p_request: {
+      what_to_fix: req.what_to_fix,
+      revise_by: req.revise_by,
+      criterion_ids: req.criterion_ids,
+      keep_grade: true,
+    },
+    p_idempotency_key: _isUuid(key) ? key : _newEntryId(),
+  });
+  if (sent && sent.refused) return Promise.resolve({ result: 'failed' });
+  _fbChanged(cid);
+  _trackPendingSync(Promise.resolve(sent));
+  return _fbWaitAnswer(sent).then(function (res) {
+    var data = res && !res.error ? _rpcObject(res.data) : null;
+    if (!res) {
+      // No answer yet: the request is shown open and goes when the device can send it.
+      var shown = _revisionOpen(cid, sid, aid);
+      return { result: 'made', request: shown ? _revisionRow(cid, shown) : null, returned: returned, hidden: false };
+    }
+    if (data && data.result === 'made') {
+      return { result: 'made', request: _fbLiveRow(data.request), returned: returned, hidden: false };
+    }
+    if (data && data.result === 'already_open') return { result: 'already_open', request: _fbLiveRow(data.request) };
+    if (data && data.result === 'not_for_dibels') return { result: 'not_for_dibels' };
+    if (data && data.result === 'hide_not_available') return { result: 'hide_needs_holding' };
+    return _fbRefused(res) ? { result: 'not_found' } : { result: 'failed' };
+  });
+}
+
+// A request as the server sent it, for the screens.
+function _fbLiveRow(r) {
+  return _plainObject(r) ? _studentWorkCopy(r) : null;
+}
+
+/* set_revision_request and cancel_revision for a live class, through the
+   outbox under their own keys. A request made here and not answered yet has
+   no server id to name: that answers failed and the teacher presses again. */
+function _reviseLive(endpoint, cid, found, extra, key) {
+  if (!_isUuid(found.id)) return Promise.resolve({ result: 'failed' });
+  var body = Object.assign({ p_request_id: found.id }, extra, {
+    p_idempotency_key: _isUuid(key) ? key : _newEntryId(),
+  });
+  var sent =
+    endpoint === 'cancel_revision' ? _writeRpc('cancel_revision', body) : _writeRpc('set_revision_request', body);
+  if (sent && sent.refused) return Promise.resolve({ result: 'failed' });
+  _fbChanged(cid);
+  _trackPendingSync(Promise.resolve(sent));
+  return _fbWaitAnswer(sent).then(function (res) {
+    var data = res && !res.error ? _rpcObject(res.data) : null;
+    if (!res) {
+      var now = _classRevisions(cid).find(function (r) {
+        return r.id === found.id;
+      });
+      var row = now ? _revisionRow(cid, now) : null;
+      return endpoint === 'cancel_revision'
+        ? { result: 'cancelled', unhidden: false, request: row }
+        : { result: 'saved', request: row };
+    }
+    if (data && (data.result === 'saved' || data.result === 'cancelled')) {
+      return Object.assign(
+        { result: data.result, request: _fbLiveRow(data.request) },
+        data.result === 'cancelled' ? { unhidden: false } : {},
+      );
+    }
+    if (data && data.result === 'not_open') return { result: 'not_open' };
+    return _fbRefused(res) ? { result: 'not_found' } : { result: 'failed' };
+  });
+}
+
 /* Return for Revision (return_for_revision), for one student and piece.
    `request`: { what_to_fix (1 to 2000 characters), revise_by ('YYYY-MM-DD'
    or null), criterion_ids (criteria of the piece's rubric; [] on work with
@@ -20556,7 +20781,7 @@ function _revisionSetRow(cid, sid, aid, row) {
    { result: 'revisions_off' } (revisionsOn false); signed in
    { result: 'not_available' }. The same key again answers the same. */
 function returnForRevision(cid, sid, aid, request, key) {
-  if (!cid || !_isDemoSession()) return Promise.resolve({ result: 'not_available' });
+  if (!cid || !(_isDemoSession() || _fbOn(cid))) return Promise.resolve({ result: 'not_available' });
   if (!_idemKeyOk(key)) return Promise.resolve({ result: 'invalid' });
   var again = _feedbackRemembered(cid, 'revision-make', key);
   if (again !== undefined) return Promise.resolve(again);
@@ -20571,6 +20796,7 @@ function returnForRevision(cid, sid, aid, request, key) {
   if (!req.keep_grade && !GradeState.holds(getReturnSettings(cid))) {
     return Promise.resolve({ result: 'hide_needs_holding' });
   }
+  if (!_isDemoSession()) return _returnForRevisionLive(cid, sid, aid, req, key);
   var returned = returnWork(cid, aid, [sid]);
   var first = _revisionWorking(cid, sid, aid);
   var before = getGradeReturn(cid, sid, aid);
@@ -20612,7 +20838,7 @@ function returnForRevision(cid, sid, aid, request, key) {
    'not_found' }, { result: 'invalid' }, { result: 'revisions_off' }, or
    signed in { result: 'not_available' }. The same key again answers the same. */
 function setRevisionRequest(cid, requestId, patch, key) {
-  if (!cid || !_isDemoSession()) return Promise.resolve({ result: 'not_available' });
+  if (!cid || !(_isDemoSession() || _fbOn(cid))) return Promise.resolve({ result: 'not_available' });
   if (!_idemKeyOk(key)) return Promise.resolve({ result: 'invalid' });
   var again = _feedbackRemembered(cid, 'revision-set', key);
   if (again !== undefined) return Promise.resolve(again);
@@ -20624,6 +20850,7 @@ function setRevisionRequest(cid, requestId, patch, key) {
   var ok = _revisionRequestOk(cid, _assessmentById(cid, found.assessment_id), patch, true);
   if (!ok) return Promise.resolve({ result: 'invalid' });
   if (!_revisionIsOpen(_revisionState(cid, found))) return Promise.resolve({ result: 'not_open' });
+  if (!_isDemoSession()) return _reviseLive('set_revision_request', cid, found, { p_patch: ok }, key);
   var draft = _studentFeedbackDraft(cid);
   var r = draft.revisions[found.id];
   Object.assign(r, ok, { updated_at: new Date().toISOString() });
@@ -20640,7 +20867,7 @@ function setRevisionRequest(cid, requestId, patch, key) {
    { result: 'not_found' }, { result: 'invalid' } (no key), { result:
    'revisions_off' }, or signed in { result: 'not_available' }. */
 function cancelRevision(cid, requestId, key) {
-  if (!cid || !_isDemoSession()) return Promise.resolve({ result: 'not_available' });
+  if (!cid || !(_isDemoSession() || _fbOn(cid))) return Promise.resolve({ result: 'not_available' });
   if (!_idemKeyOk(key)) return Promise.resolve({ result: 'invalid' });
   var again = _feedbackRemembered(cid, 'revision-cancel', key);
   if (again !== undefined) return Promise.resolve(again);
@@ -20650,6 +20877,7 @@ function cancelRevision(cid, requestId, key) {
   });
   if (!found) return Promise.resolve({ result: 'not_found' });
   if (!_revisionIsOpen(_revisionState(cid, found))) return Promise.resolve({ result: 'not_open' });
+  if (!_isDemoSession()) return _reviseLive('cancel_revision', cid, found, {}, key);
   var unhide = _revisionHidden(cid, found);
   var now = new Date().toISOString();
   // Closed first, so the row given back below is not read as a Return that ends anything.

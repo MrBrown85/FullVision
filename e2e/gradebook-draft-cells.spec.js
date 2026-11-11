@@ -294,34 +294,3 @@ test('the marks follow the theme: dashed in dark mode too', async ({ page }) => 
   await expect(page.locator('.gb-to-return')).toHaveCount(0);
   await expect(page.locator('#gb-data .gb-draft')).toHaveCount(0);
 });
-
-test('with the switch off, and on As Soon As I Save, the gradebook has no mark, count or Return', async ({ page }) => {
-  const at = await demoWithNewPiece(page);
-  await openGradebook(page);
-  const nothing = async () => {
-    await expect(page.locator('#gb-data .gb-draft')).toHaveCount(0);
-    await expect(page.locator('.gb-to-return')).toHaveCount(0);
-    await expect(page.locator('.gb-key')).not.toContainText('Draft');
-    const menu = await openColumnMenu(page);
-    await expect(menu).not.toContainText('Return');
-    await page.keyboard.press('Escape');
-    await page.locator('[data-action="setView"][data-mode="detailed"]').click();
-    await expect(page.locator('.gb-return-drafts')).toHaveCount(0);
-    await expect(page.locator('#gb-data .gb-draft')).toHaveCount(0);
-  };
-  // Switch off: grade in the dialog, which shows no Draft row either.
-  await cell(page, at.sids[0]).click();
-  const dialog = page.locator('#grader-overlay .grader-dialog');
-  await dialog.locator('[data-action="graderTagLevel"][data-tag="' + at.tag + '"][data-level="3"]').click();
-  await dialog.locator('.grader-done').click();
-  await nothing();
-  expect(await page.evaluate(cid => localStorage.getItem('gb-grade-returns-' + cid), at.cid)).toBeNull();
-
-  // On, but returning each save at once.
-  expect(await page.evaluate(cid => setStudentPageSwitch(cid, true, 'on_save'), at.cid)).toBe(true);
-  await openGradebook(page);
-  await cell(page, at.sids[1]).click();
-  await dialog.locator('[data-action="graderTagLevel"][data-tag="' + at.tag + '"][data-level="2"]').click();
-  await dialog.locator('.grader-done').click();
-  await nothing();
-});

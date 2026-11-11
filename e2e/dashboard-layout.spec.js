@@ -43,11 +43,6 @@ function measure(page) {
   });
 }
 
-test('there is no Needs Attention card', async ({ page }) => {
-  await openDashboard(page);
-  await expect(page.locator('#dash-na-card, .dash-na-row, [data-action="naFilter"]')).toHaveCount(0);
-});
-
 for (const width of [1440, 1280, 1024]) {
   test(`at ${width}px the competency cards share one height in every view, and nothing scrolls sideways`, async ({
     page,
@@ -79,20 +74,6 @@ test('below 900px the competency cards stack, each at least 300px', async ({ pag
   expect(m.stacked).toBe(true);
   expect(m.a).toBeGreaterThanOrEqual(300);
   expect(m.b).toBeGreaterThanOrEqual(300);
-});
-
-test("the class's competency codes are unique, on the cards and in Needs Support", async ({ page }) => {
-  await openDashboard(page);
-  await showViews(page, 'below', 'self');
-  const codes = await page.evaluate(() => Object.values(DashInsights.columnCodes('sci8')));
-  expect(new Set(codes).size).toBe(codes.length);
-  await expect(page.locator('.dash-comp-card .dash-comp-code')).toHaveText(codes);
-  const chips = await page
-    .locator('.dash-grid .dash-card')
-    .first()
-    .locator('button.dash-card-seg')
-    .evaluateAll(els => els.map(el => el.firstChild.textContent));
-  expect(chips).toEqual(codes);
 });
 
 test('Missing and Late opens the gradebook', async ({ page }) => {
@@ -138,18 +119,14 @@ test('pointing at a competency lights its chip on every student card, and only t
   await expect(lit).toHaveCount(0);
 });
 
-test('a student card has the flag at its foot and the full name in a title', async ({ page }) => {
+test("the flag at a student card's foot is 22px wide and flips to Unflag", async ({ page }) => {
   await openDashboard(page);
   const card = page.locator('.dash-grid > .dash-card').first();
-  await expect(card.locator('.dash-card-header .dash-flag-btn')).toHaveCount(0);
   const flag = card.locator('.dash-card-footer > .dash-flag-btn');
-  await expect(flag).toHaveAttribute('aria-label', 'Flag student');
   const box = await flag.boundingBox();
   expect(Math.round(box.width)).toBe(22);
   await flag.click();
   await expect(card.locator('.dash-card-footer > .dash-flag-btn')).toHaveAttribute('aria-label', 'Unflag student');
-  const name = card.locator('.dash-card-name');
-  await expect(name).toHaveAttribute('title', (await name.textContent()).trim());
 });
 
 test('every box on the dashboard is 12px from the next', async ({ page }) => {

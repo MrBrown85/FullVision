@@ -888,11 +888,13 @@ describe('signed in: nothing yet', () => {
     delete globalThis.getSupabase;
   });
 
-  it('data.js names none of the revision functions the server will have', () => {
+  it('data.js names the teacher’s revision functions at call sites the drift check can read, and none of the student’s (S7-W1)', () => {
     const src = readFileSync('shared/data.js', 'utf-8');
-    expect(src).not.toMatch(
-      /['"`](return_for_revision|set_revision_request|cancel_revision|revision_start|revision_finish|revision_unsend)['"`]/,
-    );
+    expect(src.match(/_writeRpc\(\s*'return_for_revision'/g).length).toBe(1);
+    expect(src.match(/_writeRpc\(\s*'set_revision_request'/g).length).toBe(1);
+    expect(src.match(/_writeRpc\(\s*'cancel_revision'/g).length).toBe(1);
+    // A student's own revision goes through the function's routes, not through this file.
+    expect(src).not.toMatch(/['"`](revision_start|revision_finish|revision_unsend)['"`]/);
   });
 
   it('no family-facing file reads the teacher’s requests', () => {

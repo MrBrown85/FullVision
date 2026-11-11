@@ -148,7 +148,7 @@ describe('a real send: start, each file to its link, finish', () => {
     const dev = school();
     const page = await signIn(dev);
     const token = JSON.parse(dev.store[KEY]).t;
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'forms', 'feedback']);
+    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'forms', 'feedback', 'group-work']);
     expect(page.root().querySelector(piece(WORK.fair) + ' [data-act="send-open"]')).toBeTruthy();
     // A piece the class does not take work for says nothing of sending.
     expect(page.root().querySelector(piece(WORK.quick) + ' .sp-send-closed')).toBeNull();
@@ -198,6 +198,7 @@ describe('a real send: start, each file to its link, finish', () => {
       'work',
       'forms',
       'feedback',
+      'group-work',
       'send-start',
       'send-finish',
       'work',
@@ -213,10 +214,10 @@ describe('a real send: start, each file to its link, finish', () => {
     expect(text(page, piece(WORK.fair) + ' .sp-send-line')).toBe(
       'Your teacher hasn’t started grading it. You can still change it.',
     );
-    // The thumbnails came from their five-minute links, with nothing of the session.
+    // The thumbnails came from their 60-second links (Batch E, E8), with nothing of the session.
     const gets = page.storageCalls.filter(c => c.method === 'GET');
     expect(gets).toHaveLength(2);
-    gets.forEach(g => expect(g.url).toMatch(/\/object\/sign\/student-photos\/.+-thumb\.jpg\?token=dl&s=300$/));
+    gets.forEach(g => expect(g.url).toMatch(/\/object\/sign\/student-photos\/.+-thumb\.jpg\?token=dl&s=60$/));
     // No token, id or name in any address the page asked, or in anything the function logged.
     [...page.calls, ...page.storageCalls].forEach(c => expect(c.url).not.toContain(token));
     page.calls.forEach(c =>
@@ -378,12 +379,14 @@ describe('a send survives a reload, within its two hours', () => {
 
     dev.answer = null;
     const again = await dev.open('');
+    // The send carries on beside `feedback`; the group's counts are asked once `feedback` has answered.
     expect(routes(again)).toEqual([
       'page',
       'work',
       'forms',
       'feedback',
       'send-start',
+      'group-work',
       'send-finish',
       'work',
       'file-links',
@@ -410,7 +413,7 @@ describe('a send survives a reload, within its two hours', () => {
     dev.clock = () => finishBy + 60 * 1000;
     const again = await dev.open('');
     expect(text(again, '#sp-send-title')).toBe('Not sent');
-    expect(routes(again)).toEqual(['page', 'work', 'forms', 'feedback']);
+    expect(routes(again)).toEqual(['page', 'work', 'forms', 'feedback', 'group-work']);
     await again.click('[data-act="send-restart"]');
     expect(text(again, '#sp-send-title')).toBe('Sent to Your Teacher');
     expect(bodyOf(again, 'send-start')[0].request_id).not.toBe(request);
