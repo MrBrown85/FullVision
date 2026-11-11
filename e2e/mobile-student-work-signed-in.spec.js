@@ -505,3 +505,38 @@ test('One per Group: the group’s work is one to grade, with every member’s p
   await expect(card.locator('.m-work-dot')).toHaveCount(2);
   expect(errors).toEqual([]);
 });
+
+test.describe('on the desktop', () => {
+  test.use({ viewport: { width: 1366, height: 900 }, isMobile: false, hasTouch: false });
+
+  test('Return for Revision from the grader is return_for_revision, and Take Back is cancel_revision', async ({
+    page,
+  }) => {
+    const errors = [];
+    page.on('pageerror', e => errors.push(String(e)));
+    await server(page);
+    await page.goto('/gradebook');
+    await page.waitForSelector('#dock-mount nav', { timeout: 10000 });
+    const cell = page.locator('.gb-scores-cell[data-sid="' + ALICE + '"][data-aid="' + LAB + '"]');
+    await cell.scrollIntoViewIfNeeded();
+    await cell.click();
+    const dialog = page.locator('#grader-overlay .grader-dialog');
+    await expect(dialog).toBeVisible();
+    await dialog.locator('[data-action="graderTagLevel"][data-tag="' + TAG + '"][data-level="3"]').click();
+    await dialog.locator('[data-grader="revision-open"]').click();
+    const sheet = page.locator('#grader-overlay .grader-sheet');
+    await sheet.locator('.grader-sheet-fix').fill('Label the graph.');
+    await sheet.locator('.grader-sheet-by').fill('2026-11-20');
+    await sheet.locator('[data-rv="send"]').click();
+    await expect(dialog.locator('.grader-return .grader-revising-mark')).toHaveText('Revising');
+    await expect.poll(async () => (await calls(page, 'return_for_revision')).length).toBe(1);
+    expect((await calls(page, 'return_for_revision'))[0]).toMatchObject({
+      p_assessment_id: LAB,
+      p_enrollment_id: ALICE,
+      p_request: { what_to_fix: 'Label the graph.', revise_by: '2026-11-20' },
+    });
+    await dialog.locator('[data-grader="revision-takeback"]').click();
+    await expect.poll(async () => (await calls(page, 'cancel_revision')).length).toBe(1);
+    expect(errors).toEqual([]);
+  });
+});
