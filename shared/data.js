@@ -17668,9 +17668,10 @@ function _workLook(cid) {
    30 seconds (opts.force reads it anyway; a read under way is joined). A
    Promise of { changed } or { error }; never rejects. A screen that
    changes is redrawn. Nothing for any class but a live one, and nothing
-   while its Send Work is off (_workReadWanted). */
+   while its Send Work is off (_workReadWanted) unless opts.anyway. */
 function refreshStudentWork(cid, opts) {
-  if (!_workOnServer(cid) || !_workReadWanted(cid)) return Promise.resolve({ changed: false });
+  if (!_workOnServer(cid)) return Promise.resolve({ changed: false });
+  if (!(opts && opts.anyway) && !_workReadWanted(cid)) return Promise.resolve({ changed: false });
   var st = _workRead[cid] || (_workRead[cid] = {});
   if (st.running) {
     if (opts && opts.force) st.again = true;
@@ -17725,6 +17726,29 @@ async function _fetchStudentWork(cid) {
   (_workRead[cid] || (_workRead[cid] = {})).at = Date.now();
   _workChanged(cid);
   return { changed: was !== _workLook(cid) };
+}
+
+/* Before a delete warning says whether photos go too (S8-F1): the
+   class's work, read from the server once this session if it has not
+   been (with Send Work off nothing else reads it, and photos sent before
+   it was turned off are still deleted). null when nothing needs reading
+   (Demo Mode, a class whose work is not the server's, or read already):
+   the readers answer now. Else a Promise of { known: true } once the
+   readers (getCourseSubmissions, CmStudentPage.studentsWithPhotos) answer
+   for the server, or { known: false } when the read failed: the warning
+   then says photos go rather than miss them. Never rejects. */
+function readStudentWorkForDelete(cid) {
+  if (!_workOnServer(cid)) return null;
+  var st = _workRead[cid];
+  if (st && st.at && !st.running) return null;
+  return refreshStudentWork(cid, { force: true, anyway: true }).then(
+    function (out) {
+      return { known: !(out && out.error) && !!(_workRead[cid] && _workRead[cid].at) };
+    },
+    function () {
+      return { known: false };
+    },
+  );
 }
 
 /* The class has just loaded from the server with its student page on
@@ -20187,6 +20211,7 @@ window.GB = {
   saveDemoStudentWork,
   studentWorkLive,
   refreshStudentWork,
+  readStudentWorkForDelete,
   retryHeldStudentWork,
   setCourseSendWork,
   saveAssessmentStudentWork,

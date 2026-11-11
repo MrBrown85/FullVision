@@ -17,6 +17,7 @@
  * - A class whose student page is off is sent nothing new.
  */
 import './setup.js';
+import { parseHTML } from 'linkedom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
@@ -323,6 +324,41 @@ describe('reading a signed-in class’s work', () => {
     setOnline(true);
     await quiet();
     expect(callsTo('list_course_submissions').length).toBeGreaterThan(0);
+  });
+
+  it('with Send Work off, Delete Class reads the class’s work once and names the photos sent before', async () => {
+    course.send_work = false;
+    await openClass();
+    expect(callsTo('list_course_submissions')).toEqual([]);
+    const doc = globalThis.document;
+    globalThis.document = parseHTML('<!DOCTYPE html><html><body><div id="main"></div></body></html>').document;
+    const message = () => document.querySelector('.confirm-card .confirm-message').textContent;
+    const PHOTOS = /scores and photos of student work\? .*Deleted photos can't come back\.$/;
+    try {
+      COURSES[CID].archived = true;
+      // The read fails: the warning says photos go rather than miss them.
+      fake.on('list_course_submissions', () => ({ data: null, error: { message: 'network: failed to fetch' } }));
+      DashClassManager.handleAction('cmDeleteCourse', { dataset: { cid: CID } });
+      await settle();
+      await settle();
+      expect(message()).toMatch(PHOTOS);
+      document.getElementById('confirm-cancel-btn').onclick();
+      // It answers: Noor's photos, sent before Send Work was turned off, are named.
+      fake.on('list_course_submissions', () => ({ data: structuredClone(srv), error: null }));
+      DashClassManager.handleAction('cmDeleteCourse', { dataset: { cid: CID } });
+      await settle();
+      await settle();
+      expect(message()).toMatch(PHOTOS);
+      document.getElementById('confirm-cancel-btn').onclick();
+      expect(callsTo('list_course_submissions')).toHaveLength(2);
+      // Read once this session: the next warning asks nothing more.
+      DashClassManager.handleAction('cmDeleteCourse', { dataset: { cid: CID } });
+      expect(message()).toMatch(PHOTOS);
+      expect(callsTo('list_course_submissions')).toHaveLength(2);
+    } finally {
+      DashClassManager.resetState();
+      globalThis.document = doc;
+    }
   });
 
   it('a class whose student page is off is sent nothing new, and its writers answer as before', async () => {
