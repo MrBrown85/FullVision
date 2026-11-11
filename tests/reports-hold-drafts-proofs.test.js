@@ -7,7 +7,7 @@
  *    they were, and none holds a draft's words; Print Grades moves.
  * 2. Nothing kept from an all-work drawing reaches a report.
  * 3. Grades never returned print nowhere.
- * 4. The surfaces this PR leaves on all work are the same in a holding class
+ * 4. The surfaces left on all work (Print Grades, Export) are the same in a holding class
  *    with drafts as in a class that returns at once.
  * 5. Delete Rubric counts the students whose scores it deletes: all work,
  *    drafts included (teacher/rubric-bank.js deleteImpact).
@@ -199,7 +199,8 @@ describe('a holding class full of drafts', { timeout: 240000 }, () => {
       grade(cid, false, 'ZZSOME');
       clearProfCache();
       freshGenerate();
-      return [surfaces(cid, ['questionnaire', 'phones', 'printGrades', 'export']), GradeState.draftsWaiting(cid)];
+      // Since S2-F2 the questionnaire and the phone copies are on returned grades too (tests/questionnaire-holds-drafts.test.js).
+      return [surfaces(cid, ['printGrades', 'export']), GradeState.draftsWaiting(cid)];
     };
     const [atOnce, none] = drawn({ student_page_enabled: true, return_grades: 'on_save' });
     const [held, waiting] = drawn(HELD);
