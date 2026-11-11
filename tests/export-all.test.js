@@ -390,6 +390,7 @@ describe('the export stays complete', () => {
     getCompetencyGroupById: 'the learning map, not student data',
     getCompetencyGroups: 'the learning map, not student data',
     getCoreSelf: 'Core Competency steps entered from reflection sheets; shown on the Dashboard only',
+    getCardsWorkUntil: 'the last day the class’s student cards open; a class setting, not student data',
     getCourseConfig: 'class settings, not student data',
     getCustomTags: 'observation tag names, not student data',
     getDibelsScore: 'read through assessmentCellValue (the reading level)',

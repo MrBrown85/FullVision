@@ -2424,8 +2424,11 @@ describe('a read and a press never cross', () => {
       DashClassManager.renderClassManager = () => drawn.push(parse(StudentCards.render(LIVE)));
       await shown(LIVE);
       expect(drawn.length).toBe(1);
+      // Every button that acts on the cards (a filter only changes which rows show).
       const off = box =>
-        Array.from(box.querySelectorAll('button[data-action^="spCards"]')).every(b => b.hasAttribute('disabled'));
+        Array.from(box.querySelectorAll('button[data-action^="spCards"]:not([data-action="spCardsFilter"])')).every(b =>
+          b.hasAttribute('disabled'),
+        );
       expect(off(drawn[0])).toBe(true);
       // Pressed anyway: nothing is made.
       expect(await StudentCards.makeAndPrint(LIVE)).toBe(0);
@@ -2544,6 +2547,329 @@ describe('a read and a press never cross', () => {
   });
 });
 
+/* S3-F1: the filters and Cards Work Until. */
+
+const filtersOf = box =>
+  Array.from(box.querySelectorAll('.sc-filters [role="radio"]')).map(b => [
+    b.textContent,
+    b.getAttribute('aria-checked'),
+  ]);
+const emptyOf = box => (box.querySelector('.sc-empty') ? box.querySelector('.sc-empty').textContent : null);
+const untilOf = box => ({
+  value: box.querySelector('#sc-until-date').getAttribute('value'),
+  label: box.querySelector('label[for="sc-until-date"]').textContent,
+  hint: box.querySelector('#sc-until-hint').textContent,
+  button: box.querySelector('[data-action="spCardsWorkUntilDefault"]')
+    ? box.querySelector('[data-action="spCardsWorkUntilDefault"]').textContent
+    : null,
+});
+const changeDay = (cid, value) =>
+  CmStudentPage.handleChange({
+    dataset: { actionChange: 'spCardsWorkUntil' },
+    value,
+    closest: () => ({ dataset: { cid } }),
+  });
+
+describe('the filters', () => {
+  const states = () => [
+    after(1, U(11), { printed_at: printed, last_opened_at: '2026-11-14T16:00:00+00:00' }),
+    after(2, U(12)), // never printed
+    after(3, U(13), { printed_at: printed, locked_at: new Date(Date.now() - 3600000).toISOString() }),
+    after(4, U(14), { printed_at: printed }), // printed, never opened
+  ];
+  const students = [
+    ...LIVE_STUDENTS,
+    { id: U(14), firstName: 'Dee', lastName: 'Dunn' },
+    { id: U(15), firstName: 'Eli', lastName: 'Eng' },
+  ];
+
+  it('All, Not Printed, Locked and Never Opened, each with its count; All first', async () => {
+    const t = await signedIn({ students, list: states });
+    try {
+      await shown(LIVE);
+      const box = parse(StudentCards.render(LIVE));
+      expect(box.querySelector('.sc-filters').getAttribute('role')).toBe('radiogroup');
+      expect(box.querySelector('.sc-filters').getAttribute('aria-label')).toBe('Show');
+      expect(filtersOf(box)).toEqual([
+        ['All 5', 'true'],
+        ['Not Printed 2', 'false'],
+        ['Locked 1', 'false'],
+        ['Never Opened 2', 'false'],
+      ]);
+      expect(rowsOf(box).map(r => r[0])).toEqual(['Jordan Abel', 'Avery Byrne', 'Cam Cole', 'Dee Dunn', 'Eli Eng']);
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it.each([
+    ['not_printed', ['Avery Byrne', 'Eli Eng']],
+    ['locked', ['Cam Cole']],
+    ['never_opened', ['Cam Cole', 'Dee Dunn']],
+    ['all', ['Jordan Abel', 'Avery Byrne', 'Cam Cole', 'Dee Dunn', 'Eli Eng']],
+  ])(
+    '%s shows only its students, with their own buttons; the buttons above the list are the class’s',
+    async (value, names) => {
+      const t = await signedIn({ students, list: states });
+      try {
+        await shown(LIVE);
+        const all = buttons(parse(StudentCards.render(LIVE)));
+        press('spCardsFilter', LIVE, { value });
+        const box = parse(StudentCards.render(LIVE));
+        expect(rowsOf(box).map(r => r[0])).toEqual(names);
+        expect(filtersOf(box).filter(f => f[1] === 'true').length).toBe(1);
+        expect(box.querySelector('[data-value="' + value + '"]').getAttribute('aria-checked')).toBe('true');
+        expect(buttons(box)).toEqual(all);
+        // Nothing was asked of the server for a filter.
+        expect(t.session.sent().filter(c => c[0] !== 'list_student_cards')).toEqual([]);
+      } finally {
+        t.session.signOut();
+      }
+    },
+  );
+
+  it.each([
+    ['not_printed', 'Every student has a printed card.'],
+    ['locked', 'No cards are locked.'],
+    ['never_opened', 'Every student with a printed card has opened it.'],
+  ])('%s with nobody in it says so', async (value, line) => {
+    const t = await signedIn({
+      list: () => [
+        after(1, U(11), { printed_at: printed, last_opened_at: printed }),
+        after(2, U(12), { printed_at: printed, last_opened_at: printed }),
+        after(3, U(13), { printed_at: printed, last_opened_at: printed }),
+      ],
+    });
+    try {
+      await shown(LIVE);
+      press('spCardsFilter', LIVE, { value });
+      const box = parse(StudentCards.render(LIVE));
+      expect(emptyOf(box)).toBe(line);
+      expect(box.querySelector('.sc-table')).toBe(null);
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('a filter stays chosen as the list changes, and its count follows', async () => {
+    seedDemo();
+    await shown(CID);
+    press('spCardsFilter', CID, { value: 'not_printed' });
+    expect(rowsOf(parse(StudentCards.render(CID))).length).toBe(3);
+    catchPrints();
+    await StudentCards.makeAndPrint(CID);
+    await afterDraw();
+    const box = parse(StudentCards.render(CID));
+    expect(filtersOf(box)[1]).toEqual(['Not Printed 0', 'true']);
+    expect(emptyOf(box)).toBe('Every student has a printed card.');
+  });
+
+  it('no list yet, or no students: no filters', async () => {
+    seedDemo();
+    onPage = CID;
+    expect(parse(StudentCards.render(CID)).querySelector('.sc-filters')).toBe(null);
+    seedDemo(ON, []);
+    await shown(CID);
+    expect(parse(StudentCards.render(CID)).querySelector('.sc-filters')).toBe(null);
+  });
+});
+
+describe('Cards Work Until', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('Demo Mode: the default with no reporting date ahead is June 30; a chosen day goes on every card; Use June 30 goes back', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-20T18:00:00.000Z'));
+    seedDemo();
+    await shown(CID);
+    await makeStudentCards(CID, [{ enrollment_id: 's1', replaces: null }]);
+    StudentCards._reset();
+    await shown(CID);
+    let box = parse(StudentCards.render(CID));
+    expect(untilOf(box)).toEqual({
+      value: '2027-06-30',
+      label: 'Cards Work Until',
+      hint: "A card stops opening after this day. It's June 30 until you choose another day, since the class has no reporting date ahead.",
+      button: null,
+    });
+    expect(changeDay(CID, '2027-01-29')).toBe(true);
+    await settle();
+    expect(JSON.parse(localStorage.getItem('gb-student-cards-' + CID))[0].works_until).toBe('2027-01-29');
+    expect(getCardsWorkUntil(CID).chosen).toBe('2027-01-29');
+    box = parse(StudentCards.render(CID));
+    expect(untilOf(box)).toEqual({
+      value: '2027-01-29',
+      label: 'Cards Work Until',
+      hint: 'A card stops opening after this day.',
+      button: 'Use June 30',
+    });
+    // A card made now takes the chosen day.
+    const made = (await makeStudentCards(CID, [{ enrollment_id: 's2', replaces: null }])).data.results[0];
+    expect(made.works_until).toBe('2027-01-29');
+    press('spCardsWorkUntilDefault', CID);
+    await settle();
+    expect(getCardsWorkUntil(CID).chosen).toBe(null);
+    expect(localStorage.getItem('gb-cards-work-until-' + CID)).toBe(null);
+    expect(JSON.parse(localStorage.getItem('gb-student-cards-' + CID)).map(c => c.works_until)).toEqual([
+      '2027-06-30',
+      '2027-06-30',
+    ]);
+    expect(untilOf(parse(StudentCards.render(CID))).button).toBe(null);
+  });
+
+  it('with a reporting date ahead, that is the default, and the way back says so', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-20T18:00:00.000Z'));
+    seedDemo({ ...ON, reportingTerms: [{ id: 't1', name: 'Term 1', starts_on: '2026-09-02', ends_on: '2027-01-29' }] });
+    const terms = getReportingTerms(CID);
+    if (!terms.length) {
+      // The seed keeps reporting terms on the course; put them where getReportingTerms reads them.
+      COURSES[CID].reportingTerms = [{ id: 't1', name: 'Term 1', starts_on: '2026-09-02', ends_on: '2027-01-29' }];
+    }
+    await shown(CID);
+    let box = parse(StudentCards.render(CID));
+    expect(untilOf(box).value).toBe('2027-01-29');
+    expect(untilOf(box).hint).toBe(
+      "A card stops opening after this day. It's the class's last reporting date until you choose another day.",
+    );
+    changeDay(CID, '2027-03-12');
+    await settle();
+    box = parse(StudentCards.render(CID));
+    expect(untilOf(box).button).toBe('Use Last Reporting Date');
+  });
+
+  it('a day already past says so, and the cards show Past Its Last Day', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-20T18:00:00.000Z'));
+    seedDemo();
+    await shown(CID);
+    await makeStudentCards(CID, [{ enrollment_id: 's1', replaces: null }]);
+    StudentCards._reset();
+    await shown(CID);
+    changeDay(CID, '2026-11-01');
+    await settle();
+    const box = parse(StudentCards.render(CID));
+    expect(untilOf(box).hint).toBe('A card stops opening after this day. That day has passed, so no card opens now.');
+    expect(rowsOf(box)[0][2]).toBe('Past Its Last Day');
+  });
+
+  it('a value that is not a day changes nothing; the same day twice sends once', async () => {
+    const t = await signedIn();
+    try {
+      await shown(LIVE);
+      changeDay(LIVE, 'soon');
+      changeDay(LIVE, '2027-02-30x');
+      await settle();
+      expect(t.session.fake.calls.filter(c => c.name === 'set_cards_work_until')).toEqual([]);
+      changeDay(LIVE, '2027-02-26');
+      changeDay(LIVE, '2027-02-26');
+      await settle();
+      expect(t.session.fake.calls.filter(c => c.name === 'set_cards_work_until').length).toBe(1);
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('signed in: the class’s day comes with the class, and is never sent up as a setting', async () => {
+    const t = await signedIn();
+    try {
+      expect(getCardsWorkUntil(LIVE).known).toBe(false);
+      _applyBundleCourseConfig(
+        LIVE,
+        {},
+        { student_page_enabled: true, return_grades: 'on_return', cards_work_until: '2027-05-14' },
+      );
+      expect(getCardsWorkUntil(LIVE)).toMatchObject({ chosen: '2027-05-14', date: '2027-05-14', known: true });
+      expect(JSON.stringify(getCourseConfig(LIVE))).not.toContain('2027-05-14');
+      await settle();
+      expect(t.session.fake.calls.filter(c => c.name === 'update_course')).toEqual([]);
+      _applyBundleCourseConfig(LIVE, {}, { cards_work_until: null });
+      expect(getCardsWorkUntil(LIVE)).toMatchObject({ chosen: null, known: true });
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('signed in: set_cards_work_until with the class, the day and a key; a list read before it lands shows the new day', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-20T18:00:00.000Z'));
+    const t = await signedIn({ list: () => [after(1, U(11), { printed_at: printed, works_until: '2026-11-19' })] });
+    try {
+      let land;
+      t.session.fake.on('set_cards_work_until', () => new Promise(r => (land = r)));
+      await shown(LIVE);
+      expect(rowsOf(parse(StudentCards.render(LIVE)))[0][2]).toBe('Past Its Last Day');
+      changeDay(LIVE, '2027-06-25');
+      await settle();
+      const sent = t.session.fake.calls.filter(c => c.name === 'set_cards_work_until');
+      expect(sent.length).toBe(1);
+      expect(Object.keys(sent[0].params).sort()).toEqual(['p_course_id', 'p_date', 'p_idempotency_key']);
+      expect(sent[0].params.p_course_id).toBe(LIVE);
+      expect(sent[0].params.p_date).toBe('2027-06-25');
+      expect(rowsOf(parse(StudentCards.render(LIVE)))[0][2]).toMatch(/^Printed /);
+      // Read again before the server has it: the cards still show the new day.
+      await StudentCards.load(LIVE);
+      let box = parse(StudentCards.render(LIVE));
+      expect(rowsOf(box)[0][2]).toMatch(/^Printed /);
+      expect(untilOf(box).value).toBe('2027-06-25');
+      land({ data: { works_until: '2027-06-25' }, error: null });
+      await settle();
+      expect(getCardsWorkUntil(LIVE)).toMatchObject({ chosen: '2027-06-25', known: true });
+      // Back to the default: p_date null.
+      t.session.fake.on('set_cards_work_until', () => ({ data: { works_until: '2027-06-30' }, error: null }));
+      press('spCardsWorkUntilDefault', LIVE);
+      await settle();
+      const last = t.session.fake.calls.filter(c => c.name === 'set_cards_work_until').pop();
+      expect(last.params.p_date).toBe(null);
+      expect(getCardsWorkUntil(LIVE).chosen).toBe(null);
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('signed in: a change the server refuses goes back to the server’s day, and the list is read again', async () => {
+    const t = await signedIn({ list: () => [after(1, U(11), { printed_at: printed })] });
+    try {
+      _applyBundleCourseConfig(LIVE, {}, { cards_work_until: '2027-05-14' });
+      t.session.fake.on('set_cards_work_until', () => ({
+        data: null,
+        error: { message: 'course not found', code: 'P0002' },
+      }));
+      await shown(LIVE);
+      const reads = () => t.session.sent().filter(c => c[0] === 'list_student_cards').length;
+      const before = reads();
+      changeDay(LIVE, '2027-06-25');
+      await afterDraw();
+      expect(reads()).toBe(before + 1);
+      expect(untilOf(parse(StudentCards.render(LIVE))).value).toBe('2027-05-14');
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('a refusal that comes after the screen went reads and draws nothing', async () => {
+    const t = await signedIn({ list: () => [after(1, U(11), { printed_at: printed })] });
+    try {
+      let refuse;
+      t.session.fake.on('set_cards_work_until', () => new Promise(r => (refuse = r)));
+      await shown(LIVE);
+      changeDay(LIVE, '2027-06-25');
+      await settle();
+      const drawn = [];
+      DashClassManager.renderClassManager = () => drawn.push(1);
+      onPage = null;
+      const reads = () => t.session.sent().filter(c => c[0] === 'list_student_cards').length;
+      const before = reads();
+      refuse({ data: null, error: { message: 'course not found', code: 'P0002' } });
+      await afterDraw();
+      expect(reads()).toBe(before);
+      expect(drawn).toEqual([]);
+    } finally {
+      t.session.signOut();
+    }
+  });
+});
+
 describe('what the files name', () => {
   const source = file => readFileSync(new URL('../' + file, import.meta.url), 'utf-8');
 
@@ -2559,18 +2885,22 @@ describe('what the files name', () => {
     expect(src.match(/_writeRpc\('mark_student_cards_printed'/g).length).toBe(1);
     expect(src.match(/functions\/v1\/teacher-cards\?forceFunctionRegion=ca-central-1/g).length).toBe(1);
     expect(src).not.toMatch(/issue_student_cards|reissue_student_card/);
-    // Unlock and Unlock All through the outbox, once each, named at the call.
+    // Unlock, Unlock All and Cards Work Until through the outbox, once each, named at the call.
     expect(src.match(/_writeRpc\('unlock_student_card'/g).length).toBe(1);
     expect(src.match(/_writeRpc\('unlock_all_student_cards'/g).length).toBe(1);
-    expect(src).not.toMatch(/set_cards_work_until/);
+    expect(src.match(/_writeRpc\('set_cards_work_until'/g).length).toBe(1);
   });
 
   it('the database drift check sees every card RPC the client calls', async () => {
     const { extractRpcNames } = await import('../scripts/check-db-drift.mjs');
     const names = extractRpcNames(source('shared/data.js'));
-    ['list_student_cards', 'mark_student_cards_printed', 'unlock_student_card', 'unlock_all_student_cards'].forEach(
-      name => expect(names.has(name), name).toBe(true),
-    );
+    [
+      'list_student_cards',
+      'mark_student_cards_printed',
+      'unlock_student_card',
+      'unlock_all_student_cards',
+      'set_cards_work_until',
+    ].forEach(name => expect(names.has(name), name).toBe(true));
   });
 
   it('the card block keeps no reply anywhere: no storage, outbox or Sentry inside makeStudentCards', () => {

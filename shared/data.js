@@ -4953,6 +4953,8 @@ function _applyBundleCourseRow(cid, courseRow) {
    first (_unsentCourseChanges); one made while the load runs is kept by
    _persistLoadedField, and the load runs again. */
 function _applyBundleCourseConfig(cid, row, courseRow) {
+  // Cards Work Until is the student cards' own (getCardsWorkUntil), never a setting this device sends up.
+  _noteCardsWorkUntil(cid, courseRow);
   if (!row || typeof row !== 'object') return;
   var config = Object.assign({}, getCourseConfig(cid) || {});
   var missing = {};
@@ -12385,6 +12387,8 @@ function _reloadCardsPrintedHere() {
   _cardsPrintResent = {};
   _cardsUnlockedHere = {};
   _cardsUnlockedAllHere = {};
+  _cardsWorkUntilHere = {};
+  _cardsWorkUntilServer = {};
 }
 function _sendCardsPrinted(ids) {
   ids.forEach(function (id) {
@@ -12546,9 +12550,12 @@ function listStudentCards(cid) {
       var ok = res && !res.error && res.data != null;
       return {
         data: ok
-          ? _withPendingUnlocks(
+          ? _withPendingWorkUntil(
               cid,
-              _withPendingPrints(cid, _rpcRows(res.data).map(_cardWithoutCode).filter(Boolean), asked),
+              _withPendingUnlocks(
+                cid,
+                _withPendingPrints(cid, _rpcRows(res.data).map(_cardWithoutCode).filter(Boolean), asked),
+              ),
             )
           : null,
         error: (res && res.error) || null,
@@ -12567,7 +12574,7 @@ function _demoMakeCards(cid, items) {
   getStudents(cid).forEach(function (st) {
     students[st.id] = st;
   });
-  var until = _demoCardsWorkUntil(cid);
+  var until = getCardsWorkUntil(cid).date;
   var taken = {};
   var results = items.map(function (it) {
     var st = students[it.enrollment_id];
@@ -12857,6 +12864,121 @@ function unlockAllStudentCards(cid, onFailed) {
     onFailed,
   );
   return _cardsAnswer({ unlocked: null, unlocked_at: at });
+}
+
+/* Cards Work Until: the last day a class's cards open. The class's own
+   choice (course.cards_work_until), or none, which means the default: the
+   class's last reporting date while it is still ahead, else the next June
+   30 (_demoCardsWorkUntil, the server's rule). The choice is written on
+   every live card in the class when it is set (set_cards_work_until), and
+   on each card when it is made.
+
+   A signed-in class's choice comes on its course row with the class
+   (get_class_bundle): _noteCardsWorkUntil keeps it, here in this page
+   only. A change made here is laid over it, and over the cards of a list
+   read before the server has it, as a printed mark is; a change the server
+   refuses is forgotten and `onFailed` is called. Demo Mode keeps the
+   choice on the device (gb-cards-work-until-<cid>) and writes it on the
+   saved cards at once. */
+var _cardsWorkUntilServer = {}; // cid → 'YYYY-MM-DD' or null, as the class's course row said
+var _cardsWorkUntilHere = {}; // cid → { date, at }: set from this page, not yet known to have landed
+function _isDay(d) {
+  return typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) && !isNaN(Date.parse(d + 'T12:00:00Z'));
+}
+function _noteCardsWorkUntil(cid, courseRow) {
+  if (!cid || !courseRow || typeof courseRow !== 'object' || !('cards_work_until' in courseRow)) return;
+  var d = courseRow.cards_work_until;
+  _cardsWorkUntilServer[cid] = _isDay(String(d || '').slice(0, 10)) ? String(d).slice(0, 10) : null;
+}
+// A change to Cards Work Until on its way to the server: { date, at }, or null.
+function _cardsWorkUntilPending(cid) {
+  var out = _cardsWorkUntilHere[cid] || null;
+  _queuedCardWrites('set_cards_work_until').forEach(function (entry) {
+    if (entry.payload.p_course_id !== cid) return;
+    var at = entry.created_at || '';
+    if (!out || at > out.at) out = { date: entry.payload.p_date || null, at: at };
+  });
+  return out;
+}
+/* The class's Cards Work Until: { chosen, date, known, reporting }.
+   chosen is the day the teacher chose, or null for the default; date is
+   the day it works out to; known is false for a signed-in class whose
+   choice has not come from the server yet (date is then the default);
+   reporting is true when the default is the class's last reporting date
+   (false: the next June 30). */
+function getCardsWorkUntil(cid) {
+  if (!cid) return { chosen: null, date: '', known: false, reporting: false };
+  var fallback = _demoCardsWorkUntil(cid);
+  var reporting =
+    !/-06-30$/.test(fallback) ||
+    (getReportingTerms(cid) || []).some(function (t) {
+      return t && t.ends_on === fallback;
+    });
+  var out = function (chosen, known) {
+    return { chosen: chosen, date: chosen || fallback, known: known, reporting: reporting };
+  };
+  if (!_writesEnabled()) {
+    var kept = _safeParseLS('gb-cards-work-until-' + cid, null);
+    return out(kept && _isDay(kept.date) ? kept.date : null, true);
+  }
+  var pending = _cardsWorkUntilPending(cid);
+  if (pending) return out(pending.date, true);
+  if (!(cid in _cardsWorkUntilServer)) return out(null, false);
+  return out(_cardsWorkUntilServer[cid], true);
+}
+function _withPendingWorkUntil(cid, cards) {
+  var pending = _cardsWorkUntilPending(cid);
+  if (!pending) return cards;
+  var date = pending.date || _demoCardsWorkUntil(cid);
+  return cards.map(function (c) {
+    c.works_until = date;
+    return c;
+  });
+}
+/* Set the class's Cards Work Until to `date` ('YYYY-MM-DD'), or back to
+   the default with null. Answers at once with { works_until }, the day it
+   works out to; a signed-in teacher's goes up through the outbox. */
+function setCardsWorkUntil(cid, date, onFailed) {
+  if (!cid || !_gradesKept(cid)) return _cardsAnswer(null);
+  if (date !== null && !_isDay(date)) return _cardsAnswer(null);
+  var until = date || _demoCardsWorkUntil(cid);
+  if (!_writesEnabled()) {
+    if (date) _safeLSSet('gb-cards-work-until-' + cid, JSON.stringify({ date: date }));
+    else {
+      try {
+        localStorage.removeItem('gb-cards-work-until-' + cid);
+      } catch (e) {
+        /* nothing kept */
+      }
+    }
+    var kept = _demoStudentCards(cid);
+    kept.forEach(function (c) {
+      c.works_until = until;
+    });
+    if (kept.length) _saveDemoStudentCards(cid, kept);
+    return _cardsAnswer({ works_until: until });
+  }
+  if (!_useSupabase || !_isUuid(cid)) return _cardsAnswer(null);
+  var mine = { date: date, at: new Date().toISOString() };
+  _cardsWorkUntilHere[cid] = mine;
+  _trackPendingSync(
+    Promise.resolve(
+      _writeRpc('set_cards_work_until', { p_course_id: cid, p_date: date, p_idempotency_key: _newEntryId() }),
+    ).then(function (res) {
+      var still = _cardsWorkUntilHere[cid] === mine;
+      if (res && !res.error) {
+        if (still) {
+          delete _cardsWorkUntilHere[cid];
+          _cardsWorkUntilServer[cid] = date;
+        }
+        return;
+      }
+      if (res && res.error && !res.error.handledSessionExpired) console.warn('set_cards_work_until failed:', res.error);
+      if (still) delete _cardsWorkUntilHere[cid];
+      if (typeof onFailed === 'function') onFailed(res && res.error);
+    }),
+  );
+  return _cardsAnswer({ works_until: until });
 }
 /* ── end Student cards ── */
 
@@ -16462,6 +16584,8 @@ window.GB = {
   markStudentCardsPrinted,
   unlockStudentCard,
   unlockAllStudentCards,
+  getCardsWorkUntil,
+  setCardsWorkUntil,
   upsertScore,
   persistScoreDiffToCanonical,
   getPointsScore,

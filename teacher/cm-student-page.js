@@ -406,6 +406,11 @@ var CmStudentPage = (function () {
   }
 
   function handleChange(el) {
+    if (el && el.dataset && /^spCards/.test(el.dataset.actionChange || '')) {
+      var cid = _cid(el);
+      if (typeof StudentCards === 'undefined' || !cid || _settings(cid).student_page !== true) return false;
+      return StudentCards.handleChange(el);
+    }
     if (!el || !el.dataset || el.dataset.actionChange !== 'spBuildSwitch') return false;
     _turnBuildSwitch(_cid(el), el);
     return true;

@@ -32,7 +32,10 @@
      closes, another tab or class is shown, the teacher signs out, the tab
      closes) or ten minutes pass. After that, printing makes new codes.
 
-   S3-F1 builds the rest (filters, Cards Work Until).
+   - Cards Work Until: the last day the class's cards open, the class's
+     last reporting date until the teacher picks another
+     (set_cards_work_until, through the outbox).
+   - Filters: All, Not Printed, Locked, Never Opened, each with its count.
 
    The cards come from shared/data.js (listStudentCards, makeStudentCards,
    markStudentCardsPrinted, unlockStudentCard, unlockAllStudentCards): the
@@ -110,6 +113,7 @@ var StudentCards = (function () {
         landed: 0,
         pressed: 0,
         again: false,
+        filter: 'all',
       })
     );
   }
@@ -795,6 +799,159 @@ var StudentCards = (function () {
     );
   }
 
+  /* ── Filters ───────────────────────────────────────────────── */
+
+  /* Which students each filter shows, and what it says when it shows none.
+     Not Printed is the students Make and Print is for (no card, or a card
+     never printed and never opened); Never Opened is a card that was
+     printed and has not been opened. */
+  var FILTERS = [
+    { value: 'all', label: 'All', empty: '' },
+    {
+      value: 'not_printed',
+      label: 'Not Printed',
+      empty: 'Every student has a printed card.',
+      shows: function (card) {
+        return !_handedOut(card);
+      },
+    },
+    {
+      value: 'locked',
+      label: 'Locked',
+      empty: 'No cards are locked.',
+      shows: function (card) {
+        return !!card && !!card.locked_at;
+      },
+    },
+    {
+      value: 'never_opened',
+      label: 'Never Opened',
+      empty: 'Every student with a printed card has opened it.',
+      shows: function (card) {
+        return !!card && !!card.printed_at && !card.last_opened_at;
+      },
+    },
+  ];
+
+  function _filter(st) {
+    return (
+      FILTERS.filter(function (f) {
+        return f.value === st.filter;
+      })[0] || FILTERS[0]
+    );
+  }
+
+  function _filterHtml(st, students, byStudent) {
+    var on = _filter(st).value;
+    return (
+      '<div class="seg cm-seg sc-filters" role="radiogroup" aria-label="Show">' +
+      FILTERS.map(function (f) {
+        var n = f.shows
+          ? students.filter(function (s) {
+              return f.shows(byStudent[s.id]);
+            }).length
+          : students.length;
+        var chosen = f.value === on;
+        return (
+          '<button type="button" class="seg-btn cm-seg-btn' +
+          (chosen ? ' active' : '') +
+          '" role="radio" aria-checked="' +
+          chosen +
+          '" data-action="spCardsFilter" data-value="' +
+          f.value +
+          '">' +
+          esc(f.label) +
+          ' <span class="sc-count">' +
+          n +
+          '</span></button>'
+        );
+      }).join('') +
+      '</div>'
+    );
+  }
+
+  /* ── Cards Work Until ──────────────────────────────────────── */
+
+  function _untilHtml(cid, off) {
+    var until = getCardsWorkUntil(cid);
+    var hints = ['A card stops opening after this day.'];
+    if (until.date && until.date < _today(cid)) hints.push('That day has passed, so no card opens now.');
+    else if (!until.chosen) {
+      hints.push(
+        until.reporting
+          ? "It's the class's last reporting date until you choose another day."
+          : "It's June 30 until you choose another day, since the class has no reporting date ahead.",
+      );
+    }
+    return (
+      '<div class="sc-until">' +
+      '<label class="sp-row-title" for="sc-until-date">Cards Work Until</label>' +
+      '<div class="sc-until-row"><input type="date" class="cm-input sc-until-date" id="sc-until-date"' +
+      ' data-action-change="spCardsWorkUntil" aria-describedby="sc-until-hint" value="' +
+      esc(until.date || '') +
+      '"' +
+      (off ? ' disabled' : '') +
+      '>' +
+      (until.chosen
+        ? '<button type="button" class="cm-action-btn sc-row-btn" data-action="spCardsWorkUntilDefault"' +
+          (off ? ' disabled' : '') +
+          '>' +
+          esc(until.reporting ? 'Use Last Reporting Date' : 'Use June 30') +
+          '</button>'
+        : '') +
+      '</div>' +
+      '<div class="cm-hint" id="sc-until-hint">' +
+      esc(hints.join(' ')) +
+      '</div></div>'
+    );
+  }
+
+  /* Set the class's Cards Work Until (null: back to the default). The list
+     shows the new day on every card at once; if the server refuses it, the
+     list is read again and the day goes back to what the server has. */
+  function workUntil(cid, date) {
+    var st = _st(cid);
+    if (st.making || st.loading) return null;
+    var now = getCardsWorkUntil(cid);
+    if ((now.chosen || null) === (date || null)) return null;
+    // A read begun before this change is older than it.
+    _pressDone(st);
+    var out = null;
+    setCardsWorkUntil(cid, date || null, function () {
+      _readAgain(cid);
+      if (_shown(cid)) _rerender();
+    }).then(function (res) {
+      if (!res || !res.data) return;
+      out = res.data.works_until;
+      (st.cards || []).forEach(function (c) {
+        c.works_until = out;
+      });
+      if (_shown(cid)) {
+        _rerender();
+        _focus('#sc-until-date');
+      }
+    });
+    return true;
+  }
+
+  function _focus(selector) {
+    if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return;
+    var el = document.querySelector(selector);
+    if (el && typeof el.focus === 'function') el.focus({ preventScroll: true });
+  }
+
+  // True when the change was one of this card's: the Cards Work Until day.
+  function handleChange(el) {
+    if (!el || !el.dataset || el.dataset.actionChange !== 'spCardsWorkUntil') return false;
+    var box = el.closest ? el.closest('[data-cid]') : null;
+    var cid = box ? box.dataset.cid : null;
+    var value = String(el.value || '');
+    if (!cid) return true;
+    if (!value) workUntil(cid, null);
+    else if (/^\d{4}-\d{2}-\d{2}$/.test(value)) workUntil(cid, value);
+    return true;
+  }
+
   function _heldLine(n) {
     return (
       (n === 1 ? '1 card went' : n + ' cards went') +
@@ -898,6 +1055,10 @@ var StudentCards = (function () {
       else if (!students.length) notes.push('No students to make cards for.');
     }
     var dis = off ? ' disabled' : '';
+    var filter = _filter(st);
+    var shown = students.filter(function (s) {
+      return !filter.shows || filter.shows(byStudent[s.id]);
+    });
     return (
       '<div class="cm-section sc-card" data-cid="' +
       esc(cid) +
@@ -934,10 +1095,15 @@ var StudentCards = (function () {
             .join('') +
           '</div>'
         : '') +
-      (known && students.length
+      _untilHtml(cid, off) +
+      (known && students.length ? _filterHtml(st, students, byStudent) : '') +
+      (known && students.length && !shown.length
+        ? '<div class="cm-hint sc-empty" role="status">' + esc(filter.empty) + '</div>'
+        : '') +
+      (known && shown.length
         ? '<table class="sc-table"><thead><tr><th scope="col">Student</th><th scope="col">Card</th>' +
           '<th scope="col">Status</th><th scope="col" class="sc-do" aria-label="Actions"></th></tr></thead><tbody>' +
-          students
+          shown
             .map(function (s) {
               return _rowHtml(cid, s, byStudent[s.id], off);
             })
@@ -975,6 +1141,19 @@ var StudentCards = (function () {
     }
     if (action === 'spCardsUnlockAll') {
       if (cid) unlockAll(cid);
+      return true;
+    }
+    if (action === 'spCardsFilter') {
+      if (cid && data.value) {
+        _st(cid).filter = data.value;
+        _rerender();
+        // The redraw makes the chosen filter a new button: the focus goes back to it.
+        _focus('.sc-filters [data-value="' + data.value + '"]');
+      }
+      return true;
+    }
+    if (action === 'spCardsWorkUntilDefault') {
+      if (cid) workUntil(cid, null);
       return true;
     }
     if (action === 'spCardsRetry') {
@@ -1019,6 +1198,8 @@ var StudentCards = (function () {
   return {
     render: render,
     handleAction: handleAction,
+    handleChange: handleChange,
+    workUntil: workUntil,
     load: load,
     makeAndPrint: makeAndPrint,
     printNewCard: printNewCard,

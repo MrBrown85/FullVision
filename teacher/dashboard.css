@@ -6854,6 +6854,42 @@ label.cm-cr-row {
 .sc-do .sc-row-btn:first-child {
   margin-left: 0;
 }
+/* Cards Work Until: a day, and the way back to the default. */
+.sc-until {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sc-until .cm-hint {
+  margin: 0;
+}
+.sc-until-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.sc-until-row .sc-until-date {
+  width: auto;
+  font-size: var(--text-sm);
+  padding: 5px 8px;
+}
+.sc-until-row .sc-row-btn {
+  margin-left: 0;
+}
+/* The filters: All, Not Printed, Locked, Never Opened, each with its count. */
+.sc-filters {
+  align-self: flex-start;
+  flex-wrap: wrap;
+}
+.sc-count {
+  margin-left: 4px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.sc-empty {
+  margin: 0;
+}
 .sc-actions .cm-action-btn:disabled,
 .sc-do .sc-row-btn:disabled {
   opacity: 0.5;
