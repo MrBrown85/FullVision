@@ -137,3 +137,36 @@ describe('with the Student Page off the assessment form is what it was', () => {
     }
   });
 });
+
+describe('with the Student Page on the form says students see the Description', () => {
+  const before = existsSync(SNAPSHOT) ? JSON.parse(readFileSync(SNAPSHOT, 'utf-8')) : {};
+  const HINT_HTML = '<p class="af-category-hint" id="af-desc-hint">' + HINT + '</p>';
+  // The form with the hint taken out is the form with the page off.
+  const withoutHint = html => html.replace(HINT_HTML, '').replace(' aria-describedby="af-desc-hint"', '');
+
+  async function check(config) {
+    const now = await walk(config);
+    Object.keys(before).forEach(name => {
+      const html = now[name];
+      expect(html.split(HINT).length - 1, name).toBe(1);
+      // Right under the box, inside the Description's field, read with it.
+      expect(html, name).toMatch(/<textarea class="af-textarea" id="af-desc"[^>]*aria-describedby="af-desc-hint"/);
+      expect(html, name).toContain('</textarea>' + HINT_HTML + '</div>');
+      expect(withoutHint(html), name).toBe(before[name]);
+    });
+  }
+
+  it('in Demo Mode', async () => {
+    await check({ student_page_enabled: true });
+  });
+
+  it('signed in, with the server agreeing', async () => {
+    const session = signIn();
+    try {
+      serverSaysStudentPageOn(CID, true);
+      await check({ student_page_enabled: true });
+    } finally {
+      session.signOut();
+    }
+  });
+});
