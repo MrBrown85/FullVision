@@ -83,6 +83,8 @@ async function overflow(page) {
 test('the screen: toolbar, hover titles, no overflow, shared next step, sources sheet, earlier reports, header', async ({
   page,
 }) => {
+  // Many reads in one open: give the CI runner room.
+  test.setTimeout(90_000);
   await open(page);
   // The toolbar: Approve and Next, the two icons; no Questions, no Save and Next.
   await expect(page.locator('#tq-approve-next')).toHaveText('Approve and Next ›');
