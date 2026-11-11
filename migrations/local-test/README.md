@@ -1569,14 +1569,15 @@ written from the service's source (`src/http/routes/object/` and
   the 30-day purge, a row deleted by hand, `TRUNCATE`. After all of it and
   the worker run to the end, **storage holds exactly the files of the pages
   handed in**.
-- **race** (21). On connections of their own, the first held open so the
+- **race** (22). On connections of their own, the first held open so the
   second is seen to wait: two sends at once, the same request twice, two
   finishes, Unsend against Replace, Unsend against a finish (both orders),
   **Unsend against a grade being saved** (both orders), **Replace during
   grading** (both orders), the student's finish against the teacher's Add
   Work, a send against its assessment being deleted (both orders, then 30
   unheld rounds), 30 sends at once against the hourly limit. Then twelve
-  seconds of everything at once in one class, about 30,000 calls: two
+  seconds of everything at once in one class (10,000 to 35,000 calls,
+depending on what else the machine is doing): two
   students, the grade RPCs, Add Work in its three modes, deletes,
   assessments made and deleted under a send, two workers. No error, no
   deadlock; every rule that must always hold, holds; Batch A's
@@ -1612,9 +1613,9 @@ suite run against it. All 50 are noticed. An earlier run found one hole (a
 table left without row security: nothing checked it), closed since.
 
 Result on 2026-11-11, PostgreSQL 17.11 (what production runs), on a clean
-clone and empty databases: `submissions.py` 485 of 485;
+clone and empty databases: `submissions.py` 486 of 486;
 `submissions_undo.py` 47 of 47; `submissions_mutate.py` 50 of 50
-noticed. PENDING-PG18
+noticed. On PostgreSQL 18.6 the same: 486 and 47, and every fingerprint is the one 17.11 gives.
 
 **What the local tests cannot prove.** The Storage service is not run here.
 Everything about it is from its documentation and its source, and is first
@@ -1624,6 +1625,10 @@ tried for real in the owner's test class after the apply:
   hosted service, and uploads under the service's own role;
 - that the bucket's size limit and type list are enforced on every upload
   path, and that the type checked is the `Content-Type` header;
+- that a signed-in teacher's request reaches the tables as the role
+  `authenticated` with the teacher's id set (the service's source sets
+  both; the policies rest on it, and if it were otherwise a teacher would
+  be refused, not let in);
 - that the role applying the migration may create a policy on
   `storage.objects` and a row in `storage.buckets` (if not, the second file
   stops with nothing applied);
