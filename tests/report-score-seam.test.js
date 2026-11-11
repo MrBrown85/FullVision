@@ -283,10 +283,22 @@ const DOORS = {
   'teacher/phone-reports.js': { surface: 'phones', names: ['snapshot'] },
   'teacher/grades-print.js': { surface: 'printGrades', names: ['buildModel', 'cellText', 'columnAverageText'] },
   'teacher/export-all.js': { surface: 'exportData', names: ['rows'] },
-  // The rubric handout, from every door that prints it (S2-F1).
+  /* The rubric handout's doors (S2-F1): what prints and its preview, who
+     prints, the dialog's list and Already Printed box, who the question
+     asks about, what a print records, and the Printed marks. Not the
+     helpers that read one sheet: they read in their caller's set (a
+     Feedback Page's, or the Rubric Bank's all-work Delete Rubric count). */
   'teacher/rubric-print.js': {
     surface: 'handout',
-    names: ['sheetData', 'scoreSheetData', 'feedbackItems', 'isStudentScored'],
+    names: [
+      'renderPages',
+      'selectStudents',
+      '_studentsGroupHtml',
+      '_printedSummaryText',
+      '_mayPrint',
+      'markPrinted',
+      '_markState',
+    ],
   },
 };
 
@@ -814,9 +826,13 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
     expect(bare.outside.length).toBeGreaterThan(0);
     expect(inSeam.outside).toEqual([]);
     expect(inSeam.inside).toBeGreaterThan(0);
-    // A rubric handout asked for as Print Rubrics asks is a report surface of its own (S2-F1): its reads are inside.
+    // One rubric sheet asked for on its own is a helper: it reads where it is called (here, outside every surface).
     const lab = getAssessments(cid).find(a => a.rubricId);
-    const handout = readsOutsideTheSeam(() => RubricPrint.sheetData(cid, lab.id, student.id));
+    const sheet = readsOutsideTheSeam(() => RubricPrint.sheetData(cid, lab.id, student.id));
+    expect(sheet.outside.join(' ')).toContain('teacher/rubric-print.js');
+    // The handout as Print Rubrics draws it is a report surface of its own (S2-F1): its reads are inside.
+    const opts = Object.assign({}, RubricPrint.DEFAULT_OPTIONS, { mode: 'completed', students: 'all', layout: 'full' });
+    const handout = readsOutsideTheSeam(() => RubricPrint.renderPages(cid, lab.id, opts));
     expect(handout.outside).toEqual([]);
     expect(handout.inside).toBeGreaterThan(0);
   });
@@ -839,18 +855,16 @@ describe('report surfaces on the Demo class', { timeout: 60000 }, () => {
     expect(asked.outside).toEqual([]);
     expect(asked.inside).toBeGreaterThan(1000);
     expect(asked.watched).toBeGreaterThan(60);
-    // The rubric sheet asked for as Print Rubrics asks is inside its own surface (S2-F1).
+    // It sees one: a single rubric sheet asked for outside every surface (a helper reads in its caller's set).
     const lab = getAssessments(cid).find(a => a.rubricId);
     const scored = getStudents(cid).find(s => getAssessmentOverallScore(cid, s.id, lab.id) > 0);
-    const handout = gradesAskedOutsideTheSeam(() => RubricPrint.sheetData(cid, lab.id, scored.id));
+    const sheet = gradesAskedOutsideTheSeam(() => RubricPrint.sheetData(cid, lab.id, scored.id));
+    expect(sheet.outside.join(' ')).toContain('getAssessmentOverallScore from teacher/rubric-print.js');
+    // The handout as Print Rubrics draws it asks inside its own surface (S2-F1).
+    const opts = Object.assign({}, RubricPrint.DEFAULT_OPTIONS, { mode: 'completed', students: 'all', layout: 'full' });
+    const handout = gradesAskedOutsideTheSeam(() => RubricPrint.renderPages(cid, lab.id, opts));
     expect(handout.outside).toEqual([]);
     expect(handout.inside).toBeGreaterThan(0);
-    // And the watch still sees a grade a report file asks for outside every surface.
-    const unwrapped = runInThisContext('(function (c, a, s) { return getAssessmentOverallScore(c, s, a); })', {
-      filename: 'teacher/rubric-print.js',
-    });
-    const bare = gradesAskedOutsideTheSeam(() => unwrapped(cid, lab.id, scored.id));
-    expect(bare.outside.join(' ')).toContain('getAssessmentOverallScore from teacher/rubric-print.js');
   });
 
   it('no function run inside withReportScores leaves work for later (S2-F1 would refuse it)', async () => {
