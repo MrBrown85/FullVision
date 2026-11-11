@@ -54,11 +54,57 @@ window.MGradePhotos = (function () {
     return typeof getStudentSubmission === 'function' ? getStudentSubmission(cid, sid, aid) : null;
   }
 
-  // The work `sid` has in on `aid`: their own, or their group's (S12-F2).
-  function workIn(cid, sid, aid) {
+  /* The work shown for `sid` on `aid`, as the desktop grader shows it
+     (S12-F2): on a One per Group piece the group's, whoever sent it, as one
+     submission-like answer { group: true, id, sender, sent_by, sent_at,
+     created_at, on_paper, note, files } with every page of the group's work
+     (getGroupWorkFiles); otherwise the student's own submission, or null. */
+  function work(cid, sid, aid) {
     var own = submission(cid, sid, aid);
-    if (own || typeof getGroupSubmissions !== 'function') return own;
-    return getGroupSubmissions(cid, sid, aid)[0] || null;
+    var group = typeof getStudentWorkGroup === 'function' ? getStudentWorkGroup(cid, sid, aid) : null;
+    if (!group) return own;
+    var subs = getGroupSubmissions(cid, sid, aid);
+    if (!subs.length) return null;
+    var first = subs.slice().sort(function (x, y) {
+      return String(x.sent_at || x.created_at) < String(y.sent_at || y.created_at) ? -1 : 1;
+    })[0];
+    var noted = subs.find(function (x) {
+      return x.note;
+    });
+    return {
+      group: true,
+      // Changes whenever a member's work does, so a picture asked for
+      // before the change is let go (hydrate).
+      id: subs
+        .map(function (x) {
+          return x.id;
+        })
+        .join('|'),
+      sender: first.enrollment_id,
+      sent_by: first.sent_by,
+      sent_at: first.sent_at,
+      created_at: first.created_at,
+      on_paper: subs.every(function (x) {
+        return x.on_paper;
+      }),
+      note: noted ? noted.note : null,
+      files: getGroupWorkFiles(cid, sid, aid),
+    };
+  }
+
+  // The card a group is graded on together shows the group's work, on a
+  // One per Group piece only; anywhere else a group card shows none, as before.
+  function _cardWork(cid, a, st, unit) {
+    if (!st || !takes(cid, a)) return { skip: true };
+    var sub = work(cid, st.id, a.id);
+    if (unit && unit.view && !(sub && sub.group)) return { skip: true };
+    return { sub: sub };
+  }
+
+  // The card shows work: the camera on its circle in the strip.
+  function hasWork(cid, a, st, unit) {
+    var w = _cardWork(cid, a, st, unit);
+    return !w.skip && !!w.sub;
   }
 
   function isToGrade(cid, a, sid) {
@@ -109,7 +155,7 @@ window.MGradePhotos = (function () {
     (getAssessments(cid) || []).forEach(function (a) {
       if (!takes(cid, a)) return;
       var state = GraderWork.workStateOf(cid, a.id, sid);
-      if (state === 'tograde') rows.push({ a: a, kind: 'grade', sub: workIn(cid, sid, a.id) });
+      if (state === 'tograde') rows.push({ a: a, kind: 'grade', sub: work(cid, sid, a.id) });
       else if (state === 'notin') rows.push({ a: a, kind: 'notin' });
     });
     return rows.sort(function (x, y) {
@@ -130,10 +176,27 @@ window.MGradePhotos = (function () {
   }
 
   // "Sent Oct 30 · 2 photos" (or Submitted, on the grading card); on paper, "Handed in on paper".
-  function sentLine(sub, verb) {
+  // A group's work: the desktop grader's line, "Sent by Priya S. for the group, Nov 3 · 4 photos".
+  function sentLine(sub, verb, cid) {
     if (!sub) return '';
     if (sub.on_paper) return 'Handed in on paper';
     var day = _day(sub.sent_at || sub.created_at);
+    if (sub.group) {
+      var by =
+        sub.sent_by === 'teacher' || !cid
+          ? null
+          : (getStudents(cid) || []).find(function (s) {
+              return s.id === sub.sender;
+            });
+      var last = by ? String(by.lastName || '').trim() : '';
+      return (
+        (by ? 'Sent by ' + displayNameFirst(by) + (last ? ' ' + last.charAt(0) + '.' : '') : 'Added by you') +
+        ' for the group' +
+        (day ? ', ' + day : '') +
+        ' · ' +
+        photosText((sub.files || []).length)
+      );
+    }
     return (verb || 'Sent') + (day ? ' ' + day : '') + ' · ' + photosText((sub.files || []).length);
   }
 
@@ -148,8 +211,9 @@ window.MGradePhotos = (function () {
 
   // html-safe: the note, names and dates go through MC.esc; ids and counts are ours or numbers
   function cardHtml(cid, a, st, unit) {
-    if (!st || (unit && unit.view) || !takes(cid, a)) return '';
-    var sub = submission(cid, st.id, a.id);
+    var w = _cardWork(cid, a, st, unit);
+    if (w.skip) return '';
+    var sub = w.sub;
     if (!sub) return notInHtml(cid, a, st);
     var files = sub.files || [];
     var first = displayNameFirst(st) || displayName(st);
@@ -162,7 +226,7 @@ window.MGradePhotos = (function () {
       '<div class="m-work-sent">' +
       CAMERA_SVG +
       '<span>' +
-      MC.esc(sentLine(sub, 'Submitted')) +
+      MC.esc(sentLine(sub, 'Submitted', cid)) +
       '</span></div>';
     if (files.length) {
       html +=
@@ -303,7 +367,7 @@ window.MGradePhotos = (function () {
             '><span class="m-scard-return-body"><span class="m-scard-return-title">' +
             MC.esc(r.a.title) +
             '</span><span class="m-scard-return-sub">' +
-            MC.esc(grade ? sentLine(r.sub) : notInLine(cid, r.a, st.id)) +
+            MC.esc(grade ? sentLine(r.sub, null, cid) : notInLine(cid, r.a, st.id)) +
             '</span></span><span class="m-scard-tograde-act">' +
             (grade ? 'Grade' : 'Add Work') +
             '</span></button>'
@@ -340,8 +404,9 @@ window.MGradePhotos = (function () {
      past: drawn first in the card, so it can stick to the card's top. */
   // html-safe: the name goes through MC.esc; ids are ours
   function pinHtml(cid, a, st, unit) {
-    if (!st || (unit && unit.view) || !takes(cid, a)) return '';
-    var sub = submission(cid, st.id, a.id);
+    var w = _cardWork(cid, a, st, unit);
+    if (w.skip) return '';
+    var sub = w.sub;
     var files = (sub && sub.files) || [];
     if (!files.length) return '';
     var first = displayNameFirst(st) || displayName(st);
@@ -361,7 +426,7 @@ window.MGradePhotos = (function () {
         })
         .join('') +
       '<span class="m-work-pin-name">' +
-      MC.esc(displayName(st)) +
+      MC.esc(unit && unit.view && unit.label ? unit.label : displayName(st)) +
       '</span>' +
       UP_SVG +
       '</button></div>'
@@ -376,7 +441,7 @@ window.MGradePhotos = (function () {
     root.querySelectorAll('.m-work, .m-work-pin').forEach(function (box) {
       var sid = box.getAttribute('data-sid');
       var aid = box.getAttribute('data-aid');
-      var sub = submission(cid, sid, aid);
+      var sub = work(cid, sid, aid);
       if (!sub) return;
       box.querySelectorAll('img[data-fv-page]').forEach(function (img) {
         if (img.getAttribute('src')) return;
@@ -386,7 +451,7 @@ window.MGradePhotos = (function () {
         var askedFile = file && file.id;
         openStudentWorkPage(cid, file, which).then(function (page) {
           if (!page) return;
-          var now = submission(cid, sid, aid);
+          var now = work(cid, sid, aid);
           var nowFile = now && (now.files || [])[Number(img.getAttribute('data-fv-page'))];
           if (
             !img.isConnected ||
@@ -467,7 +532,7 @@ window.MGradePhotos = (function () {
     if (!box) return;
     var sid = box.getAttribute('data-sid');
     var aid = box.getAttribute('data-aid');
-    var sub = submission(cid, sid, aid);
+    var sub = work(cid, sid, aid);
     var st = getStudents(cid).find(function (s) {
       return s.id === sid;
     });
@@ -515,6 +580,8 @@ window.MGradePhotos = (function () {
     on: on,
     takes: takes,
     submission: submission,
+    work: work,
+    hasWork: hasWork,
     isToGrade: isToGrade,
     toGrade: toGrade,
     toGradeCount: toGradeCount,
