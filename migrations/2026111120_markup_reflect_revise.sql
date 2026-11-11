@@ -105,13 +105,16 @@
 --
 -- ── The checks it makes first ───────────────────────────────────────────────
 -- It stops, with nothing changed, unless:
---   Batch A, S0-M4b, S0-M5, S3-M1 and Batch B are applied;
+--   Batch A, S0-M4b, S0-M5, S3-M1, Batch B and Batch B's review fixes are
+--     applied (apply order: 2026111101, 2026111102, 2026111104, then this);
 --   every existing function the new ones call is exactly the definition the
 --     tests ran against (md5 of pg_get_functiondef on PostgreSQL 17; the
 --     "relied" list below, written by migrations/local-test/
---     batch_c_fingerprints.py from a database built as live is with Batch
---     B's files as they stood on 2026-11-11; if Batch B changes before it
---     is applied the list is written again);
+--     batch_c_fingerprints.py from a database built as live is on
+--     2026-11-11, S4-M1 included, plus Batch B at 8c36fe48 and its fixes
+--     file at 7f5f34e5; the three functions the fixes file replaces are on
+--     the list, so this file stops if the fixes are not in first; if Batch
+--     B changes before it is applied the list is written again);
 --   on a first run, none of its names is taken.
 -- ON A LATER RUN (public.markup exists) every function this file makes must
 -- be as it leaves it, or as the second file (C2) leaves the three C2
@@ -198,7 +201,10 @@ begin
             ('public._work_upload_json(uuid)',                                                      '63982ca7888b11ce9b80e962f674c98a'),
             ('public._submission_file_removed()',                                                   'edc99e4c04baefcf83b9ce3c94723023'),
             ('public._submission_target_gone()',                                                    'f4f03a728aa0937ff0d89d9e5b62cc67'),
-            ('public._submission_gone()',                                                           '606be06c71d963805c12f23208b5c304')
+            ('public._submission_gone()',                                                           '606be06c71d963805c12f23208b5c304'),
+            ('public.finish_work_upload(uuid,jsonb,uuid)',                                          'c8c5c26be1758ec2e07fe73a68731159'),
+            ('student_submit.send_finish(text,uuid,uuid,jsonb,text)',                               '286e463dca1842c2586a93c77fb93456'),
+            ('student_submit.unsend(text,uuid,uuid,text)',                                          '68665f35e1678f1bba64d30c082409d8')
             -- FINGERPRINTS-END
         ) as v(fn, md5)
     loop

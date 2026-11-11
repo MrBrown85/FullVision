@@ -1,20 +1,23 @@
 """What Batch C's scripts share (batch_c.py, batch_c_undo.py, batch_c_mutate.py,
 batch_c_fingerprints.py). Not a test itself.
 
-Batch C applies only after Batch B. Batch B's files are on their own branch
-until they merge (PR 1024), so this harness reads them from BATCH_B_DIR: a
-folder holding 2026111101_student_work_submissions.sql,
-2026111102_student_work_storage.sql and local-test/storage-stand-in.sql.
+Batch C applies only after Batch B. Batch B's files are on their own
+branches until they merge (PR 1024, and its review fixes, PR 1053), so this
+harness reads them from BATCH_B_DIR: a folder holding
+2026111101_student_work_submissions.sql, 2026111102_student_work_storage.sql,
+2026111104_student_work_review_fixes.sql and local-test/storage-stand-in.sql.
 Unset, it is this repository's migrations/ folder (where they will be once
-Batch B merges). To take them from the branch now:
+Batch B merges). The fixes branch holds all four (its head 7f5f34e5 is
+Batch B's 8c36fe48 plus the fixes file), so take them from it:
 
-    mkdir -p /tmp/bb && git archive origin/batch-b-submissions migrations | tar -x -C /tmp/bb
+    mkdir -p /tmp/bb && git archive 7f5f34e5 migrations | tar -x -C /tmp/bb
     BATCH_B_DIR=/tmp/bb/migrations ...
 
-- build(): loads an EMPTY database as gradebook-prod will be once Batch B is
-  applied: everything card_codes_common.LIVE loads, then S3-M1, Supabase's
-  storage tables (Batch B's stand-in), and Batch B's two files. That is the
-  database Batch C's two files meet.
+- build(): loads an EMPTY database as gradebook-prod will be when Batch C is
+  applied: everything card_codes_common.LIVE loads, then S3-M1 and S4-M1
+  (both applied on live), Supabase's storage tables (Batch B's stand-in),
+  Batch B's two files and its review fixes, in the apply order. That is
+  the database Batch C's two files meet.
 - CDb: one scenario's own copy of it, with the student's phone and the
   teacher's browser as Batch B's contract has them, and Batch C's files and
   undo scripts.
@@ -26,7 +29,9 @@ import card_codes_common as cc
 B_DIR = os.environ.get('BATCH_B_DIR') or os.path.join(HERE, '..')
 B1 = os.path.join(B_DIR, '2026111101_student_work_submissions.sql')
 B2 = os.path.join(B_DIR, '2026111102_student_work_storage.sql')
+B_FIXES = os.path.join(B_DIR, '2026111104_student_work_review_fixes.sql')
 STAND_IN = os.path.join(B_DIR, 'local-test', 'storage-stand-in.sql')
+S4_M1 = '../2026111103_student_page_fields.sql'   # on main; applied on live
 C1 = '../2026111120_markup_reflect_revise.sql'
 C2 = '../2026111121_markup_revise_grade_changes.sql'
 # batch_c_mutate.py runs the suite against a changed copy of either file.
@@ -36,14 +41,14 @@ UNDO_C1 = 'batch-c1-undo.sql'
 UNDO_C2 = 'batch-c2-undo.sql'
 BUCKET = 'student-photos'
 HASH = 'ab' * 32
-LIVE_AFTER_B = cc.LIVE + ['../2026111003_card_codes_keyed.sql', STAND_IN, B1, B2]
+LIVE_AFTER_B = cc.LIVE + ['../2026111003_card_codes_keyed.sql', S4_M1, STAND_IN, B1, B2, B_FIXES]
 
 def text_at(rel):
     """A file's text: a path relative to this folder, or an absolute one."""
     return open(rel if os.path.isabs(rel) else os.path.join(HERE, rel)).read()
 
 def build():
-    for f in (B1, B2, STAND_IN):
+    for f in (B1, B2, B_FIXES, STAND_IN):
         if not os.path.exists(f): sys.exit('Batch B is not at %s: set BATCH_B_DIR (see the top of batch_c_common.py)' % f)
     c = connect(cc.BASE_DB)
     if c.run("select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public'")[0][0]:
@@ -103,7 +108,11 @@ C1_RELIED = ['public.fv_owns_course(uuid)', 'public.fv_owns_enrollment(uuid)', '
              'public._work_begin(uuid,uuid,uuid,text,text,uuid,jsonb,text,text,boolean,uuid,uuid)',
              'public._work_drop_expired(uuid)', 'public._work_class_full(uuid,jsonb)', 'public._work_files_state(uuid,jsonb)',
              'public._work_settle_files(uuid,jsonb)', 'public._work_upload_json(uuid)',
-             'public._submission_file_removed()', 'public._submission_target_gone()', 'public._submission_gone()']
+             'public._submission_file_removed()', 'public._submission_target_gone()', 'public._submission_gone()',
+             # Batch B's review fixes (2026111104): not called, but listed so C1 stops unless the
+             # fixes are in first (the apply order is Batch B's two files, the fixes, then C1)
+             'public.finish_work_upload(uuid,jsonb,uuid)', 'student_submit.send_finish(text,uuid,uuid,jsonb,text)',
+             'student_submit.unsend(text,uuid,uuid,text)']
 C2_RELIED = ['public._grade_copy(uuid,uuid)', 'public._markup_give(uuid,uuid)', 'public.return_for_revision(uuid,uuid,jsonb,uuid)',
              'public.cancel_revision(uuid,uuid)', 'public._grade_return_apply(uuid,uuid,jsonb,jsonb)',
              'public._grade_return_one(uuid,uuid,timestamp with time zone)']

@@ -37,7 +37,10 @@ with relied(fn, md5) as (values
     ('public._work_upload_json(uuid)',                                                      '63982ca7888b11ce9b80e962f674c98a'),
     ('public._submission_file_removed()',                                                   'edc99e4c04baefcf83b9ce3c94723023'),
     ('public._submission_target_gone()',                                                    'f4f03a728aa0937ff0d89d9e5b62cc67'),
-    ('public._submission_gone()',                                                           '606be06c71d963805c12f23208b5c304')
+    ('public._submission_gone()',                                                           '606be06c71d963805c12f23208b5c304'),
+    ('public.finish_work_upload(uuid,jsonb,uuid)',                                          'c8c5c26be1758ec2e07fe73a68731159'),
+    ('student_submit.send_finish(text,uuid,uuid,jsonb,text)',                               '286e463dca1842c2586a93c77fb93456'),
+    ('student_submit.unsend(text,uuid,uuid,text)',                                          '68665f35e1678f1bba64d30c082409d8')
     -- FINGERPRINTS-END
 ), absent(fn, md5) as (values
     -- FINGERPRINTS-BEGIN absent (written by migrations/local-test/batch_c_fingerprints.py)

@@ -1669,13 +1669,17 @@ marks whenever a grade is returned. C2 waits for the owner. The contract for
 the edge routes and the browser is `batch-c-contract.md`.
 
 Batch C applies only after Batch B, so the harness builds the database as
-live will be once Batch B is applied: everything `card_codes_common.LIVE`
-loads, S3-M1, Batch B's storage stand-in and Batch B's two files. Until
-Batch B merges, its files are read from `BATCH_B_DIR` (a folder holding its
-two migrations and `local-test/storage-stand-in.sql`, for example an
-extract of the `batch-b-submissions` branch's `migrations/` folder):
+live will be when Batch C is applied, in the apply order: everything
+`card_codes_common.LIVE` loads, S3-M1, S4-M1 (`../2026111103_student_page_fields.sql`,
+applied on live), Batch B's storage stand-in, Batch B's two files and its
+review fixes (`2026111104_student_work_review_fixes.sql`). Until Batch B
+merges, its files are read from `BATCH_B_DIR` (a folder holding the three
+migrations and `local-test/storage-stand-in.sql`): an extract of commit
+`7f5f34e5` (the `batch-b-review-fixes` branch, PR 1053), which is Batch B at
+`8c36fe48` plus the fixes file:
 
 ```bash
+mkdir -p /tmp/bb && git archive 7f5f34e5 migrations | tar -x -C /tmp/bb
 export BATCH_B_DIR=/tmp/bb/migrations
 PGPORT=54361 PGDATABASE=bc python3 batch_c_common.py build        # an empty database: live as it will be with Batch B
 PGPORT=54361 PGDATABASE=bc python3 batch_c.py                     # both files, about two minutes
@@ -1687,6 +1691,16 @@ PGPORT=54361 PGDATABASE=bc python3 batch_c_fingerprints.py check  # are the fing
 If Batch B changes before it is applied, run `batch_c_fingerprints.py`
 (without `check`) against a template built from the new Batch B: C1's guard
 compares the Batch B functions it calls, and stops on any difference.
+
+Where the fingerprints come from (refreshed 2026-11-11, PostgreSQL 17.11,
+from a template built as above): the Batch A, S0-M4b, S0-M5 and S3-M1
+functions from this branch's `migrations/` (main at `f825be77` merged in);
+the Batch B functions from `8c36fe48`; `finish_work_upload`, `send_finish`
+and `unsend` from the fixes file at `7f5f34e5` (C1 lists them so it stops
+unless the fixes are in first; it calls none of them). S4-M1 replaced
+`student_submit.page` and `_session_classes`; C1 neither calls nor
+replaces either. Every list in the eight files was current on this base but
+for those three new rows.
 
 `batch_c.py`, by scenario:
 
