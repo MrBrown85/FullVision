@@ -97,6 +97,7 @@ describe('the sample work, in the shape of list_course_submissions', () => {
       expect(s.files.length).toBeLessThanOrEqual(STUDENT_WORK_MAX_PAGES);
       s.files.forEach((f, i) => {
         expect(Object.keys(f).sort()).toEqual([
+          'added_by',
           'bytes',
           'height',
           'id',
@@ -109,6 +110,8 @@ describe('the sample work, in the shape of list_course_submissions', () => {
           'width',
         ]);
         expect(f.page).toBe(i + 1);
+        // The contract's added_by: the sample's pages are whoever sent the work's.
+        expect(f.added_by).toBe(s.sent_by);
       });
     });
   });
