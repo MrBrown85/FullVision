@@ -43,6 +43,7 @@ const PERSONAL = [
   '2012-04-17', // birthday
   '1234567', // student number
   'K7P-3QX', // slip code
+  'K7M4-QX2P', // card code
   JWT,
   'rt_9f8e7d6c5b4a', // refresh token
   'struggled with fractions', // comment / observation / note
@@ -278,6 +279,7 @@ describe('events', () => {
       'Object captured as promise rejection with keys: Science 8 Block B, code',
       // Codes, tokens and URLs
       'slip K7P-3QX was already used',
+      'card K7M4-QX2P failed to print',
       'JWT expired: ' + JWT,
       'Failed to fetch https://x.supabase.co/rest/v1/student?id=eq.' + SID,
     ];

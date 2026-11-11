@@ -1,5 +1,6 @@
 import { expect } from '@playwright/test';
 import { fakeStudentSubmit, sampleCard } from '../tests/helpers/fake-student-submit.js';
+import { fakeTeacherCards } from '../tests/helpers/fake-teacher-cards.js';
 import { findLowContrastText } from './contrast-check.js';
 
 /* What the browser tests of a real student card share
@@ -7,6 +8,12 @@ import { findLowContrastText } from './contrast-check.js';
    student-submit function answered in the test by its own handler and
    routes over a stand-in database (tests/helpers/fake-student-submit.js),
    and the checks every screen gets.
+
+   And the teacher's side (e2e/student-page-signed-in.spec.js,
+   e2e/cm-student-cards.spec.js): the teacher-cards function answered by
+   its own handler over a stand-in database
+   (tests/helpers/fake-teacher-cards.js), with serveTeacherCards, and what
+   a page holds anywhere it could keep a code (heldAnywhere).
 
    Set S0W1S_SHOTS to a folder to save a picture of each state, light and
    dark. */
@@ -111,6 +118,105 @@ export async function contrast(page) {
   }
   await page.emulateMedia({ colorScheme: 'light' });
 }
+
+/* The teacher-cards function, answered in the test by its real handler
+   over a stand-in database. `fake` is fakeTeacherCards(...). Returns the
+   posts it saw. `lose(post, n)` lets the n-th request reach the function
+   and then loses its reply; `fail(post, n)` loses it before it arrives.
+   The page's list_student_cards and mark_student_cards_printed can be
+   answered from the same stand-in through window.__e2eCardList() and
+   window.__e2eCardsPrinted(ids). */
+export const TEACHER_CORS = {
+  'access-control-allow-origin': 'http://localhost:8347',
+  'access-control-allow-headers': 'authorization, apikey, content-type, x-client-info, x-region',
+  'access-control-allow-methods': 'POST, OPTIONS',
+};
+export async function serveTeacherCards(page, fake, opts = {}) {
+  const posts = [];
+  let n = 0;
+  await page.exposeFunction('__e2eCardList', () => fake.cardsListed());
+  await page.exposeFunction('__e2eCardsPrinted', ids => fake.markPrinted(ids));
+  await page.route('**/functions/v1/teacher-cards**', async route => {
+    const req = route.request();
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: TEACHER_CORS });
+    n += 1;
+    const post = { url: req.url(), headers: req.headers(), body: JSON.parse(req.postData() || 'null') };
+    posts.push(post);
+    if (opts.fail && opts.fail(post, n)) return route.abort();
+    const { status, json } = await fake.respond({
+      url: post.url,
+      method: req.method(),
+      headers: post.headers,
+      body: req.postData(),
+    });
+    if (opts.lose && opts.lose(post, n)) return route.abort();
+    return route.fulfill({
+      status,
+      headers: { ...TEACHER_CORS, 'content-type': 'application/json', 'cache-control': 'no-store' },
+      body: JSON.stringify(json),
+    });
+  });
+  return posts;
+}
+export { fakeTeacherCards };
+
+/* Everything the page keeps where a code could linger, as one string:
+   localStorage (the outbox is there, fv-sync-queue-v1) but for the `skip`
+   keys, the test's own stand-ins; sessionStorage; and every IndexedDB
+   store. */
+export function heldAnywhere(page, skip = []) {
+  return page.evaluate(async skipped => {
+    const out = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (skipped.indexOf(k) < 0) out.push(k + '=' + localStorage.getItem(k));
+    }
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const k = sessionStorage.key(i);
+      out.push(k + '=' + sessionStorage.getItem(k));
+    }
+    const dbs = indexedDB.databases ? await indexedDB.databases() : [];
+    for (const info of dbs) {
+      const db = await new Promise((resolve, reject) => {
+        const r = indexedDB.open(info.name);
+        r.onsuccess = () => resolve(r.result);
+        r.onerror = () => reject(r.error);
+      });
+      for (const store of Array.from(db.objectStoreNames)) {
+        const rows = await new Promise(resolve => {
+          const r = db.transaction(store, 'readonly').objectStore(store).getAll();
+          r.onsuccess = () => resolve(r.result);
+          r.onerror = () => resolve([]);
+        });
+        out.push(info.name + '/' + store + '=' + JSON.stringify(rows));
+      }
+      db.close();
+    }
+    return out.join('\n');
+  }, skip);
+}
+
+/* Print with the dialog held shut: what is on the sheet each time it would
+   be open, in window.__sheets. */
+export function catchPrints(page) {
+  return page.evaluate(() => {
+    window.__sheets = [];
+    window.print = () => {
+      const root = document.getElementById('qr-slips-root');
+      window.__sheets.push({
+        pages: Array.from(root.querySelectorAll('.qs-page')).map(p => p.children.length),
+        names: Array.from(root.querySelectorAll('.qs-name')).map(e => e.textContent),
+        classes: Array.from(new Set(Array.from(root.querySelectorAll('.qs-class')).map(e => e.textContent))),
+        numbers: Array.from(root.querySelectorAll('.qs-what .qs-dates')).map(e => e.textContent),
+        codes: Array.from(root.querySelectorAll('.qs-type:not(.qs-pass) strong')).map(e => e.textContent),
+        passwords: Array.from(root.querySelectorAll('.qs-pass strong')).map(e => e.textContent),
+        qrs: root.querySelectorAll('.qs-qr svg').length,
+        text: root.textContent,
+      });
+    };
+  });
+}
+export const sheets = page => page.evaluate(() => window.__sheets || []);
 
 export async function signIn(page) {
   await page.goto('/s/#P3R8-WDK4');
