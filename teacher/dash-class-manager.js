@@ -8012,6 +8012,8 @@ window.DashClassManager = (function () {
     var data = {
       course: cid,
       savedAt: new Date().toISOString(),
+      // "Photos of student work are not in this file." once the class's student page is on (S8-F2).
+      photos: typeof FVBackupRestore !== 'undefined' ? FVBackupRestore.photosNote(cid) : undefined,
       courseInfo: structuredClone(COURSES[cid]),
       students: getStudents(cid),
       categories: getCategories(cid),

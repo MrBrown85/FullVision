@@ -409,7 +409,6 @@ describe('the export stays complete', () => {
     getQuickObsByDim: 'a subset of getAllQuickObs',
     getRemovedSections: 'the learning map, not student data',
     getReportConfig: 'report layout settings, not student data',
-    getReturnSettings: 'class settings, not student data',
     getRubricById: 'read through _assessmentRubric',
     getRubricCheckIds: 'Advanced Rubric ticks; the level they suggest is on Rubric Levels',
     getRubricChecks: 'Advanced Rubric ticks; the level they suggest is on Rubric Levels',
@@ -428,7 +427,6 @@ describe('the export stays complete', () => {
     getCourseSubmissions: 'student work, kept out with its photos',
     getStudentSubmission: 'student work, kept out with its photos',
     getAssessmentStudentWork: 'student work settings, kept out with the photos',
-    getCourseSendWork: 'student work settings, kept out with the photos',
     getStudentWork: 'the student page’s view of student work',
   };
 
@@ -442,5 +440,64 @@ describe('the export stays complete', () => {
     // A reader that is used, or gone, comes off the list.
     const stale = Object.keys(LEFT_OUT).filter(name => !readers.includes(name) || used.includes(name));
     expect(stale).toEqual([]);
+  });
+});
+
+describe('photos of student work (S8-F2)', () => {
+  const NOTE = 'Photos of student work are not in this file.';
+
+  function withSendWork(on, fn) {
+    const wasDemo = window.isDemoMode;
+    window.isDemoMode = () => true;
+    try {
+      saveDemoStudentWork(CID, { course: { send_work: on } });
+      return fn();
+    } finally {
+      window.isDemoMode = wasDemo;
+    }
+  }
+
+  it('says on Contents that photos are not in the file, for a class with its student page and Send Work on', () => {
+    seed({ config: { student_page_enabled: true } });
+    withSendWork(true, () => expect(sheet(rows(), 'Contents').notes).toContain(NOTE));
+  });
+
+  it('says nothing new while either is off', () => {
+    seed();
+    expect(sheet(rows(), 'Contents').notes).not.toContain(NOTE);
+    withSendWork(true, () => expect(sheet(rows(), 'Contents').notes).not.toContain(NOTE));
+    seed({ config: { student_page_enabled: true } });
+    withSendWork(false, () => expect(sheet(rows(), 'Contents').notes).not.toContain(NOTE));
+  });
+
+  it('puts nothing of the work sent in the file: no page, no note, no file name', () => {
+    const wasDemo = window.isDemoMode;
+    window.isDemoMode = () => true;
+    try {
+      seed({ config: { student_page_enabled: true }, assessments: [level('a1')] });
+      saveDemoStudentWork(CID, {
+        course: { send_work: true },
+        assessments: [{ id: 'a1', students_send: 'photos' }],
+        submissions: [
+          {
+            id: 'sub-1',
+            assessment_id: 'a1',
+            enrollment_id: 's1',
+            state: 'sent',
+            sent_by: 'student',
+            note: 'ZZSENT my note',
+            sent_at: '2026-10-11T16:00:00.000Z',
+            files: [
+              { id: 'f1', page: 1, path: 'zz-page.jpg', thumb_path: 'zz-page-thumb.jpg', sha256: 'ab'.repeat(32) },
+            ],
+          },
+        ],
+      });
+      expect(getCourseSubmissions(CID).submissions).toHaveLength(1);
+      const out = JSON.stringify(rows());
+      ['ZZSENT', 'zz-page', 'sub-1', 'ab'.repeat(32)].forEach(v => expect(out).not.toContain(v));
+    } finally {
+      window.isDemoMode = wasDemo;
+    }
   });
 });

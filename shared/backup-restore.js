@@ -839,7 +839,24 @@
     return { cid: cid, course: plan.course, sent: sent };
   }
 
+  /* Photos of student work are never in a class backup, and nor are the
+     records of what was sent (Colin, Q22; S8-F2): the backup is built from
+     the class's own records, and student work is not one of them. Where a
+     class could hold any (its student page is on and it takes work, Send
+     Work), the file says so, in its `photos` field. Otherwise undefined,
+     which leaves the file as it always was. A restore reads nothing from
+     the field. */
+  var PHOTOS_NOTE = 'Photos of student work are not in this file.';
+
+  function photosNote(cid) {
+    var settings = typeof getReturnSettings === 'function' ? getReturnSettings(cid) : null;
+    var send = typeof getCourseSendWork === 'function' ? getCourseSendWork(cid) : null;
+    return settings && settings.student_page && send && send.send_work ? PHOTOS_NOTE : undefined;
+  }
+
   window.FVBackupRestore = {
+    PHOTOS_NOTE: PHOTOS_NOTE,
+    photosNote: photosNote,
     parseBackup: parseBackup,
     collectIds: collectIds,
     remapBackup: remapBackup,
