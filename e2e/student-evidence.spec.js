@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 /* The student page's one Evidence panel (docs/DECISIONS.md, "Observations
    (2026-10-18)"): a timeline strip, the capture strip with the student
-   fixed, tabs with counts, and the Observations page's cards. Runs in Demo
+   fixed, type chips with counts, and the Observations page's cards. Runs in Demo
    Mode on Mei Wong (st23) in Science 8. */
 
 async function enterDemo(page) {
@@ -16,7 +16,7 @@ async function meiObs(page) {
 }
 
 test.describe('Student page Evidence panel', () => {
-  test('shows tabs with counts, adds through the strip, and deletes with Undo', async ({ page }) => {
+  test('shows type chips with counts, adds through the strip, and deletes with Undo', async ({ page }) => {
     await enterDemo(page);
     await page.goto('/student?id=st23&course=sci8');
     await page.locator('#stu-tab-evidence').click();
@@ -28,29 +28,31 @@ test.describe('Student page Evidence panel', () => {
 
     const start = (await meiObs(page)).length;
     expect(start).toBeGreaterThan(0);
-    const tabs = panel.getByRole('tab');
-    await expect(tabs).toHaveText([
+    const chips = panel.locator('.ev-type-chip');
+    const all = panel.locator('[data-ev-type="all"]');
+    await expect(chips).toHaveText([
       new RegExp('^All ' + start + '$'),
-      /^By Competency \d+$/,
-      /^Assessments \d+$/,
-      /^Concerns \d+$/,
+      /^Strength \d+$/,
+      /^Growth \d+$/,
+      /^Concern \d+$/,
+      /^Note \d+$/,
     ]);
     await expect(panel.locator('#ev-list .obs-card')).toHaveCount(start);
     await expect(panel.locator('.ev-tl-mark')).toHaveCount(start);
 
-    // Concerns tab lists only concerns.
-    await panel.getByRole('tab', { name: /^Concerns/ }).click();
+    // The Concern chip lists only concerns.
+    await panel.locator('[data-ev-type="concern"]').click();
     const concerns = await panel.locator('#ev-list .obs-card').count();
     await expect(panel.locator('#ev-list .obs-card:not([data-sentiment="concern"])')).toHaveCount(0);
     expect(concerns).toBeLessThan(start);
 
-    // Add one through the strip; it leads the All tab and joins the timeline.
-    await panel.getByRole('tab', { name: /^All/ }).click();
+    // Add one through the strip; it leads the list and joins the timeline.
+    await all.click();
     const input = panel.locator('#note-capture-input');
     await input.click();
     await input.fill('Explained her poster to a visitor without notes');
     await page.keyboard.press('Enter');
-    await expect(panel.getByRole('tab', { name: /^All/ })).toHaveText('All ' + (start + 1));
+    await expect(all).toHaveText('All ' + (start + 1));
     const first = panel.locator('#ev-list .obs-card').first();
     await expect(first).toContainText('Explained her poster to a visitor without notes');
     const newId = await first.getAttribute('data-obid');
@@ -72,7 +74,7 @@ test.describe('Student page Evidence panel', () => {
     expect((await meiObs(page)).some(o => o.id === newId)).toBe(true);
 
     await panel.locator('#ev-list .obs-card[data-obid="' + newId + '"] .obs-card-delete').click();
-    await expect(panel.getByRole('tab', { name: /^All/ })).toHaveText('All ' + start);
+    await expect(all).toHaveText('All ' + start);
     await expect.poll(async () => (await meiObs(page)).some(o => o.id === newId), { timeout: 10_000 }).toBe(false);
   });
 

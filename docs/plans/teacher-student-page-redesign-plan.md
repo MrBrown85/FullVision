@@ -1,6 +1,8 @@
 # Teacher student-page redesign (2026-11-10)
 
-**Paused after R1 by Colin, Nov 10.** R1 merged as PR 1015; R2 to R7 are off until he says otherwise.
+**Resumed Nov 11** (Colin's ruling 137: "yes! i didn't intend to pause this"). R1 merged as PR 1015. The teacher tabs keep all grades, drafts included ("Keep all grades"); the student's own page and anything sent home stay returned-only. No grade math changes: R2 reuses S13's helpers in `shared/calc.js`, and any new `calc.js` function needs Colin's review. R5 still asks him first.
+
+R3 (Observations) also keeps a private note's words (Concern, Note, a reflection) off the screen until the teacher presses Show, since the student may be looking, as the approved mockup does.
 
 The teacher's student page, tab by tab, so a student at the desk can read it and a teacher can act on it. The Overview tab shipped in PR 1013. The other tabs were designed as mockups on Colin's canvas (Overview, Grades, Competencies, Observations, Learner Profile) and reviewed against a panel of grading, privacy, data and design experts.
 
