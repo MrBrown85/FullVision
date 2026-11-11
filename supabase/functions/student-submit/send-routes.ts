@@ -20,7 +20,7 @@
 //   {route: 'unsend', session, enrollment_id, assessment_id}
 //        -> student_submit.unsend; then the worker.
 //   {route: 'file-links', session, enrollment_id, assessment_id}
-//        -> student_submit.file_links; then a 300-second link for each path
+//        -> student_submit.file_links; then a 60-second link for each path
 //           it named.
 //   {route: 'sweep', access_token}
 //        -> a signed-in teacher only: Auth says whose the token is, and that
@@ -121,8 +121,8 @@ export const MAX_FILE_BYTES = 2_000_000;
 export const MAX_PAGE_SIDE = 4_096;
 /** A thumbnail is no larger than the phone is told to make it: 400 px on its long side (shared/photo-shrink.js). */
 export const MAX_THUMB_SIDE = 400;
-/** A download link lives 300 seconds. */
-export const LINK_SECONDS = 300;
+/** A download link lives 60 seconds (E8): Cloudflare served a deleted photo until its link's end (live check 3). */
+export const LINK_SECONDS = 60;
 /** A submission holds 1 to 30 pages. */
 const MAX_PAGES = 30;
 // What the database allows in p_pages (_work_check_pages).
@@ -201,6 +201,8 @@ const ERRORS = {
     'already_sent',
     'grading_started',
     'too_many_pages',
+    // E6: twenty finishes an hour for a card (send_paths counts them).
+    'too_many',
   ],
   unsend: [...CHANGE_ERRORS, 'cannot_change', 'send_off', 'not_taking_work', 'work_closed', 'grading_started'],
   'file-links': SESSION_ERRORS,
@@ -323,7 +325,8 @@ export const good = (r: unknown): r is Json => isObject(r) && r.ok === true;
 function work(r: Json): Json {
   return {
     ok: true,
-    ...pick(r, ['v', 'send_work']),
+    // reflect_on_feedback (E1): the page asks feedback when Send Work or Reflect on Feedback is on.
+    ...pick(r, ['v', 'send_work', 'reflect_on_feedback']),
     assessments: list(r.assessments).map(a => {
       const x = isObject(a) ? a : {};
       return {
@@ -666,7 +669,7 @@ export function makeSendRoutes(opts: SendOptions) {
     return ok(answer);
   }
 
-  /* The student's own pages of one piece, handed in, as links that live 300
+  /* The student's own pages of one piece, handed in, as links that live 60
      seconds (the contract, 4). A page kept through a Replace, or added by the
      teacher, keeps the path it was first given, so its send folder can be
      another submission's; its class, piece, student and file are checked. */
