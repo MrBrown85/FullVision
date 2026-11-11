@@ -465,8 +465,10 @@ window.MGrade = (function () {
         .join(', ');
     }
 
-    /* The ⋯ on a row: Grade the N Waiting (from the first waiting) and
-       Grade Everyone (the whole class, in roster order). */
+    /* The ⋯ on a row: Grade the N Waiting (from the first waiting), Add
+       Work for the N Not In (the not-in pile, S7-F3), Work Wall (S14-F1,
+       teacher/work-wall.js) and Grade Everyone (the whole class, in roster
+       order). */
     function openRowMenu(cid, aid, from) {
       var a = _assessmentById(cid, aid);
       if (!a) return;
@@ -484,9 +486,13 @@ window.MGrade = (function () {
             return st.id === waiting[0];
           })
         : null;
-      var item = function (attrs, title, sub) {
+      var notIn = MGradePhotos.notIn(cid, a);
+      var wall = !!(window.WorkWall && window.GraderWork && GraderWork.workOn(cid, a));
+      var item = function (attrs, title, sub, action) {
         return (
-          '<button type="button" class="m-tg-menu-item" data-action="m-grade-assess" data-aid="' +
+          '<button type="button" class="m-tg-menu-item" data-action="' +
+          (action || 'm-grade-assess') +
+          '" data-aid="' +
           a.id +
           '"' +
           attrs +
@@ -513,6 +519,15 @@ window.MGrade = (function () {
                 firstSt ? 'Starts with ' + displayNameWithLast(firstSt) : '',
               )
             : '') +
+          (notIn.length
+            ? item(
+                ' data-sid="' + notIn[0] + '"',
+                'Add Work for the ' + notIn.length + ' Not In',
+                _shortNames(cid, notIn),
+                'm-add-work',
+              )
+            : '') +
+          (wall ? item('', 'Work Wall', 'Everyone’s work side by side', 'm-work-wall') : '') +
           item('', 'Grade Everyone', 'All ' + students.length + ', in roster order') +
           '<button type="button" class="m-tg-menu-cancel" data-action="m-sheet-cancel">Cancel</button>' +
           '</div>',
@@ -1226,6 +1241,7 @@ window.MGrade = (function () {
        Next goes to the next student in it. */
     var _onlyAid = null;
     var _onlyIds = null;
+    var _onlyOrdered = false; // _onlyIds is an order to keep (the Work Wall's), not a filter
     /* The grader on one student's work (S7-F4: Grade on a To Grade row):
        { cid, sid, aids, kinds } with the student's pieces fixed when it
        opens, a tab for each, one card at a time. Null otherwise. */
@@ -1284,13 +1300,24 @@ window.MGrade = (function () {
     function _swiperUnits(cid, a) {
       var all = _allUnits(cid, a);
       if (!_onlyIds || !a || a.id !== _onlyAid) return all;
-      return all.filter(function (u) {
-        if (u.view)
-          return u.view.members.some(function (m) {
-            return _onlyIds.indexOf(m) !== -1;
-          });
-        return _onlyIds.indexOf(u.st.id) !== -1;
+      // Where a unit (a group shows once) falls in the list: its first member's place.
+      var at = function (u) {
+        var ids = u.view ? u.view.members : [u.st.id];
+        var best = -1;
+        ids.forEach(function (m) {
+          var i = _onlyIds.indexOf(m);
+          if (i !== -1 && (best === -1 || i < best)) best = i;
+        });
+        return best;
+      };
+      var kept = all.filter(function (u) {
+        return at(u) !== -1;
       });
+      if (_onlyOrdered)
+        kept.sort(function (x, y) {
+          return at(x) - at(y);
+        });
+      return kept;
     }
 
     function _allUnits(cid, a) {
@@ -1338,7 +1365,7 @@ window.MGrade = (function () {
     function _subtitleText(idx, total) {
       if (_student) return _studentSubtitle();
       var label = _swiperLabels && _swiperLabels[idx];
-      return (label ? label + ' · ' : '') + (idx + 1) + ' of ' + total + (_onlyIds ? ' to grade' : '');
+      return (label ? label + ' · ' : '') + (idx + 1) + ' of ' + total + (_onlyIds && !_onlyOrdered ? ' to grade' : '');
     }
 
     // html-safe: names go through MC.esc; ids are ours; labels are constants
@@ -1518,6 +1545,7 @@ window.MGrade = (function () {
       if (!(opts && opts.keep && _onlyAid === aid)) {
         _onlyAid = null;
         _onlyIds = null;
+        _onlyOrdered = false;
         _student = null;
       }
       // A grading screen opened afresh starts each card on its first criterion.
@@ -1554,6 +1582,21 @@ window.MGrade = (function () {
         if (waiting.length) {
           _onlyAid = aid;
           _onlyIds = waiting;
+        }
+      }
+      // The Work Wall's Grade in This Order (S14): these students, in this order.
+      if (opts && Array.isArray(opts.ids) && !opts.student && opts.only !== 'tograde') {
+        var inClass = {};
+        getStudents(cid).forEach(function (x) {
+          inClass[x.id] = true;
+        });
+        var ordered = opts.ids.filter(function (id, i) {
+          return inClass[id] && opts.ids.indexOf(id) === i;
+        });
+        if (ordered.length) {
+          _onlyAid = aid;
+          _onlyIds = ordered;
+          _onlyOrdered = true;
         }
       }
 
@@ -3690,7 +3733,7 @@ window.MGrade = (function () {
       },
       // 'tograde' while the screen grades only the work waiting.
       gradingOnly: function () {
-        return _onlyIds ? 'tograde' : null;
+        return _onlyIds && !_onlyOrdered ? 'tograde' : null;
       },
       // Each student card scrolls on its own; a redraw puts them back.
       getCardScrolls: function () {

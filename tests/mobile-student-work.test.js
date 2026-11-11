@@ -160,8 +160,19 @@ describe('with the student page and Send Work on', () => {
     MGrade.openRowMenu(CID, LAB);
     const menu = document.querySelector('#m-sheet-container .m-tg-menu');
     const items = [...menu.querySelectorAll('.m-tg-menu-item')].map(b => b.textContent);
+    // The board's menu also has Add Work for the N Not In and Work Wall (S14 follow-up).
+    const notIn = MGradePhotos.notIn(
+      CID,
+      getAssessments(CID).find(a => a.id === LAB),
+    );
+    const names = notIn
+      .map(sid => getStudents(CID).find(s => s.id === sid))
+      .map(s => displayNameFirst(s) + ' ' + s.lastName.charAt(0) + '.')
+      .join(', ');
     expect(items).toEqual([
       'Grade the 2 WaitingStarts with Noor Al-Rashid',
+      'Add Work for the ' + notIn.length + ' Not In' + names,
+      'Work Wall' + 'Everyone’s work side by side',
       'Grade Everyone' + 'All ' + getStudents(CID).length + ', in roster order',
     ]);
     expect(menu.querySelector('[data-only="tograde"]').getAttribute('data-aid')).toBe(LAB);
