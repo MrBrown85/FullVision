@@ -67,6 +67,53 @@ function withReturnedOnly(fn) {
   return result;
 }
 
+/* ── Missing work left out ─────────────────────────────────────
+   The student page's Overview shows a student their grade now and the
+   grade if they handed in their missing work. The second is the same
+   calculation with that student's Missing work read as Excused: left out
+   of the course %, so the rest of their work stands for it, at their usual
+   level and with the category weights as they are. No formula here
+   changes; only what status() reads for those pieces. Proficiency already
+   leaves Missing work out (STATUS_EFFECT), so only the % and letter move.
+   The left-out pieces are part of every cache key (_ck), so this never
+   shares a cached number with the real grade. */
+var _leftOut = null; // { sid, ids: { aid: true } | null, key } while withMissingLeftOut runs
+
+/** Run `fn` with one student's Missing work left out of their grade (read
+ * as Excused), and give back what it returns. `assessmentIds` names the
+ * pieces; null or omitted means every Missing piece. The state before is
+ * put back when `fn` ends, also when it throws. `fn` must finish at once,
+ * as for withReturnedOnly. */
+function withMissingLeftOut(studentId, assessmentIds, fn) {
+  var was = _leftOut;
+  var ids = null;
+  if (assessmentIds) {
+    ids = {};
+    assessmentIds.forEach(function (aid) {
+      ids[aid] = true;
+    });
+  }
+  _leftOut = {
+    sid: studentId,
+    ids: ids,
+    key: studentId + ':' + (assessmentIds ? assessmentIds.slice().sort().join(',') : '*'),
+  };
+  var result;
+  try {
+    result = fn();
+  } finally {
+    _leftOut = was;
+  }
+  if (result && typeof result.then === 'function') {
+    throw new Error('withMissingLeftOut was given work that does not finish at once (it returned a promise).');
+  }
+  return result;
+}
+
+function _isLeftOut(sid, aid) {
+  return !!(_leftOut && _leftOut.sid === sid && (!_leftOut.ids || _leftOut.ids[aid]));
+}
+
 /* Whether a value is a set of scores as the reader's scores() gives it: a
    plain object of { studentId: [entries] }. A list, a Map, a promise or a
    student whose scores are not a list would not throw further down. Each
@@ -124,9 +171,11 @@ var _scoreRead = {
   statuses: function (cid) {
     return getAssignmentStatuses(cid);
   },
-  // One student's status on one assessment, or null.
+  /* One student's status on one assessment, or null. Missing work being
+     left out (withMissingLeftOut) reads as Excused. */
   status: function (cid, sid, aid) {
-    return _scoreRead.statuses(cid)[sid + ':' + aid] || null;
+    var s = _scoreRead.statuses(cid)[sid + ':' + aid] || null;
+    return s === 'NS' && _isLeftOut(sid, aid) ? 'EXC' : s;
   },
   /* A points score, or null when none is entered; 0 is a score. `piece` is
      the assessment, and the score is read from the one entry that holds it
@@ -207,7 +256,7 @@ function _termKey(cid) {
 /* Cache key prefix for a class: the class id, the active term and the score
    set in use ('c1#all', 'c1@2#all', 'c1@2#returned'). */
 function _ck(cid) {
-  return cid + _termKey(cid) + '#' + _scoreSet;
+  return cid + _termKey(cid) + '#' + _scoreSet + (_leftOut ? '!' + _leftOut.key : '');
 }
 
 function _assessmentDate(a) {

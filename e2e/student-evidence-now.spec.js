@@ -13,7 +13,7 @@ async function open(page, letter) {
   await page.waitForFunction(() => getAssessments('sci8').length > 0);
   await page.evaluate(l => {
     if (l) COURSES.sci8.gradingSystem = 'letter';
-    window.Router.navigate('/student?id=st1&course=sci8');
+    window.Router.navigate('/student?id=st1&course=sci8&tab=comps');
   }, letter);
   const row = page.locator('.stu-comp-row[data-tagid="PA4"]');
   await row.waitFor();
