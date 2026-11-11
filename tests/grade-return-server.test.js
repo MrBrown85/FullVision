@@ -369,6 +369,8 @@ describe('every caller of saveCourseConfig and update_course', () => {
       'shared/seed-data.js': 1,
       'teacher/dash-class-manager.js': 10,
       'teacher/grading-setup-copy.js': 1,
+      // Show My Learning (S13-F1), Demo Mode only
+      'teacher/cm-student-page.js': 1,
     });
   });
 
