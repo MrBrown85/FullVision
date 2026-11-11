@@ -1203,11 +1203,30 @@ window.StudentView = (function () {
      otherwise { ready: true, reply, view }. Every result is worked out by
      calc.js on returned grades only. view.learning is My Learning when the
      class shows it, or when opts.learning asks for it, else null. */
+  /* Preview never tells the teacher what the student has opened
+     (DECISIONS, "Student page build rulings (2026-11-10)" 10; Colin's
+     ruling 116, "Take it out"). The cache holds when the student opened
+     each returned piece (seen_at), and under As Soon As I Save a grade is
+     marked Updated only if the student had opened it (rulings 9), so the
+     mark would tell too. So Preview's copy of the reply has no seen_at,
+     updated_at or previous on any piece: every returned piece is drawn as
+     a student who has not opened it yet sees it (New, in What Changed),
+     with no Updated mark. reply() itself stays the server's, field for
+     field; the student's own page is not touched. */
+  function unopened(page) {
+    if (!page) return page;
+    var copy = Object.assign({}, page);
+    copy.assessments = (page.assessments || []).map(function (a) {
+      return Object.assign({}, a, { updated_at: null, seen_at: null, previous: null });
+    });
+    return copy;
+  }
+
   function fromCache(cid, sid, opts) {
     // opts.learning: work My Learning out as if the class showed it (Preview's See What They'd See,
     // S13-F1). Nothing is saved; the class's switch is not read or changed.
     var showLearning = !!(opts && opts.learning) || learningOn(cid);
-    var page = reply(cid, sid);
+    var page = unopened(reply(cid, sid));
     if (!page) return { ready: false };
     var feedback = feedbackReply(cid, sid, page);
     var view = withReturnedOnly(function () {
