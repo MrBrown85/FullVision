@@ -14,6 +14,8 @@ import { ungradeLabNotSent } from './helpers/demo-lab-not-in.js';
 
 const CID = 'sci8';
 const LAB = 'sci8a1';
+// Light Refraction Lab: the sample's piece with work waiting (ruling 115).
+const LIGHT = 'sci8a21';
 let wasDemo;
 let stubDocument;
 let store;
@@ -192,6 +194,9 @@ describe('with the student page and Send Work on', () => {
   });
 
   it('the red count goes when nothing waits', () => {
+    // The sample's Light Refraction Lab has 6 to grade; graded, nothing waits.
+    expect(MGradePhotos.classToGrade(CID)).toBe(6);
+    GraderWork.workCounts(CID, LIGHT).ids.tograde.forEach(sid => Grader.setOverallComment(CID, sid, LIGHT, 'Done.'));
     expect(MGradePhotos.classToGrade(CID)).toBe(0);
     const tab = document.querySelector('.m-tab-item[data-tab="grade"]');
     tab.insertAdjacentHTML('beforeend', '<span class="m-tab-badge">3</span>');
@@ -510,6 +515,9 @@ describe('the grader on one student’s work', () => {
     other = getAssessments(CID).find(x => x.id === 'sci8a4');
     clearGrade('st2', other.id);
     expect(setAssignmentStatus(CID, 'st2', other.id, 'NS')).not.toBe(false);
+    // Noor sent nothing for the sample's Light Refraction Lab: Excused there,
+    // so her list is the two pieces above.
+    expect(setAssignmentStatus(CID, 'st2', LIGHT, 'EXC')).not.toBe(false);
     turnOn();
   });
   const open = aid => {

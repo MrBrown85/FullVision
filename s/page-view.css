@@ -1981,3 +1981,154 @@
   font-size: 15px;
   color: #58585d;
 }
+
+/* Revisions (S11-F2): Needs Revision on a card and on Your Feedback, and
+   Before and After once the revision's grade is back. */
+.sp-view .sp-dot-revise {
+  background: #c2410c;
+}
+.sp-view .sp-flag-revise {
+  background: #ffedd5;
+  color: #9a3412;
+}
+.sp-view .sp-row-flag-revise {
+  background: #c2410c;
+}
+.sp-view .sp-revise {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0;
+  padding: 12px 14px;
+  border-left: 4px solid #c2410c;
+  border-radius: 12px;
+  background: #fff7ed;
+}
+.sp-view .sp-revise-who,
+.sp-view .sp-revise-first,
+.sp-view .sp-revise-crit-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #9a3412;
+}
+.sp-view .sp-revise-fix {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.sp-view .sp-revise-crit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+.sp-view .sp-revise-crit-name {
+  display: inline-flex;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--sp-card);
+  border: 1px solid #fed7aa;
+  font-size: 13px;
+  font-weight: 600;
+}
+.sp-view .sp-revise .sp-btn {
+  margin-top: 4px;
+}
+.sp-view .sp-ba-versions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.sp-view .sp-ba-version {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  min-width: 0;
+}
+.sp-view .sp-ba-photo {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid var(--sp-line);
+  background: var(--sp-fill);
+}
+.sp-view .sp-ba-version figcaption {
+  display: flex;
+  flex-direction: column;
+}
+.sp-view .sp-ba-label {
+  font-size: 15px;
+  font-weight: 700;
+}
+.sp-view .sp-ba-sent {
+  font-size: 13px;
+  color: var(--sp-text-2);
+}
+.sp-view .sp-ba-rows {
+  list-style: none;
+  margin: 0;
+  padding: 4px 16px;
+  background: var(--sp-card);
+  border-radius: 18px;
+}
+.sp-view .sp-ba-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--sp-fill);
+}
+.sp-view .sp-ba-row:first-child {
+  border-top: 0;
+}
+.sp-view .sp-ba-name {
+  font-size: 15px;
+  font-weight: 600;
+  min-width: 0;
+}
+.sp-view .sp-ba-move {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.sp-view .sp-ba-was .sp-level {
+  opacity: 0.75;
+}
+.sp-view .sp-ba-same {
+  font-size: 13px;
+  color: var(--sp-text-2);
+}
+.sp-view .sp-ba-result .sp-ba-name {
+  font-weight: 700;
+}
+.sp-view .sp-ba-said {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--sp-card);
+}
+.sp-view .sp-ba-said-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #58585d;
+}
+.sp-view .sp-ba-did .sp-ba-said-title {
+  color: var(--sp-green);
+}
+.sp-view .sp-ba-words {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}

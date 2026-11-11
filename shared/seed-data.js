@@ -5,6 +5,7 @@
    lands on yesterday and the class always looks current. No date in this
    file may be later than SEED_LAST_DAY. */
 const SEED_LAST_DAY = '2026-03-21';
+
 const _DATE_RE = /^\d{4}-\d{2}-\d{2}(T[\d:.]+Z?)?$/;
 
 /* ── The demo class ─────────────────────────────────────────────
@@ -1262,6 +1263,27 @@ function seedIfNeeded() {
         created: new Date('2026-03-04').toISOString(),
       },
     );
+    // ── The piece with work waiting (ruling 115, "Add one piece") ──
+    // Light Refraction Lab takes photos (seedDemoStudentWork, below). Only
+    // a few students have sent work; most have no grade on it yet and two
+    // are graded as drafts, so To Grade and To Return have something in
+    // them. Aiden and Olivia work as a pair. It is listed last so that
+    // every other piece, and every grade on one, is seeded as before.
+    sci8Assessments.push({
+      id: 'sci8a21',
+      title: 'Light Refraction Lab',
+      date: '2026-03-16',
+      dueDate: '2026-03-18',
+      type: 'summative',
+      tagIds: ['QAP', 'PI', 'IP', 'EM', 'CA', 'SC'],
+      evidenceType: 'lab',
+      notes: 'Traced a light ray through a glass block and measured the angle going in and the angle in the glass.',
+      coreCompetencyIds: ['CRT', 'COM'],
+      rubricId: 'rub_sci8_lab',
+      collaboration: 'pair',
+      pairs: [['st16', 'st17']],
+      created: new Date('2026-03-16').toISOString(),
+    });
     sci8Assessments.forEach(a => {
       if (a.tagIds && a.tagIds.length) a.tagIds = demoTagIds(a.tagIds, a.rubricId, a.id);
     });
@@ -3854,6 +3876,7 @@ function seedIfNeeded() {
   seedDemoMarkup();
   seedDemoReflections();
   seedDemoRevisions();
+  seedDemoDrafts();
 
   // ── Migrate old gb-notes into gb-quick-obs (one-time) ──
   Object.keys(COURSES).forEach(cid => {
@@ -3902,6 +3925,13 @@ function seedIfNeeded() {
    Students Send); the work is there for the screens that show it once a
    teacher turns both on.
 
+   Light Refraction Lab (sci8a21, ruling 115) is the piece with work
+   waiting: due two days after its date, taking photos, One per Group for
+   its one pair. Sent and not graded yet, so To Grade: Ines, Sofia (two
+   pages, with a note) and Marcus (late); Aiden for his pair with Olivia
+   (the pair counts once). Sent and graded as drafts, so To Return: Maya
+   and Liv. Everyone else has nothing in.
+
    Seeded once per class: a class seeded before this existed gets it the
    next time Demo Mode opens. */
 var DEMO_WORK_PAGES = {
@@ -3917,6 +3947,13 @@ var DEMO_WORK_PAGES = {
   'cell-lab-fatima-2': [59536, 'f92077d830342cb19305e8f1a63858bd22f49eadd97f2b378d1e7518971afb94', 6855],
   'cell-lab-priya-1': [85785, '5f43e2e52874e138e973dfa610ef8e02098af6d6466f4f33e055b1784058f088', 9615],
   'cell-lab-jordan-1': [80109, '30d1232a08f3abb286e5311e68a9c12397d7206004c2566108d6343842e743e0', 8431],
+  'light-lab-ines-1': [67460, 'eadc3dedc393d3f680890121cf9b72017bef028cbc69ae07b0e47b4027c03d5e', 7359],
+  'light-lab-sofia-1': [63130, '0a13b29cc90a70c282bd63cd35f62a4f4c2a76d0e0ad069ca1076cb96667f7d6', 7143],
+  'light-lab-sofia-2': [60402, 'c8b6ec94bacf3f6545e40ae59b0a1e680a83956f28e0f50b3904df8310b9489e', 6889],
+  'light-lab-marcus-1': [59813, 'c15f8be6112b8626988c8ec17f33c789cdba0041e0106295905e6a69a754d959', 7190],
+  'light-lab-aiden-1': [69722, '8ab3eeca6638ff721d33c65efc651fe965478df90cc7defe17fec44f47529b2e', 7784],
+  'light-lab-maya-1': [65915, 'bca04b87531fc5ece58c13ccf6f9f899fa519aae4e780a6d676b1bb2c41df540', 7255],
+  'light-lab-liv-1': [62353, '07d28e7165b0f34681ba0ee1389bf754055535950befc473fb578ae6f540825d', 7240],
 };
 
 // [student, pages, sent by, days after the lab's date, time (UTC), late, on paper, note]
@@ -3933,6 +3970,25 @@ var DEMO_WORK_SENT = [
   ['st10', ['cell-lab-jordan-1'], 'student', 0, '20:26', false, false, null],
 ];
 
+// The same, for Light Refraction Lab (sci8a21), days after its date (due two days after).
+var DEMO_LIGHT_LAB_SENT = [
+  ['st11', ['light-lab-ines-1'], 'student', 1, '18:40', false, false, null],
+  [
+    'st14',
+    ['light-lab-sofia-1', 'light-lab-sofia-2'],
+    'student',
+    2,
+    '22:10',
+    false,
+    false,
+    'My answers are on page 2.',
+  ],
+  ['st12', ['light-lab-marcus-1'], 'student', 3, '20:05', true, false, null],
+  ['st16', ['light-lab-aiden-1'], 'student', 2, '19:20', false, false, null],
+  ['st19', ['light-lab-maya-1'], 'student', 1, '17:55', false, false, null],
+  ['st20', ['light-lab-liv-1'], 'student', 2, '16:30', false, false, null],
+];
+
 function _demoDayAfter(day, n) {
   return new Date(Date.parse(day + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
 }
@@ -3947,48 +4003,29 @@ function seedDemoStudentWork() {
   var kmt = pieces.find(function (a) {
     return a && a.id === 'sci8a4';
   });
+  var lightLab = pieces.find(function (a) {
+    return a && a.id === 'sci8a21';
+  });
   if (!lab || !lab.date) return false;
   var roster = {};
   getStudents('sci8').forEach(function (s) {
     roster[s.id] = true;
   });
-  var labDay = String(lab.date).slice(0, 10);
-  var submissions = DEMO_WORK_SENT.filter(function (row) {
-    return roster[row[0]];
-  }).map(function (row) {
-    var sid = row[0];
-    var sentAt = _demoDayAfter(labDay, row[3]) + 'T' + row[4] + ':00.000Z';
-    var id = 'demo-sub-' + sid + '-sci8a1';
-    return {
-      id: id,
-      assessment_id: 'sci8a1',
-      enrollment_id: sid,
-      version: 1,
-      state: 'sent',
-      sent_by: row[2],
-      on_paper: row[6],
-      is_late: row[5],
-      note: row[7],
-      followed_plan: null,
-      created_at: new Date(Date.parse(sentAt) - 120000).toISOString(),
-      sent_at: sentAt,
-      files: row[1].map(function (name, i) {
-        var page = DEMO_WORK_PAGES[name];
-        return {
-          id: id + '-p' + (i + 1),
-          page: i + 1,
-          path: name + '.jpg',
-          thumb_path: name + '-thumb.jpg',
-          bytes: page[0],
-          thumb_bytes: page[2],
-          width: 900,
-          height: 1200,
-          rotation: 0,
-          sha256: page[1],
-        };
-      }),
-    };
+  var sent = DEMO_WORK_SENT.map(function (row) {
+    return { aid: 'sci8a1', day: String(lab.date).slice(0, 10), row: row };
   });
+  if (lightLab && lightLab.date) {
+    DEMO_LIGHT_LAB_SENT.forEach(function (row) {
+      sent.push({ aid: 'sci8a21', day: String(lightLab.date).slice(0, 10), row: row });
+    });
+  }
+  var submissions = sent
+    .filter(function (one) {
+      return roster[one.row[0]];
+    })
+    .map(function (one) {
+      return _demoSubmission(one.aid, one.day, one.row);
+    });
   var assessments = [{ id: 'sci8a1', students_send: 'photos', after_due: 'keep', accept_until: null }];
   if (kmt && kmt.date) {
     assessments.push({
@@ -3998,11 +4035,57 @@ function seedDemoStudentWork() {
       accept_until: _demoDayAfter(String(kmt.date).slice(0, 10), 7),
     });
   }
+  if (lightLab) {
+    assessments.push({
+      id: 'sci8a21',
+      students_send: 'photos',
+      after_due: 'keep',
+      accept_until: null,
+      group_work: 'group',
+    });
+  }
   return saveDemoStudentWork('sci8', {
     course: { send_work: false, keep_photos_until: 'end_of_year' },
     assessments: assessments,
     submissions: submissions,
   });
+}
+
+// One sample submission: row is [student, pages, sent by, days after `day`,
+// time (UTC), late, on paper, note].
+function _demoSubmission(aid, day, row) {
+  var sid = row[0];
+  var sentAt = _demoDayAfter(day, row[3]) + 'T' + row[4] + ':00.000Z';
+  var id = 'demo-sub-' + sid + '-' + aid;
+  return {
+    id: id,
+    assessment_id: aid,
+    enrollment_id: sid,
+    version: 1,
+    state: 'sent',
+    sent_by: row[2],
+    on_paper: row[6],
+    is_late: row[5],
+    note: row[7],
+    followed_plan: null,
+    created_at: new Date(Date.parse(sentAt) - 120000).toISOString(),
+    sent_at: sentAt,
+    files: row[1].map(function (name, i) {
+      var page = DEMO_WORK_PAGES[name];
+      return {
+        id: id + '-p' + (i + 1),
+        page: i + 1,
+        path: name + '.jpg',
+        thumb_path: name + '-thumb.jpg',
+        bytes: page[0],
+        thumb_bytes: page[2],
+        width: 900,
+        height: 1200,
+        rotation: 0,
+        sha256: page[1],
+      };
+    }),
+  };
 }
 
 /* ── Sample Mark Up (S9) ───────────────────────────────────────────
@@ -4126,6 +4209,44 @@ function seedDemoReflections() {
     };
   });
   return list.length ? saveDemoReflections('sci8', list) : false;
+}
+
+/* ── Sample drafts (ruling 115) ────────────────────────────────────
+   Maya's and Liv's work on Light Refraction Lab is graded as a draft, so
+   To Return has two in it. A draft exists only in a class that holds
+   grades (the student page on and Return Grades set to When I Return
+   Them, shared/grade-state.js): in any other class every save is returned
+   at once. So the drafts are made the first time Demo Mode opens with the
+   class holding grades and Send Work on (the drafts belong with the work
+   sent, which shows only then), through the data layer's own Overall Comment
+   writer, which keeps the draft's row as for any teacher's save. Each is
+   the Overall Comment alone, with no level: a level would change the
+   student's grades on the teacher's screens, which is grade math for
+   Colin's review. A student already graded on the piece (a draft, a
+   returned grade, a comment or a tick), or without work in, is left as
+   they are, so a draft is made once and never over a teacher's grading. */
+// [student, Overall Comment]
+var DEMO_DRAFTS = [
+  ['st19', 'Clear diagram and a full table. Say why the ray bends, not just that it does.'],
+  ['st20', 'Your diagram shows the bend. Add a third angle and label the normal.'],
+];
+
+function seedDemoDrafts() {
+  if (typeof saveScoreComment !== 'function' || typeof getReturnSettings !== 'function' || !COURSES.sci8) return false;
+  if (typeof GradeState === 'undefined' || !GradeState.holds(getReturnSettings('sci8'))) return false;
+  if (typeof getCourseSendWork !== 'function' || !getCourseSendWork('sci8').send_work) return false;
+  var lightLab = (getAssessments('sci8') || []).find(function (a) {
+    return a && a.id === 'sci8a21';
+  });
+  if (!lightLab) return false;
+  var made = 0;
+  DEMO_DRAFTS.forEach(function (row) {
+    var sid = row[0];
+    if (!getStudentSubmission('sci8', sid, lightLab.id)) return;
+    if (studentWorkGradingStarted('sci8', sid, lightLab.id)) return;
+    if (saveScoreComment('sci8', sid, lightLab.id, row[1])) made++;
+  });
+  return made > 0;
 }
 
 /* ── Sample revision (S11) ─────────────────────────────────────────

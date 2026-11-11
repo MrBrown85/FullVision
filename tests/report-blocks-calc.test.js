@@ -98,15 +98,16 @@ describe('Core Competencies block', () => {
 describe('override note', () => {
   afterEach(() => delete COURSES[CID]);
 
-  it('words the calculated level from the level itself', () => {
+  it('words the calculated level as it is printed', () => {
     seed({
       assessments: [cc('a', { weight: 54 }), cc('b', { weight: 46 })],
       scores: [sc('a', 3), sc('b', 4)],
       overrides: { [SID]: { 'sec-1': { level: 2, reason: 'Conference' } } },
     });
-    // (3 × 54 + 4 × 46) / 100 = 3.46: Proficient, not Extending
+    // (3 × 54 + 4 × 46) / 100 = 3.46, printed 3.5: Extending, as printed
+    // (DECISIONS, "A level reads as it is printed", 2026-11-11).
     expect(getSectionProficiencyRaw(CID, SID, 'sec-1')).toBeCloseTo(3.46, 9);
-    expect(ReportBlocks.renderBlockSectionOutcomes(CID, STUDENT)).toContain('calculated: 3.5 Proficient');
+    expect(ReportBlocks.renderBlockSectionOutcomes(CID, STUDENT)).toContain('calculated: 3.5 Extending');
   });
 });
 

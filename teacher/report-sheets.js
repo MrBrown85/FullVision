@@ -39,6 +39,9 @@ window.ReportSheets = (function () {
      Parent / Guardian Response and the student reflection are placed,
      never reworded (DECISIONS "Report forms" 5). */
   var GAP = 12;
+  // The Studio's box for a block that prints nothing (reports.css,
+  // .sheet-row-empty .sheet-cell min-height).
+  var EMPTY_PX = 30;
   var ROW_W = 720;
   var HALF_W = (ROW_W - GAP) / 2;
   /* One ruled line, from reports.css (.report-ruled repeats every 22px). */
@@ -233,6 +236,8 @@ window.ReportSheets = (function () {
     'grade-table': {
       label: 'Assignment Grades',
       group: 'Grades',
+      // Cut at its rows, as a table is, when it is too long for a side.
+      gradeRows: true,
       options: [
         { key: 'course', label: 'Course Grade', def: true },
         { key: 'categoryGrade', label: 'Category Grades', def: true },
@@ -1235,14 +1240,24 @@ window.ReportSheets = (function () {
      and sits `gap` under the row before it. The pinned block is docked to
      the bottom of its side, and the gap above it is the side's limit. A
      row that passes the limit, and every row after it on that side, moves
-     to a continued side inserted after it (for this student only). A row
-     taller than a whole side (below the line, unless it fits where it
-     is on the Front) is held back and printed after the report,
-     on as many sides as it needs: a table is cut at its rows, anything
-     else goes alone and over. Returns { sides: [{ rows: [{ y, h, cells:
-     [{ id, size, h, part? }] }], pinned?, kind: 'side' | 'continued' |
-     'after', from, head }], after: [id], continued: [id], over }; head
-     is true on every side but the Front. */
+     to a continued side inserted after it (for this student only).
+     Tables (Assignment Grades) go on side by side instead, so no side is
+     left blank: one that fits a side but not the room left here goes
+     whole onto the next side of the form (the Back), ahead of that side's
+     own rows, and the rows after it go with it; one taller than a whole
+     side (below the line, unless it fits where it is on the Front)
+     starts where it is, with as many of its rows as the room left there
+     holds, and goes on onto the next side of the form, then past the
+     last side onto continued sides. A row is never cut, and each part
+     repeats the table's title. Anything else taller than a side is held
+     back and printed after the report, alone and over. Returns { sides:
+     [{ rows: [{ y, h, cells: [{ id, size, h, part? }], carried? }],
+     pinned?, passed?, kind: 'side' | 'continued' | 'after', from, head }],
+     after: [id], continued: [id], over }; head is true on every side but
+     the Front. A row is carried when it belongs to an earlier side of the
+     form, or is a table's second or later part (the Studio counts each
+     block once); a side is passed when the rest of it went on to the
+     next side of the form. */
   function pack(sides, opts) {
     var H = opts.H;
     var gap = opts.gap != null ? opts.gap : GAP;
@@ -1252,12 +1267,7 @@ window.ReportSheets = (function () {
     var over = false;
     var top = opts.head ? opts.head + gap : 0;
     var full = H - top;
-    var sum = function (list) {
-      return list.reduce(function (a, b) {
-        return a + b;
-      }, 0);
-    };
-    var rowOf = function (cells) {
+    var rowOf = function (cells, from) {
       var live = cells.filter(function (c) {
         return !c.empty;
       });
@@ -1269,13 +1279,20 @@ window.ReportSheets = (function () {
           }),
         ),
       );
-      return { h: h, cells: cells, live: live };
+      return { h: h, cells: cells, live: live, from: from };
     };
+    var isTable = function (c) {
+      return !!c.rows && c.rows.length > 1;
+    };
+    // What a side of the form passes on to the next: the rest of a table
+    // it began and the rows after it.
+    var carry = [];
     sides.forEach(function (rows, s) {
       var pin = null;
-      var queue = [];
+      var queue = carry;
+      carry = [];
       rows.forEach(function (cells) {
-        var r = rowOf(cells);
+        var r = rowOf(cells, s);
         if (
           cells.some(function (c) {
             return c.id === opts.pinned;
@@ -1297,97 +1314,173 @@ window.ReportSheets = (function () {
       var cur = side;
       var y = s > 0 ? top : 0;
       var y0 = y;
-      queue.forEach(function (r) {
-        if (!r.live.length) {
-          // Nothing to print: the row keeps its place at no height, so the
-          // canvas can still show and select the block.
-          cur.rows.push({
-            y: y,
-            h: 0,
-            empty: true,
-            cells: r.cells.map(function (c) {
-              return { id: c.id, size: c.size, h: 0 };
-            }),
+      var last = s + 1 >= sides.length;
+      // The rest of this side continues on a side of its own, for this
+      // student.
+      var turn = function () {
+        cur = { rows: [], kind: 'continued', from: s, head: true };
+        out.push(cur);
+        y = y0 = top;
+        shown = 0;
+      };
+      // A block that prints nothing takes no room on paper, but the Studio
+      // shows it as a box with its name (reports.css, .sheet-row-empty). A
+      // table filling a side keeps room for those boxes, so its last rows
+      // are not pushed past the foot of the side on screen.
+      var shown = 0;
+      var place = function (cells, h, from) {
+        var row = { y: y, h: h, cells: cells };
+        var carried =
+          from !== s ||
+          cells.some(function (c) {
+            return c.part && c.part.start > 0;
           });
-          return;
-        }
-        // Fits a side: under the line, or where it is on the Front.
-        var fits = function (h) {
-          return h <= full || (cur === side && s === 0 && y + h <= limit);
-        };
-        if (!fits(r.h)) {
-          // Taller than a whole side: after the report. A short partner
-          // stays on its side, alone in the row.
-          var short = [];
-          r.live.forEach(function (c) {
-            if (fits(c.px)) short.push(c);
-            else after.push(c);
-          });
-          if (!short.length) return;
-          r = rowOf(short);
-        }
-        var lim = cur === side ? limit : H;
-        if (y + r.h > lim && (y > y0 || cur === side)) {
-          // The rest of this side continues on a side of its own, for this
-          // student. (A side with only a docked block above the limit
-          // continues too: nothing fits above the block.)
-          cur = { rows: [], kind: 'continued', from: s, head: true };
-          out.push(cur);
-          y = y0 = top;
-        }
-        var row = {
-          y: y,
-          h: r.h,
-          cells: r.live.map(function (c) {
-            return { id: c.id, size: c.size, h: r.h };
-          }),
-        };
-        if (cur !== side) {
-          row.cells.forEach(function (c) {
+        if (carried) row.carried = true;
+        if (cur !== side || carried) {
+          cells.forEach(function (c) {
             if (continued.indexOf(c.id) < 0) continued.push(c.id);
           });
         }
         cur.rows.push(row);
-        y += r.h + gap;
-      });
-    });
-    // After the report: each held block on its own sides, a table cut at
-    // its rows where a side ends.
-    after.forEach(function (c) {
-      if (c.rows && c.rows.length > 1) {
-        var start = 0;
+        y += h + gap;
+      };
+      // A table taller than a side, from its row `start`: as many rows as
+      // the room left here holds (at least one where nothing is above it),
+      // then the next side. Returns the row it stops at when the next side
+      // of the form takes the rest, or the table's length when it is done.
+      var flow = function (c, start, from) {
         while (start < c.rows.length) {
-          var room = full - c.chrome - 1;
+          var lim = cur === side ? limit : H;
+          var room = lim - y - shown - c.chrome - 1;
           var take = 0;
           var used = 0;
           while (start + take < c.rows.length && used + c.rows[start + take] <= room) {
             used += c.rows[start + take];
             take++;
           }
-          if (take === 0) {
+          if (!take) {
+            if (y + shown > y0 || lim < H) {
+              // No room for a row here: the next side.
+              if (!last) return start;
+              turn();
+              continue;
+            }
+            // One row taller than a whole side: alone, and over.
             take = 1;
+            used = c.rows[start];
             over = true;
           }
-          var h = Math.min(full, c.chrome + sum(c.rows.slice(start, start + take)));
-          out.push({
-            rows: [
-              { y: top, h: h, cells: [{ id: c.id, size: 'row', h: h, part: { start: start, end: start + take } }] },
-            ],
-            kind: 'after',
-            from: null,
-            head: true,
-          });
+          var h = Math.min(H - y, c.chrome + used);
+          place([{ id: c.id, size: c.size, h: h, part: { start: start, end: start + take } }], h, from);
           start += take;
+          if (start < c.rows.length) {
+            if (!last) return start;
+            turn();
+          }
         }
-      } else {
-        over = true;
-        out.push({
-          rows: [{ y: top, h: full, cells: [{ id: c.id, size: 'row', h: full }] }],
-          kind: 'after',
-          from: null,
-          head: true,
-        });
+        return start;
+      };
+      for (var i = 0; i < queue.length; i++) {
+        var r = queue[i];
+        if (r.resume) {
+          // A table begun on an earlier side goes on at the top of this one.
+          var at = flow(r.resume, r.start, r.from);
+          if (at < r.resume.rows.length) {
+            carry = [{ resume: r.resume, start: at, from: r.from }].concat(queue.slice(i + 1));
+            break;
+          }
+          continue;
+        }
+        if (!r.live.length) {
+          // Nothing to print: the row keeps its place at no height, so the
+          // canvas can still show and select the block.
+          var none = {
+            y: y,
+            h: 0,
+            empty: true,
+            cells: r.cells.map(function (c) {
+              return { id: c.id, size: c.size, h: 0 };
+            }),
+          };
+          if (r.from !== s) none.carried = true;
+          cur.rows.push(none);
+          shown += EMPTY_PX + gap;
+          continue;
+        }
+        // Fits a side: under the line, or where it is on the Front.
+        var fits = function (h) {
+          return h <= full || (cur === side && s === 0 && y + h <= limit);
+        };
+        var from = r.from;
+        var tables = [];
+        if (!fits(r.h)) {
+          // Taller than a whole side. A table starts here and goes on side
+          // by side; anything else prints after the report. A short partner
+          // stays where it is, alone in the row, above the table.
+          var short = [];
+          r.live.forEach(function (c) {
+            if (fits(c.px)) short.push(c);
+            else if (isTable(c)) tables.push(c);
+            else after.push(c);
+          });
+          r = short.length ? rowOf(short, from) : null;
+        }
+        var lim = cur === side ? limit : H;
+        var lone = !!r && r.live.length === 1 && isTable(r.live[0]);
+        if (lone && y + shown + r.h > lim && (y + shown > y0 || cur === side)) {
+          // A table that fits a side but not the room left here goes whole
+          // onto the next side of the form (the Back), and the rows after
+          // it with it; past the last side, whole onto a continued side. One
+          // taller than a side (it fit the Front but for the Studio's boxes),
+          // or moved once and still too long for the room there (above a
+          // docked block), starts here and goes on.
+          if (r.moved || r.h > full) {
+            tables.push(r.live[0]);
+            r = null;
+          } else if (!last) {
+            r.moved = true;
+            carry = [r].concat(queue.slice(i + 1));
+            break;
+          } else turn();
+        }
+        if (r) {
+          // (A side with only a docked block above the limit continues
+          // too: nothing fits above the block.)
+          if (y + r.h > lim && (y > y0 || cur === side)) turn();
+          place(
+            r.live.map(function (c) {
+              return { id: c.id, size: c.size, h: r.h };
+            }),
+            r.h,
+            from,
+          );
+        }
+        for (var t = 0; t < tables.length && !carry.length; t++) {
+          var stop = flow(tables[t], 0, from);
+          if (stop < tables[t].rows.length) {
+            carry = [{ resume: tables[t], start: stop, from: from }]
+              .concat(
+                tables.slice(t + 1).map(function (c) {
+                  return { resume: c, start: 0, from: from };
+                }),
+              )
+              .concat(queue.slice(i + 1));
+          }
+        }
+        if (carry.length) break;
       }
+      // What follows goes on the next side, so nothing more fits on this one.
+      if (carry.length) side.passed = true;
+    });
+    // After the report: each held block alone on a side of its own.
+    after.forEach(function (c) {
+      over = true;
+      out.push({
+        rows: [{ y: top, h: full, cells: [{ id: c.id, size: 'row', h: full }] }],
+        kind: 'after',
+        from: null,
+        head: true,
+      });
     });
     return {
       sides: out,
@@ -1509,6 +1602,7 @@ window.ReportSheets = (function () {
     Array.prototype.forEach.call(stage.children, function (el, i) {
       var c = cells[i];
       c.px = c.html ? el.offsetHeight : 0;
+      if (c.html && BLOCKS[c.cell.block].gradeRows) return _measureGradeRows(el, c);
       if (!c.html || !BLOCKS[c.cell.block].table) return;
       var tbody = el.querySelector('table tbody');
       if (!tbody || tbody.rows.length < 2) return;
@@ -1524,6 +1618,91 @@ window.ReportSheets = (function () {
       });
       c.chrome = Math.max(0, c.px - (bottom - tops[0]));
     });
+  }
+
+  /* Assignment Grades is rows of divs in one column or two, not a table:
+     each row's height is the distance to the next item's top in its
+     column, a group's heading counted with the row under it; the last
+     reaches the column's bottom. chrome is the rest of the block, plus
+     room for the one heading a part may add ("March (continued)"), so a
+     part laid out from these heights is never taller than it is said to
+     be. In two columns the rows' sum is about twice the table's height,
+     so a part takes no more than a side holds. */
+  function _measureGradeRows(el, c) {
+    var cols = el.querySelectorAll('.report-grades-col');
+    var rows = [];
+    var headMax = 0;
+    var top = Infinity;
+    var bottom = -Infinity;
+    Array.prototype.forEach.call(cols, function (col) {
+      var box = col.getBoundingClientRect();
+      top = Math.min(top, box.top);
+      bottom = Math.max(bottom, box.bottom);
+      var kids = col.children;
+      var carry = 0;
+      for (var k = 0; k < kids.length; k++) {
+        var from = k === 0 ? box.top : kids[k].getBoundingClientRect().top;
+        var to = k + 1 < kids.length ? kids[k + 1].getBoundingClientRect().top : box.bottom;
+        if (kids[k].classList.contains('report-grades-head')) {
+          carry += to - from;
+          headMax = Math.max(headMax, to - from);
+        } else {
+          rows.push(to - from + carry);
+          carry = 0;
+        }
+      }
+    });
+    if (rows.length < 2) return;
+    c.rows = rows;
+    c.chrome = Math.max(0, c.px - (bottom - top)) + headMax;
+  }
+
+  /* Assignment Grades with only rows [start, end): the groups those rows
+     are in, laid out again as the whole table is (ReportBlocks.
+     gradeColumnsHtml); a group begun on an earlier part carries on under
+     its name with "(continued)", as a group the column split cuts does. */
+  function _gradesPartHtml(html, start, end) {
+    var tpl = document.createElement('div');
+    // html-safe: html is one cell from _cellHtml (ReportBlocks.renderReportBlock), parsed in a detached div
+    tpl.innerHTML = html;
+    var cols = tpl.querySelectorAll('.report-grades-col');
+    if (!cols.length) return html;
+    var one = !tpl.querySelector('.report-grades-cols');
+    var body = one ? cols[0] : tpl.querySelector('.report-grades-cols');
+    var entries = [];
+    Array.prototype.forEach.call(cols, function (col) {
+      var head = null;
+      Array.prototype.forEach.call(col.children, function (k) {
+        if (k.classList.contains('report-grades-head')) {
+          var name = k.firstElementChild ? k.firstElementChild.textContent : '';
+          var grade = k.querySelector('.report-grades-headgrade');
+          head = { base: name.replace(/\s*\(continued\)$/, ''), grade: grade ? grade.textContent : '' };
+        } else if (k.classList.contains('report-grades-row') && head) {
+          var prev = entries[entries.length - 1];
+          entries.push({ head: head, base: head.base, first: !prev || prev.base !== head.base, html: k.outerHTML });
+        }
+      });
+    });
+    var groups = [];
+    entries.slice(start, end).forEach(function (e) {
+      var g = groups[groups.length - 1];
+      if (g && g.base === e.base) return g.rows.push(e.html);
+      groups.push({
+        base: e.base,
+        name: e.first ? e.base : e.base + ' (continued)',
+        grade: e.first ? e.head.grade : '',
+        rows: [e.html],
+      });
+    });
+    var fresh = document.createElement('div');
+    // html-safe: gradeColumnsHtml esc()s each name and grade; the rows are this cell's own rows, already escaped
+    fresh.innerHTML = ReportBlocks.gradeColumnsHtml(groups, one);
+    body.replaceWith(fresh.firstElementChild);
+    if (start > 0) {
+      var title = tpl.querySelector('.report-block-title');
+      if (title) title.textContent = title.textContent.replace(/\s*\(continued\)$/, '') + ' (continued)';
+    }
+    return tpl.innerHTML;
   }
 
   /* ── Sheets ─────────────────────────────────────────────────── */
@@ -1548,7 +1727,10 @@ window.ReportSheets = (function () {
   /* A placed cell. A block left off this student's report keeps its place
      as an empty cell (nothing prints), so the Studio can still select it. */
   function _cellTag(c, html, off, rowH) {
-    if (c.part) html = _partHtml(html, c.part.start, c.part.end, c.part.start > 0);
+    if (c.part)
+      html = (BLOCKS[c.id] || {}).gradeRows
+        ? _gradesPartHtml(html, c.part.start, c.part.end)
+        : _partHtml(html, c.part.start, c.part.end, c.part.start > 0);
     var def = BLOCKS[c.id] || {};
     return (
       '<div class="sheet-cell' +
@@ -1576,6 +1758,7 @@ window.ReportSheets = (function () {
       '<div class="sheet-row' +
       (extra || '') +
       (row.empty ? ' sheet-row-empty' : '') +
+      (row.carried ? ' sheet-row-carried' : '') +
       '" style="min-height:' +
       row.h +
       'px">' +
@@ -1704,7 +1887,7 @@ window.ReportSheets = (function () {
       var contd = r.sides.some(function (x) {
         return x.kind === 'continued' && x.from === s;
       });
-      return contd ? 0 : Math.max(0, limit - bottom - (last ? GAP : 0));
+      return contd || side.passed ? 0 : Math.max(0, limit - bottom - (last ? GAP : 0));
     });
     var labelOf = function (id) {
       return BLOCKS[id] ? BLOCKS[id].label : id;

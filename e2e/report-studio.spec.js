@@ -49,7 +49,7 @@ async function openFresh(page) {
 
 /* The Studio on the Report Card starter, on the longest report. These
    tests were written for an Assignment Grades table that fits the Back:
-   Demo Mode's 37 assessments, year to date in one column (the defaults),
+   Demo Mode's assessments, year to date in one column (the defaults),
    run to a second sheet, so it is set to This Term, two columns, by
    category (shortGradeTable). The defaults have their own test. */
 async function openStudio(page) {
@@ -137,9 +137,11 @@ async function overlapping(page) {
 }
 
 /* The rows of a side as "block" or "a+b" strings. */
+/* The blocks a stored side holds, row by row. A row carried onto it from
+   an earlier side (the rest of a table that went on) is that side's. */
 async function rowsOf(page, side) {
   return page
-    .locator(`.sheet-zoom[data-side="${side}"] .sheet-row`)
+    .locator(`.sheet-zoom[data-side="${side}"] .sheet-row:not(.sheet-row-carried)`)
     .evaluateAll(rows =>
       rows.map(r =>
         [...r.querySelectorAll('.sheet-cell')]
@@ -214,7 +216,15 @@ test.describe('Page Studio', () => {
     await openFresh(page);
     await expect(page.locator('.studio-blk.placed')).toHaveCount(1);
     await expect(page.locator('.studio-blk.placed')).toHaveAttribute('data-block', 'grade-table');
-    await expect(page.locator('.sheet-body .sheet-cell[data-block]')).toHaveCount(2);
+    // The name and the grade table, and nothing else. A long list of
+    // assessments continues the table onto more sides, a cell each, so
+    // this counts the blocks drawn, not the cells.
+    await expect(page.locator('.sheet-body .sheet-cell[data-block="header"]')).toHaveCount(1);
+    await expect(page.locator('.sheet-body .sheet-cell[data-block="grade-table"]').first()).toBeVisible();
+    const blocks = await page
+      .locator('.sheet-body .sheet-cell[data-block]')
+      .evaluateAll(cells => [...new Set(cells.map(c => c.dataset.block))]);
+    expect(blocks).toEqual(['header', 'grade-table']);
     await expect(page.locator('.report-grades-cols')).toHaveCount(0);
   });
 
@@ -610,7 +620,7 @@ test.describe('Page Studio', () => {
     await expect(page.locator('.studio-view [data-view="all"]')).toHaveAttribute('aria-checked', 'true');
     await expect(page.locator('.report-sheet.sheet-overflow')).toHaveCount(0);
     // The Report Card again, with Assignment Grades at its defaults (year to
-    // date, one column): Demo Mode's 37 assessments take a second sheet.
+    // date, one column): Demo Mode's 38 assessments take a second sheet.
     await applyTemplate(page, 'report-card');
     await expect(page.locator('.report-sheet')).toHaveCount(STUDENTS * 4, { timeout: 30_000 });
   });
@@ -1117,12 +1127,16 @@ test.describe('Page Studio', () => {
     await expect(
       palette(page).locator('.studio-tpl[data-starter="interim-update"] .studio-tpl-side .report-sheet'),
     ).toHaveCount(2);
+    // The grade table as the Report Card draws it: one part a side it takes.
+    const grades = page.locator('#rb-preview .report-sheet .report-grades');
+    await expect(grades.first()).toBeVisible();
+    const parts = await grades.count();
     await palette(page).getByRole('button', { name: 'Interim Update', exact: true }).click();
-    await expect(page.locator('#rb-preview .report-sheet .report-grades')).toHaveCount(0);
+    await expect(grades).toHaveCount(0);
     await expect(page.getByRole('radio', { name: 'Front Only' })).toHaveAttribute('aria-checked', 'true');
     await expect(page.locator('#undo-toast')).toContainText('Applied Interim Update');
     await undo(page).click();
-    await expect(page.locator('#rb-preview .report-sheet .report-grades')).toHaveCount(1);
+    await expect(grades).toHaveCount(parts);
     await expect(page.getByRole('radio', { name: 'Front and Back' })).toHaveAttribute('aria-checked', 'true');
   });
 
@@ -1309,19 +1323,29 @@ test.describe('Hands on the page', () => {
     page,
   }) => {
     await openStudio(page);
-    // Fill the Front past full: the grades move up from the Back.
+    // Fill the Front past full: the grades move up from the Back. With no
+    // room under the Front's blocks they go whole onto the Back, ahead of
+    // its own blocks, not onto a side of their own.
     await cellOf(page, 'grade-table').click();
     await bar(page).getByRole('button', { name: 'Move to Front' }).click();
-    expect(await rowsOf(page, 1)).not.toContain('grade-table');
-    // Next Steps has no room there: dropped on the Front, it goes to the Back.
+    await expect(
+      page.locator('.sheet-zoom[data-side="1"] .sheet-row-carried .sheet-cell[data-block="grade-table"]'),
+    ).toHaveCount(1);
+    await expect(page.locator('.sheet-zoom[data-from]')).toHaveCount(0);
+    expect(await rowsOf(page, 1)).toEqual(['self-assessment', 'parent-response']);
+    // Room on the Back for Next Steps.
+    await cellOf(page, 'self-assessment').click();
+    await bar(page).getByRole('button', { name: 'Remove' }).click();
+    expect(await rowsOf(page, 1)).toEqual(['parent-response']);
+    // Next Steps has no room on the Front: dropped there, it goes to the Back.
     const from = await center(page.locator('[data-action="studioBlock"][data-block="next-steps"]'));
     await dragStart(page, from, await gapAbove(page, 'legend'));
     await page.mouse.up();
     expect(await rowsOf(page, 0)).not.toContain('next-steps');
-    expect(await rowsOf(page, 1)).toEqual(['self-assessment', 'next-steps', 'parent-response']);
+    expect(await rowsOf(page, 1)).toEqual(['next-steps', 'parent-response']);
     await expect(page.locator('#undo-toast')).toContainText('Added Next Steps to the Back. The Front is full');
     await undo(page).click();
-    expect(await rowsOf(page, 1)).toEqual(['self-assessment', 'parent-response']);
+    expect(await rowsOf(page, 1)).toEqual(['parent-response']);
   });
 
   test('holding the pointer on a block in the palette shows it at print size for the previewed student', async ({
