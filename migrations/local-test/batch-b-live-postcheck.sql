@@ -40,7 +40,7 @@ with tested(fn, md5) as (values
     ('public.set_course_send_work(uuid,jsonb,uuid)',                                        '694863746b03f4be25263a5107f5b02e'),
     ('public.set_assessment_student_work(uuid,jsonb,uuid)',                                 'c58c518c44d32262b3713753b7aaac1f'),
     ('public.list_course_submissions(uuid)',                                                '8703f5ddc09b3c8dc92aa70878b5d7b1'),
-    ('public.start_work_upload(uuid,uuid,jsonb,text,uuid)',                                 'ef4590b75c38b428fcdb81b92a2407f3'),
+    ('public.start_work_upload(uuid,uuid,jsonb,text,uuid)',                                 'aa86a41467680581f47ab2f5da4f54a2'),
     ('public.finish_work_upload(uuid,jsonb,uuid)',                                          'd62a6e550d7535f123f58b17cfe838f2'),
     ('public.mark_handed_in_paper(uuid,uuid[],uuid)',                                       '1a966bceb2e46eb59107e2753e731bd4'),
     ('public.delete_submission(uuid,uuid)',                                                 '7da38ac3304aaf2f9639877b3fd0f81a'),

@@ -1060,6 +1060,12 @@ def scen_race():
         ok("the student's finish and the teacher's Add Work for the same piece at once: one is handed in, the other is told already_sent, never two",
            waited and f['ok'] and g == {'result': 'already_sent'} and d.one("select count(*) from submission where state = 'sent'") == 1 and sound(d) == '', (f, g))
         clear()
+        same = nid()
+        start = lambda x: x.rpc('start_work_upload(:a, :e, :p::jsonb, :m, :k)', a=a, e=ENR1, p='[{}]', m='new', k=same)
+        waited, t1, t2 = second_waits(start, start)
+        ok("the teacher's same Add Work request sent twice at once: the second waits and is given the first's answer; one upload, not two",
+           waited and t1['result'] == 'ready' and t2 == t1 and d.one('select count(*) from submission') == 1, (t1, t2))
+        clear()
 
         # ── A send against its assessment being deleted ─────────────────
         def new_assessment():

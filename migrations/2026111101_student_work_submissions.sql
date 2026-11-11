@@ -358,7 +358,7 @@ begin
             ('public.set_course_send_work(uuid,jsonb,uuid)',                                        '694863746b03f4be25263a5107f5b02e'),
             ('public.set_assessment_student_work(uuid,jsonb,uuid)',                                 'c58c518c44d32262b3713753b7aaac1f'),
             ('public.list_course_submissions(uuid)',                                                '8703f5ddc09b3c8dc92aa70878b5d7b1'),
-            ('public.start_work_upload(uuid,uuid,jsonb,text,uuid)',                                 'ef4590b75c38b428fcdb81b92a2407f3'),
+            ('public.start_work_upload(uuid,uuid,jsonb,text,uuid)',                                 'aa86a41467680581f47ab2f5da4f54a2'),
             ('public.finish_work_upload(uuid,jsonb,uuid)',                                          'd62a6e550d7535f123f58b17cfe838f2'),
             ('public.mark_handed_in_paper(uuid,uuid[],uuid)',                                       '1a966bceb2e46eb59107e2753e731bd4'),
             ('public.delete_submission(uuid,uuid)',                                                 '7da38ac3304aaf2f9639877b3fd0f81a'),
@@ -587,8 +587,8 @@ revoke all on sequence public.submission_file_removal_id_seq from public, anon, 
 revoke all on table student_submit.send_log from public, anon, authenticated;
 revoke all on sequence student_submit.send_log_id_seq from public, anon, authenticated;
 
--- ── 5. Triggers ─────────────────────────────────────────────────────────────
--- The bucket, in one place.
+-- ── 5. Triggers, and two things they use ────────────────────────────────────
+-- The bucket's name, in one place.
 create or replace function public._work_bucket()
  returns text
  language sql
@@ -1161,10 +1161,12 @@ begin
         raise exception 'mode must be new, add or replace' using errcode = '22023';
     end if;
     perform _work_check_pages(p_pages);
-    _cached := fv_idem_check(p_idempotency_key, 'start_work_upload');
-    if _cached is not null then return _cached; end if;
 
     perform _grade_return_lock_first(_course);
+    -- Asked under the lock: the same request sent twice at once waits here,
+    -- and the second is answered as a repeat of the first.
+    _cached := fv_idem_check(p_idempotency_key, 'start_work_upload');
+    if _cached is not null then return _cached; end if;
     if not exists (select 1 from assessment a where a.id = p_assessment_id)
        or not exists (select 1 from enrollment e where e.id = p_enrollment_id and e.withdrawn_at is null) then
         -- deleted while this call waited for the class
@@ -2071,7 +2073,7 @@ begin
             ('public.set_course_send_work(uuid,jsonb,uuid)',                                        '694863746b03f4be25263a5107f5b02e'),
             ('public.set_assessment_student_work(uuid,jsonb,uuid)',                                 'c58c518c44d32262b3713753b7aaac1f'),
             ('public.list_course_submissions(uuid)',                                                '8703f5ddc09b3c8dc92aa70878b5d7b1'),
-            ('public.start_work_upload(uuid,uuid,jsonb,text,uuid)',                                 'ef4590b75c38b428fcdb81b92a2407f3'),
+            ('public.start_work_upload(uuid,uuid,jsonb,text,uuid)',                                 'aa86a41467680581f47ab2f5da4f54a2'),
             ('public.finish_work_upload(uuid,jsonb,uuid)',                                          'd62a6e550d7535f123f58b17cfe838f2'),
             ('public.mark_handed_in_paper(uuid,uuid[],uuid)',                                       '1a966bceb2e46eb59107e2753e731bd4'),
             ('public.delete_submission(uuid,uuid)',                                                 '7da38ac3304aaf2f9639877b3fd0f81a'),
