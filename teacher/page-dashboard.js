@@ -410,6 +410,9 @@ window.PageDashboard = (function () {
     });
     obsHighlight = _lastObsState.highlight;
 
+    // Questions From Students (S10-F4): only while a class has one waiting.
+    html += Overview.questionsCardHtml(cid);
+
     /* -- Students: cards or the grid -- */
     if (focusCol && allStudents.length)
       html += Overview.compFilterHtml(cid, focusCol, _belowIds(cid, allStudents, focusCol));
@@ -1074,6 +1077,19 @@ window.PageDashboard = (function () {
   }
 
   /* ── Delegated click handler ────────────────────────────── */
+  /* Answer in the Grader: the grader on the student's piece, that student
+     only. Closing it draws the dashboard again, so an answered question
+     leaves the card, if the dashboard is still the page shown. */
+  function _answerInGrader(cid, aid, sid) {
+    if (!cid || !aid || !sid || !window.PageAssignments || !PageAssignments.openGrader) return;
+    PageAssignments.openGrader(cid, aid, sid, {
+      studentIds: [sid],
+      onClose: function () {
+        if (document.querySelector('#main .dash-glance')) render();
+      },
+    });
+  }
+
   function _handleClick(e) {
     // A click outside the open segment list closes it.
     if (mixPop && !e.target.closest('#dash-mix-pop, .dash-mix-seg')) _closeMixPop();
@@ -1089,6 +1105,10 @@ window.PageDashboard = (function () {
 
     // Dashboard-only actions
     var handlers = {
+      // Questions From Students (S10-F4): the grader on that student's piece.
+      dashAnswerQuestion: function () {
+        _answerInGrader(el.dataset.cid, el.dataset.aid, el.dataset.sid);
+      },
       goToStudent: function () {
         // The competency tiles open Competencies, the observation line Evidence.
         var part = e.target.closest('[data-student-tab]');

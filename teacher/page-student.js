@@ -749,6 +749,14 @@ window.PageStudent = (function () {
       stat: _plural(goalCount, 'Goal', 'Goals'),
       sub: lastWords ? 'Last answer ' + LearnerProfile.day(lastWords) : 'No answers yet',
     };
+    // Reflect on Feedback (S10-F4): the reflections, and a question to answer.
+    var fb = LearnerProfile.feedbackOf(cid, studentId);
+    if (fb && fb.list.length) {
+      out.profile.stat = _plural(fb.list.length, 'Reflection', 'Reflections');
+      out.profile.sub = fb.waiting
+        ? _plural(fb.waiting, 'question to answer', 'questions to answer')
+        : 'Last reflection ' + LearnerProfile.day(fb.list[0].sent_at);
+    }
     return out;
   }
 
@@ -3203,11 +3211,15 @@ window.PageStudent = (function () {
         ctx.sections.filter(function (sec) {
           return !!(goals[sec.id] || '').trim();
         }).length,
+      // Reflect on Feedback (S10-F4), or null while it is off.
+      feedback: LearnerProfile.feedbackOf(cid, studentId),
     };
     return (
       '<div class="lp-layout"><aside class="lp-aside">' +
       LearnerProfile.idCardHtml(o) +
+      LearnerProfile.feedbackAsideHtml(o) +
       '</aside><div class="lp-main">' +
+      LearnerProfile.feedbackHtml(o) +
       LearnerProfile.aboutHtml(o) +
       '<section class="qw-sec" id="lp-goals" aria-labelledby="lp-goals-h"><div class="qw-head"><h2 id="lp-goals-h">Goals</h2></div>' +
       LearnerProfile.courseGoalHtml(o) +
@@ -3224,6 +3236,27 @@ window.PageStudent = (function () {
       _coreSelfHtml(ctx, true) +
       '</section></div></div>'
     );
+  }
+
+  /* Answer in the Grader: the grader on this student's piece, this student
+     only. Closing it draws the profile again, so an answered question
+     clears here, if this student's Learner Profile is still the page shown. */
+  function _answerInGrader(aid) {
+    var cid = activeCourse;
+    var sid = studentId;
+    if (!aid || !window.PageAssignments || !PageAssignments.openGrader) return;
+    PageAssignments.openGrader(cid, aid, sid, {
+      studentIds: [sid],
+      onClose: function () {
+        if (
+          activeCourse === cid &&
+          studentId === sid &&
+          _tab === 'profile' &&
+          document.querySelector('#main .lp-layout')
+        )
+          render();
+      },
+    });
   }
 
   function _saveCoreSelf(coreId, clear) {
@@ -3762,6 +3795,14 @@ window.PageStudent = (function () {
       },
       editGoal: function () {
         editGoal(el.dataset.secid);
+      },
+      // Reflections on Feedback (S10-F4): its filter, and the grader on a question.
+      lpFeedbackFilter: function () {
+        LearnerProfile.setFeedbackFilter(el.dataset.filter);
+        render();
+      },
+      lpAnswerInGrader: function () {
+        _answerInGrader(el.dataset.aid);
       },
       lpJump: function () {
         var to = document.getElementById(el.dataset.target);

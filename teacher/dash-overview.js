@@ -225,8 +225,10 @@ window.DashOverview = (function () {
   function toGradeGlanceHtml(cid, studentIds) {
     if (!window.GraderWork || !GraderWork.workOnInClass(cid)) return '';
     var c = GraderWork.classWorkCounts(cid, studentIds);
+    // A question waiting (S10-F4) rides in the same cell: "· 1 Question".
+    var asked = questionsIn(cid).length;
     var parts = [];
-    if (!c.tograde && !c.toreturn) {
+    if (!c.tograde && !c.toreturn && !asked) {
       parts.push('All Caught Up');
       parts.push('<b>' + GraderWork.returnedThisWeek(cid) + '</b> Returned This Week');
     } else {
@@ -238,12 +240,20 @@ window.DashOverview = (function () {
         : 0;
       if (c.tograde && days >= 7)
         parts.push('<span class="dash-glance-old dash-obs-when is-overdue">Oldest ' + days + ' Days</span>');
+      if (asked) parts.push('<b>' + asked + '</b> ' + (asked === 1 ? 'Question' : 'Questions'));
     }
     return (
       '<a class="dash-glance-cell dash-glance-tograde" role="link" tabindex="0" data-href="' +
       esc('/assignments?course=' + (cid || '') + '&show=tograde') +
       '" aria-label="' +
-      esc(c.tograde + ' to grade, ' + c.toreturn + ' not returned: open Assignments') +
+      esc(
+        c.tograde +
+          ' to grade, ' +
+          c.toreturn +
+          ' not returned' +
+          (asked ? ', ' + asked + (asked === 1 ? ' question' : ' questions') : '') +
+          ': open Assignments',
+      ) +
       '">' +
       '<span class="dash-glance-label">To Grade</span>' +
       '<span class="dash-glance-value">' +
@@ -253,6 +263,99 @@ window.DashOverview = (function () {
       parts.join(' · ') +
       '</span></a>'
     );
+  }
+
+  /* ── Questions From Students (S10-F4) ───────────────────────
+     The board "Dashboard, Questions From Students": the questions students
+     asked on Reflect on Feedback and not answered yet, across the teacher's
+     classes, oldest first, each with Answer in the Grader. The list is
+     getQuestionsWaiting (shared/data.js), the one the gradebook's dot and
+     the Learner Profile's "1 question to answer" read, so one answer in the
+     grader clears all three. A question is the student's own words, shown
+     as theirs, exactly. '' (no card) when none is waiting, and in every
+     class whose student page or Reflect on Feedback is off. */
+  function questionsIn(cid) {
+    if (typeof getReflectOnFeedback !== 'function' || !getReflectOnFeedback(cid)) return [];
+    return getQuestionsWaiting(cid);
+  }
+
+  // The question waiting: a follow-up after an answer, or the first one.
+  function _waitingWords(r) {
+    var follow = !!(r.follow_up && !r.follow_up_answer);
+    return {
+      text: follow ? r.follow_up : r.question,
+      at: follow ? r.sense_now_at || r.sent_at : r.sent_at,
+    };
+  }
+
+  // The classes to look in: the one shown first, then the others not archived.
+  function questionsCardHtml(activeCid) {
+    var cids = Object.keys(typeof COURSES === 'object' && COURSES ? COURSES : {}).filter(function (c) {
+      return c !== activeCid && !(typeof isCourseArchived === 'function' && isCourseArchived(c));
+    });
+    if (activeCid) cids.unshift(activeCid);
+    var rows = [];
+    cids.forEach(function (cid) {
+      var students = {};
+      (getStudents(cid) || []).forEach(function (s) {
+        students[s.id] = s;
+      });
+      var pieces = {};
+      (getAssessments(cid) || []).forEach(function (a) {
+        if (a && a.id) pieces[a.id] = a;
+      });
+      questionsIn(cid).forEach(function (r) {
+        var st = students[r.enrollment_id];
+        var a = pieces[r.assessment_id];
+        var w = _waitingWords(r);
+        if (!st || !a || !w.text) return;
+        rows.push({ cid: cid, st: st, a: a, text: w.text, at: String(w.at || '') });
+      });
+    });
+    if (!rows.length) return '';
+    rows.sort(function (x, y) {
+      return x.at < y.at ? -1 : x.at > y.at ? 1 : 0;
+    });
+    var html =
+      '<section class="dash-overview-section dash-questions" id="dash-questions" aria-labelledby="dash-questions-title">' +
+      '<div class="dash-questions-head"><h2 class="dash-section-title" id="dash-questions-title">Questions From Students</h2>' +
+      '<span class="dash-questions-count">' +
+      rows.length +
+      '</span></div>' +
+      '<p class="dash-questions-hint">From Reflect on Feedback, across your classes. You answer in the grader, the same as from the Learner Profile.</p>' +
+      '<ul class="dash-questions-list">';
+    rows.forEach(function (row) {
+      var course = COURSES[row.cid] || {};
+      var day = row.at ? formatShortDate(row.at.slice(0, 10)) : '';
+      var name = displayNameWithLast(row.st);
+      html +=
+        '<li class="dash-questions-row">' +
+        '<span class="dash-questions-av" aria-hidden="true">' +
+        esc(initials(row.st)) +
+        '</span>' +
+        '<div class="dash-questions-body">' +
+        '<div class="dash-questions-name">' +
+        esc(name) +
+        '</div>' +
+        '<div class="dash-questions-meta">' +
+        esc([row.a.title, course.name, day].filter(Boolean).join(' · ')) +
+        '</div>' +
+        '<blockquote class="dash-questions-text">' +
+        esc(row.text) +
+        '</blockquote>' +
+        '</div>' +
+        '<button type="button" class="btn btn-ghost dash-questions-answer" data-action="dashAnswerQuestion" data-cid="' +
+        esc(row.cid) +
+        '" data-aid="' +
+        esc(row.a.id) +
+        '" data-sid="' +
+        esc(row.st.id) +
+        '" aria-label="' +
+        esc('Answer ' + name + ' in the grader') +
+        '">Answer in the Grader</button>' +
+        '</li>';
+    });
+    return html + '</ul></section>';
   }
 
   /* ── Curricular Competencies ────────────────────────────────
@@ -1267,6 +1370,7 @@ window.DashOverview = (function () {
     renderOverviewPanel: renderOverviewPanel,
     obsCardHtml: obsCardHtml,
     glanceHtml: glanceHtml,
+    questionsCardHtml: questionsCardHtml,
     viewMenuHtml: viewMenuHtml,
     competenciesCardHtml: competenciesCardHtml,
     compView: compView,
