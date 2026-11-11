@@ -434,8 +434,10 @@ create table if not exists public.revision_request (
     closed_at     timestamptz,
     constraint revision_request_first_grade_object check (first_grade is null or jsonb_typeof(first_grade) = 'object'),
     constraint revision_request_closed_has_time check ((state = 'open') = (closed_at is null)),
-    -- A hide that is on keeps what the student had, and has not ended.
-    constraint revision_request_hide_kept check (not grade_hidden or (hidden_state is not null and hide_ended_at is null)),
+    -- A hide that is on keeps what the student had, has not ended, and is
+    -- on an open request (so at most one per student and piece, by
+    -- revision_request_one_open).
+    constraint revision_request_hide_kept check (not grade_hidden or (hidden_state is not null and hide_ended_at is null and state = 'open')),
     constraint revision_request_hide_ended_has_time check ((hide_ended_at is null) = (hide_ended_by is null))
 );
 -- One open request per student per piece.

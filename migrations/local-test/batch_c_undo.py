@@ -64,6 +64,10 @@ def undo2_two():
             u = d.undo2()
             ok('undo2 (a) 4 (%s): the undo gives back the grade of the hide that is on now (the 7)' % first,
                u == 'ok' and shown(d, ENR1, lab) == 7, (u, shown(d, ENR1, lab)))
+            ok('undo2 (a) 4 (%s): the old request is left as it was; the hide that was on is marked ended by the undo' % first,
+               req(d, lo if first == 'old request first' else hi) == ['done', False, 'returned']
+               and req(d, hi if first == 'old request first' else lo) == ['open', False, 'undone'],
+               d.all('select id, state, grade_hidden, hide_ended_by from revision_request order by id'))
         finally:
             d.close()
 

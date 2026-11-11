@@ -4,10 +4,14 @@
 -- catalog C1 alone leaves, line for line).
 --
 -- What it does, in order:
---   1. Every grade a revision request is still hiding is given back to its
---      student, exactly as C2's own Take Back gives it (under each class's
---      lock). This writes those students' grade_return rows: it is the
---      reverse of what C2 did to them.
+--   1. Every hide that is on now (grade_hidden: begun and not ended; at
+--      most one per student and piece, on that piece's open request) is
+--      given back to its student, exactly as C2's own Take Back gives it
+--      (under each class's lock), and marked ended by the undo. A hide
+--      that has ended is never read, so an old request can never give back
+--      an old grade, whatever order the requests come in. No mark is given
+--      (Take Back gives none). This writes those students' grade_return
+--      rows: it is the reverse of what C2 did to them.
 --   2. The two triggers on grade_return and their function go: marks are
 --      again given only through return_work, or at once in a class that
 --      does not hold grades.
@@ -34,7 +38,9 @@ declare
 begin
     for _r in select id, course_id from public.revision_request where grade_hidden order by course_id, id loop
         perform public._grade_return_lock_first(_r.course_id);
-        perform public._revision_unhide_grade(_r.id);
+        if public._revision_unhide_grade(_r.id) then
+            update public.revision_request set hide_ended_by = 'undone' where id = _r.id;
+        end if;
     end loop;
 end
 $unhide$;
