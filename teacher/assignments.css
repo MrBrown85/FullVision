@@ -8909,3 +8909,18 @@ button.grader-member-name {
 .cr-ldg-link:hover {
   text-decoration: underline;
 }
+
+/* Class Settings › Student Page: the Send Work row (S5-F1,
+   teacher/cm-student-page.js). Class Settings' own switch row inside the
+   tab's row, which already draws the rule above. Kept here, not in
+   dashboard.css, because the student work settings are this track's. */
+.sp-send .sp-send-row {
+  align-self: stretch;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.sp-send .sp-keep-title {
+  font-size: var(--text-sm);
+  margin-top: 4px;
+}

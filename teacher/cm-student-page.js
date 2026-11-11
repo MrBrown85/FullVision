@@ -19,7 +19,7 @@
    What later PRs add, none of which needs to change dash-class-manager.js:
 
    - S3-F1: the rest of Student Cards (filters, Cards Work Until).
-   - S5-F1: Send Work and Keep Photos Until.
+   - S5-F1: Send Work and Keep Photos Until, in Demo Mode (below).
    - S8-F1: the reminder and the "photos go for good" line on Keep Photos
      Until.
    - Then Reflect on Feedback (S10) and Show My Learning (S13).
@@ -322,6 +322,115 @@ var CmStudentPage = (function () {
     else _askThenMake(cid, 'return', change, 'sp-return-' + value);
   }
 
+  /* ── Send Work and Keep Photos Until (S5-F1) ───────────────────
+     Send Work is the class's switch for students sending photos or files
+     (course.send_work, off), and Keep Photos Until when they are deleted
+     (course.keep_photos_until: End of Year, the default, or End of Term;
+     DECISIONS, Grades, photos and sign-in 5). Keep Photos Until shows only
+     while Send Work is on.
+
+     Demo Mode first: the server's columns come with Batch B, which is not
+     applied. So the two rows are drawn only where nothing is sent (Demo
+     Mode, and the app with no sign-in); for a signed-in teacher they are
+     not drawn at all and nothing is asked of the server. They are kept in
+     the class's settings on this device (send_work, keep_photos_until),
+     read through workSettings. The reminder a week before and the line
+     that photos go for good come with S8-F1. */
+  var KEEP_CHOICES = [
+    { value: 'end_of_term', label: 'End of Term' },
+    { value: 'end_of_year', label: 'End of Year' },
+  ];
+
+  function _sendsNothing() {
+    return !(typeof _writesEnabled === 'function' && _writesEnabled());
+  }
+
+  /* The class's Send Work and Keep Photos Until, as the screens read them:
+     { offered, send_work, keep_photos_until }. `offered` is false where
+     the rows are not drawn (a signed-in teacher, or the student page
+     off), and then send_work is false too: nothing about student work
+     shows anywhere. */
+  function workSettings(cid) {
+    var s = _settings(cid);
+    var offered = !!s && s.student_page === true && _sendsNothing();
+    var cfg = (offered && typeof getCourseConfig === 'function' && getCourseConfig(cid)) || {};
+    return {
+      offered: offered,
+      send_work: offered && cfg.send_work === true,
+      keep_photos_until: cfg.keep_photos_until === 'end_of_term' ? 'end_of_term' : 'end_of_year',
+    };
+  }
+
+  function _saveWork(cid, change) {
+    var cfg = Object.assign({}, getCourseConfig(cid) || {}, change);
+    saveCourseConfig(cid, cfg);
+    _rerender();
+  }
+
+  function _sendWorkRows(cid) {
+    var w = workSettings(cid);
+    if (!w.offered) return '';
+    var keep = w.send_work
+      ? '<div class="sp-row-head">' +
+        '<div class="sp-row-title sp-keep-title" id="sp-keep-label">Keep Photos Until</div>' +
+        '</div>' +
+        '<div class="seg cm-seg" role="radiogroup" aria-labelledby="sp-keep-label" aria-describedby="sp-keep-hint">' +
+        KEEP_CHOICES.map(function (c) {
+          var on = c.value === w.keep_photos_until;
+          return (
+            '<button type="button" class="seg-btn cm-seg-btn' +
+            (on ? ' active' : '') +
+            '" id="sp-keep-' +
+            c.value +
+            '" role="radio" aria-checked="' +
+            on +
+            '" data-action="spKeepPhotos" data-value="' +
+            c.value +
+            '">' +
+            esc(c.label) +
+            '</button>'
+          );
+        }).join('') +
+        '</div>' +
+        '<div class="cm-hint" id="sp-keep-hint">' +
+        esc('Photos are deleted then, for every assignment in this class.') +
+        '</div>'
+      : '';
+    return (
+      '<div class="sp-row sp-send">' +
+      '<div class="cm-recent-limit sp-send-row">' +
+      '<span class="cm-recent-text"><label class="sp-row-title" for="sp-send-switch">Send Work</label>' +
+      '<span class="cm-hint" id="sp-send-hint">' +
+      esc('Students send photos or files for an assignment you set to take student work.') +
+      '</span></span>' +
+      '<span class="gpd-switch"><input type="checkbox" role="switch" id="sp-send-switch" data-action-change="spSendWork" aria-describedby="sp-send-hint"' +
+      (w.send_work ? ' checked' : '') +
+      '><span class="gpd-switch-ui" aria-hidden="true"></span></span>' +
+      '</div>' +
+      keep +
+      '</div>'
+    );
+  }
+
+  function _turnSendWork(cid, el) {
+    if (!cid || !workSettings(cid).offered) return;
+    var on = !!(el && el.checked);
+    if (on === workSettings(cid).send_work) return;
+    _saveWork(cid, { send_work: on });
+    _focus('sp-send-switch');
+  }
+
+  function _chooseKeepPhotos(cid, value) {
+    var w = cid ? workSettings(cid) : null;
+    if (!w || !w.send_work) return;
+    var known = KEEP_CHOICES.some(function (c) {
+      return c.value === value;
+    });
+    if (!known || w.keep_photos_until === value) return;
+    _saveWork(cid, { keep_photos_until: value });
+    _focus('sp-keep-' + value);
+  }
+
   /* ── The build switch ──────────────────────────────────────── */
 
   // The switch's card: only at the build address. The row is Class
@@ -450,6 +559,7 @@ var CmStudentPage = (function () {
           '">' +
           '<h2 class="cm-grade-title">Student Page</h2>' +
           _returnGradesRow(cid) +
+          _sendWorkRows(cid) +
           '</div>' +
           (typeof StudentCards !== 'undefined' ? StudentCards.render(cid) : '') +
           _previewCard(cid)
@@ -468,6 +578,10 @@ var CmStudentPage = (function () {
       _openPreview(_cid(el), el);
       return true;
     }
+    if (action === 'spKeepPhotos') {
+      _chooseKeepPhotos(_cid(el), el && el.dataset ? el.dataset.value : null);
+      return true;
+    }
     if (action !== 'spReturnGrades') return false;
     _chooseReturnGrades(_cid(el), el && el.dataset ? el.dataset.value : null);
     return true;
@@ -482,6 +596,10 @@ var CmStudentPage = (function () {
     if (el && el.dataset && el.dataset.actionChange === 'spPreviewStudent') {
       var on = _cid(el);
       if (on) _previewFor[on] = el.value;
+      return true;
+    }
+    if (el && el.dataset && el.dataset.actionChange === 'spSendWork') {
+      _turnSendWork(_cid(el), el);
       return true;
     }
     if (!el || !el.dataset || el.dataset.actionChange !== 'spBuildSwitch') return false;
@@ -508,6 +626,7 @@ var CmStudentPage = (function () {
   return {
     isShown: isShown,
     render: render,
+    workSettings: workSettings,
     handleAction: handleAction,
     handleChange: handleChange,
     handleBlur: handleBlur,
