@@ -42,6 +42,9 @@ BASE = ['harness.sql', 'score-prelude.sql', 'score-tables.sql', 'bundle-prelude.
 # Statements of a loaded migration that name something this stand-in does not have (the report-issue
 # tables of 20261020, fv_check_reporting_terms) and are left out, by the word that marks them.
 NOT_IN_THE_STAND_IN = {'../20261102_housekeeping_fk_indexes.sql': ('report_issue', 'fv_check_reporting_terms')}
+BATCH_A = ['../2026110901_score_rows_same_class.sql', '../2026110902_grade_return.sql', '../2026110903_student_card.sql',
+           '../2026110904_student_sessions_page.sql']
+LIVE = BASE + BATCH_A + ['../2026111002_security_definer_search_path.sql', '../2026110905_grade_return_limits.sql']
 # student_submit's _norm, check and submit as gradebook-prod has them (md5 of pg_get_functiondef, read
 # from live on 2026-11-10 by the orchestrator, read-only): the three the harness built differently
 # until then. Recorded in live-function-md5.txt, on the lines that start "#student-submit".
