@@ -1,0 +1,330 @@
+"""Does the suite notice when Batch B's SQL is wrong? Each entry below is one
+small change to one of the two files: a check taken out, a limit moved, a
+policy loosened, a lock dropped, a revoke left off. For each, a copy of the
+file with that one change is applied to a fresh copy of the template and
+submissions.py is run against it. A change the suite does not notice is a
+hole in the suite.
+
+    PGDATABASE=<template> python3 submissions_mutate.py            every change
+    PGDATABASE=<template> python3 submissions_mutate.py 7 12       only those (by number)
+
+The changed copy has its fingerprint lists stood aside, so the file's own
+"is every function what I expect" checks do not catch the change for the
+suite: what is being measured is whether a behaviour check fails. (With the
+lists in place every change to a function is caught three more times: by
+the file's last step, by a second run, and by the live post-check.) Two
+entries are caught by the file itself, which refuses to apply; they say so.
+
+It prints one line per change: how many checks failed, and the first.
+
+With BATCH_B_WITH_FIXES=1 the suite runs with the review fixes applied
+after the two files (2026111104). Each change is then made to the fixes'
+copy of a function too, where that copy holds the same text, so a change to
+finish_work_upload, send_finish or unsend lands in the body that is live;
+the fixes' lists are stood aside the same way.
+"""
+import subprocess, tempfile
+from submissions_common import *
+
+FAST = 'teacher student storage grants'
+ALL = FAST + ' race'
+# (what was changed, which file, the text taken out, the text put in, scenarios to run)
+CHANGES = [
+    ('a locked card may send', M1,
+     "    if exists (select 1 from student_card k where k.id = (_in->>'card_id')::uuid and k.locked_at is not null) then\n        return jsonb_build_object('error', 'card_locked');\n    end if;\n    return _in;",
+     "    return _in;", FAST),
+    ("the class's Send Work switch is not asked when a send starts", M1,
+     "    if not _course.send_work then\n        return jsonb_build_object('ok', false, 'error', 'send_off');\n    end if;\n    select * into _a from assessment where id = p_assessment_id and course_id = _course.id;\n    _w := _work_window(_a.id);",
+     "    select * into _a from assessment where id = p_assessment_id and course_id = _course.id;\n    _w := _work_window(_a.id);", FAST),
+    ('an assessment set to take nothing takes work', M1,
+     "    if _a.students_send = 'nothing' then\n        return jsonb_build_object('ok', false, 'error', 'not_taking_work');\n    end if;\n    if _expired then",
+     "    if _expired then", FAST),
+    ("an assessment of another class is taken (the class is not compared)", M1,
+     "    select * into _a from assessment where id = p_assessment_id and course_id = _course.id;\n    _w := _work_window(_a.id);\n    if _a.id is null or not (_w->>'listed')::boolean then",
+     "    select * into _a from assessment where id = p_assessment_id;\n    _w := _work_window(_a.id);\n    if _a.id is null or not (_w->>'listed')::boolean then", FAST),
+    ('Stop after the due date never closes', M1,
+     "when 'stop' then a.due_date is null or d.today <= a.due_date", "when 'stop' then true", FAST),
+    ('Until a date closes a day late', M1,
+     "'open', case a.after_due when 'until' then d.today <= a.accept_until", "'open', case a.after_due when 'until' then d.today <= a.accept_until + 1", FAST),
+    ('an assessment whose date has not come can be sent to', M1,
+     "'listed', a.date_assigned is null or a.date_assigned <= d.today,", "'listed', true,", FAST),
+    ('late is never marked', M1,
+     "'late', a.due_date is not null and d.today > a.due_date)", "'late', false)", FAST),
+    ('the hourly limit is 21', M1, "    if _n >= 20 then", "    if _n >= 21 then", ALL),
+    ('a send is not counted toward the hourly limit', M1, "    insert into send_log (card_id) values (_card);\n", "", ALL),
+    ('the same request again is counted and makes a second send', M1,
+     "    if found then\n        return jsonb_build_object('ok', true, 'replayed', true, 'submission_id', _sub.id, 'state', _sub.state,",
+     "    if false then\n        return jsonb_build_object('ok', true, 'replayed', true, 'submission_id', _sub.id, 'state', _sub.state,", ALL),
+    ("a repeat of the start gives the send its two hours again", M1,
+     "    if found then\n        return jsonb_build_object('ok', true, 'replayed', true, 'submission_id', _sub.id, 'state', _sub.state,",
+     "    if found then\n        update submission set created_at = now() where id = _sub.id and state = 'sending';\n        return jsonb_build_object('ok', true, 'replayed', true, 'submission_id', _sub.id, 'state', _sub.state,", FAST),
+    ('a send can be finished after it has lost its place (more than two hours after its first start)', M1,
+     "    perform public._work_drop_expired(_course.id);\n    if _expired then\n        -- It could be finished for _work_hold",
+     "    if false then\n        -- It could be finished for _work_hold", FAST),
+    ('a send holds its place for three hours, not two', M1, "    select interval '2 hours';", "    select interval '3 hours';", FAST),
+    ("a page's last upload link is counted dead two hours ten after the start, though links are made for two hours after it", M1,
+     "                now() + _work_hold() + interval '2 hours 10 minutes');", "                now() + interval '2 hours 10 minutes');", FAST),
+    ("a start does not clear the class's sends that have lost their place", M1,
+     "    perform public._work_drop_expired(_course.id);\n\n    if not exists (select 1 from enrollment e", "    if not exists (select 1 from enrollment e", FAST),
+    ("the teacher's upload can be finished after it has lost its place", M1,
+     "    perform _work_drop_expired(_course);\n    -- The teacher's own upload, and never a student's unfinished send.\n", "", FAST),
+    ("the teacher's list shows uploads that have lost their place", M1,
+     "             where s.course_id = p_course_id and s.state = 'sending' and s.sent_by = 'teacher'\n               and s.created_at >= now() - _work_hold()), '[]'::jsonb));",
+     "             where s.course_id = p_course_id and s.state = 'sending' and s.sent_by = 'teacher'), '[]'::jsonb));", FAST),
+    ("the student's page shows a send that has lost its place as in progress", M1,
+     "                                    and x.state = 'sending' and x.sent_by = 'student'\n                                    and x.created_at >= now() - public._work_hold() limit 1) u on true",
+     "                                    and x.state = 'sending' and x.sent_by = 'student' limit 1) u on true", FAST),
+    ('whether the piece is still open is not asked again when the work is handed in', M1,
+     "    _w := _work_window(_a.id);\n    if not (_w->>'open')::boolean then\n        return jsonb_build_object('ok', false, 'error', 'work_closed', 'closed_on', _w->'closes_on');\n    end if;\n    if exists (select 1 from jsonb_array_elements(p_files) x",
+     "    _w := _work_window(_a.id);\n    if exists (select 1 from jsonb_array_elements(p_files) x", FAST),
+    ('late is what it was when the send started, not when it is handed in', M1,
+     "           is_late = (_w->>'late')::boolean, sent_at = now(), updated_at = now()", "           sent_at = now(), updated_at = now()", FAST),
+    ("the class's Send Work switch is not asked again when the work is handed in", M1,
+     "    if not _course.send_work then\n        return jsonb_build_object('ok', false, 'error', 'send_off');\n    end if;\n    select * into _a from assessment where id = _sub.assessment_id;",
+     "    select * into _a from assessment where id = _sub.assessment_id;", FAST),
+    ('whether the piece still takes work is not asked again when the work is handed in', M1,
+     "    if _a.students_send = 'nothing' then\n        return jsonb_build_object('ok', false, 'error', 'not_taking_work');\n    end if;\n    _w := _work_window(_a.id);\n    if not (_w->>'open')::boolean then\n        return",
+     "    _w := _work_window(_a.id);\n    if not (_w->>'open')::boolean then\n        return", FAST),
+    ('a draft does not count as grading (only a returned grade does)', M1,
+     "    select coalesce((select g.is_draft or g.returned_at is not null", "    select coalesce((select g.returned_at is not null", FAST),
+    ('Unsend does not ask whether grading has started', M1,
+     "    if _grading_started(p_enrollment_id, _a.id) then\n        return jsonb_build_object('ok', false, 'error', 'grading_started');\n    end if;\n\n    select count(*) filter (where f.added_by = 'student')",
+     "    select count(*) filter (where f.added_by = 'student')", ALL),
+    ('Replace does not ask whether grading has started when it starts', M1,
+     "        if _grading_started(p_enrollment_id, _a.id) then\n            return jsonb_build_object('ok', false, 'error', 'grading_started');\n        end if;\n        -- Pages the teacher added to it stay",
+     "        -- Pages the teacher added to it stay", FAST),
+    ('Replace does not ask whether grading has started when it finishes', M1,
+     "        if _grading_started(p_enrollment_id, _sub.assessment_id) then", "        if false then", ALL),
+    ("a student can unsend work the teacher added", M1,
+     "    if _sent.sent_by <> 'student' then\n        return jsonb_build_object('ok', false, 'error', 'cannot_change');\n    end if;\n    if not _course.send_work then",
+     "    if not _course.send_work then", FAST),
+    ("a student can replace work the teacher added", M1,
+     "        if _sent.sent_by <> 'student' then\n            -- the teacher added it, or marked it handed in on paper\n            return jsonb_build_object('ok', false, 'error', 'cannot_change');\n        end if;\n", "", FAST),
+    ('work is handed in though a page is missing from storage', M1,
+     "    _state := public._work_files_state(_sub.id, p_files);\n    if _state->'missing' <> '[]'::jsonb then\n        return jsonb_build_object('ok', false, 'error', 'missing_pages', 'missing', _state->'missing');",
+     "    _state := public._work_files_state(_sub.id, p_files);\n    if false then\n        return jsonb_build_object('ok', false, 'error', 'missing_pages', 'missing', _state->'missing');", FAST),
+    ("a missing thumbnail is not looked for", M1,
+     "filter (where o.n = 0 or th.n = 0)", "filter (where o.n = 0)", FAST),
+    ("a finish can name another student's send", M1,
+     "     where id = p_submission_id and enrollment_id = p_enrollment_id and course_id = _course.id and sent_by = 'student'\n       for update;",
+     "     where id = p_submission_id and course_id = _course.id and sent_by = 'student'\n       for update;", FAST),
+    ("file_links gives every student's pages for the piece", M1,
+     "             where s.assessment_id = p_assessment_id and s.enrollment_id = p_enrollment_id\n               and s.course_id = (_in->>'course_id')::uuid and s.state = 'sent'), '[]'::jsonb));",
+     "             where s.assessment_id = p_assessment_id\n               and s.course_id = (_in->>'course_id')::uuid and s.state = 'sent'), '[]'::jsonb));", FAST),
+    ('Unsend does not take the class lock', M1,
+     "    -- The lock a grade's save takes. An Unsend and the first level saved for\n    -- the piece take turns: whichever is second sees what the first did.\n    perform public._grade_return_lock_first((_in->>'course_id')::uuid);\n",
+     "", 'race'),
+    ('a send does not take the class lock when it starts', M1,
+     "    perform public._grade_return_lock_first((_in->>'course_id')::uuid);\n    select * into _course from course where id = (_in->>'course_id')::uuid;\n\n    -- Is this a repeat of a send",
+     "    select * into _course from course where id = (_in->>'course_id')::uuid;\n\n    -- Is this a repeat of a send", 'race'),
+    ('a deleted page queues no file', M1,
+     "    insert into submission_file_removal (bucket, path, course_id, reason, link_dies_at)\n    select _work_bucket(), p, fv_private.work_path_course(p), _why, old.link_dies_at\n      from unnest(array[old.path, old.thumb_path]) p\n    on conflict (bucket, path) do nothing;\n    return null;",
+     "    return null;", FAST),
+    ("a deleted page queues its photo and not its thumbnail", M1, "      from unnest(array[old.path, old.thumb_path]) p", "      from unnest(array[old.path]) p", FAST),
+    ("an assessment's submissions are not deleted with it", M1,
+     "    else\n        delete from submission where assessment_id = old.id;\n    end if;\n    return null;", "    end if;\n    return null;", FAST + ' race'),
+    ('removal_done believes the caller without looking in storage', M1,
+     "       and not exists (select 1 from public._work_object(r.path));", "       ;", FAST),
+    ("a removed file whose upload link is alive is finished with at once", M1, "       set removed_at = now(), done = now() >= r.link_dies_at", "       set removed_at = now(), done = true", FAST),
+    ("a teacher may upload to a path named for a student's send", M1,
+     "                      and s.state = 'sending' and s.sent_by = 'teacher'\n                      and s.created_at >= now() - _work_hold()", "                      and s.state = 'sending'\n                      and s.created_at >= now() - _work_hold()", FAST),
+    ('a teacher may upload to the path of an upload that is finished', M1,
+     "                      and s.state = 'sending' and s.sent_by = 'teacher'\n                      and s.created_at >= now() - _work_hold()", "                      and s.sent_by = 'teacher'\n                      and s.created_at >= now() - _work_hold()", FAST),
+    ("any teacher may upload to another teacher's pending path", M1,
+     "                      and s.created_at >= now() - _work_hold()\n                      and fv_owns_course(s.course_id));", "                      and s.created_at >= now() - _work_hold());", FAST),
+    ("a teacher may go on uploading to an upload that has lost its place", M1,
+     "                      and s.created_at >= now() - _work_hold()\n                      and fv_owns_course(s.course_id));", "                      and fv_owns_course(s.course_id));", FAST),
+    ("any signed-in teacher may read any class's files", M1,
+     "                      and (s.state = 'sent' or s.sent_by = 'teacher')\n                      and fv_owns_course(s.course_id));",
+     "                      and (s.state = 'sent' or s.sent_by = 'teacher'));", FAST),
+    ("a teacher may read the pages of a send a student has not finished", M1,
+     "                      and (s.state = 'sent' or s.sent_by = 'teacher')\n                      and fv_owns_course(s.course_id));",
+     "                      and fv_owns_course(s.course_id));", FAST),
+    ("a teacher may read any file under their class's folder, its row gone or not (a file a student unsent, until the worker runs)", M1,
+     "    select (select auth.uid()) is not null\n       and exists (select 1\n                     from submission_file f\n                     join submission s on s.id = f.submission_id\n                    where (f.path = p_name or f.thumb_path = p_name)\n                      and (s.state = 'sent' or s.sent_by = 'teacher')\n                      and fv_owns_course(s.course_id));",
+     "    select coalesce(fv_owns_course(fv_private.work_path_course(p_name)), false);", FAST),
+    ("Add Work does not check the student is the teacher's", M1,
+     "    if not fv_owns_enrollment(p_enrollment_id)\n       or not exists (select 1 from enrollment e\n                       where e.id = p_enrollment_id and e.course_id = _course and e.withdrawn_at is null) then",
+     "    if not exists (select 1 from enrollment e\n                       where e.id = p_enrollment_id and e.withdrawn_at is null) then", FAST),
+    ("list_course_submissions does not check the class is the teacher's", M1,
+     "    if not fv_owns_course(p_course_id) then\n        raise exception 'course not found' using errcode = 'P0002';\n    end if;\n    return jsonb_build_object(\n        'bucket', _work_bucket(),",
+     "    return jsonb_build_object(\n        'bucket', _work_bucket(),", FAST),
+    ("delete_submission does not check the class is the teacher's", M1,
+     "    select count(*) into _pages from submission_file f join submission s on s.id = f.submission_id\n     where s.id = p_submission_id and s.course_id = _course and",
+     "    select s.course_id into _course from submission s where s.id = p_submission_id;\n    select count(*) into _pages from submission_file f join submission s on s.id = f.submission_id\n     where s.id = p_submission_id and s.course_id = _course and", FAST),
+    ("finish_work_upload does not check the class is the teacher's", M1,
+     "    perform _work_check_files(p_files);\n    select s.course_id into _course from submission s where s.id = p_submission_id and fv_owns_course(s.course_id);",
+     "    perform _work_check_files(p_files);\n    select s.course_id into _course from submission s where s.id = p_submission_id;", FAST),
+    ("a patch to a class's settings also resets the one it does not name", M1,
+     "       set send_work = case when p_patch ? 'send_work' then (p_patch->>'send_work')::boolean else send_work end,",
+     "       set send_work = coalesce((p_patch->>'send_work')::boolean, false),", FAST),
+    ('the same idempotency key again runs the upload start a second time', M1,
+     "    _cached := fv_idem_check(p_idempotency_key, 'start_work_upload');\n    if _cached is not null then return _cached; end if;\n", "", FAST),
+    ('a helper is left runnable by whoever the defaults allow', M1,
+     "revoke all on function public._work_object(text) from public, anon, authenticated, service_role;\n", "", 'grants'),
+    ('a student function is left runnable by whoever the defaults allow', M1,
+     "revoke all on function student_submit.unsend(text, uuid, uuid, text) from public, anon, authenticated;\n", "", 'grants'),
+    ('the two tables are left readable by whoever the defaults allow', M1,
+     "revoke all on table public.submission, public.submission_file from public, anon, authenticated;\n", "", 'grants'),
+    # For the three tables in public, leaving this statement out changes nothing: the database's own event trigger
+    # (ensure_rls, which gradebook-prod has too) turns row security on for every new table there. The send count is
+    # in student_submit, where nothing else would.
+    ('row security is not turned on for the send count', M1, "alter table student_submit.send_log enable row level security;\n", "", 'grants'),
+    ('one function loses pg_temp from its search_path (the file refuses itself)', M1,
+     "create or replace function public.delete_submission(p_submission_id uuid, p_idempotency_key uuid default null)\n returns jsonb\n language plpgsql\n security definer\n set search_path to 'public', 'pg_temp'",
+     "create or replace function public.delete_submission(p_submission_id uuid, p_idempotency_key uuid default null)\n returns jsonb\n language plpgsql\n security definer\n set search_path to 'public'", 'teacher'),
+    ('the bucket is public (the file refuses itself)', M2,
+     "values ('student-photos', 'student-photos', false, 2097152, array['image/jpeg'])", "values ('student-photos', 'student-photos', true, 2097152, array['image/jpeg'])", 'storage'),
+    ('the read policy drops the ownership check', M2,
+     "    using (bucket_id = 'student-photos' and fv_private.work_read_allowed(name));", "    using (bucket_id = 'student-photos');", 'storage'),
+    ('the upload policy drops the named-path check', M2,
+     "    with check (bucket_id = 'student-photos' and fv_private.work_upload_allowed(name));", "    with check (bucket_id = 'student-photos');", 'storage'),
+    ('the fence lets a signed-in teacher through', M2,
+     "    using (bucket_id is distinct from 'student-photos' or fv_private.work_read_allowed(name))\n    with check (bucket_id is distinct from 'student-photos' or fv_private.work_upload_allowed(name));",
+     "    using (true)\n    with check (true);", 'storage'),
+    ('the teachers-only policy lets every role through', M2,
+     "    using (bucket_id is distinct from 'student-photos' or current_user = 'authenticated')\n    with check (bucket_id is distinct from 'student-photos' or current_user = 'authenticated');",
+     "    using (true)\n    with check (true);", 'storage'),
+    ('the read policy is for every role, not signed-in teachers', M2,
+     "create policy fv_student_photos_read on storage.objects\n    for select to authenticated", "create policy fv_student_photos_read on storage.objects\n    for select to public", 'storage'),
+
+    # ── Who added a page ──
+    ("a student's Unsend removes the pages the teacher added too", M1,
+     "    if _kept = 0 then\n        delete from submission where id = _sent.id;", "    if true then\n        delete from submission where id = _sent.id;", FAST),
+    ("a student's Replace removes the pages the teacher added too", M1,
+     "                  from submission_file t where t.submission_id = _target.id and t.added_by = 'teacher') x\n         where f.id = x.id;\n        -- Let go",
+     "                  from submission_file t where t.submission_id = _target.id and false) x\n         where f.id = x.id;\n        -- Let go", FAST),
+    ("a page the teacher adds is marked as the student's", M1,
+     "(_p.x->>'height')::int, p_sent_by,", "(_p.x->>'height')::int, 'student',", FAST),
+    ("a Replace need not fit in 30 pages with the teacher's that stay", M1,
+     "        if _theirs + jsonb_array_length(p_pages) > 30 then", "        if false then", FAST),
+    # ── What a class may hold ──
+    ("a student's send is not held to what the class may hold", M1,
+     "    if _full is not null then\n        return jsonb_build_object('ok', false, 'error', 'class_full');", "    if false then\n        return jsonb_build_object('ok', false, 'error', 'class_full');", FAST),
+    ("the teacher's Add Work is not held to what the class may hold", M1,
+     "    if _full is not null then\n        return jsonb_build_object('result', 'class_full') || _full;", "    if false then\n        return jsonb_build_object('result', 'class_full') || _full;", FAST),
+    ("a class's limit counts pages and not bytes", M1,
+     "u.pages + n.pages > _work_class_max_pages() or u.bytes + n.bytes > _work_class_max_bytes()", "u.pages + n.pages > _work_class_max_pages()", FAST),
+    ("a class's limit does not count pages that are not handed in yet", M1,
+     "             where s.course_id = p_course_id) u,", "             where s.course_id = p_course_id and s.state = 'sent') u,", FAST),
+    ("a class may hold 10,001 pages", M1, "    select 10000;", "    select 10001;", FAST),
+    ("a file larger than its sender said is taken", M1,
+     "                            or o.bytes > f.declared_bytes or th.bytes > f.declared_thumb_bytes\n", "", FAST),
+    # ── The remembered answer is asked for under the class lock ──
+    ("finish_work_upload asks for its remembered answer before it has the class", M1,
+     "    select s.course_id into _course from submission s where s.id = p_submission_id and fv_owns_course(s.course_id);\n    if _course is not null then\n        perform _grade_return_lock_first(_course);\n    end if;\n    -- Asked under the lock (when there is a class to lock): the same request\n    -- sent twice at once waits above, and the second is answered as a repeat.\n    _cached := fv_idem_check(p_idempotency_key, 'finish_work_upload');\n    if _cached is not null then return _cached; end if;\n",
+     "    _cached := fv_idem_check(p_idempotency_key, 'finish_work_upload');\n    if _cached is not null then return _cached; end if;\n    select s.course_id into _course from submission s where s.id = p_submission_id and fv_owns_course(s.course_id);\n    if _course is not null then\n        perform _grade_return_lock_first(_course);\n    end if;\n", 'race'),
+    ("mark_handed_in_paper asks for its remembered answer before it has the class", M1,
+     "    perform _grade_return_lock_first(_course);\n    -- Asked under the lock: the same request sent twice at once waits above,\n    -- and the second is answered as a repeat of the first.\n    _cached := fv_idem_check(p_idempotency_key, 'mark_handed_in_paper');\n    if _cached is not null then return _cached; end if;\n",
+     "    _cached := fv_idem_check(p_idempotency_key, 'mark_handed_in_paper');\n    if _cached is not null then return _cached; end if;\n    perform _grade_return_lock_first(_course);\n", 'race'),
+    ("delete_submission asks for its remembered answer before it has the class", M1,
+     "    select s.course_id into _course from submission s where s.id = p_submission_id and fv_owns_course(s.course_id);\n    if _course is not null then\n        perform _grade_return_lock_first(_course);\n    end if;\n    -- Asked under the lock (when there is a class to lock): the same request\n    -- sent twice at once waits above, and the second is answered as a repeat.\n    _cached := fv_idem_check(p_idempotency_key, 'delete_submission');\n    if _cached is not null then return _cached; end if;\n",
+     "    _cached := fv_idem_check(p_idempotency_key, 'delete_submission');\n    if _cached is not null then return _cached; end if;\n    select s.course_id into _course from submission s where s.id = p_submission_id and fv_owns_course(s.course_id);\n    if _course is not null then\n        perform _grade_return_lock_first(_course);\n    end if;\n", 'race'),
+    ("rotate_submission_page asks for its remembered answer before it has the class", M1,
+     "    if _course is not null then\n        perform _grade_return_lock_first(_course);\n    end if;\n    -- Asked under the lock (when there is a class to lock): the same request\n    -- sent twice at once waits above, and the second is answered as a repeat.\n    _cached := fv_idem_check(p_idempotency_key, 'rotate_submission_page');\n    if _cached is not null then return _cached; end if;\n",
+     "    _cached := fv_idem_check(p_idempotency_key, 'rotate_submission_page');\n    if _cached is not null then return _cached; end if;\n    if _course is not null then\n        perform _grade_return_lock_first(_course);\n    end if;\n", 'race'),
+    ("start_work_upload asks for its remembered answer before it has the class", M1,
+     "    perform _grade_return_lock_first(_course);\n    -- Asked under the lock: the same request sent twice at once waits here,\n    -- and the second is answered as a repeat of the first.\n    _cached := fv_idem_check(p_idempotency_key, 'start_work_upload');\n    if _cached is not null then return _cached; end if;\n",
+     "    _cached := fv_idem_check(p_idempotency_key, 'start_work_upload');\n    if _cached is not null then return _cached; end if;\n    perform _grade_return_lock_first(_course);\n", 'race'),
+    # (fv_idem_check itself makes two calls with one key take turns, so the answers come out the same either
+    # way. What these five changes break is the ORDER of the two locks, the class and then the key, which the
+    # race scenario reads from pg_locks while the second call waits.)
+    # ── Storage as gradebook-prod has it ──
+    ("an archived old version of a file counts as the file being there", M1, "       and o.archived_at is null\n", "", 'storage'),
+    ("a marker that says the file was deleted counts as the file being there", M1, "       and not o.is_delete_marker\n", "", 'storage'),
+    ("the index the trigger on assessment deletes by is not made", M1,
+     "create index if not exists submission_assessment_idx on public.submission (assessment_id);\n", "", 'scale'),
+    ("the second file's first check does not ask whether an existing bucket keeps old versions", M2,
+     "                  or _b.allowed_mime_types is distinct from array['image/jpeg']\n                  or _b.versioning_status is distinct from 'DISABLED') then",
+     "                  or _b.allowed_mime_types is distinct from array['image/jpeg']) then", 'storage'),
+    ("the second file's last step does not ask whether the bucket it made keeps old versions", M2,
+     " or _b.versioning_status is distinct from 'DISABLED' then\n        raise exception 'the bucket student-photos is not private",
+     " then\n        raise exception 'the bucket student-photos is not private", 'storage'),
+    # ── What the review found the suite did not notice (its R numbers), and the rest of its list ──
+    ("R1 permanently deleting a student leaves their submissions", M1,
+     "    if tg_table_name = 'enrollment' then\n        delete from submission where enrollment_id = old.id;\n    else",
+     "    if tg_table_name = 'enrollment' then\n        null;\n    else", FAST),
+    ("R2 an unfinished send is not dropped with the work it was to replace", M1,
+     "begin\n    delete from submission where target_id = old.id;\n    return null;", "begin\n    return null;", ALL),
+    ("R3 a thumbnail that is not a JPEG is accepted", M1,
+     "                            or o.mimetype <> 'image/jpeg' or th.mimetype <> 'image/jpeg')), '[]'::jsonb))",
+     "                            or o.mimetype <> 'image/jpeg')), '[]'::jsonb))", FAST),
+    ("R4 the student's page shows whether ANY student has sent the piece", M1,
+     "                                  where x.assessment_id = a.id and x.enrollment_id = p_enrollment_id and x.state = 'sent'\n                                  order by x.version desc limit 1) s on true",
+     "                                  where x.assessment_id = a.id and x.state = 'sent'\n                                  order by x.version desc limit 1) s on true", FAST),
+    ("R5 a teacher's finish_work_upload can hand in a student's unfinished send", M1,
+     "    select * into _sub from submission where id = p_submission_id and sent_by = 'teacher' for update;",
+     "    select * into _sub from submission where id = p_submission_id for update;", FAST),
+    ("R6 a teacher's delete_submission can delete a student's unfinished send", M1,
+     "    delete from submission s\n     where s.id = p_submission_id and s.course_id = _course and (s.state = 'sent' or s.sent_by = 'teacher');",
+     "    delete from submission s\n     where s.id = p_submission_id and s.course_id = _course;", FAST),
+    ("R7 any teacher can turn any teacher's page", M1,
+     "     where f.id = p_file_id and fv_owns_course(s.course_id);", "     where f.id = p_file_id;", FAST),
+    ("R8 Unsend is allowed after the piece has closed", M1,
+     "    if not (_w->>'open')::boolean then\n        -- Unsent now, it could not be sent again.\n        return jsonb_build_object('ok', false, 'error', 'work_closed', 'closed_on', _w->'closes_on');\n    end if;\n", "", FAST),
+    ("R9 the teacher's list shows students' unfinished sends as handed in", M1,
+     "              from submission s where s.course_id = p_course_id and s.state = 'sent'), '[]'::jsonb),",
+     "              from submission s where s.course_id = p_course_id), '[]'::jsonb),", FAST),
+    ("R11 a student withdrawn while their send waited for the class can still start it", M1,
+     "    if not exists (select 1 from enrollment e\n                    where e.id = p_enrollment_id and e.course_id = _course.id and e.withdrawn_at is null) then\n        return jsonb_build_object('ok', false, 'error', 'not_found');\n    end if;\n    if not _course.send_work then\n        return jsonb_build_object('ok', false, 'error', 'send_off');\n    end if;\n    select * into _a from assessment where id = p_assessment_id and course_id = _course.id;",
+     "    if not _course.send_work then\n        return jsonb_build_object('ok', false, 'error', 'send_off');\n    end if;\n    select * into _a from assessment where id = p_assessment_id and course_id = _course.id;", 'race'),
+    ("R12 Handed In on Paper marks a withdrawn student", M1,
+     "         where e.id = any (coalesce(p_enrollment_ids, '{}')) and e.course_id = _course and e.withdrawn_at is null\n           and not exists",
+     "         where e.id = any (coalesce(p_enrollment_ids, '{}')) and e.course_id = _course\n           and not exists", FAST),
+    ("R13 accept_until may be before the due date", M1,
+     "    if _after = 'until' and _a.due_date is not null and _until < _a.due_date then\n        raise exception 'accept_until is before the due date' using errcode = '22023';\n    end if;\n", "", FAST),
+    ("R14 the fence's write side is open, its read side kept", M2,
+     "    with check (bucket_id is distinct from 'student-photos' or fv_private.work_upload_allowed(name));", "    with check (true);", 'storage'),
+    ("R15 the removal queue never offers a file again after its link has died", M1,
+     "             where not r.done and (r.removed_at is null or r.link_dies_at <= now())\n             order by",
+     "             where not r.done and r.removed_at is null\n             order by", FAST),
+    ("R16 the trigger on assessment and enrollment does not take the class lock", M1,
+     "begin\n    perform _grade_return_lock(old.course_id);\n    if tg_table_name = 'enrollment' then", "begin\n    if tg_table_name = 'enrollment' then", 'race'),
+    ("R17 file_links also gives the pages of a send that is not finished", M1,
+     "               and s.course_id = (_in->>'course_id')::uuid and s.state = 'sent'), '[]'::jsonb));",
+     "               and s.course_id = (_in->>'course_id')::uuid), '[]'::jsonb));", FAST),
+    ("R18 the removal queue is left open to the service role", M1,
+     "revoke all on table public.submission_file_removal from public, anon, authenticated, service_role;",
+     "revoke all on table public.submission_file_removal from public, anon, authenticated;", 'grants'),
+    ("R19 a storage-policy function is left runnable by anon", M1,
+     "revoke all on function fv_private.work_read_allowed(text) from public, anon;\n", "", 'grants'),
+    ("R20 a submission may change its student after it is made", M1,
+     "            raise exception 'a submission keeps its student, assessment and class' using errcode = '23514';", "            null;", FAST),
+]
+
+# With the fixes applied: the same change in the fixes' copy where its text there differs (the fix put
+# lines inside the text the change matches).
+IN_FIXES = {"a student's Unsend removes the pages the teacher added too":
+            ("    if _kept = 0 then\n        -- An Add as More Pages", "    if true then\n        -- An Add as More Pages")}
+
+def neutral(text):
+    return MARK.sub(lambda m: m.group(1) + "            ('public.no_such_function_at_all()', 'absent')" + m.group(3), text)
+
+if __name__ == '__main__':
+    wanted = [int(a) for a in sys.argv[1:]]
+    unnoticed = []; tmp = tempfile.mkdtemp(prefix='batch-b-mutate-')
+    texts = {M1: text_of(M1), M2: text_of(M2)}
+    for n, (label, which, old, new, scenarios) in enumerate(CHANGES, 1):
+        if wanted and n not in wanted: continue
+        if texts[which].count(old) != 1:
+            print('%2d  CANNOT MAKE THIS CHANGE (its text is in the file %d times): %s' % (n, texts[which].count(old), label)); unnoticed.append(n); continue
+        paths = {}
+        for f in (M1, M2):
+            # M2's guard compares the three policy functions with its list; stood aside like the rest.
+            body = neutral(texts[f].replace(old, new) if f == which else texts[f])
+            paths[f] = os.path.join(tmp, os.path.basename(f)); open(paths[f], 'w').write(body)
+        env = dict(os.environ, BATCH_B_M1=paths[M1], BATCH_B_M2=paths[M2]); ported = False
+        if WITH_FIXES:
+            ft = text_of(FIXES); fo, fn_ = IN_FIXES.get(label, (old, new)); ported = ft.count(fo) == 1 and which == M1
+            env['BATCH_B_FIXES_FILE'] = os.path.join(tmp, 'fixes.sql')
+            open(env['BATCH_B_FIXES_FILE'], 'w').write(neutral(ft.replace(fo, fn_) if ported else ft))
+        r = subprocess.run([sys.executable, os.path.join(HERE, 'submissions.py')] + scenarios.split(), capture_output=True, text=True, cwd=HERE, env=env)
+        fails = [l[5:].split(' :: ')[0] for l in r.stdout.splitlines() if l.startswith('FAIL ')]
+        crashed = r.returncode != 0 and not fails
+        if ported: label += '  [made in the fixes\' copy too]'
+        if fails: print('%2d  noticed by %3d checks  %s\n      first: %s' % (n, len(fails), label, fails[0][:170]))
+        elif crashed: print('%2d  noticed: the suite stopped  %s\n      %s' % (n, label, (r.stderr.strip().splitlines() or ['?'])[-1][:170]))
+        else: print('%2d  NOT NOTICED  %s' % (n, label)); unnoticed.append(n)
+        sys.stdout.flush()
+    print('%d changes, %d not noticed%s' % (len(wanted) or len(CHANGES), len(unnoticed), ': ' + ', '.join(map(str, unnoticed)) if unnoticed else ''))
+    sys.exit(1 if unnoticed else 0)

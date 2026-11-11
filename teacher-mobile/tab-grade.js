@@ -390,7 +390,8 @@ window.MGrade = (function () {
 
     // html-safe: the title and category go through MC.esc; ids are ours; counts are numbers; dateStr is a date
     function _workRowHtml(cid, a, dateStr, graded, total, pct, shown) {
-      var waiting = MGradePhotos.toGrade(cid, a).length;
+      // GraderWork's counts (grade-photos.js): a group graded together is one to grade.
+      var waiting = MGradePhotos.toGradeCount(cid, a);
       var out = MGradePhotos.notIn(cid, a).length;
       var takes = MGradePhotos.takes(cid, a);
       var meta = [];
@@ -515,7 +516,7 @@ window.MGrade = (function () {
           (waiting.length
             ? item(
                 ' data-only="tograde"',
-                'Grade the ' + waiting.length + ' Waiting',
+                'Grade the ' + MGradePhotos.toGradeCount(cid, a) + ' Waiting',
                 firstSt ? 'Starts with ' + displayNameWithLast(firstSt) : '',
               )
             : '') +
@@ -1640,8 +1641,7 @@ window.MGrade = (function () {
         var currentClass = idx === 0 ? ' m-thumb-current' : '';
         var gradedClass = isGraded ? ' m-thumb-graded' : '';
         // Work sent: a camera on the student's circle (S7-F2).
-        if (!unit.view && MGradePhotos.takes(cid, assessment) && MGradePhotos.submission(cid, st.id, aid))
-          gradedClass += ' m-thumb-work';
+        if (MGradePhotos.hasWork(cid, assessment, st, unit)) gradedClass += ' m-thumb-work';
         // A real button with the student's (or group's) name, so it can be
         // reached with Tab and read aloud.
         var thumbName = unit.view ? unit.view.label : displayNameWithLast(st);

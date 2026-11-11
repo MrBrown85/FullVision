@@ -288,6 +288,36 @@ window.DashOverview = (function () {
     };
   }
 
+  /* S8-F1: the one-week reminder before the class's photos of student work
+     are deleted, at the top of its Dashboard. CmStudentPage owns when it
+     shows, its words and Dismiss; '' when it does not show. */
+  function photoReminderHtml(cid) {
+    if (typeof CmStudentPage === 'undefined' || !CmStudentPage.photoReminderHtml) return '';
+    return CmStudentPage.photoReminderHtml(cid, 'dash');
+  }
+
+  /* Dismiss, kept on this device for the class and the date it was
+     dismissed for (a new date brings the reminder back). Sign-out clears
+     it with the other fv- keys. Where storage is blocked it lasts this
+     visit only. */
+  var PHOTO_DISMISSED_KEY = 'fv-photo-reminder-dismissed:';
+  var _photoDismissedHere = {};
+  function photoReminderDismissed(cid) {
+    if (_photoDismissedHere[cid]) return _photoDismissedHere[cid];
+    try {
+      return localStorage.getItem(PHOTO_DISMISSED_KEY + cid);
+    } catch (e) {
+      return null;
+    }
+  }
+  function dismissPhotoReminder(cid, date) {
+    try {
+      localStorage.setItem(PHOTO_DISMISSED_KEY + cid, date);
+    } catch (e) {
+      _photoDismissedHere[cid] = date;
+    }
+  }
+
   // The classes to look in: the one shown first, then the others not archived.
   function questionsCardHtml(activeCid) {
     var cids = Object.keys(typeof COURSES === 'object' && COURSES ? COURSES : {}).filter(function (c) {
@@ -1371,6 +1401,9 @@ window.DashOverview = (function () {
     obsCardHtml: obsCardHtml,
     glanceHtml: glanceHtml,
     questionsCardHtml: questionsCardHtml,
+    photoReminderHtml: photoReminderHtml,
+    photoReminderDismissed: photoReminderDismissed,
+    dismissPhotoReminder: dismissPhotoReminder,
     viewMenuHtml: viewMenuHtml,
     competenciesCardHtml: competenciesCardHtml,
     compView: compView,

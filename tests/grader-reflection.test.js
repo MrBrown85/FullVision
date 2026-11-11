@@ -279,8 +279,11 @@ describe('Save as Observation', () => {
     expect(obs[0]).toMatchObject({
       text: "Plan after Letter: “Next time I'll find all three reasons first.” Went well: “My letter had a strong voice.”",
       sentiment: 'note',
+      // Marked as from a reflection: never offered to a report (ruling 110).
+      context: 'reflection',
       assignmentContext: { assessmentId: PIECE, assessmentTitle: 'Letter' },
     });
+    expect(isReflectionObservation(obs[0])).toBe(true);
     const b = card(overlay).querySelector('[data-grader="reflect-observe"]');
     expect(b.textContent).toBe('Saved as Observation');
     expect(b.disabled).toBe(true);

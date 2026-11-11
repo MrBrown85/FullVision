@@ -126,10 +126,6 @@
       null
     );
   }
-  function teacherOf() {
-    var v = view();
-    return String((v && v.course && v.course.teacherName) || '').trim();
-  }
   function objectUrl(blob) {
     try {
       var u = blob && typeof URL !== 'undefined' && URL.createObjectURL ? URL.createObjectURL(blob) : '';
@@ -514,7 +510,8 @@
     var p = pieceOf(q.id);
     if (!p || !p.send || !p.send.sent) return '';
     var sent = p.send.sent;
-    var teacher = teacherOf() || 'your teacher';
+    // The page never names the teacher (Colin's ruling 112).
+    var teacher = 'your teacher';
     var mine = sent.pages - sent.teacherPages;
     var photos = mine === 1 ? 'Your photo is' : 'Your ' + mine + ' photos are';
     var title;
@@ -671,7 +668,7 @@
   }
 
   // Check and Send, and Sending Late (the boards): the pages, Add Page or File, the note, Send.
-  function checkHtml(send, p, teacher) {
+  function checkHtml(send, p) {
     var n = send.pages.length;
     var late = p.send.lateNow;
     var accept = acceptFor(p);
@@ -704,7 +701,7 @@
             '</p></div>') +
       planAskHtml(send, p) +
       '<label class="sp-send-note-label" for="sp-send-note">' +
-      esc('Note for ' + (teacher || 'Your Teacher')) +
+      'Note for Your Teacher' +
       '</label><textarea id="sp-send-note" class="sp-send-note" maxlength="' +
       NOTE_MAX +
       '" rows="3">' +
@@ -720,14 +717,14 @@
     );
   }
 
-  // Blurry Photo, Retake (the board's words; "Mr. Brown" is the teacher's name as sent).
-  function blurryHtml(send, p, teacher) {
+  // Blurry Photo, Retake (the board's words, with "your teacher" for "Mr. Brown": ruling 112).
+  function blurryHtml(send, p) {
     var i = -1;
     send.pages.forEach(function (pg, k) {
       if (pg.key === send.blurryKey) i = k;
     });
     var pg = send.pages[i];
-    if (!pg) return checkHtml(send, p, teacher);
+    if (!pg) return checkHtml(send, p);
     return (
       '<header class="sp-send-head"><button type="button" class="sp-btn sp-btn-quiet sp-btn-small" data-act="send-blur-cancel">Cancel</button>' +
       '<div class="sp-send-head-words"><span class="sp-send-head-piece">' +
@@ -741,7 +738,7 @@
       esc('Page ' + (i + 1) + ', blurry') +
       '">' +
       '<section class="sp-send-panel"><h1 class="sp-send-title" id="sp-send-blurry-title" tabindex="-1">This photo looks blurry</h1><p class="sp-send-line">' +
-      esc((teacher || 'Your teacher') + ' may not be able to read it. Hold the phone still, right above the page.') +
+      'Your teacher may not be able to read it. Hold the phone still, right above the page.' +
       '</p><div class="sp-send-row">' +
       pickHtml('Retake', 'sp-btn-primary', 'image/*', { capture: true, retake: pg.key }) +
       '<button type="button" class="sp-btn sp-btn-tint" data-act="send-blur-keep">Use It Anyway</button></div></section>'
@@ -752,10 +749,10 @@
      are sent, the rest is still on this phone, and the send can be finished
      until two hours after it started. Ruling 17: Try Again or Remove the
      Page. */
-  function failedHtml(send, p, teacher) {
+  function failedHtml(send, p) {
     var i = send.failed;
     var n = i + 1;
-    var who = teacher || 'Your teacher';
+    var who = 'Your teacher';
     var up = [];
     var waiting = [];
     send.pages.forEach(function (pg, k) {
@@ -787,7 +784,7 @@
       '">' +
       esc('Remove Page ' + n) +
       '</button></div><p class="sp-send-hint">' +
-      esc('If it keeps failing, show ' + (teacher || 'your teacher') + ' this screen.') +
+      'If it keeps failing, show your teacher this screen.' +
       '</p>'
     );
   }
@@ -818,11 +815,11 @@
     );
   }
 
-  // Sent (the board's words; "Sent to Mr. Brown" names the teacher as sent).
-  function sentHtml(send, p, teacher) {
+  // Sent (the board's words, with "Your Teacher" for "Mr. Brown": ruling 112).
+  function sentHtml(send, p) {
     return (
       '<section class="sp-send-center"><span class="sp-send-tick" aria-hidden="true">✓</span><h1 class="sp-send-title" id="sp-send-title" tabindex="-1">' +
-      esc('Sent to ' + (teacher || 'Your Teacher')) +
+      'Sent to Your Teacher' +
       '</h1><p class="sp-send-piece">' +
       esc(p.title) +
       '</p>' +
@@ -844,19 +841,18 @@
     if (!p || !p.send) {
       return '<main class="sp-main sp-main-center"><p class="sp-lead" role="status">Opening your page…</p></main>';
     }
-    var teacher = teacherOf();
     var body =
       send.step === 'sent'
-        ? sentHtml(send, p, teacher)
+        ? sentHtml(send, p)
         : send.step === 'notsent'
           ? notSentHtml(send)
           : send.step === 'pagefailed'
-            ? failedHtml(send, p, teacher)
+            ? failedHtml(send, p)
             : send.step === 'expired'
               ? expiredHtml(send, p)
               : send.step === 'blurry'
-                ? blurryHtml(send, p, teacher)
-                : checkHtml(send, p, teacher);
+                ? blurryHtml(send, p)
+                : checkHtml(send, p);
     return (
       '<main class="sp-main sp-send">' +
       body +

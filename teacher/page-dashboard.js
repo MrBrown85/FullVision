@@ -383,7 +383,9 @@ window.PageDashboard = (function () {
     });
 
     /* -- Overview Panel -- */
-    var html = '';
+    // The photo reminder (S8-F1) first: only in the week before the class's
+    // photos are deleted.
+    var html = Overview.photoReminderHtml(cid);
     html += Overview.renderOverviewPanel({
       cid: cid,
       sections: sections,
@@ -1105,6 +1107,28 @@ window.PageDashboard = (function () {
 
     // Dashboard-only actions
     var handlers = {
+      // The photo reminder (S8-F1): Class Settings › Student Page at Keep
+      // Photos Until, or Dismiss for this class and date.
+      dashPhotoReminderChange: function () {
+        var cid = el.dataset.cid;
+        if (!cid || cid !== activeCourse) return;
+        openClassManager('student-page', cid);
+        CmStudentPage.focusKeepPhotos(cid);
+        // Class Settings draws again as the classes finish loading, which
+        // drops the focus: give it back once, if Class Settings is still on
+        // this class and nothing else has taken the focus.
+        setTimeout(function () {
+          var lost = !document.activeElement || document.activeElement === document.body;
+          var here = CM.classManagerOpen && document.querySelector('.sp-card[data-cid="' + CSS.escape(cid) + '"]');
+          if (lost && here) CmStudentPage.focusKeepPhotos(cid);
+        }, 0);
+      },
+      dashPhotoReminderDismiss: function () {
+        var cid = el.dataset.cid;
+        if (!cid || cid !== activeCourse) return;
+        CmStudentPage.dismissPhotoReminder(cid, el.dataset.date);
+        render();
+      },
       // Questions From Students (S10-F4): the grader on that student's piece.
       dashAnswerQuestion: function () {
         _answerInGrader(el.dataset.cid, el.dataset.aid, el.dataset.sid);

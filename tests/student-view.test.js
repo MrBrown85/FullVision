@@ -196,6 +196,15 @@ function cellOf(w) {
 
 const HELD = { student_page_enabled: true, return_grades: 'on_return' };
 
+/* What Preview draws from: the server's page with no piece's seen_at,
+   updated_at or previous, so a teacher never learns what the student has
+   opened (Colin's ruling 116; shared/student-view.js, unopened). */
+function unopened(page) {
+  const out = JSON.parse(JSON.stringify(page));
+  out.assessments.forEach(a => Object.assign(a, { updated_at: null, seen_at: null, previous: null }));
+  return out;
+}
+
 function seed(gradingSystem, working, rows) {
   working = working || WORKING;
   rows = rows || ROWS;
@@ -297,7 +306,6 @@ function serverPage(gradingSystem) {
       block: 'B',
       grading_system: gradingSystem,
       grading_scale: getGradingScale(CID),
-      teacher_name: TEACHER,
     },
     tags: {
       t1: {
@@ -455,7 +463,8 @@ describe.each(STYLES)('a %s class: the page from the cache is the page from the 
   it('what the page draws is the same, every result worked out by calc.js', () => {
     const cache = StudentView.fromCache(CID, S1);
     expect(cache.ready).toBe(true);
-    const phone = side.view(serverPage(system));
+    // Preview draws the page as a student who has opened nothing sees it (ruling 116).
+    const phone = side.view(unopened(serverPage(system)));
     expect(cache.view).toEqual(phone);
   });
 
@@ -499,9 +508,15 @@ describe.each(STYLES)('a %s class: the page from the cache is the page from the 
       percent: formatPointsPercent(8, 10),
       bar: 80,
     });
-    expect(by['a-quick'].updated).toBe(true);
+    // Preview: no Updated mark, and every returned piece unopened, whatever
+    // the student has opened (ruling 116). The student's own page still
+    // marks them: below, the same reply drawn by the phone.
+    expect(by['a-quick'].updated).toBe(false);
     expect(by['a-contract'].result.text).toBe('Complete');
-    expect(by['a-contract'].unseen).toBe(false);
+    expect(by['a-contract'].unseen).toBe(true);
+    const own = Object.fromEntries(side.view(serverPage(system)).work.map(p => [p.id, p]));
+    expect(own['a-quick'].updated).toBe(true);
+    expect(own['a-contract'].unseen).toBe(false);
     // A draft over a returned grade: the returned grade, its comment and ticks.
     expect(by['a-reflect'].comment).toBe('Good start.');
     expect(by['a-reflect'].competencies.map(c => c.level)).toEqual([3]);
@@ -521,7 +536,13 @@ describe.each(STYLES)('a %s class: the page from the cache is the page from the 
     expect(by['a-late']).toMatchObject({ kind: 'back', late: true });
     expect(by['a-overall'].result.kind).toBe('level');
     expect(view.counts).toEqual({ toDo: 2, sent: 0, back: 8, missing: 1 });
-    expect(view.changes.map(c => [c.id, c.why]).sort()).toEqual(
+    // What Changed, on the student's own page: what they have not opened, and the update.
+    expect(
+      side
+        .view(serverPage(system))
+        .changes.map(c => [c.id, c.why])
+        .sort(),
+    ).toEqual(
       [
         ['a-lab', 'back'],
         ['a-late', 'back'],
@@ -530,6 +551,13 @@ describe.each(STYLES)('a %s class: the page from the cache is the page from the 
         ['a-quick', 'updated'],
         ['a-reflect', 'back'],
       ].sort(),
+    );
+    // In Preview: every returned piece, as if none were opened (ruling 116).
+    expect(view.changes.map(c => [c.id, c.why]).sort()).toEqual(
+      ['a-contract', 'a-essay', 'a-lab', 'a-late', 'a-micro', 'a-overall', 'a-quick', 'a-reflect'].map(id => [
+        id,
+        'back',
+      ]),
     );
   });
 });
@@ -892,6 +920,7 @@ function asShown(grade, work) {
 }
 
 describe('every state the SQL triggers also run: the page gives what the file says', () => {
+  let side;
   afterAll(() => clearClass(CASE_CID));
 
   SUITE.cases
@@ -902,9 +931,13 @@ describe('every state the SQL triggers also run: the page gives what the file sa
         runCase(c, (want, sid, state, at) => {
           if (!('student' in want) && !('previous' in want) && !('status' in want)) return;
           seedCase(c.work, state);
+          // The server's page, field for field (StudentView.reply), drawn
+          // as the student's own page draws it: Preview hides Updated
+          // (ruling 116), the student's page does not.
           const out = StudentView.fromCache(CASE_CID, sid);
           expect(out.ready, 'step ' + at).toBe(true);
-          const piece = out.reply.assessments.find(x => x.id === CASE_AID);
+          const sent = StudentView.reply(CASE_CID, sid);
+          const piece = sent.assessments.find(x => x.id === CASE_AID);
           if ('student' in want)
             expect(asShown(piece.grade, c.work), 'step ' + at + ': the grade given').toEqual(
               asShown(want.student, c.work),
@@ -915,7 +948,8 @@ describe('every state the SQL triggers also run: the page gives what the file sa
             );
           if ('status' in want) expect(piece.status, 'step ' + at + ': the status').toBe(want.status);
           // Marked Updated only where the file says the page marks it.
-          const drawn = out.view.work.find(p => p.id === CASE_AID);
+          const drawn = (side = side || studentSide()).view(sent).work.find(p => p.id === CASE_AID);
+          expect(out.view.work.find(p => p.id === CASE_AID).updated, 'step ' + at + ': Preview').toBe(false);
           if (drawn.updated) expect(want.updated, 'step ' + at + ': Updated').toBe(true);
           // Nothing the student is not given is drawn: no result without a grade.
           if (!piece.grade) expect(drawn.result.kind, 'step ' + at).toBe('none');
@@ -1056,7 +1090,6 @@ describe('shared/student-view.js reads grades only through the seam', () => {
 // The same reply with the nine keys taken out: what a phone gets until the function passes them.
 function withoutNew(reply) {
   const out = JSON.parse(JSON.stringify(reply));
-  delete out.course.teacher_name;
   (out.classes || []).forEach(c => delete c.to_do);
   Object.values(out.tags).forEach(t => delete t.i_can);
   out.rubrics.forEach(r => r.criteria.forEach(c => delete c.tag_ids));
@@ -1120,25 +1153,40 @@ describe.each(STYLES)('a %s class: Preview as Student and the real page draw the
 
   it.each(UIS.map(ui => [JSON.stringify(ui), ui]))('for %s', (_, ui) => {
     const { view } = StudentView.fromCache(CID, S1);
-    expect(StudentPageView.html(view, ui)).toBe(phoneHtml(side, serverPage(system), ui));
+    expect(StudentPageView.html(view, ui)).toBe(phoneHtml(side, unopened(serverPage(system)), ui));
   });
 });
 
 describe('the parts the server now sends, drawn (S4-W1)', () => {
   beforeEach(() => seed('letter'));
 
-  it('the teacher’s name as sent, never made into "Mr.": over the comment, on Your Feedback, and in what changed', () => {
+  it('no teacher’s name anywhere, from Preview or from a reply that carries one (Colin’s ruling 112)', () => {
+    // The teacher has a name on this device (displayName is TEACHER).
+    expect(StudentView.reply(CID, S1).course).not.toHaveProperty('teacher_name');
     const { view } = StudentView.fromCache(CID, S1);
-    expect(view.course.teacherName).toBe('Colin Brown');
-    const essay = cardIn(drawn(view, UIS[1]), 'a-essay');
-    expect(words(essay.querySelector('.sp-piece-from .sp-from-mark'))).toBe('CB');
-    expect(words(essay.querySelector('.sp-piece-from span:last-child'))).toBe('Colin Brown');
-    expect(essay.querySelector('.sp-from-mark').getAttribute('aria-hidden')).toBe('true');
-    expect(words(drawn(view, UIS[2]).querySelector('.sp-fb-from span:last-child'))).toBe('From Colin Brown');
-    expect(words(drawn(view, UIS[6]).querySelector('.sp-since-line'))).toBe(
-      'Colin Brown returned 5 pieces and updated 1 result.',
+    expect(view.course).not.toHaveProperty('teacherName');
+    UIS.forEach(ui => expect(StudentPageView.html(view, ui)).not.toContain('Colin'));
+    // A reply that carries teacher_name, as the database may send it: the
+    // phone draws exactly what it draws without it, and never the name.
+    const side = studentSide();
+    const plain = serverPage('letter');
+    const named = JSON.parse(JSON.stringify(plain));
+    named.course.teacher_name = TEACHER;
+    side.page.ctx.__reply = named;
+    expect(JSON.parse(side.page.run('JSON.stringify(StudentData.fromServer(__reply))')).course).not.toHaveProperty(
+      'teacherName',
     );
-    expect(StudentPageView.html(view, UIS[2])).not.toMatch(/Mr\.|Ms\./);
+    UIS.forEach(ui => {
+      const html = phoneHtml(side, named, ui);
+      expect(html).not.toContain('Colin');
+      expect(html).not.toContain('Brown');
+      expect(html).not.toContain('CB<');
+      expect(html).toBe(phoneHtml(side, plain, ui));
+    });
+    const box = DOC.createElement('div');
+    box.innerHTML = phoneHtml(side, named, UIS[6]);
+    expect(words(box.querySelector('.sp-since-line'))).toBe('5 pieces came back and 1 result was updated.');
+    expect(box.querySelector('.sp-piece-from, .sp-fb-from, .sp-from-mark')).toBe(null);
   });
 
   it('the unit, and the category with what it counts as the class is set up', () => {
@@ -1214,7 +1262,6 @@ describe('the parts the server now sends, drawn (S4-W1)', () => {
     const side = studentSide();
     const good = withoutNew(serverPage('letter'));
     const bad = JSON.parse(JSON.stringify(good));
-    bad.course.teacher_name = 42;
     bad.classes = [{ enrollment_id: S1, course: { name: 'Science 9', block: 'B' }, to_do: '3' }];
     good.classes = [{ enrollment_id: S1, course: { name: 'Science 9', block: 'B' } }];
     Object.values(bad.tags).forEach(t => (t.i_can = 'I can ask.'));
@@ -1231,7 +1278,6 @@ describe('the parts the server now sends, drawn (S4-W1)', () => {
     UIS.forEach(ui => expect(phoneHtml(side, bad, ui)).toBe(phoneHtml(side, good, ui)));
     side.page.ctx.__reply = bad;
     const kept = JSON.parse(side.page.run('JSON.stringify(StudentData.fromServer(__reply))'));
-    expect(kept.course.teacherName).toBe('');
     expect(kept.classes[0].toDo).toBeNull();
     expect(kept.assessments[0]).toMatchObject({
       description: '',
@@ -1266,5 +1312,53 @@ describe('fromCache’s learning option (Preview’s See What They’d See, S13-
     expect(getCourseConfig).toBe(before);
     expect(getCourseConfig(CID).show_my_learning).toBeUndefined();
     expect(StudentView.fromCache(CID, S1).view.learning).toBeNull();
+  });
+});
+
+/* ── Preview never shows what the student has opened (ruling 116) ──
+   DECISIONS, "Student page build rulings (2026-11-10)" 10: when a student
+   opens a piece is not shown to teachers. The same returned work, opened
+   by the student or not, draws the same Preview on every screen. */
+describe('Preview as Student: a returned piece looks the same whether or not the student opened it', () => {
+  // Nothing opened: no seen_at, so under As Soon As I Save no change is marked Updated either.
+  const NOT_OPENED = Object.fromEntries(
+    Object.entries(ROWS).map(([aid, row]) => {
+      const r = { ...row };
+      delete r.seen_at;
+      if (aid === 'a-quick') {
+        delete r.previous_copy;
+        delete r.updated_at;
+      }
+      return [aid, r];
+    }),
+  );
+  // Every returned piece opened, after it came back.
+  const ALL_OPENED = Object.fromEntries(
+    Object.entries(ROWS).map(([aid, row]) => [
+      aid,
+      row.returned_at ? { ...row, seen_at: '2026-11-09T18:00:00Z' } : { ...row },
+    ]),
+  );
+  const previewHtml = rows => {
+    seed('proficiency', null, rows);
+    const { view } = StudentView.fromCache(CID, S1);
+    return UIS.map(ui => StudentPageView.html(view, ui));
+  };
+
+  it('opened, opened with an update, or never opened: the same HTML on every screen', () => {
+    const never = previewHtml(NOT_OPENED);
+    expect(previewHtml(ROWS)).toEqual(never);
+    expect(previewHtml(ALL_OPENED)).toEqual(never);
+  });
+
+  it('the student’s own page still tells them what they have not opened', () => {
+    const side = studentSide();
+    seed('proficiency', null, NOT_OPENED);
+    const never = side.view(StudentView.reply(CID, S1));
+    seed('proficiency', null, ALL_OPENED);
+    const opened = side.view(StudentView.reply(CID, S1));
+    expect(never.changes.length).toBeGreaterThan(0);
+    expect(opened.changes).toEqual([]);
+    expect(opened.work.filter(p => p.unseen)).toEqual([]);
   });
 });

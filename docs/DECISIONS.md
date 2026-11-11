@@ -410,6 +410,104 @@ Context: the evening and night of the second day. Slice S2 (reports) and most of
 
 Still open: the privacy page's wording, before cards go to another class.
 
+## Student page build rulings (2026-11-10, late night)
+
+Context: the night of Nov 10 to 11. Slices S4 to S14 and S18 were built as screens in Demo Mode behind their switches, the second migration batch (Batch B: students send work, PR 1024) went through its reviews, and a small migration for the student page's new fields was applied. Colin ruled on each point below before going to bed; a fresh orchestrator session ran the rest of the night under these rulings. Where a ruling is in his words they are quoted. Where the orchestrator read his words a certain way, that is marked as its reading: he can correct it.
+
+**Students sending work (Batch B)**
+
+1. **One private bucket, JPEG pages only, 2 MB a page.** A PDF becomes pages in the browser and is not kept. This settles the plan's "two buckets" (S5-M2) against its own 1.7 and Student page build answers 2: there is one bucket.
+2. **"Started grading" means the piece has a draft or returned grade, or an Overall Comment, for that student.** A Late or Missing mark alone does not lock the work. Once grading has started there is no Unsend and no Replace.
+3. **A student may send work for a piece that already has a grade.** It locks at once.
+4. **After the Due Date starts at Keep Accepting:** late work is taken and marked Late. A piece closed to sending refuses Unsend and Replace. A Replace started after the due date is marked Late.
+5. **Deleting an assessment, permanently deleting a student, and the 30-day class purge delete that work's photos too, from the day Batch B is applied. A deleted photo cannot come back.** This moves those three deletes up from Batch D (S8-M1), so no photo is left with no row. The orchestrator told him Send Work is not released until the on-screen warnings (S8-F1) are built; they were built that night (PRs 1045, 1048, 1083).
+6. **A teacher can delete one student's submission and its photos.** The database function comes with Batch B; the button and its confirm come later, with their wording to him.
+7. **A submission holds 30 pages at most. Copy Assessment, Duplicate Class and Restore do not copy the Student Work setting:** a copy starts at Nothing.
+8. **Nobody, the teacher included, can open a photo a student unsent or never finished sending.** Only the cleanup job touches it.
+9. **A student's Unsend or Replace removes only the student's own pages.** Pages the teacher added stay, and the submission stays with them.
+10. **A send can be finished for two hours from its first start, never longer.** Finished after the due date, it is Late. After two hours it is dropped and the student starts again.
+
+8 to 10 came from Batch B's first independent review; the builder built each as chosen.
+
+**The student page's new fields, and what Colin approved to apply**
+
+11. **"Yes, I approve the migration." Then, asked which: "Both."** (Colin, Nov 10 late night.)
+    - (a) **The page-fields migration (S4-M1, PR 1032):** build it, have it reviewed by someone who did not write it, tell him plainly what it changes, and apply it on this approval unless it differs from what was described. What was described: the student page is also sent the assessment's description, its category name and weight, its unit name, its Core Competencies, I Can text, a rubric criterion's competencies, the teacher's display name and each class's To Do count. Nothing about grades changes. **Used:** see "What was applied that night" below.
+    - (b) **Batch B (PR 1024):** apply it when the independent review says ready, without asking again; but if the review finds anything that changes what it does or deletes, go back to him first. **Not used:** see below.
+    - Each apply still gets the read-only pre-check, the md5-guarded statement rehearsed locally first (it refuses to run unless the live functions are exactly the ones it was tested against), and the post-check. Neither covers deploying an edge function or a release.
+
+**How the build runs while he is away**
+
+12. **"good, make sure everything merges on green"** (Colin, Nov 10 late night). The orchestrator's reading, told to him and not objected to: every pull request merges as soon as all its checks are green; a migration pull request waits for its apply; wording he has not seen is merged on green while he is away and listed for his approval before any release. That list exists, kept beside the night's notes.
+13. **"I'm heading to bed. keep an eye on usage, but continue on and finish all of the slices if possible. orchestrate tasks to different models like we discussed earlier."** (Colin, Nov 10 late night.) The limits the orchestrator then set itself, not his words: builders on Opus, each merging its own green screen pull requests by written rules; Fable only for the two migrations already approved (Batch B and S4-M1), their reviews and applies; no new Fable work once the week's Fable use passed 75%, none past 85%; no new builders past 80% on all models; no other migration applied, no edge function deployed, nothing released.
+14. **"I approve a standing OK to migrate changes, except anything that touches current student data for Karen or Colin."** (Colin, Nov 10 late night, after being told that project rule 1 and the build's rules need his OK for each apply.) The orchestrator's reading, told to him: a migration may be applied without asking only when (a) an independent reviewer who wrote none of it says ready, (b) the live pre-check is clean, (c) the guarded statement was rehearsed locally, and (d) it does not change, move or delete any existing row about a student in a real class (grades, returned-grade rows, students, enrolments, comments, observations, answers, slips, cards, photos), and does not change a function or trigger that writes such rows. That covers new tables, new columns with a default on class or assessment settings, new functions, and read-only function changes. It does not cover, and each still needs his explicit OK: anything under (d) (so the Note for the Report migration, which changes the trigger on every score save; S3-S1, which rewrites live slips and slip passwords; Batch D's deletions; any part of Batch C that changes `return_grades` or how a grade is stored), any edge function deploy, and any release. Batch B and S4-M1 keep their own terms from 11. **It was not used that night:** no migration was applied under it. Batch C's first file was held back on purpose (see the list below).
+15. **"Let's pause the myed integration work but not anything else."** (Colin, Nov 10 late night.) S16 (MyEdBC Input and the Export Sheet) and Batch F (the MyEd tables) stop: nothing of them is merged, reviewed or applied until he says otherwise. The draft PR 1031 stays as it is. S18 and everything else carry on. Adds to Student page build answers 10.
+16. **"Let's definitely relax the one pr per change rule. Go with your recommendation."** (Colin, Nov 10 late night.) For this build, the screens of one slice on one track go in one pull request, titled with the range ("S6-F1 to F3: …"), and so do the wiring pull requests for one migration batch. Kept separate, one pull request each: a tidy-up that changes no behaviour, a migration, anything that touches grade math, and anything waiting on a decision of his. Inside a bundle each plan id is its own commit and has its own part of the description. This relaxes `CLAUDE.md` rule 8's "One PR per change" for the student page build only. `CLAUDE.md` itself is unchanged; whether it should say so is his to decide and his to change.
+17. **A fresh orchestrator session takes over from the long one** (Colin, Nov 10 late night: "I completely agree with your suggestion… Go with 1 and 3, with 4 as a habit"). As the notes record what that meant: the old session only passes on its own builders' final reports and goes quiet; Fable stays for migrations, their reviews and the live database; routine work runs on Opus.
+18. **On small choices, the recommendation stands** (Colin, Nov 10 late night). A choice behind the build switch that is easy to reverse (wording not on a board, a default, a layout) goes with the board's words or the orchestrator's recommendation, and each one is listed for him. Anything that deletes, touches privacy, changes a grade or how one is stored, or cannot be undone is still asked first.
+19. **One sitting a day for what only Colin can release** (Colin, Nov 10 late night): edge function deploys, migrations that touch student data, and releases are read and OK'd together, in the morning, so builders are not waiting on them one at a time.
+
+**The privacy page and the photo warnings**
+
+20. **"Approve them and I'll modify them later"** (Colin, Nov 10 late night, of the privacy page draft, PR 1037, and the drafted photo warnings for S8-F1). The orchestrator's reading: the privacy page is approved as drafted and merges on green (it merged that night); every recommended line in the warnings draft is approved to build, and its four open choices go with the draft's recommendation: the one-week reminder shows in the app only; the board's "Page 1 is with Mr. Brown" is replaced; the Unsend line says whatever the server does; a Keep Photos Until date already past asks "Delete Photos Now?" first. He changes any of it later, as follow-ups. It does not cover a release. The privacy page promises teachers an email before a change to how student data is stored, so the two current teachers are emailed before the release that carries the page. This closes "Still open: the privacy page's wording" above, apart from that email.
+
+**Wording approved**
+
+21. **PR 1025 (assignment cards and All Assignments), approved as built** (Colin, Nov 10): a "Missing" pill on a To Do card; "Back to cards" (the board's words, replacing "Back to Assignments", approved earlier with PR 1023); "Nothing matches."; the teacher's name left off the comment for now.
+
+**What was applied that night**
+
+- **S4-M1 was applied**, on ruling 11(a), on Nov 11 at 07:40 UTC (Nov 10, 11:40pm Pacific), as `student_page_fields`, version 20261111074023. Its independent review said ready with nothing to fix and found that it adds only what Colin was told. It replaced two read-only functions, `student_submit.page` and `student_submit._session_classes`, and nothing else. The read-only pre-check before it was clean, and so was the post-check after it: both functions carry the tested fingerprints, the functions around them are untouched, and their grants are as before. The schema snapshot did not change (it does not record function bodies), so no other pull request was affected. PR 1032 merged after it. **Students do not see the new fields yet:** the deployed edge function passes on only the fields it names, so they reach a phone only when PR 1050 is merged and the function redeployed, on his word.
+- **Batch B was not applied.** Its second independent review said ready with nothing to fix before applying, and the guarded statements were built and rehearsed. But that review lists sixteen points that differ from or go beyond rulings 1 to 10, and he had said to come back to him first if the review found anything that changes what Batch B does or deletes. Two of them are faults against his rulings (a submission can pass 30 pages when a teacher's Add crosses a student's Replace, against 7; a student's Unsend or Replace deletes a teacher's upload not yet finished, against 9). They are fixed in a follow-up migration, PR 1053, whose own independent review says ready. Neither fault touches existing data, and no student can reach either until the routes in PR 1086 are deployed. Batch B, then PR 1053, wait for his read and OK.
+- **The nightly repair job** that S0-M4b added ran for the first time on Nov 11 at 10:47 UTC: it succeeded in 2 seconds with nothing to repair (read-only check).
+- **Nothing else** was applied, no edge function was deployed, and nothing was released. The site still runs the release of PR 1001.
+
+**Choices made for him that night** (under 18; each is his to reverse)
+
+- Batch C's first file was not applied under 14: it adds delete triggers on `assessment` and `enrollment`, existing tables that hold or lead to student data, which by the narrow reading is not "adds only". All of Batch C waits for his sitting, and its independent review was not started that night, to keep Fable for the morning's live work; it is owed after Batch B is applied and Batch C is refreshed against it.
+- The student's routes for sending work (S5-F4, PR 1086) were drafted on Opus, not Fable, to save Fable's allowance. The draft is never merged before an independent Fable security review.
+- S11's screens were not started: they could not merge before his review of the revision rule, and he may change it.
+- Batch B's builder chose, under 18: a class holds at most 10,000 pages and 5 GB (a send past it is refused); a photo link lasts five minutes; the teacher's upload also ends after the two hours; a send started before midnight on the due date and finished after is Late.
+- The S8-F1 delete warnings show whenever there are photos to lose, not only while Send Work is on (photos sent before the switch was turned off would otherwise go unwarned).
+
+### Waiting for Colin (as of Nov 11 morning)
+
+A snapshot, taken from the night's notes on the morning of Nov 11. It is not kept up to date: check the open pull requests and the newer sections below it.
+
+**Needs his word to apply, deploy or release**
+
+- Batch B (PR 1024), then its fixes (PR 1053): read the review's points that go beyond rulings 1 to 10 and say yes or no to applying; the points most needing his word are that photos are also deleted when a deleted teacher account is purged and by `clear_data()`, that a send started on a closing day and finished after midnight is refused rather than marked Late, that a student cannot send again after unsending work the teacher added pages to, that Add Work and Handed In on Paper ignore both switches and are never Late, that a student can open pages the teacher photographed under their name, that with Send Work off a student can no longer unsend or replace, and the choices in "Choices made for him" above.
+- PR 1053 leaves two choices for him: if a student unsends, sends again and finishes before the teacher finishes adding pages, the teacher's pages are dropped and the teacher is told "already sent"; and a teacher's unfinished Replace Them is dropped when the student unsends or finishes a Replace.
+- Whether Batch B gains one small read-only database function that returns an open send's paths, the clean fix for a gap PR 1086 found (without it, a wrong request id could drop the student's own open send).
+- PR 1050 (edge function: the nine new fields): merge and redeploy on his word, once he knows students will then read the assessment's Description box, its unit and category names, and the teacher's sign-up name ("Colin Brown", since there is no "what students call me" field).
+- PR 1086 (the routes a student sends work through): an independent Fable security review first, then Batch B applied, then his word to deploy. Nine questions about Supabase Storage that only the real service can answer are in its description.
+- Batch C (PR 1043, draft): all of it, after the refresh and its independent review.
+- Before Send Work opens to a class: his own step of turning the Supabase spend cap off and setting usage alerts at about 70%.
+- Before the release that carries the privacy page: the email to the two teachers about cards.
+- Not built yet, each a change to `student_submit.page` for his sitting: listing questionnaires and phone reports, and opening one from a card's session (S4-F4 works only in Demo and Preview until then); sending what My Learning needs to a student's own device (only Preview can show it now); a To Do count that leaves out work already sent.
+
+**Decisions about what the product does**
+
+- Does a teacher's Mark Up count as "started grading"? Built as recommended (yes), as a separate commit in the Batch C refresh; it must be settled before Mark Up can be used on a real class.
+- PR 1081 (S13 math, `calc.js`): his review, and an independent review owed. Its choices: undated work counts in both the month-ago and the current grade; "a month ago" is shown on the overall grade and on one skill; at the top of the scale the page says "You've Reached the Top Step"; when the level or letter is the same then and now, no line shows.
+- PR 1084 (S11 data): while a revision's regrade is a draft, the teacher's own views show the draft's grade (3.0), as teacher views count drafts; keeping the old grade there too would be a real `calc.js` change.
+- In Their Words (S18-F2, not built): the board quotes a reflection plan in a family report, but the student's Reflect screen promises "Only Mr. Brown sees this." Change that line, add a "My teacher can share this" choice per reflection, or drop the block. The same question touches Save as Observation in the grader (PR 1071).
+- Demo Mode's sample has every piece graded and no group piece, so To Grade reads All Caught Up in Demo; giving it ungraded, draft or group work changes Demo grades that tests pin.
+- Preview as Student shows the teacher which returned pieces a student has opened, against "Student page build rulings (2026-11-10)" 10.
+- Should only opening Your Feedback count as "opened"?
+- A HEIC decoder for iPhone photos on a Chromebook (its licence).
+- `sw.js` stores pdf.js on every teacher device at install after each release (about 1.85 MB).
+- The five S15 passkey choices in the drafted screens (nothing built).
+- "It counts as 0 until it's in." is shown only in Letter and Both classes, though the board shows it in a Proficiency class too.
+- A teacher who turns Send Work off after photos were sent gets no reminder before they are deleted.
+- To Return does not count marks waiting on a grade already returned, so it matches Return's list of names.
+- "The photos N students sent" in the delete warnings also counts pages the teacher added.
+- PR 1054 changed two guard tests on purpose (`tests/cm-student-page-return-grades.test.js`, `tests/grade-return-server.test.js`) to allow one Demo-only settings save.
+
+**Wording**
+
+- Every new line of wording merged that night while he was away, marked as the board's or the builder's, is listed for his approval before any release, beside the night's notes. Among them: S5-F1's labels "Until a Date" and "Last Day"; "Did it on the next one? Jordan says: Yes" in place of the board's "Followed it on the next one"; group work shown as counts, not name chips; "3 notes on Jordan's work" with no pronouns.
+
 ## Phone-report birthday tries (2026-11-03)
 
 The Nov 3 bug sweep found that a phone-report slip has no lifetime limit on wrong birthdays: five in a session or ten on one code in 15 minutes lock it for now (`student_submit.check`, `migrations/20261025_phone_reports.sql`), and scanning the code again starts a new session. Questionnaire slips lock for good after five wrong tries (Student voice 2).
