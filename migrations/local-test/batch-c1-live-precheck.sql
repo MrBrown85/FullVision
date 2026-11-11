@@ -57,7 +57,7 @@ with relied(fn, md5) as (values
     ('public._revision_unhide_grade(uuid)',                                'absent'),
     ('public._piece_latest(uuid,uuid)',                                    'absent'),
     ('public._revision_state(uuid)',                                       'absent'),
-    ('public._revision_settle(uuid,uuid)',                                 'absent'),
+    ('public._revision_settle(uuid,uuid,boolean)',                         'absent'),
     ('public._revision_json(uuid)',                                        'absent'),
     ('public._reflection_json(uuid)',                                      'absent'),
     ('public.set_course_feedback_options(uuid,jsonb,uuid)',                'absent'),

@@ -130,7 +130,7 @@ drop function if exists public.save_markup(uuid, jsonb, integer, uuid);
 drop function if exists public.set_course_feedback_options(uuid, jsonb, uuid);
 drop function if exists public._reflection_json(uuid);
 drop function if exists public._revision_json(uuid);
-drop function if exists public._revision_settle(uuid, uuid);
+drop function if exists public._revision_settle(uuid, uuid, boolean);
 drop function if exists public._revision_state(uuid);
 drop function if exists public._piece_latest(uuid, uuid);
 drop function if exists public._revision_unhide_grade(uuid);

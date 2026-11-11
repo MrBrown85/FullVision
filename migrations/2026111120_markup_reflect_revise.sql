@@ -236,14 +236,14 @@ begin
             ('public._revision_unhide_grade(uuid)',                                '26d2861325edf27f95d090ebd590eb0f', 'cbbc6fd7654c2b8677c7d210b5e15cc4'),
             ('public._piece_latest(uuid,uuid)',                                    'fee319ef4d87447eeac9b4d53a1f1b50', 'fee319ef4d87447eeac9b4d53a1f1b50'),
             ('public._revision_state(uuid)',                                       'eec7300827a8fb7771fc2cebc0d29de9', 'eec7300827a8fb7771fc2cebc0d29de9'),
-            ('public._revision_settle(uuid,uuid)',                                 '9b673ebf31a9be20552c38a7ec46d6f7', '9b673ebf31a9be20552c38a7ec46d6f7'),
+            ('public._revision_settle(uuid,uuid,boolean)',                         '70e53be05334a41bd816d803735f9bef', '70e53be05334a41bd816d803735f9bef'),
             ('public._revision_json(uuid)',                                        '969f930b121a6714edfde8052a4d876b', '969f930b121a6714edfde8052a4d876b'),
             ('public._reflection_json(uuid)',                                      '89f6847f6ab6a468284ea1df003391a6', '89f6847f6ab6a468284ea1df003391a6'),
             ('public.set_course_feedback_options(uuid,jsonb,uuid)',                '1954af2eef430d63baa91d38e74106d2', '1954af2eef430d63baa91d38e74106d2'),
             ('public.save_markup(uuid,jsonb,integer,uuid)',                        '808290a14511b137bc5c1a4574016429', '808290a14511b137bc5c1a4574016429'),
             ('public.list_assessment_markup(uuid)',                                '5e64579a923a0f0c02791b6428e54d98', '5e64579a923a0f0c02791b6428e54d98'),
-            ('public.return_work(uuid,uuid[],uuid)',                               'eb317723ac4fd5bd98ebffe7fd215279', 'eb317723ac4fd5bd98ebffe7fd215279'),
-            ('public.return_for_revision(uuid,uuid,jsonb,uuid)',                   '51ca91fa2896de5617bd53a03a68fea4', '51ca91fa2896de5617bd53a03a68fea4'),
+            ('public.return_work(uuid,uuid[],uuid)',                               '58cb572fe215ea7b912b4ed093256918', '58cb572fe215ea7b912b4ed093256918'),
+            ('public.return_for_revision(uuid,uuid,jsonb,uuid)',                   'cada3aa196107ccaf70b030a75b9a87f', 'cada3aa196107ccaf70b030a75b9a87f'),
             ('public.set_revision_request(uuid,jsonb,uuid)',                       '6f9fb14cc1c8ced04cca7e0302c40b13', '6f9fb14cc1c8ced04cca7e0302c40b13'),
             ('public.cancel_revision(uuid,uuid)',                                  '03f508a459eb621f868b699a0ea3f076', '03f508a459eb621f868b699a0ea3f076'),
             ('public.answer_reflection(uuid,text,uuid,boolean)',                   'b384f9b1c729f42733db290a0f4ddae5', 'b384f9b1c729f42733db290a0f4ddae5'),
@@ -254,9 +254,9 @@ begin
             ('student_submit.reflect(text,uuid,uuid,jsonb,text)',                  '7a4e2ab29d369ef159dce65e1e1e8f77', '7a4e2ab29d369ef159dce65e1e1e8f77'),
             ('student_submit.reply(text,uuid,uuid,jsonb,text)',                    '51e8f1db4f92885e8e310b255fa7aa70', '51e8f1db4f92885e8e310b255fa7aa70'),
             ('student_submit.answer_seen(text,uuid,uuid[],text)',                  'a32cc8e5329954ac909969269afc2518', 'a32cc8e5329954ac909969269afc2518'),
-            ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)', '791beac9abf0d412818d0fb5098f5e8a', '791beac9abf0d412818d0fb5098f5e8a'),
-            ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',          'c2ee7f35b2c8d0014f561841a526f68a', 'c2ee7f35b2c8d0014f561841a526f68a'),
-            ('student_submit.revision_unsend(text,uuid,uuid,text)',                '9e9c31cbb077f710923129131d2f3206', '9e9c31cbb077f710923129131d2f3206'),
+            ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)', '43ca2e50ff067a4fb51762367895ee84', '43ca2e50ff067a4fb51762367895ee84'),
+            ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',          'fe5ca7570a32f2dd0631314a365059cd', 'fe5ca7570a32f2dd0631314a365059cd'),
+            ('student_submit.revision_unsend(text,uuid,uuid,text)',                '6330e84cab87428ed8a71e92cdb2048c', '6330e84cab87428ed8a71e92cdb2048c'),
             ('student_submit.group_work(text,uuid,text)',                          '1db83448b1b3d7ae998870bdb07c4f36', '1db83448b1b3d7ae998870bdb07c4f36'),
             ('student_submit.group_file_links(text,uuid,uuid,text)',               '1c034fa5647b5808209b0ef9b31e8e4d', '1c034fa5647b5808209b0ef9b31e8e4d')
             -- FINGERPRINTS-END
@@ -769,8 +769,12 @@ $function$;
 -- piece's requests or returns its work, and by the second file's trigger
 -- each time a grade is returned by any path. Never closes a request whose
 -- grade is hidden (a Return that gives a grade ends the hide first).
+-- p_returned: the teacher has just returned this student's work on the
+-- piece (return_work: Return, Return and Next, Return N Graded). Then a
+-- request whose revision is in is done too, even when its grade did not
+-- change: the teacher read the revision and returned it as it was.
 -- Returns how many requests it closed (0 or 1).
-create or replace function public._revision_settle(p_enrollment_id uuid, p_assessment_id uuid)
+create or replace function public._revision_settle(p_enrollment_id uuid, p_assessment_id uuid, p_returned boolean)
  returns integer
  language plpgsql
  security definer
@@ -783,7 +787,7 @@ begin
        set state = 'done', closed_at = now(), updated_at = now()
      where r.assessment_id = p_assessment_id and r.enrollment_id = p_enrollment_id and r.state = 'open'
        and not r.grade_hidden
-       and _revision_state(r.id)->>'state' = 'returned';
+       and _revision_state(r.id)->>'state' in ('returned', case when p_returned then 'sent' end, case when p_returned then 'grading' end);
     get diagnostics _n = row_count;
     return _n;
 end;
@@ -1005,10 +1009,12 @@ begin
     -- this call remembers the whole answer under its own.
     -- A revision returned since by another path is closed first, so this
     -- Return cannot read it as anything else.
-    perform _revision_settle(e.id, p_assessment_id)
+    perform _revision_settle(e.id, p_assessment_id, false)
        from enrollment e where e.id = any (coalesce(p_enrollment_ids, '{}')) and e.course_id = _course;
     _r := return_grades(p_assessment_id, p_enrollment_ids, null);
-    perform _revision_settle(e.id, p_assessment_id)
+    -- Then Return ends each listed student's request whose revision is in,
+    -- graded or left at the same grade.
+    perform _revision_settle(e.id, p_assessment_id, true)
        from enrollment e where e.id = any (coalesce(p_enrollment_ids, '{}')) and e.course_id = _course;
     for _e in
         select e.id from enrollment e
@@ -1129,7 +1135,7 @@ begin
         return jsonb_build_object('result', 'not_for_dibels');
     end if;
     -- A request whose revision's grade has since been returned is done.
-    perform _revision_settle(p_enrollment_id, p_assessment_id);
+    perform _revision_settle(p_enrollment_id, p_assessment_id, false);
     select * into _open from revision_request
      where assessment_id = p_assessment_id and enrollment_id = p_enrollment_id and state = 'open';
     if found then
@@ -1864,7 +1870,7 @@ begin
                                   'files', case when _sub.state = 'sending' then public._work_upload_json(_sub.id) else '[]'::jsonb end);
     end if;
 
-    perform public._revision_settle(p_enrollment_id, _a.id);
+    perform public._revision_settle(p_enrollment_id, _a.id, false);
     select * into _r from revision_request where assessment_id = _a.id and enrollment_id = p_enrollment_id and state = 'open';
     if _r.id is null then
         return jsonb_build_object('ok', false, 'error', 'no_revision');
@@ -1979,7 +1985,7 @@ begin
                                    where f.submission_id = _sub.id and f.id = (x->>'file_id')::uuid)) then
         raise exception 'a file is not one of this send''s' using errcode = '22023';
     end if;
-    perform public._revision_settle(p_enrollment_id, _sub.assessment_id);
+    perform public._revision_settle(p_enrollment_id, _sub.assessment_id, false);
     select * into _r from revision_request
      where assessment_id = _sub.assessment_id and enrollment_id = p_enrollment_id and state = 'open';
     _st := case when _r.id is null then null else public._revision_state(_r.id) end;
@@ -2079,10 +2085,18 @@ begin
     get diagnostics _cancelled = row_count;
     perform set_config('fv.work_removal_reason', '', true);
 
-    perform public._revision_settle(p_enrollment_id, p_assessment_id);
+    perform public._revision_settle(p_enrollment_id, p_assessment_id, false);
     select * into _r from revision_request where assessment_id = p_assessment_id and enrollment_id = p_enrollment_id and state = 'open';
     _st := case when _r.id is null then null else public._revision_state(_r.id) end;
     _old := (_st->>'revision_submission_id')::uuid;
+    if _r.id is null
+       and (select r.state from revision_request r where r.assessment_id = p_assessment_id and r.enrollment_id = p_enrollment_id
+             order by r.created_at desc, r.id limit 1) = 'done'
+       and exists (select 1 from submission s
+                    where s.assessment_id = p_assessment_id and s.enrollment_id = p_enrollment_id and s.state = 'sent' and s.version > 1) then
+        -- the revision was returned: it is the teacher's now, as a graded first version is
+        return jsonb_build_object('ok', false, 'error', 'grading_started');
+    end if;
     if _old is null then
         return jsonb_build_object('ok', true, 'unsent', false, 'cancelled', _cancelled > 0, 'pages', 0);
     end if;
@@ -2213,7 +2227,7 @@ revoke all on function public._revision_hide_grade(uuid) from public, anon, auth
 revoke all on function public._revision_unhide_grade(uuid) from public, anon, authenticated, service_role;
 revoke all on function public._piece_latest(uuid, uuid) from public, anon, authenticated, service_role;
 revoke all on function public._revision_state(uuid) from public, anon, authenticated, service_role;
-revoke all on function public._revision_settle(uuid, uuid) from public, anon, authenticated, service_role;
+revoke all on function public._revision_settle(uuid, uuid, boolean) from public, anon, authenticated, service_role;
 revoke all on function public._revision_json(uuid) from public, anon, authenticated, service_role;
 revoke all on function public._reflection_json(uuid) from public, anon, authenticated, service_role;
 
@@ -2262,14 +2276,14 @@ begin
             ('public._revision_unhide_grade(uuid)',                                '26d2861325edf27f95d090ebd590eb0f', 'cbbc6fd7654c2b8677c7d210b5e15cc4'),
             ('public._piece_latest(uuid,uuid)',                                    'fee319ef4d87447eeac9b4d53a1f1b50', 'fee319ef4d87447eeac9b4d53a1f1b50'),
             ('public._revision_state(uuid)',                                       'eec7300827a8fb7771fc2cebc0d29de9', 'eec7300827a8fb7771fc2cebc0d29de9'),
-            ('public._revision_settle(uuid,uuid)',                                 '9b673ebf31a9be20552c38a7ec46d6f7', '9b673ebf31a9be20552c38a7ec46d6f7'),
+            ('public._revision_settle(uuid,uuid,boolean)',                         '70e53be05334a41bd816d803735f9bef', '70e53be05334a41bd816d803735f9bef'),
             ('public._revision_json(uuid)',                                        '969f930b121a6714edfde8052a4d876b', '969f930b121a6714edfde8052a4d876b'),
             ('public._reflection_json(uuid)',                                      '89f6847f6ab6a468284ea1df003391a6', '89f6847f6ab6a468284ea1df003391a6'),
             ('public.set_course_feedback_options(uuid,jsonb,uuid)',                '1954af2eef430d63baa91d38e74106d2', '1954af2eef430d63baa91d38e74106d2'),
             ('public.save_markup(uuid,jsonb,integer,uuid)',                        '808290a14511b137bc5c1a4574016429', '808290a14511b137bc5c1a4574016429'),
             ('public.list_assessment_markup(uuid)',                                '5e64579a923a0f0c02791b6428e54d98', '5e64579a923a0f0c02791b6428e54d98'),
-            ('public.return_work(uuid,uuid[],uuid)',                               'eb317723ac4fd5bd98ebffe7fd215279', 'eb317723ac4fd5bd98ebffe7fd215279'),
-            ('public.return_for_revision(uuid,uuid,jsonb,uuid)',                   '51ca91fa2896de5617bd53a03a68fea4', '51ca91fa2896de5617bd53a03a68fea4'),
+            ('public.return_work(uuid,uuid[],uuid)',                               '58cb572fe215ea7b912b4ed093256918', '58cb572fe215ea7b912b4ed093256918'),
+            ('public.return_for_revision(uuid,uuid,jsonb,uuid)',                   'cada3aa196107ccaf70b030a75b9a87f', 'cada3aa196107ccaf70b030a75b9a87f'),
             ('public.set_revision_request(uuid,jsonb,uuid)',                       '6f9fb14cc1c8ced04cca7e0302c40b13', '6f9fb14cc1c8ced04cca7e0302c40b13'),
             ('public.cancel_revision(uuid,uuid)',                                  '03f508a459eb621f868b699a0ea3f076', '03f508a459eb621f868b699a0ea3f076'),
             ('public.answer_reflection(uuid,text,uuid,boolean)',                   'b384f9b1c729f42733db290a0f4ddae5', 'b384f9b1c729f42733db290a0f4ddae5'),
@@ -2280,9 +2294,9 @@ begin
             ('student_submit.reflect(text,uuid,uuid,jsonb,text)',                  '7a4e2ab29d369ef159dce65e1e1e8f77', '7a4e2ab29d369ef159dce65e1e1e8f77'),
             ('student_submit.reply(text,uuid,uuid,jsonb,text)',                    '51e8f1db4f92885e8e310b255fa7aa70', '51e8f1db4f92885e8e310b255fa7aa70'),
             ('student_submit.answer_seen(text,uuid,uuid[],text)',                  'a32cc8e5329954ac909969269afc2518', 'a32cc8e5329954ac909969269afc2518'),
-            ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)', '791beac9abf0d412818d0fb5098f5e8a', '791beac9abf0d412818d0fb5098f5e8a'),
-            ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',          'c2ee7f35b2c8d0014f561841a526f68a', 'c2ee7f35b2c8d0014f561841a526f68a'),
-            ('student_submit.revision_unsend(text,uuid,uuid,text)',                '9e9c31cbb077f710923129131d2f3206', '9e9c31cbb077f710923129131d2f3206'),
+            ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)', '43ca2e50ff067a4fb51762367895ee84', '43ca2e50ff067a4fb51762367895ee84'),
+            ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',          'fe5ca7570a32f2dd0631314a365059cd', 'fe5ca7570a32f2dd0631314a365059cd'),
+            ('student_submit.revision_unsend(text,uuid,uuid,text)',                '6330e84cab87428ed8a71e92cdb2048c', '6330e84cab87428ed8a71e92cdb2048c'),
             ('student_submit.group_work(text,uuid,text)',                          '1db83448b1b3d7ae998870bdb07c4f36', '1db83448b1b3d7ae998870bdb07c4f36'),
             ('student_submit.group_file_links(text,uuid,uuid,text)',               '1c034fa5647b5808209b0ef9b31e8e4d', '1c034fa5647b5808209b0ef9b31e8e4d')
             -- FINGERPRINTS-END

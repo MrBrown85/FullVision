@@ -6,7 +6,7 @@ with made(fn, becomes) as (values
     ('public._revision_hide_available()',   'a4b4e942de351d6849702b96f25c7356'),
     ('public._revision_hide_grade(uuid)',   'a4c3f002d3bb2fc01e58ec5b8dab8ecb'),
     ('public._revision_unhide_grade(uuid)', 'cbbc6fd7654c2b8677c7d210b5e15cc4'),
-    ('public._markup_on_return()',          'ef080a7b6bc3614bec1ca5533e30051f')
+    ('public._markup_on_return()',          '7b01b8f9af2f6abfbc835e114e3758df')
     -- FINGERPRINTS-END
 )
 select 'a function is not as C2 leaves it' as problem, m.fn as detail,
