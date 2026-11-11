@@ -113,3 +113,21 @@ upsert_section 07e3bfc041047a08b6c34dd431d86da1 1808 class-writer
 upsert_subject 3fa8209ed1f82365ac49d745c1b7b301 1365 class-writer
 upsert_tag 3a527f37023f8290a9bfe63c91320aca 1903 class-writer
 withdraw_student c4fc1f0e7c9ecee57726e975c0b89847 1153 class-writer
+
+# Three functions in student_submit, as they are on gradebook-prod: read by
+# the orchestrator on 2026-11-10 with S3-M1's read-only pre-check
+# (s3-m1-live-precheck.sql), which listed them as differing from the harness.
+# The cause was the harness, not live: its lists left out two applied
+# migrations, 20261102_housekeeping_fk_indexes.sql (student_submit._norm gets
+# an empty search_path) and 20261107_no_report_reply.sql (check and submit
+# rewritten: a report is for reading). No earlier record here carried these
+# three, so nothing recorded was wrong; but every harness database built
+# before that day had the older check and submit and _norm without its
+# setting. card_codes_common.LIVE and batch_a_undo.py's list now load both
+# files, and the md5s below are reproduced exactly (card_codes.py checks it).
+# Kept as comment lines so the scripts that compare public functions by name
+# do not read them; card_codes_common.py reads the lines that start
+# "#student-submit".
+#student-submit student_submit._norm(text) 276ee00aa8e488d789af9e2016714c94 214
+#student-submit student_submit."check"(text,text,text) cc54e80ca585024c65926cb5e73f3f43 3192
+#student-submit student_submit.submit(text,jsonb,text) 90ace3c164dab19f6a77ba7dfb19e40e 7616

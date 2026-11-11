@@ -87,9 +87,7 @@ p2 = new_assessment(K, 'points', title='Same day, made later', date_assigned='20
 as_owner(); c.run("update assessment set created_at = '2026-10-01 09:00:00+00' where id = :a", a=p1)
 c.run("update assessment set created_at = '2026-10-01 09:00:01.5+00' where id = :a", a=p2)
 rpc(A, 'upsert_score(:e, :a, 7)', e=ENR1, a=p1); give_back(p1)
-rpc(A, 'issue_student_cards(:c, null, :k)', c=COURSE_A, k=key())
-code = one('select code from student_card where enrollment_id = :e and stopped_at is null', e=ENR1)
-token = svc("student_submit.verify_card(:c, '2012-05-15', null, null, null, 'ip-1', false)", c=code)['session_token']
+token = card_session(ENR1, '2012-05-15')   # a card and a signed-in phone, however this database makes cards
 def page(): return svc("student_submit.page(:t, :e, 'ip-1')", t=token, e=ENR1)
 def on_page(a):
     x = [p for p in page()['assessments'] if p['id'] == a]

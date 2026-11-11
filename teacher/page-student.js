@@ -1115,7 +1115,7 @@ window.PageStudent = (function () {
         '</span><span class="stu-ov-cells" aria-hidden="true">' +
         cells +
         '</span><span class="stu-ov-rub-lv">' +
-        esc((r.near.text || r.near.level) + ' of 4') +
+        esc(r.near.text || String(r.near.level)) +
         '</span></button>';
     });
     html += '</div>';
@@ -1188,7 +1188,10 @@ window.PageStudent = (function () {
       (left || '<div class="stu-ov-sub">No comment or rubric on this one yet.</div>') +
       '</div>' +
       factsHtml +
-      '</div><div class="stu-ov-teacher"><a class="stu-link" role="link" tabindex="0" data-href="/assignments?course=' +
+      // What only the teacher acts on, marked as theirs.
+      '</div><div class="stu-ov-teacher"><span class="stu-ov-only">' +
+      '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><rect x="2" y="5.5" width="8" height="5" rx="1"/><path d="M4 5.5V4a2 2 0 0 1 4 0v1.5"/></svg>' +
+      'Only You</span><a class="stu-link" role="link" tabindex="0" data-href="/assignments?course=' +
       cid +
       '&open=' +
       a.id +
@@ -1216,7 +1219,8 @@ window.PageStudent = (function () {
         return true;
       });
     var seg =
-      '<div class="seg seg-sm" role="group" aria-label="Show">' +
+      // Filters narrow the list, so they are chips, not a view switch.
+      '<div class="stu-ov-chips" role="group" aria-label="Show">' +
       [
         ['all', 'All'],
         ['marked', 'Marked'],
@@ -1225,9 +1229,7 @@ window.PageStudent = (function () {
         .map(function (f) {
           var on = _ovFilter === f[0];
           return (
-            '<button type="button" class="seg-btn' +
-            (on ? ' active' : '') +
-            '" data-action="stuOvFilter" data-filter="' +
+            '<button type="button" class="stu-ov-chip" data-action="stuOvFilter" data-filter="' +
             f[0] +
             '" aria-pressed="' +
             on +
