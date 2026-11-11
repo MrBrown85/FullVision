@@ -16531,7 +16531,7 @@ function clearCardWidgetConfig() {
      Shipped sample files only; openStudentWorkPage also shows a photo
      still in the photo queue.
    addStudentWorkPages, replaceStudentWorkPages, markStudentWorkOnPaper,
-   openStudentWorkPage   work a teacher adds (below, "Work a teacher adds").
+   deleteStudentWork, openStudentWorkPage   work a teacher adds or deletes (below, "Work a teacher adds").
 
    A client student id is the server's enrollment id, so enrollment_id is
    the student's id here. Every answer is a copy: changing it changes
@@ -17027,6 +17027,30 @@ function markStudentWorkOnPaper(cid, aid, sids) {
   });
 }
 
+/* Delete Work (Colin's ruling 87): one student's newest handed-in work on
+   a piece, every page with it, the teacher's included; the student can
+   send again. Grades and comments stay. Photos of it still in the photo
+   queue are deleted from the device. Answers { result: 'deleted', pages }
+   (pages: how many went), { result: 'nothing_sent' }, { result:
+   'not_found' }, or signed in { result: 'not_available' } (the server's
+   delete is in Batch B, not applied). */
+function deleteStudentWork(cid, sid, aid) {
+  if (!cid || !_isDemoSession()) return Promise.resolve({ result: 'not_available' });
+  return _teacherWorkQueued(cid, function () {
+    if (!_teacherWorkInClass(cid, sid, aid)) return { result: 'not_found' };
+    var draft = _studentWorkDraft(cid);
+    var sent = _teacherWorkSent(draft, sid, aid);
+    if (!sent) return { result: 'nothing_sent' };
+    draft.submissions = draft.submissions.filter(function (s) {
+      return s !== sent;
+    });
+    _studentWorkWrite(cid, draft);
+    return _teacherWorkForget(_queuePagesOf(sent)).then(function () {
+      return { result: 'deleted', pages: (sent.files || []).length };
+    });
+  });
+}
+
 /* An address an <img> can show for one page ('page') or its thumbnail
    ('thumb'), whether it is a shipped sample file or a photo still in the
    photo queue: a Promise of { url, release } or null. Call release() when
@@ -17224,6 +17248,7 @@ window.GB = {
   addStudentWorkPages,
   replaceStudentWorkPages,
   markStudentWorkOnPaper,
+  deleteStudentWork,
   openStudentWorkPage,
   returnGrades,
   listStudentCards,
