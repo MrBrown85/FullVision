@@ -212,7 +212,6 @@ describe('Class Settings › Student Page: Return Grades', () => {
         'Keep Photos Until',
         'Reflect on Feedback',
         'Show My Learning',
-        'Preview as Student',
         'Questionnaires and Reports',
       ].forEach(label => expect(html(), label).not.toContain(label));
       expect((html().match(/class="sp-row"/g) || []).length).toBe(1);

@@ -824,6 +824,19 @@ describe('a class with no grade_return rows yet (grades from before the rule was
     expect(essay.grade).toEqual(copy({ comment: 'Well argued.', tags: { t1: lv(3, 1), t2: lv(4) } }));
     expect(reply.assessments.find(a => a.id === 'a-undated').returned_at).toBeNull();
   });
+
+  it('and still counts once a draft is saved over it, which makes a row with no return date', () => {
+    seed('proficiency', WORKING, {});
+    // When I Return Them: the change waits as a draft over the grade from before.
+    upsertScore(CID, S1, 'a-essay', 't1', 1, '2026-10-01', 'summative', '', 0);
+    expect(getGradeReturn(CID, S1, 'a-essay')).toMatchObject({ is_draft: true });
+    expect(getGradeReturn(CID, S1, 'a-essay').returned_at).toBeUndefined();
+    const { reply, view } = StudentView.fromCache(CID, S1);
+    const essay = reply.assessments.find(a => a.id === 'a-essay');
+    expect(essay.returned_at).toBe('2026-10-01');
+    expect(essay.grade).toEqual(copy({ comment: 'Well argued.', tags: { t1: lv(3, 1), t2: lv(4) } }));
+    expect(view.work.find(p => p.id === 'a-essay').kind).toBe('back');
+  });
 });
 
 /* ── 6. The seam ────────────────────────────────────────────── */
