@@ -3234,6 +3234,12 @@ window.MGrade = (function () {
       backToGroup: backToGroup,
       returnAndNext: returnAndNext,
       jumpToFirstDraft: jumpToFirstDraft,
+      // Draw the grading screen again in place, if it shows this piece (Add Work, S7-F3).
+      refreshSwiper: function (cid, aid) {
+        if (_swiperCid === cid && _swiperAid === aid && document.getElementById('m-screen-grade-swiper')) {
+          _redrawSwiper(cid, aid);
+        }
+      },
       getCurrentIndex: function () {
         return _currentIdx;
       },
@@ -3306,5 +3312,6 @@ window.MGrade = (function () {
     getCardScrolls: Speed.getCardScrolls,
     gradingOnly: Speed.gradingOnly,
     setCardScrolls: Speed.setCardScrolls,
+    refreshSwiper: Speed.refreshSwiper,
   };
 })();

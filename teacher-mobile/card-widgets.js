@@ -724,6 +724,8 @@ window.MCardWidgets = (function () {
       '<div class="m-scard">' +
       heroHtml +
       '<div class="m-scard-widgets">' +
+      // The work waiting for this student, first (S7-F4): always on, outside the editor's list.
+      (window.MGradePhotos ? MGradePhotos.studentListHtml(cid, st) : '') +
       _toReturnHtml(st, cid) +
       middleHtml +
       '</div>' +
