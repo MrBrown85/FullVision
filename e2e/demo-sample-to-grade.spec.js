@@ -101,9 +101,20 @@ test.describe('desktop, 1366 wide', () => {
     await page.goto('/assignments');
     await page.evaluate(aid => WorkWall.open(getActiveCourse(), aid), LIGHT);
     const wall = page.locator('#work-wall-overlay');
-    // The Work Wall has a card a student, so it counts the pair's two
-    // students: GraderWork's list of them, not its count of pieces.
-    await expect(wall.locator('.ww-pill[data-filter="tograde"]')).toHaveText('To Grade ' + at.ids.tograde.length);
+    // The pair counts once here too (PR 1097): To Grade is a card a piece
+    // of work, the pair's on Aiden's, as the gradebook marks them.
+    const pill = wall.locator('.ww-pill[data-filter="tograde"]');
+    await expect(pill).toHaveText('To Grade ' + at.piece.tograde);
+    await expect(wall.locator('.ww-pill[data-filter="notin"]')).toHaveText('Not In ' + at.piece.notin);
+    await pill.click();
+    const cards = wall.locator('.ww-card');
+    await expect(cards).toHaveCount(at.piece.tograde);
+    expect((await cards.evaluateAll(cs => cs.map(c => c.dataset.sid))).sort()).toEqual([
+      'st11',
+      'st12',
+      'st14',
+      'st16',
+    ]);
     await shot(page, 'Demo-sample-work-wall-1366');
     expect(errors).toEqual([]);
   });
