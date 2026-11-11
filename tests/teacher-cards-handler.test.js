@@ -989,11 +989,11 @@ describe('teacher-cards: where the key, Auth and the database come from (index.t
 
   it('reads STUDENT_CARD_KEY once, through readCardKey, with no fallback', () => {
     expect(code.match(/STUDENT_CARD_KEY/g)).toHaveLength(1);
-    expect(code).toContain("const cardKeyValue = Deno.env.get('STUDENT_CARD_KEY');");
-    expect(code).toContain('const cardKey = await readCardKey(cardKeyValue);');
-    expect(code.match(/\bcardKeyValue\b/g)).toHaveLength(3);
-    expect(code).toContain("console.log(JSON.stringify(keyLine('teacher-cards', cardKeyValue, cardKey)));");
-    expect(code.match(/console\.\w+\(/g)).toEqual(['console.log(']);
+    expect(code).toContain(
+      "const cardKey = await loadCardKey('teacher-cards', () => Deno.env.get('STUDENT_CARD_KEY'));",
+    );
+    // It logs nothing itself: the one line at start is loadCardKey's.
+    expect(code.match(/console\.\w+\(/g)).toBeNull();
   });
 
   it('asks the project’s own Supabase Auth who a token belongs to', () => {

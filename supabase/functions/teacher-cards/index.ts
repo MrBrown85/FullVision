@@ -19,17 +19,16 @@
 // database over SUPABASE_DB_URL, as student-submit does, so the
 // student_submit schema never has to be exposed through the API.
 import postgres from 'https://deno.land/x/postgresjs@v3.4.5/mod.js';
-import { keyLine, readCardKey } from '../_shared/card-key.ts';
+import { loadCardKey } from '../_shared/card-key.ts';
 import { authUser, makeHandler } from './handler.ts';
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false, max: 2, idle_timeout: 20 });
 
 // The card key: exactly 64 hex characters, or no key. No fallback, and
 // nothing derived from another secret. Each time the function starts, one
-// line says which, with the key's id and never the key.
-const cardKeyValue = Deno.env.get('STUDENT_CARD_KEY');
-const cardKey = await readCardKey(cardKeyValue);
-console.log(JSON.stringify(keyLine('teacher-cards', cardKeyValue, cardKey)));
+// line says which, with the key's id and never the key. The secret's text
+// is read and let go inside loadCardKey; nothing here holds it.
+const cardKey = await loadCardKey('teacher-cards', () => Deno.env.get('STUDENT_CARD_KEY'));
 
 const handle = makeHandler({
   region: Deno.env.get('SB_REGION'),
