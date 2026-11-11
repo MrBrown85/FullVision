@@ -115,8 +115,12 @@ describe('Needs Revision (the board "Student: Needs Revision")', () => {
     expect(words(card.querySelector('.sp-revise-first'))).toBe('Your First Version');
     expect(card.querySelector('.sp-send-thumb').getAttribute('alt')).toBe('First version, page 1');
     expect(words(card.querySelector('[data-act="revise-open"]'))).toBe('Send My Revision');
-    // The grade was kept: See Your Feedback still opens it.
+    // The grade was kept: See Your Feedback still opens it, as the quieter button (one primary on the card).
     expect(words(card.querySelector('[data-act="feedback"]'))).toBe('See Your Feedback');
+    expect(card.querySelectorAll('.sp-btn-primary')).toHaveLength(1);
+    expect(card.querySelector('[data-act="feedback"]').classList.contains('sp-btn-tint')).toBe(true);
+    // Needs Revision leads To Do (the board's "1 of 3").
+    expect(page.root().querySelector('.sp-deck .sp-piece').getAttribute('data-piece')).toBe('demo-lab');
     // Never the teacher's name.
     expect(page.root().innerHTML).not.toMatch(/Rivera/);
   });
@@ -282,7 +286,8 @@ describe('Before and After (the boards "Before and After a Revision" and "… on
       'First Version, page 1',
       'Your Revision, page 1',
     ]);
-    const parts = r => [...r.querySelectorAll('.sp-ba-name, .sp-level, .sp-ba-same')].map(words);
+    const parts = r =>
+      [...r.querySelectorAll('.sp-ba-name, .sp-level, .sp-ba-old, .sp-ba-new, .sp-ba-same')].map(words);
     expect(qa(page, '.sp-ba-rows:not(.sp-ba-result) .sp-ba-row').map(parts)).toEqual([
       ['Communicating', 'Developing +', 'Proficient'],
       ['Questioning and Predicting', 'No change', 'Proficient'],
