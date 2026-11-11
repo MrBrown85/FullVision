@@ -268,6 +268,16 @@ describe('a real send: start, each file to its link, finish', () => {
       'One of your pages couldn’t be sent. Check your pages, then send again.',
       1,
     ],
+    // The piece hidden or the student withdrawn: sending again won't help.
+    ['send-start', { ok: false, error: 'not_found' }, 'This one can’t take your work right now. Ask your teacher.', 1],
+    ['send-finish', { ok: false, error: 'not_found' }, 'This one can’t take your work right now. Ask your teacher.', 1],
+    // An answer the page doesn't understand, from a connection that works: not Not Sent Yet.
+    [
+      'send-start',
+      { ok: false, error: 'bad_request' },
+      'Something went wrong sending this. Try again later, or ask your teacher.',
+      1,
+    ],
   ])('%s answers %j: the check screen says so', async (route, said, line, kept) => {
     const dev = school();
     const page = await signIn(dev);
@@ -294,6 +304,36 @@ describe('a real send: start, each file to its link, finish', () => {
     expect(text(page, '#sp-send-title')).toBe('Not sent yet');
     const starts = bodyOf(page, 'send-start');
     expect(starts[1].request_id).not.toBe(starts[0].request_id);
+  });
+
+  it.each([
+    ['too_many', { ok: false, error: 'too_many', retry_after_s: 60 }],
+    ['card_locked', { ok: false, error: 'card_locked' }],
+    ['too_many_pages', { ok: false, error: 'too_many_pages', room: 5 }],
+  ])('a page added after %s is kept on the device with the others', async (why, said) => {
+    const dev = school();
+    const page = await signIn(dev);
+    dev.answer = body => (body.route === 'send-start' ? said : null);
+    await sendFair(page, 1);
+    expect(text(page, '#sp-send-title')).toBe('Check and Send');
+    expect(dev.kept.rows.size).toBe(1);
+    await page.T.sendFiles([{}], -1);
+    await page.settle();
+    page.type('#sp-send-note', 'Two pages now.');
+    dev.answer = body => (body.route === 'send-start' ? { ok: false, error: 'network' } : null);
+    await page.click('[data-act="send-go"]');
+    expect(text(page, '#sp-send-title')).toBe('Not sent yet');
+    expect(dev.kept.rows.size).toBe(2);
+    expect([...dev.kept.rows.values()].map(r => r.meta.note)).toEqual(['Two pages now.', 'Two pages now.']);
+  });
+
+  it('a send names its student: nothing is asked while someone else is signed in', async () => {
+    const dev = school();
+    const page = await signIn(dev);
+    const before = page.calls.length;
+    const said = await page.run('StudentPage.askClass("send-start", { assessment_id: "x" }, "someone-else")');
+    expect(said).toEqual({ ok: false, error: 'other_student' });
+    expect(page.calls.length).toBe(before);
   });
 
   it('a session that ended while sending: the card’s first screen, signed out', async () => {
@@ -393,6 +433,13 @@ describe('Unsend and Replace, and the teacher’s pages', () => {
     await page.click('[data-act="send-ask-yes"]');
     expect(text(page, '#sp-send-ask-title')).toBe('Not Unsent');
     expect(text(page, '#sp-send-ask-body')).toBe('Your teacher has started grading this. Ask your teacher instead.');
+    await page.click('[data-act="send-ask-no"]');
+
+    // A refusal is not a lost connection.
+    dev.answer = body => (body.route === 'unsend' ? { ok: false, error: 'not_found' } : null);
+    await page.click(piece(WORK.fair) + ' [data-act="send-unsend"]');
+    await page.click('[data-act="send-ask-yes"]');
+    expect(text(page, '#sp-send-ask-body')).toBe('This one can’t be unsent right now. Ask your teacher.');
     await page.click('[data-act="send-ask-no"]');
 
     dev.answer = null;
