@@ -82,7 +82,10 @@ test('the dashboard, the gradebook and Assignments give the same number', async 
   await expect(page.locator('.assess-card')).toHaveCount(1);
   await shot(page, 'S6-F4-assignments-to-grade-1366');
   // Open the card: its buttons show on an open card.
-  await page.locator('#ac-' + LAB + ' .assess-title, #ac-' + LAB + ' h3').first().click();
+  await page
+    .locator('#ac-' + LAB + ' .assess-title, #ac-' + LAB + ' h3')
+    .first()
+    .click();
   await page.locator('.assess-grade-work-btn[data-aid="' + LAB + '"]').click();
   const dialog = page.locator('#grader-overlay .grader-dialog');
   await expect(dialog).toHaveClass(/has-work/);
