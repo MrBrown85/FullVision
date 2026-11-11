@@ -13,6 +13,8 @@
      Make and Print, Print Again, Print New Card, New Codes for This Class,
      Unlock and Unlock All (teacher/student-cards.js).
    - S0-W1: the build switch itself, at the build address only.
+   - S4-F6: Preview as Student, a student list and Preview
+     (teacher/preview-student.js).
 
    What later PRs add, none of which needs to change dash-class-manager.js:
 
@@ -20,8 +22,7 @@
    - S5-F1: Send Work and Keep Photos Until.
    - S8-F1: the reminder and the "photos go for good" line on Keep Photos
      Until.
-   - Then Preview as Student (S4), Reflect on Feedback (S10) and Show My
-     Learning (S13).
+   - Then Reflect on Feedback (S10) and Show My Learning (S13).
 
    DashClassManager asks isShown(cid) before it draws the tab, opens it or
    builds its panel, and while the tab is shown hands over every sp* action,
@@ -373,10 +374,72 @@ var CmStudentPage = (function () {
     _askThenMake(cid, 'switch', { student_page_enabled: false }, 'sp-build-switch');
   }
 
+  /* ── Preview as Student ────────────────────────────────────── */
+
+  // The student the list shows, by class: the last one previewed.
+  var _previewFor = {};
+
+  function _previewCard(cid) {
+    if (typeof PreviewStudent === 'undefined') return '';
+    var students = typeof sortStudents === 'function' ? sortStudents(getStudents(cid) || [], 'lastName') : [];
+    if (!students.length) return '';
+    var chosen = _previewFor[cid];
+    if (
+      !students.some(function (s) {
+        return s.id === chosen;
+      })
+    )
+      chosen = students[0].id;
+    return (
+      '<div class="cm-section sp-card sp-preview" data-cid="' +
+      esc(cid) +
+      '">' +
+      '<h2 class="cm-grade-title">Preview as Student</h2>' +
+      '<div class="cm-hint" id="sp-preview-hint">' +
+      esc('See the page exactly as one student sees it. Nothing is sent.') +
+      '</div>' +
+      '<div class="sp-preview-row">' +
+      '<select class="cm-input sp-preview-select" id="sp-preview-student" data-action-change="spPreviewStudent" aria-label="Student" aria-describedby="sp-preview-hint">' +
+      students
+        .map(function (s) {
+          return (
+            '<option value="' +
+            esc(s.id) +
+            '"' +
+            (s.id === chosen ? ' selected' : '') +
+            '>' +
+            esc(displayNameWithLast(s)) +
+            '</option>'
+          );
+        })
+        .join('') +
+      '</select>' +
+      '<button type="button" class="btn btn-secondary" id="sp-preview-open" data-action="spPreview">Open Preview</button>' +
+      '</div>' +
+      '</div>'
+    );
+  }
+
+  function _openPreview(cid, el) {
+    if (!cid || _settings(cid).student_page !== true || typeof PreviewStudent === 'undefined') return;
+    var box = el && el.closest ? el.closest('.sp-preview') : null;
+    var select = box ? box.querySelector('#sp-preview-student') : null;
+    var sid = (select && select.value) || _previewFor[cid];
+    if (!sid) return;
+    _previewFor[cid] = sid;
+    PreviewStudent.open(cid, sid, el, 'sp-preview-open');
+  }
+
   /* ── The panel ─────────────────────────────────────────────── */
 
   // The panel's HTML for a class: nothing for a class without the tab.
   function render(cid) {
+    // A preview that is open draws again with the class (rows that loaded,
+    // a change); on another class, or one whose page is off, it closes.
+    if (typeof PreviewStudent !== 'undefined' && PreviewStudent.isOpen()) {
+      if (isShown(cid) && _settings(cid).student_page === true) PreviewStudent.refresh(cid);
+      else PreviewStudent.close();
+    }
     if (!isShown(cid)) return '';
     var on = _settings(cid).student_page;
     return (
@@ -388,7 +451,8 @@ var CmStudentPage = (function () {
           '<h2 class="cm-grade-title">Student Page</h2>' +
           _returnGradesRow(cid) +
           '</div>' +
-          (typeof StudentCards !== 'undefined' ? StudentCards.render(cid) : '')
+          (typeof StudentCards !== 'undefined' ? StudentCards.render(cid) : '') +
+          _previewCard(cid)
         : '')
     );
   }
@@ -400,6 +464,10 @@ var CmStudentPage = (function () {
       if (typeof StudentCards === 'undefined' || !cid || _settings(cid).student_page !== true) return false;
       return StudentCards.handleAction(action, el);
     }
+    if (action === 'spPreview') {
+      _openPreview(_cid(el), el);
+      return true;
+    }
     if (action !== 'spReturnGrades') return false;
     _chooseReturnGrades(_cid(el), el && el.dataset ? el.dataset.value : null);
     return true;
@@ -410,6 +478,11 @@ var CmStudentPage = (function () {
       var cid = _cid(el);
       if (typeof StudentCards === 'undefined' || !cid || _settings(cid).student_page !== true) return false;
       return StudentCards.handleChange(el);
+    }
+    if (el && el.dataset && el.dataset.actionChange === 'spPreviewStudent') {
+      var on = _cid(el);
+      if (on) _previewFor[on] = el.value;
+      return true;
     }
     if (!el || !el.dataset || el.dataset.actionChange !== 'spBuildSwitch') return false;
     _turnBuildSwitch(_cid(el), el);
@@ -425,6 +498,7 @@ var CmStudentPage = (function () {
     _buildFlag = _addressHasBuildFlag();
     _state = {};
     _classOnScreen = null;
+    _previewFor = {};
   }
   // Tests: as if the app had been opened at the build address, or not.
   function _setBuildFlag(on) {
