@@ -105,6 +105,24 @@ def score_fingerprint():
                           || coalesce((select string_agg(x::text, '|' order by x::text) from rubric_score x), '')
                           || coalesce((select string_agg(x::text, '|' order by x::text) from rubric_check_score x), ''))""")
 
+def keyed_cards():
+    """True when 2026111003_card_codes_keyed.sql (S3-M1) is applied: cards are made and found by tag."""
+    return one("select to_regprocedure('student_submit.issue_cards(uuid,uuid,jsonb,text,uuid)') is not null")
+
+def card_session(enrollment=ENR1, birthday='2012-05-15', course=COURSE_A, teacher=A):
+    """A card for one student and a phone signed in with it, the way this database makes cards: Batch A's
+    (the code is read back from the table), or by tag once S3-M1 is applied (card_codes_common.py plays
+    the edge functions, with its fake key). Returns the session token."""
+    if not keyed_cards():
+        rpc(teacher, 'issue_student_cards(:c, null, :k)', c=course, k=key())
+        code = one('select code from student_card where enrollment_id = :e and stopped_at is null', e=enrollment)
+        return svc("student_submit.verify_card(:c, :b, null, null, null, 'ip-1', false)", c=code, b=birthday)['session_token']
+    import card_codes_common as cc
+    p = cc.Printed([(enrollment, one('select id from student_card where enrollment_id = :e and stopped_at is null', e=enrollment))])
+    reply = svc('student_submit.issue_cards(:t, :c, :i::jsonb, :k, null)', t=teacher, c=course, i=p.json(), k=cc.KEY_ID)
+    code = p.codes(reply)[enrollment][0]
+    return svc("student_submit.verify_card(:h, :k, :b, null, null, null, 'ip-1', false)", h=cc.code_tag(code), k=cc.KEY_ID, b=birthday)['session_token']
+
 def live_md5(before_s0_m5=False):
     """name -> md5 of the live function. before_s0_m5: as the four that S0-M5 changed were before it (the file's marked lines)."""
     want = {}; before = {}

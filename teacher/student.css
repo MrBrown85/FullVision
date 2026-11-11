@@ -3575,9 +3575,15 @@ button.stu-bd-row:focus-visible {
 
 /* ── Overview tab (teacher/page-student.js, "Overview tab") ──
    Read across a desk: what the student reads is 16–20px and plain; the
-   teacher's controls are 13px. Blue is the grade "if handed in"; red is
-   Missing, as everywhere in the app. */
+   teacher's controls are 13px. The student page's design rules
+   (docs/plans/teacher-student-page-redesign-plan.md): square 4px chips;
+   blue only for actions, links and selection; orange for what needs
+   attention (missing work); level colours only on levels; a dashed line
+   and a lock for what only the teacher sees; 44pt targets on touch. */
 .stu-ov {
+  --ov-att: #c2410c;
+  --ov-att-bg: #fff1e6;
+  --ov-att-text: #9a3412;
   display: flex;
   flex-direction: column;
   gap: 24px;
@@ -3621,7 +3627,7 @@ button.stu-bd-row:focus-visible {
   background: var(--overlay-hover);
 }
 .stu-ov :focus-visible {
-  outline: 2px solid var(--text);
+  outline: 2px solid var(--active);
   outline-offset: 2px;
 }
 .stu-ov-card {
@@ -3697,10 +3703,12 @@ button.stu-bd-row:focus-visible {
   color: var(--text-2);
 }
 .stu-ov-proj .stu-ov-label,
-.stu-ov-proj .stu-ov-letter,
 .stu-ov-proj .stu-ov-pct,
 .stu-ov-proj-note {
-  color: var(--score-4-text);
+  color: var(--text-2);
+}
+.stu-ov-proj-note strong {
+  color: var(--text);
 }
 .stu-ov-proj-note {
   margin-top: 16px;
@@ -3737,7 +3745,7 @@ button.stu-bd-row:focus-visible {
   position: absolute;
   top: 0;
   height: 10px;
-  background: repeating-linear-gradient(90deg, var(--score-4) 0 4px, transparent 4px 7px);
+  background: repeating-linear-gradient(90deg, var(--text-3) 0 4px, transparent 4px 7px);
   opacity: 0.6;
 }
 .stu-ov-pin {
@@ -3753,7 +3761,7 @@ button.stu-bd-row:focus-visible {
   width: 10px;
   margin-left: -5px;
   background: var(--surface);
-  border: 2px solid var(--score-4);
+  border: 2px solid var(--text);
   box-sizing: border-box;
 }
 .stu-ov-names {
@@ -3772,21 +3780,21 @@ button.stu-bd-row:focus-visible {
 }
 .stu-ov-band-name.proj {
   font-weight: 700;
-  color: var(--score-4-text);
+  color: var(--text);
 }
 .stu-ov-miss {
   flex: 1 1 220px;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  background: var(--score-1-bg);
+  background: var(--ov-att-bg);
   border-color: transparent;
 }
 .stu-ov-miss .stu-ov-label,
 .stu-ov-miss .stu-ov-sub,
 .stu-ov-miss-n,
 .stu-ov-miss-cost {
-  color: var(--score-1-text);
+  color: var(--ov-att-text);
 }
 .stu-ov-miss-n {
   font-size: 4.75rem;
@@ -3839,7 +3847,7 @@ button.stu-bd-row:focus-visible {
   font-size: var(--text-sm);
   font-weight: 700;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 4px;
   background: var(--text);
   color: var(--surface);
 }
@@ -3882,9 +3890,10 @@ button.stu-bd-row:focus-visible {
   font-size: 1rem;
   font-weight: 700;
   padding: 4px 12px;
-  border-radius: 999px;
-  background: var(--score-4-bg);
-  color: var(--score-4-text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
   white-space: nowrap;
 }
 .stu-ov-more {
@@ -3932,7 +3941,7 @@ button.stu-bd-row:focus-visible {
   border-top: 1px solid var(--border);
 }
 .stu-ov-row.open {
-  box-shadow: inset 3px 0 0 var(--text);
+  box-shadow: inset 3px 0 0 var(--active);
 }
 .stu-ov-row-btn {
   width: 100%;
@@ -3981,7 +3990,7 @@ button.stu-bd-row:focus-visible {
   font-weight: 700;
 }
 .stu-ov-row-score.miss .stu-ov-row-main-score {
-  color: var(--score-1);
+  color: var(--ov-att);
 }
 .stu-ov-row-score.quiet .stu-ov-row-main-score {
   font-size: 1rem;
@@ -4007,12 +4016,12 @@ button.stu-bd-row:focus-visible {
   font-size: var(--text-sm);
   font-weight: 700;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 4px;
   vertical-align: 1px;
 }
 .stu-ov-pill.miss {
-  background: var(--score-1-bg);
-  color: var(--score-1-text);
+  background: var(--ov-att-bg);
+  color: var(--ov-att-text);
 }
 .stu-ov-pill.late {
   background: var(--score-2-bg);
@@ -4070,7 +4079,7 @@ button.stu-bd-row:focus-visible {
   font-weight: 700;
 }
 .stu-ov-fact dd.proj {
-  color: var(--score-4-text);
+  color: var(--text);
 }
 .stu-ov-rubric {
   border: 1px solid var(--border);
@@ -4141,9 +4150,59 @@ button.stu-bd-row:focus-visible {
   line-height: 1.35;
 }
 .stu-ov-teacher {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
   padding-top: 16px;
-  border-top: 1px solid var(--border);
+  border-top: 1px dashed var(--border);
   font-size: var(--text-sm);
+}
+/* What only the teacher sees: a lock and "Only You". */
+.stu-ov-only {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+/* A filter on All Your Work: square chips, a light blue tint when on. */
+.stu-ov-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.stu-ov-chip {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.stu-ov-chip:hover {
+  background: var(--overlay-hover);
+}
+.stu-ov-chip[aria-pressed='true'] {
+  border-color: transparent;
+  background: var(--active-light);
+  color: var(--link);
+}
+@media (pointer: coarse) {
+  .stu-ov button {
+    min-height: 44px;
+  }
+}
+@media (prefers-color-scheme: dark) {
+  .stu-ov {
+    --ov-att: #ff9f45;
+    --ov-att-bg: rgba(255, 149, 0, 0.18);
+    --ov-att-text: #ffb86b;
+  }
 }
 .stu-ov-foot {
   margin: 0;

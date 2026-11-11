@@ -130,8 +130,12 @@ and both kind checks rebuilt. `_phone_report_json` came back without
 `reply_questionnaire_id` or `replied_at`, no function still named the
 column, a `report_reply` template insert failed the check, and an unknown
 token to `submit` still returned `expired`. A read afterwards showed nothing
-had changed. `phone_reports.py` and `questionnaires.py` test the Oct 25
-migrations as they were and still expect the reply.
+had changed. `phone_reports.py` and `questionnaires.py` were written for the
+Oct 25 migrations and expected the reply. Since 2026-11-10 they read which
+database they are given: with this migration loaded (as live has it)
+`phone_reports.py` checks the reply is gone (35 checks; 37 where it still
+exists) and `questionnaires.py` counts 17 templates, not 18 (42 either way).
+See "S3-M1" below for why the harness now loads this file.
 
 ## Score RPCs (2026-11-09)
 
@@ -941,7 +945,14 @@ part does, what students see after it, what still runs, what it leaves.
 S0-M4b stands on Batch A and has its own undo, `s0-m4b-undo.sql`. PART 1 and
 PART 1B here run as they are and touch nothing of S0-M4b; PART 1A needs
 S0-M4b's fast stop first; PART 2 needs the whole of S0-M4b's undo first.
-Each refuses without it. S0-M5 is left alone throughout. In short:
+Each refuses without it. S0-M5 is left alone throughout.
+
+S3-M1 (`../2026111003_card_codes_keyed.sql`, card codes the database cannot
+read; see the section below) stands on Batch A too once it is applied, and
+has its own undo, `s3-m1-undo.sql`. PART 1, 1A and 1B run with it applied
+and touch nothing of it; PART 2 refuses, says so first, and names what it
+found of S3-M1. The order is S3-M1's undo, then S0-M4b's, then PART 2
+(scenario `s3-m1`). In short:
 
 - **PART 1, the fast stop:** drops Batch A's 18 triggers and nothing else,
   one table at a time (`course` first), each in its own transaction that
@@ -1064,7 +1075,8 @@ on live):
     A**, the only tables that differ are the eleven the teacher's own saves,
     new pieces, rubric move and restore wrote in between. The suites from
     before Batch A pass (`student_submit.py` 79, `questionnaire_identity.py`
-    47, `phone_reports.py` 37, `questionnaires.py` 42), and `score_rpcs.py`
+    47, `phone_reports.py` 35 since its template is built as live has it,
+    37 before; `questionnaires.py` 42), and `score_rpcs.py`
     passes 182 of its 183 checks on this database: the one that fails
     compares the score tables with `docs/schema.generated.sql`, which
     describes the live database with Batch A in it. That is the snapshot
@@ -1144,10 +1156,25 @@ on live):
 - **without.** A database without S0-M4b (never applied, or already
   undone): PART 1 lists nothing, PART 1A runs straight after it, the
   pre-check says S0-M4b is not on top, PART 2 runs.
+- **s3-m1.** Everything applied and used, then S3-M1 on top. The pre-check's
+  first two rows say S0-M4b and S3-M1 are both on top, and it lists nothing
+  else. PART 2 stops before it changes anything (catalog and rows
+  compared): it says S3-M1 is applied and to run `s3-m1-undo.sql` first,
+  names its functions, its key-id table and its columns, indexes and
+  constraints on `student_card`, then says the same of S0-M4b, and names
+  nothing else. PART 1, S0-M4b's fast stop, PART 1A and PART 1B run and
+  leave every catalog line of S3-M1's as it was. After S3-M1's own undo the
+  pre-check says S3-M1 is not on top and PART 2 stops for S0-M4b alone;
+  after S0-M4b's undo PART 2 runs, and the catalog is the one from before
+  Batch A but for S0-M5 and the three slots on `course`: S3-M1 and its undo
+  leave no trace. Everything, S3-M1 included, applies again.
 
-Result on 2026-11-10: **158 of 158 on PostgreSQL 17.11 (port 54331), which is what
-production runs, and 158 of 158 on 18.6 (port 54329)**, the same checks with the
-same results.
+Result on 2026-11-10: **169 of 169 on PostgreSQL 17.11 (port 54331), which is what
+production runs, and on 18.6 (port 54329)**, the same checks with the same
+results (158 before the `s3-m1` scenario was added). Its template now loads
+the two migrations live has and the earlier lists left out (see "S3-M1"
+below), so `student_submit`'s `_norm`, `check` and `submit` are the live
+functions here too.
 
 `batch_a_undo_load.py`: six connections saving in a loop (points, a rubric
 fill, one criterion, a comment, a clear, a change to the class itself: the
@@ -1194,3 +1221,226 @@ when nobody is saving.
 Not verified: pg_cron and Supabase's real migration record (stand-ins
 here); S0-M4b's own undo against looping saves (its own tests' business); the edge function and the app against a database after PART 2;
 anything on `gradebook-prod` itself.
+
+## S3-M1: card codes the database cannot read (2026-11-10)
+
+`../2026111003_card_codes_keyed.sql` stops every card, drops the readable
+`code`, `code_hash`, `salt` and `password` from `student_card`, and keeps a
+keyed tag of each new card's code instead (`code_hmac`), made by the edge
+functions with a key the database never sees. Cards are made by
+`student_submit.issue_cards` and found by `student_submit.card` and
+`verify_card`, all called with tags only. It **deletes data** (every card's
+code and password), so it is tested here only and waits for the owner.
+
+It is tested on the database as live is since 2026-11-10 17:12 UTC: the
+harness, S0-M4, Batch A's four files, S0-M5, S0-M4b. `card_codes.py build`
+loads exactly that into an empty database (`card_codes_common.LIVE`: the
+list under "S0-M4b" above with that file added, and two more migrations,
+below). That database is only a template: every scenario copies it
+(`<PGDATABASE>_<scenario>`, made and dropped by the script), so the scripts
+can be run again and again.
+
+**Two migrations the earlier lists leave out.** The read-only pre-check
+(`s3-m1-live-precheck.sql`) was run on `gradebook-prod` on 2026-11-10 by
+the orchestrator. Everything the migration changes matched. It listed
+three functions the migration does not touch, `student_submit._norm`,
+`check` and `submit`, as differing from the harness. The cause was the
+harness: the lists under "Batch A" and "S0-M4b" above never loaded
+`../20261102_housekeeping_fk_indexes.sql` (it gives `_norm` an empty
+`search_path`) or `../20261107_no_report_reply.sql` (it rewrites `check` and
+`submit`: a report is for reading), both applied to live before Batch A.
+`card_codes_common.LIVE` and `batch_a_undo.py`'s list now load both, after
+`20261103_slip_password_kept_for_live_slips.sql`. Three statements of the
+first are left out, by name, because they touch things this stand-in does
+not have (two indexes on the report-issue tables, and
+`fv_check_reporting_terms`). With them the three functions come out with
+the live fingerprints exactly (`276ee00a…`, `cc54e80c…`, `90ace3c1…`,
+recorded in `live-function-md5.txt`; `card_codes.py` checks them on every
+run). No earlier record carried these three, so no recorded fingerprint was
+wrong; but every database built from the earlier lists has the older
+`check` and `submit`. Owed: the same two files in the lists under
+"Batch A" and "S0-M4b" and in `search_path.py`'s own list, with those
+suites rerun.
+
+```bash
+PGPORT=54331 PGDATABASE=s3m1_live python3 card_codes.py build    # an empty database: live as it is now, without S3-M1
+PGPORT=54331 PGDATABASE=s3m1_live python3 card_codes.py          # the migration, about two minutes
+PGPORT=54331 PGDATABASE=s3m1_live python3 card_codes_undo.py     # its undo
+PGPORT=54331 PGDATABASE=fv_undo python3 batch_a_undo.py s3-m1    # Batch A's undo with S3-M1 on top (its own template)
+```
+
+**The edge functions' part is played in Python** (`card_codes_common.py`),
+with a fixed fake key: a code is drawn from the slip alphabet, eight
+characters; its tag is HMAC-SHA-256 of `fv.card.code.v1`, a newline and the
+code; the password's tag is `fv.card.pass.v1`, the code and the four
+digits; the key id is the first eight hex characters of the tag of
+`fv.card.keyid.v1`. Those are the formats `card-codes-contract.md` fixes.
+The database is sent tags and nothing else, as it will be.
+
+`card_codes.py`, by scenario:
+
+- **apply.** The file meets a database in use the old way: cards for two
+  teachers' classes, one replaced once, a signed-in phone, a live slip,
+  four remembered card answers. Its shape (one transaction, lock timeout,
+  guard first; it never names pgcrypto's keyed-hash function). Each guard
+  stops it at the guard with nothing changed: each of the nine functions it
+  drops, replaces or patches with one space more in its body; one missing;
+  one of its new names already taken; Batch A, S0-M4b or S0-M5 missing; a
+  function the repo does not know that reads `student_card`, in `public`
+  and in another schema (one that only mentions it in a comment does not
+  stop it); an `auth.uid()` that would not answer with the id
+  `issue_cards` sets; a card row held by another session (it gives up at
+  five seconds). The two read-only queries written for the live database
+  (`s3-m1-live-precheck.sql`) are run here: nothing listed, the counts
+  right, and each kind of difference noticed. Then the apply: the four
+  columns gone and the four new ones there; every live card stopped and
+  the already-stopped one untouched; nothing else about a card changed; no
+  old card given a tag; card numbers in the order cards were made; the
+  signed-in phone told `card_stopped`; the remembered card answers deleted
+  and no other; **no row of any other table changed**; every catalog line
+  that changed is about the cards, the key-id table or the fifteen
+  functions the header lists, and `open`, `verify`, `check`, `submit`,
+  `page`, `seen`, `done` and `_returned_grade` are byte for byte what they
+  were; the two slip issuers back at their fingerprints from before
+  Batch A, the old slip still opening and new questionnaire and report
+  slips issued; the old functions gone and an old edge function or the
+  released site getting an error, not an answer; who can read and run what;
+  the post-check (`s3-m1-live-postcheck.sql`) empty, and noticing a grant,
+  a policy, a helper opened up and a changed function. **The table's file
+  on disk** is read before and after (the script reads the server's own
+  data directory; it skips these checks where it cannot): before, it holds
+  the codes, hashes and salts; after, none of them, because the file
+  rewrites the table; and after the same column drop without a rewrite
+  they are still there. A card is then made the new way; **a second run
+  changes no catalog line and no row, and the card made since is still
+  live and still opens.** A second run on a database where one of the
+  file's own functions was changed by hand stops.
+- **cards.** The stand-in makes the same tags as the edge functions' own
+  known answers (`tests/card-key.test.js` on their branch). `issue_cards`
+  as the `teacher-cards` function calls it: the owner; results in the request's order; what is stored (the first
+  candidate's tag, the key id, a password tag only for a student with
+  nothing else on file); no tag in any reply and no code in any row of any
+  table; a replay returns the first answer without `candidate`, makes
+  nothing and returns no tag; another teacher's id, an id that is no
+  teacher, a deleted teacher, a deleted class; anon, a signed-in teacher
+  and even the service role kept from `_as_teacher`; the caller's id put
+  back as it was found, after a call that made a card and after a replay
+  (which returns early), with the harness's `auth.uid()`, with Supabase's
+  own (it reads either setting) and with one that reads only
+  `request.jwt.claims`; a stale `replaces` in four forms gives `changed`
+  and changes nothing; a withdrawn student, another class's and nobody's
+  give `not_found`; the second candidate used when the first one's tag is
+  taken; both taken gives `failed` **and the old card is still live**;
+  every malformed request refused whole (18 shapes, no items, four bad key
+  ids); the table's own constraints refusing a plain code, a live card
+  with no tag, a second live card; `needs_new` following the key id last
+  seen, and stopping nothing.
+- **lookup.** `card` and `verify_card` as `student-submit` calls them (its
+  own statements, word for word, among them): found by tag; closed, withdrawn, deleted, expired; a caller that sends
+  the wrong shape gets an error and nothing is logged; five wrong in a row
+  and fifteen in 7 days; Unlock; the password by its tag only (the right
+  digits tagged for another card, or under another key, do not open it); a
+  password that outlives a birthday added later; nothing on file answers
+  `reprint` and counts nothing; a replaced card answers `card_stopped`
+  from both, is logged with its id and never counts as a guess (400 scans
+  lock nobody out); 300 unknown codes from one address in 15 minutes, and
+  no everyone-is-busy stop; Add Another Card, the start screen, Done,
+  midnight; `page` and `seen` on a card made the new way, a draft never
+  shown; housekeeping; what the log keeps; temporary tables named
+  `teacher` and `course` fooling nothing; and a right answer on a card
+  that is replaced while the check waits for its row: it waits, then
+  `card_stopped`, and no session.
+- **race.** On connections of their own: two first cards for one student
+  at once, two replacements of one card at once, the first rolled back,
+  the same idempotency key twice at once, and 25 rounds of four requests
+  at once for two students listed in either order. One live card each,
+  the rest told `changed`, no deadlock, no error.
+- **grants.** The file's own revokes and grants, where nothing else would
+  hide a missing one. This stand-in, like live, gives a new function to its
+  owner alone by default, and anon and signed-in teachers cannot enter the
+  `student_submit` schema at all; with both in place a dropped `revoke`
+  changes nothing anyone can see. On this copy both are taken away first
+  (a new function is runnable by everyone, as in a plain Postgres): the
+  three helpers are still left to nobody, `card`, `verify_card` and
+  `issue_cards` to the service role alone, and anon and a signed-in
+  teacher are refused each of the six by the function itself.
+- **suites.** `student_submit.py` 79, `questionnaire_identity.py` 47,
+  `phone_reports.py` 35 and `questionnaires.py` 42 are run before the file
+  and again with it applied: the same result each time. The first two are
+  untouched; the other two now read whether the report reply exists (see
+  above), and 35 is what `phone_reports.py` has on a database built as
+  live. `score_rpcs.py` passes 235 of 236
+  until `docs/schema.generated.sql` is refreshed after the apply (its one
+  comparison with the live snapshot, which does not have the three new
+  argument lists yet), then 236. `grade_return.py` 284 and
+  `grade_return_limits.py` 74 pass: they now read which way the database
+  makes cards (`batch_a_common.card_session`, `keyed_cards`), so they run
+  with or without S3-M1.
+
+`s3-m1-undo.sql` (not a migration) and its proof, `card_codes_undo.py`:
+
+- **main.** Cards made and used the old way; the catalog (`catalog.py`,
+  about 2,100 lines) and a checksum of every table. S3-M1 applied and used
+  (new cards, a signed-in phone, a replaced card). Each of the undo's
+  checks stops it at its guard with nothing changed: each of S3-M1's nine
+  functions changed since; an old function back; a column, an index, a
+  constraint, a trigger, a policy, a foreign key or a view added to
+  `student_card` since; a function built on S3-M1 that reads the cards or
+  the key id; a card row held by another session. Then the undo: **the
+  catalog is the one from before S3-M1, line for line** (but for the
+  migration record, which the header's optional statement clears); every
+  card from before is there with what it had, stopped, with a stand-in for
+  its code, hash and salt and no password; the only tables whose rows
+  differ from before are the cards, the remembered answers and what using
+  it wrote (the sign-in log, the sessions); the table's file holds none of
+  the tags; S3-M1's functions are gone; Make Cards, a card scan, the page,
+  Reissue and slips work the old way; the undo refuses a second run and
+  changes nothing; **S3-M1 applies again to the same catalog as the first
+  time**; the undo again.
+- **apply-only.** Applied and undone with nothing in between: the catalog
+  is identical, and of every table only two differ: `student_card` (every
+  card stopped; the four columns of every row) and `fv_idempotency` (the
+  three card calls' rows S3-M1 deleted).
+- **suites.** After an apply and an undo, Batch A's own suites pass as
+  before: `student_page.py` 216, `grade_return.py` 284, `score_rpcs.py`
+  236, and the slip suites 79, 47, 35, 42.
+
+The undo makes `student_card` again from Batch A's own `create table`
+rather than adding the four columns back, so the table has the same columns
+in the same order and no dropped-column slots: that is why the catalog
+comes back identical, and why S3-M1 applied a second time gives exactly the
+first catalog.
+
+`batch-a-undo.sql` knows S3-M1 as it knows S0-M4b: PART 2 stops, says S3-M1
+is applied and to run `s3-m1-undo.sql` first, and names what it found of it
+apart from anything else; the header's pre-check has a second first row for
+it. `batch_a_undo.py s3-m1` proves the order S3-M1's undo, S0-M4b's undo,
+PART 2, and that PART 1, 1A and 1B run with S3-M1 applied and leave it
+alone.
+
+Result on 2026-11-10, on PostgreSQL 17.11 (port 54331, what production
+runs) and on 18.6 (port 54329), the same on both, on databases built as
+live has them (the two migrations above loaded): `card_codes.py` 306 of 306;
+`card_codes_undo.py` 67 of 67; `batch_a_undo.py` 169 of 169 (158 before its `s3-m1`
+scenario was added). Before the two migrations were loaded the same three
+gave 278, 67 and 169; `card_codes.py` has since gained the `grants`
+scenario and three checks on the replay path, after an independent review
+showed two mutations no check saw (the `revoke` on `_as_teacher` removed;
+the caller's id not put back on a replay). Both are caught now.
+
+Which older suites still run where. `student_page.py`, `grade_return_race.py`
+and `batch_a_undo.py`'s other scenarios make cards with `issue_student_cards`
+and read codes from the table, so they run on a database **without** S3-M1
+(the lists above still build one), and `student_page.py` passes again after
+S3-M1's undo. On a database with S3-M1, `card_codes.py` (cards, lookup)
+covers what `student_page.py` covers for cards, sessions, `page`, `seen`
+and `done`. Owed once S3-M1 is applied to live: `grade_return_race.py`'s
+six card rows moved to `issue_cards`, and `live-function-md5.txt` given
+the nine new fingerprints.
+
+Not verified here: the edge functions themselves (their own tests); the
+real key; `auth.uid()` as gradebook-prod defines it (the file tries it
+before it changes anything, and the pre-check reads it); Supabase's default
+privileges in `student_submit` (the post-check lists who can run what);
+how long the old values stay in gradebook-prod's write-ahead log and
+backups; anything on `gradebook-prod` itself.
