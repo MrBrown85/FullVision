@@ -2,9 +2,10 @@
 -- switch: the part that only adds (2026-11-11). Student page build plan,
 -- Batch C, first file (C1): S9-M1, S10-M1, S11-M1, S12-M1 and S13's column.
 -- docs/plans/student-page-build-plan.md 1.6 and slices S9 to S13;
--- DECISIONS, "Grades, photos and sign-in on the student page" 4, 10 and 11,
--- "Student page build answers" 6 (a grade hidden during a revision is a
--- draft). What the edge routes and the browser code against is
+-- DECISIONS, "Grades, photos and sign-in on the student page" 4, 10 and 11.
+-- Hiding a grade during a revision ("Student page build answers" 6) is not
+-- in Batch C (Colin, Nov 11: it comes later as its own change); Return for
+-- Revision keeps the grade. What the edge routes and the browser code against is
 -- migrations/local-test/batch-c-contract.md.
 --
 -- BATCH C APPLIES ONLY AFTER BATCH B (2026111101, 2026111102): it builds
@@ -12,13 +13,14 @@
 -- check stops it, with nothing changed, if Batch B is not there or not the
 -- version it was tested with.
 --
--- The second file, 2026111121_markup_revise_grade_changes.sql (C2), holds
--- the two things that change how a grade is returned or stored. It waits
--- for the owner's review. This file works without it: with this file alone
--- a teacher cannot hide a grade during a revision (the call answers
--- hide_not_available and changes nothing), and marks reach a student only
--- when the teacher's screen returns work through return_work (or saves them
--- in a class that returns grades as soon as they are saved).
+-- The second file, 2026111121_markup_revise_grade_changes.sql (C2), adds a
+-- trigger inside every Return: it gives the marks and stores a finished
+-- revision request as done whatever path returned the grade. It waits for
+-- the owner's review. This file works without it: marks reach a student
+-- only when the teacher's screen returns work through return_work (or
+-- saves them in a class that returns grades as soon as they are saved).
+-- With either file a request for Hide (keep_grade false) answers
+-- hide_not_available and changes nothing.
 --
 -- ── What it adds ────────────────────────────────────────────────────────────
 -- 1. Two class switches, each off: course.reflect_on_feedback (Reflect on
@@ -33,17 +35,14 @@
 --    row goes with its page (a foreign key to submission_file, on delete
 --    cascade), so a page the student unsent takes its marks with it.
 -- 3. public.revision_request: Return for Revision. What to Fix, Revise By,
---    which criteria, Keep or Hide the grade, the version it was asked of,
+--    which criteria, Keep the grade (always, in Batch C), the version it was asked of,
 --    and that version's grade as the student had it (for Before and
 --    After). A revision is the next version of the piece's submission
 --    (Batch B's version column): version 2, then 3. A request is closed
 --    as done, a stored fact, once its revision's grade is returned, or
 --    once the teacher returns the student's work with the revision in
 --    (return_work), even at the same grade; nothing done to the work or
---    the grade afterwards opens it again (_revision_settle). The columns
---    the second file (C2) keeps a hide in are here too: a hide is a
---    stored fact with a beginning and an end (grade_hidden, hidden_state,
---    hide_ended_at, hide_ended_by).
+--    the grade afterwards opens it again (_revision_settle).
 -- 4. public.feedback_reflection: Reflect on Feedback. Does the feedback make
 --    sense, the question, the plan, what went well; the teacher's answer;
 --    Does It Make Sense Now, and one follow-up question and its answer.
@@ -99,7 +98,7 @@
 -- into a link, has that student's enrollment id in it: an opaque id, never
 -- a name); a grade other than their own returned one
 -- (revision_request.first_grade is the copy they were given, cut to what
--- the work's scoring uses now, and not sent while the grade is hidden).
+-- the work's scoring uses now).
 --
 -- ── What it does to existing rows ───────────────────────────────────────────
 -- Nothing. Every class gets Reflect on Feedback and Show My Learning off.
@@ -232,8 +231,7 @@ begin
     end loop;
 
     -- A first run: none of this file's names may be taken. A later run:
-    -- each function is as this file leaves it, or (for the three C2
-    -- replaces) as C2 leaves it.
+    -- each function is as this file leaves it (C2 replaces none of them).
     for _f in
         select * from (values
             -- FINGERPRINTS-BEGIN new (written by migrations/local-test/batch_c_fingerprints.py)
@@ -241,25 +239,22 @@ begin
             ('public._work_feedback_truncated()',                                  '450e3b27b73c51d01f4c431adb402bbd', '450e3b27b73c51d01f4c431adb402bbd'),
             ('public._markup_check(jsonb)',                                        'd5fac66f176bf8f23391a7c6c19b053a', 'd5fac66f176bf8f23391a7c6c19b053a'),
             ('public._markup_give(uuid,uuid)',                                     'f0f07a1b879ff038e2f0afe020233c29', 'f0f07a1b879ff038e2f0afe020233c29'),
-            ('public._revision_hide_available()',                                  'cd50f4c6493a73b3c42ae51f7580f970', 'a4b4e942de351d6849702b96f25c7356'),
-            ('public._revision_hide_grade(uuid)',                                  '247080f6572bb45951cef807a2b849bd', 'a4c3f002d3bb2fc01e58ec5b8dab8ecb'),
-            ('public._revision_unhide_grade(uuid)',                                '26d2861325edf27f95d090ebd590eb0f', 'cbbc6fd7654c2b8677c7d210b5e15cc4'),
             ('public._piece_latest(uuid,uuid)',                                    'fee319ef4d87447eeac9b4d53a1f1b50', 'fee319ef4d87447eeac9b4d53a1f1b50'),
             ('public._revision_state(uuid)',                                       '808f6944ea937a32576729e48115e58d', '808f6944ea937a32576729e48115e58d'),
-            ('public._revision_settle(uuid,uuid,boolean)',                         '70e53be05334a41bd816d803735f9bef', '70e53be05334a41bd816d803735f9bef'),
-            ('public._revision_json(uuid)',                                        '969f930b121a6714edfde8052a4d876b', '969f930b121a6714edfde8052a4d876b'),
+            ('public._revision_settle(uuid,uuid,boolean)',                         '5abc02afbaa29294cdb317838657b37c', '5abc02afbaa29294cdb317838657b37c'),
+            ('public._revision_json(uuid)',                                        '4ea85d4b58243fc0d6512b31ac6d165e', '4ea85d4b58243fc0d6512b31ac6d165e'),
             ('public._reflection_json(uuid)',                                      'f089277294adaf7d7834b41a1e93d5fa', 'f089277294adaf7d7834b41a1e93d5fa'),
             ('public.set_course_feedback_options(uuid,jsonb,uuid)',                '1954af2eef430d63baa91d38e74106d2', '1954af2eef430d63baa91d38e74106d2'),
             ('public.save_markup(uuid,jsonb,integer,uuid)',                        '808290a14511b137bc5c1a4574016429', '808290a14511b137bc5c1a4574016429'),
             ('public.list_assessment_markup(uuid)',                                '5e64579a923a0f0c02791b6428e54d98', '5e64579a923a0f0c02791b6428e54d98'),
             ('public.return_work(uuid,uuid[],uuid)',                               '13f1d5ec77567d5909c49c493ad77b64', '13f1d5ec77567d5909c49c493ad77b64'),
-            ('public.return_for_revision(uuid,uuid,jsonb,uuid)',                   'cada3aa196107ccaf70b030a75b9a87f', 'cada3aa196107ccaf70b030a75b9a87f'),
+            ('public.return_for_revision(uuid,uuid,jsonb,uuid)',                   '0f3cc087f25815ba377919f68b870f36', '0f3cc087f25815ba377919f68b870f36'),
             ('public.set_revision_request(uuid,jsonb,uuid)',                       '6f9fb14cc1c8ced04cca7e0302c40b13', '6f9fb14cc1c8ced04cca7e0302c40b13'),
-            ('public.cancel_revision(uuid,uuid)',                                  '03f508a459eb621f868b699a0ea3f076', '03f508a459eb621f868b699a0ea3f076'),
+            ('public.cancel_revision(uuid,uuid)',                                  '15fb7d84333ed19b362e778b6667f377', '15fb7d84333ed19b362e778b6667f377'),
             ('public.answer_reflection(uuid,text,uuid,boolean)',                   '3dc0da991f10c092ae0a80202310d56f', '3dc0da991f10c092ae0a80202310d56f'),
             ('public.list_course_feedback(uuid)',                                  '7fbe6b367a0c28fd4dd2b894f0dc7711', '7fbe6b367a0c28fd4dd2b894f0dc7711'),
             ('student_submit._group_members(uuid,uuid)',                           'b38b1af6f2dc142c94ce1cca454fd0fb', 'b38b1af6f2dc142c94ce1cca454fd0fb'),
-            ('student_submit.feedback(text,uuid,text)',                            '099da3fbb372771e6a7b7342b3d98d29', '099da3fbb372771e6a7b7342b3d98d29'),
+            ('student_submit.feedback(text,uuid,text)',                            '4ee8ebfb4b2af25698d2fb3eafc7f9ea', '4ee8ebfb4b2af25698d2fb3eafc7f9ea'),
             ('student_submit.markup(text,uuid,uuid,text)',                         '6cc78118aa4e98252514826aabf957a9', '6cc78118aa4e98252514826aabf957a9'),
             ('student_submit.reflect(text,uuid,uuid,jsonb,text)',                  '7a4e2ab29d369ef159dce65e1e1e8f77', '7a4e2ab29d369ef159dce65e1e1e8f77'),
             ('student_submit.reply(text,uuid,uuid,jsonb,text)',                    '264a736a722cf19022c20c343ecb01fb', '264a736a722cf19022c20c343ecb01fb'),
@@ -410,9 +405,10 @@ create table if not exists public.revision_request (
     what_to_fix   text        not null constraint revision_request_what_to_fix_check check (char_length(what_to_fix) between 1 and 2000),
     revise_by     date,
     criterion_ids uuid[]      not null default '{}',
-    -- Keep this grade (true) or hide it from the student until the new
-    -- version is graded (false). Hiding is the second file's (C2).
-    keep_grade    boolean     not null default true,
+    -- Keep this grade while the student revises. Always true in Batch C:
+    -- a request to hide it is refused (hide_not_available). The column
+    -- keeps the request's shape for a later change that adds Hide.
+    keep_grade    boolean     not null default true constraint revision_request_keep_grade_check check (keep_grade),
     -- The version it was asked of: the piece's latest handed-in submission
     -- then (null when nothing was handed in: work on paper, graded as such).
     first_submission_id uuid,
@@ -435,31 +431,12 @@ create table if not exists public.revision_request (
     -- the revision's photos are deleted.
     revision_in_at timestamptz,
     in_returned_at timestamptz,
-    -- Hide (the second file, C2). A hide is a stored fact with a beginning
-    -- and an end. grade_hidden is true from the moment the grade is hidden
-    -- until the hide ends, and never true again for this request.
-    -- hidden_state is what the student had been given when it began (the
-    -- grade_return row's returned_at, updated_at and previous_copy, and the
-    -- copy they were shown), kept there whatever the teacher does to the
-    -- score meanwhile, so Take Back can give it back. hide_ended_at and
-    -- hide_ended_by say when and how it ended: 'returned' (a Return gave
-    -- the student a grade for the piece), 'taken_back' (Take Back gave the
-    -- kept grade back) or 'undone' (the second file's undo did).
-    grade_hidden  boolean     not null default false,
-    hidden_state  jsonb,
-    hide_ended_at timestamptz,
-    hide_ended_by text        constraint revision_request_hide_ended_by_check check (hide_ended_by in ('returned', 'taken_back', 'undone')),
     created_by    uuid,
     created_at    timestamptz not null default now(),
     updated_at    timestamptz not null default now(),
     closed_at     timestamptz,
     constraint revision_request_first_grade_object check (first_grade is null or jsonb_typeof(first_grade) = 'object'),
-    constraint revision_request_closed_has_time check ((state = 'open') = (closed_at is null)),
-    -- A hide that is on keeps what the student had, has not ended, and is
-    -- on an open request (so at most one per student and piece, by
-    -- revision_request_one_open).
-    constraint revision_request_hide_kept check (not grade_hidden or (hidden_state is not null and hide_ended_at is null and state = 'open')),
-    constraint revision_request_hide_ended_has_time check ((hide_ended_at is null) = (hide_ended_by is null))
+    constraint revision_request_closed_has_time check ((state = 'open') = (closed_at is null))
 );
 -- One open request per student per piece.
 create unique index if not exists revision_request_one_open on public.revision_request (assessment_id, enrollment_id) where state = 'open';
@@ -467,7 +444,7 @@ create index if not exists revision_request_assessment_idx on public.revision_re
 create index if not exists revision_request_enrollment_idx on public.revision_request (enrollment_id);
 create index if not exists revision_request_course_idx on public.revision_request (course_id);
 comment on table public.revision_request is
-    'Return for Revision: what to fix, by when, which criteria, keep or hide the grade, and the first version''s grade for Before and After. Read and written only through the functions of 2026111120 (and 2026111121''s hide).';
+    'Return for Revision: what to fix, by when, which criteria, and the first version''s grade for Before and After. Read and written only through the functions of 2026111120 (and closed as done by 2026111121''s trigger).';
 
 -- ── 4. feedback_reflection ──────────────────────────────────────────────────
 create table if not exists public.feedback_reflection (
@@ -684,56 +661,6 @@ begin
 end;
 $function$;
 
--- Three stand-ins the second file (C2) replaces. Made only when they are
--- not there, so running this file again after C2 leaves C2's in place.
---   _revision_hide_available()  whether a grade can be hidden during a
---                               revision: here, no
---   _revision_hide_grade(id)    hide the grade of a request from its
---                               student (called under the class's lock):
---                               here, nothing is hidden
---   _revision_unhide_grade(id)  give a hidden grade back: here, there is
---                               none to give
-do $stand_ins$
-begin
-    if to_regprocedure('public._revision_hide_available()') is null then
-        execute $f$
-create function public._revision_hide_available()
- returns boolean
- language sql
- immutable
- set search_path to 'public', 'pg_temp'
-as $function$
-    select false;
-$function$
-        $f$;
-    end if;
-    if to_regprocedure('public._revision_hide_grade(uuid)') is null then
-        execute $f$
-create function public._revision_hide_grade(p_request_id uuid)
- returns boolean
- language sql
- stable
- set search_path to 'public', 'pg_temp'
-as $function$
-    select false;
-$function$
-        $f$;
-    end if;
-    if to_regprocedure('public._revision_unhide_grade(uuid)') is null then
-        execute $f$
-create function public._revision_unhide_grade(p_request_id uuid)
- returns boolean
- language sql
- stable
- set search_path to 'public', 'pg_temp'
-as $function$
-    select false;
-$function$
-        $f$;
-    end if;
-end
-$stand_ins$;
-
 -- The student's handed-in work for one piece: the latest version first.
 -- (Batch B's tables; versions above 1 are revisions.)
 create or replace function public._piece_latest(p_assessment_id uuid, p_enrollment_id uuid)
@@ -796,8 +723,7 @@ $function$;
 -- photos deleted, the grade cleared and that returned), it stays done.
 -- Called under the class's lock by every Batch C function that writes a
 -- piece's requests or returns its work, and by the second file's trigger
--- each time a grade is returned by any path. Never closes a request whose
--- grade is hidden (a Return that gives a grade ends the hide first).
+-- each time a grade is returned by any path.
 -- p_returned: the teacher has just returned this student's work on the
 -- piece (return_work: Return, Return and Next, Return N Graded). Then a
 -- request whose revision is in is done too, even when its grade did not
@@ -815,7 +741,6 @@ begin
     update revision_request r
        set state = 'done', closed_at = now(), updated_at = now()
      where r.assessment_id = p_assessment_id and r.enrollment_id = p_enrollment_id and r.state = 'open'
-       and not r.grade_hidden
        and _revision_state(r.id)->>'state' in ('returned', case when p_returned then 'sent' end, case when p_returned then 'grading' end);
     get diagnostics _n = row_count;
     return _n;
@@ -833,7 +758,7 @@ as $function$
     select jsonb_build_object(
                'id', r.id, 'assessment_id', r.assessment_id, 'enrollment_id', r.enrollment_id,
                'what_to_fix', r.what_to_fix, 'revise_by', r.revise_by, 'criterion_ids', to_jsonb(r.criterion_ids),
-               'keep_grade', r.keep_grade, 'grade_hidden', r.grade_hidden,
+               'keep_grade', r.keep_grade, 'grade_hidden', false,
                'first_submission_id', r.first_submission_id, 'first_version', r.first_version,
                'first_grade', r.first_grade, 'first_returned_at', r.first_returned_at,
                'created_at', r.created_at, 'updated_at', r.updated_at, 'closed_at', r.closed_at)
@@ -1080,13 +1005,12 @@ $function$;
 --   { "what_to_fix": "...",           1 to 2000 characters, required
 --     "revise_by": "YYYY-MM-DD"|null,
 --     "criterion_ids": [ ... ],       criteria of the piece's rubric; may be empty
---     "keep_grade": true|false }      false: hide the grade (needs C2)
+--     "keep_grade": true|false }      false (hide the grade) is not in Batch C
 -- Answers (not errors; only made is remembered):
---   made               { result, request, returned }
+--   made               { result, request, returned, hidden } (hidden: false)
 --   already_open       an open request exists for the piece: { result, request }
---   hide_not_available keep_grade false and the second file is not applied
---   hide_needs_holding keep_grade false in a class that does not hold grades
---                      (a hidden grade is a draft, and such a class shows none)
+--   hide_not_available keep_grade false: Hide is not in Batch C. Nothing is
+--                      written. (A later change that adds Hide answers here.)
 --   not_for_dibels     a DIBELS benchmark is not revised
 -- Raises P0002 for an assessment or a student that is not the teacher's, a
 -- student of another class or a withdrawn one; 22023 for a wrong shape.
@@ -1111,7 +1035,6 @@ declare
     _g       grade_return%rowtype;
     _ret     jsonb;
     _id      uuid;
-    _hidden  boolean := false;
 begin
     if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
     if not fv_owns_assessment(p_assessment_id) then
@@ -1183,12 +1106,7 @@ begin
         return jsonb_build_object('result', 'already_open', 'request', _revision_json(_open.id));
     end if;
     if not _keep then
-        if not _revision_hide_available() then
-            return jsonb_build_object('result', 'hide_not_available');
-        end if;
-        if not _grade_return_holds(p_enrollment_id) then
-            return jsonb_build_object('result', 'hide_needs_holding');
-        end if;
+        return jsonb_build_object('result', 'hide_not_available');
     end if;
 
     -- The work is returned first, as Return would return it.
@@ -1204,17 +1122,14 @@ begin
             case when _g.returned_at is not null and not _g.is_draft then _g.returned_at end,
             (select auth.uid()))
     returning id into _id;
-    if not _keep then
-        _hidden := _revision_hide_grade(_id);
-    end if;
-    _cached := jsonb_build_object('result', 'made', 'request', _revision_json(_id), 'returned', _ret, 'hidden', _hidden);
+    _cached := jsonb_build_object('result', 'made', 'request', _revision_json(_id), 'returned', _ret, 'hidden', false);
     perform fv_idem_store(p_idempotency_key, 'return_for_revision', _cached);
     return _cached;
 end;
 $function$;
 
 -- Change an open request: any of what_to_fix, revise_by, criterion_ids.
--- Keep or Hide is not changed here (take the request back and ask again).
+-- keep_grade is not changed here.
 -- Answers { result: 'saved', request } or { result: 'not_open', request }.
 create or replace function public.set_revision_request(p_request_id uuid, p_patch jsonb, p_idempotency_key uuid default null)
  returns jsonb
@@ -1286,7 +1201,8 @@ end;
 $function$;
 
 -- Take a request back. A revision already sent stays, as a later version of
--- the work. A hidden grade is given back (C2).
+-- the work. No grade row is written (unhidden: always false; no grade is
+-- hidden in Batch C).
 -- Answers { result: 'cancelled', request, unhidden } or { result: 'not_open', request }.
 create or replace function public.cancel_revision(p_request_id uuid, p_idempotency_key uuid default null)
  returns jsonb
@@ -1298,7 +1214,6 @@ declare
     _cached   jsonb;
     _course   uuid;
     _r        revision_request%rowtype;
-    _unhidden boolean := false;
 begin
     if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
     select r.course_id into _course from revision_request r where r.id = p_request_id and fv_owns_course(r.course_id);
@@ -1314,11 +1229,8 @@ begin
     if _r.state <> 'open' then
         return jsonb_build_object('result', 'not_open', 'request', _revision_json(_r.id));
     end if;
-    if _r.grade_hidden then
-        _unhidden := _revision_unhide_grade(_r.id);
-    end if;
     update revision_request set state = 'cancelled', closed_at = now(), updated_at = now() where id = _r.id;
-    _cached := jsonb_build_object('result', 'cancelled', 'request', _revision_json(_r.id), 'unhidden', _unhidden);
+    _cached := jsonb_build_object('result', 'cancelled', 'request', _revision_json(_r.id), 'unhidden', false);
     perform fv_idem_store(p_idempotency_key, 'cancel_revision', _cached);
     return _cached;
 end;
@@ -1518,13 +1430,12 @@ begin
                           select jsonb_build_object(
                                      'state', st->>'state', 'what_to_fix', r.what_to_fix, 'revise_by', r.revise_by,
                                      'criterion_ids', to_jsonb(r.criterion_ids), 'keep_grade', r.keep_grade,
-                                     'grade_hidden', r.grade_hidden,
+                                     'grade_hidden', false,
                                      'first_version', r.first_version,
                                      'first_sent_at', (select x.sent_at from submission x where x.id = r.first_submission_id),
-                                     -- the first version's grade as the student had it: not while it is hidden, and
-                                     -- not while Missing or Excused is on the piece
-                                     'first_grade', case when r.grade_hidden then null
-                                                         when coalesce(s.status, '') in ('NS', 'EXC') then null
+                                     -- the first version's grade as the student had it: not while Missing or
+                                     -- Excused is on the piece
+                                     'first_grade', case when coalesce(s.status, '') in ('NS', 'EXC') then null
                                                          else public._grade_copy_in_use(r.first_grade, a.id) end,
                                      'revision_version', st->'revision_version', 'revision_sent_at', st->'revision_sent_at',
                                      'revision_note', case when st->>'revision_sent_by' = 'student' then st->'revision_note' end,
@@ -2287,9 +2198,6 @@ revoke all on function public._work_feedback_gone() from public, anon, authentic
 revoke all on function public._work_feedback_truncated() from public, anon, authenticated, service_role;
 revoke all on function public._markup_check(jsonb) from public, anon, authenticated, service_role;
 revoke all on function public._markup_give(uuid, uuid) from public, anon, authenticated, service_role;
-revoke all on function public._revision_hide_available() from public, anon, authenticated, service_role;
-revoke all on function public._revision_hide_grade(uuid) from public, anon, authenticated, service_role;
-revoke all on function public._revision_unhide_grade(uuid) from public, anon, authenticated, service_role;
 revoke all on function public._piece_latest(uuid, uuid) from public, anon, authenticated, service_role;
 revoke all on function public._revision_state(uuid) from public, anon, authenticated, service_role;
 revoke all on function public._revision_settle(uuid, uuid, boolean) from public, anon, authenticated, service_role;
@@ -2336,25 +2244,22 @@ begin
             ('public._work_feedback_truncated()',                                  '450e3b27b73c51d01f4c431adb402bbd', '450e3b27b73c51d01f4c431adb402bbd'),
             ('public._markup_check(jsonb)',                                        'd5fac66f176bf8f23391a7c6c19b053a', 'd5fac66f176bf8f23391a7c6c19b053a'),
             ('public._markup_give(uuid,uuid)',                                     'f0f07a1b879ff038e2f0afe020233c29', 'f0f07a1b879ff038e2f0afe020233c29'),
-            ('public._revision_hide_available()',                                  'cd50f4c6493a73b3c42ae51f7580f970', 'a4b4e942de351d6849702b96f25c7356'),
-            ('public._revision_hide_grade(uuid)',                                  '247080f6572bb45951cef807a2b849bd', 'a4c3f002d3bb2fc01e58ec5b8dab8ecb'),
-            ('public._revision_unhide_grade(uuid)',                                '26d2861325edf27f95d090ebd590eb0f', 'cbbc6fd7654c2b8677c7d210b5e15cc4'),
             ('public._piece_latest(uuid,uuid)',                                    'fee319ef4d87447eeac9b4d53a1f1b50', 'fee319ef4d87447eeac9b4d53a1f1b50'),
             ('public._revision_state(uuid)',                                       '808f6944ea937a32576729e48115e58d', '808f6944ea937a32576729e48115e58d'),
-            ('public._revision_settle(uuid,uuid,boolean)',                         '70e53be05334a41bd816d803735f9bef', '70e53be05334a41bd816d803735f9bef'),
-            ('public._revision_json(uuid)',                                        '969f930b121a6714edfde8052a4d876b', '969f930b121a6714edfde8052a4d876b'),
+            ('public._revision_settle(uuid,uuid,boolean)',                         '5abc02afbaa29294cdb317838657b37c', '5abc02afbaa29294cdb317838657b37c'),
+            ('public._revision_json(uuid)',                                        '4ea85d4b58243fc0d6512b31ac6d165e', '4ea85d4b58243fc0d6512b31ac6d165e'),
             ('public._reflection_json(uuid)',                                      'f089277294adaf7d7834b41a1e93d5fa', 'f089277294adaf7d7834b41a1e93d5fa'),
             ('public.set_course_feedback_options(uuid,jsonb,uuid)',                '1954af2eef430d63baa91d38e74106d2', '1954af2eef430d63baa91d38e74106d2'),
             ('public.save_markup(uuid,jsonb,integer,uuid)',                        '808290a14511b137bc5c1a4574016429', '808290a14511b137bc5c1a4574016429'),
             ('public.list_assessment_markup(uuid)',                                '5e64579a923a0f0c02791b6428e54d98', '5e64579a923a0f0c02791b6428e54d98'),
             ('public.return_work(uuid,uuid[],uuid)',                               '13f1d5ec77567d5909c49c493ad77b64', '13f1d5ec77567d5909c49c493ad77b64'),
-            ('public.return_for_revision(uuid,uuid,jsonb,uuid)',                   'cada3aa196107ccaf70b030a75b9a87f', 'cada3aa196107ccaf70b030a75b9a87f'),
+            ('public.return_for_revision(uuid,uuid,jsonb,uuid)',                   '0f3cc087f25815ba377919f68b870f36', '0f3cc087f25815ba377919f68b870f36'),
             ('public.set_revision_request(uuid,jsonb,uuid)',                       '6f9fb14cc1c8ced04cca7e0302c40b13', '6f9fb14cc1c8ced04cca7e0302c40b13'),
-            ('public.cancel_revision(uuid,uuid)',                                  '03f508a459eb621f868b699a0ea3f076', '03f508a459eb621f868b699a0ea3f076'),
+            ('public.cancel_revision(uuid,uuid)',                                  '15fb7d84333ed19b362e778b6667f377', '15fb7d84333ed19b362e778b6667f377'),
             ('public.answer_reflection(uuid,text,uuid,boolean)',                   '3dc0da991f10c092ae0a80202310d56f', '3dc0da991f10c092ae0a80202310d56f'),
             ('public.list_course_feedback(uuid)',                                  '7fbe6b367a0c28fd4dd2b894f0dc7711', '7fbe6b367a0c28fd4dd2b894f0dc7711'),
             ('student_submit._group_members(uuid,uuid)',                           'b38b1af6f2dc142c94ce1cca454fd0fb', 'b38b1af6f2dc142c94ce1cca454fd0fb'),
-            ('student_submit.feedback(text,uuid,text)',                            '099da3fbb372771e6a7b7342b3d98d29', '099da3fbb372771e6a7b7342b3d98d29'),
+            ('student_submit.feedback(text,uuid,text)',                            '4ee8ebfb4b2af25698d2fb3eafc7f9ea', '4ee8ebfb4b2af25698d2fb3eafc7f9ea'),
             ('student_submit.markup(text,uuid,uuid,text)',                         '6cc78118aa4e98252514826aabf957a9', '6cc78118aa4e98252514826aabf957a9'),
             ('student_submit.reflect(text,uuid,uuid,jsonb,text)',                  '7a4e2ab29d369ef159dce65e1e1e8f77', '7a4e2ab29d369ef159dce65e1e1e8f77'),
             ('student_submit.reply(text,uuid,uuid,jsonb,text)',                    '264a736a722cf19022c20c343ecb01fb', '264a736a722cf19022c20c343ecb01fb'),

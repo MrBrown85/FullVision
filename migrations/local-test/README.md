@@ -1662,14 +1662,13 @@ switches (`reflect_on_feedback`, `show_my_learning`), nine teacher RPCs, nine
 student functions and their helpers, and two triggers each on assessment and
 enrollment that delete the new rows with their student or piece. It changes
 no existing row, function, trigger, policy or grant.
-`../2026111121_markup_revise_grade_changes.sql` (C2) changes how a grade is
-returned or stored: it hides a student's grade during a revision (writing
-their `grade_return` row) and adds a trigger on `grade_return` that, whenever
-a grade is returned, gives the marks, ends a hide on the piece and stores a
-finished revision request as done. A hide is a stored fact on the request
-(`grade_hidden`, `hidden_state`, `hide_ended_at`, `hide_ended_by`, columns of
-C1's own table): it ends when a Return gives the student a grade for the
-piece, or when Take Back gives the kept grade back. C2 waits for the owner.
+`../2026111121_markup_revise_grade_changes.sql` (C2) adds one function and
+two triggers on `grade_return`: whenever a grade is returned (a write that
+stamps a new returned date), the marks on that piece are given and a
+finished revision request is stored as done. It writes no grade row. C2
+waits for the owner. Hiding a grade during a revision is not in Batch C
+(Colin, Nov 11): a request for it answers `hide_not_available` with either
+file, and nothing of Hide is in either.
 The contract for the edge routes and the browser is `batch-c-contract.md`.
 
 Batch C applies only after Batch B, so the harness builds the database as
@@ -1688,7 +1687,7 @@ export BATCH_B_DIR=/tmp/bb/migrations
 PGPORT=54361 PGDATABASE=bc python3 batch_c_common.py build        # an empty database: live as it will be with Batch B
 PGPORT=54361 PGDATABASE=bc python3 batch_c.py                     # both files, about two minutes
 PGPORT=54361 PGDATABASE=bc python3 batch_c_undo.py                # both undo scripts
-PGPORT=54361 PGDATABASE=bc python3 batch_c_mutate.py              # 99 wrong versions of the SQL, about thirty minutes
+PGPORT=54361 PGDATABASE=bc python3 batch_c_mutate.py              # 82 wrong versions of the SQL, about twenty minutes
 PGPORT=54361 PGDATABASE=bc python3 batch_c_fingerprints.py check  # are the fingerprint lists in the eight files current
 ```
 
@@ -1779,7 +1778,7 @@ for those three new rows.
   From Last Time; one student never sees another's; the student's calls
   change no grade row; deleting an assessment takes its reflections.
 - **revision**. `return_for_revision`: another teacher, another class,
-  nobody, eleven wrong shapes, DIBELS, Hide without C2; a refusal writes
+  nobody, eleven wrong shapes, DIBELS, Hide (not in Batch C); a refusal writes
   nothing; made: the work returned with it, the first version and its
   grade kept, replay, already open. `set_revision_request`. The student's
   revision: another student, a wrong shape, Batch B's `send_start` and
@@ -1806,24 +1805,15 @@ for those three new rows.
   the class lock and gets the first's answer; one row. A revision finishing
   while a grade is saved waits and sees it.
 - **apply2** (C2). Without C1 it stops; each guard stops it with nothing
-  changed; the pre-check is clean. Then **exactly three functions change
-  (C1's stand-ins), one is new, two triggers are added on `grade_return`,
-  nothing else in the catalog changes, and the apply changes no row**. The
-  post-check is clean and notices damage; a second run, and C1 run again
-  after C2, change nothing.
-- **hide** (C2). Hidden: **exactly that student's `grade_return` row
-  changes** (a draft never returned; `updated_at` cleared), no other row of
-  `grade_return` or `score`; the student page shows no grade and Before and
-  After does not show it; the teacher sees a draft; another student keeps
-  theirs; a revision can still be sent; returned, the new grade shows and
-  Before and After shows the first; Take Back gives it back exactly, or with
-  a change since waiting as a draft; a class that does not hold grades
-  refuses Hide; nothing returned: nothing hidden; leaving When I Return Them
-  gives it back.
+  changed (a function it relies on changed, a trigger name taken); the
+  pre-check is clean. Then **no existing function changes, one is new, two
+  triggers are added on `grade_return`, nothing else in the catalog
+  changes, and the apply changes no row**. The post-check is clean and
+  notices damage; a second run, and C1 run again after C2, change nothing.
 - **given** (C2). Marks given by `return_grades` from an older screen, by a
   class leaving When I Return Them, by a save in a class that returns at
   once, and when a grade's row is first made returned; not by a draft or a
-  `seen()` row; the C2 helpers are runnable by nobody but their owner.
+  `seen()` row; the trigger function is runnable by nobody but its owner.
 
 Review round 1 (`batch-c-review.md`; each scenario was committed first and
 failed on the reviewed code, `73ba899e`):
@@ -1848,28 +1838,51 @@ failed on the reviewed code, `73ba899e`):
   one); a changed question waits again; a real answer can then be sent and
   reaches the student; a follow-up noted Only Me is not sent, and a real
   follow-up answer can follow it.
-- **hide_round1** (C2's (a) 1 to 3 and (b) 9). Hidden, then each of
-  eleven things done to the score (`clear_score`, `upsert_score` with
-  nothing, `clear_row_scores`, `clear_column_scores`, a rubric level and
-  box cleared, the box alone, a change, Set Everyone To, two restores, the
-  nightly repair): the hide stays on, and Take Back gives back what the
-  student had with the change waiting as a draft (or, regraded and
-  returned, the new grade and the hide over). A Return ends the hide for
-  good: stored, told to both sides, and a later Take Back (after the
-  grade was cleared and that returned, and a new draft) gives nothing. A
-  Return that gives no grade (the hidden grade cleared) leaves it on.
-  Take Back gives no mark drawn while hidden; the next Return does. The
-  hidden revision's grade returned is Updated, "was" the grade the student
-  had; the same grade returned is not.
+  (The first round's Hide checks, `hide` and `hide_round1`, went out with
+  Hide.)
 
-`batch_c_undo.py`: C2's undo gives every hidden grade back exactly and
-leaves the catalog C1 alone left, line for line; C2 applies again after it.
-With one request whose hide ended long ago (it held a 5) and one hiding a 7
-now, in both id orders, it gives back the 7 and marks only that hide
-ended by the undo; it gives no mark drawn while the grade was hidden.
-C1's PART 1 stops every Batch C function and changes no row, while Return
-and sending work still work; PART 1b puts every permission back. PART 2
-refuses while C2 is in and while the tables hold rows unless told to
+Review round 2 (`batch-c-review-2.md`; each scenario was committed first and
+failed on the code before its fix):
+
+- **round2**, with C1 alone and with C2. (b) 1: a Return that holds the
+  class while a revision's send waits for it came before the revision (the
+  revision is in, `sent`, to both sides, stored open, and the student can
+  still Unsend it); a Return that started before the send but got the class
+  after it returned it. (b) 2: a send finishing under a request taken back
+  and asked again answers `request_changed`, stores nothing, and a fresh
+  send is version 3. (b) 4: `return_work` answers the pages it gave, for a
+  student whose grade it returned and one with marks only; nothing the
+  second time; Return for Revision's `returned` counts its page. (c) 2: C2's
+  pre-check without C1 answers a row; its post-check notices a trigger
+  recreated to fire on every update, on every insert, or once a statement.
+- **put_back** (the review's new (a) 1), with C1 alone and with C2. In a
+  class that holds grades, a returned grade changed and changed back, or a
+  comment typed and deleted, with marks waiting (and again with a revision
+  in): the grade row is as it was, the marks are not given and the teacher
+  is still told they wait, the request stays open with the revision `sent`;
+  then Return gives them, and a changed grade returned by `return_grades`
+  gives them with C2 and returns the revision. In a class that returns at
+  once each such save is a Return (a new returned date) and returns the
+  revision (review (b) 3, as built).
+- **hide_out** (Hide out of Batch C). With C1 alone and with C2, in both
+  kinds of class: Hide answers `hide_not_available` and writes nothing (no
+  request, no grade row, no mark, nothing remembered); Keep and Take Back
+  answer in the same shape (`keep_grade` true, `grade_hidden`, `hidden`,
+  `unhidden` false). No hide column, function or setting is left, and C2's
+  file writes no `grade_return` row.
+- **same_rows** (the review's `p2b.py`). One script of marks, Keep requests,
+  a Hide request, revisions, put-backs, `return_grades`, `return_work`, the
+  class leaving When I Return Them, the page turned off and on, the nightly
+  repair and a restore, run on C1 alone and on C1 and C2: every
+  `grade_return` and score row is the same; the requests differ only in
+  being stored done.
+
+`batch_c_undo.py`: C2's undo changes no row (marks given stay given, a
+request stored done stays done) and leaves the catalog C1 alone left, line
+for line; marks are then given only by `return_work`; C2 applies again
+after it. C1's PART 1 stops every Batch C function and changes no row, while
+Return and sending work still work; PART 1b puts every permission back.
+PART 2 refuses while C2 is in and while the tables hold rows unless told to
 discard; then the catalog is the one before C1, line for line, but for the
 two dropped columns' slots on `course`; no row of a table that existed
 before changes; a revision a student sent stays as Batch B's version 2,

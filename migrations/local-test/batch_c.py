@@ -5,7 +5,7 @@ gradebook-prod will be once Batch B is applied (batch_c_common.build).
     PGDATABASE=<template> BATCH_B_DIR=<Batch B's migrations/> python3 batch_c.py            every scenario
     PGDATABASE=...                                            python3 batch_c.py teacher    only those named
 
-Scenarios: apply1 teacher markup started contract gone reflect revision group grants race apply2 hide given closes only_me hide_round1 round2 put_back hide_out same_rows
+Scenarios: apply1 teacher markup started contract gone reflect revision group grants race apply2 given closes only_me round2 put_back hide_out same_rows
 """
 import threading, time
 from batch_c_common import *
@@ -108,7 +108,7 @@ def apply1():
                           ('a table readable', 'grant select on public.feedback_reflection to authenticated'),
                           ('a trigger off', 'alter table public.enrollment disable trigger work_feedback_gone'),
                           ('a helper granted', 'grant execute on function public._markup_give(uuid, uuid) to service_role'),
-                          ('a function changed', "create or replace function public._revision_hide_available() returns boolean language sql immutable set search_path to 'public', 'pg_temp' as $f$ select true; $f$"),
+                          ('a function changed', "create or replace function public._piece_latest(p_assessment_id uuid, p_enrollment_id uuid) returns public.submission language sql stable security definer set search_path to 'public', 'pg_temp' as $f$ select s.* from submission s limit 1; $f$"),
                           ('the replaced _grading_started changed', "create or replace function student_submit._grading_started(p_enrollment_id uuid, p_assessment_id uuid) returns boolean language sql stable security definer set search_path to 'public', 'student_submit', 'pg_temp' as $f$ select false; $f$"),
                           ('the replaced _grading_started granted', 'grant execute on function student_submit._grading_started(uuid, uuid) to service_role')]:
             d.begin(); d.run(sql)
@@ -688,7 +688,7 @@ def revision():
                         ('a criterion on work with no rubric', {'what_to_fix': 'x', 'criterion_ids': [k['crit1']]}), ('a list', [])]:
             ok('revision: refuses ' + name, err(d, lambda: d.rfr(k['lab'], ENR1, r)) == '22023')
         ok('revision: DIBELS is not revised', d.rfr(k['dib'], ENR1, req)['result'] == 'not_for_dibels')
-        ok('revision: Hide needs the second file', d.rfr(k['lab'], ENR1, dict(req, keep_grade=False))['result'] == 'hide_not_available')
+        ok('revision: Hide is not in Batch C', d.rfr(k['lab'], ENR1, dict(req, keep_grade=False))['result'] == 'hide_not_available')
         ok('revision: a refusal writes nothing', d.one('select count(*) from revision_request') == 0 and
            d.one('select is_draft from grade_return where enrollment_id = :e and assessment_id = :a', e=ENR1, a=k['lab']))
         d.save_markup(files[0], marks('Where is the third reason?'))
@@ -965,9 +965,9 @@ def apply2():
         finally:
             d2.close()
         before = catalog(d.c); rows = row_checksums(d.c)
-        for name, sql in [('a stand-in not as C1 left it', "create or replace function public._revision_hide_grade(p_request_id uuid) returns boolean language sql stable set search_path to 'public', 'pg_temp' as $f$ select true; $f$"),
+        for name, sql in [('_revision_settle changed', "create or replace function public._revision_settle(p_enrollment_id uuid, p_assessment_id uuid, p_returned boolean) returns integer language plpgsql security definer set search_path to 'public', 'pg_temp' as $f$ begin return 0; end; $f$"),
                           ('_markup_give changed', "create or replace function public._markup_give(p_enrollment_id uuid, p_assessment_id uuid) returns integer language plpgsql security definer set search_path to 'public', 'pg_temp' as $f$ begin return 0; end; $f$"),
-                          ('a hidden grade already marked', "update revision_request set grade_hidden = true, hidden_state = '{}'")]:
+                          ('a trigger of that name already there', "create trigger markup_given_on_insert after insert on public.grade_return for each row execute function public._grade_return_gone()")]:
             d.begin(); d.run(sql)
             r = d.statements(split(text_at(C2_USED))); d.in_tx = False
             ok('apply2: the guard stops on ' + name, r.startswith('STOPPED') and d.at == 2, r)
@@ -977,7 +977,7 @@ def apply2():
         after = catalog(d.c); gone, new = differences(before, after)
         fname = lambda l: l.split(' ', 1)[1].split('(')[0] + '()'
         changed_fns = sorted({fname(l) for l in gone if l.startswith('function ') and not l.startswith('function more')})
-        ok('apply2: exactly the three stand-ins change', changed_fns == sorted(x.split('(')[0] + '()' for x in C2_REPLACES), changed_fns)
+        ok('apply2: no existing function changes', changed_fns == [], changed_fns)
         new_fns = sorted({fname(l) for l in new if l.startswith('function ') and not l.startswith('function more')} - set(changed_fns))
         ok('apply2: and one function is new', new_fns == C2_NEW, new_fns)
         new_trg = sorted(l.split(' | ')[1] for l in new if l.startswith('trigger ') and not l.startswith('trigger comment'))
@@ -988,7 +988,7 @@ def apply2():
         ok('apply2: the post-check is clean', postcheck(d, 'batch-c2-live-postcheck.sql') == [], postcheck(d, 'batch-c2-live-postcheck.sql'))
         d.begin(); d.run('alter table public.grade_return disable trigger markup_given_on_return')
         ok('apply2: the post-check notices a trigger off', postcheck(d, 'batch-c2-live-postcheck.sql') != []); d.rollback()
-        d.begin(); d.run('grant execute on function public._revision_hide_grade(uuid) to authenticated')
+        d.begin(); d.run('grant execute on function public._markup_on_return() to authenticated')
         ok('apply2: the post-check notices a grant', postcheck(d, 'batch-c2-live-postcheck.sql') != []); d.rollback()
         cat2 = catalog(d.c); rows2 = row_checksums(d.c)
         ok('apply2: a second run applies', d.apply2() == 'ok')
@@ -998,86 +998,6 @@ def apply2():
     finally:
         d.close()
 
-# ── hide: Hide the grade (C2) ──────────────────────────────────────────────
-def gr(d, e, a): return d.all('select is_draft, returned_at, returned_copy, previous_copy, updated_at, seen_at, working_copy from grade_return where enrollment_id = :e and assessment_id = :a', e=e, a=a)
-def hide():
-    d = scenario_db('hide', with_c2=True)
-    try:
-        k = seed(d); t1 = d.session(ENR1); t2 = d.session(ENR2, '2012-06-16')
-        sub, files = d.send(t1, ENR1, k['lab'], 1)
-        # each grade returned, then changed and returned again, so each has an updated_at
-        d.score(ENR1, k['lab'], 5); d.return_work(k['lab'], [ENR1]); d.score(ENR1, k['lab'], 6); d.return_work(k['lab'], [ENR1])
-        d.score(ENR2, k['lab'], 3); d.return_work(k['lab'], [ENR2]); d.score(ENR2, k['lab'], 4); d.return_work(k['lab'], [ENR2])
-        ok('hide: both grades carry an updated_at before the hide', all(gr(d, e, k['lab'])[0][4] is not None for e in (ENR1, ENR2)))
-        d.page(t1, ENR1); d.service("student_submit.seen(:t, :e, :a, 'ip-1')", t=t1, e=ENR1, a=[k['lab']])
-        g_before = gr(d, ENR1, k['lab']); others = d.all('select * from grade_return where not (enrollment_id = :e and assessment_id = :a) order by 1, 2', e=ENR1, a=k['lab'])
-        scores = d.all('select * from score order by id')
-        r = d.rfr(k['lab'], ENR1, {'what_to_fix': 'Redo it.', 'keep_grade': False})
-        ok('hide: made, hidden', r['result'] == 'made' and r['hidden'] is True and r['request']['grade_hidden'], r)
-        g = gr(d, ENR1, k['lab'])[0]
-        ok('hide: exactly that grade_return row changes: a draft, never returned', g[0] is True and g[1] is None and g[2] is None and g[4] is None
-           and g[3] == g_before[0][3] and g[5] == g_before[0][5] and g[6] == g_before[0][6], (g, g_before))
-        ok('hide: no other grade_return row changes', d.all('select * from grade_return where not (enrollment_id = :e and assessment_id = :a) order by 1, 2', e=ENR1, a=k['lab']) == others)
-        ok('hide: no score row changes', d.all('select * from score order by id') == scores)
-        p = piece(d.page(t1, ENR1), k['lab'])
-        ok('hide: the student page shows no grade', p['grade'] is None and p['returned_at'] is None, p)
-        f = piece(d.feedback(t1, ENR1), k['lab'])['revision']
-        ok('hide: Before and After does not show the hidden grade', f['grade_hidden'] and f['first_grade'] is None, f)
-        ok('hide: the teacher sees a draft', d.rpc('course_draft_count(:c)', c=COURSE_A) == 1)
-        ok('hide: another student keeps their grade', piece(d.page(t2, ENR2), k['lab'])['grade']['value'] == 4)
-        ok('hide: reflecting on hidden work is refused', d.reflect(t1, ENR1, k['lab'], {'makes_sense': 'yes', 'plan': 'p'})['error'] == 'not_returned')
-        # the revision comes in and is graded, returned
-        s, fin = d.revise(t1, ENR1, k['lab'])
-        ok('hide: a revision can be sent while hidden', fin['ok'], fin)
-        d.score(ENR1, k['lab'], 9)
-        ok('hide: still hidden while the new grade is a draft', piece(d.page(t1, ENR1), k['lab'])['grade'] is None)
-        d.return_work(k['lab'], [ENR1])
-        ok('hide: returned, the new grade shows', piece(d.page(t1, ENR1), k['lab'])['grade']['value'] == 9)
-        f = piece(d.feedback(t1, ENR1), k['lab'])['revision']
-        ok('hide: and Before and After shows the first grade', f['state'] == 'returned' and f['first_grade']['value'] == 6, f)
-        # take back while hidden: exactly what the student had comes back
-        d.score(ENR2, k['lab'], 4)
-        b2 = gr(d, ENR2, k['lab'])
-        r = d.rfr(k['lab'], ENR2, {'what_to_fix': 'x', 'keep_grade': False})
-        c = d.rpc('cancel_revision(:r, :k)', r=r['request']['id'], k=nid())
-        ok('hide: Take Back gives the grade back exactly', c['unhidden'] is True and gr(d, ENR2, k['lab']) == b2, (gr(d, ENR2, k['lab']), b2))
-        ok('hide: after Take Back the request no longer says hidden', c['request']['grade_hidden'] is False)
-        ok('hide: Take Back for one student leaves another\'s grade alone', piece(d.page(t1, ENR1), k['lab'])['grade']['value'] == 9)
-        # hidden while a draft sits on the returned grade (Return for Revision returns the work first, so only the
-        # helper itself can meet this): what comes back is what the student had, not the draft
-        d.score(ENR2, k['lab'], 5)
-        rid = d.one("insert into revision_request (course_id, assessment_id, enrollment_id, what_to_fix, keep_grade) values (:c, :a, :e, 'x', false) returning id",
-                    c=COURSE_A, a=k['lab'], e=ENR2)
-        ok('hide: the helper hides a grade that has a draft on it', d.one('select public._revision_hide_grade(:r)', r=rid) is True
-           and piece(d.page(t2, ENR2), k['lab'])['grade'] is None)
-        c = d.rpc('cancel_revision(:r, :k)', r=rid, k=nid())
-        ok('hide: taken back, the student has what they had (4) and the draft (5) still waits',
-           c['unhidden'] and piece(d.page(t2, ENR2), k['lab'])['grade']['value'] == 4 and gr(d, ENR2, k['lab'])[0][0] is True
-           and gr(d, ENR2, k['lab'])[0][2]['value'] == 4, gr(d, ENR2, k['lab']))
-        d.score(ENR2, k['lab'], 4); d.return_work(k['lab'], [ENR2]); b2 = gr(d, ENR2, k['lab'])
-        # take back after the teacher changed the grade: the change waits as a draft on the old grade
-        r = d.rfr(k['lab'], ENR2, {'what_to_fix': 'x', 'keep_grade': False})
-        d.score(ENR2, k['lab'], 2)
-        c = d.rpc('cancel_revision(:r, :k)', r=r['request']['id'], k=nid())
-        g = gr(d, ENR2, k['lab'])[0]
-        ok('hide: Take Back after a change: the student has the old grade, the change is a draft', c['unhidden'] and g[0] is True and g[1] == b2[0][1]
-           and g[2]['value'] == 4 and piece(d.page(t2, ENR2), k['lab'])['grade']['value'] == 4, g)
-        # Hide in a class that does not hold grades
-        d.run("update course set return_grades = 'on_save' where id = :c", c=COURSE_A)
-        ok('hide: refused in a class that returns at once', d.rfr(k['rub'], ENR2, {'what_to_fix': 'x', 'keep_grade': False})['result'] == 'hide_needs_holding')
-        d.run("update course set return_grades = 'on_return' where id = :c", c=COURSE_A)
-        # nothing to hide
-        r = d.rfr(k['rub'], ENR2, {'what_to_fix': 'x', 'keep_grade': False})
-        ok('hide: no returned grade: nothing hidden', r['result'] == 'made' and r['hidden'] is False and d.one('select count(*) from grade_return where enrollment_id = :e and assessment_id = :a', e=ENR2, a=k['rub']) == 0, r)
-        # leaving When I Return Them returns the hidden grade (no draft where no Draft mark shows)
-        r = d.rfr(k['lab'], ENR1, {'what_to_fix': 'y', 'keep_grade': False})
-        ok('hide: hidden again', r['hidden'] is True, r)
-        d.run("update course set return_grades = 'on_save' where id = :c", c=COURSE_A)
-        ok('hide: leaving When I Return Them gives it back', piece(d.page(t1, ENR1), k['lab'])['grade']['value'] == 9)
-        c = d.rpc('cancel_revision(:r, :k)', r=r['request']['id'], k=nid())
-        ok('hide: Take Back after that changes nothing', c['unhidden'] is False and piece(d.page(t1, ENR1), k['lab'])['grade']['value'] == 9)
-    finally:
-        d.close()
 
 # ── given: marks given on every return path (C2) ───────────────────────────
 def given():
@@ -1113,7 +1033,7 @@ def given():
         d.run("delete from grade_return where enrollment_id = :e and assessment_id = :a", e=ENR2, a=k['lab'])
         d.score(ENR2, k['lab'], 4)
         ok('given: a grade first returned (a new row) gives the marks', 'BEFORE-GRADE' in json.dumps(d.marks(t2, ENR2, k['lab'])))
-        for fn in C2_REPLACES + C2_NEW:
+        for fn in C2_NEW:
             ok('given: nobody but the owner runs ' + fn, d.one("select not has_function_privilege('authenticated', to_regprocedure(:f), 'execute') and not has_function_privilege('service_role', to_regprocedure(:f), 'execute') and not has_function_privilege('anon', to_regprocedure(:f), 'execute')", f=fn))
         # a fault would stop saves: the trigger works for every writer (an owner's direct write)
         d.run("update course set return_grades = 'on_return' where id = :c", c=COURSE_A)
@@ -1128,7 +1048,7 @@ def shown(d, e, a):
     g = d.one('select student_submit._returned_grade(:e, :a)', e=e, a=a)
     return None if g['grade'] is None else (g['grade']['value'] if g['grade']['value'] is not None
                                             else json.dumps(g['grade']['criteria'] or g['grade']['checks']))
-def req(d, rid): return d.all('select state, grade_hidden, hide_ended_by from revision_request where id = :r', r=rid)[0]
+def req(d, rid): return d.all('select state from revision_request where id = :r', r=rid)[0]
 BOX = 'cccccccc-0000-4000-8000-00000000000c'
 
 def closes():
@@ -1250,183 +1170,6 @@ def only_me():
            and c['reflection']['follow_up_answer'] == 'Look at the rubric.', c)
         ok('(b) 3: which the student gets', piece(d.feedback(t1, ENR1), lab)['reflection']['follow_up_answer'] == 'Look at the rubric.')
         ok('(b) 3: then nothing is left to answer', d.rpc('answer_reflection(:f, :t, :k, false)', f=rid, t='More', k=nid())['result'] == 'already_answered')
-    finally:
-        d.close()
-
-def hide_round1():
-    """(a) 1, 2, 3 and (b) 9: a hide is a stored fact with a beginning and an end."""
-    def world(rubric=False):
-        d = scenario_db('hr1', with_c2=True); k = seed(d); a = k['rub'] if rubric else k['lab']
-        if rubric:
-            d.run("insert into criterion_check (id, criterion_id, level, label) values (:k, :c, 3, 'box')", k=BOX, c=k['crit1'])
-            d.rpc('upsert_rubric_score(:e, :a, :x, 3, 0::smallint, null, null)', e=ENR1, a=a, x=k['crit1'])
-            d.rpc('set_rubric_check(:e, :a, :k, true)', e=ENR1, a=a, k=BOX)
-        else:
-            d.score(ENR1, a, 6)
-        d.score(ENR2, k['lab'], 8)
-        d.rpc('return_grades(:a, :e, :k)', a=a, e=[ENR1], k=nid()); d.rpc('return_grades(:a, :e, :k)', a=k['lab'], e=[ENR2], k=nid())
-        had = shown(d, ENR1, a)
-        r = d.rfr(a, ENR1, {'what_to_fix': 'Fix', 'keep_grade': False})
-        assert r['result'] == 'made' and r['hidden'], r
-        return d, k, a, r['request']['id'], had
-    def restore(d, grade_returns, scores=None):
-        return d.rpc('import_json_restore(:p::jsonb, :k)', p=json.dumps(dict(
-            {'courses': [{'id': COURSE_A, 'name': 'Science 8', 'student_page_enabled': True, 'return_grades': 'on_return'}], 'grade_returns': grade_returns},
-            **({'scores': scores} if scores else {}))), k=nid())
-    ways = [
-        ('clear_score', False, lambda d, k, a: d.rpc('clear_score(:e, :a)', e=ENR1, a=a)),
-        ('upsert_score with nothing', False, lambda d, k, a: d.rpc('upsert_score(:e, :a, null)', e=ENR1, a=a)),
-        ('clear_row_scores', False, lambda d, k, a: d.rpc('clear_row_scores(:e, :c)', e=ENR1, c=COURSE_A)),
-        ('clear_column_scores', False, lambda d, k, a: d.rpc('clear_column_scores(:a)', a=a)),
-        ('a rubric level cleared and its box unticked', True, lambda d, k, a: (d.rpc('upsert_rubric_score(:e, :a, :x, null, 0::smallint, null, null)', e=ENR1, a=a, x=k['crit1']),
-                                                                              d.rpc('set_rubric_check(:e, :a, :k, false)', e=ENR1, a=a, k=BOX))),
-        ('only the rubric box unticked', True, lambda d, k, a: d.rpc('set_rubric_check(:e, :a, :k, false)', e=ENR1, a=a, k=BOX)),
-        ('the grade changed', False, lambda d, k, a: d.score(ENR1, a, 3)),
-        ('Set Everyone To', False, lambda d, k, a: [d.rpc('upsert_score(:e, :a, 4)', e=e, a=a) for e in (ENR1, ENR2)]),
-        ('a restore whose backup holds no grade for the cell', False,
-         lambda d, k, a: restore(d, [{'enrollment_id': ENR1, 'assessment_id': a, 'is_draft': False}])),
-        ('a restore of a backup taken during the hide', False,
-         lambda d, k, a: restore(d, [{'enrollment_id': ENR1, 'assessment_id': a, 'is_draft': True}], [{'enrollment_id': ENR1, 'assessment_id': a, 'value': 6}])),
-        ('nothing but the nightly repair', False, lambda d, k, a: None),
-    ]
-    for label, rubric, do in ways:
-        d, k, a, rid, had = world(rubric)
-        try:
-            do(d, k, a)
-            if label != 'a restore whose backup holds no grade for the cell':   # that backup itself names the cell Returned (review note (c) 6)
-                ok('(a) 1: %s while hidden: the student is still shown nothing' % label, shown(d, ENR1, a) is None, shown(d, ENR1, a))
-            d.one('select public._grade_return_repair_class(:c)', c=COURSE_A)
-            ok('(a) 1: %s, then the repair: the hide is still on' % label, req(d, rid)[1] is True, req(d, rid))
-            now = d.one('select public._grade_copy(:e, :a)', e=ENR1, a=a)
-            c = d.rpc('cancel_revision(:r, :k)', r=rid, k=nid())
-            ok('(a) 1: %s, then Take Back: the student is given back what they had' % label, c['unhidden'] is True and shown(d, ENR1, a) == had,
-               (c['unhidden'], shown(d, ENR1, a), had))
-            g = d.all('select is_draft, returned_copy is not null from grade_return where enrollment_id = :e and assessment_id = :a', e=ENR1, a=a)[0]
-            kept = d.one("select hidden_state->'copy' from revision_request where id = :r", r=rid)
-            ok('(a) 1: %s, then Take Back: whatever the teacher did waits as a draft on it' % label,
-               g == ([False, False] if now == kept else [True, True]), (g, now, kept))
-            ok('(a) 1: %s: the hide ended by Take Back' % label, req(d, rid) == ['cancelled', False, 'taken_back'], req(d, rid))
-            if 'restore' not in label:
-                ok('(a) 1: %s: the other student keeps the grade they were given' % label, shown(d, ENR2, k['lab']) == 8, shown(d, ENR2, k['lab']))
-        finally:
-            d.close()
-        # regrade and Return instead: the new grade, and the hide is over
-        d, k, a, rid, had = world(rubric)
-        try:
-            do(d, k, a)
-            if rubric: d.rpc('upsert_rubric_score(:e, :a, :x, 4, 0::smallint, null, null)', e=ENR1, a=a, x=k['crit1'])
-            else: d.score(ENR1, a, 9)
-            d.rpc('return_grades(:a, :e, :k)', a=a, e=[ENR1], k=nid())
-            ok('(a) 1: %s, then regrade and Return: the new grade, and the hide is over' % label, shown(d, ENR1, a) not in (None, had)
-               and req(d, rid)[1:] == [False, 'returned'], (shown(d, ENR1, a), req(d, rid)))
-        finally:
-            d.close()
-
-    # (a) 2: the hide ended by a Return; a later Take Back gives nothing back
-    d = scenario_db('hr1', with_c2=True)
-    try:
-        k = seed(d); lab = k['lab']
-        d.score(ENR1, lab, 6); d.rpc('return_grades(:a, :e, :k)', a=lab, e=[ENR1], k=nid())
-        r = d.rfr(lab, ENR1, {'what_to_fix': 'Fix', 'keep_grade': False}); rid = r['request']['id']
-        ok('(a) 2: hidden', shown(d, ENR1, lab) is None and req(d, rid)[1] is True)
-        d.rpc('return_grades(:a, :e, :k)', a=lab, e=[ENR1], k=nid())
-        ok('(a) 2: a Return (Return N Graded) ends the hide: the student has the 6 again', shown(d, ENR1, lab) == 6)
-        ok('(a) 2: and the request says so: the hide is over, stored', req(d, rid) == ['open', False, 'returned'], req(d, rid))
-        ok('(a) 2: both sides are told it is no longer hidden', d.rpc('list_course_feedback(:c)', c=COURSE_A)['revisions'][0]['grade_hidden'] is False)
-        # the two helpers themselves, past cancel_revision's own check: an ended hide can neither begin again nor give back
-        fp = fingerprint_rows(d)
-        ok('(a) 2: a hide that has ended cannot begin again on the request', d.one('select public._revision_hide_grade(:r)', r=rid) is False
-           and req(d, rid) == ['open', False, 'returned'] and fingerprint_rows(d) == fp)
-        ok('(a) 2: and gives nothing back when asked directly', d.one('select public._revision_unhide_grade(:r)', r=rid) is False
-           and fingerprint_rows(d) == fp)
-        d.rpc('clear_score(:e, :a)', e=ENR1, a=lab); d.rpc('return_grades(:a, :e, :k)', a=lab, e=[ENR1], k=nid())
-        ok('(a) 2: the grade cleared and the clear returned: no result', shown(d, ENR1, lab) is None)
-        d.score(ENR1, lab, 9)
-        c = d.rpc('cancel_revision(:r, :k)', r=rid, k=nid())
-        ok('(a) 2: Take Back then gives nothing back', c['unhidden'] is False and shown(d, ENR1, lab) is None, (c['unhidden'], shown(d, ENR1, lab)))
-        ok('(a) 2: and the new grade still waits as a draft', d.one('select is_draft from grade_return where enrollment_id = :e and assessment_id = :a', e=ENR1, a=lab) is True)
-    finally:
-        d.close()
-
-    # the hide ends only when a Return gives a grade: a Return of a cleared hidden grade, with the revision in, leaves it on
-    d = scenario_db('hr1', with_c2=True)
-    try:
-        k = seed(d); lab = k['lab']; t1 = d.session(ENR1)
-        d.send(t1, ENR1, lab)
-        d.score(ENR1, lab, 6); d.return_work(lab, [ENR1])
-        rid = d.rfr(lab, ENR1, {'what_to_fix': 'Fix', 'keep_grade': False})['request']['id']
-        d.revise(t1, ENR1, lab)
-        d.rpc('clear_score(:e, :a)', e=ENR1, a=lab)
-        r = d.return_work(lab, [ENR1])
-        ok('(a) 2: a Return that gives no grade (the hidden grade cleared) leaves the hide on and the request open',
-           r['returned'] == 0 and req(d, rid) == ['open', True, None] and shown(d, ENR1, lab) is None, (r, req(d, rid)))
-        c = d.rpc('cancel_revision(:r, :k)', r=rid, k=nid())
-        ok('(a) 2: and Take Back still gives the 6 back', c['unhidden'] is True and shown(d, ENR1, lab) == 6)
-    finally:
-        d.close()
-
-    # (a) 1: the whole row the student had comes back, previous_copy and updated_at included, after a clear and a new grade
-    d = scenario_db('hr1', with_c2=True)
-    try:
-        k = seed(d); lab = k['lab']; t1 = d.session(ENR1)
-        d.score(ENR1, lab, 5); d.return_work(lab, [ENR1])
-        d.page(t1, ENR1); d.service("student_submit.seen(:t, :e, :a, 'ip-1')", t=t1, e=ENR1, a=[lab])
-        d.score(ENR1, lab, 6); d.return_work(lab, [ENR1])
-        before = gr(d, ENR1, lab)[0]
-        ok('(a) 1: before the hide the student has a 6 that was a 5 (previous_copy and updated_at set)',
-           before[3] is not None and before[3]['value'] == 5 and before[4] is not None, before)
-        rid = d.rfr(lab, ENR1, {'what_to_fix': 'Fix', 'keep_grade': False})['request']['id']
-        d.rpc('clear_score(:e, :a)', e=ENR1, a=lab); d.score(ENR1, lab, 3)
-        c = d.rpc('cancel_revision(:r, :k)', r=rid, k=nid())
-        after = gr(d, ENR1, lab)[0]
-        ok('(a) 1: cleared, a new grade, then Take Back: returned_at, updated_at, previous_copy and seen_at are as before the hide',
-           c['unhidden'] is True and [after[1], after[3], after[4], after[5]] == [before[1], before[3], before[4], before[5]], (after, before))
-        ok('(a) 1: the student has the 6 (was 5), and the 3 waits as a draft', shown(d, ENR1, lab) == 6 and after[0] is True and after[2]['value'] == 6
-           and d.one('select student_submit._returned_grade(:e, :a)', e=ENR1, a=lab)['previous']['value'] == 5, after)
-    finally:
-        d.close()
-
-    # (a) 3: Take Back gives the grade back without the marks drawn while it was hidden
-    d = scenario_db('hr1', with_c2=True)
-    try:
-        k = seed(d); lab = k['lab']; t1 = d.session(ENR1)
-        sub, files = d.send(t1, ENR1, lab)
-        d.save_markup(files[0], marks('GIVEN-NOTE'))
-        d.score(ENR1, lab, 6); d.return_work(lab, [ENR1])
-        rid = d.rfr(lab, ENR1, {'what_to_fix': 'Fix', 'keep_grade': False})['request']['id']
-        d.save_markup(files[0], marks('GIVEN-NOTE', 'HIDDEN-TIME-NOTE'))
-        c = d.rpc('cancel_revision(:r, :k)', r=rid, k=nid())
-        m = json.dumps(d.marks(t1, ENR1, lab))
-        ok('(a) 3: Take Back gives the grade back', c['unhidden'] is True and shown(d, ENR1, lab) == 6)
-        ok('(a) 3: but not a mark drawn while it was hidden', 'GIVEN-NOTE' in m and 'HIDDEN-TIME-NOTE' not in m, m)
-        ok('(a) 3: that mark still waits for the next Return', d.rpc('list_assessment_markup(:a)', a=lab)[0]['waiting'] is True)
-        d.return_work(lab, [ENR1])
-        ok('(a) 3: and the next Return gives it', 'HIDDEN-TIME-NOTE' in json.dumps(d.marks(t1, ENR1, lab)))
-    finally:
-        d.close()
-
-    # (b) 9: a hidden revision's grade returned is an update on the grade the student had
-    d = scenario_db('hr1', with_c2=True)
-    try:
-        k = seed(d); lab = k['lab']; t1 = d.session(ENR1)
-        d.send(t1, ENR1, lab)
-        d.score(ENR1, lab, 5); d.return_work(lab, [ENR1]); d.score(ENR1, lab, 6); d.return_work(lab, [ENR1])
-        d.page(t1, ENR1); d.service("student_submit.seen(:t, :e, :a, 'ip-1')", t=t1, e=ENR1, a=[lab])
-        rid = d.rfr(lab, ENR1, {'what_to_fix': 'Fix', 'keep_grade': False})['request']['id']
-        d.revise(t1, ENR1, lab); d.score(ENR1, lab, 9); d.return_work(lab, [ENR1])
-        g = d.one('select student_submit._returned_grade(:e, :a)', e=ENR1, a=lab)
-        ok('(b) 9: the revision\'s grade returned: the page is told it is Updated', g['grade']['value'] == 9 and g['updated_at'] is not None
-           and g['updated_at'] == g['returned_at'], g)
-        ok('(b) 9: and the previous grade is the one the student last saw (6)', (g['previous'] or {}).get('value') == 6, g)
-        ok('(b) 9: the request is done and the hide over', req(d, rid) == ['done', False, 'returned'], req(d, rid))
-        # returned at the grade the student had: no Updated
-        d.score(ENR2, lab, 7); d.return_work(lab, [ENR2])
-        r2 = d.rfr(lab, ENR2, {'what_to_fix': 'x', 'keep_grade': False})['request']['id']
-        before = d.one('select updated_at from grade_return where enrollment_id = :e and assessment_id = :a', e=ENR2, a=lab)
-        d.rpc('return_grades(:a, :e, :k)', a=lab, e=[ENR2], k=nid())
-        g = d.one('select student_submit._returned_grade(:e, :a)', e=ENR2, a=lab)
-        ok('(b) 9: a hide ended at the same grade: as the student had it, not Updated', g['grade']['value'] == 7 and g['previous'] is None
-           and d.one('select updated_at from grade_return where enrollment_id = :e and assessment_id = :a', e=ENR2, a=lab) == before, g)
     finally:
         d.close()
 
@@ -1680,7 +1423,7 @@ def hide_out():
             ok('hide_out%s: revision_request has no hide columns' % tag, cols == [], cols)
             fns = d.all("select p.oid::regprocedure::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname in ('public', 'student_submit') and p.proname ~ 'hide'")
             ok('hide_out%s: no hide function' % tag, fns == [], fns)
-            uses = d.all("select p.oid::regprocedure::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname in ('public', 'student_submit') and (prosrc ~ 'revision_unhide' or prosrc ~ 'grade_hidden' or prosrc ~ 'hidden_state')")
+            uses = d.all("select p.oid::regprocedure::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname in ('public', 'student_submit') and (prosrc ~ 'revision_unhide' or prosrc ~ '\\.grade_hidden' or prosrc ~ 'hidden_state' or prosrc ~ 'hide_ended')")
             ok('hide_out%s: no function reads a hide setting or column' % tag, uses == [], uses)
         finally:
             d.close()
@@ -1704,55 +1447,89 @@ def same_rows():
         finally: bcc.nid = real
         a = k['lab']; b = k['rub']
         ret = lambda a_, es: d.rpc('return_grades(:a, :e, :k)', a=a_, e=es, k=nid())
+        snaps = []
+        def snap():
+            # every grade_return and score row after each step (dates as how they relate, so two runs compare)
+            snaps.append(['after step %d' % (len(snaps) + 1), d.all("""select enrollment_id, assessment_id, is_draft, returned_at is not null, returned_copy, previous_copy,
+                                         updated_at is not null, updated_at = returned_at, seen_at is not null, seen_at >= returned_at,
+                                         working_copy from grade_return order by 1, 2"""),
+                          d.all('select enrollment_id, assessment_id, value, status, comment from score order by 1, 2'),
+                          d.all('select enrollment_id, assessment_id, criterion_id, value from rubric_score order by 1, 2, 3')])
         try:
             tok = d.session(ENR1); tok2 = d.session(ENR2, '2012-06-16')
             sub, files = d.send(tok, ENR1, a, 2); sub2, files2 = d.send(tok2, ENR2, a, 1)
+            snap()
             d.save_markup(files[0], marks('one')); d.save_markup(files2[0], marks('two'))
+            snap()
             d.score(ENR1, a, 5); d.score(ENR2, a, 6)
+            snap()
             ret(a, [ENR1]); d.return_work(a, [ENR2])
+            snap()
             d.service("student_submit.seen(:t, :e, :a, 'ip-1')", t=tok, e=ENR1, a=[a])
+            snap()
             d.save_markup(files[0], marks('one', 'more'))
+            snap()
             d.score(ENR1, a, 6); d.score(ENR1, a, 5)                                   # put back: no Return
+            snap()
             d.rpc("save_score_comment(:e, :a, 'x')", e=ENR1, a=a); d.rpc("save_score_comment(:e, :a, null)", e=ENR1, a=a)
+            snap()
             d.rfr(a, ENR2, {'what_to_fix': 'Fix', 'keep_grade': False})                # Hide: refused
+            snap()
             r1 = d.rfr(a, ENR1, {'what_to_fix': 'Fix'})['request']['id']; r2 = d.rfr(a, ENR2, {'what_to_fix': 'Fix'})['request']['id']
+            snap()
             s, f = d.revise(tok, ENR1, a); s2, f2 = d.revise(tok2, ENR2, a)
+            snap()
             d.save_markup(files[1], marks('three'))
+            snap()
             d.score(ENR1, a, 7); d.score(ENR2, a, 6.5)
+            snap()
             ret(a, [ENR1])                                                             # the released app's Return
+            snap()
             d.rpc('update_course(:c, :p::jsonb)', c=COURSE_A, p=json.dumps({'return_grades': 'on_save'}))     # leaving: returns ENR2's
+            snap()
             d.score(ENR1, a, 8); d.rpc('clear_score(:e, :a)', e=ENR2, a=a); d.score(ENR2, a, 4)
+            snap()
             d.rpc('upsert_rubric_score(:e, :a, :x, 3, 0::smallint, null, null)', e=ENR1, a=b, x=k['crit1'])
+            snap()
             r3 = d.rfr(b, ENR1, {'what_to_fix': 'Fix'})['request']['id']
+            snap()
             d.rpc('update_course(:c, :p::jsonb)', c=COURSE_A, p=json.dumps({'return_grades': 'on_return'}))
+            snap()
             s3, f3 = d.revise(tok, ENR1, b)
+            snap()
             d.rpc('upsert_rubric_score(:e, :a, :x, 4, 0::smallint, null, null)', e=ENR1, a=b, x=k['crit1'])
+            snap()
             d.rpc('cancel_revision(:r, :k)', r=r3, k=nid())
+            snap()
             d.return_work(b, [ENR1, ENR2])
+            snap()
             d.run('update course set student_page_enabled = false where id = :c', c=COURSE_A)   # the page off: drafts returned
+            snap()
             d.run('update course set student_page_enabled = true where id = :c', c=COURSE_A)
+            snap()
             d.score(ENR2, a, 9); ret(a, [ENR2])
+            snap()
             d.run('call public.grade_return_repair_nightly()')
+            snap()
             d.rpc('import_json_restore(:p::jsonb, :k)', k=nid(), p=json.dumps({'courses': [{'id': COURSE_A, 'name': 'Science 8', 'student_page_enabled': True, 'return_grades': 'on_return'}],
                   'scores': [{'enrollment_id': ENR1, 'assessment_id': a, 'value': 9}], 'grade_returns': [{'enrollment_id': ENR1, 'assessment_id': a, 'is_draft': False}]}))
-            g = d.all("""select enrollment_id, assessment_id, is_draft, returned_at is not null, returned_copy, previous_copy, updated_at is not null,
-                                updated_at = returned_at, seen_at is not null, seen_at >= returned_at, working_copy from grade_return order by 1, 2""")
-            sc = (d.all('select enrollment_id, assessment_id, value, status, comment from score order by 1, 2')
-                  + d.all('select enrollment_id, assessment_id, criterion_id, value from rubric_score order by 1, 2, 3'))
+            snap()
+            g = json.dumps(snaps, default=str, sort_keys=True)
             reqs = d.all('select assessment_id, enrollment_id, state from revision_request order by created_at, enrollment_id')
             given = d.all('select enrollment_id, given_rev, working_rev from markup order by enrollment_id, working_rev, given_rev')
-            return json.dumps(g, default=str, sort_keys=True), json.dumps(sc, default=str), reqs, given
+            return g, len(snaps), reqs, given
         finally:
             d.close()
     g1, s1, q1, m1 = script(False); g2, s2, q2, m2 = script(True)
-    ok('same_rows: every grade_return row is the same with C2 as without', g1 == g2, (g1[:700], g2[:700]))
-    ok('same_rows: and every score row', s1 == s2)
+    first = next((i for i, (x, y) in enumerate(zip(json.loads(g1), json.loads(g2))) if x != y), None)
+    ok('same_rows: every grade_return and score row is the same with C2 as without, after each of %d steps' % s1, g1 == g2 and s1 == s2,
+       first is not None and json.loads(g2)[first][0])
     ok('same_rows: C2 differs only in marks given and requests closed', len(q1) == len(q2) and [x[:2] for x in q1] == [x[:2] for x in q2]
        and all(x == y or (x[2] == 'open' and y[2] == 'done') for x, y in zip(q1, q2)), (q1, q2))
 
 SCENARIOS = {'apply1': apply1, 'teacher': teacher, 'markup': markup, 'started': started, 'contract': contract, 'gone': gone, 'reflect': reflect, 'revision': revision, 'group': group,
-             'grants': grants, 'race': race, 'apply2': apply2, 'hide': hide, 'given': given,
-             'closes': closes, 'only_me': only_me, 'hide_round1': hide_round1, 'round2': round2, 'put_back': put_back, 'hide_out': hide_out, 'same_rows': same_rows}
+             'grants': grants, 'race': race, 'apply2': apply2, 'given': given,
+             'closes': closes, 'only_me': only_me, 'round2': round2, 'put_back': put_back, 'hide_out': hide_out, 'same_rows': same_rows}
 if __name__ == '__main__':
     for name in (sys.argv[1:] or list(SCENARIOS)):
         try: SCENARIOS[name]()

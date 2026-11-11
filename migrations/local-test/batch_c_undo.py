@@ -2,8 +2,9 @@
 
     PGDATABASE=<template> BATCH_B_DIR=... python3 batch_c_undo.py
 
-- batch-c2-undo.sql: every hidden grade comes back exactly; the catalog is
-  the one C1 alone left, line for line; C2 can be applied again.
+- batch-c2-undo.sql: no row changes; the catalog is the one C1 alone left,
+  line for line; marks are given only by return_work again; C2 can be
+  applied again.
 - batch-c1-undo.sql PART 1: nothing of Batch C runs, no row changes, and
   grades, Return and sending work still do; PART 1b puts it back.
 - PART 2: refuses while C2 is in, and while the tables hold rows unless
@@ -25,64 +26,26 @@ def undo2():
         ok('undo2: C1 applies', d.apply1() == 'ok')
         cat_c1 = catalog(d.c)
         ok('undo2: C2 applies', d.apply2() == 'ok')
-        d.score(ENR1, k['lab'], 6); d.return_work(k['lab'], [ENR1])
-        g_before = gr(d, ENR1, k['lab'])
+        # marks given by the trigger, a request stored done by it, a request open, marks waiting
         d.save_markup(files[0], marks('n'))
-        r = d.rfr(k['lab'], ENR1, {'what_to_fix': 'x', 'keep_grade': False})
-        ok('undo2: a grade is hidden', r['hidden'] is True and piece(d.page(t1, ENR1), k['lab'])['grade'] is None)
-        rows_other = row_checksums(d.c, {t: c for t, c in table_columns(d.c).items() if t not in ('public.grade_return', 'public.revision_request')})
+        d.score(ENR1, k['lab'], 6); d.rpc('return_grades(:a, :e, :k)', a=k['lab'], e=[ENR1], k=nid())
+        ok('undo2: the trigger gave the marks', len(d.marks(t1, ENR1, k['lab'])['files']) == 1)
+        rid = d.rfr(k['lab'], ENR1, {'what_to_fix': 'x'})['request']['id']
+        s, f = d.revise(t1, ENR1, k['lab']); d.score(ENR1, k['lab'], 8)
+        d.rpc('return_grades(:a, :e, :k)', a=k['lab'], e=[ENR1], k=nid())
+        ok('undo2: the trigger stored the request done', d.one('select state from revision_request where id = :r', r=rid) == 'done')
+        d.save_markup(files[0], marks('n', 'later'))
+        rows = row_checksums(d.c)
         r = d.undo2(); ok('undo2: the undo runs', r == 'ok', r)
-        ok('undo2: the hidden grade comes back exactly', gr(d, ENR1, k['lab']) == g_before, (gr(d, ENR1, k['lab']), g_before))
-        ok('undo2: the student sees it again', piece(d.page(t1, ENR1), k['lab'])['grade']['value'] == 6)
-        ok('undo2: no other table\'s rows change', row_checksums(d.c, {t: c for t, c in table_columns(d.c).items() if t not in ('public.grade_return', 'public.revision_request')}) == rows_other)
+        ok('undo2: no row of any table changes (marks given stay given, the request stays done, no grade row)', row_checksums(d.c) == rows)
         gone, new = differences(cat_c1, catalog(d.c))
         ok('undo2: the catalog is the one C1 alone left, line for line', gone == [] and new == [], (gone[:3], new[:3]))
-        ok('undo2: Hide answers hide_not_available again', d.rfr(k['rub'], ENR1, {'what_to_fix': 'x', 'keep_grade': False})['result'] == 'hide_not_available')
+        ok('undo2: Hide answers hide_not_available, as before', d.rfr(k['rub'], ENR1, {'what_to_fix': 'x', 'keep_grade': False})['result'] == 'hide_not_available')
+        d.score(ENR1, k['lab'], 9); d.rpc('return_grades(:a, :e, :k)', a=k['lab'], e=[ENR1], k=nid())
+        ok('undo2: a Return through return_grades gives no marks again (C1 alone)', 'later' not in json.dumps(d.marks(t1, ENR1, k['lab'])))
+        ok('undo2: return_work still gives them', d.return_work(k['lab'], [ENR1])['marks_given'] == 1)
         r = d.undo2(); ok('undo2: run again, it stops: nothing to take back', r.startswith('STOPPED') and 'not applied' in r, r)
         ok('undo2: C2 can be applied again', d.apply2() == 'ok' and postcheck(d, 'batch-c2-live-postcheck.sql') == [])
-    finally:
-        d.close()
-
-def undo2_two():
-    """(a) 4: one request whose hide ended long ago (it held a 5) and one hiding the grade now (it holds a 7),
-    in both id orders: the undo gives back the 7, the grade of the hide that is on now."""
-    for first in ('old request first', 'new request first'):
-        d = scenario_db('undo2two', with_c2=True)
-        try:
-            k = seed(d); lab = k['lab']; t1 = d.session(ENR1)
-            d.send(t1, ENR1, lab)
-            d.score(ENR1, lab, 5); d.return_work(lab, [ENR1])
-            r1 = d.rfr(lab, ENR1, {'what_to_fix': 'Fix', 'keep_grade': False})['request']['id']
-            d.revise(t1, ENR1, lab); d.score(ENR1, lab, 7); d.return_work(lab, [ENR1])
-            ok('undo2 (a) 4 (%s): the revision\'s grade returned: the student has the 7' % first, shown(d, ENR1, lab) == 7)
-            r2 = d.rfr(lab, ENR1, {'what_to_fix': 'Once more', 'keep_grade': False})
-            ok('undo2 (a) 4 (%s): a second request hides the 7' % first, r2['result'] == 'made' and r2['hidden'] and shown(d, ENR1, lab) is None, r2)
-            r2 = r2['request']['id']
-            lo, hi = '00000000-0000-4000-8000-000000000001', 'ffffffff-0000-4000-8000-000000000001'
-            d.run('update revision_request set id = :n where id = :o', n=lo if first == 'old request first' else hi, o=r1)
-            d.run('update revision_request set id = :n where id = :o', n=hi if first == 'old request first' else lo, o=r2)
-            u = d.undo2()
-            ok('undo2 (a) 4 (%s): the undo gives back the grade of the hide that is on now (the 7)' % first,
-               u == 'ok' and shown(d, ENR1, lab) == 7, (u, shown(d, ENR1, lab)))
-            ok('undo2 (a) 4 (%s): the old request is left as it was; the hide that was on is marked ended by the undo' % first,
-               req(d, lo if first == 'old request first' else hi) == ['done', False, 'returned']
-               and req(d, hi if first == 'old request first' else lo) == ['open', False, 'undone'],
-               d.all('select id, state, grade_hidden, hide_ended_by from revision_request order by id'))
-        finally:
-            d.close()
-
-def undo2_marks():
-    """(a) 3 for the undo: a hidden grade given back carries no mark drawn while it was hidden."""
-    d = scenario_db('undo2marks', with_c2=True)
-    try:
-        k = seed(d); lab = k['lab']; t1 = d.session(ENR1)
-        sub, files = d.send(t1, ENR1, lab)
-        d.score(ENR1, lab, 6); d.return_work(lab, [ENR1])
-        d.rfr(lab, ENR1, {'what_to_fix': 'Fix', 'keep_grade': False})
-        d.save_markup(files[0], marks('HIDDEN-TIME-NOTE'))
-        ok('undo2 (a) 3: the undo runs', d.undo2() == 'ok')
-        ok('undo2 (a) 3: the grade is given back', shown(d, ENR1, lab) == 6)
-        ok('undo2 (a) 3: without the mark drawn while it was hidden', 'HIDDEN-TIME-NOTE' not in json.dumps(d.marks(t1, ENR1, lab)))
     finally:
         d.close()
 
@@ -141,7 +104,7 @@ def undo1():
         d.close()
 
 if __name__ == '__main__':
-    for fn in (undo2, undo2_two, undo2_marks, undo1):
+    for fn in (undo2, undo1):
         try: fn()
         except Exception as e:
             import traceback; ok(fn.__name__ + ': ran to the end', False, traceback.format_exc()[-1500:])
