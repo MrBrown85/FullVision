@@ -32,9 +32,11 @@ test('a points assessment shows its points out of the most', async ({ page }) =>
 
 test('a level keeps its + or −', async ({ page }) => {
   await openCece(page);
-  // The Competencies tab names the latest score as teachers write it.
-  const observation = page.getByRole('button', { name: /^Observation \d/ });
-  await expect(observation.locator('.stu-comp-latest')).toContainText('3− on Science Fair Proposal');
+  // The Competencies tab names the latest score as teachers write it, in
+  // the open row's facts.
+  const observation = page.getByRole('button', { name: /^Observation / });
+  await observation.click();
+  await expect(observation.locator('~ .stu-comp-facts .stu-comp-latest')).toContainText('3− on Science Fair Proposal');
   await page.locator('#stu-tab-assess').click();
   await expect(row(page, 'Chemical Reactions Lab').locator('.stu-assess-score')).toHaveText('3.3');
 });

@@ -156,7 +156,6 @@ const NOT_A_GRADE = {
   'teacher/page-dashboard.js round r.bottom - c.top + 2': 'a tip’s position',
   'teacher/page-student.js round p.R - lg.R': 'points between two course % as shown',
   'teacher/page-student.js round one.R - lg.R': 'points between two course % as shown',
-  'teacher/page-student.js round (Math.min(e.score, 4) / 4) * 28': 'a bar’s height',
   'teacher/page-student.js round levelBarPercent(cid, r.v)': 'a bar’s width',
   'teacher/report-blocks.js round (nowG.pct - thenG.pct) * 10': 'the change between two course % as shown',
   'teacher/report-blocks.js round (profPlus / total) * 100': 'a share of scores',

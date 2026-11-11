@@ -28,6 +28,7 @@ window.PageStudent = (function () {
   var _coreTerm = null; // Learner Profile: the term ordinal whose self-assessments show
   var _coreEditing = ''; // Learner Profile: the Core Competency being self-assessed
   var _openTags = new Set(); // competency cards whose evidence drawer is open
+  var _compSort = 'map'; // Competencies tab: 'map' (learning-map order) or 'lowest'
   var _overrideSelectedLevel = 0;
   var Evidence = StudentEvidence;
   var Overrides = StudentOverrides;
@@ -118,6 +119,9 @@ window.PageStudent = (function () {
   function toggleTag(row) {
     var open = row.classList.toggle('open');
     row.setAttribute('aria-expanded', String(open));
+    // The Competencies tab lays an open row out in two columns.
+    if (row.parentElement && row.parentElement.classList.contains('stu-comp'))
+      row.parentElement.classList.toggle('open', open);
     var tagId = row.dataset.tagid;
     if (tagId) {
       if (open) _openTags.add(tagId);
@@ -1347,40 +1351,117 @@ window.PageStudent = (function () {
   }
 
   /* ── Competencies tab ───────────────────────────────────── */
+  /* One 1–4 scale (design rule 5): four cells filled to the level in its
+     colour, and a ring where the first scores started (startAndNow). */
+  function _cpScaleHtml(v, start) {
+    var lvl = v > 0 ? Math.max(1, Math.min(4, roundLevel(v))) : 0;
+    var html = '<span class="stu-cp-scale" aria-hidden="true">';
+    for (var n = 1; n <= 4; n++) {
+      var share = Math.max(0, Math.min(1, (v || 0) - (n - 1)));
+      html +=
+        '<span class="stu-cp-cell"><span style="width:' +
+        share * 100 +
+        '%;background:' +
+        (PROF_COLORS[lvl] || PROF_COLORS[0]) +
+        '"></span></span>';
+    }
+    if (start > 0) html += '<span class="stu-cp-ring" style="left:' + (Math.min(start, 4) / 4) * 100 + '%"></span>';
+    return html + '</span>';
+  }
+
+  /* Since the start: where a run of scores started and where it is now
+     (startAndNow), as the class shows levels. */
+  function _cpTrend(cid, entries) {
+    var sn = startAndNow(
+      entries.map(function (e) {
+        return { t: _dayNum(e.date), v: e.score };
+      }),
+    );
+    if (!sn) return { dir: 'none', text: 'Too few to tell', start: 0, title: '' };
+    var a = formatLevel(cid, sn.start);
+    var b = formatLevel(cid, sn.now);
+    var dir = a === b ? 'flat' : sn.now > sn.start ? 'up' : 'down';
+    return {
+      dir: dir,
+      start: sn.start,
+      from: a,
+      to: b,
+      text: dir === 'flat' ? 'Steady at ' + b : (dir === 'up' ? '↑ Up from ' : '↓ Down from ') + a,
+      title: 'First four weeks ' + a + ', last four weeks ' + b,
+    };
+  }
+
+  /* The open row's facts (design rule 7): the level and how it is worked
+     out, the latest score, since the start, and any override. */
+  function _cpFactsHtml(ctx, sec, sp, entries, tr, override) {
+    var cid = ctx.cid;
+    var word = sp > 0 ? levelWord(cid, sp) : '';
+    var rows = [
+      {
+        label: 'Level',
+        value: sp > 0 ? formatLevel(cid, sp) + (word ? ' · ' + word : '') : 'Not yet assessed',
+        sub: describeCalcMethod(cid) + ' · ' + _plural(entries.length, 'score', 'scores'),
+      },
+      {
+        label: 'Latest',
+        value: '<span class="stu-comp-latest">' + esc(_latestLine(cid, sec, ctx.assessMap)) + '</span>',
+        raw: true,
+      },
+      {
+        label: 'Since the Start',
+        value: tr.dir === 'none' ? 'Too few to tell' : tr.from + ' → ' + tr.to,
+        sub: tr.dir === 'none' ? 'Needs scores at least two weeks apart' : 'The first four weeks to the last four',
+      },
+      {
+        label: 'Override',
+        value: override ? 'Set by you' : 'None',
+        sub: override ? 'The calculated level is set aside' : 'The level is calculated',
+      },
+    ];
+    return (
+      '<dl class="stu-comp-facts">' +
+      rows
+        .map(function (r) {
+          return (
+            '<div class="stu-cp-fact"><dt>' +
+            esc(r.label) +
+            '</dt><dd><span class="stu-cp-fact-v">' +
+            (r.raw ? r.value : esc(r.value)) +
+            '</span>' +
+            (r.sub ? '<span class="stu-cp-fact-sub">' + esc(r.sub) + '</span>' : '') +
+            '</dd></div>'
+          );
+        })
+        .join('') +
+      '</dl>'
+    );
+  }
+
   function _compRowHtml(ctx, sec) {
     var cid = ctx.cid;
     var tag = sec.tags[0];
     var sp = getSectionProficiency(cid, studentId, sec.id);
     var override = getSectionOverride(cid, studentId, sec.id);
     var entries = _compEntries(cid, sec);
-    var bars = entries
-      .map(function (e) {
-        var lvl = e.level != null ? e.level : roundLevel(e.score);
-        var a = ctx.assessMap[e.assessmentId];
-        return (
-          '<span class="stu-bar" style="height:' +
-          Math.max(4, Math.round((Math.min(e.score, 4) / 4) * 28)) +
-          'px;background:' +
-          (PROF_COLORS[lvl] || PROF_COLORS[0]) +
-          '" title="' +
-          esc(_shortDay(e.date) + ': ' + _entryText(e, a) + (a ? ' on ' + a.title : '')) +
-          '"></span>'
-        );
-      })
-      .join('');
+    var tr = _cpTrend(cid, entries);
     if (!tag) {
       return (
         '<div class="stu-comp"><div class="stu-comp-row stu-comp-row-static"><span class="stu-comp-name"><strong>' +
         esc(sec.name) +
         '</strong></span>' +
+        _cpScaleHtml(sp, 0) +
+        '<span class="stu-comp-level">' +
         _levelPill(cid, sp) +
-        '</div></div>'
+        '</span></div></div>'
       );
     }
     var drawerId = 'ced-' + sec.id;
     var open = _openTags.has(tag.id);
+    var sub = tag.ican || (tag.label && tag.label !== sec.name ? tag.label : '');
     return (
-      '<div class="stu-comp">' +
+      '<div class="stu-comp' +
+      (open ? ' open' : '') +
+      '">' +
       '<button type="button" class="dash-tag-row stu-comp-row' +
       (open ? ' open' : '') +
       '" data-action="toggleTag" data-tagid="' +
@@ -1393,33 +1474,29 @@ window.PageStudent = (function () {
       '<span class="stu-comp-name"><strong>' +
       esc(sec.name) +
       '</strong>' +
-      (tag.label && tag.label !== sec.name ? '<span class="stu-sub">' + esc(tag.label) + '</span>' : '') +
+      (sub ? '<span class="stu-cp-ican">' + esc(sub) + '</span>' : '') +
       (override ? '<span class="override-label">Overridden</span>' : '') +
       '</span>' +
+      _cpScaleHtml(sp, tr.start) +
       '<span class="stu-comp-level">' +
-      _levelPill(cid, sp) +
+      (sp > 0 ? _levelPill(cid, sp) : '<span class="stu-sub">Not yet</span>') +
       '</span>' +
-      '<span class="stu-comp-bars" aria-hidden="true">' +
-      (bars || '<span class="stu-sub">No scores yet</span>') +
+      '<span class="stu-cp-trend stu-cp-' +
+      tr.dir +
+      '"' +
+      (tr.title ? ' title="' + esc(tr.title) + '"' : '') +
+      '>' +
+      esc(tr.text) +
       '</span>' +
-      '<span class="stu-comp-class">' +
-      _startNowHtml(
-        cid,
-        entries.map(function (e) {
-          return { t: _dayNum(e.date), v: e.score };
-        }),
-      ) +
-      '</span>' +
-      '<span class="stu-comp-latest"><span>' +
-      esc(_latestLine(cid, sec, ctx.assessMap)) +
-      '</span><span class="stu-sub dash-tag-evidence">' +
+      '<span class="stu-cp-ev dash-tag-evidence">' +
       esc(CompetencyEvidence.rowCount(cid, studentId, tag.id)) +
-      '</span></span>' +
+      '</span>' +
       '<span class="dash-tag-chevron" aria-hidden="true">&#9654;</span>' +
       '</button>' +
       _compNowHtml(cid, tag, sp) +
       _compWhereHtml(ctx, entries) +
       CompetencyEvidence.drawerHtml(cid, studentId, sec, tag, drawerId) +
+      _cpFactsHtml(ctx, sec, sp, entries, tr, override) +
       '<div class="stu-comp-override">' +
       '<button type="button" class="override-btn' +
       (override ? ' active' : '') +
@@ -1565,14 +1642,101 @@ window.PageStudent = (function () {
     return '<span class="stu-note">' + esc(text) + '</span>';
   }
 
+  /* The three facts over the list: how many are assessed, the strongest,
+     and the one to get better at (the lowest, orange as attention). */
+  function _cpSummaryHtml(ctx) {
+    var cid = ctx.cid;
+    var scored = [];
+    ctx.sections.forEach(function (sec) {
+      var v = getSectionProficiency(cid, studentId, sec.id);
+      if (v > 0) scored.push({ sec: sec, v: v });
+    });
+    var html =
+      '<div class="stu-cp-facts3"><div class="stu-cp-tile"><div class="stu-cp-tile-label">Assessed</div>' +
+      '<div class="stu-cp-tile-v">' +
+      scored.length +
+      ' of ' +
+      _plural(ctx.sections.length, 'competency', 'competencies') +
+      '</div></div>';
+    if (scored.length >= 2) {
+      var hi = scored.reduce(function (m, x) {
+        return x.v > m.v ? x : m;
+      }, scored[0]);
+      var lo = scored.reduce(function (m, x) {
+        return x.v < m.v ? x : m;
+      }, scored[0]);
+      var loTr = _cpTrend(cid, _compEntries(cid, lo.sec));
+      html +=
+        '<div class="stu-cp-tile"><div class="stu-cp-tile-label">Strongest</div><div class="stu-cp-tile-v">' +
+        esc(hi.sec.name) +
+        ' <span class="stu-cp-tile-lv">' +
+        esc(formatLevel(cid, hi.v)) +
+        '</span></div></div>' +
+        '<div class="stu-cp-tile att"><div class="stu-cp-tile-label">To Get Better</div><div class="stu-cp-tile-v">' +
+        esc(lo.sec.name) +
+        ' <span class="stu-cp-tile-lv">' +
+        esc(formatLevel(cid, lo.v)) +
+        (loTr.dir === 'down' ? ' ↓' : '') +
+        '</span></div></div>';
+    }
+    return html + '</div>';
+  }
+
+  var CP_FOOT =
+    '<p class="stu-cp-foot">Levels compare the student to the competency, not to classmates. Private observations show only to you.</p>';
+
   function _compsTabHtml(ctx) {
     var cid = ctx.cid;
+    var sorts = [
+      ['map', 'Curriculum Order'],
+      ['lowest', 'Lowest First'],
+    ];
     var html =
-      '<div class="stu-panel-note">Competency levels: ' +
-      esc(describeCalcMethod(cid)) +
-      '. Bars show ' +
-      (ctx.term ? 'this term’s' : 'all') +
-      ' scores, oldest to newest. Select a competency to see the evidence behind it.</div>';
+      '<div class="stu-cp">' +
+      '<div class="stu-cp-head"><div class="stu-cp-head-text"><h2 class="stu-cp-title">Competencies</h2>' +
+      '<p class="stu-cp-lede">Each level is worked out as: ' +
+      esc(describeCalcMethod(cid).toLowerCase()) +
+      ' (set in Grading). The ring shows where the first scores started.</p></div>' +
+      '<div class="stu-cp-sortbox"><span class="stu-cp-sort-label" id="stu-cp-sort-label">Sort</span>' +
+      '<div class="seg seg-sm stu-cp-sort" role="radiogroup" aria-labelledby="stu-cp-sort-label">' +
+      sorts
+        .map(function (s) {
+          var on = _compSort === s[0];
+          return (
+            '<button type="button" class="seg-btn' +
+            (on ? ' active' : '') +
+            '" role="radio" aria-checked="' +
+            on +
+            '" data-action="stuCompSort" data-sort="' +
+            s[0] +
+            '">' +
+            esc(s[1]) +
+            '</button>'
+          );
+        })
+        .join('') +
+      '</div></div></div>';
+    if (!ctx.sections.length) return html + '<div class="stu-empty">This class has no competencies yet.</div></div>';
+    html += _cpSummaryHtml(ctx);
+    html +=
+      '<div class="stu-cp-list"><div class="stu-cp-colhead" aria-hidden="true"><span>Competency</span>' +
+      '<span class="stu-cp-colscale"><span>1</span><span>2</span><span>3</span><span>4</span></span>' +
+      '<span>Level</span><span>Since the Start</span><span>Evidence</span><span></span></div>';
+    if (_compSort === 'lowest') {
+      ctx.sections
+        .map(function (sec, i) {
+          return { sec: sec, i: i, v: getSectionProficiency(cid, studentId, sec.id) || 0 };
+        })
+        .sort(function (x, y) {
+          // Not yet assessed last; otherwise lowest first, map order on a tie.
+          if (!x.v !== !y.v) return x.v ? -1 : 1;
+          return x.v - y.v || x.i - y.i;
+        })
+        .forEach(function (x) {
+          html += _compRowHtml(ctx, x.sec);
+        });
+      return html + '</div>' + CP_FOOT + '</div>';
+    }
     var grouped = getGroupedSections(cid);
     var hasGroups = grouped.groups.some(function (g) {
       return g.sections.length > 0;
@@ -1603,8 +1767,7 @@ window.PageStudent = (function () {
         html += _compRowHtml(ctx, sec);
       });
     }
-    if (!ctx.sections.length) html += '<div class="stu-empty">This class has no competencies yet.</div>';
-    return html;
+    return html + '</div>' + CP_FOOT + '</div>';
   }
 
   /* ── Groups of assessments (Assessments tab, Grade Breakdown) ── */
@@ -3717,6 +3880,12 @@ window.PageStudent = (function () {
       stuOvFilter: function () {
         _ovFilter = el.dataset.filter || 'all';
         render();
+      },
+      stuCompSort: function () {
+        _compSort = el.dataset.sort === 'lowest' ? 'lowest' : 'map';
+        render();
+        var btn = document.querySelector('.stu-cp-sort [data-sort="' + _compSort + '"]');
+        if (btn) btn.focus({ preventScroll: true });
       },
       stuOvShowAll: function () {
         _ovShowAll = !_ovShowAll;
