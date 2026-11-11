@@ -458,7 +458,8 @@ test.describe('fifteen minutes with no activity', () => {
   for (const [name, act] of [
     ['a key', page => page.keyboard.press('Shift')],
     ['the pointer', page => page.mouse.move(300, 300)],
-    ['a click', page => page.mouse.click(700, 500)],
+    // On the page's margin, where a click opens nothing.
+    ['a click', page => page.mouse.click(4, 500)],
     ['a scroll', page => page.mouse.wheel(0, 200)],
   ]) {
     test(`${name} is activity: the fifteen minutes start again`, async ({ page }) => {
@@ -488,7 +489,7 @@ test.describe('fifteen minutes with no activity', () => {
     await serve(page, fn);
     await signIn(page);
     await page.clock.fastForward(10 * MIN);
-    await page.touchscreen.tap(180, 400);
+    await page.touchscreen.tap(4, 400);
     await page.clock.fastForward(10 * MIN);
     await expect(row(page, 'Cell Structure Quiz')).toBeVisible();
     await page.clock.fastForward(5 * MIN + 1000);
@@ -550,7 +551,7 @@ test.describe('fifteen minutes with no activity', () => {
 
     // Ten minutes on, the student is working in the second tab.
     await page.clock.fastForward(10 * MIN);
-    await two.mouse.click(700, 500);
+    await two.mouse.click(4, 500);
     await expect.poll(async () => JSON.parse((await stored(two)).local[KEY]).a).toBeGreaterThan(Date.now() + 9 * MIN);
     // Ten more: twenty since the first tab was touched.
     await page.clock.fastForward(10 * MIN);
@@ -749,7 +750,9 @@ test.describe('"opened" means the row was on screen', () => {
     // All Assignments, pressed while the tab is still covered.
     await page.locator('[data-act="all-open"]').waitFor({ state: 'attached' });
     await page.evaluate(() => document.querySelector('[data-act="all-open"]').click());
-    await expect(page.locator('.sp-row')).toHaveCount(9);
+    // Only what is back, so every returned piece fits on the screen.
+    await page.evaluate(() => document.querySelector('[data-filter="back"]').click());
+    await expect(page.locator('.sp-row')).toHaveCount(6);
     await expect(page.locator('#app')).toHaveCSS('visibility', 'hidden');
     await page.waitForTimeout(1500);
     expect(routes(posts)).toEqual(['page']);

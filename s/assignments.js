@@ -64,6 +64,9 @@
       tab: state.tab,
       segment: state.segment,
       all: state.all,
+      pick: state.pick,
+      search: state.search,
+      filter: state.filter,
       sheet: state.sheet,
       sending: state.sending,
       noResults: !gradesAreIn(),
@@ -78,11 +81,36 @@
     return page + (state.sheet && StudentPage.classesSheet ? StudentPage.classesSheet(state.page) : '');
   }
 
+  StudentPage.viewOf = viewOf;
+
+  /* All Assignments' search: each letter typed draws the list again, and
+     the box keeps the focus and the place being typed in. */
+  function onInput(el) {
+    if (!el || el.id !== 'sp-search' || !S || S.screen !== 'assignments') return;
+    S.search = String(el.value || '').slice(0, 100);
+    var at = typeof el.selectionStart === 'number' ? el.selectionStart : S.search.length;
+    StudentPage.paint('#sp-search');
+    var box = typeof document !== 'undefined' ? document.getElementById('sp-search') : null;
+    if (box && typeof box.setSelectionRange === 'function') box.setSelectionRange(at, at);
+  }
+
+  // The state, as student.js hands it over.
+  var S = null;
+
   StudentPage.addScreens({
     file: 'assignments',
     render: { assignments: renderAssignments },
-    // The screen reads the state it is handed; it keeps none of its own.
-    share: function () {},
+    input: onInput,
+    // Once the page is drawn: the phone's cards start at the one picked, and the count follows the swipe.
+    drawn: function (root, state) {
+      if (state.screen !== 'assignments' || typeof StudentPageView === 'undefined') return;
+      StudentPageView.settle(root, function (id) {
+        state.pick = id;
+      });
+    },
+    share: function (state) {
+      S = state;
+    },
     test: {
       viewOf: viewOf,
       rowView: function (p) {

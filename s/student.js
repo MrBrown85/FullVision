@@ -107,6 +107,9 @@ var StudentPage = (function () {
       tab: 'assignments', // a card's page: assignments | learning | questionnaires | reports
       segment: 'todo', // the Assignments tab: todo | sent | back
       all: false, // the Assignments tab: All Assignments is showing
+      pick: '', // the Assignments tab: the card showing
+      search: '', // All Assignments: the search words
+      filter: 'all', // All Assignments: all | todo | sent | back
     };
   }
 
@@ -579,6 +582,10 @@ var StudentPage = (function () {
     if (S.screen === 'loading' && window.FVLoading) window.FVLoading.start(root, 'student');
     root.querySelectorAll('textarea.sp-text').forEach(grow);
     rovingRadios(root);
+    // A screen file's own step once its screen is drawn (assignments.js: the cards follow the swipe).
+    files.forEach(function (f) {
+      if (f.drawn) f.drawn(root, S);
+    });
     var f = focusSel ? root.querySelector(focusSel) : null;
     if (f && f.focus) f.focus({ preventScroll: false });
   }

@@ -187,7 +187,7 @@ describe('Demo Mode sends nothing from the student page', () => {
       page.type('#sp-ident', hash === '#demo-card-password' ? page.T.DEMO.password : page.T.DEMO.number);
       await page.click('[data-act="card-yes"]');
       expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
-      expect(page.root().querySelectorAll('.sp-row').length).toBeGreaterThan(0);
+      expect(page.root().querySelectorAll('.sp-row, .sp-piece').length).toBeGreaterThan(0);
       expect(page.calls).toEqual([]);
       // The only files fetched late are the site's own calc.js and constants.js.
       expect(page.fetched).toEqual(['../shared/constants.js', '../shared/calc.js']);

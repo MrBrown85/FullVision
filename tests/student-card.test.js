@@ -463,7 +463,10 @@ describe('student card: a draft is nowhere on the page', () => {
     expect(drafted.dot).toBe(ungraded.dot);
     const li = title => [...page.root().querySelectorAll('.sp-row')].find(el => el.textContent.includes(title));
     const shape = el =>
-      el.outerHTML.replace(/>[^<]+</g, '><').replace(/sp-row-title">.*?<\/span>/, 'sp-row-title"></span>');
+      el.outerHTML
+        .replace(/>[^<]+</g, '><')
+        .replace(/sp-row-title">.*?<\/span>/, 'sp-row-title"></span>')
+        .replace(/data-piece="[^"]*"/g, 'data-piece=""');
     expect(shape(li('Disease Research Poster'))).toBe(shape(li('Science Fair Proposal')));
     // A returned grade with a newer draft over it keeps what was returned.
     const essay = row(page, 'Ecosystem Connections Essay');

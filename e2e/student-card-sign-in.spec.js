@@ -107,7 +107,7 @@ for (const size of [
       await shot(page, size.tag + '-s3f3-two-classes');
       await sheet.locator('.sp-class', { hasText: 'Science 8' }).click();
       await expect(page.getByRole('button', { name: 'Science 8 Block B' })).toBeVisible();
-      await expect(page.locator('.sp-row-title').first()).toBeVisible();
+      await expect(page.locator('.sp-piece.sp-picked .sp-piece-title')).toBeVisible();
       expect(JSON.parse((await stored(page)).local[KEY]).e).toBe(CECE);
       expect(errors).toEqual([]);
     });

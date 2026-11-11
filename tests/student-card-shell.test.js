@@ -15,14 +15,25 @@ import { WORK, fakeStudentSubmit, sampleCard, samplePage } from './helpers/fake-
 const TODAY = new Date().toISOString().slice(0, 10);
 
 const text = page => page.root().textContent;
-const titles = page => [...page.root().querySelectorAll('.sp-row-title')].map(el => el.textContent);
+// The titles on screen: All Assignments' rows, or the cards of To Do, Sent or Back (S4-F2).
+const titles = page =>
+  [...page.root().querySelectorAll('.sp-row-title, .sp-deck .sp-piece-title')].map(el => el.textContent);
+// Each piece's result: a row's, or a card's Your Result.
 const results = page =>
-  Object.fromEntries(
-    [...page.root().querySelectorAll('.sp-row')].map(li => [
+  Object.fromEntries([
+    ...[...page.root().querySelectorAll('.sp-row')].map(li => [
       li.querySelector('.sp-row-title').textContent,
       (li.querySelector('.sp-row-result') || {}).textContent || '',
     ]),
-  );
+    ...[...page.root().querySelectorAll('.sp-deck .sp-piece')].map(card => {
+      const first = card.querySelector('.sp-piece-row');
+      const mine = first && first.querySelector('.sp-piece-row-name').textContent === 'Your Result';
+      return [
+        card.querySelector('.sp-piece-title').textContent,
+        mine ? first.querySelector('.sp-level').textContent : '',
+      ];
+    }),
+  ]);
 const segments = page => [...page.root().querySelectorAll('.sp-segment')].map(b => b.textContent);
 const pressed = page => page.root().querySelector('.sp-segment[aria-pressed="true"]').textContent;
 
@@ -108,8 +119,9 @@ describe('To Do, Sent and Back', () => {
   it('a draft is To Do like work never graded: no result, no mark, and it does not count as Back', async () => {
     const page = await demo();
     expect(results(page)['Disease Research Poster']).toBe('');
-    const li = [...page.root().querySelectorAll('.sp-row')].find(el => el.textContent.includes('Poster'));
-    expect(li.querySelector('.sp-dot').getAttribute('class')).toBe('sp-dot sp-dot-due');
+    const li = [...page.root().querySelectorAll('.sp-deck .sp-piece')].find(el => el.textContent.includes('Poster'));
+    expect(li.className).toContain('sp-piece-due');
+    expect(li.querySelector('.sp-piece-rows')).toBeNull();
     expect(li.hasAttribute('data-unseen')).toBe(false);
     expect(page.root().innerHTML).not.toContain('two of your sources');
     await page.click('[data-segment="back"]');
@@ -145,7 +157,7 @@ describe('To Do, Sent and Back', () => {
     expect(page.root().querySelector('.sp-caught-up [data-segment="back"]').textContent).toBe('See What’s Back');
     await page.click('.sp-caught-up [data-segment="back"]');
     expect(pressed(page)).toMatch(/^Back \d+$/);
-    expect(page.root().querySelector('.sp-row')).toBeTruthy();
+    expect(page.root().querySelector('.sp-deck .sp-piece')).toBeTruthy();
   });
 
   it('a segment that is not one of the three changes nothing', async () => {
@@ -261,7 +273,7 @@ describe('Preview as Student draws what the student page draws', () => {
     page.showAll();
     const view = JSON.parse(JSON.stringify(page.T.viewOf(page.T.state())));
     const student = page.root().querySelector('.sp-view').outerHTML;
-    const preview = globalThis.PreviewStudent.drawPage(view);
+    const preview = globalThis.PreviewStudent.drawPage(view, { all: true });
     // Read back through the same parser as the student page's, so both are written out alike.
     const box = page.root().ownerDocument.createElement('div');
     box.innerHTML = preview;
