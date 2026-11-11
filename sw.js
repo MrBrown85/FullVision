@@ -30,7 +30,16 @@ const PRECACHE_URLS = [
   '/shared/offline-queue.js',
   '/shared/photo-shrink.js',
   '/shared/photo-queue.js',
+  '/shared/photo-readers.js',
+  // The PDF reader's library and worker (vendor/pdfjs/README.md), so a PDF
+  // chosen offline still becomes pages. Fetched only when a PDF is opened,
+  // but cached here at install like the other vendor files. The scan
+  // decoders, fonts and character maps beside them are cached when first
+  // used.
+  '/vendor/pdfjs/pdf.min.js',
+  '/vendor/pdfjs/pdf.worker.min.js',
   '/shared/work-thumbs.js',
+  '/shared/markup-draw.js',
   '/shared/auto-update.js',
   '/shared/calc.js',
   '/shared/grade-state.js',
@@ -42,6 +51,7 @@ const PRECACHE_URLS = [
   '/s/page-view.js',
   '/s/send.js',
   '/s/feedback.js',
+  '/s/reflect.js',
   '/s/page-view.css',
   '/shared/loading-screen.js',
   '/shared/loading-screen.css',
@@ -118,6 +128,7 @@ const PRECACHE_URLS = [
   '/teacher/rubric-bank.js',
   '/teacher/grading-setup-copy.js',
   '/teacher/page-dashboard.js',
+  '/teacher/markup.js',
   '/teacher/page-assignments.js',
   '/teacher/page-student.js',
   '/teacher/page-gradebook.js',
@@ -139,6 +150,7 @@ const PRECACHE_URLS = [
   '/teacher-mobile/sweep.js',
   '/teacher-mobile/grade-photos.js',
   '/teacher-mobile/add-work.js',
+  '/teacher-mobile/markup.js',
   '/teacher-mobile/tab-grade.js',
   '/teacher-mobile/shell.js',
 ];

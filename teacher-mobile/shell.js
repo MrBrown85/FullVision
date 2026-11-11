@@ -1546,6 +1546,17 @@
         );
         return;
       }
+      // Mark Up a page (S9-F2), from the photos full screen.
+      if (action === 'm-markup-open') {
+        if (target.closest('#m-sheet-container')) MC.dismissSheet();
+        MMarkUp.open(
+          _cid,
+          target.getAttribute('data-aid'),
+          target.getAttribute('data-sid'),
+          parseInt(target.getAttribute('data-page'), 10) || 0,
+        );
+        return;
+      }
       if (action === 'm-work-top') {
         MGradePhotos.toTop(target);
         return;

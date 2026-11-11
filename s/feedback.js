@@ -136,37 +136,202 @@
   }
 
   function demoOn(state) {
-    return !!(state && state.demo && state.demoSend && state.reply && state.page);
+    return !!(state && state.demo && (state.demoSend || state.demoReflect) && state.reply && state.page);
+  }
+
+  /* ── Demo Mode's sample: Cece's reflections (S10) ──────────────
+     At #demo-card-reflect the class has Reflect on Feedback on. Cece asked
+     about Energy Transfer Investigation and Ms. Rivera answered; she made
+     a plan on the KMT lab yesterday, which goes on her next piece to do;
+     on the Cell Structure Quiz Ms. Rivera wrote herself a note, which is
+     hers alone and never sent. Cell Microscope Lab is hers to reflect on.
+     What she sends is kept in memory until Done. */
+  function at(days, hour) {
+    var t = new Date(Date.now() + days * 864e5);
+    t.setHours(hour || 15, 10, 0, 0);
+    return t.toISOString();
+  }
+  function blank(fields) {
+    return Object.assign(
+      {
+        makes_sense: 'yes',
+        question: null,
+        plan: null,
+        went_well: null,
+        sent_at: null,
+        answer: null,
+        answered_at: null,
+        only_me: false,
+        sense_now: null,
+        sense_now_at: null,
+        follow_up: null,
+        follow_up_answer: null,
+        follow_up_answered_at: null,
+      },
+      fields,
+    );
+  }
+  function demoReflections() {
+    return {
+      'demo-energy': blank({
+        makes_sense: 'not_sure',
+        question: 'What counts as a pattern? I thought one number going up was one.',
+        sent_at: at(-5),
+        answer:
+          'A pattern is what keeps happening across your whole table. Here, every transfer loses some energy as heat. One number going up is a single result.',
+        answered_at: at(-4),
+      }),
+      'demo-kmt': blank({
+        plan: 'Next time I’ll write down what I predict before I heat anything.',
+        went_well: 'I’m proud of my particle drawings.',
+        sent_at: at(-1),
+      }),
+      'demo-quiz': blank({
+        makes_sense: 'not_sure',
+        question: 'Why was number 4 wrong?',
+        sent_at: at(-8),
+        // The teacher's note to herself: hers alone (the stand-in sends no answer marked for her only).
+        answer: 'Go over question 4 with the whole class on Monday.',
+        answered_at: at(-7),
+        only_me: true,
+      }),
+    };
+  }
+  function reflections(state) {
+    if (!state.demoReflections) state.demoReflections = demoReflections();
+    return state.demoReflections;
+  }
+
+  /* The student's reflection as the server sends it (`feedback`'s
+     `reflection`): their own words, and the teacher's answers once sent.
+     An answer the teacher kept for herself is never sent. */
+  function reflectionReply(r) {
+    var mine = !r.only_me;
+    return {
+      makes_sense: r.makes_sense,
+      question: r.question,
+      plan: r.plan,
+      went_well: r.went_well,
+      sent_at: r.sent_at,
+      answer: mine ? r.answer : null,
+      answered_at: mine ? r.answered_at : null,
+      sense_now: r.sense_now,
+      follow_up: r.follow_up,
+      follow_up_answer: r.follow_up_answer,
+      follow_up_answered_at: r.follow_up_answered_at,
+    };
+  }
+
+  // A reflection the student can see: Reflect on Feedback on, and the piece on the page and returned.
+  function reflectionSeen(state, id) {
+    var row = rowOf(state, id);
+    var r = state.demoReflect ? reflections(state)[id] : null;
+    if (!r || !row || !row.returned_at || row.status === 'NS' || row.status === 'EXC') return null;
+    return r;
   }
 
   /* ── The replies, in the contract's shapes ─────────────────── */
 
   /* `feedback` (Batch C): { ok, v, reflect_on_feedback, show_my_learning,
      assessments: [ { id, marks: { pages, notes }, revision, reflection } ],
-     last_plan }. Only Mark Up is filled here (S9-F3). null outside Demo
-     Mode's #demo-card-send: the server does not send it yet. */
+     last_plan }. Mark Up (S9-F3) with Send Work on; reflections and the
+     last plan (S10) with Reflect on Feedback on. null outside Demo Mode's
+     #demo-card-send and #demo-card-reflect: the server does not send it
+     yet. Revisions (S11) are not built. */
   function feedbackOf(state) {
     if (!demoOn(state)) return null;
-    var assessments = [];
-    Object.keys(DEMO_MARKUP).forEach(function (id) {
-      var pages = givenPages(state, id);
-      if (!pages.length) return;
-      var notes = 0;
-      pages.forEach(function (pg) {
-        pg.given.marks.forEach(function (m) {
-          if (m.type === 'note') notes += 1;
+    var byId = {};
+    var entry = function (id) {
+      return (byId[id] = byId[id] || { id: id, marks: null, revision: null, reflection: null });
+    };
+    if (state.demoSend) {
+      Object.keys(DEMO_MARKUP).forEach(function (id) {
+        var pages = givenPages(state, id);
+        if (!pages.length) return;
+        var notes = 0;
+        pages.forEach(function (pg) {
+          pg.given.marks.forEach(function (m) {
+            if (m.type === 'note') notes += 1;
+          });
         });
+        entry(id).marks = { pages: pages.length, notes: notes };
       });
-      assessments.push({ id: id, marks: { pages: pages.length, notes: notes }, revision: null, reflection: null });
-    });
+    }
+    var lastPlan = null;
+    if (state.demoReflect) {
+      var all = reflections(state);
+      Object.keys(all).forEach(function (id) {
+        var r = reflectionSeen(state, id);
+        if (!r) return;
+        entry(id).reflection = reflectionReply(r);
+        if (r.plan && (!lastPlan || r.sent_at > lastPlan.sent_at)) {
+          lastPlan = { assessment_id: id, plan: r.plan, sent_at: r.sent_at };
+        }
+      });
+    }
     return {
       ok: true,
       v: 1,
-      reflect_on_feedback: false,
+      reflect_on_feedback: !!state.demoReflect,
       show_my_learning: false,
-      assessments: assessments,
-      last_plan: null,
+      assessments: Object.keys(byId).map(function (id) {
+        return byId[id];
+      }),
+      last_plan: lastPlan,
     };
+  }
+
+  /* `reflect` and `reply` (Batch C), as the student functions are written
+     to answer: a reflection only while the class has Reflect on Feedback
+     on, only on a piece of this class returned to the student, and only
+     until the teacher answers it (sent again before then, it takes the
+     place of the first); "Does It Make Sense Now?" only once answered, and
+     a follow-up question once. The student's words go in as typed. */
+  var LIMIT = 1000;
+  function words(v) {
+    return typeof v === 'string' && v.trim() && v.length <= LIMIT ? v : null;
+  }
+  function demoReflect(body) {
+    var id = body && body.assessment_id;
+    var row = rowOf(S, id);
+    var r = body && body.reflection;
+    if (!S.demoReflect) return { ok: false, error: 'reflect_off' };
+    if (!row) return { ok: false, error: 'not_found' };
+    if (!row.returned_at) return { ok: false, error: 'not_returned' };
+    var sense = r && (r.makes_sense === 'yes' || r.makes_sense === 'not_sure') ? r.makes_sense : '';
+    var bad =
+      !sense ||
+      (sense === 'not_sure' && !words(r.question)) ||
+      (sense === 'yes' && !words(r.plan)) ||
+      (r.went_well != null && r.went_well !== '' && !words(r.went_well));
+    if (bad) return { ok: false, error: 'bad_shape' }; // the server RAISES 22023: the caller's bug
+    var all = reflections(S);
+    var had = all[id];
+    if (had && (had.answer || had.answered_at)) return { ok: false, error: 'already_answered' };
+    all[id] = blank({
+      makes_sense: sense,
+      question: sense === 'not_sure' ? r.question : null,
+      plan: sense === 'yes' ? r.plan : null,
+      went_well: sense === 'yes' && words(r.went_well) ? r.went_well : null,
+      sent_at: new Date().toISOString(),
+    });
+    return { ok: true, reflection: reflectionReply(all[id]) };
+  }
+  function demoReply(body) {
+    var id = body && body.assessment_id;
+    var r = reflectionSeen(S, id);
+    var a = body && body.reply;
+    if (!r) return { ok: false, error: 'not_found' };
+    if (!r.answer || r.only_me) return { ok: false, error: 'not_answered' };
+    if (r.follow_up) return { ok: false, error: 'already_asked' };
+    var sense = a && (a.sense_now === 'yes' || a.sense_now === 'not_sure') ? a.sense_now : '';
+    if (!sense || (sense === 'not_sure' && !words(a.follow_up)) || (sense === 'yes' && a.follow_up)) {
+      return { ok: false, error: 'bad_shape' };
+    }
+    r.sense_now = sense;
+    r.sense_now_at = new Date().toISOString();
+    if (sense === 'not_sure') r.follow_up = a.follow_up;
+    return { ok: true, reflection: reflectionReply(r) };
   }
 
   /* `markup` (Batch C): { ok, files: [ { file_id, marks, given_at } ] }, the
@@ -179,6 +344,8 @@
   function demoAnswer(route, body) {
     var id = body && body.assessment_id;
     var sample = DEMO_MARKUP[id];
+    if (route === 'reflect') return demoReflect(body);
+    if (route === 'reply') return demoReply(body);
     if (!rowOf(S, id)) return { ok: false, error: 'not_found' };
     if (route === 'markup') {
       return {
@@ -274,6 +441,7 @@
     if (act === 'card-done' || act === 'class-open' || act === 'card-add') {
       S.work = '';
       S.workPages = null;
+      if (act === 'card-done') S.demoReflections = null;
       return;
     }
     // app.js has opened See Your Work (StudentPageView.press); fetch its pages unless they are here.
@@ -285,7 +453,34 @@
     }
   }
 
+  /* `group_work` (Batch C; S12-F1): { ok, assessments: [ { id, members,
+     sent, pages, you_sent, first_sent_at } ] } for each One per Group piece
+     the student's group is on. Counts only: the server sends no group-mate's
+     name, so neither does this. Demo Mode's (#demo-card-group): Cece's
+     group of three on Cell Model Project, where a group-mate sent 4 photos
+     yesterday; pages Cece sends are added to the group's. null otherwise. */
+  function groupOf(state) {
+    if (!state || !state.demo || !state.demoGroup || !rowOf(state, 'demo-cell-model')) return null;
+    var mine = state.demoSent && state.demoSent['demo-cell-model'];
+    return {
+      ok: true,
+      assessments: [
+        {
+          id: 'demo-cell-model',
+          members: 3,
+          sent: true,
+          pages: 4 + (mine ? mine.pages.length : 0),
+          you_sent: !!(mine && mine.pages.length),
+          first_sent_at: at(-1, 19),
+        },
+      ],
+    };
+  }
+
   StudentPage.feedbackOf = feedbackOf;
+  StudentPage.groupOf = groupOf;
+  // The one way s/reflect.js asks `reflect` and `reply` (Demo Mode's answers until Batch C is wired).
+  StudentPage.feedbackAsk = answerOf;
 
   StudentPage.addScreens({
     file: 'feedback',
@@ -296,8 +491,12 @@
     },
     test: {
       feedbackOf: feedbackOf,
+      groupOf: groupOf,
       demoMarkup: function () {
         return DEMO_MARKUP;
+      },
+      demoReflections: function (state) {
+        return reflections(state);
       },
       // Tests answer `markup` and `file-links` themselves (to hold one, or fail it); null puts Demo Mode back.
       setFeedbackAnswer: function (fn) {

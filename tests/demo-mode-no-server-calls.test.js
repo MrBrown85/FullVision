@@ -368,7 +368,8 @@ describe('Demo Mode sends nothing for Draft and Returned', () => {
   );
 
   it('the rule and the grader name no server function', () => {
-    ['shared/grade-state.js', 'shared/grader.js'].forEach(file => {
+    // Mark Up (S9-F1) too: it saves through data.js's saveMarkup only.
+    ['shared/grade-state.js', 'shared/grader.js', 'shared/markup-draw.js', 'teacher/markup.js'].forEach(file => {
       const src = readFileSync(new URL('../' + file, import.meta.url), 'utf-8');
       expect(src, file).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|sendBeacon|_writeRpc|\.rpc\(|getSupabase/);
     });

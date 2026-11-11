@@ -59,7 +59,9 @@
       var work = typeof StudentPage.workOf === 'function' ? StudentPage.workOf(state) : null;
       // The teacher's Mark Up, and later reflections (s/feedback.js; Demo Mode's until the server sends `feedback`).
       var feedback = typeof StudentPage.feedbackOf === 'function' ? StudentPage.feedbackOf(state) : null;
-      return StudentView.fromPage(reply, state.page, work, feedback);
+      // Group work (S12-F1): counts only, Demo Mode's until the server sends `group_work`.
+      var groups = typeof StudentPage.groupOf === 'function' ? StudentPage.groupOf(state) : null;
+      return StudentView.fromPage(reply, state.page, work, feedback, groups);
     } catch (e) {
       return null;
     }

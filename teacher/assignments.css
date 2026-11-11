@@ -9336,3 +9336,386 @@ button.grader-member-name {
 .gb-key-item .gb-to-grade {
   margin-right: 4px;
 }
+
+/* ── Mark Up (S9-F1): teacher/markup.js, shared/markup-draw.js ───────── */
+/* The marks lie over the page on its surface, in the grader's work pane
+   and on the Mark Up screen, and turn and fit with it. */
+.markup-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.markup-pin circle {
+  fill: #d93025;
+  stroke: #fff;
+  stroke-width: 3;
+}
+.markup-pin text {
+  fill: #fff;
+  font-weight: 700;
+  font-family: inherit;
+}
+.markup-pin.is-pending circle {
+  fill: var(--active);
+}
+.markup-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  background: var(--bg, #f2f2f7);
+  display: flex;
+}
+.markup-screen {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+}
+.markup-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--divider, #e5e5ea);
+  flex-wrap: wrap;
+}
+.markup-heading {
+  min-width: 0;
+}
+.markup-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+.markup-sub {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.markup-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin: 0 auto;
+}
+.markup-tool {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 56px;
+  height: 48px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.markup-tool:hover:not(:disabled) {
+  background: var(--surface-2, #f2f2f4);
+}
+.markup-tool[aria-pressed='true'] {
+  background: var(--active);
+  color: #fff;
+}
+.markup-tool:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.markup-icon {
+  min-width: 40px;
+}
+.markup-sep {
+  width: 1px;
+  height: 28px;
+  background: var(--divider-heavy, #d1d1d6);
+  margin: 0 6px;
+}
+.markup-colors {
+  display: inline-flex;
+  gap: 6px;
+}
+.markup-color {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--divider-heavy, #d1d1d6);
+  cursor: pointer;
+  padding: 0;
+}
+.markup-color[aria-pressed='true'] {
+  box-shadow: 0 0 0 2px var(--text);
+}
+.markup-color-red {
+  background: #d93025;
+}
+.markup-color-green {
+  background: #188038;
+}
+.markup-color-blue {
+  background: #1a73e8;
+}
+.markup-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+}
+.markup-stage {
+  overflow: auto;
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+.markup-surface {
+  position: relative;
+  display: block;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.markup-stage.turn-90 .markup-surface {
+  transform: rotate(90deg);
+}
+.markup-stage.turn-180 .markup-surface {
+  transform: rotate(180deg);
+}
+.markup-stage.turn-270 .markup-surface {
+  transform: rotate(270deg);
+}
+.markup-stage.tool-pen .markup-surface,
+.markup-stage.tool-highlight .markup-surface,
+.markup-stage.tool-note .markup-surface,
+.markup-stage.tool-tick .markup-surface,
+.markup-stage.tool-cross .markup-surface {
+  cursor: crosshair;
+}
+.markup-stage.tool-eraser .markup-surface {
+  cursor: cell;
+}
+.markup-img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - 200px);
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+}
+.markup-layer-host {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.markup-side {
+  background: var(--surface);
+  border-left: 1px solid var(--divider, #e5e5ea);
+  padding: 16px;
+  overflow: auto;
+}
+.markup-side-title {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.markup-note-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.markup-note {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 24px;
+  gap: 8px;
+  align-items: start;
+}
+.markup-note-n {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #d93025;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.markup-note-text {
+  margin: 1px 0 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.markup-note-remove {
+  border: none;
+  background: none;
+  color: var(--text-2);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.markup-notes-none,
+.markup-notes-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.markup-note-new {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.markup-note-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+.markup-note-input {
+  font: inherit;
+  font-size: 14px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--divider-heavy, #d1d1d6);
+  resize: vertical;
+}
+.markup-note-actions {
+  display: flex;
+  gap: 8px;
+}
+.markup-foot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 20px;
+  background: var(--surface);
+  border-top: 1px solid var(--divider, #e5e5ea);
+}
+.markup-sees {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.markup-msg {
+  margin: 0;
+  font-size: 13px;
+  color: var(--score-1, #c0392b);
+}
+.markup-msg:empty {
+  display: none;
+}
+.markup-pages {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 8px;
+}
+.markup-pages[hidden] {
+  display: none;
+}
+.markup-note-list + .markup-notes-hint {
+  margin-top: 12px;
+}
+
+/* ── A student's reflection in the grader (S10-F3) ───────────────────── */
+.grader-reflect {
+  background: var(--surface);
+  border: 1px solid var(--divider, #e5e5ea);
+  border-left: 4px solid var(--active);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 14px;
+  font-size: 14px;
+}
+.grader-reflect-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.grader-reflect-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+.grader-reflect-when {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.grader-reflect-sense {
+  display: inline-block;
+  margin: 0 0 8px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--surface-2, #f2f2f4);
+  color: var(--text-2);
+}
+.grader-reflect-sense.is-unsure {
+  background: rgba(255, 159, 10, 0.15);
+  color: #8a5300;
+}
+.grader-reflect-who {
+  margin: 6px 0 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+.grader-reflect-said {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.grader-reflect-now {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.grader-reflect-label {
+  display: block;
+  margin: 10px 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+.grader-reflect-input {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 14px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--divider-heavy, #d1d1d6);
+  resize: vertical;
+}
+.grader-reflect-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+.grader-reflect-only {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.grader-reflect-msg {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--score-1, #c0392b);
+}
+.grader-reflect-msg:empty {
+  display: none;
+}

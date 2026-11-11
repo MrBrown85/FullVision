@@ -666,6 +666,63 @@ window.StudentView = (function () {
     return out;
   }
 
+  /* The student's own reflection on one piece, from the `feedback` reply
+     (S10-F1; the contract's `reflection`), or null. Only the student's own
+     words and the teacher's answer once sent: the server sends nothing
+     else, and anything of the wrong type reads as none. */
+  var SENSE = { yes: 'yes', not_sure: 'not_sure' };
+  function reflectionOf(r) {
+    if (!r || typeof r !== 'object' || !SENSE[r.makes_sense] || !text(r.sent_at)) return null;
+    return {
+      makesSense: SENSE[r.makes_sense],
+      question: text(r.question),
+      plan: text(r.plan),
+      wentWell: text(r.went_well),
+      sentAt: text(r.sent_at),
+      answer: text(r.answer),
+      answeredAt: text(r.answered_at),
+      senseNow: SENSE[r.sense_now] || '',
+      followUp: text(r.follow_up),
+      followUpAnswer: text(r.follow_up_answer),
+      followUpAnsweredAt: text(r.follow_up_answered_at),
+    };
+  }
+
+  function reflectionsBy(feedback) {
+    var out = {};
+    if (!feedback || typeof feedback !== 'object' || feedback.ok !== true) return out;
+    list(feedback.assessments).forEach(function (entry) {
+      if (!entry || typeof entry.id !== 'string') return;
+      var r = reflectionOf(entry.reflection);
+      if (r) out[entry.id] = r;
+    });
+    return out;
+  }
+
+  /* Your Plan From Last Time (S10-F2): the plan from the student's latest
+     reflection in this class, and the piece it goes on: the next piece
+     still to do, the one due soonest on or after the day the plan was
+     made (never the piece it was made on). Worked out from the reply's
+     dates, with no clock. null with no plan, or nothing to do after it. */
+  function planFor(feedback, work) {
+    var lp = feedback && typeof feedback === 'object' && feedback.ok === true ? feedback.last_plan : null;
+    if (!lp || typeof lp !== 'object' || !text(lp.plan).trim() || !text(lp.sent_at)) return null;
+    var from = text(lp.assessment_id);
+    var made = text(lp.sent_at).slice(0, 10);
+    var next = null;
+    work.forEach(function (p) {
+      if (p.kind !== 'due' || p.id === from) return;
+      var due = p.dueDate || p.date || '';
+      if (!due || due < made) return;
+      if (!next || due < (next.dueDate || next.date)) next = p;
+    });
+    if (!next) return null;
+    var source = work.filter(function (p) {
+      return p.id === from;
+    })[0];
+    return { pieceId: next.id, text: text(lp.plan).trim(), fromTitle: source ? source.title : '' };
+  }
+
   /* The `feedback` reply for one student from the teacher's cache, in the
      contract's shape, for Preview as Student: the marks the student was
      given on each piece, as the data layer's getStudentMarkCounts counts
@@ -678,15 +735,43 @@ window.StudentView = (function () {
       var m = counts && row && row.id ? counts(cid, sid, row.id) : null;
       if (m) assessments.push({ id: str(row.id), marks: { pages: m.pages, notes: m.notes } });
     });
-    return { ok: true, v: 1, assessments: assessments };
+    var cfg = (typeof getCourseConfig === 'function' && getCourseConfig(cid)) || {};
+    // Reflect on Feedback, the class's switch (Batch C's course column): the preview shows its button.
+    return { ok: true, v: 1, reflect_on_feedback: cfg.reflect_on_feedback === true, assessments: assessments };
+  }
+
+  /* The `group_work` reply (S12-F1; Batch C's contract), by piece: how
+     many are in the student's group, whether the group's work is in, how
+     many pages, whether the student sent any of them, and when it was
+     first sent. Counts only: no name of anyone in the group. Anything of
+     the wrong shape reads as none. */
+  function groupsBy(groups) {
+    var out = {};
+    if (!groups || typeof groups !== 'object' || groups.ok !== true) return out;
+    var whole = function (v) {
+      return typeof v === 'number' && isFinite(v) && v >= 0 ? Math.floor(v) : -1;
+    };
+    list(groups.assessments).forEach(function (g) {
+      if (!g || typeof g.id !== 'string' || whole(g.members) < 2 || typeof g.sent !== 'boolean') return;
+      out[g.id] = {
+        members: whole(g.members),
+        sent: g.sent,
+        pages: g.sent ? Math.max(0, whole(g.pages)) : 0,
+        youSent: g.you_sent === true,
+        sentAt: g.sent ? text(g.first_sent_at) : '',
+      };
+    });
+    return out;
   }
 
   /* work: the `work` reply for this class (sending, S5-F2), or nothing.
      With Send Work off, or no reply, no piece says anything of sending and
      the page is as it was. */
-  function build(page, cid, cellOf, work, feedback) {
+  function build(page, cid, cellOf, work, feedback, groups) {
     page = page || {};
+    var grouped = groupsBy(groups);
     var marked = marksBy(feedback);
+    var reflections = reflectionsBy(feedback);
     var sending = {};
     if (work && typeof work === 'object' && work.send_work === true) {
       list(work.assessments).forEach(function (entry) {
@@ -726,10 +811,18 @@ window.StudentView = (function () {
         created_at: str(row.created_at),
         // The teacher's Mark Up on the student's pages (S9-F3): only on work that came back with a grade.
         marks: null,
+        reflection: null,
+        // Your Plan From Last Time, on the next piece to do (S10-F2): { text, fromTitle }.
+        plan: null,
+        // One per Group (S12-F1): { members, sent, pages, youSent, sentAt }, counts only.
+        group: null,
       };
       Object.assign(piece, aboutOf(row));
       // Sending: what this piece takes, and what is in. Work sent and not back yet is Sent.
       piece.send = sending[piece.id] || null;
+      // A group's work is in once any member has sent it: the piece is Sent for every member.
+      piece.group = hidden ? null : grouped[piece.id] || null;
+      if (piece.group && piece.group.sent && (piece.kind === 'due' || piece.kind === 'missing')) piece.kind = 'sent';
       if (piece.send && piece.send.sent && (piece.kind === 'due' || piece.kind === 'missing')) {
         piece.kind = 'sent';
         piece.late = piece.late || piece.send.sent.late;
@@ -747,6 +840,8 @@ window.StudentView = (function () {
         piece.result = resultOf(cid, row, typeof cellOf === 'function' ? cellOf(piece.id) : null);
         piece.comment = str(grade.comment);
         piece.marks = marked[piece.id] || null;
+        // The student's reflection on it (S10-F1): only on work that came back with a grade.
+        piece.reflection = reflections[piece.id] || null;
         if (row.rubric_id && rubrics[row.rubric_id]) {
           piece.rubric = rubricView(rubrics[row.rubric_id], grade, tags);
         } else if (row.score_mode !== 'points' && row.score_mode !== 'complete') {
@@ -770,6 +865,10 @@ window.StudentView = (function () {
       work.push(piece);
     });
     work = inOrder(work);
+    var plan = planFor(feedback, work);
+    work.forEach(function (p) {
+      if (plan && p.id === plan.pieceId) p.plan = { text: plan.text, fromTitle: plan.fromTitle };
+    });
     var count = function (kind) {
       return work.filter(function (p) {
         return p.kind === kind;
@@ -804,6 +903,13 @@ window.StudentView = (function () {
       // server's `page` sends nothing for it yet, so on the student's own
       // device it stays null and the tab says it is off.
       learning: null,
+      // Reflect on Feedback (S10): on only when the class's switch is (the `feedback` reply says so).
+      reflectOn: !!(
+        feedback &&
+        typeof feedback === 'object' &&
+        feedback.ok === true &&
+        feedback.reflect_on_feedback === true
+      ),
     };
   }
 
@@ -1114,6 +1220,8 @@ window.StudentView = (function () {
         },
         null,
         feedback,
+        // Group work from the cache (S12-T1's reader), counts only, as the student's page gets it.
+        typeof getStudentGroupWork === 'function' ? getStudentGroupWork(cid, sid) : null,
       );
       v.learning = showLearning ? learning(cid, sid, v) : null;
       return v;
@@ -1125,7 +1233,7 @@ window.StudentView = (function () {
      s/student-data.js holds it (StudentData.use(StudentData.fromServer(
      reply))). Results come from calc.js on that page's own readers; with
      calc.js not loaded they are blank. */
-  function fromPage(serverReply, studentPage, work, feedback) {
+  function fromPage(serverReply, studentPage, work, feedback, groups) {
     var p = studentPage;
     var cid = p && p.course ? p.course.id : '';
     var sid = p && p.student ? p.student.id : '';
@@ -1142,6 +1250,7 @@ window.StudentView = (function () {
       },
       work,
       feedback,
+      groups,
     );
   }
 
