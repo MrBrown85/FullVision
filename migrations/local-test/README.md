@@ -1833,3 +1833,24 @@ which Batch B reads as the latest version. C1 applies again after it.
 `batch_c_mutate.py`: 59 wrong versions (38 of C1, 21 of C2), each applied
 with its fingerprint lists stood aside and run against the behaviour
 scenarios. Results are in the pull request.
+
+The earlier suites with Batch C applied (2026-11-11; scratch copies of the
+suites, each with one hook that applies C1 and C2 after Batch B and its
+fixes; the hook is not in any branch). Every behaviour check passes; what
+fails is listed, with the same suite on the same base without Batch C:
+
+- `submissions.py` (Batch B, fixes in): 563 of 563 without Batch C; with
+  it 562, the one failure the inventory "only `_returned_grade` names a
+  score table": C1's student `feedback` and `markup` read `score.status`
+  (Missing, Excused) and `feedback` cuts Before and After's first grade
+  through `_grade_copy_in_use`.
+- `submissions_fixes.py`: 188 of 188 without; 168 with. The 20 are the
+  fixes file's own apply, second-run, undo and catalog checks, which find
+  `_grading_started` as C1 leaves it: the fixes' undo refuses while C1 is
+  in (take C1 out first). Both faults the fixes close stay closed.
+- `student_page_fields.py` (S4-M1): 259 of 259 without; 254 with. The 5:
+  the same score-table inventory; three `batchb` checks that apply Batch B
+  to a base that already has it; and the `suites` check that each older
+  suite passes clean, where `grade_return.py`'s inventory of what a
+  signed-in teacher can run now lists Batch B's and Batch C's functions.
+  Every key and refusal of `page` is as before.

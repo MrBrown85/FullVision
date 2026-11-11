@@ -188,13 +188,14 @@ def teacher():
         ok('teacher: a stale save changed nothing', d.one('select working_rev from markup where file_id = :f', f=files[0]) == 2)
         r = d.save_markup(files[0], marks('no check'), None)
         ok('teacher: save_markup without a base rev saves', r['result'] == 'saved' and r['rev'] == 3)
-        bad = [('not an object', '[]'), ('no marks list', '{"v": 1}'), ('a mark of no type', '{"marks": [{"x": 1}]}'),
-               ('an unknown type', '{"marks": [{"type": "eraser"}]}'), ('a note with no text', '{"marks": [{"type": "note"}]}'),
-               ('a blank note', '{"marks": [{"type": "note", "text": "  "}]}'),
-               ('a note of 501 characters', json.dumps({'marks': [{'type': 'note', 'text': 'x' * 501}]})),
-               ('501 marks', json.dumps({'marks': [{'type': 'tick'}] * 501})),
-               ('over 256 KB', json.dumps({'marks': [{'type': 'pen', 'points': [0.123456789] * 30000}]})),
-               ('a mark that is a string', '{"marks": ["pen"]}')]
+        # each is otherwise whole ({"v": 1}, a place on the page), so it meets the one check it is for
+        bad = [('not an object', '[]'), ('no marks list', '{"v": 1}'), ('a mark of no type', '{"v": 1, "marks": [{"x": 0.5, "y": 0.5}]}'),
+               ('an unknown type', '{"v": 1, "marks": [{"type": "eraser"}]}'), ('a note with no text', '{"v": 1, "marks": [{"type": "note", "x": 0.5, "y": 0.5}]}'),
+               ('a blank note', '{"v": 1, "marks": [{"type": "note", "x": 0.5, "y": 0.5, "text": "  "}]}'),
+               ('a note of 501 characters', json.dumps({'v': 1, 'marks': [{'type': 'note', 'x': 0.5, 'y': 0.5, 'text': 'x' * 501}]})),
+               ('501 marks', json.dumps({'v': 1, 'marks': [{'type': 'tick', 'x': 0.5, 'y': 0.5}] * 501})),
+               ('over 256 KB', json.dumps({'v': 1, 'marks': [{'type': 'pen', 'points': [[0.123456789, 0.123456789]] * 5000}] * 3})),
+               ('a mark that is a string', '{"v": 1, "marks": ["pen"]}')]
         for name, m in bad:
             ok('teacher: save_markup refuses ' + name, err(d, lambda: d.rpc('save_markup(:f, :m::jsonb, null, :k)', f=files[0], m=m, k=nid())) == '22023')
         ok('teacher: save_markup refuses a negative base rev', err(d, lambda: d.save_markup(files[0], marks(), -1)) == '22023')

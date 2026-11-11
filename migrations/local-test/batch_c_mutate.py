@@ -111,7 +111,7 @@ CHANGES = [
      "    select * into _a from assessment\n     where id = p_assessment_id and course_id = _course.id\n       and (date_assigned",
      "    select * into _a from assessment\n     where id = p_assessment_id\n       and (date_assigned", 'reflect'),
     ("reply: before the teacher answered", C1,
-     "    if _f.answer is null then\n        return jsonb_build_object('ok', false, 'error', 'not_answered');\n    end if;", "", 'reflect'),
+     "    if _f.answer is null or _f.answer_only_me then\n        return jsonb_build_object('ok', false, 'error', 'not_answered');\n    end if;", "", 'reflect'),
     ("answer_reflection: another teacher's reflection is answered", C1,
      "    select f.course_id into _course from feedback_reflection f where f.id = p_reflection_id and fv_owns_course(f.course_id);",
      "    select f.course_id into _course from feedback_reflection f where f.id = p_reflection_id;", 'reflect'),
