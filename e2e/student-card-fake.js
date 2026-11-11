@@ -113,7 +113,7 @@ export async function contrast(page) {
 }
 
 export async function signIn(page) {
-  await page.goto('/s/#P3R-8WD');
+  await page.goto('/s/#P3R8-WDK4');
   await expect(page.getByRole('heading', { name: 'Is this you, Cece?' })).toBeVisible();
   await page.getByLabel('Student Number').fill('0123456');
   await page.getByRole('button', { name: 'Yes, That’s Me' }).click();

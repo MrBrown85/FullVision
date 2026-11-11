@@ -112,6 +112,22 @@ export function keyLine(fn: string, value: string | null | undefined, key: CardK
   return { start: fn, card_key: value ? 'malformed' : 'missing' };
 }
 
+/* What a function does with the key when it starts: reads the secret, makes
+   the key from it, logs the one line and gives back the key (or null). The
+   hex is read, used and let go inside this call: no name outside it ever
+   holds it. `read` is how the secret is read (Deno.env.get); `log` writes
+   the line. */
+export async function loadCardKey(
+  fn: string,
+  read: () => string | null | undefined,
+  log: (line: string) => void = line => console.log(line),
+): Promise<CardKey | null> {
+  const value = read();
+  const key = await readCardKey(value);
+  log(JSON.stringify(keyLine(fn, value, key)));
+  return key;
+}
+
 /* `count` characters from `symbols`, each equally likely. A byte is 0 to
    255, and 256 is not a multiple of 29 or of 10, so taking a byte modulo
    the alphabet would make some characters a little likelier than others.

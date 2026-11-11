@@ -5,9 +5,9 @@
    Assignments list (assignments.js).
 
    A card is not a slip. A slip opens one questionnaire or one report; a card
-   opens the student's page for the course. The boards draw both codes as six
-   characters, so the page does not guess from the shape: the server tells
-   (`kind: 'card'`).
+   opens the student's page for the course. A card's code is eight
+   characters and a slip's six (Colin, Nov 10), but the page does not guess
+   from the shape: the server tells (`kind: 'card'`).
 
    The card path asks the student-submit edge function five things, each
    one route (supabase/functions/student-submit/card-routes.ts):
@@ -199,7 +199,8 @@
 
   /* ── Demo Mode: the three answers, built on the device ─────── */
 
-  var DEMO = { code: 'P3R8WD', number: '1234567', password: '4821', tries: 5 };
+  // The sample card's code is a card's eight characters, shown P3R8-WDK4.
+  var DEMO = { code: 'P3R8WDK4', number: '1234567', password: '4821', tries: 5 };
   // Which demo is running: { hash, check, system, wrong, seen }. Null outside Demo Mode.
   var demo = null;
 
@@ -994,7 +995,8 @@
        'locked'     this address has made too many wrong tries;
        'unreached'  anything else (no internet, a server error, an answer
                     with no meaning here): not known. */
-  var WONT_OPEN = { closed: 1, card_locked: 1, card_expired: 1, reprint: 1 };
+  // card_stopped: the card was replaced by a new one (Colin, Nov 10).
+  var WONT_OPEN = { closed: 1, card_locked: 1, card_expired: 1, reprint: 1, card_stopped: 1 };
   function cardSaid(res) {
     var isCard = !!(res && res.ok === true && res.kind === 'card');
     var e = res && res.ok === false ? res.error : '';

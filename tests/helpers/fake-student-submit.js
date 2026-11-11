@@ -3,40 +3,29 @@
  * of the student's card path (S0-W1): tests/student-card-wired.test.js and
  * e2e/student-card-wired.spec.js.
  *
- * The handler and its routes are the function's own: the request's shape
- * is checked, the reply is copied field by field, and a refusal is passed
+ * The handler and its routes are the real ones
+ * (supabase/functions/student-submit/handler.ts and card-routes.ts), with a
+ * made-up card key: the request's shape is checked, a card's code is turned
+ * into its tag, the reply is copied field by field, and a refusal is passed
  * on or turned into not_found exactly as when deployed. Only Postgres is
  * replaced. The stand-in answers each student_submit function the way the
- * SQL does: a card is looked up, five wrong answers in a row lock it, a
- * right answer from the start screen starts a new session and ends the one
- * sent, a session ends at its time or on Done, and page() is refused once
- * the card or the class can no longer open.
+ * SQL does after S3-M1: a card is found by the tag of its code, five wrong
+ * answers in a row lock it, a replaced card answers card_stopped, a right
+ * answer from the start screen starts a new session and ends the one sent,
+ * a session ends at its time or on Done, and page() is refused once the
+ * card or the class can no longer open.
  *
- * WHICH FUNCTION IT IS DEPENDS ON THE CARDS IT IS GIVEN (S3-E1).
- *   - Eight-character cards (K7M4-QX2P), or no cards: the function as it
- *     is in the repo (supabase/functions/student-submit/handler.ts and
- *     card-routes.ts), with a made-up card key. The database is handed a
- *     tag of the code and never the code, a replaced card answers
- *     card_stopped, and a code that is not eight characters is not_found
- *     without the database being asked. The stand-in refuses a card's code
- *     or a typed password if one ever reaches it.
- *   - Six-character cards (P3R-8WD): the function as it stood on Nov 10
- *     2026, before S3-E1 (tests/fixtures/student-submit-handler-2026-11-10.ts),
- *     over the database as Batch A left it
- *     (migrations/2026110904_student_sessions_page.sql), which looked a
- *     card up by its code. That pair is what is deployed until the day
- *     S3-E1 and S3-M1 are, and the only one a six-character card ever
- *     opened through. The student page's tests hold six-character cards
- *     until the page can take eight (S3-F3a); each moves to the function in
- *     the repo by giving its card an eight-character code, and when none is
- *     left this half and the two fixtures go.
- * A fake holds one kind of card or the other, never both.
+ * A card's code is eight characters (P3R8-WDK4). The database is handed a
+ * tag of the code and never the code, and a typed card password as a tag
+ * too; the stand-in refuses anything else, so a code or a password that
+ * ever reached the database would fail the test that sent it. A code that
+ * is not eight characters is not_found without the database being asked,
+ * so a card here cannot be given any other length.
  *
  * Nothing here reaches a real database or a real function.
  */
 import { readCardKey } from '../../supabase/functions/_shared/card-key.ts';
 import { makeHandler } from '../../supabase/functions/student-submit/handler.ts';
-import { makeHandler as handlerBefore } from '../fixtures/student-submit-handler-2026-11-10.ts';
 import { FAKE_KEY, codeTag, passwordTag } from './card-key-fake.js';
 
 const clone = v => JSON.parse(JSON.stringify(v));
@@ -209,7 +198,7 @@ export function samplePage(today, system) {
 export function sampleCard(today, more) {
   return Object.assign(
     {
-      code: 'P3R8WD',
+      code: 'P3R8WDK4', // printed P3R8-WDK4
       enrollment: CECE,
       first: 'Cece',
       course: { name: 'Science 8', block: 'B' },
@@ -234,23 +223,20 @@ export function sampleCard(today, more) {
  *   slips     { code: what student_submit.open answers }
  *   now       () => milliseconds; the database's clock
  *   lasts     how long a new session lasts, in milliseconds (default 6 hours)
- *   cardKey   with eight-character cards: what STUDENT_CARD_KEY is set to.
- *             Left out, a made-up key. null is no key; a string that is not
- *             64 hex characters is a malformed one.
+ *   cardKey   what STUDENT_CARD_KEY is set to. Left out, a made-up key.
+ *             null is no key; a string that is not 64 hex characters is a
+ *             malformed one.
  * Returns { handle(body, headers) → the reply's JSON, respond(body) →
- * { status, json }, state, sql, logs, keyed }. `state` can be changed
- * between calls: state.cards.P3R8WD.locked = true, state.addressLocked =
- * true, state.down = true (the database is unreachable). `keyed` is true
- * when the function is the one in the repo (see the top of the file).
+ * { status, json }, state, sql, logs }. `state` can be changed between
+ * calls: state.cards.P3R8WDK4.locked = true, state.addressLocked = true,
+ * state.down = true (the database is unreachable). A card is added the same
+ * way: state.cards.K7M4QX2P = sampleCard(today, { code: 'K7M4QX2P' }).
  */
 export function fakeStudentSubmit(opts = {}) {
   const now = opts.now || (() => Date.now());
-  const lengths = [...new Set((opts.cards || []).map(k => norm(k.code).length))];
-  if (lengths.length > 1 || lengths.some(n => n !== 6 && n !== 8)) {
-    throw new Error('fakeStudentSubmit: give it six-character cards or eight-character cards, not both');
+  for (const k of opts.cards || []) {
+    if (norm(k.code).length !== 8) throw new Error('fakeStudentSubmit: a card’s code is eight characters');
   }
-  // Eight-character cards, or none: the function in the repo. Six: the function before S3-E1.
-  const keyed = lengths[0] !== 6;
   const state = {
     cards: {},
     slips: Object.assign({}, opts.slips),
@@ -289,31 +275,23 @@ export function fakeStudentSubmit(opts = {}) {
   const refusal = k =>
     k.stopped ? 'card_stopped' : k.withdrawn ? 'not_found' : k.closed ? 'closed' : k.expired ? 'card_expired' : null;
   const isTag = v => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v);
-  /* Before S3-E1 `sent` is the code as typed. After, it is the code's tag:
-     the stand-in knows the made-up key, so it can tell which card a tag
-     names (the real database cannot; it compares the tag with the one it
-     stored). Anything that is not a tag is refused there, as the real
-     functions refuse it, so a code that reached the database would fail
-     the test that sent it. */
-  const lookup = sent => {
-    if (keyed && !isTag(sent)) throw new Error('the database was handed something that is not a tag');
+  /* `tag` is the tag of a code. The stand-in knows the made-up key, so it
+     can tell which card a tag names (the real database cannot; it compares
+     the tag with the one it stored). Anything that is not a tag is refused,
+     as the real functions refuse it, so a code that reached the database
+     would fail the test that sent it. */
+  const lookup = tag => {
+    if (!isTag(tag)) throw new Error('the database was handed something that is not a tag');
     if (state.addressLocked) return { error: 'locked' };
-    if (keyed) {
-      const k = Object.values(state.cards).find(c => codeTag(c.code) === sent);
-      if (!k) return { error: 'not_found' };
-      // A replaced card says so (Colin, Nov 10).
-      return refusal(k) ? { error: refusal(k) } : k.locked ? { error: 'card_locked' } : { card: k };
-    }
-    const k = state.cards[norm(sent)];
-    if (!/^[ABCDEFGHJKMNPQRTUVWXYZ2346789]{6}$/.test(norm(sent)) || !k || k.stopped) return { error: 'not_found' };
+    const k = Object.values(state.cards).find(c => codeTag(c.code) === tag);
+    if (!k) return { error: 'not_found' };
+    // A replaced card says so (Colin, Nov 10).
     return refusal(k) ? { error: refusal(k) } : k.locked ? { error: 'card_locked' } : { card: k };
   };
-  // The card's own password: typed, before S3-E1; after, a tag bound to the card.
-  const passwordRight = (k, sent) => {
-    if (!k.password || sent == null) return false;
-    if (!keyed) return norm(sent) === norm(k.password);
-    if (!isTag(sent)) throw new Error('the database was handed a password that is not a tag');
-    return sent === passwordTag(k.code, norm(k.password));
+  // The card's own password, as a tag bound to the card. No password typed is nothing at all.
+  const passwordRight = (k, tag) => {
+    if (tag != null && !isTag(tag)) throw new Error('the database was handed a password that is not a tag');
+    return !!k.password && tag === passwordTag(k.code, norm(k.password));
   };
   const classes = s =>
     Object.keys(s.cards)
@@ -328,12 +306,12 @@ export function fakeStudentSubmit(opts = {}) {
     return refusal(k) ? { error: refusal(k) } : { session: s, card: k };
   };
 
-  /* Each function takes the parameters its statement sends, in order. The
-     keyed ones (the function in the repo) take the code's tag and the key
-     id where the ones before took the code. */
+  /* Each function takes the parameters its statement sends, in order, less
+     the key id (taken off below): card and verify_card take the code's tag
+     first. */
   const fns = {
-    card(code) {
-      const found = lookup(code);
+    card(tag) {
+      const found = lookup(tag);
       if (found.error) return no(found.error);
       const k = found.card;
       if (!k.birthday && !k.number && !k.password) return no('reprint');
@@ -347,8 +325,8 @@ export function fakeStudentSubmit(opts = {}) {
         also_password: identity && !!k.password,
       };
     },
-    verify_card(code, birthday, number, password, token, hash, add) {
-      const found = lookup(code);
+    verify_card(tag, birthday, number, password, token, hash, add) {
+      const found = lookup(tag);
       if (found.error) return no(found.error);
       const k = found.card;
       if (!k.birthday && !k.number && !k.password) return no('reprint');
@@ -433,8 +411,8 @@ export function fakeStudentSubmit(opts = {}) {
         const add = /, p_add => (true|false)\) as r$/.exec(text);
         sql.push({ fn, params: params.slice(0, -1), add: add ? add[1] === 'true' : undefined });
         const args = [...params, add ? add[1] === 'true' : undefined];
-        // The keyed card and verify_card take the key id second. The stand-in only checks it is one.
-        if (keyed && (fn === 'card' || fn === 'verify_card')) {
+        // card and verify_card take the key id second. The stand-in only checks it is one.
+        if (fn === 'card' || fn === 'verify_card') {
           if (!/^[0-9a-f]{8}$/.test(String(args[1]))) throw new Error('the database was handed no key id');
           args.splice(1, 1);
         }
@@ -443,11 +421,9 @@ export function fakeStudentSubmit(opts = {}) {
     },
   };
   // Reading the key is not instant, so the handler is ready a moment after the fake is made.
-  const handler = keyed
-    ? readCardKey(opts.cardKey === undefined ? FAKE_KEY : opts.cardKey).then(cardKey =>
-        makeHandler({ ...options, cardKey }),
-      )
-    : Promise.resolve(handlerBefore(options));
+  const handler = readCardKey(opts.cardKey === undefined ? FAKE_KEY : opts.cardKey).then(cardKey =>
+    makeHandler({ ...options, cardKey }),
+  );
 
   const respond = async (body, headers) => {
     const res = await (
@@ -464,5 +440,5 @@ export function fakeStudentSubmit(opts = {}) {
     );
     return { status: res.status, json: await res.json() };
   };
-  return { respond, handle: async (body, headers) => (await respond(body, headers)).json, state, sql, logs, keyed };
+  return { respond, handle: async (body, headers) => (await respond(body, headers)).json, state, sql, logs };
 }

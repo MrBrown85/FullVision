@@ -15,6 +15,7 @@
  *   printf 'fv.card.code.v1\nK7M4QX2P' |
  *     openssl dgst -sha256 -mac HMAC -macopt hexkey:000102…1e1f
  */
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   ALPHABET,
@@ -22,6 +23,7 @@ import {
   drawCode,
   drawPassword,
   keyLine,
+  loadCardKey,
   prettyCode,
   readCardKey,
   tidy,
@@ -197,6 +199,63 @@ describe('the card key: reading it', () => {
       expect(text).not.toContain('40');
       expect(text).not.toContain('64');
     }
+  });
+});
+
+describe('the card key: what a function does with it at start (loadCardKey)', () => {
+  it('reads the secret once, logs the one line and gives back the key', async () => {
+    const lines = [];
+    let reads = 0;
+    const key = await loadCardKey(
+      'student-submit',
+      () => (reads++, FAKE_KEY),
+      line => lines.push(line),
+    );
+    expect(reads).toBe(1);
+    expect(key.id).toBe(KNOWN.keyId);
+    expect(await key.codeTag('K7M4QX2P')).toBe(KNOWN.code.K7M4QX2P);
+    expect(lines).toEqual(['{"start":"student-submit","card_key":"present","key_id":"84c20222"}']);
+  });
+
+  it.each([
+    ['not set', undefined, 'missing'],
+    ['empty', '', 'missing'],
+    ['one character short', FAKE_KEY.slice(0, 63), 'malformed'],
+    ['not hex', 'z'.repeat(64), 'malformed'],
+  ])('%s: no key, and the line says %s', async (name, value, said) => {
+    const lines = [];
+    const key = await loadCardKey(
+      'teacher-cards',
+      () => value,
+      line => lines.push(line),
+    );
+    expect(key).toBeNull();
+    expect(lines).toEqual([JSON.stringify({ start: 'teacher-cards', card_key: said })]);
+  });
+
+  it('the line never holds the secret, whatever it was', async () => {
+    for (const value of [FAKE_KEY, FAKE_KEY.toUpperCase(), FAKE_KEY.slice(0, 40), 'hunter2-hunter2', ' ' + FAKE_KEY]) {
+      const lines = [];
+      await loadCardKey(
+        'student-submit',
+        () => value,
+        line => lines.push(line),
+      );
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).not.toContain(value.trim().slice(0, 8));
+      expect(lines[0].length).toBeLessThan(80);
+    }
+  });
+
+  it('holds the secret’s text under no name outside the call', () => {
+    const source = readFileSync(new URL('../supabase/functions/_shared/card-key.ts', import.meta.url), 'utf8');
+    const body = source.slice(source.indexOf('export async function loadCardKey'));
+    const fn = body.slice(0, body.indexOf('\n}\n') + 3);
+    // One local, used to make the key and to say whether a secret was set.
+    expect(fn.match(/\bvalue\b/g)).toHaveLength(3);
+    expect(fn).toContain('const value = read();');
+    // Nothing at the top of the module can hold a secret: no variable there is assigned after start.
+    expect(source.match(/^(let|var) /gm)).toBeNull();
   });
 });
 

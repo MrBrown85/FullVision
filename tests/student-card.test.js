@@ -194,7 +194,7 @@ describe('student card: the demo walk', () => {
     expect(text).toContain('Scan the code on your card');
     expect(text).toContain('or type it');
     expect(page.root().querySelector('label[for="sp-code"]').textContent).toBe('Card Code');
-    expect(page.root().querySelector('#sp-code').getAttribute('value')).toBe('P3R-8WD');
+    expect(page.root().querySelector('#sp-code').getAttribute('value')).toBe('P3R8-WDK4');
     expect(page.root().querySelector('form[data-form="card"] button[type="submit"]').textContent).toBe('Continue');
     expect(page.calls).toHaveLength(0);
   });
