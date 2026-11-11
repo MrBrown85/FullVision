@@ -562,10 +562,20 @@ window.PageStudent = (function () {
     { id: 'overview', label: 'Overview' },
     { id: 'comps', label: 'Competencies' },
     { id: 'assess', label: 'Assessments' },
+    // Work (S14-F2): only while the class's student page and Send Work are on.
+    { id: 'work', label: 'Work' },
     { id: 'evidence', label: 'Observations' },
     { id: 'breakdown', label: 'Grade Breakdown' },
     { id: 'profile', label: 'Learner Profile' },
   ];
+
+  // The tabs this class shows: Work is drawn by teacher/work-wall.js.
+  function _shownTabs() {
+    var work = !!window.WorkWall && WorkWall.tabOn(activeCourse);
+    return TABS.filter(function (t) {
+      return t.id !== 'work' || work;
+    });
+  }
 
   function _plural(n, one, many) {
     return n + ' ' + (n === 1 ? one : many);
@@ -724,6 +734,7 @@ window.PageStudent = (function () {
     };
     out.evidence = _evidenceSummary(ctx.obs, scope);
     out.breakdown = _breakdownSummary(ctx);
+    if (window.WorkWall && WorkWall.tabOn(cid)) out.work = WorkWall.tabSummary(cid, studentId);
     // The Learner Profile: goals set (the student's own and the competency
     // goals) and when the student last answered.
     var voice = _voiceModel(cid);
@@ -744,29 +755,31 @@ window.PageStudent = (function () {
   function _tabBarHtml(sums) {
     return (
       '<div class="stu-tabs" role="tablist" aria-label="Student details">' +
-      TABS.map(function (t) {
-        var on = t.id === _tab;
-        var sm = sums[t.id];
-        return (
-          '<button type="button" role="tab" class="stu-tab' +
-          (on ? ' active' : '') +
-          '" id="stu-tab-' +
-          t.id +
-          '" data-action="stuTab" data-tab="' +
-          t.id +
-          '" aria-selected="' +
-          on +
-          '" aria-controls="stu-panel" tabindex="' +
-          (on ? '0' : '-1') +
-          '"><span class="stu-tab-label">' +
-          esc(t.label) +
-          '</span><span class="stu-tab-stat">' +
-          esc(sm.stat) +
-          '</span><span class="stu-tab-sub">' +
-          esc(sm.sub) +
-          '</span></button>'
-        );
-      }).join('') +
+      _shownTabs()
+        .map(function (t) {
+          var on = t.id === _tab;
+          var sm = sums[t.id];
+          return (
+            '<button type="button" role="tab" class="stu-tab' +
+            (on ? ' active' : '') +
+            '" id="stu-tab-' +
+            t.id +
+            '" data-action="stuTab" data-tab="' +
+            t.id +
+            '" aria-selected="' +
+            on +
+            '" aria-controls="stu-panel" tabindex="' +
+            (on ? '0' : '-1') +
+            '"><span class="stu-tab-label">' +
+            esc(t.label) +
+            '</span><span class="stu-tab-stat">' +
+            esc(sm.stat) +
+            '</span><span class="stu-tab-sub">' +
+            esc(sm.sub) +
+            '</span></button>'
+          );
+        })
+        .join('') +
       '</div>'
     );
   }
@@ -3402,7 +3415,7 @@ window.PageStudent = (function () {
   }
 
   function _isTab(id) {
-    return TABS.some(function (t) {
+    return _shownTabs().some(function (t) {
       return t.id === id;
     });
   }
@@ -3483,6 +3496,8 @@ window.PageStudent = (function () {
       return;
     }
 
+    // Send Work turned off while the Work tab was open.
+    if (!_isTab(_tab)) _tab = 'overview';
     // Every grade on this page is the year so far (Colin, 2026-11-03).
     if (typeof setActiveTerm === 'function') setActiveTerm(cid, null);
     var sections = getSections(cid);
@@ -3552,6 +3567,7 @@ window.PageStudent = (function () {
       '">';
     if (_tab === 'overview') html += _overviewTabHtml(ctx);
     else if (_tab === 'assess') html += _assessTabHtml(ctx);
+    else if (_tab === 'work') html += WorkWall.tabHtml(cid, studentId);
     else if (_tab === 'evidence') html += Evidence.panelHtml();
     else if (_tab === 'breakdown') html += _breakdownTabHtml(ctx);
     else if (_tab === 'profile') html += _profileTabHtml(ctx);
@@ -3573,6 +3589,8 @@ window.PageStudent = (function () {
         _refreshEvidenceTile();
       },
     });
+    if (_tab === 'work') WorkWall.mountTab(document.getElementById('stu-panel'), cid, studentId, { onChange: render });
+    else if (window.WorkWall) WorkWall.unmountTab();
     CompetencyEvidence.mount(activeCourse, studentId, main, {
       onAdd: function () {
         Evidence.refresh();
@@ -3822,7 +3840,7 @@ window.PageStudent = (function () {
     if (_editorKeys(e)) return;
     var tab = e.target && e.target.closest && e.target.closest('.stu-tab');
     if (!tab) return;
-    var ids = TABS.map(function (t) {
+    var ids = _shownTabs().map(function (t) {
       return t.id;
     });
     var i = ids.indexOf(tab.dataset.tab);
@@ -3919,6 +3937,7 @@ window.PageStudent = (function () {
     closeEditStudent();
     Evidence.destroy();
     CompetencyEvidence.destroy();
+    if (window.WorkWall) WorkWall.unmountTab();
     delete window._pageSwitchCourse;
   }
 
