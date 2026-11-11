@@ -1444,3 +1444,138 @@ before it changes anything, and the pre-check reads it); Supabase's default
 privileges in `student_submit` (the post-check lists who can run what);
 how long the old values stay in gradebook-prod's write-ahead log and
 backups; anything on `gradebook-prod` itself.
+
+## Batch C: Mark Up, Reflect on Feedback, Revisions, group work, My Learning (2026-11-11)
+
+Two files. `../2026111120_markup_reflect_revise.sql` (C1) only adds: three
+tables (`markup`, `revision_request`, `feedback_reflection`), two class
+switches (`reflect_on_feedback`, `show_my_learning`), nine teacher RPCs, nine
+student functions and their helpers, and two triggers each on assessment and
+enrollment that delete the new rows with their student or piece. It changes
+no existing row, function, trigger, policy or grant.
+`../2026111121_markup_revise_grade_changes.sql` (C2) changes how a grade is
+returned or stored: it hides a student's grade during a revision (writing
+their `grade_return` row) and adds a trigger on `grade_return` that gives the
+marks whenever a grade is returned. C2 waits for the owner. The contract for
+the edge routes and the browser is `batch-c-contract.md`.
+
+Batch C applies only after Batch B, so the harness builds the database as
+live will be once Batch B is applied: everything `card_codes_common.LIVE`
+loads, S3-M1, Batch B's storage stand-in and Batch B's two files. Until
+Batch B merges, its files are read from `BATCH_B_DIR` (a folder holding its
+two migrations and `local-test/storage-stand-in.sql`, for example an
+extract of the `batch-b-submissions` branch's `migrations/` folder):
+
+```bash
+export BATCH_B_DIR=/tmp/bb/migrations
+PGPORT=54361 PGDATABASE=bc python3 batch_c_common.py build        # an empty database: live as it will be with Batch B
+PGPORT=54361 PGDATABASE=bc python3 batch_c.py                     # both files, about two minutes
+PGPORT=54361 PGDATABASE=bc python3 batch_c_undo.py                # both undo scripts
+PGPORT=54361 PGDATABASE=bc python3 batch_c_mutate.py              # 59 wrong versions of the SQL, about twenty minutes
+PGPORT=54361 PGDATABASE=bc python3 batch_c_fingerprints.py check  # are the fingerprint lists in the eight files current
+```
+
+If Batch B changes before it is applied, run `batch_c_fingerprints.py`
+(without `check`) against a template built from the new Batch B: C1's guard
+compares the Batch B functions it calls, and stops on any difference.
+
+`batch_c.py`, by scenario:
+
+- **apply1** (C1 on a database in use: a signed-in phone, work sent, a
+  returned grade, a draft). Each guard stops the file at the guard with
+  nothing changed (Batch B missing; a Batch A or Batch B function it calls
+  changed; a function, column or trigger name taken). The pre-check is
+  clean, and notices a changed function. Then the apply: **no existing
+  catalog line changes** (only counts grow: dependencies, comments, the
+  internal triggers of the new foreign key to `submission_file`); every
+  existing function keeps its fingerprint; exactly C1's functions are new;
+  **no row of any existing table changes in any column it had**; the
+  phone's page is as before; both switches are off. The post-check is
+  clean, and notices seven kinds of damage. A second run changes no catalog
+  line and no row; a second run after one of its functions was replaced
+  stops. The file is one transaction with a lock timeout and its guard
+  first, no top-level statement writes a row, and a transaction reading
+  `course` makes it give up after five seconds with nothing applied.
+- **teacher**. The switches RPC (a patch writes only what it names; shapes;
+  replay; another teacher; nobody). `save_markup`: revs, replay, a stale
+  screen answered `changed` with nothing written, ten wrong shapes, another
+  teacher, nobody, a page not handed in; marks wait in a class that holds
+  grades and are given at once in one that does not (or with the page off).
+  `list_assessment_markup`, `list_course_feedback`. `return_work`: returns
+  the draft and gives the marks, replay, nothing waiting, another teacher; a
+  mark erased before Return is never given. Deleting an assessment takes
+  its marks.
+- **markup**. Before Return the student is given nothing; the teacher's
+  working copy is in no student answer (page, feedback, markup, work);
+  after Return the marks and the counts; a later change waits; another
+  student, another class, no session, a wrong shape; Students See Your Mark
+  Up off; Missing; the page off; the stored photo is untouched; Unsend and
+  deleting a student take the marks.
+- **reflect**. Every refusal (not returned, no grade, the switch off,
+  another student, another class, not yet on the page, no session, a locked
+  card, eight wrong shapes); yes with a plan; the same twice; sent again
+  before an answer; the teacher's question list, answer (refusals, replay),
+  the waiting mark cleared; Your Teacher Answered; no change once answered;
+  `reply` (shapes, a follow-up, a second one refused, its answer); Your Plan
+  From Last Time; one student never sees another's; the student's calls
+  change no grade row; deleting an assessment takes its reflections.
+- **revision**. `return_for_revision`: another teacher, another class,
+  nobody, eleven wrong shapes, DIBELS, Hide without C2; a refusal writes
+  nothing; made: the work returned with it, the first version and its
+  grade kept, replay, already open. `set_revision_request`. The student's
+  revision: another student, a wrong shape, Batch B's `send_start` and
+  `send_finish` still refuse it, version 2, replay, missing pages, another
+  student cannot finish it; both versions listed by Batch B's `file_links`;
+  Batch B's `unsend` will not take it; sent again before grading (the first
+  revision's files queued); `revision_unsend`; grading noticed when the
+  grade changes; the student keeps the first grade while the new one is a
+  draft; **returned, the new grade replaces the old and the first stays as
+  history**; a new request marks the old done; Take Back; twenty an hour
+  shared with Batch B; Send Work off; late after Revise By; deleting a
+  student; a rubric piece's criteria; work on paper.
+- **group**. One per Group: counts with no names, a member's pages reach
+  the group and not another group, Add a Page as the member's own send,
+  each Unsend takes only its own, marks on the group's pages, Each
+  Student, odd and withdrawn members, Pairs, no groups made.
+- **grants**. Nothing runnable by `anon`; student functions for the
+  service role only; helpers for nobody; row security on the three tables,
+  unreadable by `anon` and signed-in teachers; every SECURITY DEFINER
+  function names `pg_temp` last; no student function reads `markup.working`
+  or a score table.
+- **race**. The same request twice at once for `return_for_revision`,
+  `save_markup`, `return_work`, `answer_reflection`: the second waits for
+  the class lock and gets the first's answer; one row. A revision finishing
+  while a grade is saved waits and sees it.
+- **apply2** (C2). Without C1 it stops; each guard stops it with nothing
+  changed; the pre-check is clean. Then **exactly three functions change
+  (C1's stand-ins), one is new, two triggers are added on `grade_return`,
+  nothing else in the catalog changes, and the apply changes no row**. The
+  post-check is clean and notices damage; a second run, and C1 run again
+  after C2, change nothing.
+- **hide** (C2). Hidden: **exactly that student's `grade_return` row
+  changes** (a draft never returned; `updated_at` cleared), no other row of
+  `grade_return` or `score`; the student page shows no grade and Before and
+  After does not show it; the teacher sees a draft; another student keeps
+  theirs; a revision can still be sent; returned, the new grade shows and
+  Before and After shows the first; Take Back gives it back exactly, or with
+  a change since waiting as a draft; a class that does not hold grades
+  refuses Hide; nothing returned: nothing hidden; leaving When I Return Them
+  gives it back.
+- **given** (C2). Marks given by `return_grades` from an older screen, by a
+  class leaving When I Return Them, by a save in a class that returns at
+  once, and when a grade's row is first made returned; not by a draft or a
+  `seen()` row; the C2 helpers are runnable by nobody but their owner.
+
+`batch_c_undo.py`: C2's undo gives every hidden grade back exactly and
+leaves the catalog C1 alone left, line for line; C2 applies again after it.
+C1's PART 1 stops every Batch C function and changes no row, while Return
+and sending work still work; PART 1b puts every permission back. PART 2
+refuses while C2 is in and while the tables hold rows unless told to
+discard; then the catalog is the one before C1, line for line, but for the
+two dropped columns' slots on `course`; no row of a table that existed
+before changes; a revision a student sent stays as Batch B's version 2,
+which Batch B reads as the latest version. C1 applies again after it.
+
+`batch_c_mutate.py`: 59 wrong versions (38 of C1, 21 of C2), each applied
+with its fingerprint lists stood aside and run against the behaviour
+scenarios. Results are in the pull request.

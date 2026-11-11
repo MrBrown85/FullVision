@@ -82,10 +82,12 @@
 --
 -- ── What a student is never sent ────────────────────────────────────────────
 -- markup.working (only markup.given); a reflection's answer before the
--- teacher sends it; another student's name or enrollment id; a grade other
--- than their own returned one (revision_request.first_grade is the copy
--- they were given, cut to what the work's scoring uses now, and not sent
--- while the grade is hidden).
+-- teacher sends it; another student's name; another student's enrollment
+-- id as a field (a group-mate's page path, which the edge function turns
+-- into a link, has that student's enrollment id in it: an opaque id, never
+-- a name); a grade other than their own returned one
+-- (revision_request.first_grade is the copy they were given, cut to what
+-- the work's scoring uses now, and not sent while the grade is hidden).
 --
 -- ── What it does to existing rows ───────────────────────────────────────────
 -- Nothing. Every class gets Reflect on Feedback and Show My Learning off.
@@ -128,9 +130,9 @@
 --
 -- ── Taking it back out ──────────────────────────────────────────────────────
 -- migrations/local-test/batch-c1-undo.sql (not a migration; proved by
--- batch_c_undo.py). PART 1 turns both switches off and stops the student's
--- side (its functions no longer run for the service role); it deletes
--- nothing. PART 2 removes everything this file made. It refuses while C2 is
+-- batch_c_undo.py). PART 1 stops every Batch C function, the teachers'
+-- and the student page's (each answers a permission error); it deletes
+-- nothing and changes no row. PART 1b puts them back. PART 2 removes everything this file made. It refuses while C2 is
 -- applied, and while the three tables hold a row unless the session says
 -- the rows may go (they are teachers' marks and students' reflections).
 --

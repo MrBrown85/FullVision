@@ -11,7 +11,7 @@ Batch C applies only after Batch B (`2026111101`, `2026111102`), and builds on i
 - A student sees no marks on a piece set not to show them (Students See Your Mark Up off), or while Missing or Excused is on it.
 - A revision is the next version of the piece's submission: version 2, then 3. Version 1 and its pages stay. The revision is graded in the same score rows; while the new grade is a draft the student keeps the old one; when it is returned it replaces the old one. The first version's grade is kept on the request as history (Before and After).
 - Students write their own words in a reflection; the teacher cannot change them. A teacher's answer reaches the student once it is sent.
-- Group work (One per Group) is the groups the teacher made on the assessment (Pairs or Groups). Each member who sends makes their own submission; the group's work is all of them together. No function sends a student another student's name or enrollment id.
+- Group work (One per Group) is the groups the teacher made on the assessment (Pairs or Groups). Each member who sends makes their own submission; the group's work is all of them together. No function sends a student another student's name, or another student's enrollment id as a field (a group-mate's page path, turned into a link, carries that student's enrollment id: an opaque id, never a name).
 - Every function takes the class's lock before it writes, and asks for a remembered answer under it.
 
 ## Class settings
@@ -32,8 +32,8 @@ Signed-in teachers. Each checks the caller owns the class. RAISE `PT401` (not si
 
 `p_base_rev`: the `rev` the screen last read (0 for a page with no marks), or null to skip the check.
 
-| `result`  | Meaning                                                                                                                                        |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `result`  | Meaning                                                                                                                                      |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | `saved`   | `{ result, file_id, rev, given }`. Remembered. `given` is true when the student already has these marks (a class that does not hold grades). |
 | `changed` | Another device saved since `p_base_rev`. `{ result, file_id, rev, marks }`: what is there now. Nothing written; not remembered.              |
 
@@ -55,13 +55,13 @@ Until C2 is applied, a Return through `return_grades` alone (an older screen), a
 
 The work is returned first, exactly as `return_work` returns it; then the request is made.
 
-| `result`             | Meaning                                                                                                                                         |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `result`             | Meaning                                                                                                                                           |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `made`               | `{ result, request, returned, hidden }`. Remembered. `returned` is `return_work`'s answer. `hidden`: the grade was hidden (C2, keep_grade false). |
-| `already_open`       | An open request exists for the student and piece. `request` is it.                                                                              |
-| `hide_not_available` | `keep_grade` false and C2 is not applied. Nothing changed.                                                                                       |
-| `hide_needs_holding` | `keep_grade` false in a class that does not hold grades (a hidden grade is a draft, and such a class shows none). Nothing changed.              |
-| `not_for_dibels`     | A DIBELS benchmark.                                                                                                                             |
+| `already_open`       | An open request exists for the student and piece. `request` is it.                                                                                |
+| `hide_not_available` | `keep_grade` false and C2 is not applied. Nothing changed.                                                                                        |
+| `hide_needs_holding` | `keep_grade` false in a class that does not hold grades (a hidden grade is a draft, and such a class shows none). Nothing changed.                |
+| `not_for_dibels`     | A DIBELS benchmark.                                                                                                                               |
 
 `P0002` for another teacher's piece, a student of another class, a withdrawn student.
 
@@ -69,15 +69,28 @@ A request (`request`, and each item of `list_course_feedback.revisions`):
 
 ```json
 {
-  "id": "…", "assessment_id": "…", "enrollment_id": "…",
-  "what_to_fix": "Add a third reason from Bourassa.", "revise_by": "2026-11-10", "criterion_ids": [],
-  "keep_grade": true, "grade_hidden": false,
-  "first_submission_id": "…", "first_version": 1,
+  "id": "…",
+  "assessment_id": "…",
+  "enrollment_id": "…",
+  "what_to_fix": "Add a third reason from Bourassa.",
+  "revise_by": "2026-11-10",
+  "criterion_ids": [],
+  "keep_grade": true,
+  "grade_hidden": false,
+  "first_submission_id": "…",
+  "first_version": 1,
   "first_grade": { "v": 1, "value": 2, "modifier": 1, "comment": "…", "tags": {}, "criteria": {}, "checks": [] },
-  "first_returned_at": "…", "created_at": "…", "updated_at": "…", "closed_at": null,
+  "first_returned_at": "…",
+  "created_at": "…",
+  "updated_at": "…",
+  "closed_at": null,
   "state": "open",
-  "revision_submission_id": null, "revision_version": null, "revision_sent_at": null,
-  "revision_note": null, "revision_late": null, "revision_sent_by": null
+  "revision_submission_id": null,
+  "revision_version": null,
+  "revision_sent_at": null,
+  "revision_note": null,
+  "revision_late": null,
+  "revision_sent_by": null
 }
 ```
 
@@ -182,16 +195,16 @@ Add a Page on a group piece is the member's own Batch B `send_start` (their own 
 
 ## What `student-submit` does on each route
 
-| Route             | SQL                                                       |
-| ----------------- | --------------------------------------------------------- |
-| `page`            | `page`, Batch B's `work`, and `feedback` (and `group_work`) |
-| `reflect`         | `reflect`                                                 |
-| `reply`           | `reply`                                                   |
-| `markup`          | `markup`                                                  |
-| `revise-start`    | `revision_start`, then upload links as `send-start`       |
-| `revise-finish`   | the file checks as `send-finish`, then `revision_finish`, then the removal worker |
-| `revise-unsend`   | `revision_unsend`, then the removal worker                |
-| `group-links`     | `group_file_links`, then download links as `file-links`   |
+| Route           | SQL                                                                               |
+| --------------- | --------------------------------------------------------------------------------- |
+| `page`          | `page`, Batch B's `work`, and `feedback` (and `group_work`)                       |
+| `reflect`       | `reflect`                                                                         |
+| `reply`         | `reply`                                                                           |
+| `markup`        | `markup`                                                                          |
+| `revise-start`  | `revision_start`, then upload links as `send-start`                               |
+| `revise-finish` | the file checks as `send-finish`, then `revision_finish`, then the removal worker |
+| `revise-unsend` | `revision_unsend`, then the removal worker                                        |
+| `group-links`   | `group_file_links`, then download links as `file-links`                           |
 
 Copy each reply field by field, as the card routes do.
 
