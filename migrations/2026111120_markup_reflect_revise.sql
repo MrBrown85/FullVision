@@ -83,7 +83,7 @@
 --
 -- ── What a student is never sent ────────────────────────────────────────────
 -- markup.working (only markup.given); a reflection's answer before the
--- teacher sends it, or one the teacher kept to themselves (Only Me);
+-- teacher sends it, or the teacher's Only Me notes, or that there is one;
 -- another student's name; another student's enrollment
 -- id as a field (a group-mate's page path, which the edge function turns
 -- into a link, has that student's enrollment id in it: an opaque id, never
@@ -238,7 +238,7 @@ begin
             ('public._revision_state(uuid)',                                       'eec7300827a8fb7771fc2cebc0d29de9', 'eec7300827a8fb7771fc2cebc0d29de9'),
             ('public._revision_settle(uuid,uuid,boolean)',                         '70e53be05334a41bd816d803735f9bef', '70e53be05334a41bd816d803735f9bef'),
             ('public._revision_json(uuid)',                                        '969f930b121a6714edfde8052a4d876b', '969f930b121a6714edfde8052a4d876b'),
-            ('public._reflection_json(uuid)',                                      '89f6847f6ab6a468284ea1df003391a6', '89f6847f6ab6a468284ea1df003391a6'),
+            ('public._reflection_json(uuid)',                                      'f089277294adaf7d7834b41a1e93d5fa', 'f089277294adaf7d7834b41a1e93d5fa'),
             ('public.set_course_feedback_options(uuid,jsonb,uuid)',                '1954af2eef430d63baa91d38e74106d2', '1954af2eef430d63baa91d38e74106d2'),
             ('public.save_markup(uuid,jsonb,integer,uuid)',                        '808290a14511b137bc5c1a4574016429', '808290a14511b137bc5c1a4574016429'),
             ('public.list_assessment_markup(uuid)',                                '5e64579a923a0f0c02791b6428e54d98', '5e64579a923a0f0c02791b6428e54d98'),
@@ -246,14 +246,14 @@ begin
             ('public.return_for_revision(uuid,uuid,jsonb,uuid)',                   'cada3aa196107ccaf70b030a75b9a87f', 'cada3aa196107ccaf70b030a75b9a87f'),
             ('public.set_revision_request(uuid,jsonb,uuid)',                       '6f9fb14cc1c8ced04cca7e0302c40b13', '6f9fb14cc1c8ced04cca7e0302c40b13'),
             ('public.cancel_revision(uuid,uuid)',                                  '03f508a459eb621f868b699a0ea3f076', '03f508a459eb621f868b699a0ea3f076'),
-            ('public.answer_reflection(uuid,text,uuid,boolean)',                   'b384f9b1c729f42733db290a0f4ddae5', 'b384f9b1c729f42733db290a0f4ddae5'),
+            ('public.answer_reflection(uuid,text,uuid,boolean)',                   '3dc0da991f10c092ae0a80202310d56f', '3dc0da991f10c092ae0a80202310d56f'),
             ('public.list_course_feedback(uuid)',                                  '7fbe6b367a0c28fd4dd2b894f0dc7711', '7fbe6b367a0c28fd4dd2b894f0dc7711'),
             ('student_submit._group_members(uuid,uuid)',                           'b38b1af6f2dc142c94ce1cca454fd0fb', 'b38b1af6f2dc142c94ce1cca454fd0fb'),
-            ('student_submit.feedback(text,uuid,text)',                            '9130797a14e8810566a6c1d761b2961c', '9130797a14e8810566a6c1d761b2961c'),
+            ('student_submit.feedback(text,uuid,text)',                            '099da3fbb372771e6a7b7342b3d98d29', '099da3fbb372771e6a7b7342b3d98d29'),
             ('student_submit.markup(text,uuid,uuid,text)',                         '6cc78118aa4e98252514826aabf957a9', '6cc78118aa4e98252514826aabf957a9'),
             ('student_submit.reflect(text,uuid,uuid,jsonb,text)',                  '7a4e2ab29d369ef159dce65e1e1e8f77', '7a4e2ab29d369ef159dce65e1e1e8f77'),
-            ('student_submit.reply(text,uuid,uuid,jsonb,text)',                    '51e8f1db4f92885e8e310b255fa7aa70', '51e8f1db4f92885e8e310b255fa7aa70'),
-            ('student_submit.answer_seen(text,uuid,uuid[],text)',                  'a32cc8e5329954ac909969269afc2518', 'a32cc8e5329954ac909969269afc2518'),
+            ('student_submit.reply(text,uuid,uuid,jsonb,text)',                    '264a736a722cf19022c20c343ecb01fb', '264a736a722cf19022c20c343ecb01fb'),
+            ('student_submit.answer_seen(text,uuid,uuid[],text)',                  'da85d013a0511618c989d7bb44eac2f3', 'da85d013a0511618c989d7bb44eac2f3'),
             ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)', '43ca2e50ff067a4fb51762367895ee84', '43ca2e50ff067a4fb51762367895ee84'),
             ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',          'fe5ca7570a32f2dd0631314a365059cd', 'fe5ca7570a32f2dd0631314a365059cd'),
             ('student_submit.revision_unsend(text,uuid,uuid,text)',                '6330e84cab87428ed8a71e92cdb2048c', '6330e84cab87428ed8a71e92cdb2048c'),
@@ -469,11 +469,18 @@ create table if not exists public.feedback_reflection (
     plan_at       timestamptz,
     went_well     text        constraint feedback_reflection_went_well_check check (char_length(went_well) <= 1000),
     sent_at       timestamptz not null default now(),
-    -- The teacher's answer (Send Answer). Sent to the student once written,
-    -- unless the teacher kept it to themselves (answer_only_me: Only Me).
+    -- The teacher's answer (Send Answer): always sent to the student.
     answer        text        constraint feedback_reflection_answer_check check (char_length(answer) <= 2000),
     answered_at   timestamptz,
-    answer_only_me boolean    not null default false,
+    -- The teacher's Only Me note on the reflection: theirs alone. It is
+    -- never sent, and no function a student calls reads it, so nothing a
+    -- student is told differs for a reflection with a note. It is not an
+    -- answer: a real answer can still be sent, and the student can still
+    -- change their reflection. It clears the question from the teacher's
+    -- list until the student changes the reflection (sent_at after
+    -- noted_at).
+    note          text        constraint feedback_reflection_note_check check (char_length(note) <= 2000),
+    noted_at      timestamptz,
     -- When the student's page showed the answer (answer_seen: What Changed's
     -- "answered your question" until then).
     answer_seen_at timestamptz,
@@ -483,13 +490,18 @@ create table if not exists public.feedback_reflection (
     follow_up     text        constraint feedback_reflection_follow_up_check check (char_length(follow_up) <= 1000),
     follow_up_answer text     constraint feedback_reflection_follow_up_answer_check check (char_length(follow_up_answer) <= 2000),
     follow_up_answered_at timestamptz,
-    follow_up_only_me boolean not null default false,
+    -- The teacher's Only Me note on the follow-up, as note is on the reflection.
+    follow_up_note text       constraint feedback_reflection_follow_up_note_check check (char_length(follow_up_note) <= 2000),
+    follow_up_noted_at timestamptz,
     follow_up_answer_seen_at timestamptz,
     updated_at    timestamptz not null default now(),
     constraint feedback_reflection_plan_has_time check ((plan is null) = (plan_at is null)),
     constraint feedback_reflection_answer_has_time check ((answer is null) = (answered_at is null)),
     constraint feedback_reflection_follow_up_answer_has_time check ((follow_up_answer is null) = (follow_up_answered_at is null)),
     constraint feedback_reflection_follow_up_after_answer check (follow_up is null or answer is not null),
+    constraint feedback_reflection_note_has_time check ((note is null) = (noted_at is null)),
+    constraint feedback_reflection_follow_up_note_has_time check ((follow_up_note is null) = (follow_up_noted_at is null)),
+    constraint feedback_reflection_follow_up_note_after_follow_up check (follow_up_note is null or follow_up is not null),
     constraint feedback_reflection_one unique (assessment_id, enrollment_id)
 );
 create index if not exists feedback_reflection_enrollment_idx on public.feedback_reflection (enrollment_id);
@@ -825,12 +837,14 @@ as $function$
     select jsonb_build_object(
                'id', f.id, 'assessment_id', f.assessment_id, 'enrollment_id', f.enrollment_id,
                'makes_sense', f.makes_sense, 'question', f.question, 'plan', f.plan, 'plan_at', f.plan_at, 'went_well', f.went_well,
-               'sent_at', f.sent_at, 'answer', f.answer, 'answered_at', f.answered_at, 'only_me', f.answer_only_me,
+               'sent_at', f.sent_at, 'answer', f.answer, 'answered_at', f.answered_at, 'note', f.note, 'noted_at', f.noted_at,
                'answer_seen_at', f.answer_seen_at,
                'sense_now', f.sense_now, 'sense_now_at', f.sense_now_at,
                'follow_up', f.follow_up, 'follow_up_answer', f.follow_up_answer, 'follow_up_answered_at', f.follow_up_answered_at,
-               'follow_up_only_me', f.follow_up_only_me, 'follow_up_answer_seen_at', f.follow_up_answer_seen_at,
-               'waiting', (f.question is not null and f.answer is null) or (f.follow_up is not null and f.follow_up_answer is null))
+               'follow_up_note', f.follow_up_note, 'follow_up_noted_at', f.follow_up_noted_at,
+               'follow_up_answer_seen_at', f.follow_up_answer_seen_at,
+               'waiting', (f.question is not null and f.answer is null and (f.noted_at is null or f.noted_at < f.sent_at))
+                          or (f.follow_up is not null and f.follow_up_answer is null and f.follow_up_note is null))
       from feedback_reflection f where f.id = p_reflection_id;
 $function$;
 
@@ -1283,11 +1297,14 @@ begin
 end;
 $function$;
 
--- Send Answer. It answers what is waiting: the question (or, with none, the
--- reflection itself), then the follow-up. 1 to 2000 characters. p_only_me
--- true (Only Me): the answer is the teacher's own note, never sent to the
--- student; it clears the question as an answer does, and the student can
--- then neither say whether it makes sense nor ask a follow-up.
+-- Send Answer. It answers what is open: the question (or, with none, the
+-- reflection itself) until it has an answer, then the follow-up once the
+-- student asks one. 1 to 2000 characters. p_only_me true (Only Me): the
+-- text is the teacher's own note on what is open (note, or follow_up_note;
+-- a second note takes the place of the first), never sent to the student,
+-- and nothing a student calls tells them there is one. A note is not an
+-- answer: it clears the question from the teacher's list, and a real
+-- answer can still be sent after it.
 -- Answers { result: 'answered', reflection } (remembered),
 -- { result: 'already_answered', reflection }, or { result: 'reflect_off' }
 -- while the class has Reflect on Feedback off.
@@ -1323,12 +1340,14 @@ begin
     if not (select c.reflect_on_feedback from course c where c.id = _course) then
         return jsonb_build_object('result', 'reflect_off');
     end if;
-    if _f.answer is null then
-        update feedback_reflection set answer = btrim(p_answer), answered_at = now(), answer_only_me = p_only_me, updated_at = now()
-         where id = _f.id;
+    if _f.answer is null and p_only_me then
+        update feedback_reflection set note = btrim(p_answer), noted_at = now(), updated_at = now() where id = _f.id;
+    elsif _f.answer is null then
+        update feedback_reflection set answer = btrim(p_answer), answered_at = now(), updated_at = now() where id = _f.id;
+    elsif _f.follow_up is not null and _f.follow_up_answer is null and p_only_me then
+        update feedback_reflection set follow_up_note = btrim(p_answer), follow_up_noted_at = now(), updated_at = now() where id = _f.id;
     elsif _f.follow_up is not null and _f.follow_up_answer is null then
-        update feedback_reflection set follow_up_answer = btrim(p_answer), follow_up_answered_at = now(), follow_up_only_me = p_only_me,
-                                       updated_at = now()
+        update feedback_reflection set follow_up_answer = btrim(p_answer), follow_up_answered_at = now(), updated_at = now()
          where id = _f.id;
     else
         return jsonb_build_object('result', 'already_answered', 'reflection', _reflection_json(_f.id));
@@ -1413,7 +1432,7 @@ $function$;
 -- work has, and how many notes (only when the work was returned with marks,
 -- the piece shows marks, and no Missing or Excused is on it), the revision
 -- request, and the reflection with the teacher's answer once sent (never
--- one the teacher kept to themselves) and whether the student has seen it;
+-- an Only Me note, nor that there is one) and whether the student has seen it;
 -- and the last plan the student made in the class (Your Plan From Last
 -- Time). Reflections and the last plan only while Reflect on Feedback is
 -- on. Read-only.
@@ -1492,16 +1511,13 @@ begin
                           select jsonb_build_object(
                                      'makes_sense', f.makes_sense, 'question', f.question, 'plan', f.plan, 'went_well', f.went_well,
                                      'sent_at', f.sent_at,
-                                     -- an answer the teacher kept to themselves is not sent, nor that there is one
-                                     'answer', case when not f.answer_only_me then f.answer end,
-                                     'answered_at', case when not f.answer_only_me then f.answered_at end,
+                                     -- the teacher's Only Me notes (note, follow_up_note) are never read here
+                                     'answer', f.answer, 'answered_at', f.answered_at,
                                      'sense_now', f.sense_now, 'follow_up', f.follow_up,
-                                     'follow_up_answer', case when not f.follow_up_only_me then f.follow_up_answer end,
-                                     'follow_up_answered_at', case when not f.follow_up_only_me then f.follow_up_answered_at end,
+                                     'follow_up_answer', f.follow_up_answer, 'follow_up_answered_at', f.follow_up_answered_at,
                                      -- What Changed: an answer the page has not shown yet (answer_seen)
-                                     'answer_new', (f.answer is not null and not f.answer_only_me and f.answer_seen_at is null)
-                                                   or (f.follow_up_answer is not null and not f.follow_up_only_me
-                                                       and f.follow_up_answer_seen_at is null)) as j
+                                     'answer_new', (f.answer is not null and f.answer_seen_at is null)
+                                                   or (f.follow_up_answer is not null and f.follow_up_answer_seen_at is null)) as j
                             from feedback_reflection f
                            where f.assessment_id = a.id and f.enrollment_id = p_enrollment_id
                              and _course.reflect_on_feedback) rf on true
@@ -1663,8 +1679,8 @@ $function$;
 --     "follow_up": "...",   1 to 1000 characters, only with not_sure, once
 --     "plan": "..." }       1 to 1000 characters, only with yes: Make My
 --                           Plan (it takes the place of a plan made before)
--- Only after the teacher answered (an answer they kept to themselves is not
--- an answer here), only while Reflect on Feedback is on. The same reply
+-- Only after the teacher answered (an Only Me note is not an answer), only
+-- while Reflect on Feedback is on. The same reply
 -- twice is the same reply. Answers: ok with the reflection; reflect_off,
 -- not_found, not_answered, already_asked (a second follow-up). A wrong
 -- shape raises 22023.
@@ -1730,7 +1746,7 @@ begin
     if not found then
         return jsonb_build_object('ok', false, 'error', 'not_found');
     end if;
-    if _f.answer is null or _f.answer_only_me then
+    if _f.answer is null then
         return jsonb_build_object('ok', false, 'error', 'not_answered');
     end if;
     if _more is not null and _f.follow_up is not null and _f.follow_up is distinct from _more then
@@ -1747,7 +1763,7 @@ begin
     returning * into _f;
     return jsonb_build_object('ok', true, 'reflection', jsonb_build_object(
         'sense_now', _f.sense_now, 'follow_up', _f.follow_up, 'plan', _f.plan, 'answer', _f.answer,
-        'follow_up_answer', case when not _f.follow_up_only_me then _f.follow_up_answer end));
+        'follow_up_answer', _f.follow_up_answer));
 end;
 $function$;
 
@@ -1772,15 +1788,15 @@ begin
     end if;
     perform public._grade_return_lock_first((_in->>'course_id')::uuid);
     update feedback_reflection f
-       set answer_seen_at = case when f.answer is not null and not f.answer_only_me then coalesce(f.answer_seen_at, clock_timestamp())
+       set answer_seen_at = case when f.answer is not null then coalesce(f.answer_seen_at, clock_timestamp())
                                  else f.answer_seen_at end,
-           follow_up_answer_seen_at = case when f.follow_up_answer is not null and not f.follow_up_only_me
+           follow_up_answer_seen_at = case when f.follow_up_answer is not null
                                            then coalesce(f.follow_up_answer_seen_at, clock_timestamp())
                                            else f.follow_up_answer_seen_at end
      where f.enrollment_id = p_enrollment_id and f.course_id = (_in->>'course_id')::uuid
        and f.assessment_id = any (coalesce(p_assessment_ids, '{}'))
-       and ((f.answer is not null and not f.answer_only_me and f.answer_seen_at is null)
-            or (f.follow_up_answer is not null and not f.follow_up_only_me and f.follow_up_answer_seen_at is null));
+       and ((f.answer is not null and f.answer_seen_at is null)
+            or (f.follow_up_answer is not null and f.follow_up_answer_seen_at is null));
     get diagnostics _n = row_count;
     return jsonb_build_object('ok', true, 'seen', _n);
 end;
@@ -2278,7 +2294,7 @@ begin
             ('public._revision_state(uuid)',                                       'eec7300827a8fb7771fc2cebc0d29de9', 'eec7300827a8fb7771fc2cebc0d29de9'),
             ('public._revision_settle(uuid,uuid,boolean)',                         '70e53be05334a41bd816d803735f9bef', '70e53be05334a41bd816d803735f9bef'),
             ('public._revision_json(uuid)',                                        '969f930b121a6714edfde8052a4d876b', '969f930b121a6714edfde8052a4d876b'),
-            ('public._reflection_json(uuid)',                                      '89f6847f6ab6a468284ea1df003391a6', '89f6847f6ab6a468284ea1df003391a6'),
+            ('public._reflection_json(uuid)',                                      'f089277294adaf7d7834b41a1e93d5fa', 'f089277294adaf7d7834b41a1e93d5fa'),
             ('public.set_course_feedback_options(uuid,jsonb,uuid)',                '1954af2eef430d63baa91d38e74106d2', '1954af2eef430d63baa91d38e74106d2'),
             ('public.save_markup(uuid,jsonb,integer,uuid)',                        '808290a14511b137bc5c1a4574016429', '808290a14511b137bc5c1a4574016429'),
             ('public.list_assessment_markup(uuid)',                                '5e64579a923a0f0c02791b6428e54d98', '5e64579a923a0f0c02791b6428e54d98'),
@@ -2286,14 +2302,14 @@ begin
             ('public.return_for_revision(uuid,uuid,jsonb,uuid)',                   'cada3aa196107ccaf70b030a75b9a87f', 'cada3aa196107ccaf70b030a75b9a87f'),
             ('public.set_revision_request(uuid,jsonb,uuid)',                       '6f9fb14cc1c8ced04cca7e0302c40b13', '6f9fb14cc1c8ced04cca7e0302c40b13'),
             ('public.cancel_revision(uuid,uuid)',                                  '03f508a459eb621f868b699a0ea3f076', '03f508a459eb621f868b699a0ea3f076'),
-            ('public.answer_reflection(uuid,text,uuid,boolean)',                   'b384f9b1c729f42733db290a0f4ddae5', 'b384f9b1c729f42733db290a0f4ddae5'),
+            ('public.answer_reflection(uuid,text,uuid,boolean)',                   '3dc0da991f10c092ae0a80202310d56f', '3dc0da991f10c092ae0a80202310d56f'),
             ('public.list_course_feedback(uuid)',                                  '7fbe6b367a0c28fd4dd2b894f0dc7711', '7fbe6b367a0c28fd4dd2b894f0dc7711'),
             ('student_submit._group_members(uuid,uuid)',                           'b38b1af6f2dc142c94ce1cca454fd0fb', 'b38b1af6f2dc142c94ce1cca454fd0fb'),
-            ('student_submit.feedback(text,uuid,text)',                            '9130797a14e8810566a6c1d761b2961c', '9130797a14e8810566a6c1d761b2961c'),
+            ('student_submit.feedback(text,uuid,text)',                            '099da3fbb372771e6a7b7342b3d98d29', '099da3fbb372771e6a7b7342b3d98d29'),
             ('student_submit.markup(text,uuid,uuid,text)',                         '6cc78118aa4e98252514826aabf957a9', '6cc78118aa4e98252514826aabf957a9'),
             ('student_submit.reflect(text,uuid,uuid,jsonb,text)',                  '7a4e2ab29d369ef159dce65e1e1e8f77', '7a4e2ab29d369ef159dce65e1e1e8f77'),
-            ('student_submit.reply(text,uuid,uuid,jsonb,text)',                    '51e8f1db4f92885e8e310b255fa7aa70', '51e8f1db4f92885e8e310b255fa7aa70'),
-            ('student_submit.answer_seen(text,uuid,uuid[],text)',                  'a32cc8e5329954ac909969269afc2518', 'a32cc8e5329954ac909969269afc2518'),
+            ('student_submit.reply(text,uuid,uuid,jsonb,text)',                    '264a736a722cf19022c20c343ecb01fb', '264a736a722cf19022c20c343ecb01fb'),
+            ('student_submit.answer_seen(text,uuid,uuid[],text)',                  'da85d013a0511618c989d7bb44eac2f3', 'da85d013a0511618c989d7bb44eac2f3'),
             ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)', '43ca2e50ff067a4fb51762367895ee84', '43ca2e50ff067a4fb51762367895ee84'),
             ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',          'fe5ca7570a32f2dd0631314a365059cd', 'fe5ca7570a32f2dd0631314a365059cd'),
             ('student_submit.revision_unsend(text,uuid,uuid,text)',                '6330e84cab87428ed8a71e92cdb2048c', '6330e84cab87428ed8a71e92cdb2048c'),

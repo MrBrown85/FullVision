@@ -501,8 +501,8 @@ def contract():
         rid2 = [x for x in d.rpc('list_course_feedback(:c)', c=COURSE_A)['reflections'] if x['enrollment_id'] == ENR2][0]['id']
         ok('(g) only_me must be true or false', err(d, lambda: d.rpc('answer_reflection(:r, :a, :k, null)', r=rid2, a='x', k=nid())) == '22023')
         a = d.rpc('answer_reflection(:r, :a, :k, true)', r=rid2, a='ONLY-ME-NOTE: go over question 4 on Monday.', k=nid())
-        ok('(g) Only Me: kept as the answer, marked only_me, the question no longer waiting', a['result'] == 'answered' and a['reflection']['only_me'] is True
-           and a['reflection']['waiting'] is False, a)
+        ok('(g) Only Me: kept as the teacher\'s note, not an answer, the question no longer waiting', a['result'] == 'answered'
+           and a['reflection']['note'].startswith('ONLY-ME-NOTE') and a['reflection']['answer'] is None and a['reflection']['waiting'] is False, a)
         f = piece(d.feedback(t2, ENR2), k['lab'])['reflection']
         ok('(g) the student is not sent it, nor that there is one', f['answer'] is None and f['answered_at'] is None and f['answer_new'] is False, f)
         ok('(g) it is in no student answer', 'ONLY-ME-NOTE' not in json.dumps([d.page(t2, ENR2), d.feedback(t2, ENR2), d.marks(t2, ENR2, k['lab']),
@@ -529,7 +529,8 @@ def contract():
         d.run('update course set reflect_on_feedback = true where id = :c', c=COURSE_A)
         ok('(d) turned on again, every reflection is back', len(d.rpc('list_course_feedback(:c)', c=COURSE_A)['reflections']) == n
            and d.feedback(t1, ENR1)['last_plan']['plan'] == 'Check the rubric first.')
-        ok('(d) the key of the refused answer works once the switch is on', d.rpc('answer_reflection(:r, :a, :k)', r=rid2, a='x', k=key)['result'] == 'already_answered')
+        ok('(d) the key of the refused answer works once the switch is on (a real answer after the Only Me note)',
+           d.rpc('answer_reflection(:r, :a, :k)', r=rid2, a='x', k=key)['result'] == 'answered')
         ok('(k) answer_seen is for the service role only', not d.one("select has_function_privilege('authenticated', 'student_submit.answer_seen(text,uuid,uuid[],text)'::regprocedure, 'execute') or has_function_privilege('anon', 'student_submit.answer_seen(text,uuid,uuid[],text)'::regprocedure, 'execute')"))
     finally:
         d.close()
@@ -1207,6 +1208,7 @@ def only_me():
         # what ENR1 (a note) and ENR2 (nothing) are told, call by call: the same
         same = lambda x, y: json.dumps(x, sort_keys=True) == json.dumps(y, sort_keys=True)
         f1 = piece(d.feedback(t1, ENR1), lab)['reflection']; f2 = piece(d.feedback(t2, ENR2), lab)['reflection']
+        f1.pop('sent_at'); f2.pop('sent_at')
         ok('(b) 3: feedback: a noted reflection reads as one not yet answered', same(f1, f2), (f1, f2))
         ok('(b) 3: no student call carries the note', 'NOTE-TO-SELF' not in json.dumps([d.page(t1, ENR1), d.feedback(t1, ENR1), d.marks(t1, ENR1, lab)]))
         for label, r in [('reply', lambda t, e: d.reply(t, e, lab, {'sense_now': 'yes'})),
@@ -1228,6 +1230,7 @@ def only_me():
         ok('(b) 3: the student gets the real answer, not the note', f1['answer'] == 'Here is why.' and f1['answer_new'] is True
            and 'NOTE-TO-SELF' not in json.dumps(d.feedback(t1, ENR1)), f1)
         ok('(b) 3: and can reply to it', d.reply(t1, ENR1, lab, {'sense_now': 'not_sure', 'follow_up': 'And number 4?'})['ok'])
+        d.service("student_submit.answer_seen(:t, :e, :a, 'ip-1')", t=t1, e=ENR1, a=[lab])
         c = d.rpc('answer_reflection(:f, :t, :k, true)', f=rid, t='FOLLOW-NOTE', k=nid())
         ok('(b) 3: a follow-up kept Only Me', c['result'] == 'answered' and c['reflection']['follow_up_note'] == 'FOLLOW-NOTE'
            and c['reflection']['follow_up_answer'] is None and c['reflection']['waiting'] is False, c)
