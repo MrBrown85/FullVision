@@ -16692,14 +16692,7 @@ function getCourseSubmissions(cid) {
 }
 
 function getStudentSubmission(cid, sid, aid) {
-  var found = _studentWorkSubmissions(cid)
-    .filter(function (s) {
-      return s.enrollment_id === sid && s.assessment_id === aid;
-    })
-    .sort(function (x, y) {
-      return (y.version || 1) - (x.version || 1);
-    });
-  return found.length ? found[0] : null;
+  return _newestSubmissionsOf(cid, [sid], aid)[0] || null;
 }
 
 function studentWorkGradingStarted(cid, sid, aid) {
@@ -16787,6 +16780,122 @@ function studentWorkPageUrl(cid, file, which) {
   // A sample page is a file name in assets/sample-work, nothing more.
   if (!/^[a-z0-9-]+\.jpg$/.test(name)) return Promise.resolve(null);
   return Promise.resolve(_STUDENT_WORK_DEMO_DIR + name);
+}
+
+/* ── Group work: the reader takes a group (S12-T1) ──────────────────────
+   On a piece set to One per Group (Students Send's group_work 'group'),
+   the group is the pair or group the teacher made on the assessment
+   (collaboration Pairs or Groups, getCollabGroupOf). Each member who sends
+   makes their own submission; the group's work is all of them together,
+   and every member sees it (batch-c-contract.md, "Group work"). A member
+   Graded Separately is still in the group's work: only their grade is
+   their own. Everywhere else (Each Student, individual work, a student in
+   no group, DIBELS) the group is the student alone, and these answer
+   exactly what getStudentSubmission and getStudentWork answer for them.
+
+   Shapes: getStudentGroupWork is the student's group_work(...),
+   getGroupWorkFiles the files group_file_links(...) makes links for.
+   No answer here carries a group-mate's name. Demo Mode only, as the rest
+   of student work; signed in they answer empty. */
+
+/* The group `sid` sends with on `aid`: { kind: 'pair' | 'group', index,
+   members, separate } (members on the roster, in the group's order;
+   separate: `sid` is Graded Separately), or null when the student sends
+   alone. */
+function getStudentWorkGroup(cid, sid, aid) {
+  var a = _assessmentById(cid, aid);
+  if (!a || getAssessmentStudentWork(cid, aid).group_work !== 'group') return null;
+  var group = getCollabGroupOf(a, sid);
+  if (!group) return null;
+  var roster = {};
+  (getStudents(cid) || []).forEach(function (s) {
+    if (s && s.id) roster[s.id] = true;
+  });
+  var members = group.members.filter(function (m) {
+    return roster[m];
+  });
+  if (members.length < 2) return null;
+  return { kind: group.kind, index: group.index, members: members, separate: isGradedSeparately(a, sid) };
+}
+
+// The newest handed-in submission of each of `sids` on `aid`, in that order.
+function _newestSubmissionsOf(cid, sids, aid) {
+  var subs = _studentWorkSubmissions(cid);
+  var out = [];
+  sids.forEach(function (sid) {
+    var mine = subs
+      .filter(function (s) {
+        return s.enrollment_id === sid && s.assessment_id === aid;
+      })
+      .sort(function (x, y) {
+        return (y.version || 1) - (x.version || 1);
+      });
+    if (mine.length) out.push(mine[0]);
+  });
+  return out;
+}
+
+/* The work in for `sid`'s group on `aid`: each member's newest handed-in
+   submission, members in the group's order (the student's own first when
+   they send alone, so a single student gets [their submission] or []). */
+function getGroupSubmissions(cid, sid, aid) {
+  var group = getStudentWorkGroup(cid, sid, aid);
+  return _newestSubmissionsOf(cid, group ? group.members : [sid], aid);
+}
+
+/* True when work is in for `sid` on `aid`: their own, or on a One per
+   Group piece a group-mate's. What To Grade and Not In should ask in place
+   of getStudentSubmission (see GraderWork.workStateOf). */
+function groupWorkIn(cid, sid, aid) {
+  return getGroupSubmissions(cid, sid, aid).length > 0;
+}
+
+/* Every page of the group's work, as group_file_links lists them: each
+   page of getGroupSubmissions' submissions, with enrollment_id (who sent
+   it: an id, never a name), submission_id and mine (sent in `sid`'s own
+   submission). Members in order, each one's pages in order. */
+function getGroupWorkFiles(cid, sid, aid) {
+  var out = [];
+  getGroupSubmissions(cid, sid, aid).forEach(function (s) {
+    (s.files || []).forEach(function (f) {
+      out.push(
+        Object.assign({}, f, { enrollment_id: s.enrollment_id, submission_id: s.id, mine: s.enrollment_id === sid }),
+      );
+    });
+  });
+  return out;
+}
+
+/* The student page's group_work(...): { ok, assessments: [{ id, members,
+   sent, pages, you_sent, first_sent_at }] } for each One per Group piece
+   the student's group is on: how many are in the group, whether any work
+   is in, its pages, whether the student sent some, and when the first came
+   in. No names. In the page's order (getStudentWork's). */
+function getStudentGroupWork(cid, sid) {
+  var out = [];
+  (getStudentWork(cid, sid).assessments || []).forEach(function (w) {
+    var group = getStudentWorkGroup(cid, sid, w.id);
+    if (!group) return;
+    var subs = _newestSubmissionsOf(cid, group.members, w.id);
+    var first = null;
+    var pages = 0;
+    subs.forEach(function (s) {
+      pages += (s.files || []).length;
+      var at = s.sent_at || s.created_at;
+      if (at && (!first || at < first)) first = at;
+    });
+    out.push({
+      id: w.id,
+      members: group.members.length,
+      sent: subs.length > 0,
+      pages: pages,
+      you_sent: subs.some(function (s) {
+        return s.enrollment_id === sid;
+      }),
+      first_sent_at: first,
+    });
+  });
+  return { ok: true, assessments: out };
 }
 
 /* ── Work a teacher adds (S6-F2, S7-F3) ─────────────────────────────────
@@ -18059,6 +18168,11 @@ window.GB = {
   getReturnedScores,
   getCourseSubmissions,
   getStudentSubmission,
+  getStudentWorkGroup,
+  getGroupSubmissions,
+  groupWorkIn,
+  getGroupWorkFiles,
+  getStudentGroupWork,
   getAssessmentStudentWork,
   getCourseSendWork,
   getStudentWork,

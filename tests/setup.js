@@ -243,10 +243,15 @@ load('shared/student-view.js');
 // Photos: shrinking and the queue that keeps them (Add Work in the grader).
 load('shared/photo-shrink.js');
 load('shared/photo-queue.js');
+// The PDF reader (pdf.js is fetched only when a PDF is opened).
+load('shared/photo-readers.js');
 // Pictures of student work through one helper (S14-T1).
 load('shared/work-thumbs.js');
+// Mark Up: drawing over a page of student work (S9).
+load('shared/markup-draw.js');
 load('s/page-view.js');
 load('teacher/ui.js');
+load('teacher/markup.js');
 load('teacher/report-scores.js');
 load('teacher/drafts-before-print.js');
 load('teacher/report-blocks.js');
