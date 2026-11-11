@@ -117,7 +117,7 @@ begin
             ('public._revision_hide_available()',                            'cd50f4c6493a73b3c42ae51f7580f970', 'a4b4e942de351d6849702b96f25c7356'),
             ('public._revision_hide_grade(uuid)',                            '247080f6572bb45951cef807a2b849bd', 'a4c3f002d3bb2fc01e58ec5b8dab8ecb'),
             ('public._revision_unhide_grade(uuid)',                          '26d2861325edf27f95d090ebd590eb0f', 'cbbc6fd7654c2b8677c7d210b5e15cc4'),
-            ('public._markup_on_return()',                                   'absent', '7b01b8f9af2f6abfbc835e114e3758df')
+            ('public._markup_on_return()',                                   'absent', 'c0188b31f9adf2706189cc81b560c0bb')
             -- FINGERPRINTS-END
         ) as v(fn, first_run, later_run)
     loop
@@ -261,9 +261,10 @@ create or replace function public._markup_on_return()
  set search_path to 'public', 'pg_temp'
 as $function$
 declare
-    _r    revision_request%rowtype;
-    _open boolean;
-    _now  jsonb;
+    _id     uuid;
+    _hidden boolean;
+    _h      jsonb;
+    _now    jsonb;
 begin
     -- Take Back giving a hidden grade back (_revision_unhide_grade) is not
     -- a Return: no mark is given, and its hide has already ended.
@@ -278,37 +279,39 @@ begin
     if current_setting('fv.restoring', true) = 'on' then
         return null;
     end if;
-    -- A hide on the piece ends here, for good. (The partial index
-    -- revision_request_one_open finds it; a class with no request reads
-    -- one empty index page.)
-    select * into _r from revision_request
-     where assessment_id = new.assessment_id and enrollment_id = new.enrollment_id and state = 'open'
-       for update;
-    _open := found;
-    if _open and _r.grade_hidden then
+    -- The piece's open revision request, if any (the partial index
+    -- revision_request_one_open; a class with none reads one index page).
+    -- No row lock: every writer of revision_request, like every writer of
+    -- grade_return, holds the class's lock, which this save holds.
+    select r.id, r.grade_hidden, r.hidden_state into _id, _hidden, _h
+      from revision_request r
+     where r.assessment_id = new.assessment_id and r.enrollment_id = new.enrollment_id and r.state = 'open';
+    if _id is null then
+        return null;
+    end if;
+    -- A hide on the piece ends here, for good.
+    if _hidden then
         update revision_request
            set grade_hidden = false, hide_ended_at = clock_timestamp(), hide_ended_by = 'returned', updated_at = now()
-         where id = _r.id;
+         where id = _id;
         -- The grade the student had before the hide is the one they last
         -- saw: a different grade returned now is an update on it (Updated,
         -- "was" that grade), as any change to a returned grade is; the same
         -- grade returned is what they had. Only these two columns are
         -- written, so this trigger does not fire again.
         _now := _grade_copy(new.enrollment_id, new.assessment_id);
-        if _now is distinct from _r.hidden_state->'copy' then
-            update grade_return set previous_copy = _r.hidden_state->'copy', updated_at = new.returned_at
+        if _now is distinct from _h->'copy' then
+            update grade_return set previous_copy = _h->'copy', updated_at = new.returned_at
              where enrollment_id = new.enrollment_id and assessment_id = new.assessment_id;
         else
             update grade_return
-               set previous_copy = nullif(_r.hidden_state->'previous_copy', 'null'::jsonb),
-                   updated_at = (_r.hidden_state->>'updated_at')::timestamptz
+               set previous_copy = nullif(_h->'previous_copy', 'null'::jsonb),
+                   updated_at = (_h->>'updated_at')::timestamptz
              where enrollment_id = new.enrollment_id and assessment_id = new.assessment_id;
         end if;
     end if;
     -- The revision's grade returned: the request is done, for good.
-    if _open then
-        perform _revision_settle(new.enrollment_id, new.assessment_id, false);
-    end if;
+    perform _revision_settle(new.enrollment_id, new.assessment_id, false);
     return null;
 end;
 $function$;
@@ -337,7 +340,7 @@ begin
             ('public._revision_hide_available()',   'a4b4e942de351d6849702b96f25c7356'),
             ('public._revision_hide_grade(uuid)',   'a4c3f002d3bb2fc01e58ec5b8dab8ecb'),
             ('public._revision_unhide_grade(uuid)', 'cbbc6fd7654c2b8677c7d210b5e15cc4'),
-            ('public._markup_on_return()',          '7b01b8f9af2f6abfbc835e114e3758df')
+            ('public._markup_on_return()',          'c0188b31f9adf2706189cc81b560c0bb')
             -- FINGERPRINTS-END
         ) as v(fn, becomes)
     loop

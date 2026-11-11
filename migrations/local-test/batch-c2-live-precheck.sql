@@ -14,7 +14,7 @@ with relied(fn, first_run, later_run) as (values
     ('public._revision_hide_available()',                            'cd50f4c6493a73b3c42ae51f7580f970', 'a4b4e942de351d6849702b96f25c7356'),
     ('public._revision_hide_grade(uuid)',                            '247080f6572bb45951cef807a2b849bd', 'a4c3f002d3bb2fc01e58ec5b8dab8ecb'),
     ('public._revision_unhide_grade(uuid)',                          '26d2861325edf27f95d090ebd590eb0f', 'cbbc6fd7654c2b8677c7d210b5e15cc4'),
-    ('public._markup_on_return()',                                   'absent', '7b01b8f9af2f6abfbc835e114e3758df')
+    ('public._markup_on_return()',                                   'absent', 'c0188b31f9adf2706189cc81b560c0bb')
     -- FINGERPRINTS-END
 )
 select 'a function C2 calls or replaces differs from the tested one' as problem, r.fn as detail,
