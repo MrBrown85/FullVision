@@ -1665,7 +1665,22 @@
      is already here: nothing is asked. The rows on screen change, so what
      is watched for "opened" starts again. */
   /* What the student looks at on the page, as s/page-view.js reads it. */
-  var UI_KEYS = ['tab', 'segment', 'all', 'pick', 'search', 'filter', 'feedback', 'whole', 'levels', 'form'];
+  var UI_KEYS = [
+    'tab',
+    'segment',
+    'all',
+    'pick',
+    'search',
+    'filter',
+    'feedback',
+    'whole',
+    'levels',
+    'form',
+    'work',
+    'workPage',
+    'marksOff',
+    'workPages',
+  ];
   function uiOf() {
     var ui = {};
     UI_KEYS.forEach(function (k) {
@@ -2150,7 +2165,7 @@
     } else if (act === 'card-back') {
       backToPage();
     } else if (
-      /^(tab|segment|all-open|all-close|filter|pick|open-piece|feedback|feedback-close|whole|whole-close|levels|form-pick)$/.test(
+      /^(tab|segment|all-open|all-close|filter|pick|open-piece|feedback|feedback-close|whole|whole-close|levels|form-pick|work|work-close|work-page|work-marks)$/.test(
         act,
       )
     ) {
