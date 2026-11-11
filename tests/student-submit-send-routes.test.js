@@ -990,6 +990,22 @@ describe('send-finish', () => {
     expect((await t.send(finishBody(s))).body.ok).toBe(true);
   });
 
+  it('N1: after a missing page, a later page whose thumbnail alone is missing is named too', async () => {
+    const t = setup();
+    const six = Array(6).fill(PAGES[0]);
+    // Page 1 is not up; pages 2 to 6 are, but page 6 without its thumbnail. Pages 5 and 6 are looked at after
+    // page 1 is found missing, so they are only looked for.
+    const s = await started(t, { pages: six }, [null, ...Array(5).fill([PAGE_JPEG, THUMB_JPEG])]);
+    const thumb6 = t.world.storeCalls.find(
+      c => c[0] === 'signUpload' && c[1] === t.world.subs.get(s.submission_id).files[5].thumb_path,
+    );
+    expect(thumb6).toBeTruthy();
+    t.world.objects.delete(t.world.subs.get(s.submission_id).files[5].thumb_path);
+    const r = await t.send(finishBody(s, { pages: six }));
+    expect(r.body).toEqual({ ok: false, error: 'missing_pages', missing: [s.files[0].file_id, s.files[5].file_id] });
+    expect(names(t.world)).not.toContain('send_finish');
+  });
+
   it('a file of another student’s send is refused before anything is read, and send_finish never sees its id', async () => {
     const t = setup();
     const omar = await t.send({ ...startBody(), session: OMAR_PHONE, enrollment_id: OMAR, request_id: REQ2 });

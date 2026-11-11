@@ -125,6 +125,11 @@ describe('storageRest', () => {
       const g = fakeFetch(() => json(status, { statusCode: '404', error: 'not_found' }));
       expect(await storageRest(g.fetcher, URL_, KEY).read(PAGE, 10)).toBe('missing');
     }
+    // N2: a 400 whose body does not say 404 (a wrong key, a bad request) is an error, never 'missing'.
+    for (const body of [{ statusCode: '403', error: 'Unauthorized' }, { statusCode: '400' }, {}, 'not json']) {
+      const g = fakeFetch(() => (typeof body === 'string' ? new Response(body, { status: 400 }) : json(400, body)));
+      await expect(storageRest(g.fetcher, URL_, KEY).read(PAGE, 10)).rejects.toThrow('storage read 400');
+    }
     // Said too large.
     const told = fakeFetch(() => new Response('x', { status: 200, headers: { 'content-length': '11' } }));
     expect(await storageRest(told.fetcher, URL_, KEY).read(PAGE, 10)).toBe('too_large');

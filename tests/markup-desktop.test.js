@@ -461,7 +461,7 @@ describe('answers that come late or say no', () => {
     tool('tick');
     pointer('pointerdown', 100, 100);
     await settle();
-    expect(mk().querySelector('.markup-msg').textContent).toBe('Mark Up is not ready for signed-in classes yet.');
+    expect(mk().querySelector('.markup-msg').textContent).toBe('Mark Up is not on for this class.');
   });
 
   it('each save sends the rev the last one answered, and its own key', async () => {

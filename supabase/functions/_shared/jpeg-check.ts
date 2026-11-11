@@ -52,8 +52,9 @@ export type JpegOk = {
   ok: true;
   width: number;
   height: number;
-  /** The file as it must be stored: the same bytes when nothing was cut. */
-  clean: Uint8Array;
+  /** The file as it must be stored: the same bytes when nothing was cut. Backed by a plain ArrayBuffer, as
+      Web Crypto and fetch take it. */
+  clean: Uint8Array<ArrayBuffer>;
   stripped: boolean;
 };
 export type JpegRefused = { ok: false; reason: string };
@@ -93,7 +94,7 @@ function kept(bytes: Uint8Array, marker: number, body: number, len: number): boo
 /* Reads a JPEG as described above. Never throws for what a file holds: any
    file that is not one is { ok: false, reason }. `reason` names the rule
    (for tests and for counting), never a value from the file. */
-export function inspectJpeg(input: Uint8Array, limits: JpegLimits): JpegOk | JpegRefused {
+export function inspectJpeg(input: Uint8Array<ArrayBuffer>, limits: JpegLimits): JpegOk | JpegRefused {
   const no = (reason: string): JpegRefused => ({ ok: false, reason });
   const bytes = input;
   const n = bytes.length;
@@ -209,7 +210,7 @@ export function inspectJpeg(input: Uint8Array, limits: JpegLimits): JpegOk | Jpe
 }
 
 /** The SHA-256 of some bytes, as 64 lower-case hex characters (Web Crypto). */
-export async function sha256Hex(bytes: Uint8Array): Promise<string> {
+export async function sha256Hex(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
   return Array.from(digest, b => b.toString(16).padStart(2, '0')).join('');
 }

@@ -304,10 +304,13 @@ window.Grader = (function () {
     var ids = (Array.isArray(studentIds) ? studentIds : [studentIds]).filter(function (sid) {
       return !heldForRevision(cid, sid, aid);
     });
-    // Only where Mark Up can be on (Demo Mode, the build switch and Send
-    // Work): everywhere else, a signed-in class above all, Return is
-    // returnGrades exactly as it was.
-    var marks = typeof returnWork === 'function' && typeof isDemoMode === 'function' && isDemoMode();
+    // Only where Mark Up can be on (Demo Mode, or a signed-in class the
+    // server keeps rows for, with the build switch and Send Work on):
+    // everywhere else Return is returnGrades exactly as it was.
+    var marks =
+      typeof returnWork === 'function' &&
+      ((typeof isDemoMode === 'function' && isDemoMode()) ||
+        (typeof studentWorkLive === 'function' && studentWorkLive(cid)));
     var out = marks && workOnInClass(cid) ? returnWork(cid, aid, ids) : returnGrades(cid, aid, ids);
     return _saved(cid, ids.length === 1 ? ids[0] : null, aid, 'return', out);
   }

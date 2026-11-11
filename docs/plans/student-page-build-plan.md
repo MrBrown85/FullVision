@@ -520,7 +520,7 @@ The wording above is proposed; Colin approves it in each PR, as usual.
 - `S9-F1` Desktop Mark Up: Pen, Highlight, Note, Tick, Cross, Eraser, Notes on This Page. Done (PR 1069; the Demo data side, PR 1063).
 - `S9-F2` Phone Mark Up: one finger draws, two fingers move. Done (PR 1072, sharing the desktop's `shared/markup-draw.js`).
 - `S9-F3` Student: See Your Work with Show Marks. Marks follow Students See Your Mark Up. Done (PR 1068).
-- `S9-W1` Wire. Not started: waits for Batch C.
+- `S9-W1` Wire. The teacher side is wired (Nov 11): in a signed-in class with Send Work on, Mark Up saves with `save_markup` through the outbox, the grader reads the marks (`list_course_feedback`, `list_assessment_markup`), and Return is `return_work`, which gives the marks. The student side waits for the `markup` and `feedback` edge routes.
 
 **Status (Nov 11 morning).** Demo Mode only. Not built: the board's place labels beside each note ("Headline"); a note's words in a bubble on the photo (each note is a numbered pin, its words listed under the page). Waits for Colin: whether Mark Up counts as "started grading" (Batch B's rule does not count it, so once Mark Up exists a student could unsend a marked-up photo).
 
@@ -548,7 +548,7 @@ The wording above is proposed; Colin approves it in each PR, as usual.
 - `S10-F2` The plan on the next assignment and "Did You Do It?" (Yes, Partly, Not This Time), shown as the student's word ("Jordan says…"). Done (PR 1074).
 - `S10-F3` Teacher: the reflection in the grader with Send Answer; Save as Observation. Done (PR 1071).
 - `S10-F4` Learner Profile's Working On, Reflecting So Far and Reflections on Feedback; the dashboard's Questions From Students; the gradebook and profile marks. Answering clears all three. Done (PR 1080).
-- `S10-W1` Wire. Not started: waits for Batch C.
+- `S10-W1` Wire. The teacher side is wired (Nov 11): Reflect on Feedback is read from the server, Send Answer is `answer_reflection`, the class switch is `set_course_feedback_options`. The student side (`reflect`, `reply`, `answer_seen`) waits for the edge routes. Left in held files: the Class Settings switch row, which still draws only in Demo Mode.
 - Not in the list above: the Reflect on Feedback switch in Class Settings › Student Page (PR 1085, Demo Mode only).
 
 **Status (Nov 11 morning).** Demo Mode only, behind Reflect on Feedback. Not built: Make My Plan after the teacher answers (Batch C's contract has nowhere for it); "Mr. Brown answered your question" in What Changed; the reflection rows on the Assignments page's one-student view; the board's Course Goal card; Read Aloud and voice input. Waits for Colin: whether a reflection saved as an observation may later be quoted in a report (the student is told "Only Mr. Brown sees this.").
