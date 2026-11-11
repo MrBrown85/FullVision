@@ -110,7 +110,8 @@ describe('the cards of Back', () => {
   it('a returned grade changed since: Updated; the grade shown is the one returned, not the draft over it', async () => {
     const page = await demo();
     await page.click('[data-segment="back"]');
-    expect(tags(card(page, 'Lab Safety Contract'))).toContain('Updated');
+    // Updated, with the day it was updated (S4-F5), in place of Returned.
+    expect(tags(card(page, 'Lab Safety Contract'))[0]).toMatch(/^Updated \S+ \d+$/);
     const essay = card(page, 'Ecosystem Connections Essay');
     expect(rowsOf(essay)[0]).toEqual(['Your Result', '2.0']);
     expect(essay.textContent).not.toContain('much clearer after your rewrite');
@@ -171,6 +172,8 @@ describe('All Assignments: search, filters, and a row opens its card', () => {
       'To Do',
       'Sent',
       'Back',
+      // What changed since the student last looked (S4-F5).
+      'New ' + viewOf(page).changes.length,
     ]);
     expect(listed(page)).toHaveLength(9);
   });

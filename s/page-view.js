@@ -179,7 +179,7 @@ window.StudentPageView = (function () {
     var rows = [];
     if (p.result && p.result.text) rows.push({ name: 'Your Result', text: p.result.text, level: null });
     (p.rubric ? p.rubric.rows : p.competencies || []).forEach(function (r) {
-      if (r.text) rows.push({ name: r.name, text: r.text, level: r.level });
+      if (r.text) rows.push({ name: r.name, text: r.text, level: r.level, was: r.was });
     });
     if (!rows.length) return '';
     return (
@@ -190,7 +190,13 @@ window.StudentPageView = (function () {
             '<li class="sp-piece-row"><span class="sp-piece-row-name">' +
             esc(r.name) +
             '</span>' +
-            chipHtml(r.text, r.level) +
+            (r.was
+              ? '<span class="sp-was-wrap">' +
+                chipHtml(r.text, r.level) +
+                '<span class="sp-was">' +
+                esc('Was ' + r.was) +
+                '</span></span>'
+              : chipHtml(r.text, r.level)) +
             '</li>'
           );
         })
@@ -199,15 +205,37 @@ window.StudentPageView = (function () {
     );
   }
 
+  /* What changed on an updated grade, under its rows: when, and each level
+     that moved. "Mr. Brown updated your result" waits on the server
+     sending the teacher's name. */
+  function updatedNoteHtml(p) {
+    var moved = (p.rubric ? p.rubric.rows : p.competencies || []).filter(function (r) {
+      return r.was && r.text;
+    });
+    if (!p.updated || !moved.length) return '';
+    return (
+      '<div class="sp-updated-note"><p class="sp-updated-title">' +
+      esc('Your result was updated on ' + fmtDate(p.updatedAt || p.returnedAt, DAY)) +
+      '</p>' +
+      moved
+        .map(function (r) {
+          return '<p class="sp-updated-line">' + esc(r.name + ' went from ' + r.was + ' to ' + r.text + '.') + '</p>';
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+
   // The card's pills: when it is due or came back, Missing, Late, Updated.
   function pills(p) {
     var due = p.dueDate ? 'Due ' + fmtDate(p.dueDate, DUE_DAY) : '';
     var out = [];
-    if (p.kind === 'back') out.push(['back', 'Returned ' + fmtDate(p.returnedAt, DAY)]);
+    // A returned grade changed since the student last looked says when (the board's "Updated Nov 12").
+    if (p.kind === 'back' && p.updated) out.push(['updated', 'Updated ' + fmtDate(p.updatedAt || p.returnedAt, DAY)]);
+    else if (p.kind === 'back') out.push(['back', 'Returned ' + fmtDate(p.returnedAt, DAY)]);
     else if (p.kind === 'missing') out.push(['missing', 'Missing']);
     if (p.kind !== 'back' && due) out.push(['due', due]);
     if (p.late) out.push(['quiet', 'Late']);
-    if (p.updated) out.push(['new', 'Updated']);
     return out
       .map(function (x) {
         return '<span class="sp-flag sp-flag-' + x[0] + '">' + esc(x[1]) + '</span>';
@@ -272,7 +300,7 @@ window.StudentPageView = (function () {
       '" tabindex="-1">' +
       esc(p.title) +
       '</h2>' +
-      (p.kind === 'back' ? resultRows(p) : '') +
+      (p.kind === 'back' ? resultRows(p) + updatedNoteHtml(p) : '') +
       (p.kind === 'back' && p.comment ? '<p class="sp-piece-comment">' + esc(p.comment) + '</p>' : '') +
       (todo ? gradedOnHtml(p) : '') +
       (hasFeedback(p)
@@ -422,7 +450,13 @@ window.StudentPageView = (function () {
                 '<li class="sp-fb-row"><span class="sp-fb-row-name">' +
                 esc(row.name) +
                 '</span>' +
-                chipHtml(row.text, row.level) +
+                (row.was
+                  ? '<span class="sp-was-wrap">' +
+                    chipHtml(row.text, row.level) +
+                    '<span class="sp-was">' +
+                    esc('Was ' + row.was) +
+                    '</span></span>'
+                  : chipHtml(row.text, row.level)) +
                 '</li>'
               );
             })
@@ -727,6 +761,40 @@ window.StudentPageView = (function () {
     { id: 'back', label: 'Back' },
   ];
 
+  /* What Changed Since You Last Looked (the artboard's board): the pieces
+     back or updated that the student has not opened since. */
+  function changedIds(view) {
+    var ids = {};
+    (view.changes || []).forEach(function (c) {
+      ids[c.id] = c.why;
+    });
+    return ids;
+  }
+
+  /* "3 Things Since You Last Looked", and a line saying what they are. The
+     board's line names the teacher ("Mr. Brown answered your question…"),
+     which waits on the server; answers and revisions come with S10 and
+     S11. */
+  function sinceHtml(view) {
+    var changes = view.changes || [];
+    if (!changes.length) return '';
+    var back = changes.filter(function (c) {
+      return c.why === 'back';
+    }).length;
+    var updated = changes.length - back;
+    var bits = [];
+    if (back) bits.push(back === 1 ? '1 piece came back' : back + ' pieces came back');
+    if (updated) bits.push(updated === 1 ? '1 result was updated' : updated + ' results were updated');
+    var line = bits.join(' and ') + '.';
+    return (
+      '<div class="sp-since"><p class="sp-since-title">' +
+      esc(changes.length === 1 ? '1 Thing Since You Last Looked' : changes.length + ' Things Since You Last Looked') +
+      '</p><p class="sp-since-line">' +
+      esc(line.charAt(0).toUpperCase() + line.slice(1)) +
+      '</p></div>'
+    );
+  }
+
   // What the search words and the filter leave of the list. The words are matched against the title.
   function matching(view, ui) {
     var words = String(ui.search || '')
@@ -734,8 +802,11 @@ window.StudentPageView = (function () {
       .split(/\s+/)
       .filter(Boolean);
     var filter = ui.filter || 'all';
+    var changed = changedIds(view);
     return view.work.filter(function (p) {
-      if (filter !== 'all' && segmentOf(p) !== filter) return false;
+      if (filter === 'new') {
+        if (!changed[p.id]) return false;
+      } else if (filter !== 'all' && segmentOf(p) !== filter) return false;
       var title = String(p.title || '').toLowerCase();
       return words.every(function (w) {
         return title.indexOf(w) >= 0;
@@ -755,7 +826,7 @@ window.StudentPageView = (function () {
 
   /* One row of All Assignments. It opens the piece's card; Excused work has
      no card, so its row opens nothing. */
-  function allRowHtml(p) {
+  function allRowHtml(p, why) {
     var v = rowView(p);
     var inner =
       '<span class="sp-dot sp-dot-' +
@@ -764,6 +835,8 @@ window.StudentPageView = (function () {
       esc(v.title) +
       '</span>' +
       (v.sub ? '<span class="sp-row-sub">' + esc(v.sub) + '</span>' : '') +
+      // A piece back since the student last looked says so (the board's "Returned").
+      (why === 'back' ? '<span class="sp-row-flags"><span class="sp-row-flag">Returned</span></span>' : '') +
       '</span>' +
       (v.result ? '<span class="sp-row-result">' + esc(v.result) + '</span>' : '');
     return (
@@ -783,8 +856,11 @@ window.StudentPageView = (function () {
   }
 
   function allBody(ui, view) {
-    var shown = matching(view, ui);
-    var filter = ui.filter || 'all';
+    var changed = changedIds(view);
+    var news = (view.changes || []).length;
+    // New with nothing new (it was all opened) shows everything.
+    var filter = ui.filter === 'new' && !news ? 'all' : ui.filter || 'all';
+    var shown = matching(view, Object.assign({}, ui, { filter: filter }));
     return (
       '<div class="sp-all-head"><button type="button" class="sp-head-icon" data-act="all-close" aria-label="Back to cards">' +
       BACK_ARROW +
@@ -794,26 +870,35 @@ window.StudentPageView = (function () {
       esc(ui.search || '') +
       '">' +
       '<div class="sp-filters" role="group" aria-label="Show">' +
-      FILTERS.map(function (f) {
-        var on = f.id === filter;
-        return (
-          '<button type="button" class="sp-filter' +
-          (on ? ' sp-filter-on' : '') +
-          '" data-act="filter" data-filter="' +
-          f.id +
-          '" aria-pressed="' +
-          (on ? 'true' : 'false') +
-          '">' +
-          esc(f.label) +
-          '</button>'
-        );
-      }).join('') +
+      FILTERS.concat(news ? [{ id: 'new', label: 'New ' + news }] : [])
+        .map(function (f) {
+          var on = f.id === filter;
+          return (
+            '<button type="button" class="sp-filter' +
+            (on ? ' sp-filter-on' : '') +
+            '" data-act="filter" data-filter="' +
+            f.id +
+            '" aria-pressed="' +
+            (on ? 'true' : 'false') +
+            '">' +
+            esc(f.label) +
+            '</button>'
+          );
+        })
+        .join('') +
       '</div>' +
       noResultsHtml(ui, view) +
+      sinceHtml(view) +
       (!view.work.length
         ? '<p class="sp-lead sp-empty">No assignments yet.</p>'
         : shown.length
-          ? '<ul class="sp-list">' + shown.map(allRowHtml).join('') + '</ul>'
+          ? '<ul class="sp-list">' +
+            shown
+              .map(function (p) {
+                return allRowHtml(p, changed[p.id]);
+              })
+              .join('') +
+            '</ul>'
           : '<p class="sp-lead sp-empty" role="status">Nothing matches.</p>')
     );
   }
@@ -1070,8 +1155,10 @@ window.StudentPageView = (function () {
 
   /* The four tabs. Drawn twice, once in the header for a Chromebook and
      once along the bottom for a phone; page-view.css shows one. */
-  function tabBarHtml(ui, where) {
+  function tabBarHtml(ui, where, view) {
     var on = TAB_BODIES[ui.tab] ? ui.tab : 'assignments';
+    // What changed since the student last looked, as a count on Assignments (the board's red badge).
+    var news = view && !ui.waiting ? (view.changes || []).length : 0;
     return (
       '<nav class="sp-tabs sp-tabs-' +
       where +
@@ -1086,9 +1173,13 @@ window.StudentPageView = (function () {
           (t.id === on ? ' aria-current="page"' : '') +
           '><svg class="sp-tab-icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
           t.icon +
-          '</svg><span>' +
+          '</svg>' +
+          (t.id === 'assignments' && news ? '<span class="sp-tab-badge" aria-hidden="true">' + news + '</span>' : '') +
+          '<span class="sp-tab-label">' +
           esc(t.label) +
-          '</span></button>'
+          '</span>' +
+          (t.id === 'assignments' && news ? '<span class="sp-hidden-title">' + esc(news + ' new') + '</span>' : '') +
+          '</button>'
         );
       }).join('') +
       '</nav>'
@@ -1119,7 +1210,7 @@ window.StudentPageView = (function () {
       CHEVRON +
       '</button>' +
       '<span class="sp-head-gap"></span>' +
-      tabBarHtml(ui, 'top') +
+      tabBarHtml(ui, 'top', view) +
       '<span class="sp-head-gap"></span>' +
       '<button type="button" class="sp-done" data-act="card-done">Done</button>' +
       '<button type="button" class="sp-head-icon" data-act="all-open" aria-label="All assignments"' +
@@ -1132,7 +1223,7 @@ window.StudentPageView = (function () {
       bodyHtml(view, ui) +
       (ui.note ? '<p class="sp-fine">' + esc(ui.note) + '</p>' : '') +
       '</main>' +
-      tabBarHtml(ui, 'bottom') +
+      tabBarHtml(ui, 'bottom', view) +
       '</div>'
     );
   }
@@ -1147,7 +1238,7 @@ window.StudentPageView = (function () {
 
   var TAB_IDS = { assignments: 1, learning: 1, questionnaires: 1, reports: 1 };
   var SEGMENT_IDS = { todo: 1, sent: 1, back: 1 };
-  var FILTER_IDS = { all: 1, todo: 1, sent: 1, back: 1 };
+  var FILTER_IDS = { all: 1, todo: 1, sent: 1, back: 1, new: 1 };
   var FEEDBACK_ACTS = { feedback: 1, whole: 1, 'feedback-close': 1, 'whole-close': 1, levels: 1, 'form-pick': 1 };
   function has(map, key) {
     return typeof key === 'string' && Object.prototype.hasOwnProperty.call(map, key);
