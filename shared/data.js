@@ -11536,6 +11536,8 @@ function _saveGradeReturns(cid, rows) {
   _saveCourseField('gradeReturns', cid, rows);
   // Returned-only numbers follow the rows.
   if (typeof clearProfCache === 'function') clearProfCache();
+  // Revisions (S11, Demo Mode): a Return closes a request, or ends a hide, for good.
+  _revisionsAfterRowSave(cid);
 }
 /* A signed-in class's rows, as loaded from the server
    (_fetchGradeReturns). The only way they get in: it marks the class
@@ -16767,7 +16769,9 @@ function getStudentWork(cid, sid) {
     var s = getStudentSubmission(cid, sid, a.id);
     if (!w.listed || (settings.students_send === 'nothing' && !s)) return;
     var takes = send && settings.students_send !== 'nothing' && w.open;
-    var started = !!s && studentWorkGradingStarted(cid, sid, a.id);
+    // Grading has started for the student once the teacher's marks are on a
+    // page of their work too (Colin, Nov 11): they can no longer change it.
+    var started = !!s && (studentWorkGradingStarted(cid, sid, a.id) || _teacherMarksOnWork(cid, sid, a.id));
     out.push({
       id: a.id,
       students_send: settings.students_send,
@@ -17514,6 +17518,21 @@ function studentMarkupWaiting(cid, sid, aid) {
   });
 }
 
+/* True when a page of the student's OWN work on `aid` (one submission
+   only, with `submissionId`) carries at least one of the teacher's marks,
+   given to the student or not: the server's _grading_started (C1, section
+   2b; Colin, Nov 11). A page whose marks were all erased does not count;
+   a group-mate's pages do not count for this student. Signed in there are
+   no marks here (getAssessmentMarkup reads none). */
+function _teacherMarksOnWork(cid, sid, aid, submissionId) {
+  return getAssessmentMarkup(cid, aid).some(function (r) {
+    if (r.enrollment_id !== sid || !r.marks || !Array.isArray(r.marks.marks) || !r.marks.marks.length) return false;
+    if (!submissionId) return true;
+    var page = _markupPage(cid, r.file_id);
+    return !!page && page.submission.id === submissionId;
+  });
+}
+
 /* Return, with the marks (return_work): returnGrades unchanged, then each
    listed student of the class is given the working marks on their pages of
    `aid`. Use it in place of returnGrades wherever Mark Up can be on screen.
@@ -18105,11 +18124,14 @@ function saveDemoReflections(cid, list) {
    shape is made in one function (_revisionRow, _studentRevisionOf), so
    S11-W1 changes one place.
 
-   A request's state is read live, never stored: open (no revision in),
-   sent (in, grading not started), grading (the grade changed since it came
-   in), returned (a grade was returned after it came in), cancelled. A
-   student's own shape says sent for grading: a draft is never theirs to
-   see.
+   A request's state: open (no revision in), sent (in, grading not
+   started), grading (the grade changed since it came in, or the teacher's
+   marks are on one of its pages), returned (a grade was returned after it
+   came in), cancelled. An open request's state is read live; once closed
+   (returned or cancelled) it is stored and stays closed, whatever happens
+   to the work afterwards. A student's own shape says sent for grading: a
+   draft is never theirs to see. Marks on a revision's pages lock it as a
+   grade does: the student can no longer Unsend it or send it again.
 
    Behind the build switch and Send Work (revisionsOn), as the plan's S11
    says: with either off every reader here shows nothing and every writer
@@ -18177,35 +18199,81 @@ function _revisionSubmission(cid, r) {
   );
 }
 
-/* A request's state, read live from the submissions and the grade_return
-   row: open, sent, grading, returned or cancelled. */
+/* A request's state: open, sent, grading, returned or cancelled. A closed
+   request (taken back, or its revision's grade returned) is kept closed,
+   as the server keeps state 'done' and closed_at: whatever happens to the
+   work afterwards (Delete Work, Replace Them), it never opens again. An
+   open one is read live from the submissions, the grade_return row and
+   the teacher's marks. */
 function _revisionState(cid, r) {
   if (r.cancelled_at) return 'cancelled';
-  if (!_revisionSubmission(cid, r)) return 'open';
-  var row = getGradeReturn(cid, r.enrollment_id, r.assessment_id);
-  // Returned at or after the revision came in (a save in the same instant counts).
-  if (row && row.returned_at && String(row.returned_at) >= String(r.revision_sent_at)) return 'returned';
+  if (r.closed_at) return 'returned';
+  var sub = _revisionSubmission(cid, r);
+  if (!sub) return 'open';
+  if (_revisionReturnedSince(cid, r)) return 'returned';
   var now = _revisionWorking(cid, r.enrollment_id, r.assessment_id);
-  return GradeState.sameCopy(now, r.revision_grade_at_send) ? 'sent' : 'grading';
+  if (!GradeState.sameCopy(now, r.revision_grade_at_send)) return 'grading';
+  // The teacher's marks on one of the revision's pages: grading has started.
+  return _teacherMarksOnWork(cid, r.enrollment_id, r.assessment_id, sub.id) ? 'grading' : 'sent';
+}
+// A grade was returned at or after the revision came in (a save in the same instant counts).
+function _revisionReturnedSince(cid, r) {
+  if (!r.revision_sent_at) return false;
+  var row = getGradeReturn(cid, r.enrollment_id, r.assessment_id);
+  return !!row && !!row.returned_at && String(row.returned_at) >= String(r.revision_sent_at);
 }
 function _revisionIsOpen(state) {
   return state === 'open' || state === 'sent' || state === 'grading';
 }
 
-/* The grade is hidden now: Hide was chosen and nothing has returned a
-   grade since (the row is still a draft never returned). */
+/* The grade is hidden now: Hide was chosen, the request is not taken back,
+   and no Return has ended the hide. Only a Return ends it: whatever else
+   the teacher does to the score (a regrade, Clear Score, which takes the
+   never-returned row away), the grade stays hidden and Take Back gives the
+   student back what the request kept (hidden_row, first_grade). */
 function _revisionHidden(cid, r) {
-  if (!r.hidden || r.cancelled_at) return false;
+  if (!r.hidden || r.cancelled_at || r.hide_ended_at) return false;
   var row = getGradeReturn(cid, r.enrollment_id, r.assessment_id);
-  return !!row && !!row.is_draft && !row.returned_at;
+  return !row || !row.returned_at;
 }
 
 // When a request closed: Take Back, or the return of the revision's grade.
 function _revisionClosedAt(cid, r, state) {
   if (state === 'cancelled') return r.cancelled_at;
   if (state !== 'returned') return null;
+  if (r.closed_at) return r.closed_at;
   var row = getGradeReturn(cid, r.enrollment_id, r.assessment_id);
   return (row && row.returned_at) || null;
+}
+
+/* After any grade_return row is saved (_saveGradeReturns), in Demo Mode:
+   each request whose revision's grade has now been returned is closed for
+   good (closed_at, as the server's state 'done'), and each hide a Return
+   has ended is ended for good (hide_ended_at). Stored, so nothing done to
+   the work or the score afterwards opens a request or hides a grade
+   again. A request taken back is passed over (Take Back closes it first). */
+function _revisionsAfterRowSave(cid) {
+  if (!cid || !_isDemoSession()) return;
+  var all = _revisionsOf(_studentFeedbackStored(cid));
+  var changes = {};
+  Object.keys(all).forEach(function (id) {
+    var r = all[id];
+    if (!_plainObject(r) || r.cancelled_at) return;
+    var row = getGradeReturn(cid, r.enrollment_id, r.assessment_id);
+    if (!row || !row.returned_at) return;
+    var patch = {};
+    if (r.hidden && !r.hide_ended_at) patch.hide_ended_at = row.returned_at;
+    if (!r.closed_at && _revisionSubmission(cid, r) && _revisionReturnedSince(cid, r))
+      patch.closed_at = row.returned_at;
+    if (Object.keys(patch).length) changes[id] = patch;
+  });
+  var ids = Object.keys(changes);
+  if (!ids.length) return;
+  var draft = _studentFeedbackDraft(cid);
+  ids.forEach(function (id) {
+    if (draft.revisions[id]) Object.assign(draft.revisions[id], changes[id]);
+  });
+  _studentFeedbackWrite(cid, draft);
 }
 
 /* Every request of the class on a student and a piece still in it, oldest
@@ -18575,14 +18643,21 @@ function cancelRevision(cid, requestId, key) {
   if (!found) return Promise.resolve({ result: 'not_found' });
   if (!_revisionIsOpen(_revisionState(cid, found))) return Promise.resolve({ result: 'not_open' });
   var unhide = _revisionHidden(cid, found);
+  var now = new Date().toISOString();
+  // Closed first, so the row given back below is not read as a Return that ends anything.
+  var closing = _studentFeedbackDraft(cid);
+  Object.assign(closing.revisions[found.id], { cancelled_at: now, updated_at: now });
+  _studentFeedbackWrite(cid, closing);
   if (unhide) {
     var sid = found.enrollment_id;
     var aid = found.assessment_id;
+    // What the request kept of the row before Hide: the student is given exactly that back,
+    // even when the row has gone since (Clear Score takes a never-returned row away).
     var was = found.hidden_row || (found.first_returned_at ? { returned_at: found.first_returned_at } : null);
     var row = Object.assign({}, was || {}, { is_draft: false, returned_copy: null });
     var seen = (getGradeReturn(cid, sid, aid) || {}).seen_at;
     if (seen) row.seen_at = seen;
-    // A change made since the hide waits as a draft on the grade given back.
+    // A change made since the hide (a regrade, a Clear) waits as a draft on the grade given back.
     if (!GradeState.sameCopy(_revisionWorking(cid, sid, aid), found.first_grade)) {
       row.is_draft = true;
       row.returned_copy = _studentWorkCopy(found.first_grade);
@@ -18591,9 +18666,6 @@ function cancelRevision(cid, requestId, key) {
   }
   var draft = _studentFeedbackDraft(cid);
   var r = draft.revisions[found.id];
-  var now = new Date().toISOString();
-  r.cancelled_at = now;
-  r.updated_at = now;
   var answer = { result: 'cancelled', unhidden: unhide, request: _revisionRow(cid, r) };
   _feedbackRemember(draft, 'revision-cancel', key, answer);
   _studentFeedbackWrite(cid, draft);
@@ -18641,7 +18713,7 @@ function _revisionFilesOk(files) {
    or { ok: false, error }: not_available (signed in), not_found, send_off
    (revisionsOn false), not_taking_work (Students Send is Nothing),
    no_revision (no open request), grading_started (the revision in is being
-   graded or was returned), invalid. */
+   graded, carries the teacher's marks, or was returned), invalid. */
 function sendStudentRevision(cid, sid, aid, files, note, from) {
   var refused = _studentRevisionCheck(cid, sid, aid, from);
   if (refused) return { ok: false, error: refused };

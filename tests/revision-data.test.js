@@ -687,6 +687,159 @@ describe('the request’s words, and sending', () => {
   });
 });
 
+describe('review fixes: a hidden grade is never lost', () => {
+  const clear = () => Grader.clearScore(CID, getScores(CID), JORDAN, piece(), [SUPPORT, LETTER]);
+
+  it('Hide, then Clear Score: the grade stays hidden, and Take Back gives the student exactly what they had', async () => {
+    gradeFirstVersion();
+    const before = structuredClone(row());
+    const made = await askForRevision({ keep_grade: false });
+    clear();
+    // Clear takes the never-returned row away; the hide is not lost with it.
+    expect(getRevisionRequest(CID, JORDAN, PIECE).grade_hidden).toBe(true);
+    expect(getStudentRevision(CID, JORDAN, PIECE).grade_hidden).toBe(true);
+    expect(returnedOnly()).toEqual({ piece: '—', overall: '—' });
+    const back = await cancelRevision(CID, made.request.id, key());
+    expect(back).toMatchObject({ result: 'cancelled', unhidden: true });
+    // The student has their grade again; the Clear waits as a draft on it.
+    expect(returnedOnly()).toEqual({ piece: '2.7 · 67%', overall: '2.7 · 67%' });
+    expect(StudentView.reply(CID, JORDAN).assessments.find(a => a.id === PIECE).grade).not.toBeNull();
+    expect(row()).toMatchObject({ is_draft: true, returned_at: before.returned_at });
+    expect(row().returned_copy.tags[LETTER]).toEqual({ value: 2, modifier: 1, comment: null });
+    expect(allWork().piece).toBe('—');
+  });
+
+  it('Hide, Clear, then a regrade: Take Back still gives back the first grade, the regrade a draft on it', async () => {
+    gradeFirstVersion();
+    const made = await askForRevision({ keep_grade: false });
+    clear();
+    Grader.setLevel(CID, JORDAN, PIECE, SUPPORT, 4, 0);
+    Grader.setLevel(CID, JORDAN, PIECE, LETTER, 4, 0);
+    expect(getRevisionRequest(CID, JORDAN, PIECE).grade_hidden).toBe(true);
+    expect((await cancelRevision(CID, made.request.id, key())).unhidden).toBe(true);
+    expect(returnedOnly().piece).toBe('2.7 · 67%');
+    expect(allWork().piece).toBe('4.0 · 100%');
+  });
+
+  it('only a Return ends a hide, and once ended a Clear does not bring it back', async () => {
+    gradeFirstVersion();
+    await askForRevision({ keep_grade: false });
+    sendRevision();
+    at('2026-11-10T16:00:00.000Z');
+    Grader.setLevel(CID, JORDAN, PIECE, LETTER, 3, 0);
+    Grader.returnGrades(CID, PIECE, [JORDAN]);
+    expect(getRevisionRequest(CID, JORDAN, PIECE).grade_hidden).toBe(false);
+    clear();
+    expect(getRevisionRequest(CID, JORDAN, PIECE).grade_hidden).toBe(false);
+    expect(returnedOnly().piece).toBe('3.0 · 75%');
+  });
+});
+
+describe('review fixes: a closed request stays closed', () => {
+  it('Delete Work after the revision’s grade is returned does not open the request again', async () => {
+    gradeFirstVersion();
+    await askForRevision();
+    sendRevision();
+    at('2026-11-10T16:00:00.000Z');
+    Grader.setLevel(CID, JORDAN, PIECE, LETTER, 3, 0);
+    Grader.returnGrades(CID, PIECE, [JORDAN]);
+    at('2026-11-11T16:00:00.000Z');
+    expect((await deleteStudentWork(CID, JORDAN, PIECE)).result).toBe('deleted');
+    const req = getRevisionRequest(CID, JORDAN, PIECE);
+    expect(req.state).toBe('returned');
+    expect(req.closed_at).toBe('2026-11-10T16:00:00.000Z');
+    expect(revisionWorkState(CID, JORDAN, PIECE)).toBeNull();
+    expect(getStudentRevision(CID, JORDAN, PIECE).state).toBe('returned');
+    expect(sendRevision()).toEqual({ ok: false, error: 'no_revision' });
+    expect(await cancelRevision(CID, req.id, key())).toEqual({ result: 'not_open' });
+    expect(returnedOnly().piece).toBe('3.0 · 75%');
+  });
+
+  it('a request taken back stays taken back after Delete Work', async () => {
+    gradeFirstVersion();
+    const made = await askForRevision();
+    sendRevision();
+    await cancelRevision(CID, made.request.id, key());
+    await deleteStudentWork(CID, JORDAN, PIECE);
+    expect(getRevisionRequest(CID, JORDAN, PIECE).state).toBe('cancelled');
+    expect(revisionWorkState(CID, JORDAN, PIECE)).toBeNull();
+  });
+});
+
+describe('review fixes: the teacher’s marks count as grading started', () => {
+  const marks = (n = 1) => ({
+    v: 1,
+    marks: Array.from({ length: n }, () => ({ type: 'note', x: 0.1, y: 0.1, text: 'good' })),
+  });
+  const pageOf = sid => getStudentSubmission(CID, sid, PIECE).files[0].id;
+
+  it('marks on a revision’s page lock it: no Unsend, no sending again, and the marks stay', async () => {
+    gradeFirstVersion();
+    await askForRevision();
+    sendRevision();
+    expect((await saveMarkup(CID, pageOf(JORDAN), marks(), 0, key())).result).toBe('saved');
+    expect(getRevisionRequest(CID, JORDAN, PIECE).state).toBe('grading');
+    expect(revisionWorkState(CID, JORDAN, PIECE)).toBe('grading');
+    // The student is never shown a draft: their shape still says sent.
+    expect(getStudentRevision(CID, JORDAN, PIECE).state).toBe('sent');
+    expect(unsendStudentRevision(CID, JORDAN, PIECE, JORDAN)).toEqual({ ok: false, error: 'grading_started' });
+    expect(sendRevision()).toEqual({ ok: false, error: 'grading_started' });
+    expect(getAssessmentMarkup(CID, PIECE).filter(r => r.enrollment_id === JORDAN)).toHaveLength(1);
+    expect(getSubmissionVersions(CID, JORDAN, PIECE).map(s => s.version)).toEqual([1, 2]);
+  });
+
+  it('a page whose marks were all erased does not count', async () => {
+    gradeFirstVersion();
+    await askForRevision();
+    sendRevision();
+    const page = pageOf(JORDAN);
+    await saveMarkup(CID, page, marks(), 0, key());
+    await saveMarkup(CID, page, marks(0), 1, key());
+    expect(getRevisionRequest(CID, JORDAN, PIECE).state).toBe('sent');
+    expect(unsendStudentRevision(CID, JORDAN, PIECE, JORDAN).ok).toBe(true);
+  });
+
+  it('marks on the first version’s pages do not lock the revision', async () => {
+    gradeFirstVersion();
+    await saveMarkup(CID, 'f1', marks(), 0, key());
+    await askForRevision();
+    sendRevision();
+    expect(getRevisionRequest(CID, JORDAN, PIECE).state).toBe('sent');
+    expect(unsendStudentRevision(CID, JORDAN, PIECE, JORDAN).ok).toBe(true);
+  });
+
+  it('first version: marks on the student’s own page lock it; another student’s marked page does not', async () => {
+    const work = getCourseSubmissions(CID);
+    saveDemoStudentWork(
+      CID,
+      Object.assign({}, work, {
+        submissions: work.submissions.concat({
+          id: 'sub-hannah-v1',
+          assessment_id: PIECE,
+          enrollment_id: HANNAH,
+          version: 1,
+          state: 'sent',
+          sent_by: 'student',
+          on_paper: false,
+          is_late: false,
+          note: null,
+          sent_at: '2026-10-31T04:00:00.000Z',
+          created_at: '2026-10-31T04:00:00.000Z',
+          files: [{ id: 'fh1', page: 1, path: 'letter-2.jpg', thumb_path: 'letter-2-thumb.jpg' }],
+        }),
+      }),
+    );
+    at('2026-10-31T12:00:00.000Z');
+    const sentOf = sid => getStudentWork(CID, sid).assessments.find(a => a.id === PIECE).sent;
+    expect(sentOf(JORDAN)).toMatchObject({ grading: false, can_change: true });
+    await saveMarkup(CID, 'fh1', marks(), 0, key());
+    expect(sentOf(HANNAH)).toMatchObject({ grading: true, can_change: false });
+    expect(sentOf(JORDAN)).toMatchObject({ grading: false, can_change: true });
+    await saveMarkup(CID, 'fh1', marks(0), 1, key());
+    expect(sentOf(HANNAH)).toMatchObject({ grading: false, can_change: true });
+  });
+});
+
 describe('the switches', () => {
   it('with the build switch or Send Work off, nothing shows and nothing can be made', async () => {
     for (const off of [{ sendWork: false }, { holds: true, sendWork: true, noPage: true }]) {
@@ -793,6 +946,8 @@ describe('Demo Mode’s sample', () => {
     });
     expect(r.first_grade).not.toBeNull();
     expect(revisionWorkState(SCI, 'st7', 'sci8a1')).toBe('revising');
+    // Revise By is ahead of today, as a real request would be: the sample is not overdue.
+    expect(r.revise_by > courseToday(SCI)).toBe(true);
     expect(JSON.stringify(getScores(SCI))).toBe(scores);
     expect(JSON.stringify(getGradeReturns(SCI))).toBe(rows);
     // Seeded once.

@@ -4156,7 +4156,8 @@ function seedDemoRevisions() {
       assessment_id: 'sci8a1',
       enrollment_id: 'st7',
       what_to_fix: 'Write the magnification beside each drawing, then send it again.',
-      revise_by: _demoDayAfter(day, 10),
+      // A week from today, so the sample is never overdue (the lab itself is months back).
+      revise_by: _demoDayAfter(getTodayStr(), 7),
       criterion_ids: [],
       created_at: _demoDayAfter(day, 2) + 'T21:15:00.000Z',
     },
