@@ -5662,3 +5662,237 @@ body.fv-switching-course::after {
 .m-addwork-skip {
   background: rgba(255, 255, 255, 0.14);
 }
+
+/* Mark Up a photo (S9-F2): full screen, dark, the page in the middle. */
+.m-work-markup {
+  align-self: flex-start;
+  min-height: 40px;
+  margin-top: -4px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--link);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.m-markup {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  padding: calc(env(safe-area-inset-top, 0px) + 6px) 12px calc(env(safe-area-inset-bottom, 0px) + 10px);
+  background: #1c1c1e;
+  color: #fff;
+}
+.m-markup-top {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 48px;
+}
+.m-markup-done {
+  min-height: 44px;
+  padding: 0 6px;
+  border: none;
+  background: none;
+  color: #0a84ff;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.m-markup-head {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+.m-markup-title {
+  font-size: 17px;
+  font-weight: 700;
+}
+.m-markup-sub {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m-markup-icon {
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: none;
+  color: #fff;
+  cursor: pointer;
+}
+.m-markup-icon:disabled {
+  color: rgba(255, 255, 255, 0.3);
+  cursor: default;
+}
+.m-markup-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin: 6px 0;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.m-markup-layer {
+  position: absolute;
+  transform-origin: 0 0;
+  /* The page follows the fingers at once. */
+  transition: none !important;
+  background: #fff;
+}
+.m-markup-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+.m-markup-marks {
+  position: absolute;
+  inset: 0;
+}
+.m-markup-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.m-markup-svg polyline,
+.m-markup-svg path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.m-markup-svg .m-mk-highlight {
+  stroke: #ffd60a;
+  stroke-opacity: 0.4;
+}
+.m-markup-svg .m-mk-glyph {
+  stroke-width: 6;
+}
+.m-markup-svg .m-mk-red {
+  stroke: #e5332a;
+}
+.m-markup-svg .m-mk-green {
+  stroke: #1f9d3a;
+}
+.m-markup-svg .m-mk-blue {
+  stroke: #1d64d8;
+}
+.m-mk-note {
+  position: absolute;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  max-width: 55%;
+  transform: translate(-11px, -11px);
+  pointer-events: none;
+}
+.m-mk-pin {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #e5332a;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 22px;
+  text-align: center;
+}
+.m-mk-note-text {
+  padding: 3px 7px;
+  border-radius: 8px;
+  background: #fff8c5;
+  color: #1c1c1e;
+  font-size: 12px;
+  line-height: 1.3;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.m-markup-chrome {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.m-markup-sees,
+.m-markup-hint,
+.m-markup-msg {
+  margin: 0;
+  font-size: 13px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.75);
+}
+.m-markup-msg {
+  color: #ffd60a;
+}
+.m-markup-pages {
+  display: flex;
+  justify-content: space-between;
+}
+.m-markup-btn {
+  min-height: 40px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.m-markup-btn.is-main {
+  background: #0a84ff;
+}
+.m-markup-tools {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+}
+.m-markup-tool {
+  flex: 1;
+  height: 48px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  cursor: pointer;
+}
+.m-markup-tool.is-on {
+  background: #0a84ff;
+}
+.m-markup-note-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.m-markup-note-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+.m-markup-note-text {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 16px;
+}
+.m-markup-note-btns {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

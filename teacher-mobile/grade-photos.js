@@ -472,12 +472,26 @@ window.MGradePhotos = (function () {
         '</div>' +
         (sub.files || [])
           .map(function (f, i) {
+            // Mark Up on each page (S9-F2), where the page can keep marks.
+            var mark =
+              window.MMarkUp && MMarkUp.can(cid, aid, sid, i)
+                ? '<button type="button" class="m-work-markup" data-action="m-markup-open" data-sid="' +
+                  sid +
+                  '" data-aid="' +
+                  aid +
+                  '" data-page="' +
+                  i +
+                  '"' +
+                  ((sub.files || []).length > 1 ? ' aria-label="' + MC.esc('Mark Up page ' + (i + 1)) + '"' : '') +
+                  '>Mark Up</button>'
+                : '';
             return (
               '<img class="m-work-sheet-page" alt="' +
               MC.esc('Page ' + (i + 1) + ' of ' + first + '’s work') +
               '" data-fv-page="' +
               i +
-              '" data-fv-which="page">'
+              '" data-fv-which="page">' +
+              mark
             );
           })
           .join('') +
