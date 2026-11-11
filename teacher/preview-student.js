@@ -82,6 +82,9 @@ window.PreviewStudent = (function () {
         'Your Result',
         'Each returned piece, in this class’s grading style (' + STYLE_NAMES[courseGradeMode(cid)] + ').',
       ) +
+      (StudentView.learningOn(cid)
+        ? _item('My Learning', 'Their level on each skill and their grade, only from work you’ve returned.')
+        : '') +
       '</ul></section>'
     );
   }

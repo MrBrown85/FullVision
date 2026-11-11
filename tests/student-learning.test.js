@@ -189,7 +189,9 @@ describe.each(['proficiency', 'letter', 'both'])('a %s class', system => {
   });
 
   it('holds no class average and nothing of another student', () => {
-    const json = JSON.stringify(learningOf());
+    const l = learningOf();
+    delete l.steps; // the ladder's names, the same for everyone
+    const json = JSON.stringify(l);
     expect(json).not.toMatch(/Omar|ml-omar|average|rank|class/i);
     // Omar's Extending is nowhere: Priya has no Extending.
     expect(json).not.toMatch(/Extending|EXT/);
@@ -255,5 +257,54 @@ describe('the parts of My Learning', () => {
     const l = learningOf();
     expect(l.empty).toBe(true);
     expect(skills(l).every(s => s.text === '')).toBe(true);
+  });
+});
+
+describe('the My Learning screens (s/page-view.js)', () => {
+  const html = (view, ui) => StudentPageView.html(view, Object.assign({ tab: 'learning' }, ui));
+  const el = attrs => ({ getAttribute: name => (name in attrs ? attrs[name] : null), closest: () => null });
+
+  it('off: the plain line, and nothing of a grade', () => {
+    seed('proficiency');
+    const out = html(StudentView.fromCache(CID, S1).view);
+    expect(out).toContain('Your teacher hasn’t turned on My Learning for this class.');
+    expect(out).not.toContain('sp-ml');
+  });
+
+  it('Missing counts as 0 only where the course % counts it: Letter and Both, not Proficiency', () => {
+    seed('proficiency', { show: true });
+    let out = html(StudentView.fromCache(CID, S1).view);
+    expect(out).toContain('>1 Missing<');
+    expect(out).not.toContain('counts as 0');
+    seed('letter', { show: true });
+    out = html(StudentView.fromCache(CID, S1).view);
+    expect(out).toContain('It counts as 0 until it’s in.');
+    expect(out).toContain('data-act="open-piece" data-piece="a4"');
+  });
+
+  it('a skill opens One Skill, and My Learning goes back to it', () => {
+    seed('proficiency', { show: true });
+    const view = StudentView.fromCache(CID, S1).view;
+    expect(html(view)).toContain('data-act="skill" data-skill="ev"');
+    const out = StudentPageView.press({ tab: 'learning' }, view, 'skill', el({ 'data-skill': 'ev' }));
+    expect(out.ui.skill).toBe('ev');
+    const one = html(view, out.ui);
+    expect(one).toContain('id="sp-ml-skill-title" tabindex="-1">Evidence</h1>');
+    I_CAN.forEach(line => expect(one).toContain(line));
+    expect(one).toContain('How It’s Going');
+    expect(StudentPageView.press(out.ui, view, 'skill-close', el({})).ui.skill).toBe('');
+    expect(StudentPageView.press(out.ui, view, 'tab', el({ 'data-tab': 'assignments' })).ui.skill).toBe('');
+    // A skill the view does not hold opens nothing.
+    expect(StudentPageView.press({}, view, 'skill', el({ 'data-skill': 'nope' }))).toBeNull();
+  });
+
+  it('nothing marked yet', () => {
+    seed('proficiency', { show: true });
+    Object.values(_cache.gradeReturns[CID]).forEach(rows => (rows[S1] = { is_draft: true }));
+    delete _returnedSets[CID];
+    clearProfCache();
+    const out = html(StudentView.fromCache(CID, S1).view);
+    expect(out).toContain('>Nothing Marked Yet</h1>');
+    expect(out).toContain('data-act="tab" data-tab="assignments">See Your Assignments</button>');
   });
 });
