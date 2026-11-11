@@ -124,11 +124,13 @@ for (const size of [
       expect(JSON.stringify(kept)).not.toMatch(/Cece|Science|P3R|0123456|2012-05|Extending/);
       expect(await page.context().cookies()).toEqual([]);
 
-      // The student shows what is back: every returned piece is on screen.
-      await page.getByRole('button', { name: 'Back', exact: true }).click();
+      // The student reads down the list: every returned piece has been on screen
+      // (the line over the list, What Changed Since You Last Looked, takes some room).
+      await page.locator('.sp-row').last().scrollIntoViewIfNeeded();
       await expect
         .poll(() => posts.filter(p => p.body.route === 'seen').flatMap(p => p.body.assessment_ids).length)
         .toBe(6);
+      await page.getByRole('button', { name: 'Back', exact: true }).click();
 
       // The page opened again: the student's page, with no card and no check.
       posts.length = 0;

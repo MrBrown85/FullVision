@@ -640,6 +640,9 @@
         ? '<p class="sp-note">Talk with your family about what you wrote. It will be part of your report.</p>'
         : '') +
       (state.demo ? '<p class="sp-note">This was Demo Mode. Nothing was sent.</p>' : '') +
+      (state.back
+        ? '<button type="button" class="sp-btn sp-btn-primary" data-act="page-back">Back to Your Page</button>'
+        : '') +
       '</section></main>'
     );
   }
@@ -782,6 +785,8 @@
     } else if (act === 'back') {
       S.message = '';
       if (S.part > 0) S.part -= 1;
+      // Opened from a card's page (S4-F4): the first part's Back goes back to that page.
+      else if (S.back && StudentPage.pageBack) return StudentPage.pageBack();
       else S.screen = 'confirm';
       saveDraft();
       paint();

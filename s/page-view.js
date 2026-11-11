@@ -28,6 +28,7 @@
          feedback: the id of the piece Your Feedback is open on, whole:
          true for its The Whole Rubric (also for work not back yet, from
          See the Rubric), levels: What the Levels Mean is open,
+         form: the questionnaire or report picked on a Chromebook,
          noResults: the results didn't load (say so, with Try Again),
          sending: Try Again is under way, waiting: the view is not here yet,
          note: a line under the body (Demo Mode's), sheet: Your Classes is
@@ -178,7 +179,7 @@ window.StudentPageView = (function () {
     var rows = [];
     if (p.result && p.result.text) rows.push({ name: 'Your Result', text: p.result.text, level: null });
     (p.rubric ? p.rubric.rows : p.competencies || []).forEach(function (r) {
-      if (r.text) rows.push({ name: r.name, text: r.text, level: r.level });
+      if (r.text) rows.push({ name: r.name, text: r.text, level: r.level, was: r.was });
     });
     if (!rows.length) return '';
     return (
@@ -189,7 +190,13 @@ window.StudentPageView = (function () {
             '<li class="sp-piece-row"><span class="sp-piece-row-name">' +
             esc(r.name) +
             '</span>' +
-            chipHtml(r.text, r.level) +
+            (r.was
+              ? '<span class="sp-was-wrap">' +
+                chipHtml(r.text, r.level) +
+                '<span class="sp-was">' +
+                esc('Was ' + r.was) +
+                '</span></span>'
+              : chipHtml(r.text, r.level)) +
             '</li>'
           );
         })
@@ -198,15 +205,37 @@ window.StudentPageView = (function () {
     );
   }
 
+  /* What changed on an updated grade, under its rows: when, and each level
+     that moved. "Mr. Brown updated your result" waits on the server
+     sending the teacher's name. */
+  function updatedNoteHtml(p) {
+    var moved = (p.rubric ? p.rubric.rows : p.competencies || []).filter(function (r) {
+      return r.was && r.text;
+    });
+    if (!p.updated || !moved.length) return '';
+    return (
+      '<div class="sp-updated-note"><p class="sp-updated-title">' +
+      esc('Your result was updated on ' + fmtDate(p.updatedAt || p.returnedAt, DAY)) +
+      '</p>' +
+      moved
+        .map(function (r) {
+          return '<p class="sp-updated-line">' + esc(r.name + ' went from ' + r.was + ' to ' + r.text + '.') + '</p>';
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+
   // The card's pills: when it is due or came back, Missing, Late, Updated.
   function pills(p) {
     var due = p.dueDate ? 'Due ' + fmtDate(p.dueDate, DUE_DAY) : '';
     var out = [];
-    if (p.kind === 'back') out.push(['back', 'Returned ' + fmtDate(p.returnedAt, DAY)]);
+    // A returned grade changed since the student last looked says when (the board's "Updated Nov 12").
+    if (p.kind === 'back' && p.updated) out.push(['updated', 'Updated ' + fmtDate(p.updatedAt || p.returnedAt, DAY)]);
+    else if (p.kind === 'back') out.push(['back', 'Returned ' + fmtDate(p.returnedAt, DAY)]);
     else if (p.kind === 'missing') out.push(['missing', 'Missing']);
     if (p.kind !== 'back' && due) out.push(['due', due]);
     if (p.late) out.push(['quiet', 'Late']);
-    if (p.updated) out.push(['new', 'Updated']);
     return out
       .map(function (x) {
         return '<span class="sp-flag sp-flag-' + x[0] + '">' + esc(x[1]) + '</span>';
@@ -271,7 +300,7 @@ window.StudentPageView = (function () {
       '" tabindex="-1">' +
       esc(p.title) +
       '</h2>' +
-      (p.kind === 'back' ? resultRows(p) : '') +
+      (p.kind === 'back' ? resultRows(p) + updatedNoteHtml(p) : '') +
       (p.kind === 'back' && p.comment ? '<p class="sp-piece-comment">' + esc(p.comment) + '</p>' : '') +
       (todo ? gradedOnHtml(p) : '') +
       (hasFeedback(p)
@@ -421,7 +450,13 @@ window.StudentPageView = (function () {
                 '<li class="sp-fb-row"><span class="sp-fb-row-name">' +
                 esc(row.name) +
                 '</span>' +
-                chipHtml(row.text, row.level) +
+                (row.was
+                  ? '<span class="sp-was-wrap">' +
+                    chipHtml(row.text, row.level) +
+                    '<span class="sp-was">' +
+                    esc('Was ' + row.was) +
+                    '</span></span>'
+                  : chipHtml(row.text, row.level)) +
                 '</li>'
               );
             })
@@ -726,6 +761,40 @@ window.StudentPageView = (function () {
     { id: 'back', label: 'Back' },
   ];
 
+  /* What Changed Since You Last Looked (the artboard's board): the pieces
+     back or updated that the student has not opened since. */
+  function changedIds(view) {
+    var ids = {};
+    (view.changes || []).forEach(function (c) {
+      ids[c.id] = c.why;
+    });
+    return ids;
+  }
+
+  /* "3 Things Since You Last Looked", and a line saying what they are. The
+     board's line names the teacher ("Mr. Brown answered your question…"),
+     which waits on the server; answers and revisions come with S10 and
+     S11. */
+  function sinceHtml(view) {
+    var changes = view.changes || [];
+    if (!changes.length) return '';
+    var back = changes.filter(function (c) {
+      return c.why === 'back';
+    }).length;
+    var updated = changes.length - back;
+    var bits = [];
+    if (back) bits.push(back === 1 ? '1 piece came back' : back + ' pieces came back');
+    if (updated) bits.push(updated === 1 ? '1 result was updated' : updated + ' results were updated');
+    var line = bits.join(' and ') + '.';
+    return (
+      '<div class="sp-since"><p class="sp-since-title">' +
+      esc(changes.length === 1 ? '1 Thing Since You Last Looked' : changes.length + ' Things Since You Last Looked') +
+      '</p><p class="sp-since-line">' +
+      esc(line.charAt(0).toUpperCase() + line.slice(1)) +
+      '</p></div>'
+    );
+  }
+
   // What the search words and the filter leave of the list. The words are matched against the title.
   function matching(view, ui) {
     var words = String(ui.search || '')
@@ -733,8 +802,11 @@ window.StudentPageView = (function () {
       .split(/\s+/)
       .filter(Boolean);
     var filter = ui.filter || 'all';
+    var changed = changedIds(view);
     return view.work.filter(function (p) {
-      if (filter !== 'all' && segmentOf(p) !== filter) return false;
+      if (filter === 'new') {
+        if (!changed[p.id]) return false;
+      } else if (filter !== 'all' && segmentOf(p) !== filter) return false;
       var title = String(p.title || '').toLowerCase();
       return words.every(function (w) {
         return title.indexOf(w) >= 0;
@@ -754,7 +826,7 @@ window.StudentPageView = (function () {
 
   /* One row of All Assignments. It opens the piece's card; Excused work has
      no card, so its row opens nothing. */
-  function allRowHtml(p) {
+  function allRowHtml(p, why) {
     var v = rowView(p);
     var inner =
       '<span class="sp-dot sp-dot-' +
@@ -763,6 +835,8 @@ window.StudentPageView = (function () {
       esc(v.title) +
       '</span>' +
       (v.sub ? '<span class="sp-row-sub">' + esc(v.sub) + '</span>' : '') +
+      // A piece back since the student last looked says so (the board's "Returned").
+      (why === 'back' ? '<span class="sp-row-flags"><span class="sp-row-flag">Returned</span></span>' : '') +
       '</span>' +
       (v.result ? '<span class="sp-row-result">' + esc(v.result) + '</span>' : '');
     return (
@@ -782,8 +856,11 @@ window.StudentPageView = (function () {
   }
 
   function allBody(ui, view) {
-    var shown = matching(view, ui);
-    var filter = ui.filter || 'all';
+    var changed = changedIds(view);
+    var news = (view.changes || []).length;
+    // New with nothing new (it was all opened) shows everything.
+    var filter = ui.filter === 'new' && !news ? 'all' : ui.filter || 'all';
+    var shown = matching(view, Object.assign({}, ui, { filter: filter }));
     return (
       '<div class="sp-all-head"><button type="button" class="sp-head-icon" data-act="all-close" aria-label="Back to cards">' +
       BACK_ARROW +
@@ -793,42 +870,254 @@ window.StudentPageView = (function () {
       esc(ui.search || '') +
       '">' +
       '<div class="sp-filters" role="group" aria-label="Show">' +
-      FILTERS.map(function (f) {
-        var on = f.id === filter;
-        return (
-          '<button type="button" class="sp-filter' +
-          (on ? ' sp-filter-on' : '') +
-          '" data-act="filter" data-filter="' +
-          f.id +
-          '" aria-pressed="' +
-          (on ? 'true' : 'false') +
-          '">' +
-          esc(f.label) +
-          '</button>'
-        );
-      }).join('') +
+      FILTERS.concat(news ? [{ id: 'new', label: 'New ' + news }] : [])
+        .map(function (f) {
+          var on = f.id === filter;
+          return (
+            '<button type="button" class="sp-filter' +
+            (on ? ' sp-filter-on' : '') +
+            '" data-act="filter" data-filter="' +
+            f.id +
+            '" aria-pressed="' +
+            (on ? 'true' : 'false') +
+            '">' +
+            esc(f.label) +
+            '</button>'
+          );
+        })
+        .join('') +
       '</div>' +
       noResultsHtml(ui, view) +
+      sinceHtml(view) +
       (!view.work.length
         ? '<p class="sp-lead sp-empty">No assignments yet.</p>'
         : shown.length
-          ? '<ul class="sp-list">' + shown.map(allRowHtml).join('') + '</ul>'
+          ? '<ul class="sp-list">' +
+            shown
+              .map(function (p) {
+                return allRowHtml(p, changed[p.id]);
+              })
+              .join('') +
+            '</ul>'
           : '<p class="sp-lead sp-empty" role="status">Nothing matches.</p>')
     );
   }
 
-  /* The other three tabs. Questionnaires and Reports come in S4-F4; My
-     Learning is a class switch, Show My Learning, that comes with S13 and
-     is off until then. Each says so plainly. */
+  /* The other three tabs. My Learning is a class switch, Show My Learning,
+     that comes with S13 and is off until then. Questionnaires and Reports
+     list what the view holds (S4-F4); with nothing there, each says so
+     plainly. */
   var TAB_BODIES = {
     learning: { title: 'My Learning', line: 'Your teacher hasn’t turned on My Learning for this class.' },
     questionnaires: { title: 'Questionnaires', line: 'Questionnaires from your teacher will show here.' },
-    reports: { title: 'Reports', line: 'Reports from your teacher will show here.' },
+    reports: { title: 'My Reports', line: 'Reports from your teacher will show here.' },
   };
+
+  /* ── Questionnaires and My Reports (the artboard's "Questionnaires Tab",
+     "My Reports Tab", "Questions on a Chromebook" and "Reports on a
+     Chromebook"). On a phone: what is open as a card, the rest as a list.
+     On a Chromebook: the list on the left, the one picked on the right.
+     Start and See Your Report are the student page's own presses
+     (s/app.js); in the preview nothing answers them. ───────── */
+
+  var DONE_MARK =
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  var SOON_MARK =
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>';
+
+  // When a questionnaire is open, was sent, or opens.
+  function formWhen(q) {
+    if (q.state === 'sent') return q.sentOn ? 'Sent ' + fmtDate(q.sentOn, DAY) : 'Sent';
+    if (q.state === 'soon') return q.opensOn ? 'Opens ' + fmtDate(q.opensOn, DAY) : '';
+    return q.until ? 'Open until ' + fmtDate(q.until, DAY) : '';
+  }
+  // A report's date and how long it stays open: "Nov 20 · Open until Nov 27".
+  function reportWhen(r) {
+    return [fmtDate(r.issued, DAY), r.until ? 'Open until ' + fmtDate(r.until, DAY) : ''].filter(Boolean).join(SEP);
+  }
+  function aboutMinutes(q) {
+    return q.minutes > 0 ? 'about ' + q.minutes + ' minutes' : '';
+  }
+
+  // The Chromebook's list for either tab: a dot, the title and its line; the one picked marked.
+  function formSide(items, picked, line, dot) {
+    return (
+      '<ul class="sp-side">' +
+      items
+        .map(function (x) {
+          var on = x === picked;
+          return (
+            '<li><button type="button" class="sp-side-row' +
+            (on ? ' sp-side-on' : '') +
+            '" data-act="form-pick" data-form-id="' +
+            esc(x.id) +
+            '" aria-pressed="' +
+            (on ? 'true' : 'false') +
+            '"><span class="sp-dot sp-dot-' +
+            dot(x) +
+            '" aria-hidden="true"></span><span class="sp-row-text"><span class="sp-side-title">' +
+            esc(x.title) +
+            '</span><span class="sp-row-sub">' +
+            esc(line(x)) +
+            '</span></span></button></li>'
+          );
+        })
+        .join('') +
+      '</ul>'
+    );
+  }
+
+  function startButton(q) {
+    return q.state === 'open'
+      ? '<button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="q-start" data-form-id="' +
+          esc(q.id) +
+          '">Start</button>'
+      : '';
+  }
+
+  // One questionnaire as a card: when, its title, what it asks and how long, Start.
+  function formCard(view, q, desk) {
+    var sub = desk
+      ? [view.course && view.course.name, aboutMinutes(q)].filter(Boolean).join(SEP)
+      : [q.line, aboutMinutes(q)].filter(Boolean).join(SEP);
+    var when = formWhen(q);
+    return (
+      '<section class="sp-form-card">' +
+      (when
+        ? '<span class="sp-flag sp-flag-' + (q.state === 'sent' ? 'back' : 'due') + '">' + esc(when) + '</span>'
+        : '') +
+      '<h2 class="sp-form-title" tabindex="-1">' +
+      esc(q.title) +
+      '</h2>' +
+      (sub ? '<p class="sp-form-sub">' + esc(sub) + '</p>' : '') +
+      (desk && q.line ? '<p class="sp-form-line">' + esc(q.line) + '</p>' : '') +
+      startButton(q) +
+      '</section>'
+    );
+  }
+
+  // A row of the phone's list: a mark, the title and its line; a button when it opens something.
+  function formRow(x, line, mark, act) {
+    var inner =
+      (mark ? '<span class="sp-form-mark sp-form-mark-' + mark[0] + '">' + mark[1] + '</span>' : '') +
+      '<span class="sp-row-text"><span class="sp-row-title">' +
+      esc(x.title) +
+      '</span><span class="sp-row-sub">' +
+      esc(line) +
+      '</span></span>';
+    return (
+      '<li class="sp-row">' +
+      (act
+        ? '<button type="button" class="sp-row-open" data-act="' +
+          act +
+          '" data-form-id="' +
+          esc(x.id) +
+          '">' +
+          inner +
+          NEXT_ARROW +
+          '</button>'
+        : '<span class="sp-row-open">' + inner + '</span>') +
+      '</li>'
+    );
+  }
+
+  function questionnairesBody(view, ui) {
+    var items = view.questionnaires;
+    var open = items.filter(function (q) {
+      return q.state === 'open';
+    });
+    var rest = items.filter(function (q) {
+      return q.state !== 'open';
+    });
+    var picked = pieceIn(items, ui.form);
+    return (
+      '<h1 class="sp-page-title" tabindex="-1">Questionnaires</h1>' +
+      '<div class="sp-split sp-forms">' +
+      formSide(items, picked, formWhen, function (q) {
+        return q.state === 'open' ? 'missing' : q.state === 'sent' ? 'back' : 'due';
+      }) +
+      '<div class="sp-forms-main"><div class="sp-forms-desk">' +
+      formCard(view, picked, true) +
+      '</div><div class="sp-forms-phone">' +
+      open
+        .map(function (q) {
+          return formCard(view, q, false);
+        })
+        .join('') +
+      (rest.length
+        ? '<ul class="sp-list">' +
+          rest
+            .map(function (q) {
+              return formRow(q, formWhen(q), q.state === 'sent' ? ['done', DONE_MARK] : ['soon', SOON_MARK], '');
+            })
+            .join('') +
+          '</ul>'
+        : '') +
+      '</div></div></div>'
+    );
+  }
+
+  /* One report as a card: its title (New until it is opened), when, the
+     class with the report's result as the teacher sent it, the comment. */
+  function reportCard(view, r) {
+    var shown = r.result.word || r.result.text;
+    return (
+      '<section class="sp-form-card"><div class="sp-report-head"><h2 class="sp-form-title" tabindex="-1">' +
+      esc(r.title) +
+      '</h2>' +
+      (r.isNew ? '<span class="sp-flag sp-flag-new">New</span>' : '') +
+      '</div><p class="sp-form-sub">' +
+      esc(reportWhen(r)) +
+      '</p>' +
+      (shown
+        ? '<div class="sp-report-result"><span class="sp-report-class">' +
+          esc((view.course && view.course.name) || '') +
+          '</span>' +
+          chipHtml(shown, r.result.level) +
+          '</div>'
+        : '') +
+      (r.comment ? '<p class="sp-report-comment">' + esc(r.comment) + '</p>' : '') +
+      '<button type="button" class="sp-btn sp-btn-tint sp-btn-big" data-act="r-open" data-form-id="' +
+      esc(r.id) +
+      '">See Your Report</button></section>'
+    );
+  }
+
+  function reportsBody(view, ui) {
+    var items = view.reports;
+    var picked = pieceIn(items, ui.form);
+    var line = function (r) {
+      return [r.isNew ? 'New' : '', reportWhen(r)].filter(Boolean).join(SEP);
+    };
+    return (
+      '<h1 class="sp-page-title" tabindex="-1">My Reports</h1>' +
+      '<div class="sp-split sp-forms">' +
+      formSide(items, picked, line, function (r) {
+        return r.isNew ? 'new' : 'due';
+      }) +
+      '<div class="sp-forms-main"><div class="sp-forms-desk">' +
+      reportCard(view, picked) +
+      '</div><div class="sp-forms-phone">' +
+      reportCard(view, items[0]) +
+      (items.length > 1
+        ? '<ul class="sp-list">' +
+          items
+            .slice(1)
+            .map(function (r) {
+              return formRow(r, fmtDate(r.issued, DAY), null, 'r-open');
+            })
+            .join('') +
+          '</ul>'
+        : '') +
+      '</div></div></div>'
+    );
+  }
 
   function bodyHtml(view, ui) {
     if (ui.waiting || !view) return '<p class="sp-lead sp-empty" role="status">' + esc(WAITING) + '</p>';
     var tab = TAB_BODIES[ui.tab] ? ui.tab : 'assignments';
+    if (tab === 'questionnaires' && (view.questionnaires || []).length) return questionnairesBody(view, ui);
+    if (tab === 'reports' && (view.reports || []).length) return reportsBody(view, ui);
     if (tab !== 'assignments') {
       return (
         '<h1 class="sp-page-title" tabindex="-1">' +
@@ -866,8 +1155,10 @@ window.StudentPageView = (function () {
 
   /* The four tabs. Drawn twice, once in the header for a Chromebook and
      once along the bottom for a phone; page-view.css shows one. */
-  function tabBarHtml(ui, where) {
+  function tabBarHtml(ui, where, view) {
     var on = TAB_BODIES[ui.tab] ? ui.tab : 'assignments';
+    // What changed since the student last looked, as a count on Assignments (the board's red badge).
+    var news = view && !ui.waiting ? (view.changes || []).length : 0;
     return (
       '<nav class="sp-tabs sp-tabs-' +
       where +
@@ -882,9 +1173,13 @@ window.StudentPageView = (function () {
           (t.id === on ? ' aria-current="page"' : '') +
           '><svg class="sp-tab-icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
           t.icon +
-          '</svg><span>' +
+          '</svg>' +
+          (t.id === 'assignments' && news ? '<span class="sp-tab-badge" aria-hidden="true">' + news + '</span>' : '') +
+          '<span class="sp-tab-label">' +
           esc(t.label) +
-          '</span></button>'
+          '</span>' +
+          (t.id === 'assignments' && news ? '<span class="sp-hidden-title">' + esc(news + ' new') + '</span>' : '') +
+          '</button>'
         );
       }).join('') +
       '</nav>'
@@ -915,7 +1210,7 @@ window.StudentPageView = (function () {
       CHEVRON +
       '</button>' +
       '<span class="sp-head-gap"></span>' +
-      tabBarHtml(ui, 'top') +
+      tabBarHtml(ui, 'top', view) +
       '<span class="sp-head-gap"></span>' +
       '<button type="button" class="sp-done" data-act="card-done">Done</button>' +
       '<button type="button" class="sp-head-icon" data-act="all-open" aria-label="All assignments"' +
@@ -928,7 +1223,7 @@ window.StudentPageView = (function () {
       bodyHtml(view, ui) +
       (ui.note ? '<p class="sp-fine">' + esc(ui.note) + '</p>' : '') +
       '</main>' +
-      tabBarHtml(ui, 'bottom') +
+      tabBarHtml(ui, 'bottom', view) +
       '</div>'
     );
   }
@@ -943,8 +1238,8 @@ window.StudentPageView = (function () {
 
   var TAB_IDS = { assignments: 1, learning: 1, questionnaires: 1, reports: 1 };
   var SEGMENT_IDS = { todo: 1, sent: 1, back: 1 };
-  var FILTER_IDS = { all: 1, todo: 1, sent: 1, back: 1 };
-  var FEEDBACK_ACTS = { feedback: 1, whole: 1, 'feedback-close': 1, 'whole-close': 1, levels: 1 };
+  var FILTER_IDS = { all: 1, todo: 1, sent: 1, back: 1, new: 1 };
+  var FEEDBACK_ACTS = { feedback: 1, whole: 1, 'feedback-close': 1, 'whole-close': 1, levels: 1, 'form-pick': 1 };
   function has(map, key) {
     return typeof key === 'string' && Object.prototype.hasOwnProperty.call(map, key);
   }
@@ -969,6 +1264,7 @@ window.StudentPageView = (function () {
       if (!has(TAB_IDS, attr('data-tab'))) return null;
       next.tab = attr('data-tab');
       next.all = false;
+      next.form = '';
       var top = el.closest && el.closest('.sp-tabs-top');
       return { ui: next, focus: (top ? '.sp-tabs-top' : '.sp-tabs-bottom') + ' .sp-tab-on' };
     }
@@ -1010,6 +1306,14 @@ window.StudentPageView = (function () {
       if (act === 'whole-close' && open && hasFeedback(open)) return { ui: next, focus: '#sp-fb-title' };
       next.feedback = '';
       return { ui: next, focus: open ? '#' + domId(open.id) : '.sp-segment-on' };
+    }
+    if (act === 'form-pick') {
+      var list = view ? (next.tab === 'reports' ? view.reports : view.questionnaires) || [] : [];
+      var fid2 = attr('data-form-id');
+      var item = pieceIn(list, fid2);
+      if (!item || item.id !== fid2) return null;
+      next.form = item.id;
+      return { ui: next, focus: '.sp-forms-desk .sp-form-title' };
     }
     if (act === 'levels') {
       next.levels = !next.levels;
