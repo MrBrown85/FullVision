@@ -155,21 +155,6 @@ window.MGradePhotos = (function () {
       '</span></div>';
     if (files.length) {
       html +=
-        '<div class="m-work-pin" aria-hidden="true">' +
-        '<button type="button" class="m-work-pin-btn" data-action="m-work-top" tabindex="-1" aria-label="' +
-        MC.esc('Show ' + first + '’s photos') +
-        '">' +
-        files
-          .slice(0, 3)
-          .map(function (f, i) {
-            return '<span class="m-work-pin-thumb"><img alt="" data-fv-page="' + i + '" data-fv-which="thumb"></span>';
-          })
-          .join('') +
-        '<span class="m-work-pin-name">' +
-        MC.esc(displayName(st)) +
-        '</span>' +
-        UP_SVG +
-        '</button></div>' +
         '<div class="m-work-pages" data-action="m-work-full">' +
         '<div class="m-work-scroller">' +
         files
@@ -203,12 +188,44 @@ window.MGradePhotos = (function () {
     return html + '</div>';
   }
 
+  /* The strip pinned at the top of a card once its pages have scrolled
+     past: drawn first in the card, so it can stick to the card's top. */
+  // html-safe: the name goes through MC.esc; ids are ours
+  function pinHtml(cid, a, st, unit) {
+    if (!st || (unit && unit.view) || !takes(cid, a)) return '';
+    var sub = submission(cid, st.id, a.id);
+    var files = (sub && sub.files) || [];
+    if (!files.length) return '';
+    var first = displayNameFirst(st) || displayName(st);
+    return (
+      '<div class="m-work-pin" aria-hidden="true" data-sid="' +
+      st.id +
+      '" data-aid="' +
+      a.id +
+      '">' +
+      '<button type="button" class="m-work-pin-btn" data-action="m-work-top" tabindex="-1" aria-label="' +
+      MC.esc('Show ' + first + '’s photos') +
+      '">' +
+      files
+        .slice(0, 3)
+        .map(function (f, i) {
+          return '<span class="m-work-pin-thumb"><img alt="" data-fv-page="' + i + '" data-fv-which="thumb"></span>';
+        })
+        .join('') +
+      '<span class="m-work-pin-name">' +
+      MC.esc(displayName(st)) +
+      '</span>' +
+      UP_SVG +
+      '</button></div>'
+    );
+  }
+
   /* The pages' pictures, once their addresses are known. Each answer is
      drawn only if the same student's work for the same piece is still the
      one on that element (the screen may have changed meanwhile). */
   function hydrate(root, cid) {
     if (!root || !on(cid) || typeof studentWorkPageUrl !== 'function') return;
-    root.querySelectorAll('.m-work').forEach(function (box) {
+    root.querySelectorAll('.m-work, .m-work-pin').forEach(function (box) {
       var sid = box.getAttribute('data-sid');
       var aid = box.getAttribute('data-aid');
       var sub = submission(cid, sid, aid);
@@ -242,7 +259,7 @@ window.MGradePhotos = (function () {
         var pages = t.querySelector('.m-work-pages');
         var pin = t.querySelector('.m-work-pin');
         if (!pages || !pin) return;
-        var past = t.scrollTop > pages.offsetTop + pages.offsetHeight - 8;
+        var past = pages.getBoundingClientRect().bottom < t.getBoundingClientRect().top + 8;
         if (pin.classList.contains('is-on') === past) return;
         pin.classList.toggle('is-on', past);
         pin.setAttribute('aria-hidden', past ? 'false' : 'true');
@@ -320,6 +337,7 @@ window.MGradePhotos = (function () {
     sentLine: sentLine,
     notInLine: notInLine,
     cardHtml: cardHtml,
+    pinHtml: pinHtml,
     hydrate: hydrate,
     wire: wire,
     toTop: toTop,

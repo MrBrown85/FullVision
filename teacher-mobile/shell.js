@@ -1457,12 +1457,15 @@
         var aid = target.closest('[data-aid]').getAttribute('data-aid');
         // A To Grade row, or the row menu's Grade the N Waiting: only the
         // work waiting (S7-F2). The menu's sheet goes first.
-        var only = target.getAttribute('data-only') || null;
-        if (!only && target.classList.contains('m-tg-row') && MGrade.segment && MGrade.segment() === 'tograde')
-          only = 'tograde';
+        var waitingOnly = target.getAttribute('data-only') || null;
+        if (!waitingOnly && target.classList.contains('m-tg-row') && MGrade.segment && MGrade.segment() === 'tograde')
+          waitingOnly = 'tograde';
         if (target.closest('#m-sheet-container')) MC.dismissSheet();
-        var swiperHTML = MGrade.renderSwiper(_cid, aid, { only: only });
-        _pushScreen(swiperHTML, only ? { kind: 'swiper', aid: aid, only: only } : { kind: 'swiper', aid: aid });
+        var swiperHTML = MGrade.renderSwiper(_cid, aid, { only: waitingOnly });
+        _pushScreen(
+          swiperHTML,
+          waitingOnly ? { kind: 'swiper', aid: aid, only: waitingOnly } : { kind: 'swiper', aid: aid },
+        );
         // Wired at once, as when grading from a student: a score typed or an
         // avatar tapped while the screen slides in is not lost.
         MGrade.setupSwiper(_cid, aid);

@@ -438,7 +438,7 @@ window.MGrade = (function () {
       var course = COURSES[cid];
       return (
         '<div class="m-empty m-tg-caught" id="m-grade-caught"' +
-        (_segmentMode === 'tograde' && !any ? '' : ' hidden') +
+        (_segmentMode === 'tograde' && !any ? '' : ' style="display:none"') +
         '><div class="m-empty-title">All Caught Up</div>' +
         '<div class="m-empty-subtitle">' +
         MC.esc('Nothing is waiting to grade in ' + ((course && course.name) || 'this class') + '.') +
@@ -855,7 +855,7 @@ window.MGrade = (function () {
         return _matchesAllFilters(a, ctx);
       }).length;
       var caught = document.getElementById('m-grade-caught');
-      if (caught) _setHidden(caught, !(_segmentMode === 'tograde' && !shown));
+      if (caught) caught.style.display = _segmentMode === 'tograde' && !shown ? '' : 'none';
       var count = document.querySelector('#m-sheet-container .m-live-filter-count');
       if (count) count.textContent = 'Showing ' + shown + ' of ' + assessments.length;
     }
@@ -2057,6 +2057,7 @@ window.MGrade = (function () {
         '<div class="m-grade-card-surface' +
         (status === 'NS' || status === 'EXC' ? ' m-card-status-disabled' : '') +
         '">' +
+        MGradePhotos.pinHtml(cid, assessment, st, unit) +
         header +
         // The student's work, under who it is (teacher-mobile/grade-photos.js).
         MGradePhotos.cardHtml(cid, assessment, st, unit) +

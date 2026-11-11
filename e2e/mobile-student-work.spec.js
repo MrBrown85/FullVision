@@ -25,13 +25,22 @@ async function openPhone(page, { on = true, clear = [] } = {}) {
   await page.evaluate(
     ({ on, clear, LAB }) => {
       const cid = getActiveCourse();
-      if (on) setStudentPageSwitch(cid, true, 'on_return');
+      // Clear the grades first, with the switch off: no draft is made.
       const a = getAssessments(cid).find(x => x.id === LAB);
       // Clear the grades of the students named, so their work waits.
       clear.forEach(sid => {
-        Grader.clearScore(cid, getScores(cid), sid, a);
+        const keys = [...new Set((getScores(cid)[sid] || []).filter(e => e.assessmentId === LAB).map(e => e.tagId))];
         Grader.setOverallComment(cid, sid, LAB, '');
+        getRubricCheckIds(cid, sid, LAB).forEach(id => Grader.setTick(cid, sid, LAB, id, false));
+        if (keys.length) Grader.clearScore(cid, getScores(cid), sid, a, keys);
       });
+      if (on) {
+        setStudentPageSwitch(cid, true, 'on_return');
+        // Send Work, as Class Settings › Student Page turns it on.
+        const work = getCourseSubmissions(cid);
+        work.course.send_work = true;
+        saveDemoStudentWork(cid, work);
+      }
     },
     { on, clear, LAB },
   );
@@ -106,6 +115,7 @@ test('To Grade first, the row menu, and grading only the work waiting', async ({
   // Scrolled: the pages pin as a strip at the top of the card.
   await card.evaluate(c => (c.scrollTop = c.scrollHeight));
   await expect(card.locator('.m-work-pin')).toHaveClass(/is-on/);
+  await expect(card.locator('.m-work-pin-btn')).toBeVisible();
   await expect(card.locator('.m-work-pin-btn')).toHaveAttribute('aria-label', 'Show Noor’s photos');
   await shot(page, 'S7-F2-photo-pinned');
   await card.locator('.m-work-pin-btn').click();
@@ -129,6 +139,7 @@ test('the filter applies as you tap', async ({ page }) => {
   const shown = await page.locator('#m-grade-list .m-cell:visible').count();
   await expect(sheet.locator('.m-live-filter-count')).toHaveText('Showing ' + shown + ' of ' + total);
   await expect(sheet.locator('[data-val="has-ungraded"]')).toHaveAttribute('aria-pressed', 'true');
+  await page.waitForTimeout(300); // the chip's colour fades in
   await shot(page, 'S7-F1-filter-live');
   // Tapped again, it lets go.
   await sheet.locator('[data-val="has-ungraded"]').click();

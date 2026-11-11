@@ -5123,10 +5123,10 @@ body.fv-switching-course::after {
   align-items: center;
   gap: 10px;
   width: calc(100% + 40px);
-  margin: -20px -20px 0;
+  margin: 0 -20px;
   padding: 8px 14px;
   border: 0;
-  border-radius: 20px 20px 0 0;
+  border-radius: 0 0 14px 14px;
   background: #2c2c2e;
   color: #fff;
   font: inherit;
