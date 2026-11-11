@@ -142,6 +142,32 @@ describe('with the student page and Send Work on', () => {
     expect(q('.m-markup-img').getAttribute('src')).toBe('blob:' + files(jordan)[0].id);
   });
 
+  it('a signed-in class: the piece is read again on opening, and newer marks are drawn', async () => {
+    const file = files(jordan)[0];
+    const real = globalThis.getPageMarkup;
+    const was = { live: globalThis.studentWorkLive, load: globalThis.loadAssessmentMarkup };
+    let newer = null;
+    globalThis.studentWorkLive = () => true;
+    globalThis.loadAssessmentMarkup = vi.fn(() => {
+      newer = { ...real(CID, file.id), rev: 99, marks: { v: 1, marks: [] } };
+      return Promise.resolve(true);
+    });
+    globalThis.getPageMarkup = (cid, id) => (newer && id === file.id ? newer : real(cid, id));
+    try {
+      MMarkUp.open(CID, LAB, jordan, 0);
+      expect(globalThis.loadAssessmentMarkup).toHaveBeenCalledWith(CID, LAB);
+      expect(MMarkUp.marks().length).toBeGreaterThan(0);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(MMarkUp.marks()).toEqual([]);
+    } finally {
+      MMarkUp.close();
+      globalThis.getPageMarkup = real;
+      globalThis.studentWorkLive = was.live;
+      globalThis.loadAssessmentMarkup = was.load;
+    }
+  });
+
   it('notes read in the card above the tools; the colour dots colour the Pen and Highlight', () => {
     MMarkUp.open(CID, LAB, jordan, 0);
     expect(root().querySelector('.m-markup-stage .m-mk-note')).toBeNull();
