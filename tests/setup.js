@@ -228,6 +228,7 @@ load('shared/rubric-checks.js');
 load('shared/core-self.js');
 load('teacher/ui.js');
 load('teacher/report-scores.js');
+load('teacher/drafts-before-print.js');
 load('teacher/report-blocks.js');
 load('teacher/report-sheets.js');
 load('teacher/report-issues.js');

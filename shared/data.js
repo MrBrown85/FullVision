@@ -11059,6 +11059,9 @@ function restoreScoreCells(cid, before, after) {
    and must not run the rule while it does (_movingClass). */
 var _returnedSets = {}; // cid → { working, slot, set }: the returned set for one working copy and one set of rows
 var _gradeReturnsLoadedFor = {}; // cid → true once _loadGradeReturns has run for the class
+// cid → true once the class's rows have been read from the server in this session (or since its
+// student page was turned on): a load that is not the first is redrawn by its own caller.
+var _gradeReturnsReadThisSession = {};
 var _gradeReturnsStale = {}; // cid → true when the rows must be read again whatever the class's version says
 var _movingClass = false; // a class is being moved to its server id: its scores are replayed, not graded
 var _serverStudentPage = {}; // cid → what the server last said of the class's switch (see _serverSaysStudentPage)
@@ -11532,6 +11535,7 @@ function _loadGradeReturns(cid, rows) {
    device kept from an earlier time it was on are dropped, and the class's
    rows are not loaded until the server's have been read. */
 function _forgetGradeReturns(cid) {
+  delete _gradeReturnsReadThisSession[cid];
   delete _gradeReturnsLoadedFor[cid];
   delete _returnedSets[cid];
   _cache.gradeReturns[cid] = {};
@@ -11643,7 +11647,9 @@ async function _fetchGradeReturns(cid) {
   var wasLoaded = _gradeReturnsLoadedFor[cid] === true;
   _loadGradeReturns(cid, _serverGradeRows(list));
   delete _gradeReturnsStale[cid];
-  return { changed: !wasLoaded || was !== _gradeRowsLook(getGradeReturns(cid)) };
+  var first = !_gradeReturnsReadThisSession[cid];
+  _gradeReturnsReadThisSession[cid] = true;
+  return { changed: !wasLoaded || was !== _gradeRowsLook(getGradeReturns(cid)), first: first };
 }
 /* The class has just been read from the server (_doInitData): read its
    rows too. `fresh` is false when the server answered that the class has
@@ -11664,8 +11670,10 @@ async function _loadServerGradeReturns(cid, fresh) {
   if (got.skipped) {
     if (st && st.snapshot) st.skipped = true;
     else _refreshGradeReturnsSoon(cid);
-  } else if (got.changed && !fresh) {
+  } else if (got.changed && (!fresh || got.first)) {
     // An unchanged class is not redrawn by the load; its rows just changed.
+    // And the first time a class's rows are in this session, every page
+    // that waited for them (ReportScores.ready) is drawn.
     _invalidateAndRerender();
   }
 }
@@ -12061,6 +12069,10 @@ function _pointsScoreKeys(a, own, working, loadedKey) {
    fails closed when it is not there, and its tests take it away (and put
    their own in its place) to prove that. A declared function could be
    neither removed nor told from one that never loaded. */
+/* The code on the error getReturnedScores throws when a class that holds
+   grades has not loaded its Draft and Returned rows: the one refusal a page
+   waits out (ReportScores.ready). Any other error is a fault. */
+var RETURNED_NOT_LOADED = 'RETURNED_NOT_LOADED';
 window.getReturnedScores = function getReturnedScores(cid) {
   var working = getScores(cid) || {};
   var kept = _returnedSets[cid];
@@ -12069,10 +12081,13 @@ window.getReturnedScores = function getReturnedScores(cid) {
   var klass = getReturnSettings(cid);
   if (klass.student_page && GradeState.holds(klass)) {
     if (!_gradeReturnsLoaded(cid)) {
-      throw new Error(
+      // Marked (code RETURNED_NOT_LOADED) so a page can tell this refusal from a fault: ReportScores.ready.
+      var notLoaded = new Error(
         'This class holds grades until they are returned, and which of its grades are returned has not loaded. ' +
           'No returned grade was worked out, so no draft is shown.',
       );
+      notLoaded.code = RETURNED_NOT_LOADED;
+      throw notLoaded;
     }
     // A DIBELS benchmark has no returned grade: any row for one is passed
     // over, so its entries are the working copy's.
@@ -12109,6 +12124,22 @@ window.getReturnedScores = function getReturnedScores(cid) {
   }
   _returnedSets[cid] = { working: working, slot: _cache.gradeReturns[cid], set: set };
   return set;
+};
+
+/* The Advanced Rubric ticks one student has been given on one piece: the
+   returned set's ticks, which getReturnedScores leaves out (getScores holds
+   none). The rule is GradeState.returnedCheckIds. A class that holds
+   grades whose rows have not loaded throws, as getReturnedScores does; a
+   DIBELS benchmark has no ticks to hold, so it gives the working ones; in
+   any other class this is getRubricCheckIds. Set on window for the same
+   reason as getReturnedScores. (S2-F1) */
+window.getReturnedRubricCheckIds = function getReturnedRubricCheckIds(cid, sid, aid) {
+  getReturnedScores(cid);
+  var working = getRubricCheckIds(cid, sid, aid);
+  if (isDibelsScored(_assessmentById(cid, aid))) return working;
+  var klass = getReturnSettings(cid);
+  var holds = klass.student_page && GradeState.holds(klass);
+  return GradeState.returnedCheckIds(holds ? getGradeReturn(cid, sid, aid) : null, working, holds);
 };
 
 /* A local id became a server id (_rekey): the rows move with it, whether it

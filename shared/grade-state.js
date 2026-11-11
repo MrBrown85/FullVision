@@ -463,6 +463,20 @@ window.GradeState = (function () {
     return out;
   }
 
+  /* The Advanced Rubric ticks students have been given on one piece, the
+     same way returnedScores gives their levels: the working ticks
+     (`workingIds`) where nothing is a draft, the returned copy's ticks
+     where a draft sits on a returned grade, none where the grade was never
+     returned. `holds` is whether the class holds grades; in any other class
+     every tick is returned as it is saved. A status changes nothing here,
+     as in returnedScores: calc.js and the screens apply Missing and
+     Excused. (S2-F1) */
+  function returnedCheckIds(row, workingIds, holds) {
+    var working = (workingIds || []).slice();
+    if (!holds || !row || !row.is_draft) return working;
+    return ((row.returned_copy && row.returned_copy.checks) || []).slice();
+  }
+
   /* ── For the screens ───────────────────────────────────────── */
 
   /* The state `sid`'s piece of work on `aid` is in: 'draft', 'returned', or
@@ -641,6 +655,7 @@ window.GradeState = (function () {
     stateOfRow: stateOfRow,
     studentCopy: studentCopy,
     returnedScores: returnedScores,
+    returnedCheckIds: returnedCheckIds,
     afterSave: afterSave,
     stateOf: stateOf,
     draftsIn: draftsIn,

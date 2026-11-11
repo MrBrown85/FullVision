@@ -168,8 +168,21 @@ window.Router = (function () {
 
     // Init new page
     _currentPage = module;
+    /* A page whose first draw throws must not take the app down with it:
+       the dock, the address and the title are still set, and the page
+       stays the current page (so the data layer's redraw reaches its
+       render()). The error is not swallowed: it is thrown again a moment
+       later, outside whoever navigated, so it is the uncaught error it
+       always was (Sentry reports it, and every browser test that fails on
+       a page error fails on it). */
     if (module && module.init) {
-      module.init(params);
+      try {
+        module.init(params);
+      } catch (e) {
+        setTimeout(function () {
+          throw e;
+        }, 0);
+      }
     }
     // The page sent the teacher on from its init (an old link's redirect);
     // that route has drawn and titled the page already.
@@ -292,6 +305,10 @@ window.Router = (function () {
     legacyUrl: _legacyUrl,
     getCurrentPage: function () {
       return _currentPage;
+    },
+    // Every page's address, for the tests that walk every page.
+    routes: function () {
+      return Object.keys(_routes);
     },
   };
 })();

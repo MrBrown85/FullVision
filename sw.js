@@ -54,6 +54,7 @@ const PRECACHE_URLS = [
   '/teacher/grades-print.css',
   '/teacher/ui.js',
   '/teacher/report-scores.js',
+  '/teacher/drafts-before-print.js',
   '/teacher/report-blocks.js',
   '/teacher/report-sheets.js',
   '/teacher/report-issues.js',
