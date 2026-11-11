@@ -26,8 +26,11 @@
    A real student's page (S9-W1, S10-W1) asks the server's routes in their
    place (see "A real card" below): `feedback` once the class's work is in
    and it takes work, `markup` and `file-links` for See Your Work, `reflect`,
-   `reply` and `answer-seen`. Everything it keeps is on the page's state, so
-   it ends with the session, and every request names its own student
+   `reply` and `answer-seen`; `feedback`'s revisions with their pages
+   through `file-links` (S11-W1); `group-work` once `feedback` has answered
+   and `group-links` for a group piece's pages (S12-W1). Everything it
+   keeps is on the page's state, so it ends with the session, and every
+   request names its own student
    (StudentPage.askClass refuses one made for someone else).
 
    Every answer is checked against the screen that asked before it draws:
@@ -489,7 +492,18 @@
      StudentPage.askClass, which adds the device's session. The reply is
      kept on the page's state (`realFeedback`, with the student it is for),
      so Done, another student or another class leaves nothing behind. */
-  var REAL_ROUTES = { feedback: 1, markup: 1, 'file-links': 1, reflect: 1, reply: 1, 'answer-seen': 1 };
+  var REAL_ROUTES = {
+    feedback: 1,
+    markup: 1,
+    'file-links': 1,
+    reflect: 1,
+    reply: 1,
+    'answer-seen': 1,
+    // Group work (S12-W1): the group's counts, and the group's pages of one piece.
+    'group-work': 1,
+    'group-links': 1,
+  };
+  var urls = []; // blob: addresses made here for a revision's pages, let go when the session ends
 
   function realAsk(route, body) {
     var ask = StudentPage.askClass;
@@ -506,10 +520,40 @@
     return f && state.page && f.student === state.page.student.id ? f : null;
   }
 
-  /* The `feedback` reply as the page reads it. Marks and reflections, and
-     Your Plan From Last Time; revisions are not wired yet (Phase 3), so
-     none shows. null while there is nothing to show: a class with no marks
-     and no reflections is drawn exactly as it was. */
+  /* A revision as the page reads it (S11-W1): the contract's `revision`,
+     in the shape Demo Mode's revisionReply gives. The server's `grading`
+     (the revision in is being graded) reads as sent, as a draft regrade
+     does in Demo Mode: a draft is never the student's to see. first_thumbs
+     and thumbs are this device's blob: addresses of the two versions'
+     pages (revisionPages), empty until they are fetched. */
+  var REVISION_STATE = { open: 'open', sent: 'sent', grading: 'sent', returned: 'returned' };
+  function realRevision(state, id, rv) {
+    if (!rv || typeof rv !== 'object' || !REVISION_STATE[rv.state]) return null;
+    var pages = ownRevisionPages(state, id, rv);
+    return {
+      state: REVISION_STATE[rv.state],
+      what_to_fix: rv.what_to_fix,
+      revise_by: rv.revise_by || null,
+      criterion_ids: Array.isArray(rv.criterion_ids) ? rv.criterion_ids.slice() : [],
+      keep_grade: true,
+      grade_hidden: false,
+      first_version: rv.first_version,
+      first_sent_at: rv.first_sent_at,
+      first_grade: rv.first_grade && typeof rv.first_grade === 'object' ? rv.first_grade : null,
+      revision_version: rv.revision_version,
+      revision_sent_at: rv.revision_sent_at,
+      revision_note: rv.revision_note,
+      revision_late: rv.revision_late,
+      asked_at: rv.asked_at,
+      first_thumbs: pages ? pages.first.slice() : [],
+      thumbs: pages ? pages.revision.slice() : [],
+    };
+  }
+
+  /* The `feedback` reply as the page reads it. Marks, reflections,
+     revisions and Your Plan From Last Time. null while there is nothing to
+     show: a class with no marks, no reflections and no revision asked for
+     is drawn exactly as it was. */
   function realFeedbackOf(state) {
     var f = ownFeedback(state);
     if (!f) return null;
@@ -521,8 +565,9 @@
         a.marks && typeof a.marks === 'object' ? { pages: a.marks.pages | 0, notes: a.marks.notes | 0 } : null;
       var reflection =
         r.reflect_on_feedback === true && a.reflection && typeof a.reflection === 'object' ? a.reflection : null;
-      if (!marks && !reflection) return;
-      assessments.push({ id: a.id, marks: marks, revision: null, reflection: reflection });
+      var revision = realRevision(state, a.id, a.revision);
+      if (!marks && !reflection && !revision) return;
+      assessments.push({ id: a.id, marks: marks, revision: revision, reflection: reflection });
     });
     return {
       ok: true,
@@ -539,9 +584,205 @@
     return (
       r.reflect_on_feedback === true ||
       r.assessments.some(function (a) {
-        return a && a.marks;
+        return a && (a.marks || (a.revision && typeof a.revision === 'object'));
       })
     );
+  }
+
+  /* ── Group work (S12-W1) ──────────────────────────────────────
+     `group-work` once `feedback` has answered (both are Batch C's: a
+     function without them is asked nothing more). The reply is kept on the
+     page's state with the student it is for, only when it names a piece. */
+  function ownGroups(state) {
+    var g = state && state.realGroups;
+    return g && state.page && g.student === state.page.student.id ? g : null;
+  }
+  function realGroupsOf(state) {
+    var g = ownGroups(state);
+    return g ? g.reply : null;
+  }
+  // Is piece `id` One per Group for this student? Its pages then come through `group-links`.
+  function groupPiece(state, id) {
+    var g = ownGroups(state);
+    return !!(
+      g &&
+      g.reply.assessments.some(function (a) {
+        return a && a.id === id;
+      })
+    );
+  }
+  function loadGroups(state, student) {
+    return StudentPage.whileCurrent(answerOf('group-work', { enrollment_id: student })).then(function (res) {
+      if (S !== state || !state.page || state.page.student.id !== student) return;
+      var on = !!(
+        res &&
+        res.ok === true &&
+        Array.isArray(res.assessments) &&
+        res.assessments.some(function (a) {
+          return a && typeof a.id === 'string';
+        })
+      );
+      var had = !!ownGroups(state);
+      state.realGroups = on ? { student: student, reply: res } : null;
+      if (on || had) repaint();
+    });
+  }
+
+  /* ── A revision's pages (S11-W1) ──────────────────────────────
+     The first version's pages and the revision's, for Needs Revision and
+     Before and After: `file-links` (`group-links` for a group piece) gives
+     every handed-in page with its version; each thumbnail is fetched at
+     once and shown from a blob: address, as s/send.js shows a Sent card's.
+     Asked once for each version of a revision, and only for a piece with a
+     revision asked for: a class with none is asked nothing. Kept on the
+     page's state with the student they are for. */
+  function revisionKey(rv) {
+    return [rv.first_version || 1, rv.revision_version || '', rv.revision_sent_at || ''].join('|');
+  }
+  function ownRevisionPages(state, id, rv) {
+    var all = state && state.realRevisionPages;
+    if (!all || !state.page || all.student !== state.page.student.id) return null;
+    var got = all.byId[id];
+    return got && got.ready && got.key === revisionKey(rv) ? got : null;
+  }
+  function objectUrl(blob) {
+    try {
+      var u = blob && typeof URL !== 'undefined' && URL.createObjectURL ? URL.createObjectURL(blob) : '';
+      if (u) urls.push(u);
+      return u;
+    } catch (e) {
+      return '';
+    }
+  }
+  function letGo() {
+    urls.forEach(function (u) {
+      try {
+        URL.revokeObjectURL(u);
+      } catch (e) {
+        /* already gone */
+      }
+    });
+    urls = [];
+  }
+  // One page's picture from its link, or null. The link carries its own key: nothing else is sent.
+  function picture(url) {
+    if (typeof fetch !== 'function') return Promise.resolve(null);
+    return fetch(url, { method: 'GET', credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store' }).then(
+      function (res) {
+        return res && res.ok ? res.blob() : null;
+      },
+      function () {
+        return null;
+      },
+    );
+  }
+  function loadRevisionPages(state, student) {
+    var f = ownFeedback(state);
+    if (!f) return Promise.resolve();
+    if (!state.realRevisionPages || state.realRevisionPages.student !== student) {
+      state.realRevisionPages = { student: student, byId: {} };
+    }
+    var byId = state.realRevisionPages.byId;
+    var asks = [];
+    (Array.isArray(f.reply.assessments) ? f.reply.assessments : []).forEach(function (a) {
+      var rv = a && typeof a.id === 'string' && a.revision && typeof a.revision === 'object' ? a.revision : null;
+      if (!rv || !REVISION_STATE[rv.state]) return;
+      var key = revisionKey(rv);
+      if (byId[a.id] && byId[a.id].key === key) return;
+      var mine = { key: key, ready: false, first: [], revision: [] };
+      byId[a.id] = mine;
+      var route = groupPiece(state, a.id) ? 'group-links' : 'file-links';
+      asks.push(
+        StudentPage.whileCurrent(answerOf(route, { enrollment_id: student, assessment_id: a.id })).then(function (res) {
+          if (byId[a.id] !== mine) return;
+          var files = res && res.ok === true && Array.isArray(res.files) ? res.files : null;
+          if (!files) {
+            delete byId[a.id]; // asked again the next time
+            return;
+          }
+          var first = Number(rv.first_version) || 1;
+          var again = Number(rv.revision_version) || 0;
+          var of = function (version) {
+            return files
+              .filter(function (x) {
+                return (
+                  x &&
+                  typeof x.thumb_url === 'string' &&
+                  /^https:\/\//.test(x.thumb_url) &&
+                  Number(x.version) === version
+                );
+              })
+              .sort(function (x, y) {
+                return (Number(x.page) || 0) - (Number(y.page) || 0);
+              });
+          };
+          var pick = of(first).concat(again ? of(again) : []);
+          return StudentPage.whileCurrent(
+            Promise.all(
+              pick.map(function (x) {
+                return picture(x.thumb_url);
+              }),
+            ),
+          ).then(function (blobs) {
+            if (byId[a.id] !== mine) return;
+            pick.forEach(function (x, i) {
+              var u = blobs[i] ? objectUrl(blobs[i]) : '';
+              if (u) (Number(x.version) === first ? mine.first : mine.revision).push(u);
+            });
+            mine.ready = true;
+            return true;
+          });
+        }),
+      );
+    });
+    if (!asks.length) return Promise.resolve();
+    return Promise.all(asks).then(function (done) {
+      if (S !== state || !state.page || state.page.student.id !== student) return;
+      if (
+        done.some(function (x) {
+          return x === true;
+        })
+      ) {
+        repaint();
+      }
+    });
+  }
+
+  /* s/send.js, after a real card's revision went in or came back out, or
+     pages were added to a group's work: what the page shows of it is asked
+     again. A piece that is neither is asked nothing. `change` is what the
+     route answered: the page's copy of the revision follows it at once. */
+  function workChanged(id, change) {
+    var state = S;
+    if (!state || state.demo || !state.page) return Promise.resolve();
+    var student = state.page.student.id;
+    var f = ownFeedback(state);
+    var a =
+      f && Array.isArray(f.reply.assessments)
+        ? f.reply.assessments.filter(function (x) {
+            return x && x.id === id;
+          })[0]
+        : null;
+    var rv = a && a.revision && typeof a.revision === 'object' ? a.revision : null;
+    var asks = [];
+    if (rv) {
+      if (change && change.sent) {
+        rv.state = 'sent';
+        rv.revision_version = change.version || rv.revision_version || 2;
+        rv.revision_sent_at = change.sent_at || rv.revision_sent_at;
+        rv.revision_note = change.note || null;
+        rv.revision_late = change.late === true;
+      } else if (change && change.unsent) {
+        rv.state = 'open';
+        rv.revision_version = null;
+        rv.revision_sent_at = null;
+        rv.revision_note = null;
+        rv.revision_late = null;
+      }
+      asks.push(loadFeedback(true));
+    }
+    if (groupPiece(state, id)) asks.push(loadGroups(state, student));
+    return Promise.all(asks);
   }
 
   function repaint() {
@@ -566,8 +807,11 @@
   /* `feedback`, once the class's `work` has answered that it takes work
      (s/send.js's loadWork; Mark Up is a part of Send Work). A class that
      takes none, or a function without the route, is sent nothing more and
-     the page stays as it was drawn. */
-  function loadFeedback() {
+     the page stays as it was drawn. Once `feedback` has answered, the
+     group's counts (`group-work`, S12-W1), then a revision's pages
+     (S11-W1). `again`: only `feedback` and the pages, after a revision
+     went in or came out. */
+  function loadFeedback(again) {
     var state = S;
     if (!state || state.demo || !state.page) return Promise.resolve();
     var student = state.page.student.id;
@@ -579,6 +823,11 @@
       var had = !!ownFeedback(state);
       state.realFeedback = on ? { student: student, reply: res } : null;
       if (on || had) repaint();
+      // A function from before Batch C (bad_request), or no answer: nothing more is asked.
+      if (!res || res.ok !== true) return;
+      return Promise.resolve(again === true ? null : loadGroups(state, student)).then(function () {
+        if (S === state && on) return loadRevisionPages(state, student);
+      });
     });
   }
 
@@ -699,25 +948,25 @@
     S.workPages = { id: id, state: 'loading', pages: [], asked: mine };
     StudentPage.paint('#sp-work-title');
     var body = { enrollment_id: student, assessment_id: id };
-    StudentPage.whileCurrent(Promise.all([answerOf('file-links', body), answerOf('markup', body)])).then(
-      function (both) {
-        if (!current(id, student, mine)) return;
-        var links = both[0];
-        var marks = both[1];
-        // A reply of the wrong kind is a failed fetch, never a stuck screen.
-        var ok =
-          links &&
-          links.ok === true &&
-          Array.isArray(links.files) &&
-          marks &&
-          marks.ok === true &&
-          Array.isArray(marks.files);
-        S.workPages = ok
-          ? { id: id, state: 'ready', pages: pagesFrom(links, marks), asked: mine }
-          : { id: id, state: 'failed', pages: [], asked: mine };
-        StudentPage.paint('#sp-work-title');
-      },
-    );
+    // The group's pages for a piece sent as One per Group (S12-W1); the student's own for any other.
+    var links = !S.demo && groupPiece(S, id) ? 'group-links' : 'file-links';
+    StudentPage.whileCurrent(Promise.all([answerOf(links, body), answerOf('markup', body)])).then(function (both) {
+      if (!current(id, student, mine)) return;
+      var links = both[0];
+      var marks = both[1];
+      // A reply of the wrong kind is a failed fetch, never a stuck screen.
+      var ok =
+        links &&
+        links.ok === true &&
+        Array.isArray(links.files) &&
+        marks &&
+        marks.ok === true &&
+        Array.isArray(marks.files);
+      S.workPages = ok
+        ? { id: id, state: 'ready', pages: pagesFrom(links, marks), asked: mine }
+        : { id: id, state: 'failed', pages: [], asked: mine };
+      StudentPage.paint('#sp-work-title');
+    });
   }
 
   function onClick(act, el) {
@@ -726,6 +975,9 @@
       S.work = '';
       S.workPages = null;
       S.realFeedback = null;
+      S.realGroups = null;
+      S.realRevisionPages = null;
+      letGo();
       if (act === 'card-done') {
         S.demoReflections = null;
         S.demoRevisions = null;
@@ -746,8 +998,10 @@
      the student's group is on. Counts only: the server sends no group-mate's
      name, so neither does this. Demo Mode's (#demo-card-group): Cece's
      group of three on Cell Model Project, where a group-mate sent 4 photos
-     yesterday; pages Cece sends are added to the group's. null otherwise. */
+     yesterday; pages Cece sends are added to the group's. null otherwise.
+     A real card's is what `group-work` answered (S12-W1), or null. */
   function groupOf(state) {
+    if (state && !state.demo) return realGroupsOf(state);
     if (!state || !state.demo || !state.demoGroup || !rowOf(state, 'demo-cell-model')) return null;
     var mine = state.demoSent && state.demoSent['demo-cell-model'];
     return {
@@ -768,6 +1022,20 @@
   StudentPage.feedbackOf = feedbackOf;
   StudentPage.feedbackSeen = feedbackSeen;
   StudentPage.groupOf = groupOf;
+  // s/send.js, after a real revision or group send went in or came out (S11-W1, S12-W1).
+  StudentPage.workChanged = workChanged;
+  // A real card's revision pages of piece `id`, as blob: addresses: { first, revision }, or null.
+  StudentPage.revisionPages = function (state, id) {
+    var f = ownFeedback(state);
+    var a =
+      f && Array.isArray(f.reply.assessments)
+        ? f.reply.assessments.filter(function (x) {
+            return x && x.id === id;
+          })[0]
+        : null;
+    var got = a && a.revision ? ownRevisionPages(state, id, a.revision) : null;
+    return got ? { first: got.first.slice(), revision: got.revision.slice() } : null;
+  };
   // A real card's page opening: what the class takes (s/send.js), and then, if it takes work, `feedback`.
   var openedBefore = StudentPage.pageOpened;
   StudentPage.pageOpened = function () {
@@ -784,12 +1052,15 @@
     render: {},
     click: onClick,
     share: function (state) {
+      // A new state is a sign-out: the last student's pictures go with it.
+      if (state !== S) letGo();
       S = state;
     },
     test: {
       feedbackOf: feedbackOf,
       loadFeedback: loadFeedback,
       groupOf: groupOf,
+      workChanged: workChanged,
       demoMarkup: function () {
         return DEMO_MARKUP;
       },
