@@ -260,10 +260,29 @@ describe('with the student page and Send Work on', () => {
       MAddWork.configure({ prepare: async () => ({ ok: false, reason: R.OFFICE, office: 'word' }) });
       await MAddWork.addFiles([photo('essay.docx')]);
       expect(screen().querySelector('.m-addwork-msg').textContent).toBe('Save it as a PDF first.');
+      // A PDF is read by shared/photo-readers.js: the reader is handed to PhotoShrink.prepare.
+      let asked;
+      MAddWork.configure({
+        prepare: async (f, o) => {
+          asked = o;
+          return { ok: false, reason: R.UNREADABLE, kind: 'pdf', locked: true };
+        },
+      });
+      await MAddWork.addFiles([photo('work.pdf')]);
+      expect(asked.openPdf).toBe(window.PhotoReaders.openPdf);
+      expect(typeof asked.openPdf).toBe('function');
+      expect(screen().querySelector('.m-addwork-msg').textContent).toBe(
+        'This PDF has a password. Save a copy without one, then choose it.',
+      );
       MAddWork.configure({ prepare: async () => ({ ok: false, reason: R.NO_DECODER, kind: 'pdf' }) });
       await MAddWork.addFiles([photo('work.pdf')]);
       expect(screen().querySelector('.m-addwork-msg').textContent).toBe(
-        "PDFs can't be added on the phone yet. Take a photo of each page.",
+        "PDFs can't be opened right now. Try again when you're online, or take a photo of each page.",
+      );
+      MAddWork.configure({ prepare: async () => ({ ok: false, reason: R.UNREADABLE, kind: 'pdf' }) });
+      await MAddWork.addFiles([photo('work.pdf')]);
+      expect(screen().querySelector('.m-addwork-msg').textContent).toBe(
+        "That file couldn't be used. Try another photo.",
       );
       MAddWork.configure({ prepare: async () => shrunkOf(31) });
       await MAddWork.addFiles([photo()]);

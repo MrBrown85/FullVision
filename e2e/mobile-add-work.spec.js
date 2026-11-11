@@ -7,6 +7,7 @@
  */
 import { test, expect } from '@playwright/test';
 import path from 'path';
+import { pagesPdf, lockedPdf } from '../tests/fixtures/pdf-fixtures.mjs';
 
 test.use({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
 
@@ -353,4 +354,31 @@ test('Grade From Paper on a not-in card: Set Logan To, a level, then Handed in o
   expect(levels.every(l => l === 3)).toBe(true);
   await expect(page.locator('#m-sheet-container .m-sheet')).toHaveCount(0);
   await shot(page, 'S7-F3-set-to-done');
+});
+
+test('Add Work takes a PDF: each page becomes a photo; a locked PDF says so', async ({ page }) => {
+  await openPhone(page);
+  await openLab(page);
+  const sid = (await notIn(page))[0];
+  await page.locator('#m-thumb-strip .m-thumb[data-sid="' + sid + '"]').click();
+  await page.locator('.m-swiper-card[data-sid="' + sid + '"] [data-action="m-add-work"]').click();
+  const screen = page.locator('#m-addwork');
+  await screen
+    .locator('.m-addwork-input')
+    .setInputFiles({ name: 'locked.pdf', mimeType: 'application/pdf', buffer: Buffer.from(lockedPdf()) });
+  await expect(screen.locator('.m-addwork-msg')).toHaveText(
+    'This PDF has a password. Save a copy without one, then choose it.',
+  );
+  await expect(screen.locator('.m-addwork-taken')).toHaveCount(0);
+  await screen
+    .locator('.m-addwork-input')
+    .setInputFiles({ name: 'work.pdf', mimeType: 'application/pdf', buffer: Buffer.from(pagesPdf(2)) });
+  await expect(screen.locator('.m-addwork-taken img')).toHaveCount(2);
+  await expect(screen.locator('.m-addwork-msg')).toHaveText('');
+  await shot(page, 'S7-F3-add-work-pdf');
+  await screen.locator('.m-addwork-save').click();
+  await expect(screen.locator('.m-addwork-count')).toHaveText(/^2 of /);
+  const files = await page.evaluate(({ sid, LAB }) => getStudentSubmission('sci8', sid, LAB).files, { sid, LAB });
+  expect(files).toHaveLength(2);
+  files.forEach(f => expect(f.bytes).toBeLessThanOrEqual(2 * 1000 * 1000));
 });

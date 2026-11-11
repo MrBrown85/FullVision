@@ -342,8 +342,10 @@ window.MAddWork = (function () {
   function _refusal(res) {
     var R = (window.PhotoShrink && PhotoShrink.REASONS) || {};
     if (res.reason === R.OFFICE) return 'Save it as a PDF first.';
+    if (res.locked) return 'This PDF has a password. Save a copy without one, then choose it.';
+    // The PDF reader could not load (offline, on a phone that never fetched it).
     if (res.kind === 'pdf' && res.reason === R.NO_DECODER)
-      return "PDFs can't be added on the phone yet. Take a photo of each page.";
+      return "PDFs can't be opened right now. Try again when you're online, or take a photo of each page.";
     if (res.reason === R.TOO_MANY_PAGES || res.reason === R.PDF_TOO_LARGE) return 'That PDF is too long to add here.';
     return "That file couldn't be used. Try another photo.";
   }
@@ -378,7 +380,8 @@ window.MAddWork = (function () {
         if (seq !== _seq) return;
         return Promise.resolve()
           .then(function () {
-            return prepare(file);
+            // A PDF becomes pages through shared/photo-readers.js (pdf.js, fetched the first time).
+            return prepare(file, { openPdf: window.PhotoReaders && PhotoReaders.openPdf });
           })
           .then(
             function (res) {
