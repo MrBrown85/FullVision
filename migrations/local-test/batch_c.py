@@ -6,7 +6,7 @@ gradebook-prod will be once Batch B is applied (batch_c_common.build).
     PGDATABASE=...                                            python3 batch_c.py teacher    only those named
 
 Scenarios: apply1 teacher markup started contract gone reflect revision group grants race apply2 given closes only_me round2 put_back hide_out same_rows
-revision_deleted
+revision_deleted leave_holds
 """
 import threading, time
 from batch_c_common import *
@@ -1599,10 +1599,71 @@ def revision_deleted():
         finally:
             d.close()
 
+def leave_holds():
+    """F2: marks drawn after the work was returned still wait when the class stops holding grades (it leaves When I
+    Return Them, or its Student Page is turned off). With C2 they are given then, as a Return gives them (Students See
+    Your Mark Up off and Missing as a Return has them); marks on a piece with no returned grade, and another class's,
+    still wait. Entering or staying in When I Return Them gives nothing. No grade row is written."""
+    def given(d, f): return d.one('select given_rev is not distinct from working_rev from markup where file_id = :f', f=f)
+    def waiting(d, a, f): return [x for x in d.rpc('list_assessment_markup(:a)', a=a) if x['file_id'] == f][0]['waiting']
+    def told(d, f): return [x for x in d.rpc('list_course_feedback(:c)', c=COURSE_A)['markup'] if x['file_id'] == f][0]['waiting']
+    for c2 in (False, True):
+        tag = ' (C1 and C2)' if c2 else ' (C1 alone)'
+        for how, patch, back in (('the class leaves When I Return Them', {'return_grades': 'on_save'}, {'return_grades': 'on_return'}),
+                                 ('the Student Page turned off', {'student_page_enabled': False}, {'student_page_enabled': True})):
+            d = scenario_db('leaveholds', with_c2=c2)
+            try:
+                k = seed(d); a = k['lab']; hid = nid(); mis = nid()
+                d.run("""insert into assessment (id, course_id, title, score_mode, max_points, students_send, students_see_markup) values
+                           (:h, :c, 'Hidden Marks Lab', 'points', 10, 'photos', false), (:m, :c, 'Missing Lab', 'points', 10, 'photos', true)""",
+                      h=hid, m=mis, c=COURSE_A)
+                tok = d.session(ENR1); tok2 = d.session(ENR2, '2012-06-16')
+                tb = d.session(ENR_B, '2012-07-17', course=COURSE_B, teacher=B)
+                _, fa = d.send(tok, ENR1, a); _, fn = d.send(tok2, ENR2, a); _, fh = d.send(tok, ENR1, hid); _, fm = d.send(tok, ENR1, mis)
+                _, fb = d.send(tb, ENR_B, k['b_lab'])
+                for p in (a, hid, mis): d.score(ENR1, p, 6); d.return_work(p, [ENR1])
+                d.rpc("set_score_status(:e, :a, 'NS')", e=ENR1, a=mis); d.return_work(mis, [ENR1])
+                d.rpc('upsert_score(:e, :a, 5)', B, e=ENR_B, a=k['b_lab']); d.return_work(k['b_lab'], [ENR_B], uid=B)
+                # marks drawn after the work was returned: they wait
+                d.save_markup(fa[0], marks('AFTER-RETURN')); d.save_markup(fn[0], marks('NO-GRADE-YET'))
+                d.save_markup(fh[0], marks('HIDDEN')); d.save_markup(fm[0], marks('MISSING'))
+                d.save_markup(fb[0], marks('OTHER-CLASS'), uid=B)
+                ok('leave_holds%s, %s: before, the marks wait and the teacher is told so' % (tag, how),
+                   not given(d, fa[0]) and waiting(d, a, fa[0]) is True and told(d, fa[0]) is True)
+                rows = fingerprint_rows(d)
+                d.rpc('update_course(:c, :p::jsonb)', c=COURSE_A, p=json.dumps(patch))
+                ok('leave_holds%s, %s: no grade row is written' % (tag, how), fingerprint_rows(d) == rows)
+                if c2:
+                    ok('leave_holds%s, %s: the marks waiting on a returned grade are given, and the teacher is no longer told they wait' % (tag, how),
+                       given(d, fa[0]) and waiting(d, a, fa[0]) is False and told(d, fa[0]) is False, (given(d, fa[0]), told(d, fa[0])))
+                    ok('leave_holds%s, %s: Students See Your Mark Up off: given, as a Return gives them' % (tag, how), given(d, fh[0]))
+                    ok('leave_holds%s, %s: Missing on the piece: given, as a Return gives them' % (tag, how), given(d, fm[0]))
+                else:
+                    ok('leave_holds%s, %s: not given (C1 alone: return_work or a save gives them), and the teacher is told they wait' % (tag, how),
+                       not given(d, fa[0]) and told(d, fa[0]) is True)
+                ok('leave_holds%s, %s: marks on a piece with no returned grade still wait (as built)' % (tag, how),
+                   not given(d, fn[0]) and waiting(d, a, fn[0]) is True)
+                ok("leave_holds%s, %s: another teacher's class is left alone" % (tag, how), not given(d, fb[0]))
+                if how == 'the Student Page turned off':
+                    d.rpc('update_course(:c, :p::jsonb)', c=COURSE_A, p=json.dumps(back))
+                m = json.dumps([d.marks(tok, ENR1, a), d.marks(tok, ENR1, hid), d.marks(tok, ENR1, mis)])
+                ok('leave_holds%s, %s: the student %s, and not the hidden or Missing ones' % (tag, how, 'sees them' if c2 else 'does not see them'),
+                   ('AFTER-RETURN' in m) is c2 and 'HIDDEN' not in m and 'MISSING' not in m, m[:300])
+                if how == 'the class leaves When I Return Them':
+                    d.rpc('update_course(:c, :p::jsonb)', c=COURSE_A, p=json.dumps(back))
+                # holding grades again: new marks wait, and staying in it gives nothing
+                d.save_markup(fa[0], marks('AFTER-RETURN', 'HELD AGAIN'))
+                for p in (back, {'return_grades': 'on_return', 'student_page_enabled': True}):
+                    d.rpc('update_course(:c, :p::jsonb)', c=COURSE_A, p=json.dumps(p))
+                ok('leave_holds%s, %s: back in When I Return Them, a change waits, and a class staying in it gives nothing' % (tag, how),
+                   not given(d, fa[0]) and told(d, fa[0]) is True)
+            finally:
+                d.close()
+
 SCENARIOS = {'apply1': apply1, 'teacher': teacher, 'markup': markup, 'started': started, 'contract': contract, 'gone': gone, 'reflect': reflect, 'revision': revision, 'group': group,
              'grants': grants, 'race': race, 'apply2': apply2, 'given': given,
              'closes': closes, 'only_me': only_me, 'round2': round2, 'put_back': put_back, 'hide_out': hide_out, 'same_rows': same_rows,
-             'revision_deleted': revision_deleted}
+             'revision_deleted': revision_deleted, 'leave_holds': leave_holds}
 if __name__ == '__main__':
     for name in (sys.argv[1:] or list(SCENARIOS)):
         try: SCENARIOS[name]()
