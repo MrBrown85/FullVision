@@ -334,8 +334,9 @@ var CmStudentPage = (function () {
      Mode, and the app with no sign-in); for a signed-in teacher they are
      not drawn at all and nothing is asked of the server. They are kept in
      the class's settings on this device (send_work, keep_photos_until),
-     read through workSettings. The reminder a week before and the line
-     that photos go for good come with S8-F1. */
+     read through workSettings. The line under Keep Photos Until and the
+     Delete Photos Now? question are Colin's (ruling 102); the reminder it
+     promises and the deleting itself come with S8. */
   var KEEP_CHOICES = [
     { value: 'end_of_term', label: 'End of Term' },
     { value: 'end_of_year', label: 'End of Year' },
@@ -359,6 +360,41 @@ var CmStudentPage = (function () {
       send_work: offered && cfg.send_work === true,
       keep_photos_until: cfg.keep_photos_until === 'end_of_term' ? 'end_of_term' : 'end_of_year',
     };
+  }
+
+  /* The day photos are deleted for a choice, 'YYYY-MM-DD'. End of Year is
+     June 30 of the school year the class is in today. End of Term is the
+     last day of the reporting term the class is in today, else the next
+     to end; with every term past, the last one (a day already gone); with
+     no reporting terms, June 30. */
+  function _today(cid) {
+    return typeof courseToday === 'function' ? courseToday(cid) : new Date().toISOString().slice(0, 10);
+  }
+  function keepPhotosDate(cid, choice) {
+    var today = _today(cid);
+    var y = parseInt(today.slice(0, 4), 10);
+    var june = (parseInt(today.slice(5, 7), 10) >= 8 ? y + 1 : y) + '-06-30';
+    if (choice !== 'end_of_term') return june;
+    var ends = (typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [])
+      .map(function (t) {
+        return t.ends_on;
+      })
+      .filter(function (d) {
+        return /^\d{4}-\d{2}-\d{2}$/.test(d);
+      })
+      .sort();
+    if (!ends.length) return june;
+    var ahead = ends.filter(function (d) {
+      return d >= today;
+    });
+    return ahead.length ? ahead[0] : ends[ends.length - 1];
+  }
+  function _day(iso, month) {
+    var d = new Date(iso + 'T12:00:00Z');
+    return isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { month: month, day: 'numeric', timeZone: 'UTC' });
+  }
+  function _longDay(iso) {
+    return _day(iso, 'long');
   }
 
   function _saveWork(cid, change) {
@@ -393,7 +429,11 @@ var CmStudentPage = (function () {
         }).join('') +
         '</div>' +
         '<div class="cm-hint" id="sp-keep-hint">' +
-        esc('Photos are deleted then, for every assignment in this class.') +
+        esc(
+          'Photos of student work in this class are deleted on ' +
+            _longDay(keepPhotosDate(cid, w.keep_photos_until)) +
+            ". Grades, comments and Mark Up stay. Deleted photos can't come back. You'll get a reminder a week before.",
+        ) +
         '</div>'
       : '';
     return (
@@ -427,8 +467,25 @@ var CmStudentPage = (function () {
       return c.value === value;
     });
     if (!known || w.keep_photos_until === value) return;
-    _saveWork(cid, { keep_photos_until: value });
-    _focus('sp-keep-' + value);
+    var choose = function () {
+      _saveWork(cid, { keep_photos_until: value });
+      _focus('sp-keep-' + value);
+    };
+    var on = keepPhotosDate(cid, value);
+    // A day already gone deletes the photos tonight: ask first (ruling 102).
+    if (on >= _today(cid)) return choose();
+    var name = typeof COURSES !== 'undefined' && COURSES[cid] && COURSES[cid].name ? COURSES[cid].name : 'this class';
+    showConfirm(
+      'Delete Photos Now?',
+      'End of Term was ' +
+        _day(on, 'short') +
+        ', so this deletes the photos of student work in ' +
+        name +
+        " tonight. Deleted photos can't come back.",
+      'Delete Photos',
+      'danger',
+      choose,
+    );
   }
 
   /* ── The build switch ──────────────────────────────────────── */
@@ -627,6 +684,7 @@ var CmStudentPage = (function () {
     isShown: isShown,
     render: render,
     workSettings: workSettings,
+    keepPhotosDate: keepPhotosDate,
     handleAction: handleAction,
     handleChange: handleChange,
     handleBlur: handleBlur,
