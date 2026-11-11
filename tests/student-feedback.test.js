@@ -325,15 +325,14 @@ describe('Your Rubric', () => {
 });
 
 describe('What the Levels Mean', () => {
-  it('starts closed; opened, the four levels with the board’s lines and what + and − mean', async () => {
+  it('starts open, above Your Rubric (the board): the four levels with the board’s lines and what + and − mean; it closes', async () => {
     const page = await demo();
     await openFeedback(page, 'Cell Microscope Lab');
     const btn = () => q(page, '[data-act="levels"]');
     expect(words(btn())).toBe('What the Levels Mean');
-    expect(btn().getAttribute('aria-expanded')).toBe('false');
-    expect(q(page, '.sp-fb-legend')).toBeNull();
-    await page.click('[data-act="levels"]');
     expect(btn().getAttribute('aria-expanded')).toBe('true');
+    const html = page.root().innerHTML;
+    expect(html.indexOf('sp-fb-levels')).toBeLessThan(html.indexOf('>Your Rubric<'));
     expect(
       qa(page, '.sp-fb-legend-row').map(r => [words(r.querySelector('.sp-level')), words(r.lastElementChild)]),
     ).toEqual([
@@ -347,7 +346,8 @@ describe('What the Levels Mean', () => {
       'A + means a little past that level. A − means not quite all the way there.',
     );
     await page.click('[data-act="levels"]');
-    expect(q(page, '.sp-fb-legend')).toBeNull();
+    expect(btn().getAttribute('aria-expanded')).toBe('false');
+    expect(q(page, '.sp-fb-levels-shut .sp-fb-legend')).not.toBeNull();
   });
 });
 

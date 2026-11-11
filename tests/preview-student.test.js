@@ -226,7 +226,11 @@ describe('the preview', () => {
       title: text(r.querySelector('.sp-row-title')),
       result: text(r.querySelector('.sp-row-result')),
     }));
-    expect(rows).toEqual(view.work.map(p => ({ title: p.title, result: p.result.text })));
+    // All Assignments groups the rows (work to hand in first, then by unit), so compare them in title order.
+    const byTitle = (a, b) => (a.title < b.title ? -1 : a.title > b.title ? 1 : 0);
+    expect(rows.slice().sort(byTitle)).toEqual(
+      view.work.map(p => ({ title: p.title, result: p.result.text })).sort(byTitle),
+    );
     expect(rows.find(r => r.title === 'Draft Poster').result).toBe('');
     // The changed reflection shows the grade returned, not the draft.
     const reflect = getAssessments(CID).find(a => a.id === 'reflect');
