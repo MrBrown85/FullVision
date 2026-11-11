@@ -389,3 +389,69 @@
   outline: 2px solid var(--active);
   outline-offset: 2px;
 }
+
+/* ── Student Cards (teacher/student-cards.js; board "Teacher: Student
+   Cards"): the filters as chips, and the list's words coloured by what they
+   mean. ── */
+.sc-card .sc-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sc-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--seg-track);
+  color: var(--text);
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+.sc-chip .sc-count {
+  color: inherit;
+  opacity: 0.8;
+}
+.sc-chip-warn {
+  background: var(--score-2-bg);
+  color: var(--score-2-text);
+}
+.sc-chip-alert {
+  background: var(--score-1-bg);
+  color: var(--score-1-text);
+}
+.sc-chip.active {
+  background: var(--text);
+  color: var(--surface);
+  font-weight: 600;
+}
+.sc-chip:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.sc-status .sc-lock {
+  margin: 0;
+  padding: 0;
+  background: none;
+  font-size: inherit;
+  color: var(--score-1-text);
+}
+.sc-status .sc-unprinted {
+  font-weight: 600;
+  color: var(--score-2-text);
+}
+.sc-table .sc-reissued {
+  font-weight: 600;
+  color: var(--link);
+}
+.sc-until-row .sc-until-pick {
+  width: auto;
+  font-size: var(--text-sm);
+  padding: 5px 8px;
+  color: var(--text);
+  background-color: var(--surface);
+}

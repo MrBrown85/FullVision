@@ -743,9 +743,14 @@ describe('the list in Class Settings › Student Page', () => {
       await shown(LIVE);
       const box = parse(StudentCards.render(LIVE));
       expect(rowsOf(box)).toEqual([
-        ['Jordan Abel', 'Card 2 · Made Nov 10', 'Printed Nov 12'],
+        ['Jordan Abel', 'Card 2 · Reissued Nov 10', 'Printed Nov 12'],
         ['Avery Byrne', 'Card 1 · Made Nov 10', 'Needs a New Card'],
-        ['Cam Cole', 'Card 3 · Made Nov 10', 'Not Printed'],
+        ['Cam Cole', 'Card 3 · Reissued Nov 10', 'Not Printed'],
+      ]);
+      // Coloured by meaning: a reissued card blue, a card not printed amber.
+      expect(box.querySelectorAll('.sc-which.sc-reissued').length).toBe(2);
+      expect(Array.from(box.querySelectorAll('.sc-status .sc-unprinted')).map(e => e.textContent)).toEqual([
+        'Not Printed',
       ]);
       expect(buttons(box)).toEqual(['New Codes for This Class', 'Make and Print 1 Card']);
     } finally {
@@ -946,9 +951,9 @@ describe('Make and Print, and Print Again', () => {
         expect(box.textContent).not.toContain(code);
         expect(everythingKept()).not.toContain(code);
       });
-      expect(rowsOf(box).map(r => [r[1].replace(/Made .*/, 'Made'), r[2].replace(/ .*/, '')])).toEqual([
+      expect(rowsOf(box).map(r => [r[1].replace(/(Made|Reissued) .*/, '$1'), r[2].replace(/ .*/, '')])).toEqual([
         ['Card 1 · Made', 'Printed'],
-        ['Card 2 · Made', 'Printed'],
+        ['Card 2 · Reissued', 'Printed'],
         ['Card 1 · Made', 'Printed'],
       ]);
     } finally {
@@ -1583,7 +1588,7 @@ describe('Print New Card', () => {
       const box = parse(StudentCards.render(LIVE));
       expect(rowsOf(box)[1]).toEqual([
         'Avery Byrne',
-        expect.stringMatching(/^Card 2 · Made /),
+        expect.stringMatching(/^Card 2 · Reissued /),
         expect.stringMatching(/^Printed /),
       ]);
       expect(notesOf(box)).toEqual([
@@ -2147,7 +2152,7 @@ describe('Unlock and Unlock All', () => {
       release({ data: {}, error: null });
       await unlockLanded(U(901), LIVE);
       await StudentCards.load(LIVE);
-      expect(rowsOf(parse(StudentCards.render(LIVE)))[0][2]).toBe('Locked');
+      expect(rowsOf(parse(StudentCards.render(LIVE)))[0][2]).toBe('Locked: 5 wrong tries');
     } finally {
       t.session.signOut();
     }
@@ -2198,7 +2203,7 @@ describe('Unlock and Unlock All', () => {
       await unlockLanded(U(901), LIVE);
       await quiet(LIVE);
       expect(reads()).toBe(before + 1);
-      expect(rowsOf(parse(StudentCards.render(LIVE)))[0][2]).toBe('Locked');
+      expect(rowsOf(parse(StudentCards.render(LIVE)))[0][2]).toBe('Locked: 5 wrong tries');
     } finally {
       t.session.signOut();
     }
@@ -2228,7 +2233,7 @@ describe('Unlock and Unlock All', () => {
       DashClassManager.classManagerOpen = true;
       await shown(LIVE);
       expect(reads()).toBe(before + 1);
-      expect(rowsOf(parse(StudentCards.render(LIVE)))[0][2]).toBe('Locked');
+      expect(rowsOf(parse(StudentCards.render(LIVE)))[0][2]).toBe('Locked: 5 wrong tries');
     } finally {
       t.session.signOut();
     }
@@ -2438,7 +2443,7 @@ describe('an old card stopped and the new one not printed', () => {
         // The button's own words: Avery and Cam have no card yet, so it makes three.
         "Jordan's old card has stopped, but the new one didn't print. Press Make and Print 3 Cards to print it.",
       ]);
-      expect(rowsOf(box)[0]).toEqual(['Jordan Abel', expect.stringMatching(/^Card 2 · Made /), 'Not Printed']);
+      expect(rowsOf(box)[0]).toEqual(['Jordan Abel', expect.stringMatching(/^Card 2 · Reissued /), 'Not Printed']);
       expect(buttons(box)).toContain('Make and Print 3 Cards');
       // Make and Print prints it, and the line goes.
       t.fetcher.count = () => 0;
@@ -2741,20 +2746,37 @@ const filtersOf = box =>
     b.getAttribute('aria-checked'),
   ]);
 const emptyOf = box => (box.querySelector('.sc-empty') ? box.querySelector('.sc-empty').textContent : null);
-const untilOf = box => ({
-  value: box.querySelector('#sc-until-date').getAttribute('value'),
-  label: box.querySelector('label[for="sc-until-date"]').textContent,
-  hint: box.querySelector('#sc-until-hint').textContent,
-  button: box.querySelector('[data-action="spCardsWorkUntilDefault"]')
-    ? box.querySelector('[data-action="spCardsWorkUntilDefault"]').textContent
-    : null,
-});
+/* Cards Work Until: the menu's choices and the one picked, and the day box
+   beside it (shown for Pick a Day…, or a day picked before), or null. */
+const untilOf = box => {
+  const menu = box.querySelector('#sc-until-pick');
+  const day = box.querySelector('#sc-until-date');
+  const picked = menu.querySelector('option[selected]');
+  return {
+    label: box.querySelector('label[for="sc-until-pick"]').textContent,
+    choices: Array.from(menu.querySelectorAll('option')).map(o => o.textContent),
+    picked: picked ? picked.getAttribute('value') : null,
+    value: day ? day.getAttribute('value') : null,
+    hint: box.querySelector('#sc-until-hint').textContent,
+  };
+};
 const changeDay = (cid, value) =>
   CmStudentPage.handleChange({
     dataset: { actionChange: 'spCardsWorkUntil' },
     value,
     closest: () => ({ dataset: { cid } }),
   });
+const pickUntil = (cid, value) =>
+  CmStudentPage.handleChange({
+    dataset: { actionChange: 'spCardsWorkUntilPick' },
+    value,
+    closest: () => ({ dataset: { cid } }),
+  });
+// A class's reporting periods, where getReportingTerms reads them.
+function withTerms(terms) {
+  seedDemo({ ...ON, reportingTerms: terms });
+  if (!getReportingTerms(CID).length) COURSES[CID].reportingTerms = terms;
+}
 
 describe('the filters', () => {
   const states = () => [
@@ -2781,6 +2803,13 @@ describe('the filters', () => {
         ['Not Printed 2', 'false'],
         ['Locked 1', 'false'],
         ['Never Opened 2', 'false'],
+      ]);
+      // Chips coloured by meaning: Not Printed amber, Locked red.
+      expect(Array.from(box.querySelectorAll('.sc-chip')).map(b => b.className)).toEqual([
+        'sc-chip active',
+        'sc-chip sc-chip-warn',
+        'sc-chip sc-chip-alert',
+        'sc-chip',
       ]);
       expect(rowsOf(box).map(r => r[0])).toEqual(['Jordan Abel', 'Avery Byrne', 'Cam Cole', 'Dee Dunn', 'Eli Eng']);
     } finally {
@@ -2847,6 +2876,8 @@ describe('the filters', () => {
     await afterDraw();
     const box = parse(StudentCards.render(CID));
     expect(filtersOf(box)[1]).toEqual(['Not Printed 0', 'true']);
+    // With nothing in it, Not Printed is not amber.
+    expect(box.querySelector('.sc-chip-warn')).toBe(null);
     expect(emptyOf(box)).toBe('Every student has a printed card.');
   });
 
@@ -2863,7 +2894,7 @@ describe('the filters', () => {
 describe('Cards Work Until', () => {
   afterEach(() => vi.useRealTimers());
 
-  it('Demo Mode: the default with no reporting date ahead is June 30; a chosen day goes on every card; Use June 30 goes back', async () => {
+  it('Demo Mode: the default with no reporting date ahead is June 30; a picked day goes on every card; End of the School Year goes back', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-11-20T18:00:00.000Z'));
     seedDemo();
@@ -2873,10 +2904,11 @@ describe('Cards Work Until', () => {
     await shown(CID);
     let box = parse(StudentCards.render(CID));
     expect(untilOf(box)).toEqual({
-      value: '2027-06-30',
       label: 'Cards Work Until',
-      hint: "A card stops opening after this day. It's June 30 until you choose another day, since the class has no reporting date ahead.",
-      button: null,
+      choices: ['End of the School Year, Jun 30', 'Pick a Day…'],
+      picked: 'course',
+      value: null,
+      hint: 'A card stops opening after this day.',
     });
     expect(changeDay(CID, '2027-01-29')).toBe(true);
     await quiet(CID);
@@ -2884,15 +2916,16 @@ describe('Cards Work Until', () => {
     expect(getCardsWorkUntil(CID).chosen).toBe('2027-01-29');
     box = parse(StudentCards.render(CID));
     expect(untilOf(box)).toEqual({
-      value: '2027-01-29',
       label: 'Cards Work Until',
+      choices: ['End of the School Year, Jun 30', 'Pick a Day…'],
+      picked: 'day',
+      value: '2027-01-29',
       hint: 'A card stops opening after this day.',
-      button: 'Use June 30',
     });
     // A card made now takes the chosen day.
     const made = (await makeStudentCards(CID, [{ enrollment_id: 's2', replaces: null }])).data.results[0];
     expect(made.works_until).toBe('2027-01-29');
-    press('spCardsWorkUntilDefault', CID);
+    pickUntil(CID, 'course');
     await quiet(CID);
     expect(getCardsWorkUntil(CID).chosen).toBe(null);
     expect(localStorage.getItem('gb-cards-work-until-' + CID)).toBe(null);
@@ -2900,31 +2933,59 @@ describe('Cards Work Until', () => {
       '2027-06-30',
       '2027-06-30',
     ]);
-    expect(untilOf(parse(StudentCards.render(CID))).button).toBe(null);
+    expect(untilOf(parse(StudentCards.render(CID)))).toMatchObject({ picked: 'course', value: null });
   });
 
-  it('with a reporting date ahead, that is the default, and the way back says so', async () => {
+  const summaryLine = () => parse(StudentCards.summaryHtml(CID)).querySelector('.cm-hint').textContent;
+
+  it('with one reporting date ahead, that is the End of the Course, and no End of Term is offered', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-11-20T18:00:00.000Z'));
-    seedDemo({ ...ON, reportingTerms: [{ id: 't1', name: 'Term 1', starts_on: '2026-09-02', ends_on: '2027-01-29' }] });
-    const terms = getReportingTerms(CID);
-    if (!terms.length) {
-      // The seed keeps reporting terms on the course; put them where getReportingTerms reads them.
-      COURSES[CID].reportingTerms = [{ id: 't1', name: 'Term 1', starts_on: '2026-09-02', ends_on: '2027-01-29' }];
-    }
+    withTerms([{ id: 't1', name: 'Term 1', starts_on: '2026-09-02', ends_on: '2027-01-29' }]);
     await shown(CID);
     let box = parse(StudentCards.render(CID));
-    expect(untilOf(box).value).toBe('2027-01-29');
-    expect(untilOf(box).hint).toBe(
-      "A card stops opening after this day. It's the class's last reporting date until you choose another day.",
-    );
-    const summaryLine = () => parse(StudentCards.summaryHtml(CID)).querySelector('.cm-hint').textContent;
+    expect(untilOf(box)).toMatchObject({ choices: ['End of the Course, Jan 29', 'Pick a Day…'], picked: 'course' });
     expect(summaryLine()).toBe('Cards work until Jan 29, the end of the course.');
     changeDay(CID, '2027-03-12');
     await quiet(CID);
     box = parse(StudentCards.render(CID));
-    expect(untilOf(box).button).toBe('Use Last Reporting Date');
+    expect(untilOf(box)).toMatchObject({ picked: 'day', value: '2027-03-12' });
     expect(summaryLine()).toBe('Cards work until Mar 12.');
+  });
+
+  it('End of Term is the end of the reporting period under way; Pick a Day… shows the day box and saves nothing', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-20T18:00:00.000Z'));
+    withTerms([
+      { id: 't1', name: 'Term 1', starts_on: '2026-09-02', ends_on: '2026-11-06' },
+      { id: 't2', name: 'Term 2', starts_on: '2026-11-09', ends_on: '2027-01-29' },
+      { id: 't3', name: 'Term 3', starts_on: '2027-02-01', ends_on: '2027-06-25' },
+    ]);
+    await shown(CID);
+    let box = parse(StudentCards.render(CID));
+    expect(untilOf(box)).toMatchObject({
+      choices: ['End of the Course, Jun 25', 'End of Term, Jan 29', 'Pick a Day…'],
+      picked: 'course',
+      value: null,
+    });
+    pickUntil(CID, 'term');
+    await quiet(CID);
+    expect(getCardsWorkUntil(CID).chosen).toBe('2027-01-29');
+    box = parse(StudentCards.render(CID));
+    expect(untilOf(box)).toMatchObject({ picked: 'term', value: null });
+    expect(summaryLine()).toBe('Cards work until Jan 29, the end of the term.');
+    // Pick a Day…: the day box, holding the day as it is; nothing changes until another day goes in.
+    pickUntil(CID, 'day');
+    box = parse(StudentCards.render(CID));
+    expect(untilOf(box)).toMatchObject({ picked: 'day', value: '2027-01-29' });
+    expect(getCardsWorkUntil(CID).chosen).toBe('2027-01-29');
+    changeDay(CID, '2027-04-30');
+    await quiet(CID);
+    expect(untilOf(parse(StudentCards.render(CID)))).toMatchObject({ picked: 'day', value: '2027-04-30' });
+    pickUntil(CID, 'course');
+    await quiet(CID);
+    expect(getCardsWorkUntil(CID).chosen).toBe(null);
+    expect(untilOf(parse(StudentCards.render(CID)))).toMatchObject({ picked: 'course', value: null });
   });
 
   it('a day already past says so, and the cards show Past Its Last Day', async () => {
@@ -3008,7 +3069,7 @@ describe('Cards Work Until', () => {
       expect(getCardsWorkUntil(LIVE)).toMatchObject({ chosen: '2027-06-25', known: true });
       // Back to the default: p_date null.
       t.session.fake.on('set_cards_work_until', () => ({ data: { works_until: '2027-06-30' }, error: null }));
-      press('spCardsWorkUntilDefault', LIVE);
+      pickUntil(LIVE, 'course');
       await dayLanded(LIVE);
       const last = t.session.fake.calls.filter(c => c.name === 'set_cards_work_until').pop();
       expect(last.params.p_date).toBe(null);

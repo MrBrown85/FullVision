@@ -32,10 +32,14 @@
      closes, another tab or class is shown, the teacher signs out, the tab
      closes) or ten minutes pass. After that, printing makes new codes.
 
-   - Cards Work Until: the last day the class's cards open, the class's
-     last reporting date until the teacher picks another
+   - Cards Work Until: the last day the class's cards open, chosen from a
+     menu (DECISIONS, "Student page build answers" 9): End of the Course
+     (the class's last reporting date, the default), End of Term (the end of
+     the class's reporting period now under way) or Pick a Day…
      (set_cards_work_until, through the outbox).
-   - Filters: All, Not Printed, Locked, Never Opened, each with its count.
+   - Filters: All, Not Printed, Locked, Never Opened, each with its count,
+     coloured by what they mean when they hold any (Not Printed amber,
+     Locked red).
 
    The cards come from shared/data.js (listStudentCards, makeStudentCards,
    markStudentCardsPrinted, unlockStudentCard, unlockAllStudentCards): the
@@ -117,6 +121,8 @@ var StudentCards = (function () {
         pressed: 0,
         again: false,
         filter: 'all',
+        // Pick a Day… chosen in the Cards Work Until menu, with no day typed yet.
+        picking: false,
       })
     );
   }
@@ -757,18 +763,29 @@ var StudentCards = (function () {
     return typeof courseToday === 'function' ? courseToday(cid) : new Date().toISOString().slice(0, 10);
   }
 
+  // A card after the first was made to replace one: Reissued.
+  function _reissued(card) {
+    return !!card && Number(card.seq) > 1;
+  }
+
   function _cardText(card) {
     if (!card) return 'No Card Yet';
-    var made = card.created_at ? 'Made ' + _fmtDay(card.created_at) : '';
+    var made = card.created_at ? (_reissued(card) ? 'Reissued ' : 'Made ') + _fmtDay(card.created_at) : '';
     var seq = Number(card.seq) > 0 ? 'Card ' + Number(card.seq) : '';
     return [seq, made].filter(Boolean).join(' · ');
+  }
+
+  // "Locked: 5 wrong tries": the tries that locked it, five in a row or the week's.
+  function _lockedText(card) {
+    var tries = Number(card.wrong_tries) >= 5 ? Number(card.wrong_tries) : Number(card.wrong_tries_7d) || 0;
+    return tries > 0 ? 'Locked: ' + tries + ' wrong tries' : 'Locked';
   }
 
   function _status(cid, card) {
     if (!card) return '';
     if (card.needs_new === true) return 'Needs a New Card';
     if (card.works_until && String(card.works_until).slice(0, 10) < _today(cid)) return 'Past Its Last Day';
-    if (card.locked_at) return 'Locked';
+    if (card.locked_at) return _lockedText(card);
     if (card.last_opened_at) return 'Last Opened ' + _fmtDay(card.last_opened_at);
     if (card.printed_at) return 'Printed ' + _fmtDay(card.printed_at);
     return 'Not Printed';
@@ -783,10 +800,17 @@ var StudentCards = (function () {
       (card ? '' : ' sc-none') +
       '"><th scope="row" class="sc-name">' +
       esc(name) +
-      '</th><td class="sc-which">' +
+      '</th><td class="sc-which' +
+      (_reissued(card) ? ' sc-reissued' : '') +
+      '">' +
       esc(_cardText(card)) +
       '</td><td class="sc-status">' +
-      (status === 'Locked' ? '<span class="sc-lock">Locked</span>' : esc(status)) +
+      // Coloured by meaning: locked red, not printed amber.
+      (card && card.locked_at && status.indexOf('Locked') === 0
+        ? '<span class="sc-lock">' + esc(status) + '</span>'
+        : status === 'Not Printed'
+          ? '<span class="sc-unprinted">' + esc(status) + '</span>'
+          : esc(status)) +
       '</td><td class="sc-do">' +
       (card && card.locked_at
         ? '<button type="button" class="cm-action-btn sc-row-btn" data-action="spCardsUnlock" data-card="' +
@@ -821,6 +845,7 @@ var StudentCards = (function () {
     {
       value: 'not_printed',
       label: 'Not Printed',
+      tone: 'warn',
       empty: 'Every student has a printed card.',
       shows: function (card) {
         return !_handedOut(card);
@@ -829,6 +854,7 @@ var StudentCards = (function () {
     {
       value: 'locked',
       label: 'Locked',
+      tone: 'alert',
       empty: 'No cards are locked.',
       shows: function (card) {
         return !!card && !!card.locked_at;
@@ -855,7 +881,7 @@ var StudentCards = (function () {
   function _filterHtml(st, students, byStudent) {
     var on = _filter(st).value;
     return (
-      '<div class="seg cm-seg sc-filters" role="radiogroup" aria-label="Show">' +
+      '<div class="sc-filters" role="radiogroup" aria-label="Show">' +
       FILTERS.map(function (f) {
         var n = f.shows
           ? students.filter(function (s) {
@@ -864,7 +890,9 @@ var StudentCards = (function () {
           : students.length;
         var chosen = f.value === on;
         return (
-          '<button type="button" class="seg-btn cm-seg-btn' +
+          '<button type="button" class="sc-chip' +
+          // The colour says what it means only when there is something in it.
+          (f.tone && n ? ' sc-chip-' + f.tone : '') +
           (chosen ? ' active' : '') +
           '" role="radio" aria-checked="' +
           chosen +
@@ -883,38 +911,102 @@ var StudentCards = (function () {
 
   /* ── Cards Work Until ──────────────────────────────────────── */
 
+  /* The days the menu offers, from the class's own reporting periods: the
+     end of the course (the default: the class's last reporting date, or
+     June 30 with none ahead, shared/data.js's rule) and the end of the
+     reporting period under way, when that is another day. */
+  function _untilDays(cid) {
+    var today = _today(cid);
+    var course = typeof _demoCardsWorkUntil === 'function' ? _demoCardsWorkUntil(cid) : '';
+    var term = '';
+    (getReportingTerms(cid) || []).forEach(function (t) {
+      var end = t && /^\d{4}-\d{2}-\d{2}$/.test(t.ends_on) ? t.ends_on : '';
+      if (end && end >= today && (!term || end < term)) term = end;
+    });
+    return { course: course, term: term && term !== course ? term : '' };
+  }
+
+  // Which choice the class's day is: 'course', 'term' or 'day'.
+  function _untilKind(cid, until, days) {
+    if (!until.chosen || until.chosen === days.course) return 'course';
+    if (days.term && until.chosen === days.term) return 'term';
+    return 'day';
+  }
+
+  /* Cards Work Until, a menu: End of the Course <day>, End of Term <day>
+     (when the period under way ends before the course), and Pick a Day…,
+     which shows a day box beside it. A day picked before shows in the menu
+     by its date. */
   function _untilHtml(cid, off) {
+    var st = _st(cid);
     var until = getCardsWorkUntil(cid);
+    var days = _untilDays(cid);
+    var kind = st.picking ? 'day' : _untilKind(cid, until, days);
     var hints = ['A card stops opening after this day.'];
     if (until.date && until.date < _today(cid)) hints.push('That day has passed, so no card opens now.');
-    else if (!until.chosen) {
-      hints.push(
-        until.reporting
-          ? "It's the class's last reporting date until you choose another day."
-          : "It's June 30 until you choose another day, since the class has no reporting date ahead.",
-      );
-    }
+    var choices = [
+      {
+        value: 'course',
+        label:
+          (until.reporting ? 'End of the Course, ' : 'End of the School Year, ') + _fmtDay(days.course || until.date),
+      },
+    ];
+    if (days.term) choices.push({ value: 'term', label: 'End of Term, ' + _fmtDay(days.term) });
+    choices.push({ value: 'day', label: 'Pick a Day…' });
+    var dis = off ? ' disabled' : '';
     return (
       '<div class="sc-until">' +
-      '<label class="sp-row-title" for="sc-until-date">Cards Work Until</label>' +
-      '<div class="sc-until-row"><input type="date" class="cm-input sc-until-date" id="sc-until-date"' +
-      ' data-action-change="spCardsWorkUntil" aria-describedby="sc-until-hint" value="' +
-      esc(until.date || '') +
-      '"' +
-      (off ? ' disabled' : '') +
+      '<label class="sp-row-title" for="sc-until-pick">Cards Work Until</label>' +
+      '<div class="sc-until-row"><select class="cm-input sc-until-pick" id="sc-until-pick"' +
+      ' data-action-change="spCardsWorkUntilPick" aria-describedby="sc-until-hint"' +
+      dis +
       '>' +
-      (until.chosen
-        ? '<button type="button" class="cm-action-btn sc-row-btn" data-action="spCardsWorkUntilDefault"' +
-          (off ? ' disabled' : '') +
-          '>' +
-          esc(until.reporting ? 'Use Last Reporting Date' : 'Use June 30') +
-          '</button>'
+      choices
+        .map(function (c) {
+          return (
+            '<option value="' + c.value + '"' + (c.value === kind ? ' selected' : '') + '>' + esc(c.label) + '</option>'
+          );
+        })
+        .join('') +
+      '</select>' +
+      (kind === 'day'
+        ? '<input type="date" class="cm-input sc-until-date" id="sc-until-date" aria-label="Day"' +
+          ' data-action-change="spCardsWorkUntil" aria-describedby="sc-until-hint" value="' +
+          esc(until.chosen ? until.date : '') +
+          '"' +
+          dis +
+          '>'
         : '') +
       '</div>' +
       '<div class="cm-hint" id="sc-until-hint">' +
       esc(hints.join(' ')) +
       '</div></div>'
     );
+  }
+
+  /* A choice in the Cards Work Until menu: End of the Course goes back to
+     the default; End of Term sets that day; Pick a Day… shows the day box,
+     and nothing changes until a day is put in it. */
+  function pickUntil(cid, choice) {
+    var st = _st(cid);
+    if (st.making || st.loading) return null;
+    if (choice === 'day') {
+      st.picking = true;
+      _rerender();
+      _focus('#sc-until-date');
+      return null;
+    }
+    st.picking = false;
+    var days = _untilDays(cid);
+    var out = null;
+    if (choice === 'term' && days.term) out = workUntil(cid, days.term);
+    else if (choice === 'course') out = workUntil(cid, null);
+    // Nothing to change (it is that day already): the menu is drawn again as it is.
+    if (!out) {
+      _rerender();
+      _focus('#sc-until-pick');
+    }
+    return out;
   }
 
   /* Set the class's Cards Work Until (null: back to the default). The list
@@ -925,6 +1017,7 @@ var StudentCards = (function () {
     if (st.making || st.loading) return null;
     var now = getCardsWorkUntil(cid);
     if ((now.chosen || null) === (date || null)) return null;
+    st.picking = false;
     // A read begun before this change is older than it.
     _pressDone(st);
     var out = null;
@@ -939,7 +1032,9 @@ var StudentCards = (function () {
       });
       if (_shown(cid)) {
         _rerender();
-        _focus('#sc-until-date');
+        _focus(
+          _untilKind(cid, getCardsWorkUntil(cid), _untilDays(cid)) === 'day' ? '#sc-until-date' : '#sc-until-pick',
+        );
       }
     });
     return true;
@@ -951,13 +1046,18 @@ var StudentCards = (function () {
     if (el && typeof el.focus === 'function') el.focus({ preventScroll: true });
   }
 
-  // True when the change was one of this card's: the Cards Work Until day.
+  // True when the change was one of this card's: the Cards Work Until menu, or its day.
   function handleChange(el) {
-    if (!el || !el.dataset || el.dataset.actionChange !== 'spCardsWorkUntil') return false;
+    var act = el && el.dataset ? el.dataset.actionChange : '';
+    if (act !== 'spCardsWorkUntil' && act !== 'spCardsWorkUntilPick') return false;
     var box = el.closest ? el.closest('[data-cid]') : null;
     var cid = box ? box.dataset.cid : null;
     var value = String(el.value || '');
     if (!cid) return true;
+    if (act === 'spCardsWorkUntilPick') {
+      if (value === 'course' || value === 'term' || value === 'day') pickUntil(cid, value);
+      return true;
+    }
     if (!value) workUntil(cid, null);
     else if (/^\d{4}-\d{2}-\d{2}$/.test(value)) workUntil(cid, value);
     return true;
@@ -1141,7 +1241,9 @@ var StudentCards = (function () {
     if (!until.date) return '';
     var day = _fmtDay(until.date);
     if (until.date < _today(cid)) return 'Cards stopped working after ' + day + '.';
-    return 'Cards work until ' + day + (!until.chosen && until.reporting ? ', the end of the course.' : '.');
+    var kind = _untilKind(cid, until, _untilDays(cid));
+    if (kind === 'course' && until.reporting) return 'Cards work until ' + day + ', the end of the course.';
+    return 'Cards work until ' + day + (kind === 'term' ? ', the end of the term.' : '.');
   }
 
   /* The Student Cards summary (board "Teacher: Class Settings, Student
@@ -1230,10 +1332,6 @@ var StudentCards = (function () {
       }
       return true;
     }
-    if (action === 'spCardsWorkUntilDefault') {
-      if (cid) workUntil(cid, null);
-      return true;
-    }
     if (action === 'spCardsRetry') {
       if (cid) {
         // At once: it does not wait for the list to be a minute old.
@@ -1279,6 +1377,7 @@ var StudentCards = (function () {
     handleAction: handleAction,
     handleChange: handleChange,
     workUntil: workUntil,
+    pickUntil: pickUntil,
     load: load,
     makeAndPrint: makeAndPrint,
     printNewCard: printNewCard,
