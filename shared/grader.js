@@ -296,6 +296,203 @@ window.Grader = (function () {
     return _saved(cid, ids.length === 1 ? ids[0] : null, aid, 'return', returnGrades(cid, aid, ids));
   }
 
+  /* ── Student work: what is in, and the counts (S6-F3) ──────────────
+     The one place the To Grade, To Return, Returned and Not In counts are
+     worked out (window.GraderWork). The grader dialog's Show bar, the
+     Assignments page, the gradebook's To Grade cells and the dashboard's
+     To Grade cell all call GraderWork.workCounts or classWorkCounts, so
+     they cannot disagree.
+
+     Each student is in at most one of the four, in this order:
+     - toreturn: the piece is a draft (GradeState.stateOf);
+     - returned: the student has their grade (GradeState.stateOf);
+     - tograde: work is in (sent, added by the teacher or handed in on
+       paper) and grading has not started (studentWorkGradingStarted:
+       a draft or returned grade or an Overall Comment);
+     - notin: nothing is in and the piece is not Excused (Missing counts).
+     An Excused student with nothing in is in none, only in All. To Grade
+     and Not In exist only while workOn: the class's student page (the
+     build switch) and Send Work are on and the piece's Students Send is not
+     Nothing. Elsewhere both are 0 and the rest is as GradeState says.
+
+     Counts are students, except To Grade on pair and group work: a pair or
+     group still graded together is one piece of work to grade, so it
+     counts once (the Dashboard board's "A group counts once"). Its members
+     are all listed in ids.tograde. */
+  function _piece(cid, aid) {
+    return (
+      (getAssessments(cid) || []).find(function (a) {
+        return a && a.id === aid;
+      }) || null
+    );
+  }
+
+  /* The build switch and Send Work, both on for the class. */
+  function workOnInClass(cid) {
+    if (!cid || typeof getReturnSettings !== 'function' || typeof getCourseSendWork !== 'function') return false;
+    return !!getReturnSettings(cid).student_page && !!getCourseSendWork(cid).send_work;
+  }
+
+  /* ...and the piece takes work (Students Send is not Nothing). A DIBELS
+     benchmark never does. */
+  function workOn(cid, a) {
+    if (!a || isDibelsScored(a) || !workOnInClass(cid)) return false;
+    return getAssessmentStudentWork(cid, a.id).students_send !== 'nothing';
+  }
+
+  /* 'toreturn', 'returned', 'tograde', 'notin' or null, for one student. */
+  function workStateOf(cid, aid, sid) {
+    var state = GradeState.stateOf(cid, sid, aid);
+    if (state === GradeState.DRAFT) return 'toreturn';
+    if (state === GradeState.RETURNED) return 'returned';
+    if (!workOn(cid, _piece(cid, aid))) return null;
+    if (getStudentSubmission(cid, sid, aid)) return studentWorkGradingStarted(cid, sid, aid) ? null : 'tograde';
+    return getAssignmentStatus(cid, sid, aid) === 'EXC' ? null : 'notin';
+  }
+
+  /* The four counts and All for `aid`, over `studentIds` (the whole class,
+     last-name order, when left out):
+     { tograde, toreturn, returned, notin, all, ids: { tograde, toreturn,
+       returned, notin } }, each list in the order given. */
+  function workCounts(cid, aid, studentIds) {
+    var ids = studentIds
+      ? studentIds.slice()
+      : sortStudents(getStudents(cid) || [], 'lastName').map(function (s) {
+          return s.id;
+        });
+    var lists = { tograde: [], toreturn: [], returned: [], notin: [] };
+    ids.forEach(function (sid) {
+      var k = workStateOf(cid, aid, sid);
+      if (k) lists[k].push(sid);
+    });
+    // A pair or group still graded together counts once in To Grade.
+    var units = lists.tograde.length ? groupGradingUnits(cid, _piece(cid, aid), ids) : null;
+    var tograde = lists.tograde.length;
+    if (units) {
+      tograde = units.filter(function (u) {
+        return (u.linked || [u.sid]).some(function (sid) {
+          return lists.tograde.indexOf(sid) >= 0;
+        });
+      }).length;
+    }
+    return {
+      tograde: tograde,
+      toreturn: lists.toreturn.length,
+      returned: lists.returned.length,
+      notin: lists.notin.length,
+      all: ids.length,
+      ids: lists,
+    };
+  }
+
+  /* The class's totals over every piece: { tograde, toreturn, notin,
+     pieces: [{ aid, tograde, toreturn, notin }] } (only pieces with one of
+     them), for the gradebook's bar and the dashboard's To Grade cell.
+     To Grade is 0 in a class whose work is off. */
+  function classWorkCounts(cid, studentIds) {
+    var out = { tograde: 0, toreturn: 0, notin: 0, pieces: [] };
+    (getAssessments(cid) || []).forEach(function (a) {
+      if (!a || !a.id || isDibelsScored(a)) return;
+      var c = workCounts(cid, a.id, studentIds);
+      out.tograde += c.tograde;
+      out.toreturn += c.toreturn;
+      out.notin += c.notin;
+      if (c.tograde || c.toreturn || c.notin)
+        out.pieces.push({ aid: a.id, tograde: c.tograde, toreturn: c.toreturn, notin: c.notin });
+    });
+    return out;
+  }
+
+  /* The other students on `aid` whose work holds a page that is the same
+     photo as one of `sid`'s, byte for byte (the page's sha256): the
+     "Same photo as" note. Only an exact match; a photo of the same page
+     taken twice is not one. In the order given (the class's last-name
+     order when left out). */
+  function samePhotoAs(cid, aid, sid, studentIds) {
+    var mine = getStudentSubmission(cid, sid, aid);
+    var hashes = {};
+    ((mine && mine.files) || []).forEach(function (f) {
+      if (f && f.sha256) hashes[f.sha256] = true;
+    });
+    if (!Object.keys(hashes).length) return [];
+    var ids = studentIds
+      ? studentIds
+      : sortStudents(getStudents(cid) || [], 'lastName').map(function (s) {
+          return s.id;
+        });
+    return ids.filter(function (other) {
+      if (other === sid) return false;
+      var sub = getStudentSubmission(cid, other, aid);
+      return ((sub && sub.files) || []).some(function (f) {
+        return f && f.sha256 && hashes[f.sha256];
+      });
+    });
+  }
+
+  /* Delete Work: one student's work on `aid` and its photos go for good
+     (Colin's ruling 87). Grades and comments stay. A Promise of
+     data.js deleteStudentWork's answer. */
+  function deleteWork(cid, sid, aid) {
+    return deleteStudentWork(cid, sid, aid);
+  }
+
+  /* Grade From Paper's Set Logan To (S6-F2), for the desktop grader and the
+     phone's not-in card: every criterion (or competency) `sid` has no level
+     for on `aid` is set to `level`, as Set Everyone To does for a class,
+     and the work is recorded as handed in on paper (markStudentWorkOnPaper).
+     Nothing is set on points or Complete/Incomplete work, or for a student
+     marked Missing or Excused. Answers { set, paper }: how many levels were
+     written, and the Promise of markStudentWorkOnPaper's answer. */
+  function setToFromPaper(cid, aid, sid, level) {
+    var a = _piece(cid, aid);
+    var none = { set: 0, paper: Promise.resolve({ result: 'not_set', marked: 0, submissions: [] }) };
+    if (!a || !(level >= 1 && level <= 4) || isPointsScored(a) || isCompletionScored(a) || isDibelsScored(a))
+      return none;
+    if (isScoreLocked(cid, sid, aid)) return none;
+    var groups;
+    if (a.rubricId) {
+      var rubric = getRubricById(cid, a.rubricId);
+      groups = rubric ? (rubric.criteria || []).map(rubricCriterionScoreKeys) : [];
+    } else {
+      groups = scoreTagIds(a, cid).map(function (tid) {
+        return [tid];
+      });
+    }
+    var entries = (getScores(cid)[sid] || []).filter(function (e) {
+      return e && e.assessmentId === aid;
+    });
+    var set = 0;
+    groups.forEach(function (keys) {
+      var scored = keys.some(function (k) {
+        return isScoreEntered(
+          a,
+          entries.find(function (e) {
+            return e.tagId === k;
+          }),
+        );
+      });
+      if (scored) return;
+      keys.forEach(function (k) {
+        setLevel(cid, sid, aid, k, level);
+        set++;
+      });
+    });
+    return { set: set, paper: markStudentWorkOnPaper(cid, aid, [sid]) };
+  }
+
+  /* Reads, and Delete Work, which writes no grade, so they sit apart from
+     the grade actions (tests/grader.test.js holds Grader to those). */
+  window.GraderWork = {
+    workOnInClass: workOnInClass,
+    workOn: workOn,
+    workStateOf: workStateOf,
+    workCounts: workCounts,
+    classWorkCounts: classWorkCounts,
+    samePhotoAs: samePhotoAs,
+    setToFromPaper: setToFromPaper,
+    deleteWork: deleteWork,
+  };
+
   return {
     setLevel: setLevel,
     setPlusMinus: setPlusMinus,
