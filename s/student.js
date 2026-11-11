@@ -101,6 +101,7 @@ var StudentPage = (function () {
       demoSent: {},
       // Reflect on Feedback (s/reflect.js, S10): Demo Mode's switch, what the sample has sent (s/feedback.js), the screen.
       demoReflect: false,
+      demoGroup: false, // #demo-card-group: a piece sent as One per Group (s/feedback.js, S12-F1)
       demoReflections: null,
       reflect: null,
       sendAsk: null,

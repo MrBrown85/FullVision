@@ -470,6 +470,23 @@
      plan 1.2). Some work is returned, some is a draft, one returned grade
      has a newer draft over it, and some is not graded. */
   function demoClass() {
+    var cls = demoScience();
+    // #demo-card-group: one more piece, sent by Cece's group (S12-F1); every other demo is as it was.
+    if (demo && demo.group) {
+      cls.work.unshift({
+        id: 'demo-cell-model',
+        title: 'Cell Model Project',
+        date: isoDay(-3),
+        due_date: isoDay(5),
+        tag_ids: ['demo-com'],
+        unit: 'Unit 1: Cells',
+        category: 'Projects',
+        about: 'With your group, build a model of a plant or animal cell. Label every part.',
+      });
+    }
+    return cls;
+  }
+  function demoScience() {
     function level(tagId, value, modifier) {
       return { tag_id: tagId, value: value, modifier: modifier || 0, comment: null };
     }
@@ -2060,7 +2077,8 @@
   function startDemo(hash) {
     // #demo-card-send: the sample class with Send Work on (S5-F2); off, as in every class, otherwise.
     // #demo-card-reflect: Send Work and Reflect on Feedback both on (S10).
-    var m = /^demo-card(?:-(password|letter|both|send|reflect))?$/i.exec(hash || '');
+    // #demo-card-group: Send Work on, and a piece sent as One per Group (S12-F1).
+    var m = /^demo-card(?:-(password|letter|both|send|reflect|group))?$/i.exec(hash || '');
     if (!m) return false;
     var kind = (m[1] || '').toLowerCase();
     demo = {
@@ -2070,10 +2088,12 @@
       wrong: 0,
       seen: {},
       classes: [],
+      group: kind === 'group',
     };
     adding = null;
     S.demo = true;
-    S.demoSend = kind === 'send' || kind === 'reflect';
+    S.demoSend = kind === 'send' || kind === 'reflect' || kind === 'group';
+    S.demoGroup = kind === 'group';
     S.demoReflect = kind === 'reflect';
     S.typed = prettyCode(DEMO.code);
     S.screen = 'cardstart';

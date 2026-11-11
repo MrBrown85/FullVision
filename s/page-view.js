@@ -295,7 +295,12 @@ window.StudentPageView = (function () {
     if (p.kind === 'back' && p.updated) out.push(['updated', 'Updated ' + fmtDate(p.updatedAt || p.returnedAt, DAY)]);
     else if (p.kind === 'back') out.push(['back', 'Returned ' + fmtDate(p.returnedAt, DAY)]);
     else if (p.kind === 'missing') out.push(['missing', 'Missing']);
-    else if (p.kind === 'sent') out.push(['sent', 'Sent ' + fmtDate(p.send && p.send.sent && p.send.sent.at, DAY)]);
+    else if (p.kind === 'sent') {
+      var at = (p.send && p.send.sent && p.send.sent.at) || (p.group && p.group.sentAt) || '';
+      out.push(['sent', at ? 'Sent ' + fmtDate(at, DAY) : 'Sent']);
+    }
+    // One per Group (S12-F1, the board's "Group" tag).
+    if (p.group) out.push(['quiet', 'Group']);
     if (p.kind !== 'back' && p.kind !== 'sent' && due) out.push(['due', due]);
     if (p.late) out.push(['quiet', 'Late']);
     return out
@@ -410,6 +415,39 @@ window.StudentPageView = (function () {
     );
   }
 
+  /* A piece sent as One per Group (S12-F1, the board "Student: Group
+     Work"): when the group's work went in and how many photos, how many
+     are in the group, whether the student sent any of it, and Add a Page
+     while the piece still takes work and the student has sent none of
+     their own (their own send, added to the group's). Counts only: the
+     server sends no group-mate's name, so the board's name chips are not
+     drawn. Before anyone has sent it, the usual Send My Work. */
+  function groupBlockHtml(p) {
+    var g = p.group;
+    var size = g.members + ' in your group';
+    if (!g.sent) {
+      return (
+        '<p class="sp-group-line">' +
+        esc(size + '. One of you sends it for the whole group.') +
+        '</p>' +
+        sendBlockHtml(p)
+      );
+    }
+    var open = p.send && p.send.takes && p.send.open && !(p.send.sent && p.send.sent.pages);
+    return (
+      '<div class="sp-group"><p class="sp-group-sent">' +
+      esc([g.sentAt ? 'Sent ' + fmtDate(g.sentAt, DAY) : 'Sent', photosWord(g.pages)].filter(Boolean).join(SEP)) +
+      '</p><p class="sp-group-line">' +
+      esc(size + '. ' + (g.youSent ? 'You sent pages for your group.' : 'Someone in your group sent it.')) +
+      '</p></div>' +
+      (open
+        ? '<button type="button" class="sp-btn sp-btn-tint sp-btn-big" data-act="send-open" data-piece="' +
+          esc(p.id) +
+          '">Add a Page</button>'
+        : '')
+    );
+  }
+
   /* On a card sent and not back yet: the pages, and either who is grading
      it, or that it can still be changed with Replace Photos and Unsend. */
   function sentBlockHtml(p, teacher) {
@@ -473,8 +511,8 @@ window.StudentPageView = (function () {
       (p.kind === 'due' ? planHtml(p) : '') +
       (p.kind === 'back' ? resultRows(p) + updatedNoteHtml(p, teacher) : '') +
       (p.kind === 'back' ? cardCommentHtml(p, teacher) : '') +
-      (p.kind === 'sent' ? sentBlockHtml(p, teacher) : '') +
-      (todo ? gradedOnHtml(p) + coreHtml(p) + sendBlockHtml(p) : '') +
+      (p.kind === 'sent' ? (p.group ? groupBlockHtml(p) : sentBlockHtml(p, teacher)) : '') +
+      (todo ? gradedOnHtml(p) + coreHtml(p) + (p.group ? groupBlockHtml(p) : sendBlockHtml(p)) : '') +
       (hasFeedback(p)
         ? '<button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="feedback" data-piece="' +
           esc(p.id) +

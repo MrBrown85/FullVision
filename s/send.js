@@ -49,6 +49,8 @@
     'demo-fair': { students_send: 'photos_files', after: 'keep' },
     'demo-poster': { students_send: 'photos', after: 'keep', graded: true },
     'demo-quick': { students_send: 'photos', after: 'stop' },
+    // #demo-card-group only (S12-F1): a group piece; a group-mate's pages are in, Cece's are not.
+    'demo-cell-model': { students_send: 'photos', after: 'keep' },
   };
 
   function today() {
