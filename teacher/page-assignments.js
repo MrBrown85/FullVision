@@ -14173,7 +14173,7 @@ window.PageAssignments = (function () {
       : 'The ' + (yours === 1 ? 'page' : yours + ' pages') + ' you added for ' + first;
     return (
       what +
-      ' for ' +
+      (theirs ? ' for ' : ' on ') +
       (a.title || 'this work') +
       (files.length === 1 ? ' is' : ' are') +
       ' deleted, and ' +

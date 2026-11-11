@@ -341,6 +341,25 @@ describe('Delete Work (ruling 102, item 9)', () => {
     );
   });
 
+  it('names the pages when every one is the teacher’s', () => {
+    const overlay = openGrader(
+      () => {
+        seed();
+        const work = getCourseSubmissions(CID);
+        work.submissions.push(
+          sub(DEE, [file('d1', 1, 'hd1', 'teacher'), file('d2', 2, 'hd2', 'teacher')], { sent_by: 'teacher' }),
+        );
+        saveDemoStudentWork(CID, work);
+      },
+      CID,
+      PIECE,
+      DEE,
+    );
+    expect(ask(overlay).message).toBe(
+      'The 2 pages you added for Dee on Conscription are deleted, and Dee can send it again. Dee’s grade and your comments stay. Deleted photos can’t come back.',
+    );
+  });
+
   it('a Yes that comes after the dialog moved to another student deletes nothing', async () => {
     const overlay = openGrader(seed, CID, PIECE, ANA);
     const c = ask(overlay);
