@@ -12734,8 +12734,9 @@ window.PageAssignments = (function () {
     // the dialog again itself when what Show lists has run out.
     if (_refreshGraderShow(dialog, cid, a)) return;
     var grade = _graderGrade(cid, a, sid);
-    // The dialog's first .grader-grade, as it always was (see S6-T1's PR).
-    var pill = dialog.querySelector('.grader-grade');
+    // The foot's: a member graded separately has a grade of her own in the
+    // members card, above it.
+    var pill = foot.querySelector('.grader-grade');
     pill.textContent = grade.text;
     pill.className = 'grader-grade' + (grade.tone ? ' tone-' + grade.tone : '');
     // A DIBELS benchmark has no grade: its footer shows the ORF and Maze levels.
