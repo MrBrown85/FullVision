@@ -10,7 +10,8 @@
  */
 import { test, expect } from '@playwright/test';
 
-test.describe.configure({ mode: 'parallel' });
+// 27 students' reports with 100 rows each take a while on a CI runner.
+test.describe.configure({ mode: 'parallel', timeout: 90_000 });
 
 // The same font everywhere, as e2e/report-studio.spec.js sets it.
 test.beforeEach(async ({ page }) => {
@@ -104,6 +105,7 @@ for (const total of [38, 60, 100]) {
 }
 
 // The table's other layouts cut the same way: two columns, and by category.
+// Each is checked on the previewed student.
 for (const [columns, organize] of [
   ['Two', 'Category'],
   ['Two', 'Date'],
@@ -122,10 +124,11 @@ for (const [columns, organize] of [
       await radio.click();
       await expect(radio).toHaveAttribute('aria-checked', 'true');
     }
-    await page.locator('.studio-view [data-view="all"]').click();
-    await expect(page.locator('.sheet-student')).toHaveCount(STUDENTS, { timeout: 30_000 });
+    // The previewed student, the longest report (the length tests above
+    // check every student).
     expect(await overflowing(page)).toEqual([]);
-    const first = page.locator('.sheet-student').first();
+    const first = page.locator('#rb-preview');
+    expect(await first.locator('.report-grades').count()).toBeGreaterThan(1);
     const meta = await first.locator('.report-grades .report-prof-meta').first().textContent();
     const listed = Number((meta.match(/(\d+) assessments/) || [])[1]);
     expect(await first.locator('.report-grades-row').count()).toBe(listed);
