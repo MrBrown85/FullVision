@@ -392,35 +392,8 @@
   /* The frame every tab of the page sits in: the class and Done, which
      stay in reach as the page scrolls, then the tab's own body.
      assignments.js draws the first tab. */
-  var CHEVRON =
-    '<svg class="sp-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6"/></svg>';
   var PLUS =
     '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>';
-
-  /* The class's name is the way to Switching Classes: pressed, it opens
-     Your Classes, every class this device's session has opened, and Add
-     Another Card. */
-  function pageFrame(state, body) {
-    var course = (state.page && state.page.course) || {};
-    return (
-      '<header class="sp-head sp-head-page"><div class="sp-head-words">' +
-      '<button type="button" class="sp-head-title sp-head-switch" data-act="classes-open" aria-haspopup="dialog" aria-expanded="' +
-      (state.sheet ? 'true' : 'false') +
-      '">' +
-      esc(className(course)) +
-      CHEVRON +
-      '</button><div class="sp-head-sub">' +
-      esc(TITLE) +
-      '</div></div>' +
-      '<button type="button" class="sp-btn sp-btn-quiet sp-btn-small sp-done" data-act="card-done">Done</button>' +
-      '</header>' +
-      '<main class="sp-main sp-page">' +
-      body +
-      demoNote(state, 'This is Demo Mode. Cece and her results are samples.') +
-      '</main>' +
-      (state.sheet ? classesSheet(state.page) : '')
-    );
-  }
 
   /* Your Classes (the artboard's "Switching Classes"): the classes this
      device's session has opened, the one showing ticked, then Add Another
@@ -1085,6 +1058,7 @@
     forget();
     if (typeof StudentData !== 'undefined') StudentData.use(null);
     S.page = null;
+    S.reply = null;
   }
 
   /* Signed out: the session is forgotten, the page's data is dropped and
@@ -1269,6 +1243,11 @@
     // The header stays over the top of the list: a row under it is not on screen.
     var head = document.querySelector('.sp-head');
     var under = (head && head.offsetHeight) || 0;
+    // On a phone the tabs sit over the bottom of the list: a row under them is not on screen either.
+    var bar = document.querySelector('.sp-tabs-bottom');
+    var rect = bar && typeof bar.getBoundingClientRect === 'function' ? bar.getBoundingClientRect() : null;
+    var over =
+      rect && typeof window.innerHeight === 'number' && rect.top > window.innerHeight / 2 ? bar.offsetHeight || 0 : 0;
     w.observer = new IntersectionObserver(
       function (entries) {
         entries.forEach(function (entry) {
@@ -1278,7 +1257,7 @@
         });
         if (watching === w) shown();
       },
-      { rootMargin: '-' + under + 'px 0px 0px 0px', threshold: 0.6 },
+      { rootMargin: '-' + under + 'px 0px -' + over + 'px 0px', threshold: 0.6 },
     );
     Array.prototype.forEach.call(rows, function (row) {
       w.observer.observe(row);
@@ -1533,10 +1512,43 @@
     session.enrollment = enrollment;
     if (session.kept) keep(session);
     S.page = null;
+    S.reply = null;
     if (typeof StudentData !== 'undefined') StudentData.use(null);
     S.heading = TITLE;
     S.screen = 'loading';
     return openPage();
+  }
+
+  /* A tab, one of To Do, Sent and Back, or All Assignments. The page's data
+     is already here: nothing is asked. The rows on screen change, so what
+     is watched for "opened" starts again. */
+  var TAB_IDS = { assignments: 1, learning: 1, questionnaires: 1, reports: 1 };
+  var SEGMENT_IDS = { todo: 1, sent: 1, back: 1 };
+  function showPart(act, el) {
+    if (!S.page || S.screen !== 'assignments') return;
+    var focus = '.sp-page-title';
+    if (act === 'tab') {
+      var tab = el.getAttribute('data-tab') || '';
+      if (!has(TAB_IDS, tab)) return;
+      S.tab = tab;
+      S.all = false;
+      // The focus stays on the tab pressed, in the bar it was pressed in.
+      focus = (el.closest && el.closest('.sp-tabs-top') ? '.sp-tabs-top' : '.sp-tabs-bottom') + ' .sp-tab-on';
+    } else if (act === 'segment') {
+      var seg = el.getAttribute('data-segment') || '';
+      if (!has(SEGMENT_IDS, seg)) return;
+      S.segment = seg;
+      S.all = false;
+      focus = '.sp-segment-on';
+    } else {
+      S.tab = 'assignments';
+      S.all = act === 'all-open';
+    }
+    S.sheet = false;
+    stopWatchingRows();
+    paint(focus);
+    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') window.scrollTo(0, 0);
+    watchRows();
   }
 
   function openSheet() {
@@ -1575,6 +1587,19 @@
       '../shared/calc.js',
       function () {
         return typeof assessmentCellValue === 'function';
+      },
+    ],
+    // What the page draws from (S4-F1); index.html names it, so it is fetched only for an older copy.
+    [
+      '../shared/student-view.js',
+      function () {
+        return typeof StudentView !== 'undefined';
+      },
+    ],
+    [
+      'page-view.js',
+      function () {
+        return typeof StudentPageView !== 'undefined';
       },
     ],
   ];
@@ -1626,6 +1651,7 @@
       forget();
     }
     S.page = null;
+    S.reply = null;
     if (typeof StudentData !== 'undefined') StudentData.use(null);
     S.message = MESSAGES[words || 'card_network'];
     S.again = !words;
@@ -1659,6 +1685,13 @@
         mine.expires = String(res.expires_at);
         if (mine.kept) keep(mine);
       }
+      // A class opened afresh starts on Assignments, To Do.
+      if (!S.page) {
+        S.tab = 'assignments';
+        S.segment = 'todo';
+        S.all = false;
+      }
+      S.reply = res;
       S.page = StudentData.fromServer(res);
       StudentData.use(S.page);
       // What the student typed to get in is not kept once they are in.
@@ -1728,6 +1761,7 @@
     session.active = Date.now();
     if (!S.demo) keep(session);
     S.page = null;
+    S.reply = null;
     if (typeof StudentData !== 'undefined') StudentData.use(null);
     return openPage();
   }
@@ -1848,6 +1882,8 @@
       }
     } else if (act === 'card-back') {
       backToPage();
+    } else if (act === 'tab' || act === 'segment' || act === 'all-open' || act === 'all-close') {
+      showPart(act, el);
     } else if (act === 'page-retry') {
       openPage();
     } else if (act === 'grades-retry') {
@@ -1914,7 +1950,7 @@
     });
   }
 
-  StudentPage.pageFrame = pageFrame;
+  StudentPage.classesSheet = classesSheet;
 
   StudentPage.addScreens({
     file: 'app',

@@ -103,6 +103,10 @@ var StudentPage = (function () {
       again: false, // a card's page couldn't be reached: offer Try Again
       from: '', // 'card' when the code was typed on one of the card's screens
       sheet: false, // a card's page: Your Classes is open over it (app.js)
+      reply: null, // a card's page: the server's `page` reply, which student-view.js draws from
+      tab: 'assignments', // a card's page: assignments | learning | questionnaires | reports
+      segment: 'todo', // the Assignments tab: todo | sent | back
+      all: false, // the Assignments tab: All Assignments is showing
     };
   }
 

@@ -102,17 +102,10 @@ window.PreviewStudent = (function () {
   /* The page inside the device, from StudentView's view. The real
      student page's screens replace this one function. */
   function drawPage(view) {
-    var rows = view.work.length
-      ? '<ul class="ps-list">' + view.work.map(rowView).map(rowHtml).join('') + '</ul>'
-      : '<p class="ps-empty">No assignments yet.</p>';
-    return (
-      '<div class="ps-page-head"><div class="ps-page-class">' +
-      esc(className(view.course)) +
-      '</div><div class="ps-page-sub">Student Page</div></div>' +
-      '<div class="ps-page-main"><h3 class="ps-page-title">Assignments</h3>' +
-      rows +
-      '</div>'
-    );
+    /* The student page's own drawing (s/page-view.js, S4-F1): the same HTML
+       the student's phone draws for this view, opened on All Assignments so
+       every piece and its result is in sight. */
+    return StudentPageView.html(view, { all: true });
   }
 
   /* ── The two lists ─────────────────────────────────────────── */

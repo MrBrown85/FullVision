@@ -31,8 +31,9 @@ const TODAY = new Date().toISOString().slice(0, 10);
 const KEY = 'fv-s-session';
 const SIGNED_OUT = 'You are signed out. Scan or type your card to open your page again.';
 
+// Every piece, as All Assignments lists it (S4-F1: the tab opens on To Do).
 const rows = page =>
-  [...page.root().querySelectorAll('.sp-row')].map(li => ({
+  (page.showAll(), [...page.root().querySelectorAll('.sp-row')]).map(li => ({
     title: li.querySelector('.sp-row-title').textContent,
     sub: (li.querySelector('.sp-row-sub') || {}).textContent || '',
     result: (li.querySelector('.sp-row-result') || {}).textContent || '',
@@ -46,6 +47,7 @@ const alertText = page => (page.root().querySelector('[role="alert"]') || {}).te
    server at once. A piece counts as opened only once its row has been on
    screen (tests/student-card-session.test.js has that rule's own tests). */
 async function scrollThroughAll(page) {
+  page.showAll();
   page.onScreen(() => true);
   page.advance(700); // on screen long enough to count
   await page.T.tellSeen();
@@ -105,9 +107,10 @@ describe('a real card: the code, Is This You?, the Assignments list', () => {
     expect(dev.fn.sql.map(q => q.fn)).toEqual(['card', 'verify_card', 'page', 'seen']);
     expect(dev.fn.sql[1].add).toBe(false);
 
-    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
-    expect(page.root().querySelector('.sp-head-title').textContent).toBe('Science 8 · Block B');
-    expect(page.root().querySelector('.sp-head-sub').textContent).toBe('Student Page');
+    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
+    // The class's name and its block, as the board draws them (S4-F1).
+    expect(page.root().querySelector('.sp-head-title').textContent).toBe('Science 8');
+    expect(page.root().querySelector('.sp-pill').textContent).toBe('Block B');
     expect(rows(page).map(r => r.title)).toEqual([
       'Science Fair Proposal',
       'Disease Research Poster',
@@ -162,7 +165,7 @@ describe('a real card: the code, Is This You?, the Assignments list', () => {
       student_number: null,
       password: null,
     });
-    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
   });
 
   it('a card with nothing on file asks for the card’s password and sends it', async () => {
@@ -179,7 +182,7 @@ describe('a real card: the code, Is This You?, the Assignments list', () => {
       student_number: null,
       password: '4821',
     });
-    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
   });
 
   it('a password printed before a birthday was added still works: the box takes either', async () => {
@@ -190,7 +193,7 @@ describe('a real card: the code, Is This You?, the Assignments list', () => {
     page.type('#sp-ident', '4821');
     await page.click('[data-act="card-yes"]');
     expect(page.calls[1].body).toMatchObject({ student_number: '4821', password: '4821', birthday: null });
-    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
   });
 
   it('a code typed on the slip screen opens the card too', async () => {
@@ -425,7 +428,7 @@ describe('a card that won’t open says why', () => {
     expect(page.root().querySelector('[data-act="card-yes"]').hasAttribute('disabled')).toBe(false);
     offline = false;
     await page.click('[data-act="card-yes"]');
-    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
   });
 
   it('a code typed on the card’s screen that opens nothing gets the card’s words, and stays there', async () => {
@@ -533,7 +536,7 @@ describe('the page won’t open: each refusal has its line', () => {
     expect(dev.store[KEY]).toBe(kept);
     offline = false;
     await page.click('[data-act="page-retry"]');
-    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
     expect(row(page, 'Cell Structure Quiz').result).toBe('8 / 10');
   });
 
@@ -592,7 +595,7 @@ describe('the session: one token, kept until midnight, Done or fifteen idle minu
     const token = JSON.parse(dev.store[KEY]).t;
     const page = await dev.open('');
     expect(page.calls.map(c => c.body)).toEqual([{ route: 'page', session: token, enrollment_id: CECE }]);
-    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
     expect(row(page, 'Energy Transfer Investigation').result).toBe('4.0');
     expect(dev.store[KEY]).toBeTruthy();
   });
@@ -606,7 +609,7 @@ describe('the session: one token, kept until midnight, Done or fifteen idle minu
     expect(page.root().querySelector('.sp-head-title').textContent).toBe('Student Page');
     expect(page.root().querySelector('.sp-row')).toBeNull();
     await page.settle();
-    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
   });
 
   it('Done ends it: the server is told, the token is gone, and nothing of the student is left on the page', async () => {
@@ -660,7 +663,7 @@ describe('the session: one token, kept until midnight, Done or fifteen idle minu
     const page = await signIn(dev);
     const ends = Date.parse(JSON.parse(dev.store[KEY]).x);
     page.T.checkSession(ends - 1000);
-    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
     expect(dev.store[KEY]).toBeTruthy();
     page.T.checkSession(ends);
     expect(page.root().querySelector('.sp-row')).toBeNull();
@@ -691,7 +694,7 @@ describe('the session: one token, kept until midnight, Done or fifteen idle minu
     const dev = school();
     const first = await signIn(dev);
     const second = await dev.open('');
-    expect(second.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(second.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
     await second.click('[data-act="card-done"]');
     first.T.checkSession();
     expect(first.root().querySelector('.sp-row')).toBeNull();
@@ -705,11 +708,11 @@ describe('the session: one token, kept until midnight, Done or fifteen idle minu
     await page.start('#P3R8-WDK4');
     page.type('#sp-ident', '0123456');
     await page.click('[data-act="card-yes"]');
-    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
     expect(row(page, 'Cell Structure Quiz').result).toBe('8 / 10');
     // The session's check does not mistake "nothing kept" for "signed out elsewhere".
     page.T.checkSession();
-    expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
     // Its midnight still takes the page down.
     const token = Object.keys(dev.fn.state.sessions)[0];
     page.T.checkSession(Date.parse(dev.fn.state.sessions[token].expires) + 1);
@@ -741,7 +744,7 @@ describe('the session: one token, kept until midnight, Done or fifteen idle minu
     const kept = JSON.parse(dev.store[KEY]);
     dev.store[KEY] = JSON.stringify(Object.assign(kept, { x: '2099-06-30T07:00:00.123456+00:00' }));
     const next = await dev.open('');
-    expect(next.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
+    expect(next.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
   });
 
   it('what is kept is only ever a token: anything else found there is not used', async () => {

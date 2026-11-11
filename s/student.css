@@ -665,100 +665,13 @@ button {
 .sp-away #app {
   visibility: hidden;
 }
-/* The page's header: the class on the left, Done on the right, both in
-   reach as the list scrolls. */
-.sp-head-page {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+/* The page for one class (s/page-view.js, styled by s/page-view.css) fills
+   the window, the full width of a Chromebook as on its board. */
+.sp-app:has(> .sp-view) {
+  max-width: none;
 }
-.sp-head-words {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.sp-done {
-  flex: none;
-  padding: 0 18px;
-}
-.sp-page {
-  gap: 10px;
-}
-.sp-page-title:focus {
-  outline: none;
-}
-.sp-page-title {
-  margin: 4px 4px 2px;
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.2;
-}
-.sp-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  background: var(--sp-card);
-  border-radius: 14px;
-  box-shadow: var(--sp-shadow);
-  overflow: hidden;
-}
-.sp-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 56px;
-  padding: 10px 14px;
-}
-.sp-row + .sp-row {
-  border-top: 1px solid var(--sp-fill);
-}
-.sp-dot {
-  flex: none;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--sp-field);
-}
-.sp-dot-back {
-  background: var(--sp-green);
-}
-.sp-dot-missing {
-  background: var(--sp-amber);
-}
-.sp-row-text {
+.sp-app > .sp-view {
   flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.sp-row-title {
-  font-size: 16px;
-  font-weight: 500;
-  line-height: 1.3;
-  overflow-wrap: anywhere;
-}
-.sp-row-sub {
-  font-size: 13px;
-  line-height: 1.35;
-  color: var(--sp-text-2);
-}
-.sp-row-result {
-  flex: none;
-  max-width: 45%;
-  font-size: 16px;
-  font-weight: 700;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-.sp-empty {
-  padding: 24px 4px;
-  color: var(--sp-text-2);
-}
-.sp-page .sp-demo-note {
-  margin-top: 8px;
 }
 
 /* Phone-only and Chromebook-only blocks (S3-F3). */
@@ -807,24 +720,6 @@ button {
   width: 100%;
   border-radius: 14px;
   min-height: 52px;
-}
-
-/* The class's name in the page's header opens Your Classes. */
-.sp-head-switch {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 100%;
-  min-height: 32px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  text-align: left;
-  color: var(--sp-text);
-}
-.sp-chevron {
-  flex: none;
 }
 
 /* Your Classes (the artboard's "Switching Classes"): a sheet from the
@@ -1137,15 +1032,5 @@ button {
     width: 440px;
     max-width: 100%;
     margin: 0 auto;
-  }
-  /* The page for one class gets a wider column. */
-  .sp-app:has(.sp-page) {
-    max-width: 760px;
-  }
-  .sp-page {
-    padding: 24px;
-  }
-  .sp-page-title {
-    font-size: 26px;
   }
 }

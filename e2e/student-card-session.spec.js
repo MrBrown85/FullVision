@@ -16,6 +16,7 @@ import {
   shot,
   contrast,
   signIn,
+  showAll,
 } from './student-card-fake.js';
 
 /* The card session's rules in a real browser (S0-W1, after PR 998's review
@@ -280,7 +281,8 @@ test.describe('before the page knows whether a code is a card or a slip', () => 
     await page.getByLabel('Month').selectOption('5');
     await page.getByLabel('Day').selectOption('15');
     await page.getByRole('button', { name: 'Yes, That’s Me' }).tap();
-    await expect(page.getByRole('heading', { name: 'Assignments' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
+    await showAll(page);
     await named(page);
   });
 
@@ -295,7 +297,8 @@ test.describe('before the page knows whether a code is a card or a slip', () => 
     await page.keyboard.type('0123456');
     await expect(page.getByLabel('Student Number')).toHaveValue('0123456');
     await page.keyboard.press('Enter');
-    await expect(page.getByRole('heading', { name: 'Assignments' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
+    await showAll(page);
     // One wrong try was counted, not two.
     expect(fn.logs.map(l => l.outcome)).toEqual(['ok', 'wrong_identity', 'ok', 'ok']);
   });
@@ -313,7 +316,8 @@ test.describe('before the page knows whether a code is a card or a slip', () => 
     await page.keyboard.type('4821');
     await expect(page.getByLabel('Password')).toHaveValue('4821');
     await page.keyboard.press('Enter');
-    await expect(page.getByRole('heading', { name: 'Assignments' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
+    await showAll(page);
   });
 });
 
@@ -541,7 +545,8 @@ test.describe('fifteen minutes with no activity', () => {
     await two.clock.install();
     const twoPosts = await serve(two, fn);
     await two.goto('/s/');
-    await expect(two.getByRole('heading', { name: 'Assignments' })).toBeVisible();
+    await expect(two.getByRole('heading', { name: 'Assignments' })).toBeAttached();
+    await showAll(two);
 
     // Ten minutes on, the student is working in the second tab.
     await page.clock.fastForward(10 * MIN);
@@ -598,10 +603,13 @@ test.describe('"opened" means the row was on screen', () => {
   const onScreen = page =>
     page.evaluate(() => {
       const top = document.querySelector('.sp-head').getBoundingClientRect().bottom;
+      // On a phone the tabs sit over the bottom of the screen.
+      const tabs = document.querySelector('.sp-tabs-bottom').getBoundingClientRect();
+      const bottom = tabs.top > window.innerHeight / 2 ? tabs.top : window.innerHeight;
       return [...document.querySelectorAll('.sp-row')]
         .filter(el => {
           const b = el.getBoundingClientRect();
-          const seen = Math.min(b.bottom, window.innerHeight) - Math.max(b.top, top);
+          const seen = Math.min(b.bottom, bottom) - Math.max(b.top, top);
           return seen >= b.height * 0.6;
         })
         .map(el => el.querySelector('.sp-row-title').textContent);
@@ -691,6 +699,7 @@ test.describe('"opened" means the row was on screen', () => {
     await page.waitForTimeout(1500);
     expect(sent(fn, posts).flat()).not.toContain('Piece 39');
     await page.reload();
+    await showAll(page);
     await expect(page.locator('.sp-row')).toHaveCount(39);
     await expect(row(page, 'Piece 39').locator('.sp-row-sub')).toHaveText(/· Updated$/);
   });
@@ -703,6 +712,7 @@ test.describe('"opened" means the row was on screen', () => {
     await expect(row(page, 'Piece 39').locator('.sp-row-sub')).toHaveText(/· Updated$/);
     // The list is loaded again: still marked, never having been on screen.
     await page.reload();
+    await showAll(page);
     await expect(page.locator('.sp-row')).toHaveCount(39);
     await expect(row(page, 'Piece 39').locator('.sp-row-sub')).toHaveText(/· Updated$/);
     // Scrolled to: told to the server; the mark stays for this visit.
@@ -712,6 +722,7 @@ test.describe('"opened" means the row was on screen', () => {
     await expect(row(page, 'Piece 39').locator('.sp-row-sub')).toHaveText(/· Updated$/);
     // The next time the list is loaded, it is gone.
     await page.reload();
+    await showAll(page);
     await expect(page.locator('.sp-row')).toHaveCount(39);
     await expect(row(page, 'Piece 39').locator('.sp-row-sub')).not.toHaveText(/Updated/);
   });
@@ -735,6 +746,9 @@ test.describe('"opened" means the row was on screen', () => {
     });
     posts.length = 0;
     await page.reload();
+    // All Assignments, pressed while the tab is still covered.
+    await page.locator('[data-act="all-open"]').waitFor({ state: 'attached' });
+    await page.evaluate(() => document.querySelector('[data-act="all-open"]').click());
     await expect(page.locator('.sp-row')).toHaveCount(9);
     await expect(page.locator('#app')).toHaveCSS('visibility', 'hidden');
     await page.waitForTimeout(1500);
@@ -756,7 +770,8 @@ test.describe('"opened" means the row was on screen', () => {
     await page.getByRole('button', { name: 'Continue' }).tap();
     await page.getByLabel('Student Number').fill('1234567');
     await page.getByRole('button', { name: 'Yes, That’s Me' }).tap();
-    await expect(page.getByRole('heading', { name: 'Assignments' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
+    await showAll(page);
     await page.waitForTimeout(1200);
     expect(routes(posts)).toEqual([]);
   });
