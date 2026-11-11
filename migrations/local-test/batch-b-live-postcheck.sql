@@ -12,7 +12,8 @@
 -- live functions they call are untouched; the four tables are there with
 -- row security on, no policy, and nothing readable or writable through the
 -- API; who can run what; the triggers; the new columns with their defaults;
--- the bucket, private, 2 MB, JPEG only; the four policies on
+-- the plain index the trigger on assessment deletes by; the bucket,
+-- private, 2 MB, JPEG only, versioning DISABLED; the four policies on
 -- storage.objects, word for word, and no other; no SECURITY DEFINER
 -- function lost pg_temp.
 --
@@ -51,7 +52,7 @@ with tested(fn, md5) as (values
     ('public.delete_submission(uuid,uuid)',                                                 'c1f98e77a7fb756e75af4334d520f5fc'),
     ('public.rotate_submission_page(uuid,integer,uuid)',                                    '2c08eb9198d7dc2b50a81caf18e08365'),
     ('fv_private.work_path_course(text)',                                                   '7fb0272243ceef1cb6b42658d27664e3'),
-    ('fv_private.work_upload_allowed(text)',                                                '02b678a47cb50ef6bf233a0ff244b51c'),
+    ('fv_private.work_upload_allowed(text)',                                                'b53e85108b1e870a16e717055c63f2dc'),
     ('fv_private.work_read_allowed(text)',                                                  '3ea2b37a835c7a86a881ed743b95d1c9'),
     ('student_submit._grading_started(uuid,uuid)',                                          '720b9f044b853b5c57b04bec7f59010c'),
     ('student_submit._send_session(text,uuid)',                                             'c39242f54850eeeada19945ac8123644'),
@@ -171,13 +172,22 @@ select 'column ' || c.tbl || '.' || c.col, 'there, default ' || coalesce(nullif(
                     where a.attrelid = to_regclass(c.tbl) and a.attname = c.col and not a.attisdropped
                       and coalesce(pg_get_expr(d.adbin, d.adrelid), '') = c.def)
 union all
-select 'the bucket student-photos', 'private, 2097152 bytes a file, image/jpeg only',
+select 'the bucket student-photos', 'private, 2097152 bytes a file, image/jpeg only, versioning DISABLED',
        coalesce((select 'public ' || coalesce(b.public::text, 'null') || ', limit ' || coalesce(b.file_size_limit::text, 'none')
-                        || ', types ' || coalesce(b.allowed_mime_types::text, 'any')
+                        || ', types ' || coalesce(b.allowed_mime_types::text, 'any') || ', versioning ' || b.versioning_status
                    from storage.buckets b where b.id = 'student-photos'), 'absent')
  where not exists (select 1 from storage.buckets b
                     where b.id = 'student-photos' and b.public is false and b.file_size_limit = 2097152
-                      and b.allowed_mime_types = array['image/jpeg'])
+                      and b.allowed_mime_types = array['image/jpeg'] and b.versioning_status = 'DISABLED')
+union all
+-- What the trigger on assessment deletes by: whole (no WHERE), on assessment_id alone.
+select 'index submission_assessment_idx', 'a whole index on public.submission (assessment_id)',
+       coalesce((select pg_get_indexdef(i.indexrelid) from pg_index i join pg_class c on c.oid = i.indexrelid
+                  where i.indrelid = to_regclass('public.submission') and c.relname = 'submission_assessment_idx'), 'absent')
+ where not exists (select 1 from pg_index i join pg_class c on c.oid = i.indexrelid
+                    where i.indrelid = to_regclass('public.submission') and c.relname = 'submission_assessment_idx'
+                      and i.indpred is null and i.indisvalid
+                      and pg_get_indexdef(i.indexrelid) ~ 'USING btree \(assessment_id\)$')
 union all
 select 'row security on storage.objects', 'on', 'off'
   from pg_class c where c.oid = to_regclass('storage.objects') and not c.relrowsecurity

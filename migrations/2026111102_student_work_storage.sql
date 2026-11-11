@@ -7,8 +7,10 @@
 --
 -- ── What it adds ────────────────────────────────────────────────────────────
 -- 1. ONE BUCKET, student-photos: private, 2 MB a file (2097152 bytes),
---    JPEG only. Every page of student work and its thumbnail go there, one
---    folder per class. A PDF never arrives: the browser turns each page
+--    JPEG only, versioning DISABLED (no old version of a file is kept: with
+--    versioning on, a deleted photo would stay in storage as an old
+--    version, and Unsend would not delete it). Every page of student work
+--    and its thumbnail go there, one folder per class. A PDF never arrives: the browser turns each page
 --    into a JPEG and the PDF is not kept (DECISIONS, "Student page build
 --    answers" 2), so there is no second bucket for files. (The plan's line
 --    for this file still says "the two buckets"; its section 1.7 and that
@@ -17,12 +19,18 @@
 --    keeps a project's files where the project is.
 -- 2. FOUR POLICIES on storage.objects, all for this bucket only.
 --    Two that allow, for signed-in teachers:
---      fv_student_photos_read    read any file under a class they own (the
---                                path's first folder is the class's id)
+--      fv_student_photos_read    read a page or its thumbnail that still
+--                                has its row, in a class they own, and is
+--                                handed in or part of an upload they
+--                                started. Not a page of a send a student
+--                                has not finished, and not a file whose
+--                                row is gone (unsent, replaced, deleted)
+--                                and which waits for the removal worker
 --      fv_student_photos_upload  write one exact path: a page, or its
 --                                thumbnail, of an upload that teacher has
 --                                started (start_work_upload) and not
---                                finished
+--                                finished, for the two hours it holds its
+--                                place
 --    Two that restrict, whatever other policy is ever added to
 --    storage.objects (policies that allow are added together, so without
 --    these one careless policy would open the bucket):
@@ -52,7 +60,14 @@
 --     for each path student_submit.file_links returns, and for no other.
 --   A TEACHER'S READ AND UPLOAD. The browser asks the Storage API signed
 --     in; the service runs the query as that teacher, and the policies
---     decide.
+--     decide. Nobody looks at the bytes of a teacher's upload: the bucket
+--     holds it to 2 MB and a Content-Type of image/jpeg, and the policy to
+--     the exact paths the database named for that teacher.
+--   A FILE WAITING TO BE DELETED (its row is gone, the removal worker has
+--     not run yet) can be read by no teacher and no student. The service
+--     key can read it, and a download link the edge function signed for it
+--     earlier goes on working until that link's own time is up or the file
+--     is deleted.
 --   DELETING. Only through the Storage API with the service key, for paths
 --     in public.submission_file_removal. No policy allows a delete, and SQL
 --     cannot delete a file at all.
@@ -71,9 +86,10 @@
 --   storage.buckets and storage.objects have the columns it uses, and row
 --     security is ON for storage.objects;
 --   a bucket named student-photos, if there is one, is already private,
---     2097152 bytes and image/jpeg only; and on a first run it holds no
---     file.
--- Its last step checks the bucket and the four policies are there.
+--     2097152 bytes, image/jpeg only and with versioning DISABLED; and on a
+--     first run it holds no file.
+-- Its last step checks the bucket came out that way (versioning DISABLED
+-- among the rest) and the four policies are there.
 --
 -- Can be run again: the bucket is left as it is and the four policies are
 -- made again, the same. If the bucket's settings were changed by hand since,
@@ -114,7 +130,7 @@ begin
         select * from (values
             -- FINGERPRINTS-BEGIN policy (written by migrations/local-test/submissions_fingerprints.py)
             ('fv_private.work_path_course(text)',    '7fb0272243ceef1cb6b42658d27664e3'),
-            ('fv_private.work_upload_allowed(text)', '02b678a47cb50ef6bf233a0ff244b51c'),
+            ('fv_private.work_upload_allowed(text)', 'b53e85108b1e870a16e717055c63f2dc'),
             ('fv_private.work_read_allowed(text)',   '3ea2b37a835c7a86a881ed743b95d1c9')
             -- FINGERPRINTS-END
         ) as v(fn, md5)
@@ -174,10 +190,14 @@ on conflict (id) do nothing;
 -- student's upload link is made with the service key, for one path the
 -- database named, and the upload itself is done by the Storage service.
 --
--- Two policies that allow:
---   read     any file under a class the teacher owns (the path's first folder)
+-- Two policies that allow (what each asks is in the first file,
+-- fv_private.work_read_allowed and work_upload_allowed):
+--   read     a page or thumbnail that still has its row, in a class the
+--            teacher owns, and is handed in or part of an upload the teacher
+--            started
 --   upload   one exact path: a page, or its thumbnail, of an upload that
---            teacher has started with start_work_upload and not finished
+--            teacher has started with start_work_upload, has not finished,
+--            and that still holds its place
 -- Nothing allows a teacher to change, move or delete a file. A file is
 -- deleted only by the service role, working down submission_file_removal.
 drop policy if exists fv_student_photos_read on storage.objects;

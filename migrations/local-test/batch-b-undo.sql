@@ -4,15 +4,19 @@
 -- kept under local-test/ so CI's drift check does not wait for it to be
 -- applied. Proved by migrations/local-test/submissions_undo.py.
 --
--- Two parts, each one transaction: all of it or none of it. Run PART 1 by
--- itself to stop sending and lose nothing. Run PART 2 only to take the
--- change itself out.
+-- Three parts, each one transaction: all of it or none of it.
+--   PART 1   Send Work off for every class. Nothing is deleted.
+--   PART 1B  The two triggers Batch B put on assessment and on enrollment
+--            are dropped: deleting an assessment or a student is exactly as
+--            it was before Batch B. For when those deletes misbehave.
+--   PART 2   Everything Batch B made is taken out.
+-- Run only the part you need.
 --
 -- ── To stop sending without this script ─────────────────────────────────────
 -- Batch B adds nothing to a grade's save, so there is nothing to switch off
--- for teachers. For one class: turn Send Work off in Class Settings, Student
--- Page. Students of that class are told sending is off at once; what they
--- sent stays, and the teacher can still open it.
+-- for teachers there. For one class: turn Send Work off in Class Settings,
+-- Student Page. Students of that class are told sending is off at once;
+-- what they sent stays, and the teacher can still open it.
 --
 -- ── PART 1: Send Work off for every class ───────────────────────────────────
 -- One UPDATE: course.send_work becomes false wherever it is true. Its last
@@ -23,16 +27,51 @@
 -- (Each class it changes is marked as changed, as any setting change is,
 -- so a teacher's open tab reads its settings again.)
 --
+-- ── PART 1B: the fast stop for the two triggers ─────────────────────────────
+-- Batch B put two triggers on assessment and two on enrollment
+-- (submission_gone, submission_truncate). They are the only thing of Batch
+-- B's that runs when a teacher who has never used photos deletes an
+-- assessment or a student. PART 1B drops the four. From then on:
+--   deleting an assessment, permanently deleting a student, and the 30-day
+--     purge do exactly what they did before Batch B;
+--   BUT the work handed in for what is deleted is left behind: its
+--     submissions and pages stay in the database with nothing to belong to,
+--     and its photos stay in storage. The teacher's list goes on returning
+--     the work of a deleted assessment or student (it lists by class), and
+--     its photos stay readable by that teacher, until the statement below
+--     is run. The work of a purged class is shown to nobody.
+-- So run PART 1 first, and put the triggers back as soon as the cause is
+-- found, by running the first migration file again (it makes them again and
+-- changes nothing else; tested). Then clear what was left behind meanwhile;
+-- its photos are queued for deletion as for any deleted work:
+-- orphans:
+--   delete from public.submission s where not exists (select 1 from public.enrollment e where e.id = s.enrollment_id) or not exists (select 1 from public.assessment a where a.id = s.assessment_id);
+-- end orphans
+-- PART 1B refuses, with nothing changed, if the four triggers are not all
+-- there or one of them is not Batch B's own.
+--
 -- ── PART 2: take Batch B out ────────────────────────────────────────────────
 -- IT DELETES every record of work handed in (who sent what and when, the
 -- notes, Handed In on Paper), every class's Send Work and Keep Photos Until,
 -- every assessment's Student Work settings, and the list of files deleted
 -- so far. None of it can be brought back by anything but a database backup.
 --
--- IT REFUSES WHILE THE BUCKET HOLDS A FILE. SQL cannot delete a file, and
--- dropping the tables would leave every photo in storage with nothing
--- pointing at it. So before PART 2, in this order:
---   1. PART 1 (nothing new arrives);
+-- IT REFUSES WHILE A PHOTO IS LEFT, OR COULD STILL ARRIVE. SQL cannot delete
+-- a file, and dropping the tables would leave every photo in storage with
+-- nothing pointing at it. It refuses while:
+--   the bucket student-photos holds any file;
+--   any page of work is still listed;
+--   the removal queue is not finished. A file is finished with only once
+--     it is gone AND the last upload link made for it is dead: until then
+--     whoever holds the link could put the file back, and with the queue
+--     dropped nothing would ever remove it. A link can live up to 4 hours
+--     10 minutes after the send it belongs to was first started (a send
+--     holds its place two hours, a link made at the end of that lasts two
+--     more, and ten minutes are allowed for clocks). So PART 2 can run at
+--     the earliest 4 hours 10 minutes after the last send or upload was
+--     started; its message says when.
+-- So before PART 2, in this order:
+--   1. PART 1 (nothing new is started);
 --   2. the student-submit function put back to the version from before the
 --      send routes, and the site to a release from before the send screens
 --      (otherwise they call functions that are gone and show an error);
@@ -42,22 +81,24 @@
 -- empty:
 --   delete from public.submission;
 -- end empty
---      then have the removal worker run until the queue is done, or empty
---      the bucket student-photos in the Supabase dashboard (Storage);
---   4. PART 2. Its first check counts the bucket's files and says how many
---      are left if any are.
+--      then have the removal worker run until it has nothing left to do;
+--   4. wait until every upload link is dead (4 hours 10 minutes after the
+--      last start), and have the removal worker run once more: it looks at
+--      every path one last time and removes any file that came back;
+--   5. PART 2. Its first check says what is still in the way, if anything.
 -- It also refuses, with nothing changed, unless the database is exactly as
--- Batch B leaves it: each of its 39 functions by its fingerprint, no column,
+-- Batch B leaves it: each of its 44 functions by its fingerprint, no column,
 -- index, constraint, trigger or policy added to its four tables since, and
 -- no function it does not know naming one of its tables or columns
 -- (something built on Batch B since, such as Batch C, would break: take
 -- that out first).
 -- Then, in one transaction:
 --   the four policies on storage.objects are dropped;
---   the two triggers on assessment and the two on enrollment are dropped;
+--   the two triggers on assessment and the two on enrollment are dropped
+--     (if PART 1B has not dropped them already);
 --   submission_file, submission, submission_file_removal and
 --     student_submit.send_log are dropped;
---   the 39 functions are dropped;
+--   the 44 functions are dropped;
 --   the remembered answers of its teacher RPCs are deleted from
 --     fv_idempotency (they hold storage paths);
 --   course loses send_work and keep_photos_until; assessment loses
@@ -78,7 +119,7 @@
 --   The bucket. student-photos stays, empty, private, with no policy: no
 --     teacher and no student can reach it. Delete it in the Supabase
 --     dashboard (Storage) to finish. (A bucket is deleted through the
---     Storage API, like a file.)
+--     Storage API, like a file; SQL is refused.)
 --   The migration records. supabase_migrations.schema_migrations still
 --     lists both files as applied, so CI's "never applied" check goes on
 --     passing though they are no longer in the database, and CI's schema
@@ -108,6 +149,34 @@ select id, name from batch_b_turned_off order by name, id;
 commit;
 
 -- ════════════════════════════════════════════════════════════════════════════
+-- PART 1B: the fast stop for the two triggers on assessment and enrollment.
+-- Read the header first: work handed in for what is deleted afterwards is
+-- left behind until the triggers are back.
+-- ════════════════════════════════════════════════════════════════════════════
+begin;
+set local lock_timeout = '5s';
+do $guard$
+declare
+    _n int;
+begin
+    select count(*) into _n
+      from pg_trigger t
+     where not t.tgisinternal
+       and t.tgrelid in ('public.assessment'::regclass, 'public.enrollment'::regclass)
+       and ((t.tgname = 'submission_gone' and t.tgfoid = to_regprocedure('public._submission_gone()'))
+         or (t.tgname = 'submission_truncate' and t.tgfoid = to_regprocedure('public._submission_truncated()')));
+    if _n <> 4 then
+        raise exception 'the four triggers Batch B put on assessment and enrollment are not all there as it made them (found %). Nothing was changed.', _n;
+    end if;
+end
+$guard$;
+drop trigger submission_gone on public.assessment;
+drop trigger submission_truncate on public.assessment;
+drop trigger submission_gone on public.enrollment;
+drop trigger submission_truncate on public.enrollment;
+commit;
+
+-- ════════════════════════════════════════════════════════════════════════════
 -- PART 2: take Batch B out. Read the header first.
 -- ════════════════════════════════════════════════════════════════════════════
 begin;
@@ -118,6 +187,7 @@ declare
     _f    record;
     _md5  text;
     _n    bigint;
+    _when timestamptz;
     _left text;
     _known constant text[] := array[
         -- FINGERPRINTS-BEGIN names
@@ -205,7 +275,7 @@ begin
             ('public.delete_submission(uuid,uuid)',                                                 'c1f98e77a7fb756e75af4334d520f5fc'),
             ('public.rotate_submission_page(uuid,integer,uuid)',                                    '2c08eb9198d7dc2b50a81caf18e08365'),
             ('fv_private.work_path_course(text)',                                                   '7fb0272243ceef1cb6b42658d27664e3'),
-            ('fv_private.work_upload_allowed(text)',                                                '02b678a47cb50ef6bf233a0ff244b51c'),
+            ('fv_private.work_upload_allowed(text)',                                                'b53e85108b1e870a16e717055c63f2dc'),
             ('fv_private.work_read_allowed(text)',                                                  '3ea2b37a835c7a86a881ed743b95d1c9'),
             ('student_submit._grading_started(uuid,uuid)',                                          '720b9f044b853b5c57b04bec7f59010c'),
             ('student_submit._send_session(text,uuid)',                                             'c39242f54850eeeada19945ac8123644'),
@@ -228,14 +298,20 @@ begin
         end if;
     end loop;
 
-    -- No file may be left in the bucket.
+    -- No file may be left in the bucket, and no page listed.
     select count(*) into _n from storage.objects o where o.bucket_id = 'student-photos';
     if _n > 0 then
         raise exception 'the bucket student-photos still holds % files. SQL cannot delete a file, and dropping the tables would leave them with nothing pointing at them. Delete them first (the header says how). Nothing was changed.', _n;
     end if;
     select count(*) into _n from public.submission_file;
     if _n > 0 then
-        raise exception 'there are still % pages of work handed in. Delete the submissions first (the header says how). Nothing was changed.', _n;
+        raise exception 'there are still % pages of work handed in or being sent. Delete the submissions first (the header says how). Nothing was changed.', _n;
+    end if;
+    -- Nor may a file still be able to arrive: every queued path must have
+    -- been seen gone after the last upload link made for it died.
+    select count(*), max(r.link_dies_at) into _n, _when from public.submission_file_removal r where not r.done;
+    if _n > 0 then
+        raise exception 'the removal queue is not finished: % files are not yet seen gone after their upload links died. The last link dies at %. After that, have the removal worker run once more, then run this again. Nothing was changed.', _n, _when;
     end if;
 
     -- Nothing has been built on Batch B's tables: exactly its own columns,
@@ -247,8 +323,8 @@ begin
                          'public.submission_file_removal'::regclass, 'student_submit.send_log'::regclass)
          group by c.oid
         having string_agg(a.attname, ', ' order by a.attnum) not in (
-            'id, course_id, assessment_id, enrollment_id, version, state, intent, target_id, sent_by, on_paper, note, followed_plan, is_late, card_id, request_id, created_at, links_at, sent_at, updated_at',
-            'id, submission_id, page, path, thumb_path, bytes, thumb_bytes, width, height, sha256, rotation, created_at, link_dies_at',
+            'id, course_id, assessment_id, enrollment_id, version, state, intent, target_id, sent_by, on_paper, note, followed_plan, is_late, card_id, request_id, created_at, sent_at, updated_at',
+            'id, submission_id, page, path, thumb_path, bytes, thumb_bytes, width, height, sha256, rotation, added_by, declared_bytes, declared_thumb_bytes, created_at, link_dies_at',
             'id, bucket, path, course_id, reason, queued_at, link_dies_at, tries, last_try_at, removed_at, done',
             'id, card_id, at')
         union all
@@ -275,9 +351,9 @@ begin
                               'public.submission_file_removal'::regclass, 'student_submit.send_log'::regclass)
            and ic.relname not in (
                'submission_pkey', 'submission_one_sent', 'submission_one_sending', 'submission_enrollment_idx', 'submission_course_idx',
-               'submission_target_idx', 'submission_file_pkey', 'submission_file_path_key', 'submission_file_thumb_path_key',
-               'submission_file_page_key', 'submission_file_removal_pkey', 'submission_file_removal_path_key',
-               'submission_file_removal_todo', 'send_log_pkey', 'send_log_card_at', 'send_log_at')
+               'submission_assessment_idx', 'submission_target_idx', 'submission_file_pkey', 'submission_file_path_key',
+               'submission_file_thumb_path_key', 'submission_file_page_key', 'submission_file_removal_pkey',
+               'submission_file_removal_path_key', 'submission_file_removal_todo', 'send_log_pkey', 'send_log_card_at', 'send_log_at')
     ) s;
     if _left is not null then
         raise exception 'something has been added to Batch B''s tables since: %. Nothing was changed.', _left;
@@ -305,7 +381,8 @@ drop policy if exists fv_student_photos_upload on storage.objects;
 drop policy if exists fv_student_photos_fence on storage.objects;
 drop policy if exists fv_student_photos_teachers_only on storage.objects;
 
--- The triggers on the two tables that were there before.
+-- The triggers on the two tables that were there before (already gone if
+-- PART 1B was run).
 drop trigger if exists submission_gone on public.assessment;
 drop trigger if exists submission_truncate on public.assessment;
 drop trigger if exists submission_gone on public.enrollment;

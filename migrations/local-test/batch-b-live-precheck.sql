@@ -137,13 +137,13 @@ select 'a trigger name the first file uses', 'absent', t.tgrelid::regclass::text
    and t.tgrelid in (to_regclass('public.assessment'), to_regclass('public.enrollment'))
 union all
 select 'storage.objects and storage.buckets',
-       'both there, with bucket_id, name, metadata; id, name, public, file_size_limit, allowed_mime_types',
+       'both there, with bucket_id, name, metadata, archived_at, is_delete_marker; id, name, public, file_size_limit, allowed_mime_types, versioning_status',
        'a table or a column is missing', 'yes'
  where to_regclass('storage.objects') is null or to_regclass('storage.buckets') is null
     or (select count(*) from pg_attribute where attrelid = to_regclass('storage.objects') and not attisdropped
-                                             and attname in ('bucket_id', 'name', 'metadata')) <> 3
+                                             and attname in ('bucket_id', 'name', 'metadata', 'archived_at', 'is_delete_marker')) <> 5
     or (select count(*) from pg_attribute where attrelid = to_regclass('storage.buckets') and not attisdropped
-                                             and attname in ('id', 'name', 'public', 'file_size_limit', 'allowed_mime_types')) <> 5
+                                             and attname in ('id', 'name', 'public', 'file_size_limit', 'allowed_mime_types', 'versioning_status')) <> 6
 union all
 select 'row security on storage.objects', 'on', 'off', 'yes'
   from pg_class c where c.oid = to_regclass('storage.objects') and not c.relrowsecurity
@@ -164,9 +164,10 @@ select 'the service role passes row security', 'yes', 'no', 'no'
 union all
 select 'a bucket named student-photos', 'absent',
        'public ' || coalesce(b.public::text, 'null') || ', limit ' || coalesce(b.file_size_limit::text, 'none')
-           || ', types ' || coalesce(b.allowed_mime_types::text, 'any'),
+           || ', types ' || coalesce(b.allowed_mime_types::text, 'any') || ', versioning ' || coalesce(to_jsonb(b)->>'versioning_status', 'no such column'),
        case when b.public is distinct from false or b.file_size_limit is distinct from 2097152
-                 or b.allowed_mime_types is distinct from array['image/jpeg'] then 'yes' else 'no' end
+                 or b.allowed_mime_types is distinct from array['image/jpeg']
+                 or to_jsonb(b)->>'versioning_status' is distinct from 'DISABLED' then 'yes' else 'no' end
   from storage.buckets b where b.id = 'student-photos'
 union all
 -- Policies that allow are added together. One that is already there and is
@@ -184,33 +185,39 @@ select 'signed-in teachers can enter schema fv_private (storage asks the policie
  order by 1, 2;
 
 -- ── QUERY 2: what is there ──────────────────────────────────────────────────
--- One row. Expected on gradebook-prod, before the apply:
---   postgres            17.x
---   storage_migration   the newest of Supabase's own storage changes this
---                       project has (a name; any is fine)
---   sql_delete_refused  true or false. True: this project's storage refuses
---                       a DELETE on storage.objects from SQL. False: it
---                       would let one through and leave the file's bytes
---                       behind. Either way Batch B never issues one.
---   name_index          true: storage has its index on (bucket_id, name),
---                       which the new functions' look-ups use. False: they
---                       would still be right, and slow in a large bucket.
---   keeps_versions      true or false: whether storage.objects has the
---                       columns of the newer shape (archived_at,
---                       is_delete_marker). The functions read both shapes.
+-- One row. As gradebook-prod answered on 2026-11-10 (read-only, by the
+-- orchestrator), and expected again before the apply:
+--   postgres            17.6
+--   storage_migration   lifecycle-writer-coordination: the newest of
+--                       Supabase's own storage changes this project has.
+--                       The stand-in the tests ran on is that shape. A
+--                       newer name means storage has moved on since: read
+--                       what changed before applying.
+--   sql_delete_refused  true: this project's storage refuses a DELETE on
+--                       storage.objects from SQL. Batch B never issues one.
+--   name_index          true: storage has a whole (not partial) index on
+--                       (bucket_id, name) alone, which the new functions'
+--                       look-ups can always use. False: they would still be
+--                       right, and could be slow in a large bucket.
+--   keeps_versions      true: storage.objects has archived_at and
+--                       is_delete_marker, which the new functions read by
+--                       name (the first file stops if it has not).
 --   buckets, files, storage_policies
 --                       0, 0, 0: the project has never used storage
 --   classes, assessments
---                       how many rows the two ALTER TABLEs give new columns
---                       (every one gets the defaults: Send Work off,
---                       Students Send nothing)
---   pages_on            classes with the Student Page on
+--                       14 and 142 on that day: how many rows the two ALTER
+--                       TABLEs give new columns (every one gets the
+--                       defaults: Send Work off, Students Send nothing)
+--   pages_on            2: classes with the Student Page on
 select current_setting('server_version') as postgres,
        (select m.name from storage.migrations m order by m.id desc limit 1) as storage_migration,
        exists (select 1 from pg_trigger t where t.tgrelid = to_regclass('storage.objects') and t.tgname = 'protect_objects_delete') as sql_delete_refused,
-       exists (select 1 from pg_indexes i where i.schemaname = 'storage' and i.tablename = 'objects'
-                  and i.indexdef ~ '\(bucket_id, name( COLLATE "C")?\)') as name_index,
-       exists (select 1 from pg_attribute a where a.attrelid = to_regclass('storage.objects') and a.attname = 'archived_at' and not a.attisdropped) as keeps_versions,
+       -- whole: no WHERE; on exactly those two columns, in that order
+       exists (select 1 from pg_index i
+                where i.indrelid = to_regclass('storage.objects') and i.indpred is null and i.indisvalid
+                  and pg_get_indexdef(i.indexrelid) ~ 'USING btree \(bucket_id, name( COLLATE "C")?\)$') as name_index,
+       exists (select 1 from pg_attribute a where a.attrelid = to_regclass('storage.objects') and a.attname = 'archived_at' and not a.attisdropped)
+           and exists (select 1 from pg_attribute a where a.attrelid = to_regclass('storage.objects') and a.attname = 'is_delete_marker' and not a.attisdropped) as keeps_versions,
        (select count(*) from storage.buckets) as buckets,
        (select count(*) from storage.objects) as files,
        (select count(*) from pg_policy p where p.polrelid = to_regclass('storage.objects')) as storage_policies,
