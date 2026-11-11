@@ -247,6 +247,40 @@ describe('LearnerProfile', () => {
     expect(box.querySelector('.id-private-foot').textContent).toContain('Only you see this.');
   });
 
+  // Pin (S10-T1): the jump links' exact markup and order, from the section
+  // list. A section added later (Reflections on Feedback) joins this list.
+  it('the jump links, in order, exactly as drawn', () => {
+    const nav = mount(LearnerProfile.idCardHtml(opts())).querySelector('.id-jump');
+    expect(nav.outerHTML).toBe(
+      '<nav class="id-jump" aria-label="On this page">' +
+        '<a href="#lp-about" data-action="lpJump" data-target="lp-about">About Me <span>Sep 16</span></a>' +
+        '<a href="#lp-goals" data-action="lpJump" data-target="lp-goals">Goals <span>2 set</span></a>' +
+        '<a href="#lp-refl" data-action="lpJump" data-target="lp-refl">Reflections <span>Nov 7</span></a>' +
+        '</nav>',
+    );
+    const o = opts();
+    o.model = { about: null, checkin: null, reflections: [], last: null };
+    o.goalCount = 0;
+    expect(
+      [...mount(LearnerProfile.idCardHtml(o)).querySelectorAll('.id-jump a')].map(a => [
+        a.getAttribute('href'),
+        a.textContent,
+      ]),
+    ).toEqual([
+      ['#lp-about', 'About Me Not yet'],
+      ['#lp-goals', 'Goals 0 set'],
+      ['#lp-refl', 'Reflections Not yet'],
+    ]);
+  });
+
+  it('the whole ID card is unchanged around the jump links', () => {
+    const html = LearnerProfile.idCardHtml(opts());
+    const at = html.indexOf('<nav class="id-jump"');
+    const end = html.indexOf('</nav>') + '</nav>'.length;
+    expect(html.slice(0, at)).toMatch(/^<div class="id-card"><div class="id-band"><span>Science 8 · Block B<\/span>/);
+    expect(html.slice(end)).toMatch(/^<\/div><div class="id-private">/);
+  });
+
   it('a competency reflection the teacher saved counts as a reflection on the ID card and in Reflections', () => {
     const o = opts();
     o.model = { about: null, checkin: null, reflections: [], last: null };

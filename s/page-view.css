@@ -1322,3 +1322,282 @@
     padding: 0 24px;
   }
 }
+
+/* My Learning (S13-F2 and F3): the grade, the skills, One Skill. */
+.sp-view .sp-ml {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+}
+.sp-view .sp-ml-cols,
+.sp-view .sp-ml-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.sp-view .sp-ml-card {
+  display: block;
+  margin: 0;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--sp-card);
+  box-shadow: var(--sp-shadow);
+  color: var(--sp-text);
+  text-align: left;
+  width: 100%;
+}
+.sp-view .sp-ml-card-title {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sp-text-2);
+}
+.sp-view .sp-ml-at {
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 10px;
+}
+.sp-view .sp-ml-at-lead {
+  font-size: 14px;
+  color: var(--sp-text-2);
+}
+.sp-view .sp-ml-at-word {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+.sp-view .sp-ml-overall-letter {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.sp-view .sp-ml-letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  height: 64px;
+  padding: 0 10px;
+  border-radius: 16px;
+  font-size: 34px;
+  font-weight: 800;
+}
+.sp-view .sp-ml-letter-side {
+  display: flex;
+  flex-direction: column;
+}
+.sp-view .sp-ml-ie {
+  font-size: 15px;
+  font-weight: 600;
+}
+.sp-view .sp-ml-pct {
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.sp-view .sp-ml-ladder {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+.sp-view .sp-ml-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.sp-view .sp-ml-bar {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--sp-fill);
+}
+.sp-view .sp-ml-bar.sp-lv-1 {
+  background: #f5a3a0;
+}
+.sp-view .sp-ml-bar.sp-lv-2 {
+  background: #fbbf24;
+}
+.sp-view .sp-ml-bar.sp-lv-3 {
+  background: #22c55e;
+}
+.sp-view .sp-ml-bar.sp-lv-4 {
+  background: #3b82f6;
+}
+.sp-view .sp-ml-you {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--sp-text);
+}
+.sp-view .sp-ml-step-on .sp-ml-bar {
+  height: 14px;
+}
+.sp-view .sp-ml-ladder:has(.sp-ml-you) {
+  padding-top: 18px;
+}
+.sp-view .sp-ml-step-name {
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+.sp-view .sp-ml-step-code {
+  font-size: 11px;
+  color: var(--sp-text-2);
+}
+.sp-view .sp-ml-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sp-view .sp-ml-rows > li {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--sp-fill);
+}
+.sp-view .sp-ml-rows > li:first-child {
+  border-top: 0;
+}
+.sp-view .sp-ml-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 8px 0;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+.sp-view .sp-ml-skill-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+.sp-view .sp-ml-level {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.sp-view .sp-ml-word {
+  font-size: 14px;
+  color: var(--sp-text-2);
+  font-variant-numeric: tabular-nums;
+}
+.sp-view .sp-ml-none {
+  font-size: 14px;
+  color: var(--sp-text-2);
+}
+.sp-view .sp-ml-missing-title {
+  color: #b91c1c;
+}
+.sp-view .sp-ml-line {
+  margin: 0 0 4px;
+  font-size: 14px;
+  color: var(--sp-text-2);
+}
+.sp-view .sp-ml-subject {
+  margin: 10px 0 4px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.sp-view .sp-ml-folder {
+  margin: 0;
+  border-top: 1px solid var(--sp-fill);
+}
+.sp-view .sp-ml-folder-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  cursor: pointer;
+  font-weight: 700;
+}
+.sp-view .sp-ml-folder-name {
+  flex: 1;
+  min-width: 0;
+}
+.sp-view .sp-ml-folder-count {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--sp-text-2);
+}
+.sp-view .sp-ml-ican {
+  margin: 0;
+  padding: 0 0 0 18px;
+  color: var(--sp-text-2);
+}
+.sp-view .sp-ml-top {
+  font-weight: 700;
+  color: #1e40af;
+}
+.sp-view .sp-ml-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.sp-view .sp-ml-grid {
+  stroke: var(--sp-fill);
+  stroke-width: 1;
+}
+.sp-view .sp-ml-axis {
+  font-size: 10px;
+  fill: var(--sp-text-2);
+}
+.sp-view .sp-ml-path {
+  fill: none;
+  stroke: var(--sp-text-2);
+  stroke-width: 2;
+}
+.sp-view .sp-ml-dot {
+  fill: var(--sp-field);
+}
+.sp-view .sp-ml-dot-1 {
+  fill: #dc2626;
+}
+.sp-view .sp-ml-dot-2 {
+  fill: #d97706;
+}
+.sp-view .sp-ml-dot-3 {
+  fill: #16a34a;
+}
+.sp-view .sp-ml-dot-4 {
+  fill: #2563eb;
+}
+.sp-view .sp-ml-dates {
+  display: flex;
+  justify-content: space-between;
+  padding-left: 40px;
+  font-size: 11px;
+  color: var(--sp-text-2);
+}
+.sp-view .sp-ml-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 32px 0;
+  text-align: center;
+}
+@container sp-view (min-width: 760px) {
+  .sp-view .sp-ml-cols {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .sp-view .sp-ml-col {
+    flex: 1;
+  }
+}
