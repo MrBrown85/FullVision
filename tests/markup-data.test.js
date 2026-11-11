@@ -254,7 +254,7 @@ describe('what the student is given', () => {
   });
 });
 
-describe('signed in: nothing yet', () => {
+describe('a class the server keeps no student-page rows for', () => {
   it('reads nothing, answers not_available, stores nothing and calls nothing', async () => {
     window.isDemoMode = () => false;
     const rpc = vi.fn();
@@ -272,9 +272,11 @@ describe('signed in: nothing yet', () => {
     delete globalThis.getSupabase;
   });
 
-  it('data.js names none of the Mark Up functions the server will have', () => {
+  it('data.js names the Mark Up functions at call sites the drift check can read (S9-W1)', () => {
     const src = readFileSync('shared/data.js', 'utf-8');
-    expect(src).not.toMatch(/['"`](save_markup|list_assessment_markup|return_work)['"`]/);
+    expect(src.match(/_writeRpc\(\s*'save_markup'/g).length).toBe(1);
+    expect(src.match(/_writeRpc\('return_work'/g).length).toBe(2);
+    expect(src.match(/_callRpcWithAuthGuard\(\s*'list_assessment_markup'/g).length).toBe(1);
   });
 });
 
