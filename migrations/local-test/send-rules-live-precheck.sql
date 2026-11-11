@@ -24,7 +24,7 @@
 with replaces(fn, before, becomes) as (values
     -- FINGERPRINTS-BEGIN replaces
     ('student_submit._send_begin(text,text,uuid,uuid,jsonb,text,text,uuid)', '595e0a34dc67e23ca9fadc478c2ab9b7', '6cad6dd40eb1c33451a5dcf4f60e7624'),
-    ('student_submit.send_finish(text,uuid,uuid,jsonb,text)',                '286e463dca1842c2586a93c77fb93456', '7c6673bda2f6b2ded4a14da8671fdfac'),
+    ('student_submit.send_finish(text,uuid,uuid,jsonb,text)',                '286e463dca1842c2586a93c77fb93456', '340cb72444d555a9cef594b543e2674c'),
     ('student_submit.work(text,uuid,text)',                                  '64d016d3d102327917e987b24e811129', '2ec445c5d5afadb7c3fc1699d9929e52')
     -- FINGERPRINTS-END
 ), relied(fn, md5) as (values

@@ -1233,13 +1233,19 @@ MUTANTS = [
     ('107 start: an open revision is not excluded', "           or exists (select 1 from revision_request r\n                       where r.assessment_id = _a.id and r.enrollment_id = p_enrollment_id and r.state = 'open') then\n            return jsonb_build_object('ok', false, 'error', 'already_sent');",
      " then\n            return jsonb_build_object('ok', false, 'error', 'already_sent');"),
     # ruling 107, the finish
-    ('107 finish: already_sent as before', "            if _target.sent_by <> 'teacher' or _target.on_paper or _sub.version <> 1", "            if true or _target.on_paper or _sub.version <> 1"),
+    ('107 finish: already_sent as before', "            if _target.sent_by <> 'teacher' or _target.on_paper\n", "            if true or _target.on_paper\n"),
     ('107 finish: the teacher\'s pages are not moved (deleted with their row)', "    if _target.id is not null then\n        -- The student's old pages go.", "    if _sub.intent = 'replace' then\n        -- The student's old pages go."),
     ("107 finish: the teacher's pages put first", "           set submission_id = _sub.id, page = _pages + x.rn", "           set submission_id = _sub.id, page = x.rn + 100"),
-    ('107 finish: work on paper is joined', "            if _target.sent_by <> 'teacher' or _target.on_paper or _sub.version <> 1", "            if _target.sent_by <> 'teacher' or _sub.version <> 1"),
+    ('107 finish: work on paper is joined', "            if _target.sent_by <> 'teacher' or _target.on_paper\n", "            if _target.sent_by <> 'teacher'\n"),
     ('107 finish: grading is not asked', "            if _grading_started(p_enrollment_id, _sub.assessment_id) then\n                -- As for a Replace", "            if false then\n                -- As for a Replace"),
     ('107 finish: the 30 is not asked', "            if _theirs + jsonb_array_length(p_files) > 30 then\n                return", "            if false then\n                return"),
-    ("107 finish: a revision's pages (version 2) are joined", " or _target.on_paper or _sub.version <> 1\n", " or _target.on_paper\n"),
+    # review F2: a revision's pages (version 2 and later) are revision_finish's only
+    ("F2: send_finish takes a revision's pages (the reviewed version: the check taken out)", "    if _sub.version <> 1 then\n        return jsonb_build_object('ok', false, 'error', 'not_found');\n    end if;\n", ''),
+    ("F2: refused, but the revision's send is dropped", "    if _sub.version <> 1 then\n        return jsonb_build_object('ok', false, 'error', 'not_found');",
+     "    if _sub.version <> 1 then\n        delete from submission where id = _sub.id;\n        return jsonb_build_object('ok', false, 'error', 'not_found');"),
+    ("F2: refused only when something is in (as the reviewed file's join did)", "    if _sub.version <> 1 then\n        return",
+     "    if _sub.version <> 1 and exists (select 1 from submission x where x.assessment_id = _sub.assessment_id and x.enrollment_id = p_enrollment_id and x.state = 'sent') then\n        return"),
+    ("F2: only version 3 and later refused", "    if _sub.version <> 1 then\n        return", "    if _sub.version > 2 then\n        return"),
     ("107 finish: the teacher's unfinished Add is not moved", "        update submission set target_id = _sub.id\n         where target_id = _target.id and state = 'sending' and sent_by = 'teacher' and intent = 'add';\n", ''),
     ('107 finish: the work keeps the teacher\'s version', "version = coalesce(_target.version, version),", "version = version,"),
     # work()

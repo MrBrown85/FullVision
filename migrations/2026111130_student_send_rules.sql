@@ -46,12 +46,20 @@
 --    deleted the work: a new send answered already_sent, a Replace and an
 --    Unsend cannot_change. The same was true of work the teacher added
 --    entirely with Add Work.
+-- 3. A REVISION HANDED IN THROUGH THE WRONG DOOR (found in review, Nov 11;
+--    so since C1). A revision's unfinished pages (version 2 or later, made
+--    by Batch C's revision_start) given to send_finish instead of
+--    revision_finish were handed in as ordinary work when nothing else was
+--    in for the piece (the request stayed open and then read "being
+--    graded"), and were dropped (already_sent) when version 1 was in.
 --
 -- ── What it does now ────────────────────────────────────────────────────────
 -- 1. A SEND STARTED WHILE THE PIECE WAS OPEN CAN BE FINISHED WITHIN ITS TWO
 --    HOURS, AND IS MARKED LATE (send_finish). A new send or a Replace.
 --    How the database knows the send was started while the piece was open:
---    a student's unfinished send is a row only _send_begin makes, and it
+--    a student's unfinished send of version 1 is a row only _send_begin
+--    makes (revision_start makes the others, version 2 and later, which
+--    send_finish refuses: 3 below), and it
 --    makes it only after _work_window said the piece was open, in the same
 --    transaction, so the row's created_at (its first start; no function
 --    changes it, a repeat of the start included) is a moment the piece was
@@ -117,6 +125,11 @@
 --    A Replace (student_submit.replace) of the teacher's work still answers
 --    cannot_change, and Unsend has nothing of the student's to remove: the
 --    call is send_start.
+-- 3. SEND_FINISH TAKES VERSION 1 ONLY. An unfinished send above version 1
+--    is answered not_found (not one of send_finish's sends) before anything
+--    else is asked, and nothing is changed: the send keeps its place and its
+--    pages, and revision_finish (Send My Revision) can still hand it in. A
+--    repeat of a finish that went through is answered replayed, as before.
 --
 -- What is the same, on purpose:
 --   - The lock order: every call takes the class's lock first (_grade_return
@@ -193,7 +206,7 @@ begin
         select * from (values
             -- FINGERPRINTS-BEGIN replaces (written by migrations/local-test/send_rules.py)
             ('student_submit._send_begin(text,text,uuid,uuid,jsonb,text,text,uuid)', '595e0a34dc67e23ca9fadc478c2ab9b7', '6cad6dd40eb1c33451a5dcf4f60e7624'),
-            ('student_submit.send_finish(text,uuid,uuid,jsonb,text)',                '286e463dca1842c2586a93c77fb93456', '7c6673bda2f6b2ded4a14da8671fdfac'),
+            ('student_submit.send_finish(text,uuid,uuid,jsonb,text)',                '286e463dca1842c2586a93c77fb93456', '340cb72444d555a9cef594b543e2674c'),
             ('student_submit.work(text,uuid,text)',                                  '64d016d3d102327917e987b24e811129', '2ec445c5d5afadb7c3fc1699d9929e52')
             -- FINGERPRINTS-END
         ) as v(fn, before, becomes)
@@ -496,6 +509,15 @@ begin
                                   'late', _sub.is_late,
                                   'pages', (select count(*) from submission_file f where f.submission_id = _sub.id));
     end if;
+    -- A revision's pages are Send My Revision's (revision_finish), never
+    -- this function's. Only revision_start makes an unfinished send above
+    -- version 1 (every send _send_begin makes is version 1 until it is
+    -- handed in), so version is how it is told. Refused before anything else
+    -- is asked, and nothing is changed: the send keeps its place and its
+    -- pages, and revision_finish can still hand it in.
+    if _sub.version <> 1 then
+        return jsonb_build_object('ok', false, 'error', 'not_found');
+    end if;
     if not exists (select 1 from enrollment e
                     where e.id = p_enrollment_id and e.course_id = _course.id and e.withdrawn_at is null) then
         return jsonb_build_object('ok', false, 'error', 'not_found');
@@ -564,15 +586,15 @@ begin
         -- Ruling 107: a new send for a piece whose work in is the teacher's
         -- (not on paper) joins the teacher's pages, by the rule a Replace
         -- follows, whether that work was there when the send started or
-        -- was handed in while its pages went up. Every other work in, and a
-        -- revision's pages (a version above 1: Send My Revision's, not
-        -- this function's), are answered as before.
+        -- was handed in while its pages went up. Every other work in is
+        -- answered as before. (A revision's pages never come here: refused
+        -- above.)
         select * into _target from submission
          where assessment_id = _sub.assessment_id and enrollment_id = p_enrollment_id and state = 'sent'
          order by version desc limit 1
            for update;
         if found then
-            if _target.sent_by <> 'teacher' or _target.on_paper or _sub.version <> 1
+            if _target.sent_by <> 'teacher' or _target.on_paper
                or exists (select 1 from revision_request r
                            where r.assessment_id = _sub.assessment_id and r.enrollment_id = p_enrollment_id and r.state = 'open') then
                 -- The teacher added this student's work while the pages were going up.
@@ -763,7 +785,7 @@ begin
         select * from (values
             -- FINGERPRINTS-BEGIN replaces (written by migrations/local-test/send_rules.py)
             ('student_submit._send_begin(text,text,uuid,uuid,jsonb,text,text,uuid)', '595e0a34dc67e23ca9fadc478c2ab9b7', '6cad6dd40eb1c33451a5dcf4f60e7624'),
-            ('student_submit.send_finish(text,uuid,uuid,jsonb,text)',                '286e463dca1842c2586a93c77fb93456', '7c6673bda2f6b2ded4a14da8671fdfac'),
+            ('student_submit.send_finish(text,uuid,uuid,jsonb,text)',                '286e463dca1842c2586a93c77fb93456', '340cb72444d555a9cef594b543e2674c'),
             ('student_submit.work(text,uuid,text)',                                  '64d016d3d102327917e987b24e811129', '2ec445c5d5afadb7c3fc1699d9929e52')
             -- FINGERPRINTS-END
         ) as v(fn, before, becomes)
