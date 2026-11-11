@@ -734,12 +734,15 @@ callable_ = sorted(r[0] for r in rows("""select n.nspname || '.' || p.proname fr
 # 2026111003 (S3-M1) takes issue_student_cards and reissue_student_card away: cards are then made by
 # student_submit.issue_cards, which no signed-in teacher can call (the teacher-cards edge function does).
 card_makers = [] if keyed_cards() else ['public.issue_student_cards', 'public.reissue_student_card']
+# 2026111101 (Batch B) adds three functions outside the API that storage's policies call as the signed-in teacher.
+storage_asks = (['fv_private.work_path_course', 'fv_private.work_read_allowed', 'fv_private.work_upload_allowed']
+                if one("select to_regclass('public.submission') is not null") else [])
 ok('what Batch A leaves a signed-in teacher able to run: %d RPCs and policy helpers in public, 2 helpers outside the API' % (12 + len(card_makers)),
    callable_ == sorted(['public.return_grades', 'public.list_course_grade_returns', 'public.course_draft_count',
                         'public.fv_owns_score_cell', 'public.fv_owns_tag_score_cell', 'public.fv_owns_rubric_score_cell', 'public.fv_owns_rubric_check_cell',
                         'public.list_student_cards', 'public.mark_student_cards_printed', 'public.unlock_student_card',
                         'public.unlock_all_student_cards', 'public.set_cards_work_until',
-                        'fv_private.grade_return_remap', 'fv_private.restore_grade_returns'] + card_makers), callable_)
+                        'fv_private.grade_return_remap', 'fv_private.restore_grade_returns'] + card_makers + storage_asks), callable_)
 ok("the same-class helpers say no for another teacher's cell",
    rpc(B, 'fv_owns_score_cell(:e, :a)', e=ENR1, a=acc) is False and rpc(A, 'fv_owns_score_cell(:e, :a)', e=ENR1, a=acc) is True)
 
