@@ -280,11 +280,13 @@ describe('what the server also tells, in Demo Mode (S4-W1)', () => {
     expect(text('.sp-core-name')).toEqual(['Creative Thinking', 'Critical & Reflective Thinking']);
   });
 
-  it('a returned card: the teacher’s name over the comment, as the sample sends it', async () => {
+  it('a returned card: no teacher’s name over the comment, though the sample sends one (ruling 112)', async () => {
     const page = await demo();
     await page.click('[data-segment="back"]');
     const lab = card(page, 'Cell Microscope Lab');
-    expect(lab.querySelector('.sp-piece-from').textContent).toBe('MRMs. Rivera');
+    expect(lab.querySelector('.sp-piece-from')).toBe(null);
+    expect(lab.querySelector('.sp-piece-comment')).not.toBe(null);
+    expect(page.root().innerHTML).not.toContain('Rivera');
     expect(lab.querySelector('.sp-piece-unit').textContent).toBe('Unit 1: Cells');
   });
 

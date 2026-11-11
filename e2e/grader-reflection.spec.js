@@ -69,5 +69,13 @@ test('a question answered with Send Answer; a plan saved as an observation', asy
   await expect(plan.locator('[data-grader="reflect-observe"]')).toHaveText('Saved as Observation');
   const saved = await page.evaluate(cid => (getQuickObs(cid).st4 || []).map(o => o.text), cid);
   expect(saved.some(t => t.indexOf('write the magnification') >= 0)).toBe(true);
+  // Never offered to a report (Colin's ruling 110); the teacher's own list says why.
+  await dialog.locator('[data-grader="close"]').click();
+  await page.goto('/observations');
+  const ob = page.locator('.obs-card', { hasText: 'write the magnification' }).first();
+  await expect(ob).toBeVisible();
+  await expect(ob.locator('.obs-from-reflection')).toHaveText('From a reflection. Not used in reports.');
+  if (process.env.NIGHT_SHOTS)
+    await ob.screenshot({ path: process.env.NIGHT_SHOTS + '/S10-reflection-observation-label-1366.png' });
   expect(errors).toEqual([]);
 });

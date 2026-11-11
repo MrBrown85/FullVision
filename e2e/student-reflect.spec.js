@@ -77,8 +77,8 @@ for (const [where, device] of [
     test('the teacher answered; Does It Make Sense Now? Yes', async ({ page }) => {
       const { posts, errors } = await demo(page);
       await openFeedback(page, 'Energy Transfer Investigation');
-      await page.getByRole('button', { name: 'Ms. Rivera Answered' }).click();
-      await expect(page.getByRole('heading', { level: 1, name: 'Ms. Rivera Answered' })).toBeFocused();
+      await page.getByRole('button', { name: 'Your Teacher Answered' }).click();
+      await expect(page.getByRole('heading', { level: 1, name: 'Your Teacher Answered' })).toBeFocused();
       await expect(
         page.getByText('A pattern is what keeps happening across your whole table.', { exact: false }),
       ).toBeVisible();

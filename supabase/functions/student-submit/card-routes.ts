@@ -106,6 +106,33 @@ function pick(from: unknown, keys: string[]): Json {
   return out;
 }
 
+/* The S4-M1 keys (migrations/local-test/s4-m1-contract.md). Each is copied
+   only where the database sent it, so a reply from before S4-M1 reads as it
+   did, byte for byte. Each is copied only as the type the contract names: a
+   value of any other type is sent as that key's empty value (null, [] or 0),
+   never as it came. */
+function typed(from: unknown, keys: string[], as: (v: unknown) => unknown): Json {
+  const src = object(from);
+  const out: Json = {};
+  for (const k of keys) if (k in src) out[k] = as(src[k]);
+  return out;
+}
+// Text, or null.
+const textOrNull = (v: unknown): string | null => (typeof v === 'string' ? v : null);
+// A number, or null.
+const numberOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+// A whole number, 0 or more; 0 otherwise.
+const count = (v: unknown): number => (typeof v === 'number' && Number.isSafeInteger(v) && v >= 0 ? v : 0);
+// A list of text: the strings, in order, blanks kept; anything else left behind.
+const texts = (v: unknown): string[] => list(v).filter((t): t is string => typeof t === 'string');
+// A list of ids: the ids, in order; anything else left behind.
+const ids = (v: unknown): string[] => list(v).filter((id): id is string => typeof id === 'string' && UUID.test(id));
+// A list of { id, name }, both text: those two fields of each, and nothing else.
+const named = (v: unknown): Json[] =>
+  list(v)
+    .filter(x => isObject(x) && typeof x.id === 'string' && typeof x.name === 'string')
+    .map(x => ({ id: (x as Json).id, name: (x as Json).name }));
+
 /* An object keyed by id, each value copied by `each`. A key that is not an
    id is left behind. */
 function byId(from: unknown, each: (v: unknown) => Json): Json {
@@ -125,6 +152,7 @@ function classes(v: unknown): Json[] {
     ...pick(c, ['enrollment_id']),
     student: person(object(c).student),
     course: klass(object(c).course),
+    ...typed(c, ['to_do'], count),
   }));
 }
 
@@ -156,6 +184,7 @@ function rubric(v: unknown): Json {
     ...pick(v, ['id', 'name', 'style']),
     criteria: list(object(v).criteria).map(c => ({
       ...pick(c, CRITERION),
+      ...typed(c, ['tag_ids'], ids),
       checks: list(object(c).checks).map(k => pick(k, ['id', 'level', 'label'])),
     })),
   };
@@ -175,7 +204,10 @@ function assessment(v: unknown): Json {
   const returned = typeof a.returned_at === 'string' && a.returned_at !== '';
   return {
     ...pick(a, ASSESSMENT),
-    tag_ids: list(a.tag_ids).filter(id => typeof id === 'string' && UUID.test(id)),
+    tag_ids: ids(a.tag_ids),
+    ...typed(a, ['description', 'module_name', 'category_name'], textOrNull),
+    ...typed(a, ['category_percent'], numberOrNull),
+    ...typed(a, ['core_competencies'], named),
     ...pick(a, RETURN),
     grade: returned ? gradeCopy(a.grade) : null,
     previous: returned ? gradeCopy(a.previous) : null,
@@ -190,6 +222,8 @@ function course(v: unknown): Json {
   return {
     ...pick(c, ['name', 'block', 'grading_system', 'level_order', 'round_percent']),
     grading_scale: isObject(c.grading_scale) ? c.grading_scale : null,
+    // teacher_name is never copied: students do not see the teacher's name
+    // (DECISIONS, Nov 11). The database may send it; it stops here.
   };
 }
 
@@ -200,7 +234,7 @@ function page(r: Json): Json {
     student: pick(r.student, ['enrollment_id', 'first_name']),
     course: course(r.course),
     classes: classes(r.classes),
-    tags: byId(r.tags, t => pick(t, ['label', 'code'])),
+    tags: byId(r.tags, t => ({ ...pick(t, ['label', 'code']), ...typed(t, ['i_can'], texts) })),
     rubrics: list(r.rubrics).map(rubric),
     assessments: list(r.assessments).map(assessment),
   };
