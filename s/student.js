@@ -119,6 +119,10 @@ var StudentPage = (function () {
       feedback: '', // the Assignments tab: the piece Your Feedback is open on
       whole: false, // the Assignments tab: The Whole Rubric is showing for that piece
       levels: false, // Your Feedback: What the Levels Mean is open
+      work: '', // Your Feedback: See Your Work is open on this piece (s/feedback.js, S9-F3)
+      workPage: 0, // See Your Work: the page showing, from 0
+      marksOff: false, // See Your Work: Show Marks is off
+      workPages: null, // See Your Work: the pages fetched, { id, state, pages } (s/feedback.js)
       form: '', // Questionnaires and My Reports: the one picked on a Chromebook
       back: '', // a questionnaire or report opened from a card's page: the tab to go back to
     };
