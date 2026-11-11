@@ -12166,13 +12166,19 @@ window.PageAssignments = (function () {
       // The gradebook's rows, in their order: group work steps through these.
       rowOrder: opts.studentIds && opts.studentIds.length ? opts.studentIds.slice() : null,
       onClose: opts.onClose || null,
-      // Show: To Return, Returned or All (S1-F2).
-      show: 'all',
+      // Show: To Grade, To Return, Returned, Not In or All (S1-F2, S6-F3).
+      show: opts.show && _SHOW_LABELS[opts.show] ? opts.show : 'all',
+      // The student's work beside the scoring (S6-F1): its page, the fit,
+      // each page's turn, and Focus on Work.
+      work: { page: 0, fit: 'page', turns: {}, focus: false },
     };
     overlay.addEventListener('mousedown', function (e) {
       if (e.target === overlay) closeGrader();
     });
     overlay.addEventListener('click', function (e) {
+      // Grade From Paper's Set Logan To menu (S6-F2): a grid row's fill options.
+      var fill = e.target.closest('.grader-setto-menu [data-action="graderSetTo"]');
+      if (fill) return _graderWorkAction('work-setto', fill);
       var btn = e.target.closest('[data-grader]');
       if (!btn) return;
       var what = btn.dataset.grader;
@@ -12181,7 +12187,12 @@ window.PageAssignments = (function () {
       else if (what === 'return') _graderReturn();
       else if (what === 'show') _graderSetShow(btn.dataset.show);
       else if (what === 'returnAll') _graderReturnAll(btn);
+      else if (what.indexOf('work-') === 0) _graderWorkAction(what, btn);
       else _graderGroupAction(what, btn.dataset.sid);
+    });
+    // Add Work's Choose Files (S6-F2).
+    overlay.addEventListener('change', function (e) {
+      if (e.target.classList.contains('grader-work-files')) _graderAddWorkFiles(e.target);
     });
     // A click anywhere but the open ⋯ menu closes it.
     overlay.addEventListener('mousedown', function (e) {
@@ -12358,8 +12369,17 @@ window.PageAssignments = (function () {
     // The toolbar and student header are drawn once and only updated, so a
     // save that redraws the controls (a points box on blur) doesn't swap out
     // the button being clicked.
-    // html-safe: fixed markup and icon constants; text is set with textContent below
-    if (!dialog.firstChild) dialog.innerHTML = _graderShellHtml();
+    // The student's work beside the scoring (S6-F1), while the piece takes
+    // work; the dialog is otherwise as it always was.
+    var work = GraderWork.workOn(cid, a);
+    if (!dialog.firstChild || _grader.workShell !== work) {
+      if (dialog.firstChild) _graderForgetDrawn();
+      // html-safe: fixed markup and icon constants; text is set with textContent below
+      dialog.innerHTML = work ? _graderWorkShellHtml() : _graderShellHtml();
+      _grader.workShell = work;
+    }
+    dialog.classList.toggle('has-work', work);
+    dialog.classList.toggle('is-focus', work && _grader.work.focus);
     // Group work shows the group: its grade is drawn from (and saved for)
     // the member it copies from, so that member is the focus.
     var view = _graderGroupView(cid, a, st.id);
@@ -12369,10 +12389,12 @@ window.PageAssignments = (function () {
         return x.id === view.source;
       });
     }
+    _graderWorkStudentChanged();
     _drawGraderToolbar(dialog, cid, a);
     _drawGraderHead(_graderPart(dialog, 'head'), cid, a, st, view);
     _grader.source = view ? view.source : null;
     _drawGraderPanel(_graderPart(dialog, 'panel'), cid, a, st);
+    if (work) _drawGraderWork(dialog, cid, a, st, view);
     _refreshGraderChrome();
   }
 
@@ -12958,6 +12980,10 @@ window.PageAssignments = (function () {
       ? returnStep + '\u2190 \u2192 change group \u00B7 Esc closes'
       : returnStep + '\u2190 \u2192 change student \u00B7 Esc closes';
     _refreshGraderReturn(dialog, cid, a, sid, view);
+    if (_grader.workShell) {
+      _refreshGraderWorkLine(dialog, cid, a, sid);
+      _graderShortLevels(dialog);
+    }
     // To Return, Returned and All, and Return N Graded (S1-F2). It draws
     // the dialog again itself when what Show lists has run out.
     if (_refreshGraderShow(dialog, cid, a)) return;
@@ -13420,7 +13446,24 @@ window.PageAssignments = (function () {
      hidden, as the gradebook's column does. Show is what ← → step
      through: the student on screen stays until a step, and when the last
      one it lists is gone it goes back to All. */
-  var _SHOW_LABELS = { toreturn: 'To Return', returned: 'Returned', all: 'All' };
+  var _SHOW_LABELS = {
+    tograde: 'To Grade',
+    toreturn: 'To Return',
+    returned: 'Returned',
+    notin: 'Not In',
+    all: 'All',
+  };
+  /* Show's buttons: To Grade and Not In join them while the piece takes
+     student work (S6-F3, Grader.workOn). */
+  function _graderShowKeys(cid, a) {
+    return GraderWork.workOn(cid, a)
+      ? ['tograde', 'toreturn', 'returned', 'notin', 'all']
+      : ['toreturn', 'returned', 'all'];
+  }
+  // The bar is drawn: a class that holds grades, or a piece that takes work.
+  function _graderShowWanted(cid, a) {
+    return (_holdsGrades(cid) || GraderWork.workOn(cid, a)) && !isDibelsScored(a);
+  }
 
   // The dialog's stops, in order: a group or a student each.
   function _graderStops(cid, a) {
@@ -13433,18 +13476,15 @@ window.PageAssignments = (function () {
       return { focus: sid, ids: [sid] };
     });
   }
-  // True when Show lists the stop: it has a draft, or its grade is given.
+  /* True when Show lists the stop: one of its students is in what Show
+     is on (Grader.workStateOf); for Returned, none of them has a draft. */
   function _stopShown(cid, aid, stop, show) {
-    var draft = GradeState.draftsIn(cid, aid, stop.ids).length > 0;
-    if (show === 'toreturn') return draft;
-    if (show === 'returned')
-      return (
-        !draft &&
-        stop.ids.some(function (id) {
-          return GradeState.stateOf(cid, id, aid) === GradeState.RETURNED;
-        })
-      );
-    return true;
+    if (!_SHOW_LABELS[show] || show === 'all') return true;
+    var states = stop.ids.map(function (id) {
+      return GraderWork.workStateOf(cid, aid, id);
+    });
+    if (show === 'returned' && states.indexOf('toreturn') >= 0) return false;
+    return states.indexOf(show) >= 0;
   }
   function _stopIndex(stops, sid) {
     for (var i = 0; i < stops.length; i++) if (stops[i].ids.indexOf(sid) >= 0) return i;
@@ -13459,7 +13499,7 @@ window.PageAssignments = (function () {
     return null;
   }
   function _graderShowOn() {
-    return !!_grader && (_grader.show === 'toreturn' || _grader.show === 'returned');
+    return !!_grader && !!_grader.show && _grader.show !== 'all' && !!_SHOW_LABELS[_grader.show];
   }
 
   // ← → while Show is on To Return or Returned. False when it is on All.
@@ -13467,7 +13507,7 @@ window.PageAssignments = (function () {
     if (!_graderShowOn()) return false;
     var cid = activeCourse;
     var a = _assessmentById(cid, _grader.aid);
-    if (!a || !_holdsGrades(cid)) return false;
+    if (!a || !_graderShowWanted(cid, a)) return false;
     var next = _nextShownStop(cid, a, dir);
     if (!next) return true;
     _grader.menuSid = null;
@@ -13476,16 +13516,12 @@ window.PageAssignments = (function () {
     return true;
   }
 
-  /* The bar's counts: students, among those the dialog steps through. */
+  /* The bar's counts, among the students the dialog steps through: the
+     one counting function the gradebook and the dashboard call too
+     (Grader.workCounts). Students, except a group to grade, which counts
+     once. */
   function _graderShowCounts(cid, a) {
-    var ids = _grader.studentIds;
-    return {
-      toreturn: GradeState.draftsIn(cid, a.id, ids).length,
-      returned: ids.filter(function (sid) {
-        return GradeState.stateOf(cid, sid, a.id) === GradeState.RETURNED;
-      }).length,
-      all: ids.length,
-    };
+    return GraderWork.workCounts(cid, a.id, _grader.studentIds);
   }
 
   // html-safe: fixed labels and numbers; the names in the title go through esc
@@ -13495,7 +13531,7 @@ window.PageAssignments = (function () {
     var label = GradeState.returnNGraded(waiting.length);
     return (
       '<div class="seg seg-sm grader-show-seg" role="group" aria-label="Show">' +
-      ['toreturn', 'returned', 'all']
+      _graderShowKeys(cid, a)
         .map(function (key) {
           return (
             '<button type="button" class="seg-btn"' +
@@ -13528,7 +13564,7 @@ window.PageAssignments = (function () {
      drew the whole dialog again: what Show listed has run out. */
   function _refreshGraderShow(dialog, cid, a) {
     var box = dialog.querySelector('.grader-show');
-    var on = _holdsGrades(cid) && !isDibelsScored(a) && _grader.studentIds.length > 1;
+    var on = _graderShowWanted(cid, a) && _grader.studentIds.length > 1;
     if (!on) {
       if (box) box.remove();
       _grader.show = 'all';
@@ -13567,7 +13603,7 @@ window.PageAssignments = (function () {
     if (!_grader || !_SHOW_LABELS[show]) return;
     var cid = activeCourse;
     var a = _assessmentById(cid, _grader.aid);
-    if (!a || !_holdsGrades(cid)) return;
+    if (!a || !_graderShowWanted(cid, a)) return;
     _grader.show = show;
     if (_graderShowOn()) {
       var stops = _graderStops(cid, a);
@@ -13615,6 +13651,558 @@ window.PageAssignments = (function () {
     });
     if (justThese) return done();
     _askReturn(cid, waiting, button, done);
+  }
+
+  /* ── The student's work in the dialog (S6-F1 to F3) ────────
+     In a class whose student page (the build switch) and Send Work are on,
+     on a piece whose Students Send is not Nothing (Grader.workOn), the
+     dialog grows a work pane beside the scoring panel:
+     - under the student's name, what came in ("Submitted Oct 30, 8:41 pm
+       · 2 photos", "Not In · 7 days late"), "Same photo as Mia K." when a
+       page is byte for byte another student's, and a strip of the students
+       whose work waits;
+     - the page, with ‹ 1 of 2 ›, Whole Page and Fit Width, Rotate (the
+       view only: nothing saved), Focus on Work, the student's note and
+       Delete Work;
+     - with nothing in: Add Work (Choose Files, shrunk as a student's are,
+       shared/photo-shrink.js) and Grade From Paper's Set Logan To.
+     Focus on Work gives the page the room and narrows the scoring to a
+     column with short level names (EMG, DEV, PRF, EXT).
+     Demo Mode only for now: signed in, the data layer answers nothing is in
+     and Add Work answers not_available (S6-W1 wires it). Every answer from
+     the photo store, a file shrink or a confirm checks that the dialog
+     still shows the same piece and student before it draws. */
+  var _WORK_ROTATE_ICON =
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>';
+  var _WORK_SHORT = { 1: 'EMG', 2: 'DEV', 3: 'PRF', 4: 'EXT' };
+
+  // html-safe: the parts' fixed markup
+  function _graderWorkShellHtml() {
+    return (
+      _graderToolbarHtml() +
+      '<div class="grader-scroll grader-scroll-work">' +
+      _graderHeadHtml() +
+      '<div class="grader-work-line"></div>' +
+      '<div class="grader-split">' +
+      '<section class="grader-work" aria-label="Student work"></section>' +
+      '<div class="grader-panel-col">' +
+      _graderPanelHtml() +
+      '</div></div></div>' +
+      _graderFootHtml()
+    );
+  }
+
+  // The shell changed under a drawn dialog: what it remembers drawing is gone.
+  function _graderForgetDrawn() {
+    ['statusHtml', 'markHtml', 'membersHtml', 'lineHtml', 'returnHtml', 'showHtml', 'workHtml', 'workLineHtml'].forEach(
+      function (k) {
+        _grader[k] = null;
+      },
+    );
+    _graderReleasePage(_grader);
+  }
+
+  // A photo's address holds its bytes until it is let go (openStudentWorkPage).
+  function _graderReleasePage(g) {
+    if (!g || !g.work) return;
+    if (g.work.release) g.work.release();
+    g.work.release = null;
+    g.work.imgKey = null;
+    g.work.url = null;
+    g.work.shownKey = null;
+  }
+
+  function _workStudent(cid, sid) {
+    return (
+      getStudents(cid).find(function (x) {
+        return x.id === sid;
+      }) || null
+    );
+  }
+
+  // "she", "he", "they" from the student's pronouns, or null.
+  function _workPronoun(st) {
+    var p = String((st && st.pronouns) || '')
+      .toLowerCase()
+      .trim();
+    if (/^she\b/.test(p)) return { subj: 'she', poss: 'Her' };
+    if (/^he\b/.test(p)) return { subj: 'he', poss: 'His' };
+    if (/^they\b/.test(p)) return { subj: 'they', poss: 'Their' };
+    return null;
+  }
+
+  // "Oct 30, 8:41 pm"
+  function _workWhen(ts) {
+    if (!ts) return '';
+    var d = new Date(ts);
+    if (isNaN(d.getTime())) return '';
+    var day = formatShortDate(String(ts).slice(0, 10));
+    var time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase();
+    return day + ', ' + time;
+  }
+
+  function _workPhotos(n) {
+    return n + (n === 1 ? ' photo' : ' photos');
+  }
+
+  /* The line under the name: what came in, or that nothing has. */
+  function _workLineText(cid, a, sid, sub) {
+    if (sub) {
+      if (sub.on_paper) return 'Handed in on paper';
+      var when = _workWhen(sub.sent_at || sub.created_at);
+      var verb = sub.sent_by === 'teacher' ? 'Added by you' : 'Submitted';
+      return verb + (when ? ' ' + when : '') + ' · ' + _workPhotos((sub.files || []).length);
+    }
+    var status = getAssignmentStatus(cid, sid, a.id);
+    if (status === 'EXC') return 'Excused';
+    var head = status === 'NS' ? 'Missing' : 'Not In';
+    var due = a.dueDate || a.due_date || null;
+    if (!due) return head;
+    var days = Math.round((Date.parse(courseToday(cid)) - Date.parse(String(due).slice(0, 10))) / 86400000);
+    if (days > 0) return head + ' · ' + days + (days === 1 ? ' day late' : ' days late');
+    return head + ' · Due ' + formatShortDate(String(due).slice(0, 10));
+  }
+
+  // "Mia K."
+  function _workShortName(st) {
+    if (!st) return '';
+    var last = String(st.lastName || '').trim();
+    return displayNameFirst(st) + (last ? ' ' + last.charAt(0) + '.' : '');
+  }
+
+  /* The line: what came in, Same photo as, and the strip of the students
+     whose work waits (up to five, then "+2"). Redrawn only when it changes. */
+  // html-safe: names go through esc; ids are ours; labels are fixed words
+  function _workLineHtml(cid, a, sid) {
+    var sub = getStudentSubmission(cid, sid, a.id);
+    var html = '<span class="grader-work-what">' + esc(_workLineText(cid, a, sid, sub)) + '</span>';
+    GraderWork.samePhotoAs(cid, a.id, sid, _grader.studentIds).forEach(function (other) {
+      var st = _workStudent(cid, other);
+      if (!st) return;
+      html +=
+        '<button type="button" class="grader-work-same" data-grader="work-open" data-sid="' +
+        other +
+        '" title="' +
+        esc('A page of this work is the same photo, byte for byte, as one of ' + displayNameWithLast(st) + '’s.') +
+        '">' +
+        esc('Same photo as ' + _workShortName(st)) +
+        '</button>';
+    });
+    var waiting = GraderWork.workCounts(cid, a.id, _grader.studentIds).ids.tograde;
+    if (waiting.length) {
+      var shown = waiting.slice(0, 5);
+      var more = waiting.length - shown.length;
+      html +=
+        '<span class="grader-work-strip" role="group" aria-label="Students to grade">' +
+        shown
+          .map(function (id) {
+            var st = _workStudent(cid, id);
+            var name = st ? displayNameWithLast(st) : '';
+            return (
+              '<button type="button" class="grader-work-who' +
+              (id === sid ? ' is-on' : '') +
+              '" data-grader="work-open" data-sid="' +
+              id +
+              '" aria-label="' +
+              esc(name) +
+              '" title="' +
+              esc(name) +
+              '"' +
+              (id === sid ? ' aria-current="true"' : '') +
+              '>' +
+              esc(st ? initials(st) : '') +
+              '</button>'
+            );
+          })
+          .join('') +
+        (more
+          ? '<button type="button" class="grader-work-who grader-work-more" data-grader="show" data-show="tograde" aria-label="' +
+            more +
+            ' more to grade">+' +
+            more +
+            '</button>'
+          : '') +
+        '</span>';
+    }
+    return html;
+  }
+
+  function _refreshGraderWorkLine(dialog, cid, a, sid) {
+    var line = dialog.querySelector('.grader-work-line');
+    if (!line) return;
+    var html = _workLineHtml(cid, a, sid);
+    if (_grader.workLineHtml === html) return;
+    _grader.workLineHtml = html;
+    // html-safe: built by _workLineHtml
+    line.innerHTML = html;
+  }
+
+  /* The pane for `st`: their pages, or Add Work when nothing is in. */
+  // html-safe: names and the note go through esc; ids are ours; labels are fixed words
+  function _workPaneHtml(cid, a, st, view) {
+    var w = _grader.work;
+    var sub = getStudentSubmission(cid, st.id, a.id);
+    var first = view ? view.label : displayNameFirst(st);
+    var files = (sub && sub.files) || [];
+    if (!sub) return _addWorkHtml(cid, a, st, first);
+    if (!files.length)
+      return '<div class="grader-work-empty"><p>Handed in on paper. Grade it from the paper.</p></div>';
+    var at = Math.min(Math.max(w.page, 0), files.length - 1);
+    var file = files[at];
+    var turn = w.turns[file.id] || 0;
+    var html =
+      '<div class="grader-work-tools">' +
+      '<span class="grader-work-pager">' +
+      '<button type="button" class="grader-work-step" data-grader="work-page" data-dir="-1" aria-label="Previous page"' +
+      (at > 0 ? '' : ' disabled') +
+      '>‹</button>' +
+      '<span class="grader-work-at">' +
+      (at + 1) +
+      ' of ' +
+      files.length +
+      '</span>' +
+      '<button type="button" class="grader-work-step" data-grader="work-page" data-dir="1" aria-label="Next page"' +
+      (at < files.length - 1 ? '' : ' disabled') +
+      '>›</button></span>' +
+      '<div class="seg seg-sm grader-work-fit" role="group" aria-label="Fit">' +
+      ['page', 'width']
+        .map(function (fit) {
+          return (
+            '<button type="button" class="seg-btn"' +
+            segAttr(w.fit === fit) +
+            ' data-grader="work-fit" data-fit="' +
+            fit +
+            '">' +
+            (fit === 'page' ? 'Whole Page' : 'Fit Width') +
+            '</button>'
+          );
+        })
+        .join('') +
+      '</div>' +
+      '<button type="button" class="grader-work-tool" data-grader="work-rotate" aria-label="Rotate" title="Rotate">' +
+      _WORK_ROTATE_ICON +
+      '</button>' +
+      '<span class="grader-spacer"></span>' +
+      '<button type="button" class="grader-work-tool grader-work-focus" data-grader="work-focus" aria-pressed="' +
+      !!w.focus +
+      '">Focus on Work</button>' +
+      '</div>' +
+      '<div class="grader-work-page fit-' +
+      (w.fit === 'width' ? 'width' : 'page') +
+      ' turn-' +
+      turn +
+      '"><img class="grader-work-img" alt="' +
+      esc('Page ' + (at + 1) + ' of ' + (a.title || 'the work')) +
+      '"></div>';
+    if (sub.note) {
+      html +=
+        '<div class="grader-work-note"><h3 class="grader-work-note-title">' +
+        esc(first + '’s Note, Sent With the Work') +
+        '</h3><p>' +
+        esc(sub.note) +
+        '</p></div>';
+    }
+    return (
+      html +
+      '<div class="grader-work-foot"><button type="button" class="grader-work-delete" data-grader="work-delete">Delete Work</button></div>'
+    );
+  }
+
+  /* Nothing in: Add Work, and Grade From Paper's Set Logan To. */
+  // html-safe: the name goes through esc; labels are fixed words; levels are numbers
+  function _addWorkHtml(cid, a, st, first) {
+    var w = _grader.work;
+    var levels = !isPointsScored(a) && !isCompletionScored(a) && _setEveryonePlan(cid, a.id).perStudent > 0;
+    var open = w.setTo === st.id;
+    return (
+      '<div class="grader-addwork">' +
+      '<h3 class="grader-addwork-title">' +
+      esc('Add Work for ' + first) +
+      '</h3>' +
+      '<p class="grader-addwork-hint">Photos or PDFs. Photos are made smaller before they upload.</p>' +
+      '<label class="grader-addwork-choose' +
+      (w.busy ? ' is-busy' : '') +
+      '"><input type="file" class="grader-work-files" multiple accept="image/*,.heic,.heif,application/pdf"' +
+      (w.busy ? ' disabled' : '') +
+      '>' +
+      (w.busy ? 'Adding…' : 'Choose Files') +
+      '</label>' +
+      '<p class="grader-addwork-msg" role="status">' +
+      esc(w.msg || '') +
+      '</p>' +
+      (levels
+        ? '<h3 class="grader-addwork-title">Grade From Paper</h3>' +
+          '<div class="grader-setto"><button type="button" class="grader-setto-btn" data-grader="work-setto-menu" aria-haspopup="menu" aria-expanded="' +
+          open +
+          '">' +
+          esc('Set ' + first + ' To') +
+          '</button>' +
+          '<div class="grader-setto-menu" role="menu"' +
+          (open ? '' : ' hidden') +
+          '>' +
+          // The same options as a grid row's fill: a dot and the level's name.
+          _rowFillOptionsHtml(cid, 'graderSetTo', a.id, st.id) +
+          '</div></div>'
+        : '') +
+      '</div>'
+    );
+  }
+
+  /* The pane, drawn only when it changes; the page's picture is fetched
+     when the page shown changes, and the last one let go. */
+  function _drawGraderWork(dialog, cid, a, st, view) {
+    var pane = dialog.querySelector('.grader-work');
+    if (!pane) return;
+    var html = _workPaneHtml(cid, a, st, view);
+    if (_grader.workHtml !== html) {
+      _grader.workHtml = html;
+      // html-safe: built by _workPaneHtml
+      pane.innerHTML = html;
+      _grader.work.shownKey = null;
+    }
+    var img = pane.querySelector('.grader-work-img');
+    var sub = getStudentSubmission(cid, st.id, a.id);
+    var files = (sub && sub.files) || [];
+    var file = files[Math.min(Math.max(_grader.work.page, 0), files.length - 1)];
+    if (!img || !file) return _graderReleasePage(_grader);
+    var key = [cid, a.id, st.id, file.id, file.path].join('|');
+    if (_grader.work.imgKey === key) {
+      // The pane was drawn again: the picture already fetched goes back in.
+      if (_grader.work.url && _grader.work.shownKey !== key) {
+        img.src = _grader.work.url;
+        _grader.work.shownKey = key;
+      }
+      return;
+    }
+    _graderReleasePage(_grader);
+    _grader.work.imgKey = key;
+    var g = _grader;
+    openStudentWorkPage(cid, file, 'page').then(function (res) {
+      // The dialog moved on (another student, page or piece, or closed).
+      if (_grader !== g || g.work.imgKey !== key) {
+        if (res) res.release();
+        return;
+      }
+      if (!res) return;
+      g.work.release = res.release;
+      g.work.url = res.url;
+      var now = g.overlay.querySelector('.grader-work-img');
+      if (now) {
+        now.src = res.url;
+        g.work.shownKey = key;
+      }
+    });
+  }
+
+  /* In Focus on Work the scoring's level buttons show EMG, DEV, PRF and
+     EXT, and keep their whole names for a screen reader and the hover. */
+  function _graderShortLevels(dialog) {
+    if (!dialog.classList.contains('is-focus')) return;
+    dialog.querySelectorAll('.grader-panel-col button[data-level]').forEach(function (b) {
+      var short = _WORK_SHORT[b.dataset.level];
+      var name = b.textContent.trim();
+      if (!short || !name || b.children.length) return;
+      b.setAttribute('aria-label', name);
+      b.title = name;
+      // html-safe: fixed short names and the level's fixed name
+      b.innerHTML =
+        '<span class="lvl-full">' +
+        esc(name) +
+        '</span><span class="lvl-short" aria-hidden="true">' +
+        short +
+        '</span>';
+    });
+  }
+
+  function _graderWorkAction(what, btn) {
+    if (!_grader) return;
+    var cid = activeCourse;
+    var a = _assessmentById(cid, _grader.aid);
+    var sid = focusStudentId;
+    if (!a || !sid) return;
+    var w = _grader.work;
+    var again = null;
+    if (what === 'work-page') {
+      w.page = Math.max(0, w.page + (parseInt(btn.dataset.dir, 10) || 0));
+      again = '[data-grader="work-page"][data-dir="' + btn.dataset.dir + '"]';
+    } else if (what === 'work-fit') {
+      w.fit = btn.dataset.fit === 'width' ? 'width' : 'page';
+      again = '[data-grader="work-fit"][data-fit="' + w.fit + '"]';
+    } else if (what === 'work-rotate') {
+      var sub = getStudentSubmission(cid, sid, a.id);
+      var file = sub && (sub.files || [])[w.page];
+      if (file) w.turns[file.id] = ((w.turns[file.id] || 0) + 90) % 360;
+      again = '[data-grader="work-rotate"]';
+    } else if (what === 'work-focus') {
+      w.focus = !w.focus;
+      // The page fills the width it is given, as the board draws it.
+      if (w.focus) w.fit = 'width';
+      again = '[data-grader="work-focus"]';
+    } else if (what === 'work-open') {
+      if (!btn.dataset.sid || _grader.studentIds.indexOf(btn.dataset.sid) < 0) return;
+      _grader.menuSid = null;
+      focusStudentId = btn.dataset.sid;
+      _graderToTop();
+    } else if (what === 'work-setto-menu') {
+      w.setTo = w.setTo === sid ? null : sid;
+      again = '[data-grader="work-setto-menu"]';
+    } else if (what === 'work-setto') {
+      w.setTo = null;
+      _graderSetTo(cid, a, sid, parseInt(btn.dataset.score, 10), btn.textContent.replace(/^\s*\d\s*/, '').trim());
+    } else if (what === 'work-delete') {
+      return _graderAskDeleteWork(cid, a, sid, btn);
+    } else return;
+    render();
+    var to = again && _grader && _grader.overlay.querySelector(again);
+    if (to && !to.disabled) to.focus({ preventScroll: true });
+  }
+
+  /* A new student opens on their first page. */
+  function _graderWorkStudentChanged() {
+    var w = _grader && _grader.work;
+    if (!w || w.sid === focusStudentId) return;
+    w.sid = focusStudentId;
+    w.page = 0;
+    w.msg = '';
+    w.setTo = null;
+  }
+
+  /* Grade From Paper: Set Logan To (GraderWork.setToFromPaper, which the
+     phone's not-in card can call too). Undo puts the levels back. */
+  function _graderSetTo(cid, a, sid, level, label) {
+    var before = structuredClone(getScores(cid));
+    var done = GraderWork.setToFromPaper(cid, a.id, sid, level);
+    refreshSidebarGrades(sid);
+    var after = structuredClone(getScores(cid));
+    var st = _workStudent(cid, sid);
+    var g = _grader;
+    done.paper.then(function () {
+      if (_grader === g && activeCourse === cid && g.aid === a.id) render();
+    });
+    if (!done.set) return;
+    _showFillUndo((st ? displayNameFirst(st) : 'Student') + ' set to ' + label, function () {
+      Grader.undo(cid, before, after);
+      render();
+      refreshSidebarGrades();
+    });
+  }
+
+  /* Add Work's Choose Files: each file shrunk the way a student's are
+     (PhotoShrink.prepare), its pages kept in order, then recorded as the
+     teacher's work (addStudentWorkPages). The refusals say what the
+     phone's Add Work says (teacher-mobile/add-work.js). */
+  function _addWorkRefusal(res) {
+    var R = (window.PhotoShrink && PhotoShrink.REASONS) || {};
+    if (res && res.reason === R.OFFICE) return 'Save it as a PDF first.';
+    // No PDF reader ships yet (vendor/ has none), so a PDF is refused.
+    if (res && res.kind === 'pdf' && res.reason === R.NO_DECODER)
+      return "PDFs can't be added here yet. Add a photo of each page.";
+    if (res && (res.reason === R.TOO_MANY_PAGES || res.reason === R.PDF_TOO_LARGE))
+      return 'That PDF is too long to add here.';
+    return "That file couldn't be used. Try another photo.";
+  }
+  function _addWorkAnswer(res) {
+    if (res.result === 'too_many_pages') return 'A piece of work can have 30 pages at most.';
+    if (res.result === 'storage_full') return 'This computer is full. Free some space, then try again.';
+    if (res.result === 'already_sent') return 'Work came in for this student meanwhile. It is shown now.';
+    if (res.result === 'not_available') return 'Adding work is not ready for signed-in classes yet.';
+    return "The photos couldn't be kept. Try again.";
+  }
+  function _graderAddWorkFiles(input) {
+    if (!_grader || _grader.work.busy) return;
+    var files = Array.prototype.slice.call(input.files || []);
+    input.value = '';
+    if (!files.length || !window.PhotoShrink) return;
+    var cid = activeCourse;
+    var aid = _grader.aid;
+    var sid = focusStudentId;
+    var g = _grader;
+    var same = function () {
+      return _grader === g && activeCourse === cid && g.aid === aid && focusStudentId === sid;
+    };
+    g.work.busy = true;
+    g.work.msg = '';
+    render();
+    var pages = [];
+    var said = '';
+    files
+      .reduce(function (p, file) {
+        return p.then(function () {
+          if (said) return;
+          return PhotoShrink.prepare(file).then(function (res) {
+            if (!res || !res.ok) said = _addWorkRefusal(res);
+            else pages = pages.concat(res.pages);
+            if (!said && pages.length > STUDENT_WORK_MAX_PAGES) said = 'A piece of work can have 30 pages at most.';
+          });
+        });
+      }, Promise.resolve())
+      .then(function () {
+        if (said || !pages.length) return { result: 'refused' };
+        return addStudentWorkPages(cid, sid, aid, pages, { mode: 'new' });
+      })
+      .then(null, function () {
+        return { result: 'store_failed' };
+      })
+      .then(function (res) {
+        g.work.busy = false;
+        if (_grader !== g) return;
+        // A line about this student's files is said only on their screen.
+        if (same()) {
+          g.work.msg = res.result === 'sent' ? '' : said || _addWorkAnswer(res);
+          g.work.page = 0;
+        }
+        render();
+      });
+  }
+
+  /* Delete Work (Colin's ruling 87; the confirm is ruling 102's, item 9 of
+     the photo-warning wording). The grade and comments stay. */
+  function _deleteWorkMessage(cid, a, st, sub) {
+    var files = (sub && sub.files) || [];
+    var theirs = files.filter(function (f) {
+      return f.added_by !== 'teacher';
+    }).length;
+    var yours = files.length - theirs;
+    var first = displayNameFirst(st);
+    var p = _workPronoun(st);
+    var what = theirs
+      ? first +
+        '’s ' +
+        _workPhotos(theirs) +
+        (yours ? (yours === 1 ? ' and the page you added' : ' and the ' + yours + ' pages you added') : '')
+      : 'The ' + (yours === 1 ? 'page' : yours + ' pages') + ' you added for ' + first;
+    return (
+      what +
+      (theirs ? ' for ' : ' on ') +
+      (a.title || 'this work') +
+      (files.length === 1 ? ' is' : ' are') +
+      ' deleted, and ' +
+      (p ? p.subj : first) +
+      ' can send it again. ' +
+      (p ? p.poss : first + '’s') +
+      ' grade and your comments stay. Deleted photos can’t come back.'
+    );
+  }
+  function _graderAskDeleteWork(cid, a, sid, button) {
+    var st = _workStudent(cid, sid);
+    var sub = getStudentSubmission(cid, sid, a.id);
+    if (!st || !sub) return;
+    var g = _grader;
+    if (button && button.focus) button.focus({ preventScroll: true });
+    showConfirm(
+      'Delete ' + displayNameFirst(st) + '’s Work?',
+      _deleteWorkMessage(cid, a, st, sub),
+      'Delete Work',
+      'danger',
+      function () {
+        if (_grader !== g || activeCourse !== cid || focusStudentId !== sid) return;
+        GraderWork.deleteWork(cid, sid, a.id).then(function () {
+          if (_grader !== g || activeCourse !== cid) return;
+          if (focusStudentId === sid) g.work.page = 0;
+          render();
+        });
+      },
+    );
   }
 
   /* ── Note for the Report ──────────────────────────────────
@@ -13880,6 +14468,7 @@ window.PageAssignments = (function () {
     var active = document.activeElement;
     if (active && _grader.overlay.contains(active) && active.blur) active.blur();
     var g = _grader;
+    _graderReleasePage(g);
     _grader = null;
     _hideChipTip();
     _listeners.forEach(function (l) {

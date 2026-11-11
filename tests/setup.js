@@ -240,6 +240,9 @@ load('shared/rubric-draft.js');
 load('shared/rubric-checks.js');
 load('shared/core-self.js');
 load('shared/student-view.js');
+// Photos: shrinking and the queue that keeps them (Add Work in the grader).
+load('shared/photo-shrink.js');
+load('shared/photo-queue.js');
 load('s/page-view.js');
 load('teacher/ui.js');
 load('teacher/report-scores.js');

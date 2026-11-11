@@ -8947,3 +8947,327 @@ button.grader-member-name {
 .af-work-until {
   max-width: 220px;
 }
+
+/* ── The student's work beside the scoring (S6-F1 to F3) ──────
+   Only in a dialog with .has-work: a class whose student page and Send
+   Work are on, on a piece that takes student work. */
+.grader-overlay:has(.grader-dialog.has-work) {
+  padding-top: 3vh;
+}
+.grader-dialog.has-work {
+  width: min(1440px, 100%);
+  max-height: calc(97vh - 24px);
+}
+.grader-scroll-work {
+  gap: 10px;
+}
+.grader-work-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: -6px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+.grader-work-same {
+  border: 1px solid var(--late, #b45309);
+  color: var(--late, #b45309);
+  background: transparent;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.grader-work-strip {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: auto;
+}
+.grader-work-who {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--divider-heavy);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.grader-work-who.is-on {
+  border-color: var(--active);
+  box-shadow: 0 0 0 2px var(--active);
+}
+.grader-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.grader-dialog.is-focus .grader-split {
+  grid-template-columns: minmax(0, 1fr) 380px;
+}
+.grader-panel-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.grader-work {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.grader-work-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.grader-work-pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.grader-work-step,
+.grader-work-tool {
+  min-width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--divider-heavy);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 8px;
+  cursor: pointer;
+}
+.grader-work-step:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.grader-work-focus[aria-pressed='true'] {
+  background: var(--active);
+  border-color: var(--active);
+  color: #fff;
+}
+.grader-work-page {
+  background: var(--surface-2, #f2f2f4);
+  border-radius: 12px;
+  overflow: auto;
+  max-height: calc(97vh - 300px);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+.grader-work-img {
+  display: block;
+  transition: transform 0.15s;
+}
+.grader-work-page.fit-page .grader-work-img {
+  max-width: 100%;
+  max-height: calc(97vh - 300px);
+  object-fit: contain;
+}
+.grader-work-page.fit-width .grader-work-img {
+  width: 100%;
+  height: auto;
+}
+.grader-work-page.turn-90 .grader-work-img {
+  transform: rotate(90deg);
+}
+.grader-work-page.turn-180 .grader-work-img {
+  transform: rotate(180deg);
+}
+.grader-work-page.turn-270 .grader-work-img {
+  transform: rotate(270deg);
+}
+.grader-work-note {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 14px;
+}
+.grader-work-note-title {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+.grader-work-note p {
+  margin: 0;
+}
+.grader-work-foot {
+  display: flex;
+  justify-content: flex-end;
+}
+.grader-work-delete {
+  background: none;
+  border: none;
+  color: var(--score-1, #c0392b);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 0;
+}
+.grader-work-empty,
+.grader-addwork {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.grader-work-empty p {
+  margin: 0;
+  color: var(--text-2);
+}
+.grader-addwork-title {
+  margin: 6px 0 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+.grader-addwork-hint,
+.grader-addwork-msg {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.grader-addwork-msg:empty {
+  display: none;
+}
+.grader-addwork-choose {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 10px;
+  background: var(--active);
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+.grader-addwork-choose.is-busy {
+  opacity: 0.6;
+  cursor: progress;
+}
+.grader-addwork-choose input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+.grader-setto {
+  position: relative;
+}
+.grader-setto-btn {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--divider-heavy);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.grader-setto-menu {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 180px;
+  background: var(--bg);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+.grader-setto-menu[hidden] {
+  display: none;
+}
+.grader-setto-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  text-align: left;
+  cursor: pointer;
+}
+.grader-setto-menu button:hover,
+.grader-setto-menu button:focus-visible {
+  background: var(--surface);
+}
+/* Focus on Work: short level names, the scoring in one narrow column. */
+.lvl-short {
+  display: none;
+}
+.grader-dialog.is-focus .lvl-full {
+  display: none;
+}
+.grader-dialog.is-focus .lvl-short {
+  display: inline;
+}
+.grader-dialog.is-focus .grader-panel-col .grdt-legend {
+  display: none;
+}
+/* A rubric's levels stack, one above the next, each with its checklist. */
+.grader-dialog.is-focus .grader-panel-col .grdt-row {
+  grid-template-columns: minmax(0, 1fr);
+}
+.grader-dialog.is-focus .grader-panel-col .grader-report-note {
+  display: none;
+}
+@media (max-width: 900px) {
+  .grader-split,
+  .grader-dialog.is-focus .grader-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .grader-work {
+    position: static;
+  }
+}
+/* Stacked, each level tile names its level the short way, as Focus's buttons do. */
+.grader-dialog.is-focus .grader-panel-col .grdt-tile .grdt-tile-head::before {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+  margin-right: 8px;
+}
+.grader-dialog.is-focus .grader-panel-col .grdt-tile[data-level='1'] .grdt-tile-head::before {
+  content: 'EMG';
+}
+.grader-dialog.is-focus .grader-panel-col .grdt-tile[data-level='2'] .grdt-tile-head::before {
+  content: 'DEV';
+}
+.grader-dialog.is-focus .grader-panel-col .grdt-tile[data-level='3'] .grdt-tile-head::before {
+  content: 'PRF';
+}
+.grader-dialog.is-focus .grader-panel-col .grdt-tile[data-level='4'] .grdt-tile-head::before {
+  content: 'EXT';
+}
