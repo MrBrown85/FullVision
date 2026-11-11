@@ -2043,7 +2043,8 @@
   }
 
   function startDemo(hash) {
-    var m = /^demo-card(?:-(password|letter|both))?$/i.exec(hash || '');
+    // #demo-card-send: the sample class with Send Work on (S5-F2); off, as in every class, otherwise.
+    var m = /^demo-card(?:-(password|letter|both|send))?$/i.exec(hash || '');
     if (!m) return false;
     var kind = (m[1] || '').toLowerCase();
     demo = {
@@ -2056,6 +2057,7 @@
     };
     adding = null;
     S.demo = true;
+    S.demoSend = kind === 'send';
     S.typed = prettyCode(DEMO.code);
     S.screen = 'cardstart';
     setTitle();

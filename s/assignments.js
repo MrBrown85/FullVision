@@ -55,7 +55,9 @@
     // Demo Mode's samples for Questionnaires and My Reports, which the server's page does not send yet (S4-F4).
     if (state.demo && StudentPage.demoForms) reply = Object.assign({}, reply, StudentPage.demoForms());
     try {
-      return StudentView.fromPage(reply, state.page);
+      // What the class takes and what is in (s/send.js; Demo Mode's until the `work` route exists).
+      var work = typeof StudentPage.workOf === 'function' ? StudentPage.workOf(state) : null;
+      return StudentView.fromPage(reply, state.page, work);
     } catch (e) {
       return null;
     }
@@ -85,7 +87,12 @@
       typeof StudentPageView !== 'undefined'
         ? StudentPageView.html(view, ui)
         : '<p class="sp-lead sp-msg-calm sp-empty" role="status">Opening your page…</p>';
-    return page + (state.sheet && StudentPage.classesSheet ? StudentPage.classesSheet(state.page) : '');
+    return (
+      page +
+      (state.sheet && StudentPage.classesSheet ? StudentPage.classesSheet(state.page) : '') +
+      // Unsend Your Work? and Replace Your Photos? over the card (s/send.js).
+      (typeof StudentPage.sendDialog === 'function' ? StudentPage.sendDialog(state) : '')
+    );
   }
 
   StudentPage.viewOf = viewOf;

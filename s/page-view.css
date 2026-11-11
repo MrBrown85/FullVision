@@ -1697,3 +1697,49 @@
   font-size: 13px;
   color: var(--sp-text-2);
 }
+
+/* Sending (S5-F2, S5-F3): Send My Work, a closed piece, a card sent. */
+.sp-view .sp-dot-sent {
+  background: var(--sp-blue);
+}
+.sp-view .sp-flag-sent {
+  background: rgba(0, 122, 255, 0.1);
+  color: var(--sp-blue-text);
+}
+.sp-view .sp-send-closed {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--sp-fill);
+}
+.sp-view .sp-send-closed-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+.sp-view .sp-send-closed-line,
+.sp-view .sp-send-line {
+  margin: 0;
+  font-size: 14px;
+  color: #3a3a3c;
+  line-height: 1.4;
+}
+.sp-view .sp-send-thumbs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+.sp-view .sp-send-thumb {
+  width: 72px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--sp-line);
+  background: var(--sp-fill);
+}
+.sp-view .sp-send-change {
+  display: flex;
+  gap: 8px;
+}
+.sp-view .sp-send-change .sp-btn {
+  flex: 1;
+}
