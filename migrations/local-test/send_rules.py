@@ -66,6 +66,7 @@ POST = 'send-rules-live-postcheck.sql'
 LIST_FILES = [FILE, UNDO, PRE, POST]
 REPLACED = ['student_submit._send_begin(text,text,uuid,uuid,jsonb,text,text,uuid)',
             'student_submit.send_finish(text,uuid,uuid,jsonb,text)', 'student_submit.work(text,uuid,text)']
+NEW = ['student_submit.send_paths(text,uuid,uuid,text)']   # section 4, not decided by Colin
 RELIED = ['student_submit._work_window(uuid)', 'student_submit._grading_started(uuid,uuid)', 'student_submit._send_session(text,uuid)',
           'student_submit._session_class(text,uuid)', 'student_submit.send_start(text,uuid,uuid,jsonb,text,text,uuid,text)',
           'student_submit.replace(text,uuid,uuid,jsonb,text,text,uuid,text)', 'student_submit.unsend(text,uuid,uuid,text)',
@@ -831,6 +832,56 @@ def scen_fuzz(seeds=(1, 2, 3, 4), steps=250):
         d.close()
 
 # ════════════════════════════════════════════════════════════════════════════
+# send_paths (not decided by Colin): the paths of this student's own unfinished send, and nothing else.
+def scen_paths():
+    d, k, t1, t2 = world('paths', True); a = k['takes']
+    P = lambda tok, e, sid: d.service("student_submit.send_paths(:t, :e, :s, 'ip-1')", t=tok, e=e, s=sid)
+    try:
+        with tx(d):
+            s = d.send_start(t1, ENR1, a, 3); n0 = d.one('select count(*) from student_submit.send_log')
+            cat0 = row_checksums(d.c, table_columns(d.c))
+            r = P(t1, ENR1, s['submission_id'])
+            ok("this student's own unfinished send: exactly the files the start named (_work_upload_json), its finish-by and the bucket",
+               g(r, 'ok') is True and r['files'] == s['files'] and r['finish_by'] == s['finish_by'] and r['bucket'] == s['bucket']
+               and r['submission_id'] == s['submission_id'] and r['assessment_id'] == a and r['version'] == 1, r)
+            ok('it writes nothing: no row of any table changes, nothing is counted', row_checksums(d.c, table_columns(d.c)) == cat0 and d.one('select count(*) from student_submit.send_log') == n0)
+            ok('the same files after they are uploaded, and the same again (a read)', (d.upload(s['files']), P(t1, ENR1, s['submission_id']))[1] == r)
+            ok("another student's session asking for this send: not_found, no path", P(t2, ENR2, s['submission_id']) == {'ok': False, 'error': 'not_found'})
+            ok("another student's session naming this student's enrollment: refused by the session check, no path", g(P(t2, ENR1, s['submission_id']), 'ok') is False
+               and 'files' not in P(t2, ENR1, s['submission_id']))
+            s2 = d.send_start(t2, ENR2, a, 1)
+            ok("this student asking for another student's send: not_found", P(t1, ENR1, s2['submission_id']) == {'ok': False, 'error': 'not_found'})
+            tt = tstart(d, a, ENR1, 2, mode='new')
+            ok("the teacher's unfinished upload for this student: not_found (nobody but its sender sees an unfinished send's paths)", P(t1, ENR1, tt['submission_id']) == {'ok': False, 'error': 'not_found'})
+            f = d.send_finish(t1, ENR1, s['submission_id'], s['files'])
+            ok('once handed in: not_found (file_links is the way to read it)', g(f, 'ok') is True and P(t1, ENR1, s['submission_id']) == {'ok': False, 'error': 'not_found'})
+            ok('a send that does not exist: not_found', P(t1, ENR1, nid()) == {'ok': False, 'error': 'not_found'})
+            e = refused(d, lambda: P(t1, ENR1, None))
+            ok('no submission: RAISES 22023', e is not None and e[1] == '22023', e)
+        with tx(d):
+            s = d.send_start(t1, ENR1, a, 1)
+            d.run("update submission set created_at = now() - interval '2 hours 1 second' where id = :s", s=s['submission_id'])
+            ok('past its two hours: expired, no path, nothing dropped by the read', P(t1, ENR1, s['submission_id']) == {'ok': False, 'error': 'expired'}
+               and d.one('select count(*) from submission') == 1)
+            d.run("update submission set created_at = now() - interval '1 hour 59 minutes' where id = :s", s=s['submission_id'])
+            ok('at 1 h 59: its files', g(P(t1, ENR1, s['submission_id']), 'ok') is True)
+        with tx(d):
+            s1, _ = d.send(t1, ENR1, a, 1)
+            r = d.send_start(t1, ENR1, a, 2, replace=True)
+            ok("a Replace's unfinished pages: its own 2 files, none of the work it replaces", [x['file_id'] for x in P(t1, ENR1, r['submission_id'])['files']] == ids(r['files']))
+            d.run("update student_card set locked_at = now() where enrollment_id = :e and stopped_at is null", e=ENR1)
+            ok('a locked card: card_locked, no path', P(t1, ENR1, r['submission_id']) == {'ok': False, 'error': 'card_locked'})
+        with tx(d):
+            s = d.send_start(t1, ENR1, a, 1)
+            ok('a session that is not one: refused, no path', 'files' not in (P('not-a-token', ENR1, s['submission_id']) or {}))
+        fn = 'student_submit.send_paths(text,uuid,uuid,text)'
+        ok('who can run it: the service role only (not anon, not a signed-in teacher)', run_by(d, fn) == ['service_role'], run_by(d, fn))
+        ok('it is SECURITY DEFINER, stable, with pg_temp last in its search_path',
+           d.one("select prosecdef and provolatile = 's' and proconfig = '{\"search_path=public, student_submit, pg_temp\"}' from pg_proc where oid = :f::regprocedure", f=fn))
+    finally:
+        d.close()
+
+# ════════════════════════════════════════════════════════════════════════════
 def procs(d, only=None):
     rows = d.all("""select n.nspname || '.' || p.proname || '(' || replace(oidvectortypes(p.proargtypes), ' ', '') || ')',
                            p.oid::bigint, p.proowner::regrole::text, coalesce(p.proacl::text, ''), p.prosecdef, coalesce(p.proconfig::text, ''),
@@ -887,17 +938,21 @@ def scen_apply():
            last(S[0]) == 'begin' and last(S[-1]) == 'commit' and sum(last(s) in ('begin', 'commit') for s in S) == 2
            and all(l.strip() == '' or l.strip().startswith('--') for l in T.split('\nbegin;\n')[0].split('\n')) and T.rstrip().endswith('\ncommit;'))
         kinds = [re.sub(r'\s+', ' ', bare(s).strip().lower())[:26] for s in S[1:-1]]
-        ok('between them: the lock timeout, its check, three CREATE OR REPLACE FUNCTION, its last check, the schema reload; nothing else',
-           kinds[0].startswith('set local lock_timeout') and kinds[1].startswith('do $guard$') and sum(x.startswith('create or replace function') for x in kinds) == 3
-           and kinds[-2].startswith('do $final$') and kinds[-1].startswith('notify pgrst') and len(kinds) == 7, kinds)
+        ok("between them: the lock timeout, its check, four CREATE OR REPLACE FUNCTION, send_paths' revoke and grant, its last check, the schema reload; nothing else",
+           kinds[0].startswith('set local lock_timeout') and kinds[1].startswith('do $guard$') and sum(x.startswith('create or replace function') for x in kinds) == 4
+           and kinds[-4].startswith('revoke all on function') and kinds[-3].startswith('grant execute on func')
+           and kinds[-2].startswith('do $final$') and kinds[-1].startswith('notify pgrst') and len(kinds) == 10, kinds)
         made = [re.search(r'create or replace function ([\w.]+)\(', s).group(1) for s in S if bare(s).strip().lower().startswith('create or replace function')]
-        ok('the three it replaces are _send_begin, send_finish and work, and the header names each', made == ['student_submit._send_begin', 'student_submit.send_finish', 'student_submit.work']
+        ok('the three it replaces are _send_begin, send_finish and work, the one it adds send_paths, and the header names each', made == ['student_submit._send_begin', 'student_submit.send_finish', 'student_submit.work', 'student_submit.send_paths']
            and all(m in T.split('\nbegin;\n')[0] for m in made), made)
-        ok('no grant, revoke, alter, drop or row change outside the function bodies; no TODO',
-           not re.search(r'^\s*(revoke|grant|alter|drop|insert|update|delete|truncate)\b', '\n'.join(bare(s) for s in S if not bare(s).strip().lower().startswith('create or replace function')), re.I | re.M)
-           and 'TODO' not in T)
+        tops = [bare(s) for s in S if not bare(s).strip().lower().startswith('create or replace function')]
+        ok("no alter, drop or row change outside the function bodies; the only revoke and grant are send_paths' own, to the service role; no TODO",
+           not re.search(r'^\s*(alter|drop|insert|update|delete|truncate)\b', '\n'.join(tops), re.I | re.M)
+           and [t for t in tops if re.match(r'\s*(revoke|grant)\b', t, re.I)] == ['revoke all on function student_submit.send_paths(text, uuid, uuid, text) from public, anon, authenticated;'.rstrip(';'),
+                                                                                    'grant execute on function student_submit.send_paths(text, uuid, uuid, text) to service_role;'.rstrip(';')]
+           and 'TODO' not in T, [t for t in tops if re.match(r'\s*(revoke|grant)\b', t, re.I)])
         diffs = {}
-        for m in made:
+        for m in made[:3]:
             old = body_of(ORIGINAL[m](), m).split('\n'); new = body_of(T, m).split('\n')
             diffs[m] = [l for l in difflib.unified_diff(old, new, lineterm='', n=0) if l[:1] in '+-' and l[:3] not in ('+++', '---')]
         print('# what changes in each body, comments aside:\n' + json.dumps({m: [l for l in v if not l[1:].strip().startswith('--')] for m, v in diffs.items()}, indent=1))
@@ -907,13 +962,15 @@ def scen_apply():
            and len(removed['student_submit.send_finish']) == 9 and removed['student_submit.send_finish'][0] == "-    if not (_w->>'open')::boolean then"
            and removed['student_submit.send_finish'][-2:] == ["-    if _sub.intent = 'replace' then", "-           is_late = (_w->>'late')::boolean, sent_at = now(), updated_at = now()"]
            and len(removed['student_submit.work']) == 1, removed)
-        lists = dict((n, l) for n, l in lists_of(T)[:2])
-        ok('its lists: the three it replaces (before and after) and the %d it relies on, the same in its first check and its last' % len(RELIED),
-           [x[0] for x in lists['replaces']] == REPLACED and [x[0] for x in lists['relied']] == RELIED and lists_of(T)[:2] == lists_of(T)[2:])
+        lists = dict((n, l) for n, l in lists_of(T)[:3])
+        ok('its lists: the three it replaces (before and after), the one it adds and the %d it relies on, the same in its first check and its last' % len(RELIED),
+           [x[0] for x in lists['replaces']] == REPLACED and [x[0] for x in lists['new']] == NEW and [x[0] for x in lists['relied']] == RELIED
+           and sorted(lists_of(T)[:3]) == sorted(lists_of(T)[3:]), [n for n, _ in lists_of(T)])
         ok("the 'before' fingerprints are the base's (Batch B, the fixes, C1, C2 applied)", fingerprints(d, REPLACED) == {x[0]: x[1] for x in lists['replaces']}
            and fingerprints(d, RELIED) == {x[0]: x[1] for x in lists['relied']})
         ok('the pre-check, on the base: no rows', read_only(d, PRE_Q) == [], read_only(d, PRE_Q))
-        ok('the post-check, on the base: the three functions, nothing else', sorted(x[0] for x in read_only(d, POST_Q)) == sorted('function ' + f for f in REPLACED), read_only(d, POST_Q))
+        ok('the post-check, on the base: the four functions (send_paths absent, and how it is run), nothing else',
+           sorted(x[0] for x in read_only(d, POST_Q)) == sorted(['function ' + f for f in REPLACED + NEW] + ['how ' + NEW[0] + ' is run']), read_only(d, POST_Q))
         # ── Each guard stops it, with nothing changed ───────────────────
         base = WorkDb('sr_apply_noc')
         try:
@@ -925,6 +982,8 @@ def scen_apply():
         for fn in REPLACED + RELIED:
             good, said = stopped_at_guard(d, [retouched(d, fn)], fn, S)
             if not good: bad.append((fn, said))
+        good, said = stopped_at_guard(d, ["create function student_submit.send_paths(text, uuid, uuid, text) returns jsonb language sql as $f$ select '{}'::jsonb $f$"], NEW[0], S)
+        if not good: bad.append((NEW[0], said))
         ok('each of the %d functions in its lists with another body stops it at its first check, naming it, nothing changed' % (len(REPLACED) + len(RELIED)), bad == [], bad[:3])
         good, said = stopped_at_guard(d, ['drop function student_submit.work(text,uuid,text)'], 'student_submit.work', S)
         ok('one of the three missing: stops', good, said)
@@ -941,19 +1000,25 @@ def scen_apply():
         ok('the file applies to a database in use', r == 'ok', r)
         ok('no row of any table changes', row_checksums(d.c, cols0) == rows0)
         gone, new = differences(cat0, catalog(d.c))
-        ok("in the whole catalog only the three functions' definitions differ", len(gone) == len(new) and len(gone) in (3, 6)
-           and all(any((' ' + f.split('(')[0] + '(') in l.split(' | ')[0] or f.split('(')[0] in l for f in REPLACED) for l in gone + new), (gone, new))
+        dep = sorted(l for l in gone + new if l.startswith('depends '))
+        ok('the only count lines that change are the dependencies of one more function: on its language and its schema',
+           [l.rsplit(' | ', 1)[0] for l in dep] == ['depends pg_proc | pg_language | n', 'depends pg_proc | pg_language | n', 'depends pg_proc | pg_namespace | n', 'depends pg_proc | pg_namespace | n'], dep)
+        gone = [l for l in gone if not l.startswith('depends ')]; new = [l for l in new if not l.startswith('depends ')]
+        ok("in the whole catalog only the three functions' definitions differ, and send_paths is new", len(gone) in (3, 6) and len(new) > len(gone)
+           and all(any(f.split('(')[0] in l for f in REPLACED) for l in gone)
+           and all(any(f.split('(')[0] in l for f in REPLACED + NEW) for l in new), ([l[:90] for l in gone], [l[:90] for l in new]))
         p1 = procs(d)
         ok('each of the three keeps its oid, owner, grants, SECURITY DEFINER, search_path, volatility, arguments, result and language; only the body differs',
            all(p1[f][:-1] == p0[f][:-1] and p1[f][-1] != p0[f][-1] for f in REPLACED), {f: (p0[f][:6], p1[f][:6]) for f in REPLACED})
-        ok('every other function in the database is untouched', {f: v for f, v in p1.items() if f not in REPLACED} == {f: v for f, v in p0.items() if f not in REPLACED})
+        ok('every other function in the database is untouched; the only new one is send_paths', {f: v for f, v in p1.items() if f not in REPLACED + NEW} == {f: v for f, v in p0.items() if f not in REPLACED}
+           and set(p1) - set(p0) == set(NEW))
         ok('who may run the three is what it was: send_finish and work the service role only, _send_begin nobody (it is called by send_start and replace as their owner); anon and signed-in teachers nothing',
            {fn: run_by(d, fn) for fn in REPLACED} == who0 == {REPLACED[0]: [], REPLACED[1]: ['service_role'], REPLACED[2]: ['service_role']}, who0)
         ok("the three carry the 'after' fingerprints its list says", {f: p1[f][-1] for f in REPLACED} == {x[0]: x[2] for x in lists['replaces']})
         ok('the post-check, after it: no rows', read_only(d, POST_Q) == [], read_only(d, POST_Q))
         pre_now = read_only(d, PRE_Q)
-        ok('the pre-check, after it: one row for each of the three, saying it is already applied (would not stop)',
-           sorted((x[0], x[3]) for x in pre_now) == sorted(('function ' + f, 'no') for f in REPLACED), pre_now)
+        ok('the pre-check, after it: one row for each of the four, saying it is already applied (would not stop)',
+           sorted((x[0], x[3]) for x in pre_now) == sorted(('function ' + f, 'no') for f in REPLACED + NEW), pre_now)
         # Work that was in progress when it was applied.
         tz, D, mid = midnight(d)
         d.run('update course set timezone = :z where id = :c', z=tz, c=COURSE_A)
@@ -1021,7 +1086,7 @@ def scen_undo():
         ut = text_at(UNDO)
         ok("its three bodies are the ones before the file, character for character (_send_begin and work Batch B's, send_finish the fixes file's)",
            all(body_of(ORIGINAL[m](), m) in ut for m in ORIGINAL))
-        ok("its lists are the file's", lists_of(ut)[:2] == lists_of(text_at(FILE))[:2])
+        ok("its lists are the file's", dict(lists_of(ut)) == dict(lists_of(text_at(FILE))))
         cat_b = catalog(d.c); p_b = procs(d)
         r = d.file(UNDO)
         ok('run where the file was never applied: it applies and changes nothing', r == 'ok' and catalog(d.c) == cat_b, r)
@@ -1034,15 +1099,16 @@ def scen_undo():
         cols = table_columns(d.c); rows1 = row_checksums(d.c, cols)
         r = d.file(UNDO)
         ok('the undo runs', r == 'ok', r)
-        ok('the three carry the fingerprints they had before the file', fingerprints(d, REPLACED) == {x[0]: x[1] for x in dict(lists_of(ut)[:2])['replaces']})
-        ok('every function is as before the file, pg_proc column for column (the same oid, owner, grants, settings)', procs(d) == p_b)
+        ok('send_paths is gone', d.one("select to_regprocedure('student_submit.send_paths(text,uuid,uuid,text)')") is None)
+        ok('the three carry the fingerprints they had before the file', fingerprints(d, REPLACED) == {x[0]: x[1] for x in dict(lists_of(ut))['replaces']})
+        ok('every function is as before the file, pg_proc column for column (the same oid, owner, grants, settings), and send_paths is gone', procs(d) == p_b)
         ok('the whole catalog is as before the file, line for line', catalog(d.c) == cat_b, differences(cat_b, catalog(d.c)))
         ok('no row of any table changed', row_checksums(d.c, cols) == rows1)
         ok("work handed in under the file stays as it is: the student's page, then the teacher's 2", who(d, s['submission_id']) == ['student', 'teacher', 'teacher'] and sound(d) == '')
         f2 = d.send_finish(t2, ENR2, s2['submission_id'], s2['files'])
         ok("a send started under the file onto the teacher's work is answered as before the file when finished after the undo: already_sent, dropped", err(f2) == 'already_sent', f2)
         ok("and a student behind the teacher's pages is refused again (already_sent)", err(d.send_start(t2, ENR2, a, 1)) == 'already_sent')
-        ok("the post-check lists the three functions", sorted(x[0] for x in read_only(d, POST_Q)) == sorted('function ' + f for f in REPLACED))
+        ok("the post-check lists the four functions", sorted(x[0] for x in read_only(d, POST_Q)) == sorted(['function ' + f for f in REPLACED + NEW] + ['how ' + NEW[0] + ' is run']))
         ok('the pre-check is silent again', read_only(d, PRE_Q) == [], read_only(d, PRE_Q))
         cat3 = catalog(d.c)
         ok('the undo a second time: runs, changes nothing', d.file(UNDO) == 'ok' and catalog(d.c) == cat3)
@@ -1087,10 +1153,10 @@ def cmd_fingerprints(check_only):
         before = fingerprints(d0, REPLACED); relied = fingerprints(d0, RELIED)
         r = d0.statements(split(neutral(text_at(FILE))))
         if r != 'ok': sys.exit('the file does not apply: ' + r)
-        after_ = fingerprints(d0, REPLACED)
+        after_ = fingerprints(d0, REPLACED); new_ = fingerprints(d0, NEW)
     finally:
         d0.close()
-    lists = {'replaces': [(f, before[f], after_[f]) for f in REPLACED], 'relied': [(f, relied[f]) for f in RELIED]}
+    lists = {'replaces': [(f, before[f], after_[f]) for f in REPLACED], 'relied': [(f, relied[f]) for f in RELIED], 'new': [(f, new_[f]) for f in NEW]}
     stale = []
     for rel in LIST_FILES:
         path = os.path.join(HERE, rel); was = open(path).read(); now = write_lists(was, lists)
@@ -1137,6 +1203,17 @@ MUTANTS = [
     ("107 work: can_send ignores grading", "'can_send', s.sent_by = 'teacher' and not s.on_paper and not g.started and", "'can_send', s.sent_by = 'teacher' and not s.on_paper and"),
     ('107 work: can_send ignores the piece being closed', "                                               and a.students_send <> 'nothing' and (w.j->>'open')::boolean\n                                               and not exists", "                                               and a.students_send <> 'nothing'\n                                               and not exists"),
     ('107 work: can_send is true for the student\'s own work', "'can_send', s.sent_by = 'teacher' and", "'can_send', s.sent_by in ('teacher', 'student') and"),
+    # send_paths (section 4)
+    ("paths: another student's send is answered", "     where id = p_submission_id and enrollment_id = p_enrollment_id and course_id = (_in->>'course_id')::uuid\n       and sent_by = 'student' and state = 'sending';",
+     "     where id = p_submission_id\n       and sent_by = 'student' and state = 'sending';"),
+    ("paths: the teacher's unfinished upload is answered", "       and sent_by = 'student' and state = 'sending';\n    if not found then\n        return jsonb_build_object('ok', false, 'error', 'not_found');\n    end if;\n    if _sub.created_at",
+     "       and state = 'sending';\n    if not found then\n        return jsonb_build_object('ok', false, 'error', 'not_found');\n    end if;\n    if _sub.created_at"),
+    ('paths: work handed in is answered', "       and sent_by = 'student' and state = 'sending';\n    if not found then\n        return jsonb_build_object('ok', false, 'error', 'not_found');\n    end if;\n    if _sub.created_at",
+     "       and sent_by = 'student';\n    if not found then\n        return jsonb_build_object('ok', false, 'error', 'not_found');\n    end if;\n    if _sub.created_at"),
+    ('paths: a send past its two hours is answered', "    if _sub.created_at < now() - public._work_hold() then\n        -- It has lost", "    if false then\n        -- It has lost"),
+    ('paths: a locked card is answered (the page session, not the send session)', "    _in := _send_session(p_session_token, p_enrollment_id);\n    if _in ? 'error' then\n        return jsonb_build_object('ok', false, 'error', _in->>'error');\n    end if;\n    -- This student's own send, not finished",
+     "    _in := _session_class(p_session_token, p_enrollment_id);\n    if _in ? 'error' then\n        return jsonb_build_object('ok', false, 'error', _in->>'error');\n    end if;\n    -- This student's own send, not finished"),
+    ('paths: runnable by signed-in teachers', "grant execute on function student_submit.send_paths(text, uuid, uuid, text) to service_role;", "grant execute on function student_submit.send_paths(text, uuid, uuid, text) to service_role, authenticated;"),
 ]
 
 def cmd_mutate(wanted):
@@ -1147,7 +1224,7 @@ def cmd_mutate(wanted):
         if text.count(old) != 1:
             print('%2d  CANNOT MAKE THIS CHANGE (its text is in the file %d times): %s' % (n, text.count(old), label)); unnoticed.append(n); continue
         path = os.path.join(tmp, 'm%d.sql' % n); open(path, 'w').write(text.replace(old, new))
-        r = subprocess.run([sys.executable, os.path.join(HERE, 'send_rules.py'), 'rule106', 'rule107', 'interleave'], capture_output=True, text=True, cwd=HERE,
+        r = subprocess.run([sys.executable, os.path.join(HERE, 'send_rules.py'), 'rule106', 'rule107', 'interleave', 'paths'], capture_output=True, text=True, cwd=HERE,
                            env=dict(os.environ, SEND_RULES_FILE=path))
         fails = [l[5:].split(' :: ')[0] for l in r.stdout.splitlines() if l.startswith('FAIL ')]
         if fails: print('%2d  noticed by %3d checks  %s\n      first: %s' % (n, len(fails), label, fails[0][:170]))
@@ -1161,7 +1238,7 @@ PRE_Q = split(text_at(PRE))[0] if os.path.exists(os.path.join(HERE, PRE)) else N
 POST_Q = split(text_at(POST))[0] if os.path.exists(os.path.join(HERE, POST)) else None
 SCENARIOS = {'rule106': scen_rule106, 'rule106-without': lambda: scen_rule106(False), 'rule107': scen_rule107, 'rule107-without': lambda: scen_rule107(False),
              'interleave': scen_interleave, 'interleave-without': lambda: scen_interleave(False), 'race': scen_race, 'race-without': lambda: scen_race(False),
-             'fuzz': scen_fuzz, 'apply': scen_apply, 'undo': scen_undo}
+             'fuzz': scen_fuzz, 'paths': scen_paths, 'apply': scen_apply, 'undo': scen_undo}
 if __name__ == '__main__':
     import traceback
     args = sys.argv[1:]

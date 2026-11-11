@@ -8,6 +8,8 @@
 --   student_submit._send_begin(text, text, uuid, uuid, jsonb, text, text, uuid)   Batch B's (2026111101)
 --   student_submit.send_finish(text, uuid, uuid, jsonb, text)                     the fixes file's (2026111104)
 --   student_submit.work(text, uuid, text)                                         Batch B's (2026111101)
+-- drops the one it added,
+--   student_submit.send_paths(text, uuid, uuid, text)
 -- and changes nothing else: no row, no table, no grant (CREATE OR REPLACE
 -- keeps the owner and the grants). Its last step proves each of the three
 -- carries its fingerprint from before 2026111130 again and the functions
@@ -57,6 +59,19 @@ begin
         if _md5 <> _f.before and _md5 <> _f.becomes then
             raise exception '% is not the definition this migration was written against (found %, expected %). It is neither as 2026111130 leaves it nor as it was before: something else replaced it, and this undo would lose that. Nothing was changed.',
                 _f.fn, _md5, _f.before;
+        end if;
+    end loop;
+    -- The one 2026111130 adds: absent, or as that file leaves it.
+    for _f in
+        select * from (values
+            -- FINGERPRINTS-BEGIN new (written by migrations/local-test/send_rules.py)
+            ('student_submit.send_paths(text,uuid,uuid,text)', '2f36c08b8ace950b9c7eb905b320aa40')
+            -- FINGERPRINTS-END
+        ) as v(fn, becomes)
+    loop
+        _md5 := coalesce(md5(pg_get_functiondef(to_regprocedure(_f.fn))), 'absent');
+        if _md5 <> 'absent' and _md5 <> _f.becomes then
+            raise exception '% is not as 2026111130 leaves it (found %): something else made it, and this undo would drop it. Nothing was changed.', _f.fn, _md5;
         end if;
     end loop;
     -- What the new lines rely on, as the files before this one leave it.
@@ -460,6 +475,8 @@ begin
 end;
 $function$;
 
+drop function if exists student_submit.send_paths(text, uuid, uuid, text);
+
 do $final$
 declare
     _f    record;
@@ -512,6 +529,9 @@ begin
             raise exception '% changed while this undo ran (found %, expected %). Nothing was changed.', _f.fn, _md5, _f.md5;
         end if;
     end loop;
+    if to_regprocedure('student_submit.send_paths(text,uuid,uuid,text)') is not null then
+        raise exception 'student_submit.send_paths is still there. Nothing was changed.';
+    end if;
     -- S0-M5's check: no SECURITY DEFINER function in the app's three schemas
     -- is left without pg_temp last in its search_path.
     select string_agg(n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')', ', '

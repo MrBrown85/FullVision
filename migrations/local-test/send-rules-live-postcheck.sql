@@ -10,6 +10,9 @@
 -- (SECURITY DEFINER, search_path, volatility, owner, who can run them),
 -- the functions they rely on are untouched, and no SECURITY DEFINER
 -- function lost pg_temp.
+-- It also covers student_submit.send_paths, the one function the file adds
+-- (section 4, not decided by Colin): absent before, as the file leaves it
+-- after, run by the service role only.
 -- The fingerprints are md5(pg_get_functiondef(...)) from the local harness
 -- on PostgreSQL 17.11. Written by migrations/local-test/send_rules.py,
 -- never by hand.
@@ -43,6 +46,10 @@ with replaces(fn, before, becomes) as (values
     ('public._work_upload_json(uuid)',                                                      '63982ca7888b11ce9b80e962f674c98a'),
     ('public._submission_target_gone()',                                                    'f4f03a728aa0937ff0d89d9e5b62cc67')
     -- FINGERPRINTS-END
+), new(fn, becomes) as (values
+    -- FINGERPRINTS-BEGIN new
+    ('student_submit.send_paths(text,uuid,uuid,text)', '2f36c08b8ace950b9c7eb905b320aa40')
+    -- FINGERPRINTS-END
 ), how(fn, expected, is_now) as (
     -- how each of the three is run; CREATE OR REPLACE keeps it
     select t.fn,
@@ -58,7 +65,8 @@ with replaces(fn, before, becomes) as (values
               from pg_proc p where p.oid = to_regprocedure(t.fn)) end
       from (values ('student_submit._send_begin(text,text,uuid,uuid,jsonb,text,text,uuid)', 'volatile', 'nobody'),
                    ('student_submit.send_finish(text,uuid,uuid,jsonb,text)', 'volatile', 'service_role'),
-                   ('student_submit.work(text,uuid,text)', 'stable', 'service_role')) t(fn, vol, who)
+                   ('student_submit.work(text,uuid,text)', 'stable', 'service_role'),
+                   ('student_submit.send_paths(text,uuid,uuid,text)', 'stable', 'service_role')) t(fn, vol, who)
 )
 select 'function ' || fn as what, becomes as expected, coalesce(md5(pg_get_functiondef(to_regprocedure(fn))), 'absent') as found
   from replaces
@@ -67,6 +75,10 @@ union all
 select 'function ' || fn, md5, coalesce(md5(pg_get_functiondef(to_regprocedure(fn))), 'absent')
   from relied
  where coalesce(md5(pg_get_functiondef(to_regprocedure(fn))), 'absent') <> md5
+union all
+select 'function ' || fn, becomes, coalesce(md5(pg_get_functiondef(to_regprocedure(fn))), 'absent')
+  from new
+ where coalesce(md5(pg_get_functiondef(to_regprocedure(fn))), 'absent') <> becomes
 union all
 select 'how ' || fn || ' is run', expected, is_now
   from how

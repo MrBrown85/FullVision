@@ -4,19 +4,25 @@
 -- 2026111104_student_work_review_fixes.sql (PR 1053), then Batch C's
 -- 2026111120_markup_reflect_revise.sql and
 -- 2026111121_markup_revise_grade_changes.sql (PR 1043). None of those is
--- changed. This file replaces three functions and nothing else:
+-- changed. This file replaces three functions, adds one (section 4, its
+-- own commit, NOT DECIDED BY COLIN), and changes nothing else:
 --   student_submit._send_begin(text, text, uuid, uuid, jsonb, text, text, uuid)
 --                                   a student's send or Replace, first half
 --   student_submit.send_finish(text, uuid, uuid, jsonb, text)
 --                                   a student's send or Replace, handed in
 --   student_submit.work(text, uuid, text)
 --                                   what the student's page shows about sending
+-- and adds
+--   student_submit.send_paths(text, uuid, uuid, text)
+--                                   the paths of this student's own unfinished send,
+--                                   for the edge function's send-finish route
 -- Each is the body it has after the files above (_send_begin and work are
 -- Batch B's; send_finish is the fixes file's), with the lines under the
 -- comments that say "ruling 106" or "ruling 107" added or changed and
 -- nothing else. Owner, SECURITY DEFINER, search_path, volatility,
 -- arguments and grants stay as they were (CREATE OR REPLACE keeps the owner
--- and the grants; this file has no revoke and no grant).
+-- and the grants). Its only revoke and grant are send_paths' own: the
+-- service role only, as every function in the schema.
 --
 -- GRADE MATH: none. DELETES DATA: no new path. A student's send onto the
 -- teacher's pages deletes the teacher's work row once its pages have moved
@@ -186,6 +192,19 @@ begin
         if _md5 <> _f.before and _md5 <> _f.becomes then
             raise exception '% is not the definition this migration was written against (found %, expected %). Apply 2026111104, 2026111120 and 2026111121 first; a later migration may have replaced it. Nothing was changed.',
                 _f.fn, _md5, _f.before;
+        end if;
+    end loop;
+    -- The one it adds: absent, or as this file leaves it (a second run).
+    for _f in
+        select * from (values
+            -- FINGERPRINTS-BEGIN new (written by migrations/local-test/send_rules.py)
+            ('student_submit.send_paths(text,uuid,uuid,text)', '2f36c08b8ace950b9c7eb905b320aa40')
+            -- FINGERPRINTS-END
+        ) as v(fn, becomes)
+    loop
+        _md5 := coalesce(md5(pg_get_functiondef(to_regprocedure(_f.fn))), 'absent');
+        if _md5 <> 'absent' and _md5 <> _f.becomes then
+            raise exception '% already exists, and is not as this file leaves it (found %): something else made it. Nothing was changed.', _f.fn, _md5;
         end if;
     end loop;
     -- What the new lines rely on, as the files before this one leave it.
@@ -662,6 +681,60 @@ begin
 end;
 $function$;
 
+-- ── 4. send_paths (NOT DECIDED BY COLIN; its own commit) ───────────────────
+-- A read for the edge function's send-finish route, which must read every
+-- page before it calls send_finish and may give Storage only paths the
+-- database named in that request (batch-b-contract.md, duties 1 and 7).
+-- send_finish names no path, and the phone is not trusted to say them; the
+-- route's builder (PR 1086) got them by sending the start again. This gives
+-- them without making or dropping anything: the pages of THIS student's OWN
+-- unfinished send, by its id, exactly as _work_upload_json gives them to the
+-- start ({ file_id, page, path, thumb_path }). Nothing for a send that is
+-- another student's, the teacher's, handed in, or past its two hours, and
+-- nothing for a session that may not send (_send_session: a locked card,
+-- a class whose page is off). It writes nothing and takes no lock. The
+-- service role only, as every function in the schema is.
+--   { ok: true, submission_id, assessment_id, version, finish_by, bucket, files: [...] }
+--   { ok: false, error: <a session error> | 'not_found' | 'expired' }
+create or replace function student_submit.send_paths(
+    p_session_token text, p_enrollment_id uuid, p_submission_id uuid, p_ip_hash text)
+ returns jsonb
+ language plpgsql
+ stable
+ security definer
+ set search_path to 'public', 'student_submit', 'pg_temp'
+as $function$
+declare
+    _in  jsonb;
+    _sub submission%rowtype;
+begin
+    if p_submission_id is null then
+        raise exception 'a submission is needed' using errcode = '22023';
+    end if;
+    _in := _send_session(p_session_token, p_enrollment_id);
+    if _in ? 'error' then
+        return jsonb_build_object('ok', false, 'error', _in->>'error');
+    end if;
+    -- This student's own send, not finished, in the session's class.
+    select * into _sub from submission
+     where id = p_submission_id and enrollment_id = p_enrollment_id and course_id = (_in->>'course_id')::uuid
+       and sent_by = 'student' and state = 'sending';
+    if not found then
+        return jsonb_build_object('ok', false, 'error', 'not_found');
+    end if;
+    if _sub.created_at < now() - public._work_hold() then
+        -- It has lost its place; the next call that finishes or starts
+        -- work in the class drops it.
+        return jsonb_build_object('ok', false, 'error', 'expired');
+    end if;
+    return jsonb_build_object('ok', true, 'submission_id', _sub.id, 'assessment_id', _sub.assessment_id,
+                              'version', _sub.version, 'finish_by', _sub.created_at + public._work_hold(),
+                              'bucket', public._work_bucket(), 'files', public._work_upload_json(_sub.id));
+end;
+$function$;
+revoke all on function student_submit.send_paths(text, uuid, uuid, text) from public, anon, authenticated;
+grant execute on function student_submit.send_paths(text, uuid, uuid, text) to service_role;
+
 -- ── Everything is as the header says ────────────────────────────────────────
 do $final$
 declare
@@ -713,6 +786,18 @@ begin
         _md5 := coalesce(md5(pg_get_functiondef(to_regprocedure(_f.fn))), 'absent');
         if _md5 <> _f.md5 then
             raise exception '% changed while this migration ran (found %, expected %). Nothing was changed.', _f.fn, _md5, _f.md5;
+        end if;
+    end loop;
+    for _f in
+        select * from (values
+            -- FINGERPRINTS-BEGIN new (written by migrations/local-test/send_rules.py)
+            ('student_submit.send_paths(text,uuid,uuid,text)', '2f36c08b8ace950b9c7eb905b320aa40')
+            -- FINGERPRINTS-END
+        ) as v(fn, becomes)
+    loop
+        _md5 := coalesce(md5(pg_get_functiondef(to_regprocedure(_f.fn))), 'absent');
+        if _md5 <> _f.becomes then
+            raise exception '% is not as this migration should leave it (found %, expected %). Nothing was changed.', _f.fn, _md5, _f.becomes;
         end if;
     end loop;
     -- S0-M5's check: no SECURITY DEFINER function in the app's three schemas

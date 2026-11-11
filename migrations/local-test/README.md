@@ -2166,6 +2166,11 @@ PGPORT=54611 PGDATABASE=sr python3 send_rules.py fingerprints check
 - **race**: the same on two connections, the second seen to wait.
 - **fuzz**: 1,000 random steps: never over 30, no student step queues a page
   the teacher handed in, never stuck behind the teacher's pages.
+- **paths** (section 4, `send_paths`, not decided by Colin): this student's
+  own unfinished send gives exactly the files its start named, and writes
+  nothing; another student's send, the teacher's upload, work handed in, a
+  send that does not exist give `not_found`; past two hours `expired`; a
+  locked card `card_locked`; the service role only.
 - **apply**, **undo**: as the fixes file's suite (shape, every guard, a lock
   it cannot get, the apply on a database in use with no row changed and only
   the three bodies changed, a second run, the files before it run again, what
@@ -2176,10 +2181,12 @@ PGPORT=54611 PGDATABASE=sr python3 send_rules.py fingerprints check
 base): every check marked as changed by the file must fail there and every
 other must hold.
 
-Results (2026-11-11, PostgreSQL 17.11): `send_rules.py` 266 of 266;
-`mutate` 27 wrong versions, 27 noticed (the first run missed two, the
+Results (2026-11-11, PostgreSQL 17.11): `send_rules.py` 285 of 285 (266
+before `send_paths` was added); `mutate` 33 wrong versions (27 of the two
+rules, 6 of `send_paths`), 33 noticed (the first run missed two, the
 student's own work not excluded at the start and the version kept; a check
-was added for each).
+was added for each). The earlier suites' numbers below are with
+`send_paths` in, and are the same without it.
 
 The earlier suites with this file applied (scratch copies of the suites with
 one hook each, not in any branch; each number beside the same suite on the

@@ -259,6 +259,26 @@ What `send_start` and `send_finish` answer differently. Nothing else changes.
 - `send_finish`'s answers for a send onto the teacher's pages are the Replace's: `grading_started` (grading started or a page was marked while the pages went up: the send is dropped, the teacher's work stays) and `too_many_pages` with `room` (the teacher added pages meanwhile: nothing is dropped; finish naming `room` pages or start again).
 - `replace` of the teacher's work still answers `cannot_change`, and `unsend` of it `cannot_change`: the call is `send_start`.
 
+### `send_paths(p_session_token text, p_enrollment_id uuid, p_submission_id uuid, p_ip_hash text)` (2026111130, not decided by Colin)
+
+Read-only, for the `send-finish` route: the pages of this student's own unfinished send, by its id, so the route can read every page before it calls `send_finish` (duty 1) using only paths the database named in that request (duty 7), without sending the start again.
+
+```json
+{
+  "ok": true,
+  "submission_id": "<id>",
+  "assessment_id": "<id>",
+  "version": 1,
+  "finish_by": "…",
+  "bucket": "student-photos",
+  "files": [{ "file_id": "<id>", "page": 1, "path": "…jpg", "thumb_path": "…-thumb.jpg" }]
+}
+```
+
+- `files` is exactly what `send_start` (or `replace`, or `revision_start`) named for that send: the same objects, in page order.
+- Errors: the session's (`signed_out`, `card_locked`, …, as `send_finish`), `not_found` (no such send of this student's, unfinished, in this class: another student's, the teacher's upload, one handed in, one dropped), `expired` (past its two hours; nothing is dropped by the read). RAISES `22023` with no submission.
+- It writes nothing and takes no lock. Service role only.
+
 ## The routes of `student-submit`
 
 | Route                   | SQL                             | Then                                                                                                                                                 |
@@ -402,4 +422,4 @@ For good; no second copy is kept anywhere.
 ## Changes
 
 - 2026-11-10, after the first review, before anything was built on this: a started send holds its place two hours from its first start and a repeat no longer extends it (`finish_by`; `expired` from `send_start` too); open and late are asked again at the finish (`work_closed` from `send_finish`; `late` is as at the finish); a page keeps who added it (`added_by`, `kept`, `too_many_pages` on `replace`); a class's limit (`class_full`, `bytes` and `thumb_bytes` in `p_pages`); a teacher reads only handed-in work and their own uploads; the requirements on the edge function, the `sweep` route and the 300-second download link.
-- 2026-11-11, `2026111130` (rulings 106 and 107, not applied): a send started while the piece was open finishes after its last day, Late; a student can send onto the teacher's pages (`send_start` no longer `already_sent` for them; `grading_started` and `too_many_pages` from `send_start`; `work().sent.can_send`). See "Since 2026111130".
+- 2026-11-11, `2026111130` (rulings 106 and 107, not applied): a send started while the piece was open finishes after its last day, Late; a student can send onto the teacher's pages (`send_start` no longer `already_sent` for them; `grading_started` and `too_many_pages` from `send_start`; `work().sent.can_send`; `send_paths`, not decided by Colin). See "Since 2026111130".

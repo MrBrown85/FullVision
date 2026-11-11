@@ -11,6 +11,9 @@
 -- changed; no: it would apply, and the row is worth knowing). A function
 -- the file replaces that is already as the file leaves it is listed with
 -- stops = no ("already applied").
+-- It also covers student_submit.send_paths, the one function the file adds
+-- (section 4, not decided by Colin): absent before, as the file leaves it
+-- after, run by the service role only.
 -- The fingerprints are md5(pg_get_functiondef(...)) from the local harness
 -- on PostgreSQL 17.11, the same lists as the file's own. Written by
 -- migrations/local-test/send_rules.py, never by hand.
@@ -44,6 +47,10 @@ with replaces(fn, before, becomes) as (values
     ('public._work_upload_json(uuid)',                                                      '63982ca7888b11ce9b80e962f674c98a'),
     ('public._submission_target_gone()',                                                    'f4f03a728aa0937ff0d89d9e5b62cc67')
     -- FINGERPRINTS-END
+), new(fn, becomes) as (values
+    -- FINGERPRINTS-BEGIN new
+    ('student_submit.send_paths(text,uuid,uuid,text)', '2f36c08b8ace950b9c7eb905b320aa40')
+    -- FINGERPRINTS-END
 ), how(fn, expected, is_now) as (
     -- how each of the three is run; CREATE OR REPLACE keeps it
     select t.fn,
@@ -70,6 +77,11 @@ union all
 select 'function ' || fn, md5, coalesce(md5(pg_get_functiondef(to_regprocedure(fn))), 'absent'), 'yes'
   from relied
  where coalesce(md5(pg_get_functiondef(to_regprocedure(fn))), 'absent') <> md5
+union all
+select 'function ' || fn, 'absent', md5(pg_get_functiondef(to_regprocedure(fn))) || case when md5(pg_get_functiondef(to_regprocedure(fn))) = becomes then ' (already as 2026111130 leaves it)' else '' end,
+       case when md5(pg_get_functiondef(to_regprocedure(fn))) = becomes then 'no' else 'yes' end
+  from new
+ where to_regprocedure(fn) is not null
 union all
 select 'table ' || t, 'present', 'absent', 'yes'
   from unnest(array['public.submission', 'public.submission_file', 'public.revision_request']) t
