@@ -3346,8 +3346,18 @@ body.offline-active #app-dock {
   background: transparent;
   color: var(--text-2);
 }
+/* Cancel stays plain text under the pointer too: a fill would look like Print Without Them. */
 .drafts-print-cancel:hover {
-  background: var(--active-light);
+  color: var(--text);
+  text-decoration: underline;
+}
+/* Said in the Print dialog when Return Them, Then Print could not return every draft. */
+.drafts-print-failed {
+  font-family: var(--font-base);
+  font-size: var(--text-md);
+  line-height: 1.5;
+  color: var(--danger);
+  margin: 0 0 12px;
 }
 @keyframes fade-in {
   from {

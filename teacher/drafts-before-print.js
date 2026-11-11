@@ -19,12 +19,21 @@
    which grades are drafts and who a Return returns are GradeState's
    (draftsReturned, which counts a pair or group partner with them, and
    draftsSentence), and the Return is Grader.returnGrades. So the count,
-   the names and what Return returns are one answer. */
+   the names and what Return returns are one answer.
+
+   THE QUESTION BELONGS TO THE DIALOG IT IS ASKED OVER (its owner: the
+   Print dialog, or Print Rubrics). It goes when the owner goes: the owner
+   closes it (close()) when it closes, when its page is left and when the
+   class changes, and the question also closes itself if the owner's
+   dialog leaves the page by any other way. An answer that comes after the
+   owner has gone does nothing. And an answer is acted on only while the
+   owner says it still stands (owner.still()). */
 window.DraftsBeforePrint = (function () {
   'use strict';
 
   var OVERLAY_ID = 'drafts-print-overlay';
-  var _finishOpen = null; // closes the dialog that is open, as Cancel
+  var FAILED_CLASS = 'drafts-print-failed';
+  var _closeOpen = null; // closes the question that is open, answering nothing
 
   // True when the class holds grades until the teacher returns them.
   function holds(cid) {
@@ -32,7 +41,7 @@ window.DraftsBeforePrint = (function () {
   }
 
   /* The drafts a print of `sids` on the pieces `aids` would leave out, and
-     what returning them returns: { total, pieces: [{ aid, title, sids }] },
+     what returning them returns: { cid, total, pieces: [{ aid, title, sids }] },
      the pieces in the order given. null when the class does not hold
      grades or nothing in the print is a draft. */
   function find(cid, aids, sids) {
@@ -52,15 +61,17 @@ window.DraftsBeforePrint = (function () {
     return total ? { cid: cid, total: total, pieces: pieces } : null;
   }
 
-  /* Returns every draft `found` names, through the one grader. Gives back
-     how many were returned. */
+  /* Returns every draft `found` names, through the one grader, and says
+     whether it worked: { all, left }. `left` counts the named drafts that
+     are still drafts afterwards (the rule failed, or the outbox had no room
+     and the Return was put back): `all` is true only when it is 0. */
   function returnAll(found) {
-    var n = 0;
+    var left = 0;
     ((found && found.pieces) || []).forEach(function (p) {
-      var res = Grader.returnGrades(found.cid, p.aid, p.sids);
-      n += (res && res.returned) || 0;
+      Grader.returnGrades(found.cid, p.aid, p.sids);
+      left += GradeState.draftsIn(found.cid, p.aid, p.sids).length;
     });
-    return n;
+    return { all: !!found && left === 0, left: left };
   }
 
   // "4 Grades Aren't Returned Yet", "1 Grade Isn't Returned Yet".
@@ -79,6 +90,8 @@ window.DraftsBeforePrint = (function () {
       give: 'Return It, Then Print',
       without: 'Print Without It',
     },
+    // Said in the owner's dialog when Return Them, Then Print could not return every draft it named.
+    failed: 'Those grades couldn’t be returned, so nothing printed. Try again.',
   };
 
   // html-safe: every piece's title and the drafts line esc()'d; the count is a number; the rest is fixed markup
@@ -105,11 +118,20 @@ window.DraftsBeforePrint = (function () {
     return html;
   }
 
-  /* Asks. `kind` is 'reports' or 'handout'. `choose(choice)` is called
-     once with 'return', 'without' or 'cancel' after the dialog has closed;
-     Escape and a click outside the card are Cancel. With nothing found it
+  function _ownerHere(owner) {
+    if (!owner) return false;
+    if (owner.el && !owner.el.isConnected) return false;
+    return typeof owner.still === 'function' ? !!owner.still() : true;
+  }
+
+  /* Asks over `owner` ({ el: the owner's dialog, still(): whether what was
+     asked about still stands }). `kind` is 'reports' or 'handout'.
+     `choose(choice)` is called once with 'return', 'without' or 'cancel'
+     after the question has closed, and only while the owner is still there;
+     Escape and a click outside the card are Cancel. If the owner goes first,
+     the question closes and `choose` is never called. With nothing found it
      is 'without' at once: there is nothing to ask. */
-  function ask(found, kind, choose) {
+  function ask(found, kind, choose, owner) {
     close();
     if (!found || !found.total) {
       choose('without');
@@ -126,12 +148,20 @@ window.DraftsBeforePrint = (function () {
     overlay.setAttribute('aria-describedby', 'drafts-print-why');
     overlay.innerHTML = _html(found, words);
     var done = false;
-    var finish = function (choice) {
-      if (done) return;
+    var watch = null;
+    var shut = function () {
+      if (done) return false;
       done = true;
-      _finishOpen = null;
+      _closeOpen = null;
       document.removeEventListener('keydown', onKey, true);
+      if (watch) watch.disconnect();
       overlay.remove();
+      return true;
+    };
+    var finish = function (choice) {
+      if (!shut()) return;
+      // The owner went while the question was open: nothing is done.
+      if (!_ownerHere(owner)) return;
       try {
         if (trigger && typeof trigger.focus === 'function' && choice === 'cancel') trigger.focus();
       } catch (e) {
@@ -169,16 +199,50 @@ window.DraftsBeforePrint = (function () {
       if (b) finish(b.dataset.choice);
     });
     document.addEventListener('keydown', onKey, true);
-    _finishOpen = finish;
+    _closeOpen = shut;
     document.body.appendChild(overlay);
+    // The owner's dialog taken off the page by any way at all closes the question with it.
+    if (owner && owner.el && typeof MutationObserver === 'function') {
+      watch = new MutationObserver(function () {
+        if (!owner.el.isConnected) shut();
+      });
+      watch.observe(document.body, { childList: true, subtree: true });
+    }
     // A Return cannot be undone: the keyboard starts on Cancel.
     overlay.querySelector('[data-choice="cancel"]').focus();
   }
 
-  // Closes a dialog that is open, as Cancel.
+  // Closes the question that is open, if any, answering nothing. The owner calls it when it goes.
   function close() {
-    if (_finishOpen) _finishOpen('cancel');
+    if (_closeOpen) _closeOpen();
   }
 
-  return { holds: holds, find: find, returnAll: returnAll, ask: ask, title: title, WORDS: WORDS, close: close };
+  /* Says in the owner's dialog that Return Them, Then Print could not
+     return every draft, so nothing printed. The dialog stays open. */
+  // html-safe: a fixed sentence, set as text
+  function showFailed(ownerEl) {
+    var card = ownerEl && ownerEl.querySelector ? ownerEl.querySelector('.confirm-card') || ownerEl : null;
+    if (!card) return;
+    var line = card.querySelector('.' + FAILED_CLASS);
+    if (!line) {
+      line = document.createElement('div');
+      line.className = FAILED_CLASS;
+      line.setAttribute('role', 'alert');
+      var actions = card.querySelector('.confirm-actions');
+      if (actions) actions.parentNode.insertBefore(line, actions);
+      else card.appendChild(line);
+    }
+    line.textContent = WORDS.failed;
+  }
+
+  return {
+    holds: holds,
+    find: find,
+    returnAll: returnAll,
+    ask: ask,
+    close: close,
+    showFailed: showFailed,
+    title: title,
+    WORDS: WORDS,
+  };
 })();

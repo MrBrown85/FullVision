@@ -59,6 +59,10 @@ function ungradedCell(cid, not) {
   return null;
 }
 
+// The ticks a rubric handout prints, as Print Rubrics draws it (inside its own surface).
+const handoutTicks = (cid, aid, sid) =>
+  ReportScores.withReportScores('handout', () => RubricPrint.sheetData(cid, aid, sid).ticked);
+
 describe('reports in a class that holds grades', { timeout: 120000 }, () => {
   let wasDemo;
   beforeAll(() => {
@@ -158,7 +162,7 @@ describe('reports in a class that holds grades', { timeout: 120000 }, () => {
     const held = draw();
     // Progress Reports, the Quick Report, its Feedback Pages and the rubric handout: nothing of a draft.
     expect(holding(held, ['progress', 'quick'], 'ZZDRAFT')).toEqual([]);
-    expect(RubricPrint.sheetData(cid, lab, cece).ticked).not.toContain(added);
+    expect(handoutTicks(cid, lab, cece)).not.toContain(added);
     expect(getRubricCheckIds(cid, cece, lab)).toContain(added);
     // The teacher's own record keeps every draft.
     expect(holding(held, ['export'], 'ZZDRAFT changed comment').length).toBe(1);
@@ -172,12 +176,12 @@ describe('reports in a class that holds grades', { timeout: 120000 }, () => {
       students.map(s => s.id),
     );
     expect(found.total).toBe(3);
-    expect(DraftsBeforePrint.returnAll(found)).toBe(3);
+    expect(DraftsBeforePrint.returnAll(found)).toEqual({ all: true, left: 0 });
     expect(GradeState.draftsWaiting(cid)).toBe(0);
     const given = draw();
     expect(holding(given, ['quick'], 'ZZDRAFT changed comment').length).toBeGreaterThan(0);
     expect(holding(given, ['quick'], 'ZZDRAFT new piece comment').length).toBeGreaterThan(0);
-    expect(RubricPrint.sheetData(cid, lab, cece).ticked).toContain(added);
+    expect(handoutTicks(cid, lab, cece)).toContain(added);
     // And the teacher's own record is as it was.
     holding(given, ['printGrades', 'export'], '').forEach(k => expect(given[k], k).toBe(held[k]));
   });
@@ -245,7 +249,7 @@ describe('DraftsBeforePrint', () => {
       ['Talk', ['s1', 's2']],
     ]);
     expect(GradeState.draftsSentence(CID, found.pieces[1].sids)).toBe('2 drafts: Avery and Jordan can’t see them yet.');
-    expect(DraftsBeforePrint.returnAll(found)).toBe(found.total);
+    expect(DraftsBeforePrint.returnAll(found)).toEqual({ all: true, left: 0 });
     // Noor was not in the print: hers still waits.
     expect(GradeState.stateOf(CID, 's3', 'essay')).toBe('draft');
     expect(GradeState.draftsWaiting(CID)).toBe(1);
@@ -275,6 +279,35 @@ describe('DraftsBeforePrint', () => {
     _cache.statuses[CID] = Object.assign({}, _cache.statuses[CID], { 's1:essay': 'NS' });
     expect(getAssignmentStatus(CID, 's1', 'essay')).toBe('NS');
     expect(DraftsBeforePrint.find(CID, ['essay'], ['s1'])).toBe(null);
+  });
+
+  it('a class that does not hold grades is asked nothing, even with a draft row left in it', () => {
+    seed({ student_page_enabled: true, return_grades: 'on_save' });
+    Grader.setLevel(CID, 's1', 'essay', 't1', 3, 0);
+    _cache.gradeReturns[CID] = { essay: { s1: { is_draft: true } } };
+    // The rule itself would call it a draft; the class does not hold grades, so Print asks nothing.
+    expect(GradeState.draftsIn(CID, 'essay', ['s1'])).toEqual(['s1']);
+    expect(DraftsBeforePrint.find(CID, ['essay'], ['s1'])).toBe(null);
+  });
+
+  it('a Return that does not return every draft it named says so, and nothing is said to have worked', () => {
+    Grader.setLevel(CID, 's1', 'essay', 't1', 3, 0);
+    Grader.setLevel(CID, 's3', 'essay', 't1', 2, 0);
+    const found = DraftsBeforePrint.find(CID, ['essay'], ['s1', 's3']);
+    expect(found.total).toBe(2);
+    const real = GradeState.afterReturn;
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
+    GradeState.afterReturn = () => {
+      throw new Error('the rule failed');
+    };
+    try {
+      expect(DraftsBeforePrint.returnAll(found)).toEqual({ all: false, left: 2 });
+    } finally {
+      GradeState.afterReturn = real;
+      quiet.mockRestore();
+    }
+    expect(GradeState.draftsWaiting(CID)).toBe(2);
+    expect(DraftsBeforePrint.returnAll(found)).toEqual({ all: true, left: 0 });
   });
 
   it('the title says how many grades', () => {

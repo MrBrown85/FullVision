@@ -627,6 +627,10 @@ window.PageReports = (function () {
       _showIssue(viewingIssue.id);
       return;
     }
+    // A render with nothing to print ("No report data yet", no students) leaves no summary behind:
+    // Print Reports must not open on the last render's students.
+    _lastSummary = null;
+    _lastSummarySet = '';
     Preview.renderReportPreview({
       cid: activeCourse,
       students: _previewStudents(),
@@ -1233,6 +1237,7 @@ window.PageReports = (function () {
   /* keepEveryone: the dialog closes to print, so the canvas stays on
      Everyone and the Name chosen in it stays. Any other close is a cancel. */
   function closeIssueDialog(keepEveryone) {
+    DraftsBeforePrint.close();
     var overlay = document.getElementById(ISSUE_OVERLAY_ID);
     if (overlay && overlay.remove) overlay.remove();
     if (_issueState && _issueState.nameChanged && !keepEveryone) {
@@ -1292,18 +1297,34 @@ window.PageReports = (function () {
     var who = (overlay.querySelector('input[name="issue-who"]:checked') || {}).value || 'all';
     var found = _draftsInPrint(who === 'changed' ? c.changed : c.ids);
     if (!found) return _issueAndPrint(c, who);
-    DraftsBeforePrint.ask(found, 'reports', function (choice) {
-      if (choice === 'cancel') return;
-      if (choice === 'return') {
-        DraftsBeforePrint.returnAll(found);
-        // Drawn again from the grades now returned, so what prints and the copy kept hold them.
-        renderReportPreview();
-        var now = _issueCounts();
-        if (who === 'changed') now.changed = c.changed;
-        c = now;
-      }
-      _issueAndPrint(c, who);
-    });
+    // The question belongs to this Print dialog, for this class and this report.
+    var owner = {
+      el: overlay,
+      still: function () {
+        return _issueState !== null && _issueState.counts === c && activeCourse === found.cid;
+      },
+    };
+    DraftsBeforePrint.ask(
+      found,
+      'reports',
+      function (choice) {
+        if (choice === 'cancel') return;
+        if (choice === 'return') {
+          // Every draft it named is returned, or nothing prints and no copy is saved.
+          if (!DraftsBeforePrint.returnAll(found).all) {
+            DraftsBeforePrint.showFailed(overlay);
+            return;
+          }
+          // Drawn again from the grades now returned, so what prints and the copy kept hold them.
+          renderReportPreview();
+          var now = _issueCounts();
+          if (who === 'changed') now.changed = c.changed;
+          c = now;
+        }
+        _issueAndPrint(c, who);
+      },
+      owner,
+    );
   }
 
   function _issueAndPrint(c, who) {
@@ -2053,6 +2074,8 @@ window.PageReports = (function () {
 
   /* ── Course switching ────────────────────────────────────────── */
   async function switchCourse(cid) {
+    // The Print dialog and any question over it are this class's.
+    closeIssueDialog();
     RQ.tqSaveCurrentIfNeeded();
     // A pending Undo belongs to the class being left.
     if (typeof dismissUndoToast === 'function') dismissUndoToast();

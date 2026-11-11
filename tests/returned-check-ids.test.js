@@ -357,6 +357,13 @@ describe('getReturnedRubricCheckIds', () => {
   it('a DIBELS benchmark has no Draft or Returned state: the working ticks', () => {
     seed(HELD, { rubricChecks: { 's1:bench': ['x'] } });
     expect(getReturnedRubricCheckIds(CID, 's1', 'bench')).toEqual(['x']);
+    // Even with a draft row left on it (a piece switched to DIBELS keeps its rows dormant).
+    seed(HELD, {
+      rubricChecks: { 's1:bench': ['x'] },
+      gradeReturns: { bench: { s1: { is_draft: true, returned_at: '2026-11-01T12:00:00.000Z', returned_copy: null } } },
+    });
+    expect(getGradeReturn(CID, 's1', 'bench').is_draft).toBe(true);
+    expect(getReturnedRubricCheckIds(CID, 's1', 'bench')).toEqual(['x']);
   });
 
   it('in a class that does not hold grades it is getRubricCheckIds', () => {
