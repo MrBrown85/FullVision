@@ -453,7 +453,32 @@
     }
   }
 
+  /* `group_work` (Batch C; S12-F1): { ok, assessments: [ { id, members,
+     sent, pages, you_sent, first_sent_at } ] } for each One per Group piece
+     the student's group is on. Counts only: the server sends no group-mate's
+     name, so neither does this. Demo Mode's (#demo-card-group): Cece's
+     group of three on Cell Model Project, where a group-mate sent 4 photos
+     yesterday; pages Cece sends are added to the group's. null otherwise. */
+  function groupOf(state) {
+    if (!state || !state.demo || !state.demoGroup || !rowOf(state, 'demo-cell-model')) return null;
+    var mine = state.demoSent && state.demoSent['demo-cell-model'];
+    return {
+      ok: true,
+      assessments: [
+        {
+          id: 'demo-cell-model',
+          members: 3,
+          sent: true,
+          pages: 4 + (mine ? mine.pages.length : 0),
+          you_sent: !!(mine && mine.pages.length),
+          first_sent_at: at(-1, 19),
+        },
+      ],
+    };
+  }
+
   StudentPage.feedbackOf = feedbackOf;
+  StudentPage.groupOf = groupOf;
   // The one way s/reflect.js asks `reflect` and `reply` (Demo Mode's answers until Batch C is wired).
   StudentPage.feedbackAsk = answerOf;
 
@@ -466,6 +491,7 @@
     },
     test: {
       feedbackOf: feedbackOf,
+      groupOf: groupOf,
       demoMarkup: function () {
         return DEMO_MARKUP;
       },

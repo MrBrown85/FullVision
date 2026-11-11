@@ -1999,3 +1999,20 @@
   font-size: 13px;
   color: #58585d;
 }
+
+/* Group work (S12-F1): the group's line on a card. */
+.sp-view .sp-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sp-view .sp-group-sent {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+.sp-view .sp-group-line {
+  margin: 0;
+  font-size: 15px;
+  color: #58585d;
+}
