@@ -276,7 +276,28 @@ var StudentData = (function () {
           calcMode: k.calc_mode === 'percent' ? 'percent' : 'points',
         };
       });
+    // This student's own hand-set levels, by section (no reason is sent), and the class's Next Step sentences.
+    var overrides = {};
+    var so = obj(l.section_overrides) || {};
+    Object.keys(so).forEach(function (id) {
+      var o = obj(so[id]);
+      if (o && num(o.level) > 0) overrides[id] = { level: num(o.level), date: text(o.date) };
+    });
+    var steps = {};
+    var ns = obj(l.next_steps) || {};
+    Object.keys(ns).forEach(function (id) {
+      var x = obj(ns[id]);
+      if (!x) return;
+      steps[id] = {
+        Emerging: text(x.Emerging),
+        Developing: text(x.Developing),
+        Proficient: text(x.Proficient),
+        sensitive: x.sensitive === true,
+      };
+    });
     return {
+      overrides: overrides,
+      nextSteps: steps,
       config: config,
       calcMethod: config.calcMethod,
       decayWeight: config.decayWeight,
@@ -502,7 +523,62 @@ var StudentData = (function () {
     return page && page.learning;
   }
   // The folders (competency groups) come only through getGroupedSections: calc.js reads no other way to them.
+  /* Next Step on the card (Batch E, E9): the comment bank's two readers My
+     Learning uses (shared/student-view.js), over the class's own sentences
+     `page` sends (learning.next_steps), as teacher/comment-bank.js answers
+     them in Preview: bankEntry's steps, and nextStepOf's rule word for word
+     (the lowest skill with 2 or more returned pieces, not among the
+     strongest, never a sensitive set's), copied from teacher/comment-bank.js
+     (strongestOf, nextStepOf, with its constants): change both together. */
+  var STRONGEST_PIECES = 3;
+  var NEXT_STEP_PIECES = 2;
+  var STRONGEST_GAP = 0.5;
+  function atLeast(change, step) {
+    return change != null && Math.round(change * 1000) >= Math.round(step * 1000);
+  }
+  function strongestOf(comps) {
+    var xs = (comps || [])
+      .filter(function (c) {
+        return c.level > 0;
+      })
+      .sort(function (a, b) {
+        return b.level - a.level;
+      });
+    for (var k = 1; k <= 2 && xs.length > k; k++) {
+      var top = xs.slice(0, k);
+      var enough = top.every(function (c) {
+        return (c.scores || []).length >= STRONGEST_PIECES;
+      });
+      if (enough && atLeast(top[k - 1].level - xs[k].level, STRONGEST_GAP)) return top;
+    }
+    return [];
+  }
+  var CARD_BANK = {
+    bankEntry: function (bankId) {
+      var e = L() && L().nextSteps ? L().nextSteps[bankId] : null;
+      return e
+        ? {
+            key: 'bank.' + bankId,
+            phrase: '',
+            steps: { Emerging: e.Emerging, Developing: e.Developing, Proficient: e.Proficient },
+          }
+        : null;
+    },
+    nextStepOf: function (comps) {
+      var strong = strongestOf(comps);
+      var low = null;
+      (comps || []).forEach(function (c) {
+        if (!(c.level > 0) || (c.scores || []).length < NEXT_STEP_PIECES || strong.indexOf(c) >= 0) return;
+        var e = c.bankId && L() && L().nextSteps ? L().nextSteps[c.bankId] : null;
+        if (e && e.sensitive) return;
+        if (!low || c.level < low.level) low = c;
+      });
+      return low;
+    },
+  };
+
   var LEARNING_READERS = {
+    CommentBank: CARD_BANK,
     getCourseConfig: function (cid) {
       return isThis(cid) && L() ? L().config : {};
     },
@@ -589,9 +665,11 @@ var StudentData = (function () {
         String(at.getDate()).padStart(2, '0')
       );
     },
-    // A teacher's level set by hand on a competency: `page` sends none, so none is read.
-    getOverrides: function () {
-      return {};
+    // A teacher's level set by hand on a competency: this student's own, as `page` sends them with My Learning.
+    getOverrides: function (cid) {
+      var out = {};
+      if (isThis(cid) && L()) out[page.student.id] = L().overrides || {};
+      return out;
     },
   };
 

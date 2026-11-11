@@ -7,6 +7,7 @@
  * contract's fields, and only when learning is there. With it off, the
  * phone's page is what it was, byte for byte.
  */
+import BANK_STEPS from '../supabase/functions/_shared/bank-steps.json' with { type: 'json' };
 import { describe, expect, it } from 'vitest';
 import { readCardKey } from '../supabase/functions/_shared/card-key.ts';
 import { makeHandler } from '../supabase/functions/student-submit/handler.ts';
@@ -97,6 +98,7 @@ const FROM_DB_OFF = clone(TODAY);
 FROM_DB_OFF.course.teacher_name = 'Ms. Okafor';
 
 // What the phone gets with Show My Learning on.
+const REAL_BANK_ID = Object.keys(BANK_STEPS.ids).find(id => !BANK_STEPS.sensitive.includes(id));
 const LEARNING = {
   course: {
     grading_system: 'both',
@@ -134,7 +136,7 @@ const LEARNING = {
               code: 'Q1',
               label: 'Ask questions',
               i_can_text: 'I can ask a question.',
-              bank_id: 'sci8-q1',
+              bank_id: REAL_BANK_ID,
               display_order: 0,
               i_can_statements: ['I can ask a question.', 'I can say what I expect.'],
             },
@@ -153,11 +155,24 @@ const LEARNING = {
     },
   ],
 };
+// A real bank id: its Next Step sentences come from supabase/functions/_shared/bank-steps.json.
+const NEXT = {
+  [REAL_BANK_ID]: {
+    Emerging: BANK_STEPS.steps[BANK_STEPS.ids[REAL_BANK_ID]][0],
+    Developing: BANK_STEPS.steps[BANK_STEPS.ids[REAL_BANK_ID]][1],
+    Proficient: BANK_STEPS.steps[BANK_STEPS.ids[REAL_BANK_ID]][2],
+    sensitive: false,
+  },
+};
 const ON = clone(TODAY);
 ON.assessments[0].category_id = CAT;
 ON.assessments[1].category_id = null;
 ON.show_my_learning = true;
 ON.learning = clone(LEARNING);
+ON.learning.section_overrides = {
+  [LEARNING.subjects[0].sections[0].id]: { level: 3, date: '2026-11-01T18:00:00+00:00' },
+};
+ON.learning.next_steps = NEXT;
 
 // What the database sends with it on: the same, plus what must stop at the edge.
 const FROM_DB_ON = clone(FROM_DB_OFF);
@@ -178,6 +193,11 @@ FROM_DB_ON.learning.subjects[0].color = '#000000';
 FROM_DB_ON.learning.subjects[0].sections[0].color = '#ffffff';
 FROM_DB_ON.learning.subjects[0].sections[0].removed_at = null;
 FROM_DB_ON.learning.scores = [{ enrollment_id: STU2, value: 4 }];
+// This student's hand-set level, with the teacher's reason, which must stop at the edge.
+FROM_DB_ON.learning.section_overrides = {
+  [LEARNING.subjects[0].sections[0].id]: { level: 3, date: '2026-11-01T18:00:00+00:00', reason: 'Talked with her mum' },
+  'not-a-section-id': { level: 4 },
+};
 FROM_DB_ON.learning.class_average = 3.2;
 FROM_DB_ON.class_average = 3.2;
 FROM_DB_ON.roster = [{ enrollment_id: STU2, first_name: 'Stu' }];
@@ -238,7 +258,15 @@ describe('student-submit: My Learning on the page (E9)', () => {
     const page = JSON.parse(text);
     expect(page).toEqual(ON);
     expect(page.show_my_learning).toBe(true);
-    expect(Object.keys(page.learning).sort()).toEqual(['categories', 'competency_groups', 'course', 'subjects']);
+    expect(Object.keys(page.learning).sort()).toEqual([
+      'categories',
+      'competency_groups',
+      'course',
+      'next_steps',
+      'section_overrides',
+      'subjects',
+    ]);
+    expect(text).not.toContain('Talked with her mum');
     expect(Object.keys(page.learning.course)).toHaveLength(12);
     expect(page.assessments.map(a => a.category_id)).toEqual([CAT, null]);
     // Take E9's keys away and the page is today's, to the byte.

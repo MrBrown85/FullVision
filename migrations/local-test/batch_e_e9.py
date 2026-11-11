@@ -134,8 +134,9 @@ def run():
         on_text = page_text(d, t1); p = json.loads(on_text)
         ok('on: show_my_learning is true', p.get('show_my_learning') is True, p.get('show_my_learning'))
         L = p.get('learning') or {}
-        ok('on: learning has course, categories, competency_groups, subjects and nothing else',
-           sorted(L) == ['categories', 'competency_groups', 'course', 'subjects'], sorted(L))
+        ok('on: learning has course, categories, section_overrides, competency_groups, subjects and nothing else',
+           sorted(L) == ['categories', 'competency_groups', 'course', 'section_overrides', 'subjects'], sorted(L))
+        ok('on: no hand-set level yet: section_overrides is empty', L.get('section_overrides') == {}, L.get('section_overrides'))
         ok("on: learning.course is the twelve columns, and no other", sorted(L.get('course', {})) == sorted(COURSE_COLUMNS), sorted(L.get('course', {})))
         ok('on: everything else on the page is as before', compact(strip_e9(p)) == compact(json.loads(before1)))
         # The bundle's own shapes, read from get_class_bundle as the teacher.
@@ -173,6 +174,15 @@ def run():
         ok('on: nothing of another student (no other enrollment id, no name)',
            ENR2 not in on_text and STU2 not in on_text and 'Marcus' not in on_text and ENR_B not in on_text)
         ok('on: no teacher id', A not in on_text and B not in on_text)
+        # Hand-set levels: Cece's own on her page (level and date, no reason); Stu2's never on hers.
+        d.run("insert into section_override (enrollment_id, section_id, level, reason) values (:e, :s, 4, 'Talked with her mum'), (:e2, :s2, 2, 'Stu2 only')",
+              e=ENR1, s=k['sections'][0], e2=ENR2, s2=k['sections'][1])
+        p = json.loads(page_text(d, t1)); so = p['learning']['section_overrides']
+        ok("on: Cece's hand-set level is on her page, level and date only",
+           list(so) == [k['sections'][0]] and so[k['sections'][0]]['level'] == 4 and sorted(so[k['sections'][0]]) == ['date', 'level'], so)
+        ok("on: no teacher's reason, and not Stu2's hand-set level", 'Talked with her mum' not in json.dumps(p) and 'Stu2 only' not in json.dumps(p)
+           and k['sections'][1] not in json.dumps(so))
+        d.run('delete from section_override')
         p2 = json.loads(page_text(d, t2, ENR2))
         ok('on: the other student gets the same learning, their own grade', p2['learning'] == L and ENR1 not in compact(p2))
         # ── another class off ──

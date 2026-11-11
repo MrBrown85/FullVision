@@ -85,7 +85,9 @@
 --     columns), its categories with their weights, its folders and its
 --     learning map (sections not removed, each skill with its I Can text
 --     and bank id), in get_class_bundle's shapes; and each piece its
---     category_id. The student's returned grades are already on the page.
+--     category_id, and this student's own hand-set levels (section
+--     overrides: level and date, not the teacher's reason). The student's
+--     returned grades are already on the page.
 --     Nothing of another student, no draft, no teacher-only note. With it
 --     off the answer is the same as before, byte for byte.
 --
@@ -178,7 +180,7 @@ begin
             ('student_submit.answer_seen(text,uuid,uuid[],text)',    'da85d013a0511618c989d7bb44eac2f3', '360aa4c1fe8e0e0d860284cb3809c943'),
             ('public.save_score_report_note(uuid,uuid,text,uuid)',   '7b230f6d11458a7660e23c80f8829b95', '0278137275a8a15e973648c855643447'),
             ('public.list_course_grade_returns(uuid)',               'bc5529a69303cdfe8d91604388dc927a', '0779f1e345fb278fd8702592163784c1'),
-            ('student_submit.page(text,uuid,text)',                  '034e6674a25f8a5e1abc067f50784ce6', '67a5b8270aa78e914588694e297be6bc')
+            ('student_submit.page(text,uuid,text)',                  '034e6674a25f8a5e1abc067f50784ce6', '2f1795ba4c5416788d477a540b49fccb')
             -- FINGERPRINTS-END
         ) as v(fn, before, becomes)
     loop
@@ -1347,6 +1349,10 @@ begin
                                                            'display_order', c.display_order, 'calc_mode', c.calc_mode)
                                         order by c.display_order, c.id)
                          from category c where c.course_id = _course.id), '[]'::jsonb),
+                   -- E9: this student's own hand-set levels, as the bundle sends them, without the teacher's reason
+                   'section_overrides', coalesce((
+                       select jsonb_object_agg(o.section_id::text, jsonb_build_object('level', o.level, 'date', o.updated_at))
+                         from section_override o where o.enrollment_id = p_enrollment_id), '{}'::jsonb),
                    -- E9: the class's folders, as the bundle sends them
                    'competency_groups', coalesce((
                        select jsonb_agg(jsonb_build_object('id', cg.id, 'name', cg.name, 'color', cg.color,
@@ -1441,7 +1447,7 @@ begin
             ('student_submit.answer_seen(text,uuid,uuid[],text)',    'da85d013a0511618c989d7bb44eac2f3', '360aa4c1fe8e0e0d860284cb3809c943'),
             ('public.save_score_report_note(uuid,uuid,text,uuid)',   '7b230f6d11458a7660e23c80f8829b95', '0278137275a8a15e973648c855643447'),
             ('public.list_course_grade_returns(uuid)',               'bc5529a69303cdfe8d91604388dc927a', '0779f1e345fb278fd8702592163784c1'),
-            ('student_submit.page(text,uuid,text)',                  '034e6674a25f8a5e1abc067f50784ce6', '67a5b8270aa78e914588694e297be6bc')
+            ('student_submit.page(text,uuid,text)',                  '034e6674a25f8a5e1abc067f50784ce6', '2f1795ba4c5416788d477a540b49fccb')
             -- FINGERPRINTS-END
         ) as v(fn, before, becomes)
     loop

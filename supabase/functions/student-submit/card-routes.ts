@@ -43,6 +43,8 @@
 // Kept free of Deno and database imports, as handler.ts is.
 import { CODE_LENGTH, tidy, type CardKey } from '../_shared/card-key.ts';
 import type { Identity } from './handler.ts';
+// The comment bank's Next Step sentences and its sensitive sets (scripts/build-bank-steps.mjs), for My Learning.
+import BANK_STEPS from '../_shared/bank-steps.json' with { type: 'json' };
 
 type Json = Record<string, unknown>;
 // Every parameter goes to the database as text, or as nothing.
@@ -246,9 +248,45 @@ const LEARNING_COURSE = [
   'folders_count_as_one',
   'courses_count_equally',
 ];
+/* For each of the class's skills from the BC bank, its Next Step sentences
+   (the step toward the level above, at Emerging, Developing and
+   Proficient) and whether its set is sensitive (never named as a Next
+   Step): only the bank ids the class's own learning map holds. */
+const STEPS = BANK_STEPS as { ids: Record<string, number>; steps: string[][]; sensitive: string[] };
+const SENSITIVE = new Set(STEPS.sensitive);
+function nextSteps(subjects: Json[]): Json {
+  const out: Json = {};
+  for (const s of subjects) {
+    for (const sec of list(s.sections)) {
+      for (const t of list(object(sec).tags)) {
+        const id = object(t).bank_id;
+        if (typeof id !== 'string' || !Object.hasOwn(STEPS.ids, id) || Object.hasOwn(out, id)) continue;
+        const [Emerging, Developing, Proficient] = STEPS.steps[STEPS.ids[id]] || [];
+        out[id] = {
+          Emerging: Emerging || '',
+          Developing: Developing || '',
+          Proficient: Proficient || '',
+          sensitive: SENSITIVE.has(id),
+        };
+      }
+    }
+  }
+  return out;
+}
+
 function learning(v: unknown): Json {
   const l = object(v);
   const c = object(l.course);
+  const subjects = list(l.subjects).map(s => ({
+    ...pick(s, ['id', 'name', 'display_order']),
+    sections: list(object(s).sections).map(sec => ({
+      ...pick(sec, ['id', 'name', 'display_order', 'competency_group_id']),
+      tags: list(object(sec).tags).map(t => ({
+        ...pick(t, ['id', 'code', 'label', 'i_can_text', 'bank_id', 'display_order']),
+        i_can_statements: texts(object(t).i_can_statements),
+      })),
+    })),
+  }));
   return {
     course: {
       ...pick(c, LEARNING_COURSE),
@@ -260,16 +298,10 @@ function learning(v: unknown): Json {
     competency_groups: list(l.competency_groups).map(g =>
       pick(g, ['id', 'name', 'color', 'display_order', 'counts_as_one']),
     ),
-    subjects: list(l.subjects).map(s => ({
-      ...pick(s, ['id', 'name', 'display_order']),
-      sections: list(object(s).sections).map(sec => ({
-        ...pick(sec, ['id', 'name', 'display_order', 'competency_group_id']),
-        tags: list(object(sec).tags).map(t => ({
-          ...pick(t, ['id', 'code', 'label', 'i_can_text', 'bank_id', 'display_order']),
-          i_can_statements: texts(object(t).i_can_statements),
-        })),
-      })),
-    })),
+    // This student's own hand-set levels, by section: the level and its date (no reason is sent).
+    section_overrides: byId(l.section_overrides, o => pick(o, ['level', 'date'])),
+    subjects,
+    next_steps: nextSteps(subjects),
   };
 }
 

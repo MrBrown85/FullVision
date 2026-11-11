@@ -43,6 +43,19 @@ function withLearning(reply) {
         courses_count_equally: false,
       },
       categories: [{ id: 'cat-1', name: 'Assignments', weight: 100, display_order: 0, calc_mode: 'points' }],
+      section_overrides: {},
+      // Each skill's Next Step sentences, as the edge sends them from the comment bank (bank-steps.json).
+      next_steps: Object.fromEntries(
+        tags.map(id => [
+          'bank-' + id,
+          {
+            Emerging: 'Next from Emerging on ' + id,
+            Developing: 'Next from Developing on ' + id,
+            Proficient: 'Next from Proficient on ' + id,
+            sensitive: false,
+          },
+        ]),
+      ),
       competency_groups: [
         { id: 'grp-1', name: 'Questioning and Predicting', color: '#0891b2', display_order: 0, counts_as_one: false },
       ],
@@ -63,7 +76,7 @@ function withLearning(reply) {
                 label: reply.tags[id].label,
                 i_can_text: '',
                 i_can_statements: reply.tags[id].i_can || [],
-                bank_id: null,
+                bank_id: 'bank-' + id,
                 display_order: 0,
               },
             ],
@@ -88,6 +101,36 @@ async function open() {
 }
 
 describe('My Learning on a real card', () => {
+  it('a hand-set level and the Next Step read as Preview reads them', async () => {
+    const { page, view } = await open();
+    const reply = withLearning(page.T.demoPage('proficiency'));
+    const tags = Object.keys(reply.tags);
+    const base = view(reply).learning.groups.flatMap(g => g.skills);
+    // A skill with a level below Extending names its own Next Step, the bank's sentence for its level.
+    const graded = base.find(s => s.level > 0 && s.level < 4);
+    expect(graded.next).toEqual({
+      top: false,
+      text: expect.stringMatching(/^Next from (Emerging|Developing|Proficient) on /),
+    });
+    // The teacher's hand-set level is the skill's level, as in Preview.
+    const target = base.find(s => s.level !== 4);
+    reply.learning.section_overrides = { [target.id]: { level: 4, date: null } };
+    const set = view(reply)
+      .learning.groups.flatMap(g => g.skills)
+      .find(s => s.id === target.id);
+    expect(set.level).toBe(4);
+    expect(set.next).toEqual({ top: true, text: '' });
+    // A sensitive set's skill is never the Next Step My Learning names.
+    const next = view(withLearning(page.T.demoPage('proficiency'))).learning.next;
+    if (next) {
+      const r2 = withLearning(page.T.demoPage('proficiency'));
+      const bank = 'bank-' + tags.find(id => 'sec-' + id === next.id);
+      r2.learning.next_steps[bank].sensitive = true;
+      const again = view(r2).learning.next;
+      expect(again && again.id).not.toBe(next.id);
+    }
+  });
+
   it('with Show My Learning off: no My Learning, and only the Assignments list’s four readers', async () => {
     const { page, view } = await open();
     const v = view(page.T.demoPage('proficiency'));
@@ -120,9 +163,8 @@ describe('My Learning on a real card', () => {
       expect(skills.some(s => s.level > 0 && s.text)).toBe(true);
       expect(v.learning.overall.text).not.toBe('');
       if (system !== 'proficiency') expect(v.learning.categories.map(c => c.name)).toEqual(['Assignments']);
-      // One name is reached and not given, on purpose: the comment bank is not on the student's
-      // page (it is large), so a skill's Next Step is left out there, as student-view.js says.
-      expect([...reached]).toEqual(['CommentBank']);
+      // Every name it reaches is given: the comment bank's two readers come from `learning.next_steps`.
+      expect([...reached]).toEqual([]);
       // Off again (another class, or the switch turned off): the readers go with it.
       view(page.T.demoPage(system));
       expect(page.run('typeof getSections')).toBe('undefined');
