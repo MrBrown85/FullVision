@@ -20,13 +20,13 @@ async function openEdit(page) {
   return aid;
 }
 
-test('Escape closes an unchanged Edit Assessment and goes back to its Edit button', async ({ page }) => {
+test('Escape closes an unchanged Edit Assessment and goes back to the card’s ⋯, which holds Edit', async ({ page }) => {
   await openAssignments(page);
   const aid = await openEdit(page);
   await page.locator('#af-title').focus();
   await page.keyboard.press('Escape');
   await expect(page.locator('#new-assess-form')).toBeHidden();
-  await expect(page.locator(`[data-action="editAssess"][data-aid="${aid}"]`)).toBeFocused();
+  await expect(page.locator(`#ac-${aid} .assess-more-btn`)).toBeFocused();
 });
 
 test('Escape on a changed form asks first; Escape on the question keeps the form', async ({ page }) => {

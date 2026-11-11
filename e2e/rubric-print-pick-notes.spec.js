@@ -1,14 +1,12 @@
 import { test, expect } from '@playwright/test';
+import { cardMenuItem } from './card-menu.js';
 
 // Print Rubrics: each name in the Pick Students list carries a note
 // ("changed since Nov 2", "printed Nov 2"). The list is two columns, and a
 // long name with its note once ran into the next column. Every note now stays
 // inside its own column at the widths teachers use.
-for (const [width, height] of [
-  [1440, 900],
-  [1280, 800],
-  [1024, 768],
-]) {
+// 1024 px, the narrowest, is the run that catches it; wider windows only have more room.
+for (const [width, height] of [[1024, 768]]) {
   test(`Print Rubrics notes stay in their column at ${width} wide`, async ({ page }) => {
     await page.setViewportSize({ width, height });
     await page.goto('/login.html?demo=1');
@@ -32,7 +30,7 @@ for (const [width, height] of [
     const card = page.locator('#ac-sci8a19');
     await card.waitFor();
     if (!(await card.evaluate(el => el.classList.contains('open')))) await card.locator('.assess-title').click();
-    await card.locator('[data-action="printRubrics"]').first().click();
+    await (await cardMenuItem(card, 'printRubrics')).click();
     await expect(page.locator('.rp-pick .rp-tag.is-changed').first()).toBeVisible();
 
     const spills = await page.locator('.rp-pick .rp-pick-row').evaluateAll(rows =>

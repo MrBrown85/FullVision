@@ -77,19 +77,19 @@ test('picking or hovering a rubric level moves nothing', async ({ page }) => {
       const crits = dialog.locator('.grdt-crit');
       const first = crits.nth(0);
       // Start from no level on the first criterion.
-      const chosen = first.locator('.grdt-tile.is-chosen');
-      if (await chosen.count()) await chosen.locator('.grdt-chosen-label').click();
-      await expect(first.locator('.grdt-tile.is-chosen')).toHaveCount(0);
+      const chosen = first.locator('.grdl-level.is-on');
+      if (await chosen.count()) await chosen.click();
+      await expect(first.locator('.grdl-level.is-on')).toHaveCount(0);
       const before = [await box(first), await box(crits.nth(1))];
-      const tile = first.locator('.grdt-tile[data-level="2"]');
-      await tile.hover();
+      const level = first.locator('[data-action="graderLevel"][data-level="2"]');
+      await level.hover();
       expect([await box(first), await box(crits.nth(1))]).toEqual(before);
-      await tile.click({ position: { x: 20, y: 6 } });
-      await expect(first.locator('.grdt-tile.is-chosen')).toHaveCount(1);
+      await level.click();
+      await expect(first.locator('.grdl-level.is-on')).toHaveCount(1);
       expect([await box(first), await box(crits.nth(1))]).toEqual(before);
-      // The chosen tile's − | + stay on the name's line.
-      const head = first.locator('.grdt-tile.is-chosen .grdt-tile-head');
-      expect((await box(head)).height).toBeLessThanOrEqual(28);
+      // The chosen level's − | + stay on the bar's one line.
+      const pick = first.locator('.grdl-pick');
+      expect((await box(pick)).height).toBeLessThanOrEqual(36);
       await dialog.locator('.grader-done').click();
     }
   }
@@ -173,4 +173,46 @@ test('rubric class view: no hover prompt; the bar starts after the student list'
   await expect(bar).toBeVisible();
   const sidebar = await box(page.locator('#gb-sidebar'));
   expect((await box(bar)).left).toBeGreaterThanOrEqual(sidebar.right);
+});
+
+// S0-F2 (Demo Mode only, switch on): the row sits above the dialog's footer, outside the part that scrolls: on a
+// long rubric piece Return and the Draft line are in view with no scrolling.
+test('Return and the Draft line are in view without scrolling on a rubric piece at 1280×720', async ({ page }) => {
+  await demo(page, '/gradebook?course=sci8');
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const at = await page.evaluate(() => {
+    var cid = getActiveCourse();
+    setStudentPageSwitch(cid, true);
+    var a = getAssessments(cid).find(x => x.rubricId && !isPointsScored(x) && getRubricById(cid, x.rubricId));
+    var student = sortStudents(getStudents(cid), 'lastName').find(s =>
+      (getScores(cid)[s.id] || []).some(e => e.assessmentId === a.id && Number(e.score) > 0),
+    );
+    var entry = getScores(cid)[student.id].find(e => e.assessmentId === a.id && Number(e.score) > 0);
+    return { cid: cid, sid: student.id, aid: a.id, crit: entry.tagId, to: Number(entry.score) === 1 ? 2 : 1 };
+  });
+  await page.goto('/gradebook');
+  await page.waitForSelector('#dock-mount nav', { timeout: 10000 });
+  const cell = page.locator('.gb-scores-cell[data-sid="' + at.sid + '"][data-aid="' + at.aid + '"]');
+  await cell.scrollIntoViewIfNeeded();
+  await cell.click();
+  const dialog = page.locator('#grader-overlay .grader-dialog');
+  await expect(dialog).toBeVisible();
+  // The grading is longer than the dialog: it scrolls.
+  expect(await dialog.locator('.grader-scroll').evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
+  await expect(dialog.locator('.grader-returned')).toBeInViewport({ ratio: 1 });
+
+  // A level on the first criterion, with the dialog scrolled to its top.
+  await dialog
+    .locator('[data-action="graderLevel"][data-critid="' + at.crit + '"][data-level="' + at.to + '"]')
+    .first()
+    .click();
+  await page.mouse.move(640, 5);
+  await expect(dialog.locator('.grader-draft-mark')).toHaveText('Draft');
+  await expect(dialog.locator('.grader-return [data-grader="return"]')).toBeInViewport({ ratio: 1 });
+  await expect(dialog.locator('.grader-draft-mark')).toBeInViewport({ ratio: 1 });
+  await expect(dialog.locator('.grader-draft-still')).toBeInViewport({ ratio: 1 });
+  // It is not inside the part that scrolls.
+  await expect(dialog.locator('.grader-scroll .grader-return')).toHaveCount(0);
+  await dialog.locator('.grader-return [data-grader="return"]').click();
+  await expect(dialog.locator('.grader-returned')).toBeInViewport({ ratio: 1 });
 });

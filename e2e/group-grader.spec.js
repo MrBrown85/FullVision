@@ -56,13 +56,13 @@ test('a member’s cell opens their group, and grading it fills every member', a
   await openCell(page, info, info.ids[2]);
   const dialog = page.locator('#grader-overlay .grader-dialog');
   await expect(dialog.locator('.grader-student')).toHaveText('Group 1');
-  await expect(dialog.locator('.grader-members-title')).toHaveText('Group Members');
+  await expect(dialog.locator('.grader-members-title')).toHaveText('Students in This Group');
   await expect(dialog.locator('.grader-member-name')).toHaveText(info.names);
   await expect(dialog.locator('.grader-hint')).toHaveText('← → change group · Esc closes');
   await expect(dialog.locator('.grader-student-row .grader-status')).toBeHidden();
   await expect(dialog.locator('.grader-report-note')).toBeHidden();
 
-  await dialog.locator('.grdt-tile[data-action="graderLevel"][data-level="4"]').first().click();
+  await dialog.locator('[data-action="graderLevel"][data-level="4"]').first().click();
   const first = await levelsOf(page, info, info.ids[0]);
   expect(first).toContain(':4');
   for (const sid of info.ids.slice(1, 4)) expect(await levelsOf(page, info, sid)).toBe(first);
@@ -85,7 +85,7 @@ test('Grade Separately and Back to Group Grade', async ({ page }) => {
 
   // The group's grade no longer reaches her.
   const before = await levelsOf(page, info, info.ids[1]);
-  await dialog.locator('.grdt-tile[data-action="graderLevel"][data-level="1"]').first().click();
+  await dialog.locator('[data-action="graderLevel"][data-level="1"]').first().click();
   expect(await levelsOf(page, info, info.ids[1])).toBe(before);
   const group = await levelsOf(page, info, info.ids[0]);
   expect(group).not.toBe(before);
@@ -106,7 +106,7 @@ test('Missing stays per student, and → steps group by group', async ({ page })
   const info = await setUp(page);
   await openCell(page, info, info.ids[0]);
   const dialog = page.locator('#grader-overlay .grader-dialog');
-  await dialog.locator('.grdt-tile[data-action="graderLevel"][data-level="4"]').first().click();
+  await dialog.locator('[data-action="graderLevel"][data-level="4"]').first().click();
   const sam = dialog.locator('.grader-member').nth(3);
   await sam.locator('[data-status="NS"]').click();
   await expect(sam.locator('[data-status="NS"]')).toHaveAttribute('aria-pressed', 'true');
@@ -140,13 +140,13 @@ test("a member graded separately keeps her own grade; the footer shows the group
   await openCell(page, info, info.ids[0]);
   const dialog = page.locator('#grader-overlay .grader-dialog');
   const foot = dialog.locator('.grader-foot .grader-grade');
-  await dialog.locator('.grdt-tile[data-action="graderLevel"][data-level="3"]').first().click();
+  await dialog.locator('[data-action="graderLevel"][data-level="3"]').first().click();
   const noor = dialog.locator('.grader-member').nth(1);
   await noor.locator('.grader-member-more').click();
   await noor.getByRole('menuitem', { name: 'Grade Separately' }).click();
   const hers = await noor.locator('.grader-member-separate .grader-grade').textContent();
   await expect(foot).toHaveText(hers);
-  await dialog.locator('.grdt-tile[data-action="graderLevel"][data-level="1"]').first().click();
+  await dialog.locator('[data-action="graderLevel"][data-level="1"]').first().click();
   await expect(noor.locator('.grader-member-separate .grader-grade')).toHaveText(hers);
   await expect(foot).not.toHaveText(hers);
   await expect(foot).toHaveText(/^Emerging/);

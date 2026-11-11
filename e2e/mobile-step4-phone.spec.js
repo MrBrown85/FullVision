@@ -124,9 +124,10 @@ test('sheet filters are not narrowed by Recent', async ({ page }) => {
   await page.locator('.m-tab-item[data-tab="grade"]').click();
   await expect(page.locator('[data-action="m-grade-seg"][data-val="recent"]')).toHaveClass(/m-seg-active/);
   await page.locator('[data-action="m-grade-filter-open"]').click();
-  await page.locator('[data-action="m-grade-filter-seg"][data-kind="gradedStatus"][data-val="all"]').waitFor();
+  // The filter applies as it is tapped, in every class; Done closes it.
+  await page.locator('[data-action="m-grade-filter-done"]').waitFor();
   await page.locator('[data-action="m-grade-filter-toggle"][data-kind="category"]').first().click();
-  await page.locator('[data-action="m-grade-filter-apply"]').click();
+  await page.locator('[data-action="m-grade-filter-done"]').click();
   await expect(page.locator('[data-action="m-grade-seg"][data-val="all"]')).toHaveClass(/m-seg-active/);
   // Every assessment in the chosen category shows, however old.
   const counts = await page.evaluate(() => {
@@ -230,8 +231,11 @@ test('Grade tab uses the desktop words', async ({ page }) => {
   await page.waitForTimeout(500);
   const card = page.locator('.m-swiper-card').first();
   await expect(card.locator('.m-status-pill')).toHaveText(['Missing', 'Excused', 'Late']);
-  await expect(card.locator('.m-level-key')).toContainText('Proficient');
-  await expect(card.locator('.m-score-btn[data-score="3"]').first()).toHaveAttribute('aria-label', '3, Proficient');
+  await expect(card.locator('.m-score-btn[data-score="3"] .m-level-word').first()).toHaveText('Proficient');
+  await expect(card.locator('.m-score-btn[data-score="3"]').first()).toHaveAttribute(
+    'aria-label',
+    /^3[+\u2212]?, Proficient$/,
+  );
 
   // Each card's hint shows exactly when Missing can't be picked.
   const hints = await page.evaluate(() =>

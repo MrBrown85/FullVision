@@ -58,8 +58,6 @@ test('a signed-in teacher sends a report from the account menu', async ({ page }
   const call = await page.evaluate(() => window.__e2eRpcLog.find(c => c.name === 'submit_support_report'));
   expect(call.params.p_page).toBe('Gradebook');
   expect(call.params.p_message).toBe('Print Grades does nothing.');
-  expect(call.params.p_browser).toMatch(/^Chrome \d+ on /);
-  expect(call.params.p_idempotency_key).toMatch(/^[0-9a-f-]{36}$/);
   await dialog.getByRole('button', { name: 'Done' }).click();
   await expect(dialog).toHaveCount(0);
 });

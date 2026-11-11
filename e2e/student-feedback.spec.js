@@ -61,12 +61,15 @@ test.describe('on a phone', () => {
     await contrast(page);
     await picture(page, 'phone-feedback-rubric');
 
-    await page.getByRole('button', { name: 'What the Levels Mean' }).click();
+    // What the Levels Mean starts open (the board), and closes.
     await expect(page.getByRole('button', { name: 'What the Levels Mean' })).toHaveAttribute('aria-expanded', 'true');
     await expect(page.getByText('You went beyond the goal')).toBeVisible();
     await fits(page);
     await contrast(page);
     await picture(page, 'phone-feedback-levels');
+    await page.getByRole('button', { name: 'What the Levels Mean' }).click();
+    await expect(page.getByRole('button', { name: 'What the Levels Mean' })).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByText('You went beyond the goal')).toBeHidden();
 
     await page.getByRole('button', { name: 'See the Whole Rubric' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'The Whole Rubric' })).toBeFocused();
@@ -124,7 +127,9 @@ test.describe('on a Chromebook', () => {
     await expect(page.locator('.sp-side')).toBeVisible();
     await expect(page.locator('.sp-head')).toBeVisible();
     await expect(page.locator('.sp-fb-back')).toBeHidden();
-    await page.getByRole('button', { name: 'What the Levels Mean' }).click();
+    // On a Chromebook the levels are always shown, the chips in a row (the board), with no button.
+    await expect(page.getByRole('button', { name: 'What the Levels Mean' })).toBeHidden();
+    await expect(page.getByText('You went beyond the goal')).toBeVisible();
     await fits(page);
     await named(page);
     await contrast(page);

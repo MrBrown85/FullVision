@@ -23,6 +23,13 @@
    (Students See Your Mark Up off), never returned, or with Missing or
    Excused on it.
 
+   A real student's page (S9-W1, S10-W1) asks the server's routes in their
+   place (see "A real card" below): `feedback` once the class's work is in
+   and it takes work, `markup` and `file-links` for See Your Work, `reflect`,
+   `reply` and `answer-seen`. Everything it keeps is on the page's state, so
+   it ends with the session, and every request names its own student
+   (StudentPage.askClass refuses one made for someone else).
+
    Every answer is checked against the screen that asked before it draws:
    StudentPage.whileCurrent drops it after Done, a new card or another
    class, and See Your Work must still be open on the same piece, for the
@@ -341,6 +348,7 @@
      #demo-card-send and #demo-card-reflect: the server does not send it
      yet. Revisions (S11-F2) at #demo-card-revise only. */
   function feedbackOf(state) {
+    if (state && !state.demo) return realFeedbackOf(state);
     if (!demoOn(state)) return null;
     var byId = {};
     var entry = function (id) {
@@ -476,11 +484,177 @@
     return { ok: false, error: 'not_found' };
   }
 
-  // A route's answer. Outside Demo Mode nothing is asked: Batch C's routes do not exist yet.
+  /* ── A real card (S9-W1, S10-W1) ───────────────────────────────
+     The routes of migrations/2026111120_markup_reflect_revise.sql, through
+     StudentPage.askClass, which adds the device's session. The reply is
+     kept on the page's state (`realFeedback`, with the student it is for),
+     so Done, another student or another class leaves nothing behind. */
+  var REAL_ROUTES = { feedback: 1, markup: 1, 'file-links': 1, reflect: 1, reply: 1, 'answer-seen': 1 };
+
+  function realAsk(route, body) {
+    var ask = StudentPage.askClass;
+    var student = body && typeof body.enrollment_id === 'string' ? body.enrollment_id : '';
+    if (typeof ask !== 'function' || !student || !Object.prototype.hasOwnProperty.call(REAL_ROUTES, route)) {
+      return Promise.resolve({ ok: false, error: 'network' });
+    }
+    // The student the ask is made for is named: someone else's session is never used for it.
+    return ask(route, body, student);
+  }
+
+  function ownFeedback(state) {
+    var f = state && state.realFeedback;
+    return f && state.page && f.student === state.page.student.id ? f : null;
+  }
+
+  /* The `feedback` reply as the page reads it. Marks and reflections, and
+     Your Plan From Last Time; revisions are not wired yet (Phase 3), so
+     none shows. null while there is nothing to show: a class with no marks
+     and no reflections is drawn exactly as it was. */
+  function realFeedbackOf(state) {
+    var f = ownFeedback(state);
+    if (!f) return null;
+    var r = f.reply;
+    var assessments = [];
+    (Array.isArray(r.assessments) ? r.assessments : []).forEach(function (a) {
+      if (!a || typeof a.id !== 'string') return;
+      var marks =
+        a.marks && typeof a.marks === 'object' ? { pages: a.marks.pages | 0, notes: a.marks.notes | 0 } : null;
+      var reflection =
+        r.reflect_on_feedback === true && a.reflection && typeof a.reflection === 'object' ? a.reflection : null;
+      if (!marks && !reflection) return;
+      assessments.push({ id: a.id, marks: marks, revision: null, reflection: reflection });
+    });
+    return {
+      ok: true,
+      v: 1,
+      reflect_on_feedback: r.reflect_on_feedback === true,
+      show_my_learning: false,
+      assessments: assessments,
+      last_plan: r.reflect_on_feedback === true && r.last_plan && typeof r.last_plan === 'object' ? r.last_plan : null,
+    };
+  }
+
+  // Worth keeping: something to show, or Reflect on Feedback on.
+  function worthKeeping(r) {
+    return (
+      r.reflect_on_feedback === true ||
+      r.assessments.some(function (a) {
+        return a && a.marks;
+      })
+    );
+  }
+
+  function repaint() {
+    if (!S || S.screen !== 'assignments' || S.sendAsk) return;
+    var el = typeof document !== 'undefined' ? document.activeElement : null;
+    var sel = '';
+    if (el && el.getAttribute && el.getAttribute('data-act')) {
+      var piece = el.getAttribute('data-piece');
+      sel =
+        '[data-act="' +
+        el.getAttribute('data-act') +
+        '"]' +
+        (piece ? '[data-piece="' + String(piece).replace(/["\\]/g, '') + '"]' : '');
+    } else if (el && el.classList && el.classList.contains('sp-page-title')) {
+      sel = '.sp-page-title';
+    }
+    StudentPage.paint();
+    var back = sel && typeof document !== 'undefined' ? document.querySelector('#app ' + sel) : null;
+    if (back && back.focus) back.focus({ preventScroll: true });
+  }
+
+  /* `feedback`, once the class's `work` has answered that it takes work
+     (s/send.js's loadWork; Mark Up is a part of Send Work). A class that
+     takes none, or a function without the route, is sent nothing more and
+     the page stays as it was drawn. */
+  function loadFeedback() {
+    var state = S;
+    if (!state || state.demo || !state.page) return Promise.resolve();
+    var student = state.page.student.id;
+    var work = state.realWork;
+    if (!work || work.student !== student) return Promise.resolve();
+    return StudentPage.whileCurrent(answerOf('feedback', { enrollment_id: student })).then(function (res) {
+      if (S !== state || !state.page || state.page.student.id !== student) return;
+      var on = !!(res && res.ok === true && Array.isArray(res.assessments) && worthKeeping(res));
+      var had = !!ownFeedback(state);
+      state.realFeedback = on ? { student: student, reply: res } : null;
+      if (on || had) repaint();
+    });
+  }
+
+  /* An answer the page has shown: `answer-seen` once, so the teacher's
+     answer stops counting as new. Quiet: a failed ask is tried again the
+     next time the answer is opened. */
+  function feedbackSeen(ids) {
+    var state = S;
+    var f = ownFeedback(state);
+    if (!f) return Promise.resolve();
+    var student = f.student;
+    var fresh = (Array.isArray(ids) ? ids : []).filter(function (id) {
+      var a = (f.reply.assessments || []).filter(function (x) {
+        return x && x.id === id;
+      })[0];
+      return !!(a && a.reflection && a.reflection.answer_new === true);
+    });
+    if (!fresh.length) return Promise.resolve();
+    return StudentPage.whileCurrent(answerOf('answer-seen', { enrollment_id: student, assessment_ids: fresh })).then(
+      function (res) {
+        if (S !== state || ownFeedback(state) !== f || !res || res.ok !== true) return;
+        f.reply.assessments.forEach(function (a) {
+          if (a && a.reflection && fresh.indexOf(a.id) >= 0) a.reflection.answer_new = false;
+        });
+      },
+    );
+  }
+
+  /* What `reflect` and `reply` answered, put into the page's copy so the
+     screen shows it without asking again. Only while the page still
+     belongs to the student the answer is for. */
+  function keepReflection(state, student, id, route, res) {
+    var f = ownFeedback(state);
+    if (!f || f.student !== student || !res || res.ok !== true || !res.reflection) return;
+    var list = f.reply.assessments;
+    var a = list.filter(function (x) {
+      return x && x.id === id;
+    })[0];
+    if (!a) list.push((a = { id: id, marks: null, revision: null, reflection: null }));
+    var blank = {
+      makes_sense: null,
+      question: null,
+      plan: null,
+      went_well: null,
+      sent_at: null,
+      answer: null,
+      answered_at: null,
+      sense_now: null,
+      follow_up: null,
+      follow_up_answer: null,
+      follow_up_answered_at: null,
+      answer_new: false,
+    };
+    a.reflection = Object.assign(blank, a.reflection || {}, res.reflection);
+    if (route === 'reflect' && a.reflection.plan) {
+      f.reply.last_plan = { assessment_id: id, plan: a.reflection.plan, sent_at: a.reflection.sent_at };
+    }
+  }
+
+  // A route's answer.
   function answerOf(route, body) {
     if (answerFn) return Promise.resolve(answerFn(route, body));
-    if (!S || !S.demo) return Promise.resolve({ ok: false, error: 'network' });
-    return Promise.resolve(demoAnswer(route, body));
+    if (!S) return Promise.resolve({ ok: false, error: 'network' });
+    if (S.demo) return Promise.resolve(demoAnswer(route, body));
+    var state = S;
+    var student = body && body.enrollment_id;
+    var id = body && body.assessment_id;
+    return Promise.resolve(realAsk(route, body)).then(
+      function (res) {
+        if (route === 'reflect' || route === 'reply') keepReflection(state, student, id, route, res);
+        return res;
+      },
+      function () {
+        return { ok: false, error: 'network' };
+      },
+    );
   }
 
   /* ── See Your Work: fetching a piece's pages ───────────────── */
@@ -551,6 +725,7 @@
     if (act === 'card-done' || act === 'class-open' || act === 'card-add') {
       S.work = '';
       S.workPages = null;
+      S.realFeedback = null;
       if (act === 'card-done') {
         S.demoReflections = null;
         S.demoRevisions = null;
@@ -591,7 +766,14 @@
   }
 
   StudentPage.feedbackOf = feedbackOf;
+  StudentPage.feedbackSeen = feedbackSeen;
   StudentPage.groupOf = groupOf;
+  // A real card's page opening: what the class takes (s/send.js), and then, if it takes work, `feedback`.
+  var openedBefore = StudentPage.pageOpened;
+  StudentPage.pageOpened = function () {
+    var first = typeof openedBefore === 'function' ? openedBefore() : null;
+    return Promise.resolve(first).then(loadFeedback);
+  };
   // The sample's revisions, by piece (s/send.js sends a revision into them), or null off #demo-card-revise.
   StudentPage.demoRevisions = revisions;
   // The one way s/reflect.js asks `reflect` and `reply` (Demo Mode's answers until Batch C is wired).
@@ -606,6 +788,7 @@
     },
     test: {
       feedbackOf: feedbackOf,
+      loadFeedback: loadFeedback,
       groupOf: groupOf,
       demoMarkup: function () {
         return DEMO_MARKUP;

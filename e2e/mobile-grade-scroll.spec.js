@@ -62,7 +62,7 @@ test.describe('Phone grading card', () => {
     const group = () => card(page).locator('.m-crit-group').last();
 
     await group().locator('.m-score-btn[data-score="3"]').click();
-    await expect(group().locator('.m-score-btn.m-score-active')).toHaveText('3');
+    await expect(group().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText('3');
     expect(await cardTop(page)).toBe(top);
 
     await group().locator('.m-mod-btn').last().click();
@@ -86,7 +86,7 @@ test.describe('Phone grading card', () => {
     const top = await scrollCardToBottom(page);
     const group = () => card(page).locator('.m-score-group').last();
     await group().locator('.m-score-btn[data-score="2"]').click();
-    await expect(group().locator('.m-score-btn.m-score-active')).toHaveText('2');
+    await expect(group().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText('2');
     expect(await cardTop(page)).toBe(top);
   });
 
@@ -96,7 +96,9 @@ test.describe('Phone grading card', () => {
     await card(page).locator('.m-crit-group').last().locator('.m-score-btn[data-score="4"]').click();
     // What a server echo or an id re-key does once the save lands.
     await page.evaluate(() => _invalidateAndRerender());
-    await expect(card(page).locator('.m-crit-group').last().locator('.m-score-btn.m-score-active')).toHaveText('4');
+    await expect(
+      card(page).locator('.m-crit-group').last().locator('.m-score-btn.m-score-active .m-level-fig'),
+    ).toHaveText('4');
     expect(await cardTop(page)).toBe(top);
   });
 
@@ -133,7 +135,8 @@ test.describe('Phone grading card', () => {
     await card(page).locator('.m-crit-group').nth(1).locator('.m-score-btn[data-score="2"]').click();
     await expect(box()).toHaveValue('Name the variable you change.');
     await expect(box()).toBeVisible();
-    await expect(group().getByRole('button', { name: 'Comment' })).toBeHidden();
+    // The Comment button stays, filled, to edit it (the board).
+    await expect(group().getByRole('button', { name: /^Edit the comment on / })).toBeVisible();
     expect(await saved()).toBe('Name the variable you change.');
 
     // Emptied, it clears and goes back behind its button.

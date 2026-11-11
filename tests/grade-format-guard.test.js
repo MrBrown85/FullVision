@@ -40,7 +40,7 @@ const TO_FIXED_1 = {
 const PROF_LABELS_USES = {
   'teacher-mobile/card-widgets.js': 1,
   'teacher-mobile/student-detail.js': 7,
-  'teacher-mobile/tab-grade.js': 7, // + the grading card's level key and its level buttons' names (Step 4 sweep, Nov 3)
+  'teacher-mobile/tab-grade.js': 4, // the checklist's level names; the level buttons' words are scoreLevelText's (MComponents.levelButtonsHTML)
   'teacher/comment-bank.js': 1,
   'teacher/comment-personal.js': 1,
   // The level word as a line's label ("Developing: …").
@@ -156,7 +156,6 @@ const NOT_A_GRADE = {
   'teacher/page-dashboard.js round r.bottom - c.top + 2': 'a tip’s position',
   'teacher/page-student.js round p.R - lg.R': 'points between two course % as shown',
   'teacher/page-student.js round one.R - lg.R': 'points between two course % as shown',
-  'teacher/page-student.js round (Math.min(e.score, 4) / 4) * 28': 'a bar’s height',
   'teacher/page-student.js round levelBarPercent(cid, r.v)': 'a bar’s width',
   'teacher/report-blocks.js round (nowG.pct - thenG.pct) * 10': 'the change between two course % as shown',
   'teacher/report-blocks.js round (profPlus / total) * 100': 'a share of scores',

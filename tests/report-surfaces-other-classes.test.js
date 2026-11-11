@@ -16,7 +16,8 @@
  * Each class below is drawn, every surface and the rubric handout included,
  * and must match it part for part:
  * - a class with neither setting;
- * - When I Return Them with the student page off, and turned off again;
+ * - When I Return Them with the student page off (a page turned off again is
+ *   the same state: nothing reads the switch but `=== true`);
  * - the student page on with As Soon As I Save, and on with no choice made.
  *
  *   UPDATE_REPORT_SURFACES_OTHER=1 npx vitest run tests/report-surfaces-other-classes.test.js
@@ -78,7 +79,6 @@ function drawClass(config) {
 const CLASSES = [
   ['a class with neither setting', null],
   ['a class set to When I Return Them whose student page is off', { return_grades: 'on_return' }],
-  ['a class whose student page was turned off again', { student_page_enabled: false, return_grades: 'on_return' }],
   ['a class whose student page is on with As Soon As I Save', { student_page_enabled: true, return_grades: 'on_save' }],
   ['a class whose student page is on with no choice made', { student_page_enabled: true }],
 ];

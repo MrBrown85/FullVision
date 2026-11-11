@@ -78,8 +78,8 @@ test('Return Grades: the question on leaving When I Return Them, Cancel, then Re
   await expect(card.getByRole('heading', { name: 'Student Page' })).toBeVisible();
   // Return Grades, then Send Work (S5-F1, Demo Mode), off: no Keep Photos
   // Until; then Reflect on Feedback (S10 follow-up, Demo Mode) and Show My
-  // Learning (S13-F1, Demo Mode).
-  await expect(card.locator('.sp-row')).toHaveCount(4);
+  // Learning (S13-F1, Demo Mode), and last Questionnaires and Reports (the board's).
+  await expect(card.locator('.sp-row')).toHaveCount(5);
   await expect(card.locator('.sp-row-title')).toHaveText([
     'Return Grades',
     'Send Work',
@@ -87,6 +87,7 @@ test('Return Grades: the question on leaving When I Return Them, Cancel, then Re
     'Keep Photos Until',
     'Reflect on Feedback',
     'Show My Learning',
+    'Questionnaires and Reports',
   ]);
   await expect(card.locator('#sp-return-hint')).toHaveText(
     "When a grade shows on a student's page. Until then it's a draft only you can see.",
@@ -185,14 +186,4 @@ test('Return Grades: the question on leaving When I Return Them, Cancel, then Re
   await expect(group.getByRole('radio', { name: 'When I Return Them' })).toBeChecked();
   await expect(page.locator('.confirm-overlay')).toHaveCount(0);
   expect(errors).toEqual([]);
-});
-
-test('with the switch off there is no Student Page tab and its address opens Details', async ({ page }) => {
-  await demoWithNewPiece(page);
-  await page.goto('/dashboard?manage=student-page');
-  await expect(page.getByRole('tab', { name: /^Details/ })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('.cm-tabs [role="tab"]')).toHaveCount(6);
-  await expect(page.getByRole('tab', { name: 'Student Page' })).toHaveCount(0);
-  await expect(page.locator('.sp-card')).toHaveCount(0);
-  await expect(page).toHaveURL(/\/dashboard\?manage=details$/);
 });

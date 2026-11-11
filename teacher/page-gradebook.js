@@ -456,9 +456,7 @@ window.PageGradebook = (function () {
         ' <span aria-hidden="true">\u00D7</span></button>';
     }
 
-    html += _toGradeButton();
-    html += _toReturnButton();
-    html += _questionsButton();
+    html += _workPill();
 
     html +=
       '<div style="margin-left:auto;display:flex;align-items:center;gap:12px">' +
@@ -835,7 +833,9 @@ window.PageGradebook = (function () {
         ? '<span class="gb-key-item gb-key-item-draft"><span class="gb-key-draft"></span>' + DRAFT_KEY_TEXT + '</span>'
         : '') +
       (_work
-        ? '<span class="gb-key-item"><span class="gb-to-grade">To Grade</span>Sent, not graded</span>' +
+        ? '<span class="gb-key-item"><span class="gb-to-grade">' +
+          WORK_CAMERA +
+          'To Grade</span>Sent, not graded</span>' +
           '<span class="gb-key-item">' +
           WORK_CAMERA +
           'Has photos</span>'
@@ -995,11 +995,26 @@ window.PageGradebook = (function () {
     return at ? formatShortDate(String(at).slice(0, 10)) : '';
   }
 
+  /* The toolbar's one pill (the board "Gradebook With Submissions"):
+     "9 to grade · 4 to return · 1 question", with the camera when work
+     came in. Each part is still its own filter; '' when all are 0. */
+  // html-safe: the parts are numbers and fixed words; the camera is our icon
+  function _workPill() {
+    var parts = [_toGradeButton(), _toReturnButton(), _questionsButton()].filter(Boolean);
+    if (!parts.length) return '';
+    return (
+      '<span class="gb-work-pill">' +
+      (_work && _work.total ? WORK_CAMERA : '') +
+      parts.join('<span class="gb-work-pill-sep" aria-hidden="true">·</span>') +
+      '</span>'
+    );
+  }
+
   // html-safe: a number and fixed words
   function _questionsButton() {
     if (!_questions || !_questions.total) return '';
     return (
-      '<button type="button" class="gb-to-return gb-questions-btn' +
+      '<button type="button" class="gb-pill-part gb-questions-btn' +
       (_questionsOnly ? ' active' : '') +
       '" data-action="toggleQuestions" aria-pressed="' +
       _questionsOnly +
@@ -1008,7 +1023,6 @@ window.PageGradebook = (function () {
         ? 'Showing only the work with a question waiting. Click to show everything.'
         : 'Show only the students and assessments with a question waiting for you.') +
       '">' +
-      QUESTION_DOT +
       _questions.total +
       (_questions.total === 1 ? ' question' : ' questions') +
       (_questionsOnly ? ' <span aria-hidden="true">×</span>' : '') +
@@ -1020,7 +1034,7 @@ window.PageGradebook = (function () {
   function _toGradeButton() {
     if (!_work || !_work.total) return '';
     return (
-      '<button type="button" class="gb-to-return gb-to-grade-btn' +
+      '<button type="button" class="gb-pill-part gb-to-grade-btn' +
       (_toGradeOnly ? ' active' : '') +
       '" data-action="toggleToGrade" aria-pressed="' +
       _toGradeOnly +
@@ -1041,7 +1055,7 @@ window.PageGradebook = (function () {
   function _toReturnButton() {
     if (!_drafts || !_drafts.total) return '';
     return (
-      '<button type="button" class="gb-to-return' +
+      '<button type="button" class="gb-pill-part gb-to-return' +
       (_toReturnOnly ? ' active' : '') +
       '" data-action="toggleToReturn" aria-pressed="' +
       _toReturnOnly +
@@ -2294,9 +2308,9 @@ window.PageGradebook = (function () {
         var work = _workCell(cid, a, s.id);
         if (work && work.tograde) {
           cellStyle = '';
-          display = '<span class="gb-to-grade">To Grade</span>';
-        }
-        if (work && work.photos) display += WORK_CAMERA;
+          // A filled blue chip, with the camera inside when photos came in.
+          display = '<span class="gb-to-grade">' + (work.photos ? WORK_CAMERA : '') + 'To Grade</span>';
+        } else if (work && work.photos) display += WORK_CAMERA;
         // Out for revision (S11): "Revising" under the grade, nothing in yet.
         var revising = _revisions && GraderWork.revisionStateOf(cid, s.id, a.id) === 'revising';
         if (revising) display += '<span class="gb-revising">Revising</span>';
@@ -3654,28 +3668,48 @@ window.PageGradebook = (function () {
         var title = assess && assess.title ? assess.title : 'this assessment';
         // A linked copy in another class stays; say so, as Assignments does.
         var copyNote = window.AssessmentCopy && assess ? AssessmentCopy.deleteNote(activeCourse, assess) : '';
-        // Photos students sent for it go too (S8-F1, Colin's ruling 102).
-        var sentPhotos = _studentsWithSentPhotos(activeCourse, aid);
-        showConfirm(
-          'Delete “' + title + '”?',
-          sentPhotos
-            ? 'All scores, statuses, and observations linked to this assessment will be removed, and the photos ' +
-                sentPhotos +
-                (sentPhotos === 1 ? ' student' : ' students') +
-                ' sent for it.' +
-                copyNote +
-                " You can undo this for a few seconds. After that, deleted photos can't come back."
-            : 'All scores, statuses, and observations linked to this assessment will be removed.' +
-                copyNote +
-                ' You can undo this for a few seconds.',
-          'Delete',
-          'danger',
-          function () {
-            _deleteAssessWithUndo(activeCourse, aid, title);
-          },
-        );
+        // Photos students sent for it go too (S8-F1, Colin's ruling 102). A class
+        // whose work this session has not read is read first; if that read fails
+        // the dialog says photos go rather than miss them.
+        var cid = activeCourse;
+        _photosBeforeDelete(cid, aid, function (sentPhotos, maybe) {
+          if (activeCourse !== cid) return;
+          var sent = sentPhotos
+            ? 'the photos ' + sentPhotos + (sentPhotos === 1 ? ' student' : ' students') + ' sent for it.'
+            : maybe
+              ? 'any photos students sent for it.'
+              : '';
+          showConfirm(
+            'Delete “' + title + '”?',
+            sent
+              ? 'All scores, statuses, and observations linked to this assessment will be removed, and ' +
+                  sent +
+                  copyNote +
+                  " You can undo this for a few seconds. After that, deleted photos can't come back."
+              : 'All scores, statuses, and observations linked to this assessment will be removed.' +
+                  copyNote +
+                  ' You can undo this for a few seconds.',
+            'Delete',
+            'danger',
+            function () {
+              _deleteAssessWithUndo(cid, aid, title);
+            },
+          );
+        });
       }
       _dismissContextMenu();
+    });
+  }
+
+  /* The same, read from the server first when this session has not read the
+     class's work (readStudentWorkForDelete: Send Work off reads nothing
+     else); then(count, maybe), maybe true when that read failed. At once
+     when nothing needs reading. */
+  function _photosBeforeDelete(cid, aid, then) {
+    var read = typeof readStudentWorkForDelete === 'function' ? readStudentWorkForDelete(cid) : null;
+    if (!read) return then(_studentsWithSentPhotos(cid, aid), false);
+    return read.then(function (res) {
+      return then(_studentsWithSentPhotos(cid, aid), !(res && res.known));
     });
   }
 

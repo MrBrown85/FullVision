@@ -1,21 +1,42 @@
-/* student-evidence.js — The student page's Evidence panel: a timeline strip,
-   the shared capture strip with the student fixed, tabs (All, By
-   competency, Assessments, Concerns) and the observation cards the
-   Observations page uses (teacher/obs-card.js). */
+/* student-evidence.js — The student page's Observations tab: the shared
+   capture strip with the student fixed, the term's timeline with its gaps,
+   Seen in Class (each competency and how many notes it has, which narrows
+   the list), and the notes month by month as the Observations page's cards
+   (teacher/obs-card.js), narrowed by type. Private notes (Concern, Note, a
+   reflection) keep their words off the screen until the teacher shows
+   them, since the student may be looking (redesign R3,
+   docs/plans/teacher-student-page-redesign-plan.md). */
 window.StudentEvidence = (function () {
   'use strict';
 
   var GAP_DAYS = 14;
   var WEEK_TICK_MAX_DAYS = 84;
   var MIN_SPAN_DAYS = 7;
+  var DATES_LISTED_MAX = 10;
   var DAY_MS = 86400000;
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  var MONTH_NAMES = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
 
-  var TABS = [
+  /* The type chips over the notes. */
+  var TYPES = [
     { key: 'all', label: 'All' },
-    { key: 'competency', label: 'By Competency' },
-    { key: 'assessments', label: 'Assessments' },
-    { key: 'concerns', label: 'Concerns' },
+    { key: 'strength', label: 'Strength' },
+    { key: 'growth', label: 'Growth' },
+    { key: 'concern', label: 'Concern' },
+    { key: 'note', label: 'Note' },
   ];
 
   /* ── Pure helpers (exported for tests) ──────────────────── */
@@ -174,66 +195,109 @@ window.StudentEvidence = (function () {
     };
   }
 
-  /* The observations a tab lists. 'competency' lists them all (grouped). */
-  function tabFilter(obs, tab) {
-    if (tab === 'assessments') return obs.filter(isAssessmentLinked);
-    if (tab === 'concerns')
-      return obs.filter(function (o) {
-        return o.sentiment === 'concern';
-      });
-    return obs.slice();
-  }
-
-  /* Counts on the tabs. By competency counts those linked to one. */
-  function tabCounts(obs) {
-    return {
-      all: obs.length,
-      competency: obs.filter(function (o) {
-        return !!o.competencyId;
-      }).length,
-      assessments: tabFilter(obs, 'assessments').length,
-      concerns: tabFilter(obs, 'concerns').length,
-    };
-  }
-
-  /* Groups in learning-map order; competencies no longer on the map after
-     those, and unlinked observations last.
-       items   ObsCapture.competencyItems(cid): [{ type:'section' } | { id, label }] */
-  function groupByCompetency(obs, items, labelFor) {
-    var order = [];
-    var labels = {};
-    (items || []).forEach(function (it) {
-      if (it.type === 'section' || !it.id) return;
-      order.push(it.id);
-      labels[it.id] = it.label;
+  /* The notes a type chip lists. Notes with no type show under All only. */
+  function typeFilter(obs, type) {
+    if (!type || type === 'all') return obs.slice();
+    return obs.filter(function (o) {
+      return o.sentiment === type;
     });
-    var byId = {};
-    var none = [];
+  }
+
+  /* The count on each type chip. */
+  function typeCounts(obs) {
+    var out = { all: obs.length };
+    TYPES.forEach(function (t) {
+      if (t.key !== 'all') out[t.key] = typeFilter(obs, t.key).length;
+    });
+    return out;
+  }
+
+  /* Seen in Class: each competency on the learning map, in map order, with
+     how many of these notes are linked to it.
+       items   ObsCapture.competencyItems(cid): [{ type:'section' } | { id, label }] */
+  function coverage(obs, items) {
+    var n = {};
     obs.forEach(function (o) {
-      if (!o.competencyId) {
-        none.push(o);
-        return;
-      }
-      (byId[o.competencyId] = byId[o.competencyId] || []).push(o);
+      if (o.competencyId) n[o.competencyId] = (n[o.competencyId] || 0) + 1;
+    });
+    var seen = {};
+    var out = [];
+    (items || []).forEach(function (it) {
+      if (it.type === 'section' || !it.id || seen[it.id]) return;
+      seen[it.id] = true;
+      out.push({ id: it.id, label: it.label || 'Competency', n: n[it.id] || 0 });
+    });
+    return out;
+  }
+
+  /* The notes by month, newest month first and newest note first within
+     it. A month in another year carries the year ("June 2025"). */
+  function monthGroups(obs, todayStr) {
+    var sorted = obs.slice().sort(function (a, b) {
+      var da = obDay(a);
+      var db = obDay(b);
+      if (da !== db) return da < db ? 1 : -1;
+      return (b.created || '').localeCompare(a.created || '');
     });
     var groups = [];
-    order.forEach(function (id) {
-      if (byId[id]) groups.push({ id: id, label: labels[id] || 'Competency', obs: byId[id] });
+    var byKey = {};
+    sorted.forEach(function (o) {
+      var d = obDay(o);
+      var key = isDay(d) ? d.slice(0, 7) : '';
+      if (!byKey[key]) {
+        var label = 'No Date';
+        if (key) {
+          label = MONTH_NAMES[Number(key.slice(5, 7)) - 1];
+          if (!todayStr || key.slice(0, 4) !== String(todayStr).slice(0, 4)) label += ' ' + key.slice(0, 4);
+        }
+        byKey[key] = { key: key, label: label, obs: [] };
+        groups.push(byKey[key]);
+      }
+      byKey[key].obs.push(o);
     });
-    Object.keys(byId).forEach(function (id) {
-      if (order.indexOf(id) >= 0) return;
-      groups.push({ id: id, label: (labelFor && labelFor(id)) || 'Competency', obs: byId[id] });
-    });
-    if (none.length) groups.push({ id: null, label: 'Not linked to a competency', obs: none });
     return groups;
+  }
+
+  /* "No notes for 23 days, Oct 7 to Oct 30" (or "since Oct 7" when the
+     stretch runs to today), for the latest gap; '' with none. */
+  function gapSentence(layout, todayStr) {
+    var g = layout && layout.gaps.length ? layout.gaps[layout.gaps.length - 1] : null;
+    if (!g) return '';
+    return (
+      'No notes for ' +
+      g.days +
+      ' days, ' +
+      (g.toToday
+        ? 'since ' + shortDate(g.from, todayStr)
+        : shortDate(g.from, todayStr) + ' to ' + shortDate(g.to, todayStr))
+    );
+  }
+
+  /* "Notes on Sep 12, Sep 25 and Oct 3." for a short list of days, so the
+     strip reads as words too; '' for none or too many to list. */
+  function datesSentence(layout, todayStr) {
+    if (!layout) return '';
+    var days = [];
+    layout.marks.forEach(function (m) {
+      if (days.indexOf(m.day) < 0) days.push(m.day);
+    });
+    if (!days.length || days.length > DATES_LISTED_MAX) return '';
+    var names = days.map(function (d) {
+      return shortDate(d, todayStr);
+    });
+    var list = names.length === 1 ? names[0] : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+    return (days.length === 1 ? 'A note on ' : 'Notes on ') + list + '.';
   }
 
   /* ── Panel state ────────────────────────────────────────── */
 
   var _cid = null;
   var _sid = null;
-  var _tab = 'all';
+  var _type = 'all';
+  var _comp = '';
   var _query = '';
+  /* Private notes the teacher chose to show on this screen, this visit. */
+  var _shown = {};
   /* Deleted observations stay in the data layer until their Undo toast closes. */
   var _pending = {};
   var _root = null;
@@ -288,80 +352,138 @@ window.StudentEvidence = (function () {
     });
   }
 
+  function inComp(list) {
+    if (!_comp) return list;
+    return list.filter(function (o) {
+      return o.competencyId === _comp;
+    });
+  }
+
+  function isVeiled(ob) {
+    return isPrivateObservation(ob) && !_shown[ob.id];
+  }
+
   /* ── HTML ───────────────────────────────────────────────── */
 
   /* The panel's frame; mount() fills it. */
   function panelHtml() {
     return (
       '<section class="ev-panel" id="ev-panel" aria-labelledby="ev-title">' +
-      '<div class="ev-head"><h2 class="ev-title" id="ev-title">Observations</h2></div>' +
-      '<div class="ev-timeline" id="ev-timeline"></div>' +
+      '<div class="ev-head"><h2 class="ev-title" id="ev-title">Observations</h2>' +
+      '<p class="ev-lede">What you saw and heard, beside the work handed in. A note linked to a competency counts as evidence there.</p></div>' +
       '<div class="note-capture" id="note-capture"></div>' +
-      '<div class="ev-toolbar">' +
-      '<div class="seg seg-sm ev-tabs" role="tablist" aria-label="Show observations" id="ev-tabs"></div>' +
-      '<input type="search" class="note-search-input ev-search" id="ev-search" placeholder="Search observations" aria-label="Search observations">' +
+      '<div class="ev-timeline" id="ev-timeline"></div>' +
+      '<div class="ev-seen" id="ev-seen"></div>' +
+      '<div class="ev-notes">' +
+      '<div class="ev-sec-head ev-notes-head">' +
+      '<h3 class="ev-h3" id="ev-notes-title">Notes</h3>' +
+      '<span class="ev-comp-slot" id="ev-comp-slot"></span>' +
+      '<span class="ev-grow"></span>' +
+      '<div class="ev-chips" role="group" aria-label="Show" id="ev-types"></div>' +
+      '<input type="search" class="note-search-input ev-search" id="ev-search" placeholder="Search notes" aria-label="Search notes">' +
       '</div>' +
-      '<div class="ev-list" id="ev-list" role="tabpanel" aria-labelledby="ev-tab-' +
-      _tab +
-      '"></div>' +
+      '<div class="ev-list" id="ev-list" role="region" aria-labelledby="ev-notes-title"></div>' +
+      '</div>' +
+      '<p class="ev-foot"><span class="ev-foot-lock" aria-hidden="true">' +
+      (typeof LINE_ICONS !== 'undefined' ? LINE_ICONS.lock : '') +
+      '</span>Concerns and Notes are private: only you see them. They stay hidden on this screen until you show them.</p>' +
       '</section>'
     );
   }
 
-  // html-safe: TABS keys and labels are fixed (labels escaped); counts are numbers.
-  function tabsHtml(counts) {
-    return TABS.map(function (t) {
-      var on = t.key === _tab;
+  // html-safe: TYPES keys and labels are fixed (labels escaped); counts are numbers.
+  function typesHtml(counts) {
+    return TYPES.map(function (t) {
+      var on = t.key === _type;
       return (
-        '<button type="button" role="tab" class="seg-btn ev-tab' +
-        (on ? ' active' : '') +
-        '" id="ev-tab-' +
+        '<button type="button" class="ev-chip ev-type-chip" data-ev-type="' +
         t.key +
-        '" data-ev-tab="' +
-        t.key +
-        '" aria-selected="' +
+        '" aria-pressed="' +
         on +
-        '" aria-controls="ev-list" tabindex="' +
-        (on ? '0' : '-1') +
         '">' +
         esc(t.label) +
-        ' <span class="ev-tab-count">' +
+        ' <span class="ev-chip-count">' +
         counts[t.key] +
         '</span></button>'
       );
     }).join('');
   }
 
-  var EMPTY = {
-    all: 'No observations yet. Add one above.',
-    competency: 'No observations yet. Add one above and pick a competency to link it.',
-    assessments: 'No observations are linked to an assessment yet.',
-    concerns: 'No concerns recorded.',
-  };
+  // html-safe: competency labels are escaped; ids are escaped; counts are numbers.
+  function seenHtml(cov) {
+    if (!cov.length) return '';
+    var none = cov.filter(function (c) {
+      return !c.n;
+    }).length;
+    var out =
+      '<div class="ev-sec-head"><h3 class="ev-h3" id="ev-seen-title">Seen in Class</h3>' +
+      '<span class="ev-hint">Pick a competency to see its notes</span></div>' +
+      '<div class="ev-chips ev-seen-chips" role="group" aria-labelledby="ev-seen-title">';
+    cov.forEach(function (c) {
+      out +=
+        '<button type="button" class="ev-chip ev-seen-chip' +
+        (c.n ? '' : ' is-none') +
+        '" data-ev-comp="' +
+        esc(c.id) +
+        '" aria-pressed="' +
+        (c.id === _comp) +
+        '">' +
+        esc(c.label) +
+        ' <strong class="ev-chip-count">' +
+        c.n +
+        '</strong></button>';
+    });
+    out += '</div>';
+    if (none)
+      out +=
+        '<p class="ev-seen-note">' +
+        (none === 1 ? '1 competency has' : none + ' competencies have') +
+        ' no observation yet. Watch for ' +
+        (none === 1 ? 'it' : 'them') +
+        ' next class.</p>';
+    return out;
+  }
 
-  // html-safe: the query and group labels are escaped; cards come from ObsCard.html, which escapes names, text and tags.
+  // html-safe: the label is escaped.
+  function compSlotHtml() {
+    if (!_comp) return '';
+    var label = ObsCapture.competencyLabel(_cid, _comp) || 'Competency';
+    return (
+      '<span class="ev-comp-pill">' +
+      esc(label) +
+      '<button type="button" class="ev-comp-clear" data-ev-comp="" aria-label="Show every competency">×</button></span>'
+    );
+  }
+
+  // html-safe: the query and month labels are escaped; cards come from ObsCard.html, which escapes names, text and tags.
   function listHtml(list) {
     if (!list.length) {
-      var msg = _query.trim() ? 'Nothing here matches “' + esc(_query.trim()) + '”.' : esc(EMPTY[_tab] || EMPTY.all);
+      var msg;
+      if (!studentObs().length) msg = 'No observations yet. Add one above.';
+      else if (_query.trim()) msg = 'Nothing here matches “' + esc(_query.trim()) + '”.';
+      else if (_type !== 'all' || _comp)
+        msg = 'No notes match. <button type="button" class="ev-link" data-ev-clear="1">Show All Notes</button>';
+      else msg = 'No observations yet. Add one above.';
       return '<div class="notes-empty">' + msg + '</div>';
     }
     var ctx = ObsCard.context(_cid, { hidden: _pending });
-    function card(o) {
-      return ObsCard.html(o, ctx, { showStudent: false, action: 'evEditOb', when: 'date' });
-    }
-    if (_tab !== 'competency') return list.map(card).join('');
-    return groupByCompetency(list, ObsCapture.competencyItems(_cid), function (id) {
-      return ObsCapture.competencyLabel(_cid, id);
-    })
+    return monthGroups(list, getTodayStr())
       .map(function (g) {
         return (
-          '<div class="ev-group">' +
-          '<h3 class="ev-group-title">' +
+          '<div class="ev-month">' +
+          '<h4 class="ev-month-title">' +
           esc(g.label) +
-          ' <span class="ev-tab-count">' +
-          g.obs.length +
-          '</span></h3>' +
-          g.obs.map(card).join('') +
+          '</h4>' +
+          g.obs
+            .map(function (o) {
+              return ObsCard.html(o, ctx, {
+                showStudent: false,
+                action: 'evEditOb',
+                when: 'date',
+                veiled: isVeiled(o),
+              });
+            })
+            .join('') +
           '</div>'
         );
       })
@@ -381,6 +503,8 @@ window.StudentEvidence = (function () {
     if (s) parts.push(s.label);
     if (isPrivateObservation(ob)) parts.push('Private');
     if (isAssessmentLinked(ob)) parts.push(ObsCard.assessmentTitle(_cid, ob) || 'Assessment');
+    // A private note's words stay off the screen until the teacher shows them.
+    if (isVeiled(ob)) return parts.join(' · ');
     return parts.join(' · ') + ': ' + firstLine(ob.text);
   }
 
@@ -395,36 +519,40 @@ window.StudentEvidence = (function () {
     var layout = timelineLayout(obs, { today: today, term: term });
     // With nothing to show, an empty strip of the same height holds the
     // capture box in place, so it doesn't jump down after the first add.
+    var title = term ? esc(term.label || 'This Term') : 'All Time';
     if (!layout) {
       return (
-        '<div class="ev-tl-head"><span class="ev-tl-range">' +
-        (term ? esc(term.label || 'This term') : 'All time') +
-        ' · No observations yet</span></div>' +
-        '<div class="ev-tl-scroll"><div class="ev-tl-track ev-tl-empty" aria-hidden="true"><div class="ev-tl-axis"></div></div></div>'
+        '<div class="ev-sec-head ev-tl-head"><h3 class="ev-h3">' +
+        title +
+        '</h3><span class="ev-tl-range">No observations yet</span></div>' +
+        '<div class="ev-tl-box"><div class="ev-tl-scroll"><div class="ev-tl-track ev-tl-empty" aria-hidden="true"><div class="ev-tl-axis"></div></div></div></div>'
       );
     }
     var byId = {};
     obs.forEach(function (o) {
       byId[o.id] = o;
     });
-    var range = (term ? esc(term.label || 'This term') : 'All time') + ' · ' + shortDate(layout.start, today);
-    range += ' to ' + (layout.today != null && !term ? 'today' : shortDate(layout.end, today));
+    var range =
+      shortDate(layout.start, today) +
+      ' to ' +
+      (layout.today != null && !term ? 'today' : shortDate(layout.end, today));
+    var gapLine = gapSentence(layout, today);
+    var dates = datesSentence(layout, today);
 
     var out =
-      '<div class="ev-tl-head">' +
+      '<div class="ev-sec-head ev-tl-head">' +
+      '<h3 class="ev-h3">' +
+      title +
+      '</h3>' +
       '<span class="ev-tl-range">' +
-      range +
+      esc(range) +
       '</span>' +
-      '<span class="ev-tl-legend" aria-hidden="true">' +
-      '<span class="ev-tl-key" data-type="strength">Strength</span>' +
-      '<span class="ev-tl-key" data-type="growth">Growth</span>' +
-      '<span class="ev-tl-key" data-type="concern">Concern</span>' +
-      '<span class="ev-tl-key" data-type="note">Note</span>' +
-      '<span class="ev-tl-key" data-type="none">No type</span>' +
-      '<span class="ev-tl-key" data-shape="square">Assessment</span>' +
-      '</span></div>' +
+      '<span class="ev-grow"></span>' +
+      (gapLine ? '<span class="ev-tl-gapline">' + esc(gapLine) + '</span>' : '') +
+      '</div>' +
+      '<div class="ev-tl-box">' +
       '<div class="ev-tl-scroll"><div class="ev-tl-track" role="group" aria-label="Observations timeline, ' +
-      esc(range.replace(' · ', ', ')) +
+      esc((term ? term.label || 'This Term' : 'All Time') + ', ' + range) +
       '">' +
       '<div class="ev-tl-axis"></div>';
     layout.ticks.forEach(function (t) {
@@ -438,7 +566,7 @@ window.StudentEvidence = (function () {
     if (layout.today != null)
       out += '<span class="ev-tl-today" style="left:' + pct(layout.today) + '" aria-hidden="true"></span>';
     layout.gaps.forEach(function (g) {
-      var text = 'No observations for ' + g.days + ' days';
+      var text = 'No notes for ' + g.days + ' days';
       var title =
         text +
         (g.toToday
@@ -472,7 +600,19 @@ window.StudentEvidence = (function () {
         esc(markLabel(ob, today)) +
         '"></button>';
     });
-    out += '</div></div><div class="ev-tl-tip" role="tooltip" id="ev-tl-tip" hidden></div>';
+    out +=
+      '</div></div>' +
+      '<div class="ev-tl-legend" aria-hidden="true">' +
+      '<span class="ev-tl-key" data-type="strength">Strength</span>' +
+      '<span class="ev-tl-key" data-type="growth">Growth</span>' +
+      '<span class="ev-tl-key" data-type="concern">Concern</span>' +
+      '<span class="ev-tl-key" data-type="note">Note</span>' +
+      '<span class="ev-tl-key" data-type="none">No type</span>' +
+      '<span class="ev-tl-key" data-shape="square">Assessment</span>' +
+      '<span class="ev-tl-gapkey">More than two weeks with no notes</span>' +
+      '</div>' +
+      (dates ? '<p class="ev-tl-dates">' + esc(dates) + '</p>' : '') +
+      '</div><div class="ev-tl-tip" role="tooltip" id="ev-tl-tip" hidden></div>';
     return out;
   }
 
@@ -481,14 +621,22 @@ window.StudentEvidence = (function () {
   function refreshList() {
     if (!_root) return;
     var all = searched();
-    var tabs = _root.querySelector('#ev-tabs');
-    if (tabs) tabs.innerHTML = tabsHtml(tabCounts(all));
-    var list = _root.querySelector('#ev-list');
-    if (list) {
-      list.setAttribute('aria-labelledby', 'ev-tab-' + _tab);
-      // html-safe: this file's listHtml escapes the query and labels; cards come from ObsCard.html.
-      list.innerHTML = listHtml(tabFilter(all, _tab));
+    var seen = _root.querySelector('#ev-seen');
+    if (seen) {
+      // html-safe: this file's seenHtml escapes labels and ids.
+      seen.innerHTML = seenHtml(coverage(all, ObsCapture.competencyItems(_cid)));
+      seen.hidden = !seen.innerHTML;
     }
+    var slot = _root.querySelector('#ev-comp-slot');
+    // html-safe: this file's compSlotHtml escapes the label.
+    if (slot) slot.innerHTML = compSlotHtml();
+    var base = inComp(all);
+    var types = _root.querySelector('#ev-types');
+    // html-safe: this file's typesHtml writes fixed labels and numbers.
+    if (types) types.innerHTML = typesHtml(typeCounts(base));
+    var list = _root.querySelector('#ev-list');
+    // html-safe: this file's listHtml escapes the query and labels; cards come from ObsCard.html.
+    if (list) list.innerHTML = listHtml(typeFilter(base, _type));
   }
 
   function refreshTimeline() {
@@ -504,16 +652,33 @@ window.StudentEvidence = (function () {
     refreshList();
   }
 
-  function setTab(key, focus) {
-    _tab = key;
-    refreshList();
-    if (focus && _root) {
-      var b = _root.querySelector('#ev-tab-' + key);
-      if (b) b.focus();
-    }
+  /* Keep focus on the chip that was pressed after the list redraws. */
+  function refocus(sel) {
+    if (!_root || !sel) return;
+    var b = _root.querySelector(sel);
+    if (b && b.focus) b.focus();
   }
 
-  /* A timeline mark: show its card on the All tab and highlight it. */
+  function setType(key) {
+    _type = key || 'all';
+    refreshList();
+    refocus('[data-ev-type="' + _type + '"]');
+  }
+
+  function setComp(id) {
+    _comp = id || '';
+    refreshList();
+    refocus(_comp ? '.ev-seen-chip[data-ev-comp="' + _comp + '"]' : '[data-ev-type="' + _type + '"]');
+  }
+
+  function reveal(obId) {
+    _shown[obId] = true;
+    refresh();
+    var card = _root && _root.querySelector('#ev-list .obs-card[data-obid="' + obId + '"]');
+    if (card && card.focus) card.focus();
+  }
+
+  /* A timeline mark: show its card (clearing filters that hide it) and highlight it. */
   function jumpTo(obId) {
     if (!_root) return;
     var q = _query.trim().toLowerCase();
@@ -526,7 +691,8 @@ window.StudentEvidence = (function () {
       var input = _root.querySelector('#ev-search');
       if (input) input.value = '';
     }
-    if (_tab !== 'all') _tab = 'all';
+    if (_type !== 'all' && ob.sentiment !== _type) _type = 'all';
+    if (_comp && ob.competencyId !== _comp) _comp = '';
     refreshList();
     var card = _root.querySelector('#ev-list .obs-card[data-obid="' + obId + '"]');
     if (!card) return;
@@ -560,9 +726,29 @@ window.StudentEvidence = (function () {
   }
 
   function onClick(e) {
-    var tab = e.target.closest('[data-ev-tab]');
-    if (tab) {
-      setTab(tab.getAttribute('data-ev-tab'));
+    var show = e.target.closest('.obs-card-reveal');
+    if (show) {
+      e.preventDefault();
+      e.stopPropagation();
+      reveal(show.getAttribute('data-reveal-obid'));
+      return;
+    }
+    var type = e.target.closest('[data-ev-type]');
+    if (type) {
+      setType(type.getAttribute('data-ev-type'));
+      return;
+    }
+    var comp = e.target.closest('[data-ev-comp]');
+    if (comp) {
+      var id = comp.getAttribute('data-ev-comp');
+      setComp(id && id === _comp ? '' : id);
+      return;
+    }
+    if (e.target.closest('[data-ev-clear]')) {
+      _type = 'all';
+      _comp = '';
+      refreshList();
+      refocus('[data-ev-type="all"]');
       return;
     }
     var mark = e.target.closest('.ev-tl-mark');
@@ -611,19 +797,6 @@ window.StudentEvidence = (function () {
       editOb(e.target.getAttribute('data-obid'));
       return;
     }
-    var tab = e.target.closest && e.target.closest('[data-ev-tab]');
-    if (tab && (e.key === 'ArrowRight' || e.key === 'ArrowLeft' || e.key === 'Home' || e.key === 'End')) {
-      var i = TABS.findIndex(function (t) {
-        return t.key === _tab;
-      });
-      if (e.key === 'ArrowRight') i = (i + 1) % TABS.length;
-      else if (e.key === 'ArrowLeft') i = (i - 1 + TABS.length) % TABS.length;
-      else if (e.key === 'Home') i = 0;
-      else i = TABS.length - 1;
-      e.preventDefault();
-      setTab(TABS[i].key, true);
-      return;
-    }
     var mark = e.target.closest && e.target.closest('.ev-tl-mark');
     if (mark && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
       var marks = Array.prototype.slice.call(_root.querySelectorAll('.ev-tl-mark'));
@@ -658,8 +831,10 @@ window.StudentEvidence = (function () {
   function mount(cid, studentId, opts) {
     _onChange = (opts && opts.onChange) || null;
     if (_cid !== cid || _sid !== studentId) {
-      _tab = 'all';
+      _type = 'all';
+      _comp = '';
       _query = '';
+      _shown = {};
     }
     _cid = cid;
     _sid = studentId;
@@ -764,13 +939,17 @@ window.StudentEvidence = (function () {
     refresh: refresh,
     deleteOb: deleteOb,
     jumpTo: jumpTo,
-    setTab: setTab,
+    setType: setType,
+    setComp: setComp,
     isPending: isPending,
     _helpers: {
       timelineLayout: timelineLayout,
-      tabFilter: tabFilter,
-      tabCounts: tabCounts,
-      groupByCompetency: groupByCompetency,
+      typeFilter: typeFilter,
+      typeCounts: typeCounts,
+      coverage: coverage,
+      monthGroups: monthGroups,
+      gapSentence: gapSentence,
+      datesSentence: datesSentence,
       shortDate: shortDate,
     },
   };

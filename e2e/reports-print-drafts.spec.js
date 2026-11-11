@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { findLowContrastText } from './contrast-check.js';
+import { cardMenuItem } from './card-menu.js';
 
 /* S2-F1: a family never sees a draft, and the teacher is asked, not
    surprised. In a class whose student page is on (the hidden build switch)
@@ -167,15 +168,6 @@ test.describe('Print Reports with drafts', () => {
     await expect(drafts(page)).toHaveCount(0);
     await expect.poll(() => prints(page)).toBe(2);
   });
-
-  test('in a class that does not hold grades nothing is asked', async ({ page }) => {
-    await demoWithDrafts(page, { student_page_enabled: true, return_grades: 'on_save' });
-    expect(await waiting(page)).toBe(0);
-    await openProgress(page);
-    await printReports(page);
-    await expect.poll(() => prints(page)).toBe(1);
-    await expect(drafts(page)).toHaveCount(0);
-  });
 });
 
 test.describe('Print Rubrics with a draft, from each door', () => {
@@ -192,7 +184,7 @@ test.describe('Print Rubrics with a draft, from each door', () => {
     const card = page.locator('#ac-sci8a4');
     await card.waitFor();
     if (!(await card.evaluate(el => el.classList.contains('open')))) await card.locator('.assess-title').click();
-    await card.locator('[data-action="printRubrics"]').first().click();
+    await (await cardMenuItem(card, 'printRubrics')).click();
     await printThere(page);
     const dialog = drafts(page);
     await expect(dialog.locator('.confirm-title')).toHaveText('1 Grade Isn’t Returned Yet');

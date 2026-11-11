@@ -225,3 +225,23 @@ test('Progress Reports fits a phone', async ({ page }) => {
   expect(off).toEqual([]);
   await expect.poll(sheetIn).toBe(true);
 });
+
+// The one-week photo reminder (S8-F1) on the Dashboard fits a phone, with Send
+// Work and the build switch on a week before June 30.
+test('the photo reminder line fits a phone', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2027-06-25T10:00:00'));
+  await openDesktop(page, '/dashboard');
+  await page.waitForFunction(cid => getCourseSubmissions(cid).submissions.length === 16, 'sci8', { timeout: 15000 });
+  await page.evaluate(cid => {
+    setStudentPageSwitch(cid, true, 'on_return');
+    var all = getCourseSubmissions(cid);
+    all.course = Object.assign({}, all.course, { send_work: true });
+    saveDemoStudentWork(cid, all);
+  }, 'sci8');
+  await page.goto('/dashboard');
+  await page.waitForSelector('#main .dash-glance', { timeout: 10000 });
+  const line = page.locator('#dash-photo-reminder');
+  await expect(line).toBeVisible();
+  const box = await line.boundingBox();
+  expect(box.x + box.width).toBeLessThanOrEqual(375);
+});

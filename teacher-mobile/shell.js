@@ -1506,11 +1506,6 @@
         return;
       }
 
-      if (action === 'm-grade-filter-apply') {
-        MGrade.applyFilterSheet(_cid);
-        return;
-      }
-
       // Student work (S7): the row menu, the live filter's Done, the pages.
       if (action === 'm-grade-row-menu') {
         MGrade.openRowMenu(_cid, target.getAttribute('data-aid'), target);
@@ -1668,24 +1663,13 @@
         return;
       }
 
-      // The Advanced Rubric a criterion at a time (S7-F2): the pager, Next:
-      // <criterion> on the bar, and a level's group of boxes.
-      if (action === 'm-crit-page') {
-        MGrade.pageCriterion(
+      // Nothing in: a criterion's "Not scored" row opens the card's levels.
+      if (action === 'm-paper-crit') {
+        MGrade.openPaperCriterion(
           _cid,
           target.getAttribute('data-sid'),
           target.getAttribute('data-aid'),
-          parseInt(target.getAttribute('data-dir'), 10),
-        );
-        return;
-      }
-      if (action === 'm-crit-group') {
-        MGrade.toggleCritGroup(
-          _cid,
-          target.getAttribute('data-sid'),
-          target.getAttribute('data-aid'),
-          target.getAttribute('data-critid'),
-          parseInt(target.getAttribute('data-level'), 10),
+          parseInt(target.getAttribute('data-idx'), 10),
         );
         return;
       }

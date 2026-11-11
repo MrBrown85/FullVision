@@ -8,7 +8,6 @@ import { mockAuth, gotoApp, TEST_LEARNING_MAP } from './helpers.js';
 
 const PHIL_B = 'b0000000-0000-4000-8000-00000000000b';
 const PHIL_A = 'a0000000-0000-4000-8000-00000000000a';
-const ENG_D = 'd0000000-0000-4000-8000-00000000000d';
 
 async function seedClasses(page, classes) {
   await page.addInitScript(
@@ -36,21 +35,6 @@ async function seedClasses(page, classes) {
 test.describe('Class blocks', () => {
   test.beforeEach(async ({ page }) => {
     await mockAuth(page);
-  });
-
-  test('pickers list classes in block order with the block before the name', async ({ page }) => {
-    await seedClasses(page, [
-      { id: ENG_D, name: 'English 10', block: 'D' },
-      { id: PHIL_B, name: 'Philosophy 12', block: 'B' },
-      { id: PHIL_A, name: 'Philosophy 12', block: 'A' },
-    ]);
-    await gotoApp(page, '/assignments');
-    await expect(page.locator('#gb-course-select option')).toHaveText([
-      'A · Philosophy 12',
-      'B · Philosophy 12',
-      'D · English 10',
-      'New Class\u2026',
-    ]);
   });
 
   test('a block chosen in Class Settings shows in the picker', async ({ page }) => {

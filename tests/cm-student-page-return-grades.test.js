@@ -205,16 +205,15 @@ describe('Class Settings › Student Page: Return Grades', () => {
       );
     });
 
-    it('draws no other row of the board yet', () => {
+    it('draws no other row of the board yet, but the last one, Questionnaires and Reports', () => {
       open();
-      [
-        'Send Work',
-        'Keep Photos Until',
-        'Reflect on Feedback',
-        'Show My Learning',
-        'Questionnaires and Reports',
-      ].forEach(label => expect(html(), label).not.toContain(label));
+      ['Send Work', 'Keep Photos Until', 'Reflect on Feedback', 'Show My Learning'].forEach(label =>
+        expect(html(), label).not.toContain(label),
+      );
       expect((html().match(/class="sp-row"/g) || []).length).toBe(1);
+      expect(html()).toContain(
+        '<div class="sp-row-title">Questionnaires and Reports</div><div class="cm-hint">Open with the same card. Set them up on the Questionnaires tab and in Reports.</div>',
+      );
       // Student Cards came with S0-W1, in a card of its own under this one
       // (tests/student-cards.test.js), not as a row of it.
       expect((html().match(/class="cm-section sp-card"/g) || []).length).toBe(1);
@@ -944,7 +943,6 @@ describe('Class Settings with the switch off is what main draws', () => {
     ['When I Return Them, as every class made since Batch A holds', { return_grades: 'on_return' }],
     ['As Soon As I Save', { return_grades: 'on_save' }],
     ['no choice made, as the server sends it', { return_grades: null }],
-    ['its student page turned off again', { student_page_enabled: false, return_grades: 'on_return' }],
   ])('a signed-in class with its student page off and %s', async (name, config) => {
     var session = signIn();
     try {

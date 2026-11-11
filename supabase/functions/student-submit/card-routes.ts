@@ -161,7 +161,7 @@ function classes(v: unknown): Json[] {
    Comment, a level per competency, a level per rubric criterion with its
    Work On and Went Beyond notes, and the ticked checkboxes. */
 const LEVEL = ['value', 'modifier', 'comment'];
-function gradeCopy(v: unknown): Json | null {
+export function gradeCopy(v: unknown): Json | null {
   if (!isObject(v)) return null;
   return {
     ...pick(v, ['v', ...LEVEL]),

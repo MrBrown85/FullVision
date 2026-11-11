@@ -322,7 +322,10 @@ window.ObsCard = (function () {
        readOnly      no delete button (the Term Questionnaire's lists)
        tabindex      the card's tabindex instead of 0 (with an action) or -1
        className     more classes on the card
-       title         the card's tooltip */
+       title         the card's tooltip
+       veiled        the note's words stay off the screen behind a Show
+                     button (a private note on the student page, where the
+                     student may be looking) */
   function html(ob, ctx, opts) {
     opts = opts || {};
     var showStudent = opts.showStudent !== false;
@@ -353,9 +356,11 @@ window.ObsCard = (function () {
       (p.withText ? '<span class="obs-card-with">' + esc(p.withText) + '</span>' : '') +
       (when ? '<span class="obs-card-time">' + esc(when) + '</span>' : '') +
       '</div>' +
-      '<div class="obs-card-text">' +
-      esc(ob.text) +
-      '</div>' +
+      (opts.veiled
+        ? '<div class="obs-card-text obs-card-veiled">Hidden on screen. <button type="button" class="obs-card-reveal" data-reveal-obid="' +
+          esc(ob.id) +
+          '" data-stop-prop="true">Show</button></div>'
+        : '<div class="obs-card-text">' + esc(ob.text) + '</div>') +
       metaHtml(ob, ctx, p) +
       '</div>' +
       (opts.readOnly

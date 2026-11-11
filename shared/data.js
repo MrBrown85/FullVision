@@ -349,6 +349,8 @@ function getSyncDotState() {
   if (_syncStatus === 'degraded') return { status: 'error', title: 'Cloud sync paused — saving on this device' };
   var loadProblem = _loadProblem();
   if (loadProblem) return { status: 'error', title: loadProblem };
+  var photos = _workUploadDotState() || _photoQueueDotState();
+  if (photos && photos.status === 'error') return photos;
   var q = typeof window !== 'undefined' ? window.v2Queue : null;
   if (q && typeof q.stats === 'function') {
     var stats = q.stats() || {};
@@ -359,12 +361,51 @@ function getSyncDotState() {
       return { status: 'error', title: 'Signed out — changes are waiting until you sign in' };
     if (!online && queued > 0) return { status: 'error', title: 'Offline — changes are saved on this device' };
     if (queued > 0) return { status: 'syncing', title: 'Syncing...' };
+    if (photos) return photos;
     return { status: 'idle', title: 'All changes saved' };
   }
   if (_pendingSyncs > 0) return { status: 'syncing', title: 'Syncing...' };
+  if (photos) return photos;
   return { status: 'idle', title: 'All changes saved' };
 }
 window.getSyncDotState = getSyncDotState;
+
+/* Photos of student work a signed-in teacher added that have not gone up
+   yet (shared/photo-queue.js), as the sync dot says it, or null when none
+   wait. Only once this page has wired the queue to send (_wireWorkQueue). */
+function _photoQueueDotState() {
+  var pq = typeof window !== 'undefined' ? window.PhotoQueue : null;
+  if (!_workQueueWired || !pq || typeof pq.stats !== 'function') return null;
+  var st;
+  try {
+    st = pq.stats() || {};
+  } catch (e) {
+    return null;
+  }
+  if (st.demo) return null;
+  if (Number(st.failed || 0) > 0) return { status: 'error', title: "Some photos couldn't be sent" };
+  if (st.storageFull) return { status: 'error', title: 'This device is full — some photos are not saved' };
+  if (!(Number(st.queued || 0) > 0)) return null;
+  if (st.online === false) return { status: 'error', title: 'Offline — photos are saved on this device' };
+  return { status: 'syncing', title: 'Syncing...' };
+}
+
+/* Add Work's uploads the server refused after the screen had said sent
+   (_workUploadStarted): one held to try again (the class was full), or
+   photos that could not go in as asked and were let go. The sync dot is
+   the only place this shows (CLAUDE.md rule 5). */
+function _workUploadDotState() {
+  if (typeof _workUploads !== 'function' || _isDemoSession()) return null;
+  var all = _workUploads();
+  var held = Object.keys(all).some(function (k) {
+    return all[k] && all[k].held;
+  });
+  if (held) return { status: 'error', title: "Some photos couldn't be sent" };
+  var dropped = _safeParseLS(_WORK_DROPPED_KEY, null);
+  var at = dropped && Date.parse(dropped.at);
+  if (at && Date.now() - at < _WORK_DROPPED_MS) return { status: 'error', title: "Some photos couldn't be added" };
+  return null;
+}
 
 function _updateSyncIndicator() {
   if (typeof document === 'undefined' || !document.getElementById) return;
@@ -848,6 +889,11 @@ var _ECHO_SAFE_RPCS = {
   // Return changes only which grades are returned, which the class load does
   // not carry: the rows are read on their own (_refreshGradeReturnsSoon).
   return_grades: true,
+  // Marks and reflections are not in the class load either (S9-W1, S10-W1);
+  // Return with Mark Up is Return, and gives the marks.
+  return_work: true,
+  save_markup: true,
+  answer_reflection: true,
 };
 var _echoNeedsReload = false;
 
@@ -2919,7 +2965,11 @@ function _onOutboxEvent(evt) {
     delete _baselineUndo[meta.id];
     _onCreateLanded(meta.id, meta.data);
     if (meta.endpoint === 'import_json_restore') _onRestoreLanded(meta.payload, meta.data);
+    if (_WORK_ENDPOINTS[meta.endpoint]) _onWorkWriteEvent(evt.kind, meta.endpoint, meta.payload, meta.data);
+    if (_FB_ENDPOINTS[meta.endpoint]) _onFeedbackWriteEvent(evt.kind, meta.endpoint, meta.payload, meta.data);
   } else if (evt.kind === 'flush:dead-letter') {
+    if (_WORK_ENDPOINTS[meta.endpoint]) _onWorkWriteEvent(evt.kind, meta.endpoint, meta.payload, meta.data);
+    if (_FB_ENDPOINTS[meta.endpoint]) _onFeedbackWriteEvent(evt.kind, meta.endpoint, meta.payload, meta.data);
     var undo = _baselineUndo[meta.id];
     _revertBaselineRow(undo, meta.endpoint, meta.payload);
     delete _baselineUndo[meta.id];
@@ -4959,6 +5009,10 @@ function _applyBundleCourseRow(cid, courseRow) {
 function _applyBundleCourseConfig(cid, row, courseRow) {
   // Cards Work Until is the student cards' own (getCardsWorkUntil), never a setting this device sends up.
   _noteCardsWorkUntil(cid, courseRow);
+  // Send Work and Keep Photos Until, the server's (S5-W1): read from here, never sent from here.
+  _noteCourseSendWork(cid, courseRow);
+  // Reflect on Feedback and Show My Learning, the same (S10-W1).
+  _noteCourseFeedbackOptions(cid, courseRow);
   if (!row || typeof row !== 'object') return;
   var config = Object.assign({}, getCourseConfig(cid) || {});
   var missing = {};
@@ -11463,7 +11517,7 @@ function _classOfAssessment(aid) {
 function _onReturnWriteRefused(endpoint, payload) {
   try {
     payload = payload || {};
-    if (endpoint === 'return_grades') {
+    if (endpoint === 'return_grades' || endpoint === 'return_work') {
       var cid = _classOfAssessment(payload.p_assessment_id);
       if (!cid) return;
       var back = false;
@@ -11680,6 +11734,8 @@ async function _fetchGradeReturns(cid) {
    (_refreshMustSkip's way). */
 async function _loadServerGradeReturns(cid, fresh) {
   if (!_serverKeepsRows(cid)) return;
+  _loadServerStudentWork(cid, fresh);
+  _loadServerFeedback(cid);
   if (!fresh && _gradeReturnsLoadedFor[cid] === true && !_gradeReturnsStale[cid]) return;
   var got = await _fetchGradeReturns(cid);
   if (got.error) {
@@ -11862,18 +11918,21 @@ function _gradeRule(cid, was, next) {
    Only drafts are returned; the rest are skipped. A class that does not
    hold grades has none to return. Answers as the server's return will:
    { returned, enrollment_ids, returned_at }. If the rule fails, the failure
-   is reported and the answer is that nothing was returned. */
-function returnGrades(cid, aid, studentIds) {
+   is reported and the answer is that nothing was returned. `withMarks`
+   (returnWork's, for a signed-in class) sends each student's Return as
+   return_work, which gives the marks on their pages too, in place of
+   return_grades. */
+function returnGrades(cid, aid, studentIds, withMarks) {
   var nothing = { returned: 0, enrollment_ids: [], returned_at: null };
   try {
-    return _returnGrades(cid, aid, studentIds) || nothing;
+    return _returnGrades(cid, aid, studentIds, withMarks === true) || nothing;
   } catch (e) {
     // Like the other hooks: reported, never thrown at a screen. Nothing was returned.
     _gradeStateFailed('returning grades', e);
     return nothing;
   }
 }
-function _returnGrades(cid, aid, studentIds) {
+function _returnGrades(cid, aid, studentIds, withMarks) {
   var ids = Array.isArray(studentIds) ? studentIds : studentIds ? [studentIds] : [];
   var done = [];
   var at = new Date().toISOString();
@@ -11900,7 +11959,7 @@ function _returnGrades(cid, aid, studentIds) {
       if (Object.keys(of).length) out[aid] = of;
       else delete out[aid];
       _saveGradeReturns(cid, out);
-      _sendReturns(cid, aid, done, rows[aid] || {}, of);
+      _sendReturns(cid, aid, done, rows[aid] || {}, of, withMarks);
     }
   }
   return { returned: done.length, enrollment_ids: done, returned_at: done.length ? at : null };
@@ -11918,16 +11977,14 @@ function _returnGrades(cid, aid, studentIds) {
    `was` as it was). Nothing waits on the answer: a call the outbox has no
    room for puts the row back, and one the server refuses is put right by
    the next read of the rows. Either shows on the sync dot only. */
-function _sendReturns(cid, aid, sids, was, now) {
+function _sendReturns(cid, aid, sids, was, now, withMarks) {
   if (!_writesEnabled() || !_isSendableId(aid)) return;
+  var endpoint = withMarks ? 'return_work' : 'return_grades'; // named in the calls below, as the drift check reads them
   sids.forEach(function (sid) {
     if (!_isSendableId(sid)) return;
     if (was[sid]) _returnedHere[cid + ':' + aid + ':' + sid] = { was: was[sid], now: now[sid] || null };
-    var sent = _writeRpc('return_grades', {
-      p_assessment_id: aid,
-      p_enrollment_ids: [sid],
-      p_idempotency_key: _newEntryId(),
-    });
+    var body = { p_assessment_id: aid, p_enrollment_ids: [sid], p_idempotency_key: _newEntryId() };
+    var sent = withMarks ? _writeRpc('return_work', body) : _writeRpc('return_grades', body);
     // No room in the outbox: nothing was sent, so the grade is still a draft.
     if (sent && sent.refused) {
       _unreturn(cid, aid, sid);
@@ -11936,7 +11993,7 @@ function _sendReturns(cid, aid, sids, was, now) {
     _trackPendingSync(
       Promise.resolve(sent).then(function (res) {
         if (res && res.error && !res.error.refused && !res.error.handledSessionExpired) {
-          console.warn('return_grades failed:', res.error);
+          console.warn(endpoint + ' failed:', res.error);
         }
         // A refusal by the server is put right from the outbox's own event
         // (_onReturnWriteRefused), which also runs after a reload.
@@ -14722,6 +14779,7 @@ function _writeRpc(name, params, options) {
     var undo = _snapshotBaselineRow(name, params);
     var pushed = outbox.push(name, params, {
       id: entryId,
+      key: options.key,
       blockedOn: blockedOn,
       sendOptions: options,
       guard: options.guard,
@@ -16584,13 +16642,15 @@ function clearCardWidgetConfig() {
    the student's id here. Every answer is a copy: changing it changes
    nothing stored.
 
-   DEMO MODE ONLY, for now. The sample work is shared/seed-data.js's
+   Demo Mode: the sample work is shared/seed-data.js's
    (saveDemoStudentWork), kept in localStorage under
    gb-student-work-<cid>. Its pages are drawn images shipped with the app
    in assets/sample-work/, so a page's path and thumb_path there are file
-   names in that folder, not storage paths. A signed-in class gets the
-   empty answers (Send Work off, every assessment taking nothing, nothing
-   sent) until S5-W1. Nothing here calls the server or the outbox.
+   names in that folder, not storage paths. A signed-in class whose
+   student page the server has on is answered from the server (below,
+   "Student work for a signed-in teacher", S5-W1); any other class gets
+   the empty answers (Send Work off, every assessment taking nothing,
+   nothing sent), and nothing here calls the server for it.
 
    Kept out of class backups and Download All My Data on purpose (S8-F2):
    this is not one of the _DATA_KEYS fields. */
@@ -16606,6 +16666,8 @@ var _STUDENT_WORK_DEFAULTS = {
 var _studentWork = {}; // cid → { raw, value }: the stored sample work (Demo Mode) as last read
 
 function _studentWorkStored(cid) {
+  // A signed-in class with its student page on: the server's (S5-W1, below).
+  if (_workOnServer(cid)) return _workServerView(cid);
   if (!cid || !_isDemoSession()) return null;
   var raw = null;
   try {
@@ -16804,7 +16866,8 @@ function getStudentWork(cid, sid) {
 
 function studentWorkPageUrl(cid, file, which) {
   var name = file && (which === 'thumb' ? file.thumb_path : file.path);
-  if (!name || !_studentWorkStored(cid)) return Promise.resolve(null);
+  // Demo Mode's sample pages only: a live class's are opened (openStudentWorkPage).
+  if (!name || !_isDemoSession() || !_studentWorkStored(cid)) return Promise.resolve(null);
   // A sample page is a file name in assets/sample-work, nothing more.
   if (!/^[a-z0-9-]+\.jpg$/.test(name)) return Promise.resolve(null);
   return Promise.resolve(_STUDENT_WORK_DEMO_DIR + name);
@@ -16831,6 +16894,8 @@ function studentWorkPageUrl(cid, file, which) {
    separate: `sid` is Graded Separately), or null when the student sends
    alone. */
 function getStudentWorkGroup(cid, sid, aid) {
+  // Group work is Demo Mode's until Batch C is wired (S12-W1).
+  if (!_isDemoSession()) return null;
   var a = _assessmentById(cid, aid);
   if (!a || getAssessmentStudentWork(cid, aid).group_work !== 'group') return null;
   var group = getCollabGroupOf(a, sid);
@@ -16940,9 +17005,10 @@ function getStudentGroupWork(cid, sid) {
    "photo-queue:<id>" (its thumbnail "photo-queue:<id>:thumb"), which only
    openStudentWorkPage turns into an address.
 
-   Signed in, these do nothing yet and answer { result: 'not_available' }:
-   the server side (Batch B) is not applied, so no RPC and no edge route is
-   called. Every answer is a Promise; none rejects. */
+   A signed-in class with its student page on goes to the server (below,
+   _serverTeacherWork, S5-W1); any other signed-in class answers
+   { result: 'not_available' } and calls nothing. Every answer is a
+   Promise; none rejects. */
 var _STUDENT_WORK_QUEUE_PATH = /^photo-queue:(p[a-z0-9]+)(:thumb)?$/;
 var _teacherWorkChain = {}; // cid → the last teacher-work write's promise, so two never interleave
 
@@ -17074,6 +17140,7 @@ function _teacherWorkCheck(cid, sid, aid, pages, mode) {
 }
 
 function _teacherWork(cid, sid, aid, pages, mode) {
+  if (_workOnServer(cid)) return _serverTeacherWork(cid, sid, aid, pages, mode);
   if (!cid || !_isDemoSession()) return Promise.resolve({ result: 'not_available' });
   if (!_teacherWorkPagesOk(pages)) return Promise.resolve({ result: 'invalid' });
   return _teacherWorkQueued(cid, function () {
@@ -17148,6 +17215,7 @@ function replaceStudentWorkPages(cid, sid, aid, pages) {
 /* Handed In on Paper for these students. A student who already has work
    in, or is not in the class, is passed over. */
 function markStudentWorkOnPaper(cid, aid, sids) {
+  if (_workOnServer(cid)) return _serverMarkOnPaper(cid, aid, sids);
   if (!cid || !_isDemoSession()) return Promise.resolve({ result: 'not_available', marked: 0, submissions: [] });
   return _teacherWorkQueued(cid, function () {
     var draft = _studentWorkDraft(cid);
@@ -17193,6 +17261,7 @@ function markStudentWorkOnPaper(cid, aid, sids) {
    'not_found' }, or signed in { result: 'not_available' } (the server's
    delete is in Batch B, not applied). */
 function deleteStudentWork(cid, sid, aid) {
+  if (_workOnServer(cid)) return _serverDeleteWork(cid, sid, aid);
   if (!cid || !_isDemoSession()) return Promise.resolve({ result: 'not_available' });
   return _teacherWorkQueued(cid, function () {
     if (!_teacherWorkInClass(cid, sid, aid)) return { result: 'not_found' };
@@ -17219,6 +17288,7 @@ function openStudentWorkPage(cid, file, which) {
   var name = file && (which === 'thumb' ? file.thumb_path : file.path);
   if (!name || typeof name !== 'string' || !_studentWorkStored(cid)) return Promise.resolve(null);
   var m = _STUDENT_WORK_QUEUE_PATH.exec(name);
+  if (!m && _workOnServer(cid)) return _openServerWorkPage(cid, name);
   if (!m) {
     return studentWorkPageUrl(cid, file, which).then(function (url) {
       return url ? { url: url, release: function () {} } : null;
@@ -17260,6 +17330,23 @@ function openStudentWorkPage(cid, file, which) {
 function _studentWorkRekeyed(e) {
   var d = e && e.detail;
   var q = window.PhotoQueue;
+  // A live class's uploads on their way name the piece and the student too.
+  if (d && (d.kind === 'assessment' || d.kind === 'student') && _isUuid(d.to)) {
+    var uploads = _workUploads();
+    var field = d.kind === 'assessment' ? 'aid' : 'sid';
+    var moved = false;
+    Object.keys(uploads).forEach(function (k) {
+      if (uploads[k] && uploads[k][field] === d.from) {
+        uploads[k][field] = d.to;
+        moved = true;
+      }
+    });
+    if (moved) _workUploadsSave(uploads);
+    if (d.kind === 'assessment' && _workAssessHere[d.from]) {
+      _workAssessHere[d.to] = _workAssessHere[d.from];
+      delete _workAssessHere[d.from];
+    }
+  }
   if (!d || (d.kind !== 'assessment' && d.kind !== 'student') || !q || typeof q.rekey !== 'function') {
     return Promise.resolve(null);
   }
@@ -17273,6 +17360,1788 @@ function _studentWorkRekeyed(e) {
 }
 if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
   document.addEventListener('fv:id-rekeyed', _studentWorkRekeyed);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Student work for a signed-in teacher (S5-W1, S6-W1)
+   ══════════════════════════════════════════════════════════════════
+   The same readers and writers as above, answered from the server
+   (Batch B: migrations/2026111101_student_work_submissions.sql and
+   2026111102_student_work_storage.sql; the shapes are in
+   migrations/local-test/batch-b-contract.md). Only for a class the server
+   keeps student-page rows for (_serverKeepsRows: signed in, a server id,
+   the build switch on as the server says): any other class is answered
+   exactly as before, and sent nothing new.
+
+   What is read: list_course_submissions, when the class loads with Send
+   Work on (or its Send Work is not known yet this session), when the
+   grader or the Assignments page opens (refreshStudentWork, at most every
+   30 seconds unless asked), and after this device's own writes land.
+   Send Work and Keep Photos Until also come on the course row with the
+   class. Kept in memory only (_workServer).
+
+   What is shown is that answer with this device's writes not yet answered
+   laid over it (_workServerView), so a change shows at once and a reload
+   keeps it: the outbox's queued set_course_send_work,
+   set_assessment_student_work, delete_submission and mark_handed_in_paper,
+   and the teacher's uploads still on their way (gb-work-uploads).
+
+   Add Work (start_work_upload, then finish_work_upload): the pages go into
+   the photo queue (shared/photo-queue.js, IndexedDB) under local ids, and
+   start_work_upload goes through the outbox. When it answers, the queue's
+   records take the server's submission and file ids and the pages upload
+   to the paths the server named, with the teacher's own sign-in; once
+   every page and thumbnail is up the queue's commit hands them in with
+   finish_work_upload under the batch's key. Offline the pages wait in the
+   queue and the start in the outbox; both go when the device is back.
+   Until then the work shows from the queue ("photo-queue:<id>" paths).
+
+   Pages are shown through a signed link (300 seconds) that is fetched
+   and shown from a blob: address, never put in an <img> as is (the
+   Content Security Policy allows blob: and not the storage host).
+
+   After a write that can queue files for deletion (delete_submission,
+   start_work_upload, finish_work_upload) the edge function's sweep route
+   runs the removal worker, as the contract asks. Best effort: if it does
+   not answer, the files wait in the removal queue, unreadable.
+
+   Sync problems show on the sync dot only (getSyncDotState): a refused
+   write through the outbox's own dead letters, a page that will not send
+   through the photo queue's failed count. Mark Up, reflections, revisions
+   and group work stay Demo Mode's (Phase 2 and 3). */
+var STUDENT_WORK_LINK_SECONDS = 300;
+var _WORK_REFRESH_MS = 30000; // refreshStudentWork's wait between reads, unless forced
+var _WORK_START_WAIT_MS = 8000; // how long Add Work waits for start_work_upload's answer before it answers itself
+var _WORK_UPLOADS_KEY = 'gb-work-uploads'; // the teacher's uploads on their way, by start key
+var _WORK_DROPPED_KEY = 'gb-work-dropped'; // { at }: photos refused after the screen said sent
+var _WORK_DROPPED_MS = 24 * 60 * 60 * 1000; // how long the sync dot says so, unless clicked
+var _workAwaited = {}; // start key → true while Add Work's screen still waits for the answer
+var _workServer = {}; // cid → list_course_submissions' answer, as last read
+var _workCourseRow = {}; // cid → { send_work, keep_photos_until }, as the server last said
+var _workCourseHere = {}; // cid → a change of the two on its way: { patch, at }
+var _workAssessHere = {}; // aid → a change of an assessment's settings on its way
+var _workRead = {}; // cid → { running, at, writes }
+var _workWrites = {}; // cid → how many of this device's work writes have landed
+var _workViewMemo = {}; // cid → this turn's view (cleared at the end of the turn)
+var _workViewClearing = false;
+var _workQueueWired = false;
+var _workSweepTimer = null;
+
+function _workOnServer(cid) {
+  return !!cid && !_isDemoSession() && _serverKeepsRows(cid);
+}
+/* True when class `cid`'s student work is the server's (a signed-in class
+   with the build switch on). The screens ask it beside Demo Mode. */
+function studentWorkLive(cid) {
+  return _workOnServer(cid);
+}
+
+function _workChanged(cid) {
+  delete _workViewMemo[cid];
+}
+
+function _workUploads() {
+  var all = _safeParseLS(_WORK_UPLOADS_KEY, null);
+  return _plainObject(all) ? all : {};
+}
+function _workUploadsSave(all) {
+  if (!Object.keys(all).length) {
+    try {
+      localStorage.removeItem(_WORK_UPLOADS_KEY);
+    } catch (e) {
+      /* nothing kept */
+    }
+  } else _safeLSSet(_WORK_UPLOADS_KEY, JSON.stringify(all));
+  Object.keys(_workViewMemo).forEach(_workChanged);
+}
+function _workUploadPut(rec) {
+  var all = _workUploads();
+  all[rec.key] = rec;
+  _workUploadsSave(all);
+}
+function _workUploadDrop(key) {
+  var all = _workUploads();
+  if (!all[key]) return null;
+  var rec = all[key];
+  delete all[key];
+  _workUploadsSave(all);
+  return rec;
+}
+function _workUploadByBatch(batch) {
+  var all = _workUploads();
+  var key = Object.keys(all).find(function (k) {
+    return all[k] && all[k].batch === batch;
+  });
+  return key ? all[key] : null;
+}
+
+// The class's queued writes to `endpoint`, oldest first (this teacher's).
+function _workQueued(endpoint, match) {
+  var q = window.v2Queue;
+  var entries = [];
+  try {
+    entries = q && typeof q.queued === 'function' ? q.queued(endpoint) || [] : _queuedCardWrites(endpoint);
+  } catch (e) {
+    entries = [];
+  }
+  return entries.filter(function (e) {
+    return e && e.payload && match(e.payload);
+  });
+}
+
+function _workAssessmentOfClass(cid, aid) {
+  return (getAssessments(cid) || []).some(function (a) {
+    return a && a.id === aid;
+  });
+}
+
+/* What the screens read for a signed-in class: the shape
+   saveDemoStudentWork keeps ({ course, assessments, submissions }), from
+   the server's last answer with this device's unanswered writes laid over
+   it. Worked out once a turn. */
+function _workServerView(cid) {
+  if (_workViewMemo[cid]) return _workViewMemo[cid];
+  var srv = _workServer[cid] || null;
+  var course = Object.assign({ send_work: false, keep_photos_until: 'end_of_year' }, _workCourseRow[cid] || {});
+  _workQueued('set_course_send_work', function (p) {
+    return p.p_course_id === cid;
+  }).forEach(function (e) {
+    if (_plainObject(e.payload.p_patch)) Object.assign(course, e.payload.p_patch);
+  });
+  if (_workCourseHere[cid]) Object.assign(course, _workCourseHere[cid].patch);
+
+  var byId = {};
+  ((srv && srv.assessments) || []).forEach(function (a) {
+    if (a && a.id) byId[a.id] = _studentWorkCopy(a);
+  });
+  _workQueued('set_assessment_student_work', function (p) {
+    return _workAssessmentOfClass(cid, p.p_assessment_id);
+  }).forEach(function (e) {
+    var aid = e.payload.p_assessment_id;
+    byId[aid] = Object.assign(byId[aid] || { id: aid }, e.payload.p_patch || {});
+  });
+  Object.keys(_workAssessHere).forEach(function (aid) {
+    if (_workAssessmentOfClass(cid, aid)) byId[aid] = Object.assign(byId[aid] || { id: aid }, _workAssessHere[aid]);
+  });
+
+  var subs = _studentWorkCopy((srv && srv.submissions) || []);
+  // Deleted here, not answered yet.
+  var deleted = {};
+  _workQueued('delete_submission', function () {
+    return true;
+  }).forEach(function (e) {
+    deleted[e.payload.p_submission_id] = true;
+  });
+  subs = subs.filter(function (s) {
+    return s && !deleted[s.id];
+  });
+  var sentFor = function (sid, aid) {
+    return subs.find(function (s) {
+      return s.state === 'sent' && s.enrollment_id === sid && s.assessment_id === aid;
+    });
+  };
+  var stamp = function (at) {
+    return at || new Date().toISOString();
+  };
+  // Handed In on Paper, not answered yet.
+  _workQueued('mark_handed_in_paper', function (p) {
+    return _workAssessmentOfClass(cid, p.p_assessment_id);
+  }).forEach(function (e) {
+    var aid = e.payload.p_assessment_id;
+    (e.payload.p_enrollment_ids || []).forEach(function (sid) {
+      if (sentFor(sid, aid)) return;
+      subs.push({
+        id: 'paper:' + e.id + ':' + sid,
+        assessment_id: aid,
+        enrollment_id: sid,
+        version: 1,
+        state: 'sent',
+        sent_by: 'teacher',
+        on_paper: true,
+        is_late: false,
+        note: null,
+        followed_plan: null,
+        created_at: stamp(e.created_at),
+        sent_at: stamp(e.created_at),
+        files: [],
+      });
+    });
+  });
+  // The teacher's uploads on their way: shown from the photo queue.
+  var uploads = _workUploads();
+  Object.keys(uploads)
+    .map(function (k) {
+      return uploads[k];
+    })
+    .filter(function (u) {
+      return u && u.cid === cid;
+    })
+    .sort(function (x, y) {
+      return String(x.at).localeCompare(String(y.at));
+    })
+    .forEach(function (u) {
+      var now = sentFor(u.sid, u.aid);
+      var files = function (first) {
+        return (u.ids || []).map(function (qid, i) {
+          var p = (u.pages || [])[i] || {};
+          return {
+            id: qid,
+            page: first + i,
+            path: 'photo-queue:' + qid,
+            thumb_path: 'photo-queue:' + qid + ':thumb',
+            bytes: p.bytes || null,
+            thumb_bytes: p.thumb_bytes || null,
+            width: p.width || null,
+            height: p.height || null,
+            rotation: 0,
+            sha256: p.hash || null,
+            added_by: 'teacher',
+          };
+        });
+      };
+      if (u.mode === 'add') {
+        if (!now) return;
+        var last = (now.files || []).reduce(function (n, f) {
+          return Math.max(n, (f && f.page) || 0);
+        }, 0);
+        now.files = (now.files || []).concat(files(last + 1));
+        return;
+      }
+      if (u.mode === 'new' && now) return; // the student's (or another device's) came first
+      if (now)
+        subs = subs.filter(function (s) {
+          return s !== now;
+        });
+      subs.push({
+        id: (u.server && u.server.submission_id) || u.sub,
+        assessment_id: u.aid,
+        enrollment_id: u.sid,
+        version: (now && now.version) || 1,
+        state: 'sent',
+        sent_by: 'teacher',
+        on_paper: false,
+        is_late: false,
+        note: null,
+        followed_plan: null,
+        created_at: u.at,
+        sent_at: u.at,
+        files: files(1),
+      });
+    });
+
+  var view = {
+    course: course,
+    assessments: Object.keys(byId).map(function (k) {
+      return byId[k];
+    }),
+    submissions: subs,
+  };
+  _workViewMemo[cid] = view;
+  if (!_workViewClearing) {
+    _workViewClearing = true;
+    Promise.resolve().then(function () {
+      _workViewClearing = false;
+      _workViewMemo = {};
+    });
+  }
+  return view;
+}
+
+/* ── Reading ── */
+
+// The course row's two settings, when the class loads (_applyBundleCourseConfig).
+function _noteCourseSendWork(cid, courseRow) {
+  if (!cid || !_plainObject(courseRow) || !('send_work' in courseRow)) return;
+  _workCourseRow[cid] = {
+    send_work: courseRow.send_work === true,
+    keep_photos_until: courseRow.keep_photos_until === 'end_of_term' ? 'end_of_term' : 'end_of_year',
+  };
+  _workChanged(cid);
+}
+
+/* Whether the class's work is worth reading. Every screen that shows it
+   asks for Send Work on (GraderWork.workOnInClass), so with it off there
+   is nothing to draw and nothing is read (S6-W1 review, should-fix 4).
+   Read anyway when Send Work is not known yet (the read tells), while a
+   change to it is on its way (the view already says on), or when the
+   last answer held work (a class just turned off stays current). */
+function _workReadWanted(cid) {
+  if (!_workCourseRow[cid]) return true;
+  if (_workServerView(cid).course.send_work === true) return true;
+  var srv = _workServer[cid];
+  return !!(srv && Array.isArray(srv.submissions) && srv.submissions.length);
+}
+
+function _workLook(cid) {
+  return JSON.stringify(_workServerView(cid));
+}
+
+/* Read the class's work from the server, unless it was read in the last
+   30 seconds (opts.force reads it anyway; a read under way is joined). A
+   Promise of { changed } or { error }; never rejects. A screen that
+   changes is redrawn. Nothing for any class but a live one, and nothing
+   while its Send Work is off (_workReadWanted) unless opts.anyway. */
+function refreshStudentWork(cid, opts) {
+  // The class's marks and reflections are read with its work (S9-W1, S10-W1); not waited for.
+  refreshCourseFeedback(cid, opts);
+  if (!_workOnServer(cid)) return Promise.resolve({ changed: false });
+  if (!(opts && opts.anyway) && !_workReadWanted(cid)) return Promise.resolve({ changed: false });
+  var st = _workRead[cid] || (_workRead[cid] = {});
+  if (st.running) {
+    if (opts && opts.force) st.again = true;
+    return st.running;
+  }
+  if (!(opts && opts.force) && st.at && Date.now() - st.at < _WORK_REFRESH_MS) {
+    return Promise.resolve({ changed: false });
+  }
+  st.running = (async function () {
+    var out = { changed: false };
+    try {
+      do {
+        st.again = false;
+        out = await _fetchStudentWork(cid);
+      } while (st.again || out.skipped);
+    } catch (e) {
+      out = { error: e };
+    } finally {
+      st.running = null;
+    }
+    if (out.changed) _invalidateAndRerender();
+    return out;
+  })();
+  return st.running;
+}
+
+async function _fetchStudentWork(cid) {
+  var writes = _workWrites[cid] || 0;
+  var res;
+  try {
+    res = await _callRpcWithAuthGuard(
+      'list_course_submissions',
+      { p_course_id: cid },
+      { suppressSessionExpiredModal: true },
+    );
+  } catch (e) {
+    res = { error: e };
+  }
+  var data = res && !res.error ? _rpcObject(res.data) : null;
+  if (!data || !Array.isArray(data.submissions)) {
+    // A read that failed changes nothing: the next one tries again.
+    if (res && res.error && !res.error.handledSessionExpired)
+      console.warn('list_course_submissions failed:', res.error);
+    return { error: (res && res.error) || { message: 'no answer' } };
+  }
+  if (!_workOnServer(cid)) return { changed: false };
+  // One of this device's writes landed while the read was out: it is from before that write.
+  if ((_workWrites[cid] || 0) !== writes) return { skipped: true };
+  var was = _workLook(cid);
+  _workServer[cid] = data;
+  if (_plainObject(data.course)) _noteCourseSendWork(cid, Object.assign({ send_work: false }, data.course));
+  (_workRead[cid] || (_workRead[cid] = {})).at = Date.now();
+  _workChanged(cid);
+  return { changed: was !== _workLook(cid) };
+}
+
+/* Before a delete warning says whether photos go too (S8-F1): the
+   class's work, read from the server once this session if it has not
+   been (with Send Work off nothing else reads it, and photos sent before
+   it was turned off are still deleted). null when nothing needs reading
+   (Demo Mode, a class whose work is not the server's, or read already):
+   the readers answer now. Else a Promise of { known: true } once the
+   readers (getCourseSubmissions, CmStudentPage.studentsWithPhotos) answer
+   for the server, or { known: false } when the read failed: the warning
+   then says photos go rather than miss them. Never rejects. */
+function readStudentWorkForDelete(cid) {
+  if (!_workOnServer(cid)) return null;
+  var st = _workRead[cid];
+  if (st && st.at && !st.running) return null;
+  return refreshStudentWork(cid, { force: true, anyway: true }).then(
+    function (out) {
+      return { known: !(out && out.error) && !!(_workRead[cid] && _workRead[cid].at) };
+    },
+    function () {
+      return { known: false };
+    },
+  );
+}
+
+/* The class has just loaded from the server with its student page on
+   (_loadServerGradeReturns): its work too, when Send Work is on or not
+   known yet. Never waited for, never a failed load. */
+function _loadServerStudentWork(cid, fresh) {
+  if (!_workOnServer(cid)) return;
+  var known = _workCourseRow[cid];
+  var readBefore = !!(_workRead[cid] && _workRead[cid].at);
+  if (known ? known.send_work !== true : readBefore || fresh) return;
+  refreshStudentWork(cid, { force: true });
+}
+
+// A write of this device's landed: reads begun before it are dropped, and the class read again soon.
+function _workWriteLanded(cid) {
+  _workWrites[cid] = (_workWrites[cid] || 0) + 1;
+  _workChanged(cid);
+  setTimeout(function () {
+    refreshStudentWork(cid, { force: true });
+  }, 0);
+}
+
+/* ── The two class settings and an assessment's ── */
+
+/* Send Work and Keep Photos Until: `patch` names what changes, any of
+   { send_work: boolean, keep_photos_until: 'end_of_year' | 'end_of_term' }.
+   Answers { ok } at once. Demo Mode keeps it with its sample work; a live
+   class sends set_course_send_work through the outbox. */
+function setCourseSendWork(cid, patch) {
+  var clean = {};
+  if (patch && (patch.send_work === true || patch.send_work === false)) clean.send_work = patch.send_work;
+  if (patch && (patch.keep_photos_until === 'end_of_year' || patch.keep_photos_until === 'end_of_term')) {
+    clean.keep_photos_until = patch.keep_photos_until;
+  }
+  if (!cid || !Object.keys(clean).length) return { ok: false };
+  if (_isDemoSession()) {
+    var work = getCourseSubmissions(cid);
+    work.course = Object.assign({}, work.course, clean);
+    return { ok: saveDemoStudentWork(cid, work) };
+  }
+  if (!_workOnServer(cid)) return { ok: false };
+  var mine = { patch: Object.assign({}, (_workCourseHere[cid] || {}).patch, clean) };
+  _workCourseHere[cid] = mine;
+  _workChanged(cid);
+  _trackPendingSync(
+    Promise.resolve(
+      _writeRpc('set_course_send_work', { p_course_id: cid, p_patch: clean, p_idempotency_key: _newEntryId() }),
+    ).then(function (res) {
+      var still = _workCourseHere[cid] === mine;
+      if (still) delete _workCourseHere[cid];
+      var data = res && !res.error ? _rpcObject(res.data) : null;
+      if (data && still) _noteCourseSendWork(cid, data);
+      if (res && res.error && !res.error.handledSessionExpired) console.warn('set_course_send_work failed:', res.error);
+      _workWriteLanded(cid);
+    }),
+  );
+  return { ok: true };
+}
+
+/* An assessment's Student Work card, as the form saves it: only what
+   differs from what the class holds is sent (set_assessment_student_work).
+   `w` is { students_send, after_due, accept_until, group_work,
+   students_see_markup }. Answers { ok } at once. */
+function saveAssessmentStudentWork(cid, aid, w) {
+  if (!cid || !aid || !_plainObject(w)) return { ok: false };
+  var now = getAssessmentStudentWork(cid, aid);
+  var row = {
+    students_send: w.students_send,
+    after_due: w.after_due,
+    accept_until: w.after_due === 'until' ? w.accept_until || null : null,
+    group_work: w.group_work,
+    students_see_markup: w.students_see_markup !== false,
+  };
+  if (_isDemoSession()) {
+    var work = getCourseSubmissions(cid);
+    work.assessments = (work.assessments || [])
+      .filter(function (x) {
+        return x && x.id !== aid;
+      })
+      .concat([Object.assign({ id: aid }, row)]);
+    return { ok: saveDemoStudentWork(cid, work) };
+  }
+  if (!_workOnServer(cid)) return { ok: false };
+  var patch = {};
+  Object.keys(row).forEach(function (k) {
+    if (row[k] !== now[k]) patch[k] = row[k];
+  });
+  // The server keeps a date only with Until, and needs one with it.
+  if ('after_due' in patch && row.after_due === 'until') patch.accept_until = row.accept_until;
+  if ('accept_until' in patch && row.after_due !== 'until') delete patch.accept_until;
+  if (row.after_due === 'until' && !row.accept_until) return { ok: false };
+  if (!Object.keys(patch).length) return { ok: true };
+  var mine = Object.assign({}, patch);
+  _workAssessHere[aid] = Object.assign({}, _workAssessHere[aid], mine);
+  var held = _workAssessHere[aid];
+  _workChanged(cid);
+  _trackPendingSync(
+    Promise.resolve(
+      _writeRpc('set_assessment_student_work', {
+        p_assessment_id: aid,
+        p_patch: patch,
+        p_idempotency_key: _newEntryId(),
+      }),
+    ).then(function (res) {
+      var data = res && !res.error ? _rpcObject(res.data) : null;
+      var id = (data && data.id) || aid;
+      if (_workAssessHere[aid] === held) delete _workAssessHere[aid];
+      if (data && _workServer[cid]) {
+        var list = (_workServer[cid].assessments || []).filter(function (a) {
+          return a && a.id !== id;
+        });
+        list.push(data);
+        _workServer[cid].assessments = list;
+      }
+      if (res && res.error && !res.error.handledSessionExpired) {
+        console.warn('set_assessment_student_work failed:', res.error);
+      }
+      _workWriteLanded(cid);
+    }),
+  );
+  return { ok: true };
+}
+
+/* ── Showing a page ── */
+
+var _WORK_STORAGE_PATH =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}){4}(-thumb)?\.jpg$/;
+
+/* One page or thumbnail of a live class, from storage: a link signed for
+   300 seconds, fetched, and shown from a blob: address. { url, release }
+   or null. Only a path in this class's own folder. */
+function _openServerWorkPage(cid, name) {
+  if (!_WORK_STORAGE_PATH.test(name) || name.indexOf(String(cid).toLowerCase() + '/') !== 0) {
+    return Promise.resolve(null);
+  }
+  var sb = getSupabase();
+  if (!sb || !sb.storage || typeof fetch !== 'function' || typeof URL.createObjectURL !== 'function') {
+    return Promise.resolve(null);
+  }
+  var bucket = (_workServer[cid] && _workServer[cid].bucket) || 'student-photos';
+  return Promise.resolve()
+    .then(function () {
+      return sb.storage.from(bucket).createSignedUrl(name, STUDENT_WORK_LINK_SECONDS);
+    })
+    .then(function (res) {
+      var link = res && !res.error && res.data && res.data.signedUrl;
+      if (!link) return null;
+      return fetch(link, { credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer' }).then(function (r) {
+        return r && r.ok ? r.blob() : null;
+      });
+    })
+    .then(function (blob) {
+      if (!blob) return null;
+      // Always a picture: what storage hands back is shown in an <img> and nothing else.
+      var url = URL.createObjectURL(new Blob([blob], { type: 'image/jpeg' }));
+      var released = false;
+      return {
+        url: url,
+        release: function () {
+          if (released) return;
+          released = true;
+          URL.revokeObjectURL(url);
+        },
+      };
+    })
+    .then(null, function () {
+      return null;
+    });
+}
+
+/* ── Add Work ── */
+
+// The photo queue, told how a signed-in teacher's pages go up and are handed in.
+function _wireWorkQueue() {
+  var q = window.PhotoQueue;
+  if (!q || typeof q.configure !== 'function' || _isDemoSession() || !_writesEnabled()) return null;
+  if (!_workQueueWired) {
+    _workQueueWired = true;
+    q.configure({
+      upload: _workUploadFile,
+      commit: _workCommit,
+      owner: function () {
+        return _teacherId || null;
+      },
+    });
+    if (typeof q.subscribe === 'function') q.subscribe(_updateSyncIndicator);
+  }
+  return q;
+}
+
+function _workUploadFile(path, blob) {
+  var sb = getSupabase();
+  if (!sb || !sb.storage) return Promise.resolve({ error: { message: 'offline: no client', status: 503 } });
+  return Promise.resolve(
+    sb.storage.from('student-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: false }),
+  ).then(function (res) {
+    return { error: (res && res.error) || null };
+  });
+}
+
+function _workPagesJson(rec) {
+  return (rec.pages || []).map(function (p) {
+    var out = {};
+    ['width', 'height', 'bytes', 'thumb_bytes'].forEach(function (k) {
+      var n = Number(p[k]);
+      if (isFinite(n) && n >= 1 && Math.floor(n) === n) out[k] = n;
+    });
+    return out;
+  });
+}
+
+function _workStart(rec) {
+  return _writeRpc('start_work_upload', {
+    p_assessment_id: rec.aid,
+    p_enrollment_id: rec.sid,
+    p_pages: _workPagesJson(rec),
+    p_mode: rec.mode,
+    p_idempotency_key: rec.key,
+  });
+}
+
+// Give up an upload: its photos leave the device and the screens forget it.
+function _workUploadAbandon(key) {
+  var rec = _workUploadDrop(key);
+  if (!rec) return Promise.resolve(null);
+  return _teacherWorkForget(rec.ids || []).then(function () {
+    return rec;
+  });
+}
+
+/* start_work_upload answered (from the call itself, or from the outbox's
+   own event after a reload). `ready`: the waiting pages take the server's
+   ids and go up. Anything else, while Add Work's screen still waits for
+   the answer: the photos are dropped, the class read again, and the
+   screen says why. Once the screen has said sent (the wait ran out, or
+   the page was reloaded) the photos are not dropped without a word: see
+   _workRefusedAfterSent. Returns the answer as the screens take it. Runs
+   once per answer; a second call for the same start does nothing. */
+function _workUploadStarted(key, data) {
+  var all = _workUploads();
+  var rec = all[key];
+  var res = _rpcObject(data);
+  var told = !_workAwaited[key];
+  if (!rec) return Promise.resolve(res || { result: 'store_failed' });
+  if (rec.server && rec.restartKey !== key) return Promise.resolve({ result: 'sent' });
+  if (!res || res.result !== 'ready') {
+    if (told && _workRefusedAfterSent(rec, res)) return Promise.resolve({ result: 'sent', queued: true });
+    return _workUploadAbandon(key).then(function () {
+      if (told) _workNoteDropped();
+      _workWriteLanded(rec.cid);
+      _sweepWorkRemovals();
+      if (res && res.result === 'already_sent') {
+        if (res.submission && _workServer[rec.cid]) _workServerTake(rec.cid, res.submission);
+        return { result: 'already_sent', submission: getStudentSubmission(rec.cid, rec.sid, rec.aid) };
+      }
+      return res && res.result ? res : { result: 'store_failed' };
+    });
+  }
+  var files = (res.files || []).slice().sort(function (x, y) {
+    return (x.page || 0) - (y.page || 0);
+  });
+  var q = _wireWorkQueue();
+  if (!q || files.length !== (rec.ids || []).length) {
+    return _workUploadAbandon(key).then(function () {
+      if (told) _workNoteDropped();
+      return { result: 'store_failed' };
+    });
+  }
+  return Promise.resolve(q.ready && q.ready())
+    .then(function () {
+      var pages = typeof q.pages === 'function' ? q.pages() : [];
+      var map = {};
+      var bad = false;
+      rec.ids.forEach(function (qid, i) {
+        var meta = pages.find(function (p) {
+          return p.id === qid;
+        });
+        if (!meta) return (bad = true);
+        var ids = Object.assign({}, meta.ids, { submission: res.submission_id, file: files[i].file_id });
+        // Where the queue will put it is where the server said, or nothing goes.
+        try {
+          if (q.pathFor(ids) !== String(files[i].path).toLowerCase()) bad = true;
+        } catch (e) {
+          bad = true;
+        }
+        map[meta.ids.submission] = res.submission_id;
+        map[meta.ids.file] = files[i].file_id;
+      });
+      if (bad) return { bad: true };
+      return Promise.resolve(q.rekey(map)).then(function (out) {
+        return out && out.ok ? { ok: true } : { bad: true };
+      });
+    })
+    .then(function (done) {
+      if (done.bad) {
+        return _workUploadAbandon(key).then(function () {
+          if (told) _workNoteDropped();
+          return { result: 'store_failed' };
+        });
+      }
+      var now = _workUploads();
+      var held = now[rec.key];
+      if (held) {
+        held.server = { submission_id: res.submission_id, files: files, finish_by: res.finish_by || null };
+        delete held.restartKey;
+        delete held.restarting;
+        delete held.held;
+        _workUploadsSave(now);
+      }
+      // A restart sends every page again, to its new path.
+      var again = rec.restartKey === key;
+      return Promise.all(
+        again
+          ? rec.ids.map(function (qid) {
+              return Promise.resolve(q.retry(qid, { again: true })).then(null, function () {});
+            })
+          : [],
+      ).then(function () {
+        _sweepWorkRemovals(); // an earlier upload for the piece was dropped
+        q.send();
+        return { result: 'sent', submission: getStudentSubmission(rec.cid, rec.sid, rec.aid) };
+      });
+    });
+}
+
+/* A start refused after Add Work's screen had already said sent (offline,
+   or past the 8-second wait), so no screen is there to say why. True when
+   the photos are kept:
+   - nothing_sent: the work they were to add to or replace went, so they
+     are started again as new work;
+   - class_full, or no answer at all: held on the device, shown on the sync
+     dot, and tried again when a page opens or the sync dot is clicked
+     (retryHeldStudentWork).
+   False for the rest (already_sent, on_paper, too_many_pages: they cannot
+   go in as asked); the caller lets them go and the sync dot says so. */
+function _workRefusedAfterSent(rec, res) {
+  var result = res && res.result;
+  if (result && result !== 'nothing_sent' && result !== 'class_full') return false;
+  var all = _workUploads();
+  var held = all[rec.key];
+  if (!held) return false;
+  delete held.restarting; // this answer may be a restart's own
+  if (result === 'nothing_sent') {
+    _workUploadsSave(all);
+    _workRestart(held, 'new');
+    return true;
+  }
+  held.held = result || 'no_answer';
+  _workUploadsSave(all);
+  _workWriteLanded(rec.cid);
+  _updateSyncIndicator();
+  return true;
+}
+
+// Photos let go after the screen said sent: the sync dot says so for a day, or until it is clicked.
+function _workNoteDropped() {
+  _safeLSSet(_WORK_DROPPED_KEY, JSON.stringify({ at: new Date().toISOString() }));
+  _updateSyncIndicator();
+}
+
+/* The sync dot was clicked, or a page opened: held uploads are started
+   again, and the note of photos let go is cleared. */
+function retryHeldStudentWork() {
+  try {
+    localStorage.removeItem(_WORK_DROPPED_KEY);
+  } catch (e) {
+    /* nothing kept */
+  }
+  if (_isDemoSession() || !_writesEnabled()) return _updateSyncIndicator();
+  var all = _workUploads();
+  Object.keys(all).forEach(function (k) {
+    if (all[k] && all[k].held) _workRestart(all[k]);
+  });
+  _updateSyncIndicator();
+}
+
+// A submission as the server now has it, in place of the class's copy of it.
+function _workServerTake(cid, sub) {
+  var srv = _workServer[cid];
+  if (!srv || !_plainObject(sub) || !sub.id) return;
+  srv.submissions = (srv.submissions || []).filter(function (s) {
+    return (
+      s &&
+      s.id !== sub.id &&
+      !(s.enrollment_id === sub.enrollment_id && s.assessment_id === sub.assessment_id && s.state === 'sent')
+    );
+  });
+  if (sub.state === 'sent') srv.submissions.push(_studentWorkCopy(sub));
+  _workChanged(cid);
+}
+
+/* The photo queue's commit: every page and thumbnail of one upload is in
+   storage; finish_work_upload hands them in, in order, under the batch's
+   key. Answers { error } as the queue reads it: none once handed in (or
+   dropped because the student's came first), a passing one while pages are
+   still missing or the upload is being started again, and a lasting one
+   for what storage holds that it should not. */
+async function _workCommit(batch) {
+  var rec = _workUploadByBatch(batch.key);
+  var files = (batch.files || [])
+    .slice()
+    .sort(function (x, y) {
+      return (x.order || 0) - (y.order || 0);
+    })
+    .map(function (f) {
+      return { file_id: f.id, sha256: f.hash };
+    });
+  if (
+    !files.every(function (f) {
+      return _isUuid(f.file_id) && /^[0-9a-f]{64}$/.test(String(f.sha256 || ''));
+    })
+  ) {
+    return { error: { message: 'a page has no fingerprint', status: 422 } };
+  }
+  if (rec && rec.restarting) return { error: { message: 'starting again', status: 503 } };
+  var res = await _callRpcWithAuthGuard(
+    'finish_work_upload',
+    { p_submission_id: batch.ids.submission, p_files: files, p_idempotency_key: batch.key },
+    { suppressSessionExpiredModal: true },
+  );
+  if (!res || res.error) return { error: (res && res.error) || { message: 'no answer', status: 503 } };
+  var data = _rpcObject(res.data) || {};
+  var cid = (rec && rec.cid) || batch.ids.course;
+  if (data.result === 'sent' || data.result === 'already_sent') {
+    if (data.result === 'sent' && data.submission) _workServerTake(cid, data.submission);
+    if (rec) _workUploadDrop(rec.key);
+    _workWriteLanded(cid);
+    _sweepWorkRemovals(); // Replace Them queues the old photos; already_sent drops this upload's
+    _invalidateAndRerender();
+    return { error: null };
+  }
+  if (data.result === 'missing_pages') {
+    var q = window.PhotoQueue;
+    var pages = q && typeof q.pages === 'function' ? q.pages() : [];
+    await Promise.all(
+      (data.missing || []).map(function (fileId) {
+        var meta = pages.find(function (p) {
+          return p.ids && p.ids.file === fileId;
+        });
+        return meta ? Promise.resolve(q.retry(meta.id, { again: true })).then(null, function () {}) : null;
+      }),
+    );
+    return { error: { message: 'missing_pages', status: 503 } };
+  }
+  if (data.result === 'gone' && rec) {
+    // Dropped (two hours passed, or the work it was for went): it is started again.
+    _workRestart(rec);
+    return { error: { message: 'starting again', status: 503 } };
+  }
+  return { error: { message: String(data.result || 'refused'), status: 409 } };
+}
+
+/* An upload the server no longer holds is started again with a new key:
+   as the same choice when the work it was for is still in, else as new
+   (or as `mode`, when the caller knows). Its pages go up again to the new
+   paths (_workUploadStarted). */
+function _workRestart(rec, mode) {
+  var all = _workUploads();
+  var held = all[rec.key];
+  if (!held || held.restarting) return;
+  var newKey = _newEntryId();
+  held.restarting = true;
+  delete held.server;
+  delete held.held;
+  if (mode) held.mode = mode;
+  else if (held.mode !== 'new' && !getStudentSubmission(held.cid, held.sid, held.aid)) held.mode = 'new';
+  if (held.mode === 'new') held.target = null;
+  // Kept under its new key, so the outbox's answer finds it.
+  delete all[rec.key];
+  held.key = newKey;
+  held.restartKey = newKey;
+  all[newKey] = held;
+  _workUploadsSave(all);
+  Promise.resolve(_workStart(held)).then(function (res) {
+    if (res && res.error) {
+      if (!res.error.handledSessionExpired) console.warn('start_work_upload (again) failed:', res.error);
+      return;
+    }
+    _workUploadStarted(newKey, res && res.data);
+  });
+}
+
+/* Add Work, Add as More Pages and Replace Them for a live class: the
+   answers _teacherWork gives in Demo Mode, from what the class holds.
+   Waits up to _WORK_START_WAIT_MS for the server's start; past that (or
+   offline) it answers 'sent' and the work shows from the queue until it
+   is in. */
+function _serverTeacherWork(cid, sid, aid, pages, mode) {
+  if (!_teacherWorkPagesOk(pages)) return Promise.resolve({ result: 'invalid' });
+  return _teacherWorkQueued(cid, function () {
+    if (!_teacherWorkInClass(cid, sid, aid)) return { result: 'not_found' };
+    var sent = getStudentSubmission(cid, sid, aid);
+    if (mode === 'new' && sent) return { result: 'already_sent', submission: sent };
+    if (mode !== 'new' && !sent) return { result: 'nothing_sent' };
+    if (mode === 'add' && sent.on_paper) return { result: 'on_paper', submission: sent };
+    var have = mode === 'add' ? (sent.files || []).length : 0;
+    if (have + pages.length > STUDENT_WORK_MAX_PAGES) {
+      return { result: 'too_many_pages', room: STUDENT_WORK_MAX_PAGES - have };
+    }
+    // Work that is itself still on its way can be added to once it is in.
+    if (mode !== 'new' && !_isUuid(sent.id)) return { result: 'uploading' };
+    var q = _wireWorkQueue();
+    if (!q) return { result: 'no_photo_store' };
+    var sub = _teacherWorkId();
+    return _teacherWorkQueuePages(cid, sid, aid, sub, pages).then(function (kept) {
+      if (!kept.ok) return kept.answer;
+      var rec = {
+        key: _newEntryId(),
+        cid: cid,
+        aid: aid,
+        sid: sid,
+        mode: mode,
+        sub: sub,
+        target: mode === 'new' ? null : sent.id,
+        batch: kept.batch,
+        ids: kept.ids,
+        pages: pages.map(function (p) {
+          return {
+            hash: p.hash || null,
+            bytes: p.blob.size,
+            thumb_bytes: p.thumb.size,
+            width: p.width || null,
+            height: p.height || null,
+          };
+        }),
+        at: new Date().toISOString(),
+        server: null,
+      };
+      _workUploadPut(rec);
+      // Until the wait runs out, a refusal is this screen's to say (_workUploadStarted).
+      _workAwaited[rec.key] = true;
+      var started = Promise.resolve(_workStart(rec)).then(function (res) {
+        if (res && res.error) {
+          if (!res.error.handledSessionExpired) console.warn('start_work_upload failed:', res.error);
+          // Refused (the outbox's dead letter says so on the sync dot): the photos go.
+          return _workUploadAbandon(rec.key).then(function () {
+            return { result: 'store_failed' };
+          });
+        }
+        return _workUploadStarted(rec.key, res && res.data);
+      });
+      started.then(function () {
+        delete _workAwaited[rec.key];
+      });
+      _trackPendingSync(started);
+      var waited = new Promise(function (resolve) {
+        setTimeout(function () {
+          delete _workAwaited[rec.key];
+          resolve({ result: 'sent', queued: true });
+        }, _WORK_START_WAIT_MS);
+      });
+      return Promise.race([started, waited]);
+    });
+  });
+}
+
+/* Delete Work for a live class: delete_submission for work that is in;
+   an upload of this device's still on its way is given up as well. */
+function _serverDeleteWork(cid, sid, aid) {
+  return _teacherWorkQueued(cid, function () {
+    if (!_teacherWorkInClass(cid, sid, aid)) return { result: 'not_found' };
+    var sent = getStudentSubmission(cid, sid, aid);
+    if (!sent) return { result: 'nothing_sent' };
+    var pages = (sent.files || []).length;
+    var uploads = _workUploads();
+    var mine = Object.keys(uploads).filter(function (k) {
+      var u = uploads[k];
+      return u && u.cid === cid && u.sid === sid && u.aid === aid;
+    });
+    var ids = [];
+    mine.forEach(function (k) {
+      var u = uploads[k];
+      if (u.server && u.server.submission_id) ids.push(u.server.submission_id);
+      if (u.target) ids.push(u.target);
+    });
+    // Handed In on Paper not answered yet has no id to delete by.
+    if (!_isUuid(sent.id) && !mine.length) return { result: 'uploading' };
+    if (_isUuid(sent.id)) ids.push(sent.id);
+    return Promise.all(mine.map(_workUploadAbandon)).then(function () {
+      ids
+        .filter(function (id, i) {
+          return _isUuid(id) && ids.indexOf(id) === i;
+        })
+        .forEach(function (id) {
+          _trackPendingSync(
+            Promise.resolve(
+              _writeRpc('delete_submission', { p_submission_id: id, p_idempotency_key: _newEntryId() }),
+            ).then(function (res) {
+              if (res && !res.error) {
+                var srv = _workServer[cid];
+                if (srv) {
+                  srv.submissions = (srv.submissions || []).filter(function (s) {
+                    return s && s.id !== id;
+                  });
+                }
+              } else if (res && res.error && !res.error.handledSessionExpired) {
+                console.warn('delete_submission failed:', res.error);
+              }
+              _workWriteLanded(cid);
+              _sweepWorkRemovals();
+            }),
+          );
+        });
+      _workChanged(cid);
+      return { result: 'deleted', pages: pages };
+    });
+  });
+}
+
+/* Handed In on Paper for a live class (mark_handed_in_paper): shown at
+   once, sent through the outbox. */
+function _serverMarkOnPaper(cid, aid, sids) {
+  return _teacherWorkQueued(cid, function () {
+    var who = [];
+    (Array.isArray(sids) ? sids : []).forEach(function (sid) {
+      if (typeof sid !== 'string' || who.indexOf(sid) >= 0) return;
+      if (!_teacherWorkInClass(cid, sid, aid) || getStudentSubmission(cid, sid, aid)) return;
+      who.push(sid);
+    });
+    if (!who.length) return { result: 'sent', marked: 0, submissions: [] };
+    _trackPendingSync(
+      Promise.resolve(
+        _writeRpc('mark_handed_in_paper', {
+          p_assessment_id: aid,
+          p_enrollment_ids: who,
+          p_idempotency_key: _newEntryId(),
+        }),
+      ).then(function (res) {
+        var data = res && !res.error ? _rpcObject(res.data) : null;
+        ((data && data.submissions) || []).forEach(function (s) {
+          _workServerTake(cid, s);
+        });
+        if (res && res.error && !res.error.handledSessionExpired)
+          console.warn('mark_handed_in_paper failed:', res.error);
+        _workWriteLanded(cid);
+      }),
+    );
+    _workChanged(cid);
+    return {
+      result: 'sent',
+      marked: who.length,
+      submissions: who.map(function (sid) {
+        return getStudentSubmission(cid, sid, aid);
+      }),
+    };
+  });
+}
+
+/* The edge function's sweep route: the removal worker, once things have
+   settled (two seconds after the last call). Best effort; nothing waits
+   on it and nothing shows if it fails. */
+function _sweepWorkRemovals() {
+  if (_isDemoSession() || typeof fetch !== 'function') return;
+  if (_workSweepTimer) clearTimeout(_workSweepTimer);
+  _workSweepTimer = setTimeout(function () {
+    _workSweepTimer = null;
+    var sb = getSupabase();
+    var base = ((window.__ENV && window.__ENV.SUPABASE_URL) || '').replace(/\/$/, '');
+    if (!sb || !sb.auth || !base) return;
+    Promise.resolve(sb.auth.getSession())
+      .then(function (r) {
+        var token = r && r.data && r.data.session && r.data.session.access_token;
+        if (!token) return null;
+        return fetch(base + '/functions/v1/student-submit?forceFunctionRegion=ca-central-1', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ route: 'sweep', access_token: token }),
+          credentials: 'omit',
+          referrerPolicy: 'no-referrer',
+          cache: 'no-store',
+        });
+      })
+      .then(null, function () {
+        /* the files wait in the removal queue for the next run */
+      });
+  }, 2000);
+}
+
+/* The outbox's word on a work write (_onOutboxEvent): a start that landed
+   after a reload is followed up here; a refused one drops its photos; any
+   refused work write has the class read again. */
+function _onWorkWriteEvent(kind, endpoint, payload, data) {
+  try {
+    if (endpoint === 'start_work_upload' && payload && payload.p_idempotency_key) {
+      if (kind === 'flush:success') _workUploadStarted(payload.p_idempotency_key, data);
+      else _workUploadAbandon(payload.p_idempotency_key);
+    }
+    if (kind !== 'flush:dead-letter') return;
+    var cid =
+      endpoint === 'set_course_send_work'
+        ? payload && payload.p_course_id
+        : _classOfAssessment(payload && payload.p_assessment_id);
+    if (cid) _workWriteLanded(cid);
+    else
+      Object.keys(_workServer).forEach(function (c) {
+        _workWriteLanded(c);
+      });
+  } catch (e) {
+    console.warn('student work: following up a write failed:', e);
+  }
+}
+var _WORK_ENDPOINTS = {
+  set_course_send_work: true,
+  set_assessment_student_work: true,
+  start_work_upload: true,
+  delete_submission: true,
+  mark_handed_in_paper: true,
+};
+
+/* A signed-in page opening: the queue learns how to send, and pages left
+   waiting by an earlier visit go (an upload whose start has no answer
+   waits for the outbox). */
+function _resumeWorkUploads() {
+  if (_isDemoSession() || !_writesEnabled() || !Object.keys(_workUploads()).length) return;
+  var q = _wireWorkQueue();
+  var all = _workUploads();
+  Object.keys(all).forEach(function (k) {
+    if (all[k] && all[k].held) _workRestart(all[k]); // refused after the screen said sent: tried again
+  });
+  if (q && typeof q.send === 'function') q.send();
+}
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('load', function () {
+    setTimeout(_resumeWorkUploads, 0);
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Mark Up and Reflect on Feedback for a signed-in teacher (S9-W1, S10-W1)
+   ══════════════════════════════════════════════════════════════════
+   The same readers and writers as the two Demo Mode blocks below, answered
+   from the server (migrations/2026111120_markup_reflect_revise.sql:
+   save_markup, list_assessment_markup, return_work, set_course_feedback_options,
+   answer_reflection, list_course_feedback). Only for a class the server keeps
+   student-page rows for (_workOnServer, as Send Work's wiring above): any
+   other class is answered exactly as before and sent nothing new. Return
+   for Revision, revisions and group work are not here (Phase 3).
+
+   What is read: list_course_feedback (the class's switches, a line for
+   every marked page, every reflection) when the class loads with Send Work
+   or Reflect on Feedback on, and whenever Send Work's own read runs
+   (refreshStudentWork); and, for each piece with marked pages,
+   list_assessment_markup, when that line changed. Mark Up reads its piece
+   again itself before it draws (loadAssessmentMarkup). Kept in memory only:
+   nothing about a student is stored on the device beyond the outbox's own
+   queued writes, which Sign Out clears.
+
+   What is shown is that answer with this device's writes not yet answered
+   laid over it, so a mark made or an answer sent shows at once and a
+   reload keeps it: the outbox's queued save_markup, return_work and
+   answer_reflection, and set_course_feedback_options.
+
+   Every write goes through the outbox with its own idempotency key. A save
+   or a Return for one student takes that student's cell key
+   (cell:<student>:<piece>, shared/offline-queue.js), so the marks a Return
+   gives are the ones saved before it, and two saves in a row go as one.
+   A page whose id is local (still uploading from the photo queue) has no
+   marks: Mark Up is not offered on it (getPageMarkup answers null).
+
+   Sync problems show on the sync dot only: a refused write is the outbox's
+   own dead letter. Nothing here shows a banner or a toast. */
+var _MARKUP_SAVE_WAIT_MS = 5000; // how long a save waits for the server's answer before the screen goes on
+var _FB_REFRESH_MS = 30000; // refreshCourseFeedback's wait between reads, unless forced
+var _fbCourseRow = {}; // cid → { reflect_on_feedback, show_my_learning }, as the server last said
+var _fbCourseHere = {}; // cid → a change of the two on its way: { patch }
+var _fbServer = {}; // cid → list_course_feedback's answer, as last read
+var _fbRows = {}; // cid → { assessment id → { file id → list_assessment_markup's row } }
+var _fbRead = {}; // cid → { running, again, at }
+var _fbWrites = {}; // cid → how many of this device's feedback writes have landed
+var _fbMemo = {}; // cid → { name → this turn's view }
+var _fbMemoClearing = false;
+var _FB_ENDPOINTS = {
+  set_course_feedback_options: true,
+  save_markup: true,
+  return_work: true,
+  answer_reflection: true,
+};
+
+/* True when class `cid`'s marks and reflections are the server's (a
+   signed-in class with the build switch on). */
+function _fbOn(cid) {
+  return _workOnServer(cid);
+}
+// Demo Mode, or a class the server keeps rows for: where the readers answer.
+function _fbReads(cid) {
+  return !!cid && (_isDemoSession() || _fbOn(cid));
+}
+
+function _fbChanged(cid) {
+  delete _fbMemo[cid];
+}
+function _fbMemoized(cid, name, build) {
+  var held = _fbMemo[cid] || (_fbMemo[cid] = {});
+  if (name in held) return held[name];
+  held[name] = build();
+  if (!_fbMemoClearing) {
+    _fbMemoClearing = true;
+    Promise.resolve().then(function () {
+      _fbMemoClearing = false;
+      _fbMemo = {};
+    });
+  }
+  return held[name];
+}
+
+// The course row's two switches, when the class loads (_applyBundleCourseConfig) or list_course_feedback is read.
+function _noteCourseFeedbackOptions(cid, courseRow) {
+  if (!cid || !_plainObject(courseRow)) return;
+  if (!('reflect_on_feedback' in courseRow) && !('show_my_learning' in courseRow)) return;
+  _fbCourseRow[cid] = {
+    reflect_on_feedback: courseRow.reflect_on_feedback === true,
+    show_my_learning: courseRow.show_my_learning === true,
+  };
+  _fbChanged(cid);
+}
+
+// The two switches as the screens read them: the server's, with this device's unanswered change laid over.
+function _fbCourseOptions(cid) {
+  return _fbMemoized(cid, 'course', function () {
+    var out = Object.assign({ reflect_on_feedback: false, show_my_learning: false }, _fbCourseRow[cid] || {});
+    var lay = function (patch) {
+      if (!_plainObject(patch)) return;
+      ['reflect_on_feedback', 'show_my_learning'].forEach(function (k) {
+        if (typeof patch[k] === 'boolean') out[k] = patch[k];
+      });
+    };
+    _workQueued('set_course_feedback_options', function (p) {
+      return p.p_course_id === cid;
+    }).forEach(function (e) {
+      lay(e.payload.p_patch);
+    });
+    if (_fbCourseHere[cid]) lay(_fbCourseHere[cid].patch);
+    return out;
+  });
+}
+
+/* True when reading the class's feedback is worth a request: Reflect on
+   Feedback is on, or Send Work is (Mark Up lives on it). A class with both
+   off is sent nothing. */
+function _fbWanted(cid) {
+  if (!_fbOn(cid)) return false;
+  if (_fbCourseOptions(cid).reflect_on_feedback) return true;
+  return _workServerView(cid).course.send_work === true;
+}
+
+// This device's unanswered writes among `endpoints`, oldest first.
+function _fbQueuedWrites(endpoints) {
+  var all = [];
+  endpoints.forEach(function (endpoint, order) {
+    _workQueued(endpoint, function () {
+      return true;
+    }).forEach(function (e, i) {
+      all.push({ endpoint: endpoint, payload: e.payload, at: String(e.created_at || ''), order: order, i: i });
+    });
+  });
+  return all.sort(function (x, y) {
+    if (x.at !== y.at) return x.at < y.at ? -1 : 1;
+    return x.order !== y.order ? x.order - y.order : x.i - y.i;
+  });
+}
+
+function _fbMarksEmpty(marks) {
+  return !marks || !Array.isArray(marks.marks) || !marks.marks.length;
+}
+
+/* A page's marks as the screens read them (the shape the Demo block
+   keeps): { rev, marks, saved_at, given, given_rev, given_at, waiting }.
+   waiting: the student would be given a change at the next Return, as
+   list_assessment_markup says it; a page never given whose marks were all
+   erased is not waiting. */
+function _fbWaiting(cid, aid, k) {
+  if (k.rev === k.given_rev) return false;
+  if (k.given == null && _fbMarksEmpty(k.marks)) return false;
+  return getAssessmentStudentWork(cid, aid).students_see_markup !== false;
+}
+
+/* Every marked page of the class by file id, from the server's rows with
+   this device's unanswered saves and Returns laid over them, in the order
+   they were made. */
+function _fbMarkupKept(cid) {
+  return _fbMemoized(cid, 'markup', function () {
+    var out = {};
+    var byAssessment = _fbRows[cid] || {};
+    Object.keys(byAssessment).forEach(function (aid) {
+      Object.keys(byAssessment[aid]).forEach(function (fid) {
+        var r = byAssessment[aid][fid];
+        out[fid] = {
+          aid: aid,
+          sid: r.enrollment_id,
+          rev: r.rev || 0,
+          marks: _studentWorkCopy(r.marks) || { v: 1, marks: [] },
+          saved_at: r.saved_at || null,
+          given: r.given ? _studentWorkCopy(r.given) : null,
+          given_rev: r.given_rev == null ? null : r.given_rev,
+          given_at: r.given_at || null,
+          waiting: r.waiting === true,
+        };
+      });
+    });
+    var held = _markupHeld(cid);
+    _fbQueuedWrites(['save_markup', 'return_work']).forEach(function (w) {
+      var p = w.payload;
+      if (w.endpoint === 'save_markup') {
+        var page = _markupPage(cid, p.p_file_id);
+        if (!page) return;
+        var was = out[p.p_file_id];
+        var rev = (p.p_base_rev != null ? p.p_base_rev : was ? was.rev : 0) + 1;
+        var next = {
+          aid: page.submission.assessment_id,
+          sid: page.submission.enrollment_id,
+          rev: rev,
+          marks: _studentWorkCopy(p.p_marks),
+          saved_at: w.at || null,
+          given: was ? was.given : null,
+          given_rev: was ? was.given_rev : null,
+          given_at: was ? was.given_at : null,
+        };
+        // A class that does not hold grades gives the marks as they are saved.
+        if (!held) {
+          next.given = _studentWorkCopy(p.p_marks);
+          next.given_rev = rev;
+          next.given_at = w.at || null;
+        }
+        next.waiting = _fbWaiting(cid, next.aid, next);
+        out[p.p_file_id] = next;
+        return;
+      }
+      var listed = {};
+      (Array.isArray(p.p_enrollment_ids) ? p.p_enrollment_ids : []).forEach(function (sid) {
+        listed[sid] = true;
+      });
+      Object.keys(out).forEach(function (fid) {
+        var k = out[fid];
+        if (k.aid !== p.p_assessment_id || !listed[k.sid] || !k.waiting) return;
+        k.given = _studentWorkCopy(k.marks);
+        k.given_rev = k.rev;
+        k.given_at = w.at || null;
+        k.waiting = false;
+      });
+    });
+    return out;
+  });
+}
+
+/* ── Reflections ── */
+
+// What the server does with an answer (answer_reflection) on a copy of the reflection: false when there is nothing to answer.
+function _fbApplyAnswer(r, text, onlyMe, at) {
+  var t = String(text).trim();
+  var followUpOpen = r.follow_up != null && r.follow_up_answer == null;
+  if (r.answer == null && onlyMe) {
+    r.note = t;
+    r.noted_at = at;
+  } else if (r.answer == null) {
+    r.answer = t;
+    r.answered_at = at;
+  } else if (followUpOpen && onlyMe) {
+    r.follow_up_note = t;
+    r.follow_up_noted_at = at;
+  } else if (followUpOpen) {
+    r.follow_up_answer = t;
+    r.follow_up_answered_at = at;
+  } else return false;
+  r.waiting =
+    (r.question != null && r.answer == null && (r.noted_at == null || r.noted_at < r.sent_at)) ||
+    (r.follow_up != null && r.follow_up_answer == null && r.follow_up_note == null);
+  return true;
+}
+
+// The class's reflections as the server listed them, with this device's unanswered answers laid over them.
+function _fbReflections(cid) {
+  return _fbMemoized(cid, 'reflections', function () {
+    var list = _studentWorkCopy((_fbServer[cid] || {}).reflections) || [];
+    _fbQueuedWrites(['answer_reflection']).forEach(function (w) {
+      var r = list.find(function (x) {
+        return x && x.id === w.payload.p_reflection_id;
+      });
+      if (r && typeof w.payload.p_answer === 'string') {
+        _fbApplyAnswer(r, w.payload.p_answer, w.payload.p_only_me === true, w.at || new Date().toISOString());
+      }
+    });
+    return list;
+  });
+}
+
+/* ── Reading ── */
+
+// A signature of the marked pages of one piece, from list_course_feedback's lines or list_assessment_markup's rows.
+function _fbSignature(rows) {
+  return rows
+    .map(function (m) {
+      return m.file_id + ':' + m.rev + ':' + m.given_rev;
+    })
+    .sort()
+    .join(',');
+}
+
+function _fbLook(cid) {
+  return JSON.stringify([_fbCourseOptions(cid), _fbMarkupKept(cid), _fbReflections(cid)]);
+}
+
+// list_assessment_markup for one piece: { file id → row }, or null when the read failed.
+async function _fetchAssessmentMarkup(aid) {
+  var res;
+  try {
+    res = await _callRpcWithAuthGuard(
+      'list_assessment_markup',
+      { p_assessment_id: aid },
+      { suppressSessionExpiredModal: true },
+    );
+  } catch (e) {
+    res = { error: e };
+  }
+  var rows = res && !res.error ? _rpcRows(res.data) : null;
+  if (!rows) {
+    if (res && res.error && !res.error.handledSessionExpired) console.warn('list_assessment_markup failed:', res.error);
+    return null;
+  }
+  var out = {};
+  rows.forEach(function (r) {
+    if (r && _isUuid(r.file_id)) out[r.file_id] = r;
+  });
+  return out;
+}
+
+/* Read the class's feedback from the server: the switches, the marked
+   pages, the reflections. Not more than every 30 seconds unless opts.force
+   (a read under way is joined). A Promise of { changed } or { error };
+   never rejects. A screen that changes is redrawn. Nothing for a class that
+   is not live or has Send Work and Reflect on Feedback both off. */
+function refreshCourseFeedback(cid, opts) {
+  if (!_fbWanted(cid)) return Promise.resolve({ changed: false });
+  var st = _fbRead[cid] || (_fbRead[cid] = {});
+  if (st.running) {
+    if (opts && opts.force) st.again = true;
+    return st.running;
+  }
+  if (!(opts && opts.force) && st.at && Date.now() - st.at < _FB_REFRESH_MS) {
+    return Promise.resolve({ changed: false });
+  }
+  st.running = (async function () {
+    var out = { changed: false };
+    try {
+      var tries = 0;
+      do {
+        st.again = false;
+        out = await _fetchCourseFeedback(cid);
+        tries++;
+      } while ((st.again || out.skipped) && tries < 4);
+    } catch (e) {
+      out = { error: e };
+    } finally {
+      st.running = null;
+    }
+    if (out.changed) _invalidateAndRerender();
+    return out;
+  })();
+  return st.running;
+}
+
+async function _fetchCourseFeedback(cid) {
+  var writes = _fbWrites[cid] || 0;
+  var res;
+  try {
+    res = await _callRpcWithAuthGuard(
+      'list_course_feedback',
+      { p_course_id: cid },
+      { suppressSessionExpiredModal: true },
+    );
+  } catch (e) {
+    res = { error: e };
+  }
+  var data = res && !res.error ? _rpcObject(res.data) : null;
+  if (!data || !Array.isArray(data.markup) || !Array.isArray(data.reflections)) {
+    // A read that failed changes nothing: the next one tries again.
+    if (res && res.error && !res.error.handledSessionExpired) console.warn('list_course_feedback failed:', res.error);
+    return { error: (res && res.error) || { message: 'no answer' } };
+  }
+  // The pieces whose marked pages are not what was read before.
+  var lines = {};
+  data.markup.forEach(function (m) {
+    if (m && m.assessment_id) (lines[m.assessment_id] = lines[m.assessment_id] || []).push(m);
+  });
+  var have = _fbRows[cid] || {};
+  var fresh = {};
+  var aids = Object.keys(lines).filter(function (aid) {
+    var held = have[aid]
+      ? _fbSignature(
+          Object.keys(have[aid]).map(function (f) {
+            return have[aid][f];
+          }),
+        )
+      : null;
+    return held !== _fbSignature(lines[aid]);
+  });
+  if (aids.length) {
+    var got = await Promise.all(
+      aids.map(function (aid) {
+        return _fetchAssessmentMarkup(aid);
+      }),
+    );
+    if (
+      got.some(function (g) {
+        return !g;
+      })
+    ) {
+      return { error: { message: 'the marks could not be read' } };
+    }
+    aids.forEach(function (aid, i) {
+      fresh[aid] = got[i];
+    });
+  }
+  if (!_fbOn(cid)) return { changed: false };
+  // One of this device's writes landed while the read was out: it is from before that write.
+  if ((_fbWrites[cid] || 0) !== writes) return { skipped: true };
+  var was = _fbLook(cid);
+  _fbServer[cid] = { markup: data.markup, reflections: data.reflections };
+  if (_plainObject(data.course)) _noteCourseFeedbackOptions(cid, data.course);
+  var rows = {};
+  Object.keys(lines).forEach(function (aid) {
+    rows[aid] = fresh[aid] || have[aid] || {};
+  });
+  _fbRows[cid] = rows;
+  (_fbRead[cid] || (_fbRead[cid] = {})).at = Date.now();
+  _fbChanged(cid);
+  return { changed: was !== _fbLook(cid) };
+}
+
+/* Mark Up's own read of a piece before it draws: every page's marks, both
+   copies, so a page marked on another device shows what is there. A Promise
+   of true when read; false when it could not be (offline: Mark Up goes on
+   from what this device has). Nothing for a class that is not live. */
+function loadAssessmentMarkup(cid, aid) {
+  if (!_fbOn(cid) || !_isUuid(aid)) return Promise.resolve(false);
+  var writes = _fbWrites[cid] || 0;
+  return _fetchAssessmentMarkup(aid).then(function (rows) {
+    if (!rows || !_fbOn(cid)) return false;
+    // A save of this device's landed meanwhile: the read is from before it.
+    if ((_fbWrites[cid] || 0) !== writes) return true;
+    var all = _fbRows[cid] || (_fbRows[cid] = {});
+    if (Object.keys(rows).length) all[aid] = rows;
+    else delete all[aid];
+    _fbChanged(cid);
+    return true;
+  });
+}
+
+/* The class has just loaded from the server with its student page on
+   (_loadServerGradeReturns): its feedback too, when it is wanted and its
+   work is not being read (Send Work off, Reflect on Feedback on). Never
+   waited for, never a failed load. */
+function _loadServerFeedback(cid) {
+  // A class with Send Work on (or not known yet) has it read with its work (refreshStudentWork).
+  var known = _workCourseRow[cid];
+  if (known && known.send_work !== true && _fbWanted(cid)) refreshCourseFeedback(cid, { force: true });
+}
+
+// A write of this device's landed: reads begun before it are dropped, and the class read again soon.
+function _fbWriteLanded(cid) {
+  if (!cid) return;
+  _fbWrites[cid] = (_fbWrites[cid] || 0) + 1;
+  _fbChanged(cid);
+  setTimeout(function () {
+    refreshCourseFeedback(cid, { force: true });
+  }, 0);
+}
+
+/* The class a Mark Up page or a reflection belongs to, from what is in memory. */
+function _fbClassOfFile(fileId) {
+  var found = null;
+  Object.keys(_workServer).some(function (cid) {
+    var subs = (_workServer[cid] && _workServer[cid].submissions) || [];
+    var hit = subs.some(function (s) {
+      return (s.files || []).some(function (f) {
+        return f && f.id === fileId;
+      });
+    });
+    if (hit) found = cid;
+    return hit;
+  });
+  return found;
+}
+function _fbClassOfReflection(id) {
+  return (
+    Object.keys(_fbServer).find(function (cid) {
+      return (_fbServer[cid].reflections || []).some(function (r) {
+        return r && r.id === id;
+      });
+    }) || null
+  );
+}
+
+// Put a page's row into the cache as the server now has it.
+function _fbPutRow(cid, aid, fileId, row) {
+  var all = _fbRows[cid] || (_fbRows[cid] = {});
+  (all[aid] = all[aid] || {})[fileId] = row;
+}
+
+/* The outbox's word on a feedback write (_onOutboxEvent). What landed is
+   put in the cache as the server answered, so the screen does not fall
+   back to what was read before; a refused write has the class read again.
+   Runs from the outbox's own event, so after a reload and in every tab. */
+function _onFeedbackWriteEvent(kind, endpoint, payload, data) {
+  try {
+    payload = payload || {};
+    var cid = null;
+    if (endpoint === 'set_course_feedback_options') cid = payload.p_course_id;
+    else if (endpoint === 'save_markup') cid = _fbClassOfFile(payload.p_file_id);
+    else if (endpoint === 'return_work') cid = _classOfAssessment(payload.p_assessment_id);
+    else if (endpoint === 'answer_reflection') cid = _fbClassOfReflection(payload.p_reflection_id);
+    if (kind !== 'flush:success') {
+      if (cid) _fbWriteLanded(cid);
+      else
+        Object.keys(_fbServer).forEach(function (c) {
+          _fbWriteLanded(c);
+        });
+      return;
+    }
+    if (!cid) return;
+    data = _rpcObject(data) || {};
+    if (endpoint === 'set_course_feedback_options') {
+      _noteCourseFeedbackOptions(cid, data);
+    } else if (endpoint === 'save_markup') {
+      var page = _markupPage(cid, payload.p_file_id);
+      var aid = page && page.submission.assessment_id;
+      if (aid && data.result === 'saved') {
+        var was = (_fbRows[cid] && _fbRows[cid][aid] && _fbRows[cid][aid][payload.p_file_id]) || {};
+        var given = data.given_rev != null && data.given_rev === data.rev;
+        _fbPutRow(cid, aid, payload.p_file_id, {
+          file_id: payload.p_file_id,
+          enrollment_id: page.submission.enrollment_id,
+          rev: data.rev,
+          marks: payload.p_marks,
+          saved_at: new Date().toISOString(),
+          given: given ? payload.p_marks : was.given || null,
+          given_rev: data.given_rev == null ? null : data.given_rev,
+          given_at: given ? new Date().toISOString() : was.given_at || null,
+          waiting: data.waiting === true,
+        });
+      } else if (aid && data.result === 'changed' && _plainObject(data.marks)) {
+        // Another device saved first: its marks are the page's (the teacher's own are not applied).
+        var earlier = (_fbRows[cid] && _fbRows[cid][aid] && _fbRows[cid][aid][payload.p_file_id]) || {};
+        _fbPutRow(cid, aid, payload.p_file_id, {
+          file_id: payload.p_file_id,
+          enrollment_id: page.submission.enrollment_id,
+          rev: data.rev,
+          marks: data.marks,
+          saved_at: earlier.saved_at || null,
+          given: earlier.given || null,
+          given_rev: earlier.given_rev == null ? null : earlier.given_rev,
+          given_at: earlier.given_at || null,
+          waiting: true,
+        });
+        _fbWrites[cid] = (_fbWrites[cid] || 0) + 1;
+        _fbChanged(cid);
+        _invalidateAndRerender();
+        return;
+      }
+    } else if (endpoint === 'return_work') {
+      // Every page of these students on this piece that was waiting is theirs now.
+      var listed = {};
+      (Array.isArray(payload.p_enrollment_ids) ? payload.p_enrollment_ids : []).forEach(function (sid) {
+        listed[sid] = true;
+      });
+      var rows = (_fbRows[cid] || {})[payload.p_assessment_id] || {};
+      Object.keys(rows).forEach(function (fid) {
+        var r = rows[fid];
+        if (!listed[r.enrollment_id] || r.waiting !== true) return;
+        r.given = r.marks;
+        r.given_rev = r.rev;
+        r.given_at = new Date().toISOString();
+        r.waiting = false;
+      });
+    } else if (endpoint === 'answer_reflection') {
+      var list = (_fbServer[cid] && _fbServer[cid].reflections) || [];
+      var at = list.findIndex(function (r) {
+        return r && r.id === payload.p_reflection_id;
+      });
+      if (at >= 0 && _plainObject(data.reflection)) list[at] = data.reflection;
+    }
+    _fbWrites[cid] = (_fbWrites[cid] || 0) + 1;
+    _fbChanged(cid);
+  } catch (e) {
+    console.warn('feedback: following up a write failed:', e);
+  }
+}
+
+/* A save of Mark Up for a live class (saveMarkup). The save goes through
+   the outbox, one at a time for a student's piece and in order. The screen
+   waits for the server's answer a few seconds (it needs the new rev, or
+   to hear that another device saved first); when there is none (offline,
+   slow) it goes on as if saved, and the outbox sends the marks when it
+   can. A save that landed after the screen moved on is put in the cache by
+   _onFeedbackWriteEvent either way. */
+function _saveMarkupLive(cid, fileId, marks, baseRev, key) {
+  var page = _isUuid(fileId) ? _markupPage(cid, fileId) : null;
+  var sub = page && page.submission;
+  if (!sub || !_isUuid(sub.assessment_id) || !_isUuid(sub.enrollment_id))
+    return Promise.resolve({ result: 'not_found' });
+  var before = (_fbMarkupKept(cid)[fileId] || {}).rev || 0;
+  var base = baseRev == null ? null : baseRev;
+  var sent = _writeRpc(
+    'save_markup',
+    {
+      p_file_id: fileId,
+      p_marks: _studentWorkCopy(marks),
+      p_base_rev: base,
+      p_idempotency_key: _isUuid(key) ? key : _newEntryId(),
+    },
+    { key: 'cell:' + sub.enrollment_id + ':' + sub.assessment_id },
+  );
+  if (sent && sent.refused) return Promise.resolve({ result: 'failed' });
+  _fbChanged(cid);
+  _trackPendingSync(Promise.resolve(sent));
+  var late = new Promise(function (resolve) {
+    setTimeout(resolve, _MARKUP_SAVE_WAIT_MS, null);
+  });
+  return Promise.race([Promise.resolve(sent), late]).then(function (res) {
+    if (!res) {
+      // No answer yet: the marks are queued and shown; the rev is the one the save will make.
+      var rev = (base != null ? base : before) + 1;
+      return { result: 'saved', file_id: fileId, rev: rev, given: !_markupHeld(cid) };
+    }
+    var data = res.error ? null : _rpcObject(res.data);
+    if (data && data.result === 'saved') {
+      return {
+        result: 'saved',
+        file_id: fileId,
+        rev: data.rev,
+        given: data.given_rev != null && data.given_rev === data.rev,
+      };
+    }
+    if (data && data.result === 'changed') {
+      return {
+        result: 'changed',
+        file_id: fileId,
+        rev: data.rev || 0,
+        marks: _studentWorkCopy(data.marks) || { v: 1, marks: [] },
+      };
+    }
+    var code = res.error && (res.error.code || res.error.message || '');
+    if (/P0002|page not found/i.test(String(code))) return { result: 'not_found' };
+    return { result: 'failed' };
+  });
+}
+
+/* Return with the marks for a live class (return_work): returnGrades'
+   drafts, each returned with its marks in one call (return_grades is
+   return_work's first step), and, for a student whose grade is already
+   back but whose marks are waiting, a call of its own. One student to a call,
+   each with its own key, so a retry returns nothing twice. Synchronous, as
+   returnGrades is; the marks show as given at once (_fbMarkupKept lays the
+   queued call over them). */
+function _returnWorkLive(cid, aid, ids) {
+  var listed = {};
+  ids.forEach(function (sid) {
+    if (typeof sid === 'string') listed[sid] = true;
+  });
+  var waiting = getAssessmentMarkup(cid, aid).filter(function (r) {
+    return listed[r.enrollment_id] && r.waiting;
+  });
+  var out = Object.assign({}, returnGrades(cid, aid, ids, true), { marks_given: 0, marks_enrollment_ids: [] });
+  waiting.forEach(function (r) {
+    out.marks_given++;
+    if (out.marks_enrollment_ids.indexOf(r.enrollment_id) < 0) out.marks_enrollment_ids.push(r.enrollment_id);
+  });
+  // A student returned above went with their marks. The rest have only marks to give.
+  out.marks_enrollment_ids.forEach(function (sid) {
+    if (out.enrollment_ids.indexOf(sid) >= 0) return;
+    if (!_writesEnabled() || !_isSendableId(aid) || !_isSendableId(sid)) return;
+    var sent = _writeRpc('return_work', {
+      p_assessment_id: aid,
+      p_enrollment_ids: [sid],
+      p_idempotency_key: _newEntryId(),
+    });
+    _fbChanged(cid);
+    _trackPendingSync(Promise.resolve(sent));
+  });
+  return out;
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -17303,11 +19172,11 @@ if (typeof document !== 'undefined' && typeof document.addEventListener === 'fun
    any size. A page's marks: { v: 1, marks: [...] }, 500 marks and 256 KB
    at most. The Eraser removes marks from the list; it is not a mark.
 
-   DEMO MODE ONLY, for now, kept in localStorage under
-   gb-student-feedback-<cid> (field `markup`, by file id). A signed-in
-   class reads no marks, and its writes answer { result: 'not_available' }
-   with no RPC, until S9-W1. Kept out of class backups and Download All My
-   Data, as the photos are. */
+   Demo Mode keeps them in localStorage under gb-student-feedback-<cid>
+   (field `markup`, by file id). A signed-in class's are the server's (the
+   block above, "Mark Up and Reflect on Feedback for a signed-in teacher"):
+   the same readers and writers answer from it. Kept out of class backups
+   and Download All My Data, as the photos are. */
 var MARKUP_MAX_MARKS = 500;
 var MARKUP_MAX_BYTES = 256 * 1024;
 var MARKUP_NOTE_MAX = 500;
@@ -17398,6 +19267,8 @@ function _markupValid(marks) {
    (a page not handed in, unsent, deleted, or of a deleted piece). */
 function _markupPage(cid, fileId) {
   if (!fileId) return null;
+  // A signed-in class's page still uploading has a local id and no marks.
+  if (_fbOn(cid) && !_isUuid(fileId)) return null;
   var subs = _studentWorkSubmissions(cid);
   for (var i = 0; i < subs.length; i++) {
     var files = subs[i].files || [];
@@ -17413,6 +19284,14 @@ function _markupHeld(cid) {
   return typeof GradeState !== 'undefined' && GradeState.holds(getReturnSettings(cid));
 }
 
+/* Every page's marks of the class by file id: Demo Mode's own, or a
+   signed-in class's from the server (_fbMarkupKept). */
+function _markupKeptMap(cid) {
+  if (_fbOn(cid)) return _fbMarkupKept(cid);
+  var stored = _studentFeedbackStored(cid);
+  return stored && _plainObject(stored.markup) ? stored.markup : {};
+}
+
 // list_assessment_markup's row for one page.
 function _markupRow(fileId, enrollmentId, kept) {
   var k = kept || {};
@@ -17426,7 +19305,8 @@ function _markupRow(fileId, enrollmentId, kept) {
     given: k.given ? _studentWorkCopy(k.given) : null,
     given_rev: k.given_rev == null ? null : k.given_rev,
     given_at: k.given_at || null,
-    waiting: rev > 0 && k.given_rev !== rev,
+    // The server's own word on it for a signed-in class (_fbWaiting).
+    waiting: typeof k.waiting === 'boolean' ? k.waiting : rev > 0 && k.given_rev !== rev,
   };
 }
 
@@ -17436,16 +19316,13 @@ function _markupRow(fileId, enrollmentId, kept) {
 function getPageMarkup(cid, fileId) {
   var page = _markupPage(cid, fileId);
   if (!page) return null;
-  var stored = _studentFeedbackStored(cid);
-  var kept = stored && _plainObject(stored.markup) ? stored.markup[fileId] : null;
-  return _markupRow(fileId, page.submission.enrollment_id, kept);
+  return _markupRow(fileId, page.submission.enrollment_id, _markupKeptMap(cid)[fileId] || null);
 }
 
 /* list_assessment_markup: a row for every handed-in page of `aid` that
    has been marked, in the order of the students' work, each page in order. */
 function getAssessmentMarkup(cid, aid) {
-  var stored = _studentFeedbackStored(cid);
-  var kept = stored && _plainObject(stored.markup) ? stored.markup : {};
+  var kept = _markupKeptMap(cid);
   var out = [];
   _studentWorkSubmissions(cid).forEach(function (s) {
     if (s.assessment_id !== aid) return;
@@ -17480,13 +19357,17 @@ function _markupChanged(fileId, kept) {
      nothing written;
    { result: 'invalid' }  marks of the wrong shape, or no key;
    { result: 'not_found' }  the page is not handed in;
-   { result: 'not_available' }  signed in (until S9-W1). */
+   { result: 'failed' }  signed in: the save could not be queued or the
+     server refused it;
+   { result: 'not_available' }  a class that keeps no student-page rows.
+   Signed in it is save_markup through the outbox (_saveMarkupLive). */
 function saveMarkup(cid, fileId, marks, baseRev, key) {
-  if (!cid || !_isDemoSession()) return Promise.resolve({ result: 'not_available' });
+  if (!cid || !(_isDemoSession() || _fbOn(cid))) return Promise.resolve({ result: 'not_available' });
   if (!_markupValid(marks) || !_idemKeyOk(key)) return Promise.resolve({ result: 'invalid' });
   if (baseRev != null && !(typeof baseRev === 'number' && baseRev >= 0 && Math.floor(baseRev) === baseRev)) {
     return Promise.resolve({ result: 'invalid' });
   }
+  if (!_isDemoSession()) return _saveMarkupLive(cid, fileId, marks, baseRev, key);
   var again = _feedbackRemembered(cid, 'markup-save', key);
   if (again !== undefined) return Promise.resolve(again);
   if (!_markupPage(cid, fileId)) return Promise.resolve({ result: 'not_found' });
@@ -17542,10 +19423,11 @@ function _teacherMarksOnWork(cid, sid, aid, submissionId) {
    `aid`. Use it in place of returnGrades wherever Mark Up can be on screen.
    Synchronous, as returnGrades is. Answers returnGrades' { returned,
    enrollment_ids, returned_at } plus marks_given (pages) and
-   marks_enrollment_ids. Signed in it is returnGrades alone, with no marks
-   given (until S9-W1). */
+   marks_enrollment_ids. Signed in it is return_work: each student's grade
+   and marks in one call (_returnWorkLive). */
 function returnWork(cid, aid, studentIds) {
   var ids = Array.isArray(studentIds) ? studentIds : studentIds ? [studentIds] : [];
+  if (!_isDemoSession() && _fbOn(cid)) return _returnWorkLive(cid, aid, ids);
   var out = Object.assign({}, returnGrades(cid, aid, ids), { marks_given: 0, marks_enrollment_ids: [] });
   // Signed in there are no marks to give (getAssessmentMarkup reads none).
   var listed = {};
@@ -17578,8 +19460,7 @@ function _studentMarkupFiles(cid, sid, aid) {
   if (getAssessmentStudentWork(cid, aid).students_see_markup === false) return [];
   var status = getAssignmentStatus(cid, sid, aid);
   if (status === 'NS' || status === 'EXC') return [];
-  var stored = _studentFeedbackStored(cid);
-  var kept = stored && _plainObject(stored.markup) ? stored.markup : {};
+  var kept = _markupKeptMap(cid);
   var out = [];
   _studentWorkSubmissions(cid).forEach(function (s) {
     if (s.assessment_id !== aid || s.enrollment_id !== sid) return;
@@ -17594,18 +19475,18 @@ function _studentMarkupFiles(cid, sid, aid) {
 /* What the student sees on their pages of `aid` (the student's
    markup(...)): { ok: true, files: [{ file_id, marks, given_at }] }, the
    given copy only. { ok: false, error: 'not_found' } for a piece not in
-   the class. Signed in: { ok: true, files: [] } for now. */
+   the class. A class that keeps no student-page rows: { ok: true, files: [] }. */
 function getStudentMarkup(cid, sid, aid) {
-  if (!cid || !_isDemoSession()) return { ok: true, files: [] };
+  if (!_fbReads(cid)) return { ok: true, files: [] };
   var files = _studentMarkupFiles(cid, sid, aid);
   return files ? { ok: true, files: files } : { ok: false, error: 'not_found' };
 }
 
 /* "3 notes on your work": feedback(...).marks for one student and piece,
    { pages, notes } over the given marks the student sees, or null when
-   there are none (not yet returned with marks, hidden, or signed in). */
+   there are none (not yet returned with marks, hidden). */
 function getStudentMarkCounts(cid, sid, aid) {
-  if (!cid || !_isDemoSession()) return null;
+  if (!_fbReads(cid)) return null;
   var files = (_studentMarkupFiles(cid, sid, aid) || []).filter(function (f) {
     return f.marks && Array.isArray(f.marks.marks) && f.marks.marks.length > 0;
   });
@@ -17671,22 +19552,35 @@ function saveDemoMarkup(cid, pages) {
    made in one function here (_reflectionRow, _studentReflection,
    _courseFeedbackOptions), so S10-W1 changes one place.
 
-   DEMO MODE ONLY, for now, in gb-student-feedback-<cid> (field
-   `reflections`, by assessment then student). Signed in, the readers show
-   none and the writers answer { result: 'not_available' } (the student's,
-   { ok: false, error: 'not_available' }) with no RPC, until S10-W1. */
+   Demo Mode keeps them in gb-student-feedback-<cid> (field `reflections`,
+   by assessment then student). A signed-in class's are the server's (the
+   block above): the teacher's readers and Send Answer answer from it. The
+   student's own writers here (sendStudentReflection, sendStudentReply) are
+   Demo Mode's: a real student sends through the student-submit routes and
+   they answer { ok: false, error: 'not_available' } signed in. */
 var REFLECTION_TEXT_MAX = 1000;
 var ANSWER_TEXT_MAX = 2000;
 
 function _courseFeedbackOptions(cid) {
+  if (_fbOn(cid) && !_isDemoSession()) return Object.assign({}, _fbCourseOptions(cid));
   var cfg = getCourseConfig(cid) || {};
   return { reflect_on_feedback: cfg.reflect_on_feedback === true, show_my_learning: cfg.show_my_learning === true };
 }
 
-/* True when the class's reflections show: Demo Mode, the build switch and
-   Reflect on Feedback on. */
+/* The class's two switches, { reflect_on_feedback, show_my_learning }, as
+   the screens read them: Demo Mode's settings, or a signed-in class's
+   from the server (with a change not yet answered laid over it). Both off
+   for a class that keeps no student-page rows. */
+function getCourseFeedbackOptions(cid) {
+  if (!_fbReads(cid)) return { reflect_on_feedback: false, show_my_learning: false };
+  return _courseFeedbackOptions(cid);
+}
+
+/* True when the class's reflections show: Demo Mode or a signed-in class
+   the server keeps rows for, the build switch and Reflect on Feedback on. */
 function getReflectOnFeedback(cid) {
-  if (!cid || !_isDemoSession()) return false;
+  if (!_fbReads(cid)) return false;
+  if (!_isDemoSession()) return _courseFeedbackOptions(cid).reflect_on_feedback;
   return !!getReturnSettings(cid).student_page && _courseFeedbackOptions(cid).reflect_on_feedback;
 }
 
@@ -17694,9 +19588,12 @@ function getReflectOnFeedback(cid) {
    set_course_feedback_options. `patch` names either or both, true or
    false; only what it names is written. A Promise of { reflect_on_feedback,
    show_my_learning } as saved, or { result: 'invalid' } (a wrong patch or no
-   key), or signed in { result: 'not_available' }. */
+   key), { result: 'failed' } (signed in: the server refused it), or
+   { result: 'not_available' } (a class that keeps no student-page rows).
+   Signed in it is set_course_feedback_options through the outbox, and shows
+   at once. */
 function setCourseFeedbackOptions(cid, patch, key) {
-  if (!cid || !_isDemoSession()) return Promise.resolve({ result: 'not_available' });
+  if (!cid || !_fbReads(cid)) return Promise.resolve({ result: 'not_available' });
   if (!_plainObject(patch) || !_idemKeyOk(key)) return Promise.resolve({ result: 'invalid' });
   var names = Object.keys(patch);
   var ok =
@@ -17705,8 +19602,34 @@ function setCourseFeedbackOptions(cid, patch, key) {
       return (k === 'reflect_on_feedback' || k === 'show_my_learning') && typeof patch[k] === 'boolean';
     });
   if (!ok) return Promise.resolve({ result: 'invalid' });
+  if (!_isDemoSession()) return _setCourseFeedbackLive(cid, patch, key);
   saveCourseConfig(cid, Object.assign({}, getCourseConfig(cid) || {}, patch));
   return Promise.resolve(_courseFeedbackOptions(cid));
+}
+
+// set_course_feedback_options for a live class: shown at once, sent through the outbox, as Send Work's two switches are.
+function _setCourseFeedbackLive(cid, patch, key) {
+  var mine = { patch: Object.assign({}, (_fbCourseHere[cid] || {}).patch, patch) };
+  _fbCourseHere[cid] = mine;
+  _fbChanged(cid);
+  var sent = _writeRpc('set_course_feedback_options', {
+    p_course_id: cid,
+    p_patch: Object.assign({}, patch),
+    p_idempotency_key: _isUuid(key) ? key : _newEntryId(),
+  });
+  var done = Promise.resolve(sent).then(function (res) {
+    var still = _fbCourseHere[cid] === mine;
+    if (still) delete _fbCourseHere[cid];
+    var data = res && !res.error ? _rpcObject(res.data) : null;
+    if (data && still) _noteCourseFeedbackOptions(cid, data);
+    if (res && res.error && !res.error.handledSessionExpired && !res.error.refused) {
+      console.warn('set_course_feedback_options failed:', res.error);
+    }
+    _fbWriteLanded(cid);
+    return data ? _courseFeedbackOptions(cid) : { result: 'failed' };
+  });
+  _trackPendingSync(done);
+  return done;
 }
 
 // A non-blank string of at most `max` characters, or null when blank or missing.
@@ -17730,6 +19653,13 @@ function _reflectionsOf(stored) {
 }
 
 function _reflectionKept(cid, sid, aid) {
+  if (_fbOn(cid) && !_isDemoSession()) {
+    return (
+      _fbReflections(cid).find(function (r) {
+        return r && r.assessment_id === aid && r.enrollment_id === sid;
+      }) || null
+    );
+  }
   var of = _reflectionsOf(_studentFeedbackStored(cid))[aid];
   return (of && of[sid]) || null;
 }
@@ -17758,7 +19688,8 @@ function _reflectionRow(r) {
     follow_up: r.follow_up || null,
     follow_up_answer: r.follow_up_answer || null,
     follow_up_answered_at: r.follow_up_answered_at || null,
-    waiting: _reflectionWaiting(r),
+    // The server's own word on it for a signed-in class (it counts a note kept Only Me).
+    waiting: typeof r.waiting === 'boolean' ? r.waiting : _reflectionWaiting(r),
   };
 }
 
@@ -17783,19 +19714,30 @@ function _studentReflection(r) {
    in the class, oldest first. [] while Reflect on Feedback is off. */
 function _classReflections(cid) {
   if (!getReflectOnFeedback(cid)) return [];
-  var all = _reflectionsOf(_studentFeedbackStored(cid));
   var students = {};
   (getStudents(cid) || []).forEach(function (s) {
     if (s && s.id) students[s.id] = true;
   });
   var out = [];
-  (getAssessments(cid) || []).forEach(function (a) {
-    var of = a && all[a.id];
-    if (!_plainObject(of)) return;
-    Object.keys(of).forEach(function (sid) {
-      if (students[sid] && of[sid]) out.push(of[sid]);
+  if (!_isDemoSession()) {
+    // The server's list, on a piece and a student still in the class.
+    var pieces = {};
+    (getAssessments(cid) || []).forEach(function (a) {
+      if (a && a.id) pieces[a.id] = true;
     });
-  });
+    out = _fbReflections(cid).filter(function (r) {
+      return r && pieces[r.assessment_id] && students[r.enrollment_id];
+    });
+  } else {
+    var all = _reflectionsOf(_studentFeedbackStored(cid));
+    (getAssessments(cid) || []).forEach(function (a) {
+      var of = a && all[a.id];
+      if (!_plainObject(of)) return;
+      Object.keys(of).forEach(function (sid) {
+        if (students[sid] && of[sid]) out.push(of[sid]);
+      });
+    });
+  }
   return out.sort(function (x, y) {
     return String(x.sent_at) < String(y.sent_at) ? -1 : String(x.sent_at) > String(y.sent_at) ? 1 : 0;
   });
@@ -17807,9 +19749,10 @@ function _classReflections(cid) {
    revision request of the class as _revisionRow, oldest first, [] while
    revisionsOn is false (S11);
    reflections: as _reflectionRow, [] while Reflect on Feedback is off.
-   Signed in: everything empty and both switches off. */
+   A class that keeps no student-page rows: everything empty and both
+   switches off. */
 function getCourseFeedback(cid) {
-  var demo = !!cid && _isDemoSession();
+  var demo = _fbReads(cid);
   var markup = [];
   if (demo) {
     (getAssessments(cid) || []).forEach(function (a) {
@@ -17891,13 +19834,17 @@ function getStudentLastPlan(cid, sid) {
    (or, with none, the reflection), then the follow-up. `answer` 1 to 2000
    characters. A Promise of { result: 'answered', reflection } (as
    _reflectionRow), { result: 'already_answered' }, { result: 'not_found' },
-   { result: 'invalid' } (no answer, too long, or no key), or signed in
-   { result: 'not_available' }. The same key again answers the same. */
+   { result: 'invalid' } (no answer, too long, or no key), { result:
+   'failed' } (signed in: the server refused it), or { result:
+   'not_available' } (a class that keeps no student-page rows). The same key
+   again answers the same. Signed in it is answer_reflection through the
+   outbox (_answerReflectionLive). */
 function answerReflection(cid, reflectionId, answer, key) {
-  if (!cid || !_isDemoSession()) return Promise.resolve({ result: 'not_available' });
+  if (!cid || !_fbReads(cid)) return Promise.resolve({ result: 'not_available' });
   if (typeof answer !== 'string' || !answer.trim() || answer.length > ANSWER_TEXT_MAX || !_idemKeyOk(key)) {
     return Promise.resolve({ result: 'invalid' });
   }
+  if (!_isDemoSession()) return _answerReflectionLive(cid, reflectionId, answer, key);
   var again = _feedbackRemembered(cid, 'reflection-answer', key);
   if (again !== undefined) return Promise.resolve(again);
   var found = _classReflections(cid).find(function (r) {
@@ -17920,6 +19867,47 @@ function answerReflection(cid, reflectionId, answer, key) {
   _feedbackRemember(draft, 'reflection-answer', key, out);
   _studentFeedbackWrite(cid, draft);
   return Promise.resolve(out);
+}
+
+/* Send Answer for a live class: shown at once (the queued answer is laid
+   over the list), sent through the outbox under its own key. The screen
+   waits for the server's answer a few seconds and goes on as if sent when
+   there is none (offline). */
+function _answerReflectionLive(cid, reflectionId, answer, key) {
+  var found = _isUuid(reflectionId)
+    ? _classReflections(cid).find(function (r) {
+        return r.id === reflectionId;
+      })
+    : null;
+  if (!found) return Promise.resolve({ result: 'not_found' });
+  var test = _studentWorkCopy(found);
+  var now = new Date().toISOString();
+  if (!_fbApplyAnswer(test, answer, false, now)) {
+    return Promise.resolve({ result: 'already_answered', reflection: _reflectionRow(found) });
+  }
+  var sent = _writeRpc('answer_reflection', {
+    p_reflection_id: reflectionId,
+    p_answer: answer.trim(),
+    p_idempotency_key: _isUuid(key) ? key : _newEntryId(),
+    p_only_me: false,
+  });
+  if (sent && sent.refused) return Promise.resolve({ result: 'failed' });
+  _fbChanged(cid);
+  _trackPendingSync(Promise.resolve(sent));
+  var late = new Promise(function (resolve) {
+    setTimeout(resolve, _MARKUP_SAVE_WAIT_MS, null);
+  });
+  return Promise.race([Promise.resolve(sent), late]).then(function (res) {
+    if (!res) return { result: 'answered', reflection: _reflectionRow(test) };
+    var data = res.error ? null : _rpcObject(res.data);
+    if (data && (data.result === 'answered' || data.result === 'already_answered') && _plainObject(data.reflection)) {
+      return { result: data.result, reflection: _reflectionRow(data.reflection) };
+    }
+    if (res.error && /P0002|not found/i.test(String(res.error.code || res.error.message || ''))) {
+      return { result: 'not_found' };
+    }
+    return { result: 'failed' };
+  });
 }
 
 /* The student `from` (the one signed in on the page) acting on their own
@@ -18017,7 +20005,7 @@ function sendStudentReply(cid, sid, aid, reply, from) {
    last_plan only while Reflect on Feedback is on; revisions only while
    revisionsOn. Signed in: the switches off and nothing listed. */
 function getStudentFeedback(cid, sid) {
-  var demo = !!cid && _isDemoSession();
+  var demo = _fbReads(cid);
   var on = getReflectOnFeedback(cid);
   var out = {
     ok: true,
@@ -19008,6 +20996,15 @@ window.GB = {
   studentWorkGradingStarted,
   studentWorkPageUrl,
   saveDemoStudentWork,
+  studentWorkLive,
+  refreshStudentWork,
+  refreshCourseFeedback,
+  loadAssessmentMarkup,
+  getCourseFeedbackOptions,
+  readStudentWorkForDelete,
+  retryHeldStudentWork,
+  setCourseSendWork,
+  saveAssessmentStudentWork,
   addStudentWorkPages,
   replaceStudentWorkPages,
   markStudentWorkOnPaper,

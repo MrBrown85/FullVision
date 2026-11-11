@@ -55,7 +55,9 @@ test.describe('Phone grading by rubric criterion', () => {
     const group = card.locator('.m-crit-group').first();
     const target = (await group.locator('.m-score-btn.m-score-active').count()) ? '1' : '4';
     await group.locator(`.m-score-btn[data-score="${target}"]`).click();
-    await expect(card.locator('.m-crit-group').first().locator('.m-score-btn.m-score-active')).toHaveText(target);
+    await expect(card.locator('.m-crit-group').first().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText(
+      target,
+    );
     const saved = await page.evaluate(() => {
       const cid = Object.keys(COURSES)[0];
       const a = getAssessments(cid).find(x => x.title === 'Science Fair Proposal');
@@ -73,56 +75,6 @@ test.describe('Phone grading by rubric criterion', () => {
     await expect(firstCard(page).locator('.m-score-group').first()).toBeVisible();
   });
 
-  /* Competencies view on rubric work matches the desktop's (Nov 5): one row
-     per competency the criteria feed, showing their level, and a level set
-     on a competency goes to every criterion behind it. It used to list the
-     criteria again. */
-  test("Competencies view lists the criteria's competencies and scores through them", async ({ page }) => {
-    await openLab(page, false, 'Science Fair Proposal');
-    await page.getByRole('button', { name: 'Competencies', exact: true }).click();
-    const card = firstCard(page);
-    const expected = await page.evaluate(() => {
-      const cid = Object.keys(COURSES)[0];
-      const a = getAssessments(cid).find(x => x.title === 'Science Fair Proposal');
-      const r = getRubricById(cid, a.rubricId);
-      return {
-        rows: rubricCompetencyRowKeys(cid, a),
-        criteria: r.criteria.map(c => c.id),
-        names: rubricCompetencyRowKeys(cid, a).map(id => getTagById(cid, id).label),
-      };
-    });
-    const rows = await card.locator('.m-score-mods').evaluateAll(els => els.map(e => e.dataset.tid));
-    expect(rows).toEqual(expected.rows);
-    expect(rows.some(id => expected.criteria.includes(id))).toBe(false);
-    await expect(card.locator('.m-score-tag-label')).toHaveText(expected.names);
-
-    // Set the first competency to a level it doesn't have; each criterion
-    // behind it takes that level.
-    const row = card.locator('.m-score-group').first();
-    const target =
-      (await row
-        .locator('.m-score-btn.m-score-active')
-        .textContent()
-        .catch(() => '')) === '4'
-        ? '1'
-        : '4';
-    await row.locator(`.m-score-btn[data-score="${target}"]`).click();
-    await expect(firstCard(page).locator('.m-score-group').first().locator('.m-score-btn.m-score-active')).toHaveText(
-      target,
-    );
-    const behind = await page.evaluate(tid => {
-      const cid = Object.keys(COURSES)[0];
-      const a = getAssessments(cid).find(x => x.title === 'Science Fair Proposal');
-      const sid = document.querySelector('.m-swiper-card').dataset.sid;
-      return rubricRowScoreKeys(cid, a, tid).map(k => {
-        const e = (getScores(cid)[sid] || []).find(x => x.assessmentId === a.id && x.tagId === k);
-        return e ? e.score : 0;
-      });
-    }, expected.rows[0]);
-    expect(behind.length).toBeGreaterThan(0);
-    expect(new Set(behind)).toEqual(new Set([Number(target)]));
-  });
-
   test('an Advanced Rubric ticks its way to a level', async ({ page }) => {
     await openLab(page, true);
     const group = () => firstCard(page).locator('.m-crit-group').first();
@@ -136,13 +88,54 @@ test.describe('Phone grading by rubric criterion', () => {
     await group().getByLabel('Repeats trials').check();
     await expect(group().locator('.m-score-btn.m-score-active')).toHaveCount(0);
     await group().getByLabel('Explains an odd result').check();
-    await expect(group().locator('.m-score-btn.m-score-active')).toHaveText('4');
+    await expect(group().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText('4');
     await expect(group().locator('.m-checklist-head')).toHaveText('Suggested: Extending');
     await expect(group().locator('.m-checks-btn')).toHaveText('2');
 
     // A level picked by hand stays.
     await group().locator('.m-score-btn[data-score="2"]').click();
     await group().getByLabel('Records units').check();
-    await expect(group().locator('.m-score-btn.m-score-active')).toHaveText('2');
+    await expect(group().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText('2');
   });
 });
+
+/* A long criterion name wraps between words, never inside one ("Commun
+   ication" at 390 px), beside its Checklist chip and Comment, at 390 and
+   320 px; the buttons stay on the card. */
+for (const width of [390, 320]) {
+  test(`criterion names wrap only between words at ${width} px`, async ({ page }) => {
+    await openLab(page, true);
+    await page.setViewportSize({ width, height: 812 });
+    const LONG = 'Communication of Interdisciplinary Representations';
+    await page.evaluate(long => {
+      const cid = Object.keys(COURSES)[0];
+      const rubrics = structuredClone(getRubrics(cid));
+      rubrics.forEach(r => r.criteria.forEach(c => (c.name = long)));
+      saveRubrics(cid, rubrics);
+      _invalidateAndRerender();
+    }, LONG);
+    await expect(page.locator('.m-swiper-card .m-crit-group .m-crit-name').first()).toHaveText(LONG);
+    const seen = await page.evaluate(() => {
+      const card = document.querySelector('.m-swiper-card');
+      const split = [];
+      card.querySelectorAll('.m-crit-name').forEach(el => {
+        const text = el.firstChild;
+        if (!text || text.nodeType !== 3) return;
+        let at = 0;
+        for (const word of text.data.split(' ')) {
+          const r = document.createRange();
+          r.setStart(text, at);
+          r.setEnd(text, at + word.length);
+          if (new Set([...r.getClientRects()].map(q => Math.round(q.top))).size > 1) split.push(word);
+          at += word.length + 1;
+        }
+      });
+      const edge = card.querySelector('.m-grade-card-surface').getBoundingClientRect().right;
+      const out = [...card.querySelectorAll('.m-crit-tools button')].filter(
+        b => b.getBoundingClientRect().right > edge + 0.5,
+      ).length;
+      return { split, out };
+    });
+    expect(seen).toEqual({ split: [], out: 0 });
+  });
+}

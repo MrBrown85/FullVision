@@ -2,13 +2,11 @@ import { test, expect } from '@playwright/test';
 import { catchPrints, heldAnywhere, sheets } from './student-card-fake.js';
 import { notAdded } from '../tests/helpers/kept-secret.js';
 
-// S0-W1 and S3-W1: the student page's build switch and the Student Cards
-// list in Class Settings › Student Page, in Demo Mode.
+// S0-W1 and S3-W1: the Student Cards list in Class Settings › Student Page,
+// in Demo Mode. (The build switch is pinned in
+// tests/cm-student-page-build-switch.test.js.)
 //
-// The switch is offered nowhere in the app. It shows only when the app was
-// opened at an address that carries ?build=student-page: a Student Page
-// switch in a card of its own. Turning it off with grades waiting asks
-// first. With the student page on, Student Cards lists each student's card
+// With the student page on, Student Cards lists each student's card
 // with no code, and Make and Print makes the cards and prints them eight to
 // a page on the sheet the questionnaire slips use.
 
@@ -48,9 +46,6 @@ async function demo(page) {
   });
 }
 
-const tabs = page => page.locator('.cm-tabs [role="tab"]');
-const theSwitch = page => page.getByRole('switch', { name: 'Student Page' });
-
 // Print with the dialog held shut: what is on the sheet while it would be open.
 async function printed(page, press) {
   await page.evaluate(() => {
@@ -73,100 +68,6 @@ async function printed(page, press) {
   await page.waitForFunction(() => !!window.__sheet);
   return page.evaluate(() => window.__sheet);
 }
-
-test('the build switch shows only at the build address, and turning it off asks first', async ({ page }) => {
-  const errors = [];
-  page.on('pageerror', e => errors.push(String(e)));
-  page.on('console', m => {
-    if (m.type() === 'error') errors.push(m.text());
-  });
-  const at = await demo(page);
-
-  // The app as every teacher opens it: no Student Page tab, and no switch on any tab.
-  await page.goto('/dashboard?manage=student-page');
-  await expect(tabs(page)).toHaveCount(6);
-  await expect(page.getByRole('tab', { name: 'Student Page' })).toHaveCount(0);
-  await expect(page.locator('#sp-build-switch')).toHaveCount(0);
-  for (const name of [/^Details/, /^Students/, /^Questionnaires/, /^Grading/, /^Reporting Terms/, /^Competencies/]) {
-    await page.getByRole('tab', { name }).click();
-    await expect(page.locator('#sp-build-switch')).toHaveCount(0);
-    await expect(page.locator('.sp-build')).toHaveCount(0);
-  }
-
-  // At the build address the tab is there, with the switch alone on it, off.
-  await page.goto('/dashboard?manage=student-page&build=student-page');
-  await expect(page.getByRole('tab', { name: 'Student Page' })).toHaveAttribute('aria-selected', 'true');
-  await expect(tabs(page)).toHaveCount(7);
-  await expect(theSwitch(page)).not.toBeChecked();
-  await expect(page.locator('.sp-build')).toContainText(
-    'Off for this class. Still being built: turn it on only for a class you are testing with.',
-  );
-  await expect(page.locator('.sp-card')).toHaveCount(0);
-  await expect(page.locator('.sc-card')).toHaveCount(0);
-  expect(await page.evaluate(cid => getReturnSettings(cid).student_page, at.cid)).toBe(false);
-
-  // On: Return Grades and Student Cards appear under it.
-  await page.locator('.sp-build .gpd-switch').click();
-  await expect(theSwitch(page)).toBeChecked();
-  await expect(page.locator('.sp-build')).toContainText(
-    'On for this class: grades are Draft or Returned, and students can have cards. Still being built.',
-  );
-  const group = page.getByRole('radiogroup', { name: 'Return Grades' });
-  await expect(group).toBeVisible();
-  await expect(page.locator('.sc-card').getByRole('heading', { name: 'Student Cards' })).toBeVisible();
-  expect(await page.evaluate(cid => getReturnSettings(cid), at.cid)).toEqual({
-    student_page: true,
-    return_grades: null,
-  });
-  // No choice made yet; the teacher picks When I Return Them.
-  await expect(page.locator('#sp-return-unset')).toBeVisible();
-  await group.getByRole('radio', { name: 'When I Return Them' }).click();
-  await expect(group.getByRole('radio', { name: 'When I Return Them' })).toBeChecked();
-
-  // A reload at the plain address: the tab stays (the page is on), the switch is not offered.
-  await page.goto('/dashboard?manage=student-page');
-  await expect(page.getByRole('tab', { name: 'Student Page' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('#sp-build-switch')).toHaveCount(0);
-  await expect(page.getByRole('radiogroup', { name: 'Return Grades' })).toBeVisible();
-
-  // A grade waits as a draft.
-  await page.evaluate(a => Grader.setLevel(a.cid, a.sid, 'e2e-cards', a.tag, 3, 0), at);
-  expect(await page.evaluate(cid => GradeState.draftsWaiting(cid), at.cid)).toBe(1);
-
-  // Turning the page off asks first, in the words Return Grades uses.
-  await page.goto('/dashboard?manage=student-page&build=student-page');
-  await expect(theSwitch(page)).toBeChecked();
-  await page.locator('.sp-build .gpd-switch').click();
-  const ask = page.getByRole('dialog', { name: 'Return 1 Grade Now?' });
-  await expect(ask).toBeVisible();
-  await expect(ask.locator('.confirm-message')).toHaveText(
-    '1 grade is waiting as a draft. Changing this returns it to the student now.',
-  );
-  await expect(ask.getByRole('button')).toHaveText(['Cancel', 'Return and Change']);
-  // Cancel: still on, still a draft.
-  await ask.getByRole('button', { name: 'Cancel' }).click();
-  await expect(ask).toHaveCount(0);
-  await expect(theSwitch(page)).toBeChecked();
-  expect(await page.evaluate(cid => GradeState.draftsWaiting(cid), at.cid)).toBe(1);
-  expect(await page.evaluate(cid => getReturnSettings(cid).student_page, at.cid)).toBe(true);
-
-  // Return and Change: the grade is returned and the page is off.
-  await page.locator('.sp-build .gpd-switch').click();
-  await page
-    .getByRole('dialog', { name: 'Return 1 Grade Now?' })
-    .getByRole('button', { name: 'Return and Change' })
-    .click();
-  await expect(theSwitch(page)).not.toBeChecked();
-  await expect(page.locator('.sp-card')).toHaveCount(0);
-  await expect(page.locator('.sc-card')).toHaveCount(0);
-  expect(await page.evaluate(cid => getReturnSettings(cid).student_page, at.cid)).toBe(false);
-  expect(await page.evaluate(a => getGradeReturn(a.cid, a.sid, 'e2e-cards').is_draft, at)).toBe(false);
-
-  // And at the plain address the tab is gone again.
-  await page.goto('/dashboard?manage=student-page');
-  await expect(tabs(page)).toHaveCount(6);
-  expect(errors).toEqual([]);
-});
 
 /* Make and Print in Demo Mode (S3-W1; the card-codes design, sections 4,
    8 and 10): the list shows no code, ever; one press makes every card and
@@ -415,7 +316,7 @@ test('Student Cards: Print New Card, New Codes for This Class, Unlock, with thei
   expect(afterOne.filter(c => c.enrollment_id !== at.ids[0])).toEqual(
     before.filter(c => c.enrollment_id !== at.ids[0]),
   );
-  await expect(card.locator('.sc-which').first()).toHaveText(/^Card 2 · Made /);
+  await expect(card.locator('.sc-which').first()).toHaveText(/^Card 2 · Reissued /);
   await expect(card.locator('.sc-note')).toHaveText(
     '1 card went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
   );
@@ -590,20 +491,22 @@ test('Student Cards: the filters and Cards Work Until', async ({ page }) => {
   await filters.getByRole('radio', { name: /^All/ }).click();
   await expect(card.locator('.sc-name')).toHaveText(at.names);
 
-  // Cards Work Until: the default, a chosen day on every card, and back.
-  const day = card.getByLabel('Cards Work Until');
+  // Cards Work Until: a menu (End of the Course or of the School Year, Pick a Day…), a picked day on every card, and back.
+  const menu = card.getByLabel('Cards Work Until');
   const until = await page.evaluate(cid => getCardsWorkUntil(cid), at.cid);
-  await expect(day).toHaveValue(until.date);
-  await expect(card.locator('#sc-until-hint')).toContainText('A card stops opening after this day.');
-  await day.fill('2027-03-12');
-  await expect(card.locator('[data-action="spCardsWorkUntilDefault"]')).toBeVisible();
+  await expect(menu).toHaveValue('course');
   await expect(card.locator('#sc-until-hint')).toHaveText('A card stops opening after this day.');
-  expect((await savedCards(page, at.cid)).every(c => c.works_until === '2027-03-12')).toBe(true);
+  await menu.selectOption('day');
+  const day = card.getByLabel('Day', { exact: true });
+  await expect(day).toBeFocused();
+  await day.fill('2027-03-12');
+  await expect(card.getByLabel('Cards Work Until')).toHaveValue('day');
+  await expect.poll(async () => (await savedCards(page, at.cid)).every(c => c.works_until === '2027-03-12')).toBe(true);
   await page.reload();
-  await expect(page.locator('.sc-card').getByLabel('Cards Work Until')).toHaveValue('2027-03-12');
-  await page.locator('.sc-card [data-action="spCardsWorkUntilDefault"]').click();
-  await expect(page.locator('.sc-card').getByLabel('Cards Work Until')).toHaveValue(until.date);
-  await expect(page.locator('.sc-card [data-action="spCardsWorkUntilDefault"]')).toHaveCount(0);
+  await expect(page.locator('.sc-card').getByLabel('Day', { exact: true })).toHaveValue('2027-03-12');
+  await page.locator('.sc-card').getByLabel('Cards Work Until').selectOption('course');
+  await expect(page.locator('.sc-card #sc-until-date')).toHaveCount(0);
+  await expect(page.locator('.sc-card').getByLabel('Cards Work Until')).toHaveValue('course');
   expect((await savedCards(page, at.cid)).every(c => c.works_until === until.date)).toBe(true);
 
   await noCodeKept(page, [sheet], keptBefore);

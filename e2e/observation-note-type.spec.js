@@ -153,6 +153,11 @@ for (const scheme of ['light', 'dark']) {
         'Assessment',
       ]);
       await expect(panel.locator('.ev-tl-mark[data-type="note"]').first()).toBeAttached();
+      // A Note is private: its words stay off the screen until Show.
+      await panel.locator('[data-ev-type="note"]').click();
+      const reveal = panel.locator('#ev-list .obs-card-reveal');
+      await expect(reveal.first()).toBeVisible();
+      while ((await reveal.count()) > 0) await reveal.first().click();
       const block = panel.locator('.obs-card', { hasText: 'borrowing the class microscope' }).locator('.obs-type');
       await expect(block).toHaveText('Note');
       await expectSolidNote(block, scheme);

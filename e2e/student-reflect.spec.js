@@ -62,6 +62,13 @@ for (const [where, device] of [
       const plan = page.getByLabel('What will you do next time?');
       await expect(plan).toBeFocused();
       await plan.pressSequentially('label every part before I colour it.');
+      // Send pinned at the bottom; on a Chromebook the teacher's words sit left of the steps (the boards).
+      await expect(page.getByRole('button', { name: 'Send Reflection' })).toBeInViewport();
+      if (where === 'on a Chromebook') {
+        const said = await page.locator('.sp-reflect-said').boundingBox();
+        const step = await page.locator('.sp-reflect-step').first().boundingBox();
+        expect(said.x + said.width).toBeLessThanOrEqual(step.x);
+      }
       await fits(page);
       await named(page);
       await contrast(page);
@@ -89,7 +96,7 @@ for (const [where, device] of [
         .getByRole('radiogroup', { name: 'Does it make sense now?' })
         .getByRole('radio', { name: 'Yes' })
         .click();
-      await expect(page.getByText('Then make your plan for next time.')).toBeVisible();
+      await expect(page.getByText('Your teacher will see that it makes sense now.')).toBeVisible();
       expect(posts).toEqual([]);
       expect(errors).toEqual([]);
     });

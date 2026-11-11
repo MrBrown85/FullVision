@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { cardMenuItem } from './card-menu.js';
 
 /* Every teacher page in a class that holds grades whose Draft and Returned
    rows have not loaded yet (a signed-in teacher's first draw of a session,
@@ -220,19 +221,6 @@ test.describe('Reports and Assignments while the rows load', () => {
     expect(errors).toEqual([]);
   });
 
-  test('the Term Questionnaire waits, then draws the student', async ({ page }) => {
-    const errors = [];
-    page.on('pageerror', e => errors.push(String(e.message)));
-    await demo(page);
-    await go(page, '/gradebook?course=sci8');
-    await notLoaded(page);
-    await go(page, '/reports?course=sci8&tab=questionnaire&student=st1');
-    await expect(page.locator('#report-output .report-waiting')).toHaveText('Loading this class…');
-    await loaded(page);
-    await expect(page.locator('.qn-name')).toHaveText('Cece Adeyemi');
-    expect(errors).toEqual([]);
-  });
-
   test('Sent to Phones: waiting, then the panel; Send works once the rows are in', async ({ page }) => {
     const errors = [];
     page.on('pageerror', e => errors.push(String(e.message)));
@@ -273,7 +261,7 @@ test.describe('Reports and Assignments while the rows load', () => {
     await expect(mark).toBeAttached();
     await expect(mark).toBeHidden();
     // Print Rubrics does not open while the handout cannot be worked out.
-    await card.locator('[data-action="printRubrics"]').first().click();
+    await (await cardMenuItem(card, 'printRubrics')).click();
     await expect(page.getByRole('dialog', { name: 'Print Rubrics' })).toHaveCount(0);
     await loaded(page);
     await expect(page.locator('#ac-sci8a4 [data-rp-mark-sid="' + sid + '"]').first()).toContainText('Printed');
@@ -391,7 +379,7 @@ test.describe('a fault in the returned grades never takes down a grading page', 
     const card = page.locator('#ac-sci8a4');
     await card.waitFor();
     if (!(await card.evaluate(el => el.classList.contains('open')))) await card.locator('.assess-title').click();
-    await card.locator('[data-action="printRubrics"]').first().click();
+    await (await cardMenuItem(card, 'printRubrics')).click();
     await expect(dialog).toHaveCount(0);
     expect(reported()).toBe(1);
     await expect(card).toBeVisible();

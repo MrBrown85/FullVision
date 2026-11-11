@@ -25,7 +25,7 @@
  * sends nothing).
  */
 import './setup.js';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync, readdirSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -383,6 +383,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   tabs.forEach(tab => {
     tab.clear();
     tab.release();
@@ -1922,8 +1923,11 @@ describe('categories: the server’s list is read before the whole list is saved
     const done = await anotherWriteWaits();
     input('cmCatWeightLive', { idx: '0' }, 70);
     input('cmCatWeightLive', { idx: '1' }, 30);
+    // The save waits 200 ms for the other write: the clock is moved, not slept through.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
     act('cmCatSave');
-    await new Promise(r => setTimeout(r, 700));
+    await vi.advanceTimersByTimeAsync(700);
+    vi.useRealTimers();
     await settle();
     expect(navigator.onLine).toBe(true);
     expect(draft().notice).toBe(WAITING);
@@ -1940,8 +1944,10 @@ describe('categories: the server’s list is read before the whole list is saved
   it('a drag while another write from this computer waits: the row goes back, and it does not blame the connection', async () => {
     await openApp();
     const done = await anotherWriteWaits();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
     const moved = DashClassManager.reorderCategory(1, 0);
-    await new Promise(r => setTimeout(r, 700));
+    await vi.advanceTimersByTimeAsync(700);
+    vi.useRealTimers();
     await moved;
     await settle();
     expect(draft().notice).toBe(WAITING_ORDER);

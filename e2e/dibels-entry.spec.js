@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { mockAuth, seedCourse, seedStudents, gotoApp, TEST_COURSE } from './helpers.js';
+import { cardMenuItem } from './card-menu.js';
 
 // A DIBELS 8 benchmark records each window's raw reading scores. The whole
 // class goes in a table; one student goes in the grade editor's card. The
@@ -111,18 +112,14 @@ test.describe('who is offered DIBELS', () => {
     await seedStudents(page);
   });
 
-  for (const [name, tags] of [
-    ['Humanities 8', ['ELA8', 'SS8']],
-    ['Social Studies 8', ['SS8']],
-    ['English Studies 12', ['ES12']],
-  ]) {
-    test(`a ${name} class has the DIBELS card`, async ({ page }) => {
-      await linkCourses(page, tags);
-      await gotoApp(page, '/assignments');
-      await page.locator('[data-action="showNewForm"]').first().click();
-      await expect(dibelsCard(page)).toHaveCount(1);
-    });
-  }
+  // Which classes qualify (SS8, ES12, every ELA course...) is pinned in
+  // tests/dibels-offered.test.js; one class here proves the form follows it.
+  test('a Humanities 8 class has the DIBELS card', async ({ page }) => {
+    await linkCourses(page, ['ELA8', 'SS8']);
+    await gotoApp(page, '/assignments');
+    await page.locator('[data-action="showNewForm"]').first().click();
+    await expect(dibelsCard(page)).toHaveCount(1);
+  });
 
   test('a Science 8 class has no DIBELS card', async ({ page }) => {
     await gotoApp(page, '/assignments');
@@ -141,7 +138,7 @@ test.describe('who is offered DIBELS', () => {
     await gotoApp(page, '/assignments');
     // A closed card shows its buttons on hover.
     await page.locator('#ac-assess-dibels .assess-header').first().hover();
-    await page.locator('#ac-assess-dibels [data-action="editAssess"]').first().click();
+    await (await cardMenuItem(page.locator('#ac-assess-dibels'), 'editAssess')).click();
     await expect(dibelsCard(page)).toHaveAttribute('aria-checked', 'true');
   });
 });

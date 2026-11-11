@@ -80,7 +80,12 @@ describe('All Assignments: N Things Since You Last Looked', () => {
         .sort(),
     );
     expect(words(q(page, '.sp-row-flag'))).toBe('Returned');
-    expect(page.calls.filter(c => c.body.route !== 'seen').map(c => c.body.route)).toEqual(['card', 'verify', 'page']);
+    expect(page.calls.filter(c => c.body.route !== 'seen').map(c => c.body.route)).toEqual([
+      'card',
+      'verify',
+      'page',
+      'work',
+    ]);
   });
 
   it('one thing reads in the singular', async () => {
@@ -134,6 +139,21 @@ describe('a returned grade that was updated', () => {
     // Your Feedback shows it too.
     await page.click('.sp-piece[data-piece="' + WORK.energy + '"] [data-act="feedback"]');
     expect(words(q(page, '.sp-fb-row .sp-was'))).toBe('Was Developing');
+  });
+
+  it('a result-only piece (Complete) says what it was, so Updated says what changed (Demo Mode’s Lab Safety Contract)', async () => {
+    const page = openStudentPage();
+    await page.start('#demo-card');
+    await page.submit('form[data-form="card"]');
+    page.type('#sp-ident', page.T.DEMO.number);
+    await page.click('[data-act="card-yes"]');
+    await page.click('[data-segment="back"]');
+    const p = viewOf(page).work.find(x => x.title === 'Lab Safety Contract');
+    expect(p.updated).toBe(true);
+    expect(p.result).toMatchObject({ kind: 'complete', text: 'Complete', was: 'Incomplete' });
+    const contract = qa(page, '.sp-deck .sp-piece').find(c => c.getAttribute('data-piece') === p.id);
+    expect(words(contract.querySelector('.sp-was'))).toBe('Was Incomplete');
+    expect(words(contract.querySelector('.sp-updated-line'))).toBe('Your result went from Incomplete to Complete.');
   });
 
   it('a level that did not move has no Was; a piece not updated has neither', async () => {

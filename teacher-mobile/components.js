@@ -92,7 +92,9 @@ window.MComponents = (function () {
     opts = opts || {};
     var backdrop = document.getElementById('m-sheet-backdrop');
     var container = document.getElementById('m-sheet-container');
-    var halfClass = opts.half ? ' m-sheet-half' : '';
+    // opts.action: an action sheet, its cards floating over the screen (the
+    // board "Grade Tab, Row Menu"); the content draws its own cards.
+    var halfClass = (opts.half ? ' m-sheet-half' : '') + (opts.action ? ' m-sheet-action' : '');
     // html-safe: every presentSheet caller (tab-observe, tab-grade, tab-students, card-widget-editor, card-widgets commentSheetHtml, shell settings) builds html with MC.esc on its text.
     container.innerHTML =
       '<div class="m-sheet' +
@@ -398,7 +400,99 @@ window.MComponents = (function () {
     }).length;
   }
 
+  /* ── The level buttons and Fine-tune (the board "Phone Speed Grader With
+     Photos") ──────────────────────────────────────────────────────────
+     A criterion's or competency's four levels, each its figure over its
+     word (1 Emerging … 4 Extending; in a Letter class too), in the class's
+     level order; the chosen one carries its + or − ("2+"). Under them,
+     Fine-tune <level>: − Minus and + Plus, greyed out with no level. Every
+     level row of the phone grader is drawn here, the classic grader's and
+     the grader with photos', so they look the same. A level's word is
+     scoreLevelText's and its figure formatScoreLevel's (shared/constants.js).
+     opts: order (levelOrderFor), level (whole, 0 for none), mod, mixed
+     (competencies that disagree: the lowest, outlined, no + or −), action,
+     attrs (the data attributes every button carries; ids are ours). */
+  // html-safe: levels are numbers, words constants, attrs ours
+  function levelButtonsHTML(opts) {
+    var mod = opts.mixed ? 0 : opts.mod;
+    return opts.order
+      .map(function (lv) {
+        var on = opts.level === lv;
+        var fig = on ? formatScoreLevel(lv, mod) : String(lv);
+        return (
+          '<button class="m-score-btn m-level-btn' +
+          (on ? ' m-score-active' : '') +
+          (on && opts.mixed ? ' m-score-mixed' : '') +
+          '" data-action="' +
+          opts.action +
+          '" data-score="' +
+          lv +
+          '"' +
+          opts.attrs +
+          ' aria-label="' +
+          fig +
+          ', ' +
+          scoreLevelText(lv) +
+          '"><span class="m-level-fig">' +
+          fig +
+          '</span><span class="m-level-word">' +
+          scoreLevelText(lv) +
+          '</span></button>'
+        );
+      })
+      .join('');
+  }
+
+  // A row's buttons after a save, without drawing the row again.
+  function paintLevelButtons(btns, level, mod) {
+    btns.forEach(function (btn) {
+      var lv = parseInt(btn.getAttribute('data-score'), 10);
+      var on = level === lv;
+      var fig = on ? formatScoreLevel(lv, mod) : String(lv);
+      btn.classList.toggle('m-score-active', on);
+      btn.classList.remove('m-score-mixed');
+      btn.setAttribute('aria-label', fig + ', ' + scoreLevelText(lv));
+      var f = btn.querySelector('.m-level-fig');
+      if (f) f.textContent = fig;
+    });
+  }
+
+  // "Fine-tune Proficient"; with no level, "Fine-tune <the row's name>".
+  function fineTuneLabel(level, name) {
+    return 'Fine-tune ' + (scoreLevelText(level) || name || 'level');
+  }
+
+  // − Minus and + Plus. 1− and 4+ don't exist, so those are greyed out too.
+  // html-safe: fixed markup; m is -1 or 1 and scoreModSuffix returns '+' or '−'.
+  function fineTuneButtonsHTML(level, mod) {
+    return [-1, 1]
+      .map(function (m) {
+        var allowed = level > 0 && normalizeScoreMod(level, m) === m;
+        var on = allowed && mod === m;
+        return (
+          '<button class="m-mod-btn' +
+          (on ? ' m-mod-active' : '') +
+          '" data-action="m-grade-mod" data-mod="' +
+          m +
+          '" aria-pressed="' +
+          on +
+          '"' +
+          (allowed ? '' : ' disabled') +
+          '><span class="m-mod-sign" aria-hidden="true">' +
+          scoreModSuffix(m) +
+          '</span>' +
+          (m > 0 ? 'Plus' : 'Minus') +
+          '</button>'
+        );
+      })
+      .join('');
+  }
+
   return {
+    levelButtonsHTML: levelButtonsHTML,
+    paintLevelButtons: paintLevelButtons,
+    fineTuneLabel: fineTuneLabel,
+    fineTuneButtonsHTML: fineTuneButtonsHTML,
     scoredAssessmentCount: scoredAssessmentCount,
     ICONS: ICONS,
     avatarColor: avatarColor,

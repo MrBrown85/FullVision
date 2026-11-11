@@ -4,11 +4,10 @@
  * between Send Work and Show My Learning).
  *
  * - Demo Mode first, as Show My Learning (PR 1054): the row is drawn in
- *   Demo Mode only, with the class's build switch on, and written only
+ *   Demo Mode and signed-in classes, with the class's build switch on, and written only
  *   through setCourseFeedbackOptions (shared/data.js, PR 1067), which keeps
  *   courseConfig.reflect_on_feedback and sends nothing in Demo Mode. A
- *   signed-in teacher's class has no row (Batch C is not applied) and
- *   nothing is asked of the server.
+ *   signed-in class has the row once the server keeps its rows (S10-W1).
  * - Off until turned on. Off, none of the reflection screens shows
  *   anything; on, Demo Mode's sample shows Jordan's question and a student
  *   can reflect on returned work.
@@ -122,6 +121,7 @@ describe('Reflect on Feedback in Class Settings › Student Page', () => {
       'Keep Photos Until',
       'Reflect on Feedback',
       'Show My Learning',
+      'Questionnaires and Reports',
     ]);
     expect(doc.querySelector('label[for="sp-reflect-switch"]').textContent).toBe('Reflect on Feedback');
     expect(doc.getElementById('sp-reflect-hint').textContent).toBe(HINT);
@@ -207,10 +207,22 @@ describe('Reflect on Feedback in Class Settings › Student Page', () => {
     expect((getCourseConfig(CID) || {}).reflect_on_feedback).toBeUndefined();
   });
 
-  it('a signed-in teacher’s class has no row and nothing is sent', () => {
+  it('a signed-in class has the row once the server keeps its rows, as the server holds it; any other has none', () => {
     window.isDemoMode = () => false;
     openSettings();
     expect(html()).not.toContain('sp-reflect');
     expect(CmStudentPage.reflectSettings(CID)).toEqual({ offered: false, on: false });
+    const was = { live: globalThis.studentWorkLive, options: globalThis.getCourseFeedbackOptions };
+    globalThis.studentWorkLive = () => true;
+    globalThis.getCourseFeedbackOptions = () => ({ reflect_on_feedback: true, show_my_learning: false });
+    try {
+      openSettings();
+      expect(html()).toContain('sp-reflect');
+      expect(CmStudentPage.reflectSettings(CID)).toEqual({ offered: true, on: true });
+      expect(doc.getElementById('sp-reflect-switch').hasAttribute('checked')).toBe(true);
+    } finally {
+      globalThis.studentWorkLive = was.live;
+      globalThis.getCourseFeedbackOptions = was.options;
+    }
   });
 });

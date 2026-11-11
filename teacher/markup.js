@@ -2,8 +2,10 @@
  *
  * The board "Teacher: Mark Up": the teacher writes on a page of a student's
  * work with Pen, Highlight, Note, Tick, Cross and the Eraser, in red, green
- * or blue, with Undo and Redo, and the notes are listed beside the page
- * (Notes on This Page). It opens from the grader's work pane (Mark Up, on
+ * or blue, with Undo and Redo, on a dark screen with labelled tool chips.
+ * Each note's words sit on the page beside its pin, and the notes are listed
+ * beside the page (Notes on This Page), with who sees the marks and the page
+ * switcher under them. It opens from the grader's work pane (Mark Up, on
  * teacher/page-assignments.js) over everything, on the page that pane shows.
  *
  * Marks are data over the photo; the stored photo never changes. Each change
@@ -14,8 +16,10 @@
  * student. Drawing and hit-testing are shared/markup-draw.js's, which the
  * phone can use too.
  *
- * Demo Mode, behind the build switch and Send Work: the work pane shows only
- * there. Signed in, saveMarkup answers not_available and nothing is kept.
+ * Behind the build switch and Send Work. Demo Mode keeps the marks on the
+ * device; a signed-in class keeps them on the server (save_markup through the
+ * outbox, shared/data.js "Mark Up and Reflect on Feedback for a signed-in
+ * teacher"), and Mark Up reads the piece's marks again before it draws.
  *
  * window.MarkUp: open({ cid, aid, sid, page, turn, onClose }), close(),
  * isOpen().
@@ -139,6 +143,20 @@ window.MarkUp = (function () {
       if (_s === s) _drawLayer();
     });
     _loadPage();
+    // A signed-in class: the piece's marks as the server has them now (another
+    // device may have marked a page). Used only if nothing was drawn meanwhile;
+    // a save on stale marks is answered changed, which the screen already shows.
+    if (typeof studentWorkLive === 'function' && studentWorkLive(s.cid) && typeof loadAssessmentMarkup === 'function') {
+      loadAssessmentMarkup(s.cid, s.aid).then(function (read) {
+        if (!read || _s !== s || s.edited) return;
+        var file = _file(s);
+        var row = file ? getPageMarkup(s.cid, file.id) : null;
+        if (!file || (row ? row.rev : 0) === (s.revs[file.id] || 0)) return;
+        s.revs[file.id] = row ? row.rev : 0;
+        s.hist = D.history(row ? row.marks : D.empty());
+        _draw();
+      });
+    }
     var pen = overlay.querySelector('[data-mk-tool="pen"]');
     if (pen) pen.focus({ preventScroll: true });
     return true;
@@ -262,16 +280,14 @@ window.MarkUp = (function () {
       '<aside class="markup-side" aria-label="Notes on This Page">' +
       '<h3 class="markup-side-title">Notes on This Page</h3>' +
       '<div class="markup-notes"></div>' +
-      '</aside>' +
-      '</div>' +
-      '<footer class="markup-foot">' +
-      '<p class="markup-sees"></p>' +
       '<p class="markup-msg" role="status"></p>' +
+      '<p class="markup-sees"></p>' +
       '<span class="markup-pages">' +
       '<button type="button" class="btn btn-secondary markup-page" data-mk="page" data-dir="-1"></button>' +
       '<button type="button" class="btn btn-secondary markup-page" data-mk="page" data-dir="1"></button>' +
       '</span>' +
-      '</footer>' +
+      '</aside>' +
+      '</div>' +
       '</div>'
     );
   }
@@ -337,8 +353,49 @@ window.MarkUp = (function () {
     var host = s.overlay.querySelector('.markup-layer-host');
     var marks = live || s.hist.now();
     if (s.drag && s.drag.erased && s.drag.erased.length) marks = D.without(marks, s.drag.erased);
-    // html-safe: built by MarkupDraw.svgHtml, which escapes a note's words
-    host.innerHTML = D.svgHtml(marks, D.aspect(s.overlay.querySelector('.markup-img')), { pending: s.pending });
+    var file = _file(s);
+    var turn = (file && s.turn[file.id]) || 0;
+    // html-safe: built by MarkupDraw.svgHtml, which escapes a note's words, and _calloutsHtml, which escapes them through esc
+    host.innerHTML =
+      D.svgHtml(marks, D.aspect(s.overlay.querySelector('.markup-img')), { pending: s.pending }) +
+      _calloutsHtml(marks, turn);
+  }
+
+  /* Each note's words on the page beside its pin (the board's callouts),
+     in the pin's colour: the number sits on the pin and the words run
+     toward the middle of the page. On a turned page they stay upright.
+     The list beside the page says the same, so a screen reader hears it
+     once, there. */
+  // html-safe: a note's words go through esc; places and numbers are ours
+  function _calloutsHtml(marks, turn) {
+    var notes = D.notes(marks);
+    if (!notes.length) return '';
+    var t = (((turn || 0) % 360) + 360) % 360;
+    return (
+      '<div class="markup-callouts" aria-hidden="true">' +
+      notes
+        .map(function (n) {
+          var x = Math.min(1, Math.max(0, Number(n.x) || 0));
+          var y = Math.min(1, Math.max(0, Number(n.y) || 0));
+          // Where the pin falls across the screen, once the page is turned.
+          var across = t === 90 ? 1 - y : t === 180 ? 1 - x : t === 270 ? y : x;
+          return (
+            '<span class="markup-callout' +
+            (across > 0.6 ? ' is-left' : '') +
+            '" style="left:' +
+            Math.round(x * 10000) / 100 +
+            '%;top:' +
+            Math.round(y * 10000) / 100 +
+            '%"><span class="markup-callout-box"><span class="markup-callout-n">' +
+            n.n +
+            '</span><span class="markup-callout-text">' +
+            esc(n.text) +
+            '</span></span></span>'
+          );
+        })
+        .join('') +
+      '</div>'
+    );
   }
 
   // html-safe: a note's words go through esc; numbers are ours; labels are fixed words
@@ -405,13 +462,14 @@ window.MarkUp = (function () {
 
   function _changed() {
     var s = _s;
+    s.edited = true;
     s.msg = '';
     _draw();
     _save(s, _file(s), s.hist.now());
   }
 
   function _answerLine(res) {
-    if (res.result === 'not_available') return 'Mark Up is not ready for signed-in classes yet.';
+    if (res.result === 'not_available') return 'Mark Up is not on for this class.';
     if (res.result === 'not_found') return 'This page is no longer handed in, so its marks can’t be saved.';
     return 'These marks couldn’t be saved. Try again.';
   }

@@ -415,7 +415,7 @@ The wording above is proposed; Colin approves it in each PR, as usual.
 - `S5-F3` Student: Not Sent Yet, One Page Didn't Send, the blurry check, Unsend and Replace. Done (PR 1057).
 - `S5-F4` Edge routes `send-start`, `send-finish`, `unsend`, `replace`, `file-links`, with the server's location check. Open as a draft (PR 1086): not merged, not deployed; waits for an independent security review, Batch B applied, and Colin's word to deploy.
 - `S5-F5` Demo Mode sample work: the drawn pages and the Cell Microscope Lab assessment (the Demo board). The Science 8 class moves from `constants.js` into `seed-data.js` here (a cp1 item). Done (PR 1035); the script that draws the pages is `scripts/draw-sample-work.cjs`.
-- `S5-W1` Wire to Batch B. Not started: waits for Batch B.
+- `S5-W1` Wire to Batch B. Teacher half open (S5-W1, S6-W1 (teacher)): Send Work, Keep Photos Until and the assessment's Students Send, After the Due Date and Last Day save to the server; Add Work uploads through the photo queue. The student half (the `s/` page through the edge routes) is its own PR.
 - Not in the list above: pdf.js in `vendor/`, loaded only when a PDF is chosen, with the Content Security Policy unchanged. Done (PR 1073).
 
 **Status (Nov 11 morning).** Every screen works in Demo Mode behind Send Work; nothing reaches the server. Not built: the HEIC decoder (its licence is Colin's call); Handed In Paper on the student's card (no route for it); the live camera viewfinder; showing a sent page from a `blob:` link on a real phone. Not tested: Safari, Firefox, real devices and real scans.
@@ -444,7 +444,7 @@ The wording above is proposed; Colin approves it in each PR, as usual.
 - `S6-F3` The To Grade, To Return, Returned, Not In and All filters and counts; the exact-match "Same photo as" note. Done (PR 1055).
 - `S6-F4` Assignments page with submissions; gradebook To Grade cells, camera mark and hover card. Done (PR 1056).
 - `S6-F5` Dashboard To Grade cell, in every state on its board. Done (PR 1056).
-- `S6-W1` Wire to Batch B. Not started: waits for Batch B.
+- `S6-W1` Wire to Batch B. Open (S5-W1, S6-W1 (teacher)): the work pane, the counts, Add Work, Delete Work, Grade From Paper's paper hand-in and the Work Wall read and write a signed-in class's real submissions. Mark Up, reflections, revisions and group work stay Demo Mode's; Return still calls `return_grades`.
 
 **Status (Nov 11 morning).** Demo Mode only, behind the build switch and Send Work. The artboard's worked example holds in a test (7, 3, 14, 4, then 6, 3, 15, 4). Simplified from the boards: Focus on Work's Advanced Rubric tiles stack; the gradebook's hover card is a hover line. Not built: the "9" badge on Assignments in the top bar, and the per-row Submitted lines on whole-class grids. Three screens still load pictures their own way and should move to `WorkThumbs` (S14-T1) later: the grader's work pane, the phone's grade photos and the phone's Add Work.
 
@@ -520,7 +520,7 @@ The wording above is proposed; Colin approves it in each PR, as usual.
 - `S9-F1` Desktop Mark Up: Pen, Highlight, Note, Tick, Cross, Eraser, Notes on This Page. Done (PR 1069; the Demo data side, PR 1063).
 - `S9-F2` Phone Mark Up: one finger draws, two fingers move. Done (PR 1072, sharing the desktop's `shared/markup-draw.js`).
 - `S9-F3` Student: See Your Work with Show Marks. Marks follow Students See Your Mark Up. Done (PR 1068).
-- `S9-W1` Wire. Not started: waits for Batch C.
+- `S9-W1` Wire. The teacher side is wired (Nov 11): in a signed-in class with Send Work on, Mark Up saves with `save_markup` through the outbox, the grader reads the marks (`list_course_feedback`, `list_assessment_markup`), and Return is `return_work`, which gives the marks. The student page asks `feedback`, `markup` and `file-links` from a real card (s/feedback.js) once the class's work is in and it takes work; it is wired in the second PR.
 
 **Status (Nov 11 morning).** Demo Mode only. Not built: the board's place labels beside each note ("Headline"); a note's words in a bubble on the photo (each note is a numbered pin, its words listed under the page). Waits for Colin: whether Mark Up counts as "started grading" (Batch B's rule does not count it, so once Mark Up exists a student could unsend a marked-up photo).
 
@@ -548,7 +548,7 @@ The wording above is proposed; Colin approves it in each PR, as usual.
 - `S10-F2` The plan on the next assignment and "Did You Do It?" (Yes, Partly, Not This Time), shown as the student's word ("Jordan says…"). Done (PR 1074).
 - `S10-F3` Teacher: the reflection in the grader with Send Answer; Save as Observation. Done (PR 1071).
 - `S10-F4` Learner Profile's Working On, Reflecting So Far and Reflections on Feedback; the dashboard's Questions From Students; the gradebook and profile marks. Answering clears all three. Done (PR 1080).
-- `S10-W1` Wire. Not started: waits for Batch C.
+- `S10-W1` Wire. The teacher side is wired (Nov 11): Reflect on Feedback is read from the server, Send Answer is `answer_reflection`, the class switch is `set_course_feedback_options`. The student side (`reflect`, `reply`, `answer_seen`) waits for the edge routes. Left in held files: the Class Settings switch row, which still draws only in Demo Mode.
 - Not in the list above: the Reflect on Feedback switch in Class Settings › Student Page (PR 1085, Demo Mode only).
 
 **Status (Nov 11 morning).** Demo Mode only, behind Reflect on Feedback. Not built: Make My Plan after the teacher answers (Batch C's contract has nowhere for it); "Mr. Brown answered your question" in What Changed; the reflection rows on the Assignments page's one-student view; the board's Course Goal card; Read Aloud and voice input. Waits for Colin: whether a reflection saved as an observation may later be quoted in a report (the student is told "Only Mr. Brown sees this.").

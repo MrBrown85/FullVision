@@ -208,11 +208,13 @@ function exported(cid, out, view) {
 /** Every surface for the class, for the year so far and as of each reporting term.
  * only: the surfaces to draw (all six without it). opts.handout false leaves
  * out the rubric sheets asked for as Print Rubrics asks, which are the
- * grader's handout and not part of a report. */
+ * grader's handout and not part of a report. opts.students: draw only the
+ * students with these ids (all of them without it). */
 export function surfaces(cid, only, opts) {
   const want = name => !only || only.indexOf(name) >= 0;
   const handout = !(opts && opts.handout === false);
-  const students = sortStudents(getStudents(cid), 'lastName');
+  const ids = opts && opts.students;
+  const students = sortStudents(getStudents(cid), 'lastName').filter(s => !ids || ids.indexOf(s.id) >= 0);
   const was = getActiveTerm(cid);
   const out = {};
   try {

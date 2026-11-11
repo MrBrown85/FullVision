@@ -66,9 +66,6 @@ window.MGrade = (function () {
     };
     var _filters = _cloneFilters(_FILTER_DEFAULTS);
     var _segmentMode = 'recent';
-    // Sheet-local staging copy: changes made in the filter sheet only commit
-    // to _filters on Apply. Cancel/swipe-dismiss discards pending changes.
-    var _sheetStaged = null;
     var _FILTER_ICON_SVG =
       '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>';
 
@@ -382,7 +379,7 @@ window.MGrade = (function () {
         (holds ? ' aria-pressed="' + active + '"' : '') +
         ' aria-label="To Grade, ' +
         n +
-        '">To Grade<span class="m-seg-count" aria-hidden="true">' +
+        '">To Grade<span class="m-seg-count m-seg-count-tograde" aria-hidden="true">' +
         n +
         '</span></button>'
       );
@@ -440,11 +437,12 @@ window.MGrade = (function () {
       return (
         '<div class="m-empty m-tg-caught" id="m-grade-caught"' +
         (_segmentMode === 'tograde' && !any ? '' : ' style="display:none"') +
-        '><div class="m-empty-title">All Caught Up</div>' +
+        '><div class="m-tg-caught-icon" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>' +
+        '<div class="m-empty-title">All Caught Up</div>' +
         '<div class="m-empty-subtitle">' +
         MC.esc('Nothing is waiting to grade in ' + ((course && course.name) || 'this class') + '.') +
         '</div>' +
-        '<button type="button" class="m-btn-ghost" data-action="m-grade-seg" data-val="all">See All Assessments</button>' +
+        '<button type="button" class="m-tg-caught-btn" data-action="m-grade-seg" data-val="all">See All Assessments</button>' +
         '</div>'
       );
     }
@@ -470,6 +468,14 @@ window.MGrade = (function () {
        Work for the N Not In (the not-in pile, S7-F3), Work Wall (S14-F1,
        teacher/work-wall.js) and Grade Everyone (the whole class, in roster
        order). */
+    // The row menu's icons (paths inside a 24-unit box).
+    var _MENU_ICONS = {
+      check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+      camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
+      grid: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
+      pencil: '<path d="M4 20l4-1 11-11-3-3L5 16z"/>',
+    };
+
     function openRowMenu(cid, aid, from) {
       var a = _assessmentById(cid, aid);
       if (!a) return;
@@ -489,7 +495,7 @@ window.MGrade = (function () {
         : null;
       var notIn = MGradePhotos.notIn(cid, a);
       var wall = !!(window.WorkWall && window.GraderWork && GraderWork.workOn(cid, a));
-      var item = function (attrs, title, sub, action) {
+      var item = function (attrs, title, sub, action, icon) {
         return (
           '<button type="button" class="m-tg-menu-item" data-action="' +
           (action || 'm-grade-assess') +
@@ -497,18 +503,20 @@ window.MGrade = (function () {
           a.id +
           '"' +
           attrs +
-          '><span class="m-tg-menu-title">' +
+          '><span class="m-tg-menu-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+          _MENU_ICONS[icon] +
+          '</svg></span><span class="m-tg-menu-text"><span class="m-tg-menu-title">' +
           MC.esc(title) +
           '</span><span class="m-tg-menu-sub">' +
           MC.esc(sub) +
-          '</span></button>'
+          '</span></span></button>'
         );
       };
       // html-safe: every text goes through MC.esc in item() or here; ids are ours
       MC.presentSheet(
-        '<div class="m-tg-menu" role="dialog" aria-label="' +
+        '<div class="m-tg-menu m-tg-action" role="dialog" aria-label="' +
           MC.esc(a.title) +
-          '"><div class="m-tg-menu-head"><div class="m-tg-menu-name">' +
+          '"><div class="m-tg-action-card"><div class="m-tg-menu-head"><div class="m-tg-menu-name">' +
           MC.esc(a.title) +
           '</div><div class="m-tg-menu-sub">' +
           MC.esc(meta.join(' · ')) +
@@ -518,6 +526,8 @@ window.MGrade = (function () {
                 ' data-only="tograde"',
                 'Grade the ' + MGradePhotos.toGradeCount(cid, a) + ' Waiting',
                 firstSt ? 'Starts with ' + displayNameWithLast(firstSt) : '',
+                null,
+                'check',
               )
             : '') +
           (notIn.length
@@ -526,13 +536,15 @@ window.MGrade = (function () {
                 'Add Work for the ' + notIn.length + ' Not In',
                 _shortNames(cid, notIn),
                 'm-add-work',
+                'camera',
               )
             : '') +
-          (wall ? item('', 'Work Wall', 'Everyone’s work side by side', 'm-work-wall') : '') +
-          item('', 'Grade Everyone', 'All ' + students.length + ', in roster order') +
-          '<button type="button" class="m-tg-menu-cancel" data-action="m-sheet-cancel">Cancel</button>' +
+          (wall ? item('', 'Work Wall', 'Everyone’s work side by side', 'm-work-wall', 'grid') : '') +
+          item('', 'Grade Everyone', 'All ' + students.length + ', in roster order', null, 'pencil') +
+          // Cancel is a card of its own (the board "Grade Tab, Row Menu").
+          '</div><button type="button" class="m-tg-menu-cancel" data-action="m-sheet-cancel">Cancel</button>' +
           '</div>',
-        { half: true },
+        { action: true },
       );
     }
 
@@ -617,7 +629,7 @@ window.MGrade = (function () {
         '>All</button>' +
         '</div>' +
         '<button class="m-grade-filter-btn" data-action="m-grade-filter-open" aria-label="Filter assessments"' +
-        (work ? ' aria-haspopup="dialog"' : '') +
+        ' aria-haspopup="dialog"' +
         '>' +
         _FILTER_ICON_SVG +
         '<span class="m-grade-filter-badge"' +
@@ -862,15 +874,13 @@ window.MGrade = (function () {
       _updateFilterBadge();
     }
 
-    /* All Caught Up, and the live filter sheet's "Showing 6 of 18", for the
-       list as it is now. Nothing happens in a class whose students send no
-       work. */
+    /* The filter sheet's "Showing 6 of 18", and All Caught Up (a class
+       whose students send work), for the list as it is now. */
     function _syncWorkList(cid, assessments, ctx) {
-      if (!MGradePhotos.on(cid)) return;
       var shown = assessments.filter(function (a) {
         return _matchesAllFilters(a, ctx);
       }).length;
-      var caught = document.getElementById('m-grade-caught');
+      var caught = MGradePhotos.on(cid) ? document.getElementById('m-grade-caught') : null;
       if (caught) caught.style.display = _segmentMode === 'tograde' && !shown ? '' : 'none';
       var count = document.querySelector('#m-sheet-container .m-live-filter-count');
       if (count) count.textContent = 'Showing ' + shown + ' of ' + assessments.length;
@@ -878,134 +888,15 @@ window.MGrade = (function () {
 
     /* ── Filter sheet ───────────────────────────────────────────── */
 
-    function _renderFilterSheet(cid) {
-      _sheetStaged = _cloneFilters(_filters);
-
-      var categories = typeof getCategories === 'function' ? getCategories(cid) : [];
-      var modules = typeof getModules === 'function' ? getModules(cid) : [];
-
-      function pill(kind, value, label, active) {
-        return (
-          '<button class="m-filter-pill' +
-          (active ? ' m-filter-active' : '') +
-          '" data-action="m-grade-filter-toggle" data-kind="' +
-          MC.esc(kind) +
-          '" data-val="' +
-          MC.esc(value) +
-          '">' +
-          MC.esc(label) +
-          '</button>'
-        );
-      }
-
-      function seg(kind, options, currentValue) {
-        return (
-          '<div class="m-segmented">' +
-          options
-            .map(function (o) {
-              return (
-                '<button class="m-seg-btn' +
-                (o.val === currentValue ? ' m-seg-active' : '') +
-                '" data-action="m-grade-filter-seg" data-kind="' +
-                MC.esc(kind) +
-                '" data-val="' +
-                MC.esc(o.val) +
-                '">' +
-                MC.esc(o.label) +
-                '</button>'
-              );
-            })
-            .join('') +
-          '</div>'
-        );
-      }
-
-      var catPills = categories
-        .map(function (c) {
-          return pill('category', c.id, c.name, _sheetStaged.category.indexOf(c.id) >= 0);
-        })
-        .join('');
-      catPills += pill('category', '__none', 'No Category', _sheetStaged.category.indexOf('__none') >= 0);
-
-      var modSection = '';
-      if (modules.length > 0) {
-        var modPills = modules
-          .map(function (m) {
-            return pill('module', m.id, m.name, _sheetStaged.module.indexOf(m.id) >= 0);
-          })
-          .join('');
-        modPills += pill('module', '__none', 'No Module', _sheetStaged.module.indexOf('__none') >= 0);
-        modSection =
-          '<div class="m-filter-sheet-section">' +
-          '<div class="m-filter-sheet-title">Module</div>' +
-          '<div class="m-filter-strip m-filter-strip-wrap">' +
-          modPills +
-          '</div>' +
-          '</div>';
-      }
-
-      // One option per reporting term, after the fixed ranges. The list on
-      // this screen follows the term; grades on mobile stay all-time.
-      var dateOptions = [
-        { val: 'all', label: 'All Time' },
-        { val: 'week', label: 'This Week' },
-        { val: '30d', label: 'Last 30 Days' },
-      ].concat(
-        _terms(cid).map(function (t) {
-          return { val: _termValue(t), label: t.label };
-        }),
-      );
-      var dateSeg = seg('dateRange', dateOptions, _sheetStaged.dateRange);
-
-      var statusSeg = seg(
-        'gradedStatus',
-        [
-          { val: 'all', label: 'All' },
-          { val: 'has-ungraded', label: 'Has Ungraded' },
-          { val: 'fully-graded', label: 'Fully Graded' },
-        ],
-        _sheetStaged.gradedStatus,
-      );
-
-      // A class with no categories has nothing to filter by category.
-      var catSection = (categories || []).length
-        ? '<div class="m-filter-sheet-section">' +
-          '<div class="m-filter-sheet-title">Category</div>' +
-          '<div class="m-filter-strip m-filter-strip-wrap">' +
-          catPills +
-          '</div>' +
-          '</div>'
-        : '';
-      return (
-        '<div class="m-filter-sheet">' +
-        '<div class="m-filter-sheet-heading">Filter Assessments</div>' +
-        catSection +
-        modSection +
-        '<div class="m-filter-sheet-section">' +
-        '<div class="m-filter-sheet-title">Date Range</div>' +
-        dateSeg +
-        '</div>' +
-        '<div class="m-filter-sheet-section">' +
-        '<div class="m-filter-sheet-title">Graded Status</div>' +
-        statusSeg +
-        '</div>' +
-        '<div class="m-filter-sheet-footer">' +
-        '<button class="m-btn-ghost" data-action="m-grade-filter-clear">Clear All</button>' +
-        '<button class="m-btn-primary" data-action="m-grade-filter-apply">Apply</button>' +
-        '</div>' +
-        '</div>'
-      );
-    }
-
-    /* The filter that applies as it is tapped (S7-F1), in a class whose
-       students send work: Status, Date and Category chips, "Showing 6 of
-       18", Clear All and Done. Each tap changes the list under the sheet
-       at once and is kept, as the sheet's Apply keeps it. */
-    var _live = false;
+    /* The filter that applies as it is tapped (S7-F1, the board "Grade
+       Tab, Filter That Applies As You Tap"), in every class: Status, Date,
+       Category and Module chips, "Showing 6 of 18", Clear All and Done.
+       Each tap changes the list under the sheet at once and is kept. */
 
     // html-safe: labels go through MC.esc; values are ours or category ids through MC.esc
     function _renderLiveFilterSheet(cid) {
       var categories = typeof getCategories === 'function' ? getCategories(cid) : [];
+      var modules = typeof getModules === 'function' ? getModules(cid) : [];
       var chip = function (action, kind, value, label, on) {
         return (
           '<button type="button" class="m-filter-pill' +
@@ -1026,6 +917,16 @@ window.MGrade = (function () {
       var one = function (kind, value, label) {
         return chip('m-grade-filter-seg', kind, value, label, _filters[kind] === value);
       };
+      // Category and Module: any number of chips, and their None.
+      var many = function (kind, list, none) {
+        return (
+          list
+            .map(function (x) {
+              return chip('m-grade-filter-toggle', kind, x.id, x.name, _filters[kind].indexOf(x.id) >= 0);
+            })
+            .join('') + chip('m-grade-filter-toggle', kind, '__none', none, _filters[kind].indexOf('__none') >= 0)
+        );
+      };
       var section = function (title, chips) {
         return (
           '<div class="m-filter-sheet-section"><div class="m-filter-sheet-title">' +
@@ -1043,8 +944,8 @@ window.MGrade = (function () {
       return (
         '<div class="m-filter-sheet m-live-filter" role="dialog" aria-label="Filter">' +
         '<div class="m-live-filter-head">' +
-        '<button type="button" class="m-btn-ghost" data-action="m-grade-filter-clear">Clear All</button>' +
         '<div class="m-filter-sheet-heading">Filter</div>' +
+        '<button type="button" class="m-btn-ghost m-live-filter-clear" data-action="m-grade-filter-clear">Clear All</button>' +
         '<button type="button" class="m-btn-ghost m-live-filter-done" data-action="m-grade-filter-done">Done</button>' +
         '</div>' +
         '<div class="m-live-filter-count" role="status">' +
@@ -1064,23 +965,8 @@ window.MGrade = (function () {
               })
               .join(''),
         ) +
-        ((categories || []).length
-          ? section(
-              'Category',
-              categories
-                .map(function (c) {
-                  return chip('m-grade-filter-toggle', 'category', c.id, c.name, _filters.category.indexOf(c.id) >= 0);
-                })
-                .join('') +
-                chip(
-                  'm-grade-filter-toggle',
-                  'category',
-                  '__none',
-                  'No Category',
-                  _filters.category.indexOf('__none') >= 0,
-                ),
-            )
-          : '') +
+        ((categories || []).length ? section('Category', many('category', categories, 'No Category')) : '') +
+        ((modules || []).length ? section('Module', many('module', modules, 'No Module')) : '') +
         '</div>'
       );
     }
@@ -1096,96 +982,43 @@ window.MGrade = (function () {
       });
     }
 
+    // The filters apply to the whole list: Recent would otherwise keep
+    // hiding older work under them without a word.
     function _liveChanged() {
       _saveFilters(_pickerCid);
       _syncLiveChips();
-      filterAssessments(_pickerCid);
+      filterAssessments(_pickerCid, _segmentMode === 'recent' && _activeFilterCount() > 0 ? 'all' : null);
     }
 
     function doneFilterSheet() {
-      _live = false;
       MC.dismissSheet();
     }
 
     function openFilterSheet(cid) {
-      if (MGradePhotos.on(cid)) {
-        _live = true;
-        _sheetStaged = null;
-        MC.presentSheet(_renderLiveFilterSheet(cid), {
-          onClose: function () {
-            _live = false;
-          },
-        });
-        return;
-      }
-      MC.presentSheet(_renderFilterSheet(cid), {
-        onClose: function () {
-          _sheetStaged = null;
-        },
-      });
+      MC.presentSheet(_renderLiveFilterSheet(cid));
     }
 
     /* ── Action dispatch from shell.js ──────────────────────────── */
 
     function onFilterTogglePill(kind, value) {
-      if (_live) {
-        var list = _filters[kind];
-        if (!Array.isArray(list)) return;
-        var at = list.indexOf(value);
-        if (at >= 0) list.splice(at, 1);
-        else list.push(value);
-        return _liveChanged();
-      }
-      if (!_sheetStaged) return;
-      var arr = _sheetStaged[kind];
-      if (!Array.isArray(arr)) return;
-      var idx = arr.indexOf(value);
-      if (idx >= 0) arr.splice(idx, 1);
-      else arr.push(value);
-      // Reflect the toggle in the sheet DOM without re-rendering the whole sheet
-      var sel = '.m-filter-pill[data-kind="' + kind + '"][data-val="' + value.replace(/"/g, '\\"') + '"]';
-      var btn = document.querySelector('#m-sheet-container ' + sel);
-      if (btn) btn.classList.toggle('m-filter-active', idx < 0);
+      var list = _filters[kind];
+      if (!Array.isArray(list)) return;
+      var at = list.indexOf(value);
+      if (at >= 0) list.splice(at, 1);
+      else list.push(value);
+      _liveChanged();
     }
 
+    // A chip tapped again lets go of it.
     function onFilterSegChange(kind, value) {
-      if (_live) {
-        // A chip tapped again lets go of it.
-        _filters[kind] = _filters[kind] === value ? 'all' : value;
-        return _liveChanged();
-      }
-      if (!_sheetStaged) return;
-      _sheetStaged[kind] = value;
-      // Update the segmented control inside the sheet
-      var container = document.querySelector('#m-sheet-container');
-      if (!container) return;
-      container
-        .querySelectorAll('.m-seg-btn[data-action="m-grade-filter-seg"][data-kind="' + kind + '"]')
-        .forEach(function (btn) {
-          btn.classList.toggle('m-seg-active', btn.getAttribute('data-val') === value);
-        });
-    }
-
-    function applyFilterSheet(cid) {
-      if (_sheetStaged) _filters = _cloneFilters(_sheetStaged);
-      _sheetStaged = null;
-      _saveFilters(cid);
-      MC.dismissSheet();
-      // The sheet's filters apply to the whole list: Recent would otherwise
-      // keep hiding older work under them without a word.
-      filterAssessments(cid, _activeFilterCount() > 0 ? 'all' : null);
+      _filters[kind] = _filters[kind] === value ? 'all' : value;
+      _liveChanged();
     }
 
     function clearFilterSheet(cid) {
       _filters = _cloneFilters(_FILTER_DEFAULTS);
-      if (_live) {
-        _saveFilters(cid);
-        return _liveChanged();
-      }
-      _sheetStaged = null;
       _saveFilters(cid);
-      MC.dismissSheet();
-      filterAssessments(cid);
+      _liveChanged();
     }
 
     return {
@@ -1194,7 +1027,6 @@ window.MGrade = (function () {
       openFilterSheet: openFilterSheet,
       onFilterTogglePill: onFilterTogglePill,
       onFilterSegChange: onFilterSegChange,
-      applyFilterSheet: applyFilterSheet,
       clearFilterSheet: clearFilterSheet,
       refreshToReturn: refreshToReturn,
       askReturnAll: askReturnAll,
@@ -1549,11 +1381,8 @@ window.MGrade = (function () {
         _onlyOrdered = false;
         _student = null;
       }
-      // A grading screen opened afresh starts each card on its first criterion.
-      if (!(opts && opts.keep)) {
-        _critPage = {};
-        _openGroups = {};
-      }
+      // A grading screen opened afresh shows each not-in card's criteria collapsed.
+      if (!(opts && opts.keep)) _paperOpen = {};
       if (opts && opts.student) {
         // The student's pieces: the list given (a piece shown after another),
         // or their To Grade list now. A piece no longer on it opens as usual.
@@ -1670,7 +1499,8 @@ window.MGrade = (function () {
       if (stuSt) thumbs += _studentTabsHtml(cid, stuSt);
 
       // Swiper cards. In a class that holds grades the Draft and Return bar
-      // sits under them, above the tab bar (S1-F3).
+      // sits under them, above the tab bar (S1-F3); on an Advanced Rubric a
+      // criterion at a time, it carries Next: <criterion> in every class.
       var holds = _holdsGrades(cid);
       var allStatuses = getAssignmentStatuses(cid);
       var swiper = '<div class="m-swiper' + (holds ? ' m-has-return' : '') + '" id="m-swiper">';
@@ -1715,21 +1545,8 @@ window.MGrade = (function () {
     // html-safe: fixed labels; the name and the date go through MC.esc
     function _returnBarParts(cid, a, unit, last) {
       var parts = _returnBarOwn(cid, a, unit, last);
-      // An Advanced Rubric shown a criterion at a time (S7-F2): on to the
-      // next criterion first; the line still says where the grade stands.
-      var nextCrit = parts.act || parts.state ? _pagerNext(cid, a, unit) : null;
-      if (!nextCrit) return parts;
-      return {
-        state: parts.state,
-        act:
-          '<button type="button" class="m-grade-return-btn m-crit-next-btn" data-action="m-crit-page" data-dir="1" data-sid="' +
-          unit.st.id +
-          '" data-aid="' +
-          a.id +
-          '">' +
-          MC.esc('Next: ' + (nextCrit.name || 'Criterion')) +
-          '</button>',
-      };
+      // For Revision or Take Back, then the blue button.
+      return { state: parts.state, act: (parts.lead || '') + parts.act };
     }
 
     function _returnBarOwn(cid, a, unit, last) {
@@ -1808,12 +1625,12 @@ window.MGrade = (function () {
       if (area.revise) {
         return {
           state: parts.state,
-          act:
+          lead:
             '<button type="button" class="m-grade-revise-btn" data-action="m-grade-revision"' +
             ids +
             (_revisionBusy ? ' disabled' : '') +
-            '>For Revision</button>' +
-            parts.act,
+            '>For Revision</button>',
+          act: parts.act,
         };
       }
       var r = area.revision;
@@ -1828,7 +1645,7 @@ window.MGrade = (function () {
       if (_revisionMsg) state += '<span class="m-grade-return-still">' + MC.esc(_revisionMsg) + '</span>';
       return {
         state: state,
-        act:
+        lead:
           '<button type="button" class="m-grade-revise-btn" data-action="m-grade-revision-takeback"' +
           ids +
           ' data-id="' +
@@ -1837,8 +1654,8 @@ window.MGrade = (function () {
           (_revisionBusy ? ' disabled' : '') +
           '>' +
           (_revisionBusy ? 'Taking Back…' : 'Take Back') +
-          '</button>' +
-          parts.act,
+          '</button>',
+        act: parts.act,
       };
     }
 
@@ -1862,17 +1679,21 @@ window.MGrade = (function () {
       var criteria = ((rubric && rubric.criteria) || []).filter(Boolean);
       return (
         '<div class="m-revision-sheet" role="dialog" aria-labelledby="m-revision-title">' +
-        '<div class="m-revision-head"><button type="button" class="m-revision-cancel" data-action="m-sheet-cancel">Cancel</button></div>' +
-        '<h2 class="m-revision-title" id="m-revision-title">Return for Revision</h2>' +
+        // Cancel on the left and the title in the middle, in one row (the
+        // board "Phone: Return for Revision"); the sheet's grabber is over it.
+        '<div class="m-revision-head"><button type="button" class="m-revision-cancel" data-action="m-sheet-cancel">Cancel</button>' +
+        '<h2 class="m-revision-title" id="m-revision-title">Return for Revision</h2><span aria-hidden="true"></span></div>' +
         '<p class="m-revision-sub">' +
         MC.esc(displayNameWithLast(st) + ' · ' + (a.title || 'Assessment')) +
         '</p>' +
         '<label class="m-revision-label" for="m-revision-fix">What to Fix</label>' +
         '<textarea id="m-revision-fix" class="m-revision-fix" rows="3" maxlength="2000"></textarea>' +
+        // Revise By and Revise side by side.
+        '<div class="m-revision-row"><div class="m-revision-field">' +
         '<label class="m-revision-label" for="m-revision-by">Revise By</label>' +
-        '<input type="date" id="m-revision-by" class="m-revision-by">' +
+        '<input type="date" id="m-revision-by" class="m-revision-by"></div>' +
         (criteria.length > 1
-          ? '<label class="m-revision-label" for="m-revision-crit">Revise</label>' +
+          ? '<div class="m-revision-field"><label class="m-revision-label" for="m-revision-crit">Revise</label>' +
             '<select id="m-revision-crit" class="m-revision-crit"><option value="">The Whole Assignment</option>' +
             criteria
               .map(function (c) {
@@ -1881,8 +1702,9 @@ window.MGrade = (function () {
                 );
               })
               .join('') +
-            '</select>'
+            '</select></div>'
           : '') +
+        '</div>' +
         // The grade until then: kept. The board's Hide is left out (Colin, Nov 11).
         '<h3 class="m-revision-label">Until the New Version Is Graded</h3>' +
         '<p class="m-revision-keep">Keep this grade. The new version replaces it.</p>' +
@@ -1998,11 +1820,11 @@ window.MGrade = (function () {
        going to and stays on it. */
     function _syncReturnBar(scrolled) {
       var cid = _swiperCid;
-      if (!_holdsGrades(cid)) return;
+      var a = _assessmentById(cid, _swiperAid);
+      if (!a || !_holdsGrades(cid)) return;
       if (scrolled && _returnSliding) return;
       var bar = document.getElementById('m-grade-return');
-      var a = _assessmentById(cid, _swiperAid);
-      if (!bar || !a) return;
+      if (!bar) return;
       var parts = _returnBarNow(cid, a);
       var shown = bar._fvShown || {};
       if (shown.state === parts.state && shown.act === parts.act) return;
@@ -2029,10 +1851,10 @@ window.MGrade = (function () {
     /* A grading screen just drawn (renderSwiper) shows its first card's bar:
        the bar is told so, and is not drawn a second time. */
     function _noteReturnBar(cid, aid) {
-      if (!_holdsGrades(cid)) return;
-      var bar = document.getElementById('m-grade-return');
       var a = _assessmentById(cid, aid);
-      if (bar && a) bar._fvShown = _returnBarNow(cid, a);
+      if (!a || !_holdsGrades(cid)) return;
+      var bar = document.getElementById('m-grade-return');
+      if (bar) bar._fvShown = _returnBarNow(cid, a);
     }
 
     /* What is typed on the card but not saved yet: a comment saves a moment
@@ -2126,7 +1948,7 @@ window.MGrade = (function () {
       if (idx > 0) jumpToStudent(idx, true);
     }
 
-    // html-safe: names, labels and criterion text go through MC.esc; colours through cssColor or avatarColor's constants; ids, levels and points are ours or numbers; _criterionGroupHtml, _completionBtnsHtml, _modBtnsHtml and pointsPctHtml are checked.
+    // html-safe: names, labels and criterion text go through MC.esc; colours through cssColor or avatarColor's constants; ids, levels and points are ours or numbers; _criterionGroupHtml, _completionBtnsHtml, _fineTuneHtml, MC.levelButtonsHTML and pointsPctHtml are checked.
     function _renderStudentCard(cid, st, assessment, allScores, allStatuses, unit) {
       var color = MC.avatarColor(st.id);
       var initials = MC.avatarInitials(st);
@@ -2148,6 +1970,54 @@ window.MGrade = (function () {
         });
       }
 
+      // Missing, Excused and Late: one segmented control under the name (the board).
+      var statusRow =
+        '<div class="m-status-row" role="group" aria-label="Status">' +
+        '<button class="m-status-pill' +
+        (status === 'NS' ? ' m-status-active' : '') +
+        '" data-action="m-grade-status" data-val="NS" data-sid="' +
+        st.id +
+        '" data-aid="' +
+        assessment.id +
+        '"' +
+        (canSetAssignmentStatus(cid, st.id, assessment.id, 'NS') ? '' : ' disabled') +
+        '>Missing</button>' +
+        '<button class="m-status-pill' +
+        (status === 'EXC' ? ' m-status-active' : '') +
+        '" data-action="m-grade-status" data-val="EXC" data-sid="' +
+        st.id +
+        '" data-aid="' +
+        assessment.id +
+        '"' +
+        (canSetAssignmentStatus(cid, st.id, assessment.id, 'EXC') ? '' : ' disabled') +
+        '>Excused</button>' +
+        '<button class="m-status-pill' +
+        (status === 'LATE' ? ' m-status-active' : '') +
+        '" data-action="m-grade-status" data-val="LATE" data-sid="' +
+        st.id +
+        '" data-aid="' +
+        assessment.id +
+        '">Late</button>' +
+        '</div>' +
+        // Why Missing and Excused can't be picked, where they can't.
+        '<div class="m-status-hint" data-sid="' +
+        st.id +
+        '" data-aid="' +
+        assessment.id +
+        '"' +
+        (canSetAssignmentStatus(cid, st.id, assessment.id, 'NS') ? ' hidden' : '') +
+        '>Clear the score and comment to mark Missing or Excused.</div>';
+
+      // A group's members each have their own status, in the list above.
+      if (unit && unit.view) statusRow = '';
+      // Under the name: when the work came, then the status (the board
+      // "Phone Speed Grader With Photos").
+      var sent = MGradePhotos.sentHtml(cid, assessment, st, unit);
+      // A card with nothing in has the status under Add Work instead (the
+      // board "Add Work for a Student").
+      var notInCard = MGradePhotos.notInCard(cid, assessment, st, unit);
+      var headStatus = notInCard ? '' : statusRow;
+
       var header =
         '<div class="m-grade-student-header">' +
         '<div class="m-grade-avatar" style="background:' +
@@ -2155,18 +2025,23 @@ window.MGrade = (function () {
         '">' +
         MC.esc(initials) +
         '</div>' +
-        '<div><div class="m-grade-student-name">' +
+        '<div class="m-grade-student-main"><div class="m-grade-student-name">' +
         MC.esc(name) +
         badges +
         '</div>' +
+        sent +
+        headStatus +
         '</div></div>';
       // One student's work: the card is named by the piece (the bar names the student).
       if (_student && _student.sid === st.id && !(unit && unit.view))
         header =
-          '<div class="m-grade-student-header"><div class="m-grade-student-name">' +
+          '<div class="m-grade-student-header"><div class="m-grade-student-main"><div class="m-grade-student-name">' +
           MC.esc(assessment.title) +
+          '</div>' +
+          sent +
+          headStatus +
           '</div></div>';
-      if (unit && unit.view) header = _groupCardHeadHtml(cid, assessment, unit.view);
+      if (unit && unit.view) header = _groupCardHeadHtml(cid, assessment, unit.view) + sent;
       else if (unit && unit.separateFrom) header += _separateLineHtml(assessment.id, st.id, unit.separateFrom);
 
       // Score selectors for each tag
@@ -2183,15 +2058,17 @@ window.MGrade = (function () {
       }
       // A rubric of the assessment's own is scored by criterion (Tags | Rubric).
       var rubric = _rubricViewOn(cid, assessment) ? _ownRubric(cid, assessment) : null;
-      var pager = _pagerRubric(cid, assessment);
-      if (pager) tagGroups = _criterionPagerHtml(cid, st, assessment, pager);
-      else if (rubric) {
+      if (rubric) {
         tagGroups = (rubric.criteria || [])
           .map(function (crit) {
             return _criterionGroupHtml(cid, st, assessment, rubric, crit);
           })
           .join('');
       }
+      // Nothing in: the criteria under Grade From Paper, each "Not scored ›"
+      // (or its level), until one is tapped (the board "Add Work for a Student").
+      if (notInCard && rubric && !_paperOpen[st.id + ':' + assessment.id])
+        tagGroups = _notScoredHtml(cid, st, assessment, rubric);
       var ptsTagLines = '';
       var ptsTid = null;
       // Rubric work lists the competencies its criteria feed, as the desktop's
@@ -2245,32 +2122,9 @@ window.MGrade = (function () {
             // ungraded state AND a deliberate No-Evidence choice, which the
             // graded-count / calc / report layers already treat identically
             // (all use `score > 0`).
-            var btns = '';
-            // In the class's Rubric Levels order, like the desktop card.
-            levelOrderFor(cid).forEach(function (level) {
-              var active =
-                current !== null && roundLevel(current) === level
-                  ? ' m-score-active' + (currentMixed ? ' m-score-mixed' : '')
-                  : '';
-              btns +=
-                '<button class="m-score-btn' +
-                active +
-                '" data-action="m-grade-score" data-score="' +
-                level +
-                '" data-sid="' +
-                st.id +
-                '" data-aid="' +
-                assessment.id +
-                '" data-tid="' +
-                tid +
-                '" aria-label="' +
-                level +
-                ', ' +
-                PROF_LABELS[level] +
-                '">' +
-                level +
-                '</button>';
-            });
+            // The board's level buttons, in the class's level order (MC.levelButtonsHTML).
+            var lvNow = current !== null ? roundLevel(current) : 0;
+            var rowIds = ' data-sid="' + st.id + '" data-aid="' + assessment.id + '" data-tid="' + tid + '"';
             tagGroups +=
               '<div class="m-score-group">' +
               '<div class="m-score-tag-label"><span class="m-score-tag-dot" style="background:' +
@@ -2278,20 +2132,19 @@ window.MGrade = (function () {
               '"></span>' +
               MC.esc(tagLabel) +
               '</div>' +
-              '<div class="m-score-btns" role="radiogroup" aria-label="Score for ' +
+              '<div class="m-score-btns" role="radiogroup" aria-label="Level for ' +
               MC.esc(tagLabel) +
               '">' +
-              btns +
+              MC.levelButtonsHTML({
+                order: levelOrderFor(cid),
+                level: lvNow,
+                mod: currentMod,
+                mixed: currentMixed,
+                action: 'm-grade-score',
+                attrs: rowIds,
+              }) +
               '</div>' +
-              '<div class="m-score-mods" data-sid="' +
-              st.id +
-              '" data-aid="' +
-              assessment.id +
-              '" data-tid="' +
-              tid +
-              '">' +
-              _modBtnsHtml(currentMixed ? 0 : current, currentMod) +
-              '</div>' +
+              _fineTuneHtml(rowIds, currentMixed ? 0 : lvNow, currentMod, tagLabel) +
               '</div>';
           }
         },
@@ -2352,60 +2205,6 @@ window.MGrade = (function () {
           '</div></div>';
       }
 
-      // Status toggles
-      var statusRow =
-        '<div class="m-status-row">' +
-        '<button class="m-status-pill' +
-        (status === 'NS' ? ' m-status-active' : '') +
-        '" data-action="m-grade-status" data-val="NS" data-sid="' +
-        st.id +
-        '" data-aid="' +
-        assessment.id +
-        '"' +
-        (canSetAssignmentStatus(cid, st.id, assessment.id, 'NS') ? '' : ' disabled') +
-        '>Missing</button>' +
-        '<button class="m-status-pill' +
-        (status === 'EXC' ? ' m-status-active' : '') +
-        '" data-action="m-grade-status" data-val="EXC" data-sid="' +
-        st.id +
-        '" data-aid="' +
-        assessment.id +
-        '"' +
-        (canSetAssignmentStatus(cid, st.id, assessment.id, 'EXC') ? '' : ' disabled') +
-        '>Excused</button>' +
-        '<button class="m-status-pill' +
-        (status === 'LATE' ? ' m-status-active' : '') +
-        '" data-action="m-grade-status" data-val="LATE" data-sid="' +
-        st.id +
-        '" data-aid="' +
-        assessment.id +
-        '">Late</button>' +
-        '</div>' +
-        // Why Missing and Excused can't be picked, where they can't.
-        '<div class="m-status-hint" data-sid="' +
-        st.id +
-        '" data-aid="' +
-        assessment.id +
-        '"' +
-        (canSetAssignmentStatus(cid, st.id, assessment.id, 'NS') ? ' hidden' : '') +
-        '>Clear the score and comment to mark Missing or Excused.</div>';
-
-      // A group's members each have their own status, in the list above.
-      if (unit && unit.view) statusRow = '';
-
-      // What the level numbers mean, in the class's order.
-      var levelKey = '';
-      if (rubric || /m-score-btns/.test(tagGroups)) {
-        levelKey =
-          '<div class="m-level-key">' +
-          levelOrderFor(cid)
-            .map(function (lv) {
-              return '<span><b>' + lv + '</b> ' + MC.esc(PROF_LABELS[lv]) + '</span>';
-            })
-            .join('') +
-          '</div>';
-      }
-
       // The Overall Comment: the one feedback box on the work, as on the
       // desktop (score.comment; it prints on the rubric handout).
       var commentText = getScoreComment(cid, st.id, assessment.id);
@@ -2437,10 +2236,8 @@ window.MGrade = (function () {
         MGradePhotos.pinHtml(cid, assessment, st, unit) +
         header +
         // The student's work, under who it is (teacher-mobile/grade-photos.js).
-        MGradePhotos.cardHtml(cid, assessment, st, unit) +
+        MGradePhotos.cardHtml(cid, assessment, st, unit, { status: notInCard ? statusRow : '' }) +
         tagGroups +
-        levelKey +
-        statusRow +
         commentRow +
         '</div></div>'
       );
@@ -2577,220 +2374,70 @@ window.MGrade = (function () {
       return html + '</div>';
     }
 
-    /* ── The Advanced Rubric, one criterion at a time (S7-F2) ──────
-       With the build switch and Send Work on, an Advanced Rubric's card
-       shows one criterion with a pager (previous, next, "Criterion 1 of 2"),
-       its levels, its boxes in a group per level (each with its count, the
-       chosen or suggested level's open), ± and Comment. The bar's button is
-       "Next: <criterion>" until the last criterion, then Return and Next.
-       Which criterion and which groups are open are kept per student and
-       piece while the phone is open. */
-    var _critPage = {};
-    var _openGroups = {};
+    // Not-in cards whose criteria were opened from Grade From Paper, by "sid:aid".
+    var _paperOpen = {};
+
+    // html-safe: criterion names go through MC.esc; level words are constants; ids are ours; indexes are numbers
+    function _notScoredHtml(cid, st, assessment, rubric) {
+      return (
+        '<div class="m-paper-crits">' +
+        (rubric.criteria || [])
+          .map(function (crit, i) {
+            var state = _critState(cid, st.id, assessment.id, crit);
+            var now = state.level ? scoreLevelText(state.level) : 'Not scored';
+            return (
+              '<button type="button" class="m-paper-crit" data-action="m-paper-crit" data-sid="' +
+              st.id +
+              '" data-aid="' +
+              assessment.id +
+              '" data-idx="' +
+              i +
+              '"><span class="m-paper-crit-name">' +
+              MC.esc(crit.name || 'Criterion') +
+              '</span><span class="m-paper-crit-now">' +
+              MC.esc(now) +
+              '</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg></button>'
+            );
+          })
+          .join('') +
+        '</div>'
+      );
+    }
+
+    // A "Not scored ›" row tapped: the card's criteria open, that one in view.
+    function openPaperCriterion(cid, sid, aid, idx) {
+      _paperOpen[sid + ':' + aid] = true;
+      _refreshCard(cid, sid, aid);
+      var card = document.querySelector('.m-swiper-card[data-sid="' + sid + '"]');
+      var group = card && card.querySelectorAll('.m-crit-group')[idx];
+      if (group && group.scrollIntoView) group.scrollIntoView({ block: 'nearest' });
+    }
 
     // A level's name, for a group of boxes and the ± row: a word, not a grade.
     function _levelName(lv) {
       return PROF_LABELS[lv] || '';
     }
 
-    function _pagerRubric(cid, assessment) {
-      if (!window.MGradePhotos || !MGradePhotos.on(cid)) return null;
-      var rubric = _rubricViewOn(cid, assessment) ? _ownRubric(cid, assessment) : null;
-      return _isAdvanced(rubric) && (rubric.criteria || []).length ? rubric : null;
-    }
-
-    function _pageOf(sid, aid, n) {
-      var i = _critPage[sid + ':' + aid] || 0;
-      return i >= 0 && i < n ? i : 0;
-    }
-
-    // The criterion after the one on this card, while there is one.
-    function _pagerNext(cid, a, unit) {
-      if (!unit || !a) return null;
-      var rubric = _pagerRubric(cid, a);
-      if (!rubric) return null;
-      var crits = rubric.criteria;
-      var i = _pageOf(unit.st.id, a.id, crits.length);
-      return i < crits.length - 1 ? crits[i + 1] : null;
-    }
-
-    // Which level's group is open: the teacher's choice, else the chosen level's, else the suggested one's.
-    function _openLevel(cid, sid, aid, crit, state) {
-      var key = sid + ':' + aid + ':' + crit.id;
-      if (key in _openGroups) return _openGroups[key];
-      if (state.level && !state.mixed) return state.level;
-      return RubricChecks.suggestedLevel(crit, getRubricCheckIds(cid, sid, aid)) || 0;
-    }
-
-    // html-safe: names, labels and box text go through MC.esc; ids are ours; levels are numbers
-    function _criterionPagerHtml(cid, st, assessment, rubric) {
-      var crits = rubric.criteria;
-      var idx = _pageOf(st.id, assessment.id, crits.length);
-      var crit = crits[idx];
-      var name = crit.name || 'Criterion';
-      var state = _critState(cid, st.id, assessment.id, crit);
-      var ticked = getRubricCheckIds(cid, st.id, assessment.id);
-      var openLv = _openLevel(cid, st.id, assessment.id, crit, state);
-      var ids = '" data-sid="' + st.id + '" data-aid="' + assessment.id + '"';
-      var arrow = function (dir, label, path) {
-        var off = dir < 0 ? idx === 0 : idx >= crits.length - 1;
-        return (
-          '<button type="button" class="m-crit-pager-btn" data-action="m-crit-page" data-dir="' +
-          dir +
-          ids +
-          ' aria-label="' +
-          label +
-          '"' +
-          (off ? ' disabled' : '') +
-          '><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' +
-          path +
-          '"/></svg></button>'
-        );
-      };
-      var dots = crits
-        .map(function (c, i) {
-          return '<span class="m-crit-pager-dot' + (i === idx ? ' is-on' : '') + '"></span>';
-        })
-        .join('');
-      var groups = '';
-      levelOrderFor(cid).forEach(function (lv) {
-        var boxes = RubricChecks.checksAt(crit, lv);
-        if (!boxes.length) return;
-        var n = boxes.filter(function (b) {
-          return ticked.indexOf(b.id) >= 0;
-        }).length;
-        var open = openLv === lv;
-        groups +=
-          '<div class="m-check-group' +
-          (open ? ' is-open' : '') +
-          '"><button type="button" class="m-check-group-head" data-action="m-crit-group" data-level="' +
-          lv +
-          ids +
-          ' data-critid="' +
-          crit.id +
-          '" aria-expanded="' +
-          open +
-          '"><span class="m-check-group-name l' +
-          lv +
-          '">' +
-          _levelName(lv) +
-          '</span><span class="m-check-group-count">' +
-          n +
-          ' of ' +
-          boxes.length +
-          '</span></button>';
-        if (open) {
-          boxes.forEach(function (check) {
-            groups +=
-              '<label class="m-check"><input type="checkbox" data-action="m-grade-tick' +
-              ids +
-              ' data-critid="' +
-              crit.id +
-              '" data-checkid="' +
-              check.id +
-              '"' +
-              (ticked.indexOf(check.id) >= 0 ? ' checked' : '') +
-              '><span>' +
-              MC.esc(check.label) +
-              '</span></label>';
-          });
-        }
-        groups += '</div>';
-      });
-      return (
-        '<div class="m-score-group m-crit-group m-crit-pager" data-critid="' +
-        crit.id +
-        '"><div class="m-crit-pager-head">' +
-        arrow(-1, 'Previous criterion', 'M15 18l-6-6 6-6') +
-        '<div class="m-crit-pager-mid"><div class="m-crit-name">' +
-        MC.esc(name) +
-        '</div><div class="m-crit-pager-dots" role="img" aria-label="Criterion ' +
-        (idx + 1) +
-        ' of ' +
-        crits.length +
-        '">' +
-        dots +
-        '</div></div>' +
-        arrow(1, 'Next criterion', 'M9 18l6-6-6-6') +
-        '</div>' +
-        '<div class="m-score-btns" role="radiogroup" aria-label="Level for ' +
-        MC.esc(name) +
-        '">' +
-        _critLevelBtnsHtml(cid, st, assessment, crit, state) +
-        '</div>' +
-        (groups ? '<div class="m-check-groups">' + groups + '</div>' : '') +
-        '<div class="m-score-mods" data-sid="' +
-        st.id +
-        '" data-aid="' +
-        assessment.id +
-        '" data-critid="' +
-        crit.id +
-        '" role="group" aria-label="Fine-tune ' +
-        MC.esc(state.level && !state.mixed ? _levelName(state.level) : name) +
-        '">' +
-        _modBtnsHtml(state.mixed ? 0 : state.level, state.mod) +
-        '</div>' +
-        '<div class="m-crit-pager-tools">' +
-        _critCommentBtnHtml(cid, st.id, assessment.id, crit) +
-        '</div>' +
-        _critCommentHtml(cid, st.id, assessment.id, crit) +
-        '</div>'
-      );
-    }
-
-    // Previous or next criterion on a student's card.
-    function pageCriterion(cid, sid, aid, dir) {
-      var a = _assessmentById(cid, aid);
-      var rubric = a && _pagerRubric(cid, a);
-      if (!rubric) return;
-      var n = rubric.criteria.length;
-      var next = _pageOf(sid, aid, n) + (dir < 0 ? -1 : 1);
-      if (next < 0 || next >= n) return;
-      _saveTyped(cid, sid);
-      _critPage[sid + ':' + aid] = next;
-      _refreshCard(cid, sid, aid);
-      _syncReturnBar();
-      var card = document.querySelector('.m-swiper-card[data-sid="' + sid + '"]');
-      var head = card && card.querySelector('.m-crit-pager .m-crit-name');
-      if (head && head.scrollIntoView) head.scrollIntoView({ block: 'nearest' });
-    }
-
-    // A level's group of boxes opened or closed (one open at a time).
-    function toggleCritGroup(cid, sid, aid, critId, level) {
-      var found = _findCriterion(cid, aid, critId);
-      if (!found) return;
-      var key = sid + ':' + aid + ':' + critId;
-      var state = _critState(cid, sid, aid, found.crit);
-      _openGroups[key] = _openLevel(cid, sid, aid, found.crit, state) === level ? 0 : level;
-      _refreshCard(cid, sid, aid);
-    }
-
-    // A criterion's four level buttons.
-    // html-safe: levels are numbers, labels constants, ids ours
+    // A criterion's four level buttons (MC.levelButtonsHTML).
     function _critLevelBtnsHtml(cid, st, assessment, crit, state) {
-      var btns = '';
-      levelOrderFor(cid).forEach(function (level) {
-        btns +=
-          '<button class="m-score-btn' +
-          (state.level === level ? ' m-score-active' : '') +
-          (state.level === level && state.mixed ? ' m-score-mixed' : '') +
-          '" data-action="m-grade-crit" data-score="' +
-          level +
-          '" data-sid="' +
-          st.id +
-          '" data-aid="' +
-          assessment.id +
-          '" data-critid="' +
-          crit.id +
-          '" aria-label="' +
-          level +
-          ', ' +
-          PROF_LABELS[level] +
-          '">' +
-          level +
-          '</button>';
+      return MC.levelButtonsHTML({
+        order: levelOrderFor(cid),
+        level: state.level || 0,
+        mod: state.mod,
+        mixed: state.mixed,
+        action: 'm-grade-crit',
+        attrs: ' data-sid="' + st.id + '" data-aid="' + assessment.id + '" data-critid="' + crit.id + '"',
       });
-      return btns;
+    }
+
+    // A criterion's Fine-tune row.
+    function _critFineTuneHtml(st, assessment, crit, state) {
+      return _fineTuneHtml(
+        ' data-sid="' + st.id + '" data-aid="' + assessment.id + '" data-critid="' + crit.id + '"',
+        state.mixed ? 0 : state.level,
+        state.mod,
+        crit.name || 'Criterion',
+      );
     }
 
     /* One criterion: its name, the four levels, ± and, on an Advanced
@@ -2817,10 +2464,21 @@ window.MGrade = (function () {
           '" aria-label="Checklist, ' +
           count.ticked +
           ' ticked"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 12l3 3 5-6"/></svg>' +
-          // Only the ticks, as on the desktop grader: no box total.
-          (count.ticked ? count.ticked : 'Checklist') +
+          // Only the ticks, as on the board's chip: no box total.
+          count.ticked +
           '</button>';
       }
+      // The board's "Suggested: Proficient" over the levels, from the ticks;
+      // an open checklist says it in its own head.
+      var suggested =
+        advanced && !open ? RubricChecks.suggestedLevel(crit, getRubricCheckIds(cid, st.id, assessment.id)) : 0;
+      var suggestedLine = suggested
+        ? '<div class="m-crit-suggested l' +
+          suggested +
+          '">' +
+          MC.esc('Suggested: ' + scoreLevelText(suggested)) +
+          '</div>'
+        : '';
       return (
         '<div class="m-score-group m-crit-group" data-critid="' +
         crit.id +
@@ -2829,24 +2487,17 @@ window.MGrade = (function () {
         MC.esc(crit.name || 'Criterion') +
         '</span>' +
         '<span class="m-crit-tools">' +
-        _critCommentBtnHtml(cid, st.id, assessment.id, crit) +
         checksBtn +
+        _critCommentBtnHtml(cid, st.id, assessment.id, crit) +
         '</span>' +
         '</div>' +
-        '<div class="m-score-btns" role="radiogroup" aria-label="Score for ' +
-        MC.esc(crit.name || 'criterion') +
+        suggestedLine +
+        '<div class="m-score-btns" role="radiogroup" aria-label="Level for ' +
+        MC.esc(crit.name || 'Criterion') +
         '">' +
         btns +
         '</div>' +
-        '<div class="m-score-mods" data-sid="' +
-        st.id +
-        '" data-aid="' +
-        assessment.id +
-        '" data-critid="' +
-        crit.id +
-        '">' +
-        _modBtnsHtml(state.mixed ? 0 : state.level, state.mod) +
-        '</div>' +
+        _critFineTuneHtml(st, assessment, crit, state) +
         (open ? _checklistHtml(cid, st.id, assessment.id, crit, state) : '') +
         _critCommentHtml(cid, st.id, assessment.id, crit) +
         '</div>'
@@ -2861,7 +2512,7 @@ window.MGrade = (function () {
     function _critCommentHtml(cid, sid, aid, crit) {
       var text = getRubricCriterionComment(cid, sid, aid, crit);
       return (
-        '<textarea class="m-crit-comment" rows="1" maxlength="500" aria-label="Comment on ' +
+        '<textarea class="m-crit-comment" rows="1" maxlength="500" placeholder="Type a comment" aria-label="Comment on ' +
         MC.esc(crit.name || 'criterion') +
         '" data-sid="' +
         sid +
@@ -2877,19 +2528,28 @@ window.MGrade = (function () {
       );
     }
 
-    // html-safe: fixed markup; sid, aid and critId are ids.
-    function _critCommentBtnHtml(cid, sid, aid, crit) {
+    /* The criterion's Comment button (the board): a round icon beside its
+       name, or "Comment" in the pager's ± row. Filled once there is a
+       comment, which then reads as a note under the levels. */
+    // html-safe: the name goes through MC.esc; sid, aid and critId are ids; the rest is fixed markup.
+    function _critCommentBtnHtml(cid, sid, aid, crit, labelled) {
       var has = !!getRubricCriterionComment(cid, sid, aid, crit);
+      var name = crit.name || 'criterion';
       return (
-        '<button class="m-crit-comment-btn"' +
-        (has ? ' hidden' : '') +
-        ' data-action="m-grade-crit-comment" data-sid="' +
+        '<button type="button" class="m-crit-comment-btn' +
+        (labelled ? ' is-labelled' : '') +
+        (has ? ' is-on' : '') +
+        '" data-action="m-grade-crit-comment" data-sid="' +
         sid +
         '" data-aid="' +
         aid +
         '" data-critid="' +
         crit.id +
-        '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Comment</button>'
+        '" aria-label="' +
+        MC.esc((has ? 'Edit the comment on ' : 'Comment on ') + name) +
+        '"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>' +
+        (labelled ? '<span aria-hidden="true">Comment</span>' : '') +
+        '</button>'
       );
     }
 
@@ -2899,7 +2559,6 @@ window.MGrade = (function () {
       var box = group && group.querySelector('.m-crit-comment');
       if (!box) return;
       box.hidden = false;
-      btn.hidden = true;
       box.focus();
     }
 
@@ -2907,9 +2566,6 @@ window.MGrade = (function () {
     function _closeEmptyCritComment(el) {
       if (el.value.trim()) return;
       el.hidden = true;
-      var group = el.closest('.m-crit-group');
-      var btn = group && group.querySelector('.m-crit-comment-btn');
-      if (btn) btn.hidden = false;
     }
 
     function _fitCritComment(el) {
@@ -2933,7 +2589,17 @@ window.MGrade = (function () {
       var text = el.value.trim();
       if (text === getRubricCriterionComment(cid, el.dataset.sid, el.dataset.aid, found.crit)) return;
       Grader.setCriterionComment(cid, el.dataset.sid, el.dataset.aid, el.dataset.critid, text);
+      _markCritCommentBtn(el, found.crit, !!text);
       _syncReturnBar();
+    }
+
+    // The Comment button filled, or not, as the comment now is.
+    function _markCritCommentBtn(el, crit, has) {
+      var group = el.closest && el.closest('.m-crit-group');
+      var btn = group && group.querySelector('.m-crit-comment-btn');
+      if (!btn) return;
+      btn.classList.toggle('is-on', has);
+      btn.setAttribute('aria-label', (has ? 'Edit the comment on ' : 'Comment on ') + (crit.name || 'criterion'));
     }
 
     /* Redraw one student's card in place after a criterion change. */
@@ -3187,27 +2853,20 @@ window.MGrade = (function () {
       _syncReturnBar();
     }
 
-    /* ── + / − on a level ──────────────────────────────────────── */
-    // html-safe: fixed markup; m is -1 or 1 and scoreModSuffix returns '+' or '\u2212'.
-    function _modBtnsHtml(level, mod) {
-      return [-1, 1]
-        .map(function (m) {
-          var allowed = level > 0 && normalizeScoreMod(level, m) === m;
-          return (
-            '<button class="m-mod-btn' +
-            (allowed && mod === m ? ' m-mod-active' : '') +
-            '" data-action="m-grade-mod" data-mod="' +
-            m +
-            '" aria-label="' +
-            (m > 0 ? 'Plus' : 'Minus') +
-            '"' +
-            (allowed ? '' : ' disabled') +
-            '>' +
-            scoreModSuffix(m) +
-            '</button>'
-          );
-        })
-        .join('');
+    /* ── + / − on a level: Fine-tune <level>, − Minus and + Plus ── */
+    // html-safe: attrs are our ids; the label goes through MC.esc; the buttons are MC.fineTuneButtonsHTML's fixed markup
+    function _fineTuneHtml(attrs, level, mod, name) {
+      return (
+        '<div class="m-score-mods"' +
+        attrs +
+        ' data-name="' +
+        MC.esc(name) +
+        '" role="group" aria-label="' +
+        MC.esc(MC.fineTuneLabel(level, name)) +
+        '">' +
+        MC.fineTuneButtonsHTML(level, mod) +
+        '</div>'
+      );
     }
 
     function _currentEntry(cid, sid, aid, tid) {
@@ -3217,14 +2876,23 @@ window.MGrade = (function () {
       return matches.length ? matches[matches.length - 1] : null;
     }
 
+    // A competency row after a save or an undo: its levels and Fine-tune.
     function _syncModBtns(cid, sid, aid, tid) {
-      var box = document.querySelector(
-        '.m-swiper-card[data-sid="' + sid + '"] .m-score-mods[data-aid="' + aid + '"][data-tid="' + tid + '"]',
-      );
-      if (!box) return;
+      var card = document.querySelector('.m-swiper-card[data-sid="' + sid + '"]');
+      if (!card) return;
       var e = _currentEntry(cid, sid, aid, tid);
-      var level = e ? e.score : 0;
-      box.innerHTML = _modBtnsHtml(level, e ? normalizeScoreMod(level, e.mod) : 0);
+      var level = e && e.score > 0 ? roundLevel(e.score) : 0;
+      var mod = level ? normalizeScoreMod(level, e.mod) : 0;
+      MC.paintLevelButtons(
+        card.querySelectorAll('.m-score-btn[data-aid="' + aid + '"][data-tid="' + tid + '"]'),
+        level,
+        mod,
+      );
+      var box = card.querySelector('.m-score-mods[data-aid="' + aid + '"][data-tid="' + tid + '"]');
+      if (!box) return;
+      box.setAttribute('aria-label', MC.fineTuneLabel(level, box.getAttribute('data-name')));
+      // html-safe: MC.fineTuneButtonsHTML is fixed markup
+      box.innerHTML = MC.fineTuneButtonsHTML(level, mod);
     }
 
     // Tapping the active + or − again clears it.
@@ -3276,15 +2944,7 @@ window.MGrade = (function () {
       clearProfCache();
       MC.haptic();
 
-      // Update button states. When cleared (score=0), no btn matches so all
-      // buttons become inactive — which is exactly what we want visually.
-      var card = document.querySelector('.m-swiper-card[data-sid="' + sid + '"]');
-      if (card) {
-        var btns = card.querySelectorAll('.m-score-btn[data-tid="' + tid + '"]');
-        btns.forEach(function (btn) {
-          btn.classList.toggle('m-score-active', parseInt(btn.getAttribute('data-score')) === score);
-        });
-      }
+      // The row's buttons; when cleared (score=0) none is chosen.
       _syncModBtns(cid, sid, aid, tid);
 
       // Update thumbnail graded state
@@ -3315,11 +2975,11 @@ window.MGrade = (function () {
         // After auto-zero, deactivate every score button under this (sid, aid)
         // so the UI reflects the zeroed state (no button matches score=0).
         if (newStatus === 'NS' && clearsScores) {
-          card.querySelectorAll('.m-score-btn[data-aid="' + aid + '"]').forEach(function (btn) {
-            btn.classList.remove('m-score-active');
-          });
+          MC.paintLevelButtons(card.querySelectorAll('.m-score-btn[data-aid="' + aid + '"]'), 0, 0);
           card.querySelectorAll('.m-score-mods[data-aid="' + aid + '"]').forEach(function (box) {
-            box.innerHTML = _modBtnsHtml(0, 0);
+            box.setAttribute('aria-label', MC.fineTuneLabel(0, box.getAttribute('data-name')));
+            // html-safe: MC.fineTuneButtonsHTML is fixed markup
+            box.innerHTML = MC.fineTuneButtonsHTML(0, 0);
           });
         }
         // Dim the score rows when the assessment is flagged NS or EXC (not
@@ -3374,16 +3034,6 @@ window.MGrade = (function () {
       Grader.undoOnPhone(entry.cid, entry.sid, entry.aid, beforeScores, allScores);
       clearProfCache();
 
-      // Update UI
-      var card = document.querySelector('.m-swiper-card[data-sid="' + entry.sid + '"]');
-      if (card) {
-        var btns = card.querySelectorAll('.m-score-btn[data-tid="' + entry.tid + '"]');
-        var lastScore = prev.length ? prev[prev.length - 1].score : null;
-        btns.forEach(function (btn) {
-          var lvl = parseInt(btn.getAttribute('data-score'));
-          btn.classList.toggle('m-score-active', lastScore !== null && roundLevel(lastScore) === lvl);
-        });
-      }
       _syncModBtns(entry.cid, entry.sid, entry.aid, entry.tid);
       _updateThumbGraded(entry.cid, entry.aid);
       MC.showToast('Score reverted');
@@ -3902,8 +3552,7 @@ window.MGrade = (function () {
       sendRevision: sendRevision,
       takeBackRevision: takeBackRevision,
       showStudentPiece: showStudentPiece,
-      pageCriterion: pageCriterion,
-      toggleCritGroup: toggleCritGroup,
+      openPaperCriterion: openPaperCriterion,
       openSetTo: openSetTo,
       setToFromPaper: setToFromPaper,
       studentWork: function () {
@@ -3947,7 +3596,6 @@ window.MGrade = (function () {
     openFilterSheet: List.openFilterSheet,
     onFilterTogglePill: List.onFilterTogglePill,
     onFilterSegChange: List.onFilterSegChange,
-    applyFilterSheet: List.applyFilterSheet,
     clearFilterSheet: List.clearFilterSheet,
     renderSwiper: Speed.renderSwiper,
     setScore: Speed.setScore,
@@ -3982,8 +3630,7 @@ window.MGrade = (function () {
     sendRevision: Speed.sendRevision,
     takeBackRevision: Speed.takeBackRevision,
     showStudentPiece: Speed.showStudentPiece,
-    pageCriterion: Speed.pageCriterion,
-    toggleCritGroup: Speed.toggleCritGroup,
+    openPaperCriterion: Speed.openPaperCriterion,
     openSetTo: Speed.openSetTo,
     setToFromPaper: Speed.setToFromPaper,
     studentWork: Speed.studentWork,

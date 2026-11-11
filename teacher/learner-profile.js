@@ -491,7 +491,8 @@ var LearnerProfile = (function () {
     var grades = {};
     list.forEach(function (r) {
       var cell = assessmentCellValue(cid, sid, pieces[r.assessment_id]);
-      grades[r.assessment_id] = cell && cell.kind !== 'none' ? cell.text : '';
+      // The grade as a level chip in its colour (design rule 3); level 0 has none.
+      grades[r.assessment_id] = cell && cell.kind !== 'none' ? { text: cell.text, level: cell.level || 0 } : null;
     });
     return {
       cid: cid,
@@ -599,7 +600,13 @@ var LearnerProfile = (function () {
       '"><div class="rf-top"><h3 class="rf-title">' +
       esc(_title(f, r.assessment_id)) +
       '</h3>' +
-      (grade ? '<span class="rf-grade">' + esc(grade) + '</span>' : '') +
+      (grade
+        ? '<span class="rf-grade' +
+          (grade.level ? ' stu-level stu-level-' + roundLevel(grade.level) : '') +
+          '">' +
+          esc(grade.text) +
+          '</span>'
+        : '') +
       '<span class="rf-sense' +
       (r.makes_sense === 'yes' ? ' is-yes' : ' is-unsure') +
       '">' +

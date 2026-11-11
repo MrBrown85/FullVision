@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { cardMenuItem } from './card-menu.js';
 
 /* S2-F1, the review's findings, held in the browser:
    - the question belongs to the dialog it is asked over: leaving the page
@@ -120,7 +121,7 @@ test.describe('the question goes with the page it was asked on', () => {
     const card = page.locator('#ac-sci8a4');
     await card.waitFor();
     if (!(await card.evaluate(el => el.classList.contains('open')))) await card.locator('.assess-title').click();
-    await card.locator('[data-action="printRubrics"]').first().click();
+    await (await cardMenuItem(card, 'printRubrics')).click();
     await page.getByRole('dialog', { name: 'Print Rubrics' }).locator('[data-rp="print"]').click();
     await expect(question(page)).toBeVisible();
     await page.goBack();
@@ -213,7 +214,7 @@ test.describe('a Return that does not return every draft it named', () => {
     const card = page.locator('#ac-sci8a4');
     await card.waitFor();
     if (!(await card.evaluate(el => el.classList.contains('open')))) await card.locator('.assess-title').click();
-    await card.locator('[data-action="printRubrics"]').first().click();
+    await (await cardMenuItem(card, 'printRubrics')).click();
     const dialog = page.getByRole('dialog', { name: 'Print Rubrics' });
     await failTheRule(page);
     await dialog.locator('[data-rp="print"]').click();

@@ -221,6 +221,14 @@ describe('drawing', () => {
     expect(row.querySelector('.markup-note-n').textContent).toBe('1');
     expect(row.querySelector('.markup-note-text').innerHTML).toBe('Is this a &lt;reason&gt;?');
     expect(mk().querySelector('.markup-layer text').textContent).toBe('1');
+    // The board's callout: the words on the page at the pin, escaped,
+    // hidden from a screen reader (the list says them).
+    const callout = mk().querySelector('.markup-callouts .markup-callout');
+    expect(callout.closest('.markup-callouts').getAttribute('aria-hidden')).toBe('true');
+    expect(callout.style.left).toBe('50%');
+    expect(callout.style.top).toBe('50%');
+    expect(callout.querySelector('.markup-callout-n').textContent).toBe('1');
+    expect(callout.querySelector('.markup-callout-text').innerHTML).toBe('Is this a &lt;reason&gt;?');
   });
 
   it('Enter saves a note; Escape puts it away and leaves Mark Up open', async () => {
@@ -453,7 +461,7 @@ describe('answers that come late or say no', () => {
     tool('tick');
     pointer('pointerdown', 100, 100);
     await settle();
-    expect(mk().querySelector('.markup-msg').textContent).toBe('Mark Up is not ready for signed-in classes yet.');
+    expect(mk().querySelector('.markup-msg').textContent).toBe('Mark Up is not on for this class.');
   });
 
   it('each save sends the rev the last one answered, and its own key', async () => {

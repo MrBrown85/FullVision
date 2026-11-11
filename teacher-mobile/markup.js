@@ -3,7 +3,9 @@
 
    A full-screen view of one page of a student's work. The teacher draws on
    it with one finger and moves or zooms the page with two. Six tools: Pen,
-   Highlight, Note, Tick, Cross and Eraser; Undo and Redo; Done.
+   Highlight, Note, Tick, Cross and Eraser; red, green or blue for the Pen
+   and Highlight; Undo and Redo; Done. The notes' words show in a card
+   above the tools, each by its number on the page.
 
    Marks are data over the photo, never burned into it (DECISIONS, "Grades,
    photos and sign-in" 4): the page's picture is only shown, and the marks
@@ -19,9 +21,9 @@
    other class each save gives them at once, as a grade is.
 
    Shown only where MGradePhotos.on() holds (the build switch and Send Work).
-   Demo Mode only: signed in, getPageMarkup answers null and the screen does
-   not open. The screen is one overlay over the app; it is not on the nav
-   stack. */
+   In a signed-in class the piece's marks are read again from the server
+   when the screen opens (_readPiece). The screen is one overlay over the
+   app; it is not on the nav stack. */
 
 window.MMarkUp = (function () {
   'use strict';
@@ -36,6 +38,9 @@ window.MMarkUp = (function () {
     cross: 'Cross',
     eraser: 'Eraser',
   };
+  // The pen's and highlighter's colours, as the desktop's (shared/markup-draw.js COLORS).
+  var COLORS = ['red', 'green', 'blue'];
+  var COLOR_NAMES = { red: 'Red', green: 'Green', blue: 'Blue' };
   var MAX_MARKS = 500;
   var MAX_NOTE = 500;
   var TAP_SLOP = 10; // screen pixels a tap may move
@@ -116,6 +121,7 @@ window.MMarkUp = (function () {
       sid: sid,
       page: page,
       tool: 'pen',
+      color: 'red',
       marks: [],
       rev: 0,
       undo: [],
@@ -144,9 +150,31 @@ window.MMarkUp = (function () {
     root.addEventListener('pointercancel', _onCancel);
     document.addEventListener('keydown', _onKey);
     _loadPage();
+    _readPiece(_s);
     var done = root.querySelector('.m-markup-done');
     if (done) done.focus();
     return true;
+  }
+
+  /* A signed-in class: the piece's marks as the server has them now
+     (another device may have marked a page), read as the desktop's Mark Up
+     reads them (loadAssessmentMarkup, shared/data.js). Drawn only while the
+     same page is up and nothing has been drawn on it here; a save on stale
+     marks is answered changed, which the screen already shows. */
+  function _readPiece(s) {
+    if (typeof studentWorkLive !== 'function' || !studentWorkLive(s.cid)) return;
+    if (typeof loadAssessmentMarkup !== 'function') return;
+    var page = s.page;
+    loadAssessmentMarkup(s.cid, s.aid).then(function (read) {
+      if (!read || _s !== s || s.page !== page || s.dirty || s.undo.length || s.editing) return;
+      var file = _file();
+      var row = file ? getPageMarkup(s.cid, file.id) : null;
+      if (!row || (row.rev || 0) === s.rev) return;
+      s.marks = _copy((row.marks && row.marks.marks) || []);
+      s.rev = row.rev || 0;
+      _drawPage();
+      _drawChrome();
+    });
   }
 
   function _releaseImg() {
@@ -323,6 +351,13 @@ window.MMarkUp = (function () {
     _s.marks = _s.redo.pop();
     _s.dirty = true;
     _drawPage();
+    _drawChrome();
+  }
+
+  // The pen's and highlighter's colour.
+  function setColor(color) {
+    if (!_s || COLORS.indexOf(color) < 0) return;
+    _s.color = color;
     _drawChrome();
   }
 
@@ -506,10 +541,8 @@ window.MMarkUp = (function () {
     var t = _s.tool;
     if (t === 'pen' || t === 'highlight') {
       _s.stroke = { type: t, points: [_toPage(cx, cy)] };
-      if (t === 'pen') {
-        _s.stroke.color = 'red';
-        _s.stroke.width = MarkupDraw.PEN_WIDTH;
-      } else _s.stroke.width = MarkupDraw.HIGHLIGHT_WIDTH;
+      _s.stroke.color = _s.color;
+      _s.stroke.width = t === 'pen' ? MarkupDraw.PEN_WIDTH : MarkupDraw.HIGHLIGHT_WIDTH;
     } else if (t === 'eraser') {
       _s.erasing = {};
       _erase(cx, cy);
@@ -620,30 +653,42 @@ window.MMarkUp = (function () {
   }
 
   /* The marks as shared/markup-draw.js draws them for the desktop and the
-     student (the same SVG), and on the phone each note's words beside its
-     pin, as the phone board shows them. */
-  // html-safe: MarkupDraw.svgHtml escapes a note's words; the words here go through MC.esc; places are numbers
+     student (the same SVG): a note is its numbered pin. Its words are in the
+     white card above the tools (_notesCardHtml), never on the page, where a
+     note near the edge was cut off. */
+  // html-safe: MarkupDraw.svgHtml escapes a note's words
   function _marksHtml() {
     var hidden = _s.erasing || {};
     var shown = _s.marks.filter(function (m) {
       return !hidden[m.id];
     });
     if (_s.stroke) shown = shown.concat([_s.stroke]);
-    var marks = { v: 1, marks: shown };
-    var words = MarkupDraw.notes(marks)
-      .map(function (n) {
-        return (
-          '<div class="m-mk-note" style="left:' +
-          Number(n.x) * 100 +
-          '%;top:' +
-          Number(n.y) * 100 +
-          '%"><span class="m-mk-note-text">' +
-          MC.esc(n.text) +
-          '</span></div>'
-        );
-      })
-      .join('');
-    return MarkupDraw.svgHtml(marks, _s.size.h / _s.size.w) + words;
+    return MarkupDraw.svgHtml({ v: 1, marks: shown }, _s.size.h / _s.size.w);
+  }
+
+  /* The page's notes, each by its number, and what the student sees, in a
+     white card above the tools (the board "Phone: Mark Up a Photo"). */
+  // html-safe: note words and the line go through MC.esc; numbers are ours
+  function _notesCardHtml() {
+    var list = MarkupDraw.notes({ v: 1, marks: _s.marks });
+    if (!list.length) return '<p class="m-markup-sees">' + MC.esc(_seesLine()) + '</p>';
+    return (
+      '<div class="m-markup-card"><ol class="m-markup-card-notes">' +
+      list
+        .map(function (n) {
+          return (
+            '<li class="m-mk-note"><span class="m-mk-note-n" aria-hidden="true">' +
+            n.n +
+            '</span><span class="m-mk-note-text">' +
+            MC.esc(n.text) +
+            '</span></li>'
+          );
+        })
+        .join('') +
+      '</ol><p class="m-markup-sees">' +
+      MC.esc(_seesLine()) +
+      '</p></div>'
+    );
   }
 
   function _drawPage() {
@@ -701,9 +746,7 @@ window.MMarkUp = (function () {
         '</button></div></div>';
     } else {
       html =
-        '<p class="m-markup-sees">' +
-        MC.esc(_seesLine()) +
-        '</p>' +
+        _notesCardHtml() +
         (_s.msg ? '<p class="m-markup-msg" role="status">' + MC.esc(_s.msg) + '</p>' : '') +
         (n > 1
           ? '<div class="m-markup-pages">' +
@@ -733,7 +776,22 @@ window.MMarkUp = (function () {
           );
         }).join('') +
         '</div>' +
-        '<p class="m-markup-hint">One finger draws. Two fingers move the page.</p>';
+        '<div class="m-markup-foot"><span class="m-markup-colors" role="group" aria-label="Colour">' +
+        COLORS.map(function (c) {
+          return (
+            '<button type="button" class="m-markup-color m-markup-color-' +
+            c +
+            (_s.color === c ? ' is-on' : '') +
+            '" data-mk="color" data-color="' +
+            c +
+            '" aria-label="' +
+            COLOR_NAMES[c] +
+            '" aria-pressed="' +
+            (_s.color === c) +
+            '"></button>'
+          );
+        }).join('') +
+        '</span><p class="m-markup-hint">One finger draws. Two fingers move the page.</p></div>';
     }
     // html-safe: built above from escaped parts
     box.innerHTML = html;
@@ -753,6 +811,7 @@ window.MMarkUp = (function () {
     else if (what === 'undo') undo();
     else if (what === 'redo') redo();
     else if (what === 'tool') setTool(btn.getAttribute('data-tool'));
+    else if (what === 'color') setColor(btn.getAttribute('data-color'));
     else if (what === 'prev') goPage(-1);
     else if (what === 'next') goPage(1);
     else if (what === 'note-cancel') {
@@ -786,6 +845,7 @@ window.MMarkUp = (function () {
     undo: undo,
     redo: redo,
     setTool: setTool,
+    setColor: setColor,
     saveNote: saveNote,
     hitTest: hitTest,
     // For tests: the marks on screen now, not saved yet.

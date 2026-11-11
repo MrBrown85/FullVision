@@ -275,11 +275,17 @@ window.MAddWork = (function () {
     var line = sub.on_paper
       ? first + ' handed it in on paper'
       : first + ' already sent ' + MGradePhotos.photosText(files.length);
+    // A white sheet over the camera; only Add as More Pages is the blue
+    // button, Replace Them and Skip grey side by side (the board "Adding Work
+    // for a Student Who Already Sent Some").
     return (
-      '<div class="m-addwork-conflict">' +
-      '<div class="m-addwork-conflict-line">' +
+      '<div class="m-addwork-stage" aria-hidden="true"></div>' +
+      '<div class="m-addwork-conflict" role="group" aria-labelledby="m-addwork-conflict-line">' +
+      '<div class="m-addwork-grabber" aria-hidden="true"></div>' +
+      '<div class="m-addwork-conflict-line" id="m-addwork-conflict-line">' +
       MC.esc(line) +
       '</div>' +
+      '<div class="m-addwork-conflict-row">' +
       (files.length
         ? '<div class="m-addwork-conflict-pages">' +
           files
@@ -298,7 +304,7 @@ window.MAddWork = (function () {
         : '') +
       '<div class="m-addwork-conflict-when">' +
       MC.esc(_when(sub.sent_at || sub.created_at)) +
-      '</div>' +
+      '</div></div>' +
       '<div class="m-addwork-msg" role="status">' +
       MC.esc(_s.msg) +
       '</div>' +
@@ -308,14 +314,15 @@ window.MAddWork = (function () {
         : '<button type="button" class="m-addwork-choice" data-aw="add"' +
           (_s.busy ? ' disabled' : '') +
           '>Add as More Pages</button>') +
-      '<button type="button" class="m-addwork-choice" data-aw="replace"' +
+      '<div class="m-addwork-conflict-more">' +
+      '<button type="button" class="m-addwork-choice m-addwork-replace" data-aw="replace"' +
       (_s.busy ? ' disabled' : '') +
       '>Replace Them</button>' +
       '<button type="button" class="m-addwork-choice m-addwork-skip" data-aw="skip"' +
       (_s.busy ? ' disabled' : '') +
       '>' +
       MC.esc('Skip ' + first) +
-      '</button></div></div>'
+      '</button></div></div></div>'
     );
   }
 
