@@ -27,6 +27,7 @@
 import { readCardKey } from '../../supabase/functions/_shared/card-key.ts';
 import { makeHandler } from '../../supabase/functions/student-submit/handler.ts';
 import { FAKE_KEY, codeTag, passwordTag } from './card-key-fake.js';
+import { C1, fakeWorld } from './fake-send-world.js';
 
 const clone = v => JSON.parse(JSON.stringify(v));
 const no = (error, more) => Object.assign({ ok: false, error }, more);
@@ -226,8 +227,14 @@ export function sampleCard(today, more) {
  *   cardKey   what STUDENT_CARD_KEY is set to. Left out, a made-up key.
  *             null is no key; a string that is not 64 hex characters is a
  *             malformed one.
+ *   sendWork  the class has Send Work on, and these pieces take work:
+ *             { [assessment id]: { students_send, open } }. Batch B's
+ *             student functions and the bucket are then
+ *             tests/helpers/fake-send-world.js's, over this stand-in's
+ *             sessions, with links on `storeBase`. Left out, Send Work is
+ *             off and `work` says so, as for every class.
  * Returns { handle(body, headers) → the reply's JSON, respond(body) →
- * { status, json }, state, sql, logs }. `state` can be changed between
+ * { status, json }, state, sql, logs, world }. `state` can be changed between
  * calls: state.cards.P3R8WDK4.locked = true, state.addressLocked = true,
  * state.down = true (the database is unreachable). A card is added the same
  * way: state.cards.K7M4QX2P = sampleCard(today, { code: 'K7M4QX2P' }).
@@ -388,7 +395,26 @@ export function fakeStudentSubmit(opts = {}) {
       delete state.sessions[token];
       return { ok: true };
     },
+    // Send Work off: what the class takes, as student_submit.work answers it then.
+    work(token, enrollment) {
+      const found = inSession(token, enrollment);
+      return found.error ? no(found.error) : { ok: true, v: 1, send_work: false, assessments: [] };
+    },
   };
+  const world = opts.sendWork
+    ? fakeWorld({
+        enrollments: Object.fromEntries((opts.cards || []).map(k => [k.enrollment, { course: C1 }])),
+        assessments: Object.fromEntries(Object.entries(opts.sendWork).map(([a, take]) => [a, { course: C1, ...take }])),
+        sessionError: (token, enrollment) => {
+          const found = inSession(token, enrollment);
+          return found.error ? no(found.error) : null;
+        },
+        storeBase: opts.storeBase,
+        now,
+      })
+    : null;
+  const SEND_FNS = ['work', 'send_start', 'replace', 'send_paths', 'send_finish', 'unsend', 'file_links'];
+  const WORKER_FNS = ['removal_batch', 'removal_done'];
 
   const slip = name => async code => {
     if (state.down) throw new Error('down');
@@ -409,7 +435,9 @@ export function fakeStudentSubmit(opts = {}) {
         if (state.down) throw new Error('down');
         const fn = /^select student_submit\.(\w+)\(/.exec(text)[1];
         const add = /, p_add => (true|false)\) as r$/.exec(text);
+        if (world && WORKER_FNS.includes(fn)) return world.db.call(text, params);
         sql.push({ fn, params: params.slice(0, -1), add: add ? add[1] === 'true' : undefined });
+        if (world && SEND_FNS.includes(fn)) return world.db.call(text, params);
         const args = [...params, add ? add[1] === 'true' : undefined];
         // card and verify_card take the key id second. The stand-in only checks it is one.
         if (fn === 'card' || fn === 'verify_card') {
@@ -422,7 +450,7 @@ export function fakeStudentSubmit(opts = {}) {
   };
   // Reading the key is not instant, so the handler is ready a moment after the fake is made.
   const handler = readCardKey(opts.cardKey === undefined ? FAKE_KEY : opts.cardKey).then(cardKey =>
-    makeHandler({ ...options, cardKey }),
+    makeHandler({ ...options, cardKey, store: world ? world.store : null }),
   );
 
   const respond = async (body, headers) => {
@@ -440,5 +468,5 @@ export function fakeStudentSubmit(opts = {}) {
     );
     return { status: res.status, json: await res.json() };
   };
-  return { respond, handle: async (body, headers) => (await respond(body, headers)).json, state, sql, logs };
+  return { respond, handle: async (body, headers) => (await respond(body, headers)).json, state, sql, logs, world };
 }

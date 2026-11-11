@@ -28,6 +28,10 @@
  * kept in sessionStorage; openStudentPage({ store }) opens the page on a
  * device that already holds something (the same device, opened again).
  * `addresses` is each address the page has put in the bar (replaceState).
+ * A test of sending work sets `storage`, a function from (url, init) to
+ * { status, json, blob }: every fetch that is not the function's goes to it
+ * (an upload link's PUT, a download link's GET) and is recorded in
+ * `storageCalls`.
  * openStudentPage({ noStorage: true }) is a private window, where every use
  * of localStorage throws.
  *
@@ -91,6 +95,7 @@ export function openStudentPage(opts = {}) {
   const calls = [];
   const replies = [];
   const probes = [];
+  const storageCalls = [];
   const fetched = [];
   const net = { fail: () => false };
   const out = { server: null };
@@ -179,6 +184,22 @@ export function openStudentPage(opts = {}) {
       : storage(store),
     sessionStorage: storage(tab),
     fetch: async (url, init) => {
+      // Anything but the function (a page's upload link, a page's download link) goes to `storage`.
+      if (out.storage && !/\/functions\/v1\/student-submit\?/.test(url)) {
+        storageCalls.push({ url, method: (init && init.method) || 'GET', headers: (init && init.headers) || {} });
+        pending += 1;
+        try {
+          const r = await out.storage(url, init || {});
+          return {
+            ok: r.status >= 200 && r.status < 300,
+            status: r.status,
+            json: async () => r.json || {},
+            blob: async () => r.blob,
+          };
+        } finally {
+          setTimeout(() => (pending -= 1), 0);
+        }
+      }
       const body = JSON.parse(init.body);
       const answer = r => ({ json: async () => JSON.parse(JSON.stringify(r)) });
       if (out.server) {
@@ -201,6 +222,11 @@ export function openStudentPage(opts = {}) {
       return answer(replies.length ? replies.shift() : { ok: true });
     },
   };
+  // openStudentPage({ objectUrls: true }): URL.createObjectURL gives each picture a blob: address of its own.
+  if (opts.objectUrls) {
+    let made = 0;
+    sandbox.URL = { createObjectURL: () => 'blob:page/' + ++made, revokeObjectURL() {} };
+  }
   sandbox.window = sandbox;
   const ctx = vm.createContext(sandbox);
   pageNow = () => vm.runInContext('Date.now()', ctx);
@@ -248,6 +274,7 @@ export function openStudentPage(opts = {}) {
     calls,
     replies,
     probes,
+    storageCalls,
     fetched,
     net,
     store,
