@@ -6,6 +6,7 @@
  * carrying the line restores as any other.
  */
 import './setup.js';
+import { readFileSync } from 'fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const CID = 'b0000000-0000-4000-8000-0000000000a1';
@@ -104,5 +105,40 @@ describe('Download Class Backup and photos of student work', () => {
     expect(backup.photos).toBe(NOTE);
     const remapped = FVBackupRestore.remapBackup(backup, () => crypto.randomUUID());
     expect(remapped.backup.photos).toBe(NOTE);
+  });
+});
+
+describe('Restore Class from Backup and photos of student work', () => {
+  const LINE = 'Photos of student work are not in a backup.';
+  let wasDemo;
+
+  beforeEach(() => {
+    localStorage.clear();
+    wasDemo = window.isDemoMode;
+    window.isDemoMode = () => true;
+    saveCourses({ [CID]: { id: CID, name: 'Science 8', gradingSystem: 'proficiency' } });
+    saveCourseConfig(CID, {});
+  });
+
+  afterEach(() => {
+    window.isDemoMode = wasDemo;
+  });
+
+  it('has the exact line, put after "…scores and reports." in the dialog', () => {
+    expect(FVBackupRestore.PHOTOS_NOT_IN_BACKUP).toBe(LINE);
+    const src = readFileSync('teacher/dash-class-manager.js', 'utf-8');
+    const at = src.indexOf('scores and reports. ');
+    expect(at).toBeGreaterThan(0);
+    expect(src.slice(at, at + 600)).toMatch(
+      /FVBackupRestore\.anyClassTakesWork\(\)\s*\?\s*FVBackupRestore\.PHOTOS_NOT_IN_BACKUP \+ ' '\s*:\s*''\)\s*\+\s*'Your other classes are not changed\./,
+    );
+  });
+
+  it('is said once a class has its student page and Send Work on, and not before', () => {
+    expect(FVBackupRestore.anyClassTakesWork()).toBe(false);
+    saveDemoStudentWork(CID, { course: { send_work: true } });
+    expect(FVBackupRestore.anyClassTakesWork()).toBe(false);
+    saveCourseConfig(CID, { student_page_enabled: true });
+    expect(FVBackupRestore.anyClassTakesWork()).toBe(true);
   });
 });

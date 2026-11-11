@@ -854,8 +854,19 @@
     return settings && settings.student_page && send && send.send_work ? PHOTOS_NOTE : undefined;
   }
 
+  // Restore Class from Backup says the same, once any class takes work.
+  var PHOTOS_NOT_IN_BACKUP = 'Photos of student work are not in a backup.';
+
+  function anyClassTakesWork() {
+    return Object.keys(typeof COURSES !== 'undefined' && COURSES ? COURSES : {}).some(function (cid) {
+      return !!photosNote(cid);
+    });
+  }
+
   window.FVBackupRestore = {
     PHOTOS_NOTE: PHOTOS_NOTE,
+    PHOTOS_NOT_IN_BACKUP: PHOTOS_NOT_IN_BACKUP,
+    anyClassTakesWork: anyClassTakesWork,
     photosNote: photosNote,
     parseBackup: parseBackup,
     collectIds: collectIds,

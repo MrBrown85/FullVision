@@ -8056,7 +8056,12 @@ window.DashClassManager = (function () {
     overlay.innerHTML =
       '<div class="confirm-card cm-restore-card">' +
       '<div class="confirm-title" id="cm-restore-title">Restore Class from Backup</div>' +
-      '<div class="confirm-message">Choose a file saved by Download Class Backup. It becomes a new class with its students, competencies, assessments, scores and reports. Your other classes are not changed.</div>' +
+      '<div class="confirm-message">Choose a file saved by Download Class Backup. It becomes a new class with its students, competencies, assessments, scores and reports. ' +
+      // Fixed text, said once any class takes work (S8-F2; wording approved, ruling 102).
+      (typeof FVBackupRestore !== 'undefined' && FVBackupRestore.anyClassTakesWork()
+        ? FVBackupRestore.PHOTOS_NOT_IN_BACKUP + ' '
+        : '') +
+      'Your other classes are not changed.</div>' +
       '<div class="cm-field"><label class="cm-label" for="cm-restore-file">Backup File</label>' +
       '<input type="file" id="cm-restore-file" accept=".json,application/json"></div>' +
       '<div class="cm-restore-summary" id="cm-restore-summary" role="status"></div>' +
