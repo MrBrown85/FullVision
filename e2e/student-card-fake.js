@@ -26,10 +26,8 @@ export const SIGNED_OUT = 'You are signed out. Scan or type your card to open yo
 /* Answers the page's requests from `fn`. Returns the posts it saw. `fail`
    says which requests never arrive, `delay` holds a route's answers back
    ({ card: 600 }), and `answer` replaces the function's answer to one
-   request. `codes` ({ K7M4QX2P: 'P3R8WD' }) puts an eight-character card
-   code to the stand-in database as one of its cards, which it knows by six
-   characters as the database does today. Any request to anywhere but this
-   site and the function is recorded in `elsewhere`. */
+   request. Any request to anywhere but this site and the function is
+   recorded in `elsewhere`. */
 export async function serve(page, fn, opts = {}) {
   const posts = [];
   posts.elsewhere = [];
@@ -47,8 +45,7 @@ export async function serve(page, fn, opts = {}) {
     if (opts.delay && opts.delay[body.route]) await new Promise(r => setTimeout(r, opts.delay[body.route]));
     if (opts.fail && opts.fail(body)) return route.abort();
     // `answer` can stand in for the function on one request: { status, json }.
-    const asked = opts.codes && has(opts.codes, body.code) ? { ...body, code: opts.codes[body.code] } : body;
-    const { status, json } = (opts.answer && opts.answer(body)) || (await fn.respond(asked));
+    const { status, json } = (opts.answer && opts.answer(body)) || (await fn.respond(body));
     return route.fulfill({
       status,
       headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' },
@@ -58,7 +55,6 @@ export async function serve(page, fn, opts = {}) {
   return posts;
 }
 
-const has = (map, key) => typeof key === 'string' && Object.prototype.hasOwnProperty.call(map, key);
 export const routes = posts => posts.map(p => p.body.route);
 export const school = (card, more) => fakeStudentSubmit({ cards: [sampleCard(TODAY, card)], ...more });
 export const row = (page, title) => page.locator('.sp-row', { hasText: title });
@@ -117,7 +113,7 @@ export async function contrast(page) {
 }
 
 export async function signIn(page) {
-  await page.goto('/s/#P3R-8WD');
+  await page.goto('/s/#P3R8-WDK4');
   await expect(page.getByRole('heading', { name: 'Is this you, Cece?' })).toBeVisible();
   await page.getByLabel('Student Number').fill('0123456');
   await page.getByRole('button', { name: 'Yes, That’s Me' }).click();

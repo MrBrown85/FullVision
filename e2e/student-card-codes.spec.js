@@ -10,21 +10,22 @@ import {
   named,
   contrast,
   signIn,
+  TODAY,
 } from './student-card-fake.js';
+import { OMAR, sampleCard } from '../tests/helpers/fake-student-submit.js';
 
-/* Card codes are eight characters, shown K7M4-QX2P, and a replaced card
+/* Card codes are eight characters, shown P3R8-WDK4, and a replaced card
    says so (S3-F3a; Colin, Nov 10). Slips stay six, shown K7M-4QX.
 
-   The function is answered in the test by its own handler and routes over a
-   stand-in database (e2e/student-card-fake.js). That database knows cards
-   by six characters, as the database does today, so the eight-character
-   code is put to it as the sample card's (`codes`). The function on main
-   answers a replaced card not_found; card_stopped, as S3-E1 makes the card
-   routes answer it, is stood in for with `answer`. */
+   The function is answered in the test by its own handler and routes
+   (S3-E1) over a stand-in database (e2e/student-card-fake.js): the sample
+   card is eight characters, the database is handed its tag, and a replaced
+   card answers card_stopped. */
 
-const CARD = 'K7M4QX2P';
+const CARD = 'P3R8WDK4';
+// Omar's old card: his teacher has printed him a new one, so this one is stopped.
+const OLD_CARD = 'K7M4QX2P';
 const REPLACED = 'This card has been replaced. Ask your teacher for your new card.';
-const stopped = body => (body.code === CARD ? { status: 200, json: { ok: false, error: 'card_stopped' } } : null);
 
 // The code fits its box: nothing of it is scrolled out of sight.
 async function codeFits(page) {
@@ -42,8 +43,8 @@ for (const size of [
 
     test('scanned, it opens the student’s page', async ({ page }) => {
       const fn = school();
-      const posts = await serve(page, fn, { codes: { [CARD]: 'P3R8WD' } });
-      await page.goto('/s/#K7M4-QX2P');
+      const posts = await serve(page, fn);
+      await page.goto('/s/#P3R8-WDK4');
       await expect(page.getByRole('heading', { name: 'Is this you, Cece?' })).toBeVisible();
       await expect(page).toHaveURL(/\/s\/$/);
       await page.getByLabel('Student Number').fill('0123456');
@@ -59,17 +60,17 @@ for (const size of [
 
     test('typed with or without its dash, in lower case, it opens; it fits the box', async ({ page }) => {
       const fn = school();
-      const posts = await serve(page, fn, { codes: { [CARD]: 'P3R8WD' } });
+      const posts = await serve(page, fn);
       // The slip's box, on the page with no code.
       await page.goto('/s/');
-      await page.getByLabel('Type the code on your slip').fill('k7m4qx2p');
+      await page.getByLabel('Type the code on your slip').fill('p3r8wdk4');
       await codeFits(page);
       await page.getByRole('button', { name: 'Open' }).click();
       await expect(page.getByRole('heading', { name: 'Is this you, Cece?' })).toBeVisible();
       // The card's box, once the card is put back.
       await page.getByRole('button', { name: 'No, That’s Not Me' }).click();
       await page.getByRole('button', { name: 'Type a Different Code' }).click();
-      await page.getByLabel('Card Code').fill('K7M4-QX2P');
+      await page.getByLabel('Card Code').fill('P3R8-WDK4');
       await codeFits(page);
       await page.getByRole('button', { name: 'Continue' }).click();
       await expect(page.getByRole('heading', { name: 'Is this you, Cece?' })).toBeVisible();
@@ -81,10 +82,12 @@ for (const size of [
 
     test('a replaced card says so and signs the last student out', async ({ page }) => {
       const fn = school();
-      const posts = await serve(page, fn, { answer: stopped });
+      fn.state.cards[OLD_CARD] = sampleCard(TODAY, { code: OLD_CARD, enrollment: OMAR, first: 'Omar', stopped: true });
+      const posts = await serve(page, fn);
       await signIn(page);
       expect(Object.keys((await stored(page)).local)).toEqual(['fv-s-session']);
       posts.length = 0;
+      // Omar scans his old card on the device Cece left signed in.
       await page.goto('/s/#K7M4-QX2P');
       await expect(page.getByRole('alert')).toHaveText(REPLACED);
       await expect(page).toHaveURL(/\/s\/$/);
