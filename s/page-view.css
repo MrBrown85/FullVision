@@ -1966,3 +1966,36 @@
 .sp-view .sp-work {
   max-width: 620px;
 }
+
+/* Reflect on Feedback (S10): its button under Your Feedback, and Your Plan
+   From Last Time on the next piece to do. */
+.sp-view .sp-fb-reflect {
+  align-self: stretch;
+}
+.sp-view .sp-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0;
+  padding: 12px 14px;
+  border-left: 4px solid var(--sp-green-line, #2e7d32);
+  border-radius: 12px;
+  background: #f0f7f1;
+}
+.sp-view .sp-plan-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sp-green);
+}
+.sp-view .sp-plan-words {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.sp-view .sp-plan-from {
+  margin: 0;
+  font-size: 13px;
+  color: #58585d;
+}

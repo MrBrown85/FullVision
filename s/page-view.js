@@ -470,6 +470,7 @@ window.StudentPageView = (function () {
       '</h2>' +
       (todo && p.category ? '<p class="sp-piece-category">' + esc(p.category.name) + '</p>' : '') +
       (todo && p.description ? '<p class="sp-piece-about">' + esc(p.description) + '</p>' : '') +
+      (p.kind === 'due' ? planHtml(p) : '') +
       (p.kind === 'back' ? resultRows(p) + updatedNoteHtml(p, teacher) : '') +
       (p.kind === 'back' ? cardCommentHtml(p, teacher) : '') +
       (p.kind === 'sent' ? sentBlockHtml(p, teacher) : '') +
@@ -855,6 +856,45 @@ window.StudentPageView = (function () {
         : withLevels
           ? levelsHtml(view, ui)
           : '') +
+      reflectButtonHtml(view, p) +
+      '</section>'
+    );
+  }
+
+  /* Reflect on Feedback (S10-F1), under Your Feedback and See Your Work:
+     only on returned work, and only while the class's switch is on. Once
+     the student has reflected, the same place opens what they sent, and
+     the teacher's answer when it has come ("Ms. Rivera Answered"). The
+     screens themselves are the student page's (s/reflect.js); in Preview
+     as Student the button is shown and opens nothing. */
+  function reflectButtonHtml(view, p) {
+    if (!view || !view.reflectOn || !hasFeedback(p)) return '';
+    var r = p.reflection;
+    var teacher = teacherOf(view) || 'Your Teacher';
+    var open =
+      '<button type="button" class="sp-btn sp-btn-tint sp-btn-big sp-fb-reflect" data-act="reflect-open" data-piece="' +
+      esc(p.id) +
+      '">';
+    if (!r) return open + 'Reflect on Feedback</button>';
+    var answered = !!(r.answer || r.followUpAnswer);
+    return open + esc(answered ? teacher + ' Answered' : 'Your Reflection') + '</button>';
+  }
+
+  /* Your Plan From Last Time (S10-F2), on the next piece to do: the
+     student's own words, from their reflection on an earlier piece. */
+  function planHtml(p) {
+    if (!p.plan || !p.plan.text) return '';
+    return (
+      '<section class="sp-plan" aria-labelledby="' +
+      domId(p.id) +
+      '-plan"><h3 class="sp-plan-title" id="' +
+      domId(p.id) +
+      '-plan">Your Plan From Last Time</h3><p class="sp-plan-words">' +
+      esc(p.plan.text) +
+      '</p>' +
+      (p.plan.fromTitle
+        ? '<p class="sp-plan-from">' + esc('From your reflection on ' + p.plan.fromTitle) + '</p>'
+        : '') +
       '</section>'
     );
   }
@@ -1131,6 +1171,7 @@ window.StudentPageView = (function () {
       (pages.length ? '<p class="sp-fb-sub">' + esc('Page ' + (i + 1) + ' of ' + pages.length) + '</p>' : '') +
       '</div></div>' +
       body +
+      reflectButtonHtml(view, p) +
       '</section>'
     );
   }
@@ -2270,5 +2311,7 @@ window.StudentPageView = (function () {
     photosWord: photosWord,
     thumbsHtml: thumbsHtml,
     marksLine: marksLine,
+    planHtml: planHtml,
+    initialsHtml: initialsHtml,
   };
 })();

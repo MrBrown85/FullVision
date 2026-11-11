@@ -99,6 +99,10 @@ var StudentPage = (function () {
       demoSend: false,
       send: null,
       demoSent: {},
+      // Reflect on Feedback (s/reflect.js, S10): Demo Mode's switch, what the sample has sent (s/feedback.js), the screen.
+      demoReflect: false,
+      demoReflections: null,
+      reflect: null,
       sendAsk: null,
       ident: null, // what matched on a questionnaire slip, kept to open again if the session runs out
       number: '', // the student number or slip password as typed
