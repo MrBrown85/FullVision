@@ -115,7 +115,8 @@ select 'Vault secret ' || n, 'set (the timer''s runs fail until it is)', 'not se
 -- public._keep_photos_day, written out here because the function is not
 -- there yet), whether that day has already passed, whether the class is in
 -- the trash (skipped by the job), and how many pages were made before
--- midnight after that day. A row whose day has passed (gone_tonight = yes)
+-- midnight after that day. A row whose day is today or has passed
+-- (gone_tonight = yes: the first night, after the apply, runs after it)
 -- is deleted the first night: read it before applying. On 2026-11-11 live
 -- held no photos, so this was expected to return no rows.
 with c as (
@@ -138,6 +139,6 @@ select k.id as course_id, k.keep_photos_until as choice, k.day::text as deleted_
        case when k.in_trash then 'yes (skipped)' else 'no' end as in_trash,
        (select count(*) from public.submission s join public.submission_file f on f.submission_id = s.id
          where s.course_id = k.id and s.state = 'sent' and f.created_at < ((k.day + 1)::timestamp at time zone k.tz)) as pages_before,
-       case when k.day < k.today and not k.in_trash then 'yes' else 'no' end as gone_tonight
+       case when k.day <= k.today and not k.in_trash then 'yes' else 'no' end as gone_tonight
   from k
  order by 1;

@@ -997,6 +997,16 @@ def scen_review():
         d.run("update course set reporting_terms = null where id = :c", c=COURSE_A)
         rows = [[plain(v) for v in x] for x in d.c.run(pre[-1])]
         ok('End of Year reads next June 30', rows and rows[0][1:3] == ['end_of_year', '2027-06-30'], rows)
+        # Applied on a term's last day: that night's first run deletes, so the pre-check must say so (review 2, should-fix 1).
+        d.run("update course set keep_photos_until = 'end_of_term', timezone = 'America/Vancouver' where id = :c", c=COURSE_A)
+        today = d.one("select (now() at time zone 'America/Vancouver')::date")
+        terms(d, COURSE_A, [today, today + datetime.timedelta(days=60)])
+        rows = [[plain(v) for v in x] for x in d.c.run(pre[-1])]
+        ok("applied on a term's last day: the day has not passed, but gone_tonight says yes (the first run is that night)",
+           rows and rows[0][2:5] == [str(today), 'no', 'no'] and rows[0][6] == 'yes', rows)
+        if has_file(d):
+            night(d, COURSE_A, run_on(today + datetime.timedelta(days=1)))
+            ok('and that night does delete them', pages(d) == 0)
         ok('the second query reads no student column (counts only)',
            not re.search(r'\b(first_name|last_name|preferred_name|date_of_birth|student_number|note)\b', pre[-1]))
     finally:

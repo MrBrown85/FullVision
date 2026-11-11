@@ -6,13 +6,22 @@
 --
 -- Expected: NO ROWS. Each row is one thing that is not as the file should
 -- have left it: what it is, what was expected, what was found. It proves
--- the eight functions and the procedure are the ones tested, run by nobody
+-- the nine functions and the procedure, and the one function it replaces
+-- (student_submit._grading_started), are the ones tested, run by nobody
 -- but their owner (and pg_cron, as the owner); the functions they rely on
 -- are untouched; the three tables have row security on and no grant; the
 -- two jobs are scheduled with the tested times and commands; the Vault
 -- secrets are set (by name: no value is read); and no SECURITY DEFINER
 -- function lost pg_temp. Written by migrations/local-test/photo_lifecycle.py,
 -- never by hand.
+--
+-- AFTER THIS FILE, USE THIS POST-CHECK. C1's post-check
+-- (batch-c1-live-postcheck.sql) and the send rules' post-check
+-- (send-rules-live-postcheck.sql) will list
+-- student_submit._grading_started as changed, because this file replaces it
+-- (C1's body plus the kept-marks condition). That is expected, not a fault.
+-- For the same reason C1's file and the send rules' file refuse to run
+-- again, with nothing changed.
 with relied(fn, md5) as (values
     -- FINGERPRINTS-BEGIN relied
     ('public._grade_return_lock(uuid)',                                      '530dca441198b1546a4ec4967cd83b9f'),
