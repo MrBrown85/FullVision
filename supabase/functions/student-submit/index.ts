@@ -20,11 +20,14 @@
 // to Storage or Auth gives up after 10 seconds. The removal worker that
 // follows a phone's route runs after the answer is sent, through
 // EdgeRuntime.waitUntil, where the runtime has it; otherwise before it.
+// `scheduled-sweep` is the database's timer (pg_cron through pg_net): it
+// carries PHOTO_SWEEP_SECRET, which this function and Vault both hold.
 import postgres from 'https://deno.land/x/postgresjs@v3.4.5/mod.js';
 import { loadCardKey } from '../_shared/card-key.ts';
 import { storageRest } from '../_shared/storage-rest.ts';
 import { authUser } from '../_shared/teacher-auth.ts';
 import { makeHandler } from './handler.ts';
+import { sweepSecret } from './send-routes.ts';
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false, max: 2, idle_timeout: 20 });
 
@@ -38,6 +41,12 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL');
 const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
 
+// The database timer's secret for scheduled-sweep (migrations/2026111140,
+// section 6): exactly 64 lower-case hex characters, the same value as the
+// Vault secret fv_photo_sweep_secret, or none (then that route answers a
+// server error, and its log line says so). Never logged.
+const photoSweepSecret = sweepSecret(Deno.env.get('PHOTO_SWEEP_SECRET'));
+
 const edge = (globalThis as { EdgeRuntime?: { waitUntil?: (work: Promise<unknown>) => void } }).EdgeRuntime;
 const waitUntil = edge && typeof edge.waitUntil === 'function' ? edge.waitUntil.bind(edge) : null;
 
@@ -47,6 +56,7 @@ const handle = makeHandler({
   store: supabaseUrl && serviceKey ? storageRest(fetch, supabaseUrl, serviceKey) : null,
   whoIs: supabaseUrl && anonKey ? authUser(fetch, supabaseUrl, anonKey) : null,
   defer: waitUntil ? (work: Promise<void>) => waitUntil(work) : null,
+  sweepSecret: photoSweepSecret,
   // A secret only this function holds; rotating it just resets the rate
   // limit windows.
   ipKey: Deno.env.get('STUDENT_SUBMIT_IP_KEY') || Deno.env.get('SUPABASE_DB_URL')!,

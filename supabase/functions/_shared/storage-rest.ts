@@ -67,13 +67,14 @@ export function pathParts(path: unknown): PathParts | null {
   return { course: m[1], assessment: m[2], enrollment: m[3], submission: m[4], file: m[5], thumb: !!m[6] };
 }
 
-export type Read = { bytes: Uint8Array } | 'missing' | 'too_large';
+// Bytes backed by a plain ArrayBuffer (never a SharedArrayBuffer), as fetch's body and Web Crypto take them.
+export type Read = { bytes: Uint8Array<ArrayBuffer> } | 'missing' | 'too_large';
 
 export type Store = {
   signUpload: (path: string) => Promise<string>;
   signDownloads: (paths: string[], seconds: number) => Promise<Record<string, string>>;
   read: (path: string, maxBytes: number) => Promise<Read>;
-  overwrite: (path: string, bytes: Uint8Array) => Promise<void>;
+  overwrite: (path: string, bytes: Uint8Array<ArrayBuffer>) => Promise<void>;
   remove: (paths: string[]) => Promise<void>;
 };
 
