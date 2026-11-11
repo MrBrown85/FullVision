@@ -1594,6 +1594,24 @@
         MGrade.returnAndNext();
         return;
       }
+      // Revisions (S11-F1): For Revision, its sheet's Return for Revision, Take Back.
+      if (action === 'm-grade-revision') {
+        MGrade.openRevisionSheet(_cid, target.getAttribute('data-aid'), target.getAttribute('data-sid'));
+        return;
+      }
+      if (action === 'm-grade-revision-send') {
+        MGrade.sendRevision(_cid, target.getAttribute('data-aid'), target.getAttribute('data-sid'), target);
+        return;
+      }
+      if (action === 'm-grade-revision-takeback') {
+        MGrade.takeBackRevision(
+          _cid,
+          target.getAttribute('data-aid'),
+          target.getAttribute('data-sid'),
+          target.getAttribute('data-id'),
+        );
+        return;
+      }
       if (action === 'm-grade-return-all') {
         MGrade.askReturnAll(_cid, target.getAttribute('data-aid'), target);
         return;
