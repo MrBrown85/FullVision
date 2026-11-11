@@ -28,7 +28,8 @@
          feedback: the id of the piece Your Feedback is open on, whole:
          true for its The Whole Rubric (also for work not back yet, from
          See the Rubric), compare: true for its Before and After (a
-         returned revision, S11-F2), levels: What the Levels Mean is open,
+         returned revision, S11-F2), levels: What the Levels Mean is closed
+         (it starts open),
          form: the questionnaire or report picked on a Chromebook,
          noResults: the results didn't load (say so, with Try Again),
          sending: Try Again is under way, waiting: the view is not here yet,
@@ -142,11 +143,22 @@ window.StudentPageView = (function () {
     { id: 'back', label: 'Back' },
   ];
   function inSegment(view, id) {
-    return view.work.filter(function (p) {
+    var list = view.work.filter(function (p) {
       if (id === 'todo') return p.kind === 'due' || p.kind === 'missing' || p.kind === 'revise';
       if (id === 'back') return p.kind === 'back';
       return id === 'sent' && p.kind === 'sent';
     });
+    // A revision asked for leads To Do (the Needs Revision board: "1 of 3"); the rest keep their order.
+    if (id !== 'todo') return list;
+    return list
+      .filter(function (p) {
+        return p.kind === 'revise';
+      })
+      .concat(
+        list.filter(function (p) {
+          return p.kind !== 'revise';
+        }),
+      );
   }
   function counts(view) {
     return { todo: view.counts.toDo + view.counts.missing, sent: view.counts.sent, back: view.counts.back };
@@ -225,7 +237,9 @@ window.StudentPageView = (function () {
     var rows = [];
     if (p.result && p.result.text) rows.push({ name: 'Your Result', text: p.result.text, level: null });
     (p.rubric ? p.rubric.rows : p.competencies || []).forEach(function (r) {
-      if (r.text) rows.push({ name: r.name, text: r.text, level: r.level, was: r.was });
+      // A rubric criterion names the competencies it counts toward under it (the Returned Work board).
+      var toward = p.rubric && r.toward ? r.toward.join(', ') : '';
+      if (r.text) rows.push({ name: r.name, text: r.text, level: r.level, was: r.was, toward: toward });
     });
     if (!rows.length) return '';
     return (
@@ -233,9 +247,14 @@ window.StudentPageView = (function () {
       rows
         .map(function (r) {
           return (
-            '<li class="sp-piece-row"><span class="sp-piece-row-name">' +
-            esc(r.name) +
-            '</span>' +
+            '<li class="sp-piece-row">' +
+            (r.toward
+              ? '<span class="sp-piece-row-label"><span class="sp-piece-row-name">' +
+                esc(r.name) +
+                '</span><span class="sp-piece-row-sub">' +
+                esc(r.toward) +
+                '</span></span>'
+              : '<span class="sp-piece-row-name">' + esc(r.name) + '</span>') +
             (r.was
               ? '<span class="sp-was-wrap">' +
                 chipHtml(r.text, r.level) +
@@ -271,31 +290,73 @@ window.StudentPageView = (function () {
     );
   }
 
-  // The card's pills: when it is due or came back, Missing, Late, Updated.
+  var PILL_ICON = {
+    clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+    camera: '<path d="M4 8.5h3l1.6-2.2h6.8L17 8.5h3v10H4z"/><circle cx="12" cy="13.2" r="3.2"/>',
+    again: '<path d="M19 12a7 7 0 1 1-2.1-5"/><path d="M19 4.5V8h-3.5"/>',
+    lock: '<rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>',
+    next: '<path d="M4 12h15M13 6l6 6-6 6"/>',
+  };
+  function pillIcon(name, size) {
+    return (
+      '<svg class="sp-pill-icon" viewBox="0 0 24 24" width="' +
+      (size || 12) +
+      '" height="' +
+      (size || 12) +
+      '" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+      PILL_ICON[name] +
+      '</svg>'
+    );
+  }
+  function pillHtml(kind, text, icon) {
+    return '<span class="sp-flag sp-flag-' + kind + '">' + (icon ? pillIcon(icon) : '') + esc(text) + '</span>';
+  }
+
+  // Work still to do whose last day to send has passed (the Closed Assignment board).
+  function isClosed(p) {
+    return (p.kind === 'due' || p.kind === 'missing') && !!(p.send && p.send.takes && !p.send.open);
+  }
+
+  /* The pill at the top right of a card still to do, on the unit's line: when
+     it is due, with a clock (the To Do Card board). A closed piece has none. */
+  function duePill(p) {
+    if ((p.kind !== 'due' && p.kind !== 'missing') || !p.dueDate || isClosed(p)) return '';
+    return pillHtml('due', 'Due ' + fmtDate(p.dueDate, DUE_DAY), 'clock');
+  }
+
+  /* The card's pills under its title: where it stands (Returned, Updated,
+     Missing, Revise by, Sent with its photos, Closed), Group, Late. */
   function pills(p) {
-    var due = p.dueDate ? 'Due ' + fmtDate(p.dueDate, DUE_DAY) : '';
     var out = [];
     // A returned grade changed since the student last looked says when (the board's "Updated Nov 12").
-    if (p.kind === 'back' && p.updated) out.push(['updated', 'Updated ' + fmtDate(p.updatedAt || p.returnedAt, DAY)]);
-    else if (p.kind === 'back') out.push(['back', 'Returned ' + fmtDate(p.returnedAt, DAY)]);
-    else if (p.kind === 'missing') out.push(['missing', 'Missing']);
+    if (p.kind === 'back' && p.updated)
+      out.push(pillHtml('updated', 'Updated ' + fmtDate(p.updatedAt || p.returnedAt, DAY)));
+    else if (p.kind === 'back') out.push(pillHtml('back', 'Returned ' + fmtDate(p.returnedAt, DAY)));
+    else if (p.kind === 'missing') out.push(pillHtml('missing', 'Missing'));
     else if (p.kind === 'revise') {
       // "Revise by Tue, Nov 10" (the Needs Revision board).
       var by = p.revision && p.revision.reviseBy;
-      out.push(['revise', by ? 'Revise by ' + fmtDate(by, DUE_DAY) : 'Needs Revision']);
+      out.push(pillHtml('revise', by ? 'Revise by ' + fmtDate(by, DUE_DAY) : 'Needs Revision', 'again'));
     } else if (p.kind === 'sent') {
-      var at = (p.send && p.send.sent && p.send.sent.at) || (p.group && p.group.sentAt) || '';
-      out.push(['sent', at ? 'Sent ' + fmtDate(at, DAY) : 'Sent']);
+      // "Sent Nov 4 · 3 photos" (the Sent, Being Graded board).
+      var sent = (p.send && p.send.sent) || {};
+      var at = sent.at || (p.group && p.group.sentAt) || '';
+      var pages = p.group && p.group.sent ? p.group.pages : sent.pages;
+      out.push(
+        pillHtml(
+          'sent',
+          [at ? 'Sent ' + fmtDate(at, DAY) : 'Sent', photosWord(pages)].filter(Boolean).join(SEP),
+          'camera',
+        ),
+      );
     }
+    // "Closed Nov 13" (the Closed Assignment board).
+    if (isClosed(p))
+      out.push(pillHtml('closed', p.send.closesOn ? 'Closed ' + fmtDate(p.send.closesOn, DAY) : 'Closed'));
     // One per Group (S12-F1, the board's "Group" tag).
-    if (p.group) out.push(['quiet', 'Group']);
-    if (p.kind !== 'back' && p.kind !== 'sent' && p.kind !== 'revise' && due) out.push(['due', due]);
-    if (p.late) out.push(['quiet', 'Late']);
-    return out
-      .map(function (x) {
-        return '<span class="sp-flag sp-flag-' + x[0] + '">' + esc(x[1]) + '</span>';
-      })
-      .join('');
+    if (p.group) out.push(pillHtml('quiet', 'Group'));
+    if (p.late) out.push(pillHtml('quiet', 'Late'));
+    return out.join('');
   }
 
   // An id as it may sit inside a selector's quotes.
@@ -357,7 +418,7 @@ window.StudentPageView = (function () {
     var list = p.coreCompetencies || [];
     if (!list.length) return '';
     return (
-      '<div class="sp-core"><span class="sp-graded-on-title">' +
+      '<div class="sp-core"><span class="sp-graded-on-title sp-core-label">' +
       (list.length === 1 ? 'Core Competency' : 'Core Competencies') +
       '</span>' +
       list
@@ -378,18 +439,20 @@ window.StudentPageView = (function () {
   function sendBlockHtml(p) {
     var send = p.send;
     if (!send || !send.takes) return '';
-    if (!send.open) {
-      return (
-        '<div class="sp-send-closed"><p class="sp-send-closed-title">' +
-        esc(send.closesOn ? 'Closed ' + fmtDate(send.closesOn, DAY) : 'Closed') +
-        '</p><p class="sp-send-closed-line">Hand this one in on paper</p></div>'
-      );
-    }
+    // Closed: the pill under the title says when; a locked row says what to do.
+    if (!send.open) return lockRowHtml('Hand this one in on paper', 'sp-send-closed-line');
     return (
-      '<button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="send-open" data-piece="' +
+      '<button type="button" class="sp-btn sp-btn-primary sp-btn-big sp-btn-icon" data-act="send-open" data-piece="' +
       esc(p.id) +
-      '">Send My Work</button>'
+      '">' +
+      pillIcon('camera', 20) +
+      'Send My Work</button>'
     );
+  }
+
+  // A grey row with a lock: what the student can't change and why (the Closed and Being Graded boards).
+  function lockRowHtml(text, cls) {
+    return '<p class="sp-lock-row ' + cls + '">' + pillIcon('lock', 18) + '<span>' + esc(text) + '</span></p>';
   }
 
   // The student's own pages, small, as this device has them.
@@ -459,7 +522,11 @@ window.StudentPageView = (function () {
             : '';
     return (
       thumbsHtml(sent.thumbs, 'Your page') +
-      (line ? '<p class="sp-send-line">' + esc(line) + '</p>' : '') +
+      (line
+        ? sent.grading && !sent.onPaper
+          ? lockRowHtml(line, 'sp-send-line')
+          : '<p class="sp-send-line">' + esc(line) + '</p>'
+        : '') +
       (join
         ? '<button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="send-open" data-piece="' +
           esc(p.id) +
@@ -487,10 +554,11 @@ window.StudentPageView = (function () {
     var r = p.revision;
     if (!r || p.kind !== 'revise') return '';
     var takes = p.send && p.send.takes;
+    // The Needs Revision board: the teacher's words in a blue-tinted block, the first version under it, then the one button.
     return (
       '<section class="sp-revise sp-revise-' +
       where +
-      '" aria-label="Needs Revision"><p class="sp-revise-who">Your Teacher</p><p class="sp-revise-fix">' +
+      '" aria-label="Needs Revision"><div class="sp-revise-said"><p class="sp-revise-who">Your Teacher</p><p class="sp-revise-fix">' +
       esc(r.whatToFix) +
       '</p>' +
       (r.criteria.length
@@ -502,13 +570,16 @@ window.StudentPageView = (function () {
             .join('') +
           '</p>'
         : '') +
+      '</div>' +
       (r.firstThumbs.length
         ? '<p class="sp-revise-first">Your First Version</p>' + thumbsHtml(r.firstThumbs, 'First version, page')
         : '') +
       (takes
-        ? '<button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="revise-open" data-piece="' +
+        ? '<button type="button" class="sp-btn sp-btn-primary sp-btn-big sp-btn-icon" data-act="revise-open" data-piece="' +
           esc(p.id) +
-          '">Send My Revision</button>'
+          '">' +
+          pillIcon('camera', 20) +
+          'Send My Revision</button>'
         : '') +
       '</section>'
     );
@@ -534,18 +605,24 @@ window.StudentPageView = (function () {
     );
   }
 
-  // One line of Before and After: a level then and now, or "No change".
-  function baRowHtml(name, before, beforeLevel, after, level, same) {
+  /* One line of Before and After: a level then and now, or "No change".
+     Your Result (`result`) shows the old one as plain grey words and the
+     new one bold in its level's colour (the board's "2.7 · 67% → 3.0 · 75%"). */
+  function baRowHtml(name, before, beforeLevel, after, level, same, result) {
+    var then = result
+      ? '<span class="sp-ba-old">' + esc(before) + '</span>'
+      : '<span class="sp-ba-was">' + chipHtml(before, beforeLevel) + '</span>';
+    var now = result
+      ? '<span class="sp-ba-new sp-ink-' + lvClass(level) + '">' + esc(after) + '</span>'
+      : chipHtml(after, level);
     return (
-      '<li class="sp-ba-row"><span class="sp-ba-name">' +
+      '<li class="sp-ba-row' +
+      (result ? ' sp-ba-row-result' : '') +
+      '"><span class="sp-ba-name">' +
       esc(name) +
       '</span><span class="sp-ba-move">' +
-      (same
-        ? '<span class="sp-ba-same">No change</span>'
-        : before
-          ? '<span class="sp-ba-was">' + chipHtml(before, beforeLevel) + '</span>' + TO_ARROW
-          : '') +
-      chipHtml(after, level) +
+      (same ? '<span class="sp-ba-same">No change</span>' : before ? then + TO_ARROW : '') +
+      now +
       '</span></li>'
     );
   }
@@ -559,14 +636,20 @@ window.StudentPageView = (function () {
     var sub = [view.course && view.course.name, 'Revision returned ' + fmtDate(p.returnedAt, DAY)]
       .filter(Boolean)
       .join(SEP);
+    /* The Before and After boards: one card with both versions, each row's
+       level then and now and Your Result; what was asked and what the
+       student did in one card under it. On a Chromebook the versions sit
+       on the left and the rest beside them (page-view.css). */
+    var reflect = reflectButtonHtml(view, p, true);
     return (
       '<section class="sp-feedback sp-ba" aria-labelledby="sp-fb-title">' +
       feedbackHead('Assignments', 'feedback-close', p.title, sub, p.unseen ? p.id : '', 'sp-fb-title') +
-      '<h2 class="sp-fb-section sp-ba-title">Before and After</h2>' +
+      '<div class="sp-ba-body"><div class="sp-ba-card">' +
+      '<h2 class="sp-ba-title">Before and After</h2>' +
       '<div class="sp-ba-versions">' +
       versionHtml(r.firstThumbs, 'First Version', r.firstSentAt) +
       versionHtml(r.thumbs, 'Your Revision', r.sentAt) +
-      '</div><ul class="sp-ba-rows">' +
+      '</div><div class="sp-ba-panel"><ul class="sp-ba-rows">' +
       b.rows
         .map(function (row) {
           return baRowHtml(row.name, row.before, row.beforeLevel, row.after, row.level, row.same);
@@ -575,10 +658,11 @@ window.StudentPageView = (function () {
       '</ul>' +
       (b.result.text && p.result.text
         ? '<ul class="sp-ba-rows sp-ba-result">' +
-          baRowHtml('Your Result', b.result.text, b.result.level, p.result.text, p.result.level, false) +
+          baRowHtml('Your Result', b.result.text, b.result.level, p.result.text, p.result.level, false, true) +
           '</ul>'
         : '') +
-      '<div class="sp-ba-said"><h3 class="sp-ba-said-title">Your Teacher Asked</h3><p class="sp-ba-words">' +
+      '</div></div>' +
+      '<div class="sp-ba-saids"><div class="sp-ba-said"><h3 class="sp-ba-said-title">Your Teacher Asked</h3><p class="sp-ba-words">' +
       esc(r.whatToFix) +
       '</p></div>' +
       (r.note
@@ -586,11 +670,15 @@ window.StudentPageView = (function () {
           esc(r.note) +
           '</p></div>'
         : '') +
-      '<button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="feedback" data-piece="' +
+      '</div></div>' +
+      // With Reflect on Feedback the board makes it the primary button and See Your Feedback the quieter one.
+      '<div class="sp-ba-actions"><button type="button" class="sp-btn ' +
+      (reflect ? 'sp-btn-tint' : 'sp-btn-primary') +
+      ' sp-btn-big" data-act="feedback" data-piece="' +
       esc(p.id) +
       '">See Your Feedback</button>' +
-      reflectButtonHtml(view, p) +
-      '</section>'
+      reflect +
+      '</div></section>'
     );
   }
 
@@ -600,9 +688,23 @@ window.StudentPageView = (function () {
     return '<p class="sp-piece-comment">' + esc(p.comment) + '</p>';
   }
 
+  /* A card's first line: its unit on the left and, on work still to do, when
+     it is due on the right (the To Do Card board). Nothing when it has neither. */
+  function headHtml(p) {
+    var due = duePill(p);
+    if (!p.unit && !due) return '';
+    return (
+      '<div class="sp-piece-head">' +
+      (p.unit ? '<p class="sp-piece-unit">' + esc(p.unit) + '</p>' : '<span></span>') +
+      due +
+      '</div>'
+    );
+  }
+
   function cardHtml(p, picked) {
     var unseen = p.kind === 'back' && p.unseen && p.result && p.result.text;
     var todo = p.kind === 'due' || p.kind === 'missing';
+    var tags = pills(p);
     return (
       '<article class="sp-piece sp-piece-' +
       kindOf(p) +
@@ -614,15 +716,16 @@ window.StudentPageView = (function () {
       ' aria-labelledby="' +
       domId(p.id) +
       '"><div class="sp-piece-card">' +
-      (p.unit ? '<p class="sp-piece-unit">' + esc(p.unit) + '</p>' : '') +
-      '<div class="sp-piece-tags">' +
-      pills(p) +
-      '</div><h2 class="sp-piece-title" id="' +
+      headHtml(p) +
+      '<h2 class="sp-piece-title" id="' +
       domId(p.id) +
       '" tabindex="-1">' +
       esc(p.title) +
       '</h2>' +
-      (todo && p.category ? '<p class="sp-piece-category">' + esc(p.category.name) + '</p>' : '') +
+      (tags ? '<div class="sp-piece-tags">' + tags + '</div>' : '') +
+      (todo && p.category
+        ? '<p class="sp-piece-category"><span class="sp-category-pill">' + esc(p.category.name) + '</span></p>'
+        : '') +
       (todo && p.description ? '<p class="sp-piece-about">' + esc(p.description) + '</p>' : '') +
       (p.kind === 'due' ? planHtml(p) : '') +
       (p.kind === 'back' ? resultRows(p) + updatedNoteHtml(p) : '') +
@@ -636,7 +739,10 @@ window.StudentPageView = (function () {
           '">Before and After</button>'
         : '') +
       (hasFeedback(p)
-        ? '<button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="feedback" data-piece="' +
+        ? '<button type="button" class="sp-btn ' +
+          // One primary button on a card: on Needs Revision it is Send My Revision.
+          (p.kind === 'revise' && p.send && p.send.takes ? 'sp-btn-tint' : 'sp-btn-primary') +
+          ' sp-btn-big" data-act="feedback" data-piece="' +
           esc(p.id) +
           '">See Your Feedback</button>'
         : '') +
@@ -817,34 +923,36 @@ window.StudentPageView = (function () {
     });
   }
 
-  // What the Levels Mean, opened and closed by the student.
+  /* What the Levels Mean: open until the student closes it (ui.levels set
+     means closed), above Your Rubric (the Your Feedback board). On a
+     Chromebook it is always open, the four chips in a row (page-view.css). */
   function levelsHtml(view, ui) {
     var levels = view.levels || [];
     if (!levels.length) return '';
-    var open = !!ui.levels;
+    var open = !ui.levels;
     return (
-      '<section class="sp-fb-card sp-fb-levels"><button type="button" class="sp-fb-levels-btn" data-act="levels" aria-expanded="' +
+      '<section class="sp-fb-card sp-fb-levels' +
+      (open ? '' : ' sp-fb-levels-shut') +
+      '"><button type="button" class="sp-fb-levels-btn" data-act="levels" aria-expanded="' +
       (open ? 'true' : 'false') +
       '" aria-controls="sp-fb-levels-list"><span>What the Levels Mean</span>' +
       (open ? CLOSE_CHEVRON : OPEN_CHEVRON) +
       '</button>' +
-      (open
-        ? '<div id="sp-fb-levels-list"><ul class="sp-fb-legend">' +
-          levels
-            .map(function (l) {
-              return (
-                '<li class="sp-fb-legend-row"><span class="sp-fb-legend-chip">' +
-                chipHtml(l.name, l.level) +
-                '</span><span>' +
-                esc(LEVEL_LINES[l.level - 1] || '') +
-                '</span></li>'
-              );
-            })
-            .join('') +
-          '</ul><p class="sp-fb-fine">' +
-          esc(PLUS_MINUS) +
-          '</p></div>'
-        : '') +
+      '<div id="sp-fb-levels-list" class="sp-fb-levels-list"><ul class="sp-fb-legend">' +
+      levels
+        .map(function (l) {
+          return (
+            '<li class="sp-fb-legend-row"><span class="sp-fb-legend-chip">' +
+            chipHtml(l.name, l.level) +
+            '</span><span>' +
+            esc(LEVEL_LINES[l.level - 1] || '') +
+            '</span></li>'
+          );
+        })
+        .join('') +
+      '</ul><p class="sp-fb-fine">' +
+      esc(PLUS_MINUS) +
+      '</p></div>' +
       '</section>'
     );
   }
@@ -997,8 +1105,8 @@ window.StudentPageView = (function () {
       fbCommentHtml(p) +
       '</div>' +
       (crits
-        ? '<h2 class="sp-fb-section">Your Rubric</h2>' +
-          (withLevels ? levelsHtml(view, ui) : '') +
+        ? (withLevels ? levelsHtml(view, ui) : '') +
+          '<h2 class="sp-fb-section">Your Rubric</h2>' +
           '<div class="sp-fb-crits">' +
           crits +
           '</div>' +
@@ -1021,11 +1129,13 @@ window.StudentPageView = (function () {
      the teacher's answer when it has come ("Your Teacher Answered"). The
      screens themselves are the student page's (s/reflect.js); in Preview
      as Student the button is shown and opens nothing. */
-  function reflectButtonHtml(view, p) {
+  function reflectButtonHtml(view, p, primary) {
     if (!view || !view.reflectOn || !hasFeedback(p) || p.kind !== 'back') return '';
     var r = p.reflection;
     var open =
-      '<button type="button" class="sp-btn sp-btn-tint sp-btn-big sp-fb-reflect" data-act="reflect-open" data-piece="' +
+      '<button type="button" class="sp-btn ' +
+      (primary ? 'sp-btn-primary' : 'sp-btn-tint') +
+      ' sp-btn-big sp-fb-reflect" data-act="reflect-open" data-piece="' +
       esc(p.id) +
       '">';
     if (!r) return open + 'Reflect on Feedback</button>';
@@ -1042,7 +1152,9 @@ window.StudentPageView = (function () {
       domId(p.id) +
       '-plan"><h3 class="sp-plan-title" id="' +
       domId(p.id) +
-      '-plan">Your Plan From Last Time</h3><p class="sp-plan-words">' +
+      '-plan">' +
+      pillIcon('next', 14) +
+      'Your Plan From Last Time</h3><p class="sp-plan-words">' +
       esc(p.plan.text) +
       '</p>' +
       (p.plan.fromTitle
@@ -1534,15 +1646,49 @@ window.StudentPageView = (function () {
       (!view.work.length
         ? '<p class="sp-lead sp-empty">No assignments yet.</p>'
         : shown.length
-          ? '<ul class="sp-list">' +
-            shown
-              .map(function (p) {
-                return allRowHtml(p, changed[p.id]);
+          ? groupsOf(shown)
+              .map(function (g) {
+                return (
+                  (g.head ? '<h2 class="sp-list-head">' + esc(g.head) + '</h2>' : '') +
+                  '<ul class="sp-list">' +
+                  g.rows
+                    .map(function (p) {
+                      return allRowHtml(p, changed[p.id]);
+                    })
+                    .join('') +
+                  '</ul>'
+                );
               })
-              .join('') +
-            '</ul>'
+              .join('')
           : '<p class="sp-lead sp-empty" role="status">Nothing matches.</p>')
     );
+  }
+
+  /* All Assignments' groups (the board's "This Week" and "Unit 1 ·
+     Medieval Europe"): work still to hand in first, under This Week; then
+     the rest under its unit, in the order the units come; work with no
+     unit last, in a list of its own with no heading. With no unit and
+     nothing to hand in, one list as before. */
+  function groupsOf(rows) {
+    var now = rows.filter(function (p) {
+      return p.kind === 'due' || p.kind === 'missing';
+    });
+    var rest = rows.filter(function (p) {
+      return p.kind !== 'due' && p.kind !== 'missing';
+    });
+    var units = [];
+    var byUnit = {};
+    var loose = [];
+    rest.forEach(function (p) {
+      var u = String(p.unit || '').trim();
+      if (!u) return loose.push(p);
+      if (!byUnit[u]) units.push((byUnit[u] = { head: u, rows: [] }));
+      byUnit[u].rows.push(p);
+    });
+    var out = [];
+    // A heading only says something when another group sits beside it.
+    if (now.length) out.push({ head: rest.length ? 'This Week' : '', rows: now });
+    return out.concat(units, loose.length ? [{ head: '', rows: loose }] : []);
   }
 
   /* The other three tabs. My Learning is a class switch, Show My Learning,

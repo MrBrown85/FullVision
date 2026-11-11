@@ -144,12 +144,13 @@ describe('Show My Learning', () => {
     const r = row();
     expect(r).toBeTruthy();
     // After Return Grades, Send Work and Reflect on Feedback (S10 follow-up),
-    // inside the Student Page card.
+    // inside the Student Page card, before Questionnaires and Reports.
     expect([...doc.querySelectorAll('.sp-card .sp-row-title')].map(text)).toEqual([
       'Return Grades',
       'Send Work',
       'Reflect on Feedback',
       'Show My Learning',
+      'Questionnaires and Reports',
     ]);
     expect(text(r.querySelector('label[for="sp-learning-switch"]'))).toBe('Show My Learning');
     expect(text(r.querySelector('#sp-learning-hint'))).toBe(

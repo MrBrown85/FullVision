@@ -195,6 +195,33 @@ describe('the door in Class Settings › Student Page', () => {
   });
 });
 
+describe('Class Settings › Student Page: the board’s two columns', () => {
+  it('the intro line; Student Page and the full card list on the left; the cards in short and Preview on the right', () => {
+    openSettings();
+    expect(text(doc.querySelector('.sp-card .sp-intro'))).toBe(
+      'What students can do when they open their page with their card. Each one is off until you turn it on.',
+    );
+    const main = doc.querySelector('.sp-layout > .sp-main');
+    const aside = doc.querySelector('.sp-layout > .sp-aside');
+    expect([...main.children].map(c => c.className.split(' ')[1])).toEqual(['sp-card', 'sc-card']);
+    expect([...aside.children].map(c => c.className.split(' ')[1])).toEqual(['sc-summary', 'sp-preview']);
+    const sum = aside.querySelector('.sc-summary');
+    expect(text(sum.querySelector('.cm-grade-title'))).toBe('Student Cards');
+    expect(text(sum.querySelector('button'))).toBe('Manage Cards');
+    // The last row says where questionnaires and reports are set up.
+    const rows = [...doc.querySelectorAll('.sp-card .sp-row-title')].map(text);
+    expect(rows[rows.length - 1]).toBe('Questionnaires and Reports');
+  });
+
+  it('Manage Cards takes the focus to the full Student Cards list', () => {
+    openSettings();
+    const button = doc.querySelector('.sc-summary button');
+    expect(DashClassManager.handleAction('spCardsManage', button)).toBe(true);
+    expect(doc.activeElement).toBe(doc.getElementById('sc-title'));
+    expect(doc.activeElement.closest('.sc-card')).toBeTruthy();
+  });
+});
+
 describe('the preview', () => {
   function openJordan() {
     openSettings();
@@ -226,7 +253,11 @@ describe('the preview', () => {
       title: text(r.querySelector('.sp-row-title')),
       result: text(r.querySelector('.sp-row-result')),
     }));
-    expect(rows).toEqual(view.work.map(p => ({ title: p.title, result: p.result.text })));
+    // All Assignments groups the rows (work to hand in first, then by unit), so compare them in title order.
+    const byTitle = (a, b) => (a.title < b.title ? -1 : a.title > b.title ? 1 : 0);
+    expect(rows.slice().sort(byTitle)).toEqual(
+      view.work.map(p => ({ title: p.title, result: p.result.text })).sort(byTitle),
+    );
     expect(rows.find(r => r.title === 'Draft Poster').result).toBe('');
     // The changed reflection shows the grade returned, not the draft.
     const reflect = getAssessments(CID).find(a => a.id === 'reflect');

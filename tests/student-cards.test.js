@@ -710,6 +710,10 @@ describe('the list in Class Settings › Student Page', () => {
       ]);
       expect(box.querySelector('.sc-lock').textContent).toBe('Locked');
       expect(box.textContent).not.toMatch(/K7M|4821/);
+      // The summary beside the Student Page card: printed is printed or opened.
+      const sum = parse(StudentCards.summaryHtml(LIVE));
+      expect(sum.querySelector('.sc-summary-count').textContent).toBe('4 of 6 printed · 1 locked');
+      expect(sum.querySelector('button').textContent).toBe('Manage Cards');
       // Avery's never-printed card, and Fay with none; cards students hold, so New Codes for This Class.
       expect(buttons(box)).toEqual(['New Codes for This Class', 'Make and Print 2 Cards']);
       // Dee's is locked: Unlock on her row. Every card can be replaced.
@@ -2914,10 +2918,13 @@ describe('Cards Work Until', () => {
     expect(untilOf(box).hint).toBe(
       "A card stops opening after this day. It's the class's last reporting date until you choose another day.",
     );
+    const summaryLine = () => parse(StudentCards.summaryHtml(CID)).querySelector('.cm-hint').textContent;
+    expect(summaryLine()).toBe('Cards work until Jan 29, the end of the course.');
     changeDay(CID, '2027-03-12');
     await quiet(CID);
     box = parse(StudentCards.render(CID));
     expect(untilOf(box).button).toBe('Use Last Reporting Date');
+    expect(summaryLine()).toBe('Cards work until Mar 12.');
   });
 
   it('a day already past says so, and the cards show Past Its Last Day', async () => {

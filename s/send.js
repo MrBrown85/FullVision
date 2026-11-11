@@ -1449,33 +1449,33 @@
     return sheetHtml(title, body, yes, no, q.kind === 'unsend', q.busy);
   }
 
-  // The sheet over the card. `yes` '' draws only the way out.
+  /* The question over the card, as the board's action sheet: the question
+     and its answer in one card (Unsend in red), the way out in its own card
+     under it. `yes` '' draws only the way out. */
   function sheetHtml(title, body, yes, no, danger, busy) {
     var held = busy ? ' disabled' : '';
     return (
       '<button type="button" class="sp-sheet-back" data-act="send-ask-no" aria-label="Close" tabindex="-1"></button>' +
       '<div class="sp-sheet sp-send-ask" role="alertdialog" aria-modal="true" aria-labelledby="sp-send-ask-title" aria-describedby="sp-send-ask-body">' +
-      '<h2 class="sp-sheet-title" id="sp-send-ask-title" tabindex="-1">' +
+      '<div class="sp-send-ask-card"><h2 class="sp-sheet-title" id="sp-send-ask-title" tabindex="-1">' +
       esc(title) +
       '</h2><p class="sp-send-ask-body" id="sp-send-ask-body">' +
       esc(body) +
-      '</p><div class="sp-send-ask-buttons">' +
+      '</p>' +
       (yes
-        ? '<button type="button" class="sp-btn ' +
-          (danger ? 'sp-btn-danger' : 'sp-btn-primary') +
+        ? '<button type="button" class="sp-btn sp-send-ask-yes' +
+          (danger ? ' sp-send-ask-danger' : '') +
           '" data-act="send-ask-yes"' +
           held +
           '>' +
           esc(yes) +
           '</button>'
         : '') +
-      '<button type="button" class="sp-btn ' +
-      (yes ? 'sp-btn-quiet' : 'sp-btn-primary') +
-      '" data-act="send-ask-no"' +
+      '</div><button type="button" class="sp-btn sp-send-ask-no" data-act="send-ask-no"' +
       held +
       '>' +
       esc(no) +
-      '</button></div></div>'
+      '</button></div>'
     );
   }
 
@@ -1483,6 +1483,27 @@
 
   var BACK =
     '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 5l-7 7 7 7"/></svg>';
+  // The boards' icons: a check, no Wi-Fi, a warning, a clock, a plus, a blurry page.
+  function icon(paths, size, width) {
+    return (
+      '<svg viewBox="0 0 24 24" width="' +
+      size +
+      '" height="' +
+      size +
+      '" fill="none" stroke="currentColor" stroke-width="' +
+      width +
+      '" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+      paths +
+      '</svg>'
+    );
+  }
+  var TICK_PATH = '<path d="M5 12.5l4.5 4.5L19 7.5"/>';
+  var NO_WIFI =
+    '<path d="M2 8.5a15 15 0 0 1 20 0M5.5 12a10 10 0 0 1 13 0M9 15.5a5 5 0 0 1 6 0"/><path d="M12 19h.01"/><path d="M3 3l18 18"/>';
+  var WARN = '<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5h.01"/>';
+  var CLOCK = '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>';
+  var PLUS = '<path d="M12 5v14M5 12h14"/>';
+  var BLUR = '<circle cx="12" cy="12" r="9"/><path d="M8 12h8M12 8v8" opacity="0.4"/>';
 
   /* A button that opens the camera or the file chooser: a label around a
      file input, so the browser's own chooser opens. `capture` asks a phone
@@ -1515,11 +1536,62 @@
       '</button><h1 class="sp-send-title" id="sp-send-title" tabindex="-1">' +
       esc(title) +
       '</h1></header>' +
-      (sub ? '<p class="sp-send-piece">' + esc(sub) + '</p>' : '')
+      (sub ? '<p class="sp-send-piece sp-send-piece-head">' + esc(sub) + '</p>' : '')
     );
   }
 
-  function pagesHtml(send, removable) {
+  // Only the way back, above a screen whose title sits in the middle (One Page Didn't Send).
+  function backOnly() {
+    return (
+      '<header class="sp-send-head"><button type="button" class="sp-head-icon" data-act="send-back" aria-label="Back">' +
+      BACK +
+      '</button></header>'
+    );
+  }
+
+  // A screen's big round icon: Sent (blue), Not Sent Yet (amber), One Page Didn't Send (red).
+  function bigIcon(kind, paths) {
+    return '<span class="sp-send-big sp-send-big-' + kind + '" aria-hidden="true">' + icon(paths, 40, 2.4) + '</span>';
+  }
+
+  /* The pages as small pictures in a row (Not Sent Yet, One Page Didn't
+     Send). On One Page Didn't Send (`marks`) a sent page has a green tick
+     and the one that didn't send a red "!" and a red edge. */
+  function miniPagesHtml(send, marks) {
+    return (
+      '<ol class="sp-send-mini' +
+      (marks ? '' : ' sp-send-mini-waiting') +
+      '">' +
+      send.pages
+        .map(function (pg, i) {
+          var n = i + 1;
+          var failed = marks && send.failed === i;
+          var sent = marks && pg.sent;
+          return (
+            '<li class="sp-send-page' +
+            (failed ? ' sp-send-page-failed' : '') +
+            '"><img class="sp-send-mini-img" src="' +
+            esc(pg.thumbUrl || pg.url) +
+            '" alt="' +
+            esc('Page ' + n + (failed ? ', didn’t send' : sent ? ', sent' : marks ? '' : ', waiting')) +
+            '">' +
+            (failed
+              ? '<span class="sp-send-mark sp-send-mark-bad" aria-hidden="true">!</span>'
+              : sent
+                ? '<span class="sp-send-mark sp-send-mark-ok" aria-hidden="true">' +
+                  icon(TICK_PATH, 12, 3.4) +
+                  '</span>'
+                : '') +
+            '</li>'
+          );
+        })
+        .join('') +
+      '</ol>'
+    );
+  }
+
+  // The pages in a grid of three; on Check and Send, Add Page or File is the last tile (`add`).
+  function pagesHtml(send, removable, add) {
     return (
       '<ol class="sp-send-pages">' +
       send.pages
@@ -1546,7 +1618,19 @@
           );
         })
         .join('') +
+      (add || '') +
       '</ol>'
+    );
+  }
+
+  // Add Page or File, as the board's dashed tile in the page grid.
+  function addTileHtml(accept) {
+    return (
+      '<li class="sp-send-add"><label class="sp-send-add-tile">' +
+      icon(PLUS, 22, 2) +
+      '<span>Add Page or File</span><input type="file" class="sp-send-input" accept="' +
+      esc(accept) +
+      '" multiple></label></li>'
     );
   }
 
@@ -1556,18 +1640,23 @@
      it" is the student's, Nov 8, decision 11): Yes, Partly or Not This
      Time, or none. */
   var FOLLOWED = { yes: 'Yes', partly: 'Partly', no: 'Not This Time' };
+  var PLAN_ARROW =
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
   function planAskHtml(send, p) {
     if (!p.plan || !p.plan.text) return '';
     return (
-      '<section class="sp-send-plan" aria-labelledby="sp-send-plan-title"><h2 class="sp-plan-title" id="sp-send-plan-title">Your Plan From Last Time</h2><p class="sp-plan-words">' +
+      '<section class="sp-send-plan" aria-labelledby="sp-send-plan-title"><h2 class="sp-plan-title" id="sp-send-plan-title">' +
+      PLAN_ARROW +
+      'Your Plan From Last Time</h2><p class="sp-plan-words">' +
       esc(p.plan.text) +
-      '</p><h3 class="sp-send-plan-ask" id="sp-send-plan-ask">Did You Do It?</h3><div class="sp-seg sp-seg-3" role="radiogroup" aria-label="Did you follow your plan?">' +
+      '</p><h3 class="sp-send-plan-ask" id="sp-send-plan-ask">Did You Do It?</h3><div class="sp-choices" role="radiogroup" aria-label="Did you follow your plan?">' +
       Object.keys(FOLLOWED)
         .map(function (k) {
           var on = send.followed === k;
           return (
-            '<button type="button" class="sp-seg-btn' +
-            (on ? ' sp-seg-on' : '') +
+            // Yes green when chosen, as the board; Partly and Not This Time blue.
+            '<button type="button" class="sp-choice' +
+            (k === 'yes' ? ' sp-choice-green' : '') +
             '" role="radio" aria-checked="' +
             on +
             '" tabindex="' +
@@ -1584,36 +1673,36 @@
     );
   }
 
-  // Check and Send, and Sending Late (the boards): the pages, Add Page or File, the note, Send.
+  // Check and Send, and Sending Late (the boards): the pages, Add Page or File, the note, Send at the bottom.
   function checkHtml(send, p) {
     var n = send.pages.length;
     var late = p.send.lateNow;
     var accept = acceptFor(p);
     var full = n >= send.room;
+    var due = send.revision
+      ? p.revision && p.revision.reviseBy
+        ? 'Revise by ' + fmtDay(p.revision.reviseBy, { weekday: 'short', month: 'short', day: 'numeric' })
+        : ''
+      : p.dueDate
+        ? 'Due ' + fmtDay(p.dueDate, { weekday: 'short', month: 'short', day: 'numeric' })
+        : '';
     return (
       head('Check and Send', p.title) +
       (late
-        ? '<p class="sp-send-due">' +
-          esc(
-            send.revision
-              ? p.revision && p.revision.reviseBy
-                ? 'Revise by ' + fmtDay(p.revision.reviseBy, { weekday: 'short', month: 'short', day: 'numeric' })
-                : ''
-              : p.dueDate
-                ? 'Due ' + fmtDay(p.dueDate, { weekday: 'short', month: 'short', day: 'numeric' })
-                : '',
-          ) +
-          '</p><p class="sp-send-late" role="note">This will be marked Late.</p>'
+        ? // Sending Late: one amber panel with a clock.
+          '<div class="sp-send-late-panel">' +
+          icon(CLOCK, 20, 2.2) +
+          '<div class="sp-send-late-words">' +
+          (due ? '<p class="sp-send-due">' + esc(due) + '</p>' : '') +
+          '<p class="sp-send-late" role="note">This will be marked Late.</p></div></div>'
         : '') +
-      (n ? pagesHtml(send, !send.busy) : '') +
+      (n ? pagesHtml(send, !send.busy, full ? '' : addTileHtml(accept)) : '') +
       (send.busy ? '<p class="sp-send-msg" role="status">Getting your photos ready…</p>' : '') +
       (send.message ? '<p class="sp-send-msg sp-msg" role="alert">' + esc(send.message) + '</p>' : '') +
       (full
         ? '<p class="sp-send-hint">You can send ' + send.room + ' pages at most.</p>'
         : n
-          ? '<div class="sp-send-add">' +
-            pickHtml('Add Page or File', 'sp-btn-tint', accept, { multiple: true }) +
-            '</div>'
+          ? ''
           : '<div class="sp-send-add sp-send-start">' +
             pickHtml('Use the Camera', 'sp-btn-primary', 'image/*', { capture: true }) +
             pickHtml('Choose a File', 'sp-btn-tint', accept, { multiple: true }) +
@@ -1632,17 +1721,18 @@
       '" rows="3">' +
       esc(send.note) +
       '</textarea>' +
-      '<button type="button" class="sp-btn sp-btn-primary sp-btn-big sp-send-go" data-act="send-go"' +
+      '<div class="sp-send-foot"><button type="button" class="sp-btn sp-btn-primary sp-btn-big sp-send-go" data-act="send-go"' +
       (!n || send.busy ? ' disabled' : '') +
       '>' +
       esc(
         send.step === 'sending' ? 'Sending…' : late ? 'Send Late' : 'Send ' + n + ' ' + plural(n, 'Photo', 'Photos'),
       ) +
-      '</button>'
+      '</button></div>'
     );
   }
 
-  // Blurry Photo, Retake (the board's words, with "your teacher" for "Mr. Brown": ruling 112).
+  // Blurry Photo, Retake (the board's words, with "your teacher" for "Mr. Brown": ruling 112): a dark
+  // camera screen, the warning in an amber panel, Retake and Use It Anyway one above the other.
   function blurryHtml(send, p) {
     var i = -1;
     send.pages.forEach(function (pg, k) {
@@ -1651,22 +1741,24 @@
     var pg = send.pages[i];
     if (!pg) return checkHtml(send, p);
     return (
-      '<header class="sp-send-head"><button type="button" class="sp-btn sp-btn-quiet sp-btn-small" data-act="send-blur-cancel">Cancel</button>' +
+      '<header class="sp-send-head sp-send-blurry-head"><button type="button" class="sp-send-blurry-cancel" data-act="send-blur-cancel">Cancel</button>' +
       '<div class="sp-send-head-words"><span class="sp-send-head-piece">' +
       esc(p.title) +
       '</span><span class="sp-send-head-page">' +
       esc('Page ' + (i + 1)) +
       '</span></div></header>' +
-      '<img class="sp-send-blurry-img" src="' +
+      '<div class="sp-send-blurry-frame"><img class="sp-send-blurry-img" src="' +
       esc(pg.url) +
       '" alt="' +
       esc('Page ' + (i + 1) + ', blurry') +
-      '">' +
-      '<section class="sp-send-panel"><h1 class="sp-send-title" id="sp-send-blurry-title" tabindex="-1">This photo looks blurry</h1><p class="sp-send-line">' +
+      '"></div>' +
+      '<section class="sp-send-panel">' +
+      icon(BLUR, 22, 2) +
+      '<div class="sp-send-panel-words"><h1 class="sp-send-title" id="sp-send-blurry-title" tabindex="-1">This photo looks blurry</h1><p class="sp-send-line">' +
       'Your teacher may not be able to read it. Hold the phone still, right above the page.' +
-      '</p><div class="sp-send-row">' +
+      '</p></div></section><div class="sp-send-col sp-send-blurry-buttons">' +
       pickHtml('Retake', 'sp-btn-primary', 'image/*', { capture: true, retake: pg.key }) +
-      '<button type="button" class="sp-btn sp-btn-tint" data-act="send-blur-keep">Use It Anyway</button></div></section>'
+      '<button type="button" class="sp-btn sp-send-blurry-keep" data-act="send-blur-keep">Use It Anyway</button></div>'
     );
   }
 
@@ -1696,11 +1788,16 @@
       who +
       ' sees your work once every page is sent.';
     return (
-      head('Page ' + n + ' didn’t send', '') +
-      pagesHtml(send, false) +
-      '<p class="sp-send-line" role="alert">' +
+      backOnly() +
+      '<section class="sp-send-center">' +
+      bigIcon('bad', WARN) +
+      '<h1 class="sp-send-title" id="sp-send-title" tabindex="-1">' +
+      esc('Page ' + n + ' didn’t send') +
+      '</h1><p class="sp-send-line" role="alert">' +
       esc(line) +
-      '</p><div class="sp-send-col"><button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="send-again">' +
+      '</p>' +
+      miniPagesHtml(send, true) +
+      '<div class="sp-send-col"><button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="send-again">' +
       esc('Send Page ' + n + ' Again') +
       '</button>' +
       pickHtml('Retake Page ' + n, 'sp-btn-tint', 'image/*', { capture: true, retake: send.pages[i].key }) +
@@ -1710,7 +1807,7 @@
       esc('Remove Page ' + n) +
       '</button></div><p class="sp-send-hint">' +
       'If it keeps failing, show your teacher this screen.' +
-      '</p>'
+      '</p></section>'
     );
   }
 
@@ -1728,22 +1825,26 @@
   function notSentHtml(send) {
     var n = send.pages.length;
     return (
-      '<section class="sp-send-center"><h1 class="sp-send-title" id="sp-send-title" tabindex="-1">Not sent yet</h1><p class="sp-send-line">' +
+      '<section class="sp-send-center">' +
+      bigIcon('wait', NO_WIFI) +
+      '<h1 class="sp-send-title" id="sp-send-title" tabindex="-1">Not sent yet</h1><p class="sp-send-line">' +
       esc(
         (n === 1 ? 'Your photo is' : 'Your ' + n + ' photos are') +
           ' saved on this phone. They’ll send when you’re back online.',
       ) +
       '</p>' +
-      pagesHtml(send, false) +
+      miniPagesHtml(send, false) +
       '<div class="sp-send-col"><button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="send-again">Try Again Now</button>' +
-      '<button type="button" class="sp-btn sp-btn-quiet" data-act="send-done">Back to My Work</button></div></section>'
+      '<button type="button" class="sp-btn sp-send-grey" data-act="send-done">Back to My Work</button></div></section>'
     );
   }
 
   // Sent (the board's words, with "Your Teacher" for "Mr. Brown": ruling 112).
   function sentHtml(send, p) {
     return (
-      '<section class="sp-send-center"><span class="sp-send-tick" aria-hidden="true">✓</span><h1 class="sp-send-title" id="sp-send-title" tabindex="-1">' +
+      '<section class="sp-send-center">' +
+      bigIcon('done', TICK_PATH) +
+      '<h1 class="sp-send-title" id="sp-send-title" tabindex="-1">' +
       'Sent to Your Teacher' +
       '</h1><p class="sp-send-piece">' +
       esc(p.title) +
@@ -1779,7 +1880,9 @@
                 ? blurryHtml(send, p)
                 : checkHtml(send, p);
     return (
-      '<main class="sp-main sp-send">' +
+      '<main class="sp-main sp-send' +
+      (send.step === 'blurry' ? ' sp-send-dark' : '') +
+      '">' +
       body +
       (state.demo ? '<p class="sp-fine">This is Demo Mode. Nothing is sent anywhere.</p>' : '') +
       '</main>'

@@ -17,6 +17,7 @@ import { newBankIndex } from './helpers/bc-bank-fixture.js';
 const CID = 'sci8';
 const LAB = 'sci8a1';
 const QUICK = 'sci8a2';
+const FAIR = 'sci8a20'; // a Standard rubric: listed criterion by criterion
 let wasDemo;
 let stubDocument;
 
@@ -195,7 +196,7 @@ describe('the level control is drawn the same on both graders', () => {
       b => b.querySelector('.m-level-fig').textContent + ' ' + b.querySelector('.m-level-word').textContent,
     );
 
-  it('classic and with photos: figure and word, − Minus and + Plus, in the class’s order', () => {
+  it('a plain class and one with photos, a pager and a list: figure and word, − Minus and + Plus, in the class’s order', () => {
     // History 12's case: a Letter class, highest level first.
     updateCourse(CID, { gradingSystem: 'letter' });
     saveCourseConfig(CID, { ...getCourseConfig(CID), levelOrder: 'desc' });
@@ -203,7 +204,7 @@ describe('the level control is drawn the same on both graders', () => {
     MGrade.setCriterionScore(CID, 'st3', LAB, firstCrit().id, 3);
     MGrade.setCriterionMod(CID, 'st3', LAB, firstCrit().id, 1);
     const classic = control();
-    expect(card('st3').querySelector('.m-crit-pager')).toBeNull();
+    expect(card('st3').querySelector('.m-crit-pager')).not.toBeNull();
     expect(faces(classic.levels)).toEqual(['4 Extending', '3+ Proficient', '2 Developing', '1 Emerging']);
     expect(classic.levels.getAttribute('aria-label')).toBe('Level for ' + firstCrit().name);
     expect(classic.fine.getAttribute('aria-label')).toBe('Fine-tune Proficient');
@@ -216,6 +217,18 @@ describe('the level control is drawn the same on both graders', () => {
     const photos = control();
     expect(photos.levels.outerHTML).toBe(classic.levels.outerHTML);
     expect(photos.fine.outerHTML).toBe(classic.fine.outerHTML);
+
+    // A Standard rubric is listed criterion by criterion, with the same control.
+    open(FAIR);
+    const row = card('st3').querySelector('.m-crit-group');
+    expect(card('st3').querySelector('.m-crit-pager')).toBeNull();
+    expect(faces(row.querySelector('.m-score-btns')).map(f => f.replace(/^(\d)\S*/, '$1'))).toEqual([
+      '4 Extending',
+      '3 Proficient',
+      '2 Developing',
+      '1 Emerging',
+    ]);
+    expect([...row.querySelectorAll('.m-mod-btn')].map(b => b.textContent)).toEqual(['−Minus', '+Plus']);
 
     // Lowest first when the class says so.
     saveCourseConfig(CID, { ...getCourseConfig(CID), levelOrder: 'asc' });

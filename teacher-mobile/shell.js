@@ -1506,11 +1506,6 @@
         return;
       }
 
-      if (action === 'm-grade-filter-apply') {
-        MGrade.applyFilterSheet(_cid);
-        return;
-      }
-
       // Student work (S7): the row menu, the live filter's Done, the pages.
       if (action === 'm-grade-row-menu') {
         MGrade.openRowMenu(_cid, target.getAttribute('data-aid'), target);
