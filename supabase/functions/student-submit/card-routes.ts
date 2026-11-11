@@ -13,6 +13,20 @@
 //                                                  -> student_submit.seen
 //   {route: 'done', session}                       -> student_submit.done
 //
+// The database cannot read a card's code (S3-E1). The first three routes
+// take the code the phone sent, tidy it, and hand the database its tag: a
+// keyed fingerprint made with STUDENT_CARD_KEY (../_shared/card-key.ts),
+// which the database never has. A card's own four-digit password goes the
+// same way, as a tag bound to its card. The code and the typed password
+// are never a parameter, never in a statement and never logged. A birthday
+// and a student number are checked in the database, where they live.
+//   - A code that is not eight characters once tidied is no card (a slip
+//     is six): not_found, with nothing asked of the database, so a slip
+//     scanned here is never counted as a guess at a card.
+//   - With no key, those three routes answer a plain server error and ask
+//     the database nothing. page, seen and done use the session token, not
+//     the key, and carry on.
+//
 // The session token travels as today's slip token does: in the JSON body,
 // sent back as `session`. Never a cookie (the function is on another site,
 // so the browser would drop it), never a header (nothing new for CORS to
@@ -27,17 +41,25 @@
 // scores into a grade.
 //
 // Kept free of Deno and database imports, as handler.ts is.
+import { CODE_LENGTH, tidy, type CardKey } from '../_shared/card-key.ts';
 import type { Identity } from './handler.ts';
 
 type Json = Record<string, unknown>;
 // Every parameter goes to the database as text, or as nothing.
 export type Param = string | null;
 
+/* What the phone sent to one of the three routes that take a card's code,
+   once its shape is checked. It is turned into tags (cardParams) and goes
+   no further as it is. `check` is there for verify and add-card. */
+type Typed = { code: string; check?: { who: Identity; session: string | null } };
+
 export type CardRoute = {
   // The whole SQL statement. The caller's hashed address is the last parameter.
   sql: string;
-  // The parameters before the hashed address, or null when the request's shape is wrong.
-  params: (body: Json, who: Identity | null) => Param[] | null;
+  // page, seen and done: the parameters before the hashed address, or null when the request's shape is wrong.
+  params?: (body: Json) => Param[] | null;
+  // card, verify and add-card: what was sent, or null when the request's shape is wrong.
+  typed?: (body: Json, who: Identity | null) => Typed | null;
   // The error codes passed on as they are. Any other is answered as not_found.
   errors: string[];
   // The fields of a good reply the phone is given.
@@ -195,26 +217,31 @@ function verified(r: Json): Json {
 
 // ── The routes ──────────────────────────────────────────────────────────────
 // What card() can say about a code that will not open. A guessed code is
-// not_found; so is a slip's code, a reissued card, a withdrawn student and
-// a deleted class. card_locked is five wrong tries in a row or fifteen in 7
-// days. locked is the per-address limit. There is no everyone-is-busy stop
-// on a card's routes (Colin, Nov 9); a slip's open keeps its own.
-const CARD_ERRORS = ['not_found', 'closed', 'card_locked', 'card_expired', 'reprint', 'locked'];
+// not_found; so is a slip's code, a withdrawn student and a deleted class.
+// card_stopped is a card that was replaced: the student is told to ask for
+// their new one (Colin, Nov 10). It tells a guesser nothing: the code is
+// dead and no name comes with it. card_locked is five wrong tries in a row
+// or fifteen in 7 days. locked is the per-address limit. There is no
+// everyone-is-busy stop on a card's routes (Colin, Nov 9); a slip's open
+// keeps its own.
+const CARD_ERRORS = ['not_found', 'card_stopped', 'closed', 'card_locked', 'card_expired', 'reprint', 'locked'];
 const SESSION_ERRORS = ['signed_out', 'not_found', 'card_stopped', 'card_expired', 'closed'];
 
 /* The card's identity check, for the start screen (p_add false) or for Add
    Another Card (p_add true). Which one is written into the route's
    statement, never taken from the request: sending a session token, or
-   anything else, cannot turn a plain verify into an add. */
+   anything else, cannot turn a plain verify into an add. The parameters are
+   the code's tag, the key id, the birthday, the student number, the typed
+   password's tag, the session token and the hashed address. */
 const verifyCard = (add: boolean) =>
-  'select student_submit.verify_card($1::text, $2::text, $3::text, $4::text, $5::text, $6::text, ' +
+  'select student_submit.verify_card($1::text, $2::text, $3::text, $4::text, $5::text, $6::text, $7::text, ' +
   `p_add => ${add ? 'true' : 'false'}) as r`;
 
-function verifyParams(body: Json, who: Identity | null, needsSession: boolean): Param[] | null {
+function verifyTyped(body: Json, who: Identity | null, needsSession: boolean): Typed | null {
   const c = code(body);
   const s = session(body);
   if (!c || !who || s === undefined || (needsSession && !s)) return null;
-  return [c, who.birthday, who.studentNumber, who.password, s];
+  return { code: c, check: { who, session: s } };
 }
 
 export const CARD_ROUTES: Record<string, CardRoute> = {
@@ -222,10 +249,11 @@ export const CARD_ROUTES: Record<string, CardRoute> = {
      yet. A slip's code is not_found here, as any unknown code is, so this
      route says nothing about slips; the page then sends the code to open. */
   card: {
-    sql: 'select student_submit.card($1::text, $2::text) as r',
-    params: body => {
+    // The code's tag, the key id and the hashed address.
+    sql: 'select student_submit.card($1::text, $2::text, $3::text) as r',
+    typed: body => {
       const c = code(body);
-      return c ? [c] : null;
+      return c ? { code: c } : null;
     },
     errors: CARD_ERRORS,
     reply: r => ({
@@ -244,7 +272,7 @@ export const CARD_ROUTES: Record<string, CardRoute> = {
      fresh"). A session ends at midnight where the class is, or on Done. */
   verify: {
     sql: verifyCard(false),
-    params: (body, who) => verifyParams(body, who, false),
+    typed: (body, who) => verifyTyped(body, who, false),
     errors: [...CARD_ERRORS, 'wrong_identity'],
     reply: verified,
   },
@@ -254,7 +282,7 @@ export const CARD_ROUTES: Record<string, CardRoute> = {
      using the one sent); if that session is no longer live, a new one starts. */
   'add-card': {
     sql: verifyCard(true),
-    params: (body, who) => verifyParams(body, who, true),
+    typed: (body, who) => verifyTyped(body, who, true),
     errors: [...CARD_ERRORS, 'wrong_identity'],
     reply: verified,
   },
@@ -297,6 +325,35 @@ export const CARD_ROUTES: Record<string, CardRoute> = {
     reply: () => ({ ok: true }),
   },
 };
+
+/* What to ask the database for one request: the parameters before the
+   hashed address, or why the database is not asked.
+     'bad_request'  the request's shape is wrong;
+     'not_a_card'   the code is not eight characters once tidied, so it is
+                    no card's, with or without the key; a slip's is six;
+     'no_key'       a card's code, and no key to make its tag with.
+   For the three routes that take a code, this is the only place the code
+   and the typed password are used, and tags are all that leave it. A typed
+   password is tagged whatever it holds: one that is not the card's four
+   digits matches nothing, and the database counts the wrong try. */
+export async function cardParams(
+  route: CardRoute,
+  body: Json,
+  who: Identity | null,
+  key: CardKey | null,
+): Promise<Param[] | 'bad_request' | 'not_a_card' | 'no_key'> {
+  if (!route.typed) return (route.params && route.params(body)) || 'bad_request';
+  const sent = route.typed(body, who);
+  if (!sent) return 'bad_request';
+  const c = tidy(sent.code);
+  if (c.length !== CODE_LENGTH) return 'not_a_card';
+  if (!key) return 'no_key';
+  const tag = await key.codeTag(c);
+  if (!sent.check) return [tag, key.id];
+  const { who: typed, session: token } = sent.check;
+  const password = typed.password === null ? null : await key.passwordTag(c, tidy(typed.password));
+  return [tag, key.id, typed.birthday, typed.studentNumber, password, token];
+}
 
 /* What the phone is told. A good reply is copied by the route's list. A
    refusal is its code alone, with the tries left after a wrong answer. A
