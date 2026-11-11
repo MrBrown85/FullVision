@@ -71,6 +71,14 @@
     MC.setupOfflineDetection();
     _renderTab('students');
     _bindEvents();
+    // Add Work, Then Grade It opens the grader on the work just filed (S7-F3).
+    if (window.MAddWork) {
+      MAddWork.configure({
+        onGrade: function (cid, aid, sid) {
+          if (cid === _cid) _openGraderAt(sid, aid);
+        },
+      });
+    }
     _bindEdgeSwipe();
 
     _hideLoader();
@@ -703,6 +711,8 @@
   function _renderTab(tab) {
     // Clean up previous tab's resources
     if (MStudents.destroyCardStack) MStudents.destroyCardStack();
+    // The Grade tab's red count follows the class's work waiting (S7-F4).
+    if (window.MGradePhotos) MGradePhotos.syncTabBadge(_cid);
 
     var stack = document.getElementById('m-nav-stack');
     stack.innerHTML = '';
@@ -988,6 +998,33 @@
     );
   }
 
+  /* Grade on a student page: the newest assessment's grading screen on the
+     Grade tab, at that student's card; a row names its own assessment
+     (wantAid). Back returns to the page. */
+  function _openGraderAt(gradeSid, wantAid) {
+    var newest = wantAid
+      ? getAssessments(_cid).find(function (a) {
+          return a.id === wantAid;
+        })
+      : getAssessments(_cid)
+          .slice()
+          .sort(function (a, b) {
+            return (b.date || '').localeCompare(a.date || '');
+          })[0];
+    // The Grade tab opens on its list. A grading screen left open there
+    // would come back under this one with the same ids, and the handlers
+    // would bind to the hidden copy.
+    _tabState.grade = null;
+    _switchTab('grade');
+    if (!newest) return;
+    _gradeReturnSid = gradeSid;
+    _pushScreen(MGrade.renderSwiper(_cid, newest.id), { kind: 'swiper', aid: newest.id });
+    // On group work the student's group card.
+    var gradeIdx = MGrade.studentCardIndex(_cid, newest.id, gradeSid);
+    MGrade.setupSwiper(_cid, newest.id);
+    if (gradeIdx > 0) MGrade.jumpToStudent(gradeIdx, true);
+  }
+
   /* ── Event delegation ───────────────────────────────────────── */
   function _bindEvents() {
     document.addEventListener('click', function (e) {
@@ -1010,31 +1047,16 @@
       // Grade on a student page: the newest assessment's grading screen on
       // the Grade tab, at that student's card. Back returns to the page.
       if (action === 'm-student-grade' || action === 'm-assess-grade') {
-        var gradeSid = target.getAttribute('data-sid');
-        // A row on the student screen opens its own assessment; the Grade
-        // button opens the newest.
-        var wantAid = target.getAttribute('data-aid');
-        var newest = wantAid
-          ? getAssessments(_cid).find(function (a) {
-              return a.id === wantAid;
-            })
-          : getAssessments(_cid)
-              .slice()
-              .sort(function (a, b) {
-                return (b.date || '').localeCompare(a.date || '');
-              })[0];
-        // The Grade tab opens on its list. A grading screen left open there
-        // would come back under this one with the same ids, and the handlers
-        // would bind to the hidden copy.
-        _tabState.grade = null;
-        _switchTab('grade');
-        if (!newest) return;
-        _gradeReturnSid = gradeSid;
-        _pushScreen(MGrade.renderSwiper(_cid, newest.id), { kind: 'swiper', aid: newest.id });
-        // On group work the student's group card.
-        var gradeIdx = MGrade.studentCardIndex(_cid, newest.id, gradeSid);
-        MGrade.setupSwiper(_cid, newest.id);
-        if (gradeIdx > 0) MGrade.jumpToStudent(gradeIdx, true);
+        _openGraderAt(target.getAttribute('data-sid'), target.getAttribute('data-aid'));
+        return;
+      }
+
+      // Add Work (S7-F3): from a not-in card, the students with nothing in;
+      // from a student's To Grade list, that student, then the grader.
+      if (action === 'm-add-work') {
+        MAddWork.open(_cid, target.getAttribute('data-aid'), target.getAttribute('data-sid'), {
+          then: target.getAttribute('data-then') === 'grade' ? 'grade' : 'next',
+        });
         return;
       }
 

@@ -5179,3 +5179,285 @@ body.fv-switching-course::after {
   background: var(--active);
   box-shadow: 0 0 0 2px var(--surface);
 }
+
+/* Add Work on a not-in card (S7-F3). */
+.m-work-notin {
+  gap: 6px;
+}
+.m-work-add {
+  min-height: 44px;
+  border: none;
+  border-radius: 12px;
+  background: var(--active);
+  color: #fff;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.m-work-add-hint {
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+/* A student's To Grade list: on the card and on View Profile (S7-F4). */
+.m-scard-tograde {
+  flex: none;
+  border-radius: 10px;
+  background: var(--bg);
+  overflow: hidden;
+}
+#m-screen-student-detail .m-scard-tograde {
+  margin: 0 16px 12px;
+}
+.m-scard-tograde-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 2px 10px;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.m-scard-tograde-row + .m-scard-tograde-row {
+  border-top: 0.5px solid var(--divider-medium);
+}
+.m-scard-tograde-row .m-scard-return-sub {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.m-scard-tograde-act {
+  flex: none;
+  padding: 7px 14px;
+  border-radius: 18px;
+  background: var(--active);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* The Grade tab's red count. */
+.m-tab-item[data-tab='grade'] {
+  position: relative;
+}
+.m-tab-badge {
+  position: absolute;
+  top: 2px;
+  left: calc(50% + 6px);
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--danger, #c62828);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* Add Work: the camera screen over the app. */
+.m-addwork {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
+  background: #1c1c1e;
+  color: #fff;
+  overflow-y: auto;
+}
+.m-addwork-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+.m-addwork-close {
+  min-height: 44px;
+  padding: 0 4px;
+  border: none;
+  background: none;
+  color: #0a84ff;
+  font: inherit;
+  font-size: 17px;
+  cursor: pointer;
+}
+.m-addwork-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 52px;
+}
+.m-addwork-who {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 17px;
+  font-weight: 600;
+}
+.m-addwork-count {
+  padding: 2px 9px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 13px;
+}
+.m-addwork-pile {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+}
+.m-addwork-pile-name {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 13px;
+}
+.m-addwork-pile-name.is-now {
+  background: #0a84ff;
+}
+.m-addwork-pile-name.is-done {
+  opacity: 0.5;
+}
+.m-addwork-view {
+  flex: 1;
+  min-height: 260px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 14px;
+  background: #000;
+}
+.m-addwork-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 15px;
+}
+.m-addwork-pages {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+.m-addwork-taken {
+  position: relative;
+  width: 64px;
+  height: 84px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #333;
+}
+.m-addwork-taken img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.m-addwork-taken-n {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  min-width: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.65);
+  font-size: 12px;
+  text-align: center;
+}
+.m-addwork-shutter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 4px solid #fff;
+  background: rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+}
+.m-addwork-input {
+  display: none;
+}
+.m-addwork-msg {
+  min-height: 18px;
+  font-size: 14px;
+  color: #ffd60a;
+  text-align: center;
+}
+.m-addwork-save,
+.m-addwork-choice {
+  min-height: 50px;
+  border: none;
+  border-radius: 12px;
+  background: #0a84ff;
+  color: #fff;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.m-addwork-save:disabled,
+.m-addwork-choice:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.m-addwork-conflict {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.m-addwork-conflict-line {
+  font-size: 20px;
+  font-weight: 700;
+  text-align: center;
+}
+.m-addwork-conflict-pages {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+.m-addwork-conflict-page {
+  width: 84px;
+  height: 110px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #333;
+}
+.m-addwork-conflict-page img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.m-addwork-conflict-when {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  text-align: center;
+}
+.m-addwork-conflict-acts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.m-addwork-skip {
+  background: rgba(255, 255, 255, 0.14);
+}

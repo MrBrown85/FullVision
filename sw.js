@@ -133,6 +133,7 @@ const PRECACHE_URLS = [
   '/teacher-mobile/tab-observe.js',
   '/teacher-mobile/sweep.js',
   '/teacher-mobile/grade-photos.js',
+  '/teacher-mobile/add-work.js',
   '/teacher-mobile/tab-grade.js',
   '/teacher-mobile/shell.js',
 ];

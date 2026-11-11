@@ -53,7 +53,7 @@ The desktop app is a single-page app on real paths: `/dashboard`, `/assignments`
 - Main tab modules:
   - `tab-students.js`, with `students-list.js` and `student-detail.js`
   - `tab-observe.js`
-  - `tab-grade.js`: the list of assessments and the speed grader, with `sweep.js` and `grade-photos.js` (the student's work on a grading card)
+  - `tab-grade.js`: the list of assessments and the speed grader, with `sweep.js` and `grade-photos.js` (the student's work on a grading card and a student's To Grade list) and `add-work.js` (Add Work: photographing a student's paper work)
 - It also loads `teacher/obs-capture.js` and `teacher/obs-card.js` from the desktop.
 
 The mobile experience reuses the same shared auth, data, queue, and calculation layers as desktop, but presents them through a separate shell and touch-first UI.
