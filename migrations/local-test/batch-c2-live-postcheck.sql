@@ -5,8 +5,8 @@ with made(fn, becomes) as (values
     -- FINGERPRINTS-BEGIN c2new (written by migrations/local-test/batch_c_fingerprints.py)
     ('public._revision_hide_available()',   'a4b4e942de351d6849702b96f25c7356'),
     ('public._revision_hide_grade(uuid)',   'a4c3f002d3bb2fc01e58ec5b8dab8ecb'),
-    ('public._revision_unhide_grade(uuid)', '12dd830d953d13db1617e40a27f35133'),
-    ('public._markup_on_return()',          'dcdf19c36ff69743f479df9b5ba46bff')
+    ('public._revision_unhide_grade(uuid)', 'cbbc6fd7654c2b8677c7d210b5e15cc4'),
+    ('public._markup_on_return()',          '03373450cd9c6949b6beb858a3a85a69')
     -- FINGERPRINTS-END
 )
 select 'a function is not as C2 leaves it' as problem, m.fn as detail,

@@ -93,8 +93,8 @@ begin
             ('public._grade_return_one(uuid,uuid,timestamp with time zone)', '99e3165d005b5b2020ec40dcf307c689', '99e3165d005b5b2020ec40dcf307c689'),
             ('public._revision_hide_available()',                            'cd50f4c6493a73b3c42ae51f7580f970', 'a4b4e942de351d6849702b96f25c7356'),
             ('public._revision_hide_grade(uuid)',                            '247080f6572bb45951cef807a2b849bd', 'a4c3f002d3bb2fc01e58ec5b8dab8ecb'),
-            ('public._revision_unhide_grade(uuid)',                          '26d2861325edf27f95d090ebd590eb0f', '12dd830d953d13db1617e40a27f35133'),
-            ('public._markup_on_return()',                                   'absent', 'dcdf19c36ff69743f479df9b5ba46bff')
+            ('public._revision_unhide_grade(uuid)',                          '26d2861325edf27f95d090ebd590eb0f', 'cbbc6fd7654c2b8677c7d210b5e15cc4'),
+            ('public._markup_on_return()',                                   'absent', '03373450cd9c6949b6beb858a3a85a69')
             -- FINGERPRINTS-END
         ) as v(fn, first_run, later_run)
     loop
@@ -207,6 +207,10 @@ begin
         return false;
     end if;
     _now := _grade_copy(_r.enrollment_id, _r.assessment_id);
+    -- Giving back is not a Return: the trigger on grade_return stands aside
+    -- (fv.revision_unhide, for this statement), so no mark drawn while the
+    -- grade was hidden reaches the student; it waits for the next Return.
+    perform set_config('fv.revision_unhide', 'on', true);
     update grade_return
        set is_draft = _now is distinct from _h->'copy',
            returned_at = (_h->>'returned_at')::timestamptz,
@@ -214,6 +218,7 @@ begin
            previous_copy = nullif(_h->'previous_copy', 'null'::jsonb),
            returned_copy = case when _now is distinct from _h->'copy' then _h->'copy' end
      where enrollment_id = _r.enrollment_id and assessment_id = _r.assessment_id;
+    perform set_config('fv.revision_unhide', '', true);
     return true;
 end;
 $function$;
@@ -235,6 +240,11 @@ as $function$
 declare
     _r revision_request%rowtype;
 begin
+    -- Take Back giving a hidden grade back (_revision_unhide_grade) is not
+    -- a Return: no mark is given, and its hide has already ended.
+    if current_setting('fv.revision_unhide', true) = 'on' then
+        return null;
+    end if;
     perform _markup_give(new.enrollment_id, new.assessment_id);
     -- A restore (fv.restoring) first marks every restored grade Returned,
     -- then writes the backup's own state over it: a hide is not ended by
@@ -281,8 +291,8 @@ begin
             -- FINGERPRINTS-BEGIN c2new (written by migrations/local-test/batch_c_fingerprints.py)
             ('public._revision_hide_available()',   'a4b4e942de351d6849702b96f25c7356'),
             ('public._revision_hide_grade(uuid)',   'a4c3f002d3bb2fc01e58ec5b8dab8ecb'),
-            ('public._revision_unhide_grade(uuid)', '12dd830d953d13db1617e40a27f35133'),
-            ('public._markup_on_return()',          'dcdf19c36ff69743f479df9b5ba46bff')
+            ('public._revision_unhide_grade(uuid)', 'cbbc6fd7654c2b8677c7d210b5e15cc4'),
+            ('public._markup_on_return()',          '03373450cd9c6949b6beb858a3a85a69')
             -- FINGERPRINTS-END
         ) as v(fn, becomes)
     loop
