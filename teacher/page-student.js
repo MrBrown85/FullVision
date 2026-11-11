@@ -17,51 +17,19 @@ window.PageStudent = (function () {
   var _ovFilter = 'all'; // Overview, All Your Work: all, marked, missing
   var _ovShowAll = false; // Overview: every missing piece, not the first three
   var _ovCrit = ''; // Overview: '<assessment id>:<criterion index>' whose next step shows
-  var _assessFilter = 'all'; // Assessments tab: all, prof, points, unscored
-  var _assessCat = ''; // Assessments tab: a category id, or '' for all
-  var _assessGroup = 'date'; // Assessments tab: date, category, module, type, rubric
-  var _assessClosed = {}; // Assessments tab: '<group by>:<key>' of groups folded shut
-  var _bdOpen = {}; // Grade Breakdown tab: categories whose assessments show
-  var _bdRubric = ''; // Grade Breakdown tab: the shared rubric shown ('' = the first)
-  var _typeView = 'timeline'; // Grade Breakdown tab: timeline, strengths, growth, month
-  var _typeFocus = ''; // Grade Breakdown tab, Timeline: the type brought forward ('' = all)
   var _coreTerm = null; // Learner Profile: the term ordinal whose self-assessments show
   var _coreEditing = ''; // Learner Profile: the Core Competency being self-assessed
   var _openTags = new Set(); // competency cards whose evidence drawer is open
   var _compSort = 'map'; // Competencies tab: 'map' (learning-map order) or 'lowest'
   var _grGroup = 'category'; // Grades tab: Group By
   var _grFilter = 'all'; // Grades tab: all, marked or missing
+  var _grClass = false; // Grades tab: show the class average (off by default)
   var _overrideSelectedLevel = 0;
   var Evidence = StudentEvidence;
   var Overrides = StudentOverrides;
 
   function _assessmentCategoryLabel(cid, assessment) {
     return getAssessmentCategoryName(cid, assessment);
-  }
-
-  function _assessmentCategoryBadge(cid, assessment) {
-    // A class with no categories shows no "No Category" badge.
-    if (!showsCategoryBadge(cid, assessment)) return '';
-    var label = _assessmentCategoryLabel(cid, assessment);
-    var categoryId = getAssessmentCategoryId(assessment);
-    var hasCategory = !!(categoryId || (assessment && assessment.type === 'summative'));
-    var idx = categoryId
-      ? (getCategories(cid) || []).findIndex(function (c) {
-          return c.id === categoryId;
-        })
-      : -1;
-    var t = typeof categoryTintByIndex === 'function' ? categoryTintByIndex(idx, label) : { bg: '', fg: '' };
-    return (
-      '<span class="type-badge ' +
-      (hasCategory ? 'type-badge-s' : 'type-badge-f') +
-      '" style="background:' +
-      t.bg +
-      ';color:' +
-      t.fg +
-      '">' +
-      esc(label) +
-      '</span>'
-    );
   }
 
   /* ── switchCourse ───────────────────────────────────────── */
@@ -567,27 +535,25 @@ window.PageStudent = (function () {
   var TABS = [
     { id: 'overview', label: 'Overview' },
     { id: 'comps', label: 'Competencies' },
-    // Grades (redesign R4): Assessments and Grade Breakdown in one tab, only
-    // while the class's student page build switch is on.
+    // Grades (redesign R4, R5): Assessments and Grade Breakdown in one tab.
     { id: 'grades', label: 'Grades' },
-    { id: 'assess', label: 'Assessments' },
     // Work (S14-F2): only while the class's student page and Send Work are on.
     { id: 'work', label: 'Work' },
     { id: 'evidence', label: 'Observations' },
-    { id: 'breakdown', label: 'Grade Breakdown' },
     { id: 'profile', label: 'Learner Profile' },
   ];
 
-  function _gradesTabOn(cid) {
-    return !!cid && typeof getReturnSettings === 'function' && !!getReturnSettings(cid).student_page;
+  /* The tabs Grades replaced (R5): old links and a saved tab open Grades. */
+  function _tabAlias(id) {
+    if (id === 'goals') return 'profile';
+    if (id === 'assess' || id === 'breakdown') return 'grades';
+    return id;
   }
 
   // The tabs this class shows: Work is drawn by teacher/work-wall.js.
   function _shownTabs() {
     var work = !!window.WorkWall && WorkWall.tabOn(activeCourse);
-    var grades = _gradesTabOn(activeCourse);
     return TABS.filter(function (t) {
-      if (t.id === 'grades') return grades;
       return t.id !== 'work' || work;
     });
   }
@@ -635,15 +601,6 @@ window.PageStudent = (function () {
     }
     var level = entry.level != null ? entry.level : entry.score;
     return formatScoreLevel(level, entry.mod) || String(level);
-  }
-
-  /* One assessment's score as the gradebook shows it. */
-  function _cellText(cell, assess) {
-    if (cell.kind === 'points') {
-      var max = assess.maxPoints || 100;
-      return formatPoints(cell.value) + '/' + formatPoints(max) + ' · ' + formatPointsPercent(cell.value, max);
-    }
-    return cell.text;
   }
 
   /* A competency's scored entries in the current term, oldest first. */
@@ -742,24 +699,22 @@ window.PageStudent = (function () {
     var latestA = scored.reduce(function (m, c) {
       return (c.a.date || '') > m ? c.a.date : m;
     }, '');
-    out.assess = {
-      stat: scored.length + ' Scored',
-      sub:
-        scope + (latestA ? ' · Latest ' + _shortDay(latestA) : '') + (unscored ? ' · ' + unscored + ' not scored' : ''),
-    };
     out.evidence = _evidenceSummary(ctx.obs, scope);
-    out.breakdown = _breakdownSummary(ctx);
-    if (_gradesTabOn(cid)) {
-      var cats = _assessGroups(cid, ctx.assessments, 'category').filter(function (g) {
-        return !!g.key;
-      });
-      out.grades = {
-        stat:
-          _plural(ctx.assessments.length, 'Piece', 'Pieces') +
-          (cats.length ? ' · ' + _plural(cats.length, 'Category', 'Categories') : ''),
-        sub: ov.missing.length ? ov.missing.length + ' missing' : 'Nothing missing',
-      };
-    }
+    var cats = _assessGroups(cid, ctx.assessments, 'category').filter(function (g) {
+      return !!g.key;
+    });
+    out.grades = {
+      stat:
+        _plural(ctx.assessments.length, 'Piece', 'Pieces') +
+        (cats.length ? ' · ' + _plural(cats.length, 'Category', 'Categories') : ''),
+      sub:
+        scope +
+        ' · ' +
+        scored.length +
+        ' marked' +
+        (latestA ? ' · Latest ' + _shortDay(latestA) : '') +
+        (unscored ? ' · ' + unscored + ' not marked' : ''),
+    };
     if (window.WorkWall && WorkWall.tabOn(cid)) out.work = WorkWall.tabSummary(cid, studentId);
     // The Learner Profile: goals set (the student's own and the competency
     // goals) and when the student last answered.
@@ -1654,23 +1609,6 @@ window.PageStudent = (function () {
     return html + '</div>';
   }
 
-  /* The teacher's own words on a piece of work: its Overall Comment (the
-     note on its score); otherwise a way to add one. */
-  function _assessNoteHtml(ctx, a) {
-    var withNote = ctx.allScores.find(function (s) {
-      return s.assessmentId === a.id && s.note;
-    });
-    var text = withNote ? String(withNote.note).split('\n')[0] : '';
-    var href = '/assignments?course=' + ctx.cid + '&open=' + a.id + '&student=' + studentId;
-    if (!text)
-      return (
-        '<a class="stu-note-add" role="link" tabindex="0" data-href="' +
-        href +
-        '" title="Open in Assignments">+ Note</a>'
-      );
-    return '<span class="stu-note">' + esc(text) + '</span>';
-  }
-
   /* The three facts over the list: how many are assessed, the strongest,
      and the one to get better at (the lowest, orange as attention). */
   function _cpSummaryHtml(ctx) {
@@ -1799,30 +1737,8 @@ window.PageStudent = (function () {
     return html + '</div>' + CP_FOOT + '</div>';
   }
 
-  /* ── Groups of assessments (Assessments tab, Grade Breakdown) ── */
-  var GROUP_BYS = [
-    { id: 'date', label: 'Date' },
-    { id: 'category', label: 'Category' },
-    { id: 'module', label: 'Module' },
-    { id: 'type', label: 'Type' },
-    { id: 'rubric', label: 'Rubric' },
-  ];
+  /* ── Groups of assessments (the Grades tab's Group By) ── */
   var TYPE_ORDER = ['written', 'observation', 'audio', 'video', 'photo', 'conversation'];
-  var GROUP_KEY = 'gb-student-assess-group';
-
-  function _savedGroupBy() {
-    try {
-      var g = localStorage.getItem(GROUP_KEY);
-      return GROUP_BYS.some(function (b) {
-        return b.id === g;
-      })
-        ? g
-        : 'date';
-    } catch (e) {
-      return 'date';
-    }
-  }
-
   function _typeLabel(t) {
     return t ? String(t).charAt(0).toUpperCase() + String(t).slice(1) : 'No Type';
   }
@@ -1913,787 +1829,15 @@ window.PageStudent = (function () {
     return '<span class="stu-level stu-level-' + (g ? g.level : 0) + '">' + esc(g ? g.text : '\u2014') + '</span>';
   }
 
-  /* One bar per scored assessment, oldest to newest, as the competency rows
-     draw them. */
-  function _groupBars(cid, assessments) {
-    return assessments
-      .slice()
-      .sort(function (x, y) {
-        return (x.date || '').localeCompare(y.date || '');
-      })
-      .map(function (a) {
-        var g = assessmentGroupGrade(cid, studentId, [a]);
-        if (!g) return '';
-        var share = g.pct != null ? g.pct / 100 : g.prof / 4;
-        return (
-          '<span class="stu-bar" style="height:' +
-          Math.max(4, Math.round(Math.min(1, share) * 28)) +
-          'px;background:' +
-          (PROF_COLORS[g.level] || PROF_COLORS[0]) +
-          '" title="' +
-          esc(_shortDay(a.date) + ': ' + a.title + ', ' + g.text) +
-          '"></span>'
-        );
-      })
-      .join('');
-  }
-
-  function _groupMeta(cid, g) {
-    var n = _plural(g.assessments.length, 'assessment', 'assessments');
-    var w = g.category ? Number(g.category.weight || 0) : 0;
-    return w > 0 ? w + '% of the grade \u00B7 ' + n : n;
-  }
-
-  /* ── Assessments tab ────────────────────────────────────── */
-  function _assessTabHtml(ctx) {
-    var cid = ctx.cid;
-    var secByTag = {};
-    ctx.sections.forEach(function (sec) {
-      sec.tags.forEach(function (t) {
-        secByTag[t.id] = sec;
-      });
-    });
-    var isPts = function (a) {
-      return isPointsScored(a);
-    };
-    var unscored = function (c) {
-      return c.cell.kind === 'none';
-    };
-    var cells = ctx.cells.slice().sort(function (x, y) {
-      return (y.a.date || '').localeCompare(x.a.date || '');
-    });
-    var counts = {
-      all: cells.length,
-      prof: cells.filter(function (c) {
-        return !isPts(c.a);
-      }).length,
-      points: cells.filter(function (c) {
-        return isPts(c.a);
-      }).length,
-      unscored: cells.filter(unscored).length,
-    };
-    var shown = cells.filter(function (c) {
-      if (_assessCat && getAssessmentCategoryId(c.a) !== _assessCat) return false;
-      if (_assessFilter === 'prof') return !isPts(c.a);
-      if (_assessFilter === 'points') return isPts(c.a);
-      if (_assessFilter === 'unscored') return unscored(c);
-      return true;
-    });
-    var chip = function (key, label) {
-      var on = _assessFilter === key;
-      return (
-        '<button type="button" class="stu-chip' +
-        (on ? ' active' : '') +
-        '" data-action="stuAssessFilter" data-filter="' +
-        key +
-        '" aria-pressed="' +
-        on +
-        '">' +
-        esc(label) +
-        ' ' +
-        counts[key] +
-        '</button>'
-      );
-    };
-    var cats = (getCategories(cid) || []).filter(function (cat) {
-      return cells.some(function (c) {
-        return getAssessmentCategoryId(c.a) === cat.id;
-      });
-    });
-    var groupSeg =
-      '<span class="stu-group-label" id="stu-group-label">Group By</span>' +
-      '<div class="seg seg-sm stu-group-seg" role="radiogroup" aria-labelledby="stu-group-label">' +
-      GROUP_BYS.map(function (b) {
-        var on = _assessGroup === b.id;
-        return (
-          '<button type="button" class="seg-btn' +
-          (on ? ' active' : '') +
-          '" role="radio" aria-checked="' +
-          on +
-          '" data-action="stuAssessGroup" data-group="' +
-          b.id +
-          '">' +
-          esc(b.label) +
-          '</button>'
-        );
-      }).join('') +
-      '</div>';
-    var html =
-      '<div class="stu-toolbar">' +
-      groupSeg +
-      chip('all', 'All') +
-      chip('prof', 'Proficiency') +
-      chip('points', 'Points') +
-      (counts.unscored ? chip('unscored', 'Not Scored') : '') +
-      (cats.length
-        ? '<select class="stu-select" data-action-change="stuAssessCat" aria-label="Category"><option value="">All Categories</option>' +
-          cats
-            .map(function (cat) {
-              return (
-                '<option value="' +
-                esc(cat.id) +
-                '"' +
-                (_assessCat === cat.id ? ' selected' : '') +
-                '>' +
-                esc(cat.name) +
-                '</option>'
-              );
-            })
-            .join('') +
-          '</select>'
-        : '') +
-      '<a class="stu-link" role="link" tabindex="0" data-href="/gradebook?course=' +
-      cid +
-      '">Open in Gradebook</a>' +
-      '</div>';
-    if (!shown.length) {
-      return (
-        html + '<div class="stu-empty">' + (cells.length ? 'No assessments match.' : 'No assessments yet.') + '</div>'
-      );
-    }
-    var rowHtml = function (c) {
-      var a = c.a;
-      // Each competency by its short title (the tag's label), as the cards show it.
-      var toward = [];
-      (a.tagIds || []).forEach(function (tid) {
-        var sec = secByTag[tid];
-        if (!sec) return;
-        var tag = getTagById(cid, tid);
-        var name = (tag && tag.label) || sec.name;
-        if (toward.indexOf(name) < 0) toward.push(name);
-      });
-      var towardText =
-        toward.length && toward.length === ctx.sections.length && toward.length > 2
-          ? 'All competencies'
-          : toward.join(', ');
-      var status = ctx.statuses[studentId + ':' + a.id];
-      var cell = c.cell;
-      return (
-        '<div class="stu-assess-row">' +
-        '<span class="stu-assess-date">' +
-        esc(_shortDay(a.date)) +
-        '</span>' +
-        '<span class="stu-assess-title"><a role="link" tabindex="0" data-href="/assignments?course=' +
-        cid +
-        '&open=' +
-        a.id +
-        '&student=' +
-        studentId +
-        '" title="Open in Assignments">' +
-        esc(a.title) +
-        '</a>' +
-        (status === 'NS'
-          ? '<span class="gt-status-tag gt-tag-ns">M</span>'
-          : status === 'EXC'
-            ? '<span class="gt-status-tag gt-tag-exc">EXC</span>'
-            : status === 'LATE'
-              ? '<span class="gt-status-tag gt-tag-late">LATE</span>'
-              : '') +
-        '</span>' +
-        '<span class="stu-assess-cat">' +
-        _assessmentCategoryBadge(cid, a) +
-        '</span>' +
-        // Complete and Incomplete take the Proficient and Emerging colours,
-        // as the Assignments ledger does; the grey chip fails dark mode.
-        '<span class="stu-assess-score"><span class="stu-level stu-level-' +
-        (cell.kind === 'complete' ? (cell.mark === 'complete' ? 3 : 1) : cell.level > 0 ? cell.level : 0) +
-        '">' +
-        esc(_cellText(cell, a)) +
-        '</span></span>' +
-        '<span class="stu-assess-class stu-assess-note">' +
-        _assessNoteHtml(ctx, a) +
-        '</span>' +
-        '<span class="stu-assess-toward">' +
-        esc(towardText) +
-        '</span>' +
-        '</div>'
-      );
-    };
-    if (_assessGroup === 'date') {
-      var month = '';
-      shown.forEach(function (c) {
-        var m = (c.a.date || '').slice(0, 7);
-        if (m !== month) {
-          month = m;
-          var md = m ? new Date(m + '-01T00:00:00') : null;
-          html +=
-            '<h3 class="stu-month">' +
-            (md && !isNaN(md) ? md.toLocaleDateString('en-CA', { month: 'long', year: 'numeric' }) : 'No Date') +
-            '</h3>';
-        }
-        html += rowHtml(c);
-      });
-      return html;
-    }
-    // Grouped: each group's grade and the class's on what is listed.
-    var byId = {};
-    shown.forEach(function (c) {
-      byId[c.a.id] = c;
-    });
-    _assessGroups(
-      cid,
-      shown.map(function (c) {
-        return c.a;
-      }),
-      _assessGroup,
-    ).forEach(function (g) {
-      var fold = _assessGroup + ':' + g.key;
-      var open = !_assessClosed[fold];
-      var mine = assessmentGroupGrade(cid, studentId, g.assessments, _groupCalcMode(g));
-      html +=
-        '<div class="stu-agroup">' +
-        '<button type="button" class="stu-agroup-head" data-action="stuAssessFold" data-fold="' +
-        esc(fold) +
-        '" aria-expanded="' +
-        open +
-        '">' +
-        '<span class="stu-agroup-chev" aria-hidden="true">' +
-        (open ? '\u25BE' : '\u25B8') +
-        '</span>' +
-        '<span class="stu-agroup-name">' +
-        esc(g.name) +
-        '</span>' +
-        '<span class="stu-agroup-meta">' +
-        esc(_groupMeta(cid, g)) +
-        '</span>' +
-        '<span class="stu-agroup-grades">' +
-        _startNowHtml(cid, _scoredPoints(cid, g.assessments)) +
-        _gradePill(mine) +
-        '</span>' +
-        '</button>';
-      if (open)
-        g.assessments.forEach(function (a) {
-          html += rowHtml(byId[a.id]);
-        });
-      html += '</div>';
-    });
-    return html;
-  }
-
-  /* ── Grade Breakdown tab ────────────────────────────────── */
-  function _breakdownSummary(ctx) {
-    var cid = ctx.cid;
-    var cats = _assessGroups(cid, ctx.assessments, 'category').filter(function (g) {
-      return g.category;
-    });
-    var mods = _assessGroups(cid, ctx.assessments, 'module').filter(function (g) {
-      return g.key;
-    });
-    var parts = [];
-    if (cats.length) parts.push(_plural(cats.length, 'Category', 'Categories'));
-    if (mods.length) parts.push(_plural(mods.length, 'Module', 'Modules'));
-    var lowest = null;
-    cats.forEach(function (g) {
-      var gr = assessmentGroupGrade(cid, studentId, g.assessments, _groupCalcMode(g));
-      if (!gr) return;
-      var v = courseGradeMode(cid) === 'letter' ? gr.pct : gr.prof;
-      if (v != null && (!lowest || v < lowest.v)) lowest = { v: v, name: g.name };
-    });
-    return {
-      stat: parts.length ? parts.join(' \u00B7 ') : 'By Type and Rubric',
-      sub: lowest && cats.length > 1 ? 'Lowest: ' + lowest.name : cats.length ? 'One category' : 'No categories yet',
-    };
-  }
-
-  function _bdHeadRow(cells) {
-    return (
-      '<div class="stu-bd-row stu-bd-head" aria-hidden="true">' +
-      cells
-        .map(function (c) {
-          return '<span>' + esc(c) + '</span>';
-        })
-        .join('') +
-      '</div>'
-    );
-  }
-
-  /* One group as a table row: name and count, grade, bars, class. */
-  function _bdGroupCells(ctx, g, mine) {
-    var scored = g.assessments.filter(function (a) {
-      return assessmentGroupGrade(ctx.cid, studentId, [a]);
-    }).length;
-    var count =
-      _plural(g.assessments.length, 'assessment', 'assessments') +
-      (scored === g.assessments.length ? '' : ', ' + scored + ' scored');
-    return {
-      name:
-        '<span class="stu-bd-name"><strong>' +
-        esc(g.name) +
-        '</strong><span class="stu-sub">' +
-        esc(count) +
-        '</span></span>',
-      grade: '<span>' + _gradePill(mine) + '</span>',
-      bars:
-        '<span class="stu-comp-bars" aria-hidden="true">' +
-        (_groupBars(ctx.cid, g.assessments) || '<span class="stu-sub">No scores yet</span>') +
-        '</span>',
-      change: _startNowHtml(ctx.cid, _scoredPoints(ctx.cid, g.assessments)),
-    };
-  }
-
-  function _bdAssessList(ctx, assessments) {
-    return (
-      '<div class="stu-bd-items">' +
-      assessments
-        .slice()
-        .sort(function (x, y) {
-          return (y.date || '').localeCompare(x.date || '');
-        })
-        .map(function (a) {
-          return (
-            '<div class="stu-bd-item"><span class="stu-assess-date">' +
-            esc(_shortDay(a.date)) +
-            '</span><span class="stu-assess-title"><a role="link" tabindex="0" data-href="/assignments?course=' +
-            ctx.cid +
-            '&open=' +
-            a.id +
-            '&student=' +
-            studentId +
-            '" title="Open in Assignments">' +
-            esc(a.title) +
-            '</a></span>' +
-            _gradePill(assessmentGroupGrade(ctx.cid, studentId, [a])) +
-            '</div>'
-          );
-        })
-        .join('') +
-      '</div>'
-    );
-  }
-
-  /* ── Grade Breakdown: assignment type views ─────────────── */
-  var TYPE_VIEWS = [
-    { id: 'strengths', label: 'Strengths' },
-    { id: 'growth', label: 'Growth' },
-    { id: 'month', label: 'By Month' },
-    { id: 'timeline', label: 'Timeline' },
-  ];
-  var TYPE_VIEW_KEY = 'gb-student-type-view';
-  var TYPE_COLORS = ['#1565c0', '#c2410c', '#6d28d9', '#0f766e', '#64748b', '#a21caf', '#4d7c0f'];
-  // A shape per type too, so the lines are told apart without colour.
-  var TYPE_SHAPES = ['circle', 'square', 'triangle', 'diamond', 'down'];
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-  function _savedTypeView() {
-    try {
-      var v = localStorage.getItem(TYPE_VIEW_KEY);
-      return TYPE_VIEWS.some(function (t) {
-        return t.id === v;
-      })
-        ? v
-        : 'timeline';
-    } catch (e) {
-      return 'timeline';
-    }
-  }
 
   function _dayNum(date) {
     var d = new Date(String(date || '').slice(0, 10) + 'T00:00:00');
     return isNaN(d) ? null : Math.round(d.getTime() / 864e5);
   }
 
-  /* A group's scored assessments, oldest first, each with its grade and its
-     place on the 0–4 scale. */
-  function _scoredPoints(cid, assessments) {
-    return assessments
-      .slice()
-      .sort(function (x, y) {
-        return (x.date || '').localeCompare(y.date || '');
-      })
-      .map(function (a) {
-        var g = assessmentGroupGrade(cid, studentId, [a]);
-        var v = groupGradeValue(cid, g);
-        var t = _dayNum(a.date);
-        return v == null || t == null ? null : { a: a, g: g, v: v, t: t };
-      })
-      .filter(Boolean);
-  }
-
-  /* One scale for every chart in the section: dates across, 0–4 up, with
-     the axis labelled as the class shows grades. */
-  function _chartScale(cid, pointLists) {
-    var all = [].concat.apply([], pointLists);
-    var t0 = Math.min.apply(
-      null,
-      all.map(function (p) {
-        return p.t;
-      }),
-    );
-    var t1 = Math.max.apply(
-      null,
-      all.map(function (p) {
-        return p.t;
-      }),
-    );
-    if (t1 - t0 < 14) {
-      t0 -= 7;
-      t1 += 7;
-    }
-    var vmin = Math.min.apply(
-      null,
-      all.map(function (p) {
-        return p.v;
-      }),
-    );
-    var lo = Math.max(0, Math.min(2, Math.floor((vmin - 0.25) * 2) / 2));
-    var x = function (t) {
-      return 3 + ((t - t0) / (t1 - t0)) * 94;
-    };
-    var y = function (v) {
-      return (1 - (Math.min(4, v) - lo) / (4 - lo)) * 100;
-    };
-    // Proficiency classes label the axis with the scale's words; Letter
-    // classes with the percent.
-    var words = courseGradeMode(cid) !== 'letter';
-    var ticks = [];
-    for (var k = Math.max(1, Math.ceil(lo)); k <= 4; k++)
-      ticks.push({ y: y(k), text: words ? PROF_LABELS[k] : formatLevel(cid, k) });
-    var months = [];
-    var d = new Date(t0 * 864e5);
-    var m = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
-    // The first month's name, unless the next month starts right after it.
-    if (x(m.getTime() / 864e5) - x(t0) > 8) months.push({ x: x(t0), text: MONTHS[d.getUTCMonth()] });
-    while (m.getTime() / 864e5 <= t1) {
-      months.push({ x: x(m.getTime() / 864e5), text: MONTHS[m.getUTCMonth()] });
-      m = new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() + 1, 1));
-    }
-    return { x: x, y: y, ticks: ticks, months: months, words: words };
-  }
-
-  /* A line chart: each series a line through its points, the latest point
-     larger. Each point is a button whose label shows on hover, focus or a
-     tap. series: [{ name, points, color, shape, dim, wide, dotColor }]. */
-  function _lineChartHtml(scale, series, height, label) {
-    var html =
-      '<div class="stu-chart' +
-      (scale.words ? ' stu-chart-words' : '') +
-      '" style="height:' +
-      height +
-      'px" role="group" aria-label="' +
-      esc(label) +
-      '">';
-    scale.ticks.forEach(function (t) {
-      html +=
-        '<span class="stu-chart-grid" style="top:' +
-        t.y.toFixed(2) +
-        '%"></span><span class="stu-chart-tick" style="top:' +
-        t.y.toFixed(2) +
-        '%" aria-hidden="true">' +
-        esc(t.text) +
-        '</span>';
-    });
-    series.forEach(function (s) {
-      if (s.points.length > 1)
-        html +=
-          '<svg class="stu-chart-line' +
-          (s.dim ? ' dim' : '') +
-          '" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polyline points="' +
-          s.points
-            .map(function (p) {
-              return scale.x(p.t).toFixed(2) + ',' + scale.y(p.v).toFixed(2);
-            })
-            .join(' ') +
-          '" fill="none" stroke="' +
-          s.color +
-          '" stroke-width="' +
-          (s.wide ? 2.6 : 1.6) +
-          '" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>';
-    });
-    series.forEach(function (s) {
-      s.points.forEach(function (p, i) {
-        var x = scale.x(p.t);
-        var meta = (s.name ? s.name + ' \u00B7 ' : '') + _shortDay(p.a.date) + ' \u00B7 ' + p.g.text;
-        html +=
-          '<button type="button" class="stu-chart-dot' +
-          (i === s.points.length - 1 ? ' last' : '') +
-          (s.dim ? ' dim' : '') +
-          (x > 70 ? ' tip-end' : x < 30 ? ' tip-start' : '') +
-          (scale.y(p.v) < 25 ? ' tip-below' : '') +
-          '" data-action="stuChartTip" style="left:' +
-          x.toFixed(2) +
-          '%;top:' +
-          scale.y(p.v).toFixed(2) +
-          '%" aria-label="' +
-          esc(p.a.title + ', ' + meta) +
-          '"><span class="stu-chart-mark stu-shape-' +
-          (s.shape || 'circle') +
-          '" style="background:' +
-          (s.dotColor ? PROF_COLORS[p.g.level] || PROF_COLORS[0] : s.color) +
-          '"></span><span class="stu-chart-tip" aria-hidden="true"><strong>' +
-          esc(p.a.title) +
-          '</strong>' +
-          esc(meta) +
-          '</span></button>';
-      });
-    });
-    html += '</div><div class="stu-chart-x' + (scale.words ? ' stu-chart-words' : '') + '" aria-hidden="true">';
-    scale.months.forEach(function (m) {
-      html += '<span style="left:' + m.x.toFixed(2) + '%">' + esc(m.text) + '</span>';
-    });
-    return html + '</div>';
-  }
-
-  /* Strengths: each type against all of the student's work. */
-  function _typeStrengthsHtml(ctx, types) {
-    var cid = ctx.cid;
-    var own = assessmentGroupGrade(cid, studentId, ctx.assessments);
-    var rows = types
-      .map(function (g) {
-        var mine = assessmentGroupGrade(cid, studentId, g.assessments);
-        return { g: g, mine: mine, diff: groupGradeDiff(cid, mine, own) };
-      })
-      .sort(function (a, b) {
-        return (b.diff ? b.diff.value : -Infinity) - (a.diff ? a.diff.value : -Infinity);
-      });
-    var span = rows.reduce(
-      function (m, r) {
-        return r.diff ? Math.max(m, Math.abs(r.diff.value)) : m;
-      },
-      courseGradeMode(cid) === 'letter' ? 10 : 0.5,
-    );
-    var html =
-      '<div class="stu-ts"><div class="stu-ts-row stu-ts-head"><span></span><span class="stu-ts-axis" aria-hidden="true"><span class="stu-ts-weaker">Weaker</span><span class="stu-ts-own">All Work ' +
-      _gradePill(own) +
-      '</span><span class="stu-ts-stronger">Stronger</span></span><span></span></div>';
-    rows.forEach(function (r) {
-      var w = r.diff ? (Math.abs(r.diff.value) / span) * 50 : 0;
-      var below = r.diff && r.diff.dir < 0;
-      html +=
-        '<div class="stu-ts-row"><span class="stu-bd-name"><strong>' +
-        esc(r.g.name) +
-        '</strong><span class="stu-sub">' +
-        esc(_plural(r.g.assessments.length, 'assessment', 'assessments')) +
-        '</span></span><span class="stu-ts-track" role="img" aria-label="' +
-        esc(
-          r.g.name +
-            ': ' +
-            (r.mine ? r.mine.text : 'not scored') +
-            (r.diff ? ', ' + r.diff.text + ' against all work' : ''),
-        ) +
-        '"><span class="stu-ts-bar ' +
-        (below ? 'weaker' : 'stronger') +
-        '" style="left:' +
-        (below ? 50 - w : 50).toFixed(2) +
-        '%;width:' +
-        Math.max(w, 0.6).toFixed(2) +
-        '%"></span>' +
-        (r.diff
-          ? '<span class="stu-ts-num ' +
-            (below ? 'weaker' : 'stronger') +
-            '" style="left:' +
-            (below ? 50 - w : 50 + w).toFixed(2) +
-            '%">' +
-            esc(r.diff.text) +
-            '</span>'
-          : '') +
-        '</span><span class="stu-ts-grade">' +
-        _gradePill(r.mine) +
-        '</span></div>';
-    });
-    return html + '</div>';
-  }
-
-  /* Growth: a small chart per type, all on one timeline. */
-  function _typeGrowthHtml(ctx, types) {
-    var cid = ctx.cid;
-    var lists = types.map(function (g) {
-      return _scoredPoints(cid, g.assessments);
-    });
-    var any = lists.some(function (l) {
-      return l.length;
-    });
-    if (!any) return '<div class="stu-empty">No scores yet.</div>';
-    var scale = _chartScale(
-      cid,
-      lists.filter(function (l) {
-        return l.length;
-      }),
-    );
-    var html = '<div class="stu-tg">';
-    types.forEach(function (g, i) {
-      var pts = lists[i];
-      html +=
-        '<div class="stu-tg-card"><div class="stu-tg-head"><span class="stu-bd-name"><strong>' +
-        esc(g.name) +
-        '</strong><span class="stu-sub">' +
-        esc(_plural(g.assessments.length, 'assessment', 'assessments')) +
-        '</span></span>' +
-        _startNowHtml(cid, pts) +
-        '</div>' +
-        (pts.length
-          ? _lineChartHtml(scale, [{ points: pts, color: '#3a3a3c', dotColor: true }], 110, g.name + ' Over Time')
-          : '<div class="stu-empty">No scores yet.</div>') +
-        '</div>';
-    });
-    return html + '</div>';
-  }
-
-  /* By Month: a row per type, a column per month, as the rubric table. */
-  function _typeMonthHtml(ctx, types) {
-    var cid = ctx.cid;
-    var keys = [];
-    ctx.assessments.forEach(function (a) {
-      var m = (a.date || '').slice(0, 7);
-      if (m && keys.indexOf(m) < 0) keys.push(m);
-    });
-    keys.sort();
-    if (!keys.length) return '<div class="stu-empty">No dated assessments yet.</div>';
-    var cols = 'grid-template-columns:minmax(140px,1.2fr) repeat(' + keys.length + ',minmax(60px,1fr)) 190px 110px';
-    var html =
-      '<div class="stu-rt-scroll"><div class="stu-rt" role="table" aria-label="Assignment types by month"><div class="stu-rt-row stu-rt-head" role="row" style="' +
-      cols +
-      '"><span role="columnheader">Type</span>';
-    keys.forEach(function (k) {
-      html += '<span role="columnheader" class="stu-rt-center">' + esc(MONTHS[Number(k.slice(5)) - 1]) + '</span>';
-    });
-    html +=
-      '<span role="columnheader" class="stu-rt-center">Start to Now</span><span role="columnheader" class="stu-rt-right">All</span></div>';
-    types.forEach(function (g) {
-      html +=
-        '<div class="stu-rt-row" role="row" style="' +
-        cols +
-        '"><span role="rowheader" class="stu-bd-name"><strong>' +
-        esc(g.name) +
-        '</strong><span class="stu-sub">' +
-        esc(_plural(g.assessments.length, 'assessment', 'assessments')) +
-        '</span></span>';
-      keys.forEach(function (k) {
-        var inMonth = g.assessments.filter(function (a) {
-          return (a.date || '').slice(0, 7) === k;
-        });
-        var mg = inMonth.length ? assessmentGroupGrade(cid, studentId, inMonth) : null;
-        html +=
-          '<span role="cell" class="stu-rt-center">' +
-          (mg ? _gradePill(mg) : '<span class="stu-rt-none">\u2014</span>') +
-          '</span>';
-      });
-      html +=
-        '<span role="cell">' +
-        _startNowHtml(cid, _scoredPoints(cid, g.assessments)) +
-        '</span><span role="cell" class="stu-rt-right">' +
-        _gradePill(assessmentGroupGrade(cid, studentId, g.assessments)) +
-        '</span></div>';
-    });
-    return html + '</div></div>';
-  }
-
-  /* Timeline: every assessment on one chart, a line per type; a type's
-     chip brings it forward. */
-  function _typeTimelineHtml(ctx, types) {
-    var cid = ctx.cid;
-    var lists = types.map(function (g) {
-      return _scoredPoints(cid, g.assessments);
-    });
-    var withPts = lists.filter(function (l) {
-      return l.length;
-    });
-    if (!withPts.length) return '<div class="stu-empty">No scores yet.</div>';
-    var focus = types.some(function (g) {
-      return g.key === _typeFocus;
-    })
-      ? _typeFocus
-      : '';
-    var chip = function (key, label, color, shape) {
-      var on = focus === key;
-      return (
-        '<button type="button" class="stu-chip' +
-        (on ? ' active' : '') +
-        (color ? ' stu-chip-typed" style="--chip-c:' + color : '') +
-        '" data-action="stuTypeFocus" data-key="' +
-        esc(key) +
-        '" aria-pressed="' +
-        on +
-        '">' +
-        (color
-          ? '<span class="stu-chip-dot stu-shape-' +
-            shape +
-            '" style="background:' +
-            color +
-            '" aria-hidden="true"></span>'
-          : '') +
-        esc(label) +
-        '</button>'
-      );
-    };
-    var html =
-      '<div class="stu-rt-picker" role="group" aria-labelledby="stu-hl-label"><span class="stu-picker-label" id="stu-hl-label">Highlight</span>' +
-      chip('', 'All Types', '');
-    types.forEach(function (g, i) {
-      html += chip(g.key, g.name, TYPE_COLORS[i % TYPE_COLORS.length], TYPE_SHAPES[i % TYPE_SHAPES.length]);
-    });
-    html += '</div>';
-    var series = types.map(function (g, i) {
-      return {
-        name: g.name,
-        points: lists[i],
-        color: TYPE_COLORS[i % TYPE_COLORS.length],
-        shape: TYPE_SHAPES[i % TYPE_SHAPES.length],
-        dim: !!focus && g.key !== focus,
-        wide: focus === g.key,
-      };
-    });
-    // The type brought forward draws last, on top.
-    series.sort(function (a, b) {
-      return (a.wide ? 1 : 0) - (b.wide ? 1 : 0);
-    });
-    return html + _lineChartHtml(_chartScale(cid, withPts), series, 320, 'Scored Assessments by Type');
-  }
-
-  /* A Grade Breakdown card's head: its title with a caption under it, and
-     any controls at the right. */
-  function _bdTitleHtml(id, title, caption, controls) {
-    return (
-      '<div class="stu-bd-title"><div class="stu-bd-heading"><h3 id="' +
-      id +
-      '">' +
-      esc(title) +
-      '</h3>' +
-      (caption ? '<span class="stu-sub">' + esc(caption) + '</span>' : '') +
-      '</div>' +
-      (controls || '') +
-      '</div>'
-    );
-  }
-
-  /* What the bar colours mean: the levels the bars use, lowest first.
-     Letter classes show percents, so they get no proficiency key. */
-  function _barKeyHtml(cid, assessments) {
-    if (courseGradeMode(cid) === 'letter') return '';
-    var seen = {};
-    assessments.forEach(function (a) {
-      var g = assessmentGroupGrade(cid, studentId, [a]);
-      if (g && g.level) seen[g.level] = true;
-    });
-    var levels = [1, 2, 3, 4].filter(function (k) {
-      return seen[k];
-    });
-    if (!levels.length) return '';
-    return (
-      '<div class="stu-bar-key" aria-hidden="true">' +
-      levels
-        .map(function (k) {
-          return (
-            '<span><span class="stu-bar-swatch" style="background:' +
-            PROF_COLORS[k] +
-            '"></span>' +
-            esc(PROF_LABELS[k]) +
-            '</span>'
-          );
-        })
-        .join('') +
-      '</div>'
-    );
-  }
-
-  var TYPE_CAPTIONS = {
-    timeline: 'Scored assessments in date order, one line per type.',
-    strengths: 'The grade for each type, compared with all work.',
-    growth: 'Scores over time for each type.',
-    month: 'The grade for each type, by month.',
-  };
-
   /* ── Grades (redesign R4) ─────────────────────────────────
-     Assessments and Grade Breakdown in one tab, behind the build switch:
+     Assessments and Grade Breakdown in one tab, for every class (R5):
      how the course grade is built (one bar, a segment per category as wide
      as its weight, filled to its grade), Group By (Category, Unit, Type,
      Rubric, Date), and every piece as a row that opens in place (the
@@ -2820,7 +1964,10 @@ window.PageStudent = (function () {
           );
         })
         .join('') +
-      '</div></div>'
+      '</div><span class="stu-gr-grow"></span>' +
+      '<label class="stu-gr-classavg"><input type="checkbox" data-action="stuGrClass"' +
+      (_grClass ? ' checked' : '') +
+      '> Show Class Average</label></div>'
     );
   }
 
@@ -2868,7 +2015,10 @@ window.PageStudent = (function () {
         })
         .join('');
     }
-    var groups = _assessGroups(cid, ctx.assessments, _grGroup);
+    var groups = _assessGroups(cid, ctx.assessments, _grGroup).filter(function (g) {
+      // The Rubric view shows each rubric's table; work with no rubric has none.
+      return _grGroup !== 'rubric' || !!g.rubric;
+    });
     if (!groups.length)
       return (
         '<div class="stu-gr-none">' +
@@ -2878,7 +2028,13 @@ window.PageStudent = (function () {
     if (_grGroup === 'rubric')
       return groups
         .map(function (g) {
-          return '<section class="stu-gr-group stu-gr-rubric">' + _rubricTableHtml(ctx, g) + '</section>';
+          return (
+            '<section class="stu-gr-group stu-gr-rubric-group"><div class="stu-gr-group-head"><h3 class="stu-gr-group-name">' +
+            esc(g.name) +
+            '</h3></div><div class="stu-gr-rubric">' +
+            _rubricTableHtml(ctx, g) +
+            '</div></section>'
+          );
         })
         .join('');
     return groups
@@ -2897,6 +2053,7 @@ window.PageStudent = (function () {
             : '') +
           (missing ? ' · <span class="stu-gr-miss">' + esc(missing + ' missing') + '</span>' : '') +
           '</div></div>' +
+          (_grClass ? _grClassHtml(cid, g) : '') +
           _gradePill(mine) +
           '</div>' +
           _grRowsHtml(ov, ctx, g.assessments) +
@@ -2904,6 +2061,16 @@ window.PageStudent = (function () {
         );
       })
       .join('');
+  }
+
+  /* A group's class average, only while Show Class Average is on: a grade
+     compares a student to the criteria, not to classmates. */
+  function _grClassHtml(cid, g) {
+    var ids = (getStudents(cid) || []).map(function (st) {
+      return st.id;
+    });
+    var cls = classAssessmentGroupGrade(cid, ids, g.assessments, _groupCalcMode(g));
+    return '<span class="stu-gr-class">Class ' + esc(cls ? cls.text : '—') + '</span>';
   }
 
   function _gradesTabHtml(ctx) {
@@ -2922,194 +2089,8 @@ window.PageStudent = (function () {
       _grControlsHtml(ov, ctx) +
       '<div class="stu-gr-list">' +
       _grGroupsHtml(ov, ctx) +
-      '</div></div>'
+      '</div><p class="stu-gr-foot">Class averages are off unless you turn them on: a grade compares a student to the criteria, not to classmates.</p></div>'
     );
-  }
-
-  function _breakdownTabHtml(ctx) {
-    var cid = ctx.cid;
-    var mode = courseGradeMode(cid);
-    var showShares = mode !== 'proficiency';
-
-    // Assignment types: four ways to look at this student's work by type.
-    var types = _assessGroups(cid, ctx.assessments, 'type');
-    var views = '';
-    if (types.length) {
-      views += '<div class="seg seg-sm" role="radiogroup" aria-label="Assignment types view">';
-      TYPE_VIEWS.forEach(function (v) {
-        var on = _typeView === v.id;
-        views +=
-          '<button type="button" class="seg-btn' +
-          (on ? ' active' : '') +
-          '" role="radio" aria-checked="' +
-          on +
-          '" data-action="stuTypeView" data-view="' +
-          v.id +
-          '">' +
-          esc(v.label) +
-          '</button>';
-      });
-      views += '</div>';
-    }
-    var html =
-      '<section class="stu-bd-section" aria-labelledby="stu-bd-types">' +
-      _bdTitleHtml('stu-bd-types', 'Assignment Types', types.length ? TYPE_CAPTIONS[_typeView] : '', views);
-    if (!types.length) html += '<div class="stu-empty">No assessments yet.</div>';
-    else if (_typeView === 'growth') html += _typeGrowthHtml(ctx, types);
-    else if (_typeView === 'month') html += _typeMonthHtml(ctx, types);
-    else if (_typeView === 'timeline') html += _typeTimelineHtml(ctx, types);
-    else html += _typeStrengthsHtml(ctx, types);
-    html += '</section>';
-
-    // Categories
-    var cats = _assessGroups(cid, ctx.assessments, 'category');
-    html +=
-      '<section class="stu-bd-section" aria-labelledby="stu-bd-cats">' +
-      _bdTitleHtml(
-        'stu-bd-cats',
-        'Categories',
-        cats.length
-          ? 'Weighted to produce the course grade. Each category grade is ' +
-              (mode === 'proficiency'
-                ? 'the average of its scored assessments.'
-                : 'points earned out of points possible.')
-          : '',
-      );
-    if (!cats.length) {
-      html += '<div class="stu-empty">No assessments in a category yet.</div>';
-    } else {
-      var shares = showShares ? categoryCourseShares(cid, studentId) : {};
-      html +=
-        '<div class="stu-bd-table' +
-        (showShares ? ' stu-bd-cats-shares' : ' stu-bd-cats') +
-        '">' +
-        _bdHeadRow(
-          ['Category', 'Weight', 'Grade', 'Assessments \u00B7 Oldest to Newest', 'Start to Now'].concat(
-            showShares ? ['Adds to Course %'] : [],
-          ),
-        );
-      cats.forEach(function (g) {
-        var mine = assessmentGroupGrade(cid, studentId, g.assessments, _groupCalcMode(g));
-        var c = _bdGroupCells(ctx, g, mine);
-        var open = !!_bdOpen[g.key || '-'];
-        html +=
-          '<div class="stu-bd-group"><button type="button" class="stu-bd-row" data-action="stuBdToggle" data-key="' +
-          esc(g.key || '-') +
-          '" aria-expanded="' +
-          open +
-          '">' +
-          c.name +
-          '<span class="stu-bd-weight">' +
-          (g.category ? esc(Number(g.category.weight || 0) + '%') : '\u2014') +
-          '</span>' +
-          c.grade +
-          c.bars +
-          c.change +
-          (showShares
-            ? '<span class="stu-bd-share">' +
-              (g.category && shares[g.key] ? esc(shares[g.key].text) : '\u2014') +
-              '</span>'
-            : '') +
-          '</button>' +
-          (open ? _bdAssessList(ctx, g.assessments) : '') +
-          '</div>';
-      });
-      if (showShares) {
-        var course = getCourseLetterData(cid, studentId);
-        if (course && course.R != null)
-          html +=
-            '<div class="stu-bd-row stu-bd-total"><span class="stu-bd-name"><strong>Course</strong></span><span class="stu-bd-weight">100%</span><span>' +
-            _gradePill(studentGradeSummary(cid, studentId)) +
-            '</span><span></span><span></span><span class="stu-bd-share">' +
-            esc(formatCoursePercent(cid, course.R).replace('%', '')) +
-            '</span></div>';
-      }
-      html += '</div>' + _barKeyHtml(cid, ctx.assessments);
-    }
-    html += '</section>';
-
-    // Modules
-    var mods = _assessGroups(cid, ctx.assessments, 'module');
-    var hasModules = mods.some(function (g) {
-      return g.key;
-    });
-    // With none, the card is one line saying where modules are made.
-    html +=
-      '<section class="stu-bd-section' +
-      (hasModules ? '' : ' stu-bd-section-empty') +
-      '" aria-labelledby="stu-bd-mods">' +
-      _bdTitleHtml(
-        'stu-bd-mods',
-        'Modules',
-        hasModules
-          ? 'Assessment groups from the Assignments page. Not part of the course grade.'
-          : 'None yet. Modules are created on the Assignments page.',
-      );
-    if (hasModules) {
-      html +=
-        '<div class="stu-bd-table stu-bd-mods">' +
-        _bdHeadRow(['Module', 'Grade', 'Assessments \u00B7 Oldest to Newest', 'Start to Now', 'Latest']);
-      mods.forEach(function (g) {
-        var mine = assessmentGroupGrade(cid, studentId, g.assessments);
-        var c = _bdGroupCells(ctx, g, mine);
-        var latest = g.assessments.reduce(function (m, a) {
-          return (a.date || '') > m ? a.date : m;
-        }, '');
-        html +=
-          '<div class="stu-bd-row' +
-          (g.key ? '' : ' stu-bd-none') +
-          '">' +
-          c.name +
-          c.grade +
-          c.bars +
-          c.change +
-          '<span class="stu-bd-latest">' +
-          esc(_shortDay(latest)) +
-          '</span></div>';
-      });
-      html += '</div>';
-    }
-    html += '</section>';
-
-    // Rubrics used on more than one assessment: one picked at a time, its
-    // criteria down the side and its assessments across, oldest first.
-    var rubrics = _assessGroups(cid, ctx.assessments, 'rubric').filter(function (g) {
-      return g.key && g.rubric && g.assessments.length > 1;
-    });
-    html +=
-      '<section class="stu-bd-section" aria-labelledby="stu-bd-rubrics">' +
-      _bdTitleHtml(
-        'stu-bd-rubrics',
-        'Shared Rubrics',
-        rubrics.length ? 'Criterion scores for rubrics used on more than one assessment.' : '',
-      );
-    if (!rubrics.length) html += '<div class="stu-empty">No rubric is used on more than one assessment yet.</div>';
-    else {
-      var pick =
-        rubrics.find(function (g) {
-          return g.key === _bdRubric;
-        }) || rubrics[0];
-      html += '<div class="stu-rt-picker" role="group" aria-label="Rubric">';
-      rubrics.forEach(function (g) {
-        var on = g === pick;
-        html +=
-          '<button type="button" class="stu-chip' +
-          (on ? ' active' : '') +
-          '" data-action="stuBdRubric" data-key="' +
-          esc(g.key) +
-          '" aria-pressed="' +
-          on +
-          '">' +
-          esc(g.name) +
-          ' \u00B7 ' +
-          g.assessments.length +
-          '</button>';
-      });
-      html += '</div>';
-      html += _rubricTableHtml(ctx, pick);
-    }
-    html += '</section>';
-    return html;
   }
 
   /* A shared rubric as a table: a criterion per row, an assessment per
@@ -3430,7 +2411,7 @@ window.PageStudent = (function () {
 
   /* Competency goals (canvas 9d): a card for each competency with your goal
      or the student's words side by side; the rest in one No Goal Yet list. */
-  function _compGoalsHtml(ctx) {
+  function _compGoalsHtml(ctx, showEmpty) {
     var cid = ctx.cid;
     var first = displayNameFirst(ctx.student);
     var goals = getGoals(cid)[studentId] || {};
@@ -3449,7 +2430,7 @@ window.PageStudent = (function () {
       var setOn = goalText ? dates[sec.id] : null;
       var conf = refl.confidence ? CONFIDENCE_LABELS[refl.confidence] || '' : '';
       html +=
-        '<div class="gl-card"><div class="gl-top"><div class="gl-title">' +
+        '<div class="gl-card lp2-goal lp2-compgoal"><div class="gl-top"><div class="gl-title">' +
         esc(sec.name) +
         '</div>' +
         _levelPill(cid, getSectionProficiency(cid, studentId, sec.id)) +
@@ -3498,10 +2479,13 @@ window.PageStudent = (function () {
         '</div></div></div>';
     });
     if (rest.length) {
+      // The competencies with no goal or reflection fold into one line, so
+      // the goals that exist lead (the redesign's Goals list).
       html +=
-        '<div class="gl-card gl-rest"><div class="gl-top"><div class="gl-title">No Goal Yet</div><span class="gl-meta">' +
-        esc(_plural(rest.length, 'competency', 'competencies')) +
-        '</span></div><div class="gl-rows">';
+        (full.length || !showEmpty ? '' : '<div class="lp-none">No goals yet.</div>') +
+        '<details class="gl-card gl-rest"><summary class="gl-top"><span class="gl-title">Add a Goal or Reflection</span><span class="gl-meta">' +
+        esc(_plural(rest.length, 'competency', 'competencies') + ' with none yet') +
+        '</span></summary><div class="gl-rows">';
       rest.forEach(function (sec) {
         html +=
           '<div class="gl-row"><strong>' +
@@ -3513,7 +2497,7 @@ window.PageStudent = (function () {
           _reflBlockHtml(ctx, sec, {}, true) +
           '</span></div>';
       });
-      html += '</div></div>';
+      html += '</div></details>';
     }
     if (!ctx.sections.length) html += '<div class="lp-none">This class has no competencies yet.</div>';
     return html;
@@ -3575,13 +2559,15 @@ window.PageStudent = (function () {
       '<p class="lp-calib-lede">' +
       esc(first) +
       '’s own rating beside your level. A gap is something to talk about.</p>';
-    if (!rows.length)
-      return (
-        html +
-        '<div class="lp-none">' +
-        esc(first) +
-        ' hasn’t rated a competency yet. Their ratings come from competency reflections.</div></section>'
-      );
+    // Not rated yet: every other competency, with your level, so the table
+    // shows in any class; folded away when there are many.
+    var unrated = [];
+    ctx.sections.forEach(function (sec) {
+      var r = mine[sec.id];
+      var self = r && Number(r.confidence);
+      if (self >= 1 && self <= 4) return;
+      unrated.push({ sec: sec, v: getSectionProficiency(cid, studentId, sec.id) });
+    });
     html +=
       '<div class="lp-calib" role="table" aria-label="' +
       esc(first + '’s rating beside your level') +
@@ -3609,115 +2595,173 @@ window.PageStudent = (function () {
         esc(x.note) +
         '</span></div>';
     });
-    return html + '</div></section>';
-  }
-
-  function _dispositionsHtml(ctx) {
-    var cid = ctx.cid;
-    var first = displayNameFirst(ctx.student);
-    var groups = [
-      { name: 'Learning Dispositions', sub: 'How ' + first + ' learns', dims: LEARNING_DIMS },
-      { name: 'Relational and Identity', sub: 'Who ' + first + ' is with others', dims: RELATIONAL_DIMS },
-    ];
-    var html =
-      '<div class="stu-panel-note">From the tags on ' +
-      esc(first) +
-      '’s ' +
-      _plural(ctx.obs.length, 'observation', 'observations') +
-      (ctx.term ? ' this term' : '') +
-      '. Each dot is one observation.</div><div class="stu-profile-grid">';
-    // Each disposition on one timeline, a dot per observation (it opens the
-    // observation); the ones not seen yet gather in one row.
-    var times = ctx.obs
-      .map(function (o) {
-        return _dayNum(_obDay(o));
+    var unratedHtml = unrated
+      .map(function (x) {
+        var teach = x.v > 0 ? Math.max(1, Math.min(4, roundLevel(x.v))) : 0;
+        return (
+          '<div class="lp-calib-row lp-calib-unrated" role="row"><span class="lp-calib-name" role="cell">' +
+          esc(x.sec.name) +
+          '</span><span role="cell">' +
+          _lpScaleHtml(0, true, first + ' has not rated this yet') +
+          '<span class="lp-calib-word">Not rated yet</span></span><span role="cell">' +
+          (teach
+            ? _lpScaleHtml(teach, false, 'Your level ' + formatLevel(cid, x.v)) +
+              '<span class="lp-calib-word">' +
+              esc(formatLevel(cid, x.v)) +
+              '</span>'
+            : '<span class="lp-calib-word">Not yet</span>') +
+          '</span><span class="lp-calib-note" role="cell">Ask ' +
+          esc(first) +
+          ' to rate it in a reflection.</span></div>'
+        );
       })
-      .filter(function (t) {
-        return t != null;
-      });
-    var t0 = times.length ? Math.min.apply(null, times) : 0;
-    var t1 = times.length ? Math.max.apply(null, times) : 0;
-    if (t1 - t0 < 28) {
-      t0 -= 14;
-      t1 += 14;
-    }
-    var xAt = function (t) {
-      return 3 + ((t - t0) / (t1 - t0)) * 94;
-    };
-    var axis = '<div class="stu-lane-axis" aria-hidden="true"><span></span><span class="stu-lane-months">';
-    var md = new Date(t0 * 864e5);
-    var m = new Date(Date.UTC(md.getUTCFullYear(), md.getUTCMonth() + 1, 1));
-    while (m.getTime() / 864e5 <= t1) {
-      axis +=
-        '<span style="left:' + xAt(m.getTime() / 864e5).toFixed(2) + '%">' + esc(MONTHS[m.getUTCMonth()]) + '</span>';
-      m = new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() + 1, 1));
-    }
-    axis += '</span></div>';
-    groups.forEach(function (g) {
-      var seen = [];
-      var unseen = [];
-      g.dims.forEach(function (d) {
-        var tagged = ctx.obs.filter(function (o) {
-          return (o.dims || []).indexOf(d) >= 0;
-        });
-        (tagged.length ? seen : unseen).push({ d: d, obs: tagged });
-      });
+      .join('');
+    if (unrated.length && (rows.length || unrated.length > 8))
       html +=
-        '<div class="stu-profile-group"><h3>' + esc(g.name) + '</h3><div class="stu-sub">' + esc(g.sub) + '</div>';
-      if (seen.length) html += axis;
-      seen.forEach(function (r) {
-        html +=
-          '<div class="stu-lane"><span class="stu-lane-name"><strong>' +
-          esc(OBS_LABELS[r.d]) +
-          '</strong><span class="stu-sub">' +
-          esc(_plural(r.obs.length, 'time', 'times')) +
-          '</span></span><span class="stu-lane-track" role="group" aria-label="' +
-          esc(OBS_LABELS[r.d] + ', ' + _plural(r.obs.length, 'observation', 'observations')) +
-          '">';
-        r.obs.forEach(function (o) {
-          var t = _dayNum(_obDay(o));
-          if (t == null) return;
-          html +=
-            '<button type="button" class="stu-lane-dot" data-ced="jump" data-obid="' +
-            esc(o.id) +
-            '" style="left:' +
-            xAt(t).toFixed(2) +
-            '%" title="' +
-            esc(
-              _shortDay(_obDay(o)) +
-                (isPrivateObservation(o) ? ' (Private)' : '') +
-                ': ' +
-                String(o.text || '').split('\n')[0],
-            ) +
-            '" aria-label="' +
-            esc(
-              _shortDay(_obDay(o)) +
-                (isPrivateObservation(o) ? ' (Private)' : '') +
-                ': ' +
-                String(o.text || '').split('\n')[0],
-            ) +
-            '"></button>';
-        });
-        html += '</span></div>';
-      });
-      if (unseen.length) {
-        html += '<div class="stu-unseen"><span class="stu-unseen-label">Not Seen Yet</span>';
-        unseen.forEach(function (r) {
-          html += '<span class="stu-unseen-chip">' + esc(OBS_LABELS[r.d]) + '</span>';
-        });
-        html += '</div>';
-      }
-      html += '</div>';
-    });
-    html += '</div>';
-
-    return html;
+        '<details class="lp-calib-more"><summary>' +
+        esc(_plural(unrated.length, 'competency', 'competencies') + ' not rated yet') +
+        '</summary>' +
+        unratedHtml +
+        '</details>';
+    else html += unratedHtml;
+    return html + '</div></section>';
   }
 
   /* ── Learner Profile tab (canvas 9d) ────────────────────── */
   /* The ID card beside the student's own words: About Me, Goals (theirs and
      the competency goals), Reflections; then what observations show and the
      Core Competency self-assessments by term. */
+  /* ── Learner Profile, as the redesign's board draws it (R6) ──────
+     Who: the student's card and their private note. In their words beside
+     their goals. How they see their learning. The Core Competencies, term
+     by term. How they learn. Then their reflections. */
+
+  function _lpWhoHtml(ctx, o) {
+    var a = o.model.about;
+    var say = a && LearnerProfile.text(a.say && a.say.v);
+    var meta = [o.pronouns, o.grade ? 'Grade ' + o.grade : '', o.classLabel].filter(Boolean);
+    var answered = [];
+    if (a && a.at) answered.push('Answered About Me ' + LearnerProfile.day(a.at));
+    if (o.model.checkin && o.model.checkin.at) answered.push('Goal Check-In ' + LearnerProfile.day(o.model.checkin.at));
+    var note = LearnerProfile.privateNote(o);
+    return (
+      '<div class="lp2-who"><div class="lp2-card"><div class="lp2-av" aria-hidden="true">' +
+      esc(o.initials) +
+      '</div><div class="lp2-id"><h2 class="lp2-name" id="lp-title">' +
+      esc(displayNameWithLast(ctx.student)) +
+      '</h2>' +
+      (meta.length ? '<div class="lp2-meta">' + esc(meta.join(' · ')) + '</div>' : '') +
+      (say ? '<div class="lp2-meta id-say">Say it ' + LearnerProfile.sayHtml(say) + '</div>' : '') +
+      (answered.length ? '<div class="lp2-sub">' + esc(answered.join(' · ')) + '</div>' : '') +
+      '</div></div>' +
+      '<div class="lp2-note"><div class="lp2-note-head">' +
+      (typeof LINE_ICONS !== 'undefined' ? LINE_ICONS.lock : '') +
+      'Private Note · only you see it</div>' +
+      (note
+        ? '<div class="lp2-note-text id-private-text">' + esc(note) + '</div>'
+        : '<div class="lp2-note-text lp2-quiet">' +
+          esc(_lpFirst(ctx) + ' hasn’t left you a note. A note comes from the About Me questionnaire.') +
+          '</div>') +
+      '</div></div>'
+    );
+  }
+
+  function _lpFirst(ctx) {
+    return displayNameFirst(ctx.student);
+  }
+
+  function _lpWordsHtml(o) {
+    var a = o.model.about;
+    var items = LearnerProfile.wordsItems(o);
+    var html =
+      '<section class="qw-sec lp2-sec" id="lp-about" aria-labelledby="lp-about-h"><h3 class="lp2-h3" id="lp-about-h">In ' +
+      esc(o.first) +
+      '’s Words</h3>';
+    if (!a)
+      return (
+        html +
+        '<p class="lp2-lede">' +
+        (o.aboutOn
+          ? esc(o.first) + ' hasn’t answered About Me yet.'
+          : 'About Me isn’t turned on for this class. Turn it on in ' +
+            '<a class="lp-link" role="link" tabindex="0" data-href="/dashboard?course=' +
+            esc(encodeURIComponent(o.cid)) +
+            '&amp;manage=questionnaires">Class Settings › Questionnaires</a>.') +
+        '</p></section>'
+      );
+    html += '<p class="lp2-lede">From the About Me questionnaire, ' + esc(LearnerProfile.day(a.at)) + '.</p>';
+    if (!items.length) return html + '<p class="lp2-quiet">No answers written yet.</p></section>';
+    html += '<div class="lp2-words">';
+    items.forEach(function (it) {
+      html +=
+        '<div class="lp2-word"><div class="lp2-q">' +
+        esc(it.q) +
+        '</div><div class="lp2-bubble">' +
+        esc(it.t) +
+        '</div></div>';
+    });
+    return html + '</div></section>';
+  }
+
+  function _lpGoalsHtml(ctx, o) {
+    var own = LearnerProfile.studentGoals(o);
+    var html =
+      '<section class="qw-sec lp2-sec" id="lp-goals" aria-labelledby="lp-goals-h"><div class="lp2-head"><h3 class="lp2-h3" id="lp-goals-h">Goals</h3>' +
+      '<button type="button" class="btn btn-primary lp2-add" data-action="lpAddGoal">Add Goal</button></div>' +
+      '<div class="lp2-goals">';
+    own.forEach(function (g) {
+      html +=
+        '<div class="gl-card lp2-goal"><div class="lp2-goal-top">' +
+        LearnerProfile.src('them', o.first) +
+        '<span class="lp2-goal-comp">' +
+        esc(g.comp) +
+        '</span></div><div class="lp2-goal-text">' +
+        esc(g.text) +
+        '</div><div class="lp2-goal-foot">' +
+        LearnerProfile.statusHtml(g.status) +
+        (g.when ? '<span class="lp2-when">' + esc(g.when) + '</span>' : '') +
+        '</div></div>';
+    });
+    html += _compGoalsHtml(ctx, !own.length);
+    return html + '</div></section>';
+  }
+
+  /* How they learn: each disposition seen in observations, with how often;
+     the ones not seen yet in orange. */
+  function _lpLearnsHtml(ctx) {
+    var name = _lpFirst(ctx);
+    var groups = [
+      { name: 'Learning Dispositions', dims: LEARNING_DIMS },
+      { name: 'Relational and Identity', dims: RELATIONAL_DIMS },
+    ];
+    var html =
+      '<section class="qw-sec lp2-sec" id="lp-dispositions" aria-labelledby="lp-disp-h"><h3 class="lp2-h3" id="lp-disp-h">How ' +
+      esc(name) +
+      ' Learns</h3><p class="lp2-lede">Counted from your ' +
+      _plural(ctx.obs.length, 'observation', 'observations') +
+      (ctx.term ? ' this term' : '') +
+      '. <a class="lp-link" role="link" tabindex="0" data-action="stuTab" data-tab="evidence">See them on Observations</a></p>' +
+      '<div class="lp2-learns">';
+    groups.forEach(function (g) {
+      html += '<div class="stu-profile-group lp2-learn-group"><h3>' + esc(g.name) + '</h3><div class="lp2-chips">';
+      g.dims.forEach(function (d) {
+        var n = ctx.obs.filter(function (o) {
+          return (o.dims || []).indexOf(d) >= 0;
+        }).length;
+        html +=
+          '<span class="lp2-chip' +
+          (n ? '' : ' none') +
+          '">' +
+          esc(OBS_LABELS[d] || d) +
+          ' <strong>' +
+          (n ? esc(_plural(n, 'time', 'times')) : 'Not seen yet') +
+          '</strong></span>';
+      });
+      html += '</div></div>';
+    });
+    return html + '</div></section>';
+  }
+
   function _profileTabHtml(ctx) {
     var cid = ctx.cid;
     var course = COURSES[cid] || {};
@@ -3748,28 +2792,28 @@ window.PageStudent = (function () {
       // Reflect on Feedback (S10-F4), or null while it is off.
       feedback: LearnerProfile.feedbackOf(cid, studentId),
     };
+    var waiting = !!(o.feedback && o.feedback.waiting > 0);
     return (
-      '<div class="lp-layout"><aside class="lp-aside">' +
-      LearnerProfile.idCardHtml(o) +
-      LearnerProfile.feedbackAsideHtml(o) +
-      '</aside><div class="lp-main">' +
-      LearnerProfile.feedbackHtml(o) +
-      LearnerProfile.aboutHtml(o) +
-      '<section class="qw-sec" id="lp-goals" aria-labelledby="lp-goals-h"><div class="qw-head"><h2 id="lp-goals-h">Goals</h2></div>' +
-      LearnerProfile.courseGoalHtml(o) +
-      LearnerProfile.coreGoalHtml(o) +
-      '<div class="qw-group"><h3>Competency Goals</h3>' +
-      _compGoalsHtml(ctx) +
-      '</div></section>' +
+      '<div class="lp2 lp-layout">' +
+      _lpWhoHtml(ctx, o) +
+      // A question from the student waiting for an answer leads (S10-F4).
+      (waiting ? LearnerProfile.feedbackAsideHtml(o) + LearnerProfile.feedbackHtml(o) : '') +
+      '<div class="lp2-pair">' +
+      _lpWordsHtml(o) +
+      _lpGoalsHtml(ctx, o) +
+      '</div>' +
       _calibrationHtml(ctx) +
-      LearnerProfile.reflectionsHtml(o) +
-      '<section class="qw-sec" id="lp-dispositions" aria-labelledby="lp-disp-h"><div class="qw-head"><h2 id="lp-disp-h">Seen in Observations</h2></div>' +
-      _dispositionsHtml(ctx) +
-      '</section><section class="qw-sec" id="lp-core" aria-labelledby="lp-core-h"><div class="qw-head"><h2 id="lp-core-h">Core Competencies in ' +
-      esc(first) +
-      '’s Words</h2></div>' +
+      '<section class="qw-sec lp2-sec" id="lp-core" aria-labelledby="lp-core-h">' +
       _coreSelfHtml(ctx, true) +
-      '</section></div></div>'
+      '</section>' +
+      _lpLearnsHtml(ctx) +
+      // Reflect on Feedback (S10-F4): Working On and the reflections, while it is on.
+      (waiting ? '' : LearnerProfile.feedbackAsideHtml(o) + LearnerProfile.feedbackHtml(o)) +
+      LearnerProfile.reflectionsHtml(o) +
+      '<p class="lp-foot">' +
+      esc(first) +
+      '’s own words and your private note never appear on the Overview or in Full Screen.</p>' +
+      '</div>'
     );
   }
 
@@ -3847,10 +2891,32 @@ window.PageStudent = (function () {
         tally[id] = (tally[id] || 0) + 1;
       });
     });
-    // In the Learner Profile the section heading names it; only the term picker stays.
+    // In the Learner Profile the section heading names it; the term's status
+    // (how many the student has answered, or when it is due) and the picker stay.
+    var answered = CORE_COMPETENCIES.filter(function (cc) {
+      var e = mine[cc.id] || theirs[cc.id];
+      return !!(e && e.level);
+    }).length;
+    var termName = tk.pick ? tk.pick.label || 'Term ' + tk.pick.ordinal : '';
+    var due = tk.pick && (tk.pick.ends_on || tk.pick.endsOn);
+    var status = !termName
+      ? ''
+      : answered === CORE_COMPETENCIES.length
+        ? termName + ': all ' + answered + ' answered.'
+        : answered
+          ? termName + ': ' + answered + ' of ' + CORE_COMPETENCIES.length + ' answered.'
+          : termName + ': not answered yet.' + (due ? ' Due with reports on ' + _shortDay(due) + '.' : '');
     var html =
       '<div class="stu-core-head">' +
-      (inSection ? '<span></span>' : '<h3>Core Competencies · In ' + esc(first) + '’s Words</h3>');
+      (inSection
+        ? '<div><h3 class="lp2-h3" id="lp-core-h">Core Competencies</h3><p class="lp2-lede">' +
+          esc(first) +
+          '’s self-assessment, as BC reporting asks each term. <span class="stu-core-status' +
+          (answered ? '' : ' none') +
+          '">' +
+          esc(status) +
+          '</span></p></div>'
+        : '<h3>Core Competencies · In ' + esc(first) + '’s Words</h3>');
     if (tk.terms.length) {
       html += '<div class="seg seg-sm" role="radiogroup" aria-label="Term">';
       tk.terms.forEach(function (t) {
@@ -3867,6 +2933,69 @@ window.PageStudent = (function () {
           '</button>';
       });
       html += '</div>';
+    }
+    if (inSection) {
+      html +=
+        '</div><div class="stu-core-table lp2-core"><div class="lp2-core-row lp2-core-thead" aria-hidden="true"><span>Core Competency</span>' +
+        CORE_STEPS.map(function (lv) {
+          return '<span class="lp2-core-col">' + esc(CONFIDENCE_LABELS[lv]) + '</span>';
+        }).join('') +
+        '<span>Work to Point To</span></div>';
+      CORE_COMPETENCIES.forEach(function (cc) {
+        var e = mine[cc.id] || theirs[cc.id];
+        var editing = _coreEditing === cc.id;
+        var n = tally[cc.id] || 0;
+        html +=
+          '<div class="stu-core-trow lp2-core-item"><div class="lp2-core-row"><span class="stu-core-cname"><strong>' +
+          esc(cc.label) +
+          '</strong><span class="stu-sub">' +
+          esc(cc.group) +
+          '</span></span>';
+        CORE_STEPS.forEach(function (lv) {
+          var on = !!(e && !editing && e.level === lv);
+          html +=
+            '<span class="lp2-core-col">' +
+            (on
+              ? '<span class="stu-core-step on lp2-core-chip" data-step="' +
+                esc(CONFIDENCE_LABELS[lv]) +
+                '" aria-label="' +
+                esc(first + ' chose ' + CONFIDENCE_LABELS[lv]) +
+                '">' +
+                esc(first) +
+                '</span>'
+              : '<span class="lp2-core-dot" aria-hidden="true"></span>') +
+            '</span>';
+        });
+        html +=
+          '<span class="stu-core-work' +
+          (n ? '' : ' none') +
+          '">' +
+          (n ? esc(_plural(n, 'assessment', 'assessments')) : 'None tagged yet') +
+          (editing
+            ? ''
+            : ' <button type="button" class="stu-chip" data-action="stuCoreEdit" data-core="' +
+              cc.id +
+              '">' +
+              (e ? 'Edit' : '+ Self-Assessment') +
+              '</button>') +
+          '</span></div>';
+        if (e && !editing && (e.text || e.goal || e.fromStudent))
+          html +=
+            '<div class="lp2-core-words">' +
+            (e.text ? '<div class="lp2-bubble stu-core-words">' + esc(e.text) + '</div>' : '') +
+            (e.goal ? '<div class="lp2-core-goal"><strong>Goal:</strong> ' + esc(e.goal) + '</div>' : '') +
+            (e.fromStudent
+              ? '<span class="stu-core-from">' +
+                LearnerProfile.src('them', first) +
+                ' ' +
+                esc(_shortDay(e.at)) +
+                '</span>'
+              : '') +
+            '</div>';
+        if (editing) html += _coreEditHtml(first, cc, e || {});
+        html += '</div>';
+      });
+      return html + '</div>';
     }
     html +=
       '</div><div class="stu-core-table"><div class="stu-core-trow stu-core-thead" aria-hidden="true"><span>Core Competency</span><span>' +
@@ -3991,8 +3120,7 @@ window.PageStudent = (function () {
   var TAB_KEY = 'gb-student-tab';
   function _savedTab() {
     try {
-      var t = localStorage.getItem(TAB_KEY);
-      if (t === 'goals') t = 'profile';
+      var t = _tabAlias(localStorage.getItem(TAB_KEY));
       return _isTab(t) ? t : null;
     } catch (e) {
       return null;
@@ -4126,18 +3254,11 @@ window.PageStudent = (function () {
     };
     html += _tabBarHtml(_tabSummaries(ctx));
     // Grade Breakdown's sections are cards of their own on the page.
-    html +=
-      '<div class="stu-panel' +
-      (_tab === 'breakdown' ? ' stu-panel-cards' : '') +
-      '" id="stu-panel" role="tabpanel" aria-labelledby="stu-tab-' +
-      _tab +
-      '">';
+    html += '<div class="stu-panel' + '" id="stu-panel" role="tabpanel" aria-labelledby="stu-tab-' + _tab + '">';
     if (_tab === 'overview') html += _overviewTabHtml(ctx);
-    else if (_tab === 'assess') html += _assessTabHtml(ctx);
     else if (_tab === 'grades') html += _gradesTabHtml(ctx);
     else if (_tab === 'work') html += WorkWall.tabHtml(cid, studentId);
     else if (_tab === 'evidence') html += Evidence.panelHtml();
-    else if (_tab === 'breakdown') html += _breakdownTabHtml(ctx);
     else if (_tab === 'profile') html += _profileTabHtml(ctx);
     else html += _compsTabHtml(ctx);
     html += '</div>';
@@ -4210,6 +3331,14 @@ window.PageStudent = (function () {
       stuTab: function () {
         setTab(el.dataset.tab);
       },
+      // Learner Profile, Add Goal: open the competencies with none yet.
+      lpAddGoal: function () {
+        var more = document.querySelector('#lp-goals details.gl-rest');
+        if (!more) return;
+        more.open = true;
+        var btn = more.querySelector('[data-action="editGoal"]');
+        if (btn) btn.focus();
+      },
       stuStep: function () {
         if (el.dataset.sid) switchStudent(el.dataset.sid);
       },
@@ -4254,6 +3383,12 @@ window.PageStudent = (function () {
         var btn = document.querySelector('[data-action="stuGrGroup"][data-group="' + _grGroup + '"]');
         if (btn) btn.focus({ preventScroll: true });
       },
+      stuGrClass: function () {
+        _grClass = !_grClass;
+        render();
+        var box = document.querySelector('[data-action="stuGrClass"]');
+        if (box) box.focus({ preventScroll: true });
+      },
       stuGrFilter: function () {
         _grFilter = el.dataset.filter || 'all';
         render();
@@ -4274,56 +3409,6 @@ window.PageStudent = (function () {
         if (!panel) return;
         if (document.fullscreenElement) document.exitFullscreen();
         else if (panel.requestFullscreen) panel.requestFullscreen();
-      },
-      stuAssessFilter: function () {
-        _assessFilter = el.dataset.filter || 'all';
-        render();
-      },
-      stuAssessGroup: function () {
-        _assessGroup = el.dataset.group || 'date';
-        try {
-          localStorage.setItem(GROUP_KEY, _assessGroup);
-        } catch (err) {
-          /* private mode: the choice lasts this visit */
-        }
-        render();
-      },
-      stuAssessFold: function () {
-        var k = el.dataset.fold;
-        if (_assessClosed[k]) delete _assessClosed[k];
-        else _assessClosed[k] = true;
-        render();
-      },
-      stuBdToggle: function () {
-        var k = el.dataset.key;
-        if (_bdOpen[k]) delete _bdOpen[k];
-        else _bdOpen[k] = true;
-        render();
-      },
-      stuBdRubric: function () {
-        _bdRubric = el.dataset.key || '';
-        render();
-      },
-      stuTypeView: function () {
-        _typeView = el.dataset.view || 'timeline';
-        try {
-          localStorage.setItem(TYPE_VIEW_KEY, _typeView);
-        } catch (err) {
-          /* private mode: the choice lasts this visit */
-        }
-        render();
-      },
-      // A tap on a chart point shows its label; another tap hides it.
-      stuChartTip: function () {
-        var open = el.classList.contains('show');
-        document.querySelectorAll('.stu-chart-dot.show').forEach(function (d) {
-          d.classList.remove('show');
-        });
-        if (!open) el.classList.add('show');
-      },
-      stuTypeFocus: function () {
-        _typeFocus = el.dataset.key || '';
-        render();
       },
       stuCoreTerm: function () {
         _coreTerm = Number(el.dataset.ordinal);
@@ -4404,14 +3489,6 @@ window.PageStudent = (function () {
     }
   }
 
-  function _handleChange(e) {
-    var el = e.target;
-    if (el && el.dataset && el.dataset.actionChange === 'stuAssessCat') {
-      _assessCat = el.value || '';
-      render();
-    }
-  }
-
   /* In a goal or reflection box, Enter saves and Shift+Enter adds a line;
      Escape leaves it as it was, as in the observation box. */
   function _editorKeys(e) {
@@ -4474,21 +3551,13 @@ window.PageStudent = (function () {
     setActiveCourse(activeCourse);
     studentId = params.id;
     _openTags = new Set();
-    _assessFilter = 'all';
-    _assessCat = '';
-    _assessGroup = _savedGroupBy();
-    _assessClosed = {};
-    _bdOpen = {};
-    _bdRubric = '';
-    _typeView = _savedTypeView();
-    _typeFocus = '';
     _coreTerm = null;
     _coreEditing = '';
     _drawnFor = '';
     // The tab the link names; a link to one observation opens Observations;
     // otherwise the tab last opened on this device.
     // Goals and Reflections is part of the Learner Profile now; old links open it.
-    var asked = params.tab === 'goals' ? 'profile' : params.tab;
+    var asked = _tabAlias(params.tab);
     _tab = _isTab(asked) ? asked : params.ob ? 'evidence' : _savedTab() || 'overview';
     _ovOpen = '';
     _ovFilter = 'all';
@@ -4512,7 +3581,6 @@ window.PageStudent = (function () {
     // Add delegated listeners
     _addDocListener('click', _handleClick);
     _addDocListener('click', _handleJump);
-    _addDocListener('change', _handleChange);
     _addDocListener('keydown', _handleKeydown);
 
     render();

@@ -24,7 +24,7 @@ test('a student’s own rating sits beside the teacher’s level', async ({ page
   await page.evaluate(() => window.Router.navigate('/student?id=st23&course=sci8&tab=profile'));
   const calib = page.locator('#lp-calib');
   await expect(calib.locator('h2')).toHaveText('How Mei Sees Their Learning');
-  const rows = calib.locator('.lp-calib-row:not(.lp-calib-head)');
+  const rows = calib.locator('.lp-calib-row:not(.lp-calib-head):not(.lp-calib-unrated)');
   await expect(rows).toHaveCount(2);
   await expect(rows.nth(0)).toContainText(names[0]);
   await expect(rows.nth(0).locator('.lp-calib-note')).toHaveText('You agree.');

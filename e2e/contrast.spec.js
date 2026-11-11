@@ -72,7 +72,7 @@ const DESKTOP = [
   },
   { name: 'gradebook', hash: '/gradebook', ready: '.gb-grid' },
   // The student page, one tab at a time.
-  ...['comps', 'assess', 'evidence', 'profile'].map(tab => ({
+  ...['comps', 'grades', 'evidence', 'profile'].map(tab => ({
     name: 'student ' + tab,
     hash: '/student?id=st23&course=sci8',
     ready: '.stu-tabs',
