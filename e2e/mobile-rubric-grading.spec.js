@@ -55,7 +55,9 @@ test.describe('Phone grading by rubric criterion', () => {
     const group = card.locator('.m-crit-group').first();
     const target = (await group.locator('.m-score-btn.m-score-active').count()) ? '1' : '4';
     await group.locator(`.m-score-btn[data-score="${target}"]`).click();
-    await expect(card.locator('.m-crit-group').first().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText(target);
+    await expect(card.locator('.m-crit-group').first().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText(
+      target,
+    );
     const saved = await page.evaluate(() => {
       const cid = Object.keys(COURSES)[0];
       const a = getAssessments(cid).find(x => x.title === 'Science Fair Proposal');
@@ -107,9 +109,9 @@ test.describe('Phone grading by rubric criterion', () => {
         ? '1'
         : '4';
     await row.locator(`.m-score-btn[data-score="${target}"]`).click();
-    await expect(firstCard(page).locator('.m-score-group').first().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText(
-      target,
-    );
+    await expect(
+      firstCard(page).locator('.m-score-group').first().locator('.m-score-btn.m-score-active .m-level-fig'),
+    ).toHaveText(target);
     const behind = await page.evaluate(tid => {
       const cid = Object.keys(COURSES)[0];
       const a = getAssessments(cid).find(x => x.title === 'Science Fair Proposal');

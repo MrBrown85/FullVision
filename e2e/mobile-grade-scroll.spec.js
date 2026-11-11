@@ -96,7 +96,9 @@ test.describe('Phone grading card', () => {
     await card(page).locator('.m-crit-group').last().locator('.m-score-btn[data-score="4"]').click();
     // What a server echo or an id re-key does once the save lands.
     await page.evaluate(() => _invalidateAndRerender());
-    await expect(card(page).locator('.m-crit-group').last().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText('4');
+    await expect(
+      card(page).locator('.m-crit-group').last().locator('.m-score-btn.m-score-active .m-level-fig'),
+    ).toHaveText('4');
     expect(await cardTop(page)).toBe(top);
   });
 
