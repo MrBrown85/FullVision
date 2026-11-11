@@ -1577,7 +1577,7 @@ written from the service's source (`src/http/routes/object/` and
   Work, a send against its assessment being deleted (both orders, then 30
   unheld rounds), 30 sends at once against the hourly limit. Then twelve
   seconds of everything at once in one class (10,000 to 35,000 calls,
-depending on what else the machine is doing): two
+  depending on what else the machine is doing): two
   students, the grade RPCs, Add Work in its three modes, deletes,
   assessments made and deleted under a send, two workers. No error, no
   deadlock; every rule that must always hold, holds; Batch A's
