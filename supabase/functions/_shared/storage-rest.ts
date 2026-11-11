@@ -188,9 +188,16 @@ export function storageRest(
       return deadline('read', ms, async (signal): Promise<Read> => {
         const res = await fetcher(url, { method: 'GET', headers: auth, signal });
         // The Storage service answers a file that is not there with 404, or with 400 and a body saying 404.
-        if (res.status === 404 || res.status === 400) {
+        if (res.status === 404) {
           await drop(res);
           return 'missing';
+        }
+        // Any other 400 (a wrong or rotated key answers 400 too) is an error, never "missing" (send routes
+        // review 2, N2): a phone told its pages are missing would retake them while nothing was wrong with them.
+        if (res.status === 400) {
+          const said = (await res.json().catch(() => null)) as { statusCode?: unknown } | null;
+          if (said && String(said.statusCode) === '404') return 'missing';
+          throw new StorageError('read', 400);
         }
         if (!res.ok || !res.body) {
           await drop(res);

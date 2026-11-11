@@ -16,8 +16,10 @@
  * student. Drawing and hit-testing are shared/markup-draw.js's, which the
  * phone can use too.
  *
- * Demo Mode, behind the build switch and Send Work: the work pane shows only
- * there. Signed in, saveMarkup answers not_available and nothing is kept.
+ * Behind the build switch and Send Work. Demo Mode keeps the marks on the
+ * device; a signed-in class keeps them on the server (save_markup through the
+ * outbox, shared/data.js "Mark Up and Reflect on Feedback for a signed-in
+ * teacher"), and Mark Up reads the piece's marks again before it draws.
  *
  * window.MarkUp: open({ cid, aid, sid, page, turn, onClose }), close(),
  * isOpen().
@@ -141,6 +143,20 @@ window.MarkUp = (function () {
       if (_s === s) _drawLayer();
     });
     _loadPage();
+    // A signed-in class: the piece's marks as the server has them now (another
+    // device may have marked a page). Used only if nothing was drawn meanwhile;
+    // a save on stale marks is answered changed, which the screen already shows.
+    if (typeof studentWorkLive === 'function' && studentWorkLive(s.cid) && typeof loadAssessmentMarkup === 'function') {
+      loadAssessmentMarkup(s.cid, s.aid).then(function (read) {
+        if (!read || _s !== s || s.edited) return;
+        var file = _file(s);
+        var row = file ? getPageMarkup(s.cid, file.id) : null;
+        if (!file || (row ? row.rev : 0) === (s.revs[file.id] || 0)) return;
+        s.revs[file.id] = row ? row.rev : 0;
+        s.hist = D.history(row ? row.marks : D.empty());
+        _draw();
+      });
+    }
     var pen = overlay.querySelector('[data-mk-tool="pen"]');
     if (pen) pen.focus({ preventScroll: true });
     return true;
@@ -446,13 +462,14 @@ window.MarkUp = (function () {
 
   function _changed() {
     var s = _s;
+    s.edited = true;
     s.msg = '';
     _draw();
     _save(s, _file(s), s.hist.now());
   }
 
   function _answerLine(res) {
-    if (res.result === 'not_available') return 'Mark Up is not ready for signed-in classes yet.';
+    if (res.result === 'not_available') return 'Mark Up is not on for this class.';
     if (res.result === 'not_found') return 'This page is no longer handed in, so its marks can’t be saved.';
     return 'These marks couldn’t be saved. Try again.';
   }

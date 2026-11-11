@@ -352,7 +352,7 @@ describe('only the teacher reads them', () => {
   });
 });
 
-describe('signed in: nothing yet', () => {
+describe('a class the server keeps no student-page rows for', () => {
   it('reads nothing, answers not_available, stores nothing and calls nothing', async () => {
     turnOn();
     window.isDemoMode = () => false;
@@ -381,8 +381,10 @@ describe('signed in: nothing yet', () => {
     delete globalThis.getSupabase;
   });
 
-  it('data.js names none of the Reflect on Feedback functions the server will have', () => {
+  it('data.js names the Reflect on Feedback functions at call sites the drift check can read (S10-W1)', () => {
     const src = readFileSync('shared/data.js', 'utf-8');
-    expect(src).not.toMatch(/['"`](set_course_feedback_options|list_course_feedback|answer_reflection)['"`]/);
+    expect(src.match(/_writeRpc\(\s*'set_course_feedback_options'/g).length).toBe(1);
+    expect(src.match(/_writeRpc\(\s*'answer_reflection'/g).length).toBe(1);
+    expect(src.match(/_callRpcWithAuthGuard\(\s*'list_course_feedback'/g).length).toBe(1);
   });
 });

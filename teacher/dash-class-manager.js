@@ -1065,18 +1065,37 @@ window.DashClassManager = (function () {
       : {};
   }
 
+  /* The same, read from the server first when this session has not read the
+     class's work (readStudentWorkForDelete; Send Work off reads nothing
+     else), then then(who, maybe): maybe is true when that read failed, and
+     the warning says photos go rather than miss them. At once when nothing
+     needs reading. */
+  function _cmPhotosBeforeDelete(cid, then) {
+    var read = typeof readStudentWorkForDelete === 'function' ? readStudentWorkForDelete(cid) : null;
+    if (!read) return then(_cmStudentsWithPhotos(cid), false);
+    return read.then(function (res) {
+      return then(_cmStudentsWithPhotos(cid), !(res && res.known));
+    });
+  }
+
   /* The second step: only a withdrawn student can be deleted, and the
      delete cannot be undone, so there is no Undo. */
   function cmDeleteWithdrawn(sid) {
     var cid = cmSelectedCourse;
     if (!cid) return;
+    // Photos of their work go too (S8-F1, Colin's ruling 102).
+    return _cmPhotosBeforeDelete(cid, function (who, maybe) {
+      if (cmSelectedCourse !== cid) return;
+      _cmConfirmDeleteWithdrawn(cid, sid, maybe || !!who[sid]);
+    });
+  }
+
+  function _cmConfirmDeleteWithdrawn(cid, sid, photos) {
     var entry = getWithdrawnStudents(cid).find(function (w) {
       return w && w.student && w.student.id === sid;
     });
     if (!entry) return;
     var name = fullName(entry.student);
-    // Photos of their work go too (S8-F1, Colin's ruling 102).
-    var photos = !!_cmStudentsWithPhotos(cid)[sid];
     showConfirm(
       'Delete ' + name + ' Permanently?',
       photos
@@ -7993,7 +8012,13 @@ window.DashClassManager = (function () {
     var course = COURSES[cid];
     if (!course || !isCourseArchived(cid)) return;
     // Photos of student work go too (S8-F1, Colin's ruling 102).
-    var photos = Object.keys(_cmStudentsWithPhotos(cid)).length > 0;
+    return _cmPhotosBeforeDelete(cid, function (who, maybe) {
+      if (!COURSES[cid] || !isCourseArchived(cid)) return;
+      _cmConfirmDeleteCourse(cid, COURSES[cid], maybe || Object.keys(who).length > 0);
+    });
+  }
+
+  function _cmConfirmDeleteCourse(cid, course, photos) {
     showConfirm(
       'Delete Class',
       photos
