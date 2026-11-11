@@ -83,8 +83,13 @@ window.MMarkUp = (function () {
     return (st && (displayNameFirst(st) || displayName(st))) || '';
   }
 
+  // The pages the card shows: the group's on a One per Group piece (S12-F2), else the student's own.
   function _files(cid, sid, aid) {
-    var sub = typeof getStudentSubmission === 'function' ? getStudentSubmission(cid, sid, aid) : null;
+    var sub = window.MGradePhotos
+      ? MGradePhotos.work(cid, sid, aid)
+      : typeof getStudentSubmission === 'function'
+        ? getStudentSubmission(cid, sid, aid)
+        : null;
     return ((sub && sub.files) || []).filter(function (f) {
       return f && f.id;
     });

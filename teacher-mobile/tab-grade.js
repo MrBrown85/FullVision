@@ -1641,8 +1641,7 @@ window.MGrade = (function () {
         var currentClass = idx === 0 ? ' m-thumb-current' : '';
         var gradedClass = isGraded ? ' m-thumb-graded' : '';
         // Work sent: a camera on the student's circle (S7-F2).
-        if (!unit.view && MGradePhotos.takes(cid, assessment) && MGradePhotos.submission(cid, st.id, aid))
-          gradedClass += ' m-thumb-work';
+        if (MGradePhotos.hasWork(cid, assessment, st, unit)) gradedClass += ' m-thumb-work';
         // A real button with the student's (or group's) name, so it can be
         // reached with Tab and read aloud.
         var thumbName = unit.view ? unit.view.label : displayNameWithLast(st);
