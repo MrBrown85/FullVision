@@ -24,19 +24,20 @@
 -- ── Order, among the undo scripts ───────────────────────────────────────────
 -- This one goes before S0-M4b's (s0-m4b-undo.sql, PART 2) and Batch A's
 -- (batch-a-undo.sql, PART 2): S0-M4b's puts page back as Batch A made it and
--- refuses while page is S4-M1's. It does not matter whether Batch B is
--- applied, and S3-M1's and Batch B's undo scripts do not touch these two
--- functions.
+-- refuses while page is S4-M1's (proved both ways). S3-M1's undo runs with
+-- S4-M1 applied and leaves these two functions alone (proved). This script
+-- runs with Batch B applied (proved); Batch B's own undo script does not
+-- name either function (read, not run here).
 --
 -- ── What a student sees ─────────────────────────────────────────────────────
 -- The reply loses the keys S4-M1 added (the contract lists them:
 -- migrations/local-test/s4-m1-contract.md). Every other key is as it is with
 -- S4-M1 applied, so grades, statuses and what was returned read the same.
 -- The edge function copies a reply key by key and leaves out what is not
--- there, so it needs no change either way. A page that has started to draw
--- the new keys must already cope with their absence (it does until the day
--- the edge function is extended); with the keys gone it shows no
--- description, module, category, Core Competency, I Can statement or
+-- there, so it needs no change either way. A page that draws the new keys
+-- has to cope with their absence anyway (every phone is served without
+-- them until the edge function is extended); with the keys gone it shows
+-- no description, module, category, Core Competency, I Can statement or
 -- teacher's name, and no To Do count beside a class.
 --
 -- ── To stop the new keys reaching phones without this script ────────────────
