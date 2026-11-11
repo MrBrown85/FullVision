@@ -994,6 +994,151 @@ describe('send-finish', () => {
   });
 });
 
+describe('how much one call may read or sign (review M2)', () => {
+  const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
+  const THIRTY = Array.from({ length: 30 }, () => PAGES[0]);
+  const reads = (t, from = 0) => t.storeCalls.slice(from).filter(c => c[0] === 'read');
+  // n distinct files in the folder of the answer's first file, each well formed.
+  const many = (f, n) =>
+    Array.from({ length: n }, (_, i) => {
+      const id = `0d0d0d0d-0000-4000-8000-${String(i + 1).padStart(12, '0')}`;
+      const folder = f.path.slice(0, f.path.lastIndexOf('/'));
+      return {
+        ...f,
+        file_id: id,
+        page: (i % 30) + 1,
+        path: `${folder}/${id}.jpg`,
+        thumb_path: `${folder}/${id}-thumb.jpg`,
+      };
+    });
+
+  it('send-finish stops at the first bad file: no read starts after it', async () => {
+    for (const first of [
+      [PNG, THUMB_JPEG],
+      [PAGE_JPEG, PAGE_JPEG],
+    ]) {
+      const t = setup();
+      const s = await started(t, { pages: THIRTY }, [first, ...Array(29).fill([PAGE_JPEG, THUMB_JPEG])]);
+      const before = t.world.storeCalls.length;
+      const r = await t.send(finishBody(s));
+      expect(r.body).toEqual({ ok: false, error: 'bad_file', files: [s.files[0].file_id] });
+      // Four files are read at once; once the first is bad, no read starts. Thirty pages would otherwise be sixty.
+      expect(reads(t.world, before).length).toBeLessThanOrEqual(8);
+    }
+  });
+
+  it('a send kept failing on its first thumbnail is not read whole again on every call', async () => {
+    const t = setup();
+    const s = await started(t, { pages: THIRTY }, [[PAGE_JPEG, PAGE_JPEG], ...Array(29).fill([PAGE_JPEG, THUMB_JPEG])]);
+    let n = 0;
+    for (let i = 0; i < 10; i++) {
+      const before = t.world.storeCalls.length;
+      expect((await t.send(finishBody(s))).body.error).toBe('bad_file');
+      n += reads(t.world, before).length;
+    }
+    expect(n).toBeLessThanOrEqual(10 * 8);
+  });
+
+  it('each file is read at most once in a call, whatever it holds', async () => {
+    const exif = Uint8Array.from([0xff, 0xe1, 0x00, 0x08, 0x45, 0x78, 0x69, 0x66, 0, 0]);
+    const withExif = new Uint8Array([...PAGE_JPEG.slice(0, 2), ...exif, ...PAGE_JPEG.slice(2)]);
+    for (const files of [
+      [
+        [withExif, THUMB_JPEG],
+        [PAGE2_JPEG, THUMB2_JPEG],
+      ],
+      [[PAGE_JPEG, THUMB_JPEG]],
+      [
+        [PNG, THUMB_JPEG],
+        [PAGE2_JPEG, THUMB2_JPEG],
+      ],
+    ]) {
+      const t = setup();
+      const s = await started(t, {}, files);
+      const before = t.world.storeCalls.length;
+      await t.send(finishBody(s));
+      const paths = reads(t.world, before).map(c => c[1]);
+      expect(new Set(paths).size).toBe(paths.length);
+    }
+  });
+
+  it('after a page is found missing, the rest are only looked for, not read', async () => {
+    const t = setup();
+    const s = await started(t, { pages: THIRTY }, [[PAGE_JPEG, THUMB_JPEG]]);
+    const before = t.world.storeCalls.length;
+    const r = await t.send(finishBody(s));
+    expect(r.body.error).toBe('missing_pages');
+    expect(r.body.missing).toEqual(s.files.slice(1).map(f => f.file_id));
+    // Every missing page is named, and no page is asked for more than a look once one is missing.
+    const full = reads(t.world, before).filter(c => c[2] > 0);
+    expect(full.length).toBeLessThanOrEqual(8);
+  });
+
+  it('send-start: a database answer of more than 30 pages, or a page named twice, signs nothing', async () => {
+    for (const change of [
+      r => ({ ...r, files: many(r.files[0], 31) }),
+      r => ({ ...r, files: [r.files[0], r.files[0]] }),
+    ]) {
+      const t = setup();
+      t.world.override.send_start = (params, fns) => change(fns.send_start(params));
+      const r = await t.send(startBody());
+      expect(r.status).toBe(500);
+      expect(t.world.storeCalls.filter(c => c[0] === 'signUpload')).toEqual([]);
+    }
+  });
+
+  it('send-finish: a send_paths answer of more than 30 pages, or a page named twice, reads nothing', async () => {
+    for (const change of [
+      r => ({ ...r, files: many(r.files[0], 31) }),
+      r => ({ ...r, files: [r.files[0], r.files[0], r.files[1]] }),
+    ]) {
+      const t = setup();
+      const s = await started(t);
+      t.world.override.send_paths = (params, fns) => change(fns.send_paths(params));
+      const r = await t.send(finishBody(s));
+      expect(r.status).toBe(500);
+      expect(t.world.storeCalls.filter(c => c[0] === 'read')).toEqual([]);
+    }
+  });
+
+  it('file-links: more than 30 pages of one handed-in send, or a file named twice, signs nothing', async () => {
+    for (const change of [
+      r => ({ ...r, files: many(r.files[0], 31) }),
+      r => ({ ...r, files: [r.files[0], r.files[0]] }),
+    ]) {
+      const t = setup();
+      const s = await started(t);
+      await t.send(finishBody(s));
+      t.world.override.file_links = (params, fns) => change(fns.file_links(params));
+      const before = t.world.storeCalls.length;
+      const r = await t.send({ route: 'file-links', session: CECE_PHONE, enrollment_id: CECE, assessment_id: LAB });
+      expect(r.status).toBe(500);
+      expect(t.world.storeCalls.slice(before).filter(c => c[0] === 'signDownloads')).toEqual([]);
+    }
+  });
+
+  it('file-links: two handed-in versions of 30 pages each are both linked (a revision, Batch C)', async () => {
+    const t = setup();
+    const s = await started(t, { pages: THIRTY }, Array(30).fill([PAGE_JPEG, THUMB_JPEG]));
+    expect((await t.send(finishBody(s))).body.ok).toBe(true);
+    t.world.override.file_links = (params, fns) => {
+      const r = fns.file_links(params);
+      const v2 = r.files.map(f => ({
+        ...f,
+        submission_id: REQ2,
+        version: 2,
+        file_id: f.file_id.replace(/^99/, '77'),
+        path: f.path.replace(/\/99([0-9]{6}-[^/]*)\.jpg$/, '/77$1.jpg'),
+        thumb_path: f.thumb_path.replace(/\/99([0-9]{6}-[^/]*)-thumb\.jpg$/, '/77$1-thumb.jpg'),
+      }));
+      return { ...r, files: [...r.files, ...v2] };
+    };
+    const r = await t.send({ route: 'file-links', session: CECE_PHONE, enrollment_id: CECE, assessment_id: LAB });
+    expect(r.status).toBe(200);
+    expect(r.body.files.length).toBe(60);
+  });
+});
+
 describe('replace, start to finish', () => {
   it('the old pages are deleted from storage by the worker once the new ones are in', async () => {
     const t = setup();

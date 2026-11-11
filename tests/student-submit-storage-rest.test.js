@@ -142,6 +142,27 @@ describe('storageRest', () => {
     expect(pulled).toBeLessThan(5);
   });
 
+  it('a look (a read of 0 bytes) says only whether the file is there, and pulls at most one part of it', async () => {
+    let pulled = 0;
+    const stream = () =>
+      new ReadableStream({
+        pull(c) {
+          pulled++;
+          c.enqueue(new Uint8Array(64 * 1024));
+          if (pulled > 50) c.close();
+        },
+      });
+    const there = fakeFetch(() => new Response(stream(), { status: 200 }));
+    expect(await storageRest(there.fetcher, URL_, KEY).read(PAGE, 0)).toBe('too_large');
+    expect(pulled).toBeLessThan(3);
+    const told = fakeFetch(() => new Response(stream(), { status: 200, headers: { 'content-length': '2000000' } }));
+    pulled = 0;
+    expect(await storageRest(told.fetcher, URL_, KEY).read(PAGE, 0)).toBe('too_large');
+    expect(pulled).toBeLessThan(2);
+    const gone = fakeFetch(() => json(404, { statusCode: '404', error: 'not_found' }));
+    expect(await storageRest(gone.fetcher, URL_, KEY).read(PAGE, 0)).toBe('missing');
+  });
+
   it('a Storage error names the step and the status, never the path or the key', async () => {
     const f = fakeFetch(() => json(500, { message: `failed for ${PAGE}` }));
     const store = storageRest(f.fetcher, URL_, KEY);
