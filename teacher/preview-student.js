@@ -41,17 +41,7 @@ window.PreviewStudent = (function () {
      My Learning is worked out as if the class showed it, for this preview
      only: nothing is saved, and every other screen reads the class as it is. */
   function _fromCache(cid, sid) {
-    if (!_open || !_open.learning) return StudentView.fromCache(cid, sid);
-    var real = window.getCourseConfig;
-    window.getCourseConfig = function (c) {
-      var cfg = real(c) || {};
-      return c === cid ? Object.assign({}, cfg, { show_my_learning: true }) : cfg;
-    };
-    try {
-      return StudentView.fromCache(cid, sid);
-    } finally {
-      window.getCourseConfig = real;
-    }
+    return StudentView.fromCache(cid, sid, { learning: !!(_open && _open.learning) });
   }
 
   function _student(cid, sid) {
