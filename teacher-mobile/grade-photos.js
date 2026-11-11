@@ -139,7 +139,7 @@ window.MGradePhotos = (function () {
   function cardHtml(cid, a, st, unit) {
     if (!st || (unit && unit.view) || !takes(cid, a)) return '';
     var sub = submission(cid, st.id, a.id);
-    if (!sub) return '';
+    if (!sub) return notInHtml(cid, a, st);
     var files = sub.files || [];
     var first = displayNameFirst(st) || displayName(st);
     var html =
@@ -188,6 +188,110 @@ window.MGradePhotos = (function () {
     return html + '</div>';
   }
 
+  // Days past the due date, by the class's own day; 0 when not late.
+  function daysLate(cid, a) {
+    var due = a && (a.dueDate || a.due_date);
+    if (!due || typeof courseToday !== 'function') return 0;
+    var d0 = Date.parse(String(due).slice(0, 10) + 'T00:00:00Z');
+    var d1 = Date.parse(String(courseToday(cid)).slice(0, 10) + 'T00:00:00Z');
+    if (!isFinite(d0) || !isFinite(d1) || d1 <= d0) return 0;
+    return Math.round((d1 - d0) / 86400000);
+  }
+
+  // "Not In · 7 days late", "Not In · 1 day late", or "Not In".
+  function notInState(cid, a) {
+    var n = daysLate(cid, a);
+    return 'Not In' + (n ? ' · ' + n + (n === 1 ? ' day late' : ' days late') : '');
+  }
+
+  /* A card with nothing in: where it stands, and Add Work for the student
+     (S7-F3). Not on an Excused piece, which is not owed. */
+  // html-safe: the name goes through MC.esc; ids are ours
+  function notInHtml(cid, a, st) {
+    if (getAssignmentStatus(cid, st.id, a.id) === 'EXC') return '';
+    var first = displayNameFirst(st) || displayName(st);
+    return (
+      '<div class="m-work m-work-notin" data-sid="' +
+      st.id +
+      '" data-aid="' +
+      a.id +
+      '">' +
+      '<div class="m-work-sent">' +
+      CAMERA_SVG +
+      '<span>' +
+      MC.esc(notInState(cid, a)) +
+      '</span></div>' +
+      '<button type="button" class="m-work-add" data-action="m-add-work" data-sid="' +
+      st.id +
+      '" data-aid="' +
+      a.id +
+      '">' +
+      MC.esc('Add Work for ' + first) +
+      '</button>' +
+      '<div class="m-work-add-hint">Photos or PDFs. Photos are made smaller before they upload.</div>' +
+      '</div>'
+    );
+  }
+
+  /* One student's To Grade list (S7-F4): the work waiting, with Grade, then
+     the pieces not in, with Add Work. On the student card and View Profile.
+     '' when there is nothing, or the class takes no work. */
+  // html-safe: titles and lines go through MC.esc; ids are ours
+  function studentListHtml(cid, st) {
+    if (!st) return '';
+    // Empty unless the class takes work (studentList asks on()).
+    var rows = studentList(cid, st.id);
+    if (!rows.length) return '';
+    return (
+      '<div class="m-scard-tograde"><div class="m-scard-return-head">To Grade</div>' +
+      rows
+        .map(function (r) {
+          var grade = r.kind === 'grade';
+          return (
+            '<button type="button" class="m-scard-tograde-row" data-action="' +
+            (grade ? 'm-assess-grade' : 'm-add-work') +
+            '" data-sid="' +
+            st.id +
+            '" data-aid="' +
+            r.a.id +
+            '"' +
+            (grade ? '' : ' data-then="grade"') +
+            '><span class="m-scard-return-body"><span class="m-scard-return-title">' +
+            MC.esc(r.a.title) +
+            '</span><span class="m-scard-return-sub">' +
+            MC.esc(grade ? sentLine(r.sub) : notInLine(cid, r.a, st.id)) +
+            '</span></span><span class="m-scard-tograde-act">' +
+            (grade ? 'Grade' : 'Add Work') +
+            '</span></button>'
+          );
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+
+  /* The red count on the Grade tab's button: every piece of work waiting in
+     the class. Hidden at 0, and in a class that takes no work. */
+  function syncTabBadge(cid) {
+    var tab = document.querySelector('.m-tab-item[data-tab="grade"]');
+    if (!tab) return;
+    var n = on(cid) ? classToGrade(cid) : 0;
+    var badge = tab.querySelector('.m-tab-badge');
+    if (!n) {
+      if (badge) badge.remove();
+      tab.removeAttribute('aria-description');
+      return;
+    }
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'm-tab-badge';
+      badge.setAttribute('aria-hidden', 'true');
+      tab.appendChild(badge);
+    }
+    badge.textContent = n > 99 ? '99+' : String(n);
+    tab.setAttribute('aria-description', n + ' to grade');
+  }
+
   /* The strip pinned at the top of a card once its pages have scrolled
      past: drawn first in the card, so it can stick to the card's top. */
   // html-safe: the name goes through MC.esc; ids are ours
@@ -224,7 +328,7 @@ window.MGradePhotos = (function () {
      drawn only if the same student's work for the same piece is still the
      one on that element (the screen may have changed meanwhile). */
   function hydrate(root, cid) {
-    if (!root || !on(cid) || typeof studentWorkPageUrl !== 'function') return;
+    if (!root || !on(cid) || typeof openStudentWorkPage !== 'function') return;
     root.querySelectorAll('.m-work, .m-work-pin').forEach(function (box) {
       var sid = box.getAttribute('data-sid');
       var aid = box.getAttribute('data-aid');
@@ -235,13 +339,38 @@ window.MGradePhotos = (function () {
         var file = (sub.files || [])[Number(img.getAttribute('data-fv-page'))];
         var which = img.getAttribute('data-fv-which');
         var asked = sub.id;
-        studentWorkPageUrl(cid, file, which).then(function (url) {
-          if (!url || !img.isConnected) return;
+        var askedFile = file && file.id;
+        openStudentWorkPage(cid, file, which).then(function (page) {
+          if (!page) return;
           var now = submission(cid, sid, aid);
-          if (!now || now.id !== asked || box.getAttribute('data-sid') !== sid) return;
-          img.setAttribute('src', url);
+          var nowFile = now && (now.files || [])[Number(img.getAttribute('data-fv-page'))];
+          if (
+            !img.isConnected ||
+            !now ||
+            now.id !== asked ||
+            !nowFile ||
+            nowFile.id !== askedFile ||
+            box.getAttribute('data-sid') !== sid
+          ) {
+            page.release();
+            return;
+          }
+          img.setAttribute('src', page.url);
+          _held.push({ img: img, page: page });
         });
       });
+    });
+    _letGo();
+  }
+
+  /* A photo still on the device is shown from an address that holds its
+     bytes: let it go once its picture has left the page. */
+  var _held = [];
+  function _letGo() {
+    _held = _held.filter(function (h) {
+      if (h.img.isConnected) return true;
+      h.page.release();
+      return false;
     });
   }
 
@@ -336,6 +465,11 @@ window.MGradePhotos = (function () {
     photosText: photosText,
     sentLine: sentLine,
     notInLine: notInLine,
+    notInState: notInState,
+    daysLate: daysLate,
+    studentListHtml: studentListHtml,
+    syncTabBadge: syncTabBadge,
+    releaseUnused: _letGo,
     cardHtml: cardHtml,
     pinHtml: pinHtml,
     hydrate: hydrate,

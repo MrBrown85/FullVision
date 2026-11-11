@@ -1601,3 +1601,99 @@
     flex: 1;
   }
 }
+
+/* What the server also tells (S4-W1): the unit, the category and what it
+   counts, the teacher's Description, I Can lines, Core Competencies, the
+   teacher's name over their words, what a rubric row counts toward. Each
+   shows only when the page is sent it. */
+.sp-view .sp-piece-unit {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sp-text-2);
+  overflow-wrap: anywhere;
+}
+.sp-view .sp-piece-category {
+  margin: -6px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sp-text-2);
+}
+.sp-view .sp-piece-about {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.45;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.sp-view .sp-graded-on-ican {
+  margin: -2px 0 4px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #3a3a3c;
+}
+.sp-view .sp-core {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--sp-blue-soft);
+}
+.sp-view .sp-core .sp-graded-on-title {
+  color: var(--sp-blue-text);
+}
+.sp-view .sp-core-name {
+  font-size: 14px;
+}
+.sp-view .sp-piece-from,
+.sp-view .sp-fb-from {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #3a3a3c;
+}
+.sp-view .sp-piece-from {
+  margin-bottom: -6px;
+}
+.sp-view .sp-from-mark {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--sp-blue);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+.sp-view .sp-fb-note .sp-from-mark {
+  float: left;
+  margin: 0 8px 0 0;
+}
+.sp-view .sp-fb-comment-from {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sp-view .sp-fb-comment-words {
+  margin: 0;
+}
+.sp-view .sp-fb-category {
+  margin: 0;
+  font-size: 14px;
+  color: var(--sp-text-2);
+}
+.sp-view .sp-fb-toward {
+  margin: -4px 0 0;
+  font-size: 13px;
+  color: var(--sp-text-2);
+}
