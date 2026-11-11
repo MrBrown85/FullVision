@@ -486,6 +486,12 @@ export async function checkPages(
   type Checked = { id: string; state: 'good'; sha256: string } | { id: string; state: 'bad' | 'missing' | 'skipped' };
   const checked = await inTurn(chosen, async (f): Promise<Checked> => {
     const page = await readOne(f.path, MAX_PAGE_SIDE);
+    // Only looking, after a missing file, and the page is there: its thumbnail is looked for too, so
+    // missing_pages names a page whose thumbnail is all that is missing (send routes review 2, N1).
+    if (page.state === 'skipped' && lookOnly && !stop) {
+      const thumb = await readOne(f.thumb, MAX_THUMB_SIDE);
+      return { id: f.id, state: thumb.state === 'missing' ? 'missing' : 'skipped' };
+    }
     if (page.state !== 'good') return { id: f.id, state: page.state };
     const thumb = await readOne(f.thumb, MAX_THUMB_SIDE);
     if (thumb.state !== 'good') return { id: f.id, state: thumb.state };

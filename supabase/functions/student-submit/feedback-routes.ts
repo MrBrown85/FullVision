@@ -344,6 +344,9 @@ export function makeFeedbackRoutes(opts: { db: { call: (sql: string, params: Par
     if (!r || !s || !e) return bad();
     const params = r.params(body, s, e);
     if (!params) return bad();
+    // answer-seen with no piece marks nothing: answered here, so an empty list never takes the class's lock
+    // (review of PR 1138, S1). The session is not asked; the answer says nothing about it.
+    if (route === 'answer-seen' && params[2] === '{}') return ok({ ok: true, seen: 0 });
     const answer = await opts.db.call(r.sql, [...params, hash]);
     return ok(good(answer) ? r.reply(answer) : refusal(answer, r.errors));
   };

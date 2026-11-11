@@ -688,6 +688,15 @@ describe('every Batch C route', () => {
     expect(JSON.stringify(t.logs)).not.toContain('invalid_parameter_value');
   });
 
+  it('a route named after something every object has is bad_request, with nothing asked', async () => {
+    const t = setup();
+    for (const route of ['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf']) {
+      const r = await t.send({ ...ROUTES.markup, route });
+      expect(r, route).toEqual({ status: 400, body: { ok: false, error: 'bad_request' } });
+    }
+    expect(t.world.calls).toEqual([]);
+  });
+
   it('the send routes still answer as before beside these', async () => {
     const t = setup();
     const r = await t.send({ route: 'work', ...BASE });
@@ -973,9 +982,16 @@ describe('answer-seen', () => {
     expect(t.world.calls[0][1].slice(0, 3)).toEqual([CECE_PHONE, CECE, `{${LAB},${ESSAY}}`]);
   });
 
-  it('an empty list is fine; more than 500, or anything not an id, asks nothing', async () => {
-    const t = setup();
-    expect((await t.send({ ...ROUTES['answer-seen'], assessment_ids: [] })).body).toEqual({ ok: true, seen: 0 });
+  it('an empty list is answered here, and the database (and the class lock) is not asked', async () => {
+    for (const session of [CECE_PHONE, LOCKED_PHONE, ENDED]) {
+      const t = setup();
+      const r = await t.send({ ...ROUTES['answer-seen'], session, assessment_ids: [] });
+      expect(r).toEqual({ status: 200, body: { ok: true, seen: 0 } });
+      expect(t.world.calls).toEqual([]);
+    }
+  });
+
+  it('more than 500, or anything not an id, asks nothing', async () => {
     for (const assessment_ids of [undefined, LAB, [LAB, 'x'], [LAB, null], Array(501).fill(LAB), [`${LAB}}`]]) {
       const u = setup();
       expect((await u.send({ ...ROUTES['answer-seen'], assessment_ids })).status).toBe(400);
@@ -1348,6 +1364,20 @@ describe('group-links', () => {
     t.bc.seedSent(OMAR, LAB, 1, 31);
     expect((await t.send(ROUTES['group-links'])).status).toBe(500);
     expect(t.world.storeCalls.filter(c => c[0] === 'signDownloads')).toEqual([]);
+  });
+
+  it('24 sends are signed in one call; a 25th, or more than 300 pages in all, is a server error', async () => {
+    const t = setup();
+    for (let i = 0; i < 24; i++) t.bc.seedSent(i % 2 ? OMAR : CECE, LAB, 1 + Math.floor(i / 2), 1);
+    const r = await t.send(ROUTES['group-links']);
+    expect(r.status).toBe(200);
+    expect(r.body.files).toHaveLength(24);
+    t.bc.seedSent(OMAR, LAB, 13, 1);
+    expect((await t.send(ROUTES['group-links'])).status).toBe(500);
+    const u = setup();
+    for (let i = 0; i < 11; i++) u.bc.seedSent(i % 2 ? OMAR : CECE, LAB, 1 + i, i < 10 ? 30 : 1);
+    expect((await u.send(ROUTES['group-links'])).status).toBe(500);
+    expect(u.world.storeCalls.filter(c => c[0] === 'signDownloads')).toEqual([]);
   });
 });
 

@@ -113,6 +113,11 @@ const ERRORS = {
 
 /** A send holds 1 to 30 pages; a version number is a Postgres smallint. */
 const MAX_PAGES = 30;
+/* group-links signs at most this many handed-in sends, and this many pages, in one call (review of PR 1138,
+   S2): a group of 8, each with a first send and two revisions, is 24 sends; 300 pages is ten 30-page sends,
+   far past a real group piece. Past either, the call is a server error and no link is made. */
+const MAX_GROUP_SENDS = 24;
+const MAX_GROUP_PAGES = 300;
 const MAX_VERSION = 32_767;
 
 export type RevisionOptions = Pick<SendOptions, 'db' | 'store' | 'log'> & {
@@ -265,8 +270,9 @@ export function makeRevisionRoutes(opts: RevisionOptions) {
      page and its thumbnail in the bucket's layout, in the same folder, in
      this piece, named for its file id, and in the same class as every
      other; `mine` true or false, and the page's student folder this
-     student's exactly when it is mine. Each file named once, and at most
-     30 pages for each send. Anything else is thrown, and no link is made. */
+     student's exactly when it is mine. Each file named once, at most 30
+     pages for each send, and at most 24 sends and 300 pages in all.
+     Anything else is thrown, and no link is made. */
   async function groupLinks(body: Json, hash: string): Promise<SendAnswer> {
     const s = session(body);
     const e = uuid(body.enrollment_id);
@@ -276,6 +282,7 @@ export function makeRevisionRoutes(opts: RevisionOptions) {
     const r = await db.call(SQL.groupFileLinks, [s, e, a, hash]);
     if (!good(r)) return ok(refusal(r, ERRORS['group-links']));
     if (r.bucket !== BUCKET) throw new TypeError('bucket');
+    if (list(r.files).length > MAX_GROUP_PAGES) throw new TypeError('files');
     const seen = new Set<string>();
     const perSend = new Map<string, number>();
     let course: string | null = null;
@@ -292,6 +299,7 @@ export function makeRevisionRoutes(opts: RevisionOptions) {
       const n = (perSend.get(sub) || 0) + 1;
       if (n > MAX_PAGES) throw new TypeError('files');
       perSend.set(sub, n);
+      if (perSend.size > MAX_GROUP_SENDS) throw new TypeError('files');
       course = course || p.course;
       for (const parts of [p, t]) {
         if (
