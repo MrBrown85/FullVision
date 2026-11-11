@@ -25,6 +25,7 @@ import { parseHTML } from 'linkedom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { U, signIn, seedClass, clearClass, settle, serverSaysStudentPageOn } from './helpers/pin-save-paths.js';
 import { fakeTeacherCards, fetchFrom } from './helpers/fake-teacher-cards.js';
+import { notAdded } from './helpers/kept-secret.js';
 
 const CID = 'c-cards';
 const LIVE = U(1);
@@ -84,6 +85,9 @@ const storedCards = cid => JSON.parse(localStorage.getItem('gb-student-cards-' +
 const cardKeys = () => Object.keys(localStorage._store).filter(k => k.indexOf('student-cards') >= 0);
 // Everything this device keeps, as text.
 const everythingKept = () => JSON.stringify(localStorage._store) + JSON.stringify(sessionStorage._store);
+// A password is four digits, which the device may already hold by chance:
+// it is found no more often than in `before`, what was kept before the cards.
+const passwordNotKept = (before, password) => notAdded(expect, before, everythingKept(), password);
 
 function parse(html) {
   const doc = parseHTML('<!doctype html><html><head></head><body></body></html>').document;
@@ -238,6 +242,7 @@ describe('Demo Mode: the same contract, on this device', () => {
 
   it('making cards returns each code once, eight characters; the saved card keeps no code or password', async () => {
     expect((await listStudentCards(CID)).data).toEqual([]);
+    const keptBefore = everythingKept();
     const out = (await makeStudentCards(CID, firsts(['s1', 's2', 's3']))).data;
     expect(out.results.map(r => [r.enrollment_id, r.result, r.seq])).toEqual([
       ['s1', 'made', 1],
@@ -261,7 +266,7 @@ describe('Demo Mode: the same contract, on this device', () => {
       expect('password' in c).toBe(false);
     });
     out.results.forEach(r => expect(everythingKept()).not.toContain(r.code));
-    expect(everythingKept()).not.toContain(out.results[2].password);
+    passwordNotKept(keptBefore, out.results[2].password);
     const listed = (await listStudentCards(CID)).data;
     expect(listed.map(c => [c.id, c.enrollment_id, c.seq, c.has_password])).toEqual(
       out.results.map((r, i) => [r.card_id, r.enrollment_id, 1, i === 2]),
@@ -294,6 +299,7 @@ describe('Demo Mode: the same contract, on this device', () => {
   });
 
   it('a code and password an older build saved are dropped on read, and from the device', async () => {
+    const keptBefore = everythingKept();
     localStorage.setItem(
       'gb-student-cards-' + CID,
       JSON.stringify([{ ...todays(1, 's3'), id: 'old-1', code: 'K7M-4QX', check: 'password', password: '4821' }]),
@@ -303,15 +309,18 @@ describe('Demo Mode: the same contract, on this device', () => {
     expect(listed[0]).not.toHaveProperty('code');
     expect(listed[0]).not.toHaveProperty('password');
     expect(listed[0].check).toBe('password');
-    expect(everythingKept()).not.toMatch(/K7M-4QX|4821/);
+    expect(everythingKept()).not.toContain('K7M-4QX');
+    passwordNotKept(keptBefore, '4821');
   });
 
   it('when the app starts, codes an older build saved are erased for every class at once', () => {
     const old = (id, code) => ({ ...todays(1, 's1'), id, code, check: 'password', password: '4821' });
+    const keptBefore = everythingKept();
     localStorage.setItem('gb-student-cards-c-one', JSON.stringify([old('a', 'K7M-4QX')]));
     localStorage.setItem('gb-student-cards-c-two', JSON.stringify([old('b', 'P3R-8WD')]));
     _dropOldCardCodes();
-    expect(everythingKept()).not.toMatch(/K7M-4QX|P3R-8WD|4821/);
+    expect(everythingKept()).not.toMatch(/K7M-4QX|P3R-8WD/);
+    passwordNotKept(keptBefore, '4821');
     expect(storedCards('c-one').map(c => c.id)).toEqual(['a']);
     expect(storedCards('c-two').map(c => c.id)).toEqual(['b']);
     // shared/data.js does this as it loads.
@@ -392,6 +401,7 @@ describe('a signed-in teacher: the list', () => {
       list: () => [todays(1, U(11)), todays(2, U(12), { check: 'password', password: '4821' })],
     });
     globalThis.__session = t.session;
+    const keptBefore = everythingKept();
     const out = await listStudentCards(LIVE);
     expect(out.error).toBe(null);
     expect(out.data.map(c => c.id)).toEqual([U(901), U(902)]);
@@ -402,7 +412,8 @@ describe('a signed-in teacher: the list', () => {
     });
     expect(t.session.sent()).toEqual([['list_student_cards', { p_course_id: LIVE }]]);
     expect(cardKeys()).toEqual([]);
-    expect(everythingKept()).not.toMatch(/K7M-4Q|4821/);
+    expect(everythingKept()).not.toContain('K7M-4Q');
+    passwordNotKept(keptBefore, '4821');
   });
 
   it('the reply after S3-M1 is kept as it is: card number, has_password, needs_new', async () => {
@@ -430,6 +441,7 @@ describe('a signed-in teacher: making cards asks teacher-cards', () => {
     const warned = [];
     const warn = vi.spyOn(console, 'warn').mockImplementation((...a) => warned.push(a));
     try {
+      const keptBefore = everythingKept();
       const out = await makeStudentCards(LIVE, firsts([U(11), U(12), U(13)]));
       expect(out.error).toBe(null);
       expect(out.data.results.map(r => [r.enrollment_id, r.result, r.seq])).toEqual([
@@ -458,12 +470,15 @@ describe('a signed-in teacher: making cards asks teacher-cards', () => {
       // No RPC, nothing queued, nothing kept, nothing logged.
       expect(t.session.sent()).toEqual([]);
       expect(localStorage.getItem('fv-sync-queue-v1')).toBe(null);
-      const codes = out.data.results.map(r => r.code).concat(out.data.results[1].password);
+      const password = out.data.results[1].password;
+      const codes = out.data.results.map(r => r.code);
       codes.forEach(code => {
         expect(everythingKept()).not.toContain(code);
         expect(everythingKept()).not.toContain(code.replace('-', ''));
         expect(JSON.stringify(warned)).not.toContain(code);
       });
+      passwordNotKept(keptBefore, password);
+      expect(JSON.stringify(warned)).not.toContain(password);
       // The database was handed tags, never a code.
       expect(JSON.stringify(t.fn.db.state.handed)).not.toContain(codes[0].replace('-', ''));
     } finally {
@@ -781,6 +796,7 @@ describe('Make and Print, and Print Again', () => {
     seedDemo();
     COURSES[CID].block = 'B';
     await shown(CID);
+    const keptBefore = everythingKept();
     const done = await StudentCards.makeAndPrint(CID);
     expect(done).toBe(3);
     expect(sheets.length).toBe(1);
@@ -807,9 +823,13 @@ describe('Make and Print, and Print Again', () => {
       expect(r[1]).toMatch(/^Card 1 · Made /);
       expect(r[2]).toMatch(/^Printed /);
     });
-    sheet.codes.concat(sheet.passwords).forEach(code => {
+    sheet.codes.forEach(code => {
       expect(box.textContent).not.toContain(code);
       expect(everythingKept()).not.toContain(code);
+    });
+    sheet.passwords.forEach(password => {
+      expect(box.textContent).not.toContain(password);
+      passwordNotKept(keptBefore, password);
     });
     expect(noteOf(box)).toBe(
       '3 cards went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
@@ -1781,6 +1801,7 @@ describe('New Codes for This Class', () => {
       });
       t.fn.markPrinted([U(960)]);
       await shown(LIVE);
+      const keptBefore = everythingKept();
       press('spCardsNewCodes', LIVE);
       expect(asked[0].message.startsWith('2 cards stop working now. 1 student gets their first card.')).toBe(true);
       asked[0].onOk();
@@ -1804,9 +1825,13 @@ describe('New Codes for This Class', () => {
       expect(notesOf(box)).toEqual([
         '3 cards went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
       ]);
-      sheets[0].codes.concat(sheets[0].passwords).forEach(code => {
+      sheets[0].codes.forEach(code => {
         expect(box.textContent).not.toContain(code);
         expect(everythingKept()).not.toContain(code);
+      });
+      sheets[0].passwords.forEach(password => {
+        expect(box.textContent).not.toContain(password);
+        passwordNotKept(keptBefore, password);
       });
     } finally {
       t.session.signOut();
@@ -1978,6 +2003,7 @@ describe('New Codes for This Class', () => {
   it('Demo Mode: every card replaced on the device, nothing sent', async () => {
     seedDemo();
     await shown(CID);
+    const keptBefore = everythingKept();
     await StudentCards.makeAndPrint(CID);
     const firstCodes = sheets[0].codes;
     const before = storedCards().map(c => c.id);
@@ -1995,7 +2021,8 @@ describe('New Codes for This Class', () => {
         .some(id => before.includes(id)),
     ).toBe(false);
     expect(localStorage.getItem('fv-sync-queue-v1')).toBe(null);
-    sheets[1].codes.concat(sheets[1].passwords).forEach(code => expect(everythingKept()).not.toContain(code));
+    sheets[1].codes.forEach(code => expect(everythingKept()).not.toContain(code));
+    sheets[1].passwords.forEach(password => passwordNotKept(keptBefore, password));
   });
 });
 
