@@ -92,7 +92,17 @@ window.DashOverview = (function () {
     // The class average as this class shows grades (level, letter, or both).
     var classGrade = classGradeSummary(cid, studentIds);
     var word = levelWord(cid, opts.classAvg);
-    var html = '<section class="dash-glance" aria-label="Class at a Glance">';
+    // The To Grade cell (S6-F5) takes a column of its own; Upcoming
+    // Birthdays then shows only the next birthday (the board's cost note).
+    var toGrade = toGradeGlanceHtml(cid, studentIds);
+    var html =
+      '<section class="dash-glance' +
+      (toGrade ? ' has-to-grade' : '') +
+      '" aria-label="Class at a Glance"' +
+      (toGrade
+        ? ' style="grid-template-columns:minmax(0,1.25fr) minmax(0,0.8fr) minmax(0,0.85fr) minmax(0,1.1fr)"'
+        : '') +
+      '>';
 
     html +=
       '<div class="dash-glance-cell dash-glance-avg">' +
@@ -159,9 +169,11 @@ window.DashOverview = (function () {
     }
     html += '</div>';
 
+    html += toGrade;
     html += DashInsights.missingGlanceHtml(opts.missing || [], cid);
 
     var bdays = getUpcomingBirthdays(cid);
+    if (toGrade) bdays = bdays.slice(0, 1);
     html += '<div class="dash-glance-cell dash-glance-bdays"><span class="dash-glance-label">Upcoming Birthdays</span>';
     if (!bdays.length) {
       html += '<span class="dash-glance-sub">No birthdays on file.</span>';
@@ -194,6 +206,53 @@ window.DashOverview = (function () {
     }
     html += '</div>';
     return html + '</section>';
+  }
+
+  /* The To Grade cell (S6-F5, the board "Dashboard, To Grade Cell"): in a
+     class whose student page and Send Work are on, a number and one line
+     under it, like Missing and Late beside it; the whole cell opens
+     Assignments with the To Grade filter on. Its numbers are
+     GraderWork.classWorkCounts', the same the gradebook's bar and the
+     grader's Show bar give. '' (no cell, the row as it was) with Send Work
+     off. The states on the board:
+     - "9 / 4 Not Returned"; with work sitting a week or more,
+       "· Oldest 11 Days" in amber;
+     - "0 / All Caught Up · 27 Returned This Week" when nothing waits;
+     - "0 / 3 Not Returned" when graded but not returned;
+     - "4 / 4 Groups · 1 Not Returned" when what waits is group work.
+     Counts only, never grades, so every grading style looks the same. */
+  // html-safe: numbers and fixed words; the link is our path and id
+  function toGradeGlanceHtml(cid, studentIds) {
+    if (!window.GraderWork || !GraderWork.workOnInClass(cid)) return '';
+    var c = GraderWork.classWorkCounts(cid, studentIds);
+    var parts = [];
+    if (!c.tograde && !c.toreturn) {
+      parts.push('All Caught Up');
+      parts.push('<b>' + GraderWork.returnedThisWeek(cid) + '</b> Returned This Week');
+    } else {
+      if (c.groups && c.groups === c.tograde)
+        parts.push('<b>' + c.groups + '</b> ' + (c.groups === 1 ? 'Group' : 'Groups'));
+      parts.push('<b>' + c.toreturn + '</b> Not Returned');
+      var days = c.oldest
+        ? Math.floor((Date.parse(courseToday(cid)) - Date.parse(String(c.oldest).slice(0, 10))) / 86400000)
+        : 0;
+      if (c.tograde && days >= 7)
+        parts.push('<span class="dash-glance-old dash-obs-when is-overdue">Oldest ' + days + ' Days</span>');
+    }
+    return (
+      '<a class="dash-glance-cell dash-glance-tograde" role="link" tabindex="0" data-href="' +
+      esc('/assignments?course=' + (cid || '') + '&show=tograde') +
+      '" aria-label="' +
+      esc(c.tograde + ' to grade, ' + c.toreturn + ' not returned: open Assignments') +
+      '">' +
+      '<span class="dash-glance-label">To Grade</span>' +
+      '<span class="dash-glance-value">' +
+      c.tograde +
+      '</span>' +
+      '<span class="dash-glance-sub">' +
+      parts.join(' · ') +
+      '</span></a>'
+    );
   }
 
   /* ── Curricular Competencies ────────────────────────────────

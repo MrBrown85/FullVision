@@ -49,6 +49,10 @@ window.PageGradebook = (function () {
   // Draft and Returned (S1-F1): the "N to return" filter, and the drafts on
   // screen as the last render counted them (null where grades aren't held).
   var _toReturnOnly = false;
+  // Work to grade (S6-F4): the "N to grade" filter, and what each cell's
+  // student has in (GraderWork, shared/grader.js).
+  var _toGradeOnly = false;
+  var _work = null;
   var _drafts = null;
   var _scrollShadowCleanup = null;
   var _scrollKey = null; // class and view of the last render, so a redraw keeps the table's scroll
@@ -99,6 +103,7 @@ window.PageGradebook = (function () {
     activeCourse = cid;
     if (!(await switchActiveCourse(cid))) return;
     _toReturnOnly = false;
+    _toGradeOnly = false;
     filterStudentIds = [];
     filterSections = [];
     filterModules = [];
@@ -336,6 +341,18 @@ window.PageGradebook = (function () {
     // shown, and the "N to return" filter, which leaves only those.
     _drafts = _countDrafts(cid, students, assessments);
     if (!_drafts || !_drafts.total) _toReturnOnly = false;
+    // Work to grade (S6-F4), over the students and columns shown: the same
+    // count as the grader's Show bar and the dashboard's To Grade cell.
+    _work = _countWork(cid, students, assessments);
+    if (!_work || !_work.total) _toGradeOnly = false;
+    if (_toGradeOnly) {
+      students = students.filter(function (s) {
+        return _work.bySid[s.id];
+      });
+      assessments = assessments.filter(function (a) {
+        return _work.byAid[a.id];
+      });
+    }
     if (_toReturnOnly) {
       students = students.filter(function (s) {
         return _drafts.bySid[s.id];
@@ -420,6 +437,7 @@ window.PageGradebook = (function () {
         ' <span aria-hidden="true">\u00D7</span></button>';
     }
 
+    html += _toGradeButton();
     html += _toReturnButton();
 
     html +=
@@ -796,6 +814,12 @@ window.PageGradebook = (function () {
       (_drafts
         ? '<span class="gb-key-item gb-key-item-draft"><span class="gb-key-draft"></span>' + DRAFT_KEY_TEXT + '</span>'
         : '') +
+      (_work
+        ? '<span class="gb-key-item"><span class="gb-to-grade">To Grade</span>Sent, not graded</span>' +
+          '<span class="gb-key-item">' +
+          WORK_CAMERA +
+          'Has photos</span>'
+        : '') +
       '</div>';
     return html;
   }
@@ -850,6 +874,78 @@ window.PageGradebook = (function () {
   // True when `sid`'s piece on `aid` was a draft at the last render.
   function _isDraft(sid, aid) {
     return !!(_drafts && _drafts.byAid[aid] && _drafts.byAid[aid].indexOf(sid) >= 0);
+  }
+
+  /* ── Work to grade (S6-F4) ──────────────────────────────────
+     In a class whose student page and Send Work are on: the toolbar's
+     "N to grade", which pressed leaves only the students and columns with
+     work waiting; "To Grade" in a cell whose work waits; a camera on a cell
+     whose work came in as photos; and a hover line saying what came in
+     ("Sent Oct 30 · 2 photos. Click to open in the grader."). The numbers
+     are GraderWork.workCounts' (shared/grader.js): a pair or group counts
+     once, as in the grader. With Send Work off none of it is drawn. */
+  var WORK_CAMERA =
+    '<span class="gb-work-camera" aria-hidden="true"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span>';
+
+  function _countWork(cid, students, assessments) {
+    if (!window.GraderWork || !GraderWork.workOnInClass(cid)) return null;
+    var ids = students.map(function (s) {
+      return s.id;
+    });
+    var out = { total: 0, byAid: {}, bySid: {} };
+    assessments.forEach(function (a) {
+      if (!GraderWork.workOn(cid, a)) return;
+      var c = GraderWork.workCounts(cid, a.id, ids);
+      out.total += c.tograde;
+      if (c.ids.tograde.length) out.byAid[a.id] = c.ids.tograde;
+      c.ids.tograde.forEach(function (sid) {
+        out.bySid[sid] = true;
+      });
+    });
+    return out;
+  }
+
+  // What a cell's student has in on `a`, or null: { tograde, photos, words, title }.
+  function _workCell(cid, a, sid) {
+    if (!_work || !GraderWork.workOn(cid, a)) return null;
+    var sub = getStudentSubmission(cid, sid, a.id);
+    var tograde = !!(_work.byAid[a.id] && _work.byAid[a.id].indexOf(sid) >= 0);
+    if (!sub) return null;
+    var n = (sub.files || []).length;
+    var day = sub.sent_at || sub.created_at ? formatShortDate(String(sub.sent_at || sub.created_at).slice(0, 10)) : '';
+    var what = sub.on_paper
+      ? 'Handed in on paper'
+      : (sub.sent_by === 'teacher' ? 'Added by you' : 'Sent') +
+        (day ? ' ' + day : '') +
+        ' · ' +
+        n +
+        (n === 1 ? ' photo' : ' photos');
+    return {
+      tograde: tograde,
+      photos: n > 0,
+      words: (tograde ? ', sent, not graded' : '') + (n > 0 ? ', has photos' : ''),
+      title: what + '. Click to open in the grader.',
+    };
+  }
+
+  // html-safe: a number and fixed words
+  function _toGradeButton() {
+    if (!_work || !_work.total) return '';
+    return (
+      '<button type="button" class="gb-to-return gb-to-grade-btn' +
+      (_toGradeOnly ? ' active' : '') +
+      '" data-action="toggleToGrade" aria-pressed="' +
+      _toGradeOnly +
+      '" title="' +
+      (_toGradeOnly
+        ? 'Showing only the work waiting to grade. Click to show everything.'
+        : 'Show only the students and assessments with work waiting to grade.') +
+      '">' +
+      _work.total +
+      ' to grade' +
+      (_toGradeOnly ? ' <span aria-hidden="true">×</span>' : '') +
+      '</button>'
+    );
   }
 
   /* The toolbar's "N to return": the drafts on screen, summed over the
@@ -2105,6 +2201,14 @@ window.PageGradebook = (function () {
           cellClass += ' gb-draft';
           cellStyle = cellStyle.replace(/^background:[^;]*;/, '');
         }
+        // Work in (S6-F4): To Grade in place of the dash while it waits,
+        // the camera when photos came in, and a hover line saying what.
+        var work = _workCell(cid, a, s.id);
+        if (work && work.tograde) {
+          cellStyle = '';
+          display = '<span class="gb-to-grade">To Grade</span>';
+        }
+        if (work && work.photos) display += WORK_CAMERA;
         var isScoreModeCell = _scoreMode && _scoreMode.assessmentId === a.id && si === _scoreMode.studentIdx;
         var isScoreModeCol = _scoreMode && _scoreMode.assessmentId === a.id;
         html +=
@@ -2134,7 +2238,10 @@ window.PageGradebook = (function () {
                 : 'no score') +
           (cell.late && !statusMark ? ', Late' : '') +
           (draft ? DRAFT_CELL_WORDS : '') +
-          '" data-action="editScoreCell" data-aid="' +
+          (work ? esc(work.words) : '') +
+          '"' +
+          (work ? ' title="' + esc(work.title) + '"' : '') +
+          ' data-action="editScoreCell" data-aid="' +
           a.id +
           '" data-sid="' +
           s.id +
@@ -4406,6 +4513,13 @@ window.PageGradebook = (function () {
       },
       // Draft and Returned (S1-F1). The button is redrawn with the page, so
       // the new one takes the focus.
+      toggleToGrade: function () {
+        _flushActiveScoreEditor();
+        _toGradeOnly = !_toGradeOnly;
+        render();
+        var again = document.querySelector('.gb-to-grade-btn');
+        if (again) again.focus({ preventScroll: true });
+      },
       toggleToReturn: function () {
         _flushActiveScoreEditor();
         _toReturnOnly = !_toReturnOnly;
@@ -4479,6 +4593,7 @@ window.PageGradebook = (function () {
     // From a dashboard link: these students, and one competency's columns.
     filterStudentIds = params.students ? String(params.students).split(',').filter(Boolean) : [];
     _toReturnOnly = false;
+    _toGradeOnly = false;
     _drafts = null;
     var linkedSection = params.section;
     if (

@@ -20,6 +20,9 @@ window.PageAssignments = (function () {
   var showUngraded = false;
   // "N to return" pressed: only the assessments with a draft (S1-F2).
   var _toReturnOnly = false;
+  // Show: To Grade (S6-F4): only the assessments with work waiting to grade.
+  var _toGradeOnly = false;
+  var _toGradeTotal = 0;
   // The drafts on screen, summed over the listed assessments at the last
   // render or refresh.
   var _toReturnTotal = 0;
@@ -527,6 +530,7 @@ window.PageAssignments = (function () {
       '" data-action-input="assessSearch" aria-label="Search assessments">' +
       '</div>' +
       (_holdsGrades(cid) ? '<span class="assess-to-return-slot">' + _toReturnPillHtml() + '</span>' : '') +
+      _toGradeSegHtml(cid) +
       '<div class="seg assess-seg-control" role="group" aria-label="Expand or collapse all assessments">' +
       '<button class="seg-btn assess-seg-btn"' +
       segAttr(
@@ -1708,6 +1712,7 @@ window.PageAssignments = (function () {
             ' missing</span>'
           );
         })() +
+        _toGradeChipHtml(cid, a, shownIds) +
         (holds && !isDibelsScored(a)
           ? '<span class="assess-returns" data-returns-aid="' +
             a.id +
@@ -1718,6 +1723,7 @@ window.PageAssignments = (function () {
         '</span>' +
         '</div>' +
         '<div class="assess-header-actions" data-stop-prop="true">' +
+        _gradeSubmissionsHtml(cid, a, shownIds) +
         (holds && !isDibelsScored(a)
           ? '<span class="assess-return-slot" data-return-slot-aid="' +
             a.id +
@@ -2540,6 +2546,23 @@ window.PageAssignments = (function () {
           return waitingIn[a.id] > 0;
         });
     } else _toReturnOnly = false;
+
+    // Work to grade (S6-F4): the same count as the gradebook's bar and the
+    // dashboard's To Grade cell (GraderWork.workCounts), over the students
+    // on screen. With To Grade on, only the assessments with work waiting.
+    _toGradeTotal = 0;
+    if (GraderWork.workOnInClass(cid)) {
+      var gradeIn = {};
+      var onScreen = _returnShownIds(cid);
+      assessments.forEach(function (a) {
+        gradeIn[a.id] = GraderWork.workCounts(cid, a.id, onScreen).tograde;
+        _toGradeTotal += gradeIn[a.id];
+      });
+      if (_toGradeOnly)
+        assessments = assessments.filter(function (a) {
+          return gradeIn[a.id] > 0;
+        });
+    } else _toGradeOnly = false;
 
     // Render toolbar
     var result = renderAssessToolbar(cid, assessments);
@@ -11109,6 +11132,18 @@ window.PageAssignments = (function () {
       toggleToReturn: function () {
         _toggleToReturn();
       },
+      // Work to grade (S6-F4).
+      setToGradeShow: function () {
+        _toGradeOnly = el.dataset.show === 'tograde';
+        render();
+        var again = document.querySelector(
+          '.assess-tograde-seg [data-show="' + (_toGradeOnly ? 'tograde' : 'all') + '"]',
+        );
+        if (again) again.focus({ preventScroll: true });
+      },
+      gradeSubmissions: function () {
+        _openGraderOnWork(el.dataset.aid, el.dataset.sid || null);
+      },
       returnDrafts: function () {
         _askReturnDrafts(el.dataset.aid, el);
       },
@@ -12148,6 +12183,9 @@ window.PageAssignments = (function () {
     _kbFocusEl = null;
     _statusDebounce = {};
     AC.configure(cid);
+    // Over this page itself (Grade Submissions, S6-F4): its own listeners
+    // are the dialog's too, and come back when the dialog closes.
+    var pageListeners = _listeners.slice();
     var overlay = document.createElement('div');
     overlay.id = 'grader-overlay';
     overlay.className = 'grader-overlay';
@@ -12166,6 +12204,7 @@ window.PageAssignments = (function () {
       // The gradebook's rows, in their order: group work steps through these.
       rowOrder: opts.studentIds && opts.studentIds.length ? opts.studentIds.slice() : null,
       onClose: opts.onClose || null,
+      pageListeners: opts.overPage ? pageListeners : null,
       // Show: To Grade, To Return, Returned, Not In or All (S1-F2, S6-F3).
       show: opts.show && _SHOW_LABELS[opts.show] ? opts.show : 'all',
       // The student's work beside the scoring (S6-F1): its page, the fit,
@@ -12675,6 +12714,7 @@ window.PageAssignments = (function () {
       '<div class="grader-status" role="group" aria-label="Status">' +
       _graderStatusButtons(a.id, st.id, status, isDibelsScored(a) ? ['NS', 'EXC'] : ['NS', 'EXC', 'LATE']) +
       '</div>' +
+      _inlineWorkHtml(cid, a, st.id) +
       '<span class="grader-spacer"></span>' +
       '<span class="grader-hint">← → change student</span>' +
       (isDibelsScored(a)
@@ -13006,6 +13046,111 @@ window.PageAssignments = (function () {
       }
       levels.innerHTML = _dibelsLevelPillsHtml(cid, a, sid);
     } else if (levels) levels.remove();
+  }
+
+  /* ── Work to grade on the Assignments page (S6-F4) ───────────
+     In a class whose student page and Send Work are on: Show All | To
+     Grade 9 on the toolbar, "6 to grade" on a card, Grade Submissions,
+     which opens the grader dialog on the work waiting (Show on To Grade),
+     and on one student's grader, what came in and Add Work. Every number is
+     GraderWork.workCounts', as the gradebook's and the dashboard's are. */
+  // html-safe: fixed words and a number
+  function _toGradeSegHtml(cid) {
+    if (!GraderWork.workOnInClass(cid)) return '';
+    return (
+      '<div class="seg seg-sm assess-tograde-seg" role="group" aria-label="Show">' +
+      '<button type="button" class="seg-btn"' +
+      segAttr(!_toGradeOnly) +
+      ' data-action="setToGradeShow" data-show="all">All</button>' +
+      '<button type="button" class="seg-btn"' +
+      segAttr(_toGradeOnly) +
+      ' data-action="setToGradeShow" data-show="tograde">To Grade <span class="assess-tograde-n">' +
+      _toGradeTotal +
+      '</span></button></div>'
+    );
+  }
+
+  // html-safe: a number and fixed words
+  function _toGradeChipHtml(cid, a, shownIds) {
+    if (!GraderWork.workOn(cid, a)) return '';
+    var n = GraderWork.workCounts(cid, a.id, shownIds).tograde;
+    return n ? '<span class="assess-to-grade">' + n + ' to grade</span>' : '';
+  }
+
+  // html-safe: ids are ours; fixed words
+  function _gradeSubmissionsHtml(cid, a, shownIds) {
+    if (focusStudentId || !GraderWork.workOn(cid, a)) return '';
+    if (!GraderWork.workCounts(cid, a.id, shownIds).tograde) return '';
+    return (
+      '<button type="button" class="assess-grade-work-btn" data-action="gradeSubmissions" data-aid="' +
+      a.id +
+      '">Grade Submissions</button>'
+    );
+  }
+
+  /* One student's grader on the page: what came in ("Submitted Oct 30 ·
+     2 photos", "Not In · 7 days late"), Same photo as, and Add Work for
+     Logan when nothing is in; each opens the grader dialog on them. */
+  // html-safe: names go through esc; ids are ours
+  function _inlineWorkHtml(cid, a, sid) {
+    if (!GraderWork.workOn(cid, a)) return '';
+    var sub = getStudentSubmission(cid, sid, a.id);
+    var st = _workStudent(cid, sid);
+    var html = '<span class="grader-inline-work">' + esc(_workLineText(cid, a, sid, sub)) + '</span>';
+    GraderWork.samePhotoAs(cid, a.id, sid).forEach(function (other) {
+      var o = _workStudent(cid, other);
+      if (o)
+        html +=
+          '<button type="button" class="grader-work-same" data-action="gradeSubmissions" data-aid="' +
+          a.id +
+          '" data-sid="' +
+          other +
+          '">' +
+          esc('Same photo as ' + _workShortName(o)) +
+          '</button>';
+    });
+    if (!sub && st)
+      html +=
+        '<button type="button" class="assess-add-work-btn" data-action="gradeSubmissions" data-aid="' +
+        a.id +
+        '" data-sid="' +
+        sid +
+        '">' +
+        esc('Add Work for ' + displayNameFirst(st)) +
+        '</button>';
+    else if (sub)
+      html +=
+        '<button type="button" class="assess-add-work-btn" data-action="gradeSubmissions" data-aid="' +
+        a.id +
+        '" data-sid="' +
+        sid +
+        '">See the Work</button>';
+    return html;
+  }
+
+  /* The grader dialog over this page, on `sid` or the first student whose
+     work waits, with Show on To Grade when work waits. */
+  function _openGraderOnWork(aid, sid) {
+    var cid = activeCourse;
+    if (_grader || !aid || !_assessmentById(cid, aid)) return;
+    var ids = sortStudents(getStudents(cid), 'lastName').map(function (s) {
+      return s.id;
+    });
+    var waiting = GraderWork.workCounts(cid, aid, ids).ids.tograde;
+    var to = sid || waiting[0];
+    if (!to) return;
+    var page = { open: Array.from(openAssessIds), focus: focusStudentId, expanded: _allExpanded };
+    openGrader(cid, aid, to, {
+      show: !sid && waiting.length ? 'tograde' : 'all',
+      overPage: true,
+      onClose: function () {
+        // The page as it was before the dialog opened.
+        openAssessIds = new Set(page.open);
+        focusStudentId = page.focus;
+        _allExpanded = page.expanded;
+        render();
+      },
+    });
   }
 
   /* ── Draft and Returned (S0-F2) ───────────────────────────
@@ -14475,6 +14620,11 @@ window.PageAssignments = (function () {
       document.removeEventListener(l.type, l.handler, l.options);
     });
     _listeners = [];
+    if (g.pageListeners) {
+      g.pageListeners.forEach(function (l) {
+        _addDocListener(l.type, l.handler, l.options);
+      });
+    }
     Object.keys(_statusDebounce).forEach(function (k) {
       delete _statusDebounce[k];
     });
@@ -14528,6 +14678,8 @@ window.PageAssignments = (function () {
     assessSearch = '';
     showUngraded = false;
     _toReturnOnly = false;
+    // The dashboard's To Grade cell opens the page with To Grade on.
+    _toGradeOnly = !!(params && params.show === 'tograde');
     _filterMenuOpen = false;
     rubricViewStates = {};
     _showingNewForm = false;
