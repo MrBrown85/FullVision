@@ -970,13 +970,18 @@ def scen_race():
     sides = []
     def side():
         x = Side(d); sides.append(x); return x
+    def let_go(*xs):
+        """Close connections that are finished with: the server allows only so many at once."""
+        for x in xs:
+            x.close()
+            if x in sides: sides.remove(x)
     def second_waits(first, second):
         """first() runs in an open transaction on its own connection; second() is then started on another.
         Returns (did the second wait, the first's answer, the second's answer), the first committed in between."""
         h = side(); h.begin(); a1 = attempt(lambda: first(h))
         out = {}; o = side()
         t = threading.Thread(target=lambda: out.setdefault('r', attempt(lambda: second(o)))); t.start(); time.sleep(0.6)
-        waited = t.is_alive(); h.commit(); t.join(15)
+        waited = t.is_alive(); h.commit(); t.join(15); let_go(h, o)
         return waited, a1, out.get('r')
     try:
         a = k['takes']
@@ -1081,16 +1086,17 @@ def scen_race():
            and set(p for f in s['files'] for p in (f['path'], f['thumb_path'])) <= set(queued(d)), (s, g))
         bad = []
         for n in range(30):
-            x = new_assessment(); out = {}
-            def student(o=side(), x=x, out=out):
+            x = new_assessment(); out = {}; pair = (side(), side())
+            def student(o=pair[0], x=x, out=out):
                 s = attempt(lambda: o.send_start(tok, ENR1, x))
                 if isinstance(s, dict) and s.get('ok'):
                     out['up'] = attempt(lambda: o.upload(s['files'])); out['fin'] = attempt(lambda: o.send_finish(tok, ENR1, s['submission_id'], s['files']))
                 out['start'] = s
-            def teacher(o=side(), x=x, out=out): out['del'] = attempt(lambda: o.rpc('delete_assessment(:a)', a=x))
+            def teacher(o=pair[1], x=x, out=out): out['del'] = attempt(lambda: o.rpc('delete_assessment(:a)', a=x))
             ts = [threading.Thread(target=f) for f in ((student, teacher) if n % 2 else (teacher, student))]
             for t_ in ts: t_.start()
             for t_ in ts: t_.join(20)
+            let_go(*pair)
             errors = [v for v in out.values() if isinstance(v, str) and v.startswith('ERROR')]
             if errors or d.one('select count(*) from submission where assessment_id = :a', a=x) or sound(d): bad.append((n, errors, sound(d)))
             d.run('delete from student_submit.send_log')
@@ -1100,9 +1106,11 @@ def scen_race():
         # ── The hourly limit under a burst ──────────────────────────────
         out = []
         def burst(o): out.append(attempt(lambda: o.send_start(tok, ENR1, a)))
-        ts = [threading.Thread(target=burst, args=(side(),)) for _ in range(30)]
+        crowd = [side() for _ in range(30)]
+        ts = [threading.Thread(target=burst, args=(x,)) for x in crowd]
         for t_ in ts: t_.start()
         for t_ in ts: t_.join(30)
+        let_go(*crowd)
         kinds = sorted('ok' if isinstance(v, dict) and v.get('ok') else (v.get('error') if isinstance(v, dict) else v) for v in out)
         ok('30 send_starts at once from one card: exactly 20 are given links and 10 are told too_many; one unfinished send is left',
            kinds == ['ok'] * 20 + ['too_many'] * 10 and d.one('select count(*) from student_submit.send_log') == 20 and d.one('select count(*) from submission') == 1, kinds)
