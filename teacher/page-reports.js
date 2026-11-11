@@ -118,11 +118,55 @@ window.PageReports = (function () {
         renderReports();
       },
     },
+    {
+      /* MyEdBC Input (S16-F1, teacher/myed-input.js). Shown only in Demo
+         Mode, for a class with its student page switched on, until the
+         MyEd tables (Batch F) are applied and it is wired to them. */
+      id: 'myed',
+      label: 'MyEdBC Input',
+      title: 'Marks and comments laid out for MyEdBC.',
+      hidden: function () {
+        return !_myedShown(activeCourse);
+      },
+      show: _showMyEdTab,
+      render: function (cid, output) {
+        // Generate drafts from the sentence bank, which loads the first time Reports needs it.
+        if (typeof COMMENT_BANK === 'undefined' && window.CommentBank && CommentBank.loadBank) {
+          CommentBank.loadBank().then(function (ok) {
+            if (ok && activeTab === 'myed' && activeCourse === cid) renderReports();
+          });
+        }
+        MyEdInput.mount(output, cid, getTermId(), renderReports);
+      },
+      teardown: function () {
+        if (window.MyEdInput) MyEdInput.leave();
+      },
+      pickStudent: function (sid) {
+        MyEdInput.pick(sid);
+      },
+    },
   ];
+
+  /* Whether a class has the MyEdBC Input tab: Demo Mode, with the class's
+     student page (the build switch) on. */
+  function _myedShown(cid) {
+    if (!window.MyEdInput || typeof isDemoMode !== 'function' || !isDemoMode()) return false;
+    var s = cid && typeof getReturnSettings === 'function' ? getReturnSettings(cid) : null;
+    return !!s && s.student_page === true;
+  }
+
+  function _showMyEdTab(on) {
+    if (!on && window.MyEdInput) MyEdInput.leave();
+  }
+
+  // A tab's hidden may be a function, asked each time the bar is drawn.
+  function _isHidden(t) {
+    return typeof t.hidden === 'function' ? !!t.hidden() : !!t.hidden;
+  }
 
   function _shownTabs(tabs) {
     return tabs.filter(function (t) {
-      return !t.hidden;
+      return !_isHidden(t);
     });
   }
 
@@ -149,7 +193,7 @@ window.PageReports = (function () {
     var named = tabs.find(function (t) {
       return t.id === id;
     });
-    if (named) return named.hidden ? shown[0] : named;
+    if (named) return _isHidden(named) ? shown[0] : named;
     return id ? UNKNOWN_TAB : shown[0];
   }
 
@@ -270,6 +314,7 @@ window.PageReports = (function () {
     RQ.tqSaveCurrentIfNeeded();
     activeTab = _tabIdFor(TABS, tab);
     viewingIssue = null;
+    _redrawTabBar();
     segSelect(document.querySelector('.report-seg-btn[data-tab="' + activeTab + '"]'));
     // Show/hide contextual toolbar elements
     var open = _tab();
@@ -281,6 +326,13 @@ window.PageReports = (function () {
     var layout = document.getElementById('page-layout');
     if (layout) layout.classList.toggle('sidebar-hidden', !_sidebarIsVisible());
     renderReports();
+  }
+
+  // The bar again, for the class on screen: a tab shown for one class may be hidden for another.
+  function _redrawTabBar() {
+    var bar = document.querySelector('.report-seg-control');
+    // html-safe: _tabBarHtml escapes each tab's words
+    if (bar) bar.innerHTML = _tabBarHtml(TABS);
   }
 
   function _showQuestionnaireTab(on) {
@@ -2099,6 +2151,7 @@ window.PageReports = (function () {
     // The Print dialog and any question over it are this class's.
     closeIssueDialog();
     RQ.tqSaveCurrentIfNeeded();
+    if (window.MyEdInput) MyEdInput.leave();
     // A pending Undo belongs to the class being left.
     if (typeof dismissUndoToast === 'function') dismissUndoToast();
     activeCourse = cid;
@@ -2116,7 +2169,13 @@ window.PageReports = (function () {
     _configureQuestionnaire();
     populateStudentSelect();
     populateReportPeriods(false);
-    renderReports();
+    // The open tab may not be this class's (MyEdBC Input): the bar is drawn again, and such a tab gives way to the first.
+    if (_tabIdFor(TABS, activeTab) !== activeTab) switchTab(activeTab);
+    else {
+      _redrawTabBar();
+      segSelect(document.querySelector('.report-seg-btn[data-tab="' + activeTab + '"]'));
+      renderReports();
+    }
     _syncFromServer(cid);
     document.getElementById('sidebar-mount').innerHTML = renderSidebar(cid, null);
   }
@@ -2563,6 +2622,7 @@ window.PageReports = (function () {
   function _handleReportPeriodChange() {
     // The box knows the report it was drawn for, so this saves there.
     RQ.tqSaveCurrentIfNeeded();
+    if (window.MyEdInput) MyEdInput.leave();
     viewingIssue = null;
     // A different report term means different work and heights.
     _blockSizes = null;

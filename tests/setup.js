@@ -245,6 +245,7 @@ load('teacher/report-questionnaire.js');
 load('teacher/report-studio.js');
 load('teacher/grade-report.js');
 load('teacher/report-preview.js');
+load('teacher/myed-input.js');
 load('vendor/qrcode.js');
 load('shared/questionnaire-templates.js');
 load('teacher/questionnaires.js');

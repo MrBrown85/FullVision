@@ -45,7 +45,7 @@ const SEAM_SOURCE = read(SEAM);
    printout or the export, and the phone copy's own page. A new one is
    guarded as soon as it is added. */
 const REPORT_FILE =
-  /^(page-reports|report-.*|comment-.*|grade-report|grades-print|rubric-print|phone-reports|export-all)\.js$/;
+  /^(page-reports|report-.*|comment-.*|grade-report|grades-print|rubric-print|phone-reports|export-all|myed-input)\.js$/;
 const REPORT_FILES = readdirSync(resolve(ROOT, 'teacher'))
   .filter(name => REPORT_FILE.test(name))
   .map(name => 'teacher/' + name)
@@ -281,6 +281,7 @@ const DOORS = {
     names: ['headerGrade', 'notHandedIn', 'missingAndLate', '_basisHtml', '_requiredSource'],
   },
   'teacher/phone-reports.js': { surface: 'phones', names: ['snapshot'] },
+  'teacher/myed-input.js': { surface: 'myed', names: ['rows', 'markFor'] },
   'teacher/grades-print.js': { surface: 'printGrades', names: ['buildModel', 'cellText', 'columnAverageText'] },
   'teacher/export-all.js': { surface: 'exportData', names: ['rows'] },
   /* The rubric handout's doors (S2-F1): what prints and its preview, who
@@ -322,6 +323,7 @@ describe('report files read scores only through ReportScores', () => {
       'teacher/report-feedback-cards.js',
       'teacher/comment-personal.js',
       'shared/phone-report-view.js',
+      'teacher/myed-input.js',
     ].forEach(file => expect(REPORT_FILES, file).toContain(file));
     expect(REPORT_FILES).not.toContain(SEAM);
   });
@@ -501,7 +503,7 @@ describe('report files read scores only through ReportScores', () => {
 
 /* The report rows the tests below start from: every one on all work, so
    they test the mechanism, not the table (which is pinned on its own). */
-const REPORT_ROWS = ['progress', 'handout', 'questionnaire', 'phones'];
+const REPORT_ROWS = ['progress', 'handout', 'questionnaire', 'phones', 'myed'];
 const ALL_WORK = Object.fromEntries(REPORT_ROWS.map(surface => [surface, 'all']));
 
 /* The seam's source with every report row on all work and then these
@@ -522,6 +524,7 @@ const REPORTS_ON_RETURNED = {
   handout: 'returned',
   questionnaire: 'returned',
   phones: 'returned',
+  myed: 'returned',
 };
 
 /* ── 2. The seam itself ──────────────────────────────────────── */
@@ -542,6 +545,7 @@ describe('ReportScores', () => {
       'handout',
       'questionnaire',
       'phones',
+      'myed',
       'grader',
       'printGrades',
       'exportData',
@@ -558,6 +562,7 @@ describe('ReportScores', () => {
       handout: 'returned',
       questionnaire: 'returned',
       phones: 'returned',
+      myed: 'returned',
       grader: 'all',
       printGrades: 'all',
       exportData: 'all',

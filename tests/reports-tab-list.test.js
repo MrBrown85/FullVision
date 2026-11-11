@@ -15,7 +15,11 @@ import { runInThisContext } from 'vm';
 // setup.js stubs PageReports for the router; this loads the real page.
 runInThisContext(readFileSync('teacher/page-reports.js', 'utf-8'), { filename: 'teacher/page-reports.js' });
 
-const { tabs, unknownTab, tabFor, tabIdFor, tabBarHtml } = PageReports._helpers;
+const { tabs: allTabs, unknownTab, tabFor, tabIdFor, tabBarHtml } = PageReports._helpers;
+/* The two tabs every class has. The tests below of how a list behaves
+   start from these; MyEdBC Input (S16-F1), the list's third entry, is
+   tested on its own at the foot of this file. */
+const tabs = allTabs.filter(t => t.id !== 'myed');
 
 // The bar as it was written out by hand before the list (the toolbar literal on main).
 const BAR_BEFORE =
@@ -29,7 +33,12 @@ function labels(html) {
 }
 
 describe('the Reports tab list', () => {
-  it('has two tabs today, Term Questionnaire then Progress Reports', () => {
+  it('has three tabs, Term Questionnaire, Progress Reports and MyEdBC Input (S16-F1), the third hidden outside Demo Mode', () => {
+    expect(allTabs.map(t => t.id)).toEqual(['questionnaire', 'progress', 'myed']);
+    expect(allTabs.map(t => t.label)).toEqual(['Term Questionnaire', 'Progress Reports', 'MyEdBC Input']);
+    expect(typeof allTabs[2].hidden).toBe('function');
+    expect(allTabs[2].hidden()).toBe(true);
+    expect(tabBarHtml(allTabs)).toBe(BAR_BEFORE);
     expect(tabs.map(t => t.id)).toEqual(['questionnaire', 'progress']);
     expect(tabs.map(t => t.label)).toEqual(['Term Questionnaire', 'Progress Reports']);
     expect(tabs.every(t => t.hidden === false)).toBe(true);

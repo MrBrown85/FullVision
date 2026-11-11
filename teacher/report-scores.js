@@ -50,6 +50,8 @@ window.ReportScores = (function () {
     questionnaire: 'returned',
     // Sent to Phones: each student's phone copy (S2-F2; Colin's answer 6).
     phones: 'returned',
+    // MyEdBC Input: the marks and comments a teacher types into MyEd, which families see (S16-F1; Colin's answer 6).
+    myed: 'returned',
     /* The grader's own use of a report's reading: the Note for the Report's
        preview under the grader (teacher/page-assignments.js), which asks
        the questionnaire's facts. The grader is the teacher's screen, so all
