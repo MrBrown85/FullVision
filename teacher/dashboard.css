@@ -6834,6 +6834,31 @@ label.cm-cr-row {
 .sc-status {
   color: var(--text-2);
 }
+.sc-note {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* A row's own buttons (Unlock, Print New Card), at the end of the row. */
+.sc-table .sc-do {
+  padding-right: 0;
+  text-align: right;
+  white-space: nowrap;
+}
+.sc-do .sc-row-btn {
+  display: inline-flex;
+  margin-left: 8px;
+  padding: 3px 10px;
+  font-size: var(--text-xs);
+}
+.sc-do .sc-row-btn:first-child {
+  margin-left: 0;
+}
+.sc-actions .cm-action-btn:disabled,
+.sc-do .sc-row-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 .sc-lock {
   margin-left: 8px;
   padding: 1px 8px;
