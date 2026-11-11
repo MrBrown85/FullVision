@@ -91,10 +91,26 @@ function parse(html) {
   box.innerHTML = html;
   return box;
 }
+// Student, Card and Status of each row; a row's own buttons are rowButtons'.
 const rowsOf = box =>
-  Array.from(box.querySelectorAll('.sc-table tbody tr')).map(tr => Array.from(tr.children).map(td => td.textContent));
-const buttons = box => Array.from(box.querySelectorAll('button')).map(b => b.textContent);
-const noteOf = box => (box.querySelector('.sc-note') ? box.querySelector('.sc-note').textContent : null);
+  Array.from(box.querySelectorAll('.sc-table tbody tr')).map(tr =>
+    Array.from(tr.children)
+      .filter(td => !td.classList.contains('sc-do'))
+      .map(td => td.textContent),
+  );
+// The card's own buttons, above the list.
+const buttons = box => Array.from(box.querySelectorAll('.sc-actions button')).map(b => b.textContent);
+// Each row's buttons, by the label a screen reader says.
+const rowButtons = box =>
+  Array.from(box.querySelectorAll('.sc-table tbody tr')).map(tr =>
+    Array.from(tr.querySelectorAll('.sc-do button')).map(b => b.getAttribute('aria-label')),
+  );
+// The lines under the buttons, one string each; null with none.
+const notesOf = box => {
+  const lines = Array.from(box.querySelectorAll('.sc-note .sc-note-line')).map(e => e.textContent);
+  return lines.length ? lines : null;
+};
+const noteOf = box => (notesOf(box) ? notesOf(box).join(' ') : null);
 const el = cid => ({ closest: () => ({ dataset: { cid } }) });
 
 /* The list reads its cards only when its own card is on the page
@@ -179,7 +195,10 @@ beforeEach(() => {
   realFetch = globalThis.fetch;
   window.__ENV = { SUPABASE_URL: 'https://sb.test', SUPABASE_KEY: 'anon-key-for-tests' };
 });
-afterEach(() => {
+afterEach(async () => {
+  // A print's own clean-up runs a moment after the dialog (teacher/ui.js printThen): it runs while the
+  // test's stand-in window is still there, never after, whichever test printed last.
+  await new Promise(r => setTimeout(r, 5));
   releasePrints();
   document.querySelector = realQuery;
   DashClassManager.classManagerOpen = wasOpen.open;
@@ -594,7 +613,10 @@ describe('the list in Class Settings › Student Page', () => {
       'Student',
       'Card',
       'Status',
+      '',
     ]);
+    // No card yet: nothing on a row to press.
+    expect(rowButtons(box)).toEqual([[], [], []]);
     expect(rowsOf(box)).toEqual([
       ['Jordan Abel', 'No Card Yet', ''],
       ['Avery Byrne', 'No Card Yet', ''],
@@ -636,8 +658,17 @@ describe('the list in Class Settings › Student Page', () => {
       ]);
       expect(box.querySelector('.sc-lock').textContent).toBe('Locked');
       expect(box.textContent).not.toMatch(/K7M|4821/);
-      // Avery's never-printed card, and Fay with none.
-      expect(buttons(box)).toEqual(['Make and Print 2 Cards']);
+      // Avery's never-printed card, and Fay with none; cards students hold, so New Codes for This Class.
+      expect(buttons(box)).toEqual(['New Codes for This Class', 'Make and Print 2 Cards']);
+      // Dee's is locked: Unlock on her row. Every card can be replaced.
+      expect(rowButtons(box)).toEqual([
+        ['Print a New Card for Jordan Abel'],
+        ['Print a New Card for Avery Byrne'],
+        ['Print a New Card for Cam Cole'],
+        ['Unlock Dee Dunn’s Card', 'Print a New Card for Dee Dunn'],
+        ['Print a New Card for Eli Eng'],
+        [],
+      ]);
     } finally {
       vi.useRealTimers();
       t.session.signOut();
@@ -660,7 +691,7 @@ describe('the list in Class Settings › Student Page', () => {
         ['Avery Byrne', 'Card 1 · Made Nov 10', 'Needs a New Card'],
         ['Cam Cole', 'Card 3 · Made Nov 10', 'Not Printed'],
       ]);
-      expect(buttons(box)).toEqual(['Make and Print 1 Card']);
+      expect(buttons(box)).toEqual(['New Codes for This Class', 'Make and Print 1 Card']);
     } finally {
       t.session.signOut();
     }
@@ -783,7 +814,7 @@ describe('Make and Print, and Print Again', () => {
     expect(noteOf(box)).toBe(
       '3 cards went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
     );
-    expect(buttons(box)).toEqual(['Print Again']);
+    expect(buttons(box)).toEqual(['Print Again', 'New Codes for This Class']);
     expect(storedCards().every(c => !!c.printed_at)).toBe(true);
 
     // Print Again: the same codes, and nothing made.
@@ -807,7 +838,7 @@ describe('Make and Print, and Print Again', () => {
     await markStudentCardsPrinted(CID, [first[0].card_id]);
     StudentCards._reset();
     await shown(CID);
-    expect(buttons(parse(StudentCards.render(CID)))).toEqual(['Make and Print 2 Cards']);
+    expect(buttons(parse(StudentCards.render(CID)))).toEqual(['New Codes for This Class', 'Make and Print 2 Cards']);
     await StudentCards.makeAndPrint(CID);
     expect(sheets[0].names).toEqual(['Avery Byrne', 'Noor Chen']);
     expect(sheets[0].numbers).toEqual(['Card 2', 'Card 1']);
@@ -818,7 +849,7 @@ describe('Make and Print, and Print Again', () => {
       ['s3', 1],
     ]);
     expect(listed[0].id).toBe(first[0].card_id);
-    expect(buttons(parse(StudentCards.render(CID)))).toEqual(['Print Again']);
+    expect(buttons(parse(StudentCards.render(CID)))).toEqual(['Print Again', 'New Codes for This Class']);
   });
 
   it('signed in: the request names the cards it replaces, and the printed codes are the function’s', async () => {
@@ -836,7 +867,7 @@ describe('Make and Print, and Print Again', () => {
         stopped: false,
       });
       await shown(LIVE);
-      expect(buttons(parse(StudentCards.render(LIVE)))).toEqual(['Make and Print 2 Cards']);
+      expect(buttons(parse(StudentCards.render(LIVE)))).toEqual(['New Codes for This Class', 'Make and Print 2 Cards']);
       await StudentCards.makeAndPrint(LIVE);
       expect(t.fn.posts[0].body.items).toEqual([
         { enrollment_id: U(11), replaces: null },
@@ -995,7 +1026,7 @@ describe('Make and Print, and Print Again', () => {
     DashClassManager.classManagerOpen = true;
     onPage = CID;
     const box = parse(StudentCards.render(CID));
-    expect(buttons(box)).toEqual([]);
+    expect(buttons(box)).toEqual(['New Codes for This Class']);
     expect(noteOf(box)).toBe(null);
     expect(sheets.length).toBe(1);
     clearClass('c-other');
@@ -1131,7 +1162,7 @@ describe('after the review', () => {
       // The clock moves on; no timer has fired.
       vi.setSystemTime(new Date(Date.parse('2026-11-10T18:00:00.000Z') + ms));
       const box = parse(StudentCards.render(CID));
-      expect(buttons(box)).toEqual([]);
+      expect(buttons(box)).toEqual(['New Codes for This Class']);
       expect(noteOf(box)).toBe(null);
       expect(StudentCards.printAgain(CID)).toBe(0);
       expect(StudentCards._holding()).toBe(false);
@@ -1373,6 +1404,1146 @@ describe('after the review', () => {
   });
 });
 
+/* S3-F2: Print New Card, New Codes for This Class, Unlock and Unlock All,
+   and three faults the review of S3-W1 left. */
+
+// The questions put up (teacher/ui.js showConfirm), answered by the test.
+let asked;
+let realConfirm;
+function catchQuestions() {
+  asked = [];
+  realConfirm = globalThis.showConfirm;
+  globalThis.showConfirm = (title, message, ok, style, onOk) => asked.push({ title, message, ok, style, onOk });
+}
+function releaseQuestions() {
+  if (realConfirm) globalThis.showConfirm = realConfirm;
+  realConfirm = null;
+}
+const press = (action, cid, data) =>
+  CmStudentPage.handleAction(action, { closest: () => ({ dataset: { cid } }), dataset: data || {} });
+const printed = '2026-11-12T19:30:00+00:00';
+
+describe('Print New Card', () => {
+  beforeEach(() => {
+    catchPrints();
+    catchQuestions();
+  });
+  afterEach(() => releaseQuestions());
+
+  it('a card never printed and never opened is replaced without asking', async () => {
+    seedDemo();
+    await shown(CID);
+    const first = (await makeStudentCards(CID, [{ enrollment_id: 's1', replaces: null }])).data.results[0];
+    StudentCards._reset();
+    await shown(CID);
+    expect(rowButtons(parse(StudentCards.render(CID)))[0]).toEqual(['Print a New Card for Jordan Abel']);
+    press('spCardsNewCard', CID, { student: 's1' });
+    await afterDraw();
+    expect(asked).toEqual([]);
+    expect(sheets.length).toBe(1);
+    expect(sheets[0].names).toEqual(['Jordan Abel']);
+    expect(sheets[0].numbers).toEqual(['Card 2']);
+    const listed = (await listStudentCards(CID)).data;
+    expect(listed.length).toBe(1);
+    expect(listed[0].id).not.toBe(first.card_id);
+    expect(listed[0].seq).toBe(2);
+    const box = parse(StudentCards.render(CID));
+    expect(noteOf(box)).toBe(
+      '1 card went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
+    );
+    sheets[0].codes.forEach(code => {
+      expect(box.textContent).not.toContain(code);
+      expect(everythingKept()).not.toContain(code);
+    });
+  });
+
+  it('a printed card asks first, in the design’s words; Cancel changes nothing', async () => {
+    const t = await signedIn({
+      students: [{ id: U(11), firstName: 'Jordan', preferred: 'Cece', lastName: 'Abel', dateOfBirth: '2012-03-04' }],
+      fnStudents: [FN_STUDENTS[0]],
+    });
+    try {
+      t.fn.db.state.cards.push({
+        id: U(901),
+        enrollment_id: U(11),
+        code_hmac: 'x',
+        pw_hmac: null,
+        seq: 1,
+        stopped: false,
+      });
+      t.fn.markPrinted([U(901)]);
+      await shown(LIVE);
+      expect(rowButtons(parse(StudentCards.render(LIVE)))).toEqual([['Print a New Card for Cece Abel']]);
+      press('spCardsNewCard', LIVE, { student: U(11) });
+      expect(asked.length).toBe(1);
+      expect(asked[0].title).toBe('Print a New Card for Cece?');
+      expect(asked[0].message).toBe(
+        'The card Cece has now stops working as soon as the new one is made. Everything Cece has sent stays.',
+      );
+      expect(asked[0].ok).toBe('Print New Card');
+      // Cancel: the dialog closes and nothing was asked of anyone.
+      await afterDraw();
+      expect(t.fn.posts).toEqual([]);
+      expect(sheets).toEqual([]);
+      expect(t.fn.live(U(11)).id).toBe(U(901));
+      expect(StudentCards._holding()).toBe(false);
+      expect(rowsOf(parse(StudentCards.render(LIVE)))[0][2]).toMatch(/^Printed /);
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('Print New Card: the request names the live card, the old one stops, and the new one prints', async () => {
+    const t = await signedIn();
+    try {
+      t.fn.db.state.cards.push({
+        id: U(901),
+        enrollment_id: U(12),
+        code_hmac: 'x',
+        pw_hmac: null,
+        seq: 1,
+        stopped: false,
+      });
+      t.fn.markPrinted([U(901)]);
+      await shown(LIVE);
+      press('spCardsNewCard', LIVE, { student: U(12) });
+      expect(asked[0].title).toBe('Print a New Card for Avery?');
+      asked[0].onOk();
+      await afterDraw();
+      expect(t.fn.posts.length).toBe(1);
+      expect(t.fn.posts[0].body.items).toEqual([{ enrollment_id: U(12), replaces: U(901) }]);
+      expect(t.fn.db.state.cards.find(k => k.id === U(901)).stopped).toBe(true);
+      expect(sheets.length).toBe(1);
+      expect(sheets[0].names).toEqual(['Avery Byrne']);
+      expect(sheets[0].numbers).toEqual(['Card 2']);
+      // Avery has nothing on file: the new card prints its own password.
+      expect(sheets[0].passwords[0]).toMatch(/^\d{4}$/);
+      const box = parse(StudentCards.render(LIVE));
+      expect(rowsOf(box)[1]).toEqual([
+        'Avery Byrne',
+        expect.stringMatching(/^Card 2 · Made /),
+        expect.stringMatching(/^Printed /),
+      ]);
+      expect(notesOf(box)).toEqual([
+        '1 card went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
+      ]);
+      expect(box.textContent).not.toContain(sheets[0].codes[0]);
+      expect(everythingKept()).not.toContain(sheets[0].codes[0]);
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('a card that was opened asks too, and one with no card yet gets its first without asking', async () => {
+    seedDemo();
+    await shown(CID);
+    const made = (await makeStudentCards(CID, [{ enrollment_id: 's1', replaces: null }])).data.results[0];
+    const kept = storedCards();
+    kept[0].last_opened_at = '2026-11-14T16:00:00.000Z';
+    localStorage.setItem('gb-student-cards-' + CID, JSON.stringify(kept));
+    StudentCards._reset();
+    await shown(CID);
+    press('spCardsNewCard', CID, { student: 's1' });
+    expect(asked.map(q => q.title)).toEqual(['Print a New Card for Jordan?']);
+    expect(storedCards()[0].id).toBe(made.card_id);
+    // A student with no card has no Print New Card; asked for anyway, it is a first card, with no question.
+    expect(rowButtons(parse(StudentCards.render(CID)))[1]).toEqual([]);
+    expect(await StudentCards.printNewCard(CID, 's2')).toBe(1);
+    expect(asked.length).toBe(1);
+    expect(sheets[0].names).toEqual(['Avery Byrne']);
+  });
+
+  it.each([
+    ['Class Settings closes', () => (DashClassManager.classManagerOpen = false)],
+    ['another tab is shown', () => (onPage = null)],
+    ['another class is shown', () => (onPage = CID)],
+  ])('a Yes after %s, while the question was up, makes nothing', async (what, leave) => {
+    const t = await signedIn();
+    try {
+      t.fn.db.state.cards.push({
+        id: U(901),
+        enrollment_id: U(11),
+        code_hmac: 'x',
+        pw_hmac: null,
+        seq: 1,
+        stopped: false,
+      });
+      t.fn.markPrinted([U(901)]);
+      await shown(LIVE);
+      press('spCardsNewCard', LIVE, { student: U(11) });
+      expect(asked.length).toBe(1);
+      leave();
+      asked[0].onOk();
+      await afterDraw();
+      expect(t.fn.posts).toEqual([]);
+      expect(sheets).toEqual([]);
+      expect(t.fn.live(U(11)).id).toBe(U(901));
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('a Yes after the screen went and came back makes nothing', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const t = await signedIn();
+    try {
+      t.fn.db.state.cards.push({
+        id: U(901),
+        enrollment_id: U(11),
+        code_hmac: 'x',
+        pw_hmac: null,
+        seq: 1,
+        stopped: false,
+      });
+      t.fn.markPrinted([U(901)]);
+      await shown(LIVE);
+      press('spCardsNewCard', LIVE, { student: U(11) });
+      onPage = null;
+      vi.advanceTimersByTime(1000); // the watch sees the card gone
+      onPage = LIVE;
+      asked[0].onOk();
+      await afterDraw();
+      expect(t.fn.posts).toEqual([]);
+      expect(sheets).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+      t.session.signOut();
+    }
+  });
+
+  it('an answer that comes after the screen went prints nothing and holds nothing', async () => {
+    let release;
+    const gate = new Promise(r => (release = r));
+    const t = await signedIn({ fetch: { hold: () => gate } });
+    try {
+      t.fn.db.state.cards.push({
+        id: U(901),
+        enrollment_id: U(11),
+        code_hmac: 'x',
+        pw_hmac: null,
+        seq: 1,
+        stopped: false,
+      });
+      await shown(LIVE);
+      const out = StudentCards.printNewCard(LIVE, U(11));
+      await settle();
+      expect(noteOf(parse(StudentCards.render(LIVE)))).toBe('Making cards…');
+      DashClassManager.classManagerOpen = false;
+      release();
+      expect(await out).toBe(0);
+      expect(sheets).toEqual([]);
+      expect(StudentCards._holding()).toBe(false);
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('a refusal: one line, nothing printed, the old card named as still held, and the list read again', async () => {
+    const t = await signedIn({ fetch: { answer: () => ({ status: 500, json: { ok: false, error: 'server' } }) } });
+    try {
+      t.fn.db.state.cards.push({
+        id: U(901),
+        enrollment_id: U(13),
+        code_hmac: 'x',
+        pw_hmac: null,
+        seq: 1,
+        stopped: false,
+      });
+      t.fn.markPrinted([U(901)]);
+      await shown(LIVE);
+      const reads = () => t.session.sent().filter(c => c[0] === 'list_student_cards').length;
+      const before = reads();
+      press('spCardsNewCard', LIVE, { student: U(13) });
+      asked[0].onOk();
+      await afterDraw();
+      expect(sheets).toEqual([]);
+      expect(reads()).toBe(before + 1);
+      expect(notesOf(parse(StudentCards.render(LIVE)))).toEqual([
+        'Could not make the card. Check the connection and try again.',
+        '1 student still has their old card: Cam Cole. Use Print New Card on their row to try again.',
+      ]);
+    } finally {
+      t.session.signOut();
+    }
+  });
+});
+
+describe('New Codes for This Class', () => {
+  beforeEach(() => {
+    catchPrints();
+    catchQuestions();
+  });
+  afterEach(() => {
+    releaseQuestions();
+    StudentCards._setBatch(250);
+  });
+
+  it.each([
+    [28, 0, 'New Codes for All 28 Students?', '28 cards stop working now. ', 'Make 28 New Cards'],
+    [
+      26,
+      2,
+      'New Codes for All 28 Students?',
+      '26 cards stop working now. 2 students get their first card. ',
+      'Make 28 New Cards',
+    ],
+    [
+      1,
+      1,
+      'New Codes for All 2 Students?',
+      '1 card stops working now. 1 student gets their first card. ',
+      'Make 2 New Cards',
+    ],
+    [1, 0, 'New Code for 1 Student?', '1 card stops working now. ', 'Make 1 New Card'],
+  ])('%i cards and %i students with none: the words', (stop, first, title, starts, ok) => {
+    const q = StudentCards.newCodesQuestion(stop, first);
+    expect(q.title).toBe(title);
+    expect(q.message).toBe(
+      starts +
+        "Print the new cards and hand them out. Students can't open their page until they have their new card. Everything they have sent stays.",
+    );
+    expect(q.ok).toBe(ok);
+  });
+
+  it('is offered once a student may hold a card, and counts every student', async () => {
+    seedDemo();
+    await shown(CID);
+    // No card held yet: Make and Print does it all.
+    expect(buttons(parse(StudentCards.render(CID)))).toEqual(['Make and Print 3 Cards']);
+    const made = (
+      await makeStudentCards(CID, [
+        { enrollment_id: 's1', replaces: null },
+        { enrollment_id: 's2', replaces: null },
+      ])
+    ).data.results;
+    await markStudentCardsPrinted(CID, [made[0].card_id]);
+    StudentCards._reset();
+    await shown(CID);
+    expect(buttons(parse(StudentCards.render(CID)))).toEqual(['New Codes for This Class', 'Make and Print 2 Cards']);
+    press('spCardsNewCodes', CID);
+    expect(asked.length).toBe(1);
+    expect(asked[0].title).toBe('New Codes for All 3 Students?');
+    expect(asked[0].message).toBe(
+      "2 cards stop working now. 1 student gets their first card. Print the new cards and hand them out. Students can't open their page until they have their new card. Everything they have sent stays.",
+    );
+    expect(asked[0].ok).toBe('Make 3 New Cards');
+  });
+
+  it('Cancel changes nothing', async () => {
+    const t = await signedIn();
+    try {
+      [U(11), U(12), U(13)].forEach((sid, i) =>
+        t.fn.db.state.cards.push({
+          id: U(960 + i),
+          enrollment_id: sid,
+          code_hmac: 'y' + i,
+          pw_hmac: null,
+          seq: 1,
+          stopped: false,
+        }),
+      );
+      t.fn.markPrinted([U(960), U(961), U(962)]);
+      await shown(LIVE);
+      const before = parse(StudentCards.render(LIVE)).innerHTML;
+      press('spCardsNewCodes', LIVE);
+      expect(asked[0].title).toBe('New Codes for All 3 Students?');
+      expect(asked[0].message.startsWith('3 cards stop working now. Print the new cards')).toBe(true);
+      await afterDraw();
+      expect(t.fn.posts).toEqual([]);
+      expect(sheets).toEqual([]);
+      expect(t.fn.db.state.cards.every(k => !k.stopped)).toBe(true);
+      expect(parse(StudentCards.render(LIVE)).innerHTML).toBe(before);
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('one request for the class: every card stops, every student prints, A to Z', async () => {
+    const t = await signedIn();
+    try {
+      t.fn.db.state.cards.push({
+        id: U(960),
+        enrollment_id: U(11),
+        code_hmac: 'y0',
+        pw_hmac: null,
+        seq: 1,
+        stopped: false,
+      });
+      t.fn.db.state.cards.push({
+        id: U(961),
+        enrollment_id: U(13),
+        code_hmac: 'y1',
+        pw_hmac: null,
+        seq: 1,
+        stopped: false,
+      });
+      t.fn.markPrinted([U(960)]);
+      await shown(LIVE);
+      press('spCardsNewCodes', LIVE);
+      expect(asked[0].message.startsWith('2 cards stop working now. 1 student gets their first card.')).toBe(true);
+      asked[0].onOk();
+      await afterDraw();
+      expect(t.fn.posts.length).toBe(1);
+      expect(t.fn.posts[0].body.items).toEqual([
+        { enrollment_id: U(11), replaces: U(960) },
+        { enrollment_id: U(12), replaces: null },
+        { enrollment_id: U(13), replaces: U(961) },
+      ]);
+      expect(
+        t.fn.db.state.cards
+          .filter(k => !k.stopped)
+          .map(k => k.enrollment_id)
+          .sort(),
+      ).toEqual([U(11), U(12), U(13)]);
+      expect(sheets[0].names).toEqual(['Jordan Abel', 'Avery Byrne', 'Cam Cole']);
+      expect(sheets[0].numbers).toEqual(['Card 2', 'Card 1', 'Card 2']);
+      const box = parse(StudentCards.render(LIVE));
+      expect(notesOf(box)).toEqual([
+        '3 cards went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
+      ]);
+      sheets[0].codes.concat(sheets[0].passwords).forEach(code => {
+        expect(box.textContent).not.toContain(code);
+        expect(everythingKept()).not.toContain(code);
+      });
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('a class of more than 250 goes in batches of 250', async () => {
+    const many = [];
+    const fnMany = [];
+    for (let i = 0; i < 260; i++) {
+      many.push({ id: U(2000 + i), firstName: 'S', lastName: 'N' + String(i).padStart(3, '0'), studentNumber: '1' });
+      fnMany.push({ id: U(2000 + i), number: '1' });
+    }
+    const t = await signedIn({ students: many, fnStudents: fnMany });
+    try {
+      many.forEach((s, i) =>
+        t.fn.db.state.cards.push({
+          id: U(5000 + i),
+          enrollment_id: s.id,
+          code_hmac: 'z' + i,
+          pw_hmac: null,
+          seq: 1,
+          stopped: false,
+        }),
+      );
+      t.fn.markPrinted(many.map((s, i) => U(5000 + i)));
+      await shown(LIVE);
+      press('spCardsNewCodes', LIVE);
+      expect(asked[0].title).toBe('New Codes for All 260 Students?');
+      asked[0].onOk();
+      await vi.waitFor(() => expect(sheets.length).toBe(1), { timeout: 10000 });
+      expect(t.fn.posts.map(p => p.body.items.length)).toEqual([250, 10]);
+      expect(t.fn.posts[0].body.request_id).not.toBe(t.fn.posts[1].body.request_id);
+      expect(sheets.length).toBe(1);
+      expect(sheets[0].names.length).toBe(260);
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('a part-failed run prints what was made and says plainly which students still have their old card', async () => {
+    StudentCards._setBatch(1);
+    // The first student's request is answered; the second never arrives, nor its one retry; the third is never sent.
+    const t = await signedIn({ fetch: { fail: (post, n) => n === 2 || n === 3 } });
+    try {
+      [U(11), U(12), U(13)].forEach((sid, i) =>
+        t.fn.db.state.cards.push({
+          id: U(960 + i),
+          enrollment_id: sid,
+          code_hmac: 'y' + i,
+          pw_hmac: null,
+          seq: 1,
+          stopped: false,
+        }),
+      );
+      t.fn.markPrinted([U(960), U(961), U(962)]);
+      await shown(LIVE);
+      const reads = () => t.session.sent().filter(c => c[0] === 'list_student_cards').length;
+      const before = reads();
+      press('spCardsNewCodes', LIVE);
+      asked[0].onOk();
+      await afterDraw();
+      expect(t.fetcher.count()).toBe(3);
+      expect(sheets.length).toBe(1);
+      expect(sheets[0].names).toEqual(['Jordan Abel']);
+      // The list is read again.
+      expect(reads()).toBe(before + 1);
+      const box = parse(StudentCards.render(LIVE));
+      expect(notesOf(box)).toEqual([
+        '1 card went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
+        '2 students still have their old card: Avery Byrne, Cam Cole. Use Print New Card on their rows to try again.',
+      ]);
+      // Print New Card on one of them: the line names the other only.
+      StudentCards._setBatch(250);
+      t.fetcher.count = () => 0;
+      globalThis.fetch = fetchFrom(t.fn);
+      press('spCardsNewCard', LIVE, { student: U(12) });
+      asked[1].onOk();
+      await afterDraw();
+      expect(notesOf(parse(StudentCards.render(LIVE)))).toEqual([
+        '1 card went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
+        '1 student still has their old card: Cam Cole. Use Print New Card on their row to try again.',
+      ]);
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('a student another tab gave a new card first is not named as holding the old one, once the list is read', async () => {
+    const t = await signedIn();
+    try {
+      [U(11), U(12), U(13)].forEach((sid, i) =>
+        t.fn.db.state.cards.push({
+          id: U(960 + i),
+          enrollment_id: sid,
+          code_hmac: 'y' + i,
+          pw_hmac: null,
+          seq: 1,
+          stopped: false,
+        }),
+      );
+      t.fn.markPrinted([U(960), U(961), U(962)]);
+      await shown(LIVE);
+      // Another tab replaces Cam's card; this list does not know.
+      t.fn.db.state.cards.find(k => k.id === U(962)).stopped = true;
+      t.fn.db.state.cards.push({
+        id: U(970),
+        enrollment_id: U(13),
+        code_hmac: 'w',
+        pw_hmac: null,
+        seq: 2,
+        stopped: false,
+      });
+      // ...and prints it there.
+      t.fn.markPrinted([U(970)]);
+      press('spCardsNewCodes', LIVE);
+      asked[0].onOk();
+      await afterDraw();
+      expect(sheets[0].names).toEqual(['Jordan Abel', 'Avery Byrne']);
+      // Read again: Cam has the other tab's printed card. Nothing is said about him.
+      const box = parse(StudentCards.render(LIVE));
+      expect(notesOf(box)).toEqual([
+        '2 cards went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
+      ]);
+      expect(rowsOf(box)[2][2]).toMatch(/^Printed /);
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('the screen going between two requests: the rest are not sent, nothing prints', async () => {
+    StudentCards._setBatch(1);
+    let release;
+    const gate = new Promise(r => (release = r));
+    const t = await signedIn({ fetch: { hold: (post, n) => (n === 1 ? gate : null) } });
+    try {
+      await shown(LIVE);
+      // No card held: New Codes is not offered, but it works the same way when asked.
+      [U(11), U(12), U(13)].forEach((sid, i) =>
+        t.fn.db.state.cards.push({
+          id: U(960 + i),
+          enrollment_id: sid,
+          code_hmac: 'y' + i,
+          pw_hmac: null,
+          seq: 1,
+          stopped: false,
+        }),
+      );
+      t.fn.markPrinted([U(960), U(961), U(962)]);
+      StudentCards._reset();
+      await shown(LIVE);
+      press('spCardsNewCodes', LIVE);
+      asked[0].onOk();
+      await settle();
+      onPage = null;
+      release();
+      await afterDraw();
+      expect(t.fetcher.count()).toBe(1);
+      expect(sheets).toEqual([]);
+      expect(StudentCards._holding()).toBe(false);
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('Demo Mode: every card replaced on the device, nothing sent', async () => {
+    seedDemo();
+    await shown(CID);
+    await StudentCards.makeAndPrint(CID);
+    const firstCodes = sheets[0].codes;
+    const before = storedCards().map(c => c.id);
+    press('spCardsNewCodes', CID);
+    expect(asked[0].title).toBe('New Codes for All 3 Students?');
+    asked[0].onOk();
+    await afterDraw();
+    expect(sheets.length).toBe(2);
+    expect(sheets[1].numbers).toEqual(['Card 2', 'Card 2', 'Card 2']);
+    sheets[1].codes.forEach(code => expect(firstCodes).not.toContain(code));
+    expect(
+      storedCards()
+        .map(c => c.id)
+        .some(id => before.includes(id)),
+    ).toBe(false);
+    expect(localStorage.getItem('fv-sync-queue-v1')).toBe(null);
+    sheets[1].codes.concat(sheets[1].passwords).forEach(code => expect(everythingKept()).not.toContain(code));
+  });
+});
+
+describe('Unlock and Unlock All', () => {
+  // A card locked an hour ago.
+  const locked = (n, sid, more) =>
+    after(n, sid, {
+      printed_at: printed,
+      locked_at: new Date(Date.now() - 3600000).toISOString(),
+      wrong_tries: 5,
+      ...more,
+    });
+
+  it('Demo Mode: Unlock on a locked row clears the lock on the device; Unlock All shows for two or more', async () => {
+    seedDemo();
+    await shown(CID);
+    const made = (
+      await makeStudentCards(
+        CID,
+        ['s1', 's2', 's3'].map(id => ({ enrollment_id: id, replaces: null })),
+      )
+    ).data.results;
+    await markStudentCardsPrinted(
+      CID,
+      made.map(r => r.card_id),
+    );
+    const kept = storedCards();
+    kept[0].locked_at = '2026-11-15T16:00:00.000Z';
+    kept[0].wrong_tries = 5;
+    localStorage.setItem('gb-student-cards-' + CID, JSON.stringify(kept));
+    StudentCards._reset();
+    await shown(CID);
+    let box = parse(StudentCards.render(CID));
+    expect(buttons(box)).toEqual(['New Codes for This Class']);
+    expect(rowButtons(box)[0]).toEqual(['Unlock Jordan Abel’s Card', 'Print a New Card for Jordan Abel']);
+    press('spCardsUnlock', CID, { card: made[0].card_id });
+    await settle();
+    expect(storedCards()[0].locked_at).toBe(null);
+    expect(storedCards()[0].wrong_tries).toBe(0);
+    box = parse(StudentCards.render(CID));
+    expect(rowsOf(box)[0][2]).toMatch(/^Printed /);
+    expect(rowButtons(box)[0]).toEqual(['Print a New Card for Jordan Abel']);
+
+    // Two locked: Unlock All, and it clears both.
+    const again = storedCards();
+    again[1].locked_at = '2026-11-15T16:00:00.000Z';
+    again[2].locked_at = '2026-11-15T16:00:00.000Z';
+    localStorage.setItem('gb-student-cards-' + CID, JSON.stringify(again));
+    StudentCards._reset();
+    await shown(CID);
+    expect(buttons(parse(StudentCards.render(CID)))).toEqual(['Unlock All', 'New Codes for This Class']);
+    press('spCardsUnlockAll', CID);
+    await settle();
+    expect(storedCards().every(c => !c.locked_at)).toBe(true);
+    box = parse(StudentCards.render(CID));
+    expect(buttons(box)).toEqual(['New Codes for This Class']);
+    expect(rowsOf(box).map(r => r[2].replace(/ .*/, ''))).toEqual(['Printed', 'Printed', 'Printed']);
+  });
+
+  it('signed in: unlock_student_card with the card’s id and a key, nothing else; a list read before it lands still shows it unlocked', async () => {
+    let list = () => [locked(1, U(11)), after(2, U(12), { printed_at: printed })];
+    const t = await signedIn({ list: () => list() });
+    try {
+      let release;
+      t.session.fake.on('unlock_student_card', () => new Promise(r => (release = r)));
+      await shown(LIVE);
+      expect(StudentCards.unlock(LIVE, U(901))).toBe(1);
+      await settle();
+      const sent = t.session.fake.calls.filter(c => c.name === 'unlock_student_card');
+      expect(sent.length).toBe(1);
+      expect(Object.keys(sent[0].params).sort()).toEqual(['p_card_id', 'p_idempotency_key']);
+      expect(sent[0].params.p_card_id).toBe(U(901));
+      expect(sent[0].params.p_idempotency_key).toMatch(UUID);
+      expect(rowsOf(parse(StudentCards.render(LIVE)))[0][2]).toMatch(/^Printed /);
+      // Read again while the unlock is on its way: the server still says Locked, with a lock time two
+      // minutes ahead of this computer's clock. Shown unlocked: no clock is compared.
+      list = () => [locked(1, U(11), { locked_at: new Date(Date.now() + 120000).toISOString() })];
+      await StudentCards.load(LIVE);
+      expect(rowsOf(parse(StudentCards.render(LIVE)))[0][2]).toMatch(/^Printed /);
+      // The server has answered: from now on its list is the truth. Locked again: Locked.
+      release({ data: {}, error: null });
+      await settle();
+      await StudentCards.load(LIVE);
+      expect(rowsOf(parse(StudentCards.render(LIVE)))[0][2]).toBe('Locked');
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('signed in: Unlock All is unlock_all_student_cards with the class id and a key', async () => {
+    const t = await signedIn({ list: () => [locked(1, U(11)), locked(2, U(12)), after(3, U(13))] });
+    try {
+      let release;
+      t.session.fake.on('unlock_all_student_cards', () => new Promise(r => (release = r)));
+      await shown(LIVE);
+      expect(buttons(parse(StudentCards.render(LIVE)))).toContain('Unlock All');
+      press('spCardsUnlockAll', LIVE);
+      await settle();
+      const sent = t.session.fake.calls.filter(c => c.name === 'unlock_all_student_cards');
+      expect(sent.length).toBe(1);
+      expect(Object.keys(sent[0].params).sort()).toEqual(['p_course_id', 'p_idempotency_key']);
+      expect(sent[0].params.p_course_id).toBe(LIVE);
+      const box = parse(StudentCards.render(LIVE));
+      expect(buttons(box)).not.toContain('Unlock All');
+      expect(rowsOf(box).map(r => r[2].replace(/ .*/, ''))).toEqual(['Printed', 'Printed', 'Not']);
+      // A read before the server's list catches up still shows them unlocked.
+      await StudentCards.load(LIVE);
+      expect(rowsOf(parse(StudentCards.render(LIVE))).map(r => r[2].replace(/ .*/, ''))).toEqual([
+        'Printed',
+        'Printed',
+        'Not',
+      ]);
+      release({ data: { unlocked: 2 }, error: null });
+      await settle();
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('an unlock the server refuses: the list is read again and shows the card Locked', async () => {
+    const t = await signedIn({ list: () => [locked(1, U(11))] });
+    try {
+      t.session.fake.on('unlock_student_card', () => ({
+        data: null,
+        error: { message: 'card not found', code: 'P0002' },
+      }));
+      await shown(LIVE);
+      const reads = () => t.session.sent().filter(c => c[0] === 'list_student_cards').length;
+      const before = reads();
+      press('spCardsUnlock', LIVE, { card: U(901) });
+      await afterDraw();
+      expect(reads()).toBe(before + 1);
+      expect(rowsOf(parse(StudentCards.render(LIVE)))[0][2]).toBe('Locked');
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('a refusal that comes after the screen went reads and draws nothing', async () => {
+    const t = await signedIn({ list: () => [locked(1, U(11))] });
+    try {
+      let refuse;
+      t.session.fake.on('unlock_student_card', () => new Promise(r => (refuse = r)));
+      await shown(LIVE);
+      press('spCardsUnlock', LIVE, { card: U(901) });
+      await settle();
+      const drawn = [];
+      DashClassManager.renderClassManager = () => drawn.push(1);
+      DashClassManager.classManagerOpen = false;
+      const reads = () => t.session.sent().filter(c => c[0] === 'list_student_cards').length;
+      const before = reads();
+      refuse({ data: null, error: { message: 'card not found', code: 'P0002' } });
+      await afterDraw();
+      expect(reads()).toBe(before);
+      expect(drawn).toEqual([]);
+      // Back on the screen: read again, and Locked.
+      DashClassManager.classManagerOpen = true;
+      await shown(LIVE);
+      expect(reads()).toBe(before + 1);
+      expect(rowsOf(parse(StudentCards.render(LIVE)))[0][2]).toBe('Locked');
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('a card that is not locked, or not in the list, sends nothing', async () => {
+    const t = await signedIn({ list: () => [after(1, U(11), { printed_at: printed })] });
+    try {
+      await shown(LIVE);
+      expect(StudentCards.unlock(LIVE, U(901))).toBe(0);
+      expect(StudentCards.unlock(LIVE, U(999))).toBe(0);
+      expect(StudentCards.unlockAll(LIVE)).toBe(0);
+      await settle();
+      expect(t.session.fake.calls.filter(c => /unlock/.test(c.name))).toEqual([]);
+    } finally {
+      t.session.signOut();
+    }
+  });
+});
+
+describe('the three faults the review of S3-W1 left', () => {
+  beforeEach(() => {
+    catchPrints();
+    catchQuestions();
+  });
+  afterEach(() => releaseQuestions());
+
+  it('after a failed press the buttons stay off until the list read again lands', async () => {
+    const t = await signedIn({ fetch: { fail: () => true } });
+    try {
+      await shown(LIVE);
+      let land;
+      t.session.fake.on('list_student_cards', () => new Promise(r => (land = r)));
+      const drawn = [];
+      DashClassManager.renderClassManager = () => drawn.push(parse(StudentCards.render(LIVE)));
+      await StudentCards.makeAndPrint(LIVE);
+      // Every draw since the press, and the screen now: the button is off while the list is read.
+      const make = box => box.querySelector('[data-action="spCardsMake"]');
+      expect(drawn.length).toBeGreaterThan(0);
+      drawn.forEach(box => expect(make(box).hasAttribute('disabled')).toBe(true));
+      expect(make(parse(StudentCards.render(LIVE))).hasAttribute('disabled')).toBe(true);
+      land({ data: [], error: null });
+      await afterDraw();
+      const box = parse(StudentCards.render(LIVE));
+      expect(make(box).hasAttribute('disabled')).toBe(false);
+      expect(noteOf(box)).toBe('Could not make the cards. Check the connection and try again.');
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('a late answer back on this class’s list: the list is read at once, the button off until it lands', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    let release;
+    const gate = new Promise(r => (release = r));
+    const t = await signedIn({ fetch: { hold: () => gate } });
+    try {
+      await shown(LIVE);
+      const pressed = StudentCards.makeAndPrint(LIVE);
+      await settle();
+      onPage = null;
+      vi.advanceTimersByTime(1000);
+      onPage = LIVE;
+      let land;
+      t.session.fake.on('list_student_cards', () => new Promise(r => (land = r)));
+      release();
+      expect(await pressed).toBe(0);
+      expect(
+        parse(StudentCards.render(LIVE)).querySelector('[data-action="spCardsMake"]').hasAttribute('disabled'),
+      ).toBe(true);
+      land({ data: t.fn.cardsListed(), error: null });
+      await afterDraw();
+      expect(
+        parse(StudentCards.render(LIVE)).querySelector('[data-action="spCardsMake"]').hasAttribute('disabled'),
+      ).toBe(false);
+    } finally {
+      vi.useRealTimers();
+      t.session.signOut();
+    }
+  });
+
+  it('back from the browser’s Back cache: the list is drawn again with no Print Again', async () => {
+    seedDemo();
+    await shown(CID);
+    await StudentCards.makeAndPrint(CID);
+    expect(buttons(parse(StudentCards.render(CID)))).toContain('Print Again');
+    const drawn = [];
+    DashClassManager.renderClassManager = () => drawn.push(parse(StudentCards.render(CID)));
+    // The page's own pagehide and pageshow (this test's window has no events; the browser test sends real ones).
+    StudentCards._pagehide();
+    expect(StudentCards._holding()).toBe(false);
+    // A page shown fresh, not from the Back cache: nothing to draw again.
+    StudentCards._pageshow({ persisted: false });
+    expect(drawn).toEqual([]);
+    StudentCards._pageshow({ persisted: true });
+    expect(drawn.length).toBe(1);
+    expect(buttons(drawn[0])).not.toContain('Print Again');
+    expect(noteOf(drawn[0])).toBe(null);
+  });
+
+  it('a Mark Printed refused for good: after a reload the cards still show Printed, Make and Print leaves them, and Print New Card asks', async () => {
+    const t = await signedIn();
+    try {
+      t.session.fake.on('mark_student_cards_printed', () => ({
+        data: null,
+        error: { message: 'refused', code: '42501' },
+      }));
+      await shown(LIVE);
+      await StudentCards.makeAndPrint(LIVE);
+      await settle();
+      const made = [U(11), U(12), U(13)].map(sid => t.fn.live(sid).id);
+      // The server never heard: its list says Not Printed.
+      expect(t.fn.cardsListed().every(c => c.printed_at === null)).toBe(true);
+      // The device keeps ids and times only.
+      const kept = JSON.parse(localStorage.getItem('gb-cards-printed-here'));
+      expect(Object.keys(kept).sort()).toEqual(made.slice().sort());
+      Object.values(kept).forEach(v => expect(Object.keys(v).sort()).toEqual(['at', 'cid']));
+      sheets[0].codes.forEach(code => expect(everythingKept()).not.toContain(code));
+
+      // A reload.
+      _reloadCardsPrintedHere();
+      StudentCards._reset();
+      const marks = () => t.session.fake.calls.filter(c => c.name === 'mark_student_cards_printed');
+      const sentBefore = marks().length;
+      await shown(LIVE);
+      const box = parse(StudentCards.render(LIVE));
+      expect(rowsOf(box).map(r => r[2].replace(/ .*/, ''))).toEqual(['Printed', 'Printed', 'Printed']);
+      expect(buttons(box)).toEqual(['New Codes for This Class']);
+      expect(await StudentCards.makeAndPrint(LIVE)).toBe(0);
+      // The mark is sent once more, through the outbox, ids only.
+      await settle();
+      expect(marks().length).toBe(sentBefore + 1);
+      expect(marks()[marks().length - 1].params.p_card_ids.slice().sort()).toEqual(made.slice().sort());
+      // And only once from this page.
+      StudentCards._reset();
+      await shown(LIVE);
+      await settle();
+      expect(marks().length).toBe(sentBefore + 1);
+      press('spCardsNewCard', LIVE, { student: U(11) });
+      expect(asked.map(q => q.title)).toEqual(['Print a New Card for Jordan?']);
+      expect(t.fn.posts.length).toBe(1);
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('a mark kept on the device goes once the server shows the card printed, or the card is replaced', async () => {
+    const t = await signedIn();
+    try {
+      await shown(LIVE);
+      await StudentCards.makeAndPrint(LIVE);
+      await afterDraw();
+      expect(Object.keys(JSON.parse(localStorage.getItem('gb-cards-printed-here'))).length).toBe(3);
+      await StudentCards.load(LIVE);
+      expect(localStorage.getItem('gb-cards-printed-here')).toBe(null);
+    } finally {
+      t.session.signOut();
+    }
+  });
+});
+
+/* The review of S3-F2. */
+const printedCard = (t, id, sid) => {
+  t.fn.db.state.cards.push({ id, enrollment_id: sid, code_hmac: 'x' + id, pw_hmac: null, seq: 1, stopped: false });
+  t.fn.markPrinted([id]);
+};
+
+describe('an old card stopped and the new one not printed', () => {
+  beforeEach(() => {
+    catchPrints();
+    catchQuestions();
+  });
+  afterEach(() => {
+    releaseQuestions();
+    StudentCards._setBatch(250);
+  });
+
+  it('Print New Card, the reply lost and its recovery lost too: said from the list read afterwards', async () => {
+    // 1 reaches the function and its reply is lost; 2 is its replay (no code); 3 and its retry 4 never arrive.
+    const t = await signedIn({ fetch: { lose: (post, n) => n === 1, fail: (post, n) => n === 3 || n === 4 } });
+    try {
+      printedCard(t, U(901), U(11));
+      await shown(LIVE);
+      let land;
+      t.session.fake.on('list_student_cards', () => new Promise(r => (land = r)));
+      press('spCardsNewCard', LIVE, { student: U(11) });
+      asked[0].onOk();
+      await afterDraw();
+      expect(sheets).toEqual([]);
+      // The server stopped the old card and made a new one nobody printed.
+      expect(t.fn.db.state.cards.find(k => k.id === U(901)).stopped).toBe(true);
+      // Until the list read again lands, nothing is said about what became of the card, and the buttons are off.
+      let box = parse(StudentCards.render(LIVE));
+      expect(notesOf(box)).toEqual(['Checking which cards were made…']);
+      expect(box.querySelector('[data-action="spCardsNewCard"]').hasAttribute('disabled')).toBe(true);
+      land({ data: t.fn.cardsListed(), error: null });
+      await afterDraw();
+      box = parse(StudentCards.render(LIVE));
+      expect(notesOf(box)).toEqual([
+        // The button's own words: Avery and Cam have no card yet, so it makes three.
+        "Jordan's old card has stopped, but the new one didn't print. Press Make and Print 3 Cards to print it.",
+      ]);
+      expect(rowsOf(box)[0]).toEqual(['Jordan Abel', expect.stringMatching(/^Card 2 · Made /), 'Not Printed']);
+      expect(buttons(box)).toContain('Make and Print 3 Cards');
+      // Make and Print prints it, and the line goes.
+      t.fetcher.count = () => 0;
+      globalThis.fetch = fetchFrom(t.fn);
+      t.session.fake.on('list_student_cards', () => ({ data: t.fn.cardsListed(), error: null }));
+      await StudentCards.makeAndPrint(LIVE);
+      await afterDraw();
+      expect(sheets[0].names).toContain('Jordan Abel');
+      expect(notesOf(parse(StudentCards.render(LIVE)))[1]).toBe(undefined);
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('New Codes for This Class: one student printed, one with the old card stopped, one still on the old card', async () => {
+    StudentCards._setBatch(1);
+    // 1: Jordan. 2: Avery's, its reply lost; 3: the replay; 4 and 5: the ask again, never arriving. 6 and 7: Cam's, never arriving.
+    const t = await signedIn({
+      fetch: { lose: (post, n) => n === 2, fail: (post, n) => n === 4 || n === 5 || n === 6 || n === 7 },
+    });
+    try {
+      printedCard(t, U(960), U(11));
+      printedCard(t, U(961), U(12));
+      printedCard(t, U(962), U(13));
+      await shown(LIVE);
+      press('spCardsNewCodes', LIVE);
+      asked[0].onOk();
+      await afterDraw();
+      expect(t.fetcher.count()).toBe(7);
+      expect(sheets[0].names).toEqual(['Jordan Abel']);
+      expect(t.fn.db.state.cards.find(k => k.id === U(961)).stopped).toBe(true);
+      expect(t.fn.live(U(13)).id).toBe(U(962));
+      const box = parse(StudentCards.render(LIVE));
+      expect(notesOf(box)).toEqual([
+        '1 card went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
+        '1 student still has their old card: Cam Cole. Use Print New Card on their row to try again.',
+        "1 student's old card has stopped and the new one didn't print: Avery Byrne. Press Make and Print 1 Card to print it.",
+      ]);
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('the plural form', () => {
+    // Words only; the class run above shows where they go.
+    expect(StudentCards._stoppedLine(['Bea Bell', 'Cam Cole'], null, 2)).toBe(
+      "2 students' old cards have stopped and the new ones didn't print: Bea Bell, Cam Cole. Press Make and Print 2 Cards to print them.",
+    );
+  });
+});
+
+describe('a read and a press never cross', () => {
+  beforeEach(() => {
+    catchPrints();
+    catchQuestions();
+  });
+  afterEach(() => releaseQuestions());
+
+  it('a minute-old list read again when shown: drawn at once with every button off until it lands', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const t = await signedIn();
+    try {
+      vi.setSystemTime(new Date('2026-11-10T18:00:00.000Z'));
+      printedCard(t, U(901), U(11));
+      await shown(LIVE);
+      vi.setSystemTime(new Date('2026-11-10T18:01:30.000Z'));
+      let land;
+      t.session.fake.on('list_student_cards', () => new Promise(r => (land = r)));
+      const drawn = [];
+      DashClassManager.renderClassManager = () => drawn.push(parse(StudentCards.render(LIVE)));
+      await shown(LIVE);
+      expect(drawn.length).toBe(1);
+      const off = box =>
+        Array.from(box.querySelectorAll('button[data-action^="spCards"]')).every(b => b.hasAttribute('disabled'));
+      expect(off(drawn[0])).toBe(true);
+      // Pressed anyway: nothing is made.
+      expect(await StudentCards.makeAndPrint(LIVE)).toBe(0);
+      expect(await StudentCards.printNewCard(LIVE, U(12))).toBe(0);
+      expect(t.fn.posts).toEqual([]);
+      land({ data: t.fn.cardsListed(), error: null });
+      await afterDraw();
+      expect(off(parse(StudentCards.render(LIVE)))).toBe(false);
+    } finally {
+      vi.useRealTimers();
+      t.session.signOut();
+    }
+  });
+
+  it('a Yes while a read is out waits for it, and the read cannot undo the press', async () => {
+    const t = await signedIn();
+    try {
+      printedCard(t, U(901), U(11));
+      await shown(LIVE);
+      press('spCardsNewCard', LIVE, { student: U(11) });
+      // A read starts while the question is up; it will answer with the list as it is now.
+      const before = t.fn.cardsListed();
+      let land;
+      t.session.fake.on('list_student_cards', () => new Promise(r => (land = r)));
+      StudentCards.load(LIVE);
+      asked[0].onOk();
+      await afterDraw();
+      expect(t.fn.posts).toEqual([]);
+      t.session.fake.on('list_student_cards', () => ({ data: t.fn.cardsListed(), error: null }));
+      land({ data: before, error: null });
+      await afterDraw();
+      expect(t.fn.posts.length).toBe(1);
+      expect(sheets.length).toBe(1);
+      const box = parse(StudentCards.render(LIVE));
+      expect(rowsOf(box)[0]).toEqual([
+        'Jordan Abel',
+        expect.stringMatching(/^Card 2 · /),
+        expect.stringMatching(/^Printed /),
+      ]);
+      expect(Object.keys(JSON.parse(localStorage.getItem('gb-cards-printed-here')))).toContain(t.fn.live(U(11)).id);
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('an answer to a read begun before a press finished is dropped, and the list read again', async () => {
+    let release;
+    const gate = new Promise(r => (release = r));
+    const t = await signedIn({ fetch: { hold: () => gate } });
+    try {
+      t.session.fake.on('mark_student_cards_printed', () => new Promise(() => {})); // the server never hears
+      await shown(LIVE);
+      const pressed = StudentCards.makeAndPrint(LIVE);
+      await settle();
+      // A read begun while the press is out (as Try Again could), answered with the list from before.
+      const before = t.fn.cardsListed();
+      let land;
+      t.session.fake.on('list_student_cards', () => new Promise(r => (land = r)));
+      StudentCards.load(LIVE);
+      release();
+      expect(await pressed).toBe(3);
+      t.session.fake.on('list_student_cards', () => ({ data: t.fn.cardsListed(), error: null }));
+      const reads = () => t.session.sent().filter(c => c[0] === 'list_student_cards').length;
+      const n = reads();
+      land({ data: before, error: null });
+      await afterDraw();
+      // Dropped: the cards just printed still show, and their notes are kept.
+      expect(reads()).toBe(n + 1);
+      const box = parse(StudentCards.render(LIVE));
+      expect(rowsOf(box).map(r => r[2].replace(/ .*/, ''))).toEqual(['Printed', 'Printed', 'Printed']);
+      expect(Object.keys(JSON.parse(localStorage.getItem('gb-cards-printed-here'))).length).toBe(3);
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('data.js: a printed note is erased only by a read that began after it was made', async () => {
+    const t = await signedIn();
+    try {
+      let land;
+      t.session.fake.on('list_student_cards', () => new Promise(r => (land = r)));
+      const reading = listStudentCards(LIVE);
+      await settle();
+      await new Promise(r => setTimeout(r, 2));
+      await markStudentCardsPrinted(LIVE, [U(901)]);
+      land({ data: [], error: null });
+      await reading;
+      expect(Object.keys(JSON.parse(localStorage.getItem('gb-cards-printed-here')))).toEqual([U(901)]);
+      // A read begun after the note, with no such card: it was replaced, and the note goes.
+      await new Promise(r => setTimeout(r, 2));
+      t.session.fake.on('list_student_cards', () => ({ data: [], error: null }));
+      await listStudentCards(LIVE);
+      expect(localStorage.getItem('gb-cards-printed-here')).toBe(null);
+    } finally {
+      t.session.signOut();
+    }
+  });
+
+  it('data.js: another tab’s printed notes survive this tab’s', async () => {
+    const t = await signedIn();
+    try {
+      await markStudentCardsPrinted(LIVE, [U(901)]);
+      // Another tab of the app writes its own note.
+      const kept = JSON.parse(localStorage.getItem('gb-cards-printed-here'));
+      kept[U(902)] = { at: new Date().toISOString(), cid: LIVE };
+      localStorage.setItem('gb-cards-printed-here', JSON.stringify(kept));
+      await markStudentCardsPrinted(LIVE, [U(903)]);
+      expect(Object.keys(JSON.parse(localStorage.getItem('gb-cards-printed-here'))).sort()).toEqual([
+        U(901),
+        U(902),
+        U(903),
+      ]);
+    } finally {
+      t.session.signOut();
+    }
+  });
+});
+
 describe('what the files name', () => {
   const source = file => readFileSync(new URL('../' + file, import.meta.url), 'utf-8');
 
@@ -1388,8 +2559,18 @@ describe('what the files name', () => {
     expect(src.match(/_writeRpc\('mark_student_cards_printed'/g).length).toBe(1);
     expect(src.match(/functions\/v1\/teacher-cards\?forceFunctionRegion=ca-central-1/g).length).toBe(1);
     expect(src).not.toMatch(/issue_student_cards|reissue_student_card/);
-    // Not built yet (S3-F2): nothing names these.
-    expect(src).not.toMatch(/unlock_student_card|unlock_all_student_cards|set_cards_work_until/);
+    // Unlock and Unlock All through the outbox, once each, named at the call.
+    expect(src.match(/_writeRpc\('unlock_student_card'/g).length).toBe(1);
+    expect(src.match(/_writeRpc\('unlock_all_student_cards'/g).length).toBe(1);
+    expect(src).not.toMatch(/set_cards_work_until/);
+  });
+
+  it('the database drift check sees every card RPC the client calls', async () => {
+    const { extractRpcNames } = await import('../scripts/check-db-drift.mjs');
+    const names = extractRpcNames(source('shared/data.js'));
+    ['list_student_cards', 'mark_student_cards_printed', 'unlock_student_card', 'unlock_all_student_cards'].forEach(
+      name => expect(names.has(name), name).toBe(true),
+    );
   });
 
   it('the card block keeps no reply anywhere: no storage, outbox or Sentry inside makeStudentCards', () => {

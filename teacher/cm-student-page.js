@@ -9,14 +9,14 @@
    What is on it:
 
    - S1-F4: Return Grades (When I Return Them, As Soon As I Save).
-   - S0-W1, S3-W1: Student Cards, the list (no code shown) with Make and
-     Print and Print Again (teacher/student-cards.js).
+   - S0-W1, S3-W1, S3-F2: Student Cards, the list (no code shown) with
+     Make and Print, Print Again, Print New Card, New Codes for This Class,
+     Unlock and Unlock All (teacher/student-cards.js).
    - S0-W1: the build switch itself, at the build address only.
 
    What later PRs add, none of which needs to change dash-class-manager.js:
 
-   - S3: the rest of Student Cards (filters, Unlock, Reissue, Cards Work
-     Until).
+   - S3-F1: the rest of Student Cards (filters, Cards Work Until).
    - S5-F1: Send Work and Keep Photos Until.
    - S8-F1: the reminder and the "photos go for good" line on Keep Photos
      Until.

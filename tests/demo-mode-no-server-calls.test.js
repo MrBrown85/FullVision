@@ -301,19 +301,36 @@ describe('Demo Mode sends nothing for Draft and Returned', () => {
           sel === '.sc-card' ? { dataset: { cid: CID } } : realQuery.call(document, sel);
         DashClassManager.classManagerOpen = true;
         DashClassManager.renderClassManager = () => {};
+        const realConfirm = globalThis.showConfirm;
+        // Every question is answered Yes.
+        globalThis.showConfirm = (title, message, ok, style, onOk) => onOk();
         let pressed;
         try {
           StudentCards._reset();
           StudentCards.render(CID);
           await StudentCards.load(CID);
           pressed = await StudentCards.makeAndPrint(CID);
+          // Print New Card, New Codes for This Class, Unlock and Unlock All: on the device too.
+          await StudentCards.printNewCard(CID, 's1');
+          await tick();
+          StudentCards.newCodes(CID);
+          await tick();
+          const kept = JSON.parse(localStorage.getItem('gb-student-cards-' + CID));
+          kept.forEach(c => (c.locked_at = new Date().toISOString()));
+          localStorage.setItem('gb-student-cards-' + CID, JSON.stringify(kept));
+          await StudentCards.load(CID);
+          StudentCards.unlock(CID, kept[0].id);
+          StudentCards.unlockAll(CID);
+          await tick();
         } finally {
           document.querySelector = realQuery;
           DashClassManager.classManagerOpen = wasOpen;
           DashClassManager.renderClassManager = realDraw;
+          globalThis.showConfirm = realConfirm;
         }
         expect(pressed).toBe(1);
-        expect(printed).toEqual([1]);
+        expect(printed).toEqual([1, 1, 2]);
+        expect(JSON.parse(localStorage.getItem('gb-student-cards-' + CID)).every(c => !c.locked_at)).toBe(true);
         await tick();
         expect(calls).toEqual([]);
         expect(fetched).toEqual([]);
