@@ -100,239 +100,247 @@ const SEED = {
   },
 };
 
-async function server(page) {
+async function server(page, opts) {
   await mockAuth(page);
-  await page.addInitScript(seed => {
-    const KEY = 'e2e-work-server';
-    if (!localStorage.getItem(KEY)) {
-      const cid = seed.cid;
-      localStorage.setItem('gb-courses', JSON.stringify({ [cid]: seed.course }));
-      localStorage.setItem('gb-config', JSON.stringify({ activeCourse: cid }));
-      localStorage.setItem('gb-lastActiveCourse', cid);
-      localStorage.setItem('gb-learningMaps-' + cid, JSON.stringify(seed.learningMap));
-      localStorage.setItem('gb-students-' + cid, JSON.stringify(seed.students));
-      localStorage.setItem('gb-assessments-' + cid, JSON.stringify(seed.assessments));
-      localStorage.setItem('gb-scores-' + cid, JSON.stringify({}));
-      localStorage.setItem(
-        KEY,
-        JSON.stringify({
-          course: { student_page_enabled: true, return_grades: 'on_return', send_work: true },
-          rows: {},
-          submissions: [seed.alice],
-          uploads: {},
-          stored: [],
-          n: 0,
-        }),
-      );
-    }
-    const read = () => JSON.parse(localStorage.getItem(KEY));
-    const write = s => localStorage.setItem(KEY, JSON.stringify(s));
-    const ok = data => Promise.resolve({ data, error: null });
-    const log = (name, params) => window.__e2eRpcLog.push({ name, params, at: Date.now() });
-    const client = window._supabase;
-    const real = client.rpc;
-    const fresh = s => 'e2e00000-0000-4000-9000-' + String(++s.n).padStart(12, '0');
+  await page.addInitScript(
+    ({ seed, group }) => {
+      if (group)
+        Object.assign(seed.assessments[0], {
+          collaboration: 'pair',
+          pairs: [[seed.alice.enrollment_id, seed.students[1].id]],
+        });
+      const KEY = 'e2e-work-server';
+      if (!localStorage.getItem(KEY)) {
+        const cid = seed.cid;
+        localStorage.setItem('gb-courses', JSON.stringify({ [cid]: seed.course }));
+        localStorage.setItem('gb-config', JSON.stringify({ activeCourse: cid }));
+        localStorage.setItem('gb-lastActiveCourse', cid);
+        localStorage.setItem('gb-learningMaps-' + cid, JSON.stringify(seed.learningMap));
+        localStorage.setItem('gb-students-' + cid, JSON.stringify(seed.students));
+        localStorage.setItem('gb-assessments-' + cid, JSON.stringify(seed.assessments));
+        localStorage.setItem('gb-scores-' + cid, JSON.stringify({}));
+        localStorage.setItem(
+          KEY,
+          JSON.stringify({
+            course: { student_page_enabled: true, return_grades: 'on_return', send_work: true },
+            rows: {},
+            submissions: [seed.alice],
+            uploads: {},
+            stored: [],
+            n: 0,
+          }),
+        );
+      }
+      const read = () => JSON.parse(localStorage.getItem(KEY));
+      const write = s => localStorage.setItem(KEY, JSON.stringify(s));
+      const ok = data => Promise.resolve({ data, error: null });
+      const log = (name, params) => window.__e2eRpcLog.push({ name, params, at: Date.now() });
+      const client = window._supabase;
+      const real = client.rpc;
+      const fresh = s => 'e2e00000-0000-4000-9000-' + String(++s.n).padStart(12, '0');
 
-    client.rpc = function (name, params) {
-      params = params || {};
-      const s = read();
-      if (name === 'get_class_bundle') {
-        return real(name, { p_course_id: params.p_course_id, p_if_version: null }).then(res => {
-          if (res.data && res.data.gradebook) Object.assign(res.data.gradebook.course, s.course);
-          return res;
-        });
-      }
-      if (name === 'list_course_grade_returns') return (log(name, params), ok(s.rows));
-      if (name === 'list_course_submissions') {
-        log(name, params);
-        return ok({
-          bucket: 'student-photos',
-          course: { send_work: s.course.send_work, keep_photos_until: 'end_of_year' },
-          assessments: [
-            {
-              id: seed.assessments[0].id,
-              students_send: 'photos',
-              after_due: 'keep',
-              accept_until: null,
-              group_work: 'each',
-              students_see_markup: true,
-            },
-          ],
-          submissions: s.submissions,
-          uploads: [],
-        });
-      }
-      if (name === 'set_course_send_work') {
-        log(name, params);
-        Object.assign(s.course, params.p_patch);
-        write(s);
-        return ok({ send_work: s.course.send_work, keep_photos_until: 'end_of_year' });
-      }
-      if (name === 'start_work_upload') {
-        log(name, params);
-        const sub = fresh(s);
-        const files = params.p_pages.map((_, i) => {
-          const f = fresh(s);
-          const base = [seed.cid, params.p_assessment_id, params.p_enrollment_id, sub, f].join('/');
-          return { file_id: f, page: i + 1, path: base + '.jpg', thumb_path: base + '-thumb.jpg' };
-        });
-        s.uploads[sub] = { aid: params.p_assessment_id, sid: params.p_enrollment_id, files };
-        write(s);
-        return ok({ result: 'ready', submission_id: sub, mode: params.p_mode, bucket: 'student-photos', files });
-      }
-      if (name === 'finish_work_upload') {
-        log(name, params);
-        const up = s.uploads[params.p_submission_id];
-        const missing = up.files.filter(f => s.stored.indexOf(f.path) < 0 || s.stored.indexOf(f.thumb_path) < 0);
-        if (missing.length) return ok({ result: 'missing_pages', missing: missing.map(f => f.file_id) });
-        const sub = {
-          id: params.p_submission_id,
-          assessment_id: up.aid,
-          enrollment_id: up.sid,
-          version: 1,
-          state: 'sent',
-          sent_by: 'teacher',
-          on_paper: false,
-          is_late: false,
-          note: null,
-          created_at: new Date().toISOString(),
-          sent_at: new Date().toISOString(),
-          files: up.files.map((f, i) => ({
-            id: f.file_id,
-            page: f.page,
-            path: f.path,
-            thumb_path: f.thumb_path,
-            sha256: params.p_files[i].sha256,
-            added_by: 'teacher',
-          })),
-        };
-        s.submissions.push(sub);
-        delete s.uploads[params.p_submission_id];
-        write(s);
-        return ok({ result: 'sent', submission: sub });
-      }
-      if (name === 'list_assessment_markup') {
-        log(name, params);
-        return ok(Object.values(s.marks || {}));
-      }
-      if (name === 'save_markup') {
-        log(name, params);
-        const was = (s.marks || {})[params.p_file_id];
-        const rev = was ? was.rev : 0;
-        if (params.p_base_rev != null && params.p_base_rev !== rev) {
-          return ok({ result: 'changed', file_id: params.p_file_id, rev, marks: was && was.marks });
+      client.rpc = function (name, params) {
+        params = params || {};
+        const s = read();
+        if (name === 'get_class_bundle') {
+          return real(name, { p_course_id: params.p_course_id, p_if_version: null }).then(res => {
+            if (res.data && res.data.gradebook) Object.assign(res.data.gradebook.course, s.course);
+            return res;
+          });
         }
-        s.marks = s.marks || {};
-        s.marks[params.p_file_id] = {
-          file_id: params.p_file_id,
-          enrollment_id: seed.alice.enrollment_id,
-          rev: rev + 1,
-          marks: params.p_marks,
-          given: null,
-          given_rev: null,
-          given_at: null,
-          saved_at: new Date().toISOString(),
-          waiting: true,
-        };
-        write(s);
-        return ok({ result: 'saved', file_id: params.p_file_id, rev: rev + 1, given_rev: null, waiting: true });
-      }
-      if (name === 'list_course_feedback') {
-        log(name, params);
-        return ok({
-          course: { reflect_on_feedback: false, show_my_learning: false },
-          markup: Object.values(s.marks || {}).map(r => ({
-            file_id: r.file_id,
-            assessment_id: seed.assessments[0].id,
-            enrollment_id: r.enrollment_id,
-            rev: r.rev,
-            given_rev: r.given_rev,
-            given_at: r.given_at,
-            waiting: true,
-          })),
-          revisions: s.revisions || [],
-          reflections: [],
-        });
-      }
-      if (name === 'return_for_revision') {
-        log(name, params);
-        const at = new Date().toISOString();
-        const row = {
-          id: fresh(s),
-          assessment_id: params.p_assessment_id,
-          enrollment_id: params.p_enrollment_id,
-          what_to_fix: params.p_request.what_to_fix,
-          revise_by: params.p_request.revise_by,
-          criterion_ids: params.p_request.criterion_ids,
-          keep_grade: true,
-          grade_hidden: false,
-          first_submission_id: seed.alice.id,
-          first_version: 1,
-          first_grade: null,
-          first_returned_at: at,
-          created_at: at,
-          updated_at: at,
-          closed_at: null,
-          state: 'open',
-          revision_submission_id: null,
-          revision_version: null,
-          revision_sent_at: null,
-          revision_note: null,
-          revision_late: null,
-          revision_sent_by: null,
-        };
-        s.revisions = (s.revisions || []).concat([row]);
-        const of = s.rows[params.p_assessment_id] || (s.rows[params.p_assessment_id] = {});
-        of[params.p_enrollment_id] = { is_draft: false, returned_at: at };
-        write(s);
-        return ok({ result: 'made', request: row, returned: {}, hidden: false });
-      }
-      if (name === 'cancel_revision') {
-        log(name, params);
-        const r = (s.revisions || []).find(x => x.id === params.p_request_id);
-        Object.assign(r, { state: 'cancelled', closed_at: new Date().toISOString() });
-        write(s);
-        return ok({ result: 'cancelled', request: r, unhidden: false });
-      }
-      if (/^upsert_(tag_)?score$/.test(name)) {
-        const of = s.rows[params.p_assessment_id] || (s.rows[params.p_assessment_id] = {});
-        of[params.p_enrollment_id] = { is_draft: true };
-        write(s);
-        return real(name, params);
-      }
-      if (name === 'return_grades' || name === 'return_work') {
-        log(name, params);
-        const at = new Date().toISOString();
-        (params.p_enrollment_ids || []).forEach(sid => {
-          const row = (s.rows[params.p_assessment_id] || {})[sid];
-          if (row) Object.assign(row, { is_draft: false, returned_at: at });
-        });
-        write(s);
-        return ok({
-          returned: (params.p_enrollment_ids || []).length,
-          enrollment_ids: params.p_enrollment_ids,
-          returned_at: at,
-        });
-      }
-      return real(name, params);
-    };
-
-    client.storage = {
-      from: bucket => ({
-        upload: (p, blob, opts) => {
-          const s = read();
-          log('storage.upload', { bucket, path: p, contentType: opts.contentType, upsert: opts.upsert });
-          s.stored.push(p);
+        if (name === 'list_course_grade_returns') return (log(name, params), ok(s.rows));
+        if (name === 'list_course_submissions') {
+          log(name, params);
+          return ok({
+            bucket: 'student-photos',
+            course: { send_work: s.course.send_work, keep_photos_until: 'end_of_year' },
+            assessments: [
+              {
+                id: seed.assessments[0].id,
+                students_send: 'photos',
+                after_due: 'keep',
+                accept_until: null,
+                group_work: group ? 'group' : 'each',
+                students_see_markup: true,
+              },
+            ],
+            submissions: s.submissions,
+            uploads: [],
+          });
+        }
+        if (name === 'set_course_send_work') {
+          log(name, params);
+          Object.assign(s.course, params.p_patch);
           write(s);
-          return Promise.resolve({ data: { path: p }, error: null });
-        },
-        createSignedUrl: (p, seconds) => {
-          log('storage.sign', { bucket, path: p, seconds });
-          return Promise.resolve({ data: { signedUrl: 'https://fake.supabase.co/storage/sign/' + p }, error: null });
-        },
-      }),
-    };
-  }, SEED);
+          return ok({ send_work: s.course.send_work, keep_photos_until: 'end_of_year' });
+        }
+        if (name === 'start_work_upload') {
+          log(name, params);
+          const sub = fresh(s);
+          const files = params.p_pages.map((_, i) => {
+            const f = fresh(s);
+            const base = [seed.cid, params.p_assessment_id, params.p_enrollment_id, sub, f].join('/');
+            return { file_id: f, page: i + 1, path: base + '.jpg', thumb_path: base + '-thumb.jpg' };
+          });
+          s.uploads[sub] = { aid: params.p_assessment_id, sid: params.p_enrollment_id, files };
+          write(s);
+          return ok({ result: 'ready', submission_id: sub, mode: params.p_mode, bucket: 'student-photos', files });
+        }
+        if (name === 'finish_work_upload') {
+          log(name, params);
+          const up = s.uploads[params.p_submission_id];
+          const missing = up.files.filter(f => s.stored.indexOf(f.path) < 0 || s.stored.indexOf(f.thumb_path) < 0);
+          if (missing.length) return ok({ result: 'missing_pages', missing: missing.map(f => f.file_id) });
+          const sub = {
+            id: params.p_submission_id,
+            assessment_id: up.aid,
+            enrollment_id: up.sid,
+            version: 1,
+            state: 'sent',
+            sent_by: 'teacher',
+            on_paper: false,
+            is_late: false,
+            note: null,
+            created_at: new Date().toISOString(),
+            sent_at: new Date().toISOString(),
+            files: up.files.map((f, i) => ({
+              id: f.file_id,
+              page: f.page,
+              path: f.path,
+              thumb_path: f.thumb_path,
+              sha256: params.p_files[i].sha256,
+              added_by: 'teacher',
+            })),
+          };
+          s.submissions.push(sub);
+          delete s.uploads[params.p_submission_id];
+          write(s);
+          return ok({ result: 'sent', submission: sub });
+        }
+        if (name === 'list_assessment_markup') {
+          log(name, params);
+          return ok(Object.values(s.marks || {}));
+        }
+        if (name === 'save_markup') {
+          log(name, params);
+          const was = (s.marks || {})[params.p_file_id];
+          const rev = was ? was.rev : 0;
+          if (params.p_base_rev != null && params.p_base_rev !== rev) {
+            return ok({ result: 'changed', file_id: params.p_file_id, rev, marks: was && was.marks });
+          }
+          s.marks = s.marks || {};
+          s.marks[params.p_file_id] = {
+            file_id: params.p_file_id,
+            enrollment_id: seed.alice.enrollment_id,
+            rev: rev + 1,
+            marks: params.p_marks,
+            given: null,
+            given_rev: null,
+            given_at: null,
+            saved_at: new Date().toISOString(),
+            waiting: true,
+          };
+          write(s);
+          return ok({ result: 'saved', file_id: params.p_file_id, rev: rev + 1, given_rev: null, waiting: true });
+        }
+        if (name === 'list_course_feedback') {
+          log(name, params);
+          return ok({
+            course: { reflect_on_feedback: false, show_my_learning: false },
+            markup: Object.values(s.marks || {}).map(r => ({
+              file_id: r.file_id,
+              assessment_id: seed.assessments[0].id,
+              enrollment_id: r.enrollment_id,
+              rev: r.rev,
+              given_rev: r.given_rev,
+              given_at: r.given_at,
+              waiting: true,
+            })),
+            revisions: s.revisions || [],
+            reflections: [],
+          });
+        }
+        if (name === 'return_for_revision') {
+          log(name, params);
+          const at = new Date().toISOString();
+          const row = {
+            id: fresh(s),
+            assessment_id: params.p_assessment_id,
+            enrollment_id: params.p_enrollment_id,
+            what_to_fix: params.p_request.what_to_fix,
+            revise_by: params.p_request.revise_by,
+            criterion_ids: params.p_request.criterion_ids,
+            keep_grade: true,
+            grade_hidden: false,
+            first_submission_id: seed.alice.id,
+            first_version: 1,
+            first_grade: null,
+            first_returned_at: at,
+            created_at: at,
+            updated_at: at,
+            closed_at: null,
+            state: 'open',
+            revision_submission_id: null,
+            revision_version: null,
+            revision_sent_at: null,
+            revision_note: null,
+            revision_late: null,
+            revision_sent_by: null,
+          };
+          s.revisions = (s.revisions || []).concat([row]);
+          const of = s.rows[params.p_assessment_id] || (s.rows[params.p_assessment_id] = {});
+          of[params.p_enrollment_id] = { is_draft: false, returned_at: at };
+          write(s);
+          return ok({ result: 'made', request: row, returned: {}, hidden: false });
+        }
+        if (name === 'cancel_revision') {
+          log(name, params);
+          const r = (s.revisions || []).find(x => x.id === params.p_request_id);
+          Object.assign(r, { state: 'cancelled', closed_at: new Date().toISOString() });
+          write(s);
+          return ok({ result: 'cancelled', request: r, unhidden: false });
+        }
+        if (/^upsert_(tag_)?score$/.test(name)) {
+          const of = s.rows[params.p_assessment_id] || (s.rows[params.p_assessment_id] = {});
+          of[params.p_enrollment_id] = { is_draft: true };
+          write(s);
+          return real(name, params);
+        }
+        if (name === 'return_grades' || name === 'return_work') {
+          log(name, params);
+          const at = new Date().toISOString();
+          (params.p_enrollment_ids || []).forEach(sid => {
+            const row = (s.rows[params.p_assessment_id] || {})[sid];
+            if (row) Object.assign(row, { is_draft: false, returned_at: at });
+          });
+          write(s);
+          return ok({
+            returned: (params.p_enrollment_ids || []).length,
+            enrollment_ids: params.p_enrollment_ids,
+            returned_at: at,
+          });
+        }
+        return real(name, params);
+      };
+
+      client.storage = {
+        from: bucket => ({
+          upload: (p, blob, opts) => {
+            const s = read();
+            log('storage.upload', { bucket, path: p, contentType: opts.contentType, upsert: opts.upsert });
+            s.stored.push(p);
+            write(s);
+            return Promise.resolve({ data: { path: p }, error: null });
+          },
+          createSignedUrl: (p, seconds) => {
+            log('storage.sign', { bucket, path: p, seconds });
+            return Promise.resolve({ data: { signedUrl: 'https://fake.supabase.co/storage/sign/' + p }, error: null });
+          },
+        }),
+      };
+    },
+    { seed: SEED, group: !!(opts && opts.group) },
+  );
   // The signed links serve a real photo; the sweep route answers ok.
   await page.route('https://fake.supabase.co/storage/sign/**', route =>
     route.fulfill({ status: 200, contentType: 'image/jpeg', path: PHOTO }),
@@ -478,5 +486,22 @@ test('Mark Up on the phone saves to the server when Done is pressed', async ({ p
   expect(save.p_file_id).toBe(SEED.alice.files[0].id);
   expect(save.p_base_rev).toBe(0);
   expect(save.p_marks.marks.map(m => m.type)).toEqual(['tick']);
+  expect(errors).toEqual([]);
+});
+
+test('One per Group: the group’s work is one to grade, with every member’s pages', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  await server(page, { group: true });
+  await openGradeTab(page);
+  // Alice sent for the pair: it is one piece of work to grade, and nobody is not in.
+  await expect(page.locator('.m-seg-btn[data-val="tograde"] .m-seg-count')).toHaveText('1');
+  const row = page.locator('.m-tg-row[data-aid="' + LAB + '"]');
+  await expect(row.locator('.m-tg-notin')).toHaveCount(0);
+  await row.locator('[data-action="m-grade-row-menu"]').click();
+  await page.locator('#m-sheet-container .m-tg-menu [data-only="tograde"]').click();
+  const card = page.locator('.m-swiper-card').first();
+  await expect(card.locator('.m-work-page img').first()).toHaveAttribute('src', /^blob:/);
+  await expect(card.locator('.m-work-dot')).toHaveCount(2);
   expect(errors).toEqual([]);
 });

@@ -16889,17 +16889,21 @@ function studentWorkPageUrl(cid, file, which) {
 
    Shapes: getStudentGroupWork is the student's group_work(...),
    getGroupWorkFiles the files group_file_links(...) makes links for.
-   No answer here carries a group-mate's name. Demo Mode only, as the rest
-   of student work; signed in they answer empty. */
+   No answer here carries a group-mate's name. Demo Mode, and a signed-in
+   class the server keeps rows for (each member's own submission comes from
+   list_course_submissions); any other class answers empty. */
 
 /* The group `sid` sends with on `aid`: { kind: 'pair' | 'group', index,
    members, separate } (members on the roster, in the group's order;
    separate: `sid` is Graded Separately), or null when the student sends
    alone. */
 function getStudentWorkGroup(cid, sid, aid) {
-  // Group work is Demo Mode's until Batch C is wired (S12-W1).
-  if (!_isDemoSession()) return null;
-  var a = _assessmentById(cid, aid);
+  // Demo Mode, or a signed-in class the server keeps rows for (S12-W1): the groups are the teacher's own.
+  if (!_isDemoSession() && !_fbOn(cid)) return null;
+  // The class's own copy of the piece (pairs and groups as the teacher made them), not the server's raw row.
+  var a = (getAssessments(cid) || []).find(function (x) {
+    return x && x.id === aid;
+  });
   if (!a || getAssessmentStudentWork(cid, aid).group_work !== 'group') return null;
   var group = getCollabGroupOf(a, sid);
   if (!group) return null;
