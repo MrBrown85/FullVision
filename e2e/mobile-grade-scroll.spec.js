@@ -135,7 +135,8 @@ test.describe('Phone grading card', () => {
     await card(page).locator('.m-crit-group').nth(1).locator('.m-score-btn[data-score="2"]').click();
     await expect(box()).toHaveValue('Name the variable you change.');
     await expect(box()).toBeVisible();
-    await expect(group().getByRole('button', { name: 'Comment' })).toBeHidden();
+    // The Comment button stays, filled, to edit it (the board).
+    await expect(group().getByRole('button', { name: /^Edit the comment on / })).toBeVisible();
     expect(await saved()).toBe('Name the variable you change.');
 
     // Emptied, it clears and goes back behind its button.

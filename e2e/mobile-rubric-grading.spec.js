@@ -125,25 +125,31 @@ test.describe('Phone grading by rubric criterion', () => {
     expect(new Set(behind)).toEqual(new Set([Number(target)]));
   });
 
+  // An Advanced Rubric shows a criterion at a time in every class (the board
+  // "Phone Grader, Advanced Rubric"): its boxes in a group per level.
   test('an Advanced Rubric ticks its way to a level', async ({ page }) => {
     await openLab(page, true);
-    const group = () => firstCard(page).locator('.m-crit-group').first();
+    const group = () => firstCard(page).locator('.m-crit-pager');
+    const head = lv => group().locator(`.m-check-group-head[data-level="${lv}"]`);
+    const open = async lv => {
+      if ((await head(lv).getAttribute('aria-expanded')) !== 'true') await head(lv).click();
+    };
     // Start from no level so the boxes decide it.
     if (await group().locator('.m-score-btn.m-score-active').count())
       await group().locator('.m-score-btn.m-score-active').click();
     await expect(group().locator('.m-score-btn.m-score-active')).toHaveCount(0);
 
-    await group().locator('.m-checks-btn').click();
-    await expect(group().locator('.m-checklist-head')).toHaveText('No Level Suggested Yet');
+    await open(4);
+    await expect(head(4).locator('.m-check-group-count')).toHaveText('0 of 2');
     await group().getByLabel('Repeats trials').check();
     await expect(group().locator('.m-score-btn.m-score-active')).toHaveCount(0);
     await group().getByLabel('Explains an odd result').check();
     await expect(group().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText('4');
-    await expect(group().locator('.m-checklist-head')).toHaveText('Suggested: Extending');
-    await expect(group().locator('.m-checks-btn')).toHaveText('2');
+    await expect(head(4).locator('.m-check-group-count')).toHaveText('2 of 2');
 
     // A level picked by hand stays.
     await group().locator('.m-score-btn[data-score="2"]').click();
+    await open(3);
     await group().getByLabel('Records units').check();
     await expect(group().locator('.m-score-btn.m-score-active .m-level-fig')).toHaveText('2');
   });

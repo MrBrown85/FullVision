@@ -676,7 +676,7 @@ describe('MGrade filter sheet', () => {
     expect(match[2].trim()).toBe('2'); // category(1) + dateRange(1)
   });
 
-  it('applyFilterSheet persists staged filters to localStorage', () => {
+  it('each tap in the filter sheet is kept at once (the filter that applies as you tap)', () => {
     mockDataLayer({});
     // Render first so _loadFilters picks up defaults
     MGrade.renderPicker(CID);
@@ -690,7 +690,6 @@ describe('MGrade filter sheet', () => {
     MGrade.openFilterSheet(CID);
     MGrade.onFilterTogglePill('category', 'c1');
     MGrade.onFilterSegChange('dateRange', '30d');
-    MGrade.applyFilterSheet(CID);
 
     const persisted = JSON.parse(localStorage.getItem('gb-grade-filters-' + CID));
     expect(persisted.category).toEqual(['c1']);
@@ -722,7 +721,7 @@ describe('MGrade filter sheet', () => {
     window.MComponents.dismissSheet = origDismiss;
   });
 
-  it('filter sheet HTML includes Category + Date range + Graded status sections, hides Module when no modules', () => {
+  it('filter sheet HTML includes Status, Date and Category sections, hides Module when no modules', () => {
     mockDataLayer({
       getCategories: () => [{ id: 'c1', name: 'Labs' }],
       getModules: () => [],
@@ -736,13 +735,13 @@ describe('MGrade filter sheet', () => {
     MGrade.renderPicker(CID);
     MGrade.openFilterSheet(CID);
 
-    expect(capturedHtml).toContain('Category');
-    expect(capturedHtml).toContain('Date Range');
-    expect(capturedHtml).toContain('Graded Status');
+    expect(capturedHtml).toContain('m-filter-sheet-title">Category');
+    expect(capturedHtml).toContain('m-filter-sheet-title">Date');
+    expect(capturedHtml).toContain('m-filter-sheet-title">Status');
     expect(capturedHtml).toContain('Labs'); // the one category chip
     expect(capturedHtml).toContain('No Category');
     expect(capturedHtml).not.toContain('m-filter-sheet-title">Module'); // Module section hidden
-    expect(capturedHtml).toContain('data-action="m-grade-filter-apply"');
+    expect(capturedHtml).toContain('data-action="m-grade-filter-done"');
     expect(capturedHtml).toContain('data-action="m-grade-filter-clear"');
 
     window.MComponents.presentSheet = origPresent;
