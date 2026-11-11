@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { PHONE, CHROMEBOOK, fits, named, contrast, shot } from './student-card-fake.js';
+import { pagesPdf, lockedPdf } from '../tests/fixtures/pdf-fixtures.mjs';
 
 /* Sending work from the student's page (S5-F2, S5-F3), in Demo Mode with
    Send Work on (#demo-card-send), against the built site with the live
@@ -90,5 +92,43 @@ test.describe('on a phone, late and closed', () => {
     await page.getByRole('button', { name: 'Back' }).click();
     await page.locator('.sp-piece', { hasText: 'Immune System Quick Check' }).scrollIntoViewIfNeeded();
     expect(posts).toEqual([]);
+  });
+});
+
+test.describe('on a Chromebook, a PDF', () => {
+  test.use(CHROMEBOOK);
+
+  test('a two-page PDF becomes two pages; pdf.js is fetched only once a PDF is chosen; a locked PDF says so', async ({
+    page,
+  }) => {
+    const pdfjs = [];
+    page.on('request', req => {
+      if (/\/vendor\/pdfjs\//.test(req.url())) pdfjs.push(req.url());
+    });
+    const { posts, errors } = await demo(page);
+    await page.locator('.sp-side-row', { hasText: 'Science Fair Proposal' }).click();
+    await page
+      .locator('.sp-piece', { hasText: 'Science Fair Proposal' })
+      .getByRole('button', { name: 'Send My Work' })
+      .click();
+    await expect(page.getByRole('heading', { name: 'Check and Send' })).toBeVisible();
+    await page
+      .locator('input.sp-send-input:not([capture])')
+      .setInputFiles({ name: 'work.jpg', mimeType: 'image/jpeg', buffer: readFileSync(PHOTO) });
+    await expect(page.getByRole('button', { name: 'Send 1 Photo' })).toBeEnabled();
+    expect(pdfjs).toEqual([]);
+    await page
+      .locator('input.sp-send-input')
+      .setInputFiles({ name: 'two.pdf', mimeType: 'application/pdf', buffer: Buffer.from(pagesPdf(2)) });
+    await expect(page.getByRole('button', { name: 'Send 3 Photos' })).toBeEnabled({ timeout: 20000 });
+    expect(pdfjs.length).toBeGreaterThan(0);
+    await page
+      .locator('input.sp-send-input')
+      .setInputFiles({ name: 'locked.pdf', mimeType: 'application/pdf', buffer: Buffer.from(lockedPdf()) });
+    await expect(page.getByText('This PDF has a password. Save a copy without one, then choose it here.')).toBeVisible({
+      timeout: 20000,
+    });
+    expect(posts).toEqual([]);
+    expect(errors).toEqual([]);
   });
 });
