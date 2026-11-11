@@ -2537,7 +2537,7 @@ window.PageAssignments = (function () {
       var shownIds = _returnShownIds(cid);
       var waitingIn = {};
       assessments.forEach(function (a) {
-        waitingIn[a.id] = GradeState.draftsIn(cid, a.id, shownIds).length;
+        waitingIn[a.id] = GraderWork.draftsIn(cid, a.id, shownIds).length;
         _toReturnTotal += waitingIn[a.id];
       });
       // Returning the last draft turns the filter off.
@@ -12244,6 +12244,7 @@ window.PageAssignments = (function () {
       else if (what === 'returnAll') _graderReturnAll(btn);
       else if (what.indexOf('work-') === 0) _graderWorkAction(what, btn);
       else if (what.indexOf('reflect-') === 0) _graderReflectAction(what, btn);
+      else if (what.indexOf('revision-') === 0) _graderRevisionAction(what, btn);
       else _graderGroupAction(what, btn.dataset.sid);
     });
     // Add Work's Choose Files (S6-F2).
@@ -13148,6 +13149,10 @@ window.PageAssignments = (function () {
       ? returnStep + '\u2190 \u2192 change group \u00B7 Esc closes'
       : returnStep + '\u2190 \u2192 change student \u00B7 Esc closes';
     _refreshGraderReturn(dialog, cid, a, sid, view);
+    // A revision's card and its "Was …" lines (S11-F3), on one student's own piece.
+    var own = view ? null : _workStudent(cid, sid);
+    if (own) _refreshGraderRevision(dialog, cid, a, own);
+    _refreshGraderWas(dialog, cid, a, own ? sid : null);
     if (_grader.workShell) {
       _refreshGraderWorkLine(dialog, cid, a, sid);
       _graderShortLevels(dialog);
@@ -13316,8 +13321,20 @@ window.PageAssignments = (function () {
     // What the row says is worked out once for both layouts (S11-T1).
     // Marks made since the last Return wait for one too (S9-F1), on a grade
     // already returned: Return gives them (Grader.returnGrades).
-    var area = GraderWork.returnArea(cid, a, sid, _graderReturnIds(sid, view), { marks: true });
+    // In the dialog, Return for Revision and Take Back too (S11-F1).
+    var area = GraderWork.returnArea(cid, a, sid, _graderReturnIds(sid, view), { marks: true, revisions: true });
     if (!area) return '';
+    // The page's own view says where a revision stands; its buttons are the dialog's.
+    return _graderReturnOwnHtml(cid, a, sid, view, act, area) + _graderRevisionReturnHtml(cid, a, sid, area, !attrs);
+  }
+
+  // html-safe: fixed labels; the name and the date go through esc; `act` is the caller's
+  function _graderReturnOwnHtml(cid, a, sid, view, act, area) {
+    // Out for revision (S11-F1): no Return until the revision is in.
+    if (area.kind === 'none' || area.kind === 'revising') return '';
+    if (area.kind === 'revised') {
+      return '<button type="button" class="grader-return-btn" ' + act + ' disabled>Return</button>';
+    }
     if (area.kind === 'marks') {
       return (
         '<button type="button" class="grader-return-btn" ' +
@@ -13478,7 +13495,7 @@ window.PageAssignments = (function () {
      whole class on screen how many have their grade. */
   // html-safe: numbers and fixed words
   function _returnChipsHtml(cid, a, shownIds) {
-    var n = GradeState.draftsIn(cid, a.id, shownIds).length;
+    var n = GraderWork.draftsIn(cid, a.id, shownIds).length;
     var given = focusStudentId
       ? 0
       : shownIds.filter(function (sid) {
@@ -13496,7 +13513,7 @@ window.PageAssignments = (function () {
   // html-safe: the id is ours; the names and the title go through esc
   function _returnDraftsButtonHtml(cid, a, shownIds) {
     if (focusStudentId) return '';
-    var waiting = GradeState.draftsReturned(cid, a.id, shownIds);
+    var waiting = GraderWork.draftsReturned(cid, a.id, shownIds);
     if (!waiting.length) return '';
     var label = GradeState.returnNGraded(waiting.length);
     return (
@@ -13522,7 +13539,7 @@ window.PageAssignments = (function () {
      its date, when one is known) once it is given, nothing with no grade. */
   // html-safe: fixed words; the date goes through esc
   function _returnMarkInner(cid, aid, ids) {
-    if (GradeState.draftsIn(cid, aid, ids).length) return '<span class="ret-draft">Draft</span>';
+    if (GraderWork.draftsIn(cid, aid, ids).length) return '<span class="ret-draft">Draft</span>';
     var on = null;
     var given = ids.filter(function (id) {
       if (GradeState.stateOf(cid, id, aid) !== GradeState.RETURNED) return false;
@@ -13618,7 +13635,7 @@ window.PageAssignments = (function () {
     document.querySelectorAll('#main [data-returns-aid]').forEach(function (el) {
       var a = _assessmentById(cid, el.dataset.returnsAid);
       if (!a) return;
-      total += GradeState.draftsIn(cid, a.id, shownIds).length;
+      total += GraderWork.draftsIn(cid, a.id, shownIds).length;
       set(el, _returnChipsHtml(cid, a, shownIds));
     });
     document.querySelectorAll('#main [data-return-slot-aid]').forEach(function (el) {
@@ -13654,7 +13671,7 @@ window.PageAssignments = (function () {
      waiting now. True when any was returned. */
   function _returnDrafts(cid, aid, sids) {
     if (!_holdsGrades(cid)) return false;
-    var waiting = GradeState.draftsIn(cid, aid, sids);
+    var waiting = GraderWork.draftsIn(cid, aid, sids);
     if (!waiting.length) return false;
     Grader.returnGrades(cid, aid, GradeState.returnTogether(cid, aid, waiting));
     clearProfCache();
@@ -13691,7 +13708,7 @@ window.PageAssignments = (function () {
   function _askReturnDrafts(aid, button) {
     var cid = activeCourse;
     if (!_holdsGrades(cid) || focusStudentId) return;
-    var waiting = GradeState.draftsReturned(cid, aid, _returnShownIds(cid));
+    var waiting = GraderWork.draftsReturned(cid, aid, _returnShownIds(cid));
     if (!waiting.length) return _refreshReturns();
     _askReturn(cid, waiting, button, function () {
       if (activeCourse !== cid || _grader) return;
@@ -13710,7 +13727,7 @@ window.PageAssignments = (function () {
   function _returnOne(aid, sid, button) {
     var cid = activeCourse;
     if (!_holdsGrades(cid)) return;
-    var waiting = GradeState.draftsReturned(cid, aid, [sid]);
+    var waiting = GraderWork.draftsReturned(cid, aid, [sid]);
     if (!waiting.length) return _refreshReturns();
     var done = function () {
       if (activeCourse !== cid || _grader) return;
@@ -13816,7 +13833,7 @@ window.PageAssignments = (function () {
   // html-safe: fixed labels and numbers; the names in the title go through esc
   function _graderShowHtml(cid, a, counts) {
     var show = _grader.show || 'all';
-    var waiting = GradeState.draftsReturned(cid, a.id, _grader.studentIds);
+    var waiting = GraderWork.draftsReturned(cid, a.id, _grader.studentIds);
     var label = GradeState.returnNGraded(waiting.length);
     return (
       '<div class="seg seg-sm grader-show-seg" role="group" aria-label="Show">' +
@@ -13923,7 +13940,7 @@ window.PageAssignments = (function () {
     var a = _assessmentById(cid, _grader.aid);
     if (!a || !_holdsGrades(cid)) return;
     var ids = _grader.studentIds;
-    var waiting = GradeState.draftsReturned(cid, a.id, ids);
+    var waiting = GraderWork.draftsReturned(cid, a.id, ids);
     if (!waiting.length) return _refreshGraderChrome();
     var overlay = _grader.overlay;
     var done = function () {
@@ -13993,6 +14010,7 @@ window.PageAssignments = (function () {
       'workHtml',
       'workLineHtml',
       'reflectHtml',
+      'revisionHtml',
     ].forEach(function (k) {
       _grader[k] = null;
     });
@@ -14089,6 +14107,13 @@ window.PageAssignments = (function () {
       );
     }
     if (sub) {
+      // A revision in (S11-F3): "Revised Nov 9, 7:12 pm · 1 new page".
+      var rv = _graderRevisionOf(cid, a, sid);
+      if (_revisionIn(rv) && rv.revision_submission_id === sub.id) {
+        var n = (sub.files || []).length;
+        var at = _revisionWhen(rv.revision_sent_at);
+        return 'Revised' + (at ? ' ' + at : '') + ' · ' + n + (n === 1 ? ' new page' : ' new pages');
+      }
       if (sub.on_paper) return 'Handed in on paper';
       var when = _workWhen(sub.sent_at || sub.created_at);
       var verb = sub.sent_by === 'teacher' ? 'Added by you' : 'Submitted';
@@ -14226,11 +14251,52 @@ window.PageAssignments = (function () {
     line.innerHTML = html;
   }
 
+  /* The work the pane shows: _workSubOf's, or, while a revision is in and
+     First is chosen (S11-F3), the first version. */
+  function _workPaneSubOf(cid, sid, aid) {
+    var sub = _workSubOf(cid, sid, aid);
+    var w = _grader && _grader.work;
+    if (!w || w.version !== 'first' || !sub || sub.group) return sub;
+    var a = _assessmentById(cid, aid);
+    var r = _graderRevisionOf(cid, a, sid);
+    if (!_revisionIn(r) || r.revision_submission_id !== sub.id) return sub;
+    return _revisionFirstSub(cid, a, sid, r) || sub;
+  }
+
+  /* New and First, while a revision is in (S11-F3): which version's pages
+     the pane shows. '' otherwise. */
+  // html-safe: dates from formatShortDate through esc; labels are fixed words
+  function _workVersionsHtml(cid, a, sid) {
+    var r = _graderRevisionOf(cid, a, sid);
+    var sub = _workSubOf(cid, sid, a.id);
+    if (!_revisionIn(r) || !sub || r.revision_submission_id !== sub.id) return '';
+    var firstSub = _revisionFirstSub(cid, a, sid, r);
+    if (!firstSub || firstSub.id === sub.id) return '';
+    var first = _grader.work.version === 'first';
+    var newDay = r.revision_sent_at ? formatShortDate(r.revision_sent_at) : '';
+    var firstDay = _revisionFirstDay(cid, a, sid, r);
+    return (
+      '<div class="seg seg-sm grader-work-versions" role="group" aria-label="Version">' +
+      '<button type="button" class="seg-btn"' +
+      segAttr(!first) +
+      ' data-grader="work-version" data-version="new">' +
+      esc('New' + (newDay ? ' · ' + newDay : '')) +
+      '</button><button type="button" class="seg-btn"' +
+      segAttr(first) +
+      ' data-grader="work-version" data-version="first">' +
+      esc('First' + (firstDay ? ' · ' + firstDay : '')) +
+      '</button></div>'
+    );
+  }
+
   /* The pane for `st`: their pages, or Add Work when nothing is in. */
   // html-safe: names and the note go through esc; ids are ours; labels are fixed words
   function _workPaneHtml(cid, a, st, view) {
     var w = _grader.work;
-    var sub = _workSubOf(cid, st.id, a.id);
+    var versions = view ? '' : _workVersionsHtml(cid, a, st.id);
+    // The first version is for looking at: Mark Up and Delete Work are the new one's.
+    var onFirst = !!versions && w.version === 'first';
+    var sub = _workPaneSubOf(cid, st.id, a.id);
     var first = view ? view.label : displayNameFirst(st);
     var files = (sub && sub.files) || [];
     if (!sub) return _addWorkHtml(cid, a, st, first);
@@ -14241,6 +14307,7 @@ window.PageAssignments = (function () {
     var turn = w.turns[file.id] || 0;
     var html =
       '<div class="grader-work-tools">' +
+      versions +
       '<span class="grader-work-pager">' +
       '<button type="button" class="grader-work-step" data-grader="work-page" data-dir="-1" aria-label="Previous page"' +
       (at > 0 ? '' : ' disabled') +
@@ -14273,7 +14340,7 @@ window.PageAssignments = (function () {
       '</button>' +
       '<span class="grader-spacer"></span>' +
       // Mark Up (S9-F1): writes on this page, in teacher/markup.js.
-      (window.MarkUp
+      (window.MarkUp && !onFirst
         ? '<button type="button" class="grader-work-tool grader-work-markup" data-grader="work-markup">Mark Up</button>'
         : '') +
       '<button type="button" class="grader-work-tool grader-work-focus" data-grader="work-focus" aria-pressed="' +
@@ -14293,7 +14360,8 @@ window.PageAssignments = (function () {
       '"><img class="grader-work-img" alt="' +
       esc('Page ' + (at + 1) + ' of ' + (a.title || 'the work')) +
       '"></div></div>';
-    if (sub.note) {
+    // A revision's note is on its Revision card (S11-F3).
+    if (sub.note && !(versions && !onFirst)) {
       var noteBy = sub.group ? _workStudent(cid, sub.noteBy) : null;
       html +=
         '<div class="grader-work-note"><h3 class="grader-work-note-title">' +
@@ -14307,7 +14375,7 @@ window.PageAssignments = (function () {
         '</p></div>';
     }
     // Delete Work deletes one student's own work; a group's is not offered here.
-    if (sub.group) return html;
+    if (sub.group || onFirst) return html;
     return (
       html +
       '<div class="grader-work-foot"><button type="button" class="grader-work-delete" data-grader="work-delete">Delete Work</button></div>'
@@ -14367,7 +14435,7 @@ window.PageAssignments = (function () {
       _grader.work.shownKey = null;
     }
     var img = pane.querySelector('.grader-work-img');
-    var sub = _workSubOf(cid, st.id, a.id);
+    var sub = _workPaneSubOf(cid, st.id, a.id);
     var files = (sub && sub.files) || [];
     var file = files[Math.min(Math.max(_grader.work.page, 0), files.length - 1)];
     if (!img || !file) return _graderReleasePage(_grader);
@@ -14438,7 +14506,7 @@ window.PageAssignments = (function () {
     var el = _grader.overlay.querySelector('.grader-work-surface');
     if (!el) return null;
     var a = _assessmentById(activeCourse, _grader.aid);
-    var sub = a && _workSubOf(activeCourse, focusStudentId, a.id);
+    var sub = a && _workPaneSubOf(activeCourse, focusStudentId, a.id);
     var file =
       sub &&
       (sub.files || []).find(function (f) {
@@ -14491,8 +14559,14 @@ window.PageAssignments = (function () {
     } else if (what === 'work-fit') {
       w.fit = btn.dataset.fit === 'width' ? 'width' : 'page';
       again = '[data-grader="work-fit"][data-fit="' + w.fit + '"]';
+    } else if (what === 'work-version') {
+      // New or First (S11-F3): the chosen version opens on its first page.
+      var version = btn.dataset.version === 'first' ? 'first' : null;
+      if (w.version !== version) w.page = 0;
+      w.version = version;
+      again = '[data-grader="work-version"][data-version="' + (version || 'new') + '"]';
     } else if (what === 'work-rotate') {
-      var sub = _workSubOf(cid, sid, a.id);
+      var sub = _workPaneSubOf(cid, sid, a.id);
       var file = sub && (sub.files || [])[w.page];
       if (file) w.turns[file.id] = ((w.turns[file.id] || 0) + 90) % 360;
       again = '[data-grader="work-rotate"]';
@@ -14550,6 +14624,8 @@ window.PageAssignments = (function () {
     w.page = 0;
     w.msg = '';
     w.setTo = null;
+    w.version = null;
+    _grader.revisionMsg = null;
   }
 
   /* Grade From Paper: Set Logan To (GraderWork.setToFromPaper, which the
@@ -14692,6 +14768,451 @@ window.PageAssignments = (function () {
         });
       },
     );
+  }
+
+  /* ── Revisions in the grader (S11-F1, S11-F3) ───────────────
+     The boards "Teacher: Return for Revision" and "Teacher: Grading a
+     Revision, Both Versions". In a class whose revisions are on (Demo Mode,
+     the build switch and Send Work: GraderWork.revisionsOnInClass), on one
+     student's own piece (not a group's):
+     - Return for Revision beside Return opens the sheet: What to Fix,
+       Revise By and which criteria (a rubric's). The grade is kept until
+       the new version replaces it: the board's Hide is left out (Colin,
+       Nov 11). It returns the work, then asks for another try
+       (Grader.returnForRevision);
+     - out for revision, the row says so in place of Return, with the
+       Revise By date, and Take Back (Grader.cancelRevision);
+     - once the revision is in: "Revised Nov 9, 7:12 pm · 1 new page", New
+       and First pages, the Revision card (what was asked, the student's
+       note), "Was Developing + on the Oct 30 version" on each criterion,
+       and Before and After once the new grade is in. While the new grade
+       is a draft these screens show it, marked Draft (Colin, Nov 11); the
+       student keeps the old grade until it is returned.
+     With the revisions off none of it is drawn: the dialog is as it was.
+     Every answer is drawn only while the dialog still shows the same class,
+     piece and student; the sheet's Return for Revision acts only while the
+     sheet is still open on them. */
+  function _graderRevisionOf(cid, a, sid) {
+    if (!a || isDibelsScored(a) || !GraderWork.revisionsOnInClass(cid)) return null;
+    var r = typeof getRevisionRequest === 'function' ? getRevisionRequest(cid, sid, a.id) : null;
+    return r && r.state !== 'cancelled' ? r : null;
+  }
+  // The revision is in (sent, being graded, or its grade returned).
+  function _revisionIn(r) {
+    return !!r && !!r.revision_submission_id && r.state !== 'open';
+  }
+  // "Tue, Nov 10" for a 'YYYY-MM-DD'.
+  function _reviseByText(day) {
+    var d = parseLocalDate(String(day || ''));
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+  // "Nov 9, 7:12 pm", on the teacher's own clock.
+  function _revisionWhen(ts) {
+    if (!ts) return '';
+    var d = new Date(ts);
+    if (isNaN(d.getTime())) return '';
+    return (
+      formatShortDate(ts) + ', ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase()
+    );
+  }
+  // The first version's submission, or null.
+  function _revisionFirstSub(cid, a, sid, r) {
+    var all = typeof getSubmissionVersions === 'function' ? getSubmissionVersions(cid, sid, a.id) : [];
+    return (
+      all.find(function (s) {
+        return s.id === r.first_submission_id;
+      }) ||
+      all[0] ||
+      null
+    );
+  }
+  // "Oct 30": when the first version came in, or '' when it is not known.
+  function _revisionFirstDay(cid, a, sid, r) {
+    var sub = _revisionFirstSub(cid, a, sid, r);
+    var at = (sub && (sub.sent_at || sub.created_at)) || r.first_returned_at;
+    return at ? formatShortDate(at) : '';
+  }
+
+  // Return for Revision, or the state of the request and Take Back, after the row's Return.
+  // html-safe: fixed labels; the name and the dates go through esc
+  function _graderRevisionReturnHtml(cid, a, sid, area, buttons) {
+    var g = _grader;
+    var busy = !!(g && g.revisionBusy);
+    if (area.revise) {
+      if (!buttons) return '';
+      return (
+        '<button type="button" class="grader-revise-btn" data-grader="revision-open"' +
+        (busy ? ' disabled' : '') +
+        '>Return for Revision</button>'
+      );
+    }
+    var r = area.revision;
+    if (!r) return '';
+    var html = '<div class="grader-draft grader-revision-line">';
+    if (area.kind === 'revising') {
+      html +=
+        '<p class="grader-draft-line"><span class="grader-revising-mark">Revising</span><span class="grader-draft-text">' +
+        esc('Returned for Revision' + (r.revise_by ? ' · Revise by ' + _reviseByText(r.revise_by) : '')) +
+        '</span></p>';
+    }
+    html += '</div>';
+    if (!buttons) return html;
+    var msg = g && g.revisionMsg ? '<p class="grader-revision-msg" role="status">' + esc(g.revisionMsg) + '</p>' : '';
+    return (
+      html +
+      msg +
+      '<button type="button" class="grader-takeback-btn" data-grader="revision-takeback" data-id="' +
+      esc(r.id) +
+      '"' +
+      (busy ? ' disabled' : '') +
+      '>' +
+      (busy ? 'Taking Back…' : 'Take Back') +
+      '</button>'
+    );
+  }
+
+  function _graderRevisionAction(what, btn) {
+    if (!_grader) return;
+    var cid = activeCourse;
+    var a = _assessmentById(cid, _grader.aid);
+    var sid = focusStudentId;
+    if (!a || !sid || _grader.revisionBusy) return;
+    if (what === 'revision-open') return _graderOpenRevisionSheet(cid, a, sid);
+    if (what === 'revision-takeback') return _graderTakeBack(cid, a, sid, btn.dataset.id);
+  }
+
+  function _revisionKey(prefix) {
+    return window.crypto && crypto.randomUUID
+      ? crypto.randomUUID()
+      : prefix + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+  }
+
+  /* Take Back: the request is withdrawn. */
+  function _graderTakeBack(cid, a, sid, requestId) {
+    var r = _graderRevisionOf(cid, a, sid);
+    if (!r || r.id !== requestId) return;
+    var g = _grader;
+    g.revisionBusy = true;
+    g.revisionMsg = null;
+    _refreshGraderChrome();
+    Grader.cancelRevision(cid, sid, a.id, r.id, _revisionKey('rc')).then(function (res) {
+      g.revisionBusy = false;
+      if (_grader !== g || activeCourse !== cid || g.aid !== a.id || focusStudentId !== sid) return;
+      var ok = res && (res.result === 'cancelled' || res.result === 'not_open');
+      g.revisionMsg = ok ? null : 'This couldn’t be taken back. Try again.';
+      render();
+      var back = g.overlay.querySelector('[data-grader="revision-open"], [data-grader="revision-takeback"]');
+      (back || g.overlay.querySelector('.grader-dialog')).focus({ preventScroll: true });
+    });
+  }
+
+  /* The Return for Revision sheet, over the grader. */
+  // html-safe: names, titles and criterion names go through esc; ids are escaped; labels are fixed words
+  function _revisionSheetHtml(cid, a, st) {
+    var rubric = a.rubricId ? getRubricById(cid, a.rubricId) : null;
+    var criteria = ((rubric && rubric.criteria) || []).filter(Boolean);
+    return (
+      '<div class="grader-sheet" role="dialog" aria-modal="true" aria-labelledby="grader-sheet-title" tabindex="-1">' +
+      '<h2 class="grader-sheet-title" id="grader-sheet-title">Return for Revision</h2>' +
+      '<p class="grader-sheet-sub">' +
+      esc(displayNameWithLast(st) + ' · ' + (a.title || 'Assessment')) +
+      '</p>' +
+      '<label class="grader-sheet-label" for="grader-sheet-fix">What to Fix</label>' +
+      '<textarea id="grader-sheet-fix" class="grader-sheet-fix" rows="3" maxlength="2000"></textarea>' +
+      '<label class="grader-sheet-label" for="grader-sheet-by">Revise By</label>' +
+      '<input type="date" id="grader-sheet-by" class="grader-sheet-by">' +
+      (criteria.length > 1
+        ? '<label class="grader-sheet-label" for="grader-sheet-crit">Revise</label>' +
+          '<select id="grader-sheet-crit" class="grader-sheet-crit"><option value="">The Whole Assignment</option>' +
+          criteria
+            .map(function (c) {
+              return '<option value="' + esc(c.id) + '">' + esc((c.name || 'Criterion') + ' only') + '</option>';
+            })
+            .join('') +
+          '</select>'
+        : '') +
+      // The grade until then: kept (Hide is left out, Colin, Nov 11).
+      '<h3 class="grader-sheet-label">Until the New Version Is Graded</h3>' +
+      '<p class="grader-sheet-keep">Keep this grade. The new version replaces it.</p>' +
+      '<p class="grader-sheet-msg" role="status"></p>' +
+      '<div class="grader-sheet-actions">' +
+      '<button type="button" class="btn btn-secondary" data-rv="cancel">Cancel</button>' +
+      '<button type="button" class="btn btn-primary" data-rv="send">Return for Revision</button>' +
+      '</div></div>'
+    );
+  }
+
+  function _graderOpenRevisionSheet(cid, a, sid) {
+    var g = _grader;
+    var st = _workStudent(cid, sid);
+    if (!st || g.overlay.querySelector('.grader-sheet-back')) return;
+    var back = document.createElement('div');
+    back.className = 'grader-sheet-back';
+    // html-safe: built by _revisionSheetHtml
+    back.innerHTML = _revisionSheetHtml(cid, a, st);
+    g.overlay.appendChild(back);
+    var sheet = back.querySelector('.grader-sheet');
+    var fix = sheet.querySelector('.grader-sheet-fix');
+    var busy = false;
+    var fields = function () {
+      return Array.prototype.slice.call(sheet.querySelectorAll('button, textarea, input, select'));
+    };
+    var close = function () {
+      back.remove();
+      if (_grader !== g) return;
+      var to = g.overlay.querySelector('[data-grader="revision-open"]') || g.overlay.querySelector('.grader-dialog');
+      if (to) to.focus({ preventScroll: true });
+    };
+    var say = function (text) {
+      sheet.querySelector('.grader-sheet-msg').textContent = text;
+    };
+    var send = function () {
+      if (busy) return;
+      var text = fix.value;
+      if (!text.trim()) {
+        say('Write what to fix first.');
+        fix.focus();
+        return;
+      }
+      var crit = sheet.querySelector('.grader-sheet-crit');
+      var request = {
+        what_to_fix: text.slice(0, 2000),
+        revise_by: sheet.querySelector('.grader-sheet-by').value || null,
+        criterion_ids: crit && crit.value ? [crit.value] : [],
+      };
+      var was = fields().map(function (el) {
+        return el.disabled;
+      });
+      busy = true;
+      fields().forEach(function (el) {
+        el.disabled = true;
+      });
+      sheet.querySelector('[data-rv="send"]').textContent = 'Returning…';
+      Grader.returnForRevision(cid, sid, a.id, request, _revisionKey('rv')).then(function (res) {
+        // The sheet or the dialog went, or moved on: nothing more happens here.
+        if (!back.isConnected || _grader !== g || activeCourse !== cid || g.aid !== a.id || focusStudentId !== sid)
+          return;
+        var result = res && res.result;
+        if (result === 'made' || result === 'already_open') {
+          back.remove();
+          render();
+          var tb = g.overlay.querySelector('[data-grader="revision-takeback"]');
+          (tb || g.overlay.querySelector('.grader-dialog')).focus({ preventScroll: true });
+          return;
+        }
+        busy = false;
+        fields().forEach(function (el, i) {
+          el.disabled = was[i];
+        });
+        sheet.querySelector('[data-rv="send"]').textContent = 'Return for Revision';
+        say(
+          result === 'invalid'
+            ? 'Check What to Fix and the date, then try again.'
+            : 'This couldn’t be returned for revision. Try again.',
+        );
+      });
+    };
+    back.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-rv]');
+      if (!b || b.disabled) return;
+      if (b.dataset.rv === 'cancel') close();
+      else if (b.dataset.rv === 'send') send();
+    });
+    // The sheet keeps its keys: no scoring shortcut, step or close below it.
+    back.addEventListener('keydown', function (e) {
+      e.stopPropagation();
+      if (e.key === 'Escape' && !e.isComposing) {
+        e.preventDefault();
+        if (!busy) close();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      var all = fields().filter(function (el) {
+        return !el.disabled;
+      });
+      if (!all.length) return;
+      var at = all.indexOf(document.activeElement);
+      if (e.shiftKey && at <= 0) {
+        e.preventDefault();
+        all[all.length - 1].focus();
+      } else if (!e.shiftKey && at === all.length - 1) {
+        e.preventDefault();
+        all[0].focus();
+      }
+    });
+    back.addEventListener('mousedown', function (e) {
+      e.stopPropagation();
+    });
+    fix.focus();
+  }
+
+  /* The Revision card above the scoring, once the revision is in: what was
+     asked, the student's note, and Before and After once the new grade is
+     in (the first version's result and the grade now, a draft marked so). */
+  function _cellShown(cid, cell) {
+    if (!cell) return '';
+    if (cell.kind === 'level') return formatLevel(cid, cell.value);
+    return cell.kind === 'none' ? '' : String(cell.text || '');
+  }
+  // The levels of the first version and now, per criterion (or competency): [{ id, name, before, after }].
+  function _revisionLevelRows(cid, a, sid, r) {
+    var firstCopy = r.first_grade || {};
+    var rows = [];
+    var rubric = a.rubricId ? getRubricById(cid, a.rubricId) : null;
+    if (rubric) {
+      (rubric.criteria || []).filter(Boolean).forEach(function (crit) {
+        var was = null;
+        rubricCriterionScoreKeys(crit).some(function (k) {
+          var p = (firstCopy.criteria || {})[k];
+          if (p && p.value > 0) was = p;
+          return !!was;
+        });
+        var now = _criterionState(cid, sid, a.id, crit);
+        rows.push({
+          id: crit.id,
+          name: crit.name || 'Criterion',
+          before: was ? scoreLevelText(was.value, was.modifier) : '',
+          after: now.level ? scoreLevelText(now.level, now.mod) : '',
+        });
+      });
+      return rows;
+    }
+    if (isPointsScored(a) || isCompletionScored(a)) return rows;
+    _scoreTagObjs(cid, a).forEach(function (tag) {
+      var p = (firstCopy.tags || {})[tag.id];
+      var now = _tagState(cid, sid, a.id, tag.id);
+      rows.push({
+        id: tag.id,
+        name: tag.label || 'Competency',
+        before: p && p.value > 0 ? scoreLevelText(p.value, p.modifier) : '',
+        after: now.level ? scoreLevelText(now.level, now.mod) : '',
+      });
+    });
+    return rows;
+  }
+
+  // "(a day early)", "(3 days late)": when the revision came in against Revise By.
+  function _revisionTiming(r) {
+    if (!r.revise_by || !r.revision_sent_at) return '';
+    var sent = new Date(r.revision_sent_at);
+    if (isNaN(sent.getTime())) return '';
+    var day = new Date(sent.getFullYear(), sent.getMonth(), sent.getDate());
+    var days = Math.round((parseLocalDate(r.revise_by) - day) / 86400000);
+    if (days > 1) return ' (' + days + ' days early)';
+    if (days === 1) return ' (a day early)';
+    if (days === 0) return ' (on the day)';
+    return days === -1 ? ' (a day late)' : ' (' + -days + ' days late)';
+  }
+
+  // html-safe: the student's words, names, dates and levels go through esc; labels are fixed words
+  function _graderRevisionCardHtml(cid, a, st) {
+    var r = _graderRevisionOf(cid, a, st.id);
+    if (!_revisionIn(r)) return '';
+    var when = r.revision_sent_at ? formatShortDate(r.revision_sent_at) : '';
+    var html =
+      '<section class="grader-revision" aria-labelledby="grader-revision-title">' +
+      '<h3 class="grader-revision-title" id="grader-revision-title">' +
+      esc('Revision, Sent' + (when ? ' ' + when : '') + _revisionTiming(r)) +
+      '</h3>' +
+      '<p class="grader-revision-who">You asked:</p><p class="grader-revision-said">' +
+      esc(r.what_to_fix || '') +
+      '</p>';
+    if (r.revision_note)
+      html +=
+        '<p class="grader-revision-who">' +
+        esc(displayNameFirst(st) + '’s note:') +
+        '</p><p class="grader-revision-said">' +
+        esc(r.revision_note) +
+        '</p>';
+    // Before and After: once the new grade is in (a draft, or returned).
+    var firstCell = r.state === 'grading' || r.state === 'returned' ? getRevisionFirstCell(cid, st.id, a.id) : null;
+    if (firstCell) {
+      var draft = GradeState.stateOf(cid, st.id, a.id) === GradeState.DRAFT;
+      html += '<div class="grader-revision-ba"><h4 class="grader-revision-ba-title">Before and After</h4><dl>';
+      _revisionLevelRows(cid, a, st.id, r).forEach(function (row) {
+        if (!row.before && !row.after) return;
+        html +=
+          '<div class="grader-revision-ba-row"><dt>' +
+          esc(row.name) +
+          '</dt><dd class="grader-revision-before">' +
+          esc(row.before === row.after ? 'No change' : row.before || '—') +
+          '</dd><dd class="grader-revision-after">' +
+          esc(row.after || '—') +
+          '</dd></div>';
+      });
+      html +=
+        '<div class="grader-revision-ba-row is-result"><dt>Result</dt><dd class="grader-revision-before">' +
+        esc(_cellShown(cid, firstCell)) +
+        '</dd><dd class="grader-revision-after">' +
+        esc(_cellShown(cid, assessmentCellValue(cid, st.id, a)) || '—') +
+        (draft ? ' <span class="grader-draft-mark">Draft</span>' : '') +
+        '</dd></div></dl></div>';
+    }
+    return html + '</section>';
+  }
+
+  function _refreshGraderRevision(dialog, cid, a, st) {
+    var html = _graderRevisionCardHtml(cid, a, st);
+    var box = dialog.querySelector('.grader-revision-host');
+    if (!html) {
+      if (box) box.remove();
+      _grader.revisionHtml = null;
+      return;
+    }
+    if (!box) {
+      var anchor = dialog.querySelector('.grader-separate-line');
+      if (!anchor) return;
+      box = document.createElement('div');
+      box.className = 'grader-revision-host';
+      anchor.insertAdjacentElement('beforebegin', box);
+      _grader.revisionHtml = null;
+    }
+    if (_grader.revisionHtml === html) return;
+    _grader.revisionHtml = html;
+    // html-safe: built by _graderRevisionCardHtml
+    box.innerHTML = html;
+  }
+
+  /* "Was Developing + on the Oct 30 version" on each criterion (or
+     competency) the first version had a level for, once the revision is
+     in; and "Pick the level for the new version." while the revision is not
+     graded yet, on the criteria the request named (all, when it named none). */
+  function _refreshGraderWas(dialog, cid, a, sid) {
+    var r = _graderRevisionOf(cid, a, sid);
+    var rows = _revisionIn(r) ? _revisionLevelRows(cid, a, sid, r) : [];
+    var day = rows.length ? _revisionFirstDay(cid, a, sid, r) : '';
+    var named = (r && r.criterion_ids) || [];
+    var cards = dialog.querySelectorAll('.grader-body .grdt-crit[data-critid], .grader-body .grdl-card[data-tag]');
+    Array.prototype.forEach.call(cards, function (card) {
+      var id = String(card.dataset.critid || card.dataset.tag);
+      var row = rows.find(function (x) {
+        return String(x.id) === id;
+      });
+      var text = row && row.before ? 'Was ' + row.before + ' on the ' + (day ? day + ' version' : 'first version') : '';
+      var pick = !!text && r.state === 'sent' && (!named.length || named.indexOf(id) >= 0);
+      var key = text + (pick ? '|pick' : '');
+      var was = card.querySelector('.grader-was');
+      if ((was ? was._fvKey : '') === key) return;
+      if (was) was.remove();
+      if (!text) return;
+      var side = card.querySelector('.grdt-crit-side, .grdl-side');
+      if (!side) return;
+      was = document.createElement('div');
+      was.className = 'grader-was';
+      var line = document.createElement('p');
+      line.className = 'grader-was-line';
+      line.textContent = text;
+      was.appendChild(line);
+      if (pick) {
+        var hint = document.createElement('p');
+        hint.className = 'grader-was-hint';
+        hint.textContent = 'Pick the level for the new version.';
+        was.appendChild(hint);
+      }
+      was._fvKey = key;
+      side.appendChild(was);
+    });
   }
 
   /* ── A student's reflection in the grader (S10-F3) ─────────
