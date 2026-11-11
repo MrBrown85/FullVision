@@ -1509,6 +1509,7 @@ describe('Print New Card', () => {
       press('spCardsNewCard', LIVE, { student: U(12) });
       expect(asked[0].title).toBe('Print a New Card for Avery?');
       asked[0].onOk();
+      await StudentCards._making(LIVE);
       await afterDraw();
       expect(t.fn.posts.length).toBe(1);
       expect(t.fn.posts[0].body.items).toEqual([{ enrollment_id: U(12), replaces: U(901) }]);
@@ -1655,6 +1656,7 @@ describe('Print New Card', () => {
       const before = reads();
       press('spCardsNewCard', LIVE, { student: U(13) });
       asked[0].onOk();
+      await StudentCards._making(LIVE);
       await afterDraw();
       expect(sheets).toEqual([]);
       expect(reads()).toBe(before + 1);
@@ -1782,6 +1784,7 @@ describe('New Codes for This Class', () => {
       press('spCardsNewCodes', LIVE);
       expect(asked[0].message.startsWith('2 cards stop working now. 1 student gets their first card.')).toBe(true);
       asked[0].onOk();
+      await StudentCards._making(LIVE);
       await afterDraw();
       expect(t.fn.posts.length).toBe(1);
       expect(t.fn.posts[0].body.items).toEqual([
@@ -1865,6 +1868,7 @@ describe('New Codes for This Class', () => {
       const before = reads();
       press('spCardsNewCodes', LIVE);
       asked[0].onOk();
+      await StudentCards._making(LIVE);
       await afterDraw();
       expect(t.fetcher.count()).toBe(3);
       expect(sheets.length).toBe(1);
@@ -1882,6 +1886,7 @@ describe('New Codes for This Class', () => {
       globalThis.fetch = fetchFrom(t.fn);
       press('spCardsNewCard', LIVE, { student: U(12) });
       asked[1].onOk();
+      await StudentCards._making(LIVE);
       await afterDraw();
       expect(notesOf(parse(StudentCards.render(LIVE)))).toEqual([
         '1 card went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
@@ -1921,6 +1926,7 @@ describe('New Codes for This Class', () => {
       t.fn.markPrinted([U(970)]);
       press('spCardsNewCodes', LIVE);
       asked[0].onOk();
+      await StudentCards._making(LIVE);
       await afterDraw();
       expect(sheets[0].names).toEqual(['Jordan Abel', 'Avery Byrne']);
       // Read again: Cam has the other tab's printed card. Nothing is said about him.
@@ -1978,6 +1984,7 @@ describe('New Codes for This Class', () => {
     press('spCardsNewCodes', CID);
     expect(asked[0].title).toBe('New Codes for All 3 Students?');
     asked[0].onOk();
+    await StudentCards._making(CID);
     await afterDraw();
     expect(sheets.length).toBe(2);
     expect(sheets[1].numbers).toEqual(['Card 2', 'Card 2', 'Card 2']);
@@ -2336,6 +2343,7 @@ describe('an old card stopped and the new one not printed', () => {
       t.session.fake.on('list_student_cards', () => new Promise(r => (land = r)));
       press('spCardsNewCard', LIVE, { student: U(11) });
       asked[0].onOk();
+      await StudentCards._making(LIVE);
       await afterDraw();
       expect(sheets).toEqual([]);
       // The server stopped the old card and made a new one nobody printed.
@@ -2379,6 +2387,9 @@ describe('an old card stopped and the new one not printed', () => {
       await shown(LIVE);
       press('spCardsNewCodes', LIVE);
       asked[0].onOk();
+      // Seven requests, one after another, each card's key made by WebCrypto off the event loop: wait for
+      // the press itself to finish, not a fixed number of turns.
+      await StudentCards._making(LIVE);
       await afterDraw();
       expect(t.fetcher.count()).toBe(7);
       expect(sheets[0].names).toEqual(['Jordan Abel']);
