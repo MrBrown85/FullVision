@@ -774,29 +774,46 @@ create table student_submit.attempt (                                 -- rate li
   ip_hash text, code_id uuid, course_id uuid                          -- an HMAC of the IP; never answers or names
 );
 
--- Student cards (2026110903_student_card; plan 1.5). One live card per
--- enrollment (unique where stopped_at is null); a reissue stops the old card
--- and keeps its row. The code is kept readable for the class's teacher
--- (select only, fv_owns_enrollment) beside the salted hash the student path
--- checks. Written only by issue_student_cards, mark_student_cards_printed,
--- unlock_student_card, unlock_all_student_cards, reissue_student_card,
--- set_cards_work_until and the student path. A new slip never draws a live
--- card's code, nor a new card a live slip's.
+-- Student cards (2026110903_student_card; plan 1.5), as
+-- 2026111003_card_codes_keyed (S3-M1; not applied when this was written)
+-- leaves them. One live card per enrollment (unique where stopped_at is
+-- null); a new card stops the old one and keeps its row. The table holds a
+-- keyed tag of each card's code and never the code: the tag is made by the
+-- edge functions with a key this database does not have
+-- (STUDENT_CARD_KEY), so nothing here can turn a code into a tag or a tag
+-- into a code. A card's code is eight characters and a slip's six, so the
+-- two can never read the same. Nobody reads the table through the API (no
+-- policy, no grant): teachers use list_student_cards, which returns no code.
+-- Written only by student_submit.issue_cards (no signed-in teacher can run
+-- it: the teacher-cards edge function calls it for them, over the database
+-- owner's login, acting as the teacher), mark_student_cards_printed,
+-- unlock_student_card, unlock_all_student_cards, set_cards_work_until and
+-- the student path (student_submit.card, verify_card).
 create table student_card (
   id             uuid        primary key default gen_random_uuid(),
   enrollment_id  uuid        not null references enrollment(id) on delete cascade,
-  code           text        not null,                              -- as printed, K7M-4QX; unique among live cards
-  code_hash      text        not null unique,                       -- _access_code_hash(code, salt), as a slip's
-  salt           text        not null,
   created_at     timestamptz not null default now(),
   printed_at     timestamptz,
   last_opened_at timestamptz,
   wrong_tries    integer     not null default 0,                    -- wrong answers to "Is This You?" in a row; a right one resets it; the fifth locks the card
   wrong_times    timestamptz[] not null default '{}',               -- when each wrong answer of the last 7 days was given; the fifteenth locks the card (the slow lock)
   locked_at      timestamptz,                                       -- Unlock clears it and the count
-  stopped_at     timestamptz,                                       -- reissued; never opens again
+  stopped_at     timestamptz,                                       -- replaced; never opens again (a scan answers card_stopped)
   works_until    date        not null,                              -- the card's last day, written when it is made: the class's Cards Work Until, else its last reporting date if still ahead, else the next June 30
-  password       text                                               -- the card password printed on it, for a student with no birthday or number then; the card's own
+  code_hmac      text        unique check (code_hmac ~ '^[0-9a-f]{64}$'),  -- the tag of the code; unique across every card ever made; null only on a card from before 2026111003 (all stopped)
+  pw_hmac        text        check (pw_hmac ~ '^[0-9a-f]{64}$'),    -- the tag of the card's own four-digit password; kept only for a student with no birthday or number when the card was made
+  key_id         text        check (key_id ~ '^[0-9a-f]{8}$'),      -- the id of the key that made the tags
+  seq            smallint    not null check (seq >= 1),             -- the card number: this student's first, second, third card
+  unique (enrollment_id, seq),
+  check (stopped_at is not null or (code_hmac is not null and key_id is not null))   -- a card that can open has a tag
+);
+-- The id of the card key the edge functions last called with (one row; not
+-- the key). list_student_cards marks a card made under another key id
+-- needs_new: it cannot be recognised any more.
+create table student_submit.card_key (
+  one     boolean     primary key default true check (one),
+  key_id  text        not null check (key_id ~ '^[0-9a-f]{8}$'),
+  seen_at timestamptz not null default now()
 );
 
 -- A signed-in student device (2026110904_student_sessions_page). A session

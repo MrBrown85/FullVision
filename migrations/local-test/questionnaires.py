@@ -36,7 +36,9 @@ def key(): return str(uuid.uuid4())
 # ── Templates ──────────────────────────────────────────────────────────
 as_teacher(A); sp()
 t = c.run('select list_questionnaire_templates()')[0][0]
-ok('18 templates: 15 reflections, About Me, Goal Check-In, Reply to Report', len(t) == 18, len(t))
+# 20261107_no_report_reply.sql (live since Nov 7) deletes the Reply to Report template: 17 where it is loaded.
+TEMPLATES = 18 if any(x['id'] == 'report-reply' for x in t) else 17
+ok('%d templates: 15 reflections, About Me, Goal Check-In%s' % (TEMPLATES, ', Reply to Report' if TEMPLATES == 18 else ' (no Reply to Report since 20261107)'), len(t) == TEMPLATES, len(t))
 g8 = [x for x in t if x['id'] == 'core-8-1'][0]
 ok('Grade 8 November is Self-Awareness and Goal Setting with the Personal Shield',
    g8['theme'] == 'Self-Awareness and Goal Setting' and g8['questions'][0]['kind'] == 'short_set', g8)
@@ -143,7 +145,7 @@ ok("Teacher B can read no access codes", c.run("select count(*) from student_acc
 sp()
 expect_error("Teacher B can't issue codes for A's questionnaire", lambda: c.run("select issue_access_codes(:q)", q=qid), 'not found')
 expect_error("Teacher B can't turn A's questionnaire off", lambda: c.run("select set_questionnaire_on(:q, false)", q=qid), 'not found')
-ok('templates are readable by any teacher', len(c.run('select list_questionnaire_templates()')[0][0]) == 18)
+ok('templates are readable by any teacher', len(c.run('select list_questionnaire_templates()')[0][0]) == TEMPLATES)
 as_teacher(None); sp()
 expect_error('no JWT: upsert refused', lambda: c.run("select upsert_questionnaire(:c, 'about_me', 'X')", c=COURSE_A), 'not authenticated')
 c.run('reset role'); c.run('set role anon'); sp()
