@@ -84,7 +84,7 @@ C1_FUNCTIONS = [
     'student_submit.revision_finish(text,uuid,uuid,jsonb,text)', 'student_submit.revision_unsend(text,uuid,uuid,text)',
     'student_submit.group_work(text,uuid,text)', 'student_submit.group_file_links(text,uuid,uuid,text)']
 # The one existing function C1 replaces (Batch B's): a page with the teacher's marks counts as
-# grading started (C1 section 2b; the owner has not decided it).
+# grading started (C1 section 2b; ruling 109).
 C1_REPLACES = ['student_submit._grading_started(uuid,uuid)']
 C1_PUBLIC_RPCS = ['public.set_course_feedback_options(uuid,jsonb,uuid)', 'public.save_markup(uuid,jsonb,integer,uuid)',
                   'public.list_assessment_markup(uuid)', 'public.return_work(uuid,uuid[],uuid)',

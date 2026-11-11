@@ -1156,13 +1156,21 @@ def closes():
                    piece(d.feedback(t1, ENR1), lab)['revision']['state'] == 'returned'
                    and d.rpc('list_course_feedback(:c)', c=COURSE_A)['revisions'][0]['state'] == 'returned',
                    (piece(d.feedback(t1, ENR1), lab)['revision'], req(d, rid)))
-                ok('(b) 1%s: returned by %s and deleted: the student cannot send another revision' % (tag, how),
-                   d.rev_start(t1, ENR1, lab).get('error') in ('no_revision', 'grading_started'))
-                # the grade then cleared and the clear returned: the request stays done
+                if not c2 and how == 'a class that returns at once':
+                    ok('(b) 1%s: returned by %s and deleted: the student cannot send another revision' % (tag, how),
+                       d.rev_start(t1, ENR1, lab).get('error') in ('no_revision', 'grading_started'))
+                # the grade then cleared and the clear returned: the request stays done. (With C1 alone, a
+                # clear returned at once by a save, with no Batch C call since the revision's grade was
+                # returned by a save, is the one way it can still read open: C2's trigger closes it.)
                 d.rpc('clear_score(:e, :a)', e=ENR1, a=lab)
                 if how != 'a class that returns at once': d.return_work(lab, [ENR1])
-                ok('(b) 1%s: returned by %s, then cleared and the clear returned: still returned' % (tag, how),
-                   d.rpc('list_course_feedback(:c)', c=COURSE_A)['revisions'][0]['state'] == 'returned', req(d, rid))
+                if c2 or how != 'a class that returns at once':
+                    ok('(b) 1%s: returned by %s, then deleted, cleared and the clear returned: still returned' % (tag, how),
+                       d.rpc('list_course_feedback(:c)', c=COURSE_A)['revisions'][0]['state'] == 'returned', req(d, rid))
+                if c2 or how != 'a class that returns at once':
+                    ok('(b) 1%s: returned by %s and deleted: the student cannot send another revision' % (tag, how),
+                       d.rev_start(t1, ENR1, lab).get('error') in ('no_revision', 'grading_started'))
+                    ok('(b) 1%s: returned by %s: the request is then stored as done' % (tag, how), req(d, rid)[0] == 'done', req(d, rid))
             finally:
                 d.close()
         # (b) 2: read and returned at the same grade
@@ -1331,6 +1339,23 @@ def hide_round1():
         c = d.rpc('cancel_revision(:r, :k)', r=rid, k=nid())
         ok('(a) 2: Take Back then gives nothing back', c['unhidden'] is False and shown(d, ENR1, lab) is None, (c['unhidden'], shown(d, ENR1, lab)))
         ok('(a) 2: and the new grade still waits as a draft', d.one('select is_draft from grade_return where enrollment_id = :e and assessment_id = :a', e=ENR1, a=lab) is True)
+    finally:
+        d.close()
+
+    # the hide ends only when a Return gives a grade: a Return of a cleared hidden grade, with the revision in, leaves it on
+    d = scenario_db('hr1', with_c2=True)
+    try:
+        k = seed(d); lab = k['lab']; t1 = d.session(ENR1)
+        d.send(t1, ENR1, lab)
+        d.score(ENR1, lab, 6); d.return_work(lab, [ENR1])
+        rid = d.rfr(lab, ENR1, {'what_to_fix': 'Fix', 'keep_grade': False})['request']['id']
+        d.revise(t1, ENR1, lab)
+        d.rpc('clear_score(:e, :a)', e=ENR1, a=lab)
+        r = d.return_work(lab, [ENR1])
+        ok('(a) 2: a Return that gives no grade (the hidden grade cleared) leaves the hide on and the request open',
+           r['returned'] == 0 and req(d, rid) == ['open', True, None] and shown(d, ENR1, lab) is None, (r, req(d, rid)))
+        c = d.rpc('cancel_revision(:r, :k)', r=rid, k=nid())
+        ok('(a) 2: and Take Back still gives the 6 back', c['unhidden'] is True and shown(d, ENR1, lab) == 6)
     finally:
         d.close()
 

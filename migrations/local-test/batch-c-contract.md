@@ -13,7 +13,7 @@ Batch C applies only after Batch B (`2026111101`, `2026111102`) and Batch B's re
 - Students write their own words in a reflection; the teacher cannot change them. A teacher's answer reaches the student once it is sent.
 - Group work (One per Group) is the groups the teacher made on the assessment (Pairs or Groups). Each member who sends makes their own submission; the group's work is all of them together. No function sends a student another student's name, or another student's enrollment id as a field (a group-mate's page path, turned into a link, carries that student's enrollment id: an opaque id, never a name).
 - Every function takes the class's lock before it writes, and asks for a remembered answer under it.
-- **The teacher's marks count as grading started** (not yet decided by Colin; C1 section 2b, one separable commit). Batch B's `student_submit._grading_started` counts a draft or returned grade (ruling 83); C1 replaces it, keeping that text, so that a page of the student's own work for the piece with at least one mark in the teacher's copy also counts, given or not. Batch B's `unsend`, `replace` and a finishing `send_finish` then answer `grading_started`, and Batch B's `work` shows `sent.grading: true`, `sent.can_change: false`. A page whose marks were all erased does not count; marks on a group-mate's pages do not count for this student. The same rule holds for a revision: marks on a revision's pages make its `state` `grading`, so `revision_unsend` and a second `revision_start` answer `grading_started`. The teacher's screen should say so before the first mark goes on a page (the student can no longer take it back).
+- **The teacher's marks count as grading started** (Colin decided it on Nov 11, ruling 109; C1 section 2b). Batch B's `student_submit._grading_started` counts a draft or returned grade (ruling 83); C1 replaces it, keeping that text, so that a page of the student's own work for the piece with at least one mark in the teacher's copy also counts, given or not. Batch B's `unsend`, `replace` and a finishing `send_finish` then answer `grading_started`, and Batch B's `work` shows `sent.grading: true`, `sent.can_change: false`. A page whose marks were all erased does not count; marks on a group-mate's pages do not count for this student. The same rule holds for a revision: marks on a revision's pages make its `state` `grading`, so `revision_unsend` and a second `revision_start` answer `grading_started`. The teacher's screen should say so before the first mark goes on a page (the student can no longer take it back).
 
 ## Class settings
 
@@ -55,6 +55,8 @@ Any mark may have `id` (a string of 1 to 64 characters) and `color` (`red`, `gre
 ### `return_work(p_assessment_id uuid, p_enrollment_ids uuid[], p_idempotency_key uuid)`
 
 Use in place of `return_grades` wherever Mark Up can be on screen (Return, Return and Next, Return N Graded). It runs `return_grades` unchanged, then gives each listed student of the class the marks on their pages of the piece. Returns `return_grades`' answer plus `marks_given` (pages) and `marks_enrollment_ids`. Remembered. A student whose grade is not a draft but whose marks changed is given the marks.
+
+**It also ends each listed student's revision request whose revision is in** (`sent` or `grading`), whether or not the grade changed: the teacher read the revision and returned it. The request is then `returned` (stored as done) and the student can no longer Unsend the revision or send another. A listed student whose request has no revision in keeps it open. A request whose grade is hidden is not ended by a Return that gives no grade (the hidden grade cleared).
 
 **To Return** counts, for a piece, each student who has a draft or a page with `waiting` true (`list_course_feedback.markup`, or `list_assessment_markup` for one piece), once. No server answer changes for that: the screens put the two together, and Return N Graded passes those students to `return_work`. The phone's and desktop's counts (`GraderWork.workCounts`) need it when they are wired.
 
@@ -105,7 +107,9 @@ A request (`request`, and each item of `list_course_feedback.revisions`):
 }
 ```
 
-`state`: `open` (no revision in), `sent` (in, grading not started), `grading` (the grade changed since it came in, or the teacher's marks are on one of its pages), `returned` (a grade was returned after it came in), `cancelled`. Read live from the submissions and `grade_return`, so a grade saved by any path is read right. `first_grade` is the raw copy: "Was Developing + on the Oct 30 version".
+`state`: `open` (no revision in), `sent` (in, grading not started), `grading` (the grade changed since it came in, or the teacher's marks are on one of its pages), `returned` (a grade was returned after it came in, or `return_work` returned the student with it in), `cancelled`. `returned` and `cancelled` are stored: once a request is `returned` nothing done to the work or the grade later (its photos deleted, the grade cleared and that returned) opens it again. `open`, `sent` and `grading` are read live from the submissions and `grade_return`, so a grade saved by any path is read right. `first_grade` is the raw copy: "Was Developing + on the Oct 30 version".
+
+`grade_hidden`: the hide is on now (C2). It is true from the Return for Revision that hid the grade until the hide ends, and never again for that request; it ends when a Return gives the student a grade for the piece (any Return) or when the request is taken back. `keep_grade` stays the teacher's choice.
 
 ### `set_revision_request(p_request_id uuid, p_patch jsonb, p_idempotency_key uuid)`
 
@@ -113,13 +117,13 @@ A request (`request`, and each item of `list_course_feedback.revisions`):
 
 ### `cancel_revision(p_request_id uuid, p_idempotency_key uuid)`
 
-Take Back. A revision already sent stays as a later version. With C2, a hidden grade is given back exactly as the student had it (a change the teacher made since waits as a draft on it). Answers `cancelled` with `unhidden` (remembered) or `not_open`.
+Take Back. A revision already sent stays as a later version. With C2, while the hide is on, the grade is given back exactly as the student had it, whatever the teacher did to the score since (a change, a clear by any writer, Set Everyone To, a restore: it waits as a draft on it), and no mark drawn while it was hidden goes with it (those wait for the next Return). Once the hide has ended, nothing is given back. Answers `cancelled` with `unhidden` (remembered) or `not_open`.
 
 ### `answer_reflection(p_reflection_id uuid, p_answer text, p_idempotency_key uuid)`
 
 `answer_reflection(p_reflection_id uuid, p_answer text, p_idempotency_key uuid, p_only_me boolean default false)`
 
-Send Answer, 1 to 2000 characters. Answers what is waiting: the question (or, with none, the reflection), then the follow-up. `p_only_me` true (the grader's Only Me): the answer is the teacher's own note, never sent to the student, nor that there is one; it clears the question as an answer does; the student can then not reply to it (`not_answered`). It applies to the answer it writes (the first, or the follow-up's). Answers `answered` with the reflection (remembered), `already_answered`, or `reflect_off` while the class has Reflect on Feedback off (not remembered).
+Send Answer, 1 to 2000 characters. Answers what is open: the question (or, with none, the reflection) until it has an answer, then the follow-up once the student asks one. `p_only_me` true (the grader's Only Me): the text is the teacher's own note on what is open (`note`, or `follow_up_note`; a second note takes the place of the first). A note is never sent, and no function a student calls reads it: for a reflection with a note every student answer is the one a reflection with nothing gets (the student can still change their reflection; `reply` answers `not_answered`). A note is not an answer: a real answer can still be sent after it. It clears the question from the teacher's list (`waiting` false) until the student changes the reflection. Answers `answered` with the reflection (remembered), `already_answered` (an answer is sent and no follow-up is open), or `reflect_off` while the class has Reflect on Feedback off (not remembered).
 
 ### `list_course_feedback(p_course_id uuid)`
 
@@ -129,12 +133,13 @@ Send Answer, 1 to 2000 characters. Answers what is waiting: the question (or, wi
   "markup": [ { "file_id", "assessment_id", "enrollment_id", "rev", "given_rev", "given_at", "waiting" } ],
   "revisions": [ request, … ],
   "reflections": [ { "id", "assessment_id", "enrollment_id", "makes_sense", "question", "plan", "plan_at", "went_well", "sent_at",
-                     "answer", "answered_at", "only_me", "answer_seen_at", "sense_now", "sense_now_at", "follow_up",
-                     "follow_up_answer", "follow_up_answered_at", "follow_up_only_me", "follow_up_answer_seen_at", "waiting" } ]
+                     "answer", "answered_at", "note", "noted_at", "answer_seen_at", "sense_now", "sense_now_at", "follow_up",
+                     "follow_up_answer", "follow_up_answered_at", "follow_up_note", "follow_up_noted_at", "follow_up_answer_seen_at",
+                     "waiting" } ]
 }
 ```
 
-`waiting` on a reflection: a question or follow-up has no answer (an Only Me answer is an answer). It is what the dashboard's Questions From Students, the gradebook's mark and the profile's mark count; one answer clears all three. **`reflections` is empty while the class has Reflect on Feedback off**: the rows are kept and come back when it is turned on. `answer_seen_at`: when the student's page showed the answer. Nothing here moves the class's sync cursor: read it when the screens open.
+`waiting` on a reflection: a question or follow-up has no answer and no Only Me note (a question changed after its note waits again). `answer` is only ever an answer sent to the student; `note` is the teacher's Only Me note. It is what the dashboard's Questions From Students, the gradebook's mark and the profile's mark count; one answer clears all three. **`reflections` is empty while the class has Reflect on Feedback off**: the rows are kept and come back when it is turned on. `answer_seen_at`: when the student's page showed the answer. Nothing here moves the class's sync cursor: read it when the screens open.
 
 ## The student's side: `student_submit` functions
 
@@ -165,8 +170,8 @@ Read-only. For the student's page, beside `page` and Batch B's `work`:
 
 - Lists only pieces on the page that have marks given, a revision asked, or a reflection.
 - `marks`: `pages` is the pages carrying given marks, `work_pages` every page of the work (each member's latest handed-in version), `notes` how many marks are notes ("2 pages · 3 notes on your work"), the student's and their group's. Null before the work is returned with marks.
-- `reflection` and `last_plan` only while Reflect on Feedback is on (null otherwise). `answer` and `answered_at` (and the follow-up's) are null for an answer the teacher kept Only Me. `answer_new`: an answer sent to the student that the page has not yet shown (What Changed's "Mr. Brown answered your question"); `answer_seen` clears it.
-- `revision.first_grade`: the first version's grade as the student had it, cut to what the work's scoring uses now (as `page` cuts grades). Null while the grade is hidden, or Missing or Excused is on the piece. The new grade is `page`'s.
+- `reflection` and `last_plan` only while Reflect on Feedback is on (null otherwise). `answer` and `answered_at` (and the follow-up's) are the answers sent; the teacher's Only Me notes are never read here. `answer_new`: an answer sent to the student that the page has not yet shown (What Changed's "Mr. Brown answered your question"); `answer_seen` clears it.
+- `revision.first_grade`: the first version's grade as the student had it, cut to what the work's scoring uses now (as `page` cuts grades). Null while the hide is on (`grade_hidden`), or Missing or Excused is on the piece. The new grade is `page`'s.
 - `last_plan`: Your Plan From Last Time for the next send's "Did You Do It?" (Batch B's `followed_plan`): the plan written most recently, with the reflection or later with Make My Plan (`sent_at` is when the plan was written).
 - `show_my_learning`: the My Learning tab shows grades only when true. Its numbers come from `page`'s returned grades through `calc.js`.
 
@@ -176,11 +181,11 @@ Read-only. For the student's page, beside `page` and Batch B's `work`:
 
 ### `reflect(…, p_assessment_id uuid, p_reflection jsonb, …)`
 
-`p_reflection`: `{ "makes_sense": "yes" | "not_sure", "question": "…", "plan": "…", "went_well": "…" }`, no other key. `not_sure` needs a question; `yes` needs a plan; each 1000 characters at most; `null` or `""` is the same as leaving one out. Sent again before the teacher answers, it takes the place of the first; the same reflection twice is the same. Errors: `reflect_off`, `not_found` (not the class's, or not yet on the page), `not_returned` (no grade has been returned for the piece), `already_answered`. Returns `{ ok, reflection: { makes_sense, question, plan, went_well, sent_at } }`.
+`p_reflection`: `{ "makes_sense": "yes" | "not_sure", "question": "…", "plan": "…", "went_well": "…" }`, no other key. `not_sure` needs a question; `yes` needs a plan; each 1000 characters at most; `null` or `""` is the same as leaving one out. Sent again before the teacher answers, it takes the place of the first (an Only Me note is not an answer); the same reflection twice is the same. Errors: `reflect_off`, `not_found` (not the class's, or not yet on the page), `not_returned` (no grade has been returned for the piece), `already_answered`. Returns `{ ok, reflection: { makes_sense, question, plan, went_well, sent_at } }`.
 
 ### `reply(…, p_assessment_id uuid, p_reply jsonb, …)`
 
-`p_reply`: `{ "sense_now": "yes" | "not_sure", "follow_up": "…", "plan": "…" }`, no other key. `follow_up` only with `not_sure`, once, 1000 at most. **`plan` only with `yes`, 1000 at most: Make My Plan** after the teacher's answer; it takes the place of a plan made before (a reply without one keeps it). Errors: `reflect_off`, `not_found`, `not_answered` (no answer yet, or the answer was Only Me), `already_asked`. Returns `{ ok, reflection: { sense_now, follow_up, plan, answer, follow_up_answer } }`.
+`p_reply`: `{ "sense_now": "yes" | "not_sure", "follow_up": "…", "plan": "…" }`, no other key. `follow_up` only with `not_sure`, once, 1000 at most. **`plan` only with `yes`, 1000 at most: Make My Plan** after the teacher's answer; it takes the place of a plan made before (a reply without one keeps it). Errors: `reflect_off`, `not_found`, `not_answered` (no answer sent yet), `already_asked`. Returns `{ ok, reflection: { sense_now, follow_up, plan, answer, follow_up_answer } }`.
 
 ### `answer_seen(p_session_token, p_enrollment_id, p_assessment_ids uuid[], p_ip_hash)`
 
@@ -215,7 +220,7 @@ Send My Revision, as Batch B's `send_start`, `send_finish` and `unsend`, with th
 - `revision_start` errors: Batch B's (`send_off`, `not_found`, `not_taking_work`, `expired`, `too_many`, `class_full`), plus `no_revision` (no open request) and `grading_started` (the revision in is being graded or was returned). Revise By does not close it; a revision sent after it is `late`.
 - `revision_finish` errors: Batch B's (`not_found`, `send_off`, `not_taking_work`, `expired`, `missing_pages`, `bad_file`), plus `no_revision` and `grading_started` (the pages are dropped), and `cannot_change` (the revision in was added by the teacher).
 - Sent again before grading starts, a revision takes the place of the one in (the student's pages go, for good; pages the teacher added move to the new one).
-- `revision_unsend`: `{ ok, unsent, cancelled, pages }`. THE PHOTOS ARE DELETED. Errors `grading_started`, `cannot_change`.
+- `revision_unsend`: `{ ok, unsent, cancelled, pages }`. THE PHOTOS ARE DELETED. Errors `grading_started` (also for a revision whose request was returned), `cannot_change`.
 
 **The edge function must route a revision to these.** Batch B's `send_start` answers `already_sent` for a piece with work in; Batch B's `send_finish` on a revision's send answers `already_sent` and drops it; Batch B's `unsend` and `replace` on a piece with a revision in answer `grading_started` (the first version's grade was returned). Nothing is lost by a wrong route; it is refused. Batch B's `work` lists a revision's unfinished send as that piece's `sending`, and a revision handed in as its `sent` (the latest version): tell them apart with `feedback`'s `revision`. A wrong request id is the caller's bug: one Batch B's `send_start` used before is answered by `revision_start` as a replay of that send.
 
@@ -247,9 +252,11 @@ Copy each reply field by field, as the card routes do.
 
 ## What C2 changes (when applied)
 
-- `return_for_revision` with `keep_grade: false` hides the grade: the student's `grade_return` row becomes a draft never returned (the student page and every report count nothing for it); the teacher sees a draft. `cancel_revision` gives it back. Returning the new version's grade ends the hide. A class leaving When I Return Them returns it, as any draft.
-- Every Return, by any path, gives the marks on that piece (a trigger on `grade_return`). `return_work` stays the call to use.
+- `return_for_revision` with `keep_grade: false` hides the grade: the student's `grade_return` row becomes a draft never returned (the student page and every report count nothing for it); the teacher sees a draft. The hide is a stored fact on the request (`grade_hidden`, with when and how it ended). It ends when a Return gives the student a grade for the piece, by any path: returning the new version's grade, Return N Graded including the hidden draft (the student sees the grade they had again), the class leaving When I Return Them. The Return that ends it with a different grade is an update on the grade the student had: the page is told Updated, and `previous` is that grade. `cancel_revision` while the hide is on gives the kept grade back, with no mark that was not returned. Once the hide has ended, nothing gives a grade back.
+- Every Return, by any path, gives the marks on that piece and stores a finished revision request as done (a trigger on `grade_return`). `return_work` stays the call to use.
 
 ## Changes
+
+- 2026-11-11, review round 1 (`batch-c-review.md`): a hide is a stored fact with a beginning and an end; Take Back gives back the kept grade whatever the score became, without marks, and nothing once the hide has ended; the Return that ends a hide is an Updated on the grade the student had; C2's undo gives back only a hide that is on. A request is stored as done when its revision's grade is returned (by any path with C2; by Batch C's own calls with C1 alone) and when `return_work` returns the student with the revision in; deleting the revision's photos afterwards does not open it. `revision_unsend` refuses a returned revision. Only Me is a note apart from the answer (`note`, `noted_at`, `follow_up_note`, `follow_up_noted_at` in place of `only_me` and `follow_up_only_me`): a real answer can follow it, and no student answer differs for a reflection with a note.
 
 - 2026-11-11, refresh round (before anything was built on the server side; the Demo screens already match unless named): marks have a stated place (fractions of the page) and are bounded; `save_markup` answers `given_rev` and `waiting` in place of a true/false `given` (the Demo data layer's `saveMarkup` answers `given`: change it at S9-W1); `waiting` passes over a page with nothing to give and a piece that shows no marks; `reply` takes `plan` (Make My Plan) and answers `reflect_off`; the switch off hides reflections from both sides; `answer_reflection` takes `p_only_me`; `feedback` sends `marks.work_pages` and `reflection.answer_new`; `answer_seen` is new; the route bodies and `file-links`' answer are written down; marks on a page count as grading started (not yet decided by Colin).

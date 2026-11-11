@@ -36,10 +36,20 @@
 --    which criteria, Keep or Hide the grade, the version it was asked of,
 --    and that version's grade as the student had it (for Before and
 --    After). A revision is the next version of the piece's submission
---    (Batch B's version column): version 2, then 3.
+--    (Batch B's version column): version 2, then 3. A request is closed
+--    as done, a stored fact, once its revision's grade is returned, or
+--    once the teacher returns the student's work with the revision in
+--    (return_work), even at the same grade; nothing done to the work or
+--    the grade afterwards opens it again (_revision_settle). The columns
+--    the second file (C2) keeps a hide in are here too: a hide is a
+--    stored fact with a beginning and an end (grade_hidden, hidden_state,
+--    hide_ended_at, hide_ended_by).
 -- 4. public.feedback_reflection: Reflect on Feedback. Does the feedback make
 --    sense, the question, the plan, what went well; the teacher's answer;
 --    Does It Make Sense Now, and one follow-up question and its answer.
+--    The teacher's Only Me notes (note, follow_up_note) are kept apart
+--    from the answers: no function a student calls reads them, and a real
+--    answer can still be sent after one.
 -- 5. Triggers on assessment and enrollment, as Batch B has: when one is
 --    deleted, its revision requests and reflections go, under the class's
 --    lock. (Marks go with their pages, which Batch B's triggers delete.)
@@ -100,7 +110,7 @@
 --
 -- ── What it changes in what exists ──────────────────────────────────────────
 -- ONE EXISTING FUNCTION IS REPLACED: Batch B's student_submit._grading_started
--- (section 2b; the owner has not decided it): a page carrying the teacher's
+-- (section 2b; Colin decided it, ruling 109): a page carrying the teacher's
 -- marks counts as grading started, so the student can no longer Unsend or
 -- Replace it. Batch B's text is kept and one condition added.
 -- course gains two columns (a constant default: no rewrite). assessment and
@@ -353,7 +363,7 @@ comment on table public.markup is
     'Mark Up: drawing data over one page of handed-in work. working is the teacher''s; given is what the student was given when the work was returned. Read and written only through the functions of 2026111120.';
 
 -- ── 2b. Marks count as grading started ──────────────────────────────────────
--- THE OWNER HAS NOT DECIDED THIS (it is the one replaced function in this
+-- COLIN DECIDED THIS ON NOV 11 (ruling 109) (it is the one replaced function in this
 -- file; the commit that adds it can be taken out on its own). Batch B's
 -- student_submit._grading_started (2026111101) says the teacher has
 -- started grading a student's work when the piece holds a draft or a

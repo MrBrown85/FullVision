@@ -1734,7 +1734,7 @@ for those three new rows.
   student, another class, no session, a wrong shape; Students See Your Mark
   Up off; Missing; the page off; the stored photo is untouched; Unsend and
   deleting a student take the marks.
-- **started** (C1 2b, not yet decided by the owner). Batch B's
+- **started** (C1 2b, decided by the owner: ruling 109). Batch B's
   `_grading_started` replaced: no grade and no marks is not started; one
   mark on one page is (given or not), for that student and piece only;
   Unsend, Replace and a Replace finishing after the teacher marked answer

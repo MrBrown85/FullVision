@@ -18,10 +18,27 @@
 --    student was given stops being shown to them (returned_at, updated_at
 --    and returned_copy are cleared and the row becomes a draft), as "a
 --    grade hidden during a revision is a draft" (DECISIONS, "Student page
---    build answers" 6) says. What the student had is kept on the request
---    (revision_request.hidden_state) so taking the request back gives it
---    back exactly. When the new version is graded and returned, the row is
---    returned as any draft is (return_grades, unchanged).
+--    build answers" 6) says.
+--    A HIDE IS A STORED FACT WITH A BEGINNING AND AN END, on the request
+--    (C1's columns): grade_hidden is on from the hide until it ends;
+--    hidden_state keeps what the student had (returned_at, updated_at,
+--    previous_copy and the copy they were shown), where nothing the
+--    teacher does to the score can reach it; hide_ended_at and
+--    hide_ended_by say when and how it ended. It ends exactly when
+--      - a Return gives the student a grade for the piece, by any path
+--        (Return, Return N Graded, the class leaving When I Return Them):
+--        the trigger below ends it ('returned'). Returning the revision's
+--        new grade is the usual one; a Return of the hidden grade itself
+--        ends it too, and the student sees the grade they had. The Return
+--        that ends it is an update on the grade the student had (Updated,
+--        "was" that grade) when the grade returned differs;
+--      - Take Back (cancel_revision) gives the kept grade back
+--        ('taken_back'): exactly what the student had, with whatever the
+--        teacher did to the score meanwhile (a change, a clear by any
+--        writer, Set Everyone To, a restore) waiting as a draft on it.
+--        Giving back is not a Return: no mark goes out with it.
+--    Once it has ended, nothing gives a grade back. A restore's passing
+--    "mark every grade Returned" step does not end a hide.
 --    Why not C1: it changes a row about a student's grade that exists
 --    today, and what the student page and every report count.
 -- 2. MARKS ARE GIVEN WHENEVER A GRADE IS RETURNED, BY ANY PATH. A trigger
@@ -30,7 +47,10 @@
 --    return_grades from an older screen, by the class leaving When I
 --    Return Them (2026110902's release), by a save in a class that returns
 --    at once, by a restore. C1's return_work already gives them for the
---    screens that call it; this closes the other paths.
+--    screens that call it; this closes the other paths. The same trigger
+--    ends a hide on the piece (1) and closes a revision request whose
+--    revision's grade has now been returned (C1's _revision_settle), so
+--    both are stored at the moment the Return happens.
 --    Why not C1: it runs inside every grade save and every Return. A fault
 --    in it would stop teachers saving or returning grades.
 --
@@ -46,8 +66,9 @@
 -- On the apply: nothing. No request can be hiding a grade before this file
 -- (C1 refuses to), and the trigger acts only on grade_return rows written
 -- after it. After the apply: a Return for Revision with Hide changes that
--- student's grade_return row for that piece (1); a Return of any kind fills
--- markup.given for that piece (2).
+-- student's grade_return row for that piece (1), and so does the Take Back
+-- or the Return that ends the hide; a Return of any kind fills
+-- markup.given for that piece and closes its finished revision request (2).
 --
 -- ── The checks it makes first ───────────────────────────────────────────────
 -- It stops, with nothing changed, unless C1 is applied and its three
@@ -61,8 +82,9 @@
 --
 -- ── Taking it back out ──────────────────────────────────────────────────────
 -- migrations/local-test/batch-c2-undo.sql (proved by batch_c_undo.py): every
--- grade still hidden is given back first, then the trigger goes and the
--- three stand-ins are put back as C1 left them.
+-- hide that is on now is given back first (as Take Back gives it, and
+-- marked ended by the undo), then the trigger goes and the three stand-ins
+-- are put back as C1 left them.
 begin;
 
 set local lock_timeout = '5s';
