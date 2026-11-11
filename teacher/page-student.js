@@ -3095,6 +3095,97 @@ window.PageStudent = (function () {
 
   /* Each learning disposition on one timeline, a dot per observation tagged
      with it (it opens the observation); the ones not seen yet in one row. */
+  /* One 1–4 scale (design rule 5): the teacher's level filled in its
+     colour, or the student's own rating as the outline variant. */
+  function _lpScaleHtml(level, own, label) {
+    var lvl = Math.max(0, Math.min(4, level || 0));
+    var html = '<span class="lp-scale' + (own ? ' own' : '') + '" role="img" aria-label="' + esc(label) + '">';
+    for (var n = 1; n <= 4; n++) {
+      var on = n <= lvl;
+      html +=
+        '<span class="lp-scale-cell' +
+        (on ? ' on' : '') +
+        '"' +
+        (on && !own ? ' style="background:' + (PROF_COLORS[lvl] || PROF_COLORS[0]) + '"' : '') +
+        '></span>';
+    }
+    return html + '</span>';
+  }
+
+  /* How the student sees their learning (redesign R6): each competency the
+     student rated in a reflection, their rating beside the teacher's level.
+     A step apart is something to talk about. */
+  function _calibrationHtml(ctx) {
+    var cid = ctx.cid;
+    var first = displayNameFirst(ctx.student);
+    var mine = getReflections(cid)[studentId] || {};
+    var rows = [];
+    ctx.sections.forEach(function (sec) {
+      var r = mine[sec.id];
+      var self = r && Number(r.confidence);
+      if (!(self >= 1 && self <= 4)) return;
+      var v = getSectionProficiency(cid, studentId, sec.id);
+      var teach = v > 0 ? Math.max(1, Math.min(4, roundLevel(v))) : 0;
+      var d = teach ? self - teach : 0;
+      rows.push({
+        sec: sec,
+        self: self,
+        teach: teach,
+        v: v,
+        note: !teach
+          ? 'No level from you yet.'
+          : d >= 1
+            ? 'Rates themselves higher. Ask what they’d point to.'
+            : d <= -1
+              ? 'Rates themselves lower. Show them the evidence.'
+              : 'You agree.',
+        talk: !!teach && d !== 0,
+      });
+    });
+    var html =
+      '<section class="qw-sec" id="lp-calib" aria-labelledby="lp-calib-h"><div class="qw-head"><h2 id="lp-calib-h">How ' +
+      esc(first) +
+      ' Sees Their Learning</h2></div>' +
+      '<p class="lp-calib-lede">' +
+      esc(first) +
+      '’s own rating beside your level. A gap is something to talk about.</p>';
+    if (!rows.length)
+      return (
+        html +
+        '<div class="lp-none">' +
+        esc(first) +
+        ' hasn’t rated a competency yet. Their ratings come from competency reflections.</div></section>'
+      );
+    html +=
+      '<div class="lp-calib" role="table" aria-label="' +
+      esc(first + '’s rating beside your level') +
+      '"><div class="lp-calib-row lp-calib-head" role="row"><span role="columnheader">Competency</span><span role="columnheader">' +
+      esc(first) +
+      ' Says</span><span role="columnheader">Your Level</span><span role="columnheader"><span class="help-sr-only">Note</span></span></div>';
+    rows.forEach(function (x) {
+      html +=
+        '<div class="lp-calib-row" role="row"><span class="lp-calib-name" role="cell">' +
+        esc(x.sec.name) +
+        '</span><span role="cell">' +
+        _lpScaleHtml(x.self, true, first + ' says ' + (CONFIDENCE_LABELS[x.self] || x.self)) +
+        '<span class="lp-calib-word">' +
+        esc(CONFIDENCE_LABELS[x.self] || '') +
+        '</span></span><span role="cell">' +
+        (x.teach
+          ? _lpScaleHtml(x.teach, false, 'Your level ' + formatLevel(cid, x.v)) +
+            '<span class="lp-calib-word">' +
+            esc(formatLevel(cid, x.v)) +
+            '</span>'
+          : '<span class="lp-calib-word">Not yet</span>') +
+        '</span><span class="lp-calib-note' +
+        (x.talk ? ' talk' : '') +
+        '" role="cell">' +
+        esc(x.note) +
+        '</span></div>';
+    });
+    return html + '</div></section>';
+  }
+
   function _dispositionsHtml(ctx) {
     var cid = ctx.cid;
     var first = displayNameFirst(ctx.student);
@@ -3244,6 +3335,7 @@ window.PageStudent = (function () {
       '<div class="qw-group"><h3>Competency Goals</h3>' +
       _compGoalsHtml(ctx) +
       '</div></section>' +
+      _calibrationHtml(ctx) +
       LearnerProfile.reflectionsHtml(o) +
       '<section class="qw-sec" id="lp-dispositions" aria-labelledby="lp-disp-h"><div class="qw-head"><h2 id="lp-disp-h">Seen in Observations</h2></div>' +
       _dispositionsHtml(ctx) +
