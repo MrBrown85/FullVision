@@ -1384,6 +1384,7 @@ window.MGrade = (function () {
       // A grading screen opened afresh starts each card on its first criterion.
       if (!(opts && opts.keep)) {
         _critPage = {};
+        _paperOpen = {};
         _openGroups = {};
       }
       if (opts && opts.student) {
@@ -1708,17 +1709,21 @@ window.MGrade = (function () {
       var criteria = ((rubric && rubric.criteria) || []).filter(Boolean);
       return (
         '<div class="m-revision-sheet" role="dialog" aria-labelledby="m-revision-title">' +
-        '<div class="m-revision-head"><button type="button" class="m-revision-cancel" data-action="m-sheet-cancel">Cancel</button></div>' +
-        '<h2 class="m-revision-title" id="m-revision-title">Return for Revision</h2>' +
+        // Cancel on the left and the title in the middle, in one row (the
+        // board "Phone: Return for Revision"); the sheet's grabber is over it.
+        '<div class="m-revision-head"><button type="button" class="m-revision-cancel" data-action="m-sheet-cancel">Cancel</button>' +
+        '<h2 class="m-revision-title" id="m-revision-title">Return for Revision</h2><span aria-hidden="true"></span></div>' +
         '<p class="m-revision-sub">' +
         MC.esc(displayNameWithLast(st) + ' · ' + (a.title || 'Assessment')) +
         '</p>' +
         '<label class="m-revision-label" for="m-revision-fix">What to Fix</label>' +
         '<textarea id="m-revision-fix" class="m-revision-fix" rows="3" maxlength="2000"></textarea>' +
+        // Revise By and Revise side by side.
+        '<div class="m-revision-row"><div class="m-revision-field">' +
         '<label class="m-revision-label" for="m-revision-by">Revise By</label>' +
-        '<input type="date" id="m-revision-by" class="m-revision-by">' +
+        '<input type="date" id="m-revision-by" class="m-revision-by"></div>' +
         (criteria.length > 1
-          ? '<label class="m-revision-label" for="m-revision-crit">Revise</label>' +
+          ? '<div class="m-revision-field"><label class="m-revision-label" for="m-revision-crit">Revise</label>' +
             '<select id="m-revision-crit" class="m-revision-crit"><option value="">The Whole Assignment</option>' +
             criteria
               .map(function (c) {
@@ -1727,8 +1732,9 @@ window.MGrade = (function () {
                 );
               })
               .join('') +
-            '</select>'
+            '</select></div>'
           : '') +
+        '</div>' +
         // The grade until then: kept. The board's Hide is left out (Colin, Nov 11).
         '<h3 class="m-revision-label">Until the New Version Is Graded</h3>' +
         '<p class="m-revision-keep">Keep this grade. The new version replaces it.</p>' +
@@ -2037,6 +2043,10 @@ window.MGrade = (function () {
       // Under the name: when the work came, then the status (the board
       // "Phone Speed Grader With Photos").
       var sent = MGradePhotos.sentHtml(cid, assessment, st, unit);
+      // A card with nothing in has the status under Add Work instead (the
+      // board "Add Work for a Student").
+      var notInCard = MGradePhotos.notInCard(cid, assessment, st, unit);
+      var headStatus = notInCard ? '' : statusRow;
 
       var header =
         '<div class="m-grade-student-header">' +
@@ -2050,7 +2060,7 @@ window.MGrade = (function () {
         badges +
         '</div>' +
         sent +
-        statusRow +
+        headStatus +
         '</div></div>';
       // One student's work: the card is named by the piece (the bar names the student).
       if (_student && _student.sid === st.id && !(unit && unit.view))
@@ -2059,7 +2069,7 @@ window.MGrade = (function () {
           MC.esc(assessment.title) +
           '</div>' +
           sent +
-          statusRow +
+          headStatus +
           '</div></div>';
       if (unit && unit.view) header = _groupCardHeadHtml(cid, assessment, unit.view) + sent;
       else if (unit && unit.separateFrom) header += _separateLineHtml(assessment.id, st.id, unit.separateFrom);
@@ -2087,6 +2097,10 @@ window.MGrade = (function () {
           })
           .join('');
       }
+      // Nothing in: the criteria under Grade From Paper, each "Not scored ›"
+      // (or its level), until one is tapped (the board "Add Work for a Student").
+      if (notInCard && rubric && !_paperOpen[st.id + ':' + assessment.id])
+        tagGroups = _notScoredHtml(cid, st, assessment, rubric);
       var ptsTagLines = '';
       var ptsTid = null;
       // Rubric work lists the competencies its criteria feed, as the desktop's
@@ -2254,7 +2268,7 @@ window.MGrade = (function () {
         MGradePhotos.pinHtml(cid, assessment, st, unit) +
         header +
         // The student's work, under who it is (teacher-mobile/grade-photos.js).
-        MGradePhotos.cardHtml(cid, assessment, st, unit) +
+        MGradePhotos.cardHtml(cid, assessment, st, unit, { status: notInCard ? statusRow : '' }) +
         tagGroups +
         commentRow +
         '</div></div>'
@@ -2401,6 +2415,42 @@ window.MGrade = (function () {
        Which criterion and which groups are open are kept per student and
        piece while the phone is open. */
     var _critPage = {};
+    // Not-in cards whose criteria were opened from Grade From Paper, by "sid:aid".
+    var _paperOpen = {};
+
+    // html-safe: criterion names go through MC.esc; level words are constants; ids are ours; indexes are numbers
+    function _notScoredHtml(cid, st, assessment, rubric) {
+      return (
+        '<div class="m-paper-crits">' +
+        (rubric.criteria || [])
+          .map(function (crit, i) {
+            var state = _critState(cid, st.id, assessment.id, crit);
+            var now = state.level ? scoreLevelText(state.level) : 'Not scored';
+            return (
+              '<button type="button" class="m-paper-crit" data-action="m-paper-crit" data-sid="' +
+              st.id +
+              '" data-aid="' +
+              assessment.id +
+              '" data-idx="' +
+              i +
+              '"><span class="m-paper-crit-name">' +
+              MC.esc(crit.name || 'Criterion') +
+              '</span><span class="m-paper-crit-now">' +
+              MC.esc(now) +
+              '</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg></button>'
+            );
+          })
+          .join('') +
+        '</div>'
+      );
+    }
+
+    // A "Not scored ›" row tapped: the card's criteria open, on that one.
+    function openPaperCriterion(cid, sid, aid, idx) {
+      _paperOpen[sid + ':' + aid] = true;
+      if (idx >= 0) _critPage[sid + ':' + aid] = idx;
+      _refreshCard(cid, sid, aid);
+    }
     var _openGroups = {};
 
     // A level's name, for a group of boxes and the ± row: a word, not a grade.
@@ -3704,6 +3754,7 @@ window.MGrade = (function () {
       takeBackRevision: takeBackRevision,
       showStudentPiece: showStudentPiece,
       pageCriterion: pageCriterion,
+      openPaperCriterion: openPaperCriterion,
       toggleCritGroup: toggleCritGroup,
       openSetTo: openSetTo,
       setToFromPaper: setToFromPaper,
@@ -3783,6 +3834,7 @@ window.MGrade = (function () {
     takeBackRevision: Speed.takeBackRevision,
     showStudentPiece: Speed.showStudentPiece,
     pageCriterion: Speed.pageCriterion,
+    openPaperCriterion: Speed.openPaperCriterion,
     toggleCritGroup: Speed.toggleCritGroup,
     openSetTo: Speed.openSetTo,
     setToFromPaper: Speed.setToFromPaper,

@@ -229,11 +229,12 @@ window.MGradePhotos = (function () {
   }
 
   // html-safe: the note, names and dates go through MC.esc; ids and counts are ours or numbers
-  function cardHtml(cid, a, st, unit) {
+  // opts.status: on a card with nothing in, the status control to put under Add Work.
+  function cardHtml(cid, a, st, unit, opts) {
     var w = _cardWork(cid, a, st, unit);
     if (w.skip) return '';
     var sub = w.sub;
-    if (!sub) return notInHtml(cid, a, st);
+    if (!sub) return notInHtml(cid, a, st, (opts && opts.status) || '');
     var files = sub.files || [];
     var first = displayNameFirst(st) || displayName(st);
     var html = '<div class="m-work" data-sid="' + st.id + '" data-aid="' + a.id + '">';
@@ -290,8 +291,14 @@ window.MGradePhotos = (function () {
 
   /* A card with nothing in: where it stands, and Add Work for the student
      (S7-F3). Not on an Excused piece, which is not owed. */
-  // html-safe: the name goes through MC.esc; ids are ours
-  function notInHtml(cid, a, st) {
+  // A card with nothing in, not Excused: Add Work, the status, Grade From Paper.
+  function notInCard(cid, a, st, unit) {
+    var w = _cardWork(cid, a, st, unit);
+    return !w.skip && !w.sub && getAssignmentStatus(cid, st.id, a.id) !== 'EXC';
+  }
+
+  // html-safe: the name goes through MC.esc; ids are ours; status is the grader's checked status control; CAMERA_SVG is fixed markup
+  function notInHtml(cid, a, st, status) {
     if (getAssignmentStatus(cid, st.id, a.id) === 'EXC') return '';
     var first = displayNameFirst(st) || displayName(st);
     return (
@@ -305,9 +312,11 @@ window.MGradePhotos = (function () {
       '" data-aid="' +
       a.id +
       '">' +
+      CAMERA_SVG +
       MC.esc('Add Work for ' + first) +
       '</button>' +
       '<div class="m-work-add-hint">Photos or PDFs. Photos are made smaller before they upload.</div>' +
+      (status ? '<div class="m-work-notin-status">' + status + '</div>' : '') +
       paperHtml(cid, a, st) +
       '</div>'
     );
@@ -341,6 +350,7 @@ window.MGradePhotos = (function () {
       (isScoreLocked(cid, st.id, a.id) ? ' disabled' : '') +
       '>' +
       MC.esc('Set ' + first + ' To') +
+      '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>' +
       '</button></div>'
     );
   }
@@ -615,6 +625,7 @@ window.MGradePhotos = (function () {
     releaseUnused: _letGo,
     cardHtml: cardHtml,
     sentHtml: sentHtml,
+    notInCard: notInCard,
     pinHtml: pinHtml,
     hydrate: hydrate,
     wire: wire,

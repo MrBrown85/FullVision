@@ -1674,6 +1674,15 @@
         );
         return;
       }
+      if (action === 'm-paper-crit') {
+        MGrade.openPaperCriterion(
+          _cid,
+          target.getAttribute('data-sid'),
+          target.getAttribute('data-aid'),
+          parseInt(target.getAttribute('data-idx'), 10),
+        );
+        return;
+      }
       if (action === 'm-crit-group') {
         MGrade.toggleCritGroup(
           _cid,

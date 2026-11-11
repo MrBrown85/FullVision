@@ -116,6 +116,20 @@ describe('with the student page and Send Work on', () => {
     expect(card('st1').querySelector('[data-action="m-work-setto-menu"]')).toBeNull();
   });
 
+  it('the not-in card has its status under Add Work and each criterion "Not scored" until one is tapped', () => {
+    open();
+    const crits = getRubricById(CID, lab().rubricId).criteria;
+    expect(card(sid).querySelector('.m-grade-student-header .m-status-row')).toBeNull();
+    expect(card(sid).querySelectorAll('.m-work-notin-status .m-status-pill').length).toBe(3);
+    const rows = [...card(sid).querySelectorAll('[data-action="m-paper-crit"]')];
+    expect(rows.map(r => r.querySelector('.m-paper-crit-name').textContent)).toEqual(crits.map(c => c.name));
+    expect(rows.map(r => r.querySelector('.m-paper-crit-now').textContent)).toEqual(crits.map(() => 'Not scored'));
+    expect(card(sid).querySelector('.m-score-btn')).toBeNull();
+    MGrade.openPaperCriterion(CID, sid, LAB, 1);
+    expect(card(sid).querySelector('[data-action="m-paper-crit"]')).toBeNull();
+    expect(card(sid).querySelector('.m-crit-pager .m-crit-name').textContent).toBe(crits[1].name);
+  });
+
   it('under Missing, Set Logan To is off and does nothing', () => {
     expect(setAssignmentStatus(CID, sid, LAB, 'NS')).not.toBe(false);
     open();

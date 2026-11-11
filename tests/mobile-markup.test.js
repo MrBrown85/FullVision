@@ -142,6 +142,30 @@ describe('with the student page and Send Work on', () => {
     expect(q('.m-markup-img').getAttribute('src')).toBe('blob:' + files(jordan)[0].id);
   });
 
+  it('notes read in the card above the tools; the colour dots colour the Pen and Highlight', () => {
+    MMarkUp.open(CID, LAB, jordan, 0);
+    expect(root().querySelector('.m-markup-stage .m-mk-note')).toBeNull();
+    expect(q('.m-markup-card .m-mk-note-text').textContent).toBe('Which cell is this? Label it onion or cheek.');
+    expect([...root().querySelectorAll('[data-mk="color"]')].map(b => b.getAttribute('aria-label'))).toEqual([
+      'Red',
+      'Green',
+      'Blue',
+    ]);
+    MMarkUp.setColor('blue');
+    expect(q('[data-color="blue"]').getAttribute('aria-pressed')).toBe('true');
+    drag([
+      [50, 100],
+      [150, 120],
+    ]);
+    expect(MMarkUp.marks().pop()).toMatchObject({ type: 'pen', color: 'blue' });
+    MMarkUp.setTool('highlight');
+    drag([
+      [50, 140],
+      [150, 160],
+    ]);
+    expect(MMarkUp.marks().pop()).toMatchObject({ type: 'highlight', color: 'blue' });
+  });
+
   it('one finger draws a pen line; Done saves the whole set and the stored page is unchanged', async () => {
     const before = JSON.stringify(files(jordan));
     const n = working(jordan).length;
