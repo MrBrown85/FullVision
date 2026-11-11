@@ -415,7 +415,7 @@ test('Student Cards: Print New Card, New Codes for This Class, Unlock, with thei
   expect(afterOne.filter(c => c.enrollment_id !== at.ids[0])).toEqual(
     before.filter(c => c.enrollment_id !== at.ids[0]),
   );
-  await expect(card.locator('.sc-which').first()).toHaveText(/^Card 2 · Made /);
+  await expect(card.locator('.sc-which').first()).toHaveText(/^Card 2 · Reissued /);
   await expect(card.locator('.sc-note')).toHaveText(
     '1 card went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
   );
@@ -590,20 +590,22 @@ test('Student Cards: the filters and Cards Work Until', async ({ page }) => {
   await filters.getByRole('radio', { name: /^All/ }).click();
   await expect(card.locator('.sc-name')).toHaveText(at.names);
 
-  // Cards Work Until: the default, a chosen day on every card, and back.
-  const day = card.getByLabel('Cards Work Until');
+  // Cards Work Until: a menu (End of the Course or of the School Year, Pick a Day…), a picked day on every card, and back.
+  const menu = card.getByLabel('Cards Work Until');
   const until = await page.evaluate(cid => getCardsWorkUntil(cid), at.cid);
-  await expect(day).toHaveValue(until.date);
-  await expect(card.locator('#sc-until-hint')).toContainText('A card stops opening after this day.');
-  await day.fill('2027-03-12');
-  await expect(card.locator('[data-action="spCardsWorkUntilDefault"]')).toBeVisible();
+  await expect(menu).toHaveValue('course');
   await expect(card.locator('#sc-until-hint')).toHaveText('A card stops opening after this day.');
-  expect((await savedCards(page, at.cid)).every(c => c.works_until === '2027-03-12')).toBe(true);
+  await menu.selectOption('day');
+  const day = card.getByLabel('Day', { exact: true });
+  await expect(day).toBeFocused();
+  await day.fill('2027-03-12');
+  await expect(card.getByLabel('Cards Work Until')).toHaveValue('day');
+  await expect.poll(async () => (await savedCards(page, at.cid)).every(c => c.works_until === '2027-03-12')).toBe(true);
   await page.reload();
-  await expect(page.locator('.sc-card').getByLabel('Cards Work Until')).toHaveValue('2027-03-12');
-  await page.locator('.sc-card [data-action="spCardsWorkUntilDefault"]').click();
-  await expect(page.locator('.sc-card').getByLabel('Cards Work Until')).toHaveValue(until.date);
-  await expect(page.locator('.sc-card [data-action="spCardsWorkUntilDefault"]')).toHaveCount(0);
+  await expect(page.locator('.sc-card').getByLabel('Day', { exact: true })).toHaveValue('2027-03-12');
+  await page.locator('.sc-card').getByLabel('Cards Work Until').selectOption('course');
+  await expect(page.locator('.sc-card #sc-until-date')).toHaveCount(0);
+  await expect(page.locator('.sc-card').getByLabel('Cards Work Until')).toHaveValue('course');
   expect((await savedCards(page, at.cid)).every(c => c.works_until === until.date)).toBe(true);
 
   await noCodeKept(page, [sheet], keptBefore);
