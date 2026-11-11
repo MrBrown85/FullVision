@@ -2487,6 +2487,15 @@ document.addEventListener('click', function (e) {
     helpOpenArticle: function () {
       _helpOpenArticle(el.dataset.slug);
     },
+    // A link elsewhere in the app (Import Roster) opens the Help panel at
+    // one article. Its href is the help site page, for a new tab.
+    openHelpArticle: function () {
+      _helpSlug = el.dataset.slug;
+      if (_helpOpen) _helpRenderBody();
+      else setHelpOpen(true);
+      var back = document.querySelector('#help-body .help-back');
+      if (back) back.focus();
+    },
     helpBack: function () {
       _helpSlug = null;
       _helpRenderBody();

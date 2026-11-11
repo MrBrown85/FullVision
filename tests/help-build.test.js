@@ -50,10 +50,11 @@ describe('help site build', () => {
     }
   });
 
-  it('puts the four Getting Started articles first, in order', () => {
-    expect(index.slice(0, 4).map(e => e.slug)).toEqual([
+  it('puts the five Getting Started articles first, in order', () => {
+    expect(index.slice(0, 5).map(e => e.slug)).toEqual([
       'create-a-class',
       'add-your-students',
+      'get-a-class-list-from-myeducation-bc',
       'set-up-grading',
       'create-your-first-assessment',
     ]);
@@ -134,5 +135,13 @@ describe('the Markdown subset', () => {
       labels: ['Import Roster: Review Changes'],
       shots: [{ file: 'a.jpg', steps: ['click x'], clip: '1,2,3,4' }],
     });
+  });
+});
+
+describe('inline Markdown', () => {
+  it('reads *italic* and _italic_, and leaves underscores inside words', async () => {
+    const { inline } = await import('../scripts/build-help.mjs');
+    expect(inline('choose *CSV* or _CSV_.')).toBe('choose <em>CSV</em> or <em>CSV</em>.');
+    expect(inline('a file_name_here stays')).toBe('a file_name_here stays');
   });
 });

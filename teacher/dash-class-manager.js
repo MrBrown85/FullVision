@@ -2048,6 +2048,7 @@ window.DashClassManager = (function () {
       '<p class="cm-hint">Name columns: Last Name and First Name, or Full Name (read as Last, First or First Last).</p>' +
       '<p class="cm-hint">Other columns: Preferred Name, Pronouns, Student Number, Date of Birth (year first, as 2012-05-15), Student Email, Parent Email, Parent Email 2, Designations (BC letter codes), ELL (Yes or blank).</p>' +
       '<p class="cm-hint">Columns can be in any order. Columns with other names are ignored. MyEducation BC column names, such as Legal Surname and Pupil #, are recognized.</p>' +
+      '<p class="cm-hint">A class list from MyEducation BC imports as it is. <a href="/help/get-a-class-list-from-myeducation-bc" data-action="openHelpArticle" data-slug="get-a-class-list-from-myeducation-bc">Get a Class List From MyEducation BC</a> shows where to find it.</p>' +
       '<div class="cm-import-buttons">' +
       '<button type="button" class="cm-action-btn" data-action="cmCloseImportFormat">Cancel</button>' +
       '<a class="cm-action-btn" href="/roster-template.csv" download="roster-template.csv">Download Template</a>' +

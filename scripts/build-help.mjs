@@ -136,6 +136,8 @@ export function inline(text) {
   s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, label, target) => `<a href="${href(target)}">${label}</a>`);
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   s = s.replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>');
+  // Prettier writes italics as _word_; an underscore inside a word is left.
+  s = s.replace(/(^|[\s(>])_([^_]+)_(?=[\s.,;:!?)<]|$)/g, '$1<em>$2</em>');
   return s;
 }
 
