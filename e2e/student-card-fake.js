@@ -223,5 +223,15 @@ export async function signIn(page) {
   await expect(page.getByRole('heading', { name: 'Is this you, Cece?' })).toBeVisible();
   await page.getByLabel('Student Number').fill('0123456');
   await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
-  await expect(page.getByRole('heading', { name: 'Assignments' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
+  // Every piece in one list, as the tests of the list read it.
+  await showAll(page);
+}
+
+/* All Assignments (the header's list button, S4-F1): every piece in one
+   list, as the page drew it before To Do, Sent and Back. */
+export async function showAll(page) {
+  const b = page.getByRole('button', { name: 'All assignments' });
+  if ((await b.getAttribute('aria-pressed')) !== 'true') await b.click();
+  await expect(page.getByRole('heading', { name: 'All Assignments' })).toBeVisible();
 }

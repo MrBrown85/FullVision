@@ -319,6 +319,15 @@ const WRITER_SCENARIOS = {
     expect(out.returned).toBe(on ? 1 : 0);
     if (on) expect([state('s1', 'essay'), state('s2', 'essay')]).toEqual(['returned', 'draft']);
   },
+  // Return with the marks on the pages (S9-F1): the grade part is returnGrades.
+  returnWork(on) {
+    level('s1', 'essay', 't1', 3);
+    level('s2', 'essay', 't1', 2);
+    const out = returnWork(CID, 'essay', ['s1']);
+    expect(out.returned).toBe(on ? 1 : 0);
+    expect(out.marks_given).toBe(0);
+    if (on) expect([state('s1', 'essay'), state('s2', 'essay')]).toEqual(['returned', 'draft']);
+  },
   moveRubricScores(on) {
     // Edit a Copy on scored work: each grade keeps its state.
     level('s1', 'lab', 'c1', 3);

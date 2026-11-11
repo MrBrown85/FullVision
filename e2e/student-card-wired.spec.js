@@ -17,6 +17,7 @@ import {
   shot,
   contrast,
   signIn,
+  showAll,
 } from './student-card-fake.js';
 
 /* A real student card on the student page, /s/#CODE (docs/plans/
@@ -73,7 +74,8 @@ for (const size of [
       await page.getByRole('button', { name: 'Yes, That’s Me' }).click();
 
       // The Assignments list: returned results only.
-      await expect(page.getByRole('heading', { name: 'Assignments' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
+      await showAll(page);
       await expect(row(page, 'Energy Transfer Investigation').locator('.sp-row-result')).toHaveText('4.0');
       await expect(row(page, 'Energy Transfer Investigation').locator('.sp-row-sub')).toHaveText(
         /^Back \S+ \d+ · Extending$/,
@@ -122,10 +124,19 @@ for (const size of [
       expect(JSON.stringify(kept)).not.toMatch(/Cece|Science|P3R|0123456|2012-05|Extending/);
       expect(await page.context().cookies()).toEqual([]);
 
+      // The student reads down the list: every returned piece has been on screen
+      // (the line over the list, What Changed Since You Last Looked, takes some room).
+      await page.locator('.sp-row').last().scrollIntoViewIfNeeded();
+      await expect
+        .poll(() => posts.filter(p => p.body.route === 'seen').flatMap(p => p.body.assessment_ids).length)
+        .toBe(6);
+      await page.getByRole('button', { name: 'Back', exact: true }).click();
+
       // The page opened again: the student's page, with no card and no check.
       posts.length = 0;
       await page.reload();
-      await expect(page.getByRole('heading', { name: 'Assignments' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
+      await showAll(page);
       await expect(row(page, 'Cell Structure Quiz').locator('.sp-row-result')).toHaveText('8 / 10');
       // Opened last time: no longer marked, and nothing more to tell the server.
       await expect(row(page, 'Lab Safety Contract').locator('.sp-row-sub')).toHaveText(/^Back \S+ \d+$/);
@@ -194,6 +205,9 @@ test.describe('a real card: the keyboard alone', () => {
     await page.keyboard.type('0123456');
     await page.keyboard.press('Enter');
     await expect(page.getByRole('heading', { name: 'Assignments' })).toBeFocused();
+    // Back up the header: All Assignments, then Done.
+    await page.keyboard.press('Shift+Tab');
+    await expect(page.getByRole('button', { name: 'All assignments' })).toBeFocused();
     await page.keyboard.press('Shift+Tab');
     // The class's name (Your Classes) comes before Done.
     await expect(page.getByRole('button', { name: 'Done' })).toBeFocused();
@@ -337,7 +351,8 @@ test.describe('a real card: what stops it, and what each one says', () => {
     await shot(page, '12-page-not-reached');
     offline = '';
     await page.getByRole('button', { name: 'Try Again' }).tap();
-    await expect(page.getByRole('heading', { name: 'Assignments' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
+    await showAll(page);
   });
 
   const GONE = [
@@ -373,6 +388,7 @@ test.describe('a real card: what stops it, and what each one says', () => {
     await page.goto('/s/#P3R8-WDK4');
     await page.getByLabel('Student Number').fill('0123456');
     await page.getByRole('button', { name: 'Yes, That’s Me' }).tap();
+    await showAll(page);
     await expect(page.getByRole('status')).toHaveText('Your results didn’t load. Check your internet and try again.');
     await expect(page.locator('.sp-row')).toHaveCount(9);
     await expect(page.locator('.sp-row-result')).toHaveCount(0);
@@ -508,7 +524,8 @@ test.describe('a real card: a shared Chromebook', () => {
     const tab = await page.context().newPage();
     await serve(tab, fn);
     await tab.goto('/s/');
-    await expect(tab.getByRole('heading', { name: 'Assignments' })).toBeVisible();
+    await expect(tab.getByRole('heading', { name: 'Assignments' })).toBeAttached();
+    await showAll(tab);
     await tab.getByRole('button', { name: 'Done' }).click();
     await expect(tab.getByRole('heading', { name: 'You’re signed out' })).toBeVisible();
     await tab.close();

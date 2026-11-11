@@ -1,187 +1,146 @@
-/* The Assignments list on a student's page (docs/plans/
-   student-page-build-plan.md, S0-F3; the artboard's "All Assignments" rows):
-   every piece of work in the class with its date and, once the teacher has
-   returned it, the result.
+/* The student's page for one class on the student page (S4-F1): the view
+   from shared/student-view.js, drawn by s/page-view.js.
+
+   This file is the student page's side of it: it builds the view from the
+   server's `page` reply (StudentView.fromPage, with s/student-data.js's
+   reading of it), says whether the results loaded, and hands both to
+   StudentPageView.html with what the student chose to look at (the tab,
+   To Do, Sent or Back, All Assignments; s/app.js keeps those). The teacher's
+   Preview as Student hands StudentPageView the same kind of view, so the
+   two draw the same thing.
 
    The line this build protects: a grade that was never returned shows
-   nothing at all. No level, no "draft", no hint that one exists. The page's
-   data holds returned grades only (student-data.js), and a row asks calc.js
-   for a result only when the piece has a return date.
+   nothing at all. The reply holds returned grades only, the view gives a
+   result only to a piece that came back, and nothing here works one out.
 
-   The result is worked out and worded by shared/calc.js and
-   shared/constants.js (assessmentCellValue, levelWord, formatPoints), fed by
-   student-data.js, so it follows the class's grading style and reads as the
-   teacher's gradebook cell does. Nothing here formats a grade, and nothing
-   here holds a grade's value: with calc.js not in (app.js fetches it before
-   this screen opens; the fetch can fail) a returned piece shows when it
-   came back and no result, and the list says the results didn't load.
+   With calc.js or constants.js not in (app.js fetches them before this
+   screen opens; the fetch can fail) the view is built with no grades, so a
+   returned piece shows when it came back and no result, and the page says
+   the results didn't load. A view that cannot be built shows the page's
+   plain waiting line; nothing throws into a draw.
 
-   One list, two sources: the server's `page` reply for a real card and
-   Demo Mode's reply built on the device both go through
-   StudentData.fromServer and then through this file, so the two cannot
-   show a piece differently.
-
-   A returned grade that was changed and returned again is marked Updated
-   until the student has opened it. In this build the list is where a
-   result is read, so a piece counts as opened once its row has been on
-   screen in a visible tab (Colin, Nov 10). A row that could be opened
-   (returned, its result drawn, not opened since it came back) carries its
-   piece's id as data-unseen; app.js watches those rows and tells the
-   server (`seen`). No other row carries a mark, so a piece with a draft
-   still reads exactly as a piece never graded.
-
-   app.js opens this screen after Is This You? and draws the frame around
-   it. This file adds its screen with StudentPage.addScreens. */
+   A returned piece not opened since it came back carries its id as
+   data-unseen; app.js watches those rows and tells the server (`seen`). */
 (function () {
   'use strict';
 
   if (typeof StudentPage === 'undefined' || !StudentPage.addScreens) return;
 
-  var fmtDate = StudentPage.fmtDate;
-
-  var NO_RESULTS = 'Your results didn’t load. Check your internet and try again.';
-
+  // calc.js and constants.js are both in: a result can be worked out and worded.
   function gradesAreIn() {
-    return typeof assessmentCellValue === 'function';
+    return (
+      typeof assessmentCellValue === 'function' &&
+      typeof levelWord === 'function' &&
+      typeof formatPoints === 'function' &&
+      typeof scoreLevelText === 'function'
+    );
   }
 
-  var SEP = ' · ';
-  var DAY = { month: 'short', day: 'numeric' };
-  var DUE_DAY = { weekday: 'short', month: 'short', day: 'numeric' };
-
-  /* What one row says, from the page (student-data.js's shape) and one of
-     its assessments: { kind, title, sub, result }.
-     kind: 'back' (returned), 'missing', 'excused', or 'due' (anything else:
-     not graded, or graded and not returned, which look the same).
-     result is '' unless the piece was returned with a score and calc.js is
-     in to word it. */
-  function rowView(page, a) {
-    var due = a.dueDate ? 'Due ' + fmtDate(a.dueDate, DUE_DAY) : a.date ? fmtDate(a.date, DAY) : '';
-    var view = { kind: 'due', title: a.title, sub: due, result: '' };
-    // Missing and Excused stand in place of a result. They are never drafts
-    // and show as soon as the teacher sets them.
-    if (a.status === 'NS' || a.status === 'EXC') {
-      view.kind = a.status === 'NS' ? 'missing' : 'excused';
-      view.sub = [a.status === 'NS' ? 'Missing' : 'Excused', due].filter(Boolean).join(SEP);
-      return view;
-    }
-    // Not returned: the date only, whether or not a draft exists.
-    if (!a.returnedAt) {
-      if (a.status === 'LATE') view.sub = ['Late', due].filter(Boolean).join(SEP);
-      return view;
-    }
-    var cid = page.course.id;
-    var cell = gradesAreIn() ? assessmentCellValue(cid, page.student.id, a) : { kind: 'none' };
-    var bits = ['Back ' + fmtDate(a.returnedAt, DAY)];
-    view.kind = 'back';
-    if (cell.kind === 'level') {
-      var word = levelWord(cid, cell.value);
-      if (word) bits.push(word);
-      view.result = cell.text;
-    } else if (cell.kind === 'points') {
-      view.result = formatPoints(cell.value) + ' / ' + formatPoints(a.maxPoints || 100);
-    } else if (cell.kind === 'complete') {
-      view.result = cell.mark === 'complete' ? 'Complete' : 'Incomplete';
-    }
-    if (a.status === 'LATE') bits.push('Late');
-    if (a.updated) bits.push('Updated');
-    view.sub = bits.join(SEP);
-    // A result is on the row and the student has not opened it since it came back.
-    if (a.unseen && view.result !== '') view.unseen = a.id;
-    return view;
-  }
-
-  // When the teacher made a piece, in milliseconds, or null when the
-  // server has not said.
-  function madeAt(a) {
-    // To the millisecond, as calc.js reads it and as every browser can.
-    var t = a.created_at ? Date.parse(String(a.created_at).replace(/(\.\d{3})\d+/, '$1')) : NaN;
-    return isFinite(t) ? t : null;
-  }
-
-  /* Newest first, by due date, or the date with none. Two pieces with the
-     same date: the one made later is the later one (Colin, Nov 10), so it
-     is listed first; two made at the same instant fall to their ids. Where
-     the server has not said when a piece was made, the two stay in the
-     order they came in, as before. */
-  function inOrder(assessments) {
-    return assessments.slice().sort(function (x, y) {
-      var a = x.dueDate || x.date || '';
-      var b = y.dueDate || y.date || '';
-      if (a !== b) return a < b ? 1 : -1;
-      var m = madeAt(x);
-      var n = madeAt(y);
-      if (m == null || n == null) return 0;
-      if (m !== n) return m < n ? 1 : -1;
-      return x.id < y.id ? 1 : x.id > y.id ? -1 : 0;
+  /* The reply with no grade in it, for when calc.js or constants.js did not
+     arrive: what came back still shows as back, with no result. */
+  function withoutGrades(reply) {
+    return Object.assign({}, reply, {
+      assessments: (reply.assessments || []).map(function (a) {
+        return Object.assign({}, a, { grade: null, previous: null });
+      }),
     });
   }
 
-  function rowHtml(view) {
-    return (
-      '<li class="sp-row"' +
-      (view.unseen ? ' data-unseen="' + esc(view.unseen) + '"' : '') +
-      '><span class="sp-dot sp-dot-' +
-      view.kind +
-      '" aria-hidden="true"></span>' +
-      '<span class="sp-row-text"><span class="sp-row-title">' +
-      esc(view.title) +
-      '</span>' +
-      (view.sub ? '<span class="sp-row-sub">' + esc(view.sub) + '</span>' : '') +
-      '</span>' +
-      (view.result ? '<span class="sp-row-result">' + esc(view.result) + '</span>' : '') +
-      '</li>'
-    );
-  }
-
-  function listHtml(page) {
-    var rows = inOrder((page && page.assessments) || []);
-    if (!rows.length) return '<p class="sp-lead sp-empty">No assignments yet.</p>';
-    return (
-      '<ul class="sp-list">' +
-      rows
-        .map(function (a) {
-          return rowHtml(rowView(page, a));
-        })
-        .join('') +
-      '</ul>'
-    );
-  }
-
-  /* The line over the list when calc.js didn't arrive and a piece has come
-     back: the results are missing, not empty. */
-  function noResultsHtml(state) {
-    var page = state.page;
-    var any =
-      page &&
-      page.assessments.some(function (a) {
-        return !!a.returnedAt;
-      });
-    if (gradesAreIn() || !any) return '';
-    return (
-      '<div class="sp-no-results"><p class="sp-msg sp-msg-calm" role="status">' +
-      esc(NO_RESULTS) +
-      '</p><button type="button" class="sp-btn sp-btn-quiet sp-btn-small" data-act="grades-retry"' +
-      (state.sending ? ' disabled' : '') +
-      '>' +
-      (state.sending ? 'Loading…' : 'Try Again') +
-      '</button></div>'
-    );
+  /* What the page draws (student-view.js's shape), or null while it cannot
+     be built: no page yet, or student-view.js not in. */
+  function viewOf(state) {
+    if (!state || !state.page || !state.reply) return null;
+    if (typeof StudentView === 'undefined' || !StudentView || typeof StudentView.fromPage !== 'function') return null;
+    var reply = gradesAreIn() ? state.reply : withoutGrades(state.reply);
+    // Demo Mode's samples for Questionnaires and My Reports, which the server's page does not send yet (S4-F4).
+    if (state.demo && StudentPage.demoForms) reply = Object.assign({}, reply, StudentPage.demoForms());
+    try {
+      // What the class takes and what is in (s/send.js; Demo Mode's until the `work` route exists).
+      var work = typeof StudentPage.workOf === 'function' ? StudentPage.workOf(state) : null;
+      // The teacher's Mark Up, and later reflections (s/feedback.js; Demo Mode's until the server sends `feedback`).
+      var feedback = typeof StudentPage.feedbackOf === 'function' ? StudentPage.feedbackOf(state) : null;
+      // Group work (S12-F1): counts only, Demo Mode's until the server sends `group_work`.
+      var groups = typeof StudentPage.groupOf === 'function' ? StudentPage.groupOf(state) : null;
+      return StudentView.fromPage(reply, state.page, work, feedback, groups);
+    } catch (e) {
+      return null;
+    }
   }
 
   function renderAssignments(state) {
-    return StudentPage.pageFrame(
-      state,
-      // The page's first words, where the keyboard and a screen reader start (app.js moves there).
-      '<h1 class="sp-page-title" tabindex="-1">Assignments</h1>' + noResultsHtml(state) + listHtml(state.page),
+    var view = viewOf(state);
+    var ui = {
+      tab: state.tab,
+      segment: state.segment,
+      all: state.all,
+      pick: state.pick,
+      search: state.search,
+      filter: state.filter,
+      feedback: state.feedback,
+      whole: state.whole,
+      levels: state.levels,
+      work: state.work,
+      workPage: state.workPage,
+      marksOff: state.marksOff,
+      workPages: state.workPages,
+      form: state.form,
+      sheet: state.sheet,
+      sending: state.sending,
+      noResults: !gradesAreIn(),
+      waiting: !view || typeof StudentPageView === 'undefined',
+      course: state.page ? { name: state.page.course.name, block: state.page.course.block } : null,
+      note: state.demo ? 'This is Demo Mode. Cece and her results are samples.' : '',
+    };
+    var page =
+      typeof StudentPageView !== 'undefined'
+        ? StudentPageView.html(view, ui)
+        : '<p class="sp-lead sp-msg-calm sp-empty" role="status">Opening your page…</p>';
+    return (
+      page +
+      (state.sheet && StudentPage.classesSheet ? StudentPage.classesSheet(state.page) : '') +
+      // Unsend Your Work? and Replace Your Photos? over the card (s/send.js).
+      (typeof StudentPage.sendDialog === 'function' ? StudentPage.sendDialog(state) : '')
     );
   }
+
+  StudentPage.viewOf = viewOf;
+
+  /* All Assignments' search: each letter typed draws the list again, and
+     the box keeps the focus and the place being typed in. */
+  function onInput(el) {
+    if (!el || el.id !== 'sp-search' || !S || S.screen !== 'assignments') return;
+    S.search = String(el.value || '').slice(0, 100);
+    var at = typeof el.selectionStart === 'number' ? el.selectionStart : S.search.length;
+    StudentPage.paint('#sp-search');
+    var box = typeof document !== 'undefined' ? document.getElementById('sp-search') : null;
+    if (box && typeof box.setSelectionRange === 'function') box.setSelectionRange(at, at);
+  }
+
+  // The state, as student.js hands it over.
+  var S = null;
 
   StudentPage.addScreens({
     file: 'assignments',
     render: { assignments: renderAssignments },
-    // The screen reads the state it is handed; it keeps none of its own.
-    share: function () {},
-    test: { rowView: rowView, listHtml: listHtml, inOrder: inOrder },
+    input: onInput,
+    // Once the page is drawn: the phone's cards start at the one picked, and the count follows the swipe.
+    drawn: function (root, state) {
+      if (state.screen !== 'assignments' || typeof StudentPageView === 'undefined') return;
+      StudentPageView.settle(root, function (id) {
+        state.pick = id;
+      });
+    },
+    share: function (state) {
+      S = state;
+    },
+    test: {
+      viewOf: viewOf,
+      rowView: function (p) {
+        return StudentPageView.rowView(p);
+      },
+      counts: function (v) {
+        return StudentPageView.counts(v);
+      },
+    },
   });
 })();

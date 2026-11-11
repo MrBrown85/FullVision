@@ -18,6 +18,7 @@
     <link rel="stylesheet" href="/teacher/dashboard.css" />
     <link rel="stylesheet" href="/teacher/assignments.css" />
     <link rel="stylesheet" href="/teacher/student.css" />
+    <link rel="stylesheet" href="/teacher/work-wall.css" />
     <link rel="stylesheet" href="/teacher/gradebook.css" />
     <link rel="stylesheet" href="/teacher/class-results.css" />
     <link rel="stylesheet" href="/teacher/observations.css" />
@@ -26,6 +27,7 @@
     <link rel="stylesheet" href="/teacher/rubric-print.css" />
     <link rel="stylesheet" href="/teacher/qr-slips.css" />
     <link rel="stylesheet" href="/teacher/preview-student.css" />
+    <link rel="stylesheet" href="/s/page-view.css" />
     <link rel="stylesheet" href="/shared/phone-report.css" />
     <link rel="stylesheet" href="/teacher/grades-print.css" />
     <!-- login.css omitted: only needed on login.html, its body{} rules conflict with SPA layout -->
@@ -84,6 +86,16 @@
     <script src="/shared/rubric-checks.js"></script>
     <script src="/shared/core-self.js"></script>
     <script src="/shared/student-view.js"></script>
+    <!-- Photos: shrinking and the queue that keeps them (Add Work in the grader) -->
+    <script src="/shared/photo-shrink.js"></script>
+    <script src="/shared/photo-queue.js"></script>
+    <!-- The PDF reader: pdf.js itself is fetched only when a PDF is chosen -->
+    <script src="/shared/photo-readers.js"></script>
+    <!-- Pictures of student work on the Work Wall and the Work tab -->
+    <script src="/shared/work-thumbs.js"></script>
+    <!-- Mark Up: drawing over a page of student work (S9) -->
+    <script src="/shared/markup-draw.js"></script>
+    <script src="/s/page-view.js"></script>
     <script src="/teacher/ui.js"></script>
     <!-- seed-data.js (113KB) lazy-loaded by loadSeedIfNeeded() — only fetched for new accounts -->
     <!-- Submodules (loaded before their parent page modules) -->
@@ -129,6 +141,7 @@
     <script src="/teacher/obs-card.js"></script>
     <script src="/teacher/student-evidence.js"></script>
     <script src="/teacher/competency-evidence.js"></script>
+    <script src="/teacher/work-wall.js"></script>
     <script src="/teacher/student-overrides.js"></script>
     <script src="/teacher/rubric-print.js"></script>
     <script src="/teacher/competency-wording.js"></script>
@@ -140,6 +153,7 @@
     <script src="/teacher/grading-setup-copy.js"></script>
     <!-- Page modules -->
     <script src="/teacher/page-dashboard.js"></script>
+    <script src="/teacher/markup.js"></script>
     <script src="/teacher/page-assignments.js"></script>
     <script src="/teacher/page-student.js"></script>
     <script src="/teacher/page-gradebook.js"></script>
