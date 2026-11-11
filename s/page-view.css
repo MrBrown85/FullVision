@@ -1050,6 +1050,92 @@
   background: var(--sp-blue);
 }
 
+/* What Changed Since You Last Looked (S4-F5). */
+.sp-view .sp-since {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #e8f1ff;
+  color: #0c2d6b;
+}
+.sp-view .sp-since-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+.sp-view .sp-since-line {
+  margin: 0;
+  font-size: 14px;
+}
+.sp-view .sp-row-flags {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+.sp-view .sp-row-flag {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 11px;
+  background: #0058d0;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+}
+.sp-view .sp-flag-updated {
+  background: #dbeafe;
+  color: #1e40af;
+}
+.sp-view .sp-was-wrap {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.sp-view .sp-was {
+  font-size: 12px;
+  color: #58585d;
+  white-space: nowrap;
+}
+.sp-view .sp-updated-note {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #eef4ff;
+  box-shadow: inset 0 0 0 1px #bcd4ff;
+  font-size: 14px;
+}
+.sp-view .sp-updated-title {
+  margin: 0 0 2px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e40af;
+}
+.sp-view .sp-updated-line {
+  margin: 0;
+}
+.sp-view .sp-tab {
+  position: relative;
+}
+.sp-view .sp-tab-badge {
+  position: absolute;
+  top: 2px;
+  left: calc(50% + 4px);
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #d70015;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
 /* The four tabs: along the bottom on a phone. The header's copy shows on a
    Chromebook instead. */
 .sp-view .sp-tabs {
@@ -1113,6 +1199,11 @@
   }
   .sp-view .sp-tabs-top .sp-tab-icon {
     display: none;
+  }
+  .sp-view .sp-tabs-top .sp-tab-badge {
+    position: static;
+    order: 2;
+    margin-left: 6px;
   }
   .sp-view .sp-tabs-top .sp-tab-on {
     background: #fff;

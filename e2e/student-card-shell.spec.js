@@ -29,7 +29,12 @@ for (const size of [
     test('the tabs, To Do, Sent and Back, and All Assignments', async ({ page }) => {
       const posts = await demo(page);
       const nav = page.getByRole('navigation', { name: 'Your Page' });
-      await expect(nav.getByRole('button')).toHaveText(['Assignments', 'My Learning', 'Questionnaires', 'Reports']);
+      await expect(nav.locator('.sp-tab-label')).toHaveText([
+        'Assignments',
+        'My Learning',
+        'Questionnaires',
+        'Reports',
+      ]);
       await expect(nav.getByRole('button', { name: 'Assignments' })).toHaveAttribute('aria-current', 'page');
       // On a phone the tabs sit along the bottom; on a Chromebook in the header.
       const box = await nav.boundingBox();

@@ -405,6 +405,30 @@ window.StudentView = (function () {
     };
   }
 
+  /* A returned grade changed since the student last looked (the
+     artboard's "A Returned Grade Was Updated"): when, and on each row whose
+     level moved, the level the student saw before ("Was Developing"),
+     named by constants.js's scoreLevelText. The reply's `previous` is the
+     grade before the newest return. */
+  function markWas(piece, row) {
+    var previous = row.previous;
+    var tagIds = row.tag_ids || [];
+    piece.updatedAt = str(row.updated_at);
+    if (!previous || typeof previous !== 'object') return;
+    var rows = piece.rubric ? piece.rubric.rows : piece.competencies;
+    var before = (piece.rubric ? previous.criteria : previous.tags) || {};
+    // An Overall level alone stands under the first competency, as the page shows it.
+    if (!piece.rubric && !Object.keys(before).length && num(previous.value) > 0 && tagIds.length) {
+      before = {};
+      before[tagIds[0]] = { value: previous.value, modifier: previous.modifier };
+    }
+    rows.forEach(function (r) {
+      var p = before[r.id];
+      var was = p && num(p.value) > 0 ? scoreLevelText(num(p.value), num(p.modifier) || 0) : '';
+      if (was && was !== r.text) r.was = was;
+    });
+  }
+
   // What a piece is graded on: its competencies by name, in the reply's order.
   function gradedOn(row, tags) {
     return (row.tag_ids || [])
@@ -440,6 +464,7 @@ window.StudentView = (function () {
                         1-4 band); for points: points, outOf, percent,
                         bar },
               comment, competencies: [ row ], gradedOn: [ { id, name } ],
+              updatedAt (when updated), and on a row that moved, was,
               rubric: null | { id, name, style, rows: [ row + beyond,
               descriptors, checks, levelName, descriptor, shown, next,
               goal, whole ] } }
@@ -509,6 +534,7 @@ window.StudentView = (function () {
               return levelRow(id, (tags[id] || {}).label, parts[id]);
             });
         }
+        if (piece.updated) markWas(piece, row);
       }
       work.push(piece);
     });
