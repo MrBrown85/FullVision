@@ -13185,6 +13185,25 @@ window.PageAssignments = (function () {
     // As Soon As I Save: nothing waits, so there is nothing to return.
     if (!waiting.length && !GradeState.holds(klass)) return '';
     var row = getGradeReturn(cid, sid, a.id);
+    // Marks made since the last Return wait for one too (S9-F1), on a grade
+    // already returned: Return gives them (Grader.returnGrades).
+    var marksWait =
+      !waiting.length &&
+      typeof studentMarkupWaiting === 'function' &&
+      GradeState.stateOf(cid, sid, a.id) === GradeState.RETURNED &&
+      _graderReturnIds(sid, view).some(function (id) {
+        return studentMarkupWaiting(cid, id, a.id);
+      });
+    if (marksWait) {
+      return (
+        '<button type="button" class="grader-return-btn" ' +
+        act +
+        '>Return</button>' +
+        '<div class="grader-draft"><p class="grader-draft-line">' +
+        '<span class="grader-draft-mark">Draft</span><span class="grader-draft-text">Marks saved. Not returned yet.</span>' +
+        '</p></div>'
+      );
+    }
     if (!waiting.length) {
       if (GradeState.stateOf(cid, sid, a.id) !== GradeState.RETURNED) {
         // Missing, Excused or Late with nothing in: there is nothing to return.
@@ -14028,6 +14047,10 @@ window.PageAssignments = (function () {
       _WORK_ROTATE_ICON +
       '</button>' +
       '<span class="grader-spacer"></span>' +
+      // Mark Up (S9-F1): writes on this page, in teacher/markup.js.
+      (window.MarkUp
+        ? '<button type="button" class="grader-work-tool grader-work-markup" data-grader="work-markup">Mark Up</button>'
+        : '') +
       '<button type="button" class="grader-work-tool grader-work-focus" data-grader="work-focus" aria-pressed="' +
       !!w.focus +
       '">Focus on Work</button>' +
@@ -14116,6 +14139,7 @@ window.PageAssignments = (function () {
     var files = (sub && sub.files) || [];
     var file = files[Math.min(Math.max(_grader.work.page, 0), files.length - 1)];
     if (!img || !file) return _graderReleasePage(_grader);
+    _drawGraderMarks(pane, cid, file);
     var key = [cid, a.id, st.id, file.id, file.path].join('|');
     if (_grader.work.imgKey === key) {
       // The pane was drawn again: the picture already fetched goes back in.
@@ -14143,6 +14167,33 @@ window.PageAssignments = (function () {
         g.work.shownKey = key;
       }
     });
+  }
+
+  /* The teacher's marks on the page shown (S9-F1), over the picture on
+     its surface: the working copy, what Return gives the student. Drawn
+     again only when the marks or the page's shape change; the shape is the
+     picture's, once it has loaded. */
+  function _drawGraderMarks(pane, cid, file) {
+    var surface = pane.querySelector('.grader-work-surface');
+    var img = surface && surface.querySelector('.grader-work-img');
+    if (!surface || !img || !window.MarkupDraw) return;
+    if (!img._markupLoad) {
+      img._markupLoad = true;
+      var g = _grader;
+      img.addEventListener('load', function () {
+        if (_grader === g && img.isConnected) _drawGraderMarks(pane, cid, file);
+      });
+    }
+    var row = typeof getPageMarkup === 'function' ? getPageMarkup(cid, file.id) : null;
+    var marks = row && row.marks && row.marks.marks && row.marks.marks.length ? row.marks : null;
+    var html = marks ? MarkupDraw.svgHtml(marks, MarkupDraw.aspect(img)) : '';
+    var layer = surface.querySelector('.markup-layer');
+    if (layer && layer._html === html) return;
+    if (layer) layer.remove();
+    if (!html) return;
+    // html-safe: built by MarkupDraw.svgHtml, which escapes a note's words
+    img.insertAdjacentHTML('afterend', html);
+    surface.querySelector('.markup-layer')._html = html;
   }
 
   /* The page on screen in the work pane, for a layer drawn over it (S9-T1,
@@ -14231,10 +14282,32 @@ window.PageAssignments = (function () {
       _graderSetTo(cid, a, sid, parseInt(btn.dataset.score, 10), btn.textContent.replace(/^\s*\d\s*/, '').trim());
     } else if (what === 'work-delete') {
       return _graderAskDeleteWork(cid, a, sid, btn);
+    } else if (what === 'work-markup') {
+      return _graderOpenMarkUp(cid, a, sid);
     } else return;
     render();
     var to = again && _grader && _grader.overlay.querySelector(again);
     if (to && !to.disabled) to.focus({ preventScroll: true });
+  }
+
+  /* Mark Up (S9-F1), on the page the pane shows. Done comes back here with
+     the marks drawn over the page and the Return row up to date. */
+  function _graderOpenMarkUp(cid, a, sid) {
+    var g = _grader;
+    var w = g.work;
+    MarkUp.open({
+      cid: cid,
+      aid: a.id,
+      sid: sid,
+      page: w.page,
+      turn: Object.assign({}, w.turns),
+      onClose: function () {
+        if (_grader !== g || activeCourse !== cid || g.aid !== a.id || focusStudentId !== sid) return;
+        render();
+        var b = g.overlay.querySelector('[data-grader="work-markup"]');
+        if (b) b.focus({ preventScroll: true });
+      },
+    });
   }
 
   /* A new student opens on their first page. */
@@ -14650,6 +14723,8 @@ window.PageAssignments = (function () {
     var g = _grader;
     _graderReleasePage(g);
     _grader = null;
+    // Mark Up opened from this dialog goes with it.
+    if (window.MarkUp && MarkUp.isOpen()) MarkUp.close();
     _hideChipTip();
     _listeners.forEach(function (l) {
       document.removeEventListener(l.type, l.handler, l.options);
