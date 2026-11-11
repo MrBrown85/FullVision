@@ -576,7 +576,7 @@ window.StudentView = (function () {
        reports: [ { id, title, issued, until, isNew, result: { word, text,
                 level }, comment } ],
        learning: null here; fromCache's My Learning (learning() below) }
-     piece: { id, title, date, dueDate, kind: 'due' | 'back' | 'missing' |
+     piece: { id, title, date, dueDate, kind: 'due' | 'sent' | 'back' | 'missing' |
               'excused', late, returnedAt, updated, unseen,
               result: { kind: 'level' | 'points' | 'complete' | 'none',
                         text, word, and for a level or points: level (its
@@ -589,9 +589,63 @@ window.StudentView = (function () {
               goal, whole ] } }
      row: { id, name, level, text, comment }
      A piece not back yet has its rubric's words and no level in it.
-     sent is 0: the page sends no work yet (S5). */
-  function build(page, cid, cellOf) {
+     sent counts work sent and not back yet; it is 0 without a `work` reply
+     (S5-F2). A piece's send: null, or { takes, open, closesOn, lateNow,
+     sent: null | { at, pages, late, note, byTeacher, onPaper, grading,
+     canChange, teacherPages, thumbs } } (sendOf). */
+  /* What the `work` reply says about sending one piece (S5-F2; the
+     contract is migrations/local-test/batch-b-contract.md, `work`), or null
+     when the class takes no work or the piece takes none and has none in.
+     Read as the contract types it; anything else reads as none. thumbs is
+     the student's own pages to show, as addresses on this device (Demo
+     Mode's; the real page will fetch them through `file_links`). */
+  var TAKES = { photos: 'photos', photos_files: 'photos_files' };
+  function sendOf(entry) {
+    if (!entry || typeof entry !== 'object') return null;
+    var sent = entry.sent && typeof entry.sent === 'object' ? entry.sent : null;
+    var takes = TAKES[entry.students_send] || '';
+    if (!takes && !sent) return null;
+    var whole = function (v) {
+      return typeof v === 'number' && isFinite(v) && v >= 0 ? Math.floor(v) : 0;
+    };
+    return {
+      takes: takes,
+      open: entry.open === true,
+      closesOn: text(entry.closes_on).slice(0, 10),
+      lateNow: entry.late_now === true,
+      sent: sent
+        ? {
+            at: text(sent.sent_at),
+            pages: whole(sent.pages),
+            late: sent.is_late === true,
+            note: text(sent.note),
+            byTeacher: sent.sent_by === 'teacher',
+            onPaper: sent.on_paper === true,
+            grading: sent.grading === true,
+            canChange: sent.can_change === true,
+            // How many of the pages the teacher added. Not in the contract's `work` yet (Demo Mode's own):
+            // the Unsend line that names them needs it from the server.
+            teacherPages: whole(sent.teacher_pages),
+            thumbs: list(sent.thumbs).filter(function (u) {
+              return typeof u === 'string' && /^(blob:|data:image\/jpeg)/.test(u);
+            }),
+          }
+        : null,
+    };
+  }
+
+  /* work: the `work` reply for this class (sending, S5-F2), or nothing.
+     With Send Work off, or no reply, no piece says anything of sending and
+     the page is as it was. */
+  function build(page, cid, cellOf, work) {
     page = page || {};
+    var sending = {};
+    if (work && typeof work === 'object' && work.send_work === true) {
+      list(work.assessments).forEach(function (entry) {
+        var send = entry && typeof entry.id === 'string' ? sendOf(entry) : null;
+        if (send) sending[entry.id] = send;
+      });
+    }
     var course = page.course || {};
     var student = page.student || {};
     var tags = page.tags || {};
@@ -624,6 +678,12 @@ window.StudentView = (function () {
         created_at: str(row.created_at),
       };
       Object.assign(piece, aboutOf(row));
+      // Sending: what this piece takes, and what is in. Work sent and not back yet is Sent.
+      piece.send = sending[piece.id] || null;
+      if (piece.send && piece.send.sent && (piece.kind === 'due' || piece.kind === 'missing')) {
+        piece.kind = 'sent';
+        piece.late = piece.late || piece.send.sent.late;
+      }
       // Work not back yet shows its rubric's words (See the Rubric), with no level.
       if (!grade && !hidden && row.rubric_id && rubrics[row.rubric_id]) {
         piece.rubric = rubricView(rubrics[row.rubric_id], null, tags);
@@ -683,7 +743,7 @@ window.StudentView = (function () {
         // The teacher's name as the server sends it ('' until it does): shown as sent, never made into "Mr.".
         teacherName: text(course.teacher_name),
       },
-      counts: { toDo: count('due'), sent: 0, back: count('back'), missing: count('missing') },
+      counts: { toDo: count('due'), sent: count('sent'), back: count('back'), missing: count('missing') },
       work: work,
       changes: changes,
       levels: levelsLegend(),
@@ -1004,18 +1064,23 @@ window.StudentView = (function () {
      s/student-data.js holds it (StudentData.use(StudentData.fromServer(
      reply))). Results come from calc.js on that page's own readers; with
      calc.js not loaded they are blank. */
-  function fromPage(serverReply, studentPage) {
+  function fromPage(serverReply, studentPage, work) {
     var p = studentPage;
     var cid = p && p.course ? p.course.id : '';
     var sid = p && p.student ? p.student.id : '';
     var ready = typeof assessmentCellValue === 'function';
-    return build(serverReply, cid, function (aid) {
-      if (!ready || !p) return null;
-      var a = (p.assessments || []).find(function (x) {
-        return x.id === aid;
-      });
-      return a ? assessmentCellValue(cid, sid, a) : null;
-    });
+    return build(
+      serverReply,
+      cid,
+      function (aid) {
+        if (!ready || !p) return null;
+        var a = (p.assessments || []).find(function (x) {
+          return x.id === aid;
+        });
+        return a ? assessmentCellValue(cid, sid, a) : null;
+      },
+      work,
+    );
   }
 
   return {

@@ -37,6 +37,23 @@ window.PreviewStudent = (function () {
 
   var STYLE_NAMES = { proficiency: 'Proficiency', letter: 'Letter', both: 'Both' };
 
+  /* The view the device draws. Opened by See What They'd See (S13-F1),
+     My Learning is worked out as if the class showed it, for this preview
+     only: nothing is saved, and every other screen reads the class as it is. */
+  function _fromCache(cid, sid) {
+    if (!_open || !_open.learning) return StudentView.fromCache(cid, sid);
+    var real = window.getCourseConfig;
+    window.getCourseConfig = function (c) {
+      var cfg = real(c) || {};
+      return c === cid ? Object.assign({}, cfg, { show_my_learning: true }) : cfg;
+    };
+    try {
+      return StudentView.fromCache(cid, sid);
+    } finally {
+      window.getCourseConfig = real;
+    }
+  }
+
   function _student(cid, sid) {
     return (getStudents(cid) || []).find(function (s) {
       return s && s.id === sid;
@@ -82,7 +99,7 @@ window.PreviewStudent = (function () {
         'Your Result',
         'Each returned piece, in this class’s grading style (' + STYLE_NAMES[courseGradeMode(cid)] + ').',
       ) +
-      (StudentView.learningOn(cid)
+      (StudentView.learningOn(cid) || (_open && _open.learning)
         ? _item('My Learning', 'Their level on each skill and their grade, only from work you’ve returned.')
         : '') +
       '</ul></section>'
@@ -118,7 +135,7 @@ window.PreviewStudent = (function () {
     var st = _student(cid, sid) || {};
     var first = displayNameFirst(st) || 'The student';
     var full = displayNameWithLast(st) || first;
-    var built = StudentView.fromCache(cid, sid);
+    var built = _fromCache(cid, sid);
     var screen = built.ready
       ? drawPage(built.view, _open.ui)
       : // html-safe: fixed markup
@@ -197,8 +214,9 @@ window.PreviewStudent = (function () {
 
   /* Opens the preview of student `sid` in class `cid`. `trigger` is the
      control that opened it; the focus goes back to `returnFocusId` (or the
-     trigger) when it closes. */
-  function open(cid, sid, trigger, returnFocusId) {
+     trigger) when it closes. `opts.tab` is the tab it opens on;
+     `opts.learning` shows My Learning before the class turns it on (S13-F1). */
+  function open(cid, sid, trigger, returnFocusId, opts) {
     if (!cid || !sid || !_student(cid, sid)) return false;
     close();
     _open = {
@@ -208,7 +226,8 @@ window.PreviewStudent = (function () {
       trigger: trigger || null,
       returnTo: returnFocusId || null,
       // What the student looks at, as on the phone: the page opens on Assignments, To Do.
-      ui: {},
+      ui: opts && opts.tab ? { tab: opts.tab } : {},
+      learning: !!(opts && opts.learning),
     };
     var el = document.createElement('div');
     el.id = OVERLAY_ID;
@@ -292,7 +311,7 @@ window.PreviewStudent = (function () {
      inside the device is drawn again. */
   function _press(act, el) {
     if (!_open) return;
-    var built = StudentView.fromCache(_open.cid, _open.sid);
+    var built = _fromCache(_open.cid, _open.sid);
     if (!built.ready) return;
     var out = StudentPageView.press(_open.ui, built.view, act, el);
     if (!out) return;
@@ -304,7 +323,7 @@ window.PreviewStudent = (function () {
     var box = _overlay();
     var screen = box && box.querySelector('.ps-screen');
     if (!screen || !_open) return;
-    var built = StudentView.fromCache(_open.cid, _open.sid);
+    var built = _fromCache(_open.cid, _open.sid);
     if (!built.ready) return _draw();
     // html-safe: drawPage is s/page-view.js, which escapes every title, date line and result
     screen.innerHTML = drawPage(built.view, _open.ui);

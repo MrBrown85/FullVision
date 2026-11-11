@@ -24,7 +24,8 @@ window.MCardWidgetEditor = (function () {
     config.order.forEach(function (key) {
       var w = _registryMap[key];
       if (!w) return;
-      var noDrag = key === 'flagStatus';
+      // Flag sits in the name line and To Grade under it: they turn on and off but do not move.
+      var noDrag = key === 'flagStatus' || key === 'toGrade';
       html += _editorRow(w, true, noDrag);
     });
     html += '</div>';

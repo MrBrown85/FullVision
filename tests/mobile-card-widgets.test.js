@@ -15,6 +15,7 @@ describe('Card Widget Config', () => {
     var config = getCardWidgetConfig();
     expect(config.order).toEqual([
       'hero',
+      'toGrade',
       'sectionBars',
       'completion',
       'growth',
@@ -1003,18 +1004,18 @@ describe('Integration — Full Card Render Cycle', () => {
 
   it('editor toggle cycle preserves other widgets', () => {
     var config = getCardWidgetConfig();
-    expect(config.order.length).toBe(7);
+    expect(config.order.length).toBe(8);
 
     MCardWidgetEditor.toggleWidget('narrative');
     config = getCardWidgetConfig();
     expect(config.order).toContain('narrative');
-    expect(config.order.length).toBe(8);
+    expect(config.order.length).toBe(9);
 
     MCardWidgetEditor.toggleWidget('sectionBars');
     config = getCardWidgetConfig();
     expect(config.order).not.toContain('sectionBars');
     expect(config.order).toContain('narrative');
-    expect(config.order.length).toBe(7);
+    expect(config.order.length).toBe(8);
 
     var data = { sections: [], assessments: [], statuses: {}, termId: 'term-1', widgetConfig: getCardWidgetConfig() };
     var html = MCardWidgets.assembleCard(st, cid, data);

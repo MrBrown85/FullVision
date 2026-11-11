@@ -22,7 +22,8 @@
    - S5-F1: Send Work and Keep Photos Until, in Demo Mode (below).
    - S8-F1: the reminder and the "photos go for good" line on Keep Photos
      Until.
-   - Then Reflect on Feedback (S10) and Show My Learning (S13).
+   - S13-F1: Show My Learning and See What They'd See, in Demo Mode (below).
+   - Then Reflect on Feedback (S10).
 
    DashClassManager asks isShown(cid) before it draws the tab, opens it or
    builds its panel, and while the tab is shown hands over every sp* action,
@@ -491,6 +492,96 @@ var CmStudentPage = (function () {
     );
   }
 
+  /* ── Show My Learning (S13-F1) ─────────────────────────────────
+     Show My Learning is the class's switch for the student page's My
+     Learning tab (DECISIONS, My Learning on the student page 1), off until
+     the teacher turns it on. The screens read courseConfig.show_my_learning
+     (StudentView.learningOn); this row is its one writer.
+
+     Demo Mode first, as Send Work: the server's column comes with Batch C,
+     which is not applied. So the row is drawn in Demo Mode only; for a
+     signed-in teacher it is not drawn and nothing is asked of the server.
+     It is kept in the class's settings on this device (saveCourseConfig,
+     which sends nothing in Demo Mode).
+
+     See What They'd See opens Preview as Student on My Learning for the
+     student chosen under Preview as Student (the first by last name until
+     one is chosen), as My Learning would be with the switch on. Nothing is
+     saved. A student's own device cannot show My Learning yet (the server
+     does not send what the calculation needs), and a line says so. */
+  var STYLE_NAMES = { proficiency: 'Proficiency', letter: 'Letter', both: 'Both' };
+
+  // { offered, on }: offered only in Demo Mode with the student page on; on only where offered.
+  function learningSettings(cid) {
+    var s = _settings(cid);
+    var offered = !!s && s.student_page === true && _demo() && typeof saveCourseConfig === 'function';
+    var cfg = offered ? getCourseConfig(cid) || {} : {};
+    return { offered: offered, on: offered && cfg.show_my_learning === true };
+  }
+
+  function _learningRow(cid) {
+    var l = learningSettings(cid);
+    if (!l.offered) return '';
+    var style = STYLE_NAMES[typeof courseGradeMode === 'function' ? courseGradeMode(cid) : ''] || 'Proficiency';
+    return (
+      // Drawn as Send Work's row is (assignments.css, .sp-send): Class Settings' own switch row.
+      '<div class="sp-row sp-send sp-learning">' +
+      '<div class="cm-recent-limit sp-send-row">' +
+      '<span class="cm-recent-text"><label class="sp-row-title" for="sp-learning-switch">Show My Learning</label>' +
+      '<span class="cm-hint" id="sp-learning-hint">' +
+      esc('Students see their skills, their grade and how it changes over the term.') +
+      '</span></span>' +
+      '<span class="gpd-switch"><input type="checkbox" role="switch" id="sp-learning-switch" data-action-change="spShowLearning" aria-describedby="sp-learning-hint"' +
+      (l.on ? ' checked' : '') +
+      '><span class="gpd-switch-ui" aria-hidden="true"></span></span>' +
+      '</div>' +
+      '<div class="cm-hint" id="sp-learning-would">' +
+      esc(
+        'Students would see their level on each skill and their grade in this class’s grading style (' +
+          style +
+          "), only from work you've returned.",
+      ) +
+      '</div>' +
+      '<div class="cm-hint" id="sp-learning-device">' +
+      esc(
+        "Students' own phones and Chromebooks can't show My Learning yet, even with this on. For now only Preview as Student shows it.",
+      ) +
+      '</div>' +
+      '<div class="sp-learning-see">' +
+      '<button type="button" class="btn btn-secondary" id="sp-learning-see" data-action="spSeeLearning" aria-describedby="sp-learning-would">' +
+      esc("See What They'd See") +
+      '</button>' +
+      '</div>' +
+      '</div>'
+    );
+  }
+
+  function _turnLearning(cid, el) {
+    if (!cid || !learningSettings(cid).offered) return;
+    var on = !!(el && el.checked);
+    if (on === learningSettings(cid).on) return;
+    saveCourseConfig(cid, Object.assign({}, getCourseConfig(cid) || {}, { show_my_learning: on }));
+    _rerender();
+    _focus('sp-learning-switch');
+  }
+
+  // The student Preview as Student's list shows: the one chosen there, else the first.
+  function _previewStudent(cid) {
+    var students = typeof sortStudents === 'function' ? sortStudents(getStudents(cid) || [], 'lastName') : [];
+    var chosen = _previewFor[cid];
+    var found = students.some(function (s) {
+      return s.id === chosen;
+    });
+    return found ? chosen : students.length ? students[0].id : null;
+  }
+
+  function _seeLearning(cid, el) {
+    if (!cid || !learningSettings(cid).offered || typeof PreviewStudent === 'undefined') return;
+    var sid = _previewStudent(cid);
+    if (!sid) return;
+    PreviewStudent.open(cid, sid, el, 'sp-learning-see', { tab: 'learning', learning: true });
+  }
+
   /* ── The build switch ──────────────────────────────────────── */
 
   // The switch's card: only at the build address. The row is Class
@@ -620,6 +711,7 @@ var CmStudentPage = (function () {
           '<h2 class="cm-grade-title">Student Page</h2>' +
           _returnGradesRow(cid) +
           _sendWorkRows(cid) +
+          _learningRow(cid) +
           '</div>' +
           (typeof StudentCards !== 'undefined' ? StudentCards.render(cid) : '') +
           _previewCard(cid)
@@ -636,6 +728,10 @@ var CmStudentPage = (function () {
     }
     if (action === 'spPreview') {
       _openPreview(_cid(el), el);
+      return true;
+    }
+    if (action === 'spSeeLearning') {
+      _seeLearning(_cid(el), el);
       return true;
     }
     if (action === 'spKeepPhotos') {
@@ -656,6 +752,10 @@ var CmStudentPage = (function () {
     if (el && el.dataset && el.dataset.actionChange === 'spPreviewStudent') {
       var on = _cid(el);
       if (on) _previewFor[on] = el.value;
+      return true;
+    }
+    if (el && el.dataset && el.dataset.actionChange === 'spShowLearning') {
+      _turnLearning(_cid(el), el);
       return true;
     }
     if (el && el.dataset && el.dataset.actionChange === 'spSendWork') {
@@ -687,6 +787,7 @@ var CmStudentPage = (function () {
     isShown: isShown,
     render: render,
     workSettings: workSettings,
+    learningSettings: learningSettings,
     keepPhotosDate: keepPhotosDate,
     handleAction: handleAction,
     handleChange: handleChange,

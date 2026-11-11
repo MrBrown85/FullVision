@@ -39,6 +39,7 @@ const PRECACHE_URLS = [
   '/shared/core-self.js',
   '/shared/student-view.js',
   '/s/page-view.js',
+  '/s/send.js',
   '/s/page-view.css',
   '/shared/loading-screen.js',
   '/shared/loading-screen.css',
