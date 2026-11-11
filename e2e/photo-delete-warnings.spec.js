@@ -3,9 +3,11 @@ import { test, expect } from '@playwright/test';
 // S8-F1 (teacher deletes), in Demo Mode on its sample work (Cell Microscope
 // Lab: nine students sent photos, one handed in on paper). The Gradebook's
 // Delete Assessment, Delete Permanently for a withdrawn student, and Delete
-// Class say plainly that photos go for good (Colin's ruling 102), only once
-// the class's build switch and Send Work are on. Before that every dialog
-// reads as it always has. Nothing reaches a server.
+// Class say plainly that photos go for good (Colin's ruling 102) once the
+// class's build switch is on. Send Work is not asked: photos sent before it
+// was turned off still go, so the dialogs say so with it off too. With the
+// build switch off every dialog reads as it always has. Nothing reaches a
+// server.
 
 const CID = 'sci8';
 const LAB = 'sci8a1';
@@ -17,17 +19,20 @@ async function openDemo(page) {
   await page.waitForFunction(cid => getCourseSubmissions(cid).submissions.length === 10, CID, { timeout: 15000 });
 }
 
-// The hidden build switch and the class's Send Work, both on.
-async function turnOnSendWork(page) {
-  await page.evaluate(cid => {
-    setStudentPageSwitch(cid, true);
-    var all = getCourseSubmissions(cid);
-    saveDemoStudentWork(cid, {
-      course: Object.assign({}, all.course, { send_work: true }),
-      assessments: all.assessments,
-      submissions: all.submissions,
-    });
-  }, CID);
+// The hidden build switch on; Send Work as `send` (the sample starts it off).
+async function turnOnBuildSwitch(page, send) {
+  await page.evaluate(
+    ([cid, send]) => {
+      setStudentPageSwitch(cid, true);
+      var all = getCourseSubmissions(cid);
+      saveDemoStudentWork(cid, {
+        course: Object.assign({}, all.course, { send_work: send }),
+        assessments: all.assessments,
+        submissions: all.submissions,
+      });
+    },
+    [CID, send],
+  );
 }
 
 async function deleteAssessDialog(page) {
@@ -77,7 +82,7 @@ test.describe('Photo warnings before a teacher deletes (Demo Mode)', () => {
     expect(requests).toEqual([]);
   });
 
-  test('with Send Work off, every dialog reads as it always has', async ({ page }) => {
+  test('with the build switch off, every dialog reads as it always has', async ({ page }) => {
     let dialog = await deleteAssessDialog(page);
     await expect(dialog.locator('.confirm-message')).toHaveText(
       'All scores, statuses, and observations linked to this assessment will be removed. You can undo this for a few seconds.',
@@ -97,8 +102,14 @@ test.describe('Photo warnings before a teacher deletes (Demo Mode)', () => {
     );
   });
 
+  test('with Send Work turned off after photos were sent, Delete Assessment still names them', async ({ page }) => {
+    await turnOnBuildSwitch(page, false);
+    const dialog = await deleteAssessDialog(page);
+    await expect(dialog.locator('.confirm-message')).toContainText('the photos 9 students sent for it');
+  });
+
   test('with Send Work on, each names the photos that go', async ({ page }) => {
-    await turnOnSendWork(page);
+    await turnOnBuildSwitch(page, true);
     let dialog = await deleteAssessDialog(page);
     await expect(dialog.locator('.confirm-message')).toHaveText(
       "All scores, statuses, and observations linked to this assessment will be removed, and the photos 9 students sent for it. You can undo this for a few seconds. After that, deleted photos can't come back.",

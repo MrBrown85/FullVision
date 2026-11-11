@@ -12,9 +12,11 @@
  *
  * Sent work is read through shared/data.js's read side (getCourseSubmissions),
  * filled here as Demo Mode fills it (saveDemoStudentWork). With the class's
- * build switch off, Send Work off, nothing sent, or a signed-in teacher's
- * class (the read side has nothing for it until S5-W1), every dialog reads
- * exactly as it did before this change: the first block of each pins that.
+ * build switch off, nothing sent, or a signed-in teacher's class (the read
+ * side has nothing for it until S5-W1), every dialog reads exactly as it did
+ * before this change: the first block of each pins that. Send Work is not
+ * asked: photos sent before a teacher turned it off are deleted all the same,
+ * so the dialogs still say so.
  */
 import './setup.js';
 import { parseHTML } from 'linkedom';
@@ -145,8 +147,8 @@ describe('Gradebook: Delete Assessment', () => {
   describe('reads as it always has', () => {
     it.each([
       ['with the build switch off', { on: false }],
-      ['with Send Work off', { send: false }],
       ['with nothing sent', { sent: [] }],
+      ['with nothing sent and Send Work off', { sent: [], send: false }],
       ['when only a paper copy was handed in', { sent: [sub(CARA, LAB, 0, { on_paper: true })] }],
       ['for a signed-in teacher’s class', { demo: false }],
     ])('%s', (_, opts) => {
@@ -190,6 +192,13 @@ describe('Gradebook: Delete Assessment', () => {
       } finally {
         AssessmentCopy.deleteNote = note;
       }
+    });
+
+    it('with Send Work turned off after the photos were sent', () => {
+      mount(() => seed({ send: false }), { course: CID });
+      expect(deleteAssessDialog(LAB).message).toBe(
+        "All scores, statuses, and observations linked to this assessment will be removed, and the photos 2 students sent for it. You can undo this for a few seconds. After that, deleted photos can't come back.",
+      );
     });
 
     it('Delete still waits for its few seconds, as the words say', () => {
@@ -240,8 +249,8 @@ describe('Class Settings', () => {
   describe('read as they always have', () => {
     it.each([
       ['with the build switch off', { on: false }],
-      ['with Send Work off', { send: false }],
       ['with nothing sent', { sent: [] }],
+      ['with nothing sent and Send Work off', { sent: [], send: false }],
       ['for a signed-in teacher’s class', { demo: false }],
     ])('%s', (_, opts) => {
       open(opts);
@@ -289,6 +298,21 @@ describe('Class Settings', () => {
       open();
       DashClassManager.handleAction('cmDeleteCourse', { dataset: { cid: CID } });
       expect(dialog().querySelector('.confirm-title').textContent).toBe('Delete Class');
+      expect(message()).toBe(
+        "Permanently delete Science 8 with all its students, assessments, scores and photos of student work? It disappears now and is erased for good after 30 days. Deleted photos can't come back.",
+      );
+    });
+
+    it('with Send Work turned off after the photos were sent', () => {
+      open({ send: false });
+      deleteWithdrawn(AVA);
+      expect(message()).toBe(
+        'Their scores, observations, goals, reflections, reports and photos of their work in this class are deleted. This cannot be undone.',
+      );
+      expect(keepCopy()).toMatch(/Photos of their work are not in this file\.$/);
+      document.getElementById('confirm-cancel-btn').onclick();
+
+      DashClassManager.handleAction('cmDeleteCourse', { dataset: { cid: CID } });
       expect(message()).toBe(
         "Permanently delete Science 8 with all its students, assessments, scores and photos of student work? It disappears now and is erased for good after 30 days. Deleted photos can't come back.",
       );
