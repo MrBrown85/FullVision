@@ -484,6 +484,30 @@
         about: 'With your group, build a model of a plant or animal cell. Label every part.',
       });
     }
+    /* #demo-card-revise (S11-F2): one more piece, whose revision has come
+       back: its first version was Developing + and Proficient, the revision
+       is Proficient and Proficient (s/feedback.js keeps the request and the
+       first version's grade). The Cell Microscope Lab is returned for
+       revision there too. */
+    if (demo && demo.revise) {
+      cls.work.unshift({
+        id: 'demo-vaccine',
+        title: 'How Vaccines Work',
+        date: isoDay(-15),
+        due_date: isoDay(-10),
+        tag_ids: ['demo-com', 'demo-qp'],
+        unit: 'Unit 2: Body Systems',
+        category: 'Projects',
+        working: {
+          score: { value: null, comment: 'Your third example makes the explainer complete.' },
+          tag_scores: [
+            { tag_id: 'demo-com', value: 3, modifier: 0, comment: null },
+            { tag_id: 'demo-qp', value: 3, modifier: 0, comment: null },
+          ],
+        },
+        ret: { is_draft: false, returned_at: isoDay(-2) + 'T20:15:00Z', returned_copy: null },
+      });
+    }
     return cls;
   }
   function demoScience() {
@@ -1698,6 +1722,7 @@
     'workPage',
     'marksOff',
     'workPages',
+    'compare',
   ];
   function uiOf() {
     var ui = {};
@@ -2079,23 +2104,28 @@
     // #demo-card-send: the sample class with Send Work on (S5-F2); off, as in every class, otherwise.
     // #demo-card-reflect: Send Work and Reflect on Feedback both on (S10).
     // #demo-card-group: Send Work on, and a piece sent as One per Group (S12-F1).
-    var m = /^demo-card(?:-(password|letter|both|send|reflect|group))?$/i.exec(hash || '');
+    // #demo-card-revise: Send Work on, a piece returned for revision and a revision returned (S11-F2),
+    // in a class graded by both, so Before and After shows the board's "2.7 · 67%" and "3.0 · 75%".
+    var m = /^demo-card(?:-(password|letter|both|send|reflect|group|revise))?$/i.exec(hash || '');
     if (!m) return false;
     var kind = (m[1] || '').toLowerCase();
     demo = {
       hash: hash,
       check: kind === 'password' ? 'password' : 'identity',
-      system: kind === 'letter' || kind === 'both' ? kind : 'proficiency',
+      system: kind === 'letter' || kind === 'both' ? kind : kind === 'revise' ? 'both' : 'proficiency',
       wrong: 0,
       seen: {},
       classes: [],
       group: kind === 'group',
+      revise: kind === 'revise',
     };
     adding = null;
     S.demo = true;
-    S.demoSend = kind === 'send' || kind === 'reflect' || kind === 'group';
+    S.demoSend = kind === 'send' || kind === 'reflect' || kind === 'group' || kind === 'revise';
     S.demoGroup = kind === 'group';
     S.demoReflect = kind === 'reflect';
+    S.demoRevise = kind === 'revise';
+    S.demoRevisions = null;
     S.typed = prettyCode(DEMO.code);
     S.screen = 'cardstart';
     setTitle();
@@ -2188,7 +2218,7 @@
     } else if (act === 'card-back') {
       backToPage();
     } else if (
-      /^(tab|segment|all-open|all-close|filter|pick|open-piece|feedback|feedback-close|whole|whole-close|levels|form-pick|work|work-close|work-page|work-marks)$/.test(
+      /^(tab|segment|all-open|all-close|filter|pick|open-piece|feedback|feedback-close|whole|whole-close|levels|form-pick|work|work-close|work-page|work-marks|compare)$/.test(
         act,
       )
     ) {
