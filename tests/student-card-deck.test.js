@@ -110,7 +110,8 @@ describe('the cards of Back', () => {
   it('a returned grade changed since: Updated; the grade shown is the one returned, not the draft over it', async () => {
     const page = await demo();
     await page.click('[data-segment="back"]');
-    expect(tags(card(page, 'Lab Safety Contract'))).toContain('Updated');
+    // Updated, with the day it was updated (S4-F5), in place of Returned.
+    expect(tags(card(page, 'Lab Safety Contract'))[0]).toMatch(/^Updated \S+ \d+$/);
     const essay = card(page, 'Ecosystem Connections Essay');
     expect(rowsOf(essay)[0]).toEqual(['Your Result', '2.0']);
     expect(essay.textContent).not.toContain('much clearer after your rewrite');
@@ -171,6 +172,8 @@ describe('All Assignments: search, filters, and a row opens its card', () => {
       'To Do',
       'Sent',
       'Back',
+      // What changed since the student last looked (S4-F5).
+      'New ' + viewOf(page).changes.length,
     ]);
     expect(listed(page)).toHaveLength(9);
   });
@@ -254,5 +257,49 @@ describe('what a press changes is decided in one place, for the page and the pre
       all: false,
       pick: quiz.id,
     });
+  });
+});
+
+/* S4-W1: what the server now sends about each piece and class, in Demo
+   Mode's sample (which sends it as the database does since S4-M1). */
+describe('what the server also tells, in Demo Mode (S4-W1)', () => {
+  it('a card still to do: its unit, category, Description, I Can lines and Core Competencies', async () => {
+    const page = await demo();
+    const fair = card(page, 'Science Fair Proposal');
+    const text = sel => [...fair.querySelectorAll(sel)].map(el => el.textContent);
+    expect(text('.sp-piece-unit')).toEqual(['Unit 2: Body Systems']);
+    expect(text('.sp-piece-category')).toEqual(['Projects']);
+    expect(text('.sp-piece-about')).toEqual([
+      'Choose a question you can test. Write your question, what you predict, and the steps you will follow.',
+    ]);
+    expect(text('.sp-graded-on-name')).toEqual(['Questioning and Predicting', 'Planning and Conducting']);
+    expect(text('.sp-graded-on-ican')).toEqual([
+      'I can ask a question that can be tested and say what I expect to happen.',
+      'I can plan a fair test and carry it out safely.',
+    ]);
+    expect(text('.sp-core-name')).toEqual(['Creative Thinking', 'Critical & Reflective Thinking']);
+  });
+
+  it('a returned card: the teacher’s name over the comment, as the sample sends it', async () => {
+    const page = await demo();
+    await page.click('[data-segment="back"]');
+    const lab = card(page, 'Cell Microscope Lab');
+    expect(lab.querySelector('.sp-piece-from').textContent).toBe('MRMs. Rivera');
+    expect(lab.querySelector('.sp-piece-unit').textContent).toBe('Unit 1: Cells');
+  });
+
+  it('Your Classes says how many pieces wait in each class; none where nothing waits or the server does not say', async () => {
+    const page = await demo();
+    await page.click('[data-act="classes-open"]');
+    expect([...page.root().querySelectorAll('.sp-class-todo')].map(el => el.textContent)).toEqual(['3 to do']);
+    const html = page.run('StudentPage.classesSheet')({
+      student: { id: 'e1' },
+      classes: [
+        { enrollmentId: 'e1', name: 'Science 8', block: 'B', toDo: 0 },
+        { enrollmentId: 'e2', name: 'Humanities 8', block: 'A', toDo: null },
+        { enrollmentId: 'e3', name: 'Socials 8', block: 'C', toDo: 1 },
+      ],
+    });
+    expect(html.match(/sp-class-todo">[^<]*/g)).toEqual(['sp-class-todo">1 to do']);
   });
 });

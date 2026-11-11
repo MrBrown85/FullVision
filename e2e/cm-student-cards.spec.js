@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { catchPrints, heldAnywhere, sheets } from './student-card-fake.js';
+import { notAdded } from '../tests/helpers/kept-secret.js';
 
 // S0-W1 and S3-W1: the student page's build switch and the Student Cards
 // list in Class Settings › Student Page, in Demo Mode.
@@ -219,6 +220,7 @@ test('Student Cards: Make and Print, no code kept, and Print Again until the scr
   }
 
   // One press: the cards are made and the print dialog opens.
+  const keptBefore = await heldAnywhere(page);
   await catchPrints(page);
   await card.getByRole('button', { name: 'Make and Print ' + at.count + ' Cards' }).click();
   await expect.poll(async () => (await sheets(page)).length).toBe(1);
@@ -247,13 +249,17 @@ test('Student Cards: Make and Print, no code kept, and Print Again until the scr
   await expect(card.locator('.sc-note')).toHaveText(line);
   await expect(card.locator('.sc-actions button')).toHaveText(['Print Again', 'New Codes for This Class']);
   if (SHOTS) await card.screenshot({ path: SHOTS + '/s3w1-demo-after.png' });
-  const secrets = sheet.codes.concat(sheet.passwords);
   const shownText = await page.locator('body').innerText();
   const kept = await heldAnywhere(page);
-  for (const code of secrets) {
+  for (const code of sheet.codes) {
     expect(shownText).not.toContain(code);
     expect(kept).not.toContain(code);
     expect(kept).not.toContain(code.replace('-', ''));
+  }
+  // A password is four digits, which the device already holds by the hundred: found no more often than before.
+  for (const password of sheet.passwords) {
+    expect(shownText).not.toContain(password);
+    notAdded(expect, keptBefore, kept, password);
   }
   const saved = await page.evaluate(cid => localStorage.getItem('gb-student-cards-' + cid), at.cid);
   expect(JSON.parse(saved).length).toBe(at.count);
@@ -320,15 +326,22 @@ test('Student Cards: Make and Print, no code kept, and Print Again until the scr
    picture of each question and of the list. */
 const F2_SHOTS = process.env.S3F2_SHOTS || '';
 
-// Every code and password the sheets printed is nowhere on the page or the device.
-async function noCodeKept(page, printed) {
+// Every code and password the sheets printed is nowhere on the page or the
+// device. A password is four digits, which the device already holds by the
+// hundred: it is found no more often than in `keptBefore`, what the device
+// held before any card was made.
+async function noCodeKept(page, printed, keptBefore) {
   const shownText = await page.locator('body').innerText();
   const kept = await heldAnywhere(page);
   for (const sheet of printed) {
-    for (const code of sheet.codes.concat(sheet.passwords)) {
+    for (const code of sheet.codes) {
       expect(shownText).not.toContain(code);
       expect(kept).not.toContain(code);
       expect(kept).not.toContain(code.replace('-', ''));
+    }
+    for (const password of sheet.passwords) {
+      expect(shownText).not.toContain(password);
+      notAdded(expect, keptBefore, kept, password);
     }
   }
 }
@@ -351,6 +364,7 @@ test('Student Cards: Print New Card, New Codes for This Class, Unlock, with thei
   // No card yet: nothing on a row to press, and no New Codes.
   await expect(card.locator('.sc-do button')).toHaveCount(0);
 
+  const keptBefore = await heldAnywhere(page);
   await catchPrints(page);
   await actions.first().click();
   await expect.poll(async () => (await sheets(page)).length).toBe(1);
@@ -405,7 +419,7 @@ test('Student Cards: Print New Card, New Codes for This Class, Unlock, with thei
   await expect(card.locator('.sc-note')).toHaveText(
     '1 card went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
   );
-  await noCodeKept(page, all);
+  await noCodeKept(page, all, keptBefore);
 
   // A student added later has no card: New Codes for This Class counts them as a first card.
   await page.evaluate(cid => {
@@ -451,7 +465,7 @@ test('Student Cards: Print New Card, New Codes for This Class, Unlock, with thei
     n +
       ' cards went to the printer. Print Again works until you leave this screen. After that, printing makes new codes.',
   );
-  await noCodeKept(page, all);
+  await noCodeKept(page, all, keptBefore);
 
   // Two cards locked (as five wrong tries would leave them): Unlock on each row, and Unlock All.
   await page.evaluate(cid => {
@@ -504,7 +518,7 @@ test('Student Cards: Print New Card, New Codes for This Class, Unlock, with thei
   await expect(actions).toHaveText(['New Codes for This Class']);
   await expect(card.locator('.sc-note')).toHaveCount(0);
 
-  await noCodeKept(page, all);
+  await noCodeKept(page, all, keptBefore);
   expect(await page.evaluate(() => localStorage.getItem('fv-sync-queue-v1'))).toBe(null);
   expect(errors).toEqual([]);
 });
@@ -532,6 +546,7 @@ test('Student Cards: the filters and Cards Work Until', async ({ page }) => {
   ]);
   await expect(filters.getByRole('radio', { name: /^All/ })).toHaveAttribute('aria-checked', 'true');
 
+  const keptBefore = await heldAnywhere(page);
   await catchPrints(page);
   await card.getByRole('button', { name: 'Make and Print ' + at.count + ' Cards' }).click();
   await expect.poll(async () => (await sheets(page)).length).toBe(1);
@@ -591,7 +606,7 @@ test('Student Cards: the filters and Cards Work Until', async ({ page }) => {
   await expect(page.locator('.sc-card [data-action="spCardsWorkUntilDefault"]')).toHaveCount(0);
   expect((await savedCards(page, at.cid)).every(c => c.works_until === until.date)).toBe(true);
 
-  await noCodeKept(page, [sheet]);
+  await noCodeKept(page, [sheet], keptBefore);
   expect(await page.evaluate(() => localStorage.getItem('fv-sync-queue-v1'))).toBe(null);
   expect(errors).toEqual([]);
 });

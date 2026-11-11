@@ -1213,6 +1213,9 @@ async function initAllCourses() {
   if (_demoMode) {
     _useSupabase = false;
     _teacherId = 'demo-user';
+    // The demo class (DEFAULT_COURSES) is in seed-data.js: have it before
+    // the classes are read, so a first visit opens on it as it always has.
+    await _loadSeedScript();
   }
 
   // Check Supabase availability
@@ -5196,7 +5199,7 @@ function _loadCourseFromLS(cid) {
   if (lmRaw && lmRaw._customized) {
     _cache.learningMaps[cid] = lmRaw;
   } else {
-    _cache.learningMaps[cid] = LEARNING_MAP[cid] || { subjects: [], sections: [] };
+    _cache.learningMaps[cid] = _builtInLearningMap(cid);
   }
 
   // Modules: try new key, fall back to legacy 'gb-units-' key
@@ -5260,7 +5263,15 @@ function _loadCoursesFromLS() {
   } catch (e) {
     console.warn('Courses parse error:', e);
   }
-  return structuredClone(DEFAULT_COURSES);
+  // Demo Mode's class is in shared/seed-data.js, loaded only in Demo Mode:
+  // anywhere else nothing stored means no classes.
+  return typeof DEFAULT_COURSES !== 'undefined' ? structuredClone(DEFAULT_COURSES) : {};
+}
+
+// Demo Mode's built-in learning map for its class (LEARNING_MAP, in
+// shared/seed-data.js), else an empty map.
+function _builtInLearningMap(cid) {
+  return (typeof LEARNING_MAP !== 'undefined' && LEARNING_MAP[cid]) || { subjects: [], sections: [] };
 }
 
 /* Fields that affect proficiency calculations */
@@ -6892,6 +6903,8 @@ function _clearCourseLocalState(id) {
     'grade-returns',
     'category-draft',
     'student-cards',
+    'student-work',
+    'student-feedback',
     'statuses',
     'quick-obs',
     'term-ratings',
@@ -6911,6 +6924,8 @@ function _clearCourseLocalState(id) {
   delete _classVersion[id];
   delete _serverStudentPage[id];
   delete _gradeReturnsStale[id];
+  delete _studentWork[id];
+  delete _studentFeedback[id];
 
   // Clear cache
   for (const field of Object.keys(_DATA_KEYS)) {
@@ -7406,7 +7421,7 @@ function getLearningMap(cid) {
   } catch (e) {
     console.warn('LearningMap parse error:', e);
   }
-  if (!map) map = structuredClone(LEARNING_MAP[cid] || { subjects: [], sections: [] });
+  if (!map) map = structuredClone(_builtInLearningMap(cid));
   // Migrate old nested section/tag format to flat format
   if (!map._flatVersion || map._flatVersion < 2) {
     var sectionToTag = {};
@@ -7478,7 +7493,7 @@ function withFreshLearningMapIds(map) {
 }
 
 function resetLearningMap(cid) {
-  _cache.learningMaps[cid] = LEARNING_MAP[cid] || { subjects: [], sections: [] }; // ref change auto-busts tag/section caches
+  _cache.learningMaps[cid] = _builtInLearningMap(cid); // ref change auto-busts tag/section caches
   // v2: local-only reset. The legacy config_learning_maps table was dropped;
   // the structural learning-map RPCs (upsert_subject / delete_section / etc.)
   // now live under window.v2.* and are called from the UI directly.
@@ -16393,9 +16408,28 @@ function getCardWidgetConfigFromRaw(raw) {
       })
     : [];
 
+  /* A widget the saved config does not name was added after the teacher
+     saved it (a save names every widget). One on by default goes into the
+     order after the nearest widget before it in the registry that is shown
+     (first when none is); one off by default is off. A widget the teacher
+     turned off is in `disabled` and stays off. */
   var present = new Set(order.concat(disabled));
-  WIDGET_KEYS.forEach(function (k) {
-    if (!present.has(k)) disabled.push(k);
+  WIDGET_REGISTRY.forEach(function (w, i) {
+    var k = w.key;
+    if (present.has(k)) return;
+    if (!w.defaultOn) {
+      disabled.push(k);
+      return;
+    }
+    var at = 0;
+    for (var j = i - 1; j >= 0; j--) {
+      var before = order.indexOf(WIDGET_REGISTRY[j].key);
+      if (before >= 0) {
+        at = before + 1;
+        break;
+      }
+    }
+    order.splice(at, 0, k);
   });
 
   return { order: order, disabled: disabled };
@@ -16478,6 +16512,1538 @@ function clearCardWidgetConfig() {
   if (_writesEnabled() && window.v2 && window.v2.saveTeacherPreferences) {
     window.v2.saveTeacherPreferences({ card_widget_config: null });
   }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Student work: the client's read side (S5-F5)
+   ══════════════════════════════════════════════════════════════════
+   What students have sent, and the two settings that let them send: the
+   class's Send Work switch and each assessment's Students Send. Read here
+   in the shapes the server sends them (migrations/local-test/
+   batch-b-contract.md on the batch-b-submissions branch, coded to commit
+   5cbe3657), so a screen built on these needs no change when the wiring
+   PR (S5-W1) fills them from the server:
+
+   getCourseSubmissions(cid)   list_course_submissions(p_course_id):
+     { bucket, course: { send_work, keep_photos_until },
+       assessments: [{ id, students_send, after_due, accept_until,
+                       group_work, students_see_markup }],   every assessment
+       submissions: [{ id, assessment_id, enrollment_id, version, state,
+                       sent_by, on_paper, is_late, note, followed_plan,
+                       created_at, sent_at,
+                       files: [{ id, page, path, thumb_path, bytes,
+                                 thumb_bytes, width, height, rotation,
+                                 sha256 }] }],          handed in only
+       uploads: [] }
+   getStudentSubmission(cid, sid, aid)   one student's submission for one
+     assessment (the newest version), as in `submissions`, or null.
+   getAssessmentStudentWork(cid, aid)    one entry of `assessments`.
+   getCourseSendWork(cid)                `course`.
+   getStudentWork(cid, sid)              the student page's work(...):
+     { ok, v, send_work, assessments: [{ id, students_send, open,
+       closes_on, late_now, sent, sending }] }, `sent` as
+     { submission_id, sent_at, sent_by, on_paper, is_late, note, pages,
+       grading, can_change }.
+   studentWorkGradingStarted(cid, sid, aid)   Colin's rule: the piece holds
+     a draft or a returned grade (a level, points, a tick) or an Overall
+     Comment for that student. A Late, Missing or Excused mark alone is not.
+   studentWorkPageUrl(cid, file, which)  a Promise of an address an <img>
+     can show for one page ('page') or its thumbnail ('thumb'), or null.
+     Shipped sample files only; openStudentWorkPage also shows a photo
+     still in the photo queue.
+   addStudentWorkPages, replaceStudentWorkPages, markStudentWorkOnPaper,
+   deleteStudentWork, openStudentWorkPage   work a teacher adds or deletes (below, "Work a teacher adds").
+
+   A client student id is the server's enrollment id, so enrollment_id is
+   the student's id here. Every answer is a copy: changing it changes
+   nothing stored.
+
+   DEMO MODE ONLY, for now. The sample work is shared/seed-data.js's
+   (saveDemoStudentWork), kept in localStorage under
+   gb-student-work-<cid>. Its pages are drawn images shipped with the app
+   in assets/sample-work/, so a page's path and thumb_path there are file
+   names in that folder, not storage paths. A signed-in class gets the
+   empty answers (Send Work off, every assessment taking nothing, nothing
+   sent) until S5-W1. Nothing here calls the server or the outbox.
+
+   Kept out of class backups and Download All My Data on purpose (S8-F2):
+   this is not one of the _DATA_KEYS fields. */
+var STUDENT_WORK_MAX_PAGES = 30;
+var _STUDENT_WORK_DEMO_DIR = '/assets/sample-work/';
+var _STUDENT_WORK_DEFAULTS = {
+  students_send: 'nothing',
+  after_due: 'keep',
+  accept_until: null,
+  group_work: 'each',
+  students_see_markup: true,
+};
+var _studentWork = {}; // cid → { raw, value }: the stored sample work (Demo Mode) as last read
+
+function _studentWorkStored(cid) {
+  if (!cid || !_isDemoSession()) return null;
+  var raw = null;
+  try {
+    raw = localStorage.getItem('gb-student-work-' + cid);
+  } catch (e) {
+    raw = null;
+  }
+  var held = _studentWork[cid];
+  if (!held || held.raw !== raw) {
+    var value = null;
+    try {
+      value = raw == null ? null : JSON.parse(raw);
+    } catch (e) {
+      value = null;
+    }
+    held = _studentWork[cid] = { raw: raw, value: _plainObject(value) ? value : null };
+  }
+  return held.value;
+}
+
+function _studentWorkCopy(value) {
+  return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
+/* Demo Mode's sample work for a class (seed-data.js), in the shape
+   getCourseSubmissions answers; bucket and uploads are left out. Refused
+   (false) outside Demo Mode and for a submission of more than 30 pages. */
+function saveDemoStudentWork(cid, work) {
+  if (!cid || !_isDemoSession() || !_plainObject(work)) return false;
+  var subs = Array.isArray(work.submissions) ? work.submissions : [];
+  var tooMany = subs.some(function (s) {
+    return !s || (Array.isArray(s.files) && s.files.length > STUDENT_WORK_MAX_PAGES);
+  });
+  if (tooMany) return false;
+  var stored = {
+    course: Object.assign({ send_work: false, keep_photos_until: 'end_of_year' }, _studentWorkCopy(work.course) || {}),
+    assessments: _studentWorkCopy(Array.isArray(work.assessments) ? work.assessments : []),
+    submissions: _studentWorkCopy(subs),
+  };
+  var raw = JSON.stringify(stored);
+  _safeLSSet('gb-student-work-' + cid, raw);
+  _studentWork[cid] = { raw: raw, value: stored };
+  return true;
+}
+
+function getCourseSendWork(cid) {
+  var stored = _studentWorkStored(cid);
+  var course = stored && stored.course;
+  return {
+    send_work: !!(course && course.send_work === true),
+    keep_photos_until: course && course.keep_photos_until === 'end_of_term' ? 'end_of_term' : 'end_of_year',
+  };
+}
+
+function getAssessmentStudentWork(cid, aid) {
+  var stored = _studentWorkStored(cid);
+  var own =
+    stored &&
+    (stored.assessments || []).find(function (a) {
+      return a && a.id === aid;
+    });
+  var out = Object.assign({ id: aid }, _STUDENT_WORK_DEFAULTS, own ? _studentWorkCopy(own) : {});
+  out.id = aid;
+  if (out.after_due !== 'until') out.accept_until = null;
+  return out;
+}
+
+function _studentWorkSubmissions(cid) {
+  var stored = _studentWorkStored(cid);
+  if (!stored) return [];
+  var aids = {};
+  (getAssessments(cid) || []).forEach(function (a) {
+    if (a && a.id) aids[a.id] = true;
+  });
+  // The server takes an assessment's work with it when it is deleted.
+  return (stored.submissions || [])
+    .filter(function (s) {
+      return s && s.state === 'sent' && aids[s.assessment_id];
+    })
+    .map(function (s) {
+      var out = _studentWorkCopy(s);
+      out.files = (Array.isArray(out.files) ? out.files : []).slice().sort(function (x, y) {
+        return (x.page || 0) - (y.page || 0);
+      });
+      // Who added each page (the contract's added_by); the sample's pages
+      // were all added by whoever sent the work.
+      out.files.forEach(function (f) {
+        if (f && f.added_by !== 'teacher' && f.added_by !== 'student') {
+          f.added_by = out.sent_by === 'teacher' ? 'teacher' : 'student';
+        }
+      });
+      return out;
+    });
+}
+
+function getCourseSubmissions(cid) {
+  return {
+    bucket: 'student-photos',
+    course: getCourseSendWork(cid),
+    assessments: (getAssessments(cid) || [])
+      .filter(function (a) {
+        return a && a.id;
+      })
+      .map(function (a) {
+        return getAssessmentStudentWork(cid, a.id);
+      }),
+    submissions: _studentWorkSubmissions(cid),
+    uploads: [],
+  };
+}
+
+function getStudentSubmission(cid, sid, aid) {
+  return _newestSubmissionsOf(cid, [sid], aid)[0] || null;
+}
+
+function studentWorkGradingStarted(cid, sid, aid) {
+  var row = typeof getGradeReturn === 'function' ? getGradeReturn(cid, sid, aid) : null;
+  if (row && row.is_draft) return true;
+  if (hasScoreOrFeedback(cid, sid, aid)) return true;
+  return getRubricCheckIds(cid, sid, aid).length > 0;
+}
+
+/* The window for sending, by the class's own date, as the server's
+   _work_window works it out: an assessment's `date` is its date_assigned
+   and `dueDate` its due_date. */
+function _studentWorkWindow(cid, a, settings) {
+  var today = courseToday(cid);
+  var due = a.dueDate || a.due_date ? String(a.dueDate || a.due_date).slice(0, 10) : null;
+  var closes = settings.after_due === 'until' ? settings.accept_until : settings.after_due === 'stop' ? due : null;
+  var open =
+    settings.after_due === 'until'
+      ? !!closes && today <= closes
+      : settings.after_due === 'stop'
+        ? !due || today <= due
+        : true;
+  return {
+    listed: !a.date || String(a.date).slice(0, 10) <= today,
+    closes_on: closes || null,
+    open: open,
+    late: !!due && today > due,
+  };
+}
+
+function getStudentWork(cid, sid) {
+  var send = getCourseSendWork(cid).send_work;
+  var listed = (getAssessments(cid) || [])
+    .map(function (a, i) {
+      return { a: a, i: i };
+    })
+    .filter(function (x) {
+      return x.a && x.a.id;
+    })
+    // Undated first, then oldest first; the class's own order within a day.
+    .sort(function (x, y) {
+      var p = x.a.date ? String(x.a.date).slice(0, 10) : '';
+      var q = y.a.date ? String(y.a.date).slice(0, 10) : '';
+      if (p !== q) return p < q ? -1 : 1;
+      return x.i - y.i;
+    });
+  var out = [];
+  listed.forEach(function (x) {
+    var a = x.a;
+    var settings = getAssessmentStudentWork(cid, a.id);
+    var w = _studentWorkWindow(cid, a, settings);
+    var s = getStudentSubmission(cid, sid, a.id);
+    if (!w.listed || (settings.students_send === 'nothing' && !s)) return;
+    var takes = send && settings.students_send !== 'nothing' && w.open;
+    var started = !!s && studentWorkGradingStarted(cid, sid, a.id);
+    out.push({
+      id: a.id,
+      students_send: settings.students_send,
+      open: takes,
+      closes_on: w.closes_on,
+      late_now: w.late,
+      sent: s
+        ? {
+            submission_id: s.id,
+            sent_at: s.sent_at,
+            sent_by: s.sent_by,
+            on_paper: !!s.on_paper,
+            is_late: !!s.is_late,
+            note: s.note == null ? null : s.note,
+            pages: (s.files || []).length,
+            grading: started,
+            can_change: s.sent_by === 'student' && !started && takes,
+          }
+        : null,
+      // A send that is not finished: there is none in Demo Mode's sample.
+      sending: null,
+    });
+  });
+  return { ok: true, v: 1, send_work: send, assessments: out };
+}
+
+function studentWorkPageUrl(cid, file, which) {
+  var name = file && (which === 'thumb' ? file.thumb_path : file.path);
+  if (!name || !_studentWorkStored(cid)) return Promise.resolve(null);
+  // A sample page is a file name in assets/sample-work, nothing more.
+  if (!/^[a-z0-9-]+\.jpg$/.test(name)) return Promise.resolve(null);
+  return Promise.resolve(_STUDENT_WORK_DEMO_DIR + name);
+}
+
+/* ── Group work: the reader takes a group (S12-T1) ──────────────────────
+   On a piece set to One per Group (Students Send's group_work 'group'),
+   the group is the pair or group the teacher made on the assessment
+   (collaboration Pairs or Groups, getCollabGroupOf). Each member who sends
+   makes their own submission; the group's work is all of them together,
+   and every member sees it (batch-c-contract.md, "Group work"). A member
+   Graded Separately is still in the group's work: only their grade is
+   their own. Everywhere else (Each Student, individual work, a student in
+   no group, DIBELS) the group is the student alone, and these answer
+   exactly what getStudentSubmission and getStudentWork answer for them.
+
+   Shapes: getStudentGroupWork is the student's group_work(...),
+   getGroupWorkFiles the files group_file_links(...) makes links for.
+   No answer here carries a group-mate's name. Demo Mode only, as the rest
+   of student work; signed in they answer empty. */
+
+/* The group `sid` sends with on `aid`: { kind: 'pair' | 'group', index,
+   members, separate } (members on the roster, in the group's order;
+   separate: `sid` is Graded Separately), or null when the student sends
+   alone. */
+function getStudentWorkGroup(cid, sid, aid) {
+  var a = _assessmentById(cid, aid);
+  if (!a || getAssessmentStudentWork(cid, aid).group_work !== 'group') return null;
+  var group = getCollabGroupOf(a, sid);
+  if (!group) return null;
+  var roster = {};
+  (getStudents(cid) || []).forEach(function (s) {
+    if (s && s.id) roster[s.id] = true;
+  });
+  var members = group.members.filter(function (m) {
+    return roster[m];
+  });
+  if (members.length < 2) return null;
+  return { kind: group.kind, index: group.index, members: members, separate: isGradedSeparately(a, sid) };
+}
+
+// The newest handed-in submission of each of `sids` on `aid`, in that order.
+function _newestSubmissionsOf(cid, sids, aid) {
+  var subs = _studentWorkSubmissions(cid);
+  var out = [];
+  sids.forEach(function (sid) {
+    var mine = subs
+      .filter(function (s) {
+        return s.enrollment_id === sid && s.assessment_id === aid;
+      })
+      .sort(function (x, y) {
+        return (y.version || 1) - (x.version || 1);
+      });
+    if (mine.length) out.push(mine[0]);
+  });
+  return out;
+}
+
+/* The work in for `sid`'s group on `aid`: each member's newest handed-in
+   submission, members in the group's order (the student's own first when
+   they send alone, so a single student gets [their submission] or []). */
+function getGroupSubmissions(cid, sid, aid) {
+  var group = getStudentWorkGroup(cid, sid, aid);
+  return _newestSubmissionsOf(cid, group ? group.members : [sid], aid);
+}
+
+/* True when work is in for `sid` on `aid`: their own, or on a One per
+   Group piece a group-mate's. What To Grade and Not In should ask in place
+   of getStudentSubmission (see GraderWork.workStateOf). */
+function groupWorkIn(cid, sid, aid) {
+  return getGroupSubmissions(cid, sid, aid).length > 0;
+}
+
+/* Every page of the group's work, as group_file_links lists them: each
+   page of getGroupSubmissions' submissions, with enrollment_id (who sent
+   it: an id, never a name), submission_id and mine (sent in `sid`'s own
+   submission). Members in order, each one's pages in order. */
+function getGroupWorkFiles(cid, sid, aid) {
+  var out = [];
+  getGroupSubmissions(cid, sid, aid).forEach(function (s) {
+    (s.files || []).forEach(function (f) {
+      out.push(
+        Object.assign({}, f, { enrollment_id: s.enrollment_id, submission_id: s.id, mine: s.enrollment_id === sid }),
+      );
+    });
+  });
+  return out;
+}
+
+/* The student page's group_work(...): { ok, assessments: [{ id, members,
+   sent, pages, you_sent, first_sent_at }] } for each One per Group piece
+   the student's group is on: how many are in the group, whether any work
+   is in, its pages, whether the student sent some, and when the first came
+   in. No names. In the page's order (getStudentWork's). */
+function getStudentGroupWork(cid, sid) {
+  var out = [];
+  (getStudentWork(cid, sid).assessments || []).forEach(function (w) {
+    var group = getStudentWorkGroup(cid, sid, w.id);
+    if (!group) return;
+    var subs = _newestSubmissionsOf(cid, group.members, w.id);
+    var first = null;
+    var pages = 0;
+    subs.forEach(function (s) {
+      pages += (s.files || []).length;
+      var at = s.sent_at || s.created_at;
+      if (at && (!first || at < first)) first = at;
+    });
+    out.push({
+      id: w.id,
+      members: group.members.length,
+      sent: subs.length > 0,
+      pages: pages,
+      you_sent: subs.some(function (s) {
+        return s.enrollment_id === sid;
+      }),
+      first_sent_at: first,
+    });
+  });
+  return { ok: true, assessments: out };
+}
+
+/* ── Work a teacher adds (S6-F2, S7-F3) ─────────────────────────────────
+   Add Work, Add as More Pages, Replace Them and Handed In on Paper, in the
+   shapes of the contract's start_work_upload + finish_work_upload and
+   mark_handed_in_paper, so the wiring PR (S5-W1/S6-W1/S7-W1) can point
+   them at the server without a screen changing.
+
+   pages are PhotoShrink.prepare's, in order: [{ blob, thumb, hash, width,
+   height, … }]. Each page waits in the photo queue (shared/photo-queue.js,
+   IndexedDB) under its own local id. In Demo Mode it stays there for good:
+   the queue never sends in Demo Mode, and the work is recorded on this
+   device as handed in. A page still in the queue has the path
+   "photo-queue:<id>" (its thumbnail "photo-queue:<id>:thumb"), which only
+   openStudentWorkPage turns into an address.
+
+   Signed in, these do nothing yet and answer { result: 'not_available' }:
+   the server side (Batch B) is not applied, so no RPC and no edge route is
+   called. Every answer is a Promise; none rejects. */
+var _STUDENT_WORK_QUEUE_PATH = /^photo-queue:(p[a-z0-9]+)(:thumb)?$/;
+var _teacherWorkChain = {}; // cid → the last teacher-work write's promise, so two never interleave
+
+function _teacherWorkId() {
+  return 'w' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function _studentWorkWrite(cid, stored) {
+  var raw = JSON.stringify(stored);
+  _safeLSSet('gb-student-work-' + cid, raw);
+  _studentWork[cid] = { raw: raw, value: stored };
+}
+
+// A copy of the class's stored work to change, or an empty one.
+function _studentWorkDraft(cid) {
+  var stored = _studentWorkCopy(_studentWorkStored(cid));
+  if (!_plainObject(stored)) stored = {};
+  return {
+    course: Object.assign({ send_work: false, keep_photos_until: 'end_of_year' }, stored.course || {}),
+    assessments: Array.isArray(stored.assessments) ? stored.assessments : [],
+    submissions: Array.isArray(stored.submissions) ? stored.submissions : [],
+  };
+}
+
+function _teacherWorkInClass(cid, sid, aid) {
+  var hasPiece = (getAssessments(cid) || []).some(function (a) {
+    return a && a.id === aid;
+  });
+  var hasStudent = (getStudents(cid) || []).some(function (s) {
+    return s && s.id === sid;
+  });
+  return hasPiece && hasStudent;
+}
+
+// The newest handed-in submission for one student and piece in a draft.
+function _teacherWorkSent(draft, sid, aid) {
+  var found = draft.submissions
+    .filter(function (s) {
+      return s && s.state === 'sent' && s.enrollment_id === sid && s.assessment_id === aid;
+    })
+    .sort(function (x, y) {
+      return (y.version || 1) - (x.version || 1);
+    });
+  return found[0] || null;
+}
+
+function _teacherWorkPagesOk(pages) {
+  return (
+    Array.isArray(pages) &&
+    pages.length > 0 &&
+    pages.every(function (p) {
+      return p && p.blob && p.thumb && p.blob.size > 0 && p.thumb.size > 0;
+    })
+  );
+}
+
+// One write at a time per class: each waits for the one before it.
+function _teacherWorkQueued(cid, work) {
+  var before = _teacherWorkChain[cid] || Promise.resolve();
+  var run = before.then(work, work).then(null, function () {
+    return { result: 'store_failed' };
+  });
+  _teacherWorkChain[cid] = run;
+  return run;
+}
+
+function _queuePagesOf(sub) {
+  return ((sub && sub.files) || [])
+    .map(function (f) {
+      var m = f && typeof f.path === 'string' ? _STUDENT_WORK_QUEUE_PATH.exec(f.path) : null;
+      return m && !m[2] ? m[1] : null;
+    })
+    .filter(Boolean);
+}
+
+/* Put pages in the photo queue for one submission. → { ok, ids } or the
+   queue's refusal as an answer. */
+function _teacherWorkQueuePages(cid, sid, aid, subId, pages) {
+  var q = window.PhotoQueue;
+  if (!q || typeof q.add !== 'function') return Promise.resolve({ ok: false, answer: { result: 'no_photo_store' } });
+  return q.add({ course: cid, assessment: aid, enrollment: sid, submission: subId }, pages).then(function (res) {
+    if (res && res.ok) return res;
+    var reason = res && (res.reason === 'storage_full' || res.reason === 'invalid') ? res.reason : 'store_failed';
+    return { ok: false, answer: { result: reason } };
+  });
+}
+
+function _teacherWorkForget(ids) {
+  var q = window.PhotoQueue;
+  if (!q || typeof q.remove !== 'function' || !ids.length) return Promise.resolve();
+  return Promise.all(
+    ids.map(function (id) {
+      return q.remove(id).then(null, function () {});
+    }),
+  );
+}
+
+function _teacherWorkFiles(queued, pages, firstPage) {
+  return queued.map(function (qid, i) {
+    var p = pages[i];
+    return {
+      id: qid,
+      page: firstPage + i,
+      path: 'photo-queue:' + qid,
+      thumb_path: 'photo-queue:' + qid + ':thumb',
+      bytes: p.blob.size,
+      thumb_bytes: p.thumb.size,
+      width: p.width || null,
+      height: p.height || null,
+      rotation: 0,
+      sha256: p.hash || null,
+      added_by: 'teacher',
+    };
+  });
+}
+
+/* What a teacher's Add Work would be answered, before or after the photos
+   are kept (another write may have changed the piece meanwhile). null: go. */
+function _teacherWorkCheck(cid, sid, aid, pages, mode) {
+  if (!_teacherWorkInClass(cid, sid, aid)) return { result: 'not_found' };
+  var sent = _teacherWorkSent(_studentWorkDraft(cid), sid, aid);
+  if (mode === 'new' && sent) return { result: 'already_sent', submission: getStudentSubmission(cid, sid, aid) };
+  if (mode !== 'new' && !sent) return { result: 'nothing_sent' };
+  if (mode === 'add' && sent.on_paper) return { result: 'on_paper', submission: getStudentSubmission(cid, sid, aid) };
+  var have = mode === 'add' ? (sent.files || []).length : 0;
+  if (have + pages.length > STUDENT_WORK_MAX_PAGES)
+    return { result: 'too_many_pages', room: STUDENT_WORK_MAX_PAGES - have };
+  return null;
+}
+
+function _teacherWork(cid, sid, aid, pages, mode) {
+  if (!cid || !_isDemoSession()) return Promise.resolve({ result: 'not_available' });
+  if (!_teacherWorkPagesOk(pages)) return Promise.resolve({ result: 'invalid' });
+  return _teacherWorkQueued(cid, function () {
+    var refused = _teacherWorkCheck(cid, sid, aid, pages, mode);
+    if (refused) return refused;
+    var target = _teacherWorkSent(_studentWorkDraft(cid), sid, aid);
+    var subId = mode === 'add' ? target.id : _teacherWorkId();
+    return _teacherWorkQueuePages(cid, sid, aid, subId, pages).then(function (kept) {
+      if (!kept.ok) return kept.answer;
+      // Asked again now the photos are kept: the piece may have changed.
+      var late = _teacherWorkCheck(cid, sid, aid, pages, mode);
+      var draft = _studentWorkDraft(cid);
+      var now = _teacherWorkSent(draft, sid, aid);
+      if (!late && mode !== 'new' && (!now || now.id !== target.id)) late = { result: 'nothing_sent' };
+      if (late || !_isDemoSession()) {
+        return _teacherWorkForget(kept.ids).then(function () {
+          return late || { result: 'not_available' };
+        });
+      }
+      var stamp = new Date().toISOString();
+      var dropped = [];
+      if (mode === 'add') {
+        var last = (now.files || []).reduce(function (n, f) {
+          return Math.max(n, (f && f.page) || 0);
+        }, 0);
+        now.files = (now.files || []).concat(_teacherWorkFiles(kept.ids, pages, last + 1));
+        now.updated_at = stamp;
+      } else {
+        // Replace Them: every page of what is in goes, the student's among them.
+        if (now) {
+          dropped = _queuePagesOf(now);
+          draft.submissions = draft.submissions.filter(function (s) {
+            return s !== now;
+          });
+        }
+        draft.submissions.push({
+          id: subId,
+          assessment_id: aid,
+          enrollment_id: sid,
+          version: (now && now.version) || 1,
+          state: 'sent',
+          sent_by: 'teacher',
+          on_paper: false,
+          is_late: false,
+          note: null,
+          followed_plan: null,
+          created_at: stamp,
+          sent_at: stamp,
+          files: _teacherWorkFiles(kept.ids, pages, 1),
+        });
+      }
+      _studentWorkWrite(cid, draft);
+      return _teacherWorkForget(dropped).then(function () {
+        return { result: 'sent', submission: getStudentSubmission(cid, sid, aid) };
+      });
+    });
+  });
+}
+
+/* Add Work for one student with nothing in (mode 'new', the default), or
+   Add as More Pages to what is in (mode 'add'). See the block above. */
+function addStudentWorkPages(cid, sid, aid, pages, opts) {
+  var mode = opts && opts.mode === 'add' ? 'add' : 'new';
+  return _teacherWork(cid, sid, aid, pages, mode);
+}
+
+/* Replace Them: the new pages take the place of every page that is in. */
+function replaceStudentWorkPages(cid, sid, aid, pages) {
+  return _teacherWork(cid, sid, aid, pages, 'replace');
+}
+
+/* Handed In on Paper for these students. A student who already has work
+   in, or is not in the class, is passed over. */
+function markStudentWorkOnPaper(cid, aid, sids) {
+  if (!cid || !_isDemoSession()) return Promise.resolve({ result: 'not_available', marked: 0, submissions: [] });
+  return _teacherWorkQueued(cid, function () {
+    var draft = _studentWorkDraft(cid);
+    var made = [];
+    (Array.isArray(sids) ? sids : []).forEach(function (sid) {
+      // A student named twice has work in by the second time.
+      if (typeof sid !== 'string' || !_teacherWorkInClass(cid, sid, aid) || _teacherWorkSent(draft, sid, aid)) return;
+      var stamp = new Date().toISOString();
+      var sub = {
+        id: _teacherWorkId(),
+        assessment_id: aid,
+        enrollment_id: sid,
+        version: 1,
+        state: 'sent',
+        sent_by: 'teacher',
+        on_paper: true,
+        is_late: false,
+        note: null,
+        followed_plan: null,
+        created_at: stamp,
+        sent_at: stamp,
+        files: [],
+      };
+      draft.submissions.push(sub);
+      made.push(sid);
+    });
+    if (made.length) _studentWorkWrite(cid, draft);
+    return {
+      result: 'sent',
+      marked: made.length,
+      submissions: made.map(function (sid) {
+        return getStudentSubmission(cid, sid, aid);
+      }),
+    };
+  });
+}
+
+/* Delete Work (Colin's ruling 87): one student's newest handed-in work on
+   a piece, every page with it, the teacher's included; the student can
+   send again. Grades and comments stay. Photos of it still in the photo
+   queue are deleted from the device. Answers { result: 'deleted', pages }
+   (pages: how many went), { result: 'nothing_sent' }, { result:
+   'not_found' }, or signed in { result: 'not_available' } (the server's
+   delete is in Batch B, not applied). */
+function deleteStudentWork(cid, sid, aid) {
+  if (!cid || !_isDemoSession()) return Promise.resolve({ result: 'not_available' });
+  return _teacherWorkQueued(cid, function () {
+    if (!_teacherWorkInClass(cid, sid, aid)) return { result: 'not_found' };
+    var draft = _studentWorkDraft(cid);
+    var sent = _teacherWorkSent(draft, sid, aid);
+    if (!sent) return { result: 'nothing_sent' };
+    draft.submissions = draft.submissions.filter(function (s) {
+      return s !== sent;
+    });
+    _studentWorkWrite(cid, draft);
+    return _teacherWorkForget(_queuePagesOf(sent)).then(function () {
+      return { result: 'deleted', pages: (sent.files || []).length };
+    });
+  });
+}
+
+/* An address an <img> can show for one page ('page') or its thumbnail
+   ('thumb'), whether it is a shipped sample file or a photo still in the
+   photo queue: a Promise of { url, release } or null. Call release() when
+   the picture leaves the screen (a queued photo's address holds its bytes
+   in memory until then); calling it twice is harmless. A caller whose
+   screen changed before the answer came should release it unused. */
+function openStudentWorkPage(cid, file, which) {
+  var name = file && (which === 'thumb' ? file.thumb_path : file.path);
+  if (!name || typeof name !== 'string' || !_studentWorkStored(cid)) return Promise.resolve(null);
+  var m = _STUDENT_WORK_QUEUE_PATH.exec(name);
+  if (!m) {
+    return studentWorkPageUrl(cid, file, which).then(function (url) {
+      return url ? { url: url, release: function () {} } : null;
+    });
+  }
+  if ((which === 'thumb') !== !!m[2]) return Promise.resolve(null);
+  var q = window.PhotoQueue;
+  if (!q || typeof q.blobs !== 'function' || typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
+    return Promise.resolve(null);
+  }
+  return Promise.resolve()
+    .then(function () {
+      return q.blobs(m[1]);
+    })
+    .then(
+      function (found) {
+        var blob = found && (m[2] ? found.thumb : found.photo);
+        if (!blob) return null;
+        var url = URL.createObjectURL(blob);
+        var released = false;
+        return {
+          url: url,
+          release: function () {
+            if (released) return;
+            released = true;
+            URL.revokeObjectURL(url);
+          },
+        };
+      },
+      function () {
+        return null;
+      },
+    );
+}
+
+/* A student or assessment made offline gets its server id: the photos
+   waiting for it take the new id too, so they upload to its real folder
+   (kanban f2). The queue refuses anything that is not a server id. */
+function _studentWorkRekeyed(e) {
+  var d = e && e.detail;
+  var q = window.PhotoQueue;
+  if (!d || (d.kind !== 'assessment' && d.kind !== 'student') || !q || typeof q.rekey !== 'function') {
+    return Promise.resolve(null);
+  }
+  return Promise.resolve()
+    .then(function () {
+      return q.rekey(d.from, d.to);
+    })
+    .then(null, function () {
+      return null;
+    });
+}
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  document.addEventListener('fv:id-rekeyed', _studentWorkRekeyed);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Mark Up: marks on a page of student work (S9)
+   ══════════════════════════════════════════════════════════════════
+   Marks are drawing data over a page, never burned in: the stored photo
+   (its path, bytes and sha256) never changes. Each handed-in page has two
+   copies of its marks:
+   - the teacher's working copy (`marks`, with `rev` and `saved_at`), which
+     every save replaces whole and which is never shown to a student;
+   - the copy the student was last given (`given`, with `given_rev` and
+     `given_at`). In a class that holds grades (its student page on and
+     When I Return Them) it is set only by a Return (returnWork). In any
+     other class it is set at each save, as grades are. A mark made and
+     erased before Return never reaches it.
+
+   Shapes are the server's (migrations/local-test/batch-c-contract.md on
+   batch-c-markup-reflect-revise, PR 1043, not applied): save_markup,
+   list_assessment_markup, return_work, and the student's markup(...) and
+   feedback(...).marks. Each server shape is made in one function here
+   (_markupRow, _markupSaved, _studentMarkupFiles), so the wiring PR
+   (S9-W1) changes one place when a name moves.
+
+   A mark: an object whose `type` is pen, highlight, note, tick or cross; a
+   note has a `text` of 1 to 500 characters. Everything else on it is kept
+   as sent. Demo Mode's sample (seed-data.js) places marks by fractions of
+   the page (x and y from 0 to 1, from the top left), so they stay put at
+   any size. A page's marks: { v: 1, marks: [...] }, 500 marks and 256 KB
+   at most. The Eraser removes marks from the list; it is not a mark.
+
+   DEMO MODE ONLY, for now, kept in localStorage under
+   gb-student-feedback-<cid> (field `markup`, by file id). A signed-in
+   class reads no marks, and its writes answer { result: 'not_available' }
+   with no RPC, until S9-W1. Kept out of class backups and Download All My
+   Data, as the photos are. */
+var MARKUP_MAX_MARKS = 500;
+var MARKUP_MAX_BYTES = 256 * 1024;
+var MARKUP_NOTE_MAX = 500;
+var _MARKUP_TYPES = ['pen', 'highlight', 'note', 'tick', 'cross'];
+var _IDEM_KEPT = 200; // remembered answers per class, newest kept
+var _studentFeedback = {}; // cid → { raw, value }: the stored feedback (Demo Mode) as last read
+
+function _studentFeedbackStored(cid) {
+  if (!cid || !_isDemoSession()) return null;
+  var raw = null;
+  try {
+    raw = localStorage.getItem('gb-student-feedback-' + cid);
+  } catch (e) {
+    raw = null;
+  }
+  var held = _studentFeedback[cid];
+  if (!held || held.raw !== raw) {
+    var value = null;
+    try {
+      value = raw == null ? null : JSON.parse(raw);
+    } catch (e) {
+      value = null;
+    }
+    held = _studentFeedback[cid] = { raw: raw, value: _plainObject(value) ? value : null };
+  }
+  return held.value;
+}
+
+// A copy of the class's stored feedback to change, or an empty one.
+function _studentFeedbackDraft(cid) {
+  var stored = _studentWorkCopy(_studentFeedbackStored(cid));
+  if (!_plainObject(stored)) stored = {};
+  return {
+    markup: _plainObject(stored.markup) ? stored.markup : {},
+    reflections: _plainObject(stored.reflections) ? stored.reflections : {},
+    idem: _plainObject(stored.idem) ? stored.idem : {},
+    idem_order: Array.isArray(stored.idem_order) ? stored.idem_order : [],
+  };
+}
+
+function _studentFeedbackWrite(cid, draft) {
+  var raw = JSON.stringify(draft);
+  _safeLSSet('gb-student-feedback-' + cid, raw);
+  _studentFeedback[cid] = { raw: raw, value: draft };
+}
+
+/* A remembered answer for `key` (what the server keeps under
+   p_idempotency_key), or undefined. `what` keeps one function's keys from
+   answering for another's. */
+function _feedbackRemembered(cid, what, key) {
+  var stored = _studentFeedbackStored(cid);
+  var hit = stored && _plainObject(stored.idem) ? stored.idem[what + ':' + key] : undefined;
+  return hit === undefined ? undefined : _studentWorkCopy(hit);
+}
+function _feedbackRemember(draft, what, key, answer) {
+  var k = what + ':' + key;
+  draft.idem[k] = _studentWorkCopy(answer);
+  draft.idem_order = draft.idem_order.filter(function (x) {
+    return x !== k;
+  });
+  draft.idem_order.push(k);
+  while (draft.idem_order.length > _IDEM_KEPT) delete draft.idem[draft.idem_order.shift()];
+}
+
+function _idemKeyOk(key) {
+  return typeof key === 'string' && key.length > 0 && key.length <= 100;
+}
+
+function _markupBytes(s) {
+  return typeof TextEncoder !== 'undefined' ? new TextEncoder().encode(s).length : s.length;
+}
+
+/* True when `marks` is a page's marks as save_markup takes them. */
+function _markupValid(marks) {
+  if (!_plainObject(marks) || marks.v !== 1 || !Array.isArray(marks.marks)) return false;
+  if (marks.marks.length > MARKUP_MAX_MARKS) return false;
+  var ok = marks.marks.every(function (m) {
+    if (!_plainObject(m) || _MARKUP_TYPES.indexOf(m.type) < 0) return false;
+    if (m.type !== 'note') return true;
+    return typeof m.text === 'string' && m.text.length >= 1 && m.text.length <= MARKUP_NOTE_MAX;
+  });
+  return ok && _markupBytes(JSON.stringify(marks)) <= MARKUP_MAX_BYTES;
+}
+
+/* The handed-in page `fileId` in the class: { file, submission }, or null
+   (a page not handed in, unsent, deleted, or of a deleted piece). */
+function _markupPage(cid, fileId) {
+  if (!fileId) return null;
+  var subs = _studentWorkSubmissions(cid);
+  for (var i = 0; i < subs.length; i++) {
+    var files = subs[i].files || [];
+    for (var j = 0; j < files.length; j++) {
+      if (files[j] && files[j].id === fileId) return { file: files[j], submission: subs[i] };
+    }
+  }
+  return null;
+}
+
+/* A class whose marks wait for a Return, as its grades do. */
+function _markupHeld(cid) {
+  return typeof GradeState !== 'undefined' && GradeState.holds(getReturnSettings(cid));
+}
+
+// list_assessment_markup's row for one page.
+function _markupRow(fileId, enrollmentId, kept) {
+  var k = kept || {};
+  var rev = k.rev || 0;
+  return {
+    file_id: fileId,
+    enrollment_id: enrollmentId,
+    rev: rev,
+    marks: _studentWorkCopy(k.marks) || { v: 1, marks: [] },
+    saved_at: k.saved_at || null,
+    given: k.given ? _studentWorkCopy(k.given) : null,
+    given_rev: k.given_rev == null ? null : k.given_rev,
+    given_at: k.given_at || null,
+    waiting: rev > 0 && k.given_rev !== rev,
+  };
+}
+
+/* One page's marks for the teacher: list_assessment_markup's row, both
+   copies. A handed-in page with no marks yet has rev 0 and no marks; a page
+   not handed in (or signed in, for now) is null. */
+function getPageMarkup(cid, fileId) {
+  var page = _markupPage(cid, fileId);
+  if (!page) return null;
+  var stored = _studentFeedbackStored(cid);
+  var kept = stored && _plainObject(stored.markup) ? stored.markup[fileId] : null;
+  return _markupRow(fileId, page.submission.enrollment_id, kept);
+}
+
+/* list_assessment_markup: a row for every handed-in page of `aid` that
+   has been marked, in the order of the students' work, each page in order. */
+function getAssessmentMarkup(cid, aid) {
+  var stored = _studentFeedbackStored(cid);
+  var kept = stored && _plainObject(stored.markup) ? stored.markup : {};
+  var out = [];
+  _studentWorkSubmissions(cid).forEach(function (s) {
+    if (s.assessment_id !== aid) return;
+    (s.files || []).forEach(function (f) {
+      if (f && kept[f.id]) out.push(_markupRow(f.id, s.enrollment_id, kept[f.id]));
+    });
+  });
+  return out;
+}
+
+// save_markup's answers.
+function _markupSaved(fileId, kept) {
+  return { result: 'saved', file_id: fileId, rev: kept.rev, given: kept.given_rev === kept.rev };
+}
+function _markupChanged(fileId, kept) {
+  var k = kept || {};
+  return {
+    result: 'changed',
+    file_id: fileId,
+    rev: k.rev || 0,
+    marks: _studentWorkCopy(k.marks) || { v: 1, marks: [] },
+  };
+}
+
+/* Save the whole set of working marks for one page (save_markup). `marks`
+   is { v: 1, marks: [...] }; `baseRev` the rev the screen last read (0 for
+   none) or null to skip the check; `key` an idempotency key the screen makes
+   once per save and sends again on a retry. A Promise, never rejected, of:
+   { result: 'saved', file_id, rev, given }  (given: the student already has
+     these marks, in a class that does not hold grades);
+   { result: 'changed', file_id, rev, marks }  another save came first;
+     nothing written;
+   { result: 'invalid' }  marks of the wrong shape, or no key;
+   { result: 'not_found' }  the page is not handed in;
+   { result: 'not_available' }  signed in (until S9-W1). */
+function saveMarkup(cid, fileId, marks, baseRev, key) {
+  if (!cid || !_isDemoSession()) return Promise.resolve({ result: 'not_available' });
+  if (!_markupValid(marks) || !_idemKeyOk(key)) return Promise.resolve({ result: 'invalid' });
+  if (baseRev != null && !(typeof baseRev === 'number' && baseRev >= 0 && Math.floor(baseRev) === baseRev)) {
+    return Promise.resolve({ result: 'invalid' });
+  }
+  var again = _feedbackRemembered(cid, 'markup-save', key);
+  if (again !== undefined) return Promise.resolve(again);
+  if (!_markupPage(cid, fileId)) return Promise.resolve({ result: 'not_found' });
+  var draft = _studentFeedbackDraft(cid);
+  var kept = draft.markup[fileId] || null;
+  var rev = (kept && kept.rev) || 0;
+  if (baseRev != null && baseRev !== rev) return Promise.resolve(_markupChanged(fileId, kept));
+  var now = new Date().toISOString();
+  var next = Object.assign({}, kept || {}, {
+    rev: rev + 1,
+    marks: _studentWorkCopy(marks),
+    saved_at: now,
+  });
+  // Not held: the student has them at once, as a grade saved is returned.
+  if (!_markupHeld(cid)) {
+    next.given = _studentWorkCopy(marks);
+    next.given_rev = next.rev;
+    next.given_at = now;
+  }
+  draft.markup[fileId] = next;
+  var answer = _markupSaved(fileId, next);
+  _feedbackRemember(draft, 'markup-save', key, answer);
+  _studentFeedbackWrite(cid, draft);
+  return Promise.resolve(answer);
+}
+
+/* True when one of the student's pages of `aid` has marks the student has
+   not been given (list_assessment_markup's waiting): what To Return should
+   count beside drafts. */
+function studentMarkupWaiting(cid, sid, aid) {
+  return getAssessmentMarkup(cid, aid).some(function (r) {
+    return r.enrollment_id === sid && r.waiting;
+  });
+}
+
+/* Return, with the marks (return_work): returnGrades unchanged, then each
+   listed student of the class is given the working marks on their pages of
+   `aid`. Use it in place of returnGrades wherever Mark Up can be on screen.
+   Synchronous, as returnGrades is. Answers returnGrades' { returned,
+   enrollment_ids, returned_at } plus marks_given (pages) and
+   marks_enrollment_ids. Signed in it is returnGrades alone, with no marks
+   given (until S9-W1). */
+function returnWork(cid, aid, studentIds) {
+  var ids = Array.isArray(studentIds) ? studentIds : studentIds ? [studentIds] : [];
+  var out = Object.assign({}, returnGrades(cid, aid, ids), { marks_given: 0, marks_enrollment_ids: [] });
+  // Signed in there are no marks to give (getAssessmentMarkup reads none).
+  var listed = {};
+  ids.forEach(function (sid) {
+    if (typeof sid === 'string') listed[sid] = true;
+  });
+  var rows = getAssessmentMarkup(cid, aid).filter(function (r) {
+    return listed[r.enrollment_id] && r.waiting;
+  });
+  if (!rows.length) return out;
+  var draft = _studentFeedbackDraft(cid);
+  var now = new Date().toISOString();
+  rows.forEach(function (r) {
+    var kept = draft.markup[r.file_id];
+    kept.given = _studentWorkCopy(kept.marks);
+    kept.given_rev = kept.rev;
+    kept.given_at = now;
+    out.marks_given++;
+    if (out.marks_enrollment_ids.indexOf(r.enrollment_id) < 0) out.marks_enrollment_ids.push(r.enrollment_id);
+  });
+  _studentFeedbackWrite(cid, draft);
+  return out;
+}
+
+/* The given marks on one student's pages of `aid`, or [] when the student
+   sees none: the piece is set not to show them (Students See Your Mark
+   Up off) or Missing or Excused is on it. null for a piece not in the class. */
+function _studentMarkupFiles(cid, sid, aid) {
+  if (!_assessmentById(cid, aid)) return null;
+  if (getAssessmentStudentWork(cid, aid).students_see_markup === false) return [];
+  var status = getAssignmentStatus(cid, sid, aid);
+  if (status === 'NS' || status === 'EXC') return [];
+  var stored = _studentFeedbackStored(cid);
+  var kept = stored && _plainObject(stored.markup) ? stored.markup : {};
+  var out = [];
+  _studentWorkSubmissions(cid).forEach(function (s) {
+    if (s.assessment_id !== aid || s.enrollment_id !== sid) return;
+    (s.files || []).forEach(function (f) {
+      var k = f && kept[f.id];
+      if (k && k.given) out.push({ file_id: f.id, marks: _studentWorkCopy(k.given), given_at: k.given_at || null });
+    });
+  });
+  return out;
+}
+
+/* What the student sees on their pages of `aid` (the student's
+   markup(...)): { ok: true, files: [{ file_id, marks, given_at }] }, the
+   given copy only. { ok: false, error: 'not_found' } for a piece not in
+   the class. Signed in: { ok: true, files: [] } for now. */
+function getStudentMarkup(cid, sid, aid) {
+  if (!cid || !_isDemoSession()) return { ok: true, files: [] };
+  var files = _studentMarkupFiles(cid, sid, aid);
+  return files ? { ok: true, files: files } : { ok: false, error: 'not_found' };
+}
+
+/* "3 notes on your work": feedback(...).marks for one student and piece,
+   { pages, notes } over the given marks the student sees, or null when
+   there are none (not yet returned with marks, hidden, or signed in). */
+function getStudentMarkCounts(cid, sid, aid) {
+  if (!cid || !_isDemoSession()) return null;
+  var files = (_studentMarkupFiles(cid, sid, aid) || []).filter(function (f) {
+    return f.marks && Array.isArray(f.marks.marks) && f.marks.marks.length > 0;
+  });
+  if (!files.length) return null;
+  var notes = 0;
+  files.forEach(function (f) {
+    f.marks.marks.forEach(function (m) {
+      if (m && m.type === 'note') notes++;
+    });
+  });
+  return { pages: files.length, notes: notes };
+}
+
+/* Demo Mode's sample marks (seed-data.js): { file_id: { v: 1, marks } },
+   saved as the teacher's working copy and given to the student, as a class
+   that does not hold grades gives them. Refused (false) outside Demo Mode,
+   for a page not handed in, or for marks of the wrong shape. */
+function saveDemoMarkup(cid, pages) {
+  if (!cid || !_isDemoSession() || !_plainObject(pages)) return false;
+  var ids = Object.keys(pages);
+  var ok = ids.every(function (id) {
+    return _markupPage(cid, id) && _markupValid(pages[id]);
+  });
+  if (!ok) return false;
+  var draft = _studentFeedbackDraft(cid);
+  var now = new Date().toISOString();
+  ids.forEach(function (id) {
+    var marks = _studentWorkCopy(pages[id]);
+    draft.markup[id] = {
+      rev: 1,
+      marks: marks,
+      saved_at: now,
+      given: _studentWorkCopy(marks),
+      given_rev: 1,
+      given_at: now,
+    };
+  });
+  _studentFeedbackWrite(cid, draft);
+  return true;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Reflect on Feedback: a student's reflection on returned work (S10)
+   ══════════════════════════════════════════════════════════════════
+   After a piece comes back, the student says whether the feedback makes
+   sense (yes, or not sure with a question), makes a plan and may say what
+   went well; the teacher answers; the student says whether it makes sense
+   now, with one follow-up question. The student's words are theirs: no
+   teacher function changes them. Only the teacher reads them ("Only Mr.
+   Brown sees this"): a student reads only their own, and nothing a family
+   reads (reports, phone reports, the Term Questionnaire) reads them.
+
+   Behind the class's Reflect on Feedback switch (courseConfig
+   .reflect_on_feedback, off by default) and the build switch: with either
+   off, every reader here shows no reflection and a student's send answers
+   reflect_off. The plan comes back on the student's next piece as Your
+   Plan From Last Time, and "Did You Do It?" (yes, partly, no for Not This
+   Time) is kept on that piece's submission (Batch B's followed_plan).
+
+   Shapes are the server's (batch-c-contract.md, PR 1043, not applied):
+   set_course_feedback_options, list_course_feedback, answer_reflection,
+   and the student's feedback(...), reflect(...) and reply(...). Each is
+   made in one function here (_reflectionRow, _studentReflection,
+   _courseFeedbackOptions), so S10-W1 changes one place.
+
+   DEMO MODE ONLY, for now, in gb-student-feedback-<cid> (field
+   `reflections`, by assessment then student). Signed in, the readers show
+   none and the writers answer { result: 'not_available' } (the student's,
+   { ok: false, error: 'not_available' }) with no RPC, until S10-W1. */
+var REFLECTION_TEXT_MAX = 1000;
+var ANSWER_TEXT_MAX = 2000;
+
+function _courseFeedbackOptions(cid) {
+  var cfg = getCourseConfig(cid) || {};
+  return { reflect_on_feedback: cfg.reflect_on_feedback === true, show_my_learning: cfg.show_my_learning === true };
+}
+
+/* True when the class's reflections show: Demo Mode, the build switch and
+   Reflect on Feedback on. */
+function getReflectOnFeedback(cid) {
+  if (!cid || !_isDemoSession()) return false;
+  return !!getReturnSettings(cid).student_page && _courseFeedbackOptions(cid).reflect_on_feedback;
+}
+
+/* Turn Reflect on Feedback (and Show My Learning) on or off:
+   set_course_feedback_options. `patch` names either or both, true or
+   false; only what it names is written. A Promise of { reflect_on_feedback,
+   show_my_learning } as saved, or { result: 'invalid' } (a wrong patch or no
+   key), or signed in { result: 'not_available' }. */
+function setCourseFeedbackOptions(cid, patch, key) {
+  if (!cid || !_isDemoSession()) return Promise.resolve({ result: 'not_available' });
+  if (!_plainObject(patch) || !_idemKeyOk(key)) return Promise.resolve({ result: 'invalid' });
+  var names = Object.keys(patch);
+  var ok =
+    names.length > 0 &&
+    names.every(function (k) {
+      return (k === 'reflect_on_feedback' || k === 'show_my_learning') && typeof patch[k] === 'boolean';
+    });
+  if (!ok) return Promise.resolve({ result: 'invalid' });
+  saveCourseConfig(cid, Object.assign({}, getCourseConfig(cid) || {}, patch));
+  return Promise.resolve(_courseFeedbackOptions(cid));
+}
+
+// A non-blank string of at most `max` characters, or null when blank or missing.
+function _reflectionText(v, max) {
+  if (v == null) return { ok: true, value: null };
+  if (typeof v !== 'string' || v.length > max) return { ok: false };
+  return { ok: true, value: v.trim() ? v : null };
+}
+
+/* A piece the student has been given a grade on: returned, or a draft over
+   a grade returned before (the student still has that one). */
+function _feedbackReturned(cid, sid, aid) {
+  var row = getGradeReturn(cid, sid, aid);
+  if (row && row.returned_at) return true;
+  // A draft never returned is not back (stateOf says Draft).
+  return GradeState.stateOf(cid, sid, aid) === GradeState.RETURNED;
+}
+
+function _reflectionsOf(stored) {
+  return stored && _plainObject(stored.reflections) ? stored.reflections : {};
+}
+
+function _reflectionKept(cid, sid, aid) {
+  var of = _reflectionsOf(_studentFeedbackStored(cid))[aid];
+  return (of && of[sid]) || null;
+}
+
+// What is waiting for the teacher: a question (or, with none, the reflection), then a follow-up.
+function _reflectionWaiting(r) {
+  if (r.follow_up && !r.follow_up_answer) return true;
+  return !!r.question && !r.answer;
+}
+
+// list_course_feedback's reflection.
+function _reflectionRow(r) {
+  return {
+    id: r.id,
+    assessment_id: r.assessment_id,
+    enrollment_id: r.enrollment_id,
+    makes_sense: r.makes_sense,
+    question: r.question || null,
+    plan: r.plan || null,
+    went_well: r.went_well || null,
+    sent_at: r.sent_at,
+    answer: r.answer || null,
+    answered_at: r.answered_at || null,
+    sense_now: r.sense_now || null,
+    sense_now_at: r.sense_now_at || null,
+    follow_up: r.follow_up || null,
+    follow_up_answer: r.follow_up_answer || null,
+    follow_up_answered_at: r.follow_up_answered_at || null,
+    waiting: _reflectionWaiting(r),
+  };
+}
+
+// The student's feedback(...).reflection: their own words and the answers, no ids.
+function _studentReflection(r) {
+  return {
+    makes_sense: r.makes_sense,
+    question: r.question || null,
+    plan: r.plan || null,
+    went_well: r.went_well || null,
+    sent_at: r.sent_at,
+    answer: r.answer || null,
+    answered_at: r.answered_at || null,
+    sense_now: r.sense_now || null,
+    follow_up: r.follow_up || null,
+    follow_up_answer: r.follow_up_answer || null,
+    follow_up_answered_at: r.follow_up_answered_at || null,
+  };
+}
+
+/* Every reflection of the class that shows, on a piece and a student still
+   in the class, oldest first. [] while Reflect on Feedback is off. */
+function _classReflections(cid) {
+  if (!getReflectOnFeedback(cid)) return [];
+  var all = _reflectionsOf(_studentFeedbackStored(cid));
+  var students = {};
+  (getStudents(cid) || []).forEach(function (s) {
+    if (s && s.id) students[s.id] = true;
+  });
+  var out = [];
+  (getAssessments(cid) || []).forEach(function (a) {
+    var of = a && all[a.id];
+    if (!_plainObject(of)) return;
+    Object.keys(of).forEach(function (sid) {
+      if (students[sid] && of[sid]) out.push(of[sid]);
+    });
+  });
+  return out.sort(function (x, y) {
+    return String(x.sent_at) < String(y.sent_at) ? -1 : String(x.sent_at) > String(y.sent_at) ? 1 : 0;
+  });
+}
+
+/* list_course_feedback: { course, markup, revisions, reflections }.
+   markup: every marked page of the class ({ file_id, assessment_id,
+   enrollment_id, rev, given_rev, given_at, waiting }); revisions: [] (S11);
+   reflections: as _reflectionRow, [] while Reflect on Feedback is off.
+   Signed in: everything empty and both switches off. */
+function getCourseFeedback(cid) {
+  var demo = !!cid && _isDemoSession();
+  var markup = [];
+  if (demo) {
+    (getAssessments(cid) || []).forEach(function (a) {
+      if (!a || !a.id) return;
+      getAssessmentMarkup(cid, a.id).forEach(function (r) {
+        markup.push({
+          file_id: r.file_id,
+          assessment_id: a.id,
+          enrollment_id: r.enrollment_id,
+          rev: r.rev,
+          given_rev: r.given_rev,
+          given_at: r.given_at,
+          waiting: r.waiting,
+        });
+      });
+    });
+  }
+  return {
+    course: demo ? _courseFeedbackOptions(cid) : { reflect_on_feedback: false, show_my_learning: false },
+    markup: markup,
+    revisions: [],
+    reflections: _classReflections(cid).map(_reflectionRow),
+  };
+}
+
+/* Questions From Students: the reflections with a question or follow-up
+   not answered, oldest first, for the class or (with `sid`) one student.
+   What the dashboard's card, the gradebook's mark and the Learner
+   Profile's mark count; one answer clears all three. */
+function getQuestionsWaiting(cid, sid) {
+  return _classReflections(cid)
+    .filter(function (r) {
+      return _reflectionWaiting(r) && (!sid || r.enrollment_id === sid);
+    })
+    .map(_reflectionRow);
+}
+
+/* One student's reflections, newest first, each with `next`: the next
+   piece of the class the student sent work for after reflecting, and their
+   "Did You Do It?" on it ({ assessment_id, followed_plan }, followed_plan
+   yes, partly, no or null), or null when none is in yet. For the Learner
+   Profile's Reflections on Feedback and "2 of 3 plans followed". */
+function getStudentReflections(cid, sid) {
+  var subs = _studentWorkSubmissions(cid).filter(function (s) {
+    return s.enrollment_id === sid && s.sent_at;
+  });
+  return _classReflections(cid)
+    .filter(function (r) {
+      return r.enrollment_id === sid;
+    })
+    .reverse()
+    .map(function (r) {
+      var row = _reflectionRow(r);
+      var after = subs
+        .filter(function (s) {
+          return s.assessment_id !== r.assessment_id && String(s.sent_at) > String(r.sent_at);
+        })
+        .sort(function (x, y) {
+          return String(x.sent_at) < String(y.sent_at) ? -1 : 1;
+        })[0];
+      row.next = after ? { assessment_id: after.assessment_id, followed_plan: after.followed_plan || null } : null;
+      return row;
+    });
+}
+
+/* Your Plan From Last Time (feedback(...).last_plan): the student's newest
+   plan in the class, { assessment_id, plan, sent_at }, or null. */
+function getStudentLastPlan(cid, sid) {
+  var withPlan = _classReflections(cid).filter(function (r) {
+    return r.enrollment_id === sid && r.plan;
+  });
+  var last = withPlan[withPlan.length - 1];
+  return last ? { assessment_id: last.assessment_id, plan: last.plan, sent_at: last.sent_at } : null;
+}
+
+/* Send Answer (answer_reflection): answers what is waiting, the question
+   (or, with none, the reflection), then the follow-up. `answer` 1 to 2000
+   characters. A Promise of { result: 'answered', reflection } (as
+   _reflectionRow), { result: 'already_answered' }, { result: 'not_found' },
+   { result: 'invalid' } (no answer, too long, or no key), or signed in
+   { result: 'not_available' }. The same key again answers the same. */
+function answerReflection(cid, reflectionId, answer, key) {
+  if (!cid || !_isDemoSession()) return Promise.resolve({ result: 'not_available' });
+  if (typeof answer !== 'string' || !answer.trim() || answer.length > ANSWER_TEXT_MAX || !_idemKeyOk(key)) {
+    return Promise.resolve({ result: 'invalid' });
+  }
+  var again = _feedbackRemembered(cid, 'reflection-answer', key);
+  if (again !== undefined) return Promise.resolve(again);
+  var found = _classReflections(cid).find(function (r) {
+    return r.id === reflectionId;
+  });
+  if (!found) return Promise.resolve({ result: 'not_found' });
+  var draft = _studentFeedbackDraft(cid);
+  var r = draft.reflections[found.assessment_id][found.enrollment_id];
+  var now = new Date().toISOString();
+  if (!r.answer) {
+    r.answer = answer;
+    r.answered_at = now;
+  } else if (r.follow_up && !r.follow_up_answer) {
+    r.follow_up_answer = answer;
+    r.follow_up_answered_at = now;
+  } else {
+    return Promise.resolve({ result: 'already_answered' });
+  }
+  var out = { result: 'answered', reflection: _reflectionRow(r) };
+  _feedbackRemember(draft, 'reflection-answer', key, out);
+  _studentFeedbackWrite(cid, draft);
+  return Promise.resolve(out);
+}
+
+/* The student `from` (the one signed in on the page) acting on their own
+   piece: an error code, or null to go on. The server answers not_found
+   for an enrollment the session does not hold. */
+function _studentFeedbackCheck(cid, sid, aid, from) {
+  if (!cid || !_isDemoSession()) return 'not_available';
+  if (!sid || from !== sid) return 'not_found';
+  var inClass = (getStudents(cid) || []).some(function (s) {
+    return s && s.id === sid;
+  });
+  if (!inClass || !_assessmentById(cid, aid)) return 'not_found';
+  if (!getReflectOnFeedback(cid)) return 'reflect_off';
+  return null;
+}
+
+/* A student's reflection (reflect): `reflection` is { makes_sense: 'yes' |
+   'not_sure', question, plan, went_well }, each 1000 characters at most;
+   not_sure needs a question, yes a plan. `from` is the student signed in
+   on the page: only they reflect on their own work. Sent again before the
+   teacher answers, it takes the place of the first. Answers { ok: true,
+   reflection } (as the student sees it) or { ok: false, error }:
+   reflect_off, not_found, not_returned (the student has no grade back on
+   the piece), already_answered, invalid (a wrong shape), not_available
+   (signed in). */
+function sendStudentReflection(cid, sid, aid, reflection, from) {
+  var refused = _studentFeedbackCheck(cid, sid, aid, from);
+  if (refused) return { ok: false, error: refused };
+  if (!_plainObject(reflection)) return { ok: false, error: 'invalid' };
+  var sense = reflection.makes_sense;
+  var q = _reflectionText(reflection.question, REFLECTION_TEXT_MAX);
+  var p = _reflectionText(reflection.plan, REFLECTION_TEXT_MAX);
+  var w = _reflectionText(reflection.went_well, REFLECTION_TEXT_MAX);
+  if ((sense !== 'yes' && sense !== 'not_sure') || !q.ok || !p.ok || !w.ok) return { ok: false, error: 'invalid' };
+  if ((sense === 'not_sure' && !q.value) || (sense === 'yes' && !p.value)) return { ok: false, error: 'invalid' };
+  if (!_feedbackReturned(cid, sid, aid)) return { ok: false, error: 'not_returned' };
+  var kept = _reflectionKept(cid, sid, aid);
+  if (kept && kept.answer) return { ok: false, error: 'already_answered' };
+  var words = { makes_sense: sense, question: q.value, plan: p.value, went_well: w.value };
+  // The same reflection twice is the same.
+  if (
+    kept &&
+    ['makes_sense', 'question', 'plan', 'went_well'].every(function (k) {
+      return (kept[k] || null) === words[k];
+    })
+  ) {
+    return { ok: true, reflection: _studentReflection(kept) };
+  }
+  var draft = _studentFeedbackDraft(cid);
+  var of = (draft.reflections[aid] = _plainObject(draft.reflections[aid]) ? draft.reflections[aid] : {});
+  of[sid] = Object.assign(
+    {
+      id: (kept && kept.id) || 'rf' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      assessment_id: aid,
+      enrollment_id: sid,
+      sent_at: new Date().toISOString(),
+    },
+    words,
+  );
+  _studentFeedbackWrite(cid, draft);
+  return { ok: true, reflection: _studentReflection(of[sid]) };
+}
+
+/* Does It Make Sense Now? (reply): `reply` is { sense_now: 'yes' |
+   'not_sure', follow_up } (follow_up only with not_sure, once, 1000
+   characters at most). Answers { ok: true, reflection } or { ok: false,
+   error }: reflect_off, not_found (no reflection), not_answered (no answer
+   yet), already_asked (a follow-up is in), invalid, not_available. */
+function sendStudentReply(cid, sid, aid, reply, from) {
+  var refused = _studentFeedbackCheck(cid, sid, aid, from);
+  if (refused) return { ok: false, error: refused };
+  if (!_plainObject(reply) || (reply.sense_now !== 'yes' && reply.sense_now !== 'not_sure')) {
+    return { ok: false, error: 'invalid' };
+  }
+  var f = _reflectionText(reply.follow_up, REFLECTION_TEXT_MAX);
+  if (!f.ok || (f.value && reply.sense_now !== 'not_sure')) return { ok: false, error: 'invalid' };
+  var kept = _reflectionKept(cid, sid, aid);
+  if (!kept) return { ok: false, error: 'not_found' };
+  if (!kept.answer) return { ok: false, error: 'not_answered' };
+  if (kept.follow_up) return { ok: false, error: 'already_asked' };
+  var draft = _studentFeedbackDraft(cid);
+  var r = draft.reflections[aid][sid];
+  r.sense_now = reply.sense_now;
+  r.sense_now_at = new Date().toISOString();
+  if (f.value) r.follow_up = f.value;
+  _studentFeedbackWrite(cid, draft);
+  return { ok: true, reflection: _studentReflection(r) };
+}
+
+/* What the student's page reads beside their work (feedback): { ok, v,
+   reflect_on_feedback, show_my_learning, assessments: [{ id, marks,
+   revision, reflection }], last_plan }, for the student `sid` only. A piece
+   is listed when it has marks given (getStudentMarkCounts) or a
+   reflection; revision is null until S11. Reflections and last_plan only
+   while Reflect on Feedback is on. Signed in: the switches off and nothing
+   listed. */
+function getStudentFeedback(cid, sid) {
+  var demo = !!cid && _isDemoSession();
+  var on = getReflectOnFeedback(cid);
+  var out = {
+    ok: true,
+    v: 1,
+    reflect_on_feedback: on,
+    show_my_learning: demo && _courseFeedbackOptions(cid).show_my_learning,
+    assessments: [],
+    last_plan: on ? getStudentLastPlan(cid, sid) : null,
+  };
+  if (!demo) return out;
+  (getAssessments(cid) || []).forEach(function (a) {
+    if (!a || !a.id) return;
+    var marks = getStudentMarkCounts(cid, sid, a.id);
+    var kept = on ? _reflectionKept(cid, sid, a.id) : null;
+    if (!marks && !kept) return;
+    out.assessments.push({
+      id: a.id,
+      marks: marks,
+      revision: null,
+      reflection: kept ? _studentReflection(kept) : null,
+    });
+  });
+  return out;
+}
+
+/* "Did You Do It?" on the piece sent after a plan: `value` 'yes', 'partly'
+   or 'no' (Not This Time), or null, kept on the student's submission for
+   `aid` as Batch B's followed_plan (send_start's p_followed_plan). A
+   Promise of { result: 'saved', submission }, { result: 'nothing_sent' },
+   { result: 'not_found' }, { result: 'invalid' }, or signed in { result:
+   'not_available' }. Demo Mode's own way in: the student's real send passes
+   it with the work. */
+function setStudentFollowedPlan(cid, sid, aid, value) {
+  if (!cid || !_isDemoSession()) return Promise.resolve({ result: 'not_available' });
+  if (value !== null && value !== 'yes' && value !== 'partly' && value !== 'no') {
+    return Promise.resolve({ result: 'invalid' });
+  }
+  return _teacherWorkQueued(cid, function () {
+    if (!_teacherWorkInClass(cid, sid, aid)) return { result: 'not_found' };
+    var draft = _studentWorkDraft(cid);
+    var sent = _teacherWorkSent(draft, sid, aid);
+    if (!sent) return { result: 'nothing_sent' };
+    sent.followed_plan = value;
+    _studentWorkWrite(cid, draft);
+    return { result: 'saved', submission: getStudentSubmission(cid, sid, aid) };
+  });
+}
+
+/* Demo Mode's sample reflections (seed-data.js): [{ assessment_id,
+   enrollment_id, sent_at, makes_sense, question, plan, went_well, answer,
+   answered_at, sense_now, sense_now_at }], kept as sent whatever the
+   switch says (the readers show them only while it is on). false outside
+   Demo Mode, or for a student or piece not in the class. */
+function saveDemoReflections(cid, list) {
+  if (!cid || !_isDemoSession() || !Array.isArray(list)) return false;
+  var students = {};
+  (getStudents(cid) || []).forEach(function (s) {
+    if (s && s.id) students[s.id] = true;
+  });
+  var ok = list.every(function (r) {
+    return _plainObject(r) && students[r.enrollment_id] && _assessmentById(cid, r.assessment_id) && r.sent_at;
+  });
+  if (!ok) return false;
+  var draft = _studentFeedbackDraft(cid);
+  list.forEach(function (r) {
+    var of = (draft.reflections[r.assessment_id] = _plainObject(draft.reflections[r.assessment_id])
+      ? draft.reflections[r.assessment_id]
+      : {});
+    of[r.enrollment_id] = Object.assign(
+      { id: 'demo-rf-' + r.enrollment_id + '-' + r.assessment_id },
+      _studentWorkCopy(r),
+    );
+  });
+  _studentFeedbackWrite(cid, draft);
+  return true;
 }
 
 /* ── Namespace ──────────────────────────────────────────────── */
@@ -16600,6 +18166,44 @@ window.GB = {
   getGradeReturns,
   getGradeReturn,
   getReturnedScores,
+  getCourseSubmissions,
+  getStudentSubmission,
+  getStudentWorkGroup,
+  getGroupSubmissions,
+  groupWorkIn,
+  getGroupWorkFiles,
+  getStudentGroupWork,
+  getAssessmentStudentWork,
+  getCourseSendWork,
+  getStudentWork,
+  studentWorkGradingStarted,
+  studentWorkPageUrl,
+  saveDemoStudentWork,
+  addStudentWorkPages,
+  replaceStudentWorkPages,
+  markStudentWorkOnPaper,
+  deleteStudentWork,
+  openStudentWorkPage,
+  getPageMarkup,
+  getAssessmentMarkup,
+  saveMarkup,
+  studentMarkupWaiting,
+  returnWork,
+  getStudentMarkup,
+  getStudentMarkCounts,
+  saveDemoMarkup,
+  getReflectOnFeedback,
+  setCourseFeedbackOptions,
+  getCourseFeedback,
+  getQuestionsWaiting,
+  getStudentReflections,
+  getStudentLastPlan,
+  answerReflection,
+  sendStudentReflection,
+  sendStudentReply,
+  getStudentFeedback,
+  setStudentFollowedPlan,
+  saveDemoReflections,
   returnGrades,
   listStudentCards,
   makeStudentCards,
@@ -16675,6 +18279,27 @@ window.GB = {
   saveViewPref,
 };
 
+/* seed-data.js, fetched once, in Demo Mode only. It holds the demo class
+   (DEFAULT_COURSES), read when the classes are, and seedIfNeeded. Resolves
+   at once where it has already run; a failed fetch resolves too. */
+var _seedScript = null;
+function _loadSeedScript() {
+  if (typeof DEFAULT_COURSES !== 'undefined') return Promise.resolve();
+  if (!_seedScript) {
+    _seedScript = new Promise(function (resolve) {
+      var s = document.createElement('script');
+      s.src = '/shared/seed-data.js?v=46';
+      s.onload = resolve;
+      s.onerror = function () {
+        _seedScript = null;
+        resolve();
+      };
+      document.head.appendChild(s);
+    });
+  }
+  return _seedScript;
+}
+
 /**
  * Lazily loads seed-data.js and calls seedIfNeeded() — only fetches the 113KB
  * script when actually needed (new accounts, or after explicit data reset).
@@ -16698,14 +18323,7 @@ window.loadSeedIfNeeded = function () {
   // User deliberately wiped all data — never auto-seed
   if (localStorage.getItem('gb-data-wiped') === '1') return Promise.resolve();
   // Lazy-load the script, then seed
-  var script = new Promise(function (resolve) {
-    var s = document.createElement('script');
-    s.src = '/shared/seed-data.js?v=45';
-    s.onload = resolve;
-    s.onerror = resolve;
-    document.head.appendChild(s);
-  });
-  return Promise.all([script, bank]).then(function () {
+  return Promise.all([_loadSeedScript(), bank]).then(function () {
     if (typeof seedIfNeeded === 'function') seedIfNeeded();
   });
 };
@@ -16724,8 +18342,20 @@ window.resetDemoData = async function () {
   Object.keys(COURSES).forEach(function (cid) {
     delete COURSES[cid];
   });
-  Object.assign(COURSES, structuredClone(DEFAULT_COURSES));
+  // seed-data.js has run by now (Demo Mode loads it at start); if it has
+  // not, seedIfNeeded puts the class back itself.
+  if (typeof DEFAULT_COURSES !== 'undefined') Object.assign(COURSES, structuredClone(DEFAULT_COURSES));
   saveCourses(COURSES);
+  // Photos added in Demo Mode wait in the photo queue (IndexedDB), not in
+  // the class data: they go too.
+  var q = window.PhotoQueue;
+  if (q && typeof q.wipe === 'function') {
+    try {
+      await q.wipe();
+    } catch (e) {
+      console.warn('Could not clear waiting photos:', e);
+    }
+  }
   await window.loadSeedIfNeeded();
 };
 

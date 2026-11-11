@@ -51,8 +51,17 @@
   function viewOf(state) {
     if (!state || !state.page || !state.reply) return null;
     if (typeof StudentView === 'undefined' || !StudentView || typeof StudentView.fromPage !== 'function') return null;
+    var reply = gradesAreIn() ? state.reply : withoutGrades(state.reply);
+    // Demo Mode's samples for Questionnaires and My Reports, which the server's page does not send yet (S4-F4).
+    if (state.demo && StudentPage.demoForms) reply = Object.assign({}, reply, StudentPage.demoForms());
     try {
-      return StudentView.fromPage(gradesAreIn() ? state.reply : withoutGrades(state.reply), state.page);
+      // What the class takes and what is in (s/send.js; Demo Mode's until the `work` route exists).
+      var work = typeof StudentPage.workOf === 'function' ? StudentPage.workOf(state) : null;
+      // The teacher's Mark Up, and later reflections (s/feedback.js; Demo Mode's until the server sends `feedback`).
+      var feedback = typeof StudentPage.feedbackOf === 'function' ? StudentPage.feedbackOf(state) : null;
+      // Group work (S12-F1): counts only, Demo Mode's until the server sends `group_work`.
+      var groups = typeof StudentPage.groupOf === 'function' ? StudentPage.groupOf(state) : null;
+      return StudentView.fromPage(reply, state.page, work, feedback, groups);
     } catch (e) {
       return null;
     }
@@ -70,6 +79,11 @@
       feedback: state.feedback,
       whole: state.whole,
       levels: state.levels,
+      work: state.work,
+      workPage: state.workPage,
+      marksOff: state.marksOff,
+      workPages: state.workPages,
+      form: state.form,
       sheet: state.sheet,
       sending: state.sending,
       noResults: !gradesAreIn(),
@@ -81,7 +95,12 @@
       typeof StudentPageView !== 'undefined'
         ? StudentPageView.html(view, ui)
         : '<p class="sp-lead sp-msg-calm sp-empty" role="status">Opening your page…</p>';
-    return page + (state.sheet && StudentPage.classesSheet ? StudentPage.classesSheet(state.page) : '');
+    return (
+      page +
+      (state.sheet && StudentPage.classesSheet ? StudentPage.classesSheet(state.page) : '') +
+      // Unsend Your Work? and Replace Your Photos? over the card (s/send.js).
+      (typeof StudentPage.sendDialog === 'function' ? StudentPage.sendDialog(state) : '')
+    );
   }
 
   StudentPage.viewOf = viewOf;

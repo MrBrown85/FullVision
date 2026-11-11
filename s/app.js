@@ -398,7 +398,8 @@
   /* Your Classes (the artboard's "Switching Classes"): the classes this
      device's session has opened, the one showing ticked, then Add Another
      Card. The server sends the list with the page; it holds each class's
-     name and block and the student's first name, nothing else. */
+     name and block, the student's first name and, since S4-M1, how many
+     pieces wait there (to_do), nothing else. */
   function classesSheet(page) {
     var here = page && page.student ? page.student.id : '';
     var list = (page && page.classes) || [];
@@ -422,6 +423,8 @@
             esc(c.name) +
             '</span>' +
             (c.block ? '<span class="sp-class-sub">' + esc(blockLabel(c.block)) + '</span>' : '') +
+            // How many pieces wait there ("3 to do"), once the server says; nothing at 0 or when it does not.
+            (c.toDo > 0 ? '<span class="sp-class-todo">' + esc(c.toDo + ' to do') + '</span>' : '') +
             '</span>' +
             (on ? '<span class="sp-class-tick">' + CHECK_MARK + '</span>' : '') +
             '</button></li>'
@@ -467,6 +470,23 @@
      plan 1.2). Some work is returned, some is a draft, one returned grade
      has a newer draft over it, and some is not graded. */
   function demoClass() {
+    var cls = demoScience();
+    // #demo-card-group: one more piece, sent by Cece's group (S12-F1); every other demo is as it was.
+    if (demo && demo.group) {
+      cls.work.unshift({
+        id: 'demo-cell-model',
+        title: 'Cell Model Project',
+        date: isoDay(-3),
+        due_date: isoDay(5),
+        tag_ids: ['demo-com'],
+        unit: 'Unit 1: Cells',
+        category: 'Projects',
+        about: 'With your group, build a model of a plant or animal cell. Label every part.',
+      });
+    }
+    return cls;
+  }
+  function demoScience() {
     function level(tagId, value, modifier) {
       return { tag_id: tagId, value: value, modifier: modifier || 0, comment: null };
     }
@@ -478,7 +498,14 @@
     }
     return {
       student: { enrollment_id: 'demo-cece', first_name: 'Cece' },
-      course: { id: 'demo-science-8', name: 'Science 8', block: 'B', grading_scale: null },
+      course: { id: 'demo-science-8', name: 'Science 8', block: 'B', grading_scale: null, teacher_name: 'Ms. Rivera' },
+      // The class's categories and what each weighs (category_percent is worked out from them as the server does).
+      categories: [
+        { name: 'Labs and Investigations', weight: 50 },
+        { name: 'Quizzes', weight: 30 },
+        { name: 'Projects', weight: 20 },
+        { name: 'Practice', weight: 0 },
+      ],
       rubrics: [
         {
           id: 'demo-rubric-lab',
@@ -486,18 +513,28 @@
           style: 'simple',
           // What each level asks, as the teacher wrote it: Your Feedback and The Whole Rubric show it.
           criteria: [
-            demoCriterion('demo-crit-method', 'Method', [
-              'Lists a few of the steps.',
-              'Lists the steps, with some out of order.',
-              'Lists every step in order, so someone else could repeat it.',
-              'Lists every step in order and says why each one matters.',
-            ]),
-            demoCriterion('demo-crit-drawing', 'Labelled Drawing', [
-              'Draws the cell.',
-              'Draws the cell and labels some of its parts.',
-              'Draws the cell and labels every part.',
-              'Draws the cell to scale and labels every part.',
-            ]),
+            demoCriterion(
+              'demo-crit-method',
+              'Method',
+              ['demo-pc'],
+              [
+                'Lists a few of the steps.',
+                'Lists the steps, with some out of order.',
+                'Lists every step in order, so someone else could repeat it.',
+                'Lists every step in order and says why each one matters.',
+              ],
+            ),
+            demoCriterion(
+              'demo-crit-drawing',
+              'Labelled Drawing',
+              ['demo-com'],
+              [
+                'Draws the cell.',
+                'Draws the cell and labels some of its parts.',
+                'Draws the cell and labels every part.',
+                'Draws the cell to scale and labels every part.',
+              ],
+            ),
           ],
         },
       ],
@@ -508,6 +545,11 @@
           date: isoDay(-1),
           due_date: isoDay(4),
           tag_ids: ['demo-qp', 'demo-pc'],
+          unit: 'Unit 2: Body Systems',
+          category: 'Projects',
+          about:
+            'Choose a question you can test. Write your question, what you predict, and the steps you will follow.',
+          core: ['CT', 'CRT'],
         },
         {
           // A draft, never returned: the student sees the piece and its date only.
@@ -516,6 +558,10 @@
           date: isoDay(-9),
           due_date: isoDay(-2),
           tag_ids: ['demo-pa', 'demo-com'],
+          unit: 'Unit 2: Body Systems',
+          category: 'Projects',
+          about: 'Make a poster about one disease: what causes it, how it spreads, and how the body fights it.',
+          core: ['COM', 'CRT'],
           working: {
             score: { value: null, comment: 'Draft: two of your sources are missing.' },
             tag_scores: [level('demo-pa', 1), level('demo-com', 1)],
@@ -527,6 +573,8 @@
           title: 'Immune System Quick Check',
           date: isoDay(-7),
           due_date: isoDay(-5),
+          unit: 'Unit 2: Body Systems',
+          category: 'Quizzes',
           score_mode: 'points',
           max_points: 12,
           status: 'NS',
@@ -537,6 +585,8 @@
           date: isoDay(-13),
           due_date: isoDay(-8),
           tag_ids: ['demo-pa'],
+          unit: 'Unit 1: Cells',
+          category: 'Labs and Investigations',
           working: {
             score: { value: null, comment: 'Your data table shows every transfer. Well done.' },
             tag_scores: [level('demo-pa', 4)],
@@ -548,6 +598,8 @@
           title: 'Cell Structure Quiz',
           date: isoDay(-11),
           due_date: isoDay(-11),
+          unit: 'Unit 1: Cells',
+          category: 'Quizzes',
           score_mode: 'points',
           max_points: 10,
           working: { score: { value: 8, comment: '' } },
@@ -560,6 +612,8 @@
           due_date: isoDay(-14),
           rubric_id: 'demo-rubric-lab',
           tag_ids: ['demo-qp', 'demo-pc'],
+          unit: 'Unit 1: Cells',
+          category: 'Labs and Investigations',
           working: {
             score: { value: null, comment: 'Careful focusing. Label the nucleus next time.' },
             rubric_scores: [criterion('demo-crit-method', 3), criterion('demo-crit-drawing', 2, 1)],
@@ -574,6 +628,7 @@
           date: isoDay(-24),
           due_date: isoDay(-17),
           tag_ids: ['demo-com'],
+          category: 'Projects',
           working: {
             score: { value: null, comment: 'Draft: much clearer after your rewrite.' },
             tag_scores: [level('demo-com', 3, 1)],
@@ -593,6 +648,7 @@
           date: isoDay(-27),
           due_date: isoDay(-22),
           tag_ids: ['demo-pc'],
+          category: 'Labs and Investigations',
           status: 'LATE',
           working: { score: { value: null, comment: '' }, tag_scores: [level('demo-pc', 3)] },
           ret: { is_draft: false, returned_at: at(-19), returned_copy: null },
@@ -604,6 +660,7 @@
           title: 'Lab Safety Contract',
           date: isoDay(-32),
           due_date: isoDay(-30),
+          category: 'Practice',
           score_mode: 'complete',
           working: { score: { value: 1, comment: '' } },
           ret: {
@@ -620,8 +677,8 @@
   }
 
   // One criterion of a sample rubric, in the server's shape, with what each of its four levels asks.
-  function demoCriterion(id, name, words) {
-    var c = { id: id, name: name, weight: 1, checks: [] };
+  function demoCriterion(id, name, tagIds, words) {
+    var c = { id: id, name: name, weight: 1, tag_ids: tagIds, checks: [] };
     words.forEach(function (w, i) {
       c['level_' + (i + 1) + '_value'] = i + 1;
       c['level_' + (i + 1) + '_descriptor'] = w;
@@ -630,12 +687,71 @@
   }
 
   var DEMO_TAGS = {
-    'demo-qp': { label: 'Questioning and Predicting', code: 'QP' },
-    'demo-pc': { label: 'Planning and Conducting', code: 'PC' },
-    'demo-pa': { label: 'Processing and Analyzing Data', code: 'PA' },
-    'demo-com': { label: 'Communicating', code: 'COM' },
-    'demo-hum-evidence': { label: 'Evidence', code: 'EV' },
+    'demo-qp': {
+      label: 'Questioning and Predicting',
+      code: 'QP',
+      i_can: ['I can ask a question that can be tested and say what I expect to happen.'],
+    },
+    'demo-pc': {
+      label: 'Planning and Conducting',
+      code: 'PC',
+      i_can: ['I can plan a fair test and carry it out safely.'],
+    },
+    'demo-pa': {
+      label: 'Processing and Analyzing Data',
+      code: 'PA',
+      i_can: ['I can find patterns in my data and explain what they show.'],
+    },
+    'demo-com': { label: 'Communicating', code: 'COM', i_can: ['I can share what I found in words and diagrams.'] },
+    'demo-hum-evidence': {
+      label: 'Evidence',
+      code: 'EV',
+      i_can: ['I can use evidence from sources to back up what I say.'],
+    },
   };
+
+  // The Core Competencies by the names the server sends (shared/constants.js's labels, in its order).
+  var DEMO_CORE = [
+    ['COM', 'Communicating'],
+    ['COL', 'Collaborating'],
+    ['CT', 'Creative Thinking'],
+    ['CRT', 'Critical & Reflective Thinking'],
+    ['PPI', 'Personal & Cultural Identity'],
+    ['PAR', 'Personal Awareness & Responsibility'],
+    ['SAR', 'Social Awareness & Responsibility'],
+  ];
+  function demoCore(ids) {
+    return DEMO_CORE.filter(function (c) {
+      return (ids || []).indexOf(c[0]) >= 0;
+    }).map(function (c) {
+      return { id: c[0], name: c[1] };
+    });
+  }
+
+  /* What a sample piece's category counts, by the server's rule
+     (migrations/local-test/s4-m1-contract.md, "category_percent"). */
+  function demoPercent(cls, w, system) {
+    var cats = cls.categories || [];
+    var k = cats.filter(function (c) {
+      return c.name === w.category;
+    })[0];
+    if (!k || w.score_mode === 'dibels') return null;
+    if (k.weight === 0) return 0;
+    var total = cats.reduce(function (sum, c) {
+      return sum + c.weight;
+    }, 0);
+    return system !== 'proficiency' && total === 100 ? k.weight : null;
+  }
+
+  /* How many pieces wait for the student in a sample class, by the
+     server's rule (to_do): not a reading benchmark, and Missing, or not
+     Excused and never returned. */
+  function demoToDo(cls) {
+    return cls.work.filter(function (w) {
+      if (w.score_mode === 'dibels') return false;
+      return w.status === 'NS' || (w.status !== 'EXC' && !returnedGrade(w));
+    }).length;
+  }
 
   /* The second sample class, for Add Another Card (Switching Classes): one
      piece returned, one a draft, one not graded yet. */
@@ -643,7 +759,13 @@
   function demoSecondClass() {
     return {
       student: { enrollment_id: DEMO_SECOND, first_name: 'Cece' },
-      course: { id: 'demo-humanities-8', name: 'Humanities 8', block: 'A', grading_scale: null },
+      course: {
+        id: 'demo-humanities-8',
+        name: 'Humanities 8',
+        block: 'A',
+        grading_scale: null,
+        teacher_name: 'Mr. Okafor',
+      },
       rubrics: [],
       work: [
         {
@@ -652,6 +774,7 @@
           date: isoDay(-2),
           due_date: isoDay(3),
           tag_ids: ['demo-hum-evidence'],
+          unit: 'Unit 1: Medieval Europe',
         },
         {
           // A draft, never returned: the date only.
@@ -741,6 +864,7 @@
       enrollment_id: cls.student.enrollment_id,
       student: { first_name: cls.student.first_name },
       course: { name: cls.course.name, block: cls.course.block },
+      to_do: demoToDo(cls),
     };
   }
 
@@ -790,6 +914,11 @@
           weight: 1,
           rubric_id: w.rubric_id || null,
           tag_ids: w.tag_ids || [],
+          description: w.about || null,
+          module_name: w.unit || null,
+          category_name: w.category || null,
+          category_percent: demoPercent(cls, w, system || 'proficiency'),
+          core_competencies: demoCore(w.core),
           // Missing, Excused and Late are never drafts: they show at once.
           status: w.status || null,
           returned_at: back ? back.returned_at : null,
@@ -1553,7 +1682,22 @@
      is already here: nothing is asked. The rows on screen change, so what
      is watched for "opened" starts again. */
   /* What the student looks at on the page, as s/page-view.js reads it. */
-  var UI_KEYS = ['tab', 'segment', 'all', 'pick', 'search', 'filter', 'feedback', 'whole', 'levels'];
+  var UI_KEYS = [
+    'tab',
+    'segment',
+    'all',
+    'pick',
+    'search',
+    'filter',
+    'feedback',
+    'whole',
+    'levels',
+    'form',
+    'work',
+    'workPage',
+    'marksOff',
+    'workPages',
+  ];
   function uiOf() {
     var ui = {};
     UI_KEYS.forEach(function (k) {
@@ -1579,6 +1723,103 @@
     stopWatchingRows();
     paint(out.focus);
     if (!out.piece && typeof window !== 'undefined' && typeof window.scrollTo === 'function') window.scrollTo(0, 0);
+    watchRows();
+  }
+
+  /* ── Questionnaires and My Reports (S4-F4) ─────────────────── */
+
+  /* Demo Mode's samples, in the shape the server's page is to send them
+     (shared/student-view.js, questionnairesOf and reportsOf). Kept out of
+     the page reply itself, which is the server's shape today. */
+  function demoForms() {
+    function at(offset) {
+      return isoDay(offset) + 'T20:15:00Z';
+    }
+    var report = StudentPage.demoReport();
+    return {
+      questionnaires: [
+        {
+          id: 'demo-q-reflection',
+          title: 'November Reflection',
+          description: 'Core Competencies and your goal check-in',
+          minutes: 10,
+          state: 'open',
+          closes_on: isoDay(9),
+        },
+        { id: 'demo-q-about', title: 'About Me', state: 'sent', sent_at: at(-58) },
+        { id: 'demo-q-march', title: 'March Reflection', state: 'not_open_yet', opens_on: isoDay(112) },
+      ],
+      reports: [
+        {
+          id: 'demo-r-1',
+          title: report.report,
+          issued_at: at(-1),
+          expires_on: isoDay(6),
+          opened_at: null,
+          overall: report.overall,
+          comment: report.comment,
+        },
+        { id: 'demo-r-0', title: 'Interim Update', issued_at: at(-40), opened_at: at(-39) },
+      ],
+    };
+  }
+
+  /* Start, or See Your Report, from the card's page. A real card cannot
+     open either yet: the server has no route that opens a questionnaire or
+     a phone report from a card's session (S4-F4's pull request names what
+     is missing), and the server's page lists none, so these buttons show
+     only in Demo Mode. There they open the sample questionnaire and report
+     on the slip's own screens, with the student already known. */
+  function openForm(act, id) {
+    if (!S.demo || !S.page || S.screen !== 'assignments') return;
+    var forms = demoForms();
+    var known = (act === 'q-start' ? forms.questionnaires : forms.reports).some(function (x) {
+      return x.id === id;
+    });
+    if (!known) return;
+    StudentPage.newTurn();
+    stopWatchingRows();
+    S.back = S.tab;
+    S.sheet = false;
+    if (act === 'r-open') {
+      S.data = {
+        ok: true,
+        kind: 'report',
+        token: 'demo',
+        student: { first_name: S.page.student.firstName },
+        course: { name: S.page.course.name, block: S.page.course.block },
+        report: { title: StudentPage.demoReport().report },
+      };
+      S.report = StudentPage.demoReport();
+      S.screen = 'report';
+      paint('.pr-view h1, .pr-view h2');
+      return;
+    }
+    S.screen = 'loading';
+    paint();
+    var mine = S;
+    StudentPage.loadDemoTemplates(function () {
+      if (S !== mine || S.screen !== 'loading' || !S.back) return;
+      S.data = StudentPage.demoData('reflection');
+      S.part = 0;
+      S.answers = {};
+      S.screen = 'part';
+      paint('h1');
+    });
+  }
+
+  // Back to Your Page from a questionnaire sent or a report read: the tab it was opened from.
+  function pageBack() {
+    if (!S.back || !S.page) return;
+    StudentPage.newTurn();
+    S.tab = S.back;
+    S.back = '';
+    S.data = null;
+    S.report = null;
+    S.screen = 'assignments';
+    setTitle();
+    paint('.sp-page-title');
+    arm();
     watchRows();
   }
 
@@ -1727,10 +1968,20 @@
         S.feedback = '';
         S.whole = false;
         S.levels = false;
+        S.form = '';
+      }
+      // A reply the page cannot read (a list that is not a list) is a
+      // failed page: the plain message with Try Again, never a throw.
+      var read;
+      try {
+        read = StudentData.fromServer(res);
+        StudentData.use(read);
+      } catch (e) {
+        pageRefused({ ok: false, error: 'network' });
+        return;
       }
       S.reply = res;
-      S.page = StudentData.fromServer(res);
-      StudentData.use(S.page);
+      S.page = read;
       // What the student typed to get in is not kept once they are in.
       S.number = '';
       S.bday = { m: '', d: '', y: '' };
@@ -1750,7 +2001,8 @@
   function fetchGradesAgain() {
     S.sending = true;
     paint();
-    return whenGradesAreIn().then(function () {
+    // Drawn only if the page that asked is still the one showing (not after Done).
+    return StudentPage.whileCurrent(whenGradesAreIn()).then(function () {
       S.sending = false;
       paint();
       watchRows();
@@ -1823,7 +2075,10 @@
   }
 
   function startDemo(hash) {
-    var m = /^demo-card(?:-(password|letter|both))?$/i.exec(hash || '');
+    // #demo-card-send: the sample class with Send Work on (S5-F2); off, as in every class, otherwise.
+    // #demo-card-reflect: Send Work and Reflect on Feedback both on (S10).
+    // #demo-card-group: Send Work on, and a piece sent as One per Group (S12-F1).
+    var m = /^demo-card(?:-(password|letter|both|send|reflect|group))?$/i.exec(hash || '');
     if (!m) return false;
     var kind = (m[1] || '').toLowerCase();
     demo = {
@@ -1833,9 +2088,13 @@
       wrong: 0,
       seen: {},
       classes: [],
+      group: kind === 'group',
     };
     adding = null;
     S.demo = true;
+    S.demoSend = kind === 'send' || kind === 'reflect' || kind === 'group';
+    S.demoGroup = kind === 'group';
+    S.demoReflect = kind === 'reflect';
     S.typed = prettyCode(DEMO.code);
     S.screen = 'cardstart';
     setTitle();
@@ -1887,6 +2146,14 @@
     } else if (act === 'card-notme') {
       // An answer still on its way is for a card this student has handed back.
       StudentPage.newTurn();
+      // The check may already have passed and kept a session (its page
+      // still on the way): that student is signed out, as Done does, so
+      // the next person on this device never opens their page. Adding a
+      // card, the session is the student already signed in, and stays.
+      if (session && !adding) {
+        endOnServer(session.token);
+        forget();
+      }
       S.sending = false;
       S.message = '';
       S.screen = 'cardnotme';
@@ -1920,11 +2187,15 @@
     } else if (act === 'card-back') {
       backToPage();
     } else if (
-      /^(tab|segment|all-open|all-close|filter|pick|open-piece|feedback|feedback-close|whole|whole-close|levels)$/.test(
+      /^(tab|segment|all-open|all-close|filter|pick|open-piece|feedback|feedback-close|whole|whole-close|levels|form-pick|work|work-close|work-page|work-marks)$/.test(
         act,
       )
     ) {
       showPart(act, el);
+    } else if (act === 'q-start' || act === 'r-open') {
+      openForm(act, el.getAttribute('data-form-id') || '');
+    } else if (act === 'page-back') {
+      pageBack();
     } else if (act === 'page-retry') {
       openPage();
     } else if (act === 'grades-retry') {
@@ -1992,6 +2263,8 @@
   }
 
   StudentPage.classesSheet = classesSheet;
+  StudentPage.demoForms = demoForms;
+  StudentPage.pageBack = pageBack;
 
   StudentPage.addScreens({
     file: 'app',

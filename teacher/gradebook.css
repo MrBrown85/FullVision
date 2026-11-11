@@ -2173,3 +2173,21 @@ th.gb-group-alt {
   font-weight: 600;
   color: var(--link);
 }
+/* Questions From Students (S10-F4): the yellow dot on a cell whose student
+   asked a question not answered yet, in the key and in "N questions". */
+.gb-question {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 4px;
+  border-radius: 50%;
+  background: #f5b800;
+  box-shadow: 0 0 0 1.5px var(--surface);
+  vertical-align: middle;
+}
+.gb-key-item .gb-question {
+  margin: 0 5px 0 0;
+}
+.gb-questions-btn .gb-question {
+  margin: 0 6px 0 0;
+}

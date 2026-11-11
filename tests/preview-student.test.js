@@ -252,7 +252,7 @@ describe('the preview', () => {
     same.innerHTML = StudentPageView.html(view, { tab: 'assignments', segment: 'back', all: false, pick: '' });
     expect(screen().innerHTML === same.innerHTML).toBe(true);
     click(screen().querySelector('.sp-tabs-bottom [data-tab="reports"]'));
-    expect(text(screen().querySelector('.sp-page-title'))).toBe('Reports');
+    expect(text(screen().querySelector('.sp-page-title'))).toBe('My Reports');
     click(screen().querySelector('[data-act="all-open"]'));
     const box = screen().querySelector('#sp-search');
     box.value = 'reflection';
@@ -414,5 +414,76 @@ describe('Demo Mode', () => {
     expect(calls).toEqual([]);
     // Nothing was saved either.
     expect(localStorage.getItem('gb-grade-returns-' + CID)).toBe(JSON.stringify(_cache.gradeReturns[CID]));
+  });
+});
+
+describe('S9-F3: See Your Work in the preview, from the marks the student was given', () => {
+  const MARKS = { v: 1, marks: [{ type: 'note', x: 0.4, y: 0.3, text: 'Name your source.' }] };
+  const READERS = ['getStudentMarkCounts', 'getStudentMarkup', 'getStudentSubmission', 'openStudentWorkPage'];
+  let saved;
+  // The data layer's Mark Up readers (PR 1063's), answering for Jordan's essay only.
+  function stubMarkup(opts) {
+    saved = {};
+    READERS.forEach(n => (saved[n] = globalThis[n]));
+    const given = (cid, sid, aid) => cid === CID && sid === S1 && aid === 'essay';
+    globalThis.getStudentMarkCounts = (cid, sid, aid) => (given(cid, sid, aid) ? { pages: 1, notes: 1 } : null);
+    globalThis.getStudentMarkup = (cid, sid, aid) => ({
+      ok: true,
+      files: given(cid, sid, aid) ? [{ file_id: 'f1', marks: MARKS, given_at: '2026-11-03T18:00:00Z' }] : [],
+    });
+    globalThis.getStudentSubmission = (cid, sid, aid) =>
+      given(cid, sid, aid) ? { id: 's1', files: [{ id: 'f1', page: 1, path: 'cell-lab-jordan-1.jpg' }] } : null;
+    globalThis.openStudentWorkPage = (cid, file) =>
+      (opts && opts.hold) || Promise.resolve({ url: '/assets/sample-work/' + file.path, release() {} });
+  }
+  afterEach(() => {
+    Object.keys(saved || {}).forEach(n => (globalThis[n] = saved[n]));
+    saved = null;
+  });
+  const screen = () => overlay().querySelector('.ps-screen');
+  function openEssayFeedback() {
+    PreviewStudent.open(CID, S1, null);
+    click(screen().querySelector('[data-segment="back"]'));
+    click(screen().querySelector('.sp-piece[data-piece="essay"] [data-act="feedback"]'));
+  }
+
+  it('Jordan Sees names the notes; Your Feedback has See Your Work; it opens the page with the marks', async () => {
+    stubMarkup();
+    openEssayFeedback();
+    const sees = [...overlay().querySelectorAll('.ps-side-left .ps-item')].map(li => [
+      text(li.querySelector('.ps-item-title')),
+      text(li.querySelector('.ps-item-line')),
+    ]);
+    expect(sees).toContainEqual(['1 note on Jordan’s work', 'Your Mark Up, on the photos.']);
+    expect(text(screen().querySelector('.sp-fb-work-line'))).toBe('1 page · 1 note on your work');
+    click(screen().querySelector('[data-act="work"]'));
+    await vi.waitFor(() => expect(screen().querySelector('.sp-work-img')).toBeTruthy());
+    expect(screen().querySelector('.sp-work-img').getAttribute('src')).toBe(
+      '/assets/sample-work/cell-lab-jordan-1.jpg',
+    );
+    expect(text(screen().querySelector('.sp-work-notes li span:last-child'))).toBe('Name your source.');
+  });
+
+  it('with no marks given (no reader yet, or none), nothing of Mark Up shows', () => {
+    stubMarkup();
+    globalThis.getStudentMarkCounts = () => null;
+    openEssayFeedback();
+    expect(screen().querySelector('[data-act="work"]')).toBeNull();
+    expect(overlay().textContent).not.toMatch(/Mark Up/);
+  });
+
+  it('a page that arrives after See Your Work closed is let go and not drawn', async () => {
+    let settle;
+    const hold = new Promise(r => (settle = r));
+    stubMarkup({ hold });
+    openEssayFeedback();
+    click(screen().querySelector('[data-act="work"]'));
+    expect(text(screen().querySelector('.sp-work [role="status"]'))).toBe('Getting your work…');
+    click(screen().querySelector('[data-act="work-close"]'));
+    let released = 0;
+    settle({ url: '/assets/sample-work/x.jpg', release: () => (released += 1) });
+    await vi.waitFor(() => expect(released).toBe(1));
+    expect(screen().querySelector('.sp-work')).toBeNull();
+    expect(text(screen().querySelector('#sp-fb-title'))).toBe('Returned Essay');
   });
 });

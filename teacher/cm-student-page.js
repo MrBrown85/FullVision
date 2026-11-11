@@ -19,10 +19,11 @@
    What later PRs add, none of which needs to change dash-class-manager.js:
 
    - S3-F1: the rest of Student Cards (filters, Cards Work Until).
-   - S5-F1: Send Work and Keep Photos Until.
+   - S5-F1: Send Work and Keep Photos Until, in Demo Mode (below).
    - S8-F1: the reminder and the "photos go for good" line on Keep Photos
      Until.
-   - Then Reflect on Feedback (S10) and Show My Learning (S13).
+   - S13-F1: Show My Learning and See What They'd See, in Demo Mode (below).
+   - Then Reflect on Feedback (S10).
 
    DashClassManager asks isShown(cid) before it draws the tab, opens it or
    builds its panel, and while the tab is shown hands over every sp* action,
@@ -322,6 +323,265 @@ var CmStudentPage = (function () {
     else _askThenMake(cid, 'return', change, 'sp-return-' + value);
   }
 
+  /* ── Send Work and Keep Photos Until (S5-F1) ───────────────────
+     Send Work is the class's switch for students sending photos or files
+     (course.send_work, off), and Keep Photos Until when they are deleted
+     (course.keep_photos_until: End of Year, the default, or End of Term;
+     DECISIONS, Grades, photos and sign-in 5). Keep Photos Until shows only
+     while Send Work is on.
+
+     Demo Mode first: the server's columns come with Batch B, which is not
+     applied. So the two rows are drawn in Demo Mode only; for a signed-in
+     teacher they are not drawn at all and nothing is asked of the server.
+     They are kept with Demo Mode's student work (getCourseSendWork,
+     saveDemoStudentWork in shared/data.js), read through workSettings. The line under Keep Photos Until and the
+     Delete Photos Now? question are Colin's (ruling 102); the reminder it
+     promises and the deleting itself come with S8. */
+  var KEEP_CHOICES = [
+    { value: 'end_of_term', label: 'End of Term' },
+    { value: 'end_of_year', label: 'End of Year' },
+  ];
+
+  // Demo Mode: the one place the two rows are drawn until S5-W1.
+  function _demo() {
+    return typeof isDemoMode === 'function' && isDemoMode();
+  }
+
+  /* The class's Send Work and Keep Photos Until, as the screens read them:
+     { offered, send_work, keep_photos_until }, from getCourseSendWork
+     (shared/data.js, S5-F5). `offered` is false where the rows are not
+     drawn (a signed-in teacher, or the student page off), and then
+     send_work is false too: nothing about student work shows anywhere. */
+  function workSettings(cid) {
+    var s = _settings(cid);
+    var offered = !!s && s.student_page === true && _demo() && typeof getCourseSendWork === 'function';
+    var w = offered ? getCourseSendWork(cid) : { send_work: false, keep_photos_until: 'end_of_year' };
+    return {
+      offered: offered,
+      send_work: offered && w.send_work === true,
+      keep_photos_until: w.keep_photos_until === 'end_of_term' ? 'end_of_term' : 'end_of_year',
+    };
+  }
+
+  /* The day photos are deleted for a choice, 'YYYY-MM-DD'. End of Year is
+     June 30 of the school year the class is in today. End of Term is the
+     last day of the reporting term the class is in today, else the next
+     to end; with every term past, the last one (a day already gone); with
+     no reporting terms, June 30. */
+  function _today(cid) {
+    return typeof courseToday === 'function' ? courseToday(cid) : new Date().toISOString().slice(0, 10);
+  }
+  function keepPhotosDate(cid, choice) {
+    var today = _today(cid);
+    var y = parseInt(today.slice(0, 4), 10);
+    var june = (parseInt(today.slice(5, 7), 10) >= 8 ? y + 1 : y) + '-06-30';
+    if (choice !== 'end_of_term') return june;
+    var ends = (typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [])
+      .map(function (t) {
+        return t.ends_on;
+      })
+      .filter(function (d) {
+        return /^\d{4}-\d{2}-\d{2}$/.test(d);
+      })
+      .sort();
+    if (!ends.length) return june;
+    var ahead = ends.filter(function (d) {
+      return d >= today;
+    });
+    return ahead.length ? ahead[0] : ends[ends.length - 1];
+  }
+  function _day(iso, month) {
+    var d = new Date(iso + 'T12:00:00Z');
+    return isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { month: month, day: 'numeric', timeZone: 'UTC' });
+  }
+  function _longDay(iso) {
+    return _day(iso, 'long');
+  }
+
+  // Demo Mode's one writer of student work (saveDemoStudentWork), with the
+  // class's two settings changed and everything else as it was.
+  function _saveWork(cid, change) {
+    var work = getCourseSubmissions(cid);
+    work.course = Object.assign({}, work.course, change);
+    saveDemoStudentWork(cid, work);
+    _rerender();
+  }
+
+  function _sendWorkRows(cid) {
+    var w = workSettings(cid);
+    if (!w.offered) return '';
+    var keep = w.send_work
+      ? '<div class="sp-row-head">' +
+        '<div class="sp-row-title sp-keep-title" id="sp-keep-label">Keep Photos Until</div>' +
+        '</div>' +
+        '<div class="seg cm-seg" role="radiogroup" aria-labelledby="sp-keep-label" aria-describedby="sp-keep-hint">' +
+        KEEP_CHOICES.map(function (c) {
+          var on = c.value === w.keep_photos_until;
+          return (
+            '<button type="button" class="seg-btn cm-seg-btn' +
+            (on ? ' active' : '') +
+            '" id="sp-keep-' +
+            c.value +
+            '" role="radio" aria-checked="' +
+            on +
+            '" data-action="spKeepPhotos" data-value="' +
+            c.value +
+            '">' +
+            esc(c.label) +
+            '</button>'
+          );
+        }).join('') +
+        '</div>' +
+        '<div class="cm-hint" id="sp-keep-hint">' +
+        esc(
+          'Photos of student work in this class are deleted on ' +
+            _longDay(keepPhotosDate(cid, w.keep_photos_until)) +
+            ". Grades, comments and Mark Up stay. Deleted photos can't come back. You'll get a reminder a week before.",
+        ) +
+        '</div>'
+      : '';
+    return (
+      '<div class="sp-row sp-send">' +
+      '<div class="cm-recent-limit sp-send-row">' +
+      '<span class="cm-recent-text"><label class="sp-row-title" for="sp-send-switch">Send Work</label>' +
+      '<span class="cm-hint" id="sp-send-hint">' +
+      esc('Students send photos or files for an assignment you set to take student work.') +
+      '</span></span>' +
+      '<span class="gpd-switch"><input type="checkbox" role="switch" id="sp-send-switch" data-action-change="spSendWork" aria-describedby="sp-send-hint"' +
+      (w.send_work ? ' checked' : '') +
+      '><span class="gpd-switch-ui" aria-hidden="true"></span></span>' +
+      '</div>' +
+      keep +
+      '</div>'
+    );
+  }
+
+  function _turnSendWork(cid, el) {
+    if (!cid || !workSettings(cid).offered) return;
+    var on = !!(el && el.checked);
+    if (on === workSettings(cid).send_work) return;
+    _saveWork(cid, { send_work: on });
+    _focus('sp-send-switch');
+  }
+
+  function _chooseKeepPhotos(cid, value) {
+    var w = cid ? workSettings(cid) : null;
+    if (!w || !w.send_work) return;
+    var known = KEEP_CHOICES.some(function (c) {
+      return c.value === value;
+    });
+    if (!known || w.keep_photos_until === value) return;
+    var choose = function () {
+      _saveWork(cid, { keep_photos_until: value });
+      _focus('sp-keep-' + value);
+    };
+    var on = keepPhotosDate(cid, value);
+    // A day already gone deletes the photos tonight: ask first (ruling 102).
+    if (on >= _today(cid)) return choose();
+    var name = typeof COURSES !== 'undefined' && COURSES[cid] && COURSES[cid].name ? COURSES[cid].name : 'this class';
+    showConfirm(
+      'Delete Photos Now?',
+      'End of Term was ' +
+        _day(on, 'short') +
+        ', so this deletes the photos of student work in ' +
+        name +
+        " tonight. Deleted photos can't come back.",
+      'Delete Photos',
+      'danger',
+      choose,
+    );
+  }
+
+  /* ── Show My Learning (S13-F1) ─────────────────────────────────
+     Show My Learning is the class's switch for the student page's My
+     Learning tab (DECISIONS, My Learning on the student page 1), off until
+     the teacher turns it on. The screens read courseConfig.show_my_learning
+     (StudentView.learningOn); this row is its one writer.
+
+     Demo Mode first, as Send Work: the server's column comes with Batch C,
+     which is not applied. So the row is drawn in Demo Mode only; for a
+     signed-in teacher it is not drawn and nothing is asked of the server.
+     It is kept in the class's settings on this device (saveCourseConfig,
+     which sends nothing in Demo Mode).
+
+     See What They'd See opens Preview as Student on My Learning for the
+     student chosen under Preview as Student (the first by last name until
+     one is chosen), as My Learning would be with the switch on. Nothing is
+     saved. A student's own device cannot show My Learning yet (the server
+     does not send what the calculation needs), and a line says so. */
+  var STYLE_NAMES = { proficiency: 'Proficiency', letter: 'Letter', both: 'Both' };
+
+  // { offered, on }: offered only in Demo Mode with the student page on; on only where offered.
+  function learningSettings(cid) {
+    var s = _settings(cid);
+    var offered = !!s && s.student_page === true && _demo() && typeof saveCourseConfig === 'function';
+    var cfg = offered ? getCourseConfig(cid) || {} : {};
+    return { offered: offered, on: offered && cfg.show_my_learning === true };
+  }
+
+  function _learningRow(cid) {
+    var l = learningSettings(cid);
+    if (!l.offered) return '';
+    var style = STYLE_NAMES[typeof courseGradeMode === 'function' ? courseGradeMode(cid) : ''] || 'Proficiency';
+    return (
+      // Drawn as Send Work's row is (assignments.css, .sp-send): Class Settings' own switch row.
+      '<div class="sp-row sp-send sp-learning">' +
+      '<div class="cm-recent-limit sp-send-row">' +
+      '<span class="cm-recent-text"><label class="sp-row-title" for="sp-learning-switch">Show My Learning</label>' +
+      '<span class="cm-hint" id="sp-learning-hint">' +
+      esc('Students see their skills, their grade and how it changes over the term.') +
+      '</span></span>' +
+      '<span class="gpd-switch"><input type="checkbox" role="switch" id="sp-learning-switch" data-action-change="spShowLearning" aria-describedby="sp-learning-hint"' +
+      (l.on ? ' checked' : '') +
+      '><span class="gpd-switch-ui" aria-hidden="true"></span></span>' +
+      '</div>' +
+      '<div class="cm-hint" id="sp-learning-would">' +
+      esc(
+        'Students would see their level on each skill and their grade in this class’s grading style (' +
+          style +
+          "), only from work you've returned.",
+      ) +
+      '</div>' +
+      '<div class="cm-hint" id="sp-learning-device">' +
+      esc(
+        "Students' own phones and Chromebooks can't show My Learning yet, even with this on. For now only Preview as Student shows it.",
+      ) +
+      '</div>' +
+      '<div class="sp-learning-see">' +
+      '<button type="button" class="btn btn-secondary" id="sp-learning-see" data-action="spSeeLearning" aria-describedby="sp-learning-would">' +
+      esc("See What They'd See") +
+      '</button>' +
+      '</div>' +
+      '</div>'
+    );
+  }
+
+  function _turnLearning(cid, el) {
+    if (!cid || !learningSettings(cid).offered) return;
+    var on = !!(el && el.checked);
+    if (on === learningSettings(cid).on) return;
+    saveCourseConfig(cid, Object.assign({}, getCourseConfig(cid) || {}, { show_my_learning: on }));
+    _rerender();
+    _focus('sp-learning-switch');
+  }
+
+  // The student Preview as Student's list shows: the one chosen there, else the first.
+  function _previewStudent(cid) {
+    var students = typeof sortStudents === 'function' ? sortStudents(getStudents(cid) || [], 'lastName') : [];
+    var chosen = _previewFor[cid];
+    var found = students.some(function (s) {
+      return s.id === chosen;
+    });
+    return found ? chosen : students.length ? students[0].id : null;
+  }
+
+  function _seeLearning(cid, el) {
+    if (!cid || !learningSettings(cid).offered || typeof PreviewStudent === 'undefined') return;
+    var sid = _previewStudent(cid);
+    if (!sid) return;
+    PreviewStudent.open(cid, sid, el, 'sp-learning-see', { tab: 'learning', learning: true });
+  }
+
   /* ── The build switch ──────────────────────────────────────── */
 
   // The switch's card: only at the build address. The row is Class
@@ -450,6 +710,8 @@ var CmStudentPage = (function () {
           '">' +
           '<h2 class="cm-grade-title">Student Page</h2>' +
           _returnGradesRow(cid) +
+          _sendWorkRows(cid) +
+          _learningRow(cid) +
           '</div>' +
           (typeof StudentCards !== 'undefined' ? StudentCards.render(cid) : '') +
           _previewCard(cid)
@@ -468,6 +730,14 @@ var CmStudentPage = (function () {
       _openPreview(_cid(el), el);
       return true;
     }
+    if (action === 'spSeeLearning') {
+      _seeLearning(_cid(el), el);
+      return true;
+    }
+    if (action === 'spKeepPhotos') {
+      _chooseKeepPhotos(_cid(el), el && el.dataset ? el.dataset.value : null);
+      return true;
+    }
     if (action !== 'spReturnGrades') return false;
     _chooseReturnGrades(_cid(el), el && el.dataset ? el.dataset.value : null);
     return true;
@@ -482,6 +752,14 @@ var CmStudentPage = (function () {
     if (el && el.dataset && el.dataset.actionChange === 'spPreviewStudent') {
       var on = _cid(el);
       if (on) _previewFor[on] = el.value;
+      return true;
+    }
+    if (el && el.dataset && el.dataset.actionChange === 'spShowLearning') {
+      _turnLearning(_cid(el), el);
+      return true;
+    }
+    if (el && el.dataset && el.dataset.actionChange === 'spSendWork') {
+      _turnSendWork(_cid(el), el);
       return true;
     }
     if (!el || !el.dataset || el.dataset.actionChange !== 'spBuildSwitch') return false;
@@ -508,6 +786,9 @@ var CmStudentPage = (function () {
   return {
     isShown: isShown,
     render: render,
+    workSettings: workSettings,
+    learningSettings: learningSettings,
+    keepPhotosDate: keepPhotosDate,
     handleAction: handleAction,
     handleChange: handleChange,
     handleBlur: handleBlur,

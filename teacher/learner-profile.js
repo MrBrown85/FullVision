@@ -102,6 +102,83 @@ var LearnerProfile = (function () {
     return '<svg class="lp-ic" viewBox="0 0 24 24" aria-hidden="true">' + paths[kind] + '</svg>';
   }
 
+  /* The latest reflection's date: a questionnaire reflection, or a
+     competency reflection (+ Reflection) when that is newer. */
+  function reflectedAt(o) {
+    var refl = o.model.reflections[0];
+    var comp = o.compRefl || { count: 0, last: null };
+    var reflAt = refl ? refl.at : null;
+    if (comp.last && (!reflAt || String(comp.last) > String(reflAt))) reflAt = comp.last;
+    return reflAt;
+  }
+
+  /* The profile's sections, in page order. Each has the id its <section>
+     carries, the jump link's label, and what the link says beside the
+     label. A new section (Reflections on Feedback, S10-F4) is one more
+     entry here. */
+  var SECTIONS = [
+    // Reflect on Feedback (S10-F4): only while the class has it on.
+    {
+      id: 'lp-feedback',
+      label: 'Reflections on Feedback',
+      when: function (o) {
+        return !!o.feedback;
+      },
+      sub: function (o) {
+        var f = o.feedback;
+        if (f.waiting) return f.waiting + (f.waiting === 1 ? ' question' : ' questions');
+        return f.list.length ? day(f.list[0].sent_at) : 'Not yet';
+      },
+    },
+    {
+      id: 'lp-about',
+      label: 'About Me',
+      sub: function (o) {
+        var a = o.model.about;
+        return a ? day(a.at) : 'Not yet';
+      },
+    },
+    {
+      id: 'lp-goals',
+      label: 'Goals',
+      sub: function (o) {
+        return o.goalCount + ' set';
+      },
+    },
+    {
+      id: 'lp-refl',
+      label: 'Reflections',
+      sub: function (o) {
+        var at = reflectedAt(o);
+        return at ? day(at) : 'Not yet';
+      },
+    },
+  ];
+
+  function jumpHtml(o) {
+    return (
+      '<nav class="id-jump" aria-label="On this page">' +
+      SECTIONS.filter(function (s) {
+        return !s.when || s.when(o);
+      })
+        .map(function (s) {
+          return (
+            '<a href="#' +
+            esc(s.id) +
+            '" data-action="lpJump" data-target="' +
+            esc(s.id) +
+            '">' +
+            esc(s.label) +
+            ' <span>' +
+            esc(s.sub(o)) +
+            '</span></a>'
+          );
+        })
+        .join('') +
+      '</nav>'
+    );
+  }
+
   function idCardHtml(o) {
     var a = o.model.about;
     var say = a && text(a.say && a.say.v);
@@ -122,11 +199,6 @@ var LearnerProfile = (function () {
     }
     if (learns)
       facts += '<div><dt>' + icon('people') + 'Learns best</dt><dd><strong>' + esc(learns) + '</strong></dd></div>';
-    var refl = o.model.reflections[0];
-    // A competency reflection (+ Reflection) counts too: the newer date shows.
-    var comp = o.compRefl || { count: 0, last: null };
-    var reflAt = refl ? refl.at : null;
-    if (comp.last && (!reflAt || String(comp.last) > String(reflAt))) reflAt = comp.last;
     var html =
       '<div class="id-card"><div class="id-band"><span>' +
       esc(o.classLabel) +
@@ -139,16 +211,8 @@ var LearnerProfile = (function () {
       (o.pronouns ? '<span class="id-pron">' + esc(o.pronouns) + '</span>' : '') +
       '</div>' +
       (facts ? '<dl class="id-facts">' + facts + '</dl>' : '') +
-      '<nav class="id-jump" aria-label="On this page">' +
-      '<a href="#lp-about" data-action="lpJump" data-target="lp-about">About Me <span>' +
-      esc(a ? day(a.at) : 'Not yet') +
-      '</span></a>' +
-      '<a href="#lp-goals" data-action="lpJump" data-target="lp-goals">Goals <span>' +
-      esc(o.goalCount + ' set') +
-      '</span></a>' +
-      '<a href="#lp-refl" data-action="lpJump" data-target="lp-refl">Reflections <span>' +
-      esc(reflAt ? day(reflAt) : 'Not yet') +
-      '</span></a></nav></div>';
+      jumpHtml(o) +
+      '</div>';
     var note = a && text(a.note && a.note.v);
     if (note) {
       html +=
@@ -390,7 +454,245 @@ var LearnerProfile = (function () {
     return html + '</section>';
   }
 
+  /* ── Reflect on Feedback (S10-F4) ─────────────────────────────
+     The board "Student Page, Learner Profile With Reflections": beside the
+     ID card, Working On (the student's newest plan) and Reflecting So Far;
+     in the main column, Reflections on Feedback, one card per reflection,
+     newest first, with All / Questions / Plans. Only while the class's
+     student page and Reflect on Feedback are on (feedbackOf answers null
+     otherwise, and nothing here is drawn). A reflection is the student's
+     own words: they show in the student's bubble, exactly, through esc.
+     A question waiting leads to the grader, where it is answered; the
+     count is getQuestionsWaiting's (shared/data.js), the one the dashboard
+     and the gradebook read, so one answer clears all three. Grades on the
+     cards come from calc.js (assessmentCellValue), all work, as every
+     teacher screen. */
+
+  var FOLLOWED = { yes: 'Yes', partly: 'Partly', no: 'Not This Time' };
+  var _feedbackFilter = 'all';
+
+  function setFeedbackFilter(f) {
+    _feedbackFilter = f === 'questions' || f === 'plans' ? f : 'all';
+  }
+
+  // Everything the three parts show, or null while Reflect on Feedback is off.
+  function feedbackOf(cid, sid) {
+    if (typeof getReflectOnFeedback !== 'function' || !getReflectOnFeedback(cid)) return null;
+    var pieces = {};
+    (getAssessments(cid) || []).forEach(function (a) {
+      if (a && a.id) pieces[a.id] = a;
+    });
+    var list = getStudentReflections(cid, sid).filter(function (r) {
+      return !!pieces[r.assessment_id];
+    });
+    var returned = Object.keys(pieces).filter(function (aid) {
+      return GradeState.stateOf(cid, sid, aid) === GradeState.RETURNED;
+    }).length;
+    var grades = {};
+    list.forEach(function (r) {
+      var cell = assessmentCellValue(cid, sid, pieces[r.assessment_id]);
+      grades[r.assessment_id] = cell && cell.kind !== 'none' ? cell.text : '';
+    });
+    return {
+      cid: cid,
+      sid: sid,
+      list: list,
+      pieces: pieces,
+      grades: grades,
+      returned: returned,
+      waiting: getQuestionsWaiting(cid, sid).length,
+      lastPlan: getStudentLastPlan(cid, sid),
+    };
+  }
+
+  function _title(f, aid) {
+    var a = f.pieces[aid];
+    return a ? a.title || 'Untitled' : '';
+  }
+
+  function feedbackAsideHtml(o) {
+    var f = o.feedback;
+    if (!f) return '';
+    var html = '';
+    var last = f.lastPlan && f.pieces[f.lastPlan.assessment_id] ? f.lastPlan : null;
+    if (last) {
+      var from = f.list.find(function (r) {
+        return r.assessment_id === last.assessment_id;
+      });
+      html +=
+        '<div class="lp-card lp-working"><h3>Working On</h3>' +
+        bubble(last.plan) +
+        '<div class="lp-card-note">' +
+        esc(
+          'From the reflection on ' +
+            _title(f, last.assessment_id) +
+            (last.sent_at ? ', ' + day(last.sent_at) : '') +
+            '.' +
+            (from && !from.next ? ' It shows on ' + o.first + '’s next ' + o.courseName + ' assignment.' : ''),
+        ) +
+        '</div></div>';
+    }
+    var plans = f.list.filter(function (r) {
+      return !!r.plan;
+    });
+    var shown = plans.filter(function (r) {
+      return !!r.next;
+    });
+    var followed = shown.filter(function (r) {
+      return r.next.followed_plan === 'yes';
+    });
+    var lines = [
+      f.list.length +
+        (f.list.length === 1 ? ' reflection on ' : ' reflections on ') +
+        f.returned +
+        (f.returned === 1 ? ' returned piece' : ' returned pieces'),
+    ];
+    if (shown.length) lines.push(followed.length + ' of ' + shown.length + ' plans followed on the next piece');
+    if (f.waiting)
+      lines.push(f.waiting + (f.waiting === 1 ? ' question waiting for you' : ' questions waiting for you'));
+    html +=
+      '<div class="lp-card lp-so-far"><h3>Reflecting So Far</h3><ul>' +
+      lines
+        .map(function (l, i) {
+          return '<li' + (f.waiting && i === lines.length - 1 ? ' class="lp-so-far-ask"' : '') + '>' + esc(l) + '</li>';
+        })
+        .join('') +
+      '</ul></div>';
+    return html;
+  }
+
+  function _answerButton(r) {
+    return (
+      '<div class="rf-wait"><span>Not answered yet</span>' +
+      '<button type="button" class="btn btn-ghost rf-answer" data-action="lpAnswerInGrader" data-aid="' +
+      esc(r.assessment_id) +
+      '">Answer in the Grader</button></div>'
+    );
+  }
+
+  function _said(label, words) {
+    return (
+      '<figure class="qw rf-said"><figcaption class="qw-q">' +
+      esc(label) +
+      '</figcaption>' +
+      bubble(words) +
+      '</figure>'
+    );
+  }
+
+  function _answered(at, words) {
+    return (
+      '<div class="rf-you"><div class="qw-q">' +
+      esc('You answered' + (at ? ' ' + day(at) : '') + ':') +
+      '</div><div class="rf-you-text">' +
+      esc(words) +
+      '</div></div>'
+    );
+  }
+
+  function _cardHtml(o, f, r) {
+    var kinds = (r.question ? ' rf-q' : '') + (r.plan ? ' rf-p' : '');
+    var grade = f.grades[r.assessment_id];
+    var html =
+      '<article class="rf-card' +
+      kinds +
+      '"><div class="rf-top"><h3 class="rf-title">' +
+      esc(_title(f, r.assessment_id)) +
+      '</h3>' +
+      (grade ? '<span class="rf-grade">' + esc(grade) + '</span>' : '') +
+      '<span class="rf-sense' +
+      (r.makes_sense === 'yes' ? ' is-yes' : ' is-unsure') +
+      '">' +
+      (r.makes_sense === 'yes' ? 'Makes sense' : 'Not sure') +
+      '</span><span class="rf-day">' +
+      esc(day(r.sent_at)) +
+      '</span></div>';
+    if (r.question) {
+      html += _said('Asked:', r.question);
+      if (!r.answer) html += _answerButton(r);
+      else {
+        html += _answered(r.answered_at, r.answer);
+        if (r.sense_now === 'yes')
+          html += '<div class="rf-line">' + esc(o.first + ' says it makes sense now.') + '</div>';
+        if (r.follow_up) {
+          html += _said(o.first + ' is still not sure and asks:', r.follow_up);
+          html += r.follow_up_answer ? _answered(r.follow_up_answered_at, r.follow_up_answer) : _answerButton(r);
+        }
+      }
+    }
+    if (r.plan) {
+      html += _said('Plan:', r.plan);
+      html +=
+        '<div class="rf-line rf-next">' +
+        (!r.next
+          ? 'Not yet shown'
+          : r.next.followed_plan && FOLLOWED[r.next.followed_plan]
+            ? esc('Did it on the next one? ' + o.first + ' says: ' + FOLLOWED[r.next.followed_plan])
+            : esc('Didn’t say on the next one')) +
+        '</div>';
+    }
+    if (r.went_well) html += _said('Proud of:', r.went_well);
+    return html + '</article>';
+  }
+
+  function feedbackHtml(o) {
+    var f = o.feedback;
+    if (!f) return '';
+    var filters = [
+      ['all', 'All'],
+      ['questions', 'Questions'],
+      ['plans', 'Plans'],
+    ];
+    var html =
+      '<section class="qw-sec" id="lp-feedback" aria-labelledby="lp-feedback-h"><div class="qw-head"><h2 id="lp-feedback-h">Reflections on Feedback</h2>' +
+      (f.list.length
+        ? '<div class="seg rf-filter" role="group" aria-label="Show">' +
+          filters
+            .map(function (x) {
+              var on = _feedbackFilter === x[0];
+              return (
+                '<button type="button" class="seg-btn' +
+                (on ? ' active' : '') +
+                '" data-action="lpFeedbackFilter" data-filter="' +
+                x[0] +
+                '" aria-pressed="' +
+                on +
+                '">' +
+                x[1] +
+                '</button>'
+              );
+            })
+            .join('') +
+          '</div>'
+        : '') +
+      '</div>';
+    if (!f.list.length)
+      return (
+        html +
+        '<div class="lp-none">' +
+        esc('No reflections on feedback from ' + o.first + ' yet.') +
+        '</div></section>'
+      );
+    var shown = f.list.filter(function (r) {
+      return _feedbackFilter === 'questions' ? !!r.question : _feedbackFilter === 'plans' ? !!r.plan : true;
+    });
+    if (!shown.length)
+      html +=
+        '<div class="lp-none">' +
+        esc((_feedbackFilter === 'questions' ? 'No questions from ' : 'No plans from ') + o.first + ' yet.') +
+        '</div>';
+    shown.forEach(function (r) {
+      html += _cardHtml(o, f, r);
+    });
+    return html + '</section>';
+  }
+
   return {
+    SECTIONS: SECTIONS,
+    feedbackOf: feedbackOf,
+    feedbackAsideHtml: feedbackAsideHtml,
+    feedbackHtml: feedbackHtml,
+    setFeedbackFilter: setFeedbackFilter,
     idCardHtml: idCardHtml,
     aboutHtml: aboutHtml,
     courseGoalHtml: courseGoalHtml,

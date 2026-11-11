@@ -103,7 +103,7 @@
     <main class="policy">
       <a class="back" role="link" tabindex="0" data-href="login.html">← Back to FullVision</a>
       <h1>Privacy Policy</h1>
-      <p class="updated">Last updated: November 7, 2026</p>
+      <p class="updated">Last updated: November 10, 2026</p>
 
       <p>
         FullVision is a gradebook and learning-profile tool for teachers in British Columbia. This page explains what
@@ -119,9 +119,10 @@
 
       <h2>Who uses it</h2>
       <p>
-        Only teachers sign in. Students and parents do not have accounts, and FullVision never emails or messages them.
-        Teachers enter student information themselves, so each teacher decides what goes in. Before entering student
-        information, a teacher should confirm that their school district allows it.
+        Only teachers have accounts. Students and parents do not, and FullVision never emails or messages them. A
+        student opens their own page with a printed card, or a questionnaire or a report with a slip, as described
+        below. Teachers enter student information themselves, so each teacher decides what goes in. Before entering
+        student information, a teacher should confirm that their school district allows it.
       </p>
 
       <h2>Student questionnaires</h2>
@@ -135,13 +136,14 @@
           designations, notes or another student's information.
         </li>
         <li>
-          Each code works once, only for that student, and only while the questionnaire is open. FullVision stores codes
-          only as one-way hashes, so a code cannot be read back from the database.
+          Each code works once, only for that student, and only while the questionnaire is open. FullVision stores a
+          slip's code scrambled (as a hash), not as printed. A slip's code is short, so someone with a copy of the
+          database could work the codes out from it.
         </li>
         <li>
           Before the questions open, the student shows the slip is theirs: their birthday or student number, checked
           against what the teacher entered, or, for a student with neither, a four-digit password FullVision prints on
-          the slip and keeps with the student's record. After five wrong tries the slip stops working.
+          the slip and keeps, as printed, with the student's record. After five wrong tries the slip stops working.
         </li>
         <li>
           The answers go to the teacher's gradebook and nowhere else. A question the teacher marks as private, such as
@@ -168,6 +170,53 @@
           The link works until the date the teacher sets. FullVision checks the birthday against the date of birth the
           teacher entered. After five wrong birthdays the page stops; scanning the code again starts over, but the link
           takes no more than ten wrong birthdays in 15 minutes. Students can open their report as often as they like.
+        </li>
+      </ul>
+
+      <h2>Student cards</h2>
+      <p>
+        A teacher can turn on a Student Page for a class and print a card for each student. The student scans or types
+        the card's code on a phone or Chromebook and opens their own page for that class, without an account.
+      </p>
+      <ul>
+        <li>
+          The page shows the student's first name, the class, and the work the teacher has returned: each result, the
+          teacher's comments and the rubric, and marks such as Missing or Late. It never shows a grade the teacher has
+          not returned, designations, notes, observations or another student's information.
+        </li>
+        <li>
+          Before the page opens, the student shows the card is theirs: their birthday or student number, checked against
+          what the teacher entered, or, for a student with neither, a four-digit password printed on the card. A card's
+          password is its own, not the one on the student's slips. Five wrong tries in a row, or 15 in a week, lock the
+          card until the teacher unlocks it.
+        </li>
+        <li>
+          FullVision does not keep a card's code or its password. The database keeps only a keyed fingerprint of each: a
+          value made from the code with a secret key. The key is kept in the settings of the two Supabase services that
+          make and check cards, never in the database, and the operator keeps one copy so a lost key does not mean
+          reprinting every card. A fingerprint cannot be turned back into a code, and without the key it cannot be used
+          to test a guess, so a copy of the database gives nobody a working card.
+        </li>
+        <li>
+          The code is printed once, on the card. No teacher's screen shows it, and nobody can look it up after printing.
+          So the sheet can be printed again, the teacher's browser holds the codes in memory until the teacher leaves
+          the screen, for ten minutes at most, and never saves them. A lost card is replaced: the teacher prints a new
+          card with a new code, and the old card stops working.
+        </li>
+        <li>
+          A card works until the class's last reporting date, or a day the teacher chooses. It stops sooner if the
+          teacher prints a new card, turns the Student Page off, withdraws the student or deletes the class. A device
+          stays signed in until midnight, until the student taps Done, or until the page has gone 15 minutes unused.
+        </li>
+        <li>
+          For each card FullVision records its card number, when it was made, printed and last opened, its wrong tries,
+          whether it is locked or replaced, and the last day it works. The teacher sees these in Student Cards. Each try
+          at a code is logged with the time and the result, with the same scrambled network address as for slips, and
+          kept for 30 days.
+        </li>
+        <li>
+          When a student opens a returned piece of work, FullVision records the time, so the page can mark the grade
+          Updated if the teacher changes it later. Teachers do not see this time.
         </li>
       </ul>
 
@@ -212,6 +261,14 @@
             </td>
           </tr>
           <tr>
+            <td>Student cards</td>
+            <td>
+              For each card, a keyed fingerprint of its code and, for a student with no birthday or student number, of
+              its password; its card number; when it was made, printed and last opened; wrong tries; and the last day it
+              works. Never the code or the password itself. When the student opened each returned piece of work.
+            </td>
+          </tr>
+          <tr>
             <td>Reports sent to phones</td>
             <td>The copy of each student's report the teacher sent to phones, and when the student opened it.</td>
           </tr>
@@ -237,8 +294,9 @@
           Montreal data centre (AWS ca-central-1).
         </li>
         <li>
-          <strong>Student answers</strong> go from the student's phone to a Supabase service that runs in the same
-          Montreal data centre, and from there into the database. They do not pass through Netlify.
+          <strong>Student answers and student cards</strong> go between the student's device and a Supabase service that
+          runs in the same Montreal data centre, and from there to the database. Cards are made by a second service in
+          the same place. Both refuse to run anywhere else. Neither passes through Netlify.
         </li>
         <li>
           <strong>Web pages</strong> are delivered by Netlify, which serves them from data centres around the world.
@@ -262,13 +320,13 @@
         <li>
           <strong>You.</strong> Each teacher sees only their own classes and students. The database enforces this on
           every request; signed-in teachers cannot read another teacher's data, and people who are not signed in cannot
-          read anything. The only thing they can do is answer a questionnaire, or open their own report, with the code
-          on their slip.
+          read anything but their own: a student can answer a questionnaire, or open their own report, with the code on
+          their slip, and open their own page with their card.
         </li>
         <li>
           <strong>The operator.</strong> Colin Brown has administrator access to the database. He uses it only to keep
           FullVision running and to fix problems, such as a save that failed, and does not look at student information
-          for any other reason.
+          for any other reason. The database holds no card code for him to see.
         </li>
         <li>
           <strong>Service providers.</strong> Supabase, Netlify and Sentry run the systems described above. They process
@@ -291,7 +349,11 @@
         </li>
         <li>A student who no longer belongs to any class is deleted along with that class.</li>
         <li>Change history for scores and term ratings is kept for 2 years, or until its class is deleted.</li>
-        <li>The record of student code attempts is kept for 30 days.</li>
+        <li>
+          A student's cards, and what is recorded about them, are deleted with the student or with their class. When a
+          student opened a piece of work is deleted with that piece or that student.
+        </li>
+        <li>The record of tries at slip and card codes is kept for 30 days.</li>
         <li>
           <strong>Backups.</strong> Supabase makes a daily backup of the database and keeps each one for 7 days. A
           deleted item can remain in backups for up to 7 days after it is deleted.
@@ -302,9 +364,13 @@
       <ul>
         <li>All connections use HTTPS encryption.</li>
         <li>Supabase encrypts the stored data and backups.</li>
-        <li>Passwords are stored only as one-way hashes and are never visible to the operator.</li>
+        <li>Teachers' passwords are stored only as one-way hashes and are never visible to the operator.</li>
         <li>Database rules restrict every request to the signed-in teacher's own data.</li>
-        <li>Student codes work once, are stored only as one-way hashes, and are blocked after repeated wrong tries.</li>
+        <li>
+          Student card codes and passwords are kept only as keyed fingerprints, made with a key the database never
+          holds. Slip codes are stored as hashes, and slip passwords as printed. Every code is blocked after repeated
+          wrong tries.
+        </li>
         <li>The pages only run scripts from FullVision itself and from Sentry's error-reporting service.</li>
       </ul>
 

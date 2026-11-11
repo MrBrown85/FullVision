@@ -44,6 +44,14 @@ window.StudentView = (function () {
     var n = Number(v);
     return isFinite(n) ? n : null;
   }
+  // Text as sent, or '' for anything that is not text (a new key of the wrong type shows nothing).
+  function text(v) {
+    return typeof v === 'string' ? v : '';
+  }
+  // Text, or null when there is none (the server sends an empty name or Description as null).
+  function textOrNull(v) {
+    return v != null && String(v) !== '' ? String(v) : null;
+  }
   // A time as the server writes it, in milliseconds, or null (as s/student-data.js reads it).
   function when(v) {
     var t = v ? Date.parse(String(v).replace(/(\.\d{3})\d+/, '$1')) : NaN;
@@ -139,7 +147,32 @@ window.StudentView = (function () {
     return GradeState.partInUse(GradeState.copyOf(_gradeOf(a, entries, checks)), scoring);
   }
 
-  function rubricReply(rubric) {
+  /* What a category counts toward the course grade, as the server states it
+     (migrations/local-test/s4-m1-contract.md, "category_percent"): the
+     category's weight where "counts N% of your grade" is true as the class
+     is set up, 0 where its work counts toward nothing, null where no percent
+     would be true. The class's setup, never this student's arithmetic. */
+  function categoryPercent(cid, a, category) {
+    if (!category || isDibelsScored(a)) return null;
+    if (Number(category.weight) === 0) return 0;
+    var total = ((typeof getCategories === 'function' && getCategories(cid)) || []).reduce(function (sum, c) {
+      return sum + Number((c && c.weight) || 0);
+    }, 0);
+    return courseGradeMode(cid) !== 'proficiency' && Math.abs(total - 100) < 1e-9 ? Number(category.weight) : null;
+  }
+
+  // A piece's Core Competencies, each once, in the Ministry's order, by their names.
+  function coreCompetenciesOf(a) {
+    var ids = typeof _coreCompetencyIdsOf === 'function' ? _coreCompetencyIdsOf(a.coreCompetencyIds) : [];
+    return ids
+      .map(function (id) {
+        var cc = typeof getCoreCompetency === 'function' ? getCoreCompetency(id) : null;
+        return cc ? { id: str(id), name: str(cc.label) } : null;
+      })
+      .filter(Boolean);
+  }
+
+  function rubricReply(rubric, tags) {
     var out = {
       id: str(rubric.id),
       name: str(rubric.name || rubric.title),
@@ -154,6 +187,13 @@ window.StudentView = (function () {
         [1, 2, 3, 4].forEach(function (l) {
           row['level_' + l + '_descriptor'] = str(levels[l]);
         });
+        // The competencies this row counts toward, only those still on the class, by id.
+        row.tag_ids = (Array.isArray(c.tagIds) ? c.tagIds : [])
+          .map(str)
+          .filter(function (id, i, all) {
+            return !!tags[id] && all.indexOf(id) === i;
+          })
+          .sort();
         row.checks = (c.checks || [])
           .filter(function (k) {
             return k && k.id;
@@ -191,7 +231,16 @@ window.StudentView = (function () {
 
     var tags = {};
     (getAllTags(cid) || []).forEach(function (t) {
-      if (t && t.id) tags[t.id] = { label: str(t.label), code: str(t.code) };
+      if (!t || !t.id) return;
+      // Its I Can statements as the class has them: in order, not trimmed, blanks kept (as the server sends them).
+      var iCan = t.i_can_statements || t.iCanStatements;
+      tags[t.id] = {
+        label: str(t.label),
+        code: str(t.code),
+        i_can: (Array.isArray(iCan) ? iCan : []).filter(function (s) {
+          return typeof s === 'string';
+        }),
+      };
     });
 
     // An assessment is listed once its date has come; one with no date as soon as it exists.
@@ -221,7 +270,9 @@ window.StudentView = (function () {
       .filter(function (r) {
         return r && rubricIds[r.id];
       })
-      .map(rubricReply)
+      .map(function (r) {
+        return rubricReply(r, tags);
+      })
       .sort(function (x, y) {
         return x.id < y.id ? -1 : x.id > y.id ? 1 : 0;
       });
@@ -243,6 +294,10 @@ window.StudentView = (function () {
       var tagIds = (a.tagIds || a.tag_ids || []).filter(function (id) {
         return !!tags[id];
       });
+      var moduleId = a.moduleId || a.module_id;
+      var unit = moduleId && typeof getModuleById === 'function' ? getModuleById(cid, moduleId) : null;
+      var categoryId = a.categoryId || a.category_id;
+      var category = categoryId && typeof getCategoryById === 'function' ? getCategoryById(cid, categoryId) : null;
       return {
         id: str(a.id),
         title: str(a.title),
@@ -254,6 +309,11 @@ window.StudentView = (function () {
         weight: num(a.weight),
         rubric_id: a.rubricId || a.rubric_id || null,
         tag_ids: tagIds.slice().sort(),
+        description: textOrNull(a.description),
+        module_name: unit && unit.name != null ? str(unit.name) : null,
+        category_name: category && category.name != null ? str(category.name) : null,
+        category_percent: categoryPercent(cid, a, category),
+        core_competencies: coreCompetenciesOf(a),
         status: status,
         returned_at: returnedAt,
         updated_at: (row && row.updated_at) || null,
@@ -274,6 +334,8 @@ window.StudentView = (function () {
         grading_system: courseGradeMode(cid),
         // The class's own Counts As percents and points bands, or the defaults (calc.js reads them).
         grading_scale: getGradingScale(cid) || null,
+        // The teacher's name as they signed up with it (bootstrap_teacher's display_name), as the server sends it.
+        teacher_name: textOrNull(((typeof getConfig === 'function' && getConfig()) || {}).displayName),
       },
       tags: tags,
       rubrics: rubrics,
@@ -354,7 +416,8 @@ window.StudentView = (function () {
      asks (its descriptor, and on an Advanced Rubric its boxes not ticked);
      the Proficient wording (a Single-Point Rubric's goal); and each of the
      four levels for The Whole Rubric, the one given marked. */
-  function rubricView(rubric, grade) {
+  function rubricView(rubric, grade, tags) {
+    tags = tags || {};
     var criteria = (grade && grade.criteria) || {};
     var ticked = {};
     ((grade && grade.checks) || []).forEach(function (id) {
@@ -368,6 +431,15 @@ window.StudentView = (function () {
         var part = criteria[c.id] || null;
         var row = levelRow(c.id, c.name, part);
         row.beyond = str(part && part.beyond);
+        // The competencies this row counts toward, by name ("Counts toward Perspective").
+        row.toward = list(c.tag_ids)
+          .map(str)
+          .filter(function (id, i, all) {
+            return all.indexOf(id) === i && tags[id] && tags[id].label;
+          })
+          .map(function (id) {
+            return str(tags[id].label);
+          });
         row.descriptors = [1, 2, 3, 4].map(function (l) {
           return str(c['level_' + l + '_descriptor']);
         });
@@ -405,15 +477,85 @@ window.StudentView = (function () {
     };
   }
 
-  // What a piece is graded on: its competencies by name, in the reply's order.
-  function gradedOn(row, tags) {
-    return (row.tag_ids || [])
-      .filter(function (id) {
-        return tags[id] && tags[id].label;
+  /* A returned grade changed since the student last looked (the
+     artboard's "A Returned Grade Was Updated"): when, and on each row whose
+     level moved, the level the student saw before ("Was Developing"),
+     named by constants.js's scoreLevelText. The reply's `previous` is the
+     grade before the newest return. */
+  function markWas(piece, row) {
+    var previous = row.previous;
+    var tagIds = row.tag_ids || [];
+    piece.updatedAt = str(row.updated_at);
+    if (!previous || typeof previous !== 'object') return;
+    var rows = piece.rubric ? piece.rubric.rows : piece.competencies;
+    var before = (piece.rubric ? previous.criteria : previous.tags) || {};
+    // An Overall level alone stands under the first competency, as the page shows it.
+    if (!piece.rubric && !Object.keys(before).length && num(previous.value) > 0 && tagIds.length) {
+      before = {};
+      before[tagIds[0]] = { value: previous.value, modifier: previous.modifier };
+    }
+    rows.forEach(function (r) {
+      var p = before[r.id];
+      var was = p && num(p.value) > 0 ? scoreLevelText(num(p.value), num(p.modifier) || 0) : '';
+      if (was && was !== r.text) r.was = was;
+    });
+  }
+
+  // A list from a reply, or none when what came is not a list.
+  function list(v) {
+    return Array.isArray(v) ? v : [];
+  }
+
+  // A competency's I Can lines as the page shows them: text only, blanks left out.
+  function iCanOf(tag) {
+    return list(tag && tag.i_can)
+      .map(function (s) {
+        return text(s).trim();
+      })
+      .filter(Boolean);
+  }
+
+  /* What a piece is graded on: its competencies by name, in the reply's
+     order, then those its rubric's rows count toward; each once, with its
+     I Can lines (none until the server sends them). */
+  function gradedOn(row, tags, rubric) {
+    var ids = list(row.tag_ids).slice();
+    if (rubric) {
+      list(rubric.criteria).forEach(function (c) {
+        Array.prototype.push.apply(ids, list(c && c.tag_ids));
+      });
+    }
+    return ids
+      .map(str)
+      .filter(function (id, i, all) {
+        return all.indexOf(id) === i && tags[id] && tags[id].label;
       })
       .map(function (id) {
-        return { id: str(id), name: str(tags[id].label) };
+        return { id: id, name: str(tags[id].label), iCan: iCanOf(tags[id]) };
       });
+  }
+
+  /* What the reply says about a piece beyond its grade (S4-M1; each is
+     left out while the server does not send it, and a value of the wrong
+     type is read as none): its unit, its category and what that counts
+     toward the grade, the teacher's Description, its Core Competencies. */
+  function aboutOf(row) {
+    var percent = row.category_percent;
+    var name = text(row.category_name);
+    return {
+      unit: text(row.module_name),
+      category: name
+        ? { name: name, percent: typeof percent === 'number' && isFinite(percent) && percent >= 0 ? percent : null }
+        : null,
+      description: text(row.description),
+      coreCompetencies: list(row.core_competencies)
+        .filter(function (c) {
+          return c && typeof c === 'object' && text(c.id) && text(c.name);
+        })
+        .map(function (c) {
+          return { id: c.id, name: c.name };
+        }),
+    };
   }
 
   /* The plain data the student page draws, from a `page` reply (the
@@ -428,22 +570,215 @@ window.StudentView = (function () {
        work:    [ piece ], newest first,
        changes: [ { id, title, why: 'updated' | 'back' } ],
        levels:  [ { level, name } ], Emerging to Extending (What the
-                Levels Mean), or none while constants.js is not in }
-     piece: { id, title, date, dueDate, kind: 'due' | 'back' | 'missing' |
+                Levels Mean), or none while constants.js is not in,
+       questionnaires: [ { id, title, line, minutes, state: 'open' |
+                'sent' | 'soon', opensOn, until, sentOn } ],
+       reports: [ { id, title, issued, until, isNew, result: { word, text,
+                level }, comment } ],
+       learning: null here; fromCache's My Learning (learning() below) }
+     piece: { id, title, date, dueDate, kind: 'due' | 'sent' | 'back' | 'missing' |
               'excused', late, returnedAt, updated, unseen,
               result: { kind: 'level' | 'points' | 'complete' | 'none',
                         text, word, and for a level or points: level (its
                         1-4 band); for points: points, outOf, percent,
                         bar },
               comment, competencies: [ row ], gradedOn: [ { id, name } ],
+              updatedAt (when updated), and on a row that moved, was,
+              marks: null | { pages, notes } (the teacher's Mark Up given
+              on returned work, from the `feedback` reply),
               rubric: null | { id, name, style, rows: [ row + beyond,
               descriptors, checks, levelName, descriptor, shown, next,
               goal, whole ] } }
      row: { id, name, level, text, comment }
      A piece not back yet has its rubric's words and no level in it.
-     sent is 0: the page sends no work yet (S5). */
-  function build(page, cid, cellOf) {
+     sent counts work sent and not back yet; it is 0 without a `work` reply
+     (S5-F2). A piece's send: null, or { takes, open, closesOn, lateNow,
+     sent: null | { at, pages, late, note, byTeacher, onPaper, grading,
+     canChange, teacherPages, thumbs } } (sendOf). */
+  /* What the `work` reply says about sending one piece (S5-F2; the
+     contract is migrations/local-test/batch-b-contract.md, `work`), or null
+     when the class takes no work or the piece takes none and has none in.
+     Read as the contract types it; anything else reads as none. thumbs is
+     the student's own pages to show, as addresses on this device (Demo
+     Mode's; the real page will fetch them through `file_links`). */
+  var TAKES = { photos: 'photos', photos_files: 'photos_files' };
+  function sendOf(entry) {
+    if (!entry || typeof entry !== 'object') return null;
+    var sent = entry.sent && typeof entry.sent === 'object' ? entry.sent : null;
+    var takes = TAKES[entry.students_send] || '';
+    if (!takes && !sent) return null;
+    var whole = function (v) {
+      return typeof v === 'number' && isFinite(v) && v >= 0 ? Math.floor(v) : 0;
+    };
+    return {
+      takes: takes,
+      open: entry.open === true,
+      closesOn: text(entry.closes_on).slice(0, 10),
+      lateNow: entry.late_now === true,
+      sent: sent
+        ? {
+            at: text(sent.sent_at),
+            pages: whole(sent.pages),
+            late: sent.is_late === true,
+            note: text(sent.note),
+            byTeacher: sent.sent_by === 'teacher',
+            onPaper: sent.on_paper === true,
+            grading: sent.grading === true,
+            canChange: sent.can_change === true,
+            // How many of the pages the teacher added. Not in the contract's `work` yet (Demo Mode's own):
+            // the Unsend line that names them needs it from the server.
+            teacherPages: whole(sent.teacher_pages),
+            thumbs: list(sent.thumbs).filter(function (u) {
+              return typeof u === 'string' && /^(blob:|data:image\/jpeg)/.test(u);
+            }),
+          }
+        : null,
+    };
+  }
+
+  /* What the `feedback` reply says of the teacher's Mark Up on one piece
+     (S9-F3; migrations/local-test/batch-c-contract.md, `feedback`): how
+     many of the student's pages carry the marks they were given, and how
+     many of those marks are notes ("2 pages · 3 notes on your work"). The
+     server sends it only for work returned with marks, and none for a
+     piece set not to show them or with Missing or Excused on it; build()
+     also gives it only to a piece that came back with a grade. Anything of
+     the wrong shape reads as none. */
+  function marksOf(m) {
+    if (!m || typeof m !== 'object') return null;
+    var whole = function (v) {
+      return typeof v === 'number' && isFinite(v) && v >= 0 ? Math.floor(v) : -1;
+    };
+    var pages = whole(m.pages);
+    var notes = whole(m.notes);
+    return pages >= 1 && notes >= 0 ? { pages: pages, notes: notes } : null;
+  }
+
+  // The `feedback` reply's pieces by id (Mark Up only, for now), or none for a reply that is not one.
+  function marksBy(feedback) {
+    var out = {};
+    if (!feedback || typeof feedback !== 'object' || feedback.ok !== true) return out;
+    list(feedback.assessments).forEach(function (entry) {
+      if (!entry || typeof entry.id !== 'string') return;
+      var m = marksOf(entry.marks);
+      if (m) out[entry.id] = m;
+    });
+    return out;
+  }
+
+  /* The student's own reflection on one piece, from the `feedback` reply
+     (S10-F1; the contract's `reflection`), or null. Only the student's own
+     words and the teacher's answer once sent: the server sends nothing
+     else, and anything of the wrong type reads as none. */
+  var SENSE = { yes: 'yes', not_sure: 'not_sure' };
+  function reflectionOf(r) {
+    if (!r || typeof r !== 'object' || !SENSE[r.makes_sense] || !text(r.sent_at)) return null;
+    return {
+      makesSense: SENSE[r.makes_sense],
+      question: text(r.question),
+      plan: text(r.plan),
+      wentWell: text(r.went_well),
+      sentAt: text(r.sent_at),
+      answer: text(r.answer),
+      answeredAt: text(r.answered_at),
+      senseNow: SENSE[r.sense_now] || '',
+      followUp: text(r.follow_up),
+      followUpAnswer: text(r.follow_up_answer),
+      followUpAnsweredAt: text(r.follow_up_answered_at),
+    };
+  }
+
+  function reflectionsBy(feedback) {
+    var out = {};
+    if (!feedback || typeof feedback !== 'object' || feedback.ok !== true) return out;
+    list(feedback.assessments).forEach(function (entry) {
+      if (!entry || typeof entry.id !== 'string') return;
+      var r = reflectionOf(entry.reflection);
+      if (r) out[entry.id] = r;
+    });
+    return out;
+  }
+
+  /* Your Plan From Last Time (S10-F2): the plan from the student's latest
+     reflection in this class, and the piece it goes on: the next piece
+     still to do, the one due soonest on or after the day the plan was
+     made (never the piece it was made on). Worked out from the reply's
+     dates, with no clock. null with no plan, or nothing to do after it. */
+  function planFor(feedback, work) {
+    var lp = feedback && typeof feedback === 'object' && feedback.ok === true ? feedback.last_plan : null;
+    if (!lp || typeof lp !== 'object' || !text(lp.plan).trim() || !text(lp.sent_at)) return null;
+    var from = text(lp.assessment_id);
+    var made = text(lp.sent_at).slice(0, 10);
+    var next = null;
+    work.forEach(function (p) {
+      if (p.kind !== 'due' || p.id === from) return;
+      var due = p.dueDate || p.date || '';
+      if (!due || due < made) return;
+      if (!next || due < (next.dueDate || next.date)) next = p;
+    });
+    if (!next) return null;
+    var source = work.filter(function (p) {
+      return p.id === from;
+    })[0];
+    return { pieceId: next.id, text: text(lp.plan).trim(), fromTitle: source ? source.title : '' };
+  }
+
+  /* The `feedback` reply for one student from the teacher's cache, in the
+     contract's shape, for Preview as Student: the marks the student was
+     given on each piece, as the data layer's getStudentMarkCounts counts
+     them (the given copy only, none while the piece hides its Mark Up or
+     Missing or Excused is on it). Before that reader exists, none. */
+  function feedbackReply(cid, sid, page) {
+    var counts = typeof getStudentMarkCounts === 'function' ? getStudentMarkCounts : null;
+    var assessments = [];
+    list(page && page.assessments).forEach(function (row) {
+      var m = counts && row && row.id ? counts(cid, sid, row.id) : null;
+      if (m) assessments.push({ id: str(row.id), marks: { pages: m.pages, notes: m.notes } });
+    });
+    var cfg = (typeof getCourseConfig === 'function' && getCourseConfig(cid)) || {};
+    // Reflect on Feedback, the class's switch (Batch C's course column): the preview shows its button.
+    return { ok: true, v: 1, reflect_on_feedback: cfg.reflect_on_feedback === true, assessments: assessments };
+  }
+
+  /* The `group_work` reply (S12-F1; Batch C's contract), by piece: how
+     many are in the student's group, whether the group's work is in, how
+     many pages, whether the student sent any of them, and when it was
+     first sent. Counts only: no name of anyone in the group. Anything of
+     the wrong shape reads as none. */
+  function groupsBy(groups) {
+    var out = {};
+    if (!groups || typeof groups !== 'object' || groups.ok !== true) return out;
+    var whole = function (v) {
+      return typeof v === 'number' && isFinite(v) && v >= 0 ? Math.floor(v) : -1;
+    };
+    list(groups.assessments).forEach(function (g) {
+      if (!g || typeof g.id !== 'string' || whole(g.members) < 2 || typeof g.sent !== 'boolean') return;
+      out[g.id] = {
+        members: whole(g.members),
+        sent: g.sent,
+        pages: g.sent ? Math.max(0, whole(g.pages)) : 0,
+        youSent: g.you_sent === true,
+        sentAt: g.sent ? text(g.first_sent_at) : '',
+      };
+    });
+    return out;
+  }
+
+  /* work: the `work` reply for this class (sending, S5-F2), or nothing.
+     With Send Work off, or no reply, no piece says anything of sending and
+     the page is as it was. */
+  function build(page, cid, cellOf, work, feedback, groups) {
     page = page || {};
+    var grouped = groupsBy(groups);
+    var marked = marksBy(feedback);
+    var reflections = reflectionsBy(feedback);
+    var sending = {};
+    if (work && typeof work === 'object' && work.send_work === true) {
+      list(work.assessments).forEach(function (entry) {
+        var send = entry && typeof entry.id === 'string' ? sendOf(entry) : null;
+        if (send) sending[entry.id] = send;
+      });
+    }
     var course = page.course || {};
     var student = page.student || {};
     var tags = page.tags || {};
@@ -472,12 +807,29 @@ window.StudentView = (function () {
         comment: '',
         competencies: [],
         rubric: null,
-        gradedOn: gradedOn(row, tags),
+        gradedOn: gradedOn(row, tags, row.rubric_id ? rubrics[row.rubric_id] : null),
         created_at: str(row.created_at),
+        // The teacher's Mark Up on the student's pages (S9-F3): only on work that came back with a grade.
+        marks: null,
+        reflection: null,
+        // Your Plan From Last Time, on the next piece to do (S10-F2): { text, fromTitle }.
+        plan: null,
+        // One per Group (S12-F1): { members, sent, pages, youSent, sentAt }, counts only.
+        group: null,
       };
+      Object.assign(piece, aboutOf(row));
+      // Sending: what this piece takes, and what is in. Work sent and not back yet is Sent.
+      piece.send = sending[piece.id] || null;
+      // A group's work is in once any member has sent it: the piece is Sent for every member.
+      piece.group = hidden ? null : grouped[piece.id] || null;
+      if (piece.group && piece.group.sent && (piece.kind === 'due' || piece.kind === 'missing')) piece.kind = 'sent';
+      if (piece.send && piece.send.sent && (piece.kind === 'due' || piece.kind === 'missing')) {
+        piece.kind = 'sent';
+        piece.late = piece.late || piece.send.sent.late;
+      }
       // Work not back yet shows its rubric's words (See the Rubric), with no level.
       if (!grade && !hidden && row.rubric_id && rubrics[row.rubric_id]) {
-        piece.rubric = rubricView(rubrics[row.rubric_id], null);
+        piece.rubric = rubricView(rubrics[row.rubric_id], null, tags);
       }
       if (grade) {
         var returned = when(row.returned_at);
@@ -487,8 +839,11 @@ window.StudentView = (function () {
         piece.unseen = !(seen != null && seen >= Math.max(returned || 0, changed || 0));
         piece.result = resultOf(cid, row, typeof cellOf === 'function' ? cellOf(piece.id) : null);
         piece.comment = str(grade.comment);
+        piece.marks = marked[piece.id] || null;
+        // The student's reflection on it (S10-F1): only on work that came back with a grade.
+        piece.reflection = reflections[piece.id] || null;
         if (row.rubric_id && rubrics[row.rubric_id]) {
-          piece.rubric = rubricView(rubrics[row.rubric_id], grade);
+          piece.rubric = rubricView(rubrics[row.rubric_id], grade, tags);
         } else if (row.score_mode !== 'points' && row.score_mode !== 'complete') {
           var parts = grade.tags || {};
           var ids = row.tag_ids || [];
@@ -505,10 +860,15 @@ window.StudentView = (function () {
               return levelRow(id, (tags[id] || {}).label, parts[id]);
             });
         }
+        if (piece.updated) markWas(piece, row);
       }
       work.push(piece);
     });
     work = inOrder(work);
+    var plan = planFor(feedback, work);
+    work.forEach(function (p) {
+      if (plan && p.id === plan.pieceId) p.plan = { text: plan.text, fromTitle: plan.fromTitle };
+    });
     var count = function (kind) {
       return work.filter(function (p) {
         return p.kind === kind;
@@ -530,12 +890,76 @@ window.StudentView = (function () {
           course.grading_system === 'letter' || course.grading_system === 'both'
             ? course.grading_system
             : 'proficiency',
+        // The teacher's name as the server sends it ('' until it does): shown as sent, never made into "Mr.".
+        teacherName: text(course.teacher_name),
       },
-      counts: { toDo: count('due'), sent: 0, back: count('back'), missing: count('missing') },
+      counts: { toDo: count('due'), sent: count('sent'), back: count('back'), missing: count('missing') },
       work: work,
       changes: changes,
       levels: levelsLegend(),
+      questionnaires: questionnairesOf(page),
+      reports: reportsOf(page),
+      // My Learning: fromCache fills it when the class shows it. The
+      // server's `page` sends nothing for it yet, so on the student's own
+      // device it stays null and the tab says it is off.
+      learning: null,
+      // Reflect on Feedback (S10): on only when the class's switch is (the `feedback` reply says so).
+      reflectOn: !!(
+        feedback &&
+        typeof feedback === 'object' &&
+        feedback.ok === true &&
+        feedback.reflect_on_feedback === true
+      ),
     };
+  }
+
+  /* The Questionnaires and Reports tabs (S4-F4), from the reply's
+     `questionnaires` and `reports` when it has them. The server's `page`
+     sends neither yet (see the S4-F4 pull request): until it does both lists
+     are empty, from either door. The server decides each questionnaire's
+     state, so nothing here reads a clock.
+       questionnaire: { id, title, description, minutes, state: 'open' |
+                        'sent' | 'not_open_yet', opens_on, closes_on, sent_at }
+       report:        { id, title, issued_at, expires_on, opened_at,
+                        overall: { word, text, level }, comment: [ text ] }
+     The report's overall and comment are the phone report as the teacher
+     sent it (worded by calc.js when it was sent), as s/report.js shows it. */
+  var Q_STATES = { open: 'open', sent: 'sent', not_open_yet: 'soon' };
+  function questionnairesOf(page) {
+    return (Array.isArray(page.questionnaires) ? page.questionnaires : [])
+      .filter(function (q) {
+        return q && q.id && Q_STATES[q.state];
+      })
+      .map(function (q) {
+        return {
+          id: str(q.id),
+          title: str(q.title),
+          line: str(q.description),
+          minutes: num(q.minutes),
+          state: Q_STATES[q.state],
+          opensOn: str(q.opens_on).slice(0, 10),
+          until: str(q.closes_on).slice(0, 10),
+          sentOn: str(q.sent_at),
+        };
+      });
+  }
+  function reportsOf(page) {
+    return (Array.isArray(page.reports) ? page.reports : [])
+      .filter(function (r) {
+        return r && r.id;
+      })
+      .map(function (r) {
+        var o = r.overall && typeof r.overall === 'object' ? r.overall : {};
+        return {
+          id: str(r.id),
+          title: str(r.title),
+          issued: str(r.issued_at),
+          until: str(r.expires_on).slice(0, 10),
+          isNew: !r.opened_at,
+          result: { word: str(o.word), text: str(o.text), level: num(o.level) },
+          comment: Array.isArray(r.comment) ? str(r.comment[0]) : str(r.comment),
+        };
+      });
   }
 
   /* Newest first, by due date, or the date with none. Two pieces with the
@@ -557,40 +981,277 @@ window.StudentView = (function () {
     });
   }
 
+  /* ── My Learning (S13-T1) ──────────────────────────────────── */
+
+  /* Show My Learning, the class's switch (Class Settings › Student Page,
+     S13-F1): on only when the class's settings say so. Missing is off. */
+  function learningOn(cid) {
+    var cfg = (typeof getCourseConfig === 'function' && getCourseConfig(cid)) || {};
+    return cfg.show_my_learning === true;
+  }
+
+  // A whole level, 1 to 4, for a level's colour and its step on the ladder; 0 with none (calc.js's).
+  function bandOf(value) {
+    return nearestScoreLevel(Number(value)).level;
+  }
+
+  /* One skill's mark on one returned piece: the piece, its date, and the
+     mark named by constants.js's scoreLevelText ("Proficient +") in a class
+     that uses levels, or calc.js's formatLevel ("78%") in a Letter class.
+     `value` places it on How It's Going (a + or − a third of a level, as
+     every calculation counts it). */
+  function markOf(cid, p, e) {
+    var value = scoreModValue(e);
+    var whole = e.level != null ? Number(e.level) : Number(e.score);
+    var letter = courseGradeMode(cid) === 'letter';
+    return {
+      id: p.id,
+      title: p.title,
+      date: p.dueDate || p.date || '',
+      value: value,
+      level: bandOf(value),
+      text: letter ? formatLevel(cid, value) : scoreLevelText(whole, e.mod) || levelText(cid, value),
+      code: letter ? '' : levelCode(value),
+    };
+  }
+
+  /* One skill (a competency of the learning map): its name, its I Can
+     statements as the learning map holds them (the curriculum bank's), the
+     level calc.js gives it from returned work (getSectionProficiency),
+     worded as the class grades, and its marks on each returned piece,
+     newest first. */
+  function skillOf(cid, sid, sec, back) {
+    var value = getSectionProficiency(cid, sid, sec.id);
+    var letter = courseGradeMode(cid) === 'letter';
+    var iCan = [];
+    var pieces = [];
+    (sec.tags || []).forEach(function (t) {
+      (t.i_can_statements || t.iCanStatements || []).forEach(function (s) {
+        var line = str(s).trim();
+        if (line) iCan.push(line);
+      });
+      tagMarksByAssessment(cid, sid, t.id).forEach(function (e) {
+        var p = back[e.assessmentId];
+        if (p && Number(e.score) > 0) pieces.push(markOf(cid, p, e));
+      });
+    });
+    pieces.sort(function (x, y) {
+      return x.date === y.date ? 0 : x.date < y.date ? 1 : -1;
+    });
+    var has = value > 0;
+    return {
+      id: str(sec.id),
+      name: str(sec.name || sec.shortName || sec.id),
+      level: bandOf(value),
+      text: has ? (letter ? formatLevel(cid, value) : levelWord(cid, value)) : '',
+      code: has && !letter ? levelCode(value) : '',
+      iCan: iCan,
+      pieces: pieces,
+      value: has ? value : 0,
+    };
+  }
+
+  /* The class's skills in the learning map's order, in its folders, under
+     each course's name when the class holds more than one. */
+  function skillGroups(cid, sid, back) {
+    var grouped = getGroupedSections(cid) || { groups: [], ungrouped: [] };
+    var subjects = {};
+    ((typeof getSubjects === 'function' && getSubjects(cid)) || []).forEach(function (s) {
+      if (s && s.id) subjects[s.id] = str(s.name || s.label);
+    });
+    var out = [];
+    var add = function (folder, sections) {
+      var bySubject = [];
+      sections.forEach(function (sec) {
+        var subject = subjects[sec.subject] || '';
+        var last = bySubject[bySubject.length - 1];
+        if (!last || last.subject !== subject) bySubject.push((last = { subject: subject, sections: [] }));
+        last.sections.push(sec);
+      });
+      bySubject.forEach(function (g) {
+        out.push({
+          subject: g.subject,
+          folder: folder,
+          skills: g.sections.map(function (sec) {
+            return skillOf(cid, sid, sec, back);
+          }),
+        });
+      });
+    };
+    (grouped.groups || []).forEach(function (g) {
+      if (g && g.sections && g.sections.length) add(str(g.group.name || g.group.label), g.sections);
+    });
+    if ((grouped.ungrouped || []).length) add('', grouped.ungrouped);
+    // One course's name says nothing; two or more head their skills.
+    var names = {};
+    out.forEach(function (g) {
+      if (g.subject) names[g.subject] = true;
+    });
+    if (Object.keys(names).length < 2) {
+      out.forEach(function (g) {
+        g.subject = '';
+      });
+    }
+    return out;
+  }
+
+  /* What Makes Up Your Grade: each category with a grade, its weight and
+     the student's letter and % on its work (calc.js's assessmentGroupGrade,
+     the category's own way of adding up). Letter and Both classes only. */
+  function categoriesOf(cid, sid) {
+    if (courseGradeMode(cid) === 'proficiency') return [];
+    var all = getAssessments(cid) || [];
+    return ((typeof getCategories === 'function' && getCategories(cid)) || [])
+      .slice()
+      .sort(function (x, y) {
+        return (Number(x.displayOrder) || 0) - (Number(y.displayOrder) || 0);
+      })
+      .map(function (category) {
+        var g = assessmentGroupGrade(
+          cid,
+          sid,
+          all.filter(function (a) {
+            return (a.categoryId || a.category_id || null) === category.id;
+          }),
+          typeof categoryCalcMode === 'function' ? categoryCalcMode(category) : 'points',
+        );
+        if (!g || !g.letter) return null;
+        return {
+          id: str(category.id),
+          name: str(category.name),
+          weight: num(category.weight),
+          text: g.letter,
+          level: g.level,
+        };
+      })
+      .filter(Boolean);
+  }
+
+  /* The student's My Learning, from the teacher's cache. Called inside
+     withReturnedOnly (fromCache), so every level, letter and % is calc.js's
+     on returned work only, for the year so far. `view` is the page built
+     from the same reply (its returned pieces and its Missing work).
+       { mode: 'proficiency' | 'letter' | 'both', empty,
+         overall: { text, level, word, letter: null | { grade, pct } },
+         categories: [ { id, name, weight, text, level } ],
+         strongest: skill | null, missing: [ piece ], work: [ piece ]
+         (returned pieces with a result, newest first),
+         groups: [ { subject, folder, skills: [ skill ] } ],
+         steps: [ { level, name, code } ], Emerging to Extending }
+       skill: { id, name, level, text, code, iCan: [ text ], pieces:
+         [ { id, title, date, value, level, text, code } ] }
+     Nothing in it is another student's or the class's: no average, no
+     rank, no count of anyone else. Left out until calc.js has them (Colin's
+     review): how the grade moved in a month, and the Next Step. */
+  function learning(cid, sid, view) {
+    return readAsOfTerm(cid, null, function () {
+      var mode = courseGradeMode(cid);
+      var back = {};
+      var work = [];
+      view.work.forEach(function (p) {
+        if (p.kind === 'back' && p.result && p.result.text) {
+          back[p.id] = p;
+          work.push(p);
+        }
+      });
+      var groups = skillGroups(cid, sid, back);
+      var strongest = null;
+      groups.forEach(function (g) {
+        g.skills.forEach(function (s) {
+          if (s.value > 0 && (!strongest || s.value > strongest.value)) strongest = s;
+        });
+      });
+      var badges = studentGradeBadges(cid, sid);
+      var summary = studentGradeSummary(cid, sid);
+      var overall = {
+        text: summary.text,
+        level: summary.level,
+        word: badges.prof ? levelWord(cid, getOverallProficiency(cid, sid)) : '',
+        letter: badges.letter ? { grade: str(badges.letter.grade), pct: str(badges.letter.pct) } : null,
+      };
+      groups.forEach(function (g) {
+        g.skills.forEach(function (s) {
+          delete s.value;
+        });
+      });
+      var missing = view.work
+        .filter(function (p) {
+          return p.kind === 'missing';
+        })
+        .reverse();
+      return {
+        mode: mode,
+        empty: !summary.text && !work.length,
+        overall: overall,
+        categories: categoriesOf(cid, sid),
+        strongest: strongest,
+        missing: missing,
+        work: work,
+        groups: groups,
+        // The four steps of a skill's ladder, Emerging to Extending, named by constants.js and calc.js.
+        steps: [1, 2, 3, 4].map(function (l) {
+          return { level: l, name: levelName(l), code: levelCode(l) };
+        }),
+      };
+    });
+  }
+
   /* ── The two doors ─────────────────────────────────────────── */
 
   /* Preview as Student: one student's page from the teacher's cache.
      { ready: false } while the class's returned grades cannot be read;
      otherwise { ready: true, reply, view }. Every result is worked out by
-     calc.js on returned grades only. */
-  function fromCache(cid, sid) {
+     calc.js on returned grades only. view.learning is My Learning when the
+     class shows it, or when opts.learning asks for it, else null. */
+  function fromCache(cid, sid, opts) {
+    // opts.learning: work My Learning out as if the class showed it (Preview's See What They'd See,
+    // S13-F1). Nothing is saved; the class's switch is not read or changed.
+    var showLearning = !!(opts && opts.learning) || learningOn(cid);
     var page = reply(cid, sid);
     if (!page) return { ready: false };
+    var feedback = feedbackReply(cid, sid, page);
     var view = withReturnedOnly(function () {
-      return build(page, cid, function (aid) {
-        var a = pieceOf(cid, aid);
-        return a ? assessmentCellValue(cid, sid, a) : null;
-      });
+      var v = build(
+        page,
+        cid,
+        function (aid) {
+          var a = pieceOf(cid, aid);
+          return a ? assessmentCellValue(cid, sid, a) : null;
+        },
+        null,
+        feedback,
+        // Group work from the cache (S12-T1's reader), counts only, as the student's page gets it.
+        typeof getStudentGroupWork === 'function' ? getStudentGroupWork(cid, sid) : null,
+      );
+      v.learning = showLearning ? learning(cid, sid, v) : null;
+      return v;
     });
-    return { ready: true, reply: page, view: view };
+    return { ready: true, reply: page, feedback: feedback, view: view };
   }
 
   /* The student page: the view of the server's reply, once
      s/student-data.js holds it (StudentData.use(StudentData.fromServer(
      reply))). Results come from calc.js on that page's own readers; with
      calc.js not loaded they are blank. */
-  function fromPage(serverReply, studentPage) {
+  function fromPage(serverReply, studentPage, work, feedback, groups) {
     var p = studentPage;
     var cid = p && p.course ? p.course.id : '';
     var sid = p && p.student ? p.student.id : '';
     var ready = typeof assessmentCellValue === 'function';
-    return build(serverReply, cid, function (aid) {
-      if (!ready || !p) return null;
-      var a = (p.assessments || []).find(function (x) {
-        return x.id === aid;
-      });
-      return a ? assessmentCellValue(cid, sid, a) : null;
-    });
+    return build(
+      serverReply,
+      cid,
+      function (aid) {
+        if (!ready || !p) return null;
+        var a = (p.assessments || []).find(function (x) {
+          return x.id === aid;
+        });
+        return a ? assessmentCellValue(cid, sid, a) : null;
+      },
+      work,
+      feedback,
+      groups,
+    );
   }
 
   return {
@@ -599,5 +1260,7 @@ window.StudentView = (function () {
     build: build,
     fromCache: fromCache,
     fromPage: fromPage,
+    feedbackReply: feedbackReply,
+    learningOn: learningOn,
   };
 })();

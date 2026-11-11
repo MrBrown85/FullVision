@@ -692,8 +692,11 @@ window.MCardWidgets = (function () {
     var actionsIdx = order.indexOf('actions');
     var actionsHtml = actionsIdx >= 0 ? render('actions', st, cid, data) : '';
 
-    // Middle widgets: everything except hero, actions, flagStatus
-    var skip = new Set(['hero', 'actions', 'flagStatus']);
+    // To Grade (S7-F4): pinned under the name, like the board; the editor can turn it off.
+    var toGradeHtml = order.indexOf('toGrade') >= 0 && window.MGradePhotos ? MGradePhotos.studentListHtml(cid, st) : '';
+
+    // Middle widgets: everything except hero, actions, flagStatus, toGrade
+    var skip = new Set(['hero', 'actions', 'flagStatus', 'toGrade']);
     var middleHtml = '';
 
     // Check for completion+missingWork 2-up pairing
@@ -724,6 +727,7 @@ window.MCardWidgets = (function () {
       '<div class="m-scard">' +
       heroHtml +
       '<div class="m-scard-widgets">' +
+      toGradeHtml +
       _toReturnHtml(st, cid) +
       middleHtml +
       '</div>' +

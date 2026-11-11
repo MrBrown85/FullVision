@@ -218,6 +218,19 @@ function load(file) {
 
 load('shared/html.js');
 load('shared/constants.js');
+// Demo Mode's class (DEFAULT_COURSES, LEARNING_MAP) lives in seed-data.js.
+// Only those two are taken from it here, run inside a function so nothing
+// else of the file becomes global: seeding stays the stub above, and a test
+// that wants the sample class runs seed-data.js and seedIfNeeded itself.
+Object.assign(
+  globalThis,
+  runInThisContext(
+    '(function () {\n' +
+      readFileSync(resolve(root, 'shared/seed-data.js'), 'utf-8') +
+      '\nreturn { DEFAULT_COURSES: DEFAULT_COURSES, LEARNING_MAP: LEARNING_MAP };\n})()',
+    { filename: 'shared/seed-data.js' },
+  ),
+);
 load('shared/reporting-term-presets.js');
 load('shared/data.js');
 load('shared/calc.js');
@@ -227,8 +240,18 @@ load('shared/rubric-draft.js');
 load('shared/rubric-checks.js');
 load('shared/core-self.js');
 load('shared/student-view.js');
+// Photos: shrinking and the queue that keeps them (Add Work in the grader).
+load('shared/photo-shrink.js');
+load('shared/photo-queue.js');
+// The PDF reader (pdf.js is fetched only when a PDF is opened).
+load('shared/photo-readers.js');
+// Pictures of student work through one helper (S14-T1).
+load('shared/work-thumbs.js');
+// Mark Up: drawing over a page of student work (S9).
+load('shared/markup-draw.js');
 load('s/page-view.js');
 load('teacher/ui.js');
+load('teacher/markup.js');
 load('teacher/report-scores.js');
 load('teacher/drafts-before-print.js');
 load('teacher/report-blocks.js');
@@ -272,6 +295,7 @@ load('teacher/obs-capture.js');
 load('teacher/obs-card.js');
 load('teacher/student-evidence.js');
 load('teacher/competency-evidence.js');
+load('teacher/work-wall.js');
 load('teacher/student-overrides.js');
 load('teacher/rubric-print.js');
 load('teacher/competency-wording.js');
