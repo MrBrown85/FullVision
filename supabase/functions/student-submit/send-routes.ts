@@ -60,6 +60,9 @@ type Param = string | null;
 
 export type SendOptions = {
   db: { call: (sql: string, params: Param[]) => Promise<unknown> };
+  // The removal worker to share with Batch C's revision routes (revision-routes.ts), so one runs at a time in
+  // this instance; absent, these routes make their own.
+  removal?: Removal | null;
   // The student-photos bucket with the service key, or null when it is not set up: then every route that
   // needs it answers a server error and asks the database nothing.
   store: Store | null;
@@ -130,8 +133,8 @@ export const SQL = {
 
 // ── What each route passes on ───────────────────────────────────────────────
 // Any other refusal is answered not_found, as card-routes.ts does.
-const SESSION_ERRORS = ['signed_out', 'not_found', 'card_stopped', 'card_expired', 'closed'];
-const CHANGE_ERRORS = [...SESSION_ERRORS, 'card_locked'];
+export const SESSION_ERRORS = ['signed_out', 'not_found', 'card_stopped', 'card_expired', 'closed'];
+export const CHANGE_ERRORS = [...SESSION_ERRORS, 'card_locked'];
 const ERRORS = {
   work: SESSION_ERRORS,
   'send-start': [
@@ -180,18 +183,18 @@ const ERRORS = {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-function isObject(v: unknown): v is Json {
+export function isObject(v: unknown): v is Json {
   return !!v && typeof v === 'object' && !Array.isArray(v);
 }
-const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
-const uuid = (v: unknown): string | null => (typeof v === 'string' && UUID.test(v) ? v.toLowerCase() : null);
-const whole = (v: unknown, lo: number, hi: number): v is number =>
+export const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+export const uuid = (v: unknown): string | null => (typeof v === 'string' && UUID.test(v) ? v.toLowerCase() : null);
+export const whole = (v: unknown, lo: number, hi: number): v is number =>
   typeof v === 'number' && Number.isSafeInteger(v) && v >= lo && v <= hi;
 
 /* The device's session token, as card-routes.ts reads it for page: a
    string of at most 128 characters. Null when absent or of the wrong shape:
    every route here needs one. The database decides whether it is live. */
-function session(body: Json): string | null {
+export function session(body: Json): string | null {
   const v = body.session;
   return typeof v === 'string' && v.length > 0 && v.length <= 128 ? v : null;
 }
@@ -200,7 +203,7 @@ function session(body: Json): string | null {
    width and height (whole, 1 to 20,000) and bytes and thumb_bytes (whole, 1
    to 2,097,152). Only those four are copied: nothing else in a page reaches
    the database. Null when anything is wrong. */
-function pages(v: unknown): Json[] | null {
+export function pages(v: unknown): Json[] | null {
   if (!Array.isArray(v) || v.length < 1 || v.length > MAX_PAGES) return null;
   const out: Json[] = [];
   for (const p of v) {
@@ -225,7 +228,7 @@ function pages(v: unknown): Json[] | null {
 /* The student's note: null, or text of at most 1,000 characters as
    Postgres counts them, with no NUL (which Postgres text cannot hold).
    Undefined when it is wrong. */
-function note(v: unknown): string | null | undefined {
+export function note(v: unknown): string | null | undefined {
   if (v == null || v === '') return null;
   if (typeof v !== 'string' || v.includes('\u0000') || [...v].length > 1000) return undefined;
   return v;
@@ -253,7 +256,7 @@ function readStart(body: Json): Start | null {
 }
 
 /* The pages to hand in, in their final order: 1 to 30 file ids, each once. */
-function fileIds(v: unknown): string[] | null {
+export function fileIds(v: unknown): string[] | null {
   if (!Array.isArray(v) || v.length < 1 || v.length > MAX_PAGES) return null;
   const ids = v.map(uuid);
   if (ids.includes(null) || new Set(ids).size !== ids.length) return null;
@@ -261,10 +264,10 @@ function fileIds(v: unknown): string[] | null {
 }
 
 // ── Copying a reply ─────────────────────────────────────────────────────────
-const plain = (v: unknown): unknown =>
+export const plain = (v: unknown): unknown =>
   typeof v === 'string' || typeof v === 'boolean' || (typeof v === 'number' && Number.isFinite(v)) ? v : null;
 
-function pick(from: unknown, keys: string[]): Json {
+export function pick(from: unknown, keys: string[]): Json {
   const src = isObject(from) ? from : {};
   const out: Json = {};
   for (const k of keys) if (k in src) out[k] = plain(src[k]);
@@ -282,13 +285,13 @@ const EXTRA: Record<string, (r: Json) => Json> = {
   bad_file: r => ({ files: list(r.files).map(uuid).filter(Boolean) }),
 };
 
-function refusal(r: unknown, errors: readonly string[]): Json {
+export function refusal(r: unknown, errors: readonly string[]): Json {
   if (!isObject(r) || typeof r.error !== 'string') throw new TypeError('reply');
   if (!errors.includes(r.error)) return { ok: false, error: 'not_found' };
   return { ok: false, error: r.error, ...(EXTRA[r.error] ? EXTRA[r.error](r) : {}) };
 }
 
-const good = (r: unknown): r is Json => isObject(r) && r.ok === true;
+export const good = (r: unknown): r is Json => isObject(r) && r.ok === true;
 
 function work(r: Json): Json {
   return {
@@ -326,8 +329,8 @@ function work(r: Json): Json {
    this send, this file, the thumbnail beside its page in the same folder.
    A file that is anything else is thrown: the database did not name it so,
    and no link is made for any of them. */
-type SendFile = { id: string; page: number; path: string; thumb: string };
-function sendFiles(r: Json, enrollment: string, assessment: string, submission: string): SendFile[] {
+export type SendFile = { id: string; page: number; path: string; thumb: string };
+export function sendFiles(r: Json, enrollment: string, assessment: string, submission: string): SendFile[] {
   if (r.bucket !== BUCKET) throw new TypeError('bucket');
   // At most the 30 pages a send holds, each named once: no more links made or files read than that in one call.
   const named = list(r.files);
@@ -358,7 +361,7 @@ function sendFiles(r: Json, enrollment: string, assessment: string, submission: 
 }
 
 // Runs `each` over `items`, a few at a time, in order of the answers.
-async function inTurn<T, U>(items: T[], each: (item: T) => Promise<U>): Promise<U[]> {
+export async function inTurn<T, U>(items: T[], each: (item: T) => Promise<U>): Promise<U[]> {
   const out: U[] = new Array(items.length);
   let next = 0;
   const lane = async () => {
@@ -371,11 +374,20 @@ async function inTurn<T, U>(items: T[], each: (item: T) => Promise<U>): Promise<
   return out;
 }
 
-const bad = (): SendAnswer => ({ status: 400, body: { ok: false, error: 'bad_request' } });
-const server = (): SendAnswer => ({ status: 500, body: { ok: false, error: 'server' } });
-const ok = (body: Json): SendAnswer => ({ status: 200, body });
+export const bad = (): SendAnswer => ({ status: 400, body: { ok: false, error: 'bad_request' } });
+export const server = (): SendAnswer => ({ status: 500, body: { ok: false, error: 'server' } });
+export const ok = (body: Json): SendAnswer => ({ status: 200, body });
 
-export function makeSendRoutes(opts: SendOptions) {
+/** The removal worker and the run that follows a phone's route. */
+export type Removal = {
+  worker: (route: string, budget: { ms: number; rounds: number }) => Promise<void>;
+  after: (route: string) => Promise<void>;
+};
+
+/* The removal worker, made once per handler and shared by every route that
+   can queue a file (send-routes.ts and revision-routes.ts), so "one run at
+   a time in this instance" holds across both. */
+export function makeRemoval(opts: Pick<SendOptions, 'db' | 'store' | 'log' | 'now' | 'defer'>): Removal {
   const { db, store, log } = opts;
   let sweeping = false;
 
@@ -429,6 +441,86 @@ export function makeSendRoutes(opts: SendOptions) {
     if (opts.defer) opts.defer(run);
     else await run;
   };
+
+  return { worker, after };
+}
+
+/* The pages of an unfinished send, read and checked (the contract, 1), for
+   send-finish here and revise-finish in revision-routes.ts. Each path is
+   read at most once. The first bad file stops the reading: no read starts
+   after it, and the answer is bad_file (the phone starts again). After a
+   file is found missing, the rest are only looked for (a read of 0 bytes:
+   the body is let go unread), so missing_pages still names every missing
+   page. Each file that passed is stored again as it passed (review M3):
+   location data cut out, typed image/jpeg, Cache-Control private,
+   no-store, so no stored file keeps a cache header the phone chose. The
+   hash is of these bytes, the page as stored. `refused` is the answer when
+   anything is bad or missing, and the database is then not to be asked. */
+export async function checkPages(
+  store: Store,
+  log: SendOptions['log'],
+  route: string,
+  chosen: SendFile[],
+): Promise<{ refused: Json } | { files: { file_id: string; sha256: string }[] }> {
+  const reasons = new Set<string>();
+  let stripped = 0;
+  let stop = false;
+  let lookOnly = false;
+  type One = { state: 'good'; check: JpegOk } | { state: 'bad' | 'missing' | 'skipped' };
+  const readOne = async (path: string, maxSide: number): Promise<One> => {
+    if (stop) return { state: 'skipped' };
+    if (lookOnly) return (await store.read(path, 0)) === 'missing' ? { state: 'missing' } : { state: 'skipped' };
+    const got = await store.read(path, MAX_FILE_BYTES);
+    if (got === 'missing') {
+      lookOnly = true;
+      return { state: 'missing' };
+    }
+    const check = got === 'too_large' ? null : inspectJpeg(got.bytes, { maxBytes: MAX_FILE_BYTES, maxSide });
+    if (!check || !check.ok) {
+      stop = true;
+      reasons.add(check ? check.reason : 'too_large');
+      return { state: 'bad' };
+    }
+    return { state: 'good', check };
+  };
+  type Checked = { id: string; state: 'good'; sha256: string } | { id: string; state: 'bad' | 'missing' | 'skipped' };
+  const checked = await inTurn(chosen, async (f): Promise<Checked> => {
+    const page = await readOne(f.path, MAX_PAGE_SIDE);
+    // Only looking, after a missing file, and the page is there: its thumbnail is looked for too, so
+    // missing_pages names a page whose thumbnail is all that is missing (send routes review 2, N1).
+    if (page.state === 'skipped' && lookOnly && !stop) {
+      const thumb = await readOne(f.thumb, MAX_THUMB_SIDE);
+      return { id: f.id, state: thumb.state === 'missing' ? 'missing' : 'skipped' };
+    }
+    if (page.state !== 'good') return { id: f.id, state: page.state };
+    const thumb = await readOne(f.thumb, MAX_THUMB_SIDE);
+    if (thumb.state !== 'good') return { id: f.id, state: thumb.state };
+    // Another file is bad or missing: this one will not be handed in now, so nothing is written.
+    if (stop || lookOnly) return { id: f.id, state: 'skipped' };
+    await store.overwrite(f.path, page.check.clean);
+    await store.overwrite(f.thumb, thumb.check.clean);
+    stripped += Number(page.check.stripped) + Number(thumb.check.stripped);
+    return { id: f.id, state: 'good', sha256: await sha256Hex(page.check.clean) };
+  });
+  if (stripped) log({ route, stripped });
+  const missing = checked.filter(c => c.state === 'missing').map(c => c.id);
+  const refused = checked.filter(c => c.state === 'bad').map(c => c.id);
+  if (missing.length || refused.length) {
+    if (refused.length) log({ route, refused: refused.length, reasons: [...reasons].sort() });
+    return {
+      refused: refused.length
+        ? { ok: false, error: 'bad_file', files: refused }
+        : { ok: false, error: 'missing_pages', missing },
+    };
+  }
+  // A file is skipped only once another is bad or missing.
+  if (checked.some(c => c.state !== 'good')) throw new TypeError('checked');
+  return { files: checked.map(c => ({ file_id: c.id, sha256: (c as { sha256: string }).sha256 })) };
+}
+
+export function makeSendRoutes(opts: SendOptions) {
+  const { db, store, log } = opts;
+  const { worker, after } = opts.removal || makeRemoval(opts);
 
   async function start(route: 'send-start' | 'replace', body: Json, hash: string): Promise<SendAnswer> {
     const asked = readStart(body);
@@ -498,64 +590,14 @@ export function makeSendRoutes(opts: SendOptions) {
     // A file that is not one of this send's: the phone's mistake. Nothing is read and send_finish is not asked.
     if (chosen.includes(undefined)) return bad();
 
-    // Every page and its thumbnail, read and checked (the contract, 1). Each path is read at most once.
-    // The first bad file stops the reading: no read starts after it, and the answer is bad_file (the phone
-    // starts again). After a file is found missing, the rest are only looked for (a read of 0 bytes: the
-    // body is let go unread), so missing_pages still names every missing page.
-    const reasons = new Set<string>();
-    let stripped = 0;
-    let stop = false;
-    let lookOnly = false;
-    type One = { state: 'good'; check: JpegOk } | { state: 'bad' | 'missing' | 'skipped' };
-    const readOne = async (path: string, maxSide: number): Promise<One> => {
-      if (stop) return { state: 'skipped' };
-      if (lookOnly) return (await store.read(path, 0)) === 'missing' ? { state: 'missing' } : { state: 'skipped' };
-      const got = await store.read(path, MAX_FILE_BYTES);
-      if (got === 'missing') {
-        lookOnly = true;
-        return { state: 'missing' };
-      }
-      const check = got === 'too_large' ? null : inspectJpeg(got.bytes, { maxBytes: MAX_FILE_BYTES, maxSide });
-      if (!check || !check.ok) {
-        stop = true;
-        reasons.add(check ? check.reason : 'too_large');
-        return { state: 'bad' };
-      }
-      return { state: 'good', check };
-    };
-    type Checked = { id: string; state: 'good'; sha256: string } | { id: string; state: 'bad' | 'missing' | 'skipped' };
-    const checked = await inTurn(chosen as SendFile[], async (f): Promise<Checked> => {
-      const page = await readOne(f.path, MAX_PAGE_SIDE);
-      if (page.state !== 'good') return { id: f.id, state: page.state };
-      const thumb = await readOne(f.thumb, MAX_THUMB_SIDE);
-      if (thumb.state !== 'good') return { id: f.id, state: thumb.state };
-      // Another file is bad or missing: this one will not be handed in now, so nothing is written.
-      if (stop || lookOnly) return { id: f.id, state: 'skipped' };
-      // Each file is stored again as it passed the check (review M3): location data cut out, typed
-      // image/jpeg, Cache-Control private, no-store, so no stored file keeps a cache header the phone chose.
-      // The hash is of these bytes, the page as stored.
-      await store.overwrite(f.path, page.check.clean);
-      await store.overwrite(f.thumb, thumb.check.clean);
-      stripped += Number(page.check.stripped) + Number(thumb.check.stripped);
-      return { id: f.id, state: 'good', sha256: await sha256Hex(page.check.clean) };
-    });
-    if (stripped) log({ route: 'send-finish', stripped });
-    const missing = checked.filter(c => c.state === 'missing').map(c => c.id);
-    const refused = checked.filter(c => c.state === 'bad').map(c => c.id);
-    if (missing.length || refused.length) {
-      // Nothing is handed in, and send_finish is not asked (the contract, 1).
-      if (refused.length) log({ route: 'send-finish', refused: refused.length, reasons: [...reasons].sort() });
+    // Every page and its thumbnail, read and checked (the contract, 1): checkPages. When anything is bad or
+    // missing, nothing is handed in, and send_finish is not asked.
+    const checked = await checkPages(store, log, 'send-finish', chosen as SendFile[]);
+    if ('refused' in checked) {
       await after('send-finish');
-      return ok(
-        refused.length
-          ? { ok: false, error: 'bad_file', files: refused }
-          : { ok: false, error: 'missing_pages', missing },
-      );
+      return ok(checked.refused);
     }
-    // A file is skipped only once another is bad or missing.
-    if (checked.some(c => c.state !== 'good')) throw new TypeError('checked');
-
-    const files = checked.map(c => ({ file_id: c.id, sha256: (c as { sha256: string }).sha256 }));
+    const files = checked.files;
     const done = await db.call(SQL.sendFinish, [s, enrollment, submission, JSON.stringify(files), hash]);
     const answer = good(done)
       ? { ok: true, ...pick(done, ['replayed', 'submission_id', 'sent_at', 'late', 'pages']) }

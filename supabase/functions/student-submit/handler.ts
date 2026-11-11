@@ -22,7 +22,10 @@
 import type { CardKey } from '../_shared/card-key.ts';
 import { CARD_ROUTES, cardParams, cardReply, type Param } from './card-routes.ts';
 import type { Store } from '../_shared/storage-rest.ts';
-import { SEND_ROUTES, makeSendRoutes } from './send-routes.ts';
+import { SEND_ROUTES, makeRemoval, makeSendRoutes } from './send-routes.ts';
+// Batch C's routes (Mark Up, Reflect, Revisions, group work): feedback-routes.ts and revision-routes.ts.
+import { FEEDBACK_ROUTES, makeFeedbackRoutes } from './feedback-routes.ts';
+import { REVISION_ROUTES, makeRevisionRoutes } from './revision-routes.ts';
 
 export type Db = {
   open: (code: string, ipHash: string) => Promise<Record<string, unknown>>;
@@ -201,7 +204,18 @@ export function identity(body: Record<string, unknown>): Identity | null {
 
 export function makeHandler(opts: Options) {
   const log = opts.log || (entry => console.log(JSON.stringify(entry)));
+  // One removal worker for every route that can queue a file, so one runs at a time.
+  const removal = makeRemoval({
+    db: opts.db,
+    store: opts.store || null,
+    log,
+    now: opts.now || Date.now,
+    defer: opts.defer || null,
+  });
+  const feedbackRoute = makeFeedbackRoutes({ db: opts.db });
+  const revisionRoute = makeRevisionRoutes({ db: opts.db, store: opts.store || null, log, removal });
   const sendRoute = makeSendRoutes({
+    removal,
     db: opts.db,
     store: opts.store || null,
     whoIs: opts.whoIs || null,
@@ -246,12 +260,21 @@ export function makeHandler(opts: Options) {
       (route !== 'verify' || (body.token == null && body.code != null))
         ? CARD_ROUTES[route]
         : null;
-    const send = typeof route === 'string' && Object.hasOwn(SEND_ROUTES, route) ? route : null;
+    const send =
+      typeof route !== 'string'
+        ? null
+        : Object.hasOwn(SEND_ROUTES, route)
+          ? sendRoute
+          : Object.hasOwn(FEEDBACK_ROUTES, route)
+            ? feedbackRoute
+            : Object.hasOwn(REVISION_ROUTES, route)
+              ? revisionRoute
+              : null;
     let result: Record<string, unknown>;
     try {
       const hash = await ipHash(req, opts.ipKey);
       if (send) {
-        const out = await sendRoute(send, body, hash);
+        const out = await send(route as string, body, hash);
         if (out.status !== 200) {
           if (out.status !== 400) log({ route, outcome: out.body.error, ms: Date.now() - started });
           return reply(out.status, out.body, origin);
