@@ -11643,7 +11643,7 @@ async function _fetchGradeReturns(cid) {
   var wasLoaded = _gradeReturnsLoadedFor[cid] === true;
   _loadGradeReturns(cid, _serverGradeRows(list));
   delete _gradeReturnsStale[cid];
-  return { changed: !wasLoaded || was !== _gradeRowsLook(getGradeReturns(cid)) };
+  return { changed: !wasLoaded || was !== _gradeRowsLook(getGradeReturns(cid)), first: !wasLoaded };
 }
 /* The class has just been read from the server (_doInitData): read its
    rows too. `fresh` is false when the server answered that the class has
@@ -11664,8 +11664,10 @@ async function _loadServerGradeReturns(cid, fresh) {
   if (got.skipped) {
     if (st && st.snapshot) st.skipped = true;
     else _refreshGradeReturnsSoon(cid);
-  } else if (got.changed && !fresh) {
+  } else if (got.changed && (!fresh || got.first)) {
     // An unchanged class is not redrawn by the load; its rows just changed.
+    // And the first time a class's rows are in this session, every page
+    // that waited for them (ReportScores.ready) is drawn.
     _invalidateAndRerender();
   }
 }
