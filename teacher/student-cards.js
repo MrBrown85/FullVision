@@ -61,10 +61,25 @@ var StudentCards = (function () {
   var STALE_MS = 60000; // the list is read again when it is drawn after this long
   var HOLD_MS = 10 * 60 * 1000; // Print Again works this long at most
   var BATCH = 250; // the most students teacher-cards takes in one request
-  /* cid → { cards, at, loading, looking, making, failed, msg, stillOld }.
-     stillOld: after Print New Card or New Codes for This Class, the
-     students who may still have the card they had (enrollment id → that
-     card's id). One stays named while the list still shows that card. */
+  /* cid → { cards, at, loading, looking, making, failed, msg, replaced,
+     reads, landed, pressed, again }.
+
+     Reads are numbered: `reads` is the number of the last read begun,
+     `landed` the last that came back with a list, `pressed` the number of
+     the last read begun before the last press finished. An answer to a read
+     numbered `pressed` or lower is older than what the press did, so it is
+     dropped and the list is read again. `again`: a read was asked for
+     while one was out; it starts when that one lands.
+
+     replaced: after Print New Card or New Codes for This Class, what became
+     of each student whose card was named: { cards: enrollment id → { id,
+     seq } of the card named, after: the read number that must land before
+     anything is said (0: the answer was clean, and the list is already
+     right), single: the first name when one student was asked, failed:
+     true when nothing was printed }. Each student is then decided from the
+     list alone: the card named still there is "still has their old card";
+     an unprinted card numbered one more than it is "old card stopped, new
+     one not printed". A student is dropped once neither is true. */
   var _state = {};
 
   /* The codes of the last press, for Print Again: { cid, items, count,
@@ -90,7 +105,11 @@ var StudentCards = (function () {
         making: null,
         failed: false,
         msg: '',
-        stillOld: null,
+        replaced: null,
+        reads: 0,
+        landed: 0,
+        pressed: 0,
+        again: false,
       })
     );
   }
@@ -199,19 +218,39 @@ var StudentCards = (function () {
   // Read the class's cards. One read at a time for a class.
   function load(cid) {
     var st = _st(cid);
-    if (st.loading) return st.loading;
+    if (st.loading) {
+      // One read at a time: this one starts when the one out lands, so it begins after whatever asked for it.
+      st.again = true;
+      return st.loading;
+    }
+    var mine = ++st.reads;
     st.loading = listStudentCards(cid).then(function (res) {
       st.loading = null;
-      st.at = Date.now();
-      if (res && Array.isArray(res.data)) {
-        st.cards = res.data;
-        st.failed = false;
-      } else {
-        st.failed = true;
+      // Asked before the last press finished: older than what the press did. Dropped, and read again.
+      var stale = mine <= st.pressed;
+      if (!stale) {
+        st.at = Date.now();
+        if (res && Array.isArray(res.data)) {
+          st.cards = res.data;
+          st.failed = false;
+          st.landed = mine;
+        } else {
+          st.failed = true;
+        }
+      }
+      if (stale || st.again) {
+        st.again = false;
+        if (_onPage(cid)) load(cid);
+        else st.at = 0;
       }
       _rerender();
     });
     return st.loading;
+  }
+
+  // A press has finished: any read begun before now is older than what it did.
+  function _pressDone(st) {
+    st.pressed = st.reads;
   }
 
   /* After an answer that is not a clean success: read the list again, now
@@ -234,7 +273,11 @@ var StudentCards = (function () {
     st.looking = true;
     setTimeout(function () {
       st.looking = false;
-      if (_onPage(cid) && !st.loading && !st.making) load(cid);
+      if (_onPage(cid) && !st.loading && !st.making) {
+        load(cid);
+        // Drawn again at once: every button that acts on the list is off, visibly, until the read lands.
+        _rerender();
+      }
     }, 0);
   }
 
@@ -430,15 +473,34 @@ var StudentCards = (function () {
     if (st.making) return st.making;
     if (!asked.length) return Promise.resolve(0);
     var students = _roster(cid);
-    // A new press lets go of the last one's codes. A student an earlier press left on their old card stays
-    // named until the list shows them another card.
+    // A new press lets go of the last one's codes. A student an earlier press left without a working new
+    // card stays named until the list shows otherwise.
     _drop();
     var gen = _watchScreen(cid);
     if (replacing) {
-      st.stillOld = st.stillOld || {};
+      var now = _byStudent(st.cards);
+      var named = st.replaced ? st.replaced.cards : {};
       asked.forEach(function (it) {
-        if (it.replaces) st.stillOld[it.enrollment_id] = it.replaces;
+        if (!it.replaces) return;
+        var c = now[it.enrollment_id];
+        named[it.enrollment_id] = {
+          id: it.replaces,
+          seq: c && c.id === it.replaces && Number(c.seq) > 0 ? Number(c.seq) : null,
+        };
       });
+      var one =
+        asked.length === 1
+          ? _roster(cid).filter(function (s) {
+              return s.id === asked[0].enrollment_id;
+            })[0]
+          : null;
+      st.replaced = {
+        cards: named,
+        after: Infinity, // nothing is said while the press is out
+        single: one ? _first(one) || _name(one) : null,
+        count: asked.length,
+        failed: false,
+      };
     }
     st.msg = 'Making cards…';
     var couldNot =
@@ -446,28 +508,35 @@ var StudentCards = (function () {
       ' Check the connection and try again.';
     st.making = _askInBatches(cid, asked, gen).then(function (results) {
       st.making = null;
+      // Any read begun before now is older than this press: its answer is dropped and the list read again.
+      _pressDone(st);
       var any = results.some(function (r) {
         return r.result !== 'unanswered';
       });
       if (any) _putMade(st, results);
       // Anything short of every card made with its code (a refusal, no connection, another tab's change,
       // a lost reply not made good): the list this screen holds may be wrong, so it is read again and the
-      // next press names the right cards.
+      // next press names the right cards. What became of each student whose card was named is said only
+      // once that read has landed: the read that begins next is numbered one more than the last begun.
       var clean = results.every(function (r) {
         return r && r.result === 'made' && r.code;
       });
+      if (st.replaced) st.replaced.after = clean ? 0 : st.reads + 1;
       if (!_stillAsking(cid, gen)) {
         // Late: the screen that asked has gone. Nothing is drawn or printed, and the codes go with this
         // answer. The screen there now is drawn as it is, and if it is this class's list, read again:
         // any card that was made shows Not Printed.
         st.msg = '';
+        if (st.replaced) st.replaced.after = st.reads + 1;
         _readAgain(cid);
         _rerender();
         return 0;
       }
       var items = any ? cardItems(students, results, null, _demo()) : [];
       if (!items.length) {
-        st.msg = couldNot;
+        // Replacing: whether the old card is still live is for the list read again to say.
+        st.msg = replacing ? '' : couldNot;
+        if (st.replaced) st.replaced.failed = true;
         _unwatch();
         _readAgain(cid);
         _rerender();
@@ -512,6 +581,8 @@ var StudentCards = (function () {
   function makeAndPrint(cid) {
     var st = _st(cid);
     if (st.making) return st.making;
+    // Not while the list is being read: the press would name the cards of a list about to change.
+    if (st.loading) return Promise.resolve(0);
     var byStudent = _byStudent(st.cards);
     var asked = _toMake(_roster(cid), byStudent).map(function (s) {
       var c = byStudent[s.id];
@@ -521,14 +592,22 @@ var StudentCards = (function () {
   }
 
   /* Put a question up over the screen. A Yes makes cards only if the
-     screen that asked is still there and nothing else is being made; Cancel
+     screen that asked is still there and nothing else is being made; a Yes
+     while the list is being read waits for the read to land, so the press
+     finishes after it and no older answer lands on top of it. Cancel
      changes nothing. */
   function _ask(cid, q, then) {
     var gen = _watchScreen(cid);
-    showConfirm(q.title, q.message, q.ok, 'danger', function () {
-      if (!_stillAsking(cid, gen) || _st(cid).making) return;
+    var st = _st(cid);
+    var yes = function () {
+      if (!_stillAsking(cid, gen) || st.making) return;
+      if (st.loading) {
+        st.loading.then(yes);
+        return;
+      }
       then();
-    });
+    };
+    showConfirm(q.title, q.message, q.ok, 'danger', yes);
   }
 
   // The question Print New Card asks (design section 4).
@@ -621,11 +700,12 @@ var StudentCards = (function () {
   // Unlock one card. Answers how many were unlocked here.
   function unlock(cid, cardId) {
     var st = _st(cid);
-    if (st.making) return 0;
+    if (st.making || st.loading) return 0;
     var card = (st.cards || []).filter(function (c) {
       return c && c.id === cardId;
     })[0];
     if (!card || !card.locked_at) return 0;
+    _pressDone(st);
     unlockStudentCard(cid, cardId, function () {
       // Refused for good: the list shows what the server has.
       _readAgain(cid);
@@ -640,11 +720,12 @@ var StudentCards = (function () {
   // Unlock every locked card in the class. Answers how many the list showed locked.
   function unlockAll(cid) {
     var st = _st(cid);
-    if (st.making) return 0;
+    if (st.making || st.loading) return 0;
     var locked = (st.cards || []).filter(function (c) {
       return c && c.locked_at;
     });
     if (!locked.length) return 0;
+    _pressDone(st);
     unlockAllStudentCards(cid, function () {
       _readAgain(cid);
     }).then(function (out) {
@@ -721,20 +802,6 @@ var StudentCards = (function () {
     );
   }
 
-  /* The students the last Print New Card or New Codes for This Class left
-     with the card they had, A to Z: the list still shows that card. */
-  function _stillOldNames(st, students, byStudent) {
-    if (!st.stillOld) return [];
-    var names = students
-      .filter(function (s) {
-        var c = byStudent[s.id];
-        return !!st.stillOld[s.id] && !!c && c.id === st.stillOld[s.id];
-      })
-      .map(_name);
-    if (!names.length) st.stillOld = null;
-    return names;
-  }
-
   function _stillOldLine(names) {
     return names.length === 1
       ? '1 student still has their old card: ' + names[0] + '. Use Print New Card on their row to try again.'
@@ -742,6 +809,57 @@ var StudentCards = (function () {
           ' students still have their old card: ' +
           names.join(', ') +
           '. Use Print New Card on their rows to try again.';
+  }
+
+  // `n` is the number on the Make and Print button.
+  function _stoppedLine(names, single, n) {
+    var press = 'Press Make and Print ' + n + (n === 1 ? ' Card' : ' Cards');
+    if (single && names.length === 1) {
+      return single + "'s old card has stopped, but the new one didn't print. " + press + ' to print it.';
+    }
+    return names.length === 1
+      ? "1 student's old card has stopped and the new one didn't print: " + names[0] + '. ' + press + ' to print it.'
+      : names.length +
+          " students' old cards have stopped and the new ones didn't print: " +
+          names.join(', ') +
+          '. ' +
+          press +
+          ' to print them.';
+  }
+
+  /* What became of the students whose card the last Print New Card or New
+     Codes for This Class named, decided from the list alone (see `replaced`
+     at the top): null while the list read after the press has not landed;
+     else the lines to show, A to Z. */
+  function _replacedLines(st, students, byStudent, n) {
+    var r = st.replaced;
+    if (!r) return [];
+    if (st.making || (r.after && st.landed < r.after)) return null;
+    var old = [];
+    var stopped = [];
+    students.forEach(function (s) {
+      var named = r.cards[s.id];
+      if (!named) return;
+      var c = byStudent[s.id];
+      if (c && c.id === named.id) old.push(_name(s));
+      else if (c && !_handedOut(c) && (named.seq === null || Number(c.seq) === named.seq + 1)) stopped.push(_name(s));
+      else delete r.cards[s.id];
+    });
+    if (!old.length && !stopped.length) {
+      st.replaced = null;
+      return [];
+    }
+    var lines = [];
+    // Nothing printed, and the list shows the old card still live.
+    if (r.failed && old.length) {
+      lines.push(
+        (r.count === 1 ? 'Could not make the card.' : 'Could not make the cards.') +
+          ' Check the connection and try again.',
+      );
+    }
+    if (old.length) lines.push(_stillOldLine(old));
+    if (stopped.length) lines.push(_stoppedLine(stopped, r.count === 1 ? r.single : null, n));
+    return lines;
   }
 
   // The Student Cards card for a class whose student page is on.
@@ -768,11 +886,12 @@ var StudentCards = (function () {
           return byStudent[s.id] && byStudent[s.id].locked_at;
         }).length
       : 0;
-    var stillOld = known && !st.making ? _stillOldNames(st, students, byStudent) : [];
+    var replaced = known ? _replacedLines(st, students, byStudent, n) : null;
     var notes = [];
     if (st.msg) notes.push(st.msg);
     else if (held) notes.push(_heldLine(held.count));
-    if (stillOld.length) notes.push(_stillOldLine(stillOld));
+    if (replaced) notes = notes.concat(replaced);
+    else if (known && !st.making && !failed) notes.push('Checking which cards were made…');
     if (!notes.length) {
       if (failed) notes.push('Could not load the cards. Check the connection and try again.');
       else if (!known) notes.push('Loading cards…');
@@ -914,6 +1033,7 @@ var StudentCards = (function () {
     newCodesQuestion: newCodesQuestion,
     _holding: _holding,
     _reset: _reset,
+    _stoppedLine: _stoppedLine,
     _pagehide: _pagehide,
     _pageshow: _pageshow,
     _setBatch: function (n) {
