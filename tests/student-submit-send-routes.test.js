@@ -768,6 +768,28 @@ describe('send-finish', () => {
       }
     });
 
+    it('a revision (send_paths answers version 2 or more) is not_found: nothing read, stored, signed or handed in', async () => {
+      for (const version of [2, 3]) {
+        const t = setup();
+        const s = await started(t);
+        t.world.override.send_paths = (params, fns) => ({ ...fns.send_paths(params), version });
+        const before = t.world.storeCalls.length;
+        const r = await t.send(finishBody(s));
+        expect(r, String(version)).toEqual({ status: 200, body: { ok: false, error: 'not_found' } });
+        expect(t.world.storeCalls.slice(before).filter(c => c[0] !== 'remove')).toEqual([]);
+        expect(names(t.world)).not.toContain('send_finish');
+        expect(t.world.subs.get(s.submission_id).state).toBe('sending');
+      }
+      // A version that is not a whole number is not an answer send_paths gives: a plain server error.
+      for (const version of [null, '1', 1.5, 0]) {
+        const t = setup();
+        const s = await started(t);
+        t.world.override.send_paths = (params, fns) => ({ ...fns.send_paths(params), version });
+        expect((await t.send(finishBody(s))).status, String(version)).toBe(500);
+        expect(t.world.storeCalls.filter(c => c[0] === 'read')).toEqual([]);
+      }
+    });
+
     it.each(['card_locked', 'closed', 'signed_out', 'card_stopped', 'card_expired'])(
       'send_paths answers %s: passed on, nothing read',
       async error => {

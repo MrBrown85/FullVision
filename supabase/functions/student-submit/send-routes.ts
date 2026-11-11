@@ -489,6 +489,10 @@ export function makeSendRoutes(opts: SendOptions) {
     }
     const assessment = uuid(r.assessment_id);
     if (uuid(r.submission_id) !== submission || !assessment) throw new TypeError('reply');
+    // A revision (version 2 or more) is sent through Batch C's revision routes, never this one: nothing is
+    // read, stored again or signed for it here.
+    if (!whole(r.version, 1, Number.MAX_SAFE_INTEGER)) throw new TypeError('reply');
+    if (r.version > 1) return ok({ ok: false, error: 'not_found' });
     const byId = new Map(sendFiles(r, enrollment, assessment, submission).map(f => [f.id, f]));
     const chosen = ids.map(id => byId.get(id));
     // A file that is not one of this send's: the phone's mistake. Nothing is read and send_finish is not asked.
