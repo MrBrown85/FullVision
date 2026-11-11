@@ -155,6 +155,11 @@ def piece(x, tok, e, a): return next((w for w in (g(x.work(tok, e), 'assessments
 def nocan(w):
     """can_send is false (without the file there is no can_send at all)."""
     return g(w, 'sent', 'can_send') is (False if MODE['fixed'] else None)
+def snap(x):
+    """Every row a send can touch: submissions, their pages, the revision requests, the delete queue."""
+    return (x.all('select id::text, state, intent, target_id::text, version, sent_by, is_late from submission order by id'),
+            x.all('select id::text, submission_id::text, page, added_by from submission_file order by id'),
+            x.all('select id::text, state, revision_in_at::text, closed_at::text from revision_request order by id'), queued(x))
 def card_of(x, e): return x.one('select id::text from student_card where enrollment_id = :e and stopped_at is null', e=e)
 def draft(x, a, e=ENR1, v=5): return x.rpc('upsert_score(:e, :a, :v)', e=e, a=a, v=v)
 def fresh(d):
@@ -468,9 +473,31 @@ def scen_rule107(fixed=True):
             rv = d.rev_start(t1, ENR1, a, 1) if hasattr(d, 'rev_start') else d.service("student_submit.revision_start(:t, :e, :a, :p::jsonb, null, :r, 'ip-1')", t=t1, e=ENR1, a=a, p=json.dumps([{'width': 1, 'height': 1}]), r=nid())
             d.upload(rv['files'])
             d.rpc('cancel_revision(:r, :k)', r=rq['request']['id'], k=nid())
+            b4 = snap(d)
             f = d.send_finish(t1, ENR1, rv['submission_id'], rv['files'])
-            check("a revision's unfinished pages (version 2) given to send_finish after the request was taken back: already_sent, as before; the teacher's work untouched",
-                  err(f) == 'already_sent' and who(d, old) == ['teacher', 'teacher'] and [x[1] for x in sent(d)] == ['teacher'], (f, sent(d)))
+            check("a revision's unfinished pages (version 2) given to send_finish after the request was taken back: not_found, nothing changed (review F2; it was already_sent and the pages dropped); the teacher's work untouched",
+                  err(f) == 'not_found' and snap(d) == b4 and who(d, old) == ['teacher', 'teacher'] and [x[1] for x in sent(d)] == ['teacher'], (f, sent(d)), differs=True)
+        for v1_in in (False, True):
+            # Review F2: a revision's unfinished pages (version 2, made by revision_start) handed to send_finish
+            # instead of revision_finish. Versions above 1 are revision_finish's only: refused, nothing changed.
+            with suppress(Skip), tx(d):
+                if v1_in: d.send(t1, ENR1, a, 1, note='first')
+                rq = d.rpc('return_for_revision(:a, :e, :r::jsonb, :k)', a=a, e=ENR1, r=json.dumps({'what_to_fix': 'Do it.'}), k=nid())
+                rv = d.service("student_submit.revision_start(:t, :e, :a, :p::jsonb, null, :r, 'ip-1')", t=t1, e=ENR1, a=a, p=json.dumps([{'width': 10, 'height': 10}] * 2), r=nid())
+                d.upload(rv['files'])
+                b4 = snap(d)
+                f = d.send_finish(t1, ENR1, rv['submission_id'], rv['files'])
+                check("F2, %s: a revision's unfinished pages (version 2) given to send_finish: not_found, and nothing changed (the send still unfinished with its 2 pages, nothing handed in, nothing queued, the request open)"
+                      % ('the student\'s version 1 in' if v1_in else 'nothing handed in'),
+                      g(rq, 'result') == 'made' and g(rv, 'version') == 2 and err(f) == 'not_found' and snap(d) == b4, (rq, rv.get('version'), f), differs=True)
+                if not MODE['fixed']: raise Skip
+                p = d.service("student_submit.send_paths(:t, :e, :s, 'ip-1')", t=t1, e=ENR1, s=rv['submission_id'])
+                ok('F2: send_paths still gives its pages, and says version 2 (a route can refuse it before reading)', g(p, 'version') == 2 and ids(g(p, 'files')) == ids(rv['files']), p)
+                fr = d.service("student_submit.revision_finish(:t, :e, :s, :f::jsonb, 'ip-1')", t=t1, e=ENR1, s=rv['submission_id'], f=json.dumps([{'file_id': x['file_id'], 'sha256': HASH} for x in rv['files']]))
+                st = d.one("select public._revision_state(id)->>'state' from revision_request where id = :r", r=rq['request']['id'])
+                ok('F2: Send My Revision then hands it in: version 2 with its 2 pages, the request reads sent, its revision in',
+                   g(fr, 'ok') is True and st == 'sent' and [x[6] for x in sent(d)] == ([1, 2] if v1_in else [2]) and len(pages(d, rv['submission_id'])) == 2
+                   and d.one('select revision_in_at is not null from revision_request where id = :r', r=rq['request']['id']) is True and sound(d) == '', (fr, st, sent(d)))
         with tx(d):
             s0, f0 = d.send(t1, ENR1, a, 1)
             check("the student's own work in: send_start is already_sent, as before (Replace is the way); can_send false",
@@ -483,10 +510,14 @@ def scen_rule107(fixed=True):
             d.rpc('cancel_revision(:r, :k)', r=rq['request']['id'], k=nid())
             rt, rf = tadd(d, a, ENR1, 2, mode='replace')
             check("the teacher's work can be a version 2 (Replace Them on a revision whose request was taken back): it is the piece's latest", [x[1] for x in sent(d)] == ['student', 'teacher'] and sent(d)[1][6] == 2, sent(d))
+            reqs = snap(d)[2]
             s, f = d.send(t1, ENR1, a, 1)
             check("the student's send onto it keeps its version, 2, beside version 1 (as a Replace of version 2 would); 1 + the teacher's 2",
                   g(f, 'ok') is True and [x[1] for x in sent(d)] == ['student', 'student'] and sent(d)[1][6] == 2 and sent(d)[1][0] == s['submission_id']
                   and who(d, s['submission_id']) == ['student', 'teacher', 'teacher'] and sound(d) == '', (f, sent(d)), differs=True)
+            if MODE['fixed']:
+                ok("the join deleted the teacher's sent version 2, so C1's revision_gone ran (round 3): no request is open, so it settled none; every request as it was",
+                   snap(d)[2] == reqs and d.one("select count(*) from revision_request where enrollment_id = :e and state = 'open'", e=ENR1) == 0, (reqs, snap(d)[2]))
         with tx(d):
             u, t, old = teacher_left(d, t1, a)
             check('a Replace of the teacher\'s work still answers cannot_change (the call is send_start)', err(d.send_start(t1, ENR1, a, 1, replace=True)) == 'cannot_change')
