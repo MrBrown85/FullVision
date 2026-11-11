@@ -1199,6 +1199,10 @@ window.StudentView = (function () {
       return x.date === y.date ? 0 : x.date < y.date ? 1 : -1;
     });
     var has = value > 0;
+    var bankTag = (sec.tags || []).find(function (t) {
+      return !!(t && t.bank_id);
+    });
+    var bankId = bankTag ? str(bankTag.bank_id) : null;
     return {
       id: str(sec.id),
       name: str(sec.name || sec.shortName || sec.id),
@@ -1207,8 +1211,62 @@ window.StudentView = (function () {
       code: has && !letter ? levelCode(value) : '',
       iCan: iCan,
       pieces: pieces,
+      next: has ? nextStepOfSkill(cid, sid, sec.id, bankId) : null,
       value: has ? value : 0,
+      bankId: bankId,
     };
+  }
+
+  /* A skill's Next Step (ruling 114): calc.js's nextStepLevel says which
+     level's step applies, and the comment bank says it, word for word, as
+     Generate reads a competency's bank entry (CommentBank.bankEntry, for
+     the first of the skill's competencies from the BC bank). { top: true }
+     at Extending ("You've Reached the Top Step"); { top: false, text }
+     below it; null when nothing is returned on the skill, the bank has no
+     step for it, or the comment bank is not on the page (the student's own
+     device, until the server sends My Learning). */
+  function nextStepOfSkill(cid, sid, sectionId, bankId) {
+    if (typeof nextStepLevel !== 'function') return null;
+    var n = nextStepLevel(cid, sid, sectionId);
+    if (!n) return null;
+    if (n.top) return { top: true, text: '' };
+    var bank = typeof CommentBank !== 'undefined' && CommentBank && CommentBank.bankEntry;
+    var e = bank && bankId ? CommentBank.bankEntry(bankId) : null;
+    var text = e && e.steps ? sentence(e.steps[n.key]) : '';
+    return text ? { top: false, text: text } : null;
+  }
+
+  // A bank step as a sentence: a capital first, a full stop last (as CompetencyWording writes one).
+  function sentence(t) {
+    var s = str(t).trim();
+    if (!s) return '';
+    s = s.charAt(0).toUpperCase() + s.slice(1);
+    return /[.!?]$/.test(s) ? s : s + '.';
+  }
+
+  /* My Learning's Next Step: the skill the comment bank's Generate names
+     (CommentBank.nextStepOf: the lowest with 2 or more returned pieces, not
+     among the strongest), with its step. { id, name, text } or null. */
+  function overallNextStep(groups) {
+    if (typeof CommentBank === 'undefined' || !CommentBank || !CommentBank.nextStepOf) return null;
+    var comps = [];
+    groups.forEach(function (g) {
+      g.skills.forEach(function (s) {
+        if (s.value > 0) comps.push({ skill: s, id: s.id, level: s.value, scores: s.pieces, bankId: s.bankId });
+      });
+    });
+    var c = CommentBank.nextStepOf(comps);
+    var s = c && c.skill;
+    return s && s.next && !s.next.top && s.next.text ? { id: s.id, name: s.name, text: s.next.text } : null;
+  }
+
+  /* How the grade has moved in a month (calc.js gradeMonthChange, returned
+     work only, as of the class's today): { dir: 1 | -1, from } when the
+     word or letter changed, else null (no board shows the same word). */
+  function monthChange(cid, sid) {
+    if (typeof gradeMonthChange !== 'function' || typeof courseToday !== 'function') return null;
+    var m = gradeMonthChange(cid, sid, courseToday(cid));
+    return m && m.dir ? { dir: m.dir, from: str(m.from) } : null;
   }
 
   /* The class's skills in the learning map's order, in its folders, under
@@ -1301,8 +1359,10 @@ window.StudentView = (function () {
        skill: { id, name, level, text, code, iCan: [ text ], pieces:
          [ { id, title, date, value, level, text, code } ] }
      Nothing in it is another student's or the class's: no average, no
-     rank, no count of anyone else. Left out until calc.js has them (Colin's
-     review): how the grade moved in a month, and the Next Step. */
+     rank, no count of anyone else.
+       trend: { dir: 1 | -1, from } | null, how the grade moved in a month;
+       next: { id, name, text } | null, the Next Step My Learning names;
+       skill.next: { top, text } | null, its own Next Step, or the Top Step. */
   function learning(cid, sid, view) {
     return readAsOfTerm(cid, null, function () {
       var mode = courseGradeMode(cid);
@@ -1329,9 +1389,11 @@ window.StudentView = (function () {
         word: badges.prof ? levelWord(cid, getOverallProficiency(cid, sid)) : '',
         letter: badges.letter ? { grade: str(badges.letter.grade), pct: str(badges.letter.pct) } : null,
       };
+      var next = overallNextStep(groups);
       groups.forEach(function (g) {
         g.skills.forEach(function (s) {
           delete s.value;
+          delete s.bankId;
         });
       });
       var missing = view.work
@@ -1343,6 +1405,8 @@ window.StudentView = (function () {
         mode: mode,
         empty: !summary.text && !work.length,
         overall: overall,
+        trend: monthChange(cid, sid),
+        next: next,
         categories: categoriesOf(cid, sid),
         strongest: strongest,
         missing: missing,

@@ -172,6 +172,40 @@ test.describe('Is This You? on a Chromebook', () => {
   });
 });
 
+test.describe('Is This You? on a phone', () => {
+  test.use(PHONE);
+
+  test('the avatar centred above the heading; Yes and No full width with a gap', async ({ page }) => {
+    await serve(page, twoClasses());
+    await page.goto('/s/#P3R8-WDK4');
+    const box = page.locator('.sp-check-box');
+    await expect(box.getByRole('heading', { name: 'Is this you, Cece?' })).toBeVisible();
+    const r = await box.evaluate(el => {
+      const at = s => el.querySelector(s).getBoundingClientRect();
+      const b = el.getBoundingClientRect();
+      const a = at('.sp-avatar');
+      const h = at('.sp-big');
+      const yes = at('[data-act="card-yes"]');
+      const no = at('[data-act="card-notme"]');
+      return {
+        avatarMid: a.left + a.width / 2,
+        boxMid: b.left + b.width / 2,
+        avatarAbove: a.bottom <= h.top,
+        yes: yes.width,
+        no: no.width,
+        box: b.width,
+        gap: no.top - yes.bottom,
+      };
+    });
+    expect(Math.abs(r.avatarMid - r.boxMid)).toBeLessThan(2);
+    expect(r.avatarAbove).toBe(true);
+    expect(r.yes).toBe(r.box);
+    expect(r.no).toBe(r.box);
+    expect(r.gap).toBeGreaterThanOrEqual(8);
+    await shot(page, 'phone-s3f3-is-this-you');
+  });
+});
+
 /* A camera and a QR reader standing in for the Chromebook's: the camera is
    a canvas's picture, and the reader finds the card's address on its
    fourth look. */

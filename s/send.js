@@ -27,7 +27,8 @@
    (IndexedDB, through shared/photo-queue.js's store) from the press of
    Send until the server has them, so a reload or a dropped connection
    finishes the send within its two hours; after that the student sends
-   again. Done empties that store. Mark Up, reflections, revisions and
+   again. Every sign-out (Done, idle, another tab, midnight) empties that
+   store (ruling 138). Mark Up, reflections, revisions and
    group work stay Demo Mode's.
 
    Every photo and PDF goes through shared/photo-shrink.js (one path for
@@ -607,13 +608,14 @@
   var running = {}; // 'student:piece' → a real send started and not handed in, on screen or not
   var thumbs = {}; // submission id → the blob: addresses of its pages' thumbnails, in order
   var thumbsAsked = {}; // submission id → true once its links were asked for
-  var realSeen = false; // a real card's page has opened in this tab: Done empties the device's store
+  var realSeen = false; // a real card's page has opened in this tab: a sign-out empties the device's store
   var DAY_MS = 24 * 60 * 60 * 1000;
 
-  // The routes, for the class on screen. app.js adds the session; Demo Mode never comes here.
-  function askRoute(route, body) {
+  // The routes, for the class on screen. app.js adds the session; Demo Mode never comes here. A send's
+  // own calls name its student (enrollment): app.js asks nothing when another student is signed in now.
+  function askRoute(route, body, enrollment) {
     return typeof StudentPage.askClass === 'function'
-      ? StudentPage.askClass(route, body)
+      ? StudentPage.askClass(route, body, enrollment)
       : Promise.resolve({ ok: false, error: 'network' });
   }
 
@@ -852,9 +854,21 @@
     };
   }
 
+  // What the device holds of a send: its pages, in order, its note and its answer on the plan.
+  function keptAs(send) {
+    return JSON.stringify([
+      send.pages.map(function (pg) {
+        return pg.id || pg.key;
+      }),
+      send.note,
+      send.followed,
+    ]);
+  }
+
   // The whole send kept again: every page of it, and nothing left of an earlier send of the same piece.
   function saveAll(send) {
     send.kept = send.pages.length > 0;
+    send.keptAs = keptAs(send);
     return onDevice(function (st) {
       return st
         .list()
@@ -1001,6 +1015,7 @@
         send.pages.push(pg);
       });
       if (!send.pages.length) return;
+      send.keptAs = send.pages.length === kept.rows.length ? keptAs(send) : '';
       show(send);
       return goReal(send);
     });
@@ -1068,7 +1083,8 @@
     send.message = '';
     send.failed = -1;
     draw(send);
-    return (fresh || !send.kept ? saveAll(send) : Promise.resolve()).then(function () {
+    // Kept again when new, never kept, or changed since (a page added after a refusal that kept the send).
+    return (fresh || !send.kept || send.keptAs !== keptAs(send) ? saveAll(send) : Promise.resolve()).then(function () {
       if (offline()) return stop(send, 'notsent');
       return startReal(send);
     });
@@ -1083,7 +1099,7 @@
       note: send.note.slice(0, NOTE_MAX) || null,
       followed_plan: p && p.plan && FOLLOWED[send.followed] ? send.followed : null,
     };
-    return askRoute(send.replace ? 'replace' : 'send-start', body).then(function (res) {
+    return askRoute(send.replace ? 'replace' : 'send-start', body, send.student).then(function (res) {
       if (!res || res.ok !== true) return refused(send, res);
       // Handed in already: an earlier try's finish went through and its answer was lost.
       if (res.state === 'sent') return handedIn(send, clock());
@@ -1164,7 +1180,7 @@
         return pg.fileId;
       }),
     };
-    return askRoute('send-finish', body).then(function (res) {
+    return askRoute('send-finish', body, send.student).then(function (res) {
       if (res && res.ok === true) return handedIn(send, Date.parse(String(res.sent_at || '')) || clock());
       if (res && res.error === 'missing_pages') {
         // The server does not have these yet: they go again.
@@ -1215,8 +1231,16 @@
     class_full: 'Your class can’t take any more photos right now. Ask your teacher.',
   };
   var SESSION_OVER = { signed_out: 1, card_stopped: 1, card_expired: 1, closed: 1 };
+  var NOT_FOUND = 'This one can’t take your work right now. Ask your teacher.';
+  var NOT_UNDERSTOOD = 'Something went wrong sending this. Try again later, or ask your teacher.';
   function refused(send, res) {
     var e = (res && res.ok === false && typeof res.error === 'string' && res.error) || 'network';
+    if (e === 'other_student') {
+      // Another student is signed in now: this send is not theirs. Its pages stay on the device.
+      send.busy = false;
+      delete running[send.student + ':' + send.id];
+      return;
+    }
     if (has(SESSION_OVER, e)) {
       send.busy = false;
       if (typeof StudentPage.sessionRefused === 'function') StudentPage.sessionRefused({ ok: false, error: e });
@@ -1262,11 +1286,19 @@
       );
     }
     if (e === 'card_locked') return stop(send, 'check', StudentPage.MESSAGES.card_locked);
-    if (e === 'bad_file' || e === 'not_found') {
+    if (e === 'bad_file') {
       // The server will not take this send as it is: the next press starts a new one.
       send.request = '';
       return stop(send, 'check', 'One of your pages couldn’t be sent. Check your pages, then send again.');
     }
+    if (e === 'not_found') {
+      // The piece is hidden now, or the student is no longer in the class: sending again won't help.
+      send.request = '';
+      stop(send, 'check', NOT_FOUND);
+      return loadWork();
+    }
+    // An answer the page doesn't understand, from a connection that works: not Not Sent Yet, which waits for one.
+    if (e === 'bad_request') return stop(send, 'check', NOT_UNDERSTOOD);
     return stop(send, 'notsent');
   }
 
@@ -1306,7 +1338,9 @@
                 ? FOR_GOOD[e]
                 : e === 'card_locked'
                   ? StudentPage.MESSAGES.card_locked
-                  : 'Couldn’t reach FullVision. Check your internet and try again.',
+                  : e === 'network' || e === 'server'
+                    ? 'Couldn’t reach FullVision. Check your internet and try again.'
+                    : 'This one can’t be unsent right now. Ask your teacher.',
       };
       StudentPage.paint('#sp-send-ask-title');
       if (e !== 'network' && e !== 'server') loadWork();
@@ -1863,6 +1897,17 @@
     input: onInput,
     change: onChange,
     share: function (state) {
+      // A new state is a sign-out (StudentPage.reset: Done, 15 idle minutes, Done in another tab,
+      // midnight, signed_out): the last student's unfinished sends and thumbnails go with it, so coming
+      // back online sends nothing of theirs under the next student, and so do the photos this device
+      // kept for them (ruling 138, "Yes, wipe them").
+      if (state !== S) {
+        running = {};
+        thumbs = {};
+        thumbsAsked = {};
+        letGo();
+        if (realSeen) wipeDevice();
+      }
       S = state;
     },
     test: {

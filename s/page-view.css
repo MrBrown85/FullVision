@@ -1323,16 +1323,24 @@
   }
 }
 
-/* My Learning (S13-F2 and F3): the grade, the skills, One Skill. */
+/* My Learning (S13-F2 and F3): the grade, the skills, One Skill. Each
+   level has one colour (--sp-ml-1 to 4); the ladder, the little bars, the
+   chart's line and dots use it. */
 .sp-view .sp-ml {
+  --sp-ml-1: #dc2626;
+  --sp-ml-2: #d97706;
+  --sp-ml-3: #2e7d32;
+  --sp-ml-4: #1d4ed8;
+  --sp-ml-amber-bg: #fff3dc;
+  --sp-ml-amber-ink: #7c4a03;
+  --sp-ml-at: var(--sp-fill);
   display: flex;
   flex-direction: column;
   gap: 12px;
   margin: 0;
   padding: 0;
 }
-.sp-view .sp-ml-cols,
-.sp-view .sp-ml-col {
+.sp-view .sp-ml-head {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1347,6 +1355,7 @@
   background: var(--sp-card);
   box-shadow: var(--sp-shadow);
   color: var(--sp-text);
+  font: inherit;
   text-align: left;
   width: 100%;
 }
@@ -1356,31 +1365,75 @@
   font-weight: 700;
   color: var(--sp-text-2);
 }
+.sp-view .sp-ml-icon {
+  flex: none;
+  display: block;
+}
+.sp-view .sp-ml-ink-1 {
+  color: var(--sp-ml-1);
+}
+.sp-view .sp-ml-ink-2 {
+  color: var(--sp-ml-2);
+}
+.sp-view .sp-ml-ink-3 {
+  color: var(--sp-ml-3);
+}
+.sp-view .sp-ml-ink-4 {
+  color: var(--sp-ml-4);
+}
+
+/* The grade: the word (or letter) on the left, the ladder beside it. */
+.sp-view .sp-ml-overall {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sp-view .sp-ml-overall-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
 .sp-view .sp-ml-at {
   display: flex;
   flex-direction: column;
-  margin: 0 0 10px;
+  margin: 0;
 }
 .sp-view .sp-ml-at-lead {
   font-size: 14px;
+  font-weight: 600;
   color: var(--sp-text-2);
 }
 .sp-view .sp-ml-at-word {
   font-size: 30px;
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1.15;
 }
-.sp-view .sp-ml-overall-letter {
+.sp-view .sp-ml-trend {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 4px;
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.sp-view .sp-ml-trend-up {
+  color: var(--sp-green);
+}
+.sp-view .sp-ml-trend-down {
+  color: var(--sp-text-2);
+}
+.sp-view .sp-ml-overall-letter {
+  align-items: center;
+  justify-content: flex-start;
+  gap: 16px;
 }
 .sp-view .sp-ml-letter {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 64px;
-  height: 64px;
+  min-width: 72px;
+  height: 72px;
   padding: 0 10px;
   border-radius: 16px;
   font-size: 34px;
@@ -1389,72 +1442,209 @@
 .sp-view .sp-ml-letter-side {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 .sp-view .sp-ml-ie {
   font-size: 15px;
   font-weight: 600;
 }
 .sp-view .sp-ml-pct {
-  font-size: 24px;
-  font-weight: 700;
+  font-size: 28px;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
+
+/* The ladder: four rising steps, those reached in the student's level's
+   colour, You outlined. */
 .sp-view .sp-ml-ladder {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 4px;
+  grid-template-columns: repeat(4, 24px);
+  align-items: end;
+  gap: 5px;
+  flex: none;
+}
+.sp-view .sp-ml-at-1 {
+  --sp-ml-at: var(--sp-ml-1);
+}
+.sp-view .sp-ml-at-2 {
+  --sp-ml-at: var(--sp-ml-2);
+}
+.sp-view .sp-ml-at-3 {
+  --sp-ml-at: var(--sp-ml-3);
+}
+.sp-view .sp-ml-at-4 {
+  --sp-ml-at: var(--sp-ml-4);
 }
 .sp-view .sp-ml-step {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  justify-content: flex-end;
+  gap: 4px;
   min-width: 0;
 }
 .sp-view .sp-ml-bar {
-  position: relative;
   display: block;
   width: 100%;
-  height: 10px;
-  border-radius: 5px;
+  border-radius: 4px;
   background: var(--sp-fill);
 }
-.sp-view .sp-ml-bar.sp-lv-1 {
-  background: #f5a3a0;
+.sp-view .sp-ml-step-1 .sp-ml-bar {
+  height: 16px;
 }
-.sp-view .sp-ml-bar.sp-lv-2 {
-  background: #fbbf24;
+.sp-view .sp-ml-step-2 .sp-ml-bar {
+  height: 26px;
 }
-.sp-view .sp-ml-bar.sp-lv-3 {
-  background: #22c55e;
+.sp-view .sp-ml-step-3 .sp-ml-bar {
+  height: 38px;
 }
-.sp-view .sp-ml-bar.sp-lv-4 {
-  background: #3b82f6;
+.sp-view .sp-ml-step-4 .sp-ml-bar {
+  height: 50px;
 }
-.sp-view .sp-ml-you {
-  position: absolute;
-  top: -20px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--sp-text);
+.sp-view .sp-ml-bar-on {
+  background: var(--sp-ml-at);
 }
 .sp-view .sp-ml-step-on .sp-ml-bar {
-  height: 14px;
+  box-shadow:
+    0 0 0 2px var(--sp-card),
+    0 0 0 4px var(--sp-ml-at);
 }
-.sp-view .sp-ml-ladder:has(.sp-ml-you) {
-  padding-top: 18px;
+.sp-view .sp-ml-you {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--sp-text);
+  color: var(--sp-card);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.sp-view .sp-ml-ladder-named {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.sp-view .sp-ml-ladder-named .sp-ml-step-1 .sp-ml-bar {
+  height: 20px;
+}
+.sp-view .sp-ml-ladder-named .sp-ml-step-2 .sp-ml-bar {
+  height: 34px;
+}
+.sp-view .sp-ml-ladder-named .sp-ml-step-3 .sp-ml-bar {
+  height: 48px;
+}
+.sp-view .sp-ml-ladder-named .sp-ml-step-4 .sp-ml-bar {
+  height: 62px;
+}
+.sp-view .sp-ml-ladder-named .sp-ml-bar {
+  border-radius: 6px;
 }
 .sp-view .sp-ml-step-name {
+  margin-top: 2px;
   font-size: 12px;
   font-weight: 600;
-  text-align: center;
-}
-.sp-view .sp-ml-step-code {
-  font-size: 11px;
   color: var(--sp-text-2);
+  text-align: center;
+  overflow-wrap: anywhere;
 }
+.sp-view .sp-ml-step-on .sp-ml-step-name {
+  font-weight: 800;
+  color: var(--sp-ml-at);
+}
+
+/* A level as a skill row shows it: a little four-bar ladder and a chip. */
+.sp-view .sp-ml-mini {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+}
+.sp-view .sp-ml-mini i {
+  display: block;
+  width: 4px;
+  border-radius: 1px;
+  background: var(--sp-fill);
+}
+.sp-view .sp-ml-mini i:nth-child(1) {
+  height: 5px;
+}
+.sp-view .sp-ml-mini i:nth-child(2) {
+  height: 8px;
+}
+.sp-view .sp-ml-mini i:nth-child(3) {
+  height: 11px;
+}
+.sp-view .sp-ml-mini i:nth-child(4) {
+  height: 14px;
+}
+.sp-view .sp-ml-mini i.sp-ml-mini-on {
+  background: var(--sp-ml-at);
+}
+
+/* Next Step and Your Strongest: an icon, a coloured title, the words. */
+.sp-view .sp-ml-next,
+.sp-view .sp-ml-strongest {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+.sp-view .sp-ml-next-still {
+  cursor: default;
+}
+.sp-view .sp-ml-next .sp-ml-icon {
+  align-self: flex-start;
+  margin-top: 1px;
+  color: var(--sp-ml-amber-ink);
+}
+.sp-view .sp-ml-next-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.sp-view .sp-ml-next-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sp-ml-amber-ink);
+}
+.sp-view .sp-ml-next-line {
+  font-size: 15px;
+  line-height: 1.4;
+}
+.sp-view .sp-ml-strongest .sp-ml-icon {
+  color: var(--sp-ml-4);
+}
+.sp-view .sp-ml-strongest-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sp-ml-4);
+}
+.sp-view .sp-ml-strongest-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 10px;
+}
+.sp-view .sp-ml-strongest-name {
+  min-width: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+.sp-view .sp-ml-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #e3edff;
+  box-shadow: none;
+  color: #1e3a8a;
+  font-weight: 700;
+}
+.sp-view .sp-ml-top .sp-ml-icon {
+  color: var(--sp-ml-4);
+}
+
+/* Rows. */
 .sp-view .sp-ml-rows {
   list-style: none;
   margin: 0;
@@ -1478,6 +1668,8 @@
   padding: 8px 0;
   border: 0;
   background: none;
+  color: inherit;
+  font: inherit;
   text-align: left;
 }
 .sp-view .sp-ml-skill-name {
@@ -1500,14 +1692,34 @@
   font-size: 14px;
   color: var(--sp-text-2);
 }
+
+/* Missing: amber, as work that needs the student. */
+.sp-view .sp-ml-missing {
+  background: var(--sp-ml-amber-bg);
+  box-shadow: none;
+}
 .sp-view .sp-ml-missing-title {
-  color: #b91c1c;
+  margin: 0;
+  font-size: 15px;
+  color: var(--sp-ml-amber-ink);
+}
+.sp-view .sp-ml-missing .sp-row-title {
+  font-weight: 700;
+  color: var(--sp-ml-amber-ink);
+}
+.sp-view .sp-ml-missing .sp-ml-rows > li {
+  border-top-color: rgba(124, 74, 3, 0.15);
 }
 .sp-view .sp-ml-line {
   margin: 0 0 4px;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--sp-text-2);
 }
+.sp-view .sp-ml-missing .sp-ml-line {
+  color: var(--sp-ml-amber-ink);
+}
+
+/* Your Skills. */
 .sp-view .sp-ml-subject {
   margin: 10px 0 4px;
   font-size: 15px;
@@ -1534,15 +1746,31 @@
   font-weight: 400;
   color: var(--sp-text-2);
 }
+
+/* One Skill: the I Can lines, each with a target. */
 .sp-view .sp-ml-ican {
+  list-style: none;
+  padding: 4px 16px;
+}
+.sp-view .sp-ml-ican > li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   margin: 0;
-  padding: 0 0 0 18px;
-  color: var(--sp-text-2);
+  padding: 10px 0;
+  border-top: 1px solid var(--sp-fill);
+  font-size: 16px;
+  line-height: 1.4;
 }
-.sp-view .sp-ml-top {
-  font-weight: 700;
-  color: #1e40af;
+.sp-view .sp-ml-ican > li:first-child {
+  border-top: 0;
 }
+.sp-view .sp-ml-ican .sp-ml-icon {
+  margin-top: 2px;
+  color: var(--sp-ml-4);
+}
+
+/* How It's Going: the line in the skill's level's colour, each dot in its own, the latest ringed. */
 .sp-view .sp-ml-chart {
   display: block;
   width: 100%;
@@ -1559,29 +1787,62 @@
 .sp-view .sp-ml-path {
   fill: none;
   stroke: var(--sp-text-2);
-  stroke-width: 2;
+  stroke-width: 2.5;
+}
+.sp-view .sp-ml-path-1 {
+  stroke: var(--sp-ml-1);
+}
+.sp-view .sp-ml-path-2 {
+  stroke: var(--sp-ml-2);
+}
+.sp-view .sp-ml-path-3 {
+  stroke: var(--sp-ml-3);
+}
+.sp-view .sp-ml-path-4 {
+  stroke: var(--sp-ml-4);
 }
 .sp-view .sp-ml-dot {
   fill: var(--sp-field);
 }
 .sp-view .sp-ml-dot-1 {
-  fill: #dc2626;
+  fill: var(--sp-ml-1);
 }
 .sp-view .sp-ml-dot-2 {
-  fill: #d97706;
+  fill: var(--sp-ml-2);
 }
 .sp-view .sp-ml-dot-3 {
-  fill: #16a34a;
+  fill: var(--sp-ml-3);
 }
 .sp-view .sp-ml-dot-4 {
-  fill: #2563eb;
+  fill: var(--sp-ml-4);
+}
+.sp-view .sp-ml-ring {
+  fill: var(--sp-card);
+  stroke: var(--sp-field);
+  stroke-width: 2;
+}
+.sp-view .sp-ml-ring-1 {
+  stroke: var(--sp-ml-1);
+}
+.sp-view .sp-ml-ring-2 {
+  stroke: var(--sp-ml-2);
+}
+.sp-view .sp-ml-ring-3 {
+  stroke: var(--sp-ml-3);
+}
+.sp-view .sp-ml-ring-4 {
+  stroke: var(--sp-ml-4);
 }
 .sp-view .sp-ml-dates {
   display: flex;
   justify-content: space-between;
-  padding-left: 40px;
+  padding-left: calc(100% * 70 / 300);
   font-size: 11px;
   color: var(--sp-text-2);
+}
+.sp-view .sp-ml-date-last {
+  font-weight: 700;
+  color: var(--sp-text);
 }
 .sp-view .sp-ml-empty {
   display: flex;
@@ -1591,14 +1852,44 @@
   padding: 32px 0;
   text-align: center;
 }
+
+/* A Chromebook (SDeskLearning): the grade, Next Step and Your Strongest
+   three across; Missing a full-width strip; the skills in two columns. */
 @container sp-view (min-width: 760px) {
-  .sp-view .sp-ml-cols {
+  .sp-view .sp-ml-head {
     flex-direction: row;
-    align-items: flex-start;
+    flex-wrap: wrap;
+    align-items: stretch;
     gap: 16px;
   }
-  .sp-view .sp-ml-col {
-    flex: 1;
+  .sp-view .sp-ml-head > .sp-ml-card {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+  }
+  .sp-view .sp-ml-head > .sp-ml-overall {
+    flex-grow: 1.4;
+  }
+  .sp-view .sp-ml-head > .sp-ml-next,
+  .sp-view .sp-ml-head > .sp-ml-strongest {
+    align-items: flex-start;
+  }
+  .sp-view .sp-ml-head .sp-row-go {
+    display: none;
+  }
+  .sp-view .sp-ml-head .sp-ml-strongest-line {
+    justify-content: flex-start;
+  }
+  .sp-view .sp-ml-head > .sp-ml-missing {
+    flex-basis: 100%;
+    order: 9;
+  }
+  .sp-view .sp-ml-skills .sp-ml-rows {
+    columns: 2;
+    column-gap: 32px;
+  }
+  .sp-view .sp-ml-skills .sp-ml-rows > li {
+    break-inside: avoid;
   }
 }
 
