@@ -75,16 +75,16 @@ for (const size of [
       await page.getByRole('button', { name: 'Back to cards' }).click();
       await expect(page.locator('.sp-segment[aria-pressed="true"]')).toHaveText('Sent 0');
 
-      for (const [tab, line] of [
-        ['My Learning', 'Your teacher hasn’t turned on My Learning for this class.'],
-        ['Questionnaires', 'Questionnaires from your teacher will show here.'],
-        ['Reports', 'Reports from your teacher will show here.'],
+      // Demo Mode lists sample questionnaires and reports (S4-F4); My Learning says it is off.
+      for (const [tab, heading, line] of [
+        ['My Learning', 'My Learning', 'Your teacher hasn’t turned on My Learning for this class.'],
+        ['Questionnaires', 'Questionnaires', 'November Reflection'],
+        ['Reports', 'My Reports', 'Interim Update'],
       ]) {
         await nav.getByRole('button', { name: tab }).click();
         await expect(nav.getByRole('button', { name: tab })).toHaveAttribute('aria-current', 'page');
-        await expect(page.getByRole('heading', { name: tab })).toBeVisible();
-        await expect(page.getByText(line)).toBeVisible();
-        await expect(page.locator('.sp-row')).toHaveCount(0);
+        await expect(page.getByRole('heading', { level: 1, name: heading, exact: true })).toBeVisible();
+        await expect(page.getByText(line, { exact: true }).locator('visible=true').first()).toBeVisible();
         await fits(page);
         await named(page);
         await contrast(page);

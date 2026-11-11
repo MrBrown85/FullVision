@@ -28,6 +28,7 @@
          feedback: the id of the piece Your Feedback is open on, whole:
          true for its The Whole Rubric (also for work not back yet, from
          See the Rubric), levels: What the Levels Mean is open,
+         form: the questionnaire or report picked on a Chromebook,
          noResults: the results didn't load (say so, with Try Again),
          sending: Try Again is under way, waiting: the view is not here yet,
          note: a line under the body (Demo Mode's), sheet: Your Classes is
@@ -817,18 +818,221 @@ window.StudentPageView = (function () {
     );
   }
 
-  /* The other three tabs. Questionnaires and Reports come in S4-F4; My
-     Learning is a class switch, Show My Learning, that comes with S13 and
-     is off until then. Each says so plainly. */
+  /* The other three tabs. My Learning is a class switch, Show My Learning,
+     that comes with S13 and is off until then. Questionnaires and Reports
+     list what the view holds (S4-F4); with nothing there, each says so
+     plainly. */
   var TAB_BODIES = {
     learning: { title: 'My Learning', line: 'Your teacher hasn’t turned on My Learning for this class.' },
     questionnaires: { title: 'Questionnaires', line: 'Questionnaires from your teacher will show here.' },
-    reports: { title: 'Reports', line: 'Reports from your teacher will show here.' },
+    reports: { title: 'My Reports', line: 'Reports from your teacher will show here.' },
   };
+
+  /* ── Questionnaires and My Reports (the artboard's "Questionnaires Tab",
+     "My Reports Tab", "Questions on a Chromebook" and "Reports on a
+     Chromebook"). On a phone: what is open as a card, the rest as a list.
+     On a Chromebook: the list on the left, the one picked on the right.
+     Start and See Your Report are the student page's own presses
+     (s/app.js); in the preview nothing answers them. ───────── */
+
+  var DONE_MARK =
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  var SOON_MARK =
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>';
+
+  // When a questionnaire is open, was sent, or opens.
+  function formWhen(q) {
+    if (q.state === 'sent') return q.sentOn ? 'Sent ' + fmtDate(q.sentOn, DAY) : 'Sent';
+    if (q.state === 'soon') return q.opensOn ? 'Opens ' + fmtDate(q.opensOn, DAY) : '';
+    return q.until ? 'Open until ' + fmtDate(q.until, DAY) : '';
+  }
+  // A report's date and how long it stays open: "Nov 20 · Open until Nov 27".
+  function reportWhen(r) {
+    return [fmtDate(r.issued, DAY), r.until ? 'Open until ' + fmtDate(r.until, DAY) : ''].filter(Boolean).join(SEP);
+  }
+  function aboutMinutes(q) {
+    return q.minutes > 0 ? 'about ' + q.minutes + ' minutes' : '';
+  }
+
+  // The Chromebook's list for either tab: a dot, the title and its line; the one picked marked.
+  function formSide(items, picked, line, dot) {
+    return (
+      '<ul class="sp-side">' +
+      items
+        .map(function (x) {
+          var on = x === picked;
+          return (
+            '<li><button type="button" class="sp-side-row' +
+            (on ? ' sp-side-on' : '') +
+            '" data-act="form-pick" data-form-id="' +
+            esc(x.id) +
+            '" aria-pressed="' +
+            (on ? 'true' : 'false') +
+            '"><span class="sp-dot sp-dot-' +
+            dot(x) +
+            '" aria-hidden="true"></span><span class="sp-row-text"><span class="sp-side-title">' +
+            esc(x.title) +
+            '</span><span class="sp-row-sub">' +
+            esc(line(x)) +
+            '</span></span></button></li>'
+          );
+        })
+        .join('') +
+      '</ul>'
+    );
+  }
+
+  function startButton(q) {
+    return q.state === 'open'
+      ? '<button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="q-start" data-form-id="' +
+          esc(q.id) +
+          '">Start</button>'
+      : '';
+  }
+
+  // One questionnaire as a card: when, its title, what it asks and how long, Start.
+  function formCard(view, q, desk) {
+    var sub = desk
+      ? [view.course && view.course.name, aboutMinutes(q)].filter(Boolean).join(SEP)
+      : [q.line, aboutMinutes(q)].filter(Boolean).join(SEP);
+    var when = formWhen(q);
+    return (
+      '<section class="sp-form-card">' +
+      (when
+        ? '<span class="sp-flag sp-flag-' + (q.state === 'sent' ? 'back' : 'due') + '">' + esc(when) + '</span>'
+        : '') +
+      '<h2 class="sp-form-title" tabindex="-1">' +
+      esc(q.title) +
+      '</h2>' +
+      (sub ? '<p class="sp-form-sub">' + esc(sub) + '</p>' : '') +
+      (desk && q.line ? '<p class="sp-form-line">' + esc(q.line) + '</p>' : '') +
+      startButton(q) +
+      '</section>'
+    );
+  }
+
+  // A row of the phone's list: a mark, the title and its line; a button when it opens something.
+  function formRow(x, line, mark, act) {
+    var inner =
+      (mark ? '<span class="sp-form-mark sp-form-mark-' + mark[0] + '">' + mark[1] + '</span>' : '') +
+      '<span class="sp-row-text"><span class="sp-row-title">' +
+      esc(x.title) +
+      '</span><span class="sp-row-sub">' +
+      esc(line) +
+      '</span></span>';
+    return (
+      '<li class="sp-row">' +
+      (act
+        ? '<button type="button" class="sp-row-open" data-act="' +
+          act +
+          '" data-form-id="' +
+          esc(x.id) +
+          '">' +
+          inner +
+          NEXT_ARROW +
+          '</button>'
+        : '<span class="sp-row-open">' + inner + '</span>') +
+      '</li>'
+    );
+  }
+
+  function questionnairesBody(view, ui) {
+    var items = view.questionnaires;
+    var open = items.filter(function (q) {
+      return q.state === 'open';
+    });
+    var rest = items.filter(function (q) {
+      return q.state !== 'open';
+    });
+    var picked = pieceIn(items, ui.form);
+    return (
+      '<h1 class="sp-page-title" tabindex="-1">Questionnaires</h1>' +
+      '<div class="sp-split sp-forms">' +
+      formSide(items, picked, formWhen, function (q) {
+        return q.state === 'open' ? 'missing' : q.state === 'sent' ? 'back' : 'due';
+      }) +
+      '<div class="sp-forms-main"><div class="sp-forms-desk">' +
+      formCard(view, picked, true) +
+      '</div><div class="sp-forms-phone">' +
+      open
+        .map(function (q) {
+          return formCard(view, q, false);
+        })
+        .join('') +
+      (rest.length
+        ? '<ul class="sp-list">' +
+          rest
+            .map(function (q) {
+              return formRow(q, formWhen(q), q.state === 'sent' ? ['done', DONE_MARK] : ['soon', SOON_MARK], '');
+            })
+            .join('') +
+          '</ul>'
+        : '') +
+      '</div></div></div>'
+    );
+  }
+
+  /* One report as a card: its title (New until it is opened), when, the
+     class with the report's result as the teacher sent it, the comment. */
+  function reportCard(view, r) {
+    var shown = r.result.word || r.result.text;
+    return (
+      '<section class="sp-form-card"><div class="sp-report-head"><h2 class="sp-form-title" tabindex="-1">' +
+      esc(r.title) +
+      '</h2>' +
+      (r.isNew ? '<span class="sp-flag sp-flag-new">New</span>' : '') +
+      '</div><p class="sp-form-sub">' +
+      esc(reportWhen(r)) +
+      '</p>' +
+      (shown
+        ? '<div class="sp-report-result"><span class="sp-report-class">' +
+          esc((view.course && view.course.name) || '') +
+          '</span>' +
+          chipHtml(shown, r.result.level) +
+          '</div>'
+        : '') +
+      (r.comment ? '<p class="sp-report-comment">' + esc(r.comment) + '</p>' : '') +
+      '<button type="button" class="sp-btn sp-btn-tint sp-btn-big" data-act="r-open" data-form-id="' +
+      esc(r.id) +
+      '">See Your Report</button></section>'
+    );
+  }
+
+  function reportsBody(view, ui) {
+    var items = view.reports;
+    var picked = pieceIn(items, ui.form);
+    var line = function (r) {
+      return [r.isNew ? 'New' : '', reportWhen(r)].filter(Boolean).join(SEP);
+    };
+    return (
+      '<h1 class="sp-page-title" tabindex="-1">My Reports</h1>' +
+      '<div class="sp-split sp-forms">' +
+      formSide(items, picked, line, function (r) {
+        return r.isNew ? 'new' : 'due';
+      }) +
+      '<div class="sp-forms-main"><div class="sp-forms-desk">' +
+      reportCard(view, picked) +
+      '</div><div class="sp-forms-phone">' +
+      reportCard(view, items[0]) +
+      (items.length > 1
+        ? '<ul class="sp-list">' +
+          items
+            .slice(1)
+            .map(function (r) {
+              return formRow(r, fmtDate(r.issued, DAY), null, 'r-open');
+            })
+            .join('') +
+          '</ul>'
+        : '') +
+      '</div></div></div>'
+    );
+  }
 
   function bodyHtml(view, ui) {
     if (ui.waiting || !view) return '<p class="sp-lead sp-empty" role="status">' + esc(WAITING) + '</p>';
     var tab = TAB_BODIES[ui.tab] ? ui.tab : 'assignments';
+    if (tab === 'questionnaires' && (view.questionnaires || []).length) return questionnairesBody(view, ui);
+    if (tab === 'reports' && (view.reports || []).length) return reportsBody(view, ui);
     if (tab !== 'assignments') {
       return (
         '<h1 class="sp-page-title" tabindex="-1">' +
@@ -944,7 +1148,7 @@ window.StudentPageView = (function () {
   var TAB_IDS = { assignments: 1, learning: 1, questionnaires: 1, reports: 1 };
   var SEGMENT_IDS = { todo: 1, sent: 1, back: 1 };
   var FILTER_IDS = { all: 1, todo: 1, sent: 1, back: 1 };
-  var FEEDBACK_ACTS = { feedback: 1, whole: 1, 'feedback-close': 1, 'whole-close': 1, levels: 1 };
+  var FEEDBACK_ACTS = { feedback: 1, whole: 1, 'feedback-close': 1, 'whole-close': 1, levels: 1, 'form-pick': 1 };
   function has(map, key) {
     return typeof key === 'string' && Object.prototype.hasOwnProperty.call(map, key);
   }
@@ -969,6 +1173,7 @@ window.StudentPageView = (function () {
       if (!has(TAB_IDS, attr('data-tab'))) return null;
       next.tab = attr('data-tab');
       next.all = false;
+      next.form = '';
       var top = el.closest && el.closest('.sp-tabs-top');
       return { ui: next, focus: (top ? '.sp-tabs-top' : '.sp-tabs-bottom') + ' .sp-tab-on' };
     }
@@ -1010,6 +1215,14 @@ window.StudentPageView = (function () {
       if (act === 'whole-close' && open && hasFeedback(open)) return { ui: next, focus: '#sp-fb-title' };
       next.feedback = '';
       return { ui: next, focus: open ? '#' + domId(open.id) : '.sp-segment-on' };
+    }
+    if (act === 'form-pick') {
+      var list = view ? (next.tab === 'reports' ? view.reports : view.questionnaires) || [] : [];
+      var fid2 = attr('data-form-id');
+      var item = pieceIn(list, fid2);
+      if (!item || item.id !== fid2) return null;
+      next.form = item.id;
+      return { ui: next, focus: '.sp-forms-desk .sp-form-title' };
     }
     if (act === 'levels') {
       next.levels = !next.levels;
