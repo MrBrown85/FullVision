@@ -5023,3 +5023,86 @@ button.stu-bd-row:focus-visible {
     --gr-att: #ff9f45;
   }
 }
+
+/* Learner Profile: how the student sees their learning (redesign R6). One
+   1–4 scale: the teacher's level filled in its colour, the student's own
+   rating as the outline variant (design rule 5). */
+.lp-calib-lede {
+  margin: -8px 0 0;
+  font-size: var(--text-md);
+  color: var(--text-2);
+}
+.lp-calib {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.lp-calib-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 1.4fr);
+  align-items: center;
+  gap: 8px 16px;
+  padding: 14px 16px;
+}
+.lp-calib-row + .lp-calib-row {
+  border-top: 1px solid var(--border);
+}
+.lp-calib-head {
+  padding: 10px 16px;
+  background: var(--bg);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.lp-calib-name {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.lp-scale {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  max-width: 140px;
+}
+.lp-scale-cell {
+  display: block;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--seg-track, var(--border));
+  box-sizing: border-box;
+}
+.lp-scale.own .lp-scale-cell {
+  background: var(--surface);
+  border: 2px solid var(--border);
+}
+.lp-scale.own .lp-scale-cell.on {
+  background: transparent;
+  border-color: var(--text);
+}
+.lp-calib-word {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.lp-calib-note {
+  font-size: var(--text-md);
+  color: var(--text-2);
+}
+.lp-calib-note.talk {
+  font-weight: 600;
+  color: var(--text);
+}
+@media (max-width: 900px) {
+  .lp-calib-head {
+    display: none;
+  }
+  .lp-calib-row {
+    grid-template-columns: 1fr 1fr;
+  }
+  .lp-calib-name,
+  .lp-calib-note {
+    grid-column: 1 / -1;
+  }
+}
