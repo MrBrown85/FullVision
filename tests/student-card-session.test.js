@@ -574,6 +574,85 @@ describe('a reply for a card or a session that is no longer the current one is d
     expect(dev.store).toEqual({});
   });
 
+  it('the check has passed and the page is on its way, then No, That’s Not Me: that student is signed out, as Done does', async () => {
+    const dev = school();
+    let release;
+    const gate = new Promise(r => (release = r));
+    const tab = await dev.open('#P3R8-WDK4', async body => {
+      if (body.route === 'page') await gate;
+      return dev.fn.handle(body);
+    });
+    tab.type('#sp-ident', '0123456');
+    tab.tap('[data-act="card-yes"]');
+    await until(() => Object.keys(dev.store).length > 0, 'the session kept');
+    const token = JSON.parse(dev.store[KEY]).t;
+    tab.tap('[data-act="card-notme"]');
+    await tab.tick();
+    expect(tab.root().querySelector('.sp-big').textContent).toBe('Give This Card Back');
+    release();
+    await tab.settle();
+    expect(tab.root().querySelector('.sp-row')).toBeNull();
+    // Nothing of hers is left on the device, and the server has ended her session.
+    expect(dev.store).toEqual({});
+    expect(tab.calls.map(c => c.body)).toContainEqual({ route: 'done', session: token });
+    expect(dev.fn.state.sessions).toEqual({});
+    // The next person to open the page gets nobody's list.
+    const next = await dev.open('');
+    expect(next.calls).toEqual([]);
+    expect(text(next)).not.toContain('Energy Transfer Investigation');
+  });
+
+  it.each([
+    ['assessments', 'x'],
+    ['rubrics', 7],
+  ])('a page whose %s is not a list: the plain message and Try Again, not Checking… for good', async (field, value) => {
+    const dev = school();
+    const tab = await dev.open('#P3R8-WDK4', async body => {
+      const res = await dev.fn.handle(body);
+      if (body.route === 'page' && res && res.ok) return Object.assign({}, res, { [field]: value });
+      return res;
+    });
+    tab.type('#sp-ident', '0123456');
+    await tab.click('[data-act="card-yes"]');
+    await tab.settle();
+    expect(alertText(tab)).toBe(UNREACHED);
+    expect(tab.root().querySelector('[data-act="page-retry"]')).toBeTruthy();
+    expect(text(tab)).not.toContain('Checking');
+  });
+
+  it('Try Again on results, then Done: the signed-out screen is not drawn again when the results arrive', async () => {
+    const dev = school();
+    const page = dev.tab();
+    page.net.fail = src => /calc\.js$/.test(src);
+    await page.start('#P3R8-WDK4');
+    page.type('#sp-ident', '0123456');
+    await page.click('[data-act="card-yes"]');
+    expect(page.root().querySelector('[data-act="grades-retry"]')).toBeTruthy();
+    page.net.fail = () => false;
+    page.tap('[data-act="grades-retry"]');
+    page.tap('[data-act="card-done"]');
+    const shown = page.root().firstElementChild;
+    await page.settle();
+    // The screen Done drew is the one still showing, untouched.
+    expect(page.root().firstElementChild).toBe(shown);
+    expect(page.root().querySelector('.sp-row')).toBeNull();
+  });
+
+  it('another tab signs Omar in: the tab still showing Cece’s list takes it down', async () => {
+    const dev = school({ more: [omarCard()] });
+    const first = await signIn(dev);
+    const omar = await dev.open('#ABCD-EFGH');
+    omar.type('#sp-ident', '7654321');
+    await omar.click('[data-act="card-yes"]');
+    expect(JSON.parse(dev.store[KEY]).e).toBe(OMAR);
+    first.fire('storage');
+    first.T.checkSession();
+    await first.settle();
+    expect(first.root().querySelector('.sp-row')).toBeNull();
+    // Omar stays signed in: Cece's tab leaves without touching his session.
+    expect(JSON.parse(dev.store[KEY]).e).toBe(OMAR);
+  });
+
   it('another code typed under Is This You? while the check is on its way: the new card’s screen is ready to answer', async () => {
     const dev = school({ more: [omarCard()] });
     let release;
