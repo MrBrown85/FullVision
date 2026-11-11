@@ -148,7 +148,7 @@ describe('a real send: start, each file to its link, finish', () => {
     const dev = school();
     const page = await signIn(dev);
     const token = JSON.parse(dev.store[KEY]).t;
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'feedback']);
+    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'feedback', 'group-work']);
     expect(page.root().querySelector(piece(WORK.fair) + ' [data-act="send-open"]')).toBeTruthy();
     // A piece the class does not take work for says nothing of sending.
     expect(page.root().querySelector(piece(WORK.quick) + ' .sp-send-closed')).toBeNull();
@@ -197,6 +197,7 @@ describe('a real send: start, each file to its link, finish', () => {
       'page',
       'work',
       'feedback',
+      'group-work',
       'send-start',
       'send-finish',
       'work',
@@ -377,7 +378,17 @@ describe('a send survives a reload, within its two hours', () => {
 
     dev.answer = null;
     const again = await dev.open('');
-    expect(routes(again)).toEqual(['page', 'work', 'feedback', 'send-start', 'send-finish', 'work', 'file-links']);
+    // The send carries on beside `feedback`; the group's counts are asked once `feedback` has answered.
+    expect(routes(again)).toEqual([
+      'page',
+      'work',
+      'feedback',
+      'send-start',
+      'group-work',
+      'send-finish',
+      'work',
+      'file-links',
+    ]);
     expect(text(again, '#sp-send-title')).toBe('Sent to Your Teacher');
     expect(bodyOf(again, 'send-start')[0]).toMatchObject({ request_id: request, note: 'For Thursday.' });
     expect([...dev.fn.world.subs.values()].map(s => [s.state, s.files.length, s.note])).toEqual([
@@ -400,7 +411,7 @@ describe('a send survives a reload, within its two hours', () => {
     dev.clock = () => finishBy + 60 * 1000;
     const again = await dev.open('');
     expect(text(again, '#sp-send-title')).toBe('Not sent');
-    expect(routes(again)).toEqual(['page', 'work', 'feedback']);
+    expect(routes(again)).toEqual(['page', 'work', 'feedback', 'group-work']);
     await again.click('[data-act="send-restart"]');
     expect(text(again, '#sp-send-title')).toBe('Sent to Your Teacher');
     expect(bodyOf(again, 'send-start')[0].request_id).not.toBe(request);

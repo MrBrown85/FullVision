@@ -28,8 +28,13 @@
    Send until the server has them, so a reload or a dropped connection
    finishes the send within its two hours; after that the student sends
    again. Every sign-out (Done, idle, another tab, midnight) empties that
-   store (ruling 138). Mark Up, reflections, revisions and
-   group work stay Demo Mode's.
+   store (ruling 138).
+
+   A revision (S11-W1) goes the same three steps on its own routes:
+   `revise-start` with a request id of its own (never a `send-start` one),
+   the uploads, `revise-finish`; Unsend My Revision is `revise-unsend`.
+   Adding pages to a group's work (S12-W1) is an ordinary send. After
+   either, s/feedback.js asks again what the page shows of it.
 
    Every photo and PDF goes through shared/photo-shrink.js (one path for
    every upload): JPEG pages under 2 MB, a PDF turned into pages (30 pages
@@ -672,7 +677,9 @@
     return Object.assign({}, w.reply, {
       assessments: list(w.reply.assessments).map(function (a) {
         if (!a || !a.sent || typeof a.sent !== 'object') return a;
-        var mine = thumbs[a.sent.submission_id] || [];
+        // A revision handed in (S11-W1): its pages are the ones s/feedback.js fetched for Before and After.
+        var rev = typeof StudentPage.revisionPages === 'function' ? StudentPage.revisionPages(state, a.id) : null;
+        var mine = thumbs[a.sent.submission_id] || (rev && rev.revision.length ? rev.revision : []);
         return Object.assign({}, a, { sent: Object.assign({}, a.sent, { thumbs: mine }) });
       }),
     });
@@ -839,6 +846,7 @@
       enrollment: send.student,
       piece: send.id,
       replace: send.replace,
+      revision: !!send.revision, // a revision's send goes on through revise-start and revise-finish
       request: send.request,
       submission: send.submission,
       finish_by: send.finishBy,
@@ -986,7 +994,7 @@
         id: first.piece,
         student: student,
         replace: !!first.replace,
-        revision: false,
+        revision: first.revision === true,
         real: true,
         kept: true, // these pages are on the device already
         room: MAX_PAGES,
@@ -1097,9 +1105,11 @@
       request_id: send.request,
       pages: send.pages.map(sizeOf),
       note: send.note.slice(0, NOTE_MAX) || null,
-      followed_plan: p && p.plan && FOLLOWED[send.followed] ? send.followed : null,
     };
-    return askRoute(send.replace ? 'replace' : 'send-start', body, send.student).then(function (res) {
+    // A revision has no plan to answer (S11-W1); its request id is its own, made for this send.
+    if (!send.revision) body.followed_plan = p && p.plan && FOLLOWED[send.followed] ? send.followed : null;
+    var route = send.revision ? 'revise-start' : send.replace ? 'replace' : 'send-start';
+    return askRoute(route, body, send.student).then(function (res) {
       if (!res || res.ok !== true) return refused(send, res);
       // Handed in already: an earlier try's finish went through and its answer was lost.
       if (res.state === 'sent') return handedIn(send, clock());
@@ -1180,8 +1190,8 @@
         return pg.fileId;
       }),
     };
-    return askRoute('send-finish', body, send.student).then(function (res) {
-      if (res && res.ok === true) return handedIn(send, Date.parse(String(res.sent_at || '')) || clock());
+    return askRoute(send.revision ? 'revise-finish' : 'send-finish', body, send.student).then(function (res) {
+      if (res && res.ok === true) return handedIn(send, Date.parse(String(res.sent_at || '')) || clock(), res);
       if (res && res.error === 'missing_pages') {
         // The server does not have these yet: they go again.
         var missing = list(res.missing);
@@ -1202,13 +1212,28 @@
     });
   }
 
-  function handedIn(send, at) {
+  function handedIn(send, at, res) {
     forget(send);
     send.busy = false;
     send.sentAt = at;
     send.step = 'sent';
     draw(send, '#sp-send-title');
     loadWork();
+    // A revision in, or pages added to a group's work: s/feedback.js asks again what the page shows of it.
+    if (typeof StudentPage.workChanged === 'function') {
+      StudentPage.workChanged(
+        send.id,
+        send.revision
+          ? {
+              sent: true,
+              version: res && res.version,
+              sent_at: (res && res.sent_at) || new Date(at).toISOString(),
+              late: !!(res && res.late === true),
+              note: send.note.slice(0, NOTE_MAX) || null,
+            }
+          : null,
+      );
+    }
   }
 
   function expire(send) {
@@ -1229,7 +1254,11 @@
     cannot_change: 'Your teacher added this work, so it can’t be changed here. Ask your teacher.',
     grading_started: 'Your teacher has started grading this. Ask your teacher instead.',
     class_full: 'Your class can’t take any more photos right now. Ask your teacher.',
+    // A revision (S11-W1): the request was taken back, or it is done.
+    no_revision: 'Your teacher isn’t asking for a revision of this one now. Ask your teacher if you’re not sure.',
   };
+  // revise-finish: the teacher took the request back and asked again while the pages went up (the contract's words).
+  var REQUEST_CHANGED = 'Your teacher changed what to fix. Read it again, then send your revision.';
   var SESSION_OVER = { signed_out: 1, card_stopped: 1, card_expired: 1, closed: 1 };
   var NOT_FOUND = 'This one can’t take your work right now. Ask your teacher.';
   var NOT_UNDERSTOOD = 'Something went wrong sending this. Try again later, or ask your teacher.';
@@ -1256,9 +1285,17 @@
           ' Hand it in on paper.',
       );
     }
+    if (e === 'request_changed' && send.revision) {
+      // The pages were dropped: the next press is a fresh revise-start, with a new request id.
+      send.request = '';
+      forget(send);
+      stop(send, 'check', REQUEST_CHANGED);
+      return reaskRevision(send);
+    }
     if (has(FOR_GOOD, e)) {
       forget(send);
       stop(send, 'check', FOR_GOOD[e]);
+      if (send.revision) reaskRevision(send);
       return loadWork();
     }
     if (e === 'too_many_pages') {
@@ -1302,6 +1339,11 @@
     return stop(send, 'notsent');
   }
 
+  // What the teacher asks of a revision may have changed: s/feedback.js asks `feedback` again.
+  function reaskRevision(send) {
+    if (typeof StudentPage.workChanged === 'function') StudentPage.workChanged(send.id, null);
+  }
+
   function has(map, key) {
     return typeof key === 'string' && Object.prototype.hasOwnProperty.call(map, key);
   }
@@ -1311,13 +1353,23 @@
     S.sendAsk = { kind: 'unsend', id: id, busy: true };
     StudentPage.paint('#sp-send-ask-title');
     var student = S.page.student.id;
-    return askRoute('unsend', { assessment_id: id }).then(function (res) {
+    // Unsend My Revision (S11-W1): the revision's own route; the first version and its grade stay.
+    var p = pieceOf(id);
+    var revision = !!(p && p.revision && p.revision.state === 'sent');
+    return askRoute(revision ? 'revise-unsend' : 'unsend', { assessment_id: id }, student).then(function (res) {
       if (!S || !S.page || S.page.student.id !== student) return;
       var e = res && res.ok === false && typeof res.error === 'string' ? res.error : res && res.ok ? '' : 'network';
+      if (e === 'other_student') {
+        S.sendAsk = null; // another student is signed in now: nothing of this one's is asked
+        return;
+      }
       if (has(SESSION_OVER, e)) {
         S.sendAsk = null;
         if (typeof StudentPage.sessionRefused === 'function') StudentPage.sessionRefused({ ok: false, error: e });
         return;
+      }
+      if (revision && e !== 'network' && e !== 'server' && typeof StudentPage.workChanged === 'function') {
+        StudentPage.workChanged(id, e ? null : { unsent: true });
       }
       if (!e) {
         S.sendAsk = null;

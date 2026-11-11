@@ -2044,6 +2044,12 @@
     reflect: 1,
     reply: 1,
     'answer-seen': 1,
+    // Revisions and group work (S11-W1, S12-W1; s/send.js and s/feedback.js).
+    'revise-start': 1,
+    'revise-finish': 1,
+    'revise-unsend': 1,
+    'group-work': 1,
+    'group-links': 1,
   };
   function askClass(route, body, enrollment) {
     if (S.demo || !session || !has(CLASS_ROUTES, route)) return Promise.resolve({ ok: false, error: 'signed_out' });
