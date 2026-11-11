@@ -77,6 +77,8 @@ create table course (
   curriculum_tags  text[],                                         -- BC bank course keys the class is linked to, e.g. {HIST12} (20261102_course_curriculum_tags)
   folders_count_as_one boolean not null default true,             -- overall averages each folder first; false: plain mean of every competency (20261102_folders_count_as_one)
   courses_count_equally boolean not null default false,           -- combined class: roll up each course on its own, then average the courses (20261102_courses_count_equally)
+  reflect_on_feedback boolean not null default false,             -- Reflect on Feedback, Class Settings › Student Page (2026111120_markup_reflect_revise, Batch C; not applied when this was written)
+  show_my_learning boolean not null default false,                -- Show My Learning: the student page shows the student's own skills and grade, returned work only (2026111120)
   student_page_enabled boolean not null default false,            -- the student page build switch; off: every save is returned at once (2026110902_grade_return)
   return_grades    text default 'on_return'                        -- 'on_return' When I Return Them | 'on_save' As Soon As I Save | null no choice made, works as on_save;
                    check (return_grades is null or return_grades in ('on_return', 'on_save')), -- classes from before 2026-11-09 are null (2026110902_grade_return)
@@ -1019,6 +1021,90 @@ create table support_report (
   created_at   timestamptz not null default now()
 );
 
+-- Mark Up, Reflect on Feedback, Revisions (2026111120_markup_reflect_revise,
+-- Batch C, first file; needs Batch B's submission tables; not applied when
+-- this was written). No foreign key to assessment, enrollment or course, as
+-- grade_return and submission have none: every write is made under the
+-- class's lock, and triggers on assessment and enrollment delete the rows
+-- (work_feedback_gone). Nobody reads these through the API (row security on,
+-- no policy, no grant). Teachers: set_course_feedback_options, save_markup,
+-- list_assessment_markup, return_work (return_grades, then the marks),
+-- return_for_revision, set_revision_request, cancel_revision,
+-- answer_reflection, list_course_feedback. Students, through the
+-- student-submit edge function: student_submit.feedback, markup, reflect,
+-- reply, revision_start, revision_finish, revision_unsend, group_work,
+-- group_file_links. A student is sent only markup.given, never working, and
+-- only their own (and their group's) pages. A revision is the next version
+-- of the piece's submission (submission.version 2, 3). The second file
+-- (2026111121_markup_revise_grade_changes, waits for the owner) gives marks
+-- and closes a finished revision request on every return path; it writes
+-- no grade row. Hiding a grade during a revision is not in Batch C.
+-- C1 also replaces Batch B's student_submit._grading_started (not yet decided
+-- by the owner): a page carrying the teacher's marks counts as grading
+-- started, so the student cannot Unsend or Replace it.
+-- The contract: migrations/local-test/batch-c-contract.md.
+create table markup (
+  file_id       uuid        primary key references submission_file(id) on delete cascade, -- the page; its marks go with it
+  course_id     uuid        not null,                               -- the page's piece, for lookups
+  assessment_id uuid        not null,
+  enrollment_id uuid        not null,
+  working       jsonb,                                              -- the teacher's copy: { v: 1, marks: [ { type: pen|highlight|note|tick|cross, ... } ] }; never sent to a student
+  working_rev   integer     not null default 0,                     -- save_markup's base_rev compares with it
+  working_at    timestamptz,
+  given         jsonb,                                              -- the student's copy, set when the work is returned
+  given_rev     integer,                                            -- the working_rev it was given at
+  given_at      timestamptz,
+  created_at    timestamptz not null default now()
+  -- indexes on (assessment_id, enrollment_id), (enrollment_id), (course_id)
+);
+create table revision_request (
+  id            uuid        primary key default gen_random_uuid(),
+  course_id     uuid        not null,
+  assessment_id uuid        not null,
+  enrollment_id uuid        not null,
+  state         text        not null default 'open',                -- open | done (its revision's grade was returned) | cancelled; sent and grading are read from the submissions
+  what_to_fix   text        not null,                               -- 1..2000 characters
+  revise_by     date,
+  criterion_ids uuid[]      not null default '{}',                  -- criteria of the piece's rubric
+  keep_grade    boolean     not null default true,                  -- always true: Hide is not in Batch C (a request for it answers hide_not_available)
+  first_submission_id uuid,                                         -- the version it was asked of (null: nothing handed in)
+  first_version smallint    not null default 1,
+  first_grade   jsonb,                                              -- that version's grade as the student had it (a grade copy); Before and After
+  first_returned_at timestamptz,
+  grade_mark    text,                                               -- md5 of grade_return.working_copy when the revision came in: grading has started once it differs
+  revision_in_at timestamptz,                                       -- when the revision now in came in
+  in_returned_at timestamptz,                                       -- grade_return.returned_at then: a Return since has changed it (returned)
+  created_by    uuid,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  closed_at     timestamptz                                         -- there exactly when state is not open
+  -- unique (assessment_id, enrollment_id) where state = 'open'; indexes on (assessment_id), (enrollment_id), (course_id)
+);
+create table feedback_reflection (
+  id            uuid        primary key default gen_random_uuid(),
+  course_id     uuid        not null,
+  assessment_id uuid        not null,
+  enrollment_id uuid        not null,                               -- unique with assessment_id: one per student per piece
+  makes_sense   text        not null,                               -- yes | not_sure: the student's own words from here down to went_well
+  question      text,                                               -- with not_sure; 1000 characters at most
+  plan          text,                                               -- with yes, or later with Make My Plan (reply): Your Plan From Last Time on the next piece
+  plan_at       timestamptz,                                        -- when the plan was last written; the newest is Your Plan From Last Time
+  went_well     text,
+  sent_at       timestamptz not null default now(),
+  answer        text,                                               -- the teacher's answer (Send Answer); sent to the student once written, unless answer_only_me
+  answered_at   timestamptz,
+  answer_only_me boolean    not null default false,                 -- Only Me: the teacher's own note, never sent
+  answer_seen_at timestamptz,                                       -- the student's page showed the answer (answer_seen)
+  sense_now     text,                                               -- Does It Make Sense Now?: yes | not_sure
+  sense_now_at  timestamptz,
+  follow_up     text,                                               -- one more question, with not_sure
+  follow_up_answer text,
+  follow_up_answered_at timestamptz,
+  follow_up_only_me boolean not null default false,
+  follow_up_answer_seen_at timestamptz,
+  updated_at    timestamptz not null default now()
+);
+
 -- ─── Extensions + cron ──────────────────────────────────────────────────────
 -- pg_cron enabled (migration fullvision_v2_enable_pg_cron).
 -- Job `fv_retention_cleanup_daily` runs at 03:17 UTC calling fv_retention_cleanup().
@@ -1035,6 +1121,9 @@ create table support_report (
 -- `category_weight_sum_check(_update)` deferred constraint triggers on category → fv_check_category_weight_sum()
 -- `score_audit_trigger`         after  update on score          → _score_audit_diff(...)
 -- `term_rating_audit_trigger`   after  update on term_rating    → _term_rating_audit_field(...)
+-- `work_feedback_gone`          after  delete (row) on enrollment, assessment → _work_feedback_gone(): the class lock, then its revision requests and reflections go (2026111120)
+-- `work_feedback_truncate`      after  truncate on enrollment, assessment → _work_feedback_truncated()
+-- `markup_given_on_insert|return` after insert of a returned row, or update of returned_at to a new date on a row that is not a draft, on grade_return (a Return) → _markup_on_return(): the marks on that piece are given and a finished revision request is stored done (2026111121, waits for the owner)
 -- `grade_return_insert|update|delete` after each statement on score, tag_score, rubric_score, rubric_check_score → _grade_return_on_change(): the class lock, then working_copy against the grade now
 -- `grade_return_gone`           after  delete (row) on enrollment, assessment → _grade_return_gone(): the class lock, then its grade_return rows go
 -- `grade_return_repoint`        after  update (row) on tag_score, rubric_score, rubric_check_score when its tag, criterion or check id changes → _grade_return_repoint(part, id column); acts only inside move_rubric_scores
