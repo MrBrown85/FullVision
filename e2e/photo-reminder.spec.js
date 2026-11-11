@@ -50,12 +50,21 @@ test.describe('The photo reminder (Demo Mode)', () => {
     expect(requests).toEqual([]);
   });
 
-  test('with the build switch off, or Send Work off, the Dashboard has no reminder', async ({ page }) => {
+  test('with the build switch off the Dashboard has no reminder; with photos kept it shows with Send Work off too', async ({
+    page,
+  }) => {
     await dashboard(page);
     await expect(page.locator('.photo-reminder')).toHaveCount(0);
+    // Send Work off, the sample's photos kept: still deleted on June 30 (ruling 108's follow-up).
     await page.evaluate(cid => setStudentPageSwitch(cid, true, 'on_return'), CID);
+    expect(await page.evaluate(cid => getCourseSendWork(cid).send_work, CID)).toBe(false);
     await dashboard(page);
-    await expect(page.locator('.photo-reminder')).toHaveCount(0);
+    await expect(page.locator('#dash-photo-reminder .photo-reminder-text')).toHaveText(LINE);
+    if (SHOTS) await page.screenshot({ path: SHOTS + '/S8-keep-photos-send-work-off-dashboard-1366.png' });
+    await page.locator('#dash-photo-reminder').getByRole('button', { name: 'Change the Date' }).click();
+    await expect(page.locator('#sp-keep-end_of_year')).toBeFocused();
+    await expect(page.locator('#sp-send-switch')).not.toBeChecked();
+    if (SHOTS) await page.screenshot({ path: SHOTS + '/S8-keep-photos-send-work-off-class-settings-1366.png' });
   });
 
   test('a week before June 30 it shows on both screens; Change the Date and Dismiss work', async ({ page }) => {

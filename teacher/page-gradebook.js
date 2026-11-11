@@ -3670,19 +3670,14 @@ window.PageGradebook = (function () {
   }
 
   /* S8-F1: how many students have photos sent for `aid`, which Delete
-     Assessment deletes with it. Counted from the read side in shared/data.js
-     (getCourseSubmissions), students not pages: a submission with at least one
-     page, whoever sent it. 0, and the dialog reads as it always has, while the
-     class's build switch is off or nothing has been sent. Send Work is not
-     asked: photos sent before it was turned off are still deleted. */
+     Assessment deletes with it: students not pages, whoever sent it
+     (CmStudentPage.studentsWithPhotos, the one question). 0, and the dialog
+     reads as it always has, while the class's build switch is off or nothing
+     has been sent. Send Work is not asked: photos sent before it was turned
+     off are still deleted. */
   function _studentsWithSentPhotos(cid, aid) {
-    if (typeof getCourseSubmissions !== 'function') return 0;
-    if (typeof getReturnSettings !== 'function' || !getReturnSettings(cid).student_page) return 0;
-    var who = {};
-    (getCourseSubmissions(cid).submissions || []).forEach(function (s) {
-      if (s && s.assessment_id === aid && Array.isArray(s.files) && s.files.length) who[s.enrollment_id] = true;
-    });
-    return Object.keys(who).length;
+    if (!aid || typeof CmStudentPage === 'undefined' || !CmStudentPage.studentsWithPhotos) return 0;
+    return Object.keys(CmStudentPage.studentsWithPhotos(cid, aid)).length;
   }
 
   /* Delete Assignment hides the column and offers Undo (the toast's button or

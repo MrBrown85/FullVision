@@ -37,7 +37,8 @@ test('with Send Work off the form has no Student Work card; on, it does, and its
   await page.goto('/dashboard?manage=student-page&course=sci8');
   const sw = page.locator('#sp-send-switch');
   await expect(sw).not.toBeChecked();
-  await expect(page.locator('#sp-keep-hint')).toHaveCount(0);
+  // The sample has photos kept, so Keep Photos Until shows with Send Work off too (ruling 108's follow-up).
+  await expect(page.locator('#sp-keep-hint')).toContainText('Photos of student work in this class are deleted on');
   await sw.check();
   await expect(page.locator('#sp-keep-hint')).toContainText('Photos of student work in this class are deleted on');
   await expect(page.locator('#sp-keep-end_of_year')).toHaveAttribute('aria-checked', 'true');
