@@ -428,6 +428,11 @@ describe('the export stays complete', () => {
     getStudentSubmission: 'student work, kept out with its photos',
     getAssessmentStudentWork: 'student work settings, kept out with the photos',
     getStudentWork: 'the student page’s view of student work',
+    // Group work (S12-T1): student work read by group, kept out with its photos.
+    getStudentWorkGroup: 'the group on the assessment, already in the class file',
+    getGroupSubmissions: 'student work, kept out with its photos',
+    getGroupWorkFiles: 'student work, kept out with its photos',
+    getStudentGroupWork: 'the student page’s view of group work',
     // Mark Up (S9): drawing data over the photos, kept out with them.
     getPageMarkup: 'Mark Up on a page of student work, kept out with the photos',
     getAssessmentMarkup: 'Mark Up on student work, kept out with the photos',
