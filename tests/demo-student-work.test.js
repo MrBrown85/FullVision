@@ -18,6 +18,8 @@ import { newBankIndex } from './helpers/bc-bank-fixture.js';
 const CID = 'sci8';
 const LAB = 'sci8a1';
 const KMT = 'sci8a4';
+// Light Refraction Lab, the piece with work waiting (ruling 115): 6 more submissions.
+const LIGHT = 'sci8a21';
 let wasDemo;
 
 function seedDemo() {
@@ -75,7 +77,7 @@ describe('the sample work, in the shape of list_course_submissions', () => {
         'students_send',
       ]),
     );
-    expect(all.submissions).toHaveLength(10);
+    expect(all.submissions).toHaveLength(16);
     all.submissions.forEach(s => {
       expect(Object.keys(s).sort()).toEqual([
         'assessment_id',
@@ -196,7 +198,8 @@ describe('the sample work, in the shape of list_course_submissions', () => {
       CID,
       getAssessments(CID).filter(a => a.id !== LAB),
     );
-    expect(getCourseSubmissions(CID).submissions).toEqual([]);
+    // Only Light Refraction Lab's work is left.
+    expect(getCourseSubmissions(CID).submissions.map(s => s.assessment_id)).toEqual(Array(6).fill(LIGHT));
     expect(getStudentSubmission(CID, 'st1', LAB)).toBeNull();
   });
 });
@@ -212,7 +215,7 @@ describe('the student page’s work(...)', () => {
   it('with Send Work off, as it starts: the work sent shows, nothing is open and nothing can change', () => {
     const w = getStudentWork(CID, 'st1');
     expect(w.send_work).toBe(false);
-    expect(w.assessments.map(a => a.id)).toEqual([LAB, KMT]);
+    expect(w.assessments.map(a => a.id)).toEqual([LAB, KMT, LIGHT]);
     expect(w.assessments[0]).toMatchObject({ open: false, sent: { pages: 1, can_change: false } });
     expect(getStudentWork(CID, 'st11').assessments[0]).toMatchObject({ open: false, sent: null });
   });
@@ -222,7 +225,7 @@ describe('the student page’s work(...)', () => {
     const w = getStudentWork(CID, 'st1');
     expect(Object.keys(w).sort()).toEqual(['assessments', 'ok', 'send_work', 'v']);
     expect(w).toMatchObject({ ok: true, v: 1, send_work: true });
-    expect(w.assessments.map(a => a.id)).toEqual([LAB, KMT]);
+    expect(w.assessments.map(a => a.id)).toEqual([LAB, KMT, LIGHT]);
     const lab = w.assessments[0];
     expect(Object.keys(lab).sort()).toEqual([
       'closes_on',
@@ -344,7 +347,7 @@ describe('outside Demo Mode, and the store’s limits', () => {
   it('refuses a submission of more than 30 pages', () => {
     const files = Array.from({ length: 31 }, (_, i) => ({ id: 'f' + i, page: i + 1 }));
     expect(saveDemoStudentWork(CID, { submissions: [{ id: 's', state: 'sent', files }] })).toBe(false);
-    expect(getCourseSubmissions(CID).submissions).toHaveLength(10);
+    expect(getCourseSubmissions(CID).submissions).toHaveLength(16);
     expect(saveDemoStudentWork(CID, { submissions: [{ id: 's', state: 'sent', files: files.slice(0, 30) }] })).toBe(
       true,
     );
@@ -361,7 +364,7 @@ describe('outside Demo Mode, and the store’s limits', () => {
     localStorage.removeItem('gb-student-work-sci8');
     expect(getCourseSubmissions(CID).submissions).toEqual([]);
     seedIfNeeded();
-    expect(getCourseSubmissions(CID).submissions).toHaveLength(10);
+    expect(getCourseSubmissions(CID).submissions).toHaveLength(16);
   });
 
   it('goes with the class when the class is deleted', async () => {

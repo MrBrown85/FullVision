@@ -157,10 +157,11 @@ jobs:
       # failure resolving security.ubuntu.com"), every browser job failed
       # before a test ran. GitHub's Ubuntu image already carries what
       # Chromium needs, so fall back to Chromium alone; the tests then say
-      # whether it runs.
+      # whether it runs. The first try gives up after two minutes: unreachable
+      # servers made apt retry for ten.
       - name: Install Chromium
         run: |
-          if ! npx playwright install --with-deps chromium; then
+          if ! timeout 120 npx playwright install --with-deps chromium; then
             echo "::warning::Could not install Chromium's Linux packages; installing Chromium alone."
             npx playwright install chromium
           fi
