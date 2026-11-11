@@ -3741,6 +3741,41 @@ button.stu-bd-row:focus-visible {
 .stu-ov-band.now {
   background: var(--text-3);
 }
+/* Level colours on levels only (design rule 3): the grade right now, its
+   band on the strip, and each marked score. */
+.stu-ov-band.now.stu-ov-lv-1 {
+  background: var(--score-1);
+}
+.stu-ov-band.now.stu-ov-lv-2 {
+  background: var(--score-2);
+}
+.stu-ov-band.now.stu-ov-lv-3 {
+  background: var(--score-3);
+}
+.stu-ov-band.now.stu-ov-lv-4 {
+  background: var(--score-4);
+}
+.stu-ov-lv-1 .stu-ov-letter,
+.stu-ov-lv-1 .stu-ov-pct {
+  color: var(--score-1-text);
+}
+.stu-ov-lv-2 .stu-ov-letter,
+.stu-ov-lv-2 .stu-ov-pct {
+  color: var(--score-2-text);
+}
+.stu-ov-lv-3 .stu-ov-letter,
+.stu-ov-lv-3 .stu-ov-pct {
+  color: var(--score-3-text);
+}
+.stu-ov-lv-4 .stu-ov-letter,
+.stu-ov-lv-4 .stu-ov-pct {
+  color: var(--score-4-text);
+}
+.stu-ov-row-main-score.stu-ov-chip-lv {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 4px;
+}
 .stu-ov-gap {
   position: absolute;
   top: 0;
@@ -3795,6 +3830,18 @@ button.stu-bd-row:focus-visible {
 .stu-ov-miss-n,
 .stu-ov-miss-cost {
   color: var(--ov-att-text);
+}
+/* Nothing missing is not a warning: the tile drops its orange. */
+.stu-ov-miss.none {
+  background: var(--surface);
+  border-color: var(--border);
+}
+.stu-ov-miss.none .stu-ov-label,
+.stu-ov-miss.none .stu-ov-sub {
+  color: var(--text-2);
+}
+.stu-ov-miss.none .stu-ov-miss-n {
+  color: var(--text);
 }
 .stu-ov-miss-n {
   font-size: 4.75rem;

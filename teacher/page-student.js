@@ -931,7 +931,12 @@ window.PageStudent = (function () {
       var w = top - b.min;
       var isNow = nowP >= b.min && nowP < (i < bands.length - 1 ? top : 101);
       var isProj = projP != null && projP >= b.min && projP < (i < bands.length - 1 ? top : 101);
-      track += '<span class="stu-ov-band' + (isNow ? ' now' : '') + '" style="flex:' + w + ' 1 0"></span>';
+      track +=
+        '<span class="stu-ov-band' +
+        (isNow ? ' now' + (ov.now.level > 0 ? ' stu-ov-lv-' + roundLevel(ov.now.level) : '') : '') +
+        '" style="flex:' +
+        w +
+        ' 1 0"></span>';
       names +=
         '<span class="stu-ov-band-name' +
         (isNow ? ' now' : isProj ? ' proj' : '') +
@@ -974,7 +979,9 @@ window.PageStudent = (function () {
     var html =
       '<div class="stu-ov-card stu-ov-grade"><div class="stu-ov-pair">' +
       '<div class="stu-ov-now"><div class="stu-ov-label">Your Grade Right Now</div>' +
-      '<div class="stu-ov-big">' +
+      '<div class="stu-ov-big' +
+      (now.level > 0 ? ' stu-ov-lv-' + roundLevel(now.level) : '') +
+      '">' +
       big +
       '</div>' +
       (now.hasPct && now.showLevel ? '<div class="stu-ov-level">' + _levelPill(cid, now.level) + '</div>' : '') +
@@ -1009,7 +1016,9 @@ window.PageStudent = (function () {
 
   function _ovMissingTileHtml(ov) {
     return (
-      '<div class="stu-ov-card stu-ov-miss"><div class="stu-ov-label">Missing</div>' +
+      '<div class="stu-ov-card stu-ov-miss' +
+      (ov.missing.length ? '' : ' none') +
+      '"><div class="stu-ov-label">Missing</div>' +
       '<div class="stu-ov-miss-n">' +
       ov.missing.length +
       '</div>' +
@@ -1088,11 +1097,17 @@ window.PageStudent = (function () {
     if (st === 'NS') return { main: ov.now.hasPct ? '0%' : 'Missing', sub: 'Not in yet', cls: 'miss' };
     if (st === 'EXC') return { main: 'Doesn’t count', sub: '', cls: 'quiet' };
     if (!cell || cell.kind === 'none') return { main: 'Not marked', sub: '', cls: 'quiet' };
+    // A marked score wears its level's colour (calc.js gives the level).
+    var lv = cell.level > 0 ? roundLevel(cell.level) : 0;
     if (cell.kind === 'points') {
       var max = a.maxPoints || 100;
-      return { main: formatPointsPercent(cell.value, max), sub: formatPoints(cell.value) + ' / ' + formatPoints(max) };
+      return {
+        main: formatPointsPercent(cell.value, max),
+        sub: formatPoints(cell.value) + ' / ' + formatPoints(max),
+        lv: lv,
+      };
     }
-    return { main: cell.text, sub: '' };
+    return { main: cell.text, sub: '', lv: lv };
   }
 
   /* An open piece's rubric: one 1–4 scale per criterion, and one next
@@ -1292,7 +1307,9 @@ window.PageStudent = (function () {
         esc(_shortDay(a.date)) +
         '</span></span><span class="stu-ov-row-score' +
         (sc.cls ? ' ' + sc.cls : '') +
-        '"><span class="stu-ov-row-main-score">' +
+        '"><span class="stu-ov-row-main-score' +
+        (sc.lv ? ' stu-ov-chip-lv stu-level-' + sc.lv : '') +
+        '">' +
         esc(sc.main) +
         '</span>' +
         (sc.sub ? '<span class="stu-ov-row-sub">' + esc(sc.sub) + '</span>' : '') +
