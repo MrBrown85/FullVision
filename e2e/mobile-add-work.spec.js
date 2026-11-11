@@ -222,3 +222,35 @@ test('Add Work, Then Grade It from a student with nothing in', async ({ page }) 
   await expect(card.locator('.m-work-sent')).toHaveText(/^Submitted .+ · 1 photo$/);
   await expect(card.locator('[data-action="m-add-work"]')).toHaveCount(0);
 });
+
+test('Reset Demo Data deletes the photos a teacher added on the phone', async ({ page }) => {
+  await openPhone(page);
+  const sid = (await notIn(page))[0];
+  // Add Work keeps its photos in the photo queue (IndexedDB), not in the class data.
+  const kept = await page.evaluate(
+    async ({ sid, LAB }) => {
+      const b = new Blob([new Uint8Array([255, 216, 255, 224])], { type: 'image/jpeg' });
+      const res = await addStudentWorkPages('sci8', sid, LAB, [
+        { blob: b, thumb: b, hash: 'a'.repeat(64), width: 10, height: 10 },
+      ]);
+      await PhotoQueue.ready();
+      return { result: res.result, queued: PhotoQueue.stats().queued };
+    },
+    { sid, LAB },
+  );
+  expect(kept).toEqual({ result: 'sent', queued: 1 });
+
+  await page.locator('.m-screen .m-demo-pill').click();
+  const sheet = page.locator('#m-sheet-container .m-sheet.m-sheet-visible');
+  await sheet.getByRole('button', { name: 'Reset Demo Data' }).click();
+  // The reset reloads the page once the photos are gone.
+  const reloaded = page.waitForEvent('load');
+  await sheet.getByRole('button', { name: 'Reset', exact: true }).click();
+  await reloaded;
+  await expect(page.locator('.m-card-stack-item').first()).toBeVisible();
+  const left = await page.evaluate(async () => {
+    await PhotoQueue.ready();
+    return { queued: PhotoQueue.stats().queued, rows: (await PhotoQueue.indexedDbStore().list()).length };
+  });
+  expect(left).toEqual({ queued: 0, rows: 0 });
+});

@@ -1182,9 +1182,20 @@
       if (action === 'm-demo-reset-confirm') {
         MC.dismissSheet();
         if (typeof resetDemoData === 'function') {
-          resetDemoData().then(function () {
-            window.location.reload();
-          });
+          resetDemoData()
+            .then(function () {
+              // Photos added in Demo Mode are kept on the device in the photo
+              // queue, not in the class data: delete them too. Demo Mode only
+              // (resetDemoData does nothing outside it), and entering Demo Mode
+              // already erased this device's unsent work.
+              var q = window.PhotoQueue;
+              if (typeof isDemoMode === 'function' && isDemoMode() && q && typeof q.wipe === 'function') {
+                return q.wipe();
+              }
+            })
+            .then(function () {
+              window.location.reload();
+            });
         }
         return;
       }
