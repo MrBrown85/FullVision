@@ -34,10 +34,10 @@ begin
     -- Supabase's storage tables, with the columns this file writes and reads.
     if to_regclass('storage.buckets') is null or to_regclass('storage.objects') is null
        or (select count(*) from pg_attribute
-            where attrelid = 'storage.buckets'::regclass and not attisdropped
+            where attrelid = to_regclass('storage.buckets') and not attisdropped
               and attname in ('id', 'name', 'public', 'file_size_limit', 'allowed_mime_types')) <> 5
        or (select count(*) from pg_attribute
-            where attrelid = 'storage.objects'::regclass and not attisdropped
+            where attrelid = to_regclass('storage.objects') and not attisdropped
               and attname in ('bucket_id', 'name')) <> 2 then
         raise exception 'storage.buckets or storage.objects is not the shape this file was written for. Nothing was changed.';
     end if;

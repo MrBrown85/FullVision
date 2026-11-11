@@ -56,7 +56,7 @@ begin
     -- storage.objects to see which files are really there.
     if to_regclass('storage.objects') is null or to_regclass('storage.buckets') is null
        or (select count(*) from pg_attribute
-            where attrelid = 'storage.objects'::regclass and not attisdropped
+            where attrelid = to_regclass('storage.objects') and not attisdropped
               and attname in ('bucket_id', 'name', 'metadata')) <> 3 then
         raise exception 'storage.objects is not there with bucket_id, name and metadata. Nothing was changed.';
     end if;
@@ -65,7 +65,7 @@ begin
     -- that role reads past row security they would see no file at all, and
     -- every send would be answered "missing pages".
     if not (select r.rolsuper or r.rolbypassrls from pg_roles r where r.rolname = current_user)
-       and (select c.relowner::regrole::text from pg_class c where c.oid = 'storage.objects'::regclass) <> current_user then
+       and (select c.relowner::regrole::text from pg_class c where c.oid = to_regclass('storage.objects')) <> current_user then
         raise exception 'the role applying this file (%) cannot read storage.objects past its row security, so no upload could ever be confirmed. Nothing was changed.', current_user;
     end if;
 
@@ -141,6 +141,13 @@ begin
         loop
             raise exception '%.% already exists, and public.submission does not: something else made it. Nothing was changed.', _col.tbl, _col.attname;
         end loop;
+        -- CREATE OR REPLACE TRIGGER below would quietly take over a trigger
+        -- of the same name.
+        if exists (select 1 from pg_trigger t
+                    where not t.tgisinternal and t.tgname in ('submission_gone', 'submission_truncate')
+                      and t.tgrelid in ('public.assessment'::regclass, 'public.enrollment'::regclass)) then
+            raise exception 'a trigger named submission_gone or submission_truncate is already on assessment or enrollment, and public.submission does not exist: something else made it. Nothing was changed.';
+        end if;
     end if;
 end
 $guard$;
@@ -1707,24 +1714,25 @@ grant execute on function public.mark_handed_in_paper(uuid, uuid[], uuid) to aut
 grant execute on function public.delete_submission(uuid, uuid) to authenticated, service_role;
 grant execute on function public.rotate_submission_page(uuid, integer, uuid) to authenticated, service_role;
 
--- Helpers in public: nobody is granted them. They are called by the
+-- Helpers in public: nobody is granted them, the service role included
+-- (whatever the schema's defaults would have given). They are called by the
 -- functions above, as their owner.
-revoke all on function public._work_bucket() from public, anon, authenticated;
-revoke all on function public._work_max_bytes() from public, anon, authenticated;
-revoke all on function public._work_object(text) from public, anon, authenticated;
-revoke all on function public._work_check_pages(jsonb) from public, anon, authenticated;
-revoke all on function public._work_check_files(jsonb) from public, anon, authenticated;
-revoke all on function public._work_begin(uuid, uuid, uuid, text, text, uuid, jsonb, text, text, boolean, uuid, uuid) from public, anon, authenticated;
-revoke all on function public._work_files_state(uuid, jsonb) from public, anon, authenticated;
-revoke all on function public._work_settle_files(uuid, jsonb) from public, anon, authenticated;
-revoke all on function public._work_upload_json(uuid) from public, anon, authenticated;
-revoke all on function public._submission_json(uuid) from public, anon, authenticated;
-revoke all on function public._assessment_work_json(uuid) from public, anon, authenticated;
-revoke all on function public._submission_same_class() from public, anon, authenticated;
-revoke all on function public._submission_file_removed() from public, anon, authenticated;
-revoke all on function public._submission_target_gone() from public, anon, authenticated;
-revoke all on function public._submission_gone() from public, anon, authenticated;
-revoke all on function public._submission_truncated() from public, anon, authenticated;
+revoke all on function public._work_bucket() from public, anon, authenticated, service_role;
+revoke all on function public._work_max_bytes() from public, anon, authenticated, service_role;
+revoke all on function public._work_object(text) from public, anon, authenticated, service_role;
+revoke all on function public._work_check_pages(jsonb) from public, anon, authenticated, service_role;
+revoke all on function public._work_check_files(jsonb) from public, anon, authenticated, service_role;
+revoke all on function public._work_begin(uuid, uuid, uuid, text, text, uuid, jsonb, text, text, boolean, uuid, uuid) from public, anon, authenticated, service_role;
+revoke all on function public._work_files_state(uuid, jsonb) from public, anon, authenticated, service_role;
+revoke all on function public._work_settle_files(uuid, jsonb) from public, anon, authenticated, service_role;
+revoke all on function public._work_upload_json(uuid) from public, anon, authenticated, service_role;
+revoke all on function public._submission_json(uuid) from public, anon, authenticated, service_role;
+revoke all on function public._assessment_work_json(uuid) from public, anon, authenticated, service_role;
+revoke all on function public._submission_same_class() from public, anon, authenticated, service_role;
+revoke all on function public._submission_file_removed() from public, anon, authenticated, service_role;
+revoke all on function public._submission_target_gone() from public, anon, authenticated, service_role;
+revoke all on function public._submission_gone() from public, anon, authenticated, service_role;
+revoke all on function public._submission_truncated() from public, anon, authenticated, service_role;
 
 -- What the storage policies call. Storage asks as the signed-in teacher, so
 -- that role must be able to run them; the schema is not served by the API,
@@ -1738,10 +1746,10 @@ grant execute on function fv_private.work_read_allowed(text) to authenticated, s
 
 -- The student's side: the service role only, as every function in the
 -- schema is. The helpers are granted to nobody.
-revoke all on function student_submit._grading_started(uuid, uuid) from public, anon, authenticated;
-revoke all on function student_submit._send_session(text, uuid) from public, anon, authenticated;
-revoke all on function student_submit._work_window(uuid) from public, anon, authenticated;
-revoke all on function student_submit._send_begin(text, text, uuid, uuid, jsonb, text, text, uuid) from public, anon, authenticated;
+revoke all on function student_submit._grading_started(uuid, uuid) from public, anon, authenticated, service_role;
+revoke all on function student_submit._send_session(text, uuid) from public, anon, authenticated, service_role;
+revoke all on function student_submit._work_window(uuid) from public, anon, authenticated, service_role;
+revoke all on function student_submit._send_begin(text, text, uuid, uuid, jsonb, text, text, uuid) from public, anon, authenticated, service_role;
 revoke all on function student_submit.work(text, uuid, text) from public, anon, authenticated;
 revoke all on function student_submit.send_start(text, uuid, uuid, jsonb, text, text, uuid, text) from public, anon, authenticated;
 revoke all on function student_submit.replace(text, uuid, uuid, jsonb, text, text, uuid, text) from public, anon, authenticated;

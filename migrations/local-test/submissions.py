@@ -1166,7 +1166,334 @@ def scen_race():
         for x in sides: x.close()
         d.close()
 
-SCENARIOS = {'teacher': scen_teacher, 'student': scen_student, 'storage': scen_storage, 'race': scen_race}
+# ════════════════════════════════════════════════════════════════════════════
+PRE1, PRE2 = split(text_of('batch-b-live-precheck.sql'))    # the two read-only queries for the live database, before
+POST = split(text_of('batch-b-live-postcheck.sql'))[0]      # and the one after
+last = lambda st: st.split('\n')[-1].strip().lower()
+ABOUT = re.compile(r'submission|send_log|_work_|student_work|work_path_course|work_upload_allowed|work_read_allowed|students_send|after_due|accept_until|group_work|students_see_markup'
+                   r'|send_work|keep_photos_until|fv_student_photos|_grading_started|_send_session|_send_begin'
+                   r'|student_submit\.(work|send_start|send_finish|replace|unsend|file_links|removal_batch|removal_done)\('
+                   r'|mark_handed_in_paper|^(depends|comments on|internal triggers) ')
+def all_functions(d):
+    return {r[0]: r[1] for r in d.all("""select n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')', md5(pg_get_functiondef(p.oid))
+                                           from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                                          where n.nspname in ('public', 'student_submit', 'fv_private', 'auth', 'storage') and p.prokind in ('f', 'p')""")}
+def retouched(d, sig):
+    """The function's own definition with one more space in it: the same function to a caller, another fingerprint."""
+    return d.one('select pg_get_functiondef(to_regprocedure(:s))', s=sig).replace('\n begin', '\n  begin', 1).replace('\nbegin', '\n begin', 1).replace(' select ', '  select ', 1)
+
+def in_use(d):
+    """The database in use before Batch B: the Student Page on, a card and a signed-in phone, a returned
+    grade and a draft, a remembered answer. Returns what the checks need."""
+    d.run("update student set preferred_name = 'CeCe', date_of_birth = '2012-05-15' where id = :s", s=STU1)
+    d.run("update course set student_page_enabled = true, return_grades = 'on_return' where id = :c", c=COURSE_A)
+    k = {'a1': nid(), 'a2': nid()}
+    d.run("""insert into assessment (id, course_id, title, score_mode, max_points, due_date) values
+               (:a, :c, 'Cell Microscope Lab', 'points', 10, '2026-11-20'), (:b, :c, 'Paper Quiz', 'points', 10, null)""", a=k['a1'], b=k['a2'], c=COURSE_A)
+    d.teacher('upsert_score(:e, :a, 8)', e=ENR1, a=k['a1']); d.teacher('return_grades(:a, :e, :k)', a=k['a1'], e=[ENR1], k=nid())
+    d.teacher('upsert_score(:e, :a, 6)', e=ENR2, a=k['a1'])
+    k['token'], k['code'] = d.session(ENR1)
+    return k
+
+def scen_apply():
+    d = WorkDb('apply')
+    try:
+        k = in_use(d)
+        # ── The files' shape ────────────────────────────────────────────
+        for name, S in (('first', S1), ('second', S2)):
+            ok('the %s file is one transaction: begin first, commit last' % name, last(S[0]) == 'begin' and last(S[-1]) == 'commit')
+            ok('it sets a lock timeout, then runs every check before it creates or changes anything',
+               S[1].strip().lower().endswith("set local lock_timeout = '5s'") and '$guard$' in S[2]
+               and not any(w in bare(' '.join(S[:2])).lower() for w in ('create ', 'alter ', 'drop ', 'update ', 'delete ', 'insert ')))
+        ok('neither file has an unfinished header', 'PLACEHOLDER' not in T1 + T2 and 'TODO' not in T1 + T2)
+
+        # ── The database it meets is the live one, as far as can be told here ──
+        relied = fingerprints(d, RELIED_ON)
+        want = {}
+        for line in open(os.path.join(HERE, 'live-function-md5.txt')):
+            w = line.split()
+            if len(w) >= 3 and not line.startswith('#'): want[w[0]] = w[1]
+            if line.startswith('#student-submit '): want['student_submit.' + w[1].split('(')[0].split('.')[-1]] = w[2]
+        known = {f: (relied[f], want[f.split('(')[0].replace('public.', '')]) for f in RELIED_ON if f.split('(')[0].replace('public.', '') in want}
+        ok('of the twelve live functions the new ones call, the %d that live-function-md5.txt records are the live ones byte for byte (the rest go to the read-only pre-check)' % len(known),
+           len(known) >= 5 and all(a == b for a, b in known.values()), known)
+        lists1 = fingerprint_lists(T1); lists2 = fingerprint_lists(T2)
+        ok('the first file carries one list of its 39 functions, twice (its first check and its last), and the second file a list of the three its policies call',
+           len(lists1) == 2 and lists1[0] == lists1[1] and [f for f, _ in lists1[0]] == B_FUNCTIONS and [f for f, _ in lists2[0]] == POLICY_FUNCTIONS, (len(lists1), len(lists2)))
+        pre_lists = fingerprint_lists(text_of('batch-b-live-precheck.sql')); post_lists = fingerprint_lists(text_of('batch-b-live-postcheck.sql'))
+        ok('the pre-check carries the twelve live functions as this database has them, and each new function as absent; the post-check carries both lists as they should be afterwards',
+           dict(pre_lists[0]) == relied and pre_lists[1] == [(f, 'absent') for f in B_FUNCTIONS] and post_lists[0] == lists1[0] and dict(post_lists[1]) == relied)
+
+        cat0 = catalog(d.c); cols0 = table_columns(d.c); rows0 = row_checksums(d.c, cols0); fps0 = all_functions(d)
+        g0 = score_fingerprint(d); page0 = d.page(k['token'], ENR1)
+        same = lambda: (catalog(d.c), row_checksums(d.c, cols0)) == (cat0, rows0)
+
+        # ── Each guard stops it, at the guard, with nothing changed ─────
+        def stopped_by(S, setup, want, role=None):
+            """A file run after `setup` (undone afterwards): True when it stops at its guard saying `want`."""
+            d.begin()
+            try:
+                for st in setup: d.run(st)
+                if role: d.run('set local role ' + role)
+                try:
+                    for n, st in enumerate(S):
+                        at = n
+                        if last(st) not in ('begin', 'commit'): d.run(st)
+                    return (False, 'it ran')
+                except Exception as e:
+                    return (at == 2 and want in message(e) and 'Nothing was changed' in message(e), message(e)[:300])
+            finally:
+                d.rollback()
+        for sig in ('student_submit._session_class(text,uuid)', 'student_submit._device_session(text)', 'student_submit._card_refusal(uuid)',
+                    'public._grade_return_lock(uuid)', 'public._grade_return_lock_first(uuid)'):
+            new = retouched(d, sig)
+            good, said = stopped_by(S1, [new], sig.split('(')[0])
+            ok('guard: %s with another body (one space more) stops the first file, nothing changed' % sig.split('(')[0],
+               good and new != d.one('select pg_get_functiondef(to_regprocedure(:s))', s=sig) and 'not the definition this migration was tested against' in said, said)
+        for label, setup, want in (
+                ('Batch A is not all applied', ['alter table student_submit.device_session rename to bb_renamed'], 'Batch A is not all applied'),
+                ('S0-M4b is not applied', ['alter function public._grade_return_repair_class(uuid) rename to bb_renamed'], 'S0-M4b is not applied'),
+                ('S0-M5 is not applied', ['alter function public.fv_owns_assessment(uuid) set search_path = public'], 'S0-M5 is not applied'),
+                ('S3-M1 is not applied', ['alter function student_submit.issue_cards(uuid,uuid,jsonb,text,uuid) rename to bb_renamed'], 'S3-M1 is not applied'),
+                ('one of its function names is taken', ["create function student_submit.unsend(text, uuid, uuid, text) returns jsonb language sql as $f$ select '{}'::jsonb $f$"], 'student_submit.unsend'),
+                ('one of its helper names is taken', ["create function public._work_bucket() returns text language sql as $f$ select 'x'::text $f$"], 'public._work_bucket()'),
+                ('one of its table names is taken', ['create table public.submission_file (id int)'], 'a table this file makes already exists'),
+                ('one of its column names is taken', ['alter table public.course add column send_work integer'], 'course.send_work already exists'),
+                ('one of its column names on assessment is taken', ['alter table public.assessment add column after_due text'], 'assessment.after_due already exists'),
+                ('one of its trigger names is taken', ["create function public.bb_t() returns trigger language plpgsql as $f$ begin return null; end $f$",
+                                                       'create trigger submission_gone after delete on public.assessment for each row execute function public.bb_t()'], 'a trigger named submission_gone'),
+                ('storage.objects has no metadata column', ['alter table storage.objects drop column metadata'], 'storage.objects is not there'),
+                ('there is no storage schema', ['alter schema storage rename to bb_renamed'], 'storage.objects is not there')):
+            good, said = stopped_by(S1, setup, want)
+            ok('guard: %s: the first file stops, nothing changed' % label, good, said)
+        good, said = stopped_by(S1, ['create role bb_plain nologin', 'grant usage on schema student_submit, storage, fv_private to bb_plain'],
+                                'cannot read storage.objects past its row security', role='bb_plain')
+        ok('guard: applied by a role that does not read storage.objects past its row security, the first file stops (every send would be answered "missing pages")', good, said)
+        good, said = stopped_by(S2, [], '2026111101_student_work_submissions.sql is not applied')
+        ok('guard: the second file without the first stops, nothing changed', good, said)
+        ok('after every refusal the catalog and every row are what they were', same())
+
+        # ── The read-only checks written for the live database, here ────
+        ok("the live pre-check, on this harness as built, lists one thing: its service role is subject to row security, which Supabase's is not (that row is what the query is for)",
+           [[r[0], r[3]] for r in d.all(PRE1)] == [['the service role passes row security', 'no']], d.all(PRE1)[:3])
+        def pre1(setup=()):
+            """The first pre-check query with the service role as Supabase makes it, after `setup`; all of it undone."""
+            d.begin()
+            try:
+                d.run('alter role service_role bypassrls')
+                for st in setup: d.run(st)
+                return sorted([r[0], r[3]] for r in d.all(PRE1))
+            finally:
+                d.rollback()
+        ok('with the service role as Supabase makes it, it lists nothing: every function, table and earlier migration is as tested', pre1() == [], pre1()[:3])
+        facts = d.all(PRE2)
+        ok('its second query describes storage and counts what the two ALTERs touch: PostgreSQL 17 or 18, storage at prevent-direct-deletes, SQL deletes refused, the name index there, '
+           'one shape of storage.objects, no bucket, no file, no policy, 2 classes, 2 assessments, 1 Student Page on',
+           len(facts) == 1 and re.match(r'1[78]\.', facts[0][0]) and facts[0][1:] == ['prevent-direct-deletes', True, True, False, 0, 0, 0, 2, 2, 1], facts)
+        got = pre1([retouched(d, 'student_submit._session_class(text,uuid)'), retouched(d, 'public.fv_owns_course(uuid)')])
+        ok('the pre-check lists a function that is not the one tested, and says whether a file would stop on it',
+           got == [['function public.fv_owns_course(uuid)', 'no'], ['function student_submit._session_class(text,uuid)', 'yes']], got)
+        got = pre1(["create function student_submit.unsend(text, uuid, uuid, text) returns jsonb language sql as $f$ select '{}'::jsonb $f$",
+                              'create table public.submission (id int)', 'alter table public.assessment add column group_work text',
+                              'alter function student_submit.issue_cards(uuid,uuid,jsonb,text,uuid) rename to bb_renamed',
+                              'alter table storage.objects disable row level security', 'alter table storage.objects drop column metadata',
+                              "insert into storage.buckets (id, name, public) values ('student-photos', 'student-photos', true)",
+                              'create policy someone_elses on storage.objects for select using (true)',
+                              'grant usage on schema student_submit to authenticated', 'revoke usage on schema fv_private from authenticated'])
+        ok('and a name already taken (a function, a table, a column), S3-M1 missing, row security off on storage.objects, a column of it gone, a public bucket of that name, '
+           'a policy already there, the student schema opened, the policy functions\' schema closed',
+           [r[0] for r in got] == ['a bucket named student-photos', 'a column the first file adds', 'a policy already on storage.objects', 'a table the first file makes',
+                                   'anon or signed-in teachers can enter schema student_submit', 'earlier migrations', 'function student_submit.unsend(text,uuid,uuid,text)',
+                                   'row security on storage.objects', "signed-in teachers can enter schema fv_private (storage asks the policies' functions as them)",
+                                   'storage.objects and storage.buckets'], got)
+        before_rows = d.all(POST)
+        ok('the live post-check, run before the apply, lists what is not there yet (%d rows)' % len(before_rows),
+           len(before_rows) > 60 and ['the bucket student-photos', 'private, 2097152 bytes a file, image/jpeg only', 'absent'] in before_rows, before_rows[:2])
+        ok('none of those checks changed anything', same())
+
+        # A lock it cannot get.
+        o = d.other(); o.run('begin'); o.run('select * from assessment for update')
+        t0 = time.time(); r = d.statements(S1); waited = time.time() - t0
+        o.run('rollback'); o.close()
+        ok('with an assessment row held by another session the first file gives up after five seconds with nothing changed (%.1f s)' % waited,
+           r.startswith('STOPPED') and 'lock timeout' in r and 4 < waited < 9 and same(), r)
+
+        # ── The apply ───────────────────────────────────────────────────
+        r = d.file(M1_USED)
+        ok('the first file applies', r == 'ok', r)
+        ok('with only the first file applied the post-check lists the bucket and its four policies as missing, and nothing else',
+           sorted(x[0] for x in d.all(POST)) == ['policy fv_student_photos_fence on storage.objects', 'policy fv_student_photos_read on storage.objects',
+                                                'policy fv_student_photos_teachers_only on storage.objects', 'policy fv_student_photos_upload on storage.objects',
+                                                'the bucket student-photos'], d.all(POST)[:3])
+        for label, setup, want in (
+                ('a function its policies call is not the one tested', [retouched(d, 'fv_private.work_upload_allowed(text)')], 'fv_private.work_upload_allowed'),
+                ('row security is off on storage.objects', ['alter table storage.objects disable row level security'], 'row security turned off'),
+                ('a public bucket named student-photos exists', ["insert into storage.buckets (id, name, public) values ('student-photos', 'student-photos', true)"], 'is not private'),
+                ('a bucket of that name with another size limit exists',
+                 ["insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values ('student-photos', 'student-photos', false, 52428800, array['image/jpeg'])"], 'is not private'),
+                ('the bucket already holds a file', ["insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values ('student-photos', 'student-photos', false, 2097152, array['image/jpeg'])",
+                                                     "insert into storage.objects (bucket_id, name) values ('student-photos', 'someone/elses.jpg')"], 'already holds files'),
+                ('storage.buckets has no file_size_limit column', ['alter table storage.buckets drop column file_size_limit'], 'not the shape this file was written for')):
+            good, said = stopped_by(S2, setup, want)
+            ok('guard: %s: the second file stops, nothing changed' % label, good, said)
+        good, said = stopped_by(S2, ["insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values ('student-photos', 'student-photos', false, 2097152, array['image/jpeg'])"], 'never')
+        ok('guard: an empty bucket of that name that is already private, 2 MB and JPEG only does not stop it', said == 'it ran', said)
+        r = d.file(M2_USED)
+        ok('the second file applies', r == 'ok', r)
+
+        cat1 = catalog(d.c); rows1 = row_checksums(d.c, cols0); fps1 = all_functions(d)
+        differ = sorted(t for t in rows0 if rows1.get(t) != rows0[t])
+        ok('no row of any table that existed changed, in any column it had (%d tables compared); storage.buckets gained its one row' % len(rows0),
+           differ == ['storage.buckets'] and rows0['storage.buckets'][0] == 0 and rows1['storage.buckets'][0] == 1, differ)
+        ok('every class has Send Work off and End of Year; every assessment takes nothing, keeps accepting, each student, Mark Up shown',
+           d.all('select distinct send_work, keep_photos_until from course') == [[False, 'end_of_year']]
+           and d.all('select distinct students_send, after_due, accept_until, group_work, students_see_markup from assessment') == [['nothing', 'keep', None, 'each', True]])
+        ok('four new tables, all empty; one bucket, empty', [d.one('select count(*) from ' + t) for t in ('public.submission', 'public.submission_file', 'public.submission_file_removal', 'student_submit.send_log')] == [0] * 4
+           and d.all('select id from storage.buckets') == [['student-photos']] and d.storage.names() == [])
+        gone, new = differences(cat0, cat1)
+        ok('every catalog line that is new is about the new tables, columns, functions, triggers and policies; the only lines that went are counts (%d gone, %d new)' % (len(gone), len(new)),
+           all(re.match(r'(depends|comments on) ', l) for l in gone) and all(ABOUT.search(l) for l in new), [l for l in new if not ABOUT.search(l)][:5] + gone[:2])
+        changed = sorted(f for f in fps0 if fps1.get(f) != fps0[f]); added = sorted(set(fps1) - set(fps0))
+        ok('no function that existed was changed or dropped: all %d are byte for byte what they were' % len(fps0), changed == [], changed)
+        ok('39 functions are new, the ones the first file lists, each with the fingerprint it lists',
+           len(added) == 39 and fingerprints(d, B_FUNCTIONS) == dict(lists1[0]), added[:3])
+        ok('the grades are untouched, and the signed-in phone reads the same page as before', score_fingerprint(d) == g0 and d.page(k['token'], ENR1) == page0)
+        ok('saving, returning and reading a grade work as before',
+           d.teacher('upsert_score(:e, :a, 9)', e=ENR2, a=k['a2']) is not None and d.teacher('return_grades(:a, :e, :k)', a=k['a2'], e=[ENR2], k=nid())['returned'] == 1
+           and d.one('select student_submit._returned_grade(:e, :a)', e=ENR2, a=k['a2'])['grade']['value'] == 9)
+        ok('the live post-check lists nothing: the apply landed as tested', d.all(POST) == [], d.all(POST)[:4])
+        d.begin()
+        d.run('grant select on public.submission to authenticated'); d.run('create policy peek on public.submission_file for select using (true)')
+        d.run('grant execute on function public._work_begin(uuid,uuid,uuid,text,text,uuid,jsonb,text,text,boolean,uuid,uuid) to authenticated')
+        d.run('grant execute on function student_submit.unsend(text,uuid,uuid,text) to authenticated')
+        d.run(retouched(d, 'student_submit.send_finish(text,uuid,uuid,jsonb,text)')); d.run('alter table public.submission_file disable trigger submission_file_removed')
+        d.run("update storage.buckets set public = true where id = 'student-photos'"); d.run('drop policy fv_student_photos_fence on storage.objects')
+        d.run('create policy loose on storage.objects for select using (true)'); d.run('alter function public.delete_submission(uuid,uuid) set search_path = public')
+        d.run('alter table public.course alter column send_work set default true'); d.run("update assessment set students_send = 'photos' where id = :a", a=k['a1'])
+        got = sorted(r[0] for r in d.all(POST)); d.rollback()
+        ok('the post-check notices a grant on a table, a policy on one, a helper and a student function opened to teachers, a changed function, a trigger switched off, the bucket made public, '
+           'a policy of ours dropped, a policy added, a lost pg_temp, a changed default, and an assessment set to take work',
+           got == ['SECURITY DEFINER without pg_temp last in its search_path', 'another policy on storage.objects', 'assessments that take work', 'column public.course.send_work',
+                   'function public.delete_submission(uuid,uuid)', 'function student_submit.send_finish(text,uuid,uuid,jsonb,text)', 'policy fv_student_photos_fence on storage.objects',
+                   'table public.submission_file', 'the bucket student-photos', 'trigger submission_file_removed on public.submission_file',
+                   'what authenticated can do to public.submission through the API',
+                   'who can run public._work_begin(uuid,uuid,uuid,text,text,uuid,jsonb,text,text,boolean,uuid,uuid)', 'who can run student_submit.unsend(text,uuid,uuid,text)'], got)
+
+        # ── Deleting an assessment or a student is as it was, where there is no work ──
+        scores = d.one('select count(*) from score')
+        d.teacher('delete_assessment(:a)', a=k['a2'])
+        ok('delete_assessment on a piece with no work handed in does what it did: the assessment and its scores go, nothing is queued',
+           d.one('select count(*) from assessment where id = :a', a=k['a2']) == 0 and d.one('select count(*) from score') == scores - 1 and queued(d) == [])
+
+        # ── Used, then run again ────────────────────────────────────────
+        d.run("update course set send_work = true where id = :c", c=COURSE_A); d.run("update assessment set students_send = 'photos' where id = :a", a=k['a1'])
+        s, f = d.send(k['token'], ENR1, k['a1'], 2)
+        ok('with Send Work turned on, the student who was signed in before the apply sends two pages', f is not None and f.get('ok') is True, (s, f))
+        cat2 = catalog(d.c); rows2 = row_checksums(d.c)
+        r = d.apply_b()
+        ok('a second run of both files applies and changes no catalog line and no row: the work handed in is still there, Send Work is still on',
+           r == 'ok' and (catalog(d.c), row_checksums(d.c)) == (cat2, rows2) and d.one('select count(*) from submission_file') == 2
+           and d.one('select send_work from course where id = :c', c=COURSE_A) is True, r)
+        # A later migration replaces one of its functions (Batch C will): a second run must not undo that.
+        d.run(retouched(d, 'student_submit._grading_started(uuid,uuid)'))
+        r = d.file(M1_USED)
+        ok('after a later migration has replaced one of its functions, running the first file again stops at its first check and puts nothing back',
+           r.startswith('STOPPED') and d.at == 2 and 'do not run this file again' in r and 'student_submit._grading_started' in r
+           and d.one('select md5(pg_get_functiondef(:f::regprocedure))', f='student_submit._grading_started(uuid,uuid)') != dict(lists1[0])['student_submit._grading_started(uuid,uuid)'], r)
+        d.run("update storage.buckets set file_size_limit = 52428800 where id = 'student-photos'")
+        r = d.file(M2_USED)
+        ok('and the second file run again after the bucket\'s limit was raised by hand stops and says so, rather than leave it or quietly reset it', r.startswith('STOPPED') and 'is not private, limited to 2097152' in r, r)
+    finally:
+        d.close()
+
+# ════════════════════════════════════════════════════════════════════════════
+def scen_grants():
+    """The files' own revokes and grants, where nothing else would hide a missing one. This stand-in, like
+    gradebook-prod, gives a new function to its owner (and in public to the service role) by default, and
+    anon and signed-in teachers cannot enter the student_submit schema at all: with both in place a dropped
+    revoke would change nothing anyone could see. Here both are taken away first, as in a plain Postgres."""
+    d = WorkDb('grants')
+    try:
+        d.run('alter default privileges for role postgres grant execute on functions to public')
+        d.run('alter default privileges for role postgres grant all on tables to public')
+        d.run('grant usage on schema student_submit to anon, authenticated')
+        d.run("create function student_submit.probe() returns int language sql as $f$ select 1 $f$")
+        ok('grants: on this copy a new function is runnable by everyone unless something revokes it',
+           d.role('anon', 'select student_submit.probe()')[0][0] == 1 and d.role('authenticated', 'select student_submit.probe()')[0][0] == 1)
+        d.run('drop function student_submit.probe()')
+        r = d.apply_b()
+        ok('grants: the two files apply', r == 'ok', r)
+        who = {r[0]: r[1] for r in d.all("""select n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')',
+                                                   array(select r from unnest(array['anon', 'authenticated', 'public', 'service_role']) r where has_function_privilege(r, p.oid, 'execute'))
+                                              from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                                             where n.nspname in ('public', 'student_submit', 'fv_private')""")}
+        sig = lambda s: d.one("select n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')' from pg_proc p join pg_namespace n on n.oid = p.pronamespace where p.oid = :s::regprocedure", s=s)
+        mine = {s: who[sig(s)] for s in B_FUNCTIONS}
+        teachers = [s for s in B_FUNCTIONS if s.startswith('public.') and not s.startswith('public._')] + POLICY_FUNCTIONS
+        students = [s for s in B_FUNCTIONS if s.startswith('student_submit.') and not s.startswith('student_submit._')]
+        helpers = [s for s in B_FUNCTIONS if s not in teachers and s not in students]
+        ok("grants: the eight teacher RPCs and the three functions the storage policies call are left to signed-in teachers and the service role: not the public, not anon",
+           len(teachers) == 11 and all(mine[s] == ['authenticated', 'service_role'] for s in teachers), {s: mine[s] for s in teachers if mine[s] != ['authenticated', 'service_role']})
+        ok("grants: the eight functions the edge function calls are left to the service role and nobody else",
+           len(students) == 8 and all(mine[s] == ['service_role'] for s in students), {s: mine[s] for s in students if mine[s] != ['service_role']})
+        ok("grants: the other twenty (helpers and trigger functions) are left to nobody but their owner, by the file's own revokes: not the public, anon, a signed-in teacher or the service role",
+           len(helpers) == 20 and all(mine[s] == [] for s in helpers), {s: mine[s] for s in helpers if mine[s]})
+        k = seed_work(d)
+        for role in ('anon', 'authenticated'):
+            for s, call in (('student_submit.work', "select student_submit.work('x', '%s', 'ip')" % ENR1),
+                            ('student_submit.send_start', "select student_submit.send_start('x', '%s', '%s', '[{}]'::jsonb, null, null, '%s', 'ip')" % (ENR1, k['takes'], nid())),
+                            ('student_submit.replace', "select student_submit.replace('x', '%s', '%s', '[{}]'::jsonb, null, null, '%s', 'ip')" % (ENR1, k['takes'], nid())),
+                            ('student_submit.send_finish', "select student_submit.send_finish('x', '%s', '%s', '[]'::jsonb, 'ip')" % (ENR1, nid())),
+                            ('student_submit.unsend', "select student_submit.unsend('x', '%s', '%s', 'ip')" % (ENR1, k['takes'])),
+                            ('student_submit.file_links', "select student_submit.file_links('x', '%s', '%s', 'ip')" % (ENR1, k['takes'])),
+                            ('student_submit.removal_batch', 'select student_submit.removal_batch(10)'),
+                            ('student_submit.removal_done', "select student_submit.removal_done('{1}')"),
+                            ('student_submit._grading_started', "select student_submit._grading_started('%s', '%s')" % (ENR1, k['takes'])),
+                            ('student_submit._send_session', "select student_submit._send_session('x', '%s')" % ENR1),
+                            ('student_submit._work_window', "select student_submit._work_window('%s')" % k['takes']),
+                            ('public._work_object', "select * from public._work_object('x')"),
+                            ('public._submission_json', "select public._submission_json('%s')" % nid())):
+                e = refused(d, lambda: d.role(role, call, uid=A if role == 'authenticated' else None))
+                ok('grants: let into the schema, %s is still refused %s, by the function itself' % (role, s), e is not None and 'permission denied for function' in e[0], e)
+            for t in ('public.submission', 'public.submission_file', 'public.submission_file_removal', 'student_submit.send_log'):
+                for what, sql in (('read', 'select * from %s' % t), ('delete from', 'delete from %s' % t)):
+                    e = refused(d, lambda: d.role(role, sql, uid=A if role == 'authenticated' else None))
+                    ok('grants: %s cannot %s %s, though this copy gives every new table to everyone' % (role, what, t), e is not None and 'permission denied' in e[0], e)
+        e = refused(d, lambda: d.role('anon', "select set_course_send_work('%s', '{}'::jsonb, null)" % COURSE_A))
+        ok('grants: anon is refused a teacher RPC', e is not None and 'permission denied for function' in e[0], e)
+        ok("grants: the post-check, on this copy, still lists nothing about who can run or read what", [r for r in d.all(POST) if r[0].startswith(('who can', 'what '))] == [], d.all(POST)[:3])
+    finally:
+        d.close()
+
+# ════════════════════════════════════════════════════════════════════════════
+def scen_suites():
+    """The older suites, untouched, with the two files applied."""
+    d = WorkDb('suites')
+    try:
+        before = {}
+        SUITES = (('student_submit.py', '79 passed, 0 failed'), ('questionnaire_identity.py', '47 passed, 0 failed'), ('phone_reports.py', '35 passed, 0 failed'),
+                  ('questionnaires.py', '42 passed, 0 failed'), ('grade_return.py', '284 passed, 0 failed'), ('grade_return_limits.py', '74 passed, 0 failed'))
+        for script, want in SUITES:
+            before[script] = d.suite(script)
+            ok('before the two files %s passes on the database as live has it: %s' % (script, want), before[script] == want, (before[script], d.failures[:3]))
+        got0 = d.suite('score_rpcs.py'); fail0 = list(d.failures)
+        r = d.apply_b()
+        ok('the two files apply to the database as built', r == 'ok', r)
+        for script, want in SUITES:
+            got = d.suite(script)
+            ok('with the two files applied %s passes as before: %s' % (script, want), got == want, (got, d.failures[:3]))
+        # score_rpcs.py compares every table and function it loads with docs/schema.generated.sql, the snapshot of the
+        # live database. Until that snapshot is refreshed after the apply it has neither assessment's new columns nor its
+        # new triggers, and that one comparison fails; nothing else may.
+        got = d.suite('score_rpcs.py')
+        expected = {'every score table matches the live snapshot: columns, constraints, indexes, triggers, policies'}
+        ok('with the two files applied score_rpcs.py fails only its comparison of the tables with the live snapshot, which is from before the apply (assessment has five more columns and two more triggers); every check of what a score RPC does still passes',
+           set(d.failures) - set(fail0) <= expected and int(got.split()[0]) + len(set(d.failures) - set(fail0)) == int(got0.split()[0]), (got0, got, sorted(set(d.failures) - set(fail0))))
+        print('# score_rpcs.py: %s before, %s after (%s)' % (got0, got, ', '.join(sorted(set(d.failures) - set(fail0))) or 'no new failure'))
+    finally:
+        d.close()
+
+SCENARIOS = {'apply': scen_apply, 'teacher': scen_teacher, 'student': scen_student, 'storage': scen_storage, 'race': scen_race, 'grants': scen_grants, 'suites': scen_suites}
 if __name__ == '__main__':
     for name in (sys.argv[1:] or list(SCENARIOS)):
         SCENARIOS[name]()

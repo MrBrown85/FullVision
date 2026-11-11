@@ -176,3 +176,13 @@ grant all on storage.buckets, storage.objects to service_role, authenticated, an
 grant all on storage.buckets, storage.objects to postgres with grant option;
 -- 0020: the index storage keeps on (bucket_id, name), compared byte by byte.
 create index if not exists idx_objects_bucket_id_name on storage.objects (bucket_id, name collate "C");
+
+-- 0002: the service's own record of its changes. The live pre-check reads the
+-- newest name; this stand-in is at 0055.
+create table if not exists storage.migrations (
+    id          integer primary key,
+    name        varchar(100) unique not null,
+    hash        varchar(40) not null,
+    executed_at timestamp default current_timestamp
+);
+insert into storage.migrations (id, name, hash) values (55, 'prevent-direct-deletes', 'stand-in') on conflict do nothing;

@@ -13,6 +13,8 @@ A list sits between two comment lines, `-- FINGERPRINTS-BEGIN <which>` and
     relied   the live functions the new ones call, as the harness built as
              live has them (the values the read-only pre-check compares
              gradebook-prod with)
+    names    the signatures of the functions the first file makes, with no
+             fingerprint: rows of a list of text
 
 The values come from a copy of the template with the first file applied
 (its own lists stood aside for that one apply, since they are what is being
@@ -46,9 +48,12 @@ def rewrite(text, lists):
         end = text.index('-- FINGERPRINTS-END', m.end())
         end_line = text.rfind('\n', 0, end)
         which = m.group(2) or 'new'
-        rows = lists[which]
-        width = max(len(k) for k in rows) + 3
-        body = ',\n'.join("%s(%s '%s')" % (m.group(1), ("'%s'," % k).ljust(width), v) for k, v in rows.items())
+        if which == 'names':     # only the signatures, as a list of text
+            body = ',\n'.join("%s'%s'" % (m.group(1), k) for k in lists['new'])
+        else:
+            rows = lists[which]
+            width = max(len(k) for k in rows) + 3
+            body = ',\n'.join("%s(%s '%s')" % (m.group(1), ("'%s'," % k).ljust(width), v) for k, v in rows.items())
         out.append(text[pos:m.end()] + '\n' + body); pos = end_line
     return ''.join(out) + text[pos:]
 
