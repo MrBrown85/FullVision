@@ -37,6 +37,7 @@ test('Reflect on Feedback: off at first, on shows the reflection screens, off ag
     'Keep Photos Until',
     'Reflect on Feedback',
     'Show My Learning',
+    'Questionnaires and Reports',
   ]);
   expect(await page.evaluate(cid => StudentView.fromCache(cid, 'st1').view.reflectOn, CID)).toBe(false);
 
