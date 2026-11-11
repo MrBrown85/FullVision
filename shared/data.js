@@ -16084,8 +16084,9 @@ function saveCardWidgetConfig(config) {
 
 /* The settings that follow the teacher to any device:
    { studentView: 'cards' | 'grid', helpRule: { below, min },
-     closedModules: { [courseId]: [moduleId] } } (closed module folders on
-   the Assignments page). Empty until one is changed. */
+     closedModules: { [courseId]: [moduleId] } (closed module folders on
+   the Assignments page), view: { [key]: string } (getViewPref) }. Empty
+   until one is changed. */
 function getDashboardPrefs() {
   var cfg = _cache.config || getConfig();
   return (cfg && cfg.dashboardPrefs) || {};
@@ -16101,6 +16102,27 @@ function saveDashboardPrefs(change) {
     window.v2.saveTeacherPreferences({ dashboard_prefs: prefs });
   }
   return prefs;
+}
+
+/* A page's view choice (the roster's Sort and Show, Newest First, the
+   Gradebook's header height and rubric columns, the hidden sidebar), kept
+   with the teacher's preferences so it survives signing out, which wipes
+   this computer's storage (supabase.js, _clearDeviceData). Each is a string
+   under its old localStorage key; a choice made before it moved here is
+   still read from that key until it is next changed. */
+function getViewPref(key) {
+  var view = getDashboardPrefs().view || {};
+  if (Object.prototype.hasOwnProperty.call(view, key)) return view[key];
+  try {
+    return localStorage.getItem(key);
+  } catch (e) {
+    return null;
+  }
+}
+function saveViewPref(key, value) {
+  var view = Object.assign({}, getDashboardPrefs().view || {});
+  view[key] = value == null ? null : String(value);
+  saveDashboardPrefs({ view: view });
 }
 
 function clearCardWidgetConfig() {
@@ -16304,6 +16326,8 @@ window.GB = {
   clearCardWidgetConfig,
   getDashboardPrefs,
   saveDashboardPrefs,
+  getViewPref,
+  saveViewPref,
 };
 
 /**
