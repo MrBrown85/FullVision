@@ -755,11 +755,15 @@ window.ReportStudio = (function () {
           var zj = zooms[j];
           var from = zj.dataset.side != null ? zj.dataset.side : zj.dataset.from;
           if (Number(from) !== side) continue;
-          // The held block's own row is not counted, as targetFor skips it.
-          Array.prototype.forEach.call(zj.querySelectorAll('.sheet-row:not(.sheet-pinned)'), function (row) {
-            var cells = row.querySelectorAll(':scope > .sheet-cell');
-            if (!(drag && cells.length === 1 && cells[0].dataset.block === drag.id)) base++;
-          });
+          // The held block's own row is not counted, as targetFor skips it;
+          // nor is a row carried from an earlier side or a table's later part.
+          Array.prototype.forEach.call(
+            zj.querySelectorAll('.sheet-row:not(.sheet-pinned):not(.sheet-row-carried)'),
+            function (row) {
+              var cells = row.querySelectorAll(':scope > .sheet-cell');
+              if (!(drag && cells.length === 1 && cells[0].dataset.block === drag.id)) base++;
+            },
+          );
         }
         var body = sheet.querySelector('.sheet-body');
         var br = body.getBoundingClientRect();
@@ -769,20 +773,29 @@ window.ReportStudio = (function () {
     }
     function rowsOf(pg) {
       var k = pg.k;
-      return Array.prototype.map.call(pg.body.querySelectorAll(':scope > .sheet-row'), function (row) {
-        var rr = row.getBoundingClientRect();
-        var cells = Array.prototype.map.call(row.querySelectorAll(':scope > .sheet-cell'), function (c) {
-          return { id: c.dataset.block, size: c.dataset.size, right: (c.getBoundingClientRect().right - pg.left) / k };
-        });
-        return {
-          el: row,
-          top: (rr.top - pg.top) / k,
-          bottom: (rr.bottom - pg.top) / k,
-          cells: cells,
-          pinned: row.classList.contains('sheet-pinned'),
-          held: !!drag && cells.length === 1 && cells[0].id === drag.id,
-        };
-      });
+      // A row carried from an earlier side, or a table's later part, is
+      // another side's (or counted where the table starts).
+      return Array.prototype.map.call(
+        pg.body.querySelectorAll(':scope > .sheet-row:not(.sheet-row-carried)'),
+        function (row) {
+          var rr = row.getBoundingClientRect();
+          var cells = Array.prototype.map.call(row.querySelectorAll(':scope > .sheet-cell'), function (c) {
+            return {
+              id: c.dataset.block,
+              size: c.dataset.size,
+              right: (c.getBoundingClientRect().right - pg.left) / k,
+            };
+          });
+          return {
+            el: row,
+            top: (rr.top - pg.top) / k,
+            bottom: (rr.bottom - pg.top) / k,
+            cells: cells,
+            pinned: row.classList.contains('sheet-pinned'),
+            held: !!drag && cells.length === 1 && cells[0].id === drag.id,
+          };
+        },
+      );
     }
     function blockOf(el) {
       if (el.closest('.studio-bar, .studio-page-add, .studio-page-empty, .studio-tpl, .studio-tpl-del')) return null;
