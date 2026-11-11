@@ -349,7 +349,7 @@ function getSyncDotState() {
   if (_syncStatus === 'degraded') return { status: 'error', title: 'Cloud sync paused — saving on this device' };
   var loadProblem = _loadProblem();
   if (loadProblem) return { status: 'error', title: loadProblem };
-  var photos = _photoQueueDotState();
+  var photos = _workUploadDotState() || _photoQueueDotState();
   if (photos && photos.status === 'error') return photos;
   var q = typeof window !== 'undefined' ? window.v2Queue : null;
   if (q && typeof q.stats === 'function') {
@@ -388,6 +388,23 @@ function _photoQueueDotState() {
   if (!(Number(st.queued || 0) > 0)) return null;
   if (st.online === false) return { status: 'error', title: 'Offline — photos are saved on this device' };
   return { status: 'syncing', title: 'Syncing...' };
+}
+
+/* Add Work's uploads the server refused after the screen had said sent
+   (_workUploadStarted): one held to try again (the class was full), or
+   photos that could not go in as asked and were let go. The sync dot is
+   the only place this shows (CLAUDE.md rule 5). */
+function _workUploadDotState() {
+  if (typeof _workUploads !== 'function' || _isDemoSession()) return null;
+  var all = _workUploads();
+  var held = Object.keys(all).some(function (k) {
+    return all[k] && all[k].held;
+  });
+  if (held) return { status: 'error', title: "Some photos couldn't be sent" };
+  var dropped = _safeParseLS(_WORK_DROPPED_KEY, null);
+  var at = dropped && Date.parse(dropped.at);
+  if (at && Date.now() - at < _WORK_DROPPED_MS) return { status: 'error', title: "Some photos couldn't be added" };
+  return null;
 }
 
 function _updateSyncIndicator() {
@@ -17396,6 +17413,9 @@ var STUDENT_WORK_LINK_SECONDS = 300;
 var _WORK_REFRESH_MS = 30000; // refreshStudentWork's wait between reads, unless forced
 var _WORK_START_WAIT_MS = 8000; // how long Add Work waits for start_work_upload's answer before it answers itself
 var _WORK_UPLOADS_KEY = 'gb-work-uploads'; // the teacher's uploads on their way, by start key
+var _WORK_DROPPED_KEY = 'gb-work-dropped'; // { at }: photos refused after the screen said sent
+var _WORK_DROPPED_MS = 24 * 60 * 60 * 1000; // how long the sync dot says so, unless clicked
+var _workAwaited = {}; // start key → true while Add Work's screen still waits for the answer
 var _workServer = {}; // cid → list_course_submissions' answer, as last read
 var _workCourseRow = {}; // cid → { send_work, keep_photos_until }, as the server last said
 var _workCourseHere = {}; // cid → a change of the two on its way: { patch, at }
@@ -17639,6 +17659,19 @@ function _noteCourseSendWork(cid, courseRow) {
   _workChanged(cid);
 }
 
+/* Whether the class's work is worth reading. Every screen that shows it
+   asks for Send Work on (GraderWork.workOnInClass), so with it off there
+   is nothing to draw and nothing is read (S6-W1 review, should-fix 4).
+   Read anyway when Send Work is not known yet (the read tells), while a
+   change to it is on its way (the view already says on), or when the
+   last answer held work (a class just turned off stays current). */
+function _workReadWanted(cid) {
+  if (!_workCourseRow[cid]) return true;
+  if (_workServerView(cid).course.send_work === true) return true;
+  var srv = _workServer[cid];
+  return !!(srv && Array.isArray(srv.submissions) && srv.submissions.length);
+}
+
 function _workLook(cid) {
   return JSON.stringify(_workServerView(cid));
 }
@@ -17646,11 +17679,13 @@ function _workLook(cid) {
 /* Read the class's work from the server, unless it was read in the last
    30 seconds (opts.force reads it anyway; a read under way is joined). A
    Promise of { changed } or { error }; never rejects. A screen that
-   changes is redrawn. Nothing for any class but a live one. */
+   changes is redrawn. Nothing for any class but a live one, and nothing
+   while its Send Work is off (_workReadWanted) unless opts.anyway. */
 function refreshStudentWork(cid, opts) {
   // The class's marks and reflections are read with its work (S9-W1, S10-W1); not waited for.
   refreshCourseFeedback(cid, opts);
   if (!_workOnServer(cid)) return Promise.resolve({ changed: false });
+  if (!(opts && opts.anyway) && !_workReadWanted(cid)) return Promise.resolve({ changed: false });
   var st = _workRead[cid] || (_workRead[cid] = {});
   if (st.running) {
     if (opts && opts.force) st.again = true;
@@ -17705,6 +17740,29 @@ async function _fetchStudentWork(cid) {
   (_workRead[cid] || (_workRead[cid] = {})).at = Date.now();
   _workChanged(cid);
   return { changed: was !== _workLook(cid) };
+}
+
+/* Before a delete warning says whether photos go too (S8-F1): the
+   class's work, read from the server once this session if it has not
+   been (with Send Work off nothing else reads it, and photos sent before
+   it was turned off are still deleted). null when nothing needs reading
+   (Demo Mode, a class whose work is not the server's, or read already):
+   the readers answer now. Else a Promise of { known: true } once the
+   readers (getCourseSubmissions, CmStudentPage.studentsWithPhotos) answer
+   for the server, or { known: false } when the read failed: the warning
+   then says photos go rather than miss them. Never rejects. */
+function readStudentWorkForDelete(cid) {
+  if (!_workOnServer(cid)) return null;
+  var st = _workRead[cid];
+  if (st && st.at && !st.running) return null;
+  return refreshStudentWork(cid, { force: true, anyway: true }).then(
+    function (out) {
+      return { known: !(out && out.error) && !!(_workRead[cid] && _workRead[cid].at) };
+    },
+    function () {
+      return { known: false };
+    },
+  );
 }
 
 /* The class has just loaded from the server with its student page on
@@ -17937,17 +17995,23 @@ function _workUploadAbandon(key) {
 
 /* start_work_upload answered (from the call itself, or from the outbox's
    own event after a reload). `ready`: the waiting pages take the server's
-   ids and go up. Anything else: the photos are dropped and the class read
-   again. Returns the answer as the screens take it. Runs once per answer;
-   a second call for the same start does nothing. */
+   ids and go up. Anything else, while Add Work's screen still waits for
+   the answer: the photos are dropped, the class read again, and the
+   screen says why. Once the screen has said sent (the wait ran out, or
+   the page was reloaded) the photos are not dropped without a word: see
+   _workRefusedAfterSent. Returns the answer as the screens take it. Runs
+   once per answer; a second call for the same start does nothing. */
 function _workUploadStarted(key, data) {
   var all = _workUploads();
   var rec = all[key];
   var res = _rpcObject(data);
+  var told = !_workAwaited[key];
   if (!rec) return Promise.resolve(res || { result: 'store_failed' });
   if (rec.server && rec.restartKey !== key) return Promise.resolve({ result: 'sent' });
   if (!res || res.result !== 'ready') {
+    if (told && _workRefusedAfterSent(rec, res)) return Promise.resolve({ result: 'sent', queued: true });
     return _workUploadAbandon(key).then(function () {
+      if (told) _workNoteDropped();
       _workWriteLanded(rec.cid);
       _sweepWorkRemovals();
       if (res && res.result === 'already_sent') {
@@ -17963,6 +18027,7 @@ function _workUploadStarted(key, data) {
   var q = _wireWorkQueue();
   if (!q || files.length !== (rec.ids || []).length) {
     return _workUploadAbandon(key).then(function () {
+      if (told) _workNoteDropped();
       return { result: 'store_failed' };
     });
   }
@@ -17994,6 +18059,7 @@ function _workUploadStarted(key, data) {
     .then(function (done) {
       if (done.bad) {
         return _workUploadAbandon(key).then(function () {
+          if (told) _workNoteDropped();
           return { result: 'store_failed' };
         });
       }
@@ -18003,6 +18069,7 @@ function _workUploadStarted(key, data) {
         held.server = { submission_id: res.submission_id, files: files, finish_by: res.finish_by || null };
         delete held.restartKey;
         delete held.restarting;
+        delete held.held;
         _workUploadsSave(now);
       }
       // A restart sends every page again, to its new path.
@@ -18019,6 +18086,57 @@ function _workUploadStarted(key, data) {
         return { result: 'sent', submission: getStudentSubmission(rec.cid, rec.sid, rec.aid) };
       });
     });
+}
+
+/* A start refused after Add Work's screen had already said sent (offline,
+   or past the 8-second wait), so no screen is there to say why. True when
+   the photos are kept:
+   - nothing_sent: the work they were to add to or replace went, so they
+     are started again as new work;
+   - class_full, or no answer at all: held on the device, shown on the sync
+     dot, and tried again when a page opens or the sync dot is clicked
+     (retryHeldStudentWork).
+   False for the rest (already_sent, on_paper, too_many_pages: they cannot
+   go in as asked); the caller lets them go and the sync dot says so. */
+function _workRefusedAfterSent(rec, res) {
+  var result = res && res.result;
+  if (result && result !== 'nothing_sent' && result !== 'class_full') return false;
+  var all = _workUploads();
+  var held = all[rec.key];
+  if (!held) return false;
+  delete held.restarting; // this answer may be a restart's own
+  if (result === 'nothing_sent') {
+    _workUploadsSave(all);
+    _workRestart(held, 'new');
+    return true;
+  }
+  held.held = result || 'no_answer';
+  _workUploadsSave(all);
+  _workWriteLanded(rec.cid);
+  _updateSyncIndicator();
+  return true;
+}
+
+// Photos let go after the screen said sent: the sync dot says so for a day, or until it is clicked.
+function _workNoteDropped() {
+  _safeLSSet(_WORK_DROPPED_KEY, JSON.stringify({ at: new Date().toISOString() }));
+  _updateSyncIndicator();
+}
+
+/* The sync dot was clicked, or a page opened: held uploads are started
+   again, and the note of photos let go is cleared. */
+function retryHeldStudentWork() {
+  try {
+    localStorage.removeItem(_WORK_DROPPED_KEY);
+  } catch (e) {
+    /* nothing kept */
+  }
+  if (_isDemoSession() || !_writesEnabled()) return _updateSyncIndicator();
+  var all = _workUploads();
+  Object.keys(all).forEach(function (k) {
+    if (all[k] && all[k].held) _workRestart(all[k]);
+  });
+  _updateSyncIndicator();
 }
 
 // A submission as the server now has it, in place of the class's copy of it.
@@ -18098,16 +18216,20 @@ async function _workCommit(batch) {
 }
 
 /* An upload the server no longer holds is started again with a new key:
-   as the same choice when the work it was for is still in, else as new.
-   Its pages go up again to the new paths (_workUploadStarted). */
-function _workRestart(rec) {
+   as the same choice when the work it was for is still in, else as new
+   (or as `mode`, when the caller knows). Its pages go up again to the new
+   paths (_workUploadStarted). */
+function _workRestart(rec, mode) {
   var all = _workUploads();
   var held = all[rec.key];
   if (!held || held.restarting) return;
   var newKey = _newEntryId();
   held.restarting = true;
   delete held.server;
-  if (held.mode !== 'new' && !getStudentSubmission(held.cid, held.sid, held.aid)) held.mode = 'new';
+  delete held.held;
+  if (mode) held.mode = mode;
+  else if (held.mode !== 'new' && !getStudentSubmission(held.cid, held.sid, held.aid)) held.mode = 'new';
+  if (held.mode === 'new') held.target = null;
   // Kept under its new key, so the outbox's answer finds it.
   delete all[rec.key];
   held.key = newKey;
@@ -18170,6 +18292,8 @@ function _serverTeacherWork(cid, sid, aid, pages, mode) {
         server: null,
       };
       _workUploadPut(rec);
+      // Until the wait runs out, a refusal is this screen's to say (_workUploadStarted).
+      _workAwaited[rec.key] = true;
       var started = Promise.resolve(_workStart(rec)).then(function (res) {
         if (res && res.error) {
           if (!res.error.handledSessionExpired) console.warn('start_work_upload failed:', res.error);
@@ -18180,9 +18304,13 @@ function _serverTeacherWork(cid, sid, aid, pages, mode) {
         }
         return _workUploadStarted(rec.key, res && res.data);
       });
+      started.then(function () {
+        delete _workAwaited[rec.key];
+      });
       _trackPendingSync(started);
       var waited = new Promise(function (resolve) {
         setTimeout(function () {
+          delete _workAwaited[rec.key];
           resolve({ result: 'sent', queued: true });
         }, _WORK_START_WAIT_MS);
       });
@@ -18350,6 +18478,10 @@ var _WORK_ENDPOINTS = {
 function _resumeWorkUploads() {
   if (_isDemoSession() || !_writesEnabled() || !Object.keys(_workUploads()).length) return;
   var q = _wireWorkQueue();
+  var all = _workUploads();
+  Object.keys(all).forEach(function (k) {
+    if (all[k] && all[k].held) _workRestart(all[k]); // refused after the screen said sent: tried again
+  });
   if (q && typeof q.send === 'function') q.send();
 }
 if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
@@ -20869,6 +21001,8 @@ window.GB = {
   refreshCourseFeedback,
   loadAssessmentMarkup,
   getCourseFeedbackOptions,
+  readStudentWorkForDelete,
+  retryHeldStudentWork,
   setCourseSendWork,
   saveAssessmentStudentWork,
   addStudentWorkPages,

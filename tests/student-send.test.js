@@ -309,7 +309,7 @@ describe('S5-F3: Not Sent Yet, One Page Didn’t Send, the blurry check, Unsend 
       'Your teacher may not be able to read it. Hold the phone still, right above the page.',
     );
     expect(text(page, '.sp-send-head-page')).toBe('Page 1');
-    const retake = page.root().querySelector('.sp-send-panel .sp-send-input');
+    const retake = page.root().querySelector('.sp-send-blurry-buttons .sp-send-input');
     expect([words(retake.parentNode), retake.hasAttribute('capture')]).toEqual(['Retake', true]);
     await page.click('[data-act="send-blur-keep"]');
     expect(text(page, '[data-act="send-go"]')).toBe('Send 1 Photo');
@@ -323,7 +323,7 @@ describe('S5-F3: Not Sent Yet, One Page Didn’t Send, the blurry check, Unsend 
     await openSend(page, 'Science Fair Proposal');
     await choose(page, [{ name: 'a.jpg' }, { name: 'b.jpg', blurry: true }]);
     const key = page.T.state().send.blurryKey;
-    const input = page.root().querySelector('.sp-send-panel .sp-send-input');
+    const input = page.root().querySelector('.sp-send-blurry-buttons .sp-send-input');
     input.files = [{ name: 'b2.jpg' }];
     await page.T.sendChange(input);
     await page.settle();
@@ -430,11 +430,8 @@ describe('S5-F3: Not Sent Yet, One Page Didn’t Send, the blurry check, Unsend 
     expect(text(page, '#sp-send-ask-body')).toBe(
       'Your 2 photos are deleted and Science Fair Proposal goes back to To Do. Deleted photos can’t come back. After grading starts, ask your teacher instead.',
     );
-    expect([...page.root().querySelectorAll('.sp-send-ask-buttons .sp-btn')].map(words)).toEqual([
-      'Unsend',
-      'Keep It Sent',
-    ]);
-    await page.click('.sp-send-ask-buttons [data-act="send-ask-no"]');
+    expect([...page.root().querySelectorAll('.sp-send-ask .sp-btn')].map(words)).toEqual(['Unsend', 'Keep It Sent']);
+    await page.click('.sp-send-ask [data-act="send-ask-no"]');
     expect(has(page, '.sp-send-ask')).toBe(false);
     expect(text(page, '[data-segment="sent"]')).toBe('Sent 1');
     await page.click('[data-act="send-unsend"]');
@@ -463,10 +460,7 @@ describe('S5-F3: Not Sent Yet, One Page Didn’t Send, the blurry check, Unsend 
     expect(text(page, '#sp-send-ask-body')).toBe(
       'Your 2 photos are deleted when the new ones are sent. Deleted photos can’t come back.',
     );
-    expect([...page.root().querySelectorAll('.sp-send-ask-buttons .sp-btn')].map(words)).toEqual([
-      'Replace Photos',
-      'Cancel',
-    ]);
+    expect([...page.root().querySelectorAll('.sp-send-ask .sp-btn')].map(words)).toEqual(['Replace Photos', 'Cancel']);
     // Past the due date (the clock moved on a week).
     const later = Date.now() + 7 * 24 * 60 * 60 * 1000;
     page.T.setClock(() => later);
