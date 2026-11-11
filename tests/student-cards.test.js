@@ -195,7 +195,10 @@ beforeEach(() => {
   realFetch = globalThis.fetch;
   window.__ENV = { SUPABASE_URL: 'https://sb.test', SUPABASE_KEY: 'anon-key-for-tests' };
 });
-afterEach(() => {
+afterEach(async () => {
+  // A print's own clean-up runs a moment after the dialog (teacher/ui.js printThen): it runs while the
+  // test's stand-in window is still there, never after, whichever test printed last.
+  await new Promise(r => setTimeout(r, 5));
   releasePrints();
   document.querySelector = realQuery;
   DashClassManager.classManagerOpen = wasOpen.open;
@@ -2290,7 +2293,7 @@ describe('the three faults the review of S3-W1 left', () => {
     try {
       await shown(LIVE);
       await StudentCards.makeAndPrint(LIVE);
-      await settle();
+      await afterDraw();
       expect(Object.keys(JSON.parse(localStorage.getItem('gb-cards-printed-here'))).length).toBe(3);
       await StudentCards.load(LIVE);
       expect(localStorage.getItem('gb-cards-printed-here')).toBe(null);
