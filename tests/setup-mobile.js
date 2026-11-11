@@ -127,5 +127,6 @@ load('teacher-mobile/students-list.js');
 load('teacher-mobile/student-detail.js');
 load('teacher-mobile/tab-students.js');
 load('teacher-mobile/tab-observe.js');
+load('teacher-mobile/grade-photos.js');
 load('teacher-mobile/tab-grade.js');
 // NOTE: shell.js auto-boots — we test its logic through the modules instead
