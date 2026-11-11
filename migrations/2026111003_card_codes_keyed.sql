@@ -391,8 +391,8 @@ begin
     delete from public.fv_idempotency
      where endpoint in ('issue_student_cards', 'reissue_student_card', 'unlock_student_card');
     get diagnostics _cached = row_count;
-    drop index public.student_card_live_code;
-    alter table public.student_card drop constraint student_card_code_hash_key;
+    drop index if exists public.student_card_live_code;
+    alter table public.student_card drop constraint if exists student_card_code_hash_key;
     alter table public.student_card drop column code, drop column code_hash, drop column salt, drop column password;
     -- Dropping a column only hides it: the old values would stay in the
     -- table's file until each row is next rewritten and its old copy cleaned

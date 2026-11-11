@@ -32,7 +32,8 @@ and the database is sent tags only, as it will be.
   race     Two requests for the same student at once, on connections of
            their own: one live card, never two.
   suites   The slip suites and the score suites, untouched, on a database
-           with the file applied.
+           with the file applied; and the two grade_return suites, which
+           read which way the database makes cards.
 
 PGPORT=54331 PGDATABASE=s3m1_live python3 card_codes.py build
 PGPORT=54331 PGDATABASE=s3m1_live python3 card_codes.py
@@ -912,6 +913,11 @@ def scen_suites():
                              ('phone_reports.py', '37 passed, 0 failed'), ('questionnaires.py', '42 passed, 0 failed')):
             got = d.suite(script)
             ok('with the file applied %s passes untouched, as before: %s' % (script, want), got == want, (got, d.failures[:3]))
+        # These two make a card where they need a signed-in phone, and one lists what a teacher can run:
+        # they read which way this database makes cards (batch_a_common.card_session, keyed_cards).
+        for script, want in (('grade_return.py', '284 passed, 0 failed'), ('grade_return_limits.py', '74 passed, 0 failed')):
+            got = d.suite(script)
+            ok('with the file applied %s passes as before: %s' % (script, want), got == want, (got, d.failures[:3]))
         # score_rpcs.py compares every function with docs/schema.generated.sql, the snapshot of the live
         # database. Until that snapshot is refreshed after the apply it does not have this file's three
         # new argument lists, and that one comparison fails; afterwards all 236 pass.
