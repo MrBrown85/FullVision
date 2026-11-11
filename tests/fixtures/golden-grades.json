@@ -2890,10 +2890,10 @@
                   "grp_SCI8_5": "3.0 · 75%"
                 },
                 "letter": "B",
-                "overallText": "2.9 · 74%",
+                "overallText": "3.0 · 74%",
                 "percent": 74.7,
                 "summaryLevel": 3,
-                "summaryText": "2.9 · B 74.7%"
+                "summaryText": "3.0 · B 74.7%"
               },
               "st18": {
                 "categories": {
@@ -3474,7 +3474,7 @@
                 "folderText": {
                   "grp_SCI8_0": "2.2 · 54%",
                   "grp_SCI8_1": "2.0 · 50%",
-                  "grp_SCI8_2": "2.0 · 51%",
+                  "grp_SCI8_2": "2.1 · 51%",
                   "grp_SCI8_3": "2.1 · 53%",
                   "grp_SCI8_4": "2.2 · 54%",
                   "grp_SCI8_5": "2.2 · 56%"
@@ -6080,10 +6080,10 @@
                   "grp_SCI8_5": "3.0"
                 },
                 "letter": "B",
-                "overallText": "2.9",
+                "overallText": "3.0",
                 "percent": 74.7,
                 "summaryLevel": 3,
-                "summaryText": "2.9"
+                "summaryText": "3.0"
               },
               "st18": {
                 "categories": {
@@ -6664,7 +6664,7 @@
                 "folderText": {
                   "grp_SCI8_0": "2.2",
                   "grp_SCI8_1": "2.0",
-                  "grp_SCI8_2": "2.0",
+                  "grp_SCI8_2": "2.1",
                   "grp_SCI8_3": "2.1",
                   "grp_SCI8_4": "2.2",
                   "grp_SCI8_5": "2.2"
@@ -9900,7 +9900,7 @@
                 "letter": "C",
                 "overallText": "2.5 · 62%",
                 "percent": 63.7,
-                "summaryLevel": 2,
+                "summaryLevel": 3,
                 "summaryText": "2.5 · C 63.7%"
               },
               "st23": {
@@ -13090,7 +13090,7 @@
                 "letter": "C",
                 "overallText": "2.5",
                 "percent": 63.7,
-                "summaryLevel": 2,
+                "summaryLevel": 3,
                 "summaryText": "2.5"
               },
               "st23": {
@@ -18714,7 +18714,7 @@
                 "letter": "C",
                 "overallText": "2.5 · 62%",
                 "percent": 63.7,
-                "summaryLevel": 2,
+                "summaryLevel": 3,
                 "summaryText": "2.5 · C 63.7%"
               },
               "st23": {
@@ -21904,7 +21904,7 @@
                 "letter": "C",
                 "overallText": "2.5",
                 "percent": 63.7,
-                "summaryLevel": 2,
+                "summaryLevel": 3,
                 "summaryText": "2.5"
               },
               "st23": {
@@ -22897,7 +22897,7 @@
                 "letter": "C",
                 "overallText": "2.5 · 61%",
                 "percent": 61,
-                "summaryLevel": 2,
+                "summaryLevel": 3,
                 "summaryText": "2.5 · C 61%"
               },
               "e0000000-0000-4000-8000-000000000103": {
@@ -23111,7 +23111,7 @@
                 "letter": "C",
                 "overallText": "2.5",
                 "percent": 61,
-                "summaryLevel": 2,
+                "summaryLevel": 3,
                 "summaryText": "2.5"
               },
               "e0000000-0000-4000-8000-000000000103": {
@@ -23394,7 +23394,7 @@
                 "letter": "C",
                 "overallText": "2.5 · 61%",
                 "percent": 61,
-                "summaryLevel": 2,
+                "summaryLevel": 3,
                 "summaryText": "2.5 · C 61%"
               },
               "e0000000-0000-4000-8000-000000000103": {
@@ -23608,7 +23608,7 @@
                 "letter": "C",
                 "overallText": "2.5",
                 "percent": 61,
-                "summaryLevel": 2,
+                "summaryLevel": 3,
                 "summaryText": "2.5"
               },
               "e0000000-0000-4000-8000-000000000103": {
