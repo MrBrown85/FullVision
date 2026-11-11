@@ -2028,10 +2028,13 @@
   /* The routes s/send.js asks for the class on screen (S5-W1): work,
      send-start, replace, send-finish, unsend and file-links. The device's
      session is added here, in the body as every card route sends it, and
-     the token goes nowhere else. A real card only. */
+     the token goes nowhere else. A real card only. A send names its own
+     student (`enrollment`): when someone else is signed in now, nothing is
+     asked, so one student's send is never started under another's session. */
   var CLASS_ROUTES = { work: 1, 'send-start': 1, replace: 1, 'send-finish': 1, unsend: 1, 'file-links': 1 };
-  function askClass(route, body) {
+  function askClass(route, body, enrollment) {
     if (S.demo || !session || !has(CLASS_ROUTES, route)) return Promise.resolve({ ok: false, error: 'signed_out' });
+    if (enrollment && enrollment !== session.enrollment) return Promise.resolve({ ok: false, error: 'other_student' });
     return ask(route, Object.assign({}, body, { session: session.token, enrollment_id: session.enrollment }));
   }
 
