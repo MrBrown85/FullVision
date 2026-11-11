@@ -6,6 +6,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { mockAuth, seedCourse, seedStudents, gotoApp, TEST_COURSE } from './helpers.js';
+import { cardMenuItem } from './card-menu.js';
 
 const RUBRIC = {
   id: 'rubric-001',
@@ -52,13 +53,14 @@ async function openCard(page) {
   const title = page.locator('text=Rubric Lab Report').first();
   await expect(title).toBeVisible();
   // The card's grid is in the page while collapsed; expand it when hidden.
-  if (!(await page.locator('.rsg-header-level').first().isVisible())) await title.click();
-  await expect(page.locator('.rsg-header-level').first()).toBeVisible();
-  await expect(page.locator('.rsg-header-level')).toHaveCount(4);
+  if (!(await page.locator('.rsg-criterion-row').first().isVisible())) await title.click();
+  await expect(page.locator('.rsg-criterion-row').first()).toBeVisible();
+  // Set Everyone To ▾ lists the four levels in the card's header.
+  await expect(page.locator('.assess-setto .assess-menu-item')).toHaveCount(4);
 }
 
 async function cardOrder(page) {
-  const header = await page.locator('.rsg-header-level').allTextContents();
+  const header = await page.locator('.assess-setto .assess-menu-item').allTextContents();
   const row = await page.locator('.rsg-criterion-row').first().locator('.rsg-level').allTextContents();
   return { header, row };
 }
@@ -72,7 +74,7 @@ async function printedHeads(page) {
     window.__realSetTimeout = window.setTimeout;
     window.setTimeout = (fn, ms, ...rest) => (!ms ? 0 : window.__realSetTimeout(fn, ms, ...rest));
   });
-  await page.locator('[data-action="printRubrics"]').first().click();
+  await (await cardMenuItem(page.locator('.assess-card.open').first(), 'printRubrics')).click();
   const dialog = page.getByRole('dialog', { name: 'Print Rubrics' });
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: /^Print \d+ Pages?$/ }).click();

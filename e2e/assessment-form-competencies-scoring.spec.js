@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { openCompPicker, closeCompPicker } from './helpers.js';
+import { cardMenuItem } from './card-menu.js';
 
 /* New Assessment > Scoring > Competencies (Step 4 group 3 #24, Colin
    2026-11-03): score each tagged competency Emerging to Extending, with +
@@ -105,10 +106,7 @@ test('it needs a tagged competency, says so, and saves no rubric', async ({ page
   expect(saved.rubricId).toBeFalsy();
   expect(saved.scoreMode || 'proficiency').toBe('proficiency');
   // Editing opens it on Competencies.
-  await page
-    .locator('#ac-' + saved.id + ' [data-action="editAssess"]')
-    .first()
-    .click();
+  await (await cardMenuItem(page.locator('#ac-' + saved.id), 'editAssess')).click();
   await expect(page.locator('.af-scoremode-btn[data-mode="competencies"]')).toHaveAttribute('aria-checked', 'true');
 });
 

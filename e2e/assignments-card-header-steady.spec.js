@@ -114,19 +114,18 @@ test('hidden buttons take no clicks: a click there opens the card', async ({ pag
     const lab = page.locator('.assess-card', { hasText: 'Chemical Reactions Lab' }).first();
     if (await lab.evaluate(c => c.classList.contains('open'))) await lab.locator('.assess-title').click();
     await expect(lab).not.toHaveClass(/open/);
-    // With the mouse away, nothing hidden sits under the edit button's spot.
+    // With the mouse away, nothing hidden sits under the ⋯ button's spot.
     await page.mouse.move(5, 5);
     const hit = await lab.evaluate(c => {
-      const b = c.querySelector('[data-action="editAssess"]').getBoundingClientRect();
+      const b = c.querySelector('.assess-more-btn').getBoundingClientRect();
       const el = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
       return !!el.closest('.assess-header-actions');
     });
     expect(hit).toBe(false);
-    // Hovered, a closed card shows Print and edit / duplicate / delete, not
-    // the open grader's Grade By toggle.
+    // Hovered, a closed card shows its ⋯, not the open grid's Set Everyone To.
     await lab.locator('.assess-grip').hover();
-    await expect(lab.locator('[data-action="editAssess"]')).toBeVisible();
-    await expect(lab.locator('.rubric-view-toggle')).toBeHidden();
+    await expect(lab.locator('.assess-more-btn')).toBeVisible();
+    await expect(lab.locator('.assess-setto')).toBeHidden();
     // A click on the header's blank middle opens the card.
     const p = await lab.evaluate(c => {
       const h = c.querySelector('.assess-header').getBoundingClientRect();
@@ -136,7 +135,7 @@ test('hidden buttons take no clicks: a click there opens the card', async ({ pag
     });
     await page.mouse.click(p.x, p.y);
     await expect(lab).toHaveClass(/open/);
-    await expect(lab.locator('.rubric-view-btn[aria-pressed="true"]')).toHaveText('Rubric');
+    await expect(lab.locator('.assess-body')).toBeVisible();
     await lab.locator('.assess-title').click();
   }
 });

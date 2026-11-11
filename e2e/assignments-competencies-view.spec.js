@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { mockAuth, seedCourse, seedStudents, gotoApp, TEST_COURSE } from './helpers.js';
+import { cardMenuItem } from './card-menu.js';
 
 // Competencies | Rubric on rubric work: Competencies lists the competencies
 // the criteria feed (then any criterion that feeds none), each showing its
@@ -52,9 +53,9 @@ test('the Competencies view scores a competency through its criteria', async ({ 
   await gotoApp(page, '/assignments');
   const card = page.locator('#ac-assess-comp');
   if (!(await card.evaluate(el => el.classList.contains('open')))) await card.locator('.assess-title').click();
-  const view = card.locator('.rubric-view-toggle .rubric-view-btn');
-  await expect(view).toHaveText(['Competencies', 'Rubric']);
-  await view.filter({ hasText: 'Competencies' }).click();
+  // Grade by Competencies or Rubric, from the card's ⋯ menu.
+  const gradeBy = async rubric => (await cardMenuItem(card, 'setRubricView', '[data-rubric="' + rubric + '"]')).click();
+  await gradeBy(false);
 
   const alice = card.locator('.rsg-student[data-status-student="stu-001"]');
   const rows = alice.locator('.rsg-criterion-row.is-tag');
@@ -67,9 +68,9 @@ test('the Competencies view scores a competency through its criteria', async ({ 
   expect(await aliceScores(page)).toEqual({ 'crit-q1': 3, 'crit-q2': 3 });
 
   // Criteria that disagree show the lowest, striped, with no + | −.
-  await view.filter({ hasText: 'Rubric' }).click();
+  await gradeBy(true);
   await alice.locator('.rsg-criterion-row[data-criterion="crit-q2"] .rsg-level.l2').click();
-  await view.filter({ hasText: 'Competencies' }).click();
+  await gradeBy(false);
   await expect(qap.locator('.rsg-level.active.mixed')).toHaveText('Developing');
   await expect(qap.locator('.rsg-mod')).toHaveCount(0);
 

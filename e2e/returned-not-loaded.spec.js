@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { cardMenuItem } from './card-menu.js';
 
 /* Every teacher page in a class that holds grades whose Draft and Returned
    rows have not loaded yet (a signed-in teacher's first draw of a session,
@@ -273,7 +274,7 @@ test.describe('Reports and Assignments while the rows load', () => {
     await expect(mark).toBeAttached();
     await expect(mark).toBeHidden();
     // Print Rubrics does not open while the handout cannot be worked out.
-    await card.locator('[data-action="printRubrics"]').first().click();
+    await (await cardMenuItem(card, 'printRubrics')).click();
     await expect(page.getByRole('dialog', { name: 'Print Rubrics' })).toHaveCount(0);
     await loaded(page);
     await expect(page.locator('#ac-sci8a4 [data-rp-mark-sid="' + sid + '"]').first()).toContainText('Printed');
@@ -391,7 +392,7 @@ test.describe('a fault in the returned grades never takes down a grading page', 
     const card = page.locator('#ac-sci8a4');
     await card.waitFor();
     if (!(await card.evaluate(el => el.classList.contains('open')))) await card.locator('.assess-title').click();
-    await card.locator('[data-action="printRubrics"]').first().click();
+    await (await cardMenuItem(card, 'printRubrics')).click();
     await expect(dialog).toHaveCount(0);
     expect(reported()).toBe(1);
     await expect(card).toBeVisible();

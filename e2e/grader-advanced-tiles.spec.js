@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { mockAuth, seedCourse, seedStudents, gotoApp, TEST_COURSE } from './helpers.js';
 
-// The grade editor draws an Advanced Rubric as tiles holding each level's
-// checkboxes. Ticking every box of a level suggests and sets it; a level
-// picked by hand stays, and the note under the criterion says so.
+// The grade editor draws an Advanced Rubric as the board's compact rows:
+// the checklist folds under its chip, a column of boxes under each level.
+// Ticking every box of a level suggests and sets it; a level picked by hand
+// stays, and the Suggested line's hover says so.
 const RUBRIC = {
   id: 'rub-adv',
   name: 'Lab Skills Rubric',
@@ -54,16 +55,23 @@ test('Advanced Rubric tiles tick, suggest and keep a hand-picked level', async (
   await page.locator('.gb-scores-cell[data-sid="stu-001"][data-aid="assess-adv"]').click();
 
   const crit = page.locator('#grader-overlay .grdt-crit[data-critid="crit-safe"]');
-  await expect(crit.locator('.grdt-advice')).toContainText('No Level Suggested Yet');
+  // The checklists start open (Show); the chip folds one away and back.
+  const chip = crit.locator('[data-action="graderChecks"]');
+  await expect(chip).toHaveAttribute('aria-expanded', 'true');
+  await expect(crit.locator('.grdr-suggested')).toHaveCount(0);
+  await chip.click();
+  await expect(crit.locator('.grdr-checklist')).toHaveCount(0);
+  await chip.click();
 
   await crit.locator('input[data-checkid="k3a"]').check();
   await crit.locator('input[data-checkid="k3b"]').check();
-  await expect(crit.locator('.grdt-advice')).toContainText('Suggested: Proficient');
-  await expect(crit.locator('.grdt-tile.is-chosen')).toContainText('Proficient');
+  await expect(crit.locator('.grdr-suggested')).toHaveText('Suggested: Proficient');
+  await expect(crit.locator('.grdl-level.is-on')).toHaveText('Proficient');
+  await expect(chip).toContainText('2');
 
-  // The tile around the checkboxes picks its level.
-  await crit.locator('.grdt-tile.is-checklist[data-level="4"]').click({ position: { x: 6, y: 6 } });
-  await expect(crit.locator('.grdt-tile.is-chosen')).toContainText('Extending');
-  await expect(crit.locator('.grdt-advice')).toContainText('You picked Extending');
-  await expect(crit.locator('.grdt-tile.is-suggested')).toContainText('Goggles on');
+  // A level picked by hand stays, and the Suggested line's hover says so.
+  await crit.locator('[data-action="graderLevel"][data-level="4"]').click();
+  await expect(crit.locator('.grdl-level.is-on')).toHaveText('Extending');
+  await expect(crit.locator('.grdr-suggested')).toHaveAttribute('title', /^You picked Extending/);
+  await expect(crit.locator('.rsg-checklist-col.is-chosen')).toContainText('Reminds others');
 });
