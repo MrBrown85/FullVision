@@ -5,7 +5,7 @@ gradebook-prod will be once Batch B is applied (batch_c_common.build).
     PGDATABASE=<template> BATCH_B_DIR=<Batch B's migrations/> python3 batch_c.py            every scenario
     PGDATABASE=...                                            python3 batch_c.py teacher    only those named
 
-Scenarios: apply1 teacher markup started contract reflect revision group grants race apply2 hide given
+Scenarios: apply1 teacher markup started contract gone reflect revision group grants race apply2 hide given
 """
 import threading, time
 from batch_c_common import *
@@ -530,6 +530,49 @@ def contract():
            and d.feedback(t1, ENR1)['last_plan']['plan'] == 'Check the rubric first.')
         ok('(d) the key of the refused answer works once the switch is on', d.rpc('answer_reflection(:r, :a, :k)', r=rid2, a='x', k=key)['result'] == 'already_answered')
         ok('(k) answer_seen is for the service role only', not d.one("select has_function_privilege('authenticated', 'student_submit.answer_seen(text,uuid,uuid[],text)'::regprocedure, 'execute') or has_function_privilege('anon', 'student_submit.answer_seen(text,uuid,uuid[],text)'::regprocedure, 'execute')"))
+    finally:
+        d.close()
+
+# ── gone: what C1's delete triggers do, path by path (point 4 of the refresh) ─
+def gone():
+    d = scenario_db('gone')
+    try:
+        k = seed(d); t1 = d.session(ENR1); t2 = d.session(ENR2, '2012-06-16')
+        counts = lambda: tuple(d.one('select count(*) from %s' % t) for t in ('markup', 'revision_request', 'feedback_reflection'))
+        def fill(e, t, a):
+            """A page marked and given, a reflection, a revision request: one of each for e on a."""
+            sub, files = d.send(t, e, a, 1)
+            d.save_markup(files[0], marks('n')); d.score(e, a, 6); d.return_work(a, [e])
+            assert d.reflect(t, e, a, {'makes_sense': 'yes', 'plan': 'p'})['ok']
+            assert d.rfr(a, e, {'what_to_fix': 'x'})['result'] == 'made'
+        fill(ENR1, t1, k['lab']); fill(ENR2, t2, k['lab'])
+        d.run("update assessment set score_mode = 'points', max_points = 10 where id = :a", a=k['rub'])
+        fill(ENR1, t1, k['rub'])
+        ok('gone: three of each to start', counts() == (3, 3, 3), counts())
+        # withdrawing a student is not a delete: nothing goes
+        r = d.rpc('withdraw_student(:e, :k)', e=ENR2, k=nid())
+        ok('gone: withdrawing a student deletes nothing of Batch C', counts() == (3, 3, 3), (r, counts()))
+        # deleting the withdrawn student (Class Settings, Withdrawn, Delete): that student's rows only
+        r = d.rpc('delete_withdrawn_student(:e, :k)', e=ENR2, k=nid())
+        ok("gone: deleting a withdrawn student takes that student's marks, revision requests and reflections, and only theirs",
+           counts() == (2, 2, 2) and d.one('select count(*) from feedback_reflection where enrollment_id = :e', e=ENR2) == 0, (r, counts()))
+        # Delete Assessment: that piece's rows only
+        d.rpc('delete_assessment(:a)', a=k['rub'])
+        ok("gone: deleting an assessment takes that piece's rows, and only its", counts() == (1, 1, 1)
+           and d.one('select count(*) from revision_request where assessment_id = :a', a=k['lab']) == 1, counts())
+        # an assessment with none of these rows: the trigger deletes nothing
+        before = counts(); d.rpc('delete_assessment(:a)', a=k['dib'])
+        ok('gone: deleting an assessment with no such rows deletes none', counts() == before)
+        # Teacher B's class is never touched: give it a reflection first
+        d.run("update course set student_page_enabled = true, return_grades = 'on_return', send_work = true, reflect_on_feedback = true where id = :c", c=COURSE_B)
+        tb = d.session(ENR_B, '2012-07-17', course=COURSE_B, teacher=B)
+        d.rpc('upsert_score(:e, :a, 5)', B, e=ENR_B, a=k['b_lab']); d.rpc('return_grades(:a, :e, :k)', B, a=k['b_lab'], e=[ENR_B], k=nid())
+        ok("gone: Teacher B's student reflects", d.reflect(tb, ENR_B, k['b_lab'], {'makes_sense': 'yes', 'plan': 'b'})['ok'])
+        # the 30-day purge of a deleted class: every row of that class goes, the other class's stay
+        d.run("update course set deleted_at = now() - interval '31 days' where id = :c", c=COURSE_A)
+        r = d.one('select public.fv_retention_cleanup()')
+        ok("gone: the 30-day purge of a deleted class takes all its rows and leaves the other class's", counts() == (0, 0, 1)
+           and d.one('select count(*) from feedback_reflection where course_id = :c', c=COURSE_B) == 1, (r, counts()))
     finally:
         d.close()
 
@@ -1077,7 +1120,7 @@ def given():
     finally:
         d.close()
 
-SCENARIOS = {'apply1': apply1, 'teacher': teacher, 'markup': markup, 'started': started, 'contract': contract, 'reflect': reflect, 'revision': revision, 'group': group,
+SCENARIOS = {'apply1': apply1, 'teacher': teacher, 'markup': markup, 'started': started, 'contract': contract, 'gone': gone, 'reflect': reflect, 'revision': revision, 'group': group,
              'grants': grants, 'race': race, 'apply2': apply2, 'hide': hide, 'given': given}
 if __name__ == '__main__':
     for name in (sys.argv[1:] or list(SCENARIOS)):

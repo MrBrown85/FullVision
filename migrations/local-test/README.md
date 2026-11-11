@@ -1759,6 +1759,12 @@ for those three new rows.
   answer, no reply to it, a follow-up answered Only Me. (c, d) the switch
   off: `reply` and `answer_reflection` answer `reflect_off`, both sides list
   no reflection, nothing is deleted, all back when it is on.
+- **gone** (what C1's delete triggers do). With a marked page, a
+  reflection and a revision request for two students on two pieces:
+  withdrawing a student deletes nothing; deleting the withdrawn student takes
+  only theirs; Delete Assessment takes only that piece's; a piece with none
+  deletes none; the 30-day purge of a deleted class takes all of that
+  class's and none of another teacher's.
 - **reflect**. Every refusal (not returned, no grade, the switch off,
   another student, another class, not yet on the page, no session, a locked
   card, eight wrong shapes); yes with a plan; the same twice; sent again
