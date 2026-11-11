@@ -2,8 +2,9 @@
  * The student page's Evidence panel — teacher/student-evidence.js.
  *
  * Timeline layout (term span, all-time span, gaps over 14 days, the gap up
- * to today), the tab filters and counts, competency grouping, and the
- * panel itself in a DOM: tabs, cards, add and Undo delete.
+ * to today), the type chips and counts, Seen in Class, months, and the
+ * panel itself in a DOM: chips, private notes kept off screen, cards, add
+ * and Undo delete.
  */
 import './setup.js';
 import { vi } from 'vitest';
@@ -119,38 +120,52 @@ describe('timelineLayout', () => {
   });
 });
 
-describe('tab filters', () => {
+describe('type chips, Seen in Class and months', () => {
   const obs = [
     ob('a', '2026-10-10', { sentiment: 'concern', competencyId: 't2' }),
     ob('b', '2026-10-09', { assignmentContext: { assessmentId: 'x1', assessmentTitle: 'Lab 1' } }),
-    ob('c', '2026-10-08', { sentiment: 'strength', competencyId: 't1' }),
-    ob('d', '2026-10-07', { competencyId: 'gone' }),
-    ob('e', '2026-10-06', { sentiment: 'concern' }),
+    ob('c', '2026-09-08', { sentiment: 'strength', competencyId: 't1' }),
+    ob('d', '2026-09-07', { competencyId: 'gone', sentiment: 'note' }),
+    ob('e', '2025-06-06', { sentiment: 'concern', competencyId: 't1' }),
   ];
 
-  it('lists each tab', () => {
-    expect(H.tabFilter(obs, 'all').map(o => o.id)).toEqual(['a', 'b', 'c', 'd', 'e']);
-    expect(H.tabFilter(obs, 'assessments').map(o => o.id)).toEqual(['b']);
-    expect(H.tabFilter(obs, 'concerns').map(o => o.id)).toEqual(['a', 'e']);
+  it('lists each type; a note with no type shows under All only', () => {
+    expect(H.typeFilter(obs, 'all').map(o => o.id)).toEqual(['a', 'b', 'c', 'd', 'e']);
+    expect(H.typeFilter(obs, 'concern').map(o => o.id)).toEqual(['a', 'e']);
+    expect(H.typeFilter(obs, 'growth')).toEqual([]);
+    expect(H.typeCounts(obs)).toEqual({ all: 5, strength: 1, growth: 0, concern: 2, note: 1 });
   });
 
-  it('counts each tab; By competency counts the linked ones', () => {
-    expect(H.tabCounts(obs)).toEqual({ all: 5, competency: 3, assessments: 1, concerns: 2 });
-  });
-
-  it('groups by competency in learning-map order, unknown next, unlinked last', () => {
+  it('counts each competency on the map, in map order, zero included; off-map links are left out', () => {
     const items = [
       { type: 'section', label: 'Questioning' },
       { id: 't1', label: 'Make observations' },
       { id: 't2', label: 'Plan an investigation' },
+      { id: 't3', label: 'Evaluate' },
     ];
-    const groups = H.groupByCompetency(obs, items, () => '');
-    expect(groups.map(g => [g.label, g.obs.map(o => o.id)])).toEqual([
-      ['Make observations', ['c']],
-      ['Plan an investigation', ['a']],
-      ['Competency', ['d']],
-      ['Not linked to a competency', ['b', 'e']],
+    expect(H.coverage(obs, items)).toEqual([
+      { id: 't1', label: 'Make observations', n: 2 },
+      { id: 't2', label: 'Plan an investigation', n: 1 },
+      { id: 't3', label: 'Evaluate', n: 0 },
     ]);
+  });
+
+  it('groups by month, newest first, with the year on another year', () => {
+    const g = H.monthGroups(obs, '2026-10-18');
+    expect(g.map(m => [m.label, m.obs.map(o => o.id)])).toEqual([
+      ['October', ['a', 'b']],
+      ['September', ['c', 'd']],
+      ['June 2025', ['e']],
+    ]);
+  });
+
+  it('says the latest gap and lists a short run of days', () => {
+    const L = H.timelineLayout([ob('x', '2026-09-20'), ob('y', '2026-10-16')], { today: '2026-10-18' });
+    expect(H.gapSentence(L, '2026-10-18')).toBe('No notes for 26 days, Sep 20 to Oct 16');
+    const L2 = H.timelineLayout([ob('x', '2026-09-20')], { today: '2026-10-18' });
+    expect(H.gapSentence(L2, '2026-10-18')).toBe('No notes for 28 days, since Sep 20');
+    expect(H.datesSentence(L, '2026-10-18')).toBe('Notes on Sep 20 and Oct 16.');
+    expect(H.datesSentence(L2, '2026-10-18')).toBe('A note on Sep 20.');
   });
 });
 
@@ -211,60 +226,103 @@ describe('Evidence panel in the page', () => {
 
   const $ = sel => dom.document.querySelector(sel);
   const $$ = sel => Array.from(dom.document.querySelectorAll(sel));
-  const tabText = () => $$('.ev-tab').map(t => t.textContent.replace(/\s+/g, ' ').trim());
+  const chipText = () => $$('.ev-type-chip').map(t => t.textContent.replace(/\s+/g, ' ').trim());
   const cardIds = () => $$('#ev-list .obs-card').map(c => c.getAttribute('data-obid'));
 
-  it('shows one Evidence panel with tabs, counts and cards newest first, without the name', () => {
+  it('shows one panel with type chips, counts and cards newest first by month, without the name', () => {
     expect($('#ev-title').textContent).toBe('Observations');
-    expect(tabText()).toEqual(['All 3', 'By Competency 0', 'Assessments 1', 'Concerns 1']);
+    expect(chipText()).toEqual(['All 3', 'Strength 1', 'Growth 0', 'Concern 1', 'Note 0']);
+    expect($('[data-ev-type="all"]').getAttribute('aria-pressed')).toBe('true');
     expect(cardIds()).toEqual(['o3', 'o2', 'o1']);
+    expect($$('.ev-month-title').map(h => h.textContent)).toEqual(['October', 'September']);
     expect($('#ev-list .obs-card-student')).toBeNull();
     expect($('#ev-list .obs-card-with')).toBeNull();
     // A card opens the edit window (the Observations page's, over this page).
     expect($('#ev-list .obs-card').getAttribute('data-action')).toBe('evEditOb');
     expect($('#ev-list .obs-card').getAttribute('tabindex')).toBe('0');
+    // No learning map: no Seen in Class.
+    expect($('#ev-seen').hidden).toBe(true);
   });
 
-  it('draws a mark per observation and labels the gap', () => {
-    expect($$('.ev-tl-mark').map(m => m.getAttribute('data-obid'))).toEqual(['o1', 'o2', 'o3']);
-    expect($('.ev-tl-mark[data-obid="o2"]').getAttribute('data-shape')).toBe('square');
+  it('keeps a private note off the screen until Show', () => {
+    const text = () => $('#ev-list .obs-card[data-obid="o3"] .obs-card-text').textContent;
+    expect(text()).toBe('Hidden on screen. Show');
+    expect($('.ev-tl-mark[data-obid="o3"]').getAttribute('aria-label')).toBe('Oct 16 · Concern · Private');
+    expect($('#ev-list .obs-card[data-obid="o1"] .obs-card-text').textContent).toBe('Asked a sharp question');
+    $('#ev-list .obs-card[data-obid="o3"] .obs-card-reveal').click();
+    expect(text()).toBe('Left the lab early');
     expect($('.ev-tl-mark[data-obid="o3"]').getAttribute('aria-label')).toBe(
       'Oct 16 · Concern · Private: Left the lab early',
     );
-    // Sep 20 → Oct 1 is 11 days, Oct 1 → Oct 16 is 15, Oct 16 → today is 2.
-    expect($$('.ev-tl-gap-label').map(g => g.textContent)).toEqual(['No observations for 15 days']);
-    expect($('.ev-tl-range').textContent).toBe('All time · Sep 20 to today');
+    // Another student, then back: hidden again.
+    StudentEvidence.mount('c1', 's2');
+    StudentEvidence.mount('c1', 's1');
+    expect(text()).toBe('Hidden on screen. Show');
   });
 
-  it('switches tabs', () => {
-    $('[data-ev-tab="concerns"]').click();
+  it('draws a mark per observation, labels the gap and says it in words', () => {
+    expect($$('.ev-tl-mark').map(m => m.getAttribute('data-obid'))).toEqual(['o1', 'o2', 'o3']);
+    expect($('.ev-tl-mark[data-obid="o2"]').getAttribute('data-shape')).toBe('square');
+    // Sep 20 → Oct 1 is 11 days, Oct 1 → Oct 16 is 15, Oct 16 → today is 2.
+    expect($$('.ev-tl-gap-label').map(g => g.textContent)).toEqual(['No notes for 15 days']);
+    expect($('.ev-tl-head .ev-h3').textContent).toBe('All Time');
+    expect($('.ev-tl-range').textContent).toBe('Sep 20 to today');
+    expect($('.ev-tl-gapline').textContent).toBe('No notes for 15 days, Oct 1 to Oct 16');
+    expect($('.ev-tl-dates').textContent).toBe('Notes on Sep 20, Oct 1 and Oct 16.');
+  });
+
+  it('narrows by type, and says so when nothing matches', () => {
+    $('[data-ev-type="concern"]').click();
     expect(cardIds()).toEqual(['o3']);
-    expect($('#ev-tab-concerns').getAttribute('aria-selected')).toBe('true');
-    $('[data-ev-tab="assessments"]').click();
-    expect(cardIds()).toEqual(['o2']);
-    $('[data-ev-tab="competency"]').click();
-    expect($('.ev-group-title').textContent).toContain('Not linked to a competency');
+    expect($('[data-ev-type="concern"]').getAttribute('aria-pressed')).toBe('true');
+    expect($('[data-ev-type="all"]').getAttribute('aria-pressed')).toBe('false');
+    $('[data-ev-type="growth"]').click();
+    expect($('#ev-list').textContent).toBe('No notes match. Show All Notes');
+    $('[data-ev-clear]').click();
     expect(cardIds()).toEqual(['o3', 'o2', 'o1']);
   });
 
-  it('search filters the active tab and its counts', () => {
+  it('Seen in Class counts each competency, marks the unseen, and narrows the notes', () => {
+    store[0].competencyId = 't1';
+    store[2].competencyId = 't1';
+    const tags = { t1: { id: 't1', label: 'Make observations' }, t2: { id: 't2', label: 'Plan an investigation' } };
+    swap('getSections', () => [{ id: 'sec', name: 'Questioning', tags: [tags.t1, tags.t2] }]);
+    swap('getTagById', (cid, id) => tags[id] || null);
+    StudentEvidence.refresh();
+    const chips = () => $$('.ev-seen-chip').map(c => c.textContent.replace(/\s+/g, ' ').trim());
+    expect($('#ev-seen').hidden).toBe(false);
+    expect(chips()).toEqual(['Make observations 2', 'Plan an investigation 0']);
+    expect($('.ev-seen-chip[data-ev-comp="t2"]').classList.contains('is-none')).toBe(true);
+    expect($('.ev-seen-note').textContent).toBe('1 competency has no observation yet. Watch for it next class.');
+
+    $('.ev-seen-chip[data-ev-comp="t1"]').click();
+    expect(cardIds()).toEqual(['o3', 'o1']);
+    expect(chipText()).toEqual(['All 2', 'Strength 1', 'Growth 0', 'Concern 1', 'Note 0']);
+    expect($('.ev-comp-pill').textContent).toContain('Make observations');
+    // The pill's × shows every competency.
+    $('.ev-comp-clear').click();
+    expect(cardIds()).toEqual(['o3', 'o2', 'o1']);
+    expect($('.ev-comp-pill')).toBeNull();
+  });
+
+  it('search narrows the notes and the counts', () => {
     const input = $('#ev-search');
     input.value = 'lab';
     input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
     // "Left the lab early" by text, "Strong graph" by its assessment title.
     expect(cardIds()).toEqual(['o3', 'o2']);
-    expect(tabText()).toEqual(['All 2', 'By Competency 0', 'Assessments 1', 'Concerns 1']);
-    $('[data-ev-tab="concerns"]').click();
+    expect(chipText()).toEqual(['All 2', 'Strength 0', 'Growth 0', 'Concern 1', 'Note 0']);
+    $('[data-ev-type="concern"]').click();
     expect(cardIds()).toEqual(['o3']);
     input.value = 'zebra';
     input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
     expect($('#ev-list').textContent).toContain('Nothing here matches');
   });
 
-  it('a timeline mark opens the All tab on its card', () => {
-    $('[data-ev-tab="concerns"]').click();
+  it('a timeline mark clears a filter that hides its card', () => {
+    $('[data-ev-type="concern"]').click();
     $('.ev-tl-mark[data-obid="o1"]').click();
-    expect($('#ev-tab-all').getAttribute('aria-selected')).toBe('true');
+    expect($('[data-ev-type="all"]').getAttribute('aria-pressed')).toBe('true');
     expect($('#ev-list .obs-card[data-obid="o1"]').classList.contains('ev-card-hit')).toBe(true);
   });
 
@@ -293,7 +351,7 @@ describe('Evidence panel in the page', () => {
     cap.submit();
     expect(cardIds()[0]).toBe('o4');
     expect($('.ev-tl-mark[data-obid="o4"]')).toBeTruthy();
-    expect(tabText()[0]).toBe('All 4');
+    expect(chipText()[0]).toBe('All 4');
   });
 
   it('tells the page after an add, a delete and an Undo, and reports a pending delete', () => {
@@ -315,11 +373,10 @@ describe('Evidence panel in the page', () => {
     store = [];
     StudentEvidence.refresh();
     expect($('#ev-list').textContent).toBe('No observations yet. Add one above.');
-    // An empty strip keeps its height, so the capture box below it stays put.
     expect($('#ev-timeline').hidden).toBe(false);
-    expect($('.ev-tl-range').textContent).toBe('All time · No observations yet');
+    expect($('.ev-tl-range').textContent).toBe('No observations yet');
     expect($$('.ev-tl-mark')).toHaveLength(0);
-    $('[data-ev-tab="concerns"]').click();
-    expect($('#ev-list').textContent).toBe('No concerns recorded.');
+    $('[data-ev-type="concern"]').click();
+    expect($('#ev-list').textContent).toBe('No observations yet. Add one above.');
   });
 });
