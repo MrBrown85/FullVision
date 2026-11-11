@@ -3471,11 +3471,11 @@ window.PageGradebook = (function () {
      Assessment deletes with it. Counted from the read side in shared/data.js
      (getCourseSubmissions), students not pages: a submission with at least one
      page, whoever sent it. 0, and the dialog reads as it always has, while the
-     class's build switch or Send Work is off or nothing has been sent. */
+     class's build switch is off or nothing has been sent. Send Work is not
+     asked: photos sent before it was turned off are still deleted. */
   function _studentsWithSentPhotos(cid, aid) {
-    if (typeof getCourseSubmissions !== 'function' || typeof getCourseSendWork !== 'function') return 0;
+    if (typeof getCourseSubmissions !== 'function') return 0;
     if (typeof getReturnSettings !== 'function' || !getReturnSettings(cid).student_page) return 0;
-    if (!getCourseSendWork(cid).send_work) return 0;
     var who = {};
     (getCourseSubmissions(cid).submissions || []).forEach(function (s) {
       if (s && s.assessment_id === aid && Array.isArray(s.files) && s.files.length) who[s.enrollment_id] = true;
