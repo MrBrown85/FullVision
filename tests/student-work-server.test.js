@@ -17,6 +17,7 @@
  * - A class whose student page is off is sent nothing new.
  */
 import './setup.js';
+import { parseHTML } from 'linkedom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
@@ -310,6 +311,56 @@ describe('reading a signed-in class’s work', () => {
     expect(getCourseSendWork(CID).send_work).toBe(false);
   });
 
+  it('with Send Work off, opening the grader, the Assignments page or the Work Wall reads nothing', async () => {
+    course.send_work = false;
+    await openClass();
+    expect((await refreshStudentWork(CID)).changed).toBe(false);
+    expect((await refreshStudentWork(CID, { force: true })).changed).toBe(false);
+    expect(callsTo('list_course_submissions')).toEqual([]);
+    // Turned on (still on its way): read again.
+    fake.on('set_course_send_work', p => ({ data: Object.assign({}, srv.course, p.p_patch), error: null }));
+    setOnline(false);
+    setCourseSendWork(CID, { send_work: true });
+    setOnline(true);
+    await quiet();
+    expect(callsTo('list_course_submissions').length).toBeGreaterThan(0);
+  });
+
+  it('with Send Work off, Delete Class reads the class’s work once and names the photos sent before', async () => {
+    course.send_work = false;
+    await openClass();
+    expect(callsTo('list_course_submissions')).toEqual([]);
+    const doc = globalThis.document;
+    globalThis.document = parseHTML('<!DOCTYPE html><html><body><div id="main"></div></body></html>').document;
+    const message = () => document.querySelector('.confirm-card .confirm-message').textContent;
+    const PHOTOS = /scores and photos of student work\? .*Deleted photos can't come back\.$/;
+    try {
+      COURSES[CID].archived = true;
+      // The read fails: the warning says photos go rather than miss them.
+      fake.on('list_course_submissions', () => ({ data: null, error: { message: 'network: failed to fetch' } }));
+      DashClassManager.handleAction('cmDeleteCourse', { dataset: { cid: CID } });
+      await settle();
+      await settle();
+      expect(message()).toMatch(PHOTOS);
+      document.getElementById('confirm-cancel-btn').onclick();
+      // It answers: Noor's photos, sent before Send Work was turned off, are named.
+      fake.on('list_course_submissions', () => ({ data: structuredClone(srv), error: null }));
+      DashClassManager.handleAction('cmDeleteCourse', { dataset: { cid: CID } });
+      await settle();
+      await settle();
+      expect(message()).toMatch(PHOTOS);
+      document.getElementById('confirm-cancel-btn').onclick();
+      expect(callsTo('list_course_submissions')).toHaveLength(2);
+      // Read once this session: the next warning asks nothing more.
+      DashClassManager.handleAction('cmDeleteCourse', { dataset: { cid: CID } });
+      expect(message()).toMatch(PHOTOS);
+      expect(callsTo('list_course_submissions')).toHaveLength(2);
+    } finally {
+      DashClassManager.resetState();
+      globalThis.document = doc;
+    }
+  });
+
   it('a class whose student page is off is sent nothing new, and its writers answer as before', async () => {
     course.student_page_enabled = false;
     await openClass();
@@ -433,6 +484,44 @@ describe('Add Work', () => {
     expect(res.submission.id).toBe(theirs.id);
     expect(store.count()).toBe(0);
     expect(callsTo('finish_work_upload')).toEqual([]);
+  });
+
+  it('refused after the screen said sent, the photos are kept: held when the class is full, tried again, and on the sync dot only', async () => {
+    await openClass();
+    _WORK_START_WAIT_MS = 0;
+    setOnline(false);
+    expect((await addStudentWorkPages(CID, MATEO, CAUSES, shrunk(1))).result).toBe('sent');
+    fake.on('start_work_upload', () => ({ data: { result: 'class_full' }, error: null }));
+    setOnline(true);
+    await quiet();
+    expect(store.count()).toBe(1); // the page waits on the device
+    expect(getStudentSubmission(CID, MATEO, CAUSES).files[0].path).toMatch(/^photo-queue:p/);
+    expect(getSyncDotState()).toEqual({ status: 'error', title: "Some photos couldn't be sent" });
+    // Room again: the sync dot's click (or the next page open) tries it again, under a new key.
+    fake.on('start_work_upload', answerStart);
+    retryHeldStudentWork();
+    await quiet();
+    const starts = callsTo('start_work_upload');
+    expect(starts).toHaveLength(2);
+    expect(starts[1].p_idempotency_key).not.toBe(starts[0].p_idempotency_key);
+    expect(callsTo('finish_work_upload')).toHaveLength(1);
+    expect(store.count()).toBe(0);
+    expect(getSyncDotState().status).toBe('idle');
+  });
+
+  it('refused after the screen said sent because the student sent first, the sync dot says so', async () => {
+    await openClass();
+    _WORK_START_WAIT_MS = 0;
+    setOnline(false);
+    await addStudentWorkPages(CID, MATEO, CAUSES, shrunk(1));
+    const theirs = sent(MATEO, CAUSES, 1);
+    fake.on('start_work_upload', () => ({ data: { result: 'already_sent', submission: theirs }, error: null }));
+    setOnline(true);
+    await quiet();
+    expect(store.count()).toBe(0);
+    expect(getSyncDotState()).toEqual({ status: 'error', title: "Some photos couldn't be added" });
+    retryHeldStudentWork(); // the click clears it
+    expect(getSyncDotState().status).toBe('idle');
   });
 
   it('an upload the server let go of is started again with a new key, and its pages go to the new paths', async () => {

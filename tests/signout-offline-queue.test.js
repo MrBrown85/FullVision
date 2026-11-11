@@ -171,6 +171,47 @@ describe('signOut and unsent offline changes', () => {
     }
   });
 
+  it('counts Add Work photos still uploading as unsent, one per piece of work, and keeps them', async () => {
+    loadSupabase({ queued: 0, deadLettered: 0 });
+    const queue = globalThis.PhotoQueue;
+    let wiped = false;
+    let sent = 0;
+    globalThis.PhotoQueue = {
+      stats: () => ({ queued: 3, demo: false }),
+      pages: () => [
+        { id: 'p1', batch: 'b1' },
+        { id: 'p2', batch: 'b1' },
+        { id: 'p3', batch: 'b2' },
+      ],
+      send: async () => {
+        sent++;
+        return {};
+      },
+      wipe: async () => {
+        wiped = true;
+        return { ok: true };
+      },
+    };
+    const onLine = Object.getOwnPropertyDescriptor(navigator, 'onLine');
+    Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+    try {
+      const res = await window.signOut();
+      expect(res).toEqual({ unsent: 2 });
+      expect(sent).toBe(1); // tried once before asking
+      expect(wiped).toBe(false);
+      expect(window.location.href).toBe('');
+      // Demo Mode's sample photos never count.
+      globalThis.PhotoQueue.stats = () => ({ queued: 3, demo: true });
+      await window.signOut();
+      expect(wiped).toBe(true);
+    } finally {
+      if (onLine) Object.defineProperty(navigator, 'onLine', onLine);
+      else delete navigator.onLine;
+      globalThis.PhotoQueue = queue;
+      if (!queue) delete globalThis.PhotoQueue;
+    }
+  });
+
   it('still leaves when the photo queue cannot be emptied', async () => {
     loadSupabase({ queued: 0, deadLettered: 0 });
     globalThis.PhotoQueue = { wipe: () => Promise.reject(new Error('blocked')) };
