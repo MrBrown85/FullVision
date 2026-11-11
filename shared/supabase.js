@@ -205,24 +205,64 @@
     document.body.appendChild(toast);
   };
 
-  /* Changes still waiting in the offline queue (queued + failed) for the
-     signed-in user. Tries one upload first so a sign-out only warns about
-     what genuinely could not be sent. */
+  /* Add Work's photos still on this device for the signed-in teacher
+     (shared/photo-queue.js), one per piece of work. Sign Out deletes them
+     (_deletePhotoQueue), so they count as unsent. Never in Demo Mode, where
+     the queue keeps the sample work for good. */
+  function _photoQueueStats() {
+    var pq = window.PhotoQueue;
+    if (!pq || typeof pq.stats !== 'function') return null;
+    try {
+      var st = pq.stats() || {};
+      return st.demo ? null : st;
+    } catch (e) {
+      return null;
+    }
+  }
+  function _unsentPhotoCount() {
+    var st = _photoQueueStats();
+    if (!st || !(Number(st.queued || 0) > 0)) return 0;
+    var pq = window.PhotoQueue;
+    try {
+      if (typeof pq.pages === 'function') {
+        var batches = {};
+        (pq.pages() || []).forEach(function (p) {
+          batches[(p && (p.batch || p.id)) || ''] = true;
+        });
+        var n = Object.keys(batches).length;
+        if (n > 0) return n;
+      }
+    } catch (e) {
+      /* counted by page below */
+    }
+    return Number(st.queued || 0);
+  }
+
+  /* Changes still waiting in the offline queue (queued + failed) and photos
+     still in the photo queue, for the signed-in user. Tries one upload of
+     each first so a sign-out only warns about what genuinely could not be
+     sent. */
   async function _unsentQueueCount() {
     var q = window.v2Queue;
-    if (!q || typeof q.stats !== 'function') return 0;
-    if (navigator.onLine && typeof q.flush === 'function' && q.stats().queued > 0) {
+    var hasQ = !!(q && typeof q.stats === 'function');
+    var tries = [];
+    if (navigator.onLine && hasQ && typeof q.flush === 'function' && q.stats().queued > 0) tries.push(q.flush());
+    var pq = window.PhotoQueue;
+    if (navigator.onLine && _unsentPhotoCount() > 0 && typeof pq.send === 'function') {
+      tries.push(Promise.resolve().then(() => pq.send()));
+    }
+    if (tries.length) {
       await Promise.race([
-        q.flush(),
+        Promise.all(tries).catch(function () {}),
         new Promise(function (r) {
           setTimeout(r, 8000);
         }),
       ]);
     }
-    var stats = q.stats();
+    var stats = hasQ ? q.stats() || {} : {};
     // Failed writes count too: signing out wipes them, and with them the
     // teacher's last chance to retry them.
-    return Number(stats.queued || 0) + Number(stats.deadLettered || 0);
+    return Number(stats.queued || 0) + Number(stats.deadLettered || 0) + _unsentPhotoCount();
   }
 
   /**

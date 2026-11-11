@@ -1231,6 +1231,8 @@ function refreshSyncStatusUI() {
 function _retryFromSyncDot() {
   var dot = document.getElementById('sync-indicator-dot');
   if (!dot || !/\berror\b/.test(dot.className || '')) return;
+  // Add Work's photos the server refused after the screen said sent (shared/data.js).
+  if (typeof retryHeldStudentWork === 'function') retryHeldStudentWork();
   if (window.GB && typeof window.GB.isSupabaseDegraded === 'function' && window.GB.isSupabaseDegraded()) {
     if (typeof window.GB.retrySupabaseRecovery === 'function') window.GB.retrySupabaseRecovery();
     return;
