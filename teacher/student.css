@@ -5641,5 +5641,128 @@ details.gl-rest > summary .gl-title {
 .lp2.lp-layout {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   grid-template-columns: none;
+}
+
+/* ── Desktop size (Colin, Nov 12: "too big to follow on desktop") ──
+   The redesigned tabs are sized to be read across a desk on an iPad. With
+   a mouse on a wide screen they take the app's own scale: smaller type,
+   tighter spacing. Touch screens, and the Overview in Full Screen (turned
+   toward the student), keep the large size. */
+@media (pointer: fine) and (min-width: 1025px) {
+  /* Page and section headings */
+  .stu-ov:not(:fullscreen) .stu-ov-title,
+  .stu-cp-title,
+  .stu-gr-title,
+  .ev-title,
+  .lp2-name {
+    font-size: 1.375rem;
+  }
+  .stu-ov:not(:fullscreen) .stu-ov-h3,
+  .ev-h3,
+  .lp2-h3,
+  .stu-core-head .lp2-h3,
+  .lp2 #lp-calib .qw-head h2,
+  .stu-cp-tile-v {
+    font-size: 1.0625rem;
+  }
+  /* Overview: the figures and the reading text */
+  .stu-ov:not(:fullscreen) {
+    gap: 16px;
+  }
+  .stu-ov:not(:fullscreen) .stu-ov-card {
+    padding: 16px 20px;
+  }
+  .stu-ov:not(:fullscreen) .stu-ov-letter,
+  .stu-ov:not(:fullscreen) .stu-ov-miss-n {
+    font-size: 3rem;
+  }
+  .stu-ov:not(:fullscreen) .stu-ov-pct {
+    font-size: 1.375rem;
+  }
+  .stu-ov:not(:fullscreen) .stu-ov-better-name,
+  .stu-ov:not(:fullscreen) .stu-ov-next-text {
+    font-size: 1.0625rem;
+  }
+  .stu-ov:not(:fullscreen) .stu-ov-read,
+  .stu-ov:not(:fullscreen) .stu-ov-thin-lede,
+  .stu-ov:not(:fullscreen) .stu-ov-miss-cost,
+  .stu-ov:not(:fullscreen) .stu-ov-todo-title,
+  .stu-ov:not(:fullscreen) .stu-ov-none,
+  .stu-ov:not(:fullscreen) .stu-ov-fact dd {
+    font-size: var(--text-md);
+  }
+  .stu-ov:not(:fullscreen) .stu-ov-row-title,
+  .stu-gr .stu-ov-row-title {
+    font-size: var(--text-md);
+  }
+  .stu-ov-row-main-score {
+    font-size: 1rem;
+  }
+  .stu-ov-row-btn {
+    padding: 8px 16px;
+  }
+  /* Competencies */
+  .stu-cp,
+  .stu-gr,
+  .ev-panel,
+  .lp2 {
+    gap: 16px;
+  }
+  .stu-cp-tile {
+    padding: 12px 16px;
+  }
+  .stu-comp-name strong {
+    font-size: var(--text-md);
+  }
+  .stu-comp button.dash-tag-row.stu-comp-row {
+    padding: 10px 16px;
+  }
+  /* Grades */
+  .stu-gr-course {
+    padding: 16px;
+  }
+  .stu-gr-course-v .stu-level {
+    font-size: 1.125rem;
+  }
+  .stu-gr-group-name {
+    font-size: 1rem;
+  }
+  .stu-gr-group-head {
+    padding: 8px 16px;
+  }
+  /* Observations */
+  .ev-tl-box {
+    padding: 12px 16px 8px;
+  }
+  /* Learner Profile */
+  .lp2-av {
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+    font-size: 1.125rem;
+  }
+  .lp2-card {
+    padding: 14px 20px;
+  }
+  .lp2-pair {
+    gap: 24px;
+  }
+  .lp2-bubble,
+  .lp2-goal-text,
+  .lp2-compgoal .gl-answer,
+  .lp-calib-name {
+    font-size: var(--text-md);
+  }
+  .lp2-goals > .gl-card,
+  .lp2-goals > details.gl-rest {
+    padding: 12px 16px;
+  }
+  .lp2-core-item {
+    padding: 8px 16px;
+  }
+  .lp-calib-row {
+    padding: 10px 16px;
+  }
 }
