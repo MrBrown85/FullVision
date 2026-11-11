@@ -368,39 +368,78 @@ window.Grader = (function () {
     // A pair or group still graded together counts once in To Grade.
     var units = lists.tograde.length ? groupGradingUnits(cid, _piece(cid, aid), ids) : null;
     var tograde = lists.tograde.length;
+    var groups = 0;
     if (units) {
-      tograde = units.filter(function (u) {
+      var waiting = units.filter(function (u) {
         return (u.linked || [u.sid]).some(function (sid) {
           return lists.tograde.indexOf(sid) >= 0;
         });
+      });
+      tograde = waiting.length;
+      groups = waiting.filter(function (u) {
+        return !!u.linked;
       }).length;
     }
+    // When the longest-waiting work to grade came in (an ISO time), or null.
+    var oldest = null;
+    lists.tograde.forEach(function (sid) {
+      var sub = getStudentSubmission(cid, sid, aid);
+      var at = sub && (sub.sent_at || sub.created_at);
+      if (at && (!oldest || at < oldest)) oldest = at;
+    });
     return {
       tograde: tograde,
       toreturn: lists.toreturn.length,
       returned: lists.returned.length,
       notin: lists.notin.length,
       all: ids.length,
+      groups: groups,
+      oldest: oldest,
       ids: lists,
     };
   }
 
-  /* The class's totals over every piece: { tograde, toreturn, notin,
-     pieces: [{ aid, tograde, toreturn, notin }] } (only pieces with one of
-     them), for the gradebook's bar and the dashboard's To Grade cell.
-     To Grade is 0 in a class whose work is off. */
-  function classWorkCounts(cid, studentIds) {
-    var out = { tograde: 0, toreturn: 0, notin: 0, pieces: [] };
+  /* The class's totals over every piece (or the pieces in `aids`):
+     { tograde, toreturn, notin, groups, oldest, pieces: [{ aid, tograde,
+     toreturn, notin }] } (only pieces with one of them), for the
+     gradebook's bar and the dashboard's To Grade cell. groups: how many of
+     the To Grade are pairs or groups; oldest: when the longest-waiting work
+     came in. To Grade is 0 in a class whose work is off. */
+  function classWorkCounts(cid, studentIds, aids) {
+    var out = { tograde: 0, toreturn: 0, notin: 0, groups: 0, oldest: null, pieces: [] };
     (getAssessments(cid) || []).forEach(function (a) {
       if (!a || !a.id || isDibelsScored(a)) return;
+      if (aids && aids.indexOf(a.id) < 0) return;
       var c = workCounts(cid, a.id, studentIds);
       out.tograde += c.tograde;
       out.toreturn += c.toreturn;
       out.notin += c.notin;
+      out.groups += c.groups;
+      if (c.oldest && (!out.oldest || c.oldest < out.oldest)) out.oldest = c.oldest;
       if (c.tograde || c.toreturn || c.notin)
         out.pieces.push({ aid: a.id, tograde: c.tograde, toreturn: c.toreturn, notin: c.notin });
     });
     return out;
+  }
+
+  /* How many grades on the class's pieces were returned in the 7 days to
+     `today` (the class's own date when left out): the dashboard's "27
+     Returned This Week". A student's grade on a piece counts once. */
+  function returnedThisWeek(cid, today) {
+    var day = today || courseToday(cid);
+    var since = new Date(Date.parse(day) - 6 * 86400000).toISOString().slice(0, 10);
+    var n = 0;
+    var students = getStudents(cid) || [];
+    (getAssessments(cid) || []).forEach(function (a) {
+      if (!a || !a.id || isDibelsScored(a)) return;
+      students.forEach(function (st) {
+        if (GradeState.stateOf(cid, st.id, a.id) !== GradeState.RETURNED) return;
+        var row = typeof getGradeReturn === 'function' ? getGradeReturn(cid, st.id, a.id) : null;
+        var on = row && row.returned_at ? String(row.returned_at).slice(0, 10) : '';
+        if (on && on >= since && on <= day) n++;
+      });
+    });
+    return n;
   }
 
   /* The other students on `aid` whose work holds a page that is the same
@@ -488,6 +527,7 @@ window.Grader = (function () {
     workStateOf: workStateOf,
     workCounts: workCounts,
     classWorkCounts: classWorkCounts,
+    returnedThisWeek: returnedThisWeek,
     samePhotoAs: samePhotoAs,
     setToFromPaper: setToFromPaper,
     deleteWork: deleteWork,

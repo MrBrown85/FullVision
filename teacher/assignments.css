@@ -9271,3 +9271,59 @@ button.grader-member-name {
 .grader-dialog.is-focus .grader-panel-col .grdt-tile[data-level='4'] .grdt-tile-head::before {
   content: 'EXT';
 }
+
+/* ── Work to grade on the Assignments page and in the gradebook (S6-F4).
+   The gradebook's marks live here with the rest of this slice's styles. */
+.assess-to-grade {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 10px;
+  background: var(--active);
+  color: #fff;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.assess-grade-work-btn,
+.assess-add-work-btn {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--active);
+  background: var(--bg);
+  color: var(--active);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.assess-grade-work-btn {
+  background: var(--active);
+  color: #fff;
+}
+.grader-inline-work {
+  color: var(--text-2);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.gb-to-grade {
+  color: var(--active);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.gb-work-camera {
+  display: inline-flex;
+  margin-left: 3px;
+  color: var(--active);
+  vertical-align: middle;
+}
+.gb-key-item .gb-work-camera {
+  margin: 0 4px 0 0;
+}
+.gb-key-item .gb-to-grade {
+  margin-right: 4px;
+}
