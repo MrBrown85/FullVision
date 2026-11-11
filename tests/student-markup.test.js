@@ -102,7 +102,7 @@ describe('S9-F3: the marks the student was given, on returned work only', () => 
     expect(words(q(page, '.sp-work .sp-fb-sub'))).toBe('Page 1 of 1');
     const img = q(page, '.sp-work-img');
     expect(img.getAttribute('src')).toBe('../assets/sample-work/cell-lab-cece-1.jpg');
-    expect(img.getAttribute('alt')).toBe('Your page 1 with Ms. Rivera’s marks');
+    expect(img.getAttribute('alt')).toBe('Your page 1 with your teacher’s marks');
     expect(qa(page, '.sp-work-over .sp-work-pin').map(words)).toEqual(['1', '2', '3']);
     expect(qa(page, '.sp-work-notes li span:last-child').map(words)).toEqual(LAB_NOTES);
     expect(qa(page, '.sp-work-notes li .sp-work-pin').map(words)).toEqual(['1', '2', '3']);

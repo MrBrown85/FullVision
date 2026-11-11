@@ -167,7 +167,7 @@ describe('S5-F2: Send My Work, Check and Send, Sent, Sending Late, Closed', () =
     expect(text(page, '.sp-send-hint')).toBe(
       'Photos or PDFs. Working in Word, PowerPoint or Google? Save it as a PDF, then choose it here.',
     );
-    expect(text(page, '.sp-send-note-label')).toBe('Note for Ms. Rivera');
+    expect(text(page, '.sp-send-note-label')).toBe('Note for Your Teacher');
     expect(page.root().querySelector('[data-act="send-go"]').hasAttribute('disabled')).toBe(true);
   });
 
@@ -186,7 +186,7 @@ describe('S5-F2: Send My Work, Check and Send, Sent, Sending Late, Closed', () =
     page.type('#sp-send-note', 'Page 2 has my answers.');
     await page.click('[data-act="send-go"]');
     await page.settle();
-    expect(text(page, '#sp-send-title')).toBe('Sent to Ms. Rivera');
+    expect(text(page, '#sp-send-title')).toBe('Sent to Your Teacher');
     expect(text(page, '.sp-send-when')).toMatch(/^\w+day, \S+ \d+ · \d{1,2}:\d\d (am|pm)$/);
     const rec = Object.values(page.T.state().demoSent)[0];
     expect(rec.note).toBe('Page 2 has my answers.');
@@ -200,7 +200,7 @@ describe('S5-F2: Send My Work, Check and Send, Sent, Sending Late, Closed', () =
     const sent = card(page, 'Science Fair Proposal');
     expect(words(sent.querySelector('.sp-flag-sent'))).toMatch(/^Sent \S+ \d+$/);
     expect(words(sent.querySelector('.sp-send-line'))).toBe(
-      'Ms. Rivera hasn’t started grading it. You can still change it.',
+      'Your teacher hasn’t started grading it. You can still change it.',
     );
     expect([...sent.querySelectorAll('.sp-send-change .sp-btn')].map(words)).toEqual(['Replace Photos', 'Unsend']);
     expect(page.calls).toEqual([]);
@@ -224,7 +224,7 @@ describe('S5-F2: Send My Work, Check and Send, Sent, Sending Late, Closed', () =
     await page.click('[data-act="send-done"]');
     await page.click('[data-segment="sent"]');
     const poster = card(page, 'Disease Research Poster');
-    expect(words(poster.querySelector('.sp-send-line'))).toBe('Ms. Rivera is grading this');
+    expect(words(poster.querySelector('.sp-send-line'))).toBe('Your teacher is grading this');
     expect(poster.querySelector('.sp-send-change')).toBeNull();
     // Even a press made up by hand asks nothing: the work cannot be changed.
     const forged = page.root().ownerDocument.createElement('button');
@@ -303,7 +303,7 @@ describe('S5-F3: Not Sent Yet, One Page Didn’t Send, the blurry check, Unsend 
     await choose(page, [{ name: 'a.jpg', blurry: true }]);
     expect(text(page, '#sp-send-blurry-title')).toBe('This photo looks blurry');
     expect(text(page, '.sp-send-panel .sp-send-line')).toBe(
-      'Ms. Rivera may not be able to read it. Hold the phone still, right above the page.',
+      'Your teacher may not be able to read it. Hold the phone still, right above the page.',
     );
     expect(text(page, '.sp-send-head-page')).toBe('Page 1');
     const retake = page.root().querySelector('.sp-send-panel .sp-send-input');
@@ -344,7 +344,7 @@ describe('S5-F3: Not Sent Yet, One Page Didn’t Send, the blurry check, Unsend 
     page.ctx.navigator = { onLine: true };
     await page.click('[data-act="send-again"]');
     await page.settle();
-    expect(text(page, '#sp-send-title')).toBe('Sent to Ms. Rivera');
+    expect(text(page, '#sp-send-title')).toBe('Sent to Your Teacher');
   });
 
   it('one page didn’t send: Colin’s words with the clock time two hours from the start; nothing handed in until every page is up', async () => {
@@ -358,12 +358,12 @@ describe('S5-F3: Not Sent Yet, One Page Didn’t Send, the blurry check, Unsend 
     await page.settle();
     expect(text(page, '#sp-send-title')).toBe('Page 2 didn’t send');
     expect(text(page, '.sp-send-line')).toBe(
-      'Page 1 is sent. Page 2 is still on this phone. Finish by 11:40, or you’ll need to send both pages again. Ms. Rivera sees your work once every page is sent.',
+      'Page 1 is sent. Page 2 is still on this phone. Finish by 11:40, or you’ll need to send both pages again. Your teacher sees your work once every page is sent.',
     );
     expect(text(page, '[data-act="send-again"]')).toBe('Send Page 2 Again');
     expect(words(page.root().querySelector('.sp-send-col .sp-send-input').parentNode)).toBe('Retake Page 2');
     expect(text(page, '[data-act="send-drop"]')).toBe('Remove Page 2');
-    expect(text(page, '.sp-send-hint')).toBe('If it keeps failing, show Ms. Rivera this screen.');
+    expect(text(page, '.sp-send-hint')).toBe('If it keeps failing, show your teacher this screen.');
     // Ruling 17: the teacher never gets a submission with a page missing.
     expect(page.T.state().demoSent).toEqual({});
     // An hour later it still goes, and the clock time does not move.
@@ -371,7 +371,7 @@ describe('S5-F3: Not Sent Yet, One Page Didn’t Send, the blurry check, Unsend 
     now += 60 * 60 * 1000;
     await page.click('[data-act="send-again"]');
     await page.settle();
-    expect(text(page, '#sp-send-title')).toBe('Sent to Ms. Rivera');
+    expect(text(page, '#sp-send-title')).toBe('Sent to Your Teacher');
     expect(Object.values(page.T.state().demoSent)[0].pages).toHaveLength(2);
   });
 
@@ -393,7 +393,7 @@ describe('S5-F3: Not Sent Yet, One Page Didn’t Send, the blurry check, Unsend 
     expect(page.T.state().demoSent).toEqual({});
     await page.click('[data-act="send-restart"]');
     await page.settle();
-    expect(text(page, '#sp-send-title')).toBe('Sent to Ms. Rivera');
+    expect(text(page, '#sp-send-title')).toBe('Sent to Your Teacher');
   });
 
   it('Remove the Page hands in the pages that are up', async () => {
@@ -405,7 +405,7 @@ describe('S5-F3: Not Sent Yet, One Page Didn’t Send, the blurry check, Unsend 
     await page.settle();
     await page.click('[data-act="send-drop"]');
     await page.settle();
-    expect(text(page, '#sp-send-title')).toBe('Sent to Ms. Rivera');
+    expect(text(page, '#sp-send-title')).toBe('Sent to Your Teacher');
     expect(Object.values(page.T.state().demoSent)[0].pages).toHaveLength(1);
   });
 
@@ -425,7 +425,7 @@ describe('S5-F3: Not Sent Yet, One Page Didn’t Send, the blurry check, Unsend 
     await page.click('[data-act="send-unsend"]');
     expect(text(page, '#sp-send-ask-title')).toBe('Unsend Your Work?');
     expect(text(page, '#sp-send-ask-body')).toBe(
-      'Your 2 photos are deleted and Science Fair Proposal goes back to To Do. Deleted photos can’t come back. After grading starts, ask Ms. Rivera instead.',
+      'Your 2 photos are deleted and Science Fair Proposal goes back to To Do. Deleted photos can’t come back. After grading starts, ask your teacher instead.',
     );
     expect([...page.root().querySelectorAll('.sp-send-ask-buttons .sp-btn')].map(words)).toEqual([
       'Unsend',
@@ -446,7 +446,7 @@ describe('S5-F3: Not Sent Yet, One Page Didn’t Send, the blurry check, Unsend 
     Object.values(page.T.state().demoSent)[0].teacherPages = 1;
     await page.click('[data-act="send-unsend"]');
     expect(text(page, '#sp-send-ask-body')).toBe(
-      'Your 2 photos are deleted. The page Ms. Rivera added stays. Deleted photos can’t come back.',
+      'Your 2 photos are deleted. The page your teacher added stays. Deleted photos can’t come back.',
     );
     await page.click('[data-act="send-ask-yes"]');
     expect(text(page, '[data-segment="sent"]')).toBe('Sent 1');
@@ -490,7 +490,7 @@ describe('S5-F3: Not Sent Yet, One Page Didn’t Send, the blurry check, Unsend 
     await page.click('[data-act="send-ask-yes"]');
     expect(Object.keys(page.T.state().demoSent)).toHaveLength(1);
     expect(words(card(page, 'Science Fair Proposal').querySelector('.sp-send-line'))).toBe(
-      'Ms. Rivera is grading this',
+      'Your teacher is grading this',
     );
   });
 

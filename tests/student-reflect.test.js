@@ -67,7 +67,7 @@ describe('S10-F1: reflecting, on returned work only', () => {
     expect(words(q(page, '[data-act="reflect-open"]'))).toBe('Reflect on Feedback');
     await page.click('[data-act="feedback-close"]');
     await openFeedback(page, 'Energy Transfer Investigation');
-    expect(words(q(page, '[data-act="reflect-open"]'))).toBe('Ms. Rivera Answered');
+    expect(words(q(page, '[data-act="reflect-open"]'))).toBe('Your Teacher Answered');
   });
 
   it('a note the teacher kept for herself is never sent: the quiz shows only what Cece asked', async () => {
@@ -87,7 +87,7 @@ describe('S10-F1: reflecting, on returned work only', () => {
     const page = await demo();
     await openReflect(page);
     expect(words(q(page, '#sp-reflect-title'))).toBe('Reflect on Feedback');
-    expect(words(q(page, '.sp-reflect-said h2'))).toBe('Ms. Rivera Said');
+    expect(words(q(page, '.sp-reflect-said h2'))).toBe('Your Teacher Said');
     expect(words(q(page, '.sp-reflect-said p'))).toBe('Careful focusing. Label the nucleus next time.');
     const group = q(page, '[role="radiogroup"]');
     expect(group.getAttribute('aria-label')).toBe('Does the feedback make sense?');
@@ -110,11 +110,11 @@ describe('S10-F1: reflecting, on returned work only', () => {
     page.type('#sp-reflect-plan', 'Next time I’ll label every part first.');
     expect(q(page, '[data-act="reflect-send"]').hasAttribute('disabled')).toBe(false);
     page.type('#sp-reflect-went', 'I got better at focusing.');
-    expect(words(q(page, '.sp-reflect-private'))).toBe('Only Ms. Rivera sees this.');
+    expect(words(q(page, '.sp-reflect-private'))).toBe('Only your teacher sees this.');
     await page.click('[data-act="reflect-send"]');
     expect(words(q(page, '#sp-reflect-title'))).toBe('Reflection Sent');
     expect(words(q(page, '.sp-reflect-plan .sp-plan-words'))).toBe('Next time I’ll label every part first.');
-    expect(page.root().textContent).toMatch(/Ms\. Rivera will read it\./);
+    expect(page.root().textContent).toMatch(/Your teacher will read it\./);
     expect(page.root().textContent).toMatch(/It’ll show on your next Science 8 assignment\./);
     const sent = page.T.feedbackOf(page.T.state());
     expect(sent.assessments.find(a => a.id === 'demo-lab').reflection).toMatchObject({
@@ -129,21 +129,21 @@ describe('S10-F1: reflecting, on returned work only', () => {
     expect(page.calls).toEqual([]);
   });
 
-  it('Not Sure: a question, Ask Ms. Rivera, Question Sent', async () => {
+  it('Not Sure: a question, Ask Your Teacher, Question Sent', async () => {
     const page = await demo();
     await openReflect(page);
     await page.click('[data-act="reflect-sense"][data-value="not_sure"]');
-    expect(page.root().textContent).toMatch(/That’s okay\. Ask Ms\. Rivera about the part that doesn’t make sense\./);
+    expect(page.root().textContent).toMatch(/That’s okay\. Ask your teacher about the part that doesn’t make sense\./);
     expect(qa(page, '[data-field="question"]').map(words)).toEqual([
       'What does … mean?',
       'Can you show me an example of…',
       'I don’t know how to…',
     ]);
     page.type('#sp-reflect-question', 'What counts as a label?');
-    expect(words(q(page, '[data-act="reflect-send"]'))).toBe('Ask Ms. Rivera');
+    expect(words(q(page, '[data-act="reflect-send"]'))).toBe('Ask Your Teacher');
     await page.click('[data-act="reflect-send"]');
     expect(words(q(page, '#sp-reflect-title'))).toBe('Question Sent');
-    expect(page.root().textContent).toMatch(/Ms\. Rivera will answer it here\./);
+    expect(page.root().textContent).toMatch(/Your teacher will answer it here\./);
   });
 
   it('only on returned work: a press made up by hand on work not back opens nothing; the stand-in refuses it', async () => {
@@ -199,13 +199,13 @@ describe('S10-F1: Your Teacher Answered', () => {
   it('the question and the answer; Yes: "Then make your plan for next time."', async () => {
     const page = await demo();
     await openReflect(page, 'Energy Transfer Investigation');
-    expect(words(q(page, '#sp-reflect-title'))).toBe('Ms. Rivera Answered');
+    expect(words(q(page, '#sp-reflect-title'))).toBe('Your Teacher Answered');
     const bubbles = qa(page, '.sp-bubble');
     expect(words(bubbles[0].querySelector('.sp-bubble-who'))).toMatch(/^You Asked, \S+ \d+$/);
     expect(words(bubbles[0].querySelector('.sp-bubble-words'))).toBe(
       'What counts as a pattern? I thought one number going up was one.',
     );
-    expect(words(bubbles[1].querySelector('.sp-bubble-who span:last-child'))).toMatch(/^Ms\. Rivera, \S+ \d+$/);
+    expect(words(bubbles[1].querySelector('.sp-bubble-who span:last-child'))).toMatch(/^Your Teacher, \S+ \d+$/);
     expect(q(page, '[role="radiogroup"]').getAttribute('aria-label')).toBe('Does it make sense now?');
     await page.click('[data-act="reflect-sense-now"][data-value="yes"]');
     expect(page.root().textContent).toMatch(/Then make your plan for next time\./);
@@ -220,7 +220,7 @@ describe('S10-F1: Your Teacher Answered', () => {
     page.type('#sp-reflect-follow', 'So is a pattern always over the whole table?');
     await page.click('[data-act="reflect-follow"]');
     expect(qa(page, '.sp-bubble-words').map(words)).toContain('So is a pattern always over the whole table?');
-    expect(page.root().textContent).toMatch(/Ms\. Rivera will answer it here\./);
+    expect(page.root().textContent).toMatch(/Your teacher will answer it here\./);
     expect(q(page, '[data-act="reflect-follow"]')).toBeNull();
     const again = await page.run(
       'StudentPage.feedbackAsk("reply", { assessment_id: "demo-energy", reply: { sense_now: "not_sure", follow_up: "Again?" } })',

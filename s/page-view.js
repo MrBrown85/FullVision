@@ -57,29 +57,9 @@ window.StudentPageView = (function () {
 
   /* ── What the server also tells (S4-M1) ────────────────────────
      Each part below draws only when the view holds it: until the server
-     sends the teacher's name, a unit, a category, a Description, Core
-     Competencies or I Can lines, the page is as it was. */
-
-  // The teacher's name as the view gives it (as they signed up with it), or ''.
-  function teacherOf(view) {
-    return String((view && view.course && view.course.teacherName) || '').trim();
-  }
-
-  // The teacher's initials, for the small mark beside their words: "Colin Brown" is CB.
-  function initialsOf(name) {
-    var words = String(name || '')
-      .split(/\s+/)
-      .filter(Boolean);
-    if (!words.length) return '';
-    var first = Array.from(words[0])[0] || '';
-    var last = words.length > 1 ? Array.from(words[words.length - 1])[0] || '' : '';
-    return (first + last).toUpperCase();
-  }
-
-  function initialsHtml(name) {
-    var mark = initialsOf(name);
-    return mark ? '<span class="sp-from-mark" aria-hidden="true">' + esc(mark) + '</span>' : '';
-  }
+     sends a unit, a category, a Description, Core Competencies or I Can
+     lines, the page is as it was. The page never names the teacher
+     (Colin's ruling 112, "Leave the name off."): it says "your teacher". */
 
   /* A category and what it counts: "Practice Questions · counts 40% of your
      grade"; "Practice · doesn't count toward your grade" for a category
@@ -264,19 +244,15 @@ window.StudentPageView = (function () {
   }
 
   /* What changed on an updated grade, under its rows: who and when, and
-     each level that moved. With no teacher's name from the server: "Your
-     result was updated on Nov 12". */
-  function updatedNoteHtml(p, teacher) {
+     each level that moved: "Your result was updated on Nov 12". */
+  function updatedNoteHtml(p) {
     var moved = (p.rubric ? p.rubric.rows : p.competencies || []).filter(function (r) {
       return r.was && r.text;
     });
     if (!p.updated || !moved.length) return '';
     return (
       '<div class="sp-updated-note"><p class="sp-updated-title">' +
-      esc(
-        (teacher ? teacher + ' updated your result on ' : 'Your result was updated on ') +
-          fmtDate(p.updatedAt || p.returnedAt, DAY),
-      ) +
+      esc('Your result was updated on ' + fmtDate(p.updatedAt || p.returnedAt, DAY)) +
       '</p>' +
       moved
         .map(function (r) {
@@ -450,9 +426,9 @@ window.StudentPageView = (function () {
 
   /* On a card sent and not back yet: the pages, and either who is grading
      it, or that it can still be changed with Replace Photos and Unsend. */
-  function sentBlockHtml(p, teacher) {
+  function sentBlockHtml(p) {
     var sent = (p.send && p.send.sent) || {};
-    var who = teacher || 'Your teacher';
+    var who = 'Your teacher';
     var line = sent.onPaper
       ? 'Handed in on paper'
       : sent.grading
@@ -473,18 +449,13 @@ window.StudentPageView = (function () {
     );
   }
 
-  // The teacher's comment on a returned card, under their name when the server sends it.
-  function cardCommentHtml(p, teacher) {
+  // The teacher's comment on a returned card.
+  function cardCommentHtml(p) {
     if (!p.comment) return '';
-    return (
-      (teacher ? '<p class="sp-piece-from">' + initialsHtml(teacher) + '<span>' + esc(teacher) + '</span></p>' : '') +
-      '<p class="sp-piece-comment">' +
-      esc(p.comment) +
-      '</p>'
-    );
+    return '<p class="sp-piece-comment">' + esc(p.comment) + '</p>';
   }
 
-  function cardHtml(p, picked, teacher) {
+  function cardHtml(p, picked) {
     var unseen = p.kind === 'back' && p.unseen && p.result && p.result.text;
     var todo = p.kind === 'due' || p.kind === 'missing';
     return (
@@ -509,9 +480,9 @@ window.StudentPageView = (function () {
       (todo && p.category ? '<p class="sp-piece-category">' + esc(p.category.name) + '</p>' : '') +
       (todo && p.description ? '<p class="sp-piece-about">' + esc(p.description) + '</p>' : '') +
       (p.kind === 'due' ? planHtml(p) : '') +
-      (p.kind === 'back' ? resultRows(p) + updatedNoteHtml(p, teacher) : '') +
-      (p.kind === 'back' ? cardCommentHtml(p, teacher) : '') +
-      (p.kind === 'sent' ? (p.group ? groupBlockHtml(p) : sentBlockHtml(p, teacher)) : '') +
+      (p.kind === 'back' ? resultRows(p) + updatedNoteHtml(p) : '') +
+      (p.kind === 'back' ? cardCommentHtml(p) : '') +
+      (p.kind === 'sent' ? (p.group ? groupBlockHtml(p) : sentBlockHtml(p)) : '') +
       (todo ? gradedOnHtml(p) + coreHtml(p) + (p.group ? groupBlockHtml(p) : sendBlockHtml(p)) : '') +
       (hasFeedback(p)
         ? '<button type="button" class="sp-btn sp-btn-primary sp-btn-big" data-act="feedback" data-piece="' +
@@ -533,7 +504,6 @@ window.StudentPageView = (function () {
      the list is on the left and the card picked on the right (the
      Chromebook board). page-view.css shows one or the other. */
   function deckHtml(ui, pieces, view) {
-    var teacher = teacherOf(view);
     var picked = pieceIn(pieces, ui.pick);
     return (
       '<div class="sp-split">' +
@@ -541,7 +511,7 @@ window.StudentPageView = (function () {
       '<div class="sp-deck">' +
       pieces
         .map(function (p) {
-          return cardHtml(p, p === picked, teacher);
+          return cardHtml(p, p === picked);
         })
         .join('') +
       '</div></div>' +
@@ -760,7 +730,7 @@ window.StudentPageView = (function () {
      Single-Point Rubric: the goal, then Went Beyond or Work On. Then the
      teacher's comment on the criterion (on a Single-Point Rubric that is
      Work On). */
-  function criterionHtml(style, row, teacher) {
+  function criterionHtml(style, row) {
     var parts = '';
     var lv = lvClass(row.level);
     if (style === 'single_point') {
@@ -787,7 +757,7 @@ window.StudentPageView = (function () {
           parts += partHtml('amber', 'To Reach ' + row.next.name, wordsHtml(row.next.descriptor), TO_ARROW);
         }
       }
-      if (row.comment) parts += '<p class="sp-fb-note">' + initialsHtml(teacher) + esc(row.comment) + '</p>';
+      if (row.comment) parts += '<p class="sp-fb-note">' + esc(row.comment) + '</p>';
     }
     return (
       '<section class="sp-fb-card sp-fb-criterion"><div class="sp-fb-crit-head"><h3 class="sp-fb-crit-name">' +
@@ -834,19 +804,10 @@ window.StudentPageView = (function () {
     );
   }
 
-  // The Overall Comment on Your Feedback: "From Colin Brown" over it when the server sends the name.
-  function fbCommentHtml(p, teacher) {
+  // The Overall Comment on Your Feedback.
+  function fbCommentHtml(p) {
     if (!p.comment) return '';
-    if (!teacher) return '<p class="sp-fb-comment">' + esc(p.comment) + '</p>';
-    return (
-      '<div class="sp-fb-comment sp-fb-comment-from"><p class="sp-fb-from">' +
-      initialsHtml(teacher) +
-      '<span>' +
-      esc('From ' + teacher) +
-      '</span></p><p class="sp-fb-comment-words">' +
-      esc(p.comment) +
-      '</p></div>'
-    );
+    return '<p class="sp-fb-comment">' + esc(p.comment) + '</p>';
   }
 
   function feedbackHtml(view, ui, p) {
@@ -859,7 +820,7 @@ window.StudentPageView = (function () {
             return row.text || row.comment || row.beyond;
           })
           .map(function (row) {
-            return criterionHtml(style, row, teacherOf(view));
+            return criterionHtml(style, row);
           })
           .join('')
       : '';
@@ -878,7 +839,7 @@ window.StudentPageView = (function () {
       (p.comment ? ' sp-fb-top-two' : '') +
       '">' +
       yourResultHtml(p) +
-      fbCommentHtml(p, teacherOf(view)) +
+      fbCommentHtml(p) +
       '</div>' +
       (crits
         ? '<h2 class="sp-fb-section">Your Rubric</h2>' +
@@ -902,20 +863,19 @@ window.StudentPageView = (function () {
   /* Reflect on Feedback (S10-F1), under Your Feedback and See Your Work:
      only on returned work, and only while the class's switch is on. Once
      the student has reflected, the same place opens what they sent, and
-     the teacher's answer when it has come ("Ms. Rivera Answered"). The
+     the teacher's answer when it has come ("Your Teacher Answered"). The
      screens themselves are the student page's (s/reflect.js); in Preview
      as Student the button is shown and opens nothing. */
   function reflectButtonHtml(view, p) {
     if (!view || !view.reflectOn || !hasFeedback(p)) return '';
     var r = p.reflection;
-    var teacher = teacherOf(view) || 'Your Teacher';
     var open =
       '<button type="button" class="sp-btn sp-btn-tint sp-btn-big sp-fb-reflect" data-act="reflect-open" data-piece="' +
       esc(p.id) +
       '">';
     if (!r) return open + 'Reflect on Feedback</button>';
     var answered = !!(r.answer || r.followUpAnswer);
-    return open + esc(answered ? teacher + ' Answered' : 'Your Reflection') + '</button>';
+    return open + esc(answered ? 'Your Teacher Answered' : 'Your Reflection') + '</button>';
   }
 
   /* Your Plan From Last Time (S10-F2), on the next piece to do: the
@@ -1120,12 +1080,8 @@ window.StudentPageView = (function () {
     var i = Math.max(0, Math.min(n - 1, Number(ui.workPage) || 0));
     var page = pages[i];
     var showing = !ui.marksOff;
-    var teacher = teacherOf(view);
     var drawn = showing ? marksHtml(page.marks) : { over: '', notes: [] };
-    var alt =
-      'Your page ' +
-      (i + 1) +
-      (showing && drawn.over ? ' with ' + (teacher ? teacher + '’s' : 'your teacher’s') + ' marks' : '');
+    var alt = 'Your page ' + (i + 1) + (showing && drawn.over ? ' with your teacher’s marks' : '');
     var dots = '';
     for (var k = 0; k < n; k++) dots += '<span class="sp-work-dot' + (k === i ? ' sp-work-dot-on' : '') + '"></span>';
     return (
@@ -1271,9 +1227,9 @@ window.StudentPageView = (function () {
   }
 
   /* "3 Things Since You Last Looked", and a line saying what they are. The
-     board's line names the teacher ("Mr. Brown answered your question…"),
-     which waits on the server; answers and revisions come with S10 and
-     S11. */
+     board's line named the teacher ("Mr. Brown answered your question…");
+     the page never does (Colin's ruling 112). Answers and revisions come
+     with S10 and S11. */
   function sinceHtml(view) {
     var changes = view.changes || [];
     if (!changes.length) return '';
@@ -1284,15 +1240,7 @@ window.StudentPageView = (function () {
     var bits = [];
     if (back) bits.push(back === 1 ? '1 piece came back' : back + ' pieces came back');
     if (updated) bits.push(updated === 1 ? '1 result was updated' : updated + ' results were updated');
-    var teacher = teacherOf(view);
     var line = bits.join(' and ') + '.';
-    // With the teacher's name, the board's pattern: "Colin Brown returned 5 pieces and updated 1 result."
-    if (teacher) {
-      var did = [];
-      if (back) did.push(back === 1 ? 'returned 1 piece' : 'returned ' + back + ' pieces');
-      if (updated) did.push(updated === 1 ? 'updated 1 result' : 'updated ' + updated + ' results');
-      line = teacher + ' ' + did.join(' and ') + '.';
-    }
     return (
       '<div class="sp-since"><p class="sp-since-title">' +
       esc(changes.length === 1 ? '1 Thing Since You Last Looked' : changes.length + ' Things Since You Last Looked') +
@@ -2350,6 +2298,5 @@ window.StudentPageView = (function () {
     thumbsHtml: thumbsHtml,
     marksLine: marksLine,
     planHtml: planHtml,
-    initialsHtml: initialsHtml,
   };
 })();

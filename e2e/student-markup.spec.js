@@ -3,7 +3,7 @@ import { PHONE, CHROMEBOOK, fits, named, contrast } from './student-card-fake.js
 
 /* See Your Work, with Show Marks (S9-F3), in Demo Mode with Send Work on
    (#demo-card-send), against the built site with the live site's CSP: the
-   sample page loads, the marks Ms. Rivera gave sit over it, Show Marks
+   sample page loads, the marks the teacher gave sit over it, Show Marks
    takes them off and puts them back, and Back returns to Your Feedback.
    Nothing leaves the browser. */
 
@@ -56,7 +56,7 @@ for (const [where, device] of [
       await expect(see).toContainText('1 page · 3 notes on your work');
       await see.click();
       await expect(page.getByRole('heading', { level: 1, name: 'Cell Microscope Lab' })).toBeFocused();
-      const img = page.getByRole('img', { name: 'Your page 1 with Ms. Rivera’s marks' });
+      const img = page.getByRole('img', { name: 'Your page 1 with your teacher’s marks' });
       await expect(img).toBeVisible();
       await expect.poll(() => img.evaluate(el => el.complete && el.naturalWidth > 0)).toBe(true);
       await expect(page.locator('.sp-work-over .sp-work-pin')).toHaveCount(3);
