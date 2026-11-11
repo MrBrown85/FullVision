@@ -1675,19 +1675,20 @@ Batch C applies only after Batch B, so the harness builds the database as
 live will be when Batch C is applied, in the apply order: everything
 `card_codes_common.LIVE` loads, S3-M1, S4-M1 (`../2026111103_student_page_fields.sql`,
 applied on live), Batch B's storage stand-in, Batch B's two files and its
-review fixes (`2026111104_student_work_review_fixes.sql`). Until Batch B
-merges, its files are read from `BATCH_B_DIR` (a folder holding the three
-migrations and `local-test/storage-stand-in.sql`): an extract of commit
-`7f5f34e5` (the `batch-b-review-fixes` branch, PR 1053), which is Batch B at
-`8c36fe48` plus the fixes file:
+review fixes (`2026111104_student_work_review_fixes.sql`). Batch B and its
+fixes are on `main` now but not on this branch, so its files are read from
+`BATCH_B_DIR` (a folder holding the three migrations and
+`local-test/storage-stand-in.sql`): an extract of `origin/main` (at
+`6137c856`; every fingerprint list taken from `7f5f34e5`, Batch B at
+`8c36fe48` plus the fixes file, is current on it):
 
 ```bash
-mkdir -p /tmp/bb && git archive 7f5f34e5 migrations | tar -x -C /tmp/bb
+mkdir -p /tmp/bb && git archive origin/main migrations | tar -x -C /tmp/bb
 export BATCH_B_DIR=/tmp/bb/migrations
 PGPORT=54361 PGDATABASE=bc python3 batch_c_common.py build        # an empty database: live as it will be with Batch B
-PGPORT=54361 PGDATABASE=bc python3 batch_c.py                     # both files, about two minutes
+PGPORT=54361 PGDATABASE=bc python3 batch_c.py                     # both files, about a minute
 PGPORT=54361 PGDATABASE=bc python3 batch_c_undo.py                # both undo scripts
-PGPORT=54361 PGDATABASE=bc python3 batch_c_mutate.py              # 82 wrong versions of the SQL, about twenty minutes
+PGPORT=54361 PGDATABASE=bc python3 batch_c_mutate.py              # 82 wrong versions of the SQL, about ten minutes
 PGPORT=54361 PGDATABASE=bc python3 batch_c_fingerprints.py check  # are the fingerprint lists in the eight files current
 ```
 
@@ -1888,43 +1889,33 @@ two dropped columns' slots on `course`; no row of a table that existed
 before changes; a revision a student sent stays as Batch B's version 2,
 which Batch B reads as the latest version. C1 applies again after it.
 
-`batch_c_mutate.py`: 99 wrong versions (67 of C1, 32 of C2; 23 of them
-wrong versions of review round 1's fixes), each applied with its
-fingerprint lists stood aside and run against the behaviour scenarios.
-Results are in the pull request.
+`batch_c_mutate.py`: 82 wrong versions (72 of C1, 10 of C2), each applied
+with its fingerprint lists stood aside and run against the behaviour
+scenarios. Hide's 26 went out with Hide; 12 are wrong versions of review
+round 2's fixes. One (C2's trigger firing on a draft) behaves as the right
+one and is noticed only by the post-check's comparison of the trigger.
 
-Review round 1 (2026-11-11, PostgreSQL 17.11, from a clean clone): 650 of
-650, the undo 46 of 46, all 99 wrong versions noticed, every fingerprint
-list current. The earlier suites below were run again the way the
-independent review ran them (the fixes branch with this branch laid over
-it, one scratch hook): `submissions.py` 562 of 563 (the same one check),
-`submissions_fixes.py` 188 of 188, `student_page_fields.py` 248 of 259 with
-this round's files and 248 of 259 with the reviewed ones (`73ba899e`) in the
-same copy: the 11 are the hook's own (Batch B applied while that suite's
-`apply` scenario holds a save open, then its catalog counts), the
-score-table inventory, three `batchb` checks and `score_rpcs.py`'s live
-snapshot. Timings are in pull request 1043.
+Review round 2 (2026-11-11, PostgreSQL 17.11, from a clean clone of
+`b3e5ad13`, Batch B from `origin/main` at `6137c856`): `batch_c.py` 634 of
+634, the undo 36 of 36, all 82 wrong versions noticed, every fingerprint
+list current.
 
-The earlier suites with Batch C applied (2026-11-11; scratch copies of the
-suites, each with one hook that applies C1 and C2 after Batch B and its
-fixes; the hook is not in any branch). Every behaviour check passes; what
-fails is listed, with the same suite on the same base without Batch C:
+The earlier suites with Batch C applied (2026-11-11; `origin/main`'s
+suites in a scratch copy, each with one hook that applies C1 and C2 after
+Batch B and its fixes; the hook is not in any branch), against the same
+suite on the same base without Batch C. Every behaviour check passes; what
+fails is listed:
 
-- `submissions.py` (Batch B, fixes in): 563 of 563 without Batch C; with
-  it 562, the one failure the inventory "only `_returned_grade` names a
-  score table": C1's student `feedback` and `markup` read `score.status`
+- `submissions.py` (Batch B, fixes in): 562 of 563 without Batch C (the
+  one is `score_rpcs.py`'s live snapshot, which now passes on `main`); 561
+  with it, the one more the inventory "only `_returned_grade` names a score
+  table": C1's student `feedback` and `markup` read `score.status`
   (Missing, Excused) and `feedback` cuts Before and After's first grade
   through `_grade_copy_in_use`.
-- `submissions_fixes.py`: 188 of 188 without; 168 with. The 20 are the
-  fixes file's own apply, second-run, undo and catalog checks, which find
-  `_grading_started` as C1 leaves it: the fixes' undo refuses while C1 is
-  in (take C1 out first). Both faults the fixes close stay closed.
-- `student_page_fields.py` (S4-M1): 259 of 259 without; 254 with. The 5:
-  the same score-table inventory; three `batchb` checks that apply Batch B
-  to a base that already has it; and the `suites` check that each older
-  suite passes clean, where `grade_return.py`'s inventory of what a
-  signed-in teacher can run now lists Batch B's and Batch C's functions.
-  Every key and refusal of `page` is as before.
+- `submissions_fixes.py`: 188 of 188 without and with.
+- `student_page_fields.py` (S4-M1): 259 of 259 without; 255 with. The 4:
+  the same inventory, and three `batchb` checks that apply Batch B to a
+  base that already has it. Every key and refusal of `page` is as before.
 
 ## Batch B: students send work (S5-M1, S5-M2, 2026-11-11)
 
