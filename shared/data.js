@@ -6900,6 +6900,7 @@ function _clearCourseLocalState(id) {
     'grade-returns',
     'category-draft',
     'student-cards',
+    'student-work',
     'statuses',
     'quick-obs',
     'term-ratings',
@@ -6919,6 +6920,7 @@ function _clearCourseLocalState(id) {
   delete _classVersion[id];
   delete _serverStudentPage[id];
   delete _gradeReturnsStale[id];
+  delete _studentWork[id];
 
   // Clear cache
   for (const field of Object.keys(_DATA_KEYS)) {
@@ -16488,6 +16490,270 @@ function clearCardWidgetConfig() {
   }
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   Student work: the client's read side (S5-F5)
+   ══════════════════════════════════════════════════════════════════
+   What students have sent, and the two settings that let them send: the
+   class's Send Work switch and each assessment's Students Send. Read here
+   in the shapes the server sends them (migrations/local-test/
+   batch-b-contract.md on the batch-b-submissions branch, coded to commit
+   5cbe3657), so a screen built on these needs no change when the wiring
+   PR (S5-W1) fills them from the server:
+
+   getCourseSubmissions(cid)   list_course_submissions(p_course_id):
+     { bucket, course: { send_work, keep_photos_until },
+       assessments: [{ id, students_send, after_due, accept_until,
+                       group_work, students_see_markup }],   every assessment
+       submissions: [{ id, assessment_id, enrollment_id, version, state,
+                       sent_by, on_paper, is_late, note, followed_plan,
+                       created_at, sent_at,
+                       files: [{ id, page, path, thumb_path, bytes,
+                                 thumb_bytes, width, height, rotation,
+                                 sha256 }] }],          handed in only
+       uploads: [] }
+   getStudentSubmission(cid, sid, aid)   one student's submission for one
+     assessment (the newest version), as in `submissions`, or null.
+   getAssessmentStudentWork(cid, aid)    one entry of `assessments`.
+   getCourseSendWork(cid)                `course`.
+   getStudentWork(cid, sid)              the student page's work(...):
+     { ok, v, send_work, assessments: [{ id, students_send, open,
+       closes_on, late_now, sent, sending }] }, `sent` as
+     { submission_id, sent_at, sent_by, on_paper, is_late, note, pages,
+       grading, can_change }.
+   studentWorkGradingStarted(cid, sid, aid)   Colin's rule: the piece holds
+     a draft or a returned grade (a level, points, a tick) or an Overall
+     Comment for that student. A Late, Missing or Excused mark alone is not.
+   studentWorkPageUrl(cid, file, which)  a Promise of an address an <img>
+     can show for one page ('page') or its thumbnail ('thumb'), or null.
+
+   A client student id is the server's enrollment id, so enrollment_id is
+   the student's id here. Every answer is a copy: changing it changes
+   nothing stored.
+
+   DEMO MODE ONLY, for now. The sample work is shared/seed-data.js's
+   (saveDemoStudentWork), kept in localStorage under
+   gb-student-work-<cid>. Its pages are drawn images shipped with the app
+   in assets/sample-work/, so a page's path and thumb_path there are file
+   names in that folder, not storage paths. A signed-in class gets the
+   empty answers (Send Work off, every assessment taking nothing, nothing
+   sent) until S5-W1. Nothing here calls the server or the outbox.
+
+   Kept out of class backups and Download All My Data on purpose (S8-F2):
+   this is not one of the _DATA_KEYS fields. */
+var STUDENT_WORK_MAX_PAGES = 30;
+var _STUDENT_WORK_DEMO_DIR = '/assets/sample-work/';
+var _STUDENT_WORK_DEFAULTS = {
+  students_send: 'nothing',
+  after_due: 'keep',
+  accept_until: null,
+  group_work: 'each',
+  students_see_markup: true,
+};
+var _studentWork = {}; // cid → { raw, value }: the stored sample work (Demo Mode) as last read
+
+function _studentWorkStored(cid) {
+  if (!cid || !_isDemoSession()) return null;
+  var raw = null;
+  try {
+    raw = localStorage.getItem('gb-student-work-' + cid);
+  } catch (e) {
+    raw = null;
+  }
+  var held = _studentWork[cid];
+  if (!held || held.raw !== raw) {
+    var value = null;
+    try {
+      value = raw == null ? null : JSON.parse(raw);
+    } catch (e) {
+      value = null;
+    }
+    held = _studentWork[cid] = { raw: raw, value: _plainObject(value) ? value : null };
+  }
+  return held.value;
+}
+
+function _studentWorkCopy(value) {
+  return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
+/* Demo Mode's sample work for a class (seed-data.js), in the shape
+   getCourseSubmissions answers; bucket and uploads are left out. Refused
+   (false) outside Demo Mode and for a submission of more than 30 pages. */
+function saveDemoStudentWork(cid, work) {
+  if (!cid || !_isDemoSession() || !_plainObject(work)) return false;
+  var subs = Array.isArray(work.submissions) ? work.submissions : [];
+  var tooMany = subs.some(function (s) {
+    return !s || (Array.isArray(s.files) && s.files.length > STUDENT_WORK_MAX_PAGES);
+  });
+  if (tooMany) return false;
+  var stored = {
+    course: Object.assign({ send_work: false, keep_photos_until: 'end_of_year' }, _studentWorkCopy(work.course) || {}),
+    assessments: _studentWorkCopy(Array.isArray(work.assessments) ? work.assessments : []),
+    submissions: _studentWorkCopy(subs),
+  };
+  var raw = JSON.stringify(stored);
+  _safeLSSet('gb-student-work-' + cid, raw);
+  _studentWork[cid] = { raw: raw, value: stored };
+  return true;
+}
+
+function getCourseSendWork(cid) {
+  var stored = _studentWorkStored(cid);
+  var course = stored && stored.course;
+  return {
+    send_work: !!(course && course.send_work === true),
+    keep_photos_until: course && course.keep_photos_until === 'end_of_term' ? 'end_of_term' : 'end_of_year',
+  };
+}
+
+function getAssessmentStudentWork(cid, aid) {
+  var stored = _studentWorkStored(cid);
+  var own =
+    stored &&
+    (stored.assessments || []).find(function (a) {
+      return a && a.id === aid;
+    });
+  var out = Object.assign({ id: aid }, _STUDENT_WORK_DEFAULTS, own ? _studentWorkCopy(own) : {});
+  out.id = aid;
+  if (out.after_due !== 'until') out.accept_until = null;
+  return out;
+}
+
+function _studentWorkSubmissions(cid) {
+  var stored = _studentWorkStored(cid);
+  if (!stored) return [];
+  var aids = {};
+  (getAssessments(cid) || []).forEach(function (a) {
+    if (a && a.id) aids[a.id] = true;
+  });
+  // The server takes an assessment's work with it when it is deleted.
+  return (stored.submissions || [])
+    .filter(function (s) {
+      return s && s.state === 'sent' && aids[s.assessment_id];
+    })
+    .map(function (s) {
+      var out = _studentWorkCopy(s);
+      out.files = (Array.isArray(out.files) ? out.files : []).slice().sort(function (x, y) {
+        return (x.page || 0) - (y.page || 0);
+      });
+      return out;
+    });
+}
+
+function getCourseSubmissions(cid) {
+  return {
+    bucket: 'student-photos',
+    course: getCourseSendWork(cid),
+    assessments: (getAssessments(cid) || [])
+      .filter(function (a) {
+        return a && a.id;
+      })
+      .map(function (a) {
+        return getAssessmentStudentWork(cid, a.id);
+      }),
+    submissions: _studentWorkSubmissions(cid),
+    uploads: [],
+  };
+}
+
+function getStudentSubmission(cid, sid, aid) {
+  var found = _studentWorkSubmissions(cid)
+    .filter(function (s) {
+      return s.enrollment_id === sid && s.assessment_id === aid;
+    })
+    .sort(function (x, y) {
+      return (y.version || 1) - (x.version || 1);
+    });
+  return found.length ? found[0] : null;
+}
+
+function studentWorkGradingStarted(cid, sid, aid) {
+  var row = typeof getGradeReturn === 'function' ? getGradeReturn(cid, sid, aid) : null;
+  if (row && row.is_draft) return true;
+  if (hasScoreOrFeedback(cid, sid, aid)) return true;
+  return getRubricCheckIds(cid, sid, aid).length > 0;
+}
+
+/* The window for sending, by the class's own date, as the server's
+   _work_window works it out: an assessment's `date` is its date_assigned
+   and `dueDate` its due_date. */
+function _studentWorkWindow(cid, a, settings) {
+  var today = courseToday(cid);
+  var due = a.dueDate || a.due_date ? String(a.dueDate || a.due_date).slice(0, 10) : null;
+  var closes = settings.after_due === 'until' ? settings.accept_until : settings.after_due === 'stop' ? due : null;
+  var open =
+    settings.after_due === 'until'
+      ? !!closes && today <= closes
+      : settings.after_due === 'stop'
+        ? !due || today <= due
+        : true;
+  return {
+    listed: !a.date || String(a.date).slice(0, 10) <= today,
+    closes_on: closes || null,
+    open: open,
+    late: !!due && today > due,
+  };
+}
+
+function getStudentWork(cid, sid) {
+  var send = getCourseSendWork(cid).send_work;
+  var listed = (getAssessments(cid) || [])
+    .map(function (a, i) {
+      return { a: a, i: i };
+    })
+    .filter(function (x) {
+      return x.a && x.a.id;
+    })
+    // Undated first, then oldest first; the class's own order within a day.
+    .sort(function (x, y) {
+      var p = x.a.date ? String(x.a.date).slice(0, 10) : '';
+      var q = y.a.date ? String(y.a.date).slice(0, 10) : '';
+      if (p !== q) return p < q ? -1 : 1;
+      return x.i - y.i;
+    });
+  var out = [];
+  listed.forEach(function (x) {
+    var a = x.a;
+    var settings = getAssessmentStudentWork(cid, a.id);
+    var w = _studentWorkWindow(cid, a, settings);
+    var s = getStudentSubmission(cid, sid, a.id);
+    if (!w.listed || (settings.students_send === 'nothing' && !s)) return;
+    var takes = send && settings.students_send !== 'nothing' && w.open;
+    var started = !!s && studentWorkGradingStarted(cid, sid, a.id);
+    out.push({
+      id: a.id,
+      students_send: settings.students_send,
+      open: takes,
+      closes_on: w.closes_on,
+      late_now: w.late,
+      sent: s
+        ? {
+            submission_id: s.id,
+            sent_at: s.sent_at,
+            sent_by: s.sent_by,
+            on_paper: !!s.on_paper,
+            is_late: !!s.is_late,
+            note: s.note == null ? null : s.note,
+            pages: (s.files || []).length,
+            grading: started,
+            can_change: s.sent_by === 'student' && !started && takes,
+          }
+        : null,
+      // A send that is not finished: there is none in Demo Mode's sample.
+      sending: null,
+    });
+  });
+  return { ok: true, v: 1, send_work: send, assessments: out };
+}
+
+function studentWorkPageUrl(cid, file, which) {
+  var name = file && (which === 'thumb' ? file.thumb_path : file.path);
+  if (!name || !_studentWorkStored(cid)) return Promise.resolve(null);
+  // A sample page is a file name in assets/sample-work, nothing more.
+  if (!/^[a-z0-9-]+\.jpg$/.test(name)) return Promise.resolve(null);
+  return Promise.resolve(_STUDENT_WORK_DEMO_DIR + name);
+}
+
 /* ── Namespace ──────────────────────────────────────────────── */
 var _mobileRerender = null;
 
@@ -16608,6 +16874,14 @@ window.GB = {
   getGradeReturns,
   getGradeReturn,
   getReturnedScores,
+  getCourseSubmissions,
+  getStudentSubmission,
+  getAssessmentStudentWork,
+  getCourseSendWork,
+  getStudentWork,
+  studentWorkGradingStarted,
+  studentWorkPageUrl,
+  saveDemoStudentWork,
   returnGrades,
   listStudentCards,
   makeStudentCards,

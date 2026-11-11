@@ -3849,6 +3849,9 @@ function seedIfNeeded() {
     });
   })();
 
+  // Sample student work, for a class seeded now or before it existed.
+  seedDemoStudentWork();
+
   // ── Migrate old gb-notes into gb-quick-obs (one-time) ──
   Object.keys(COURSES).forEach(cid => {
     const oldNotes = getNotes(cid);
@@ -3876,4 +3879,123 @@ function seedIfNeeded() {
     }
   });
   return _didSeed;
+}
+
+/* ── Sample student work (S5-F5) ─────────────────────────────────
+   Demo Mode's work sent for Cell Microscope Lab (sci8a1), in the shape the
+   server's list of a class's submissions has (shared/data.js, "Student
+   work"). The pages are drawn, not photographed: assets/sample-work, one
+   JPEG and a thumbnail each, made for Demo Mode and no real student's work.
+   bytes and sha256 are each file's own (tests/demo-student-work.test.js
+   checks them).
+
+   The spread, every grade left as it was seeded: sent on time (Cece, Liam,
+   Jas, Priya, Jordan), two pages (Noor; Fatima, sent late too), sent late
+   (Sam, with a note), added by the teacher (Mateo), handed in on paper
+   (Ethan), and nothing sent (everyone else). KMT & States of Matter Lab
+   (sci8a4) takes photos and files and closed a week after its date, with
+   nothing sent; every other piece takes no work. Send Work is on, so the
+   sample shows once the class's student page is turned on.
+
+   Seeded once per class: a class seeded before this existed gets it the
+   next time Demo Mode opens. */
+var DEMO_WORK_PAGES = {
+  // name: [bytes, sha256, thumbnail bytes]
+  'cell-lab-cece-1': [82220, 'c120c33f3d4bfb27cce2ef02ae2849501970794e62d4e767abe95c2843070ff7', 8645],
+  'cell-lab-noor-1': [77973, 'fd421eef95c3b0a12d0afbc11c6ecbd19ff970e919371d3a175fa6e40b0d70f1', 8478],
+  'cell-lab-noor-2': [61162, '2ec8fb1f358257a34be19605bf27bdf43f9ca4e37ebfb50e96ce3bba4d0e4ad3', 6920],
+  'cell-lab-sam-1': [70648, '87b1fcd4397aef096c49dabc5aeb01d492e53d0bcb05b75bf37f3611fc5d4607', 8195],
+  'cell-lab-liam-1': [79200, '2d40992134618544ee01bcea0d8f6dac54decc76afa1765d41ba9a0efa9311a1', 8602],
+  'cell-lab-mateo-1': [72147, '9de1b4d34f1f64c87a3d0506aa26610f1cf5f683659bb1197ae904007f5e9027', 8053],
+  'cell-lab-jas-1': [79637, 'bc8fe3c5bd96a287eedc75bf646da0f7774fbed148c02e5b59107f856b067ea9', 8230],
+  'cell-lab-fatima-1': [80633, '02d6af81e5124372011272c68a6056905c2e5842549282473fd174f5b9347dd1', 8353],
+  'cell-lab-fatima-2': [59536, 'f92077d830342cb19305e8f1a63858bd22f49eadd97f2b378d1e7518971afb94', 6855],
+  'cell-lab-priya-1': [85785, '5f43e2e52874e138e973dfa610ef8e02098af6d6466f4f33e055b1784058f088', 9615],
+  'cell-lab-jordan-1': [80109, '30d1232a08f3abb286e5311e68a9c12397d7206004c2566108d6343842e743e0', 8431],
+};
+
+// [student, pages, sent by, days after the lab's date, time (UTC), late, on paper, note]
+var DEMO_WORK_SENT = [
+  ['st1', ['cell-lab-cece-1'], 'student', 0, '16:20', false, false, null],
+  ['st2', ['cell-lab-noor-1', 'cell-lab-noor-2'], 'student', 0, '17:41', false, false, 'Page 2 has my answers.'],
+  ['st3', ['cell-lab-sam-1'], 'student', 3, '02:15', true, false, 'I was away Thursday.'],
+  ['st4', ['cell-lab-liam-1'], 'student', 0, '18:05', false, false, null],
+  ['st5', ['cell-lab-mateo-1'], 'teacher', 1, '22:30', false, false, null],
+  ['st6', [], 'teacher', 1, '22:34', false, true, null],
+  ['st7', ['cell-lab-jas-1'], 'student', 0, '19:12', false, false, 'I labelled both drawings.'],
+  ['st8', ['cell-lab-fatima-1', 'cell-lab-fatima-2'], 'student', 2, '03:48', true, false, null],
+  ['st9', ['cell-lab-priya-1'], 'student', 0, '16:58', false, false, null],
+  ['st10', ['cell-lab-jordan-1'], 'student', 0, '20:26', false, false, null],
+];
+
+function _demoDayAfter(day, n) {
+  return new Date(Date.parse(day + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+}
+
+function seedDemoStudentWork() {
+  if (typeof saveDemoStudentWork !== 'function' || !COURSES.sci8) return false;
+  if (localStorage.getItem('gb-student-work-sci8') != null) return false;
+  var pieces = getAssessments('sci8') || [];
+  var lab = pieces.find(function (a) {
+    return a && a.id === 'sci8a1';
+  });
+  var kmt = pieces.find(function (a) {
+    return a && a.id === 'sci8a4';
+  });
+  if (!lab || !lab.date) return false;
+  var roster = {};
+  getStudents('sci8').forEach(function (s) {
+    roster[s.id] = true;
+  });
+  var labDay = String(lab.date).slice(0, 10);
+  var submissions = DEMO_WORK_SENT.filter(function (row) {
+    return roster[row[0]];
+  }).map(function (row) {
+    var sid = row[0];
+    var sentAt = _demoDayAfter(labDay, row[3]) + 'T' + row[4] + ':00.000Z';
+    var id = 'demo-sub-' + sid + '-sci8a1';
+    return {
+      id: id,
+      assessment_id: 'sci8a1',
+      enrollment_id: sid,
+      version: 1,
+      state: 'sent',
+      sent_by: row[2],
+      on_paper: row[6],
+      is_late: row[5],
+      note: row[7],
+      followed_plan: null,
+      created_at: new Date(Date.parse(sentAt) - 120000).toISOString(),
+      sent_at: sentAt,
+      files: row[1].map(function (name, i) {
+        var page = DEMO_WORK_PAGES[name];
+        return {
+          id: id + '-p' + (i + 1),
+          page: i + 1,
+          path: name + '.jpg',
+          thumb_path: name + '-thumb.jpg',
+          bytes: page[0],
+          thumb_bytes: page[2],
+          width: 900,
+          height: 1200,
+          rotation: 0,
+          sha256: page[1],
+        };
+      }),
+    };
+  });
+  var assessments = [{ id: 'sci8a1', students_send: 'photos', after_due: 'keep', accept_until: null }];
+  if (kmt && kmt.date) {
+    assessments.push({
+      id: 'sci8a4',
+      students_send: 'photos_files',
+      after_due: 'until',
+      accept_until: _demoDayAfter(String(kmt.date).slice(0, 10), 7),
+    });
+  }
+  return saveDemoStudentWork('sci8', {
+    course: { send_work: true, keep_photos_until: 'end_of_year' },
+    assessments: assessments,
+    submissions: submissions,
+  });
 }
