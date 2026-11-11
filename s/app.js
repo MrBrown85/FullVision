@@ -1826,9 +1826,18 @@
         S.levels = false;
         S.form = '';
       }
+      // A reply the page cannot read (a list that is not a list) is a
+      // failed page: the plain message with Try Again, never a throw.
+      var read;
+      try {
+        read = StudentData.fromServer(res);
+        StudentData.use(read);
+      } catch (e) {
+        pageRefused({ ok: false, error: 'network' });
+        return;
+      }
       S.reply = res;
-      S.page = StudentData.fromServer(res);
-      StudentData.use(S.page);
+      S.page = read;
       // What the student typed to get in is not kept once they are in.
       S.number = '';
       S.bday = { m: '', d: '', y: '' };
@@ -1848,7 +1857,8 @@
   function fetchGradesAgain() {
     S.sending = true;
     paint();
-    return whenGradesAreIn().then(function () {
+    // Drawn only if the page that asked is still the one showing (not after Done).
+    return StudentPage.whileCurrent(whenGradesAreIn()).then(function () {
       S.sending = false;
       paint();
       watchRows();
@@ -1985,6 +1995,14 @@
     } else if (act === 'card-notme') {
       // An answer still on its way is for a card this student has handed back.
       StudentPage.newTurn();
+      // The check may already have passed and kept a session (its page
+      // still on the way): that student is signed out, as Done does, so
+      // the next person on this device never opens their page. Adding a
+      // card, the session is the student already signed in, and stays.
+      if (session && !adding) {
+        endOnServer(session.token);
+        forget();
+      }
       S.sending = false;
       S.message = '';
       S.screen = 'cardnotme';
