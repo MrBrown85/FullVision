@@ -18183,7 +18183,8 @@ function _revisionState(cid, r) {
   if (r.cancelled_at) return 'cancelled';
   if (!_revisionSubmission(cid, r)) return 'open';
   var row = getGradeReturn(cid, r.enrollment_id, r.assessment_id);
-  if (row && row.returned_at && String(row.returned_at) > String(r.revision_sent_at)) return 'returned';
+  // Returned at or after the revision came in (a save in the same instant counts).
+  if (row && row.returned_at && String(row.returned_at) >= String(r.revision_sent_at)) return 'returned';
   var now = _revisionWorking(cid, r.enrollment_id, r.assessment_id);
   return GradeState.sameCopy(now, r.revision_grade_at_send) ? 'sent' : 'grading';
 }
