@@ -169,6 +169,22 @@ describe('S9-F3: the marks the student was given, on returned work only', () => 
     lab.returned_at = back;
     expect(page.T.feedbackOf(st).assessments).toHaveLength(1);
   });
+
+  it('a page whose marks were never given is not counted, and has no marks to show', async () => {
+    const page = await demo();
+    const lab = page.T.demoMarkup()['demo-lab'];
+    lab.pages.push({ file_id: 'demo-file-lab-2', page: 2, image: 'cell-lab-cece-1.jpg', given: null, working: null });
+    try {
+      expect(page.T.feedbackOf(page.T.state()).assessments[0].marks).toEqual({ pages: 1, notes: 3 });
+      await openWork(page);
+      expect(words(q(page, '.sp-work .sp-fb-sub'))).toBe('Page 1 of 2');
+      await page.click('[aria-label="Next Page"]');
+      expect(q(page, '.sp-work-over').innerHTML).toBe('');
+      expect(q(page, '.sp-work-img').getAttribute('alt')).toBe('Your page 2');
+    } finally {
+      lab.pages.pop();
+    }
+  });
 });
 
 describe('the view keeps Mark Up off anything not returned with a grade', () => {

@@ -47,7 +47,7 @@
     v: 1,
     marks: [
       { id: 'm1', type: 'tick', x: 0.08, y: 0.25, color: 'green' },
-      { id: 'm2', type: 'note', x: 0.3, y: 0.52, text: 'Careful drawing: the rows show each cell wall.' },
+      { id: 'm2', type: 'note', x: 0.46, y: 0.47, text: 'Careful drawing: the rows show each cell wall.' },
       { id: 'm3', type: 'note', x: 0.83, y: 0.42, text: 'Label the membrane on one more cell.' },
       {
         id: 'm4',
