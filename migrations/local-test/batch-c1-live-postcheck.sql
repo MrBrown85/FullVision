@@ -11,7 +11,7 @@ with made(fn, becomes, or_c2) as (values
     ('public._revision_hide_grade(uuid)',                                  '247080f6572bb45951cef807a2b849bd', 'a4c3f002d3bb2fc01e58ec5b8dab8ecb'),
     ('public._revision_unhide_grade(uuid)',                                '26d2861325edf27f95d090ebd590eb0f', 'cbbc6fd7654c2b8677c7d210b5e15cc4'),
     ('public._piece_latest(uuid,uuid)',                                    'fee319ef4d87447eeac9b4d53a1f1b50', 'fee319ef4d87447eeac9b4d53a1f1b50'),
-    ('public._revision_state(uuid)',                                       'eec7300827a8fb7771fc2cebc0d29de9', 'eec7300827a8fb7771fc2cebc0d29de9'),
+    ('public._revision_state(uuid)',                                       '808f6944ea937a32576729e48115e58d', '808f6944ea937a32576729e48115e58d'),
     ('public._revision_settle(uuid,uuid,boolean)',                         '70e53be05334a41bd816d803735f9bef', '70e53be05334a41bd816d803735f9bef'),
     ('public._revision_json(uuid)',                                        '969f930b121a6714edfde8052a4d876b', '969f930b121a6714edfde8052a4d876b'),
     ('public._reflection_json(uuid)',                                      'f089277294adaf7d7834b41a1e93d5fa', 'f089277294adaf7d7834b41a1e93d5fa'),
@@ -31,8 +31,8 @@ with made(fn, becomes, or_c2) as (values
     ('student_submit.reply(text,uuid,uuid,jsonb,text)',                    '264a736a722cf19022c20c343ecb01fb', '264a736a722cf19022c20c343ecb01fb'),
     ('student_submit.answer_seen(text,uuid,uuid[],text)',                  'da85d013a0511618c989d7bb44eac2f3', 'da85d013a0511618c989d7bb44eac2f3'),
     ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)', '43ca2e50ff067a4fb51762367895ee84', '43ca2e50ff067a4fb51762367895ee84'),
-    ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',          'fe5ca7570a32f2dd0631314a365059cd', 'fe5ca7570a32f2dd0631314a365059cd'),
-    ('student_submit.revision_unsend(text,uuid,uuid,text)',                '6330e84cab87428ed8a71e92cdb2048c', '6330e84cab87428ed8a71e92cdb2048c'),
+    ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',          '6c3943b9b061f946062a042213c2dcfd', '6c3943b9b061f946062a042213c2dcfd'),
+    ('student_submit.revision_unsend(text,uuid,uuid,text)',                '73ac162e56dde98d11ffcd03aa4b5ffa', '73ac162e56dde98d11ffcd03aa4b5ffa'),
     ('student_submit.group_work(text,uuid,text)',                          '1db83448b1b3d7ae998870bdb07c4f36', '1db83448b1b3d7ae998870bdb07c4f36'),
     ('student_submit.group_file_links(text,uuid,uuid,text)',               '1c034fa5647b5808209b0ef9b31e8e4d', '1c034fa5647b5808209b0ef9b31e8e4d')
     -- FINGERPRINTS-END

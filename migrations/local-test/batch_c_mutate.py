@@ -18,8 +18,8 @@ refuses to apply is reported as caught by the file.
 import subprocess, tempfile
 from batch_c_common import *
 
-C1S = 'teacher markup started contract reflect revision group grants race closes only_me'
-C2S = 'hide given hide_round1 closes'
+C1S = 'teacher markup started contract reflect revision group grants race closes only_me round2'
+C2S = 'hide given hide_round1 closes round2'
 CHANGES = [
     # ── C1 ──
     ("_grading_started: marks do not count (Batch B's rule only)", C1,
@@ -230,9 +230,15 @@ CHANGES = [
     ("C2 (b) 1: the trigger does not close the request", C2, "    perform _revision_settle(new.enrollment_id, new.assessment_id, false);\n    return null;", "    return null;", C2S),
     ("C1 (a) 2: a request closes while its grade is hidden", C1, "       and not r.grade_hidden\n       and _revision_state(r.id)", "       and _revision_state(r.id)", C2S),
     ("C1 (b) 1: the state reads 'returned' from the revision's photos", C1,
-     "                             when r.revision_in_at is not null and g.returned_at > r.revision_in_at then 'returned'\n                             when v.id is null then 'open'",
+     "                             when r.revision_in_at is not null and g.returned_at is not null\n                                  and g.returned_at is distinct from r.in_returned_at then 'returned'\n                             when v.id is null then 'open'",
      "                             when v.id is null then 'open'\n                             when g.returned_at is not null and not g.is_draft and g.returned_at > v.sent_at then 'returned'", 'closes revision'),
     ("C1 (b) 1: revision_finish does not keep when the revision came in", C1, "           revision_in_at = _sub.sent_at,\n", "", 'closes revision'),
+    ("C1 round 2 (b) 1: a revision is returned by a grade returned after its send began (two clocks)", C1,
+     "                             when r.revision_in_at is not null and g.returned_at is not null\n                                  and g.returned_at is distinct from r.in_returned_at then 'returned'",
+     "                             when r.revision_in_at is not null and g.returned_at > r.revision_in_at then 'returned'", 'round2 closes'),
+    ("C1 round 2 (b) 1: the returned date is read at the start of the send, before the class", C1,
+     "           in_returned_at = (select g.returned_at from grade_return g\n                              where g.enrollment_id = p_enrollment_id and g.assessment_id = _sub.assessment_id),",
+     "           in_returned_at = (select max(g.returned_at) from grade_return g\n                              where g.enrollment_id = p_enrollment_id and g.assessment_id = _sub.assessment_id and g.returned_at < now()),", 'round2 closes'),
     ("C1 (b) 1: return_work does not settle before it returns", C1,
      "    perform _revision_settle(e.id, p_assessment_id, false)\n       from enrollment e where e.id = any (coalesce(p_enrollment_ids, '{}')) and e.course_id = _course;\n    _r := return_grades",
      "    _r := return_grades", 'closes'),

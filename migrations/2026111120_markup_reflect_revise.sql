@@ -245,7 +245,7 @@ begin
             ('public._revision_hide_grade(uuid)',                                  '247080f6572bb45951cef807a2b849bd', 'a4c3f002d3bb2fc01e58ec5b8dab8ecb'),
             ('public._revision_unhide_grade(uuid)',                                '26d2861325edf27f95d090ebd590eb0f', 'cbbc6fd7654c2b8677c7d210b5e15cc4'),
             ('public._piece_latest(uuid,uuid)',                                    'fee319ef4d87447eeac9b4d53a1f1b50', 'fee319ef4d87447eeac9b4d53a1f1b50'),
-            ('public._revision_state(uuid)',                                       'eec7300827a8fb7771fc2cebc0d29de9', 'eec7300827a8fb7771fc2cebc0d29de9'),
+            ('public._revision_state(uuid)',                                       '808f6944ea937a32576729e48115e58d', '808f6944ea937a32576729e48115e58d'),
             ('public._revision_settle(uuid,uuid,boolean)',                         '70e53be05334a41bd816d803735f9bef', '70e53be05334a41bd816d803735f9bef'),
             ('public._revision_json(uuid)',                                        '969f930b121a6714edfde8052a4d876b', '969f930b121a6714edfde8052a4d876b'),
             ('public._reflection_json(uuid)',                                      'f089277294adaf7d7834b41a1e93d5fa', 'f089277294adaf7d7834b41a1e93d5fa'),
@@ -265,8 +265,8 @@ begin
             ('student_submit.reply(text,uuid,uuid,jsonb,text)',                    '264a736a722cf19022c20c343ecb01fb', '264a736a722cf19022c20c343ecb01fb'),
             ('student_submit.answer_seen(text,uuid,uuid[],text)',                  'da85d013a0511618c989d7bb44eac2f3', 'da85d013a0511618c989d7bb44eac2f3'),
             ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)', '43ca2e50ff067a4fb51762367895ee84', '43ca2e50ff067a4fb51762367895ee84'),
-            ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',          'fe5ca7570a32f2dd0631314a365059cd', 'fe5ca7570a32f2dd0631314a365059cd'),
-            ('student_submit.revision_unsend(text,uuid,uuid,text)',                '6330e84cab87428ed8a71e92cdb2048c', '6330e84cab87428ed8a71e92cdb2048c'),
+            ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',          '6c3943b9b061f946062a042213c2dcfd', '6c3943b9b061f946062a042213c2dcfd'),
+            ('student_submit.revision_unsend(text,uuid,uuid,text)',                '73ac162e56dde98d11ffcd03aa4b5ffa', '73ac162e56dde98d11ffcd03aa4b5ffa'),
             ('student_submit.group_work(text,uuid,text)',                          '1db83448b1b3d7ae998870bdb07c4f36', '1db83448b1b3d7ae998870bdb07c4f36'),
             ('student_submit.group_file_links(text,uuid,uuid,text)',               '1c034fa5647b5808209b0ef9b31e8e4d', '1c034fa5647b5808209b0ef9b31e8e4d')
             -- FINGERPRINTS-END
@@ -427,9 +427,14 @@ create table if not exists public.revision_request (
     -- A fingerprint only: no grade is kept here.
     grade_mark    text,
     -- When the revision now in came in (revision_finish; cleared by
-    -- revision_unsend). A grade returned after it has returned the
-    -- revision, even once the revision's photos are deleted.
+    -- revision_unsend), and the grade_return row's returned_at as it was
+    -- then, both written under the class's lock. Every Return writes
+    -- returned_at under that lock too, so a Return after the revision came
+    -- in is one that has changed returned_at since: no two clocks are
+    -- compared. A grade so returned has returned the revision, even once
+    -- the revision's photos are deleted.
     revision_in_at timestamptz,
+    in_returned_at timestamptz,
     -- Hide (the second file, C2). A hide is a stored fact with a beginning
     -- and an end. grade_hidden is true from the moment the grade is hidden
     -- until the hide ends, and never true again for this request.
@@ -746,9 +751,10 @@ $function$;
 -- Where a revision request stands:
 --   cancelled  the teacher took it back (stored)
 --   returned   kept as done (stored: _revision_settle), or a grade was
---              returned after the revision came in (revision_in_at, stored
---              when it came in, so a revision whose photos are deleted
---              afterwards is still read as returned)
+--              returned after the revision came in: returned_at is not
+--              what it was when the revision came in (in_returned_at,
+--              stored then under the class's lock, so a revision whose
+--              photos are deleted afterwards is still read as returned)
 --   open       nothing newer than the version it was asked of is in
 --   sent       the revision is in; grading it has not started
 --   grading    the revision is in and the grade has changed since, or the
@@ -766,7 +772,8 @@ as $function$
                'state', case when r.state = 'cancelled' then 'cancelled'
                              when r.state = 'done' then 'returned'
                              -- returned since the revision came in (a draft on it since does not take that back)
-                             when r.revision_in_at is not null and g.returned_at > r.revision_in_at then 'returned'
+                             when r.revision_in_at is not null and g.returned_at is not null
+                                  and g.returned_at is distinct from r.in_returned_at then 'returned'
                              when v.id is null then 'open'
                              when md5(coalesce(g.working_copy::text, '')) is distinct from r.grade_mark then 'grading'
                              when exists (select 1 from markup m join submission_file f on f.id = m.file_id
@@ -2056,11 +2063,16 @@ begin
            is_late = _r.revise_by is not null and (now() at time zone public._fv_timezone(_course.timezone))::date > _r.revise_by
      where id = _sub.id
     returning * into _sub;
-    -- Grading of the revision starts when the grade next changes.
+    -- Grading of the revision starts when the grade next changes; it is
+    -- returned by the next Return that gives a grade (returned_at as it is
+    -- now, read under the class's lock: a Return that held the class while
+    -- this send waited came before it).
     update revision_request
        set grade_mark = (select md5(coalesce(g.working_copy::text, '')) from (select 1) one
                            left join grade_return g on g.enrollment_id = p_enrollment_id and g.assessment_id = _sub.assessment_id),
            revision_in_at = _sub.sent_at,
+           in_returned_at = (select g.returned_at from grade_return g
+                              where g.enrollment_id = p_enrollment_id and g.assessment_id = _sub.assessment_id),
            updated_at = now()
      where id = _r.id;
     return jsonb_build_object('ok', true, 'replayed', false, 'submission_id', _sub.id, 'version', _sub.version,
@@ -2137,7 +2149,7 @@ begin
     perform set_config('fv.work_removal_reason', 'unsend', true);
     delete from submission where id = _old;
     perform set_config('fv.work_removal_reason', '', true);
-    update revision_request set grade_mark = null, revision_in_at = null, updated_at = now() where id = _r.id;
+    update revision_request set grade_mark = null, revision_in_at = null, in_returned_at = null, updated_at = now() where id = _r.id;
     return jsonb_build_object('ok', true, 'unsent', true, 'cancelled', _cancelled > 0, 'pages', _pages);
 end;
 $function$;
@@ -2301,7 +2313,7 @@ begin
             ('public._revision_hide_grade(uuid)',                                  '247080f6572bb45951cef807a2b849bd', 'a4c3f002d3bb2fc01e58ec5b8dab8ecb'),
             ('public._revision_unhide_grade(uuid)',                                '26d2861325edf27f95d090ebd590eb0f', 'cbbc6fd7654c2b8677c7d210b5e15cc4'),
             ('public._piece_latest(uuid,uuid)',                                    'fee319ef4d87447eeac9b4d53a1f1b50', 'fee319ef4d87447eeac9b4d53a1f1b50'),
-            ('public._revision_state(uuid)',                                       'eec7300827a8fb7771fc2cebc0d29de9', 'eec7300827a8fb7771fc2cebc0d29de9'),
+            ('public._revision_state(uuid)',                                       '808f6944ea937a32576729e48115e58d', '808f6944ea937a32576729e48115e58d'),
             ('public._revision_settle(uuid,uuid,boolean)',                         '70e53be05334a41bd816d803735f9bef', '70e53be05334a41bd816d803735f9bef'),
             ('public._revision_json(uuid)',                                        '969f930b121a6714edfde8052a4d876b', '969f930b121a6714edfde8052a4d876b'),
             ('public._reflection_json(uuid)',                                      'f089277294adaf7d7834b41a1e93d5fa', 'f089277294adaf7d7834b41a1e93d5fa'),
@@ -2321,8 +2333,8 @@ begin
             ('student_submit.reply(text,uuid,uuid,jsonb,text)',                    '264a736a722cf19022c20c343ecb01fb', '264a736a722cf19022c20c343ecb01fb'),
             ('student_submit.answer_seen(text,uuid,uuid[],text)',                  'da85d013a0511618c989d7bb44eac2f3', 'da85d013a0511618c989d7bb44eac2f3'),
             ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)', '43ca2e50ff067a4fb51762367895ee84', '43ca2e50ff067a4fb51762367895ee84'),
-            ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',          'fe5ca7570a32f2dd0631314a365059cd', 'fe5ca7570a32f2dd0631314a365059cd'),
-            ('student_submit.revision_unsend(text,uuid,uuid,text)',                '6330e84cab87428ed8a71e92cdb2048c', '6330e84cab87428ed8a71e92cdb2048c'),
+            ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',          '6c3943b9b061f946062a042213c2dcfd', '6c3943b9b061f946062a042213c2dcfd'),
+            ('student_submit.revision_unsend(text,uuid,uuid,text)',                '73ac162e56dde98d11ffcd03aa4b5ffa', '73ac162e56dde98d11ffcd03aa4b5ffa'),
             ('student_submit.group_work(text,uuid,text)',                          '1db83448b1b3d7ae998870bdb07c4f36', '1db83448b1b3d7ae998870bdb07c4f36'),
             ('student_submit.group_file_links(text,uuid,uuid,text)',               '1c034fa5647b5808209b0ef9b31e8e4d', '1c034fa5647b5808209b0ef9b31e8e4d')
             -- FINGERPRINTS-END
