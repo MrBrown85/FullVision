@@ -498,6 +498,17 @@ window.StudentView = (function () {
       var was = p && num(p.value) > 0 ? scoreLevelText(num(p.value), num(p.modifier) || 0) : '';
       if (was && was !== r.text) r.was = was;
     });
+    /* A piece with a result only (points, or Complete/Incomplete) has no
+       rows: its Your Result says what it was, worded as resultOf words a
+       result ("6 / 10", "Incomplete"), so Updated says what changed. */
+    var res = piece.result || {};
+    var v = num(previous.value);
+    var then = '';
+    if (res.kind === 'complete' && v != null) then = v > 0 ? 'Complete' : 'Incomplete';
+    else if (res.kind === 'points' && v != null && typeof formatPoints === 'function') {
+      then = formatPoints(v) + ' / ' + res.outOf;
+    }
+    if (then && res.text && then !== res.text) res.was = then;
   }
 
   // A list from a reply, or none when what came is not a list.

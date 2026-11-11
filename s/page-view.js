@@ -235,7 +235,8 @@ window.StudentPageView = (function () {
      rubric criterion with the level given, worded by the view. */
   function resultRows(p) {
     var rows = [];
-    if (p.result && p.result.text) rows.push({ name: 'Your Result', text: p.result.text, level: null });
+    if (p.result && p.result.text)
+      rows.push({ name: 'Your Result', text: p.result.text, level: null, was: p.result.was });
     (p.rubric ? p.rubric.rows : p.competencies || []).forEach(function (r) {
       // A rubric criterion names the competencies it counts toward under it (the Returned Work board).
       var toward = p.rubric && r.toward ? r.toward.join(', ') : '';
@@ -276,6 +277,9 @@ window.StudentPageView = (function () {
     var moved = (p.rubric ? p.rubric.rows : p.competencies || []).filter(function (r) {
       return r.was && r.text;
     });
+    // A result-only piece (points, Complete) says how its result moved.
+    if (p.result && p.result.was && p.result.text)
+      moved = moved.concat([{ name: 'Your result', was: p.result.was, text: p.result.text }]);
     if (!p.updated || !moved.length) return '';
     return (
       '<div class="sp-updated-note"><p class="sp-updated-title">' +
@@ -2494,6 +2498,8 @@ window.StudentPageView = (function () {
     return (
       '<div class="sp-view' +
       (fb ? ' sp-on-feedback' : '') +
+      // The cards or Your Feedback, with To Do, Sent and Back: on a Chromebook, a sidebar down the left (page-view.css).
+      (onAssignments && !all && !ui.waiting && view ? ' sp-on-deck' : '') +
       '">' +
       '<header class="sp-head">' +
       '<button type="button" class="sp-head-switch" data-act="classes-open" aria-haspopup="dialog" aria-expanded="' +
