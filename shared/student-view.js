@@ -877,9 +877,10 @@ window.StudentView = (function () {
       if (rev) entry.revision = rev;
       assessments.push(entry);
     });
-    var cfg = (typeof getCourseConfig === 'function' && getCourseConfig(cid)) || {};
-    // Reflect on Feedback, the class's switch (Batch C's course column): the preview shows its button.
-    return { ok: true, v: 1, reflect_on_feedback: cfg.reflect_on_feedback === true, assessments: assessments };
+    // Reflect on Feedback, the class's switch (Batch C's course column, as the data layer reads it
+    // for Demo Mode and for a signed-in class): the preview shows its button.
+    var on = typeof getReflectOnFeedback === 'function' && getReflectOnFeedback(cid) === true;
+    return { ok: true, v: 1, reflect_on_feedback: on, assessments: assessments };
   }
 
   /* The `group_work` reply (S12-F1; Batch C's contract), by piece: how

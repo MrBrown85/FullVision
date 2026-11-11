@@ -21,9 +21,9 @@
    other class each save gives them at once, as a grade is.
 
    Shown only where MGradePhotos.on() holds (the build switch and Send Work).
-   Demo Mode only: signed in, getPageMarkup answers null and the screen does
-   not open. The screen is one overlay over the app; it is not on the nav
-   stack. */
+   In a signed-in class the piece's marks are read again from the server
+   when the screen opens (_readPiece). The screen is one overlay over the
+   app; it is not on the nav stack. */
 
 window.MMarkUp = (function () {
   'use strict';
@@ -150,9 +150,31 @@ window.MMarkUp = (function () {
     root.addEventListener('pointercancel', _onCancel);
     document.addEventListener('keydown', _onKey);
     _loadPage();
+    _readPiece(_s);
     var done = root.querySelector('.m-markup-done');
     if (done) done.focus();
     return true;
+  }
+
+  /* A signed-in class: the piece's marks as the server has them now
+     (another device may have marked a page), read as the desktop's Mark Up
+     reads them (loadAssessmentMarkup, shared/data.js). Drawn only while the
+     same page is up and nothing has been drawn on it here; a save on stale
+     marks is answered changed, which the screen already shows. */
+  function _readPiece(s) {
+    if (typeof studentWorkLive !== 'function' || !studentWorkLive(s.cid)) return;
+    if (typeof loadAssessmentMarkup !== 'function') return;
+    var page = s.page;
+    loadAssessmentMarkup(s.cid, s.aid).then(function (read) {
+      if (!read || _s !== s || s.page !== page || s.dirty || s.undo.length || s.editing) return;
+      var file = _file();
+      var row = file ? getPageMarkup(s.cid, file.id) : null;
+      if (!row || (row.rev || 0) === s.rev) return;
+      s.marks = _copy((row.marks && row.marks.marks) || []);
+      s.rev = row.rev || 0;
+      _drawPage();
+      _drawChrome();
+    });
   }
 
   function _releaseImg() {

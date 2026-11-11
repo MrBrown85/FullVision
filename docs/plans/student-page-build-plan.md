@@ -520,7 +520,7 @@ The wording above is proposed; Colin approves it in each PR, as usual.
 - `S9-F1` Desktop Mark Up: Pen, Highlight, Note, Tick, Cross, Eraser, Notes on This Page. Done (PR 1069; the Demo data side, PR 1063).
 - `S9-F2` Phone Mark Up: one finger draws, two fingers move. Done (PR 1072, sharing the desktop's `shared/markup-draw.js`).
 - `S9-F3` Student: See Your Work with Show Marks. Marks follow Students See Your Mark Up. Done (PR 1068).
-- `S9-W1` Wire. The teacher side is wired (Nov 11): in a signed-in class with Send Work on, Mark Up saves with `save_markup` through the outbox, the grader reads the marks (`list_course_feedback`, `list_assessment_markup`), and Return is `return_work`, which gives the marks. The student side waits for the `markup` and `feedback` edge routes.
+- `S9-W1` Wire. The teacher side is wired (Nov 11): in a signed-in class with Send Work on, Mark Up saves with `save_markup` through the outbox, the grader reads the marks (`list_course_feedback`, `list_assessment_markup`), and Return is `return_work`, which gives the marks. The student page asks `feedback`, `markup` and `file-links` from a real card (s/feedback.js) once the class's work is in and it takes work; it is wired in the second PR.
 
 **Status (Nov 11 morning).** Demo Mode only. Not built: the board's place labels beside each note ("Headline"); a note's words in a bubble on the photo (each note is a numbered pin, its words listed under the page). Waits for Colin: whether Mark Up counts as "started grading" (Batch B's rule does not count it, so once Mark Up exists a student could unsend a marked-up photo).
 

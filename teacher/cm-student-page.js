@@ -635,18 +635,24 @@ var CmStudentPage = (function () {
      comes back, students say if it made sense, ask a question and make a
      plan. The screens built in S10 read it through getReflectOnFeedback.
 
-     Demo Mode first, as Show My Learning: the server's column comes with
-     Batch C, which is not applied. So the row is drawn in Demo Mode only;
-     for a signed-in teacher it is not drawn and nothing is asked of the
-     server. Its one writer is setCourseFeedbackOptions (shared/data.js),
-     which in Demo Mode keeps it in the class's settings and sends nothing. */
+     Drawn in Demo Mode and in a signed-in class the server keeps
+     student-page rows for (S10-W1). Its one writer is
+     setCourseFeedbackOptions (shared/data.js): in Demo Mode it keeps the
+     switch in the class's settings and sends nothing; signed in it is
+     set_course_feedback_options through the outbox, and getCourseFeedbackOptions
+     reads it. */
 
-  // { offered, on }: offered only in Demo Mode with the student page on; on only where offered.
+  // { offered, on }: offered in Demo Mode, or a signed-in class the server keeps rows for, with the student page on; on only where offered.
   function reflectSettings(cid) {
     var s = _settings(cid);
-    var offered = !!s && s.student_page === true && _demo() && typeof setCourseFeedbackOptions === 'function';
-    var cfg = offered ? getCourseConfig(cid) || {} : {};
-    return { offered: offered, on: offered && cfg.reflect_on_feedback === true };
+    var live = typeof studentWorkLive === 'function' && studentWorkLive(cid);
+    var offered =
+      !!s &&
+      s.student_page === true &&
+      (_demo() || live) &&
+      typeof setCourseFeedbackOptions === 'function' &&
+      typeof getCourseFeedbackOptions === 'function';
+    return { offered: offered, on: offered && getCourseFeedbackOptions(cid).reflect_on_feedback === true };
   }
 
   function _reflectRow(cid) {
