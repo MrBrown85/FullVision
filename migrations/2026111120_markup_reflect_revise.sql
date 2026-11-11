@@ -252,7 +252,7 @@ begin
             ('public.set_course_feedback_options(uuid,jsonb,uuid)',                '1954af2eef430d63baa91d38e74106d2', '1954af2eef430d63baa91d38e74106d2'),
             ('public.save_markup(uuid,jsonb,integer,uuid)',                        '808290a14511b137bc5c1a4574016429', '808290a14511b137bc5c1a4574016429'),
             ('public.list_assessment_markup(uuid)',                                '5e64579a923a0f0c02791b6428e54d98', '5e64579a923a0f0c02791b6428e54d98'),
-            ('public.return_work(uuid,uuid[],uuid)',                               '58cb572fe215ea7b912b4ed093256918', '58cb572fe215ea7b912b4ed093256918'),
+            ('public.return_work(uuid,uuid[],uuid)',                               '13f1d5ec77567d5909c49c493ad77b64', '13f1d5ec77567d5909c49c493ad77b64'),
             ('public.return_for_revision(uuid,uuid,jsonb,uuid)',                   'cada3aa196107ccaf70b030a75b9a87f', 'cada3aa196107ccaf70b030a75b9a87f'),
             ('public.set_revision_request(uuid,jsonb,uuid)',                       '6f9fb14cc1c8ced04cca7e0302c40b13', '6f9fb14cc1c8ced04cca7e0302c40b13'),
             ('public.cancel_revision(uuid,uuid)',                                  '03f508a459eb621f868b699a0ea3f076', '03f508a459eb621f868b699a0ea3f076'),
@@ -1010,7 +1010,9 @@ $function$;
 -- given the marks on their pages of the piece. A student with no draft and
 -- no marks waiting is passed over, as return_grades passes them over.
 -- Returns return_grades' answer with marks_given (pages) and
--- marks_enrollment_ids.
+-- marks_enrollment_ids: the pages waiting when it began that the student
+-- has now, however they were given (here, or by the second file's trigger
+-- inside return_grades).
 create or replace function public.return_work(p_assessment_id uuid, p_enrollment_ids uuid[], p_idempotency_key uuid default null)
  returns jsonb
  language plpgsql
@@ -1020,11 +1022,11 @@ as $function$
 declare
     _cached jsonb;
     _course uuid;
-    _r      jsonb;
-    _e      uuid;
-    _n      int;
-    _pages  int := 0;
-    _who    uuid[] := '{}';
+    _r       jsonb;
+    _e       uuid;
+    _pages   int := 0;
+    _who     uuid[] := '{}';
+    _waiting uuid[];
 begin
     if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
     if not fv_owns_assessment(p_assessment_id) then
@@ -1042,6 +1044,13 @@ begin
     -- Return cannot read it as anything else.
     perform _revision_settle(e.id, p_assessment_id, false)
        from enrollment e where e.id = any (coalesce(p_enrollment_ids, '{}')) and e.course_id = _course;
+    -- The listed students' pages with marks waiting (as _markup_give reads
+    -- them), counted at the end once given.
+    select coalesce(array_agg(m.file_id), '{}') into _waiting
+      from markup m join enrollment e on e.id = m.enrollment_id
+     where m.assessment_id = p_assessment_id and e.id = any (coalesce(p_enrollment_ids, '{}')) and e.course_id = _course
+       and m.given_rev is distinct from m.working_rev
+       and not (m.given is null and jsonb_array_length(coalesce(m.working->'marks', '[]'::jsonb)) = 0);
     _r := return_grades(p_assessment_id, p_enrollment_ids, null);
     -- Then Return ends each listed student's request whose revision is in,
     -- graded or left at the same grade.
@@ -1054,11 +1063,12 @@ begin
                             where g.enrollment_id = e.id and g.assessment_id = p_assessment_id and g.is_draft)
          order by e.id
     loop
-        _n := _markup_give(_e, p_assessment_id);
-        if _n > 0 then
-            _pages := _pages + _n; _who := _who || _e;
-        end if;
+        perform _markup_give(_e, p_assessment_id);
     end loop;
+    select count(*)::int, coalesce(array_agg(distinct m.enrollment_id order by m.enrollment_id), '{}')
+      into _pages, _who
+      from markup m
+     where m.file_id = any (_waiting) and m.given_rev = m.working_rev;
     _cached := _r || jsonb_build_object('marks_given', _pages, 'marks_enrollment_ids', to_jsonb(_who));
     perform fv_idem_store(p_idempotency_key, 'return_work', _cached);
     return _cached;
@@ -2337,7 +2347,7 @@ begin
             ('public.set_course_feedback_options(uuid,jsonb,uuid)',                '1954af2eef430d63baa91d38e74106d2', '1954af2eef430d63baa91d38e74106d2'),
             ('public.save_markup(uuid,jsonb,integer,uuid)',                        '808290a14511b137bc5c1a4574016429', '808290a14511b137bc5c1a4574016429'),
             ('public.list_assessment_markup(uuid)',                                '5e64579a923a0f0c02791b6428e54d98', '5e64579a923a0f0c02791b6428e54d98'),
-            ('public.return_work(uuid,uuid[],uuid)',                               '58cb572fe215ea7b912b4ed093256918', '58cb572fe215ea7b912b4ed093256918'),
+            ('public.return_work(uuid,uuid[],uuid)',                               '13f1d5ec77567d5909c49c493ad77b64', '13f1d5ec77567d5909c49c493ad77b64'),
             ('public.return_for_revision(uuid,uuid,jsonb,uuid)',                   'cada3aa196107ccaf70b030a75b9a87f', 'cada3aa196107ccaf70b030a75b9a87f'),
             ('public.set_revision_request(uuid,jsonb,uuid)',                       '6f9fb14cc1c8ced04cca7e0302c40b13', '6f9fb14cc1c8ced04cca7e0302c40b13'),
             ('public.cancel_revision(uuid,uuid)',                                  '03f508a459eb621f868b699a0ea3f076', '03f508a459eb621f868b699a0ea3f076'),

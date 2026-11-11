@@ -18,7 +18,7 @@ with made(fn, becomes, or_c2) as (values
     ('public.set_course_feedback_options(uuid,jsonb,uuid)',                '1954af2eef430d63baa91d38e74106d2', '1954af2eef430d63baa91d38e74106d2'),
     ('public.save_markup(uuid,jsonb,integer,uuid)',                        '808290a14511b137bc5c1a4574016429', '808290a14511b137bc5c1a4574016429'),
     ('public.list_assessment_markup(uuid)',                                '5e64579a923a0f0c02791b6428e54d98', '5e64579a923a0f0c02791b6428e54d98'),
-    ('public.return_work(uuid,uuid[],uuid)',                               '58cb572fe215ea7b912b4ed093256918', '58cb572fe215ea7b912b4ed093256918'),
+    ('public.return_work(uuid,uuid[],uuid)',                               '13f1d5ec77567d5909c49c493ad77b64', '13f1d5ec77567d5909c49c493ad77b64'),
     ('public.return_for_revision(uuid,uuid,jsonb,uuid)',                   'cada3aa196107ccaf70b030a75b9a87f', 'cada3aa196107ccaf70b030a75b9a87f'),
     ('public.set_revision_request(uuid,jsonb,uuid)',                       '6f9fb14cc1c8ced04cca7e0302c40b13', '6f9fb14cc1c8ced04cca7e0302c40b13'),
     ('public.cancel_revision(uuid,uuid)',                                  '03f508a459eb621f868b699a0ea3f076', '03f508a459eb621f868b699a0ea3f076'),
