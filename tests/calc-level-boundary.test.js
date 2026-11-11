@@ -1,13 +1,15 @@
 /**
- * A level exactly on a boundary reads as the scale says (shared/calc.js:
- * _onPaper, roundLevel, _wholePercent; grade math, for Colin's review).
+ * A level reads as it is printed (shared/calc.js: printedLevel, roundLevel,
+ * _onPaper, _wholePercent; DECISIONS, "A level reads as it is printed",
+ * 2026-11-11; grade math, for Colin's review).
  *
- * A + or − is worth a third, which a computer can't hold exactly, so an
- * average that is exactly 2.5 on paper can come out 2.4999999999999996. The
- * figure beside it prints "2.5", and 2.5 is Proficient, but the word used to
- * come from the unrounded value and said Developing. Every reading that
- * compares a level or a percent with a boundary now reads it on paper (12
- * significant figures) first. A level honestly under a boundary stays under.
+ * The figure is the level on paper to one decimal, a half rounding up, and
+ * the word, code, colour, + or − and counts by level all come from that
+ * figure: 2.47 prints 2.5 and reads Proficient, 2.44 prints 2.4 and reads
+ * Developing. "On paper" matters too: a + or − is a third, which a computer
+ * can't hold exactly, so an average that is exactly 2.5 (or 2.45, or 1.65)
+ * can come out a hair under. A printed whole % and a letter keep their own
+ * rule: the % on paper, rounded as shown.
  */
 import './setup.js';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -185,45 +187,87 @@ function hair(num, den, side) {
   return side < 0 ? exact - exact * Number.EPSILON : exact + exact * Number.EPSILON;
 }
 
-describe('words, codes and colours: 1.5, 2.5 and 3.5', () => {
+describe('words, codes and colours follow the printed figure: around 1.5, 2.5 and 3.5', () => {
   [
     [1.5, 'Emerging', 'Developing'],
     [2.5, 'Developing', 'Proficient'],
     [3.5, 'Proficient', 'Extending'],
   ].forEach(([b, below, above]) => {
-    it(b + ' reads ' + above + ' from either side, and just under it is ' + below, () => {
+    it(b + ': from ' + (b - 0.05).toFixed(2) + ' it prints ' + b.toFixed(1) + ' and reads ' + above, () => {
       seedStyle('proficiency');
-      const thirds = b * 3; // in thirds: 4.5, 7.5, 10.5
-      const under = hair(thirds * 2, 6, -1);
-      const over = hair(thirds * 2, 6, 1);
-      expect(under).toBeLessThan(b);
-      expect(over).toBeGreaterThan(b);
-      [under, b, over].forEach(v => {
-        expect(levelWord(CID, v)).toBe(above);
-        expect(levelCode(v)).toBe(PROF_CODES[Math.ceil(b)]);
-        expect(roundLevel(v)).toBe(Math.ceil(b));
-        expect(formatLevel(CID, v)).toBe(b.toFixed(1));
-      });
-      [b - 0.01, b - 1e-6, b - 1e-9].forEach(v => {
-        expect(levelWord(CID, v)).toBe(below);
-        expect(roundLevel(v)).toBe(Math.floor(b));
+      const lo = Math.floor(b);
+      // [level, printed, whole level]
+      const table = [
+        [b - 0.06, (b - 0.1).toFixed(1), lo], // 2.44
+        [b - 0.0501, (b - 0.1).toFixed(1), lo], // 2.4499
+        [b - 0.05, b.toFixed(1), lo + 1], // 2.45
+        [hair(Math.round((b - 0.05) * 60), 60, -1), b.toFixed(1), lo + 1], // 2.45, a hair under
+        [b - 0.03, b.toFixed(1), lo + 1], // 2.47
+        [hair(b * 6, 6, -1), b.toFixed(1), lo + 1], // 2.5, a hair under
+        [b, b.toFixed(1), lo + 1],
+        [b + 0.05, (b + 0.1).toFixed(1), lo + 1], // 2.55
+      ];
+      table.forEach(([v, printed, whole]) => {
+        expect(formatLevel(CID, v)).toBe(printed);
+        expect(levelFigure(v)).toBe(printed);
+        expect(printedLevel(v)).toBe(Number(printed));
+        expect(roundLevel(v)).toBe(whole);
+        expect(levelWord(CID, v)).toBe(whole > lo ? above : below);
+        expect(levelCode(v)).toBe(PROF_CODES[whole]);
       });
     });
   });
+
+  it('an exact x.x5 prints the same however the computer came to it (1.65 is 1.7)', () => {
+    seedStyle('proficiency');
+    [
+      [33, 20, '1.7'],
+      [47, 20, '2.4'],
+      [53, 20, '2.7'],
+      [73, 20, '3.7'],
+    ].forEach(([num, den, printed]) => {
+      [hair(num, den, -1), num / den, hair(num, den, 1)].forEach(v => {
+        expect(formatLevel(CID, v)).toBe(printed);
+        expect(levelFigure(v)).toBe(printed);
+      });
+    });
+    // toFixed alone gives "1.6" for the 1.65 the computer holds.
+    expect((1.65).toFixed(1)).toBe('1.6');
+  });
 });
 
-describe('+ and − (nearestScoreLevel): halfway between two steps', () => {
-  // Halfway between steps t and t+1 is (2t + 1) / 6 levels; it rounds up.
-  for (let t = 3; t < 12; t++) {
-    it(formatScoreLevel(Math.round(t / 3), t - Math.round(t / 3) * 3) + ' and the step above', () => {
-      const up = nearestScoreLevel((t + 1) / 3).text;
-      const down = nearestScoreLevel(t / 3).text;
-      [hair(2 * t + 1, 6, -1), (2 * t + 1) / 6, hair(2 * t + 1, 6, 1)].forEach(v => {
-        expect(nearestScoreLevel(v).text).toBe(up);
+describe('+ and − follow the printed figure: the nearest step to it, a tie going up', () => {
+  // Every printed figure from 1.0 to 4.0, k tenths: its nearest step is
+  // 3k/10 thirds, a half rounding up.
+  for (let k = 10; k <= 40; k++) {
+    const step = Math.floor((3 * k + 5) / 10);
+    const level = Math.max(1, Math.min(4, Math.round(step / 3)));
+    const text = formatScoreLevel(level, step - level * 3);
+    it((k / 10).toFixed(1) + ' is ' + text, () => {
+      [k / 10 - 0.05, k / 10, k / 10 + 0.0499].forEach(v => {
+        if (!(v > 0)) return;
+        expect(nearestScoreLevel(v)).toEqual({ level, text });
       });
-      expect(nearestScoreLevel((2 * t + 1) / 6 - 1e-6).text).toBe(down);
     });
   }
+
+  it('each cut, from both sides', () => {
+    // [just under the cut, at the cut]: 1.14 prints 1.1 (1), 1.15 prints 1.2 (1+).
+    [
+      [1.14, '1', 1.15, '1+'],
+      [1.44, '1+', 1.45, '2\u2212'],
+      [1.84, '2\u2212', 1.85, '2'],
+      [2.14, '2', 2.15, '2+'],
+      [2.44, '2+', 2.45, '3\u2212'],
+      [2.84, '3\u2212', 2.85, '3'],
+      [3.14, '3', 3.15, '3+'],
+      [3.44, '3+', 3.45, '4\u2212'],
+      [3.84, '4\u2212', 3.85, '4'],
+    ].forEach(([under, a, at, b]) => {
+      expect(nearestScoreLevel(under).text).toBe(a);
+      expect(nearestScoreLevel(at).text).toBe(b);
+    });
+  });
 });
 
 describe('letters and printed percents', () => {
@@ -446,6 +490,184 @@ describe('every other reading of a level or a % on a boundary', () => {
   });
 });
 
+/* ── Every one-decimal figure is printed on paper ────────────────────── */
+
+/* Sections, each with its own pieces in date order; `subject` defaults to
+   one course. [{ id, subject, marks: [[level, modifier]] }]. */
+function seedSections(spec, system) {
+  localStorage.clear();
+  clearClass(CID);
+  const assessments = [];
+  const cells = { [ME]: {} };
+  let day = 0;
+  spec.forEach(sec =>
+    sec.marks.forEach(m => {
+      const id = 'p' + assessments.length;
+      day++;
+      const date = new Date(Date.UTC(2026, 8, 1) + day * 86400000).toISOString().slice(0, 10);
+      assessments.push({ id, title: id, date, dueDate: date, type: 'summative', weight: 1, tagIds: ['t-' + sec.id] });
+      cells[ME][id] = levels({ ['t-' + sec.id]: lv(m[0], m[1]) });
+    }),
+  );
+  const subjects = Array.from(new Set(spec.map(x => x.subject || 'subj'))).map(id => ({ id, name: id }));
+  seedClass(CID, {
+    students: [{ id: ME, firstName: 'Priya', lastName: 'Shah' }],
+    assessments,
+    scores: _gradebookCellsToScoreCache(CID, assessments, cells).scores,
+    learningMaps: {
+      subjects,
+      competencyGroups: [],
+      sections: spec.map(x => ({
+        id: x.id,
+        name: x.id,
+        subject: x.subject || 'subj',
+        tags: [{ id: 't-' + x.id, label: x.id }],
+      })),
+    },
+    categories: [],
+    courseConfigs: {},
+  });
+  COURSES[CID] = { id: CID, name: 'Course', block: 'A', gradingSystem: system || 'proficiency', gradeLevel: '8' };
+  clearProfCache();
+}
+
+// 17 Emerging and 3 Developing: 23 ÷ 20 = 1.15 on paper, which the
+// computer holds a hair under (toFixed gives "1.1", ×10 gives 11.4999…).
+const ONE_FIFTEEN = Array.from({ length: 20 }, (_, i) => (i < 17 ? [1, 0] : [2, 0]));
+// 1.15 a hair under, as a sum can make it: ×10 gives 11.499999999999996.
+const LOW = 1.15 - 1.15 * Number.EPSILON;
+
+describe('every one-decimal figure is the level on paper, a half rounding up', () => {
+  it('the noise is real', () => {
+    expect((1.15).toFixed(1)).toBe('1.1');
+    expect(Math.round(LOW * 10)).toBe(11);
+  });
+
+  it('a skill, the overall, the badge and the class summary print 1.2', () => {
+    seedSections([{ id: 'ev', marks: ONE_FIFTEEN }]);
+    const v = getSectionProficiency(CID, ME, 'ev');
+    expect(v).toBeCloseTo(1.15, 12);
+    expect(formatLevel(CID, v)).toBe('1.2');
+    expect(formatLevelAs(CID, v, 'level')).toBe('1.2');
+    expect(nearestScoreLevel(v).text).toBe('1+');
+    expect(studentGradeBadges(CID, ME).prof.text).toBe('1.2');
+    expect(studentGradeSummary(CID, ME).text).toBe('1.2');
+    expect(classGradeSummary(CID, [ME]).text).toBe('1.2');
+    expect(assessmentGroupGrade(CID, ME, _cache.assessments[CID]).text).toBe('1.2');
+  });
+
+  it('a Both class’s figure beside its %', () => {
+    seedSections([{ id: 'ev', marks: ONE_FIFTEEN }], 'both');
+    const v = getSectionProficiency(CID, ME, 'ev');
+    expect(formatLevel(CID, v)).toBe('1.2 · 29%');
+  });
+
+  it('a level set by hand keeps the calculated level on paper', () => {
+    seedSections([{ id: 'ev', marks: ONE_FIFTEEN }]);
+    setSectionOverride(CID, ME, 'ev', 3, 'Conference');
+    expect(getSectionOverride(CID, ME, 'ev').calculated).toBe(1.2);
+  });
+
+  it('the letter’s % from a level, to one decimal', () => {
+    seedStyle('letter');
+    // 1.15 ÷ 4 = 28.75%: 28.8.
+    expect(calcLetterGrade(1.15, CID).pct).toBe(28.8);
+  });
+
+  it('change texts: levelChange, levelMoveText, groupGradeGap, groupGradeDiff', () => {
+    seedStyle('proficiency');
+    expect(levelChange(1, LOW)).toBe('+0.2');
+    expect(levelChangeAs(CID, 1, LOW)).toBe('+0.2');
+    expect(levelMoveText(CID, 1, LOW).text).toBe('↑ 0.2');
+    expect(groupGradeGap(CID, { prof: LOW }, { prof: 1 }).text).toBe('0.2 above class');
+    expect(groupGradeDiff(CID, { prof: LOW }, { prof: 1 }).text).toBe('+0.2');
+  });
+
+  it('points averages and spreads', () => {
+    seedStyle('proficiency');
+    const a = { id: 'q', scoreMode: 'points', maxPoints: 20 };
+    expect(classColumnAverageText(CID, a, { avg: LOW, pct: 5.75, count: 1 })).toBe('1.2/20 · 6%');
+    expect(classSpreadText(CID, a, LOW, true)).toBe('1.2/20');
+    expect(classSpreadRangeText(CID, a, { low: LOW, high: LOW, points: true })).toBe('1.2–1.2/20');
+  });
+
+  it('the previews of a setting change print the figure on paper', () => {
+    seedSections([{ id: 'ev', marks: ONE_FIFTEEN }]);
+    expect(previewCalcMethodChange(CID, 'mostRecent').example).toEqual({
+      name: 'Priya Shah',
+      before: '1.2',
+      after: '2.0',
+    });
+    seedSections([
+      { id: 'ev', marks: ONE_FIFTEEN },
+      { id: 'x', marks: [[4, 0]] },
+    ]);
+    expect(
+      previewLearningMapChange(CID, map => {
+        map.sections = map.sections.filter(s => s.id !== 'x');
+      }).example.after,
+    ).toBe('1.2');
+    // (1.15 + 4 + 4) ÷ 3 = 3.05 on paper: 3.1. Each course equally: 2.575, 2.6.
+    seedSections([
+      { id: 'ev', marks: ONE_FIFTEEN },
+      { id: 'x', subject: 'two', marks: [[4, 0]] },
+      { id: 'y', subject: 'two', marks: [[4, 0]] },
+    ]);
+    expect(previewCoursesEqualChange(CID, true).example).toEqual({ name: 'Priya Shah', before: '3.1', after: '2.6' });
+  });
+});
+
+describe('the figures read from a level set aside: stubbed to a noisy 1.15', () => {
+  // Each reads a level from a calc.js function; the stub hands it 1.15 a
+  // hair under, which the old ×10 rounding printed as 1.1.
+  function withStub(name, fn, run) {
+    const real = globalThis[name];
+    globalThis[name] = fn;
+    try {
+      return run();
+    } finally {
+      globalThis[name] = real;
+    }
+  }
+
+  it('a level set by hand stores its calculated level on paper', () => {
+    seedSections([{ id: 'ev', marks: ONE_FIFTEEN }]);
+    withStub(
+      'getSectionProficiencyRaw',
+      () => LOW,
+      () => setSectionOverride(CID, ME, 'ev', 3, 'Conference'),
+    );
+    expect(getSectionOverride(CID, ME, 'ev').calculated).toBe(1.2);
+  });
+
+  it('the class’s change since the last report', () => {
+    seedStyle('proficiency');
+    let call = 0;
+    const r = withStub(
+      'previousReportTerm',
+      () => ({ ordinal: 1, label: 'Report 1' }),
+      () =>
+        withStub(
+          '_classGradeMeans',
+          () => ({ prof: call++ === 0 ? LOW : 1, pct: null }),
+          () => classGradeChange(CID, [ME]),
+        ),
+    );
+    expect(r.text).toBe('\u25B2 0.2');
+  });
+
+  it('a setting’s preview of the overall', () => {
+    seedSections([{ id: 'ev', marks: ONE_FIFTEEN }]);
+    let call = 0;
+    const r = withStub(
+      'getOverallProficiency',
+      () => (call++ === 0 ? LOW : 2),
+      () => previewCoursesEqualChange(CID, true),
+    );
+    expect(r.example).toEqual({ name: 'Priya Shah', before: '1.2', after: '2.0' });
+  });
+});
+
 describe('what stays as it was', () => {
   it('the level itself is never changed, only what it is compared as', () => {
     seedSkill([E, Xm, Xm, Dm]);
@@ -453,9 +675,10 @@ describe('what stays as it was', () => {
     expect(getOverallProficiency(CID, ME)).toBe(2.4999999999999996);
   });
 
-  it('an honest level just under 2.5 prints 2.5 and reads Developing, as before (owner’s choice)', () => {
-    // Five pieces, 37 thirds: 2.47 on paper. The figure rounds it to 2.5;
-    // the word follows the level, not the figure.
+  it('a level just under 2.5 that prints 2.5 reads Proficient, as printed (Colin, 2026-11-11)', () => {
+    // Five pieces, 37 thirds: (3 + 3 + 2 + 2 + 2⅓) ÷ 5 = 2.47 on paper. It
+    // prints 2.5, so it reads Proficient, with the code, colour and + or −
+    // of 2.5. The level itself stays 2.47.
     seedSkill([
       [3, 0],
       [3, 0],
@@ -466,11 +689,30 @@ describe('what stays as it was', () => {
     const v = getSectionProficiency(CID, ME, 'ev');
     expect(v).toBeCloseTo(37 / 15, 12);
     expect(formatLevel(CID, v)).toBe('2.5');
+    expect(levelWord(CID, v)).toBe('Proficient');
+    expect(levelCode(v)).toBe('PRF');
+    expect(nearestScoreLevel(v)).toEqual({ level: 3, text: '3\u2212' });
+    expect(nextStepLevel(CID, ME, 'ev')).toEqual({ level: 3, key: 'Proficient', top: false });
+    expect(studentGradeBadges(CID, ME).prof).toEqual({ text: '2.5', level: 3 });
+  });
+
+  it('a level that prints 2.4 reads Developing', () => {
+    // (3 + 3 + 2 + 2 + 2) ÷ 5 = 2.4.
+    seedSkill([
+      [3, 0],
+      [3, 0],
+      [2, 0],
+      [2, 0],
+      [2, 0],
+    ]);
+    const v = getSectionProficiency(CID, ME, 'ev');
+    expect(formatLevel(CID, v)).toBe('2.4');
     expect(levelWord(CID, v)).toBe('Developing');
+    expect(nearestScoreLevel(v).text).toBe('2+');
   });
 });
 
-/* ── The property: the word is the level on paper's word ─────────────── */
+/* ── The property: every reading agrees with the printed figure ─────── */
 
 function rng(seed) {
   let s = seed >>> 0;
@@ -483,14 +725,35 @@ function rng(seed) {
   };
 }
 
-describe('the property: every average of entered levels reads as its exact value says', () => {
-  it('20,000 random histories of one to eight pieces, averaged in date order', () => {
+// What a printed figure ("2.5") says: its whole level and its nearest step,
+// a half rounding up, worked out from the text in whole tenths.
+function fromFigure(text) {
+  const k = Math.round(Number(text) * 10);
+  const whole = Math.floor((k + 5) / 10);
+  const step = Math.floor((3 * k + 5) / 10);
+  const level = Math.max(1, Math.min(4, Math.round(step / 3)));
+  return { whole, near: { level, text: formatScoreLevel(level, step - level * 3) } };
+}
+
+function checkAgrees(v) {
+  const fig = formatLevel(CID, v);
+  const said = fromFigure(fig);
+  expect(levelFigure(v)).toBe(fig);
+  expect(roundLevel(v)).toBe(said.whole);
+  expect(levelWord(CID, v)).toBe(PROF_LABELS[said.whole]);
+  expect(levelCode(v)).toBe(PROF_CODES[said.whole]);
+  expect(nearestScoreLevel(v)).toEqual(said.near);
+  expect(renderGrowthSparkline([{ prof: v, date: '2026-10-01' }])).toContain(PROF_COLORS[said.whole]);
+  expect(_gridRow([{ id: ME }], () => v).counts[Math.max(1, Math.min(4, said.whole))]).toBe(1);
+}
+
+describe('the property: the printed figure and every reading of it agree', () => {
+  it('20,000 random histories of one to eight pieces, against the exact value in thirds', () => {
     seedStyle('proficiency');
     const r = rng(20261111);
-    let halves = 0;
+    let nearLine = 0;
     for (let k = 0; k < 20000; k++) {
       const n = 1 + Math.floor(r() * 8);
-      // Mostly steps that land on halves, so boundaries come up often.
       const pool = k % 2 ? STEPS : [3, 5, 7, 8, 10, 11];
       const list = Array.from({ length: n }, () => pool[Math.floor(r() * pool.length)]);
       const T = list.reduce((a, b) => a + b, 0); // the sum in thirds, exact
@@ -498,23 +761,19 @@ describe('the property: every average of entered levels reads as its exact value
         list.map((t, i) => ({ score: stepValue(t), date: '2026-10-' + (10 + i), assessmentId: 'a' + i })),
         'average',
       );
-      // The exact level is T / 3n. Its whole level, a half rounding up:
-      const whole = Math.floor((2 * T + 3 * n) / (6 * n));
-      // Its nearest step (in thirds), a half rounding up:
-      const step = Math.floor((2 * T + n) / (2 * n));
-      expect(roundLevel(v)).toBe(whole);
-      expect(levelWord(CID, v)).toBe(PROF_LABELS[whole]);
-      expect(levelCode(v)).toBe(PROF_CODES[whole]);
-      const sl = Math.max(1, Math.min(4, Math.round(step / 3)));
-      expect(nearestScoreLevel(v)).toEqual({ level: sl, text: formatScoreLevel(sl, step - sl * 3) });
-      // On a half exactly, the printed figure is that half and the word is
-      // the level above it.
-      if ((2 * T) % (3 * n) === 0 && ((2 * T) / (3 * n)) % 2 === 1) {
-        halves++;
-        expect(formatLevel(CID, v)).toBe((T / (3 * n)).toFixed(1));
-        expect(Number(formatLevel(CID, v))).toBe(whole - 0.5);
-      }
+      // The exact level is T / 3n; printed, it is P tenths, a half rounding
+      // up: P = floor((20T + 3n) / 6n).
+      const P = Math.floor((20 * T + 3 * n) / (6 * n));
+      expect(formatLevel(CID, v)).toBe((P / 10).toFixed(1));
+      checkAgrees(v);
+      if (P % 10 === 5 && 10 * T < 3 * n * P) nearLine++; // under x.5, printed x.5
     }
-    expect(halves).toBeGreaterThan(500);
+    expect(nearLine).toBeGreaterThan(200);
+  });
+
+  it('20,000 random levels from 1 to 4, any number of decimals', () => {
+    seedStyle('proficiency');
+    const r = rng(1111);
+    for (let k = 0; k < 20000; k++) checkAgrees(1 + r() * 3);
   });
 });
