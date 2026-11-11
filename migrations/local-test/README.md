@@ -1659,14 +1659,17 @@ backups; anything on `gradebook-prod` itself.
 Two files. `../2026111120_markup_reflect_revise.sql` (C1) only adds: three
 tables (`markup`, `revision_request`, `feedback_reflection`), two class
 switches (`reflect_on_feedback`, `show_my_learning`), nine teacher RPCs, nine
-student functions and their helpers, and two triggers each on assessment and
-enrollment that delete the new rows with their student or piece. It changes
-no existing row, function, trigger, policy or grant.
-`../2026111121_markup_revise_grade_changes.sql` (C2) adds one function and
-two triggers on `grade_return`: whenever a grade is returned (a write that
-stamps a new returned date), the marks on that piece are given and a
-finished revision request is stored as done. It writes no grade row. C2
-waits for the owner. Hiding a grade during a revision is not in Batch C
+student functions and their helpers, two triggers each on assessment and
+enrollment that delete the new rows with their student or piece, and one on
+submission that settles a revision's request before the revision is deleted
+(review round 3). It changes no existing row, function (but Batch B's
+`_grading_started`), trigger, policy or grant.
+`../2026111121_markup_revise_grade_changes.sql` (C2) adds two functions,
+two triggers on `grade_return` and one on `course`: whenever a grade is
+returned (a write that stamps a new returned date), the marks on that piece
+are given and a finished revision request is stored as done; when a class
+stops holding grades, marks waiting on returned work are given. It writes
+no grade row. C2 waits for the owner. Hiding a grade during a revision is not in Batch C
 (Colin, Nov 11): a request for it answers `hide_not_available` with either
 file, and nothing of Hide is in either.
 The contract for the edge routes and the browser is `batch-c-contract.md`.
@@ -1688,7 +1691,7 @@ export BATCH_B_DIR=/tmp/bb/migrations
 PGPORT=54361 PGDATABASE=bc python3 batch_c_common.py build        # an empty database: live as it will be with Batch B
 PGPORT=54361 PGDATABASE=bc python3 batch_c.py                     # both files, about a minute
 PGPORT=54361 PGDATABASE=bc python3 batch_c_undo.py                # both undo scripts
-PGPORT=54361 PGDATABASE=bc python3 batch_c_mutate.py              # 82 wrong versions of the SQL, about ten minutes
+PGPORT=54361 PGDATABASE=bc python3 batch_c_mutate.py              # 94 wrong versions of the SQL, about fifteen minutes
 PGPORT=54361 PGDATABASE=bc python3 batch_c_fingerprints.py check  # are the fingerprint lists in the eight files current
 ```
 
@@ -1889,11 +1892,40 @@ two dropped columns' slots on `course`; no row of a table that existed
 before changes; a revision a student sent stays as Batch B's version 2,
 which Batch B reads as the latest version. C1 applies again after it.
 
-`batch_c_mutate.py`: 82 wrong versions (72 of C1, 10 of C2), each applied
+Review round 3 (`batch-c-review-3.md`; each scenario was committed first and
+failed on the reviewed code, `b26cf1c7`):
+
+- **revision_deleted** (F1), with C1 alone and with C2, in a class that
+  holds grades (Return by `return_work` and by `return_grades`) and one
+  that returns at once. A revision in, the teacher deletes it
+  (`delete_submission`): open again to both sides, stored open; a changed
+  grade then returned leaves it open; the student sends a revision again
+  (version 2), which reads `sent`; the next changed grade returned returns
+  it. The teacher's Replace Them on a revision keeps it the revision in
+  (version 2, `sent`), and a changed grade returned by `return_grades`
+  returns it. (A revision deleted after its grade was returned stays
+  returned: `closes`, which now passes through the new `revision_gone`
+  trigger.)
+- **leave_holds** (F2), with C1 alone and with C2, for the class leaving
+  When I Return Them and for its Student Page turned off. Marks drawn after
+  a grade was returned wait; after the switch, with C2, they are given and
+  the teacher is no longer told they wait; on a piece with Students See
+  Your Mark Up off, and on a Missing piece, they are given as a Return
+  gives them and the student sees none; marks on a piece with no returned
+  grade still wait (as built); another teacher's class is left alone; no
+  grade row is written; back in When I Return Them a change waits, and a
+  class staying in it gives nothing. With C1 alone nothing is given until
+  `return_work` or a save of marks.
+
+`batch_c_mutate.py`: 94 wrong versions (78 of C1, 16 of C2), each applied
 with its fingerprint lists stood aside and run against the behaviour
 scenarios. Hide's 26 went out with Hide; 12 are wrong versions of review
-round 2's fixes. One (C2's trigger firing on a draft) behaves as the right
-one and is noticed only by the post-check's comparison of the trigger.
+round 2's fixes, 12 of round 3's. One (C2's trigger firing on a draft)
+behaves as the right one and is noticed only by the post-check's comparison
+of the trigger. Round 1's "the state reads returned from the revision's
+photos" is now noticed by `round2`'s race checks (the new trigger settles
+a revision before its photos go, so `closes` no longer tells the two
+apart).
 
 Review round 2 (2026-11-11, PostgreSQL 17.11, from a clean clone of
 `b3e5ad13`, Batch B from `origin/main` at `6137c856`): `batch_c.py` 634 of
