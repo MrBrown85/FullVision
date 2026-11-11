@@ -709,6 +709,7 @@
       paint();
       return Promise.resolve();
     }
+    if (S.cardForm) return sendFromCard(answers);
     S.sending = true;
     S.message = '';
     paint();
@@ -747,6 +748,34 @@
       } else {
         S.message = messageFor(res);
       }
+      paint();
+    });
+  }
+
+  /* Opened from a real card's page (S4-F4): `answer` through the card's
+     session (app.js's askClass), once. There is no token to renew, so no
+     second try: a refusal says why and the answers stay on screen.
+     Answered already (`already_sent`) is as good as sent. */
+  function sendFromCard(answers) {
+    var state = S;
+    var form = S.cardForm;
+    S.sending = true;
+    S.message = '';
+    paint();
+    var body = { questionnaire_id: form.id, answers: answers };
+    return StudentPage.askClass('answer', body, form.student).then(function (res) {
+      if (S !== state || S.cardForm !== form || S.screen !== 'part') return;
+      S.sending = false;
+      if ((res && res.ok === true) || (res && res.error === 'already_sent')) {
+        clearDraft();
+        S.screen = 'sent';
+        S.message = '';
+        paint();
+        StudentPage.formSent(form, res);
+        return;
+      }
+      if (StudentPage.formSessionOver('answer', res)) return StudentPage.sessionRefused(res);
+      S.message = StudentPage.formMessage('answer', res && res.ok === false ? res : { ok: false, error: 'network' });
       paint();
     });
   }

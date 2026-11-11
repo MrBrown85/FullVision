@@ -44,7 +44,8 @@ with relied(fn, md5) as (values
     ('student_submit.reply(text,uuid,uuid,jsonb,text)',      '264a736a722cf19022c20c343ecb01fb', 'c62efad49630d212de8357e64a23088f'),
     ('student_submit.answer_seen(text,uuid,uuid[],text)',    'da85d013a0511618c989d7bb44eac2f3', '360aa4c1fe8e0e0d860284cb3809c943'),
     ('public.save_score_report_note(uuid,uuid,text,uuid)',   '7b230f6d11458a7660e23c80f8829b95', '0278137275a8a15e973648c855643447'),
-    ('public.list_course_grade_returns(uuid)',               'bc5529a69303cdfe8d91604388dc927a', '0779f1e345fb278fd8702592163784c1')
+    ('public.list_course_grade_returns(uuid)',               'bc5529a69303cdfe8d91604388dc927a', '0779f1e345fb278fd8702592163784c1'),
+    ('student_submit.page(text,uuid,text)',                  '034e6674a25f8a5e1abc067f50784ce6', '67a5b8270aa78e914588694e297be6bc')
     -- FINGERPRINTS-END
 ), new(fn, becomes) as (values
     -- FINGERPRINTS-BEGIN new

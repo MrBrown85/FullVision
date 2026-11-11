@@ -32,7 +32,8 @@ begin
             ('student_submit.reply(text,uuid,uuid,jsonb,text)',      '264a736a722cf19022c20c343ecb01fb', 'c62efad49630d212de8357e64a23088f'),
             ('student_submit.answer_seen(text,uuid,uuid[],text)',    'da85d013a0511618c989d7bb44eac2f3', '360aa4c1fe8e0e0d860284cb3809c943'),
             ('public.save_score_report_note(uuid,uuid,text,uuid)',   '7b230f6d11458a7660e23c80f8829b95', '0278137275a8a15e973648c855643447'),
-            ('public.list_course_grade_returns(uuid)',               'bc5529a69303cdfe8d91604388dc927a', '0779f1e345fb278fd8702592163784c1')
+            ('public.list_course_grade_returns(uuid)',               'bc5529a69303cdfe8d91604388dc927a', '0779f1e345fb278fd8702592163784c1'),
+            ('student_submit.page(text,uuid,text)',                  '034e6674a25f8a5e1abc067f50784ce6', '67a5b8270aa78e914588694e297be6bc')
             -- FINGERPRINTS-END
         ) as v(fn, before, becomes)
     loop
@@ -598,6 +599,111 @@ AS $function$
                and (g.is_draft or g.returned_at is not null)
                and a.score_mode <> 'dibels'
              group by g.assessment_id) x;
+$function$;
+
+CREATE OR REPLACE FUNCTION student_submit.page(p_session_token text, p_enrollment_id uuid, p_ip_hash text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'student_submit', 'pg_temp'
+AS $function$
+declare
+    _in      jsonb := _session_class(p_session_token, p_enrollment_id);
+    _course  course%rowtype;
+    _today   date;
+    _weights numeric;
+begin
+    if _in ? 'error' then
+        return jsonb_build_object('ok', false, 'error', _in->>'error');
+    end if;
+    select * into _course from course where id = (_in->>'course_id')::uuid;
+    _today := (now() at time zone public._fv_timezone(_course.timezone))::date;
+    -- What the class's category weights total: 100, or null with no categories.
+    select sum(k.weight) into _weights from category k where k.course_id = _course.id;
+
+    return jsonb_build_object(
+        'ok', true, 'v', 1,
+        'expires_at', _in->'expires_at',
+        'student', (select jsonb_build_object('enrollment_id', e.id,
+                                              'first_name', coalesce(nullif(btrim(s.preferred_name), ''), s.first_name))
+                      from enrollment e join student s on s.id = e.student_id where e.id = p_enrollment_id),
+        'course', jsonb_build_object(
+            'name', _course.name, 'block', _course.block, 'grading_system', _course.grading_system,
+            'grading_scale', _course.grading_scale, 'level_order', _course.level_order,
+            'round_percent', _course.round_percent,
+            -- The name the class's teacher signed up with, and nothing else of theirs.
+            'teacher_name', (select nullif(t.display_name, '') from teacher t where t.id = _course.teacher_id)),
+        'classes', _session_classes((_in->>'session_id')::uuid),
+        'tags', coalesce((
+            select jsonb_object_agg(t.id::text, jsonb_build_object('label', t.label, 'code', t.code,
+                                                                   'i_can', to_jsonb(t.i_can_statements)))
+              from tag t join section s on s.id = t.section_id
+             where s.course_id = _course.id and s.removed_at is null), '{}'::jsonb),
+        'rubrics', coalesce((
+            select jsonb_agg(jsonb_build_object(
+                       'id', r.id, 'name', r.name, 'style', r.style,
+                       'criteria', coalesce((
+                           select jsonb_agg(jsonb_build_object(
+                                      'id', cr.id, 'name', cr.name, 'weight', cr.weight,
+                                      'level_1_value', cr.level_1_value, 'level_2_value', cr.level_2_value,
+                                      'level_3_value', cr.level_3_value, 'level_4_value', cr.level_4_value,
+                                      'level_1_descriptor', cr.level_1_descriptor, 'level_2_descriptor', cr.level_2_descriptor,
+                                      'level_3_descriptor', cr.level_3_descriptor, 'level_4_descriptor', cr.level_4_descriptor,
+                                      -- The competencies this row counts toward, only those still on the class.
+                                      'tag_ids', coalesce((select jsonb_agg(x.tag_id order by x.tag_id)
+                                                             from criterion_tag x
+                                                             join tag t on t.id = x.tag_id
+                                                             join section s on s.id = t.section_id
+                                                            where x.criterion_id = cr.id
+                                                              and s.course_id = _course.id and s.removed_at is null), '[]'::jsonb),
+                                      'checks', coalesce((
+                                          select jsonb_agg(jsonb_build_object('id', ck.id, 'level', ck.level, 'label', ck.label)
+                                                           order by ck.level, ck.display_order, ck.id)
+                                            from criterion_check ck where ck.criterion_id = cr.id), '[]'::jsonb))
+                                    order by cr.display_order, cr.id)
+                             from criterion cr where cr.rubric_id = r.id), '[]'::jsonb)) order by r.id)
+              from rubric r
+             where r.course_id = _course.id
+               and exists (select 1 from assessment a where a.rubric_id = r.id
+                              and (a.date_assigned is null or a.date_assigned <= _today))), '[]'::jsonb),
+        'assessments', coalesce((
+            select jsonb_agg(
+                       jsonb_build_object(
+                           'id', a.id, 'title', a.title, 'date', a.date_assigned, 'due_date', a.due_date,
+                           'score_mode', a.score_mode, 'max_points', a.max_points, 'weight', a.weight,
+                           'rubric_id', a.rubric_id, 'created_at', a.created_at,
+                           'tag_ids', coalesce((select jsonb_agg(x.tag_id order by x.tag_id)
+                                                  from assessment_tag x
+                                                  join tag t on t.id = x.tag_id
+                                                  join section s on s.id = t.section_id
+                                                 where x.assessment_id = a.id and s.removed_at is null), '[]'::jsonb),
+                           'description', nullif(a.description, ''),
+                           'module_name', (select m.name from module m where m.id = a.module_id and m.course_id = _course.id),
+                           'category_name', k.name,
+                           -- What the category counts toward the course grade as the class is set
+                           -- up, or null where no percent would be true (the header says when).
+                           'category_percent', case when a.score_mode = 'dibels' then null
+                                                    when k.weight = 0 then 0
+                                                    when _course.grading_system in ('letter', 'both') and _weights = 100 then k.weight
+                                               end,
+                           -- The Ministry's seven, in its order, named as shared/constants.js names them.
+                           'core_competencies', coalesce((
+                               select jsonb_agg(jsonb_build_object('id', cc.id, 'name', cc.name) order by cc.ord)
+                                 from (values (1, 'COM', 'Communicating'),
+                                              (2, 'COL', 'Collaborating'),
+                                              (3, 'CT',  'Creative Thinking'),
+                                              (4, 'CRT', 'Critical & Reflective Thinking'),
+                                              (5, 'PPI', 'Personal & Cultural Identity'),
+                                              (6, 'PAR', 'Personal Awareness & Responsibility'),
+                                              (7, 'SAR', 'Social Awareness & Responsibility')) as cc(ord, id, name)
+                                where cc.id = any (a.core_competency_ids)), '[]'::jsonb))
+                       || _returned_grade(p_enrollment_id, a.id)
+                     order by a.date_assigned nulls first, a.display_order, a.created_at, a.id)
+              from assessment a
+              left join category k on k.id = a.category_id and k.course_id = _course.id
+             where a.course_id = _course.id
+               and (a.date_assigned is null or a.date_assigned <= _today)), '[]'::jsonb));
+end;
 $function$;
 -- UNDO-BODIES-END
 

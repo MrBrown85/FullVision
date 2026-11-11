@@ -88,9 +88,10 @@ describe('a real card: the code, Is This You?, the Assignments list', () => {
 
     page.type('#sp-ident', '0123456');
     await page.click('[data-act="card-yes"]');
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work']);
+    // `forms` is S4-F4's: the Questionnaires and My Reports tabs.
+    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'forms']);
     await scrollThroughAll(page);
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'seen']);
+    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'forms', 'seen']);
     // The code goes again with what was typed. No token, and no session: this device had none.
     expect(page.calls[1].body).toEqual({
       route: 'verify',
@@ -103,8 +104,9 @@ describe('a real card: the code, Is This You?, the Assignments list', () => {
     expect(token).toMatch(/^[0-9a-f]{64}$/);
     expect(page.calls[2].body).toEqual({ route: 'page', session: token, enrollment_id: CECE });
     // Every request passed the handler's own checks.
-    expect(dev.fn.logs.map(l => l.outcome)).toEqual(['ok', 'ok', 'ok', 'ok', 'ok']);
-    expect(dev.fn.sql.map(q => q.fn)).toEqual(['card', 'verify_card', 'page', 'work', 'seen']);
+    // (`forms` excepted: the stand-in database has no forms function, so the handler answers a server error.)
+    expect(dev.fn.logs.map(l => l.outcome)).toEqual(['ok', 'ok', 'ok', 'ok', 'error', 'ok']);
+    expect(dev.fn.sql.map(q => q.fn)).toEqual(['card', 'verify_card', 'page', 'work', 'forms', 'seen']);
     expect(dev.fn.sql[1].add).toBe(false);
 
     expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
@@ -140,7 +142,7 @@ describe('a real card: the code, Is This You?, the Assignments list', () => {
     const page = await signIn(dev);
     await scrollThroughAll(page);
     await page.click('[data-act="card-done"]');
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'seen', 'done']);
+    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'forms', 'seen', 'done']);
     page.calls.forEach(c => {
       expect(c.url).toBe('https://x.supabase.co/functions/v1/student-submit?forceFunctionRegion=ca-central-1');
       expect(c.init.method).toBe('POST');
@@ -558,7 +560,7 @@ describe('the page won’t open: each refusal has its line', () => {
     page.type('#sp-ident', '0123456');
     await page.click('[data-act="card-yes"]');
     await scrollThroughAll(page);
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'seen']);
+    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'forms', 'seen']);
     expect(page.root().querySelector('.sp-row')).toBeNull();
     expect(page.root().querySelector('.sp-msg').textContent).toBe(SIGNED_OUT);
     expect(dev.store).toEqual({});
@@ -597,6 +599,7 @@ describe('the session: one token, kept until midnight, Done or fifteen idle minu
     expect(page.calls.map(c => c.body)).toEqual([
       { route: 'page', session: token, enrollment_id: CECE },
       { route: 'work', session: token, enrollment_id: CECE },
+      { route: 'forms', session: token, enrollment_id: CECE },
     ]);
     expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
     expect(row(page, 'Energy Transfer Investigation').result).toBe('4.0');

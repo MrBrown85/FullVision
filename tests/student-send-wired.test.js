@@ -129,7 +129,7 @@ describe('a class with Send Work off: nothing about sending, and the page as it 
     page.tap('[data-act="card-yes"]');
     for (let i = 0; i < 50 && !routes(page).includes('work'); i++) await page.tick();
     for (let i = 0; i < 5; i++) await page.tick();
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work']);
+    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'forms']);
     const drawn = page.root().innerHTML;
     expect(drawn).toContain('sp-page-title');
     open();
@@ -137,7 +137,7 @@ describe('a class with Send Work off: nothing about sending, and the page as it 
     // Byte for byte what was drawn before `work` answered.
     expect(page.root().innerHTML).toBe(drawn);
     expect(drawn).not.toMatch(/sp-send|Send My Work|Hand this one in on paper/);
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work']);
+    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'forms']);
     expect(page.fetched).toEqual(['../shared/constants.js', '../shared/calc.js']);
     expect(page.storageCalls).toEqual([]);
   });
@@ -148,7 +148,7 @@ describe('a real send: start, each file to its link, finish', () => {
     const dev = school();
     const page = await signIn(dev);
     const token = JSON.parse(dev.store[KEY]).t;
-    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'feedback']);
+    expect(routes(page)).toEqual(['card', 'verify', 'page', 'work', 'forms', 'feedback']);
     expect(page.root().querySelector(piece(WORK.fair) + ' [data-act="send-open"]')).toBeTruthy();
     // A piece the class does not take work for says nothing of sending.
     expect(page.root().querySelector(piece(WORK.quick) + ' .sp-send-closed')).toBeNull();
@@ -196,6 +196,7 @@ describe('a real send: start, each file to its link, finish', () => {
       'verify',
       'page',
       'work',
+      'forms',
       'feedback',
       'send-start',
       'send-finish',
@@ -377,7 +378,16 @@ describe('a send survives a reload, within its two hours', () => {
 
     dev.answer = null;
     const again = await dev.open('');
-    expect(routes(again)).toEqual(['page', 'work', 'feedback', 'send-start', 'send-finish', 'work', 'file-links']);
+    expect(routes(again)).toEqual([
+      'page',
+      'work',
+      'forms',
+      'feedback',
+      'send-start',
+      'send-finish',
+      'work',
+      'file-links',
+    ]);
     expect(text(again, '#sp-send-title')).toBe('Sent to Your Teacher');
     expect(bodyOf(again, 'send-start')[0]).toMatchObject({ request_id: request, note: 'For Thursday.' });
     expect([...dev.fn.world.subs.values()].map(s => [s.state, s.files.length, s.note])).toEqual([
@@ -400,7 +410,7 @@ describe('a send survives a reload, within its two hours', () => {
     dev.clock = () => finishBy + 60 * 1000;
     const again = await dev.open('');
     expect(text(again, '#sp-send-title')).toBe('Not sent');
-    expect(routes(again)).toEqual(['page', 'work', 'feedback']);
+    expect(routes(again)).toEqual(['page', 'work', 'forms', 'feedback']);
     await again.click('[data-act="send-restart"]');
     expect(text(again, '#sp-send-title')).toBe('Sent to Your Teacher');
     expect(bodyOf(again, 'send-start')[0].request_id).not.toBe(request);

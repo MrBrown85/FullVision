@@ -6,7 +6,7 @@
 --
 -- THIS FILE DELETES NOTHING. It writes no grade, score, comment or Mark Up
 -- row on the apply. It adds two columns to grade_return, one table, seven
--- functions, and replaces eleven.
+-- functions, and replaces twelve.
 --
 -- What changes, for a teacher or a student:
 --
@@ -73,13 +73,21 @@
 --     answer is too_many with retry_after_s, as the send limit's is. Rows
 --     older than a day are cleared by the next call.
 --
--- E7  is not in this batch: slips moving to the card key (plan S3-S1). The
---     database holds only a salted hash of each printed slip's code, and no
---     key, so no printed slip can be converted; keeping them working means
---     the old path stays until the last one ends, and a report slip has no
---     last day the database knows (a teacher can move it out). It also
---     needs a new teacher-side edge function to print slips. Its own PR.
+-- E7  (slips moving to the card key, plan S3-S1) is its own migration and
+--     PR (2026111160), applied after this one: it replaces the four live slip
+--     functions and moves slip printing to an edge function.
 -- E8  (links of 60 seconds) is the edge function's alone: nothing here.
+--
+-- E9  My Learning on the student's own device (plan S13-W1;
+--     my-learning-contract.md). When a class has Show My Learning on,
+--     student_submit.page also sends show_my_learning: true and learning:
+--     the class's calculation settings and grading style (twelve course
+--     columns), its categories with their weights, its folders and its
+--     learning map (sections not removed, each skill with its I Can text
+--     and bank id), in get_class_bundle's shapes; and each piece its
+--     category_id. The student's returned grades are already on the page.
+--     Nothing of another student, no draft, no teacher-only note. With it
+--     off the answer is the same as before, byte for byte.
 --
 -- ── The checks it makes first ───────────────────────────────────────────────
 -- It stops, with nothing changed, unless Batch D is applied and every
@@ -169,7 +177,8 @@ begin
             ('student_submit.reply(text,uuid,uuid,jsonb,text)',      '264a736a722cf19022c20c343ecb01fb', 'c62efad49630d212de8357e64a23088f'),
             ('student_submit.answer_seen(text,uuid,uuid[],text)',    'da85d013a0511618c989d7bb44eac2f3', '360aa4c1fe8e0e0d860284cb3809c943'),
             ('public.save_score_report_note(uuid,uuid,text,uuid)',   '7b230f6d11458a7660e23c80f8829b95', '0278137275a8a15e973648c855643447'),
-            ('public.list_course_grade_returns(uuid)',               'bc5529a69303cdfe8d91604388dc927a', '0779f1e345fb278fd8702592163784c1')
+            ('public.list_course_grade_returns(uuid)',               'bc5529a69303cdfe8d91604388dc927a', '0779f1e345fb278fd8702592163784c1'),
+            ('student_submit.page(text,uuid,text)',                  '034e6674a25f8a5e1abc067f50784ce6', '67a5b8270aa78e914588694e297be6bc')
             -- FINGERPRINTS-END
         ) as v(fn, before, becomes)
     loop
@@ -1206,6 +1215,176 @@ begin
 end;
 $function$;
 
+-- ── E9: page sends My Learning when the class shows it ────────────────────────
+-- As 2026111103 made it, with E9 (plan S13-W1; my-learning-contract.md): when
+-- the class has Show My Learning on, page also sends show_my_learning: true
+-- and learning (the class's calculation settings, categories, folders and
+-- learning map, in get_class_bundle's shapes, without a tag's source_text),
+-- and each assessments[] item its category_id. With it off nothing is added:
+-- the answer is the same jsonb as before. Every other line is as it was.
+create or replace function student_submit.page(p_session_token text, p_enrollment_id uuid, p_ip_hash text)
+ returns jsonb
+ language plpgsql
+ stable
+ security definer
+ set search_path to 'public', 'student_submit', 'pg_temp'
+as $function$
+declare
+    _in      jsonb := _session_class(p_session_token, p_enrollment_id);
+    _course  course%rowtype;
+    _today   date;
+    _weights numeric;
+begin
+    if _in ? 'error' then
+        return jsonb_build_object('ok', false, 'error', _in->>'error');
+    end if;
+    select * into _course from course where id = (_in->>'course_id')::uuid;
+    _today := (now() at time zone public._fv_timezone(_course.timezone))::date;
+    -- What the class's category weights total: 100, or null with no categories.
+    select sum(k.weight) into _weights from category k where k.course_id = _course.id;
+
+    return jsonb_build_object(
+        'ok', true, 'v', 1,
+        'expires_at', _in->'expires_at',
+        'student', (select jsonb_build_object('enrollment_id', e.id,
+                                              'first_name', coalesce(nullif(btrim(s.preferred_name), ''), s.first_name))
+                      from enrollment e join student s on s.id = e.student_id where e.id = p_enrollment_id),
+        'course', jsonb_build_object(
+            'name', _course.name, 'block', _course.block, 'grading_system', _course.grading_system,
+            'grading_scale', _course.grading_scale, 'level_order', _course.level_order,
+            'round_percent', _course.round_percent,
+            -- The name the class's teacher signed up with, and nothing else of theirs.
+            'teacher_name', (select nullif(t.display_name, '') from teacher t where t.id = _course.teacher_id)),
+        'classes', _session_classes((_in->>'session_id')::uuid),
+        'tags', coalesce((
+            select jsonb_object_agg(t.id::text, jsonb_build_object('label', t.label, 'code', t.code,
+                                                                   'i_can', to_jsonb(t.i_can_statements)))
+              from tag t join section s on s.id = t.section_id
+             where s.course_id = _course.id and s.removed_at is null), '{}'::jsonb),
+        'rubrics', coalesce((
+            select jsonb_agg(jsonb_build_object(
+                       'id', r.id, 'name', r.name, 'style', r.style,
+                       'criteria', coalesce((
+                           select jsonb_agg(jsonb_build_object(
+                                      'id', cr.id, 'name', cr.name, 'weight', cr.weight,
+                                      'level_1_value', cr.level_1_value, 'level_2_value', cr.level_2_value,
+                                      'level_3_value', cr.level_3_value, 'level_4_value', cr.level_4_value,
+                                      'level_1_descriptor', cr.level_1_descriptor, 'level_2_descriptor', cr.level_2_descriptor,
+                                      'level_3_descriptor', cr.level_3_descriptor, 'level_4_descriptor', cr.level_4_descriptor,
+                                      -- The competencies this row counts toward, only those still on the class.
+                                      'tag_ids', coalesce((select jsonb_agg(x.tag_id order by x.tag_id)
+                                                             from criterion_tag x
+                                                             join tag t on t.id = x.tag_id
+                                                             join section s on s.id = t.section_id
+                                                            where x.criterion_id = cr.id
+                                                              and s.course_id = _course.id and s.removed_at is null), '[]'::jsonb),
+                                      'checks', coalesce((
+                                          select jsonb_agg(jsonb_build_object('id', ck.id, 'level', ck.level, 'label', ck.label)
+                                                           order by ck.level, ck.display_order, ck.id)
+                                            from criterion_check ck where ck.criterion_id = cr.id), '[]'::jsonb))
+                                    order by cr.display_order, cr.id)
+                             from criterion cr where cr.rubric_id = r.id), '[]'::jsonb)) order by r.id)
+              from rubric r
+             where r.course_id = _course.id
+               and exists (select 1 from assessment a where a.rubric_id = r.id
+                              and (a.date_assigned is null or a.date_assigned <= _today))), '[]'::jsonb),
+        'assessments', coalesce((
+            select jsonb_agg(
+                       jsonb_build_object(
+                           'id', a.id, 'title', a.title, 'date', a.date_assigned, 'due_date', a.due_date,
+                           'score_mode', a.score_mode, 'max_points', a.max_points, 'weight', a.weight,
+                           'rubric_id', a.rubric_id, 'created_at', a.created_at,
+                           'tag_ids', coalesce((select jsonb_agg(x.tag_id order by x.tag_id)
+                                                  from assessment_tag x
+                                                  join tag t on t.id = x.tag_id
+                                                  join section s on s.id = t.section_id
+                                                 where x.assessment_id = a.id and s.removed_at is null), '[]'::jsonb),
+                           'description', nullif(a.description, ''),
+                           'module_name', (select m.name from module m where m.id = a.module_id and m.course_id = _course.id),
+                           'category_name', k.name,
+                           -- What the category counts toward the course grade as the class is set
+                           -- up, or null where no percent would be true (the header says when).
+                           'category_percent', case when a.score_mode = 'dibels' then null
+                                                    when k.weight = 0 then 0
+                                                    when _course.grading_system in ('letter', 'both') and _weights = 100 then k.weight
+                                               end,
+                           -- The Ministry's seven, in its order, named as shared/constants.js names them.
+                           'core_competencies', coalesce((
+                               select jsonb_agg(jsonb_build_object('id', cc.id, 'name', cc.name) order by cc.ord)
+                                 from (values (1, 'COM', 'Communicating'),
+                                              (2, 'COL', 'Collaborating'),
+                                              (3, 'CT',  'Creative Thinking'),
+                                              (4, 'CRT', 'Critical & Reflective Thinking'),
+                                              (5, 'PPI', 'Personal & Cultural Identity'),
+                                              (6, 'PAR', 'Personal Awareness & Responsibility'),
+                                              (7, 'SAR', 'Social Awareness & Responsibility')) as cc(ord, id, name)
+                                where cc.id = any (a.core_competency_ids)), '[]'::jsonb))
+                       -- E9: the piece's category id, only when Show My Learning is on
+                       || case when _course.show_my_learning then jsonb_build_object('category_id', k.id) else '{}'::jsonb end
+                       || _returned_grade(p_enrollment_id, a.id)
+                     order by a.date_assigned nulls first, a.display_order, a.created_at, a.id)
+              from assessment a
+              left join category k on k.id = a.category_id and k.course_id = _course.id
+             where a.course_id = _course.id
+               and (a.date_assigned is null or a.date_assigned <= _today)), '[]'::jsonb))
+        -- E9: Show My Learning on: the class's own settings, categories, folders and learning map
+        -- (get_class_bundle's shapes; no tag source_text). Off: nothing is added.
+        || case when _course.show_my_learning then jsonb_build_object(
+               'show_my_learning', true,
+               'learning', jsonb_build_object(
+                   -- E9: the twelve calculation and grading-style columns of course, and no other
+                   'course', jsonb_build_object(
+                       'grading_system', _course.grading_system, 'calc_method', _course.calc_method,
+                       'decay_weight', _course.decay_weight, 'recent_score_limit', _course.recent_score_limit,
+                       'grading_scale', _course.grading_scale, 'category_weights', _course.category_weights,
+                       'round_percent', _course.round_percent, 'level_order', _course.level_order,
+                       'reporting_terms', _course.reporting_terms, 'timezone', _course.timezone,
+                       'folders_count_as_one', _course.folders_count_as_one,
+                       'courses_count_equally', _course.courses_count_equally),
+                   -- E9: every category of the class, as the bundle sends them
+                   'categories', coalesce((
+                       select jsonb_agg(jsonb_build_object('id', c.id, 'name', c.name, 'weight', c.weight,
+                                                           'display_order', c.display_order, 'calc_mode', c.calc_mode)
+                                        order by c.display_order, c.id)
+                         from category c where c.course_id = _course.id), '[]'::jsonb),
+                   -- E9: the class's folders, as the bundle sends them
+                   'competency_groups', coalesce((
+                       select jsonb_agg(jsonb_build_object('id', cg.id, 'name', cg.name, 'color', cg.color,
+                                                           'display_order', cg.display_order,
+                                                           'counts_as_one', cg.counts_as_one)
+                                        order by cg.display_order, cg.name)
+                         from competency_group cg where cg.course_id = _course.id), '[]'::jsonb),
+                   -- E9: the learning map: subjects, their sections not removed, their tags, in the bundle's order
+                   'subjects', coalesce((
+                       select jsonb_agg(jsonb_build_object(
+                                  'id', subj.id, 'name', subj.name, 'display_order', subj.display_order,
+                                  'sections', coalesce((
+                                      select jsonb_agg(jsonb_build_object(
+                                                 'id', sec.id, 'name', sec.name, 'display_order', sec.display_order,
+                                                 'competency_group_id', sec.competency_group_id,
+                                                 'tags', coalesce((
+                                                     select jsonb_agg(jsonb_build_object(
+                                                                'id', t.id, 'code', t.code, 'label', t.label,
+                                                                'i_can_text', t.i_can_text,
+                                                                'i_can_statements', to_jsonb(t.i_can_statements),
+                                                                'bank_id', t.bank_id, 'display_order', t.display_order)
+                                                            order by t.display_order, t.label)
+                                                       from tag t where t.section_id = sec.id), '[]'::jsonb))
+                                             order by sec.display_order, sec.name)
+                                        from section sec
+                                       where sec.subject_id = subj.id and sec.course_id = _course.id
+                                         and sec.removed_at is null), '[]'::jsonb))
+                                order by subj.display_order, subj.name)
+                         from subject subj where subj.course_id = _course.id), '[]'::jsonb)))
+           else '{}'::jsonb end;
+end;
+$function$;
+
+-- Service role only for page, as before (create or replace keeps its grants;
+-- these two lines change nothing where they are as they should be).
+revoke all on function student_submit.page(text, uuid, text) from public, anon, authenticated;
+grant execute on function student_submit.page(text, uuid, text) to service_role;
+
 -- ── Who can run what ────────────────────────────────────────────────────────
 -- The student's side: the service role only (the edge function). Replaced
 -- functions keep their grants. The helpers are granted to nobody.
@@ -1261,7 +1440,8 @@ begin
             ('student_submit.reply(text,uuid,uuid,jsonb,text)',      '264a736a722cf19022c20c343ecb01fb', 'c62efad49630d212de8357e64a23088f'),
             ('student_submit.answer_seen(text,uuid,uuid[],text)',    'da85d013a0511618c989d7bb44eac2f3', '360aa4c1fe8e0e0d860284cb3809c943'),
             ('public.save_score_report_note(uuid,uuid,text,uuid)',   '7b230f6d11458a7660e23c80f8829b95', '0278137275a8a15e973648c855643447'),
-            ('public.list_course_grade_returns(uuid)',               'bc5529a69303cdfe8d91604388dc927a', '0779f1e345fb278fd8702592163784c1')
+            ('public.list_course_grade_returns(uuid)',               'bc5529a69303cdfe8d91604388dc927a', '0779f1e345fb278fd8702592163784c1'),
+            ('student_submit.page(text,uuid,text)',                  '034e6674a25f8a5e1abc067f50784ce6', '67a5b8270aa78e914588694e297be6bc')
             -- FINGERPRINTS-END
         ) as v(fn, before, becomes)
     loop

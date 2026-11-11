@@ -121,6 +121,8 @@ function typed(from: unknown, keys: string[], as: (v: unknown) => unknown): Json
 const textOrNull = (v: unknown): string | null => (typeof v === 'string' ? v : null);
 // A number, or null.
 const numberOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+// An id, or null.
+const idOrNull = (v: unknown): string | null => (typeof v === 'string' && UUID.test(v) ? v : null);
 // A whole number, 0 or more; 0 otherwise.
 const count = (v: unknown): number => (typeof v === 'number' && Number.isSafeInteger(v) && v >= 0 ? v : 0);
 // A list of text: the strings, in order, blanks kept; anything else left behind.
@@ -199,12 +201,13 @@ function rubric(v: unknown): Json {
    nothing is put in its place. */
 const ASSESSMENT = ['id', 'title', 'date', 'due_date', 'created_at', 'score_mode', 'max_points', 'weight', 'rubric_id'];
 const RETURN = ['status', 'returned_at', 'updated_at', 'seen_at'];
-function assessment(v: unknown): Json {
+function assessment(v: unknown, withCategory: boolean): Json {
   const a = object(v);
   const returned = typeof a.returned_at === 'string' && a.returned_at !== '';
   return {
     ...pick(a, ASSESSMENT),
     tag_ids: ids(a.tag_ids),
+    ...(withCategory ? typed(a, ['category_id'], idOrNull) : {}),
     ...typed(a, ['description', 'module_name', 'category_name'], textOrNull),
     ...typed(a, ['category_percent'], numberOrNull),
     ...typed(a, ['core_competencies'], named),
@@ -227,7 +230,51 @@ function course(v: unknown): Json {
   };
 }
 
+/* My Learning (Batch E, E9; my-learning-contract.md): the class's own
+   settings, categories, folders and learning map, sent only while the class
+   has Show My Learning on. A tag's source_text, and anything else not named
+   here, stops here. */
+const jsonObject = (v: unknown): Json | null => (isObject(v) ? v : null);
+const LEARNING_COURSE = [
+  'grading_system',
+  'calc_method',
+  'decay_weight',
+  'recent_score_limit',
+  'round_percent',
+  'level_order',
+  'timezone',
+  'folders_count_as_one',
+  'courses_count_equally',
+];
+function learning(v: unknown): Json {
+  const l = object(v);
+  const c = object(l.course);
+  return {
+    course: {
+      ...pick(c, LEARNING_COURSE),
+      grading_scale: jsonObject(c.grading_scale),
+      category_weights: jsonObject(c.category_weights),
+      reporting_terms: Array.isArray(c.reporting_terms) ? c.reporting_terms : null,
+    },
+    categories: list(l.categories).map(k => pick(k, ['id', 'name', 'weight', 'display_order', 'calc_mode'])),
+    competency_groups: list(l.competency_groups).map(g =>
+      pick(g, ['id', 'name', 'color', 'display_order', 'counts_as_one']),
+    ),
+    subjects: list(l.subjects).map(s => ({
+      ...pick(s, ['id', 'name', 'display_order']),
+      sections: list(object(s).sections).map(sec => ({
+        ...pick(sec, ['id', 'name', 'display_order', 'competency_group_id']),
+        tags: list(object(sec).tags).map(t => ({
+          ...pick(t, ['id', 'code', 'label', 'i_can_text', 'bank_id', 'display_order']),
+          i_can_statements: texts(object(t).i_can_statements),
+        })),
+      })),
+    })),
+  };
+}
+
 function page(r: Json): Json {
+  const mine = isObject(r.learning);
   return {
     ok: true,
     ...pick(r, ['v', 'expires_at']),
@@ -236,7 +283,8 @@ function page(r: Json): Json {
     classes: classes(r.classes),
     tags: byId(r.tags, t => ({ ...pick(t, ['label', 'code']), ...typed(t, ['i_can'], texts) })),
     rubrics: list(r.rubrics).map(rubric),
-    assessments: list(r.assessments).map(assessment),
+    assessments: list(r.assessments).map(a => assessment(a, mine)),
+    ...(mine ? { show_my_learning: true, learning: learning(r.learning) } : {}),
   };
 }
 
