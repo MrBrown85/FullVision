@@ -255,7 +255,7 @@ window.MGradePhotos = (function () {
             '" data-aid="' +
             r.a.id +
             '"' +
-            (grade ? '' : ' data-then="grade"') +
+            (grade ? ' data-only="student"' : ' data-then="grade"') +
             '><span class="m-scard-return-body"><span class="m-scard-return-title">' +
             MC.esc(r.a.title) +
             '</span><span class="m-scard-return-sub">' +

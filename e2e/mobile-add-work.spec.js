@@ -190,10 +190,36 @@ test('the student card’s To Grade list, View Profile’s, the red count, and A
   await expect(detail.locator('.m-scard-tograde .m-scard-return-head')).toHaveText('To Grade');
   await shot(page, 'S7-F4-view-profile-to-grade');
 
-  // Grade opens the grader on that work, at Noor's card.
+  // Grade opens the grader on Noor's work only, a tab for each piece, the lab first.
+  const pieces = await detail.locator('.m-scard-tograde-row').count();
   await detail.locator('.m-scard-tograde-row[data-action="m-assess-grade"][data-aid="' + LAB + '"]').click();
-  await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
-  await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('Cell Microscope Lab');
+  const grader = page.locator('#m-screen-grade-swiper');
+  await expect(grader).toBeVisible();
+  const noor = await fullName(page, 'st2');
+  const first = noor.split(' ')[0];
+  await expect(page.locator('#m-nav-bar-grade-swiper .m-nav-bar-back')).toHaveText(first);
+  await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText(noor);
+  await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('1 of ' + pieces + ' for ' + first);
+  const tabs = grader.locator('.m-work-tabs [role="tab"]');
+  await expect(tabs).toHaveCount(pieces);
+  await expect(tabs.first()).toHaveText('Cell Microscope Lab');
+  await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
+  await expect(grader.locator('.m-swiper-card')).toHaveCount(1);
+  await expect(grader.locator('#m-thumb-strip')).toBeHidden();
+  await expect(grader.locator('.m-swiper-card .m-grade-student-name')).toHaveText('Cell Microscope Lab');
+  await expect(grader.locator('.m-work-sent')).toHaveText(/^Submitted .+ · 2 photos$/);
+  await shot(page, 'S7-F4-grader-one-student');
+  if (pieces > 1) {
+    // A tab shows that piece in place.
+    await tabs.nth(1).click();
+    await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('2 of ' + pieces + ' for ' + first);
+    await expect(grader.locator('.m-work-tab-on')).toHaveCount(1);
+    await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');
+    await expect(grader.locator('.m-swiper-card [data-action="m-add-work"]')).toBeVisible();
+  }
+  // Back goes back to Noor.
+  await page.locator('#m-nav-bar-grade-swiper .m-nav-bar-back').click();
+  await expect(page.locator('#m-screen-student-detail')).toBeVisible();
 });
 
 test('Add Work, Then Grade It from a student with nothing in', async ({ page }) => {
@@ -221,4 +247,69 @@ test('Add Work, Then Grade It from a student with nothing in', async ({ page }) 
   const card = page.locator('.m-swiper-card[data-sid="' + sid + '"]');
   await expect(card.locator('.m-work-sent')).toHaveText(/^Submitted .+ · 1 photo$/);
   await expect(card.locator('[data-action="m-add-work"]')).toHaveCount(0);
+});
+
+test('Reset Demo Data deletes the photos a teacher added on the phone', async ({ page }) => {
+  await openPhone(page);
+  const sid = (await notIn(page))[0];
+  // Add Work keeps its photos in the photo queue (IndexedDB), not in the class data.
+  const kept = await page.evaluate(
+    async ({ sid, LAB }) => {
+      const b = new Blob([new Uint8Array([255, 216, 255, 224])], { type: 'image/jpeg' });
+      const res = await addStudentWorkPages('sci8', sid, LAB, [
+        { blob: b, thumb: b, hash: 'a'.repeat(64), width: 10, height: 10 },
+      ]);
+      await PhotoQueue.ready();
+      return { result: res.result, queued: PhotoQueue.stats().queued };
+    },
+    { sid, LAB },
+  );
+  expect(kept).toEqual({ result: 'sent', queued: 1 });
+
+  await page.locator('.m-screen .m-demo-pill').click();
+  const sheet = page.locator('#m-sheet-container .m-sheet.m-sheet-visible');
+  await sheet.getByRole('button', { name: 'Reset Demo Data' }).click();
+  // The reset reloads the page once the photos are gone.
+  const reloaded = page.waitForEvent('load');
+  await sheet.getByRole('button', { name: 'Reset', exact: true }).click();
+  await reloaded;
+  await expect(page.locator('.m-card-stack-item').first()).toBeVisible();
+  const left = await page.evaluate(async () => {
+    await PhotoQueue.ready();
+    return { queued: PhotoQueue.stats().queued, rows: (await PhotoQueue.indexedDbStore().list()).length };
+  });
+  expect(left).toEqual({ queued: 0, rows: 0 });
+});
+
+test('the Advanced Rubric a criterion at a time: pager, groups of boxes, Next: criterion', async ({ page }) => {
+  await openPhone(page, { clear: ['st2'] });
+  const crits = await page.evaluate(
+    LAB => getRubricById('sci8', getAssessments('sci8').find(a => a.id === LAB).rubricId).criteria.map(c => c.name),
+    LAB,
+  );
+  await openLab(page);
+  await page.locator('#m-thumb-strip .m-thumb[data-sid="st2"]').click();
+  const card = page.locator('.m-swiper-card[data-sid="st2"]');
+  const pager = card.locator('.m-crit-pager');
+  await expect(pager).toHaveCount(1);
+  await expect(pager.locator('.m-crit-name')).toHaveText(crits[0]);
+  await expect(pager.getByRole('img', { name: 'Criterion 1 of ' + crits.length })).toBeVisible();
+  await expect(pager.getByRole('button', { name: 'Previous criterion' })).toBeDisabled();
+  await expect(pager.getByRole('radiogroup', { name: 'Level for ' + crits[0] })).toBeVisible();
+  const bar = page.locator('#m-grade-return');
+  // Nothing graded yet: no Next, as Return and Next is not offered either.
+  const group = pager.locator('.m-check-group-head').first();
+  await group.click();
+  await expect(card.locator('.m-crit-pager .m-check-group-head').first()).toHaveAttribute('aria-expanded', 'true');
+  await card.locator('.m-crit-pager .m-check-group.is-open input[type="checkbox"]').first().check();
+  await expect(card.locator('.m-crit-pager .m-check-group-head').first().locator('.m-check-group-count')).toHaveText(
+    /^1 of \d+$/,
+  );
+  await expect(bar.locator('.m-crit-next-btn')).toHaveText('Next: ' + crits[1]);
+  await shot(page, 'S7-F2-advanced-rubric');
+  await bar.locator('.m-crit-next-btn').click();
+  await expect(card.locator('.m-crit-pager .m-crit-name')).toHaveText(crits[1]);
+  await expect(card.getByRole('img', { name: 'Criterion 2 of ' + crits.length })).toBeVisible();
+  await card.getByRole('button', { name: 'Previous criterion' }).click();
+  await expect(card.locator('.m-crit-pager .m-crit-name')).toHaveText(crits[0]);
 });
