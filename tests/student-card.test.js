@@ -555,8 +555,6 @@ describe('student-data.js: the one adapter', () => {
       block: 'C',
       gradingSystem: 'both',
       gradingScale: null,
-      // S4-M1's teacher_name: this reply has none, so it reads as none.
-      teacherName: '',
     });
     expect(read.assessments.map(a => a.id)).toEqual(['a1', 'a2', 'a3', 'a5', 'a6', 'a7']);
     expect(JSON.stringify(read)).not.toContain('SECRET NOTE');
