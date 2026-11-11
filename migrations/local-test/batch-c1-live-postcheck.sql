@@ -31,7 +31,7 @@ with made(fn, becomes, or_c2) as (values
     ('student_submit.reply(text,uuid,uuid,jsonb,text)',                    '264a736a722cf19022c20c343ecb01fb', '264a736a722cf19022c20c343ecb01fb'),
     ('student_submit.answer_seen(text,uuid,uuid[],text)',                  'da85d013a0511618c989d7bb44eac2f3', 'da85d013a0511618c989d7bb44eac2f3'),
     ('student_submit.revision_start(text,uuid,uuid,jsonb,text,uuid,text)', '43ca2e50ff067a4fb51762367895ee84', '43ca2e50ff067a4fb51762367895ee84'),
-    ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',          '6c3943b9b061f946062a042213c2dcfd', '6c3943b9b061f946062a042213c2dcfd'),
+    ('student_submit.revision_finish(text,uuid,uuid,jsonb,text)',          'a04e2d62a76b00a7f6ad03a76a0ede74', 'a04e2d62a76b00a7f6ad03a76a0ede74'),
     ('student_submit.revision_unsend(text,uuid,uuid,text)',                '73ac162e56dde98d11ffcd03aa4b5ffa', '73ac162e56dde98d11ffcd03aa4b5ffa'),
     ('student_submit.group_work(text,uuid,text)',                          '1db83448b1b3d7ae998870bdb07c4f36', '1db83448b1b3d7ae998870bdb07c4f36'),
     ('student_submit.group_file_links(text,uuid,uuid,text)',               '1c034fa5647b5808209b0ef9b31e8e4d', '1c034fa5647b5808209b0ef9b31e8e4d')
