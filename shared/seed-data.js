@@ -3851,6 +3851,7 @@ function seedIfNeeded() {
 
   // Sample student work, for a class seeded now or before it existed.
   seedDemoStudentWork();
+  seedDemoMarkup();
 
   // ── Migrate old gb-notes into gb-quick-obs (one-time) ──
   Object.keys(COURSES).forEach(cid => {
@@ -4000,4 +4001,58 @@ function seedDemoStudentWork() {
     assessments: assessments,
     submissions: submissions,
   });
+}
+
+/* ── Sample Mark Up (S9) ───────────────────────────────────────────
+   The teacher's marks on two pages of Cell Microscope Lab, given to the
+   students as a class that does not hold grades gives them (shared/data.js,
+   "Mark Up"). Places are fractions of the page from its top left. Jordan's
+   page has three notes, a tick and a pen line; Noor's second page has a
+   note and a cross. Seeded once per class, after the sample work: a class
+   seeded before this existed gets it the next time Demo Mode opens. */
+var DEMO_MARKUP = {
+  'demo-sub-st10-sci8a1-p1': {
+    v: 1,
+    marks: [
+      { id: 'm1', type: 'note', x: 0.72, y: 0.18, text: 'Which cell is this? Label it onion or cheek.' },
+      { id: 'm2', type: 'tick', x: 0.12, y: 0.42, color: 'green' },
+      { id: 'm3', type: 'note', x: 0.7, y: 0.46, text: 'Good: you noted the cell wall.' },
+      {
+        id: 'm4',
+        type: 'pen',
+        color: 'red',
+        width: 0.004,
+        points: [
+          [0.2, 0.71],
+          [0.34, 0.7],
+          [0.48, 0.72],
+        ],
+      },
+      { id: 'm5', type: 'note', x: 0.7, y: 0.74, text: 'Add the magnification you used.' },
+    ],
+  },
+  'demo-sub-st2-sci8a1-p2': {
+    v: 1,
+    marks: [
+      { id: 'm1', type: 'cross', x: 0.15, y: 0.36, color: 'red' },
+      { id: 'm2', type: 'note', x: 0.68, y: 0.36, text: 'Check this: cheek cells have no cell wall.' },
+    ],
+  },
+};
+
+function seedDemoMarkup() {
+  if (typeof saveDemoMarkup !== 'function' || !COURSES.sci8) return false;
+  var stored = null;
+  try {
+    stored = JSON.parse(localStorage.getItem('gb-student-feedback-sci8') || 'null');
+  } catch (e) {
+    stored = null;
+  }
+  if (stored && stored.markup && Object.keys(stored.markup).length) return false;
+  // Only the pages the sample still has (a student can be gone from the roster).
+  var pages = {};
+  Object.keys(DEMO_MARKUP).forEach(function (id) {
+    if (typeof getPageMarkup === 'function' && getPageMarkup('sci8', id)) pages[id] = DEMO_MARKUP[id];
+  });
+  return Object.keys(pages).length ? saveDemoMarkup('sci8', pages) : false;
 }

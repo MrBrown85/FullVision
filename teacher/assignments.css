@@ -9072,9 +9072,18 @@ button.grader-member-name {
   justify-content: center;
   align-items: flex-start;
 }
-.grader-work-img {
+/* The page's surface (S9-T1): the picture and any layer over it turn and
+   fit as one. */
+.grader-work-surface {
+  position: relative;
   display: block;
   transition: transform 0.15s;
+}
+.grader-work-page.fit-width .grader-work-surface {
+  width: 100%;
+}
+.grader-work-img {
+  display: block;
 }
 .grader-work-page.fit-page .grader-work-img {
   max-width: 100%;
@@ -9085,13 +9094,13 @@ button.grader-member-name {
   width: 100%;
   height: auto;
 }
-.grader-work-page.turn-90 .grader-work-img {
+.grader-work-page.turn-90 .grader-work-surface {
   transform: rotate(90deg);
 }
-.grader-work-page.turn-180 .grader-work-img {
+.grader-work-page.turn-180 .grader-work-surface {
   transform: rotate(180deg);
 }
-.grader-work-page.turn-270 .grader-work-img {
+.grader-work-page.turn-270 .grader-work-surface {
   transform: rotate(270deg);
 }
 .grader-work-note {

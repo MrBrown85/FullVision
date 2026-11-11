@@ -1045,8 +1045,11 @@ window.StudentView = (function () {
      { ready: false } while the class's returned grades cannot be read;
      otherwise { ready: true, reply, view }. Every result is worked out by
      calc.js on returned grades only. view.learning is My Learning when the
-     class shows it, else null. */
-  function fromCache(cid, sid) {
+     class shows it, or when opts.learning asks for it, else null. */
+  function fromCache(cid, sid, opts) {
+    // opts.learning: work My Learning out as if the class showed it (Preview's See What They'd See,
+    // S13-F1). Nothing is saved; the class's switch is not read or changed.
+    var showLearning = !!(opts && opts.learning) || learningOn(cid);
     var page = reply(cid, sid);
     if (!page) return { ready: false };
     var view = withReturnedOnly(function () {
@@ -1054,7 +1057,7 @@ window.StudentView = (function () {
         var a = pieceOf(cid, aid);
         return a ? assessmentCellValue(cid, sid, a) : null;
       });
-      v.learning = learningOn(cid) ? learning(cid, sid, v) : null;
+      v.learning = showLearning ? learning(cid, sid, v) : null;
       return v;
     });
     return { ready: true, reply: page, view: view };
