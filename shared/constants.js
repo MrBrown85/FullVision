@@ -866,6 +866,7 @@ const LINE_ICONS = {
     '<rect x="5.5" y="5.5" width="8.5" height="8.5" rx="1.5"/><path d="M10.5 5.5V3a1.5 1.5 0 0 0-1.5-1.5H3A1.5 1.5 0 0 0 1.5 3v6A1.5 1.5 0 0 0 3 10.5h2.5"/></svg>',
   trash: _LINE_SVG + '<path d="M2 4h12"/><path d="M5.5 4V2.5h5V4"/><path d="M3.5 4l.8 9.5h7.4l.8-9.5"/></svg>',
   lock: _LINE_SVG + '<rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>',
+  flag: _LINE_SVG + '<path d="M3.5 14.5v-12"/><path d="M3.5 2.5h8.5l-2 3 2 3H3.5"/></svg>',
   print:
     _LINE_SVG +
     '<path d="M4.5 6V2h7v4"/><rect x="1.5" y="6" width="13" height="5.5" rx="1"/><path d="M4.5 9.5h7V14h-7z"/></svg>',
