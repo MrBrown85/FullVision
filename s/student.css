@@ -17,6 +17,8 @@
   --sp-green-soft: #bbf7d0;
   --sp-green-line: #2e7d32;
   --sp-amber: #b45309;
+  --sp-amber-soft: #fff1db;
+  --sp-amber-text: #8a4b00;
   --sp-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
@@ -389,6 +391,21 @@ button {
   font-size: 16px;
   line-height: 1.45;
   white-space: pre-wrap;
+}
+
+/* Is This You? on a phone: the avatar centred above the heading, and
+   Yes, That's Me / No, That's Not Me full width with a gap. The Chromebook
+   rules (min-width: 900px) put the avatar beside the heading. */
+.sp-check-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sp-hello-who {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
 }
 
 /* Start, Sent and messages */
@@ -973,8 +990,7 @@ button {
     gap: 6px;
   }
   .sp-hello-who {
-    display: flex;
-    align-items: center;
+    flex-direction: row;
     gap: 14px;
   }
   .sp-check-box .sp-avatar {
@@ -1042,11 +1058,16 @@ button {
   padding: 12px 16px 0;
 }
 
-/* Your Classes: how many pieces wait in each class (S4-W1). */
+/* Your Classes: how many pieces wait in each class (S4-W1), as the board's
+   amber pill at the right of the row. */
 .sp-class-todo {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 10px;
+  background: var(--sp-amber-soft);
+  color: var(--sp-amber-text);
   font-size: 13px;
-  font-weight: 600;
-  color: var(--sp-blue-text, #0066cc);
+  font-weight: 700;
 }
 
 /* Sending work (S5-F2, S5-F3; s/send.js): Check and Send, the camera and
@@ -1090,8 +1111,8 @@ button {
   margin: 0;
   padding: 8px 12px;
   border-radius: 10px;
-  background: #fff1db;
-  color: #8a4b00;
+  background: var(--sp-amber-soft);
+  color: var(--sp-amber-text);
   font-weight: 600;
 }
 .sp-send-pages {

@@ -95,6 +95,18 @@ window.PreviewStudent = (function () {
     return pages ? { pages: pages, notes: notes } : null;
   }
 
+  /* Whether any returned piece came back with words from the teacher: the
+     piece's comment, or a comment on one of its competencies or rubric
+     criteria (shared/student-view.js sets them only from a returned grade). */
+  function _commentsSeen(view) {
+    function said(row) {
+      return !!(row && row.comment);
+    }
+    return ((view && view.work) || []).some(function (p) {
+      return !!p && (said(p) || (p.competencies || []).some(said) || ((p.rubric && p.rubric.rows) || []).some(said));
+    });
+  }
+
   function _seesHtml(first, cid, view) {
     var marks = _marksSeen(view);
     return (
@@ -108,6 +120,7 @@ window.PreviewStudent = (function () {
       (StudentView.learningOn(cid) || (_open && _open.learning)
         ? _item('My Learning', 'Their level on each skill and their grade, only from work you’ve returned.')
         : '') +
+      (_commentsSeen(view) ? _item('Your comment and criterion comments', 'Word for word, as you wrote them.') : '') +
       (marks
         ? _item(
             marks.notes
@@ -136,6 +149,9 @@ window.PreviewStudent = (function () {
       _item('Grades you haven’t returned', drafts) +
       _item('Other students', 'No class average, no one else’s work.') +
       _item('Your private notes', 'Observations marked Private stay with you.') +
+      (StudentView.learningOn(cid) || (_open && _open.learning)
+        ? ''
+        : _item('My Learning', 'Off for this class. Turn it on in Class Settings › Student Page.')) +
       '</ul></section>'
     );
   }

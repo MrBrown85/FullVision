@@ -29,6 +29,8 @@ window.PageStudent = (function () {
   var _coreEditing = ''; // Learner Profile: the Core Competency being self-assessed
   var _openTags = new Set(); // competency cards whose evidence drawer is open
   var _compSort = 'map'; // Competencies tab: 'map' (learning-map order) or 'lowest'
+  var _grGroup = 'category'; // Grades tab: Group By
+  var _grFilter = 'all'; // Grades tab: all, marked or missing
   var _overrideSelectedLevel = 0;
   var Evidence = StudentEvidence;
   var Overrides = StudentOverrides;
@@ -565,6 +567,9 @@ window.PageStudent = (function () {
   var TABS = [
     { id: 'overview', label: 'Overview' },
     { id: 'comps', label: 'Competencies' },
+    // Grades (redesign R4): Assessments and Grade Breakdown in one tab, only
+    // while the class's student page build switch is on.
+    { id: 'grades', label: 'Grades' },
     { id: 'assess', label: 'Assessments' },
     // Work (S14-F2): only while the class's student page and Send Work are on.
     { id: 'work', label: 'Work' },
@@ -573,10 +578,16 @@ window.PageStudent = (function () {
     { id: 'profile', label: 'Learner Profile' },
   ];
 
+  function _gradesTabOn(cid) {
+    return !!cid && typeof getReturnSettings === 'function' && !!getReturnSettings(cid).student_page;
+  }
+
   // The tabs this class shows: Work is drawn by teacher/work-wall.js.
   function _shownTabs() {
     var work = !!window.WorkWall && WorkWall.tabOn(activeCourse);
+    var grades = _gradesTabOn(activeCourse);
     return TABS.filter(function (t) {
+      if (t.id === 'grades') return grades;
       return t.id !== 'work' || work;
     });
   }
@@ -738,6 +749,17 @@ window.PageStudent = (function () {
     };
     out.evidence = _evidenceSummary(ctx.obs, scope);
     out.breakdown = _breakdownSummary(ctx);
+    if (_gradesTabOn(cid)) {
+      var cats = _assessGroups(cid, ctx.assessments, 'category').filter(function (g) {
+        return !!g.key;
+      });
+      out.grades = {
+        stat:
+          _plural(ctx.assessments.length, 'Piece', 'Pieces') +
+          (cats.length ? ' · ' + _plural(cats.length, 'Category', 'Categories') : ''),
+        sub: ov.missing.length ? ov.missing.length + ' missing' : 'Nothing missing',
+      };
+    }
     if (window.WorkWall && WorkWall.tabOn(cid)) out.work = WorkWall.tabSummary(cid, studentId);
     // The Learner Profile: goals set (the student's own and the competency
     // goals) and when the student last answered.
@@ -1242,6 +1264,48 @@ window.PageStudent = (function () {
     );
   }
 
+  /* One piece of work as a row that opens in place (design rule 7): the
+     Overview's All Your Work and the Grades tab share it. */
+  function _ovRowHtml(ov, ctx, a) {
+    var st = ov.statusOf(a);
+    var open = _ovOpen === a.id;
+    var sc = _ovScore(ov, a);
+    var pill =
+      st === 'NS'
+        ? '<span class="stu-ov-pill miss">Missing</span>'
+        : st === 'LATE'
+          ? '<span class="stu-ov-pill late">Late</span>'
+          : st === 'EXC'
+            ? '<span class="stu-ov-pill exc">Excused</span>'
+            : '';
+    return (
+      '<div class="stu-ov-row' +
+      (open ? ' open' : '') +
+      '" id="stu-ov-row-' +
+      esc(a.id) +
+      '"><button type="button" class="stu-ov-row-btn" data-action="stuOvOpen" data-aid="' +
+      esc(a.id) +
+      '" aria-expanded="' +
+      open +
+      '"><span class="stu-ov-row-main"><span class="stu-ov-row-title">' +
+      esc(a.title) +
+      pill +
+      '</span><span class="stu-ov-row-date">' +
+      esc(_shortDay(a.date)) +
+      '</span></span><span class="stu-ov-row-score' +
+      (sc.cls ? ' ' + sc.cls : '') +
+      '"><span class="stu-ov-row-main-score' +
+      (sc.lv ? ' stu-ov-chip-lv stu-level-' + sc.lv : '') +
+      '">' +
+      esc(sc.main) +
+      '</span>' +
+      (sc.sub ? '<span class="stu-ov-row-sub">' + esc(sc.sub) + '</span>' : '') +
+      '</span><span class="stu-ov-chev" aria-hidden="true">›</span></button>' +
+      (open ? _ovOpenHtml(ov, ctx, a) : '') +
+      '</div>'
+    );
+  }
+
   function _ovAllHtml(ov, ctx) {
     var list = ctx.assessments
       .slice()
@@ -1284,42 +1348,7 @@ window.PageStudent = (function () {
     if (!list.length) return html + '<div class="stu-ov-card stu-ov-none">Nothing here.</div></div>';
     html += '<div class="stu-ov-rows">';
     list.forEach(function (a) {
-      var st = ov.statusOf(a);
-      var open = _ovOpen === a.id;
-      var sc = _ovScore(ov, a);
-      var pill =
-        st === 'NS'
-          ? '<span class="stu-ov-pill miss">Missing</span>'
-          : st === 'LATE'
-            ? '<span class="stu-ov-pill late">Late</span>'
-            : st === 'EXC'
-              ? '<span class="stu-ov-pill exc">Excused</span>'
-              : '';
-      html +=
-        '<div class="stu-ov-row' +
-        (open ? ' open' : '') +
-        '" id="stu-ov-row-' +
-        esc(a.id) +
-        '"><button type="button" class="stu-ov-row-btn" data-action="stuOvOpen" data-aid="' +
-        esc(a.id) +
-        '" aria-expanded="' +
-        open +
-        '"><span class="stu-ov-row-main"><span class="stu-ov-row-title">' +
-        esc(a.title) +
-        pill +
-        '</span><span class="stu-ov-row-date">' +
-        esc(_shortDay(a.date)) +
-        '</span></span><span class="stu-ov-row-score' +
-        (sc.cls ? ' ' + sc.cls : '') +
-        '"><span class="stu-ov-row-main-score' +
-        (sc.lv ? ' stu-ov-chip-lv stu-level-' + sc.lv : '') +
-        '">' +
-        esc(sc.main) +
-        '</span>' +
-        (sc.sub ? '<span class="stu-ov-row-sub">' + esc(sc.sub) + '</span>' : '') +
-        '</span><span class="stu-ov-chev" aria-hidden="true">›</span></button>' +
-        (open ? _ovOpenHtml(ov, ctx, a) : '') +
-        '</div>';
+      html += _ovRowHtml(ov, ctx, a);
     });
     return html + '</div></div>';
   }
@@ -2663,6 +2692,240 @@ window.PageStudent = (function () {
     month: 'The grade for each type, by month.',
   };
 
+  /* ── Grades (redesign R4) ─────────────────────────────────
+     Assessments and Grade Breakdown in one tab, behind the build switch:
+     how the course grade is built (one bar, a segment per category as wide
+     as its weight, filled to its grade), Group By (Category, Unit, Type,
+     Rubric, Date), and every piece as a row that opens in place (the
+     Overview's row). All grades through calc.js: assessmentGroupGrade,
+     studentGradeSummary, and the Overview's _ovScore. */
+  var GR_GROUPS = [
+    { id: 'category', label: 'Category' },
+    { id: 'module', label: 'Unit' },
+    { id: 'type', label: 'Type' },
+    { id: 'rubric', label: 'Rubric' },
+    { id: 'date', label: 'Date' },
+  ];
+
+  function _grFiltered(ov, list) {
+    return list.filter(function (a) {
+      var st = ov.statusOf(a);
+      if (_grFilter === 'missing') return st === 'NS';
+      if (_grFilter === 'marked') {
+        var c = ov.cellOf[a.id];
+        return st !== 'NS' && st !== 'EXC' && c && c.kind !== 'none';
+      }
+      return true;
+    });
+  }
+
+  function _grNewestFirst(list) {
+    return list.slice().sort(function (x, y) {
+      return (y.date || '').localeCompare(x.date || '');
+    });
+  }
+
+  function _grCourseHtml(ctx) {
+    var cid = ctx.cid;
+    var summary = studentGradeSummary(cid, studentId);
+    var cats = _assessGroups(cid, ctx.assessments, 'category').filter(function (g) {
+      return !!g.key && g.category && Number(g.category.weight || 0) > 0;
+    });
+    var html =
+      '<div class="stu-gr-course"><div class="stu-gr-course-now"><div class="stu-gr-label">Course Grade</div>' +
+      '<div class="stu-gr-course-v">' +
+      _gradePill(summary) +
+      '</div></div>';
+    if (!cats.length) return html + '</div>';
+    var label = [];
+    html += '<div class="stu-gr-bar">';
+    cats.forEach(function (g) {
+      var mine = assessmentGroupGrade(cid, studentId, g.assessments, _groupCalcMode(g));
+      var w = Number(g.category.weight || 0);
+      var fill = mine ? (mine.pct != null ? mine.pct : mine.prof != null ? (mine.prof / 4) * 100 : 0) : 0;
+      label.push(g.name + ' ' + (mine ? mine.text : 'not yet graded') + ', ' + w + '% of the grade');
+      html +=
+        '<div class="stu-gr-seg" style="flex:' +
+        w +
+        ' 1 0">' +
+        '<div class="stu-gr-track"><div class="stu-gr-fill" style="width:' +
+        Math.max(0, Math.min(100, fill)) +
+        '%;background:' +
+        (PROF_COLORS[mine ? mine.level : 0] || PROF_COLORS[0]) +
+        '"></div></div>' +
+        '<div class="stu-gr-seg-head"><span class="stu-gr-seg-name">' +
+        esc(g.name) +
+        '</span><span class="stu-gr-seg-v">' +
+        esc(mine ? mine.text : '—') +
+        '</span></div>' +
+        '<div class="stu-gr-seg-w">' +
+        esc(w + '% of the grade') +
+        '</div></div>';
+    });
+    return (
+      html.replace(
+        '<div class="stu-gr-bar">',
+        '<div class="stu-gr-bar" role="img" aria-label="' + esc(label.join('; ')) + '">',
+      ) + '</div></div>'
+    );
+  }
+
+  function _grControlsHtml(ov, ctx) {
+    var counts = {
+      all: ctx.assessments.length,
+      marked: 0,
+      missing: 0,
+    };
+    ctx.assessments.forEach(function (a) {
+      var st = ov.statusOf(a);
+      var c = ov.cellOf[a.id];
+      if (st === 'NS') counts.missing++;
+      else if (st !== 'EXC' && c && c.kind !== 'none') counts.marked++;
+    });
+    return (
+      '<div class="stu-gr-controls"><span class="stu-gr-label" id="stu-gr-group-label">Group By</span>' +
+      '<div class="seg seg-sm" role="radiogroup" aria-labelledby="stu-gr-group-label">' +
+      GR_GROUPS.map(function (g) {
+        var on = _grGroup === g.id;
+        return (
+          '<button type="button" class="seg-btn' +
+          (on ? ' active' : '') +
+          '" role="radio" aria-checked="' +
+          on +
+          '" data-action="stuGrGroup" data-group="' +
+          g.id +
+          '">' +
+          esc(g.label) +
+          '</button>'
+        );
+      }).join('') +
+      '</div>' +
+      '<div class="stu-ov-chips" role="group" aria-label="Show">' +
+      [
+        ['all', 'All'],
+        ['marked', 'Marked'],
+        ['missing', 'Missing'],
+      ]
+        .map(function (f) {
+          return (
+            '<button type="button" class="stu-ov-chip" data-action="stuGrFilter" data-filter="' +
+            f[0] +
+            '" aria-pressed="' +
+            (_grFilter === f[0]) +
+            '">' +
+            f[1] +
+            ' <span class="stu-gr-count">' +
+            counts[f[0]] +
+            '</span></button>'
+          );
+        })
+        .join('') +
+      '</div></div>'
+    );
+  }
+
+  function _grRowsHtml(ov, ctx, list) {
+    var rows = _grNewestFirst(_grFiltered(ov, list));
+    if (!rows.length) return '<div class="stu-gr-none">Nothing here with this filter.</div>';
+    return (
+      '<div class="stu-ov-rows">' +
+      rows
+        .map(function (a) {
+          return _ovRowHtml(ov, ctx, a);
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+
+  function _grGroupsHtml(ov, ctx) {
+    var cid = ctx.cid;
+    if (_grGroup === 'date') {
+      var months = [];
+      var byKey = {};
+      _grNewestFirst(_grFiltered(ov, ctx.assessments)).forEach(function (a) {
+        var key = String(a.date || '').slice(0, 7);
+        if (!byKey[key]) {
+          var d = key ? new Date(key + '-01T00:00:00') : null;
+          byKey[key] = {
+            name: d && !isNaN(d) ? d.toLocaleDateString('en-CA', { month: 'long', year: 'numeric' }) : 'No Date',
+            list: [],
+          };
+          months.push(byKey[key]);
+        }
+        byKey[key].list.push(a);
+      });
+      if (!months.length) return '<div class="stu-gr-none">Nothing here with this filter.</div>';
+      return months
+        .map(function (m) {
+          return (
+            '<section class="stu-gr-group"><div class="stu-gr-group-head"><h3 class="stu-gr-group-name">' +
+            esc(m.name) +
+            '</h3></div>' +
+            _grRowsHtml(ov, ctx, m.list) +
+            '</section>'
+          );
+        })
+        .join('');
+    }
+    var groups = _assessGroups(cid, ctx.assessments, _grGroup);
+    if (!groups.length)
+      return (
+        '<div class="stu-gr-none">' +
+        (_grGroup === 'rubric' ? 'No work uses a rubric yet.' : 'No assessments yet.') +
+        '</div>'
+      );
+    if (_grGroup === 'rubric')
+      return groups
+        .map(function (g) {
+          return '<section class="stu-gr-group stu-gr-rubric">' + _rubricTableHtml(ctx, g) + '</section>';
+        })
+        .join('');
+    return groups
+      .map(function (g) {
+        var mine = assessmentGroupGrade(cid, studentId, g.assessments, _groupCalcMode(g));
+        var missing = g.assessments.filter(function (a) {
+          return ov.statusOf(a) === 'NS';
+        }).length;
+        return (
+          '<section class="stu-gr-group"><div class="stu-gr-group-head"><div><h3 class="stu-gr-group-name">' +
+          esc(g.name) +
+          '</h3><div class="stu-gr-group-meta">' +
+          esc(_plural(g.assessments.length, 'piece', 'pieces')) +
+          (g.category && Number(g.category.weight || 0) > 0
+            ? ' · ' + esc(Number(g.category.weight) + '% of the grade')
+            : '') +
+          (missing ? ' · <span class="stu-gr-miss">' + esc(missing + ' missing') + '</span>' : '') +
+          '</div></div>' +
+          _gradePill(mine) +
+          '</div>' +
+          _grRowsHtml(ov, ctx, g.assessments) +
+          '</section>'
+        );
+      })
+      .join('');
+  }
+
+  function _gradesTabHtml(ctx) {
+    var ov = _overviewModel(ctx);
+    var first = displayNameFirst(ctx.student);
+    return (
+      '<div class="stu-gr">' +
+      '<div class="stu-gr-head"><div class="stu-gr-head-text"><h2 class="stu-gr-title">Grades</h2>' +
+      '<p class="stu-gr-lede">Every piece of ' +
+      esc(first) +
+      '’s work and how it adds up.</p></div>' +
+      '<a class="stu-gr-open" role="link" tabindex="0" data-href="/gradebook?course=' +
+      ctx.cid +
+      '">Open in Gradebook</a></div>' +
+      _grCourseHtml(ctx) +
+      _grControlsHtml(ov, ctx) +
+      '<div class="stu-gr-list">' +
+      _grGroupsHtml(ov, ctx) +
+      '</div></div>'
+    );
+  }
+
   function _breakdownTabHtml(ctx) {
     var cid = ctx.cid;
     var mode = courseGradeMode(cid);
@@ -3871,6 +4134,7 @@ window.PageStudent = (function () {
       '">';
     if (_tab === 'overview') html += _overviewTabHtml(ctx);
     else if (_tab === 'assess') html += _assessTabHtml(ctx);
+    else if (_tab === 'grades') html += _gradesTabHtml(ctx);
     else if (_tab === 'work') html += WorkWall.tabHtml(cid, studentId);
     else if (_tab === 'evidence') html += Evidence.panelHtml();
     else if (_tab === 'breakdown') html += _breakdownTabHtml(ctx);
@@ -3977,6 +4241,23 @@ window.PageStudent = (function () {
         _compSort = el.dataset.sort === 'lowest' ? 'lowest' : 'map';
         render();
         var btn = document.querySelector('.stu-cp-sort [data-sort="' + _compSort + '"]');
+        if (btn) btn.focus({ preventScroll: true });
+      },
+      stuGrGroup: function () {
+        var g = el.dataset.group;
+        _grGroup = GR_GROUPS.some(function (x) {
+          return x.id === g;
+        })
+          ? g
+          : 'category';
+        render();
+        var btn = document.querySelector('[data-action="stuGrGroup"][data-group="' + _grGroup + '"]');
+        if (btn) btn.focus({ preventScroll: true });
+      },
+      stuGrFilter: function () {
+        _grFilter = el.dataset.filter || 'all';
+        render();
+        var btn = document.querySelector('[data-action="stuGrFilter"][data-filter="' + _grFilter + '"]');
         if (btn) btn.focus({ preventScroll: true });
       },
       stuOvShowAll: function () {

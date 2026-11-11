@@ -96,6 +96,18 @@ body:has(.cm-toolbar) #app-dock [data-action='toggleSidebar'] {
   border-radius: 12px;
   box-shadow: var(--shadow-sm);
 }
+/* With the To Grade cell (S6-F5): four columns, wide enough at 1440 that
+   "2 Not Returned · Oldest 11 Days" and the one birthday's name each stay
+   on one line, as on the board. */
+.dash-glance.has-to-grade {
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr) minmax(0, 0.95fr) minmax(0, 0.9fr);
+}
+.dash-glance.has-to-grade .dash-bdays {
+  grid-template-columns: minmax(0, 1fr);
+}
+.dash-glance-old {
+  white-space: nowrap;
+}
 .dash-glance-cell {
   display: flex;
   flex-direction: column;
@@ -238,13 +250,25 @@ a.dash-glance-cell:hover {
   color: var(--text-2);
 }
 @media (max-width: 900px) {
-  .dash-glance {
+  .dash-glance,
+  .dash-glance.has-to-grade {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
   .dash-glance-bdays {
     grid-column: 1 / -1;
     border-left: 0;
     border-top: 1px solid var(--divider-subtle);
+  }
+  /* Four cells make two rows of two. */
+  .dash-glance.has-to-grade .dash-glance-cell:nth-child(n + 3) {
+    grid-column: auto;
+    border-top: 1px solid var(--divider-subtle);
+  }
+  .dash-glance.has-to-grade .dash-glance-cell:nth-child(3) {
+    border-left: 0;
+  }
+  .dash-glance.has-to-grade .dash-glance-bdays {
+    border-left: 1px solid var(--divider-subtle);
   }
 }
 
@@ -7364,8 +7388,12 @@ label.cm-cr-row {
 }
 
 /* ── Questions From Students (S10-F4) ──────────────────────── */
-/* #main is a flex column: the card keeps its height, as Observations does. */
+/* #main is a flex column: the card keeps its height, as Observations does.
+   The board puts it at the top of the page while it has questions, under
+   only the photo reminder. page-dashboard.js writes it after the
+   competency cards, so the flex order lifts it. */
 .page-dashboard .dash-questions {
+  order: -1;
   flex-shrink: 0;
   margin-top: 12px;
 }
@@ -7378,6 +7406,7 @@ label.cm-cr-row {
   margin-bottom: 0;
 }
 .dash-questions-count {
+  margin-left: auto;
   min-width: 22px;
   padding: 1px 7px;
   border-radius: 11px;
@@ -7401,26 +7430,34 @@ label.cm-cr-row {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 12px 0;
+  padding: 14px 0;
   border-top: 1px solid var(--divider);
 }
 .dash-questions-av {
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: var(--active);
   color: #fff;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
 }
 .dash-questions-body {
   flex: 1;
   min-width: 0;
 }
+/* The name, then "piece · class · date" on the same line. */
+.dash-questions-who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+}
 .dash-questions-name {
+  font-size: var(--text-md);
   font-weight: 600;
   color: var(--text);
 }
@@ -7428,27 +7465,25 @@ label.cm-cr-row {
   color: var(--text-2);
   font-size: var(--text-sm);
 }
+/* The student's words, in a yellow box: a question waits on you. */
 .dash-questions-text {
   margin: 6px 0 0;
-  padding: 6px 10px;
-  border-left: 3px solid #f5b800;
-  border-radius: 0 6px 6px 0;
-  background: var(--bg);
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, #f5b800 60%, var(--surface));
+  border-radius: 8px;
+  background: color-mix(in srgb, #f5b800 14%, var(--surface));
   color: var(--text);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.dash-questions-answer {
-  flex-shrink: 0;
+.btn.dash-questions-answer {
+  margin-top: 8px;
+  min-height: 28px;
+  padding: 6px 12px;
+  border-radius: 14px;
+  font-size: var(--text-sm);
+  font-weight: 600;
   white-space: nowrap;
-}
-@media (max-width: 600px) {
-  .dash-questions-row {
-    flex-wrap: wrap;
-  }
-  .dash-questions-answer {
-    margin-left: 42px;
-  }
 }
 
 /* ── The photo reminder (S8-F1) ────────────────────────────── */
@@ -7466,6 +7501,7 @@ label.cm-cr-row {
   border-radius: 12px;
 }
 .page-dashboard .photo-reminder {
+  order: -2;
   flex-shrink: 0;
   margin-bottom: 12px;
 }
