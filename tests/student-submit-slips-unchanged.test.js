@@ -17,8 +17,10 @@
  *   2. an IPv6 caller's rate-limit key (PR 975).
  */
 import { describe, expect, it } from 'vitest';
+import { readCardKey } from '../supabase/functions/_shared/card-key.ts';
 import { makeHandler as today } from '../supabase/functions/student-submit/handler.ts';
 import { makeHandler as before } from './fixtures/student-submit-handler-2026-11-03.ts';
+import { FAKE_KEY } from './helpers/card-key-fake.js';
 
 const TOKEN = 'a'.repeat(64);
 const URL_ = 'https://x.supabase.co/functions/v1/student-submit?forceFunctionRegion=ca-central-1';
@@ -80,6 +82,8 @@ function side(make, opts) {
   const handle = make({
     region: opts && 'region' in opts ? opts.region : 'ca-central-1',
     ipKey: 'test-key',
+    // The card key (S3-E1). No slip test gives one: a slip needs none.
+    cardKey: opts && opts.cardKey,
     log: entry => logs.push(Object.assign({}, entry, { ms: 0 })),
     db: {
       open: async (code, hash) => (asked.push(['open', code, hash]), answer('open', code)),
@@ -271,17 +275,19 @@ describe('a slip’s requests get the same answer from the function with and wit
 
 describe('what deploying does change, and nothing else', () => {
   it('requests the function refused before and serves now: the card’s routes', async () => {
+    // Since S3-E1 a card's code is eight characters and is checked with the card key.
+    const cardKey = await readCardKey(FAKE_KEY);
     const CARD_REQUESTS = [
-      { route: 'card', code: 'P3R8WD' },
-      { route: 'verify', code: 'P3R8WD', student_number: '0123456' },
-      { route: 'add-card', code: 'P3R8WD', student_number: '0123456', session: TOKEN },
+      { route: 'card', code: 'P3R8WD4K' },
+      { route: 'verify', code: 'P3R8WD4K', student_number: '0123456' },
+      { route: 'add-card', code: 'P3R8WD4K', student_number: '0123456', session: TOKEN },
       { route: 'page', session: TOKEN, enrollment_id: '11111111-1111-4111-8111-111111111111' },
       { route: 'seen', session: TOKEN, enrollment_id: '11111111-1111-4111-8111-111111111111', assessment_ids: [] },
       { route: 'done', session: TOKEN },
     ];
     for (const body of CARD_REQUESTS) {
-      const was = await seenBy(before, post(body));
-      const is = await seenBy(today, post(body));
+      const was = await seenBy(before, post(body), { cardKey });
+      const is = await seenBy(today, post(body), { cardKey });
       // Before: a bad request, the database never asked. This is what the page meets until the function is deployed.
       expect(was.status, body.route).toBe(400);
       expect(was.text).toBe('{"ok":false,"error":"bad_request"}');

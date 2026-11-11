@@ -6774,8 +6774,8 @@ label.cm-cr-row {
   border: 0;
 }
 
-/* ── Student Cards (teacher/student-cards.js): the bare list under Return
-   Grades ── */
+/* ── Student Cards (teacher/student-cards.js): the list under Return
+   Grades. No code is ever shown in it. ── */
 .sc-card {
   display: flex;
   flex-direction: column;
@@ -6828,13 +6828,7 @@ label.cm-cr-row {
 .sc-table .sc-name {
   font-weight: 600;
 }
-.sc-code {
-  font-family: ui-monospace, Menlo, monospace;
-  letter-spacing: 1px;
-}
-.sc-none .sc-code {
-  font-family: var(--font-base);
-  letter-spacing: 0;
+.sc-none .sc-which {
   color: var(--text-3);
 }
 .sc-status {

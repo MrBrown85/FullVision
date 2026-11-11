@@ -9,8 +9,8 @@
    What is on it:
 
    - S1-F4: Return Grades (When I Return Them, As Soon As I Save).
-   - S0-W1: Student Cards, a bare list with Make Cards and Print All
-     (teacher/student-cards.js).
+   - S0-W1, S3-W1: Student Cards, the list (no code shown) with Make and
+     Print and Print Again (teacher/student-cards.js).
    - S0-W1: the build switch itself, at the build address only.
 
    What later PRs add, none of which needs to change dash-class-manager.js:

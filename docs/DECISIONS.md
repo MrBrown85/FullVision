@@ -239,7 +239,7 @@ Context: [`plans/student-page-build-plan.md`](plans/student-page-build-plan.md),
 4. **Missing, Excused and Late are never drafts.** They show and count as soon as they are set. _See also "Student page build rulings" 13: Missing also hides a grade returned earlier._
 5. **Existing classes start on As Soon As I Save** until their teacher first opens Class Settings › Student Page; new classes start on When I Return Them. Grades from the grade-scans skill follow the class's setting, so they can arrive as drafts.
 6. **Which grades each screen uses.** Returned only for anything a family or student reads (Progress Reports, the Term Questionnaire's facts and Generate, Sent to Phones, MyEdBC Input, the student page, Preview as Student). All work, drafts marked, for the teacher's own views. A grade hidden during a revision is a draft.
-7. **Cards.** The class's teacher can see a card's code again, so reprinting never stops a card. A device stays signed in until midnight or until Done. Today Only codes wait with Family Codes. A card can send 20 times an hour.
+7. **Cards.** The class's teacher can see a card's code again, so reprinting never stops a card. A device stays signed in until midnight or until Done. Today Only codes wait with Family Codes. A card can send 20 times an hour. _The first sentence is superseded 2026-11-10: see "Card codes the database cannot read"._
 8. **Keep Photos Until is per class only.** Backups and Download All My Data leave photos out and say so.
 9. **Migrations are tested locally only,** on the throwaway Postgres harness; no Supabase branch. The first real check is in Colin's own test class after a batch is applied.
 10. **The MyEd extension is not in this build.** MyEdBC Input and the Export Sheet are.
@@ -300,7 +300,7 @@ Context: the second day of the build. The math and screen reviews, and the first
 
 7. **The first migration batch (PR 966) is applied as verified,** with its three known limits closed in a small migration straight behind it (PR 989) rather than by reopening a batch that four review rounds had proven. One exception: its four ownership helpers are rewritten before applying. Production runs PostgreSQL 17, which plans a SQL-language function again on every statement; with the helpers written that way the batch took a 30-student rubric fill from about 23 ms to about 100 ms. Written in PL/pgSQL they cost what a save costs today.
 8. **Three stronger measures are built now, each its own migration:** every security-definer function in `public` names `pg_temp` last in its search path (PR 991); score rows carry their class, so a score filed under another class's student is refused from any writer; and the class's sync row is taken once at commit, which ends nine ways two of today's saves can block each other. None is applied without Colin.
-9. **A card's code and password stay readable by the class's teacher.** The privacy page must say so, and Colin puts it to his district's privacy officer.
+9. **A card's code and password stay readable by the class's teacher.** The privacy page must say so, and Colin puts it to his district's privacy officer. _Superseded 2026-11-10: see "Card codes the database cannot read"._
 10. **When a student opens a returned piece is recorded for the student's own page only.** It is what marks a grade Updated (evening rulings 9). It is not shown to teachers, is kept as long as the grade, and goes on the privacy page.
 
 ## Student page build rulings (2026-11-10, later)
@@ -325,6 +325,47 @@ Context: the same day, after the first migration batch was applied. The screens 
 Each on Colin's word, after its independent review: the first migration batch (PR 966), the search-path change (PR 991) and the follow-up to the batch (PR 989) were applied to the database; the `student-submit` edge function was deployed with its card routes; and `main` was released (PR 1001). Colin then turned Student Page on for one of his own classes, made cards, scanned one, and saw a returned grade and no draft. That closed the build plan's first slice.
 
 Still open: the privacy page's wording, which must change before cards go to another class.
+
+## Card codes the database cannot read (2026-11-10)
+
+Context: Batch A stored each card's code and password so the teacher could read them again. Colin was asked which of three options was best practice, chose the strongest, and then answered the design's questions one at a time. Design and build order: [`plans/student-page-build-plan.md`](plans/student-page-build-plan.md), sections 1.5 and 1.8 and slice S3. This section SUPERSEDES "Student page build answers (2026-11-09)" 7's first sentence ("The class's teacher can see a card's code again, so reprinting never stops a card") and "Student page build rulings (2026-11-10)" 9 (a card's code and password stay readable by the class's teacher).
+
+Words used here:
+
+- **The key:** one secret, `STUDENT_CARD_KEY`, kept in the edge functions' settings and nowhere in the database.
+- **Tag:** a keyed fingerprint of a code (HMAC-SHA-256). Only someone holding the key can make one. The database stores tags, never codes.
+- **Stopped:** a card that never opens again. Its row stays as history.
+
+**The rulings**
+
+1. **The database stores no card code or card password it can read back** (Colin, 2026-11-10: "yes, i would like the stronger fix to be built now rather than deferred"). Making a card and checking one both go through an edge function that holds the key. The database keeps only tags. So a copy of the database, a leaked backup or a stolen database password gives nobody a working card. With it come New Codes for This Class, and codes kept off the screen. There is no timed rotation: a code is replaced when the teacher asks, and it ends with the class's last reporting date.
+2. **Slips get the same fix next, as their own change** (Colin, 2026-11-10). Questionnaire and phone-report slips have the same weakness: their codes are salted hashes made inside the database, and `student.slip_password` is stored readable. They move to the same key right after cards are live and before the January pilot, with their own migration and review. Not inside the card migration: slips are live for both current users, and a card mistake must not be able to break them. Not left on the roadmap.
+3. **A card code is eight characters** (`K7M4-QX2P`); a slip stays six (Colin, 2026-11-10). Once the database cannot read a card's code it cannot compare one with a slip's, so the two are told apart by length. Eight characters also make a card 841 times harder to guess, which matters for a code that lasts the course. Students type two more characters; a scan is the same. No class but Colin's test class has cards, so this is the cheapest moment to change it.
+4. **Colin keeps a copy of the key in his password manager** (Colin, 2026-11-10). This reverses the design's advice to keep no copy. He asked what teachers would actually want: never to reprint every card because a key was lost. The copy adds little risk, because his password manager already holds his Supabase sign-in. He makes the key and the copy himself, in his Mac's own Terminal: the key goes to the clipboard, into the password manager, into the functions' settings, and the clipboard is cleared. No assistant ever sees it. The password manager should have two-step sign-in on. The copy is only for putting a lost key back; changing the key still stops every old card.
+5. **A replaced card says so** (Colin, 2026-11-10): "This card has been replaced. Ask your teacher for your new card." A reprint now always stops the old card, so after New Codes for This Class a whole class may be holding old cards; "That code didn't work" would send them looking for a typo. The line names no one, so it tells a guesser nothing.
+6. **A card number tells a student's cards apart** (Colin, 2026-11-10): Card 1, Card 2, Card 3, printed small on the card and shown in the list. Never any characters of the code: they would have to be stored, and they would make one chosen card easier to guess.
+
+**What follows from ruling 1 without a choice**
+
+7. **A card password is the card's own.** A student with no birthday and no student number gets four digits made with the card, kept only as a tag. Before this it was a copy of `student.slip_password`, which the database stores readable. That student's slip and card now print different passwords.
+8. **Print All, with the same codes, cannot exist.** It becomes New Codes for This Class, which stops every card and makes new ones.
+9. **No code is shown on a teacher's screen.** "Reissue, Show Code" and the in-app print preview go. A code exists only in the reply to the press that made it and in the browser's print dialog. Print Again works from the page's memory until the teacher leaves the screen, or for ten minutes at most; the code is never saved on the computer or sent anywhere else.
+10. **Colin's test class loses its 30 cards.** The migration stops them and erases their codes and passwords; its undo cannot bring them back. Converting them was rejected: the codes have sat readable in the database and its backups since Nov 10, so only new codes make ruling 1 true. That class has no working cards for about 15 to 30 minutes on the day.
+11. **"A new slip avoids every live card code" ("Student page build rulings (2026-11-09, evening)" 5) now holds by length:** a card has eight characters and a slip six, so they can never match. The two slip issuers lose the check Batch A added and go back to their earlier bodies.
+12. **The privacy page changes.** The question Colin was to put to his district's privacy officer (the teacher can read a card's code) is gone. The page must say that FullVision keeps a keyed fingerprint of a card's code and password, not the code; that nobody can look one up after the card is printed; and, until ruling 2 is built, that slip codes are salted hashes a copy of the database could work out.
+
+**The deploy order**
+
+13. **The key, then both functions, then the migration, then the release.** Colin makes the key. Then `student-submit` (it checks cards by tag) and the new `teacher-cards` (it makes cards) are deployed. Then the migration is applied. Then Colin checks on his Mac and says "release". The step that can be undone comes before the step that erases: if the functions misbehave, the old ones go back and nothing is lost. In no step does a card open by the old check, and in none does a slip fail. The teacher's screens merge to `main` before the migration is applied, so the database check in CI stays green. Each step waits for Colin's OK.
+
+**The costs Colin accepted**
+
+14. One more migration, with its independent review and his OK before it is applied. It deletes data (the 30 codes and passwords), so it is reviewed under project rule 2.
+15. A reprint makes a new code and stops the old card. A lost card is replaced, never shown again.
+16. A code cannot be looked up after it is made. If the print dialog is cancelled and the teacher leaves the screen, the cards are made again.
+17. His test class's 30 cards are replaced.
+18. Losing the key without the copy, or changing it, stops every card in every class until each teacher presses New Codes for This Class and prints. Whoever holds both the key and a copy of the database can work out every code; the two sit under one Supabase account, so two-step sign-in on that account matters most.
+19. Backups taken before the migration still hold the 30 old codes. They are dead after it, but restoring such a backup would bring back the old readable design.
 
 ## Phone-report birthday tries (2026-11-03)
 
