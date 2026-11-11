@@ -424,6 +424,12 @@ describe('the export stays complete', () => {
     getStudentTermRating: 'read through getTermRatings',
     getSubjects: 'the learning map, not student data',
     getCompletionMark: 'read through assessmentCellValue',
+    // Student work (S5-F5): photos of student work are not in this file (Q22).
+    getCourseSubmissions: 'student work, kept out with its photos',
+    getStudentSubmission: 'student work, kept out with its photos',
+    getAssessmentStudentWork: 'student work settings, kept out with the photos',
+    getCourseSendWork: 'student work settings, kept out with the photos',
+    getStudentWork: 'the student page’s view of student work',
   };
 
   it('uses every per-class reader in shared/data.js, or says why not', () => {
