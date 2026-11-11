@@ -49,6 +49,8 @@ const WRITERS = [
   'moveRubricScores', // scores follow an assessment to another rubric
   'returnGrades', // Return: the students are given their grade (S0-F2)
   'returnWork', // the same, with the marks on their pages (S9-F1)
+  'returnForRevision', // Return for Revision: returns the work, and Hide makes the grade a draft (S11)
+  'cancelRevision', // Take Back: gives a hidden grade back (S11)
 ];
 
 // data.js holds the writers; grader.js is the one caller; seed-data.js
