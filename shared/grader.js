@@ -297,13 +297,75 @@ window.Grader = (function () {
      marks_enrollment_ids }. Every screen's Return comes here, so no Return
      leaves marks behind. */
   function returnTo(cid, aid, studentIds) {
-    var ids = Array.isArray(studentIds) ? studentIds : [studentIds];
+    // A student whose work is out for revision (S11), with nothing in or the
+    // revision not graded yet, is not returned: the work already went back,
+    // and what waits is the revision. Outside Demo Mode with the build
+    // switch and Send Work on, no one is (revisionWorkState is null).
+    var ids = (Array.isArray(studentIds) ? studentIds : [studentIds]).filter(function (sid) {
+      return !heldForRevision(cid, sid, aid);
+    });
     // Only where Mark Up can be on (Demo Mode, the build switch and Send
     // Work): everywhere else, a signed-in class above all, Return is
     // returnGrades exactly as it was.
     var marks = typeof returnWork === 'function' && typeof isDemoMode === 'function' && isDemoMode();
     var out = marks && workOnInClass(cid) ? returnWork(cid, aid, ids) : returnGrades(cid, aid, ids);
     return _saved(cid, ids.length === 1 ? ids[0] : null, aid, 'return', out);
+  }
+
+  /* ── Revisions (S11) ───────────────────────────────────────────────
+     Return for Revision and Take Back, for the desktop grader and the
+     phone's. Each passes the data layer's writer (shared/data.js,
+     "Revisions") what the screen gives, and answers its Promise. It is
+     Demo Mode only: signed in the writer answers not_available and sends
+     nothing, and no screen offers either while GraderWork.revisionsOnInClass
+     is false. Return for Revision returns the work first (the grade and the
+     marks), then asks for another try: `request` is { what_to_fix,
+     revise_by, criterion_ids }; `key` is made once per press. The grade is
+     always kept until the new version replaces it: Hide is not offered
+     (Colin, Nov 11: "Take hide out and we'll work on it later."). */
+  function returnForRevisionAction(cid, sid, aid, request, key) {
+    var ask = Object.assign({}, request, { keep_grade: true });
+    return _saved(cid, sid, aid, 'returnForRevision', returnForRevision(cid, sid, aid, ask, key));
+  }
+
+  /* Take Back: the request on `sid`'s piece is withdrawn. */
+  function cancelRevisionAction(cid, sid, aid, requestId, key) {
+    return _saved(cid, sid, aid, 'cancelRevision', cancelRevision(cid, requestId, key));
+  }
+
+  /* What a revision makes of a piece, for the counts and the screens:
+     'revising' (out for revision, nothing in yet), 'revised' (the revision
+     is in, grading not started), 'grading' (the revision's grade is a
+     draft), or null (no open request; always null outside Demo Mode or
+     with the build switch or Send Work off). */
+  function revisionStateOf(cid, sid, aid) {
+    return typeof revisionWorkState === 'function' ? revisionWorkState(cid, sid, aid) : null;
+  }
+
+  /* A piece out for revision whose revision has not been graded yet: the
+     work already went back, so no Return includes it. */
+  function heldForRevision(cid, sid, aid) {
+    var state = revisionStateOf(cid, sid, aid);
+    return state === 'revising' || state === 'revised';
+  }
+
+  // The class's revisions show: Demo Mode, the build switch and Send Work.
+  function revisionsOnInClass(cid) {
+    return typeof revisionsOn === 'function' && revisionsOn(cid);
+  }
+
+  /* GradeState.draftsIn and draftsReturned, less the pieces held for a
+     revision: who a Return N Graded returns, and its N. With no revision
+     open they are GradeState's exactly. */
+  function draftsIn(cid, aid, studentIds) {
+    return GradeState.draftsIn(cid, aid, studentIds).filter(function (sid) {
+      return !heldForRevision(cid, sid, aid);
+    });
+  }
+  function draftsReturned(cid, aid, studentIds) {
+    return GradeState.draftsReturned(cid, aid, studentIds).filter(function (sid) {
+      return !heldForRevision(cid, sid, aid);
+    });
   }
 
   /* ── Student work: what is in, and the counts (S6-F3) ──────────────
@@ -352,6 +414,13 @@ window.Grader = (function () {
 
   /* 'toreturn', 'returned', 'tograde', 'notin' or null, for one student. */
   function workStateOf(cid, aid, sid) {
+    // A revision first (S11): one sent in is work to grade again; one being
+    // graded waits to be returned; one asked for and not in yet is neither:
+    // the work went back to the student, its grade kept (Returned).
+    var revision = revisionStateOf(cid, sid, aid);
+    if (revision === 'revising') return 'returned';
+    if (revision === 'revised') return 'tograde';
+    if (revision === 'grading') return 'toreturn';
     var state = GradeState.stateOf(cid, sid, aid);
     if (state === GradeState.DRAFT) return 'toreturn';
     if (state === GradeState.RETURNED) return 'returned';
@@ -416,6 +485,10 @@ window.Grader = (function () {
         if (at && (!oldest || at < oldest)) oldest = at;
       });
     });
+    // Of the To Grade, the revisions sent in (S11): the dashboard's "1 Revised".
+    var revised = lists.tograde.filter(function (sid) {
+      return revisionStateOf(cid, sid, aid) === 'revised';
+    }).length;
     return {
       tograde: tograde,
       toreturn: lists.toreturn.length,
@@ -423,6 +496,7 @@ window.Grader = (function () {
       notin: lists.notin.length,
       all: ids.length,
       groups: groups,
+      revised: revised,
       oldest: oldest,
       ids: lists,
     };
@@ -435,7 +509,7 @@ window.Grader = (function () {
      the To Grade are pairs or groups; oldest: when the longest-waiting work
      came in. To Grade is 0 in a class whose work is off. */
   function classWorkCounts(cid, studentIds, aids) {
-    var out = { tograde: 0, toreturn: 0, notin: 0, groups: 0, oldest: null, pieces: [] };
+    var out = { tograde: 0, toreturn: 0, notin: 0, groups: 0, revised: 0, oldest: null, pieces: [] };
     (getAssessments(cid) || []).forEach(function (a) {
       if (!a || !a.id || isDibelsScored(a)) return;
       if (aids && aids.indexOf(a.id) < 0) return;
@@ -444,6 +518,7 @@ window.Grader = (function () {
       out.toreturn += c.toreturn;
       out.notin += c.notin;
       out.groups += c.groups;
+      out.revised += c.revised;
       if (c.oldest && (!out.oldest || c.oldest < out.oldest)) out.oldest = c.oldest;
       if (c.tograde || c.toreturn || c.notin)
         out.pieces.push({ aid: a.id, tograde: c.tograde, toreturn: c.toreturn, notin: c.notin });
@@ -555,9 +630,89 @@ window.Grader = (function () {
     return { set: set, paper: markStudentWorkOnPaper(cid, aid, [sid]) };
   }
 
+  /* ── The Return area (S11-T1) ───────────────────────────────────
+     What the place beside Return says for one student's piece, worked out
+     once for both layouts: the desktop grader's row above its footer
+     (teacher/page-assignments.js, _graderReturnHtml) and the phone's bar
+     under its cards (teacher-mobile/tab-grade.js, _returnBarOwn). Each
+     draws it its own way. `ids` are the students its Return returns (a
+     group's linked members, or the one student); `opts.marks`: marks made
+     since the last Return wait for one too (S9-F1; the desktop asks).
+     Answers null (nothing to draw: no student page, a DIBELS benchmark, a
+     class that returns as soon as it saves with nothing waiting, or a
+     status with nothing in), or one of:
+       { kind: 'empty' }     Return, greyed out: nothing graded yet
+       { kind: 'returned', returnedAt }
+       { kind: 'marks' }     Draft: Marks saved. Not returned yet.
+       { kind: 'draft', given }  Draft: Saved. Not returned yet; `given` is
+         { returnedAt } when the student still sees a grade returned before. */
+  /* With `opts.revisions` (a layout that draws them) and the class's
+     revisions on (S11, Demo Mode, the build switch and Send Work), for one
+     student's own piece (not a group's):
+       { kind: 'revising', revision }  out for revision, nothing in: no
+         Return; `revision` is getRevisionRequest's row (Take Back);
+       { kind: 'revised', revision }   the revision is in, not graded yet:
+         Return greyed out, as with nothing graded;
+       any kind above with `revision` while the revision's grade is a draft;
+       any kind above, or { kind: 'none' } where nothing else would show,
+         with `revise: true`: Return for Revision is offered. */
+  function returnArea(cid, a, sid, ids, opts) {
+    if (!a || isDibelsScored(a) || typeof getReturnSettings !== 'function') return null;
+    var own = ids.length === 1 && ids[0] === sid;
+    if (!own || !(opts && opts.revisions) || !revisionsOnInClass(cid)) return _returnAreaOf(cid, a, sid, ids, opts);
+    var state = revisionStateOf(cid, sid, a.id);
+    var request = state ? getRevisionRequest(cid, sid, a.id) : null;
+    if (state === 'revising' || state === 'revised') return { kind: state, revision: request };
+    var out = _returnAreaOf(cid, a, sid, ids, opts);
+    if (state === 'grading') return Object.assign(out || { kind: 'empty' }, { revision: request });
+    // A status with nothing in has nothing to return or revise.
+    if (!out && getAssignmentStatus(cid, sid, a.id)) return null;
+    return Object.assign(out || { kind: 'none' }, { revise: true });
+  }
+
+  function _returnAreaOf(cid, a, sid, ids, opts) {
+    var klass = getReturnSettings(cid);
+    if (!klass.student_page) return null;
+    // A Missing or Excused piece is never a draft (GradeState.stateOf).
+    var waiting = GradeState.draftsIn(cid, a.id, ids).map(function (id) {
+      return getGradeReturn(cid, id, a.id);
+    });
+    // As Soon As I Save: nothing waits, so there is nothing to return.
+    if (!waiting.length && !GradeState.holds(klass)) return null;
+    var state = GradeState.stateOf(cid, sid, a.id);
+    if (!waiting.length) {
+      var marks =
+        opts &&
+        opts.marks &&
+        typeof studentMarkupWaiting === 'function' &&
+        state === GradeState.RETURNED &&
+        ids.some(function (id) {
+          return studentMarkupWaiting(cid, id, a.id);
+        });
+      if (marks) return { kind: 'marks' };
+      if (state !== GradeState.RETURNED) {
+        // Missing, Excused or Late with nothing in: there is nothing to return.
+        return getAssignmentStatus(cid, sid, a.id) ? null : { kind: 'empty' };
+      }
+      var row = getGradeReturn(cid, sid, a.id);
+      return { kind: 'returned', returnedAt: (row && row.returned_at) || null };
+    }
+    // The grade the student was given before this change, if there was one.
+    var given = waiting.find(function (r) {
+      return r && r.returned_copy;
+    });
+    return { kind: 'draft', given: given ? { returnedAt: given.returned_at || null } : null };
+  }
+
   /* Reads, and Delete Work, which writes no grade, so they sit apart from
      the grade actions (tests/grader.test.js holds Grader to those). */
   window.GraderWork = {
+    returnArea: returnArea,
+    revisionsOnInClass: revisionsOnInClass,
+    revisionStateOf: revisionStateOf,
+    heldForRevision: heldForRevision,
+    draftsIn: draftsIn,
+    draftsReturned: draftsReturned,
     workOnInClass: workOnInClass,
     workOn: workOn,
     workStateOf: workStateOf,
@@ -604,5 +759,8 @@ window.Grader = (function () {
     undoOnPhone: undoOnPhone,
     undo: undo,
     returnGrades: returnTo,
+    // Revisions (S11)
+    returnForRevision: returnForRevisionAction,
+    cancelRevision: cancelRevisionAction,
   };
 })();

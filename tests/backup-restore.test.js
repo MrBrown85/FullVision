@@ -791,3 +791,36 @@ describe('restoreClassFromBackup', () => {
     expect(COURSES[CID]).toBeTruthy();
   });
 });
+
+/* An observation saved from a student's reflection (context 'reflection',
+   ruling 110) comes back from a backup still marked, so it stays out of
+   every report in the restored class too. */
+describe('a backup of an observation from a reflection', () => {
+  var originals;
+  beforeEach(() => {
+    resetClass();
+    var b = bundle();
+    b.observations.observations[0].context_type = 'reflection';
+    _bundleToCache(CID, b);
+    originals = { _writeRpc: globalThis._writeRpc, _isDemoSession: globalThis._isDemoSession };
+  });
+  afterEach(() => {
+    Object.assign(globalThis, originals);
+  });
+
+  it('keeps the mark in the file, in what the server is sent, and in the restored class', async () => {
+    var backup = downloadBackup();
+    var plan = FVBackupRestore.planRestore(backup, { name: 'Copy', makeId: counterIds() });
+    expect(plan.payload.observations[0].context_type).toBe('reflection');
+    globalThis._isDemoSession = () => true;
+    globalThis._writeRpc = vi.fn();
+    var restored = FVBackupRestore.restoreClassFromBackup(backup, { name: 'Science 8 Copy' });
+    await restored.sent;
+    var obs = getAllQuickObs(restored.cid);
+    expect(obs).toHaveLength(2);
+    obs.forEach(o => expect(isReflectionObservation(o)).toBe(true));
+    var st = getStudents(restored.cid)[0];
+    expect(ReportFeedback.observations(restored.cid, st, null)).toEqual([]);
+    expect(ReportBlocks.renderBlockObservations(restored.cid, st)).not.toContain('Helped a classmate');
+  });
+});

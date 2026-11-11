@@ -79,12 +79,14 @@ describe('grades shown by grading setting', () => {
   });
 
   it('shows the roster grade as a proficiency code', () => {
-    expect([0, 1, 1.4, 1.5, 2.49, 2.67, 3, 3.33, 3.5, 4].map(levelCode)).toEqual([
+    // The code follows the printed figure: 2.44 prints 2.4, 2.49 prints 2.5.
+    expect([0, 1, 1.4, 1.5, 2.44, 2.49, 2.67, 3, 3.33, 3.5, 4].map(levelCode)).toEqual([
       'IE',
       'EMG',
       'EMG',
       'DEV',
       'DEV',
+      'PRF',
       'PRF',
       'PRF',
       'PRF',

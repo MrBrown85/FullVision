@@ -1283,6 +1283,9 @@ body.fv-switching-course::after {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
+.m-edit-row-fixed {
+  cursor: default;
+}
 .m-edit-row-k {
   font-weight: 500;
 }
@@ -5872,4 +5875,115 @@ body.fv-switching-course::after {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* ── Revisions on the phone (S11-F1) ──────────────────────────────
+   For Revision and Take Back beside Return and Next; the Revising mark;
+   the Return for Revision sheet. */
+.m-grade-return-act:has(.m-grade-revise-btn) {
+  display: flex;
+  gap: 8px;
+}
+.m-grade-revise-btn {
+  flex: none;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--divider-heavy);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--active);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-grade-revise-btn:only-child {
+  flex: 1;
+}
+.m-grade-revise-btn:disabled {
+  color: var(--text-3);
+}
+.m-revising-mark {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 13px;
+  background: var(--seg-track, rgba(120, 120, 128, 0.12));
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 700;
+}
+.m-revision-sheet {
+  padding: 0 4px 16px;
+}
+.m-revision-head {
+  display: flex;
+}
+.m-revision-cancel {
+  border: none;
+  background: none;
+  padding: 4px 0;
+  color: var(--active);
+  font: inherit;
+  font-size: 17px;
+  cursor: pointer;
+}
+.m-revision-title {
+  margin: 6px 0 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+.m-revision-sub {
+  margin: 2px 0 8px;
+  font-size: 14px;
+  color: var(--text-2);
+}
+.m-revision-label {
+  display: block;
+  margin: 14px 0 6px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.m-revision-fix,
+.m-revision-by,
+.m-revision-crit {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--divider-heavy);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+.m-revision-keep {
+  margin: 0;
+  font-size: 15px;
+}
+.m-revision-msg {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--text-2);
+}
+.m-revision-msg:empty {
+  display: none;
+}
+.m-revision-send {
+  width: 100%;
+  min-height: 50px;
+  margin-top: 16px;
+  border: none;
+  border-radius: 14px;
+  background: var(--active);
+  color: #fff;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.m-revision-send:disabled {
+  opacity: 0.6;
 }

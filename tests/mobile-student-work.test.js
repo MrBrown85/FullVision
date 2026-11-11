@@ -19,6 +19,8 @@ import { ungradeLabNotSent } from './helpers/demo-lab-not-in.js';
 
 const CID = 'sci8';
 const LAB = 'sci8a1';
+// Light Refraction Lab: the sample's piece with work waiting (ruling 115).
+const LIGHT = 'sci8a21';
 let wasDemo;
 
 function seedDemo() {
@@ -125,7 +127,8 @@ describe('with the student page and Send Work on', () => {
     expect(MGradePhotos.toGrade(CID, a)).toEqual(['st2', 'st3']);
     // Ten sent (one on paper): everyone else is not in.
     expect(MGradePhotos.notIn(CID, a)).toHaveLength(getStudents(CID).length - 10);
-    expect(MGradePhotos.classToGrade(CID)).toBe(2);
+    // 2 on the lab, and 6 on Light Refraction Lab (Aiden's pair counts once).
+    expect(MGradePhotos.classToGrade(CID)).toBe(8);
     // A grade started is no longer waiting.
     Grader.setOverallComment(CID, 'st2', LAB, 'Good labels.');
     expect(MGradePhotos.toGrade(CID, a)).toEqual(['st3']);
@@ -135,7 +138,7 @@ describe('with the student page and Send Work on', () => {
     const root = picker();
     const seg = root.querySelector('[data-val="tograde"]');
     expect(seg.classList.contains('m-seg-active')).toBe(true);
-    expect(seg.textContent).toBe('To Grade2');
+    expect(seg.textContent).toBe('To Grade8');
     const row = root.querySelector('.m-tg-row[data-aid="' + LAB + '"]');
     expect(row.style.display).not.toBe('none');
     expect(row.querySelector('.m-tg-pill').textContent).toBe('2 to grade');
@@ -143,8 +146,13 @@ describe('with the student page and Send Work on', () => {
     expect(row.querySelector('[data-action="m-grade-row-menu"]').getAttribute('aria-label')).toBe(
       'More for Cell Microscope Lab',
     );
+    const light = root.querySelector('.m-tg-row[data-aid="' + LIGHT + '"]');
+    expect(light.style.display).not.toBe('none');
+    expect(light.querySelector('.m-tg-pill').textContent).toBe('6 to grade');
     // A piece with nothing waiting is not on To Grade.
-    const other = [...root.querySelectorAll('.m-tg-row')].filter(r => r.getAttribute('data-aid') !== LAB);
+    const other = [...root.querySelectorAll('.m-tg-row')].filter(
+      r => r.getAttribute('data-aid') !== LAB && r.getAttribute('data-aid') !== LIGHT,
+    );
     expect(other.length).toBeGreaterThan(0);
     other.forEach(r => expect(r.style.display).toBe('none'));
     expect(root.querySelector('#m-grade-caught').style.display).toBe('none');
@@ -153,6 +161,7 @@ describe('with the student page and Send Work on', () => {
   it('says All Caught Up when nothing waits', () => {
     Grader.setOverallComment(CID, 'st2', LAB, 'Done.');
     Grader.setOverallComment(CID, 'st3', LAB, 'Done.');
+    GraderWork.workCounts(CID, LIGHT).ids.tograde.forEach(sid => Grader.setOverallComment(CID, sid, LIGHT, 'Done.'));
     const caught = picker().querySelector('#m-grade-caught');
     expect(caught.style.display).not.toBe('none');
     expect(caught.textContent).toBe('All Caught UpNothing is waiting to grade in Science 8.See All Assessments');

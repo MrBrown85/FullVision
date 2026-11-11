@@ -37,6 +37,12 @@ async function openPhone(page, { on = true, clear = [] } = {}) {
         getRubricCheckIds(cid, sid, LAB).forEach(id => Grader.setTick(cid, sid, LAB, id, false));
         if (keys.length) Grader.clearScore(cid, getScores(cid), sid, a, keys);
       });
+      // The sample's Light Refraction Lab has work waiting too (ruling 115):
+      // it gets an Overall Comment here, with the switch off (no draft), so
+      // only this test's own work waits.
+      getStudents(cid).forEach(s => {
+        if (groupWorkIn(cid, s.id, 'sci8a21')) Grader.setOverallComment(cid, s.id, 'sci8a21', 'Seen.');
+      });
       if (on) {
         setStudentPageSwitch(cid, true, 'on_return');
         const work = getCourseSubmissions(cid);

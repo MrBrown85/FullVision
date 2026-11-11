@@ -676,7 +676,8 @@ function _pieceScoreEntry(cid, sid, piece, holds) {
  */
 function pointsToProf(rawScore, maxPoints, scale) {
   if (!maxPoints || maxPoints <= 0) return 0;
-  const pct = (rawScore / maxPoints) * 100;
+  // On paper, so 14.5 / 25 is 58%, not 57.99999999999999%.
+  const pct = _onPaper((rawScore / maxPoints) * 100);
   // Highest start first, however the table was saved.
   const boundaries = ((scale && scale.boundaries) || DEFAULT_GRADING_SCALE.boundaries)
     .slice()
@@ -1092,9 +1093,10 @@ function _levelPoints(cid, value) {
    no reporting terms never ends, so it shows IE. With no class given, F. */
 function percentageToLetter(R, cid) {
   if (R == null) return null;
+  var r = _onPaper(R);
   // Every band but the last (F, which turns on whether the course ended).
   for (var i = 0; i < BC_LETTER_BANDS.length - 1; i++) {
-    if (R >= BC_LETTER_BANDS[i].min) return BC_LETTER_BANDS[i].label;
+    if (r >= BC_LETTER_BANDS[i].min) return BC_LETTER_BANDS[i].label;
   }
   return cid == null || courseHasEnded(cid) ? 'F' : 'IE';
 }
@@ -1450,10 +1452,10 @@ function _groupGrade(cid, prof, pct, count) {
   if (prof == null && pct == null) return null;
   var mode = courseGradeMode(cid);
   var shownPct = pct == null ? null : _roundPercent(pct, getRoundWholePercent(cid) ? 0 : 1);
-  var profText = prof == null ? null : Number(prof).toFixed(1);
+  var profText = prof == null ? null : _figureText(prof);
   var pctText = shownPct == null ? null : percentageToLetter(shownPct, cid) + ' ' + shownPct + '%';
   var text = mode === 'letter' ? pctText : mode === 'both' ? [profText, pctText].filter(Boolean).join(' · ') : profText;
-  var level = mode === 'letter' ? (shownPct == null ? 0 : _percentLevel(shownPct)) : prof > 0 ? Math.round(prof) : 0;
+  var level = mode === 'letter' ? (shownPct == null ? 0 : _percentLevel(shownPct)) : prof > 0 ? roundLevel(prof) : 0;
   if (!text) return null;
   return {
     text: text,
@@ -1473,7 +1475,7 @@ function groupGradeGap(cid, mine, cls) {
   var a = asPct ? mine.pct : mine.prof;
   var b = asPct ? cls.pct : cls.prof;
   if (a == null || b == null) return null;
-  var d = Math.round((a - b) * 10) / 10;
+  var d = _oneDecimal(a - b);
   if (d === 0) return { text: 'Same as class', dir: 0 };
   var amount = Math.abs(d).toFixed(1) + (asPct ? '%' : '');
   return { text: amount + (d > 0 ? ' above class' : ' below class'), dir: d > 0 ? 1 : -1 };
@@ -1488,7 +1490,7 @@ function groupGradeDiff(cid, mine, ref) {
   var a = asPct ? mine.pct : mine.prof;
   var b = asPct ? ref.pct : ref.prof;
   if (a == null || b == null) return null;
-  var d = Math.round((a - b) * 10) / 10;
+  var d = _oneDecimal(a - b);
   var sign = d > 0 ? '+' : d < 0 ? '\u2212' : '';
   return { value: d, text: sign + Math.abs(d).toFixed(1) + (asPct ? '%' : ''), dir: d > 0 ? 1 : d < 0 ? -1 : 0 };
 }
@@ -1680,7 +1682,8 @@ function rubricCriterionLevel(cid, studentId, assessment, criterion) {
    comes from. */
 function nearestScoreLevel(value) {
   if (!(value > 0)) return { level: 0, text: '' };
-  var steps = Math.round(value / SCORE_MOD_STEP);
+  // The nearest step to the printed figure; a tie (2.5) goes up.
+  var steps = Math.round(_onPaper(printedLevel(value) / SCORE_MOD_STEP));
   var level = Math.max(1, Math.min(4, Math.round(steps * SCORE_MOD_STEP)));
   var mod = Math.round((steps * SCORE_MOD_STEP - level) / SCORE_MOD_STEP);
   return { level: level, text: formatScoreLevel(level, mod) };
@@ -1702,7 +1705,55 @@ function getRoundWholePercent(cid) {
    before rounding. */
 function _roundPercent(R, digits) {
   var f = Math.pow(10, digits);
-  return Math.round(Number((R * f).toPrecision(12))) / f;
+  return Math.round(_onPaper(R * f)) / f;
+}
+
+/* A worked-out level or percent as it is on paper, to 12 significant
+   figures. A + or − is a third, which a computer can't hold exactly, so an
+   average that is exactly 2.5 on paper (Emerging, Extending −, Extending −,
+   Developing −) can come out 2.4999999999999996. Everything that compares a
+   level or percent with a boundary, or rounds one to print it, reads it
+   through this first. Only a value within about 5 × 10⁻¹² of a boundary
+   reads as on it. The value itself is never changed, only what it is
+   compared as. */
+function _onPaper(v) {
+  var n = Number(v);
+  return isFinite(n) ? Number(n.toPrecision(12)) : n;
+}
+
+/* A level as it is printed: on paper, to one decimal, a half rounding up
+   (2.47 is 2.5, 2.44 is 2.4, an exact 1.65 is 1.7). Everything a teacher,
+   student or family reads from a level comes from this one value: the
+   figure, the word, the code, the colour, the + or −, the counts by level
+   (DECISIONS, "A level reads as it is printed", 2026-11-11). The level
+   itself (stored, averaged, sent to the server) is never changed. */
+function printedLevel(value) {
+  return _oneDecimal(value);
+}
+
+/* The whole level a level reads as (its word, code and colour): the
+   printed figure rounded, a half going up. 2.47 prints 2.5 and is 3; 2.44
+   prints 2.4 and is 2. 0 stays 0. */
+function roundLevel(value) {
+  return Math.round(_onPaper(printedLevel(value)));
+}
+
+/* A percent as a whole number, as it is printed ("63%"). 62.5 is 63. */
+function _wholePercent(p) {
+  return _roundPercent(p, 0);
+}
+
+/* A level, % or points to one decimal, on paper, a half rounding up: an
+   exact 1.65 is 1.7 however the computer came to it (as 1.65 or as
+   1.6499999999999999). Every one-decimal figure calc.js prints, and every
+   change between two, comes from this, so equal values print the same. */
+function _oneDecimal(v) {
+  return _roundPercent(v, 1);
+}
+
+/* The same as text: "1.7", "2.0". */
+function _figureText(v) {
+  return _oneDecimal(v).toFixed(1);
 }
 
 function getCourseLetterData(cid, studentId) {
@@ -2374,7 +2425,7 @@ function setSectionOverride(cid, studentId, sectionId, level, reason) {
       reason: reason,
       date: typeof courseToday === 'function' ? courseToday(cid) : new Date().toISOString().slice(0, 10),
       // 0 when the section has no scored work: nothing was calculated.
-      calculated: Math.round(raw * 10) / 10,
+      calculated: _oneDecimal(raw),
     };
   } else {
     delete overrides[studentId][sectionId];
@@ -2527,7 +2578,7 @@ function rollUpSectionLevels(cid, levelOf) {
  */
 function calcLetterGrade(avgProf, cid) {
   var pct = levelToPercent(cid, avgProf);
-  return { letter: percentageToLetter(pct, cid), pct: pct == null ? null : Math.round(pct * 10) / 10 };
+  return { letter: percentageToLetter(pct, cid), pct: pct == null ? null : _oneDecimal(pct) };
 }
 
 /** Determine the trend direction for a section by comparing the two most recent summative scores.
@@ -2569,7 +2620,7 @@ function evidenceChange(entries) {
     });
   if (list.length < 2) return null;
   var lv = function (e) {
-    return Math.max(1, Math.min(4, Math.round(Number(e.score))));
+    return Math.max(1, Math.min(4, roundLevel(Number(e.score))));
   };
   var first = lv(list[0]);
   var last = lv(list[list.length - 1]);
@@ -2791,7 +2842,7 @@ function courseGradeMode(cid) {
 
 function _percentLevel(pct) {
   for (var i = 0; i < BC_LETTER_BANDS.length; i++) {
-    if (pct >= BC_LETTER_BANDS[i].min) return BC_LETTER_BANDS[i].level;
+    if (_onPaper(pct) >= BC_LETTER_BANDS[i].min) return BC_LETTER_BANDS[i].level;
   }
   return 1;
 }
@@ -2806,8 +2857,8 @@ function formatLevel(cid, value, empty) {
 /* A level as the class shows it, with the percent it is shown as. */
 function _levelAtPercent(cid, value, percent) {
   var mode = courseGradeMode(cid);
-  var num = Number(value).toFixed(1);
-  var pct = Math.round(percent) + '%';
+  var num = _figureText(value);
+  var pct = _wholePercent(percent) + '%';
   if (mode === 'letter') return pct;
   if (mode === 'both') return num + ' \u00B7 ' + pct;
   return num;
@@ -2828,14 +2879,14 @@ function levelBarPercent(cid, value) {
    none. The one place a level is rounded to a decimal. */
 function levelFigure(value, empty) {
   if (!(value > 0)) return empty === undefined ? '\u2014' : empty;
-  return Number(value).toFixed(1);
+  return _figureText(value);
 }
 
 /* The change between two printed figures, so 3.1 to 3.0 reads "−0.1";
    "—" when either side has no level. */
 function levelChange(before, after) {
   if (!(before > 0 && after > 0)) return '\u2014';
-  var d = Math.round(after * 10) - Math.round(before * 10);
+  var d = Math.round(_onPaper(after * 10)) - Math.round(_onPaper(before * 10));
   return (d > 0 ? '+' : d < 0 ? '\u2212' : '') + (Math.abs(d) / 10).toFixed(1);
 }
 
@@ -2846,7 +2897,7 @@ function levelChange(before, after) {
 function levelChangeAs(cid, before, after) {
   if (courseGradeMode(cid) !== 'letter') return levelChange(before, after);
   if (!(before > 0 && after > 0)) return '\u2014';
-  var d = Math.round(levelToPercent(cid, after)) - Math.round(levelToPercent(cid, before));
+  var d = _wholePercent(levelToPercent(cid, after)) - _wholePercent(levelToPercent(cid, before));
   return (d > 0 ? '+' : d < 0 ? '\u2212' : '') + Math.abs(d) + '%';
 }
 
@@ -2856,14 +2907,14 @@ function levelChangeAs(cid, before, after) {
    choice. */
 function formatLevelAs(cid, value, as, empty) {
   if (!(value > 0)) return empty === undefined ? '\u2014' : empty;
-  if (as === 'percent') return Math.round(levelToPercent(cid, value)) + '%';
-  return Number(value).toFixed(1);
+  if (as === 'percent') return _wholePercent(levelToPercent(cid, value)) + '%';
+  return _figureText(value);
 }
 
 /* A points score as a % of the assessment's most, "90%". */
 function formatPointsPercent(points, maxPoints) {
   var max = Number(maxPoints) || 100;
-  return Math.round((Number(points) / max) * 100) + '%';
+  return _wholePercent((Number(points) / max) * 100) + '%';
 }
 
 /* What one gradebook cell shows: one student on one assessment, as the
@@ -2959,7 +3010,7 @@ function assessmentCellValue(cid, sid, assessment) {
   if (val > 0 || pointsVal != null) {
     out.kind = isPoints ? 'points' : 'level';
     out.value = val;
-    out.level = pointsVal != null ? pointsToProf(val, a.maxPoints || 100, getGradingScale(cid)) : Math.round(val);
+    out.level = pointsVal != null ? pointsToProf(val, a.maxPoints || 100, getGradingScale(cid)) : roundLevel(val);
     out.outOfRange = isScoreOutOfRange(a, val);
     if (isPoints) {
       out.text = formatPoints(val);
@@ -2967,7 +3018,7 @@ function assessmentCellValue(cid, sid, assessment) {
     }
     var own = rubricVal !== undefined ? getAssessmentGroupPercentage(cid, sid, [a]) : null;
     out.percent = own && own.pct != null ? own.pct : levelToPercent(cid, val);
-    out.percentText = Math.round(out.percent) + '%';
+    out.percentText = _wholePercent(out.percent) + '%';
     out.text = _levelAtPercent(cid, val, out.percent);
     return out;
   }
@@ -2978,7 +3029,7 @@ function assessmentCellValue(cid, sid, assessment) {
    don't use proficiency words. */
 function levelWord(cid, value) {
   if (!(value > 0) || courseGradeMode(cid) === 'letter') return '';
-  return PROF_LABELS[Math.round(value)] || '';
+  return PROF_LABELS[roundLevel(value)] || '';
 }
 
 /* A student's or competency's level (an average) as the class describes it
@@ -3043,7 +3094,7 @@ function studentGradeBadges(cid, sid, termId) {
   var out = { prof: null, letter: null };
   if (mode !== 'letter') {
     var overall = getOverallProficiency(cid, sid);
-    if (overall > 0) out.prof = { text: overall.toFixed(1), level: Math.round(overall) };
+    if (overall > 0) out.prof = { text: _figureText(overall), level: roundLevel(overall) };
   }
   if (mode !== 'proficiency') {
     var lg = getCourseLetterData(cid, sid);
@@ -3074,7 +3125,7 @@ function studentGradeBadges(cid, sid, termId) {
    or − is already in the value, so 2.67 (3−) is PRF and 3.33 (3+) is PRF. */
 function levelCode(value) {
   if (!(value > 0)) return PROF_CODES[0];
-  return PROF_CODES[Math.max(1, Math.min(4, Math.round(value)))];
+  return PROF_CODES[Math.max(1, Math.min(4, roundLevel(value)))];
 }
 
 /* The grades beside a name in the roster: studentGradeBadges with the
@@ -3129,8 +3180,8 @@ function classGradeSummary(cid, studentIds) {
   var parts = [];
   var level = 0;
   if (means.prof != null) {
-    parts.push(means.prof.toFixed(1));
-    level = Math.round(means.prof);
+    parts.push(_figureText(means.prof));
+    level = roundLevel(means.prof);
   }
   if (means.pct != null) {
     var pct = _roundPercent(means.pct, getRoundWholePercent(cid) ? 0 : 1);
@@ -3190,8 +3241,8 @@ function classGradeChange(cid, studentIds) {
   var diff =
     key === 'pct'
       ? _roundPercent(now, getRoundWholePercent(cid) ? 0 : 1) - _roundPercent(before, getRoundWholePercent(cid) ? 0 : 1)
-      : Math.round(now * 10) / 10 - Math.round(before * 10) / 10;
-  diff = Math.round(diff * 10) / 10;
+      : _oneDecimal(now) - _oneDecimal(before);
+  diff = _oneDecimal(diff);
   var dir = diff > 0 ? 1 : diff < 0 ? -1 : 0;
   var amount = key === 'pct' ? Math.abs(diff) + '%' : Math.abs(diff).toFixed(1);
   return {
@@ -3258,7 +3309,7 @@ function _nowAndMonthAgo(cid, today, read) {
 
 /* The whole level a level's word comes from (levelWord), 1 to 4. */
 function _wordLevel(value) {
-  return Math.max(1, Math.min(4, Math.round(value)));
+  return Math.max(1, Math.min(4, roundLevel(value)));
 }
 
 /** How one skill (a section of the learning map) has moved in a month, from
@@ -3275,7 +3326,7 @@ function skillMonthChange(cid, sid, sectionId, today) {
   if (!r || !(r.then > 0)) return null;
   var letter = courseGradeMode(cid) === 'letter';
   var shown = function (v) {
-    return letter ? Math.round(levelToPercent(cid, v)) : _wordLevel(v);
+    return letter ? _wholePercent(levelToPercent(cid, v)) : _wordLevel(v);
   };
   var d = shown(r.now) - shown(r.then);
   return {
@@ -3351,7 +3402,7 @@ function competencyDistribution(cid, studentIds, which) {
         ? getGroupProficiency(cid, sid, which.groupId)
         : getSectionProficiency(cid, sid, which && which.sectionId);
     if (!(v > 0)) return;
-    var level = Math.max(1, Math.min(4, Math.round(v)));
+    var level = Math.max(1, Math.min(4, roundLevel(v)));
     bands[level - 1].ids.push(sid);
     values[sid] = v;
     total += v;
@@ -3441,10 +3492,10 @@ function levelMoveText(cid, first, last) {
   if (!(first > 0 && last > 0)) return null;
   var d, amount;
   if (courseGradeMode(cid) === 'proficiency') {
-    d = Math.round(last * 10) - Math.round(first * 10);
+    d = Math.round(_onPaper(last * 10)) - Math.round(_onPaper(first * 10));
     amount = (Math.abs(d) / 10).toFixed(1);
   } else {
-    d = Math.round(levelToPercent(cid, last)) - Math.round(levelToPercent(cid, first));
+    d = _wholePercent(levelToPercent(cid, last)) - _wholePercent(levelToPercent(cid, first));
     amount = String(Math.abs(d));
   }
   var dir = d > 0 ? 1 : d < 0 ? -1 : 0;
@@ -3457,13 +3508,13 @@ function levelMoveText(cid, first, last) {
 function classColumnAverageText(cid, assessment, res) {
   if (!res) return '\u2014';
   if (res.pct != null) {
-    if (isCompletionScored(assessment)) return Math.round(res.pct) + '%';
+    if (isCompletionScored(assessment)) return _wholePercent(res.pct) + '%';
     return (
-      formatPoints(Math.round(res.avg * 10) / 10) +
+      formatPoints(_oneDecimal(res.avg)) +
       '/' +
       formatPoints(Number(assessment.maxPoints) || 100) +
       ' \u00B7 ' +
-      Math.round(res.pct) +
+      _wholePercent(res.pct) +
       '%'
     );
   }
@@ -3519,7 +3570,7 @@ function classGradeDistribution(cid, studentIds) {
       return { label: PROF_LABELS[level], level: level, ids: [] };
     });
     (studentIds || []).forEach(function (sid) {
-      var level = Math.round(getOverallProficiency(cid, sid));
+      var level = roundLevel(getOverallProficiency(cid, sid));
       if (level >= 1 && level <= 4) bands[4 - level].ids.push(sid);
     });
   }
@@ -3530,8 +3581,8 @@ function renderGrowthSparkline(points) {
   if (!points || points.length === 0) return '<span style="font-size:0.75rem;color:var(--text-3)">No data yet</span>';
   return `<div class="growth-sparkline">${points
     .map((p, i) => {
-      const color = PROF_COLORS[Math.round(p.prof)] || PROF_COLORS[0];
-      return `${i > 0 ? '<span class="sparkline-line"></span>' : ''}<span class="sparkline-dot" style="background:${color}" title="${formatDate(p.date)}: ${PROF_LABELS[Math.round(p.prof)] || '—'}"></span>`;
+      const color = PROF_COLORS[roundLevel(p.prof)] || PROF_COLORS[0];
+      return `${i > 0 ? '<span class="sparkline-line"></span>' : ''}<span class="sparkline-dot" style="background:${color}" title="${formatDate(p.date)}: ${PROF_LABELS[roundLevel(p.prof)] || '—'}"></span>`;
     })
     .join('')}</div>`;
 }
@@ -3564,7 +3615,7 @@ function previewCalcMethodChange(cid, method, decayWeight, recentLimit) {
   var keep = { calcMethod: cc.calcMethod, decayWeight: cc.decayWeight, recentScoreLimit: cc.recentScoreLimit };
   var students = getStudents(cid);
   var shown = function (v) {
-    return v > 0 ? Number(v).toFixed(1) : '';
+    return v > 0 ? _figureText(v) : '';
   };
   var before = students.map(function (s) {
     return shown(getOverallProficiency(cid, s.id));
@@ -3667,7 +3718,7 @@ function previewFolderCountChange(cid, change) {
 function previewLearningMapChange(cid, change) {
   var students = getStudents(cid);
   var shown = function (v) {
-    return v > 0 ? Number(v).toFixed(1) : '';
+    return v > 0 ? _figureText(v) : '';
   };
   var before = students.map(function (s) {
     return shown(getOverallProficiency(cid, s.id));
@@ -3708,7 +3759,7 @@ function previewCoursesEqualChange(cid, on) {
 function _previewOverallChange(cid, target, field, value) {
   var students = getStudents(cid);
   var shown = function (v) {
-    return v > 0 ? Number(v).toFixed(1) : '';
+    return v > 0 ? _figureText(v) : '';
   };
   var before = students.map(function (s) {
     return shown(getOverallProficiency(cid, s.id));
@@ -3803,7 +3854,7 @@ function classColumnSpread(cid, students, col) {
 // A counted value's band, 1–4: a level rounded, or points through the
 // class's Points to Proficiency table. A Letter class's Missing (0) is 1.
 function _spreadBand(cid, v, asPoints) {
-  var level = asPoints ? pointsToProf(v.value, v.possible, getGradingScale(cid)) : Math.round(v.value);
+  var level = asPoints ? pointsToProf(v.value, v.possible, getGradingScale(cid)) : roundLevel(v.value);
   return Math.max(1, Math.min(4, level || 1));
 }
 
@@ -3842,7 +3893,7 @@ function _gridRow(students, levelOf) {
   (students || []).forEach(function (s) {
     var v = levelOf(s.id);
     if (v == null || !(v > 0)) return;
-    var band = Math.max(1, Math.min(4, Math.round(v)));
+    var band = Math.max(1, Math.min(4, roundLevel(v)));
     counts[band]++;
     ids[band].push(s.id);
     total += v;
@@ -4186,8 +4237,7 @@ function assessmentCourseShare(cid, assessment) {
    "3.0 · 75%"). */
 function classSpreadText(cid, assessment, value, points) {
   if (value == null) return '—';
-  if (points)
-    return formatPoints(Math.round(value * 10) / 10) + '/' + formatPoints(Number(assessment.maxPoints) || 100);
+  if (points) return formatPoints(_oneDecimal(value)) + '/' + formatPoints(Number(assessment.maxPoints) || 100);
   return formatColumnAverageLevel(cid, value);
 }
 
@@ -4198,9 +4248,9 @@ function classSpreadRangeText(cid, assessment, spread) {
   if (!spread) return '—';
   if (spread.points)
     return (
-      formatPoints(Math.round(spread.low * 10) / 10) +
+      formatPoints(_oneDecimal(spread.low)) +
       '–' +
-      formatPoints(Math.round(spread.high * 10) / 10) +
+      formatPoints(_oneDecimal(spread.high)) +
       '/' +
       formatPoints(Number(assessment.maxPoints) || 100)
     );

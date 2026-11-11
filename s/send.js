@@ -67,15 +67,18 @@
     if (!state || !state.demo || !state.demoSend || !state.reply) return null;
     var day = today();
     var sentFor = state.demoSent || {};
+    // #demo-card-revise (S11-F2): the pieces returned for revision (s/feedback.js).
+    var revs = typeof StudentPage.demoRevisions === 'function' ? StudentPage.demoRevisions(state) : null;
     return {
       ok: true,
       v: 1,
       send_work: true,
       assessments: (state.reply.assessments || [])
         .filter(function (a) {
-          return a && (DEMO_TAKES[a.id] || sentFor[a.id]);
+          return a && (DEMO_TAKES[a.id] || sentFor[a.id] || (revs && revs[a.id]));
         })
         .map(function (a) {
+          if (revs && revs[a.id]) return revisionWork(a, revs[a.id], day);
           var takes = DEMO_TAKES[a.id] || {};
           var due = a.due_date ? String(a.due_date).slice(0, 10) : '';
           var closes = takes.after === 'stop' && due ? due : null;
@@ -108,6 +111,54 @@
             sending: null,
           };
         }),
+    };
+  }
+
+  /* A piece returned for revision, in `work`'s shape (S11-F2): it takes
+     photos while the request is open, and what is in is the newest version,
+     as the contract's `sent` is: the revision once sent, the first version
+     until then. The first version is being graded (it has its grade), so it
+     can't be changed; a revision can be until the teacher starts grading it.
+     Late is judged by Revise By. */
+  function revisionWork(a, r, day) {
+    var rec = r.revision;
+    var open = !r.returned;
+    return {
+      id: a.id,
+      students_send: 'photos',
+      open: open,
+      closes_on: null,
+      late_now: !!r.revise_by && day > r.revise_by,
+      sent: rec
+        ? {
+            submission_id: 'demo-rev-' + a.id,
+            sent_at: rec.at,
+            sent_by: 'student',
+            on_paper: false,
+            is_late: !!rec.late,
+            note: rec.note,
+            pages: rec.pages.length,
+            grading: !!rec.grading || !open,
+            can_change: open && !rec.grading,
+            thumbs: rec.pages.map(function (pg) {
+              return pg.thumbUrl || pg.url;
+            }),
+            teacher_pages: 0,
+          }
+        : {
+            submission_id: 'demo-sub-' + a.id,
+            sent_at: r.first_sent_at,
+            sent_by: 'student',
+            on_paper: false,
+            is_late: false,
+            note: null,
+            pages: r.first_thumbs.length,
+            grading: true,
+            can_change: false,
+            thumbs: [],
+            teacher_pages: 0,
+          },
+      sending: null,
     };
   }
 
@@ -183,10 +234,14 @@
     var p = pieceOf(id);
     if (!p || !p.send || !p.send.takes) return;
     if (replace ? !(p.send.sent && p.send.sent.canChange) : !p.send.open) return;
+    // Send My Revision (S11-F2): a piece returned for revision, or replacing the revision sent.
+    var revision = !!p.revision && (replace ? p.kind === 'sent' : p.kind === 'revise');
+    if (!replace && p.revision && !revision) return;
     S.send = {
       id: p.id,
       student: S.page.student.id,
       replace: !!replace,
+      revision: revision,
       pages: [], // { key, blob, thumb, hash, url, thumbUrl, blurry, from, sent }
       note: '',
       followed: '', // Did You Do It? (S10-F2): '' | yes | partly | no (Batch B's followed_plan)
@@ -439,6 +494,7 @@
   }
 
   function finish(send) {
+    if (send.revision) return finishRevision(send);
     var p = pieceOf(send.id);
     var due = p && p.dueDate ? p.dueDate : '';
     var now = clock();
@@ -455,6 +511,33 @@
       }),
       // A Replace keeps the pages the teacher added (ruling 92).
       teacherPages: (old && old.teacherPages) || 0,
+    };
+    send.sentAt = now;
+    send.step = 'sent';
+    StudentPage.paint('#sp-send-title');
+  }
+
+  /* A revision handed in (S11-F2), as revision_finish answers: only on a
+     request still open, never once grading of the revision in has started;
+     sent after Revise By it is Late (a label). */
+  function finishRevision(send) {
+    var revs = typeof StudentPage.demoRevisions === 'function' ? StudentPage.demoRevisions(S) : null;
+    var r = revs && revs[send.id];
+    if (!r || r.returned || (r.revision && r.revision.grading)) {
+      send.step = 'check';
+      send.message = 'Your teacher has started grading this. Ask your teacher instead.';
+      StudentPage.paint('#sp-send-title');
+      return;
+    }
+    var now = clock();
+    r.revision = {
+      at: new Date(now).toISOString(),
+      note: send.note.slice(0, NOTE_MAX),
+      late: !!r.revise_by && today() > r.revise_by,
+      pages: send.pages.map(function (pg) {
+        return { url: pg.url, thumbUrl: pg.thumbUrl };
+      }),
+      grading: false,
     };
     send.sentAt = now;
     send.step = 'sent';
@@ -487,6 +570,13 @@
     }
     if (q.kind === 'replace') {
       open(q.id, true);
+      return;
+    }
+    // Unsend My Revision (S11-F2): the revision goes, and the piece needs its revision again.
+    var revs = p.revision && typeof StudentPage.demoRevisions === 'function' ? StudentPage.demoRevisions(S) : null;
+    if (revs && revs[q.id] && revs[q.id].revision) {
+      revs[q.id].revision = null;
+      StudentPage.paint('.sp-segment-on');
       return;
     }
     var rec = S.demoSent[q.id];
@@ -677,7 +767,15 @@
       head('Check and Send', p.title) +
       (late
         ? '<p class="sp-send-due">' +
-          esc(p.dueDate ? 'Due ' + fmtDay(p.dueDate, { weekday: 'short', month: 'short', day: 'numeric' }) : '') +
+          esc(
+            send.revision
+              ? p.revision && p.revision.reviseBy
+                ? 'Revise by ' + fmtDay(p.revision.reviseBy, { weekday: 'short', month: 'short', day: 'numeric' })
+                : ''
+              : p.dueDate
+                ? 'Due ' + fmtDay(p.dueDate, { weekday: 'short', month: 'short', day: 'numeric' })
+                : '',
+          ) +
           '</p><p class="sp-send-late" role="note">This will be marked Late.</p>'
         : '') +
       (n ? pagesHtml(send, !send.busy) : '') +
@@ -878,7 +976,7 @@
       }
       return;
     }
-    if (act === 'send-open') return open(attr('data-piece'), false);
+    if (act === 'send-open' || act === 'revise-open') return open(attr('data-piece'), false);
     if (act === 'send-unsend') return ask('unsend', attr('data-piece'));
     if (act === 'send-replace') return ask('replace', attr('data-piece'));
     if (act === 'send-ask-yes') return answer(true);

@@ -83,6 +83,8 @@ test('Return Grades: the question on leaving When I Return Them, Cancel, then Re
   await expect(card.locator('.sp-row-title')).toHaveText([
     'Return Grades',
     'Send Work',
+    // Demo Mode's sample has photos, so Keep Photos Until shows with Send Work off (ruling 108's follow-up).
+    'Keep Photos Until',
     'Reflect on Feedback',
     'Show My Learning',
   ]);

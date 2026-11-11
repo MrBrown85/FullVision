@@ -16,6 +16,16 @@ Context: `grading-compliance-plan.md`. All implemented; see its status table.
 - **D9 Missing means labelled Missing** (Colin, 2026-10-30). Work is missing only when its status is Missing (`NS`), whatever its due date. An empty cell past its due date is an empty cell: no "0", no "Past Due", and it is not counted as missing in the gradebook, Missing and Late, Needs Attention, the student cards, the Assignments page, the report blocks or the comment. The grade was never changed by a due date; only the display was.
 - **D8 + and − on every proficiency score** (Colin, 2026-10-22: "the plus minus should be consistent"): a competency, a rubric criterion, and an assessment scored as a whole on its Overall row (`score.modifier`, `migrations/20261022_score_modifier.sql`), in Assignments, the gradebook and the phone. A 3+ counts as 3.33 wherever it is.
 
+## A level reads as it is printed (Nov 11, 2026)
+
+Colin (2026-11-11): "I'll defer to your recommendations on the grade round issue. Make it so." A student at 2.47 saw "2.5" beside "Developing", though the scale says 2.5 is Proficient. An average that was exactly 2.5 on paper could also read Developing, because a computer holds 2.5 as 2.4999999999999996. PR 1101.
+
+- **Rule:** a level reads as it is printed. The printed figure is the level on paper to one decimal, with a half rounding up (`printedLevel` in `shared/calc.js`). The word, code, colour, + or −, counts by level and everything else read from a level follow that figure. So 2.47 prints 2.5 and reads Proficient, and 2.44 prints 2.4 and reads Developing. 1.5 and 3.5 work the same way. The + or − is the nearest step to the printed figure, and a tie goes up (2.5 is 3−).
+- **Why:** the number and the word must agree. Letters already work this way: the % is rounded as shown, then the letter is taken from it (D6).
+- **What moves:** a student whose average is from x.45 to just under x.5 moves up a word, a code, a colour and a + or −. An exact x.x5 (1.65) now always prints 1.7, however the computer came to it. Stored, averaged and server-bound levels do not change. Percents and letters keep their own rule.
+- A points score exactly on a Points to Proficiency start (29 / 50 = 58%) gets that level, though the computer makes it 57.99999999999999.
+- Pages outside `calc.js` that still round a level themselves are a follow-up: they will call `printedLevel` / `roundLevel`.
+
 ## Assessment Factor (2026-10-25)
 
 Supersedes D2. Teachers asked for the multiplier back on points work (an assignment out of 6 counted 4 times), and Schoology has one ("Factor"). Colin: taking it out was an oversight.

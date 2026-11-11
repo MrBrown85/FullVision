@@ -183,7 +183,8 @@ test('Grade Breakdown shows each category with its share, and Group By groups th
   await expect(page.locator('#stu-tab-breakdown .stu-tab-stat')).toHaveText('3 Categories');
   await expect(page.locator('.stu-bd-cats .stu-bd-row:not(.stu-bd-head)')).toHaveCount(3);
   await page.locator('.stu-bd-cats [data-action="stuBdToggle"]').first().click();
-  await expect(page.locator('.stu-bd-items .stu-bd-item')).toHaveCount(8);
+  // Labs & Investigations: 8 labs, and the sample's Light Refraction Lab (ruling 115), not graded yet.
+  await expect(page.locator('.stu-bd-items .stu-bd-item')).toHaveCount(9);
   // Assignment Types comes first and opens on Timeline.
   await expect(page.locator('.stu-bd-section').first()).toHaveAttribute('aria-labelledby', 'stu-bd-types');
   await expect(page.locator('[data-action="stuTypeView"][data-view="timeline"]')).toHaveAttribute(

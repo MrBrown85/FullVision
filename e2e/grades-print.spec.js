@@ -1,6 +1,6 @@
 /**
  * Print Grades: the class grade sheet, printed from Demo Mode's Science 8
- * (27 students, 37 assessments) through Chromium's print engine.
+ * (27 students, 38 assessments) through Chromium's print engine.
  * teacher/grades-print.js; docs/DECISIONS.md "Printed class grade sheet".
  *
  * Portrait, laid out like MyEd's class list with grid, filling the page.
@@ -137,7 +137,7 @@ test.describe('Print Grades', () => {
       }
     }
     await expect(dialog.getByRole('switch')).toHaveCount(5);
-    await expectCount(dialog, '3 pages · Letter', `${STUDENTS} students · 37 columns`);
+    await expectCount(dialog, '3 pages · Letter', `${STUDENTS} students · 38 columns`);
     // The page picture shows the first page's columns and the final grade only on the last.
     await expect(dialog.locator('.gpd-thumb .gpd-t-colhead .gpd-t-cell')).toHaveCount(14);
     await expect(dialog.locator('.gpd-thumb .gpd-t-avg')).toHaveCount(1);
@@ -201,7 +201,7 @@ test.describe('Print Grades', () => {
         .first(),
     ).toHaveText(/^\d\.\d$/);
     // Every column prints once.
-    expect(await page.locator('#grades-print-root th.gp-ch[data-col]').count()).toBe(37);
+    expect(await page.locator('#grades-print-root th.gp-ch[data-col]').count()).toBe(38);
 
     const pdf = await pdfOfStaged(page);
     expect(countPages(pdf)).toBe(expected);
@@ -213,7 +213,7 @@ test.describe('Print Grades', () => {
     let dialog = await openDialog(page);
     await choose(dialog, 'Term', 'All Time');
     await choose(dialog, 'Paper', /^Legal/);
-    await expectCount(dialog, '3 pages · Legal', `${STUDENTS} students · 37 columns`);
+    await expectCount(dialog, '3 pages · Legal', `${STUDENTS} students · 38 columns`);
     await stageFromDialog(page, dialog);
     // The page rule names the paper and portrait, so the print dialog picks Legal.
     expect(await page.locator('#grades-print-page').textContent()).toContain('size: legal portrait');
@@ -248,7 +248,9 @@ test.describe('Print Grades', () => {
   test('Compact prints fewer pages than Normal', async ({ page }) => {
     await openDemoGradebook(page);
     const dialog = await openDialog(page);
-    await choose(dialog, 'Term', 'All Time');
+    // Term 1: All Time's 38 columns take 3 Letter pages at either size since
+    // the sample's Light Refraction Lab (ruling 115) joined it.
+    await choose(dialog, 'Term', /^Term 1/);
     await choose(dialog, 'Paper', /^Letter/);
     await choose(dialog, 'Text Size', 'Normal');
     const normal = await pagesInStatus(dialog);
@@ -281,7 +283,7 @@ test.describe('Print Grades', () => {
     const dialog = await openDialog(page);
     await choose(dialog, 'Term', 'All Time');
     await dialog.getByLabel('Blank Gradebook').check();
-    await expectCount(dialog, '3 pages · Letter', `${STUDENTS} students · Blank Gradebook · 37 columns`);
+    await expectCount(dialog, '3 pages · Letter', `${STUDENTS} students · Blank Gradebook · 38 columns`);
     for (const label of ['Final Grade', 'Class Average Row', 'Late Marks']) {
       await expect(dialog.getByLabel(label)).toBeDisabled();
     }
