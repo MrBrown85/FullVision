@@ -1500,6 +1500,20 @@
         MGradePhotos.openFull(_cid, target);
         return;
       }
+      // Grade From Paper on a not-in card: Set Logan To, then a level.
+      if (action === 'm-work-setto-menu') {
+        MGrade.openSetTo(_cid, target.getAttribute('data-aid'), target.getAttribute('data-sid'));
+        return;
+      }
+      if (action === 'm-work-setto') {
+        MGrade.setToFromPaper(
+          _cid,
+          target.getAttribute('data-aid'),
+          target.getAttribute('data-sid'),
+          parseInt(target.getAttribute('data-level'), 10),
+        );
+        return;
+      }
       if (action === 'm-work-top') {
         MGradePhotos.toTop(target);
         return;

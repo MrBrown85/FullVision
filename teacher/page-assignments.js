@@ -14036,9 +14036,15 @@ window.PageAssignments = (function () {
       (w.fit === 'width' ? 'width' : 'page') +
       ' turn-' +
       turn +
+      // The page's surface (S9-T1): the picture, and whatever is drawn over
+      // it later (Mark Up), turn and fit together inside it.
+      '"><div class="grader-work-surface" data-file-id="' +
+      esc(file.id) +
+      '" data-page="' +
+      (at + 1) +
       '"><img class="grader-work-img" alt="' +
       esc('Page ' + (at + 1) + ' of ' + (a.title || 'the work')) +
-      '"></div>';
+      '"></div></div>';
     if (sub.note) {
       html +=
         '<div class="grader-work-note"><h3 class="grader-work-note-title">' +
@@ -14137,6 +14143,35 @@ window.PageAssignments = (function () {
         g.work.shownKey = key;
       }
     });
+  }
+
+  /* The page on screen in the work pane, for a layer drawn over it (S9-T1,
+     Mark Up): { el, img, cid, aid, sid, fileId, page, turn }, or null when
+     no page shows. `el` is the surface: the picture fills it, it turns and
+     fits with the picture, and a child placed over it with position:
+     absolute and inset: 0 lies exactly on the page. */
+  function workSurface() {
+    if (!_grader || !_grader.workShell) return null;
+    var el = _grader.overlay.querySelector('.grader-work-surface');
+    if (!el) return null;
+    var a = _assessmentById(activeCourse, _grader.aid);
+    var sub = a && getStudentSubmission(activeCourse, focusStudentId, a.id);
+    var file =
+      sub &&
+      (sub.files || []).find(function (f) {
+        return f && String(f.id) === el.dataset.fileId;
+      });
+    if (!file) return null;
+    return {
+      el: el,
+      img: el.querySelector('.grader-work-img'),
+      cid: activeCourse,
+      aid: a.id,
+      sid: focusStudentId,
+      fileId: file.id,
+      page: parseInt(el.dataset.page, 10),
+      turn: _grader.work.turns[file.id] || 0,
+    };
   }
 
   /* In Focus on Work the scoring's level buttons show EMG, DEV, PRF and
@@ -14897,6 +14932,7 @@ window.PageAssignments = (function () {
     graderOpen: function () {
       return !!_grader;
     },
+    workSurface: workSurface,
     switchCourse: switchCourse,
     toggleFocusStudent: toggleFocusStudent,
   };

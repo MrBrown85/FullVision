@@ -243,6 +243,8 @@ load('shared/student-view.js');
 // Photos: shrinking and the queue that keeps them (Add Work in the grader).
 load('shared/photo-shrink.js');
 load('shared/photo-queue.js');
+// Pictures of student work through one helper (S14-T1).
+load('shared/work-thumbs.js');
 load('s/page-view.js');
 load('teacher/ui.js');
 load('teacher/report-scores.js');
@@ -288,6 +290,7 @@ load('teacher/obs-capture.js');
 load('teacher/obs-card.js');
 load('teacher/student-evidence.js');
 load('teacher/competency-evidence.js');
+load('teacher/work-wall.js');
 load('teacher/student-overrides.js');
 load('teacher/rubric-print.js');
 load('teacher/competency-wording.js');
