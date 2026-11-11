@@ -390,7 +390,8 @@ window.MGrade = (function () {
 
     // html-safe: the title and category go through MC.esc; ids are ours; counts are numbers; dateStr is a date
     function _workRowHtml(cid, a, dateStr, graded, total, pct, shown) {
-      var waiting = MGradePhotos.toGrade(cid, a).length;
+      // GraderWork's counts (grade-photos.js): a group graded together is one to grade.
+      var waiting = MGradePhotos.toGradeCount(cid, a);
       var out = MGradePhotos.notIn(cid, a).length;
       var takes = MGradePhotos.takes(cid, a);
       var meta = [];
@@ -515,7 +516,7 @@ window.MGrade = (function () {
           (waiting.length
             ? item(
                 ' data-only="tograde"',
-                'Grade the ' + waiting.length + ' Waiting',
+                'Grade the ' + MGradePhotos.toGradeCount(cid, a) + ' Waiting',
                 firstSt ? 'Starts with ' + displayNameWithLast(firstSt) : '',
               )
             : '') +

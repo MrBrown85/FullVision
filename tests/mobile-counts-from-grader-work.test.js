@@ -202,20 +202,27 @@ afterEach(() => {
 });
 
 describe('every phone number for sent work, on the fixture', () => {
-  it('today, before the phone asks GraderWork', () => {
+  /* Was, before the phone asked GraderWork: badge and To Grade 6; Lab
+     "4 not in"; Talk "3 to grade", "7 not in"; the menus to match; S2's
+     list "Lab: Grade, Talk: Add Work", S5's and S9's with "Lab: Add Work".
+     The rest is unchanged. */
+  it('is what GraderWork says', () => {
     expect(phone()).toEqual({
-      badge: '6',
-      segment: '6',
-      lab: { pill: '3 to grade', notin: '4 not in' },
-      talk: { pill: '3 to grade', notin: '7 not in' },
-      labMenu: ['Grade the 3 Waiting', 'Add Work for the 4 Not In'],
-      talkMenu: ['Grade the 3 Waiting', 'Add Work for the 7 Not In'],
+      badge: '5',
+      segment: '5',
+      // Lab: S7 (Missing) and S8 are not in; S5 and S9, graded from paper, are not.
+      lab: { pill: '3 to grade', notin: '2 not in' },
+      // Talk: the group's work (S0 and S1 sent) counts once, and S5's: 2.
+      // Not in: S3, S4, S6, S7, S8, S9; S2 is in through the group.
+      talk: { pill: '2 to grade', notin: '6 not in' },
+      labMenu: ['Grade the 3 Waiting', 'Add Work for the 2 Not In'],
+      talkMenu: ['Grade the 2 Waiting', 'Add Work for the 6 Not In'],
       showing: 'Showing 2 of 3',
       cards: {
         S0: ['Talk: Grade', 'Lab: Grade'],
-        S2: ['Lab: Grade', 'Talk: Add Work'],
-        S5: ['Talk: Grade', 'Lab: Add Work'],
-        S9: ['Talk: Add Work', 'Lab: Add Work'],
+        S2: ['Talk: Grade', 'Lab: Grade'],
+        S5: ['Talk: Grade'],
+        S9: ['Talk: Add Work'],
       },
       labGrader: '1 of 3 to grade',
       talkGrader: '1 of 2 to grade',
@@ -223,7 +230,7 @@ describe('every phone number for sent work, on the fixture', () => {
   });
 });
 
-describe.skip('the same numbers on the phone, the gradebook and the dashboard', () => {
+describe('the same numbers on the phone, the gradebook and the dashboard', () => {
   it('for the class, and for each piece', () => {
     const p = phone();
     const total = GraderWork.classWorkCounts(CID).tograde;

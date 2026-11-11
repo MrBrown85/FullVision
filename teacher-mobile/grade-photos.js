@@ -13,11 +13,17 @@
    side"). Anywhere else on() is false, every count is empty, cardHtml is ''
    and the phone is exactly what it was. Nothing here writes or sends.
 
-   Words used here:
-   - to grade: a student sent work (or handed it in on paper) and grading
-     has not started (studentWorkGradingStarted: a draft or returned grade or
-     an Overall Comment for that student);
-   - not in: nothing sent, and not Excused. */
+   Every count and list of sent work here is GraderWork's (shared/grader.js:
+   workOn, workStateOf, workCounts, classWorkCounts), the one count the
+   dashboard, the gradebook, the Assignments page, the desktop grader and
+   the Work Wall use, so the phone gives the same numbers (S6/S7). Its
+   words: a student is in exactly one state on a piece:
+   - to grade: work is in (their own, or on a One per Group piece a
+     group-mate's) and grading has not started;
+   - to return: a draft grade; returned: a returned grade, so a student
+     graded from paper with nothing sent is neither to grade nor not in;
+   - not in: nothing in, no grade, and not Excused (Missing counts).
+   A pair or group still graded together is one piece to grade. */
 
 window.MGradePhotos = (function () {
   'use strict';
@@ -36,59 +42,64 @@ window.MGradePhotos = (function () {
 
   // The build switch and Send Work, both on for the class.
   function on(cid) {
-    if (!cid || typeof getReturnSettings !== 'function' || typeof getCourseSendWork !== 'function') return false;
-    return !!getReturnSettings(cid).student_page && !!getCourseSendWork(cid).send_work;
+    return !!window.GraderWork && GraderWork.workOnInClass(cid);
   }
 
   // The piece takes work: Students Send is Photos, or Photos and Files.
   function takes(cid, a) {
-    if (!on(cid) || !a || typeof getAssessmentStudentWork !== 'function') return false;
-    return getAssessmentStudentWork(cid, a.id).students_send !== 'nothing';
+    return !!a && !!window.GraderWork && GraderWork.workOn(cid, a);
   }
 
   function submission(cid, sid, aid) {
     return typeof getStudentSubmission === 'function' ? getStudentSubmission(cid, sid, aid) : null;
   }
 
+  // The work `sid` has in on `aid`: their own, or their group's (S12-F2).
+  function workIn(cid, sid, aid) {
+    var own = submission(cid, sid, aid);
+    if (own || typeof getGroupSubmissions !== 'function') return own;
+    return getGroupSubmissions(cid, sid, aid)[0] || null;
+  }
+
   function isToGrade(cid, a, sid) {
-    if (!takes(cid, a)) return false;
-    return !!submission(cid, sid, a.id) && !studentWorkGradingStarted(cid, sid, a.id);
+    return takes(cid, a) && GraderWork.workStateOf(cid, a.id, sid) === 'tograde';
   }
 
+  // The class in the grader's order.
   function _roster(cid) {
-    return sortStudents(getStudents(cid).slice(), 'alpha');
+    return sortStudents(getStudents(cid).slice(), 'alpha').map(function (st) {
+      return st.id;
+    });
   }
 
-  // The students whose work waits to be graded, in the grader's order.
+  // GraderWork's counts for the piece, its lists in the grader's order; null when it takes no work.
+  function counts(cid, a) {
+    if (!takes(cid, a)) return null;
+    return GraderWork.workCounts(cid, a.id, _roster(cid));
+  }
+
+  // The students whose work waits to be graded, in the grader's order (a group's members each).
   function toGrade(cid, a) {
-    if (!takes(cid, a)) return [];
-    return _roster(cid)
-      .map(function (st) {
-        return st.id;
-      })
-      .filter(function (sid) {
-        return isToGrade(cid, a, sid);
-      });
+    var c = counts(cid, a);
+    return c ? c.ids.tograde : [];
   }
 
-  // The students with nothing in, in the grader's order. An Excused piece is not owed.
+  // How many pieces of work wait: a pair or group graded together counts once.
+  function toGradeCount(cid, a) {
+    var c = counts(cid, a);
+    return c ? c.tograde : 0;
+  }
+
+  // The students with nothing in, in the grader's order.
   function notIn(cid, a) {
-    if (!takes(cid, a)) return [];
-    return _roster(cid)
-      .map(function (st) {
-        return st.id;
-      })
-      .filter(function (sid) {
-        return !submission(cid, sid, a.id) && getAssignmentStatus(cid, sid, a.id) !== 'EXC';
-      });
+    var c = counts(cid, a);
+    return c ? c.ids.notin : [];
   }
 
-  // Every student's to-grade count across the class: the Grade tab's badge.
+  // The work waiting across the class: the Grade tab's badge and its To Grade count.
   function classToGrade(cid) {
     if (!on(cid)) return 0;
-    return (getAssessments(cid) || []).reduce(function (n, a) {
-      return n + toGrade(cid, a).length;
-    }, 0);
+    return GraderWork.classWorkCounts(cid, _roster(cid)).tograde;
   }
 
   // The pieces `sid` has to grade, then the ones not in, newest first.
@@ -97,9 +108,9 @@ window.MGradePhotos = (function () {
     var rows = [];
     (getAssessments(cid) || []).forEach(function (a) {
       if (!takes(cid, a)) return;
-      if (isToGrade(cid, a, sid)) rows.push({ a: a, kind: 'grade', sub: submission(cid, sid, a.id) });
-      else if (!submission(cid, sid, a.id) && getAssignmentStatus(cid, sid, a.id) !== 'EXC')
-        rows.push({ a: a, kind: 'notin' });
+      var state = GraderWork.workStateOf(cid, a.id, sid);
+      if (state === 'tograde') rows.push({ a: a, kind: 'grade', sub: workIn(cid, sid, a.id) });
+      else if (state === 'notin') rows.push({ a: a, kind: 'notin' });
     });
     return rows.sort(function (x, y) {
       if (x.kind !== y.kind) return x.kind === 'grade' ? -1 : 1;
@@ -506,6 +517,7 @@ window.MGradePhotos = (function () {
     submission: submission,
     isToGrade: isToGrade,
     toGrade: toGrade,
+    toGradeCount: toGradeCount,
     notIn: notIn,
     classToGrade: classToGrade,
     studentList: studentList,
