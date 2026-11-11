@@ -339,6 +339,14 @@ window.WorkWall = (function () {
       views.list.find(function (x) {
         return x.id === w.by;
       }) || null;
+    // A pair or group still graded together is one piece of work to grade
+    // (GraderWork counts it once): its members share a unit key.
+    var unitOf = {};
+    (groupGradingUnits(cid, a, ids) || []).forEach(function (u, n) {
+      (u.linked || []).forEach(function (sid) {
+        unitOf[sid] = 'u' + n;
+      });
+    });
     var rows = roster.map(function (st, i) {
       var sub = getStudentSubmission(cid, st.id, a.id);
       return {
@@ -348,6 +356,7 @@ window.WorkWall = (function () {
         pages: _pages(sub),
         state: GraderWork.workStateOf(cid, a.id, st.id),
         mark: _mark(cid, st.id, a, by),
+        unit: unitOf[st.id] || null,
       };
     });
     var byLevel = {};
@@ -361,7 +370,7 @@ window.WorkWall = (function () {
       rows: rows,
       views: views,
       by: by,
-      counts: { all: rows.length, tograde: counts.ids.tograde.length, notin: counts.ids.notin.length, level: byLevel },
+      counts: { all: rows.length, tograde: counts.tograde, notin: counts.notin, level: byLevel },
     };
   }
 
@@ -373,6 +382,10 @@ window.WorkWall = (function () {
       if (f === 'notin') return r.state === 'notin';
       return r.mark.level === Number(f);
     });
+    // To Grade shows a card per piece of work, as it counts: one card for a
+    // pair or group, the member whose work is in (or the first) standing
+    // for it.
+    if (f === 'tograde') rows = _onePerUnit(rows);
     var rank = function (r) {
       if (w.sort === 'tograde') return r.state === 'tograde' ? 0 : r.state === 'notin' ? 2 : 1;
       if (w.sort === 'level') return r.state === 'notin' ? 2 : r.mark.level ? 0 : 1;
@@ -383,6 +396,18 @@ window.WorkWall = (function () {
       if (d) return d;
       if (w.sort === 'level' && x.mark.value !== y.mark.value) return y.mark.value - x.mark.value;
       return x.order - y.order;
+    });
+  }
+
+  function _onePerUnit(rows) {
+    var pick = {};
+    rows.forEach(function (r) {
+      if (!r.unit) return;
+      var had = pick[r.unit];
+      if (!had || (!had.pages.length && r.pages.length)) pick[r.unit] = r;
+    });
+    return rows.filter(function (r) {
+      return !r.unit || pick[r.unit] === r;
     });
   }
 
