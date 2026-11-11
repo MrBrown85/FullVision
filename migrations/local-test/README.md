@@ -2248,10 +2248,16 @@ designed.
 
 ## Batch B send rules: rulings 106 and 107 (2026-11-11)
 
-One file, `../2026111130_student_send_rules.sql`, applied after Batch B's two
-files, the fixes file (`2026111104`) and Batch C's two files. It replaces
+One file, `../2026111130_student_send_rules.sql`. **Apply order:** Batch B's
+two files and the fixes file (`2026111104`), all three on live; then Batch C's
+C1 (`2026111120`) and C2 (`2026111121`), as of `b26cf1c7`; then this file. Its
+first check stops it, with nothing changed, unless all five are in at the
+tested fingerprints: the Batch B and fixes functions it relies on, C1's
+`_grading_started`, `_revision_state`, `revision_start` and `revision_finish`,
+and C2's `_markup_on_return` (so it stops with C1 in and C2 not). It replaces
 `student_submit._send_begin`, `send_finish` and `work`, each from its body
-after those files, and nothing else:
+after those files, adds `student_submit.send_paths` (approved by Colin on
+Nov 11), and nothing else:
 
 - **Ruling 106.** A send started while the piece was open can be finished
   within its two hours after the piece's last day has ended, and is Late.
@@ -2263,14 +2269,24 @@ after those files, and nothing else:
 - **Ruling 107.** When the work in is the teacher's (Add Work, or what an
   Unsend left) and not on paper, `send_start` starts a send; at the finish the
   student's pages come first and the teacher's follow, by the rule a Replace
-  follows. Grading started, 30 pages, a revision open and Handed In on Paper
-  are asked as for a Replace. `work().sent.can_send` says so.
+  follows. Grading started (a draft, a returned grade, an Overall Comment, or
+  a page with the teacher's marks: C1's `_grading_started`, ruling 109), 30
+  pages, a revision open and Handed In on Paper are asked as for a Replace.
+  `work().sent.can_send` says so.
 
-The base is `batch_c_common.py`'s (Batch B and the fixes from `BATCH_B_DIR`,
-see the Batch C section above); `send_rules.py` applies C1 and C2 to it:
+With Batch C after its two review rounds (`b26cf1c7`: Hide out, C2 only the
+marks-on-Return trigger, `in_returned_at`, `request_changed`), none of the
+three bodies needed a change: Batch C changed none of them and nothing they
+call (every fingerprint in the lists is the same), and a revision goes
+through Batch C's own `revision_start` and `revision_finish`, which this file
+does not touch (Revise By marks it late and never closes it, so ruling 106
+has nothing to change there).
+
+The base is `batch_c_common.py`'s (Batch B and the fixes; this branch has
+`main` merged, so `BATCH_B_DIR` may be left unset); `send_rules.py` applies
+C1 and C2 to it:
 
 ```bash
-export BATCH_B_DIR=/tmp/bb/migrations                            # as in the Batch C section
 PGPORT=54611 PGDATABASE=sr python3 batch_c_common.py build        # an empty database: live with Batch B and the fixes
 PGPORT=54611 PGDATABASE=sr python3 send_rules.py                  # every scenario, about four minutes
 PGPORT=54611 PGDATABASE=sr python3 send_rules.py mutate           # wrong versions of the file, about five minutes
@@ -2302,7 +2318,7 @@ PGPORT=54611 PGDATABASE=sr python3 send_rules.py fingerprints check
 - **race**: the same on two connections, the second seen to wait.
 - **fuzz**: 1,000 random steps: never over 30, no student step queues a page
   the teacher handed in, never stuck behind the teacher's pages.
-- **paths** (section 4, `send_paths`, not decided by Colin): this student's
+- **paths** (section 4, `send_paths`, approved by Colin on Nov 11): this student's
   own unfinished send gives exactly the files its start named, and writes
   nothing; another student's send, the teacher's upload, work handed in, a
   send that does not exist give `not_found`; past two hours `expired`; a
@@ -2317,25 +2333,25 @@ PGPORT=54611 PGDATABASE=sr python3 send_rules.py fingerprints check
 base): every check marked as changed by the file must fail there and every
 other must hold.
 
-Results (2026-11-11, PostgreSQL 17.11): `send_rules.py` 285 of 285 (266
-before `send_paths` was added); `mutate` 33 wrong versions (27 of the two
-rules, 6 of `send_paths`), 33 noticed (the first run missed two, the
-student's own work not excluded at the start and the version kept; a check
-was added for each). The earlier suites' numbers below are with
-`send_paths` in, and are the same without it.
+Results (2026-11-11, PostgreSQL 17.11, from a clean clone, Batch C at
+`b26cf1c7`): `send_rules.py` 288 of 288 (285 as the file was before this
+refresh, unchanged, on the new Batch C; the 3 new: the file stops with C1
+in and C2 taken out, this undo stops once C2's undo has run, and that was
+rolled back; the check that each function in its lists stops it now covers
+28); `mutate` 33 wrong versions (27 of the two rules,
+6 of `send_paths`), 33 noticed; `fingerprints check` every list current.
 
 The earlier suites with this file applied (scratch copies of the suites with
 one hook each, not in any branch; each number beside the same suite on the
-same base without this file):
+same base without this file). The file needs C2 now, so each hook applies it
+after C2:
 
-- `batch_c.py` (the file applied after every C1 apply): 491 of 491 without;
-  485 with. The 6 are structural, where `apply1` and `apply2` look at what C1
-  alone changes: "no existing catalog line changes", "every existing function
-  but `_grading_started` keeps its fingerprint", "exactly the 31 functions of
-  C1 are new", C1's "a second run applies" and "a second run after a function
-  was replaced stops" (C1's guard lists the fixes' `send_finish` and stops on
-  this file's), and "C1 run again after C2 applies". Every behaviour check
-  passes.
+- `batch_c.py` (the file applied with every C2 apply): 634 of 634 without;
+  631 with. The 3 are structural, where `apply2` looks at what C2 alone
+  changes: "no existing function changes" (this file's three), "one function
+  is new" (`send_paths` too), and "C1 run again after C2 applies" (C1's guard
+  lists the fixes' `send_finish` and stops on this file's). Every behaviour
+  check passes, C1 alone's scenarios on the base as before.
 - `submissions.py` (Batch B, the fixes, C1 and C2 in): 562 of 563 without
   (the one is C1's: "only `_returned_grade` names a score table"); 560 with.
   The 2 more are ruling 107 itself: "the work stays, as the teacher's ... the
@@ -2344,12 +2360,17 @@ same base without this file):
 - `submissions_fixes.py` (its fixed scenarios with C1, C2 and this file):
   188 of 188 without; 187 with. The one is ruling 107: "probe C, 8: ... a new
   send already_sent".
+- `student_page_fields.py` (S4-M1; Batch B, the fixes, C1 and C2 in its
+  template): 255 of 259 without and 255 with, the same 4: C1's inventory, and
+  three `batchb` checks that apply Batch B to a base that already has it.
 
-The order out: `send-rules-undo.sql` before the undo of Batch C, of the fixes
-or of Batch B. Batch C's undo PART 2 does not check this file's functions and
+**The order out:** `send-rules-undo.sql` first, then Batch C's undo
+(`batch-c2-undo.sql`, then `batch-c1-undo.sql`), then the fixes' undo, then
+Batch B's. Batch C's undo PART 2 does not check this file's functions and
 drops `revision_request`, which `work`, `_send_begin` and `send_finish` read:
 with this file in, the student's page then fails (proved, and rolled back, in
-the undo scenario).
+the undo scenario). This undo checks C2's trigger function, so once C2's
+undo has run it stops (proved too).
 
 Not verified here: anything on gradebook-prod; the edge routes and the Demo
 screens; PostgreSQL 17.6 printing these bodies with the same fingerprints (the
