@@ -3592,7 +3592,6 @@ window.PageStudent = (function () {
     destroy: destroy,
     render: render,
     switchStudent: switchStudent,
-    switchCourse: switchCourse,
     openEditStudent: openEditStudent,
   };
 })();

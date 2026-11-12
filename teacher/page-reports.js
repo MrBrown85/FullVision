@@ -2781,7 +2781,6 @@ window.PageReports = (function () {
   return {
     init: init,
     destroy: destroy,
-    switchCourse: switchCourse,
     /* The data layer's redraw (_invalidateAndRerender) after the class's
        returned grades load: the page draws what it was waiting for. While
        nothing was waiting it does nothing, as before this page had a

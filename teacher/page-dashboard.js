@@ -96,9 +96,6 @@ window.PageDashboard = (function () {
     CM.configure({ activeCourse: activeCourse, onRender: render, onCourseChange: switchCourse });
     CM.openClassManager(tab, cid);
   }
-  function closeClassManager() {
-    CM.closeClassManager();
-  }
   function renderClassManager() {
     CM.renderClassManager();
   }
@@ -1514,6 +1511,5 @@ window.PageDashboard = (function () {
     init: init,
     destroy: destroy,
     render: render,
-    switchCourse: switchCourse,
   };
 })();
