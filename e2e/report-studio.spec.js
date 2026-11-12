@@ -1267,6 +1267,12 @@ test.describe('Hands on the page', () => {
     page,
   }) => {
     await openStudio(page);
+    // Progress in One Area first, so the Front has less room than the
+    // grades need: without the empty Proficiency Word column their titles
+    // wrap less, and the block alone now fits under the Front's blocks
+    // (Assignment Grades layout, 2026-11-12).
+    await page.locator('[data-action="studioBlock"][data-block="progress"]').click();
+    await expect(page.locator('.sheet-zoom[data-side="0"] .sheet-cell[data-block="progress"]')).toHaveCount(1);
     // Fill the Front past full: the grades move up from the Back. With no
     // room under the Front's blocks they go whole onto the Back, ahead of
     // its own blocks, not onto a side of their own.

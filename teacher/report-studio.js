@@ -567,17 +567,14 @@ window.ReportStudio = (function () {
       });
       html += '</div>';
       if (auto) {
+        var autoBools = bools.filter(function (o) {
+          return o.def === 'auto';
+        });
         html +=
           '<div class="studio-bar-hint">' +
-          esc(
-            bools
-              .filter(function (o) {
-                return o.def === 'auto';
-              })
-              .map(labelOf)
-              .join(' and '),
-          ) +
-          ' start from the class grading setting.</div>';
+          esc(autoBools.map(labelOf).join(' and ')) +
+          (autoBools.length === 1 ? ' starts' : ' start') +
+          ' from the class grading setting.</div>';
       }
       html += '</div>';
     }

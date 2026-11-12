@@ -1249,7 +1249,20 @@ describe('stage 3 blocks', () => {
     const pop = ReportStudio.blockToolbarHtml(f, 'grade-table', null);
     expect(pop).toContain('aria-label="Range"');
     expect(pop).toContain('aria-label="Organize By"');
-    expect(pop).toContain('Percent and Proficiency Word start from the class grading setting.');
+    // A Proficiency class (this one) is not offered Proficiency Word: it
+    // prints no word beside a mark. A Both class neither; a Letter class is.
+    stub('getActiveCourse', () => CID);
+    expect(ReportStudio.blockToolbarHtml(f, 'grade-table', null)).toContain(
+      'Percent starts from the class grading setting.',
+    );
+    expect(ReportStudio.blockToolbarHtml(f, 'grade-table', null)).not.toContain('data-key="word"');
+    COURSES[CID].gradingSystem = 'both';
+    expect(ReportStudio.blockToolbarHtml(f, 'grade-table', null)).not.toContain('data-key="word"');
+    COURSES[CID].gradingSystem = 'letter';
+    const letter = ReportStudio.blockToolbarHtml(f, 'grade-table', null);
+    expect(letter).toMatch(/data-key="word"> Proficiency Word/);
+    expect(letter).toContain('Percent and Proficiency Word start from the class grading setting.');
+    COURSES[CID].gradingSystem = 'proficiency';
     // Per Competency shows only when organized by competency.
     expect(pop).not.toContain('aria-label="Per Competency"');
     const byComp = S.setOption(f, 'grade-table', 'organize', 'competency');

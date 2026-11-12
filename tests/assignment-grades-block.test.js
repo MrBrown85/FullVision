@@ -29,6 +29,13 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FILE = resolve(HERE, 'fixtures/assignment-grades-main.json');
 const UPDATE = process.env.UPDATE_ASSIGNMENT_GRADES_MAIN === '1';
+/* The block's HTML as origin/main printed it on Nov 12 at 9eddcecb, after
+   the rulings above and before the Proficiency Word column left a
+   Proficiency or Both class; written by this file in a checkout of that
+   commit:
+     UPDATE_ASSIGNMENT_GRADES_BEFORE_LAYOUT=1 npx vitest run tests/assignment-grades-block.test.js */
+const BEFORE_FILE = resolve(HERE, 'fixtures/assignment-grades-before-layout.json');
+const UPDATE_BEFORE = process.env.UPDATE_ASSIGNMENT_GRADES_BEFORE_LAYOUT === '1';
 
 const CID = 'agb-course';
 const SID = 'agb-stu';
@@ -139,8 +146,30 @@ function rows(html) {
 const row = (html, title) => rows(html).find(r => r.title === title);
 
 /* Main's HTML with only the rulings' changes made: no-mark cell blank,
-   points spaced, and (Proficiency, Both) no word beside points. */
+   points spaced, and (Proficiency, Both) no word beside points. Since
+   then (DECISIONS, the same entry, Assignment Grades layout, 2026-11-12)
+   a Proficiency or Both class prints no Proficiency Word column at all,
+   whatever Word says, and its legend keeps the scale line Word's default
+   gives it (noWordColumn). */
 function rulings(mode, html) {
+  return noWordColumn(mode, ruledRows(mode, html));
+}
+function noWordColumn(mode, html) {
+  if (mode === 'letter') return html;
+  const scale = 'Proficiency: Emerging · Developing · Proficient · Extending.';
+  return html
+    .replace(/<span class="report-grades-word">[^<]*<\/span>/g, '')
+    .replace(/^<div class="report-block-box report-grades( report-grades-half)?">/, m =>
+      m.replace('">', ' report-grades-noword">'),
+    )
+    .replace(/<div class="report-grades-legend">([^<]*)<\/div>/, (m, text) => {
+      if (text.indexOf(scale) >= 0) return m;
+      const score = 'Points shown as scored; other work shown as its proficiency.';
+      const parts = text.indexOf(score) === 0 ? [score, scale, text.slice(score.length).trim()] : [scale, text.trim()];
+      return '<div class="report-grades-legend">' + parts.filter(Boolean).join(' ') + '</div>';
+    });
+}
+function ruledRows(mode, html) {
   return html.replace(ROW, (whole, inner) => {
     let r = inner
       .replace(/(<span class="report-grades-figs">)—(<\/span>)/, '$1$2')
@@ -155,13 +184,16 @@ function rulings(mode, html) {
 
 let NOW;
 let MAIN;
+let BEFORE;
 beforeAll(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-11-01T12:00:00Z'));
   NOW = {};
   MODES.forEach(mode => CASES.forEach(([name, opts]) => (NOW[mode + ' › ' + name] = render(mode, opts))));
   if (UPDATE) writeFileSync(FILE, JSON.stringify(NOW, null, 2) + '\n');
+  if (UPDATE_BEFORE) writeFileSync(BEFORE_FILE, JSON.stringify(NOW, null, 2) + '\n');
   MAIN = JSON.parse(readFileSync(FILE, 'utf8'));
+  BEFORE = JSON.parse(readFileSync(BEFORE_FILE, 'utf8'));
 });
 afterAll(() => {
   vi.useRealTimers();
@@ -197,6 +229,9 @@ describe('Assignment Grades: each kind of row', () => {
     );
     // The row keeps its cells, so its grid does not collapse.
     expect(get('proficiency', 'default')).toContain(
+      '<span class="report-grades-title">Cells Sketch</span><span class="report-grades-figs"></span></div>',
+    );
+    expect(get('letter', 'score true · percent true · word true')).toContain(
       '<span class="report-grades-title">Cells Sketch</span><span class="report-grades-figs"></span><span class="report-grades-word"></span></div>',
     );
   });
@@ -230,7 +265,7 @@ describe('Assignment Grades: each kind of row', () => {
 
   it('levels, Complete, Incomplete, Missing and Excused read as on main', () => {
     const p = get('proficiency', 'default');
-    expect(row(p, 'Plate Tectonics')).toEqual({ title: 'Plate Tectonics', figs: 'Proficient +', word: '' });
+    expect(row(p, 'Plate Tectonics')).toEqual({ title: 'Plate Tectonics', figs: 'Proficient +', word: null });
     expect(row(p, 'Rock Cycle Poster').figs).toBe('Developing');
     expect(row(p, 'Reading Log').figs).toBe('✓ Complete');
     expect(row(p, 'Safety Contract').figs).toBe('✗ Incomplete');
@@ -245,5 +280,71 @@ describe('Assignment Grades: each kind of row', () => {
     const p = get('proficiency', 'default');
     expect(p).toContain('Points shown as scored; other work shown as its proficiency.');
     expect(get('letter', 'default')).toContain('Points shown as scored; other work scored out of 4.');
+  });
+});
+
+/* The Proficiency Word column in a Proficiency or Both class (DECISIONS,
+   the same entry, Assignment Grades layout, 2026-11-12): it printed
+   nothing there, so it is not printed and not offered, and a saved form's
+   Word is not read. A Letter class prints exactly what it did. */
+describe('Assignment Grades: the word column only in a Letter class', () => {
+  const WORD_ROWS = /<span class="report-grades-word">/;
+
+  it('a Letter class prints what main printed, every case', () => {
+    CASES.forEach(([name]) => expect(NOW['letter › ' + name]).toBe(BEFORE['letter › ' + name]));
+    // The word column is there with Word on, as before.
+    expect(NOW['letter › score true · percent true · word true']).toMatch(WORD_ROWS);
+    expect(NOW['letter › score true · percent true · word false']).not.toMatch(WORD_ROWS);
+  });
+
+  it('a Proficiency or Both class prints no word column, Word on or off, and nothing else moves', () => {
+    ['proficiency', 'both'].forEach(mode =>
+      CASES.forEach(([name]) => {
+        const html = NOW[mode + ' › ' + name];
+        expect(html).not.toMatch(WORD_ROWS);
+        expect(html).toMatch(/^<div class="report-block-box report-grades( report-grades-half)? report-grades-noword"/);
+        expect(html).toBe(noWordColumn(mode, BEFORE[mode + ' › ' + name]));
+      }),
+    );
+    // Main printed an empty word cell beside every mark there.
+    expect(BEFORE['proficiency › default']).toMatch(WORD_ROWS);
+    expect(BEFORE['both › default']).toMatch(WORD_ROWS);
+  });
+
+  it('a saved form with Word on or off draws the same in a Proficiency or Both class', () => {
+    ['proficiency', 'both'].forEach(mode =>
+      [true, false].forEach(score =>
+        [true, false].forEach(percent => {
+          const on = NOW[`${mode} › score ${score} · percent ${percent} · word true`];
+          expect(NOW[`${mode} › score ${score} · percent ${percent} · word false`]).toBe(on);
+        }),
+      ),
+    );
+  });
+
+  it('a saved form keeps its Word option: it loads, draws without the column, and is not rewritten', () => {
+    const S = ReportSheets;
+    const saved = S.setOption(S.insert(S.form(), 'grade-table', { side: 1 }), 'grade-table', 'word', true);
+    const json = JSON.stringify(saved);
+    const loaded = S.normalizeForm(JSON.parse(json));
+    expect(S.cellOf(loaded, 'grade-table').options.word).toBe(true);
+    MODES.forEach(mode => {
+      seed(mode);
+      const html = ReportBlocks.renderReportBlock(
+        'grade-table',
+        CID,
+        STUDENT,
+        {},
+        S.optionsFor(S.cellOf(loaded, 'grade-table')),
+      );
+      if (mode === 'letter') expect(html).toMatch(WORD_ROWS);
+      else expect(html).not.toMatch(WORD_ROWS);
+    });
+    expect(JSON.stringify(loaded)).toBe(JSON.stringify(S.normalizeForm(JSON.parse(json))));
+    expect(JSON.stringify(saved)).toBe(json);
+  });
+
+  it('with no layout to measure, the mark column keeps its usual width (no style on the block)', () => {
+    MODES.forEach(mode => CASES.forEach(([name]) => expect(NOW[mode + ' › ' + name]).not.toContain('--grades-mark')));
   });
 });

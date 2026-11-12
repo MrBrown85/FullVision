@@ -2850,10 +2850,15 @@ textarea.studio-text {
 /* The date column is in em, wide enough for the widest date ("May 30")
    on one line in a wide font such as DejaVu Sans, Linux's default, with
    room to spare: at 40px a date wrapped to two lines there and made its
-   row taller than the rest (Nov 12). */
+   row taller than the rest (Nov 12). The mark column keeps its usual
+   width and grows to --grades-mark, the widest mark the class can print
+   measured in the sheet's fonts (report-blocks.js _gradesMarkPx): at 90px
+   a Both class's "Proficient − · 67%" ran into the next column (Nov 12).
+   The title gives up the room. A Letter class's word column is as it was;
+   a Proficiency or Both class has none (report-grades-noword). */
 .report-grades-row {
   display: grid;
-  grid-template-columns: 4.2em minmax(0, 1fr) 90px 62px;
+  grid-template-columns: 4.2em minmax(0, 1fr) max(90px, var(--grades-mark, 0px)) 62px;
   column-gap: 6px;
   align-items: center;
   min-height: 20px;
@@ -2864,13 +2869,13 @@ textarea.studio-text {
   line-height: 1.25;
 }
 .report-grades-noword .report-grades-row {
-  grid-template-columns: 4.2em minmax(0, 1fr) 90px;
+  grid-template-columns: 4.2em minmax(0, 1fr) max(90px, var(--grades-mark, 0px));
 }
 .report-grades-col:only-child .report-grades-row {
-  grid-template-columns: 4.4em minmax(0, 1fr) 104px 70px;
+  grid-template-columns: 4.4em minmax(0, 1fr) max(104px, var(--grades-mark, 0px)) 70px;
 }
 .report-grades-noword .report-grades-col:only-child .report-grades-row {
-  grid-template-columns: 4.4em minmax(0, 1fr) 104px;
+  grid-template-columns: 4.4em minmax(0, 1fr) max(104px, var(--grades-mark, 0px));
 }
 .report-grades-headgrade {
   white-space: nowrap;
