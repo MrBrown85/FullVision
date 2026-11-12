@@ -1287,6 +1287,58 @@ function seedIfNeeded() {
     sci8Assessments.forEach(a => {
       if (a.tagIds && a.tagIds.length) a.tagIds = demoTagIds(a.tagIds, a.rubricId, a.id);
     });
+    // Units: the Assignments page groups work into coloured unit folders. A few
+    // cross-unit pieces stay ungrouped so the page shows both. Grouping only;
+    // no grade reads a unit. Colours come from the page's colour picker.
+    const sci8Units = [
+      {
+        id: 'sci8-mod-cells',
+        name: 'Cells & Body Systems',
+        color: '#ec4899',
+        ids: ['sci8a1', 'sci8a2', 'sci8a3', 'sci8q1', 'sci8q11', 'sci8q9', 'sci8t1'],
+      },
+      {
+        id: 'sci8-mod-chem',
+        name: 'Chemistry & Matter',
+        color: '#8b5cf6',
+        ids: ['sci8a4', 'sci8a7', 'sci8a13', 'sci8q2', 'sci8q3', 'sci8q6', 'sci8a19', 'sci8t2'],
+      },
+      { id: 'sci8-mod-earth', name: 'Earth Science', color: '#f59e0b', ids: ['sci8a5', 'sci8q7', 'sci8a15', 'sci8t3'] },
+      {
+        id: 'sci8-mod-ecology',
+        name: 'Ecology & Environment',
+        color: '#10b981',
+        ids: ['sci8a9', 'sci8q5', 'sci8a12', 'sci8a18', 'sci8a16', 'sci8a11', 'sci8t4'],
+      },
+      {
+        id: 'sci8-mod-energy',
+        name: 'Energy, Forces & Light',
+        color: '#06b6d4',
+        ids: ['sci8a8', 'sci8q8', 'sci8a14', 'sci8a17', 'sci8a21'],
+      },
+    ];
+    const sci8UnitOf = {};
+    sci8Units.forEach(u => u.ids.forEach(id => (sci8UnitOf[id] = u.id)));
+    sci8Assessments.forEach(a => {
+      if (sci8UnitOf[a.id]) a.moduleId = sci8UnitOf[a.id];
+    });
+    saveModules(
+      'sci8',
+      sci8Units.map((u, i) => ({
+        id: u.id,
+        name: u.name,
+        color: u.color,
+        sortOrder: i,
+        created: new Date('2025-09-01').toISOString(),
+      })),
+    );
+    // A first visit shows the unit with the Light Refraction Lab open and the
+    // four earlier units closed, in the page's own closed-folder memory.
+    {
+      const closedByClass = Object.assign({}, (getDashboardPrefs() || {}).closedModules || {});
+      closedByClass.sci8 = sci8Units.filter(u => u.id !== 'sci8-mod-energy').map(u => u.id);
+      saveDashboardPrefs({ closedModules: closedByClass });
+    }
     const sci8SeedAssessments = normalizeSci8Assessments(sci8Assessments);
     saveAssessments('sci8', current(sci8SeedAssessments));
 

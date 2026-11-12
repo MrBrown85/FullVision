@@ -10,6 +10,7 @@ async function openDemoAssignments(page, path = '/assignments?course=sci8', read
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/);
   await page.waitForFunction(() => getAssessments('sci8').length > 0);
+  await page.evaluate(() => saveDashboardPrefs({ closedModules: { sci8: [] } })); // these checks want every unit folder open
   await page.evaluate(p => window.Router.navigate(p), path);
   await page.waitForSelector(ready);
 }
@@ -114,6 +115,8 @@ test('hidden buttons take no clicks: a click there opens the card', async ({ pag
     const lab = page.locator('.assess-card', { hasText: 'Chemical Reactions Lab' }).first();
     if (await lab.evaluate(c => c.classList.contains('open'))) await lab.locator('.assess-title').click();
     await expect(lab).not.toHaveClass(/open/);
+    // The card sits in a unit folder, further down the page: bring it into view.
+    await lab.scrollIntoViewIfNeeded();
     // With the mouse away, nothing hidden sits under the ⋯ button's spot.
     await page.mouse.move(5, 5);
     const hit = await lab.evaluate(c => {
@@ -146,6 +149,7 @@ test('a touch screen shows no actions on a closed card', async ({ browser }) => 
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/);
   await page.waitForFunction(() => getAssessments('sci8').length > 0);
+  await page.evaluate(() => saveDashboardPrefs({ closedModules: { sci8: [] } })); // these checks want every unit folder open
   const hoverNone = await page.evaluate(() => matchMedia('(hover: none)').matches);
   test.skip(!hoverNone, 'this browser reports a hover device');
   await page.evaluate(() => window.Router.navigate('/assignments?course=sci8'));
