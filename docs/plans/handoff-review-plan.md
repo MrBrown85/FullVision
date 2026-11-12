@@ -65,7 +65,7 @@ What the Nov 2 plan got wrong, found on re-check:
 - `schema.sql` is not stale. Eight migration PRs edited it this week, and its header says it keeps notes the generated file cannot. Do not retire it now.
 - The two `test.fail()` phone bugs are gone with `e2e/mobile.spec.js`.
 - The skipped points test is not about retired points grading. Per-assessment points scoring is live; the test only had a wrong field name. Fix it, do not delete it.
-- Write-path Phase 6 is not just dead code. One of its four items (`persistScoreDiffToCanonical`) is the live score send. Another (the `saveScores` mass-loss guard) is reachable and refuses real saves (see S19-B3).
+- Write-path Phase 6 is not just dead code. One of its four items (`persistScoreDiffToCanonical`) is the live score send. Another (the `saveScores` mass-loss guard) can refuse a real mark in two rare cases (see S19-B3). The night's report that Delete Assessment trips it was wrong.
 - None of the nine "unused" server functions is safe to drop as a mechanical change.
 
 ---
@@ -333,7 +333,7 @@ The skeptics refuted every move as written except the diagrams (S19-A16). Severa
 
 - `_DATA_KEYS`: all 25 entries are live. Nothing to remove.
 - `persistScoreDiffToCanonical`: the live score send inside `saveScores`. Three extra calls after it (in `restoreScoreCells` and the two undo paths in `shared/grader.js`) send the same cells twice.
-- The `saveScores` mass-loss guard: reachable. After Delete Assessment on a piece that holds most of a class's entries, the guard refuses that save, and then refuses every later score save in that class. Signed in, those later grades are neither kept on the device nor sent. It stays stuck until a server load rewrites the saved copy. Reproduced in the map.
+- The `saveScores` mass-loss guard: the night's report said Delete Assessment makes it refuse every later save. That was wrong (see S19-B3). The guard can still refuse a real mark in two rare cases, both described in S19-B3.
 - Legacy comments: three are wrong (`data.js:100`, `1362-1364`, `14594-14598`).
 
 #### S19-B1. The re-checked Phase 6 list
@@ -349,11 +349,17 @@ Lines 100, 1362-1364, 2136 and 14594-14598, and `tests/write-path-audit.test.js:
 **Done when.** Only those comments changed.
 **Status.** Queued for the night of Nov 11 (wave 3).
 
-#### S19-B3. Stop the mass-loss guard refusing real saves
+#### S19-B3. Keep a mark the guard blocks
 
-Compare against the server's copy when there is one, and do not count entries of an assessment that was deleted (or give `deleteAssessmentScores` an allowance, as fills have). A test that fails today proves it; a second test proves an accidental empty save is still refused.
-**Needs Colin.** It changes how marks are saved. It is a bug fix, and the bug can lose grades.
-**Status.** Waits for Colin. Recommended first after the night.
+**What was claimed.** The night's probe reported that Delete Assessment on a piece that holds most of a class's entries makes the `saveScores` mass-loss guard refuse that save and every later score save in the class.
+**Why it was wrong.** Both delete paths (`_commitDeleteAssess` in `teacher/page-gradebook.js`, `_confirmDeleteAssess` in `teacher/page-assignments.js`) save the shorter work list first. `saveAssessments` then calls `_cleanOrphanedScores`, which removes the deleted work's marks from the cache and the saved copy, so the guard sees no drop. The probe skipped that step. Two agents tested it 16 ways (30 students; points, competency and rubric work; Gradebook and Assignments; Demo Mode and signed in): no block, and a mark entered afterwards was saved and sent. `e2e/pin-delete-assessment-then-grade.spec.js` (PR #1246) pins it.
+**What can still go wrong.** Two rare cases, both found in that testing. In both, the red "Score save blocked" message shows, and its "Retry Now" button retries pending sends only; it does not save the blocked mark again.
+
+1. The browser refuses the one saved-copy write at the moment of a Delete Assessment (storage full or failing). The saved copy keeps the old marks, so the guard blocks every later points or Complete mark. Those marks are lost if the teacher reloads before a level or comment save rewrites the saved copy.
+2. Two tabs on the same class. Tab A uses Set Everyone To on a column. Tab B, which saved something in the last two seconds and so has not yet reloaded the class, enters a mark. The guard blocks it, because it would otherwise overwrite tab A's fill. That mark is gone after tab B reloads.
+   **The fix.** A blocked mark is kept and saved once the saved copy is fresh. It is never dropped. Tests come first, a test that fails today for each case and one that proves an accidental empty save is still refused. An independent reviewer then tries to break it.
+   **Needs Colin.** It changes how marks are saved; his Nov 12 ruling lets it merge once the reviewer cannot break it (section 6, decision 9).
+   **Status.** In progress (Nov 12). Being built as its own PR.
 
 #### S19-B4. Send an undone cell once
 
@@ -470,7 +476,7 @@ D8 and D9 wait for the last wave, so they pin the assessment form work that anot
 
 ### Track E. Organized code
 
-All of Track E waits for the decision to sell to schools (Phase 4), except where a feature PR needs a tidying first. Recommended order, from the map.
+The Nov 12 ruling started Track E with the pieces that do not touch marks (`docs/DECISIONS.md`, "Handoff review rulings (2026-11-12)"). Pieces that touch marks follow after the safe pieces, as move-only PRs with an independent review. The score writers themselves (the plan's rows for statuses, score writes and group grading, Draft and Returned, and the load path) wait for a day's use on real classes after a release, which needs Colin. Recommended order, from the map.
 
 **Tidyings in `shared/data.js` that cut false coupling** (each its own PR):
 
@@ -594,33 +600,35 @@ Leave these alone until someone re-maps them.
 
 ## 6. Decisions for Colin
 
+On 2026-11-12 Colin ruled on several of these; see "Handoff review rulings (2026-11-12)" in `docs/DECISIONS.md`. The rows it settles are marked.
+
 The seven open decisions on card cp1, the server change the Nov 2 plan marked "your OK", and what the map raised. Each says what it blocks.
 
-| #   | Decision                                                                                                                                                                 | It blocks                                                      |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
-| 1   | Delete or keep `fullvision-user-inputs.xlsx` and `fullvision-documentation-inventory.xlsx`, and the two `_dev` scripts that build them (with the Apple design rulebook). | The two `_dev` scripts and the rulebook (see the `.xlsx` rule) |
-| 2   | Keep or drop `fv_backup.orphan_student_20261012` and `points_zero_20261016` past this term.                                                                              | Any backup-table migration                                     |
-| 3   | Drop any of the unused server functions. Every candidate was refuted as a mechanical change; each needs its own check against the live database.                         | Nov 2 item 11                                                  |
-| 4   | Staging: a Supabase branch or a small second project.                                                                                                                    | S19-D16, S19-F8, a rehearsed restore                           |
-| 5   | Keep the repo public or make it private.                                                                                                                                 | S19-F3; S19-F2; the held sections of S19-F1                    |
-| 6   | Turn on Sentry performance tracing.                                                                                                                                      | S19-C11 (depends on 7)                                         |
-| 7   | Keep Sentry in the EU and disclose it, or keep error reports in Canada.                                                                                                  | S19-F5, the privacy impact answers in S19-F2                   |
-| 8   | Merge `bootstrap_teacher` and `list_teacher_courses` into one boot call.                                                                                                 | S19-C8                                                         |
-| 9   | Approve the fix for the mass-loss guard that refuses real saves after Delete Assessment.                                                                                 | S19-B3, then B4 and B5                                         |
-| 10  | Send an undone cell once instead of twice.                                                                                                                               | S19-B4, B5                                                     |
-| 11  | Finish the review of `87ed0faa` (S0-F1e).                                                                                                                                | S19-B6                                                         |
-| 12  | Keep `schema.sql` (the map says keep).                                                                                                                                   | Closes S19-A10; the README's `schema.sql` line                 |
-| 13  | Drop the `curriculum_data.js` fallback, accepting that a failed JSON load then shows no courses.                                                                         | S19-A8                                                         |
-| 14  | Move the security headers, then check them with `curl` after the next release.                                                                                           | S19-A9, S19-C5                                                 |
-| 15  | Test-only and "needs Colin" dead code: keep as test seams, or delete with their tests.                                                                                   | S19-A40                                                        |
-| 16  | Does the phone get an Undo button for `undoLastScore`, or does it go with its tests?                                                                                     | Part of S19-A40                                                |
-| 17  | Which criterion level is right when keys are mixed: the desktop's or the phone's? And should the grading order match?                                                    | Sharing that code in Track E                                   |
-| 18  | Retire the April-era saved-copy readers.                                                                                                                                 | S19-B8                                                         |
-| 19  | When to make lint and `tsc` able to fail the build.                                                                                                                      | S19-D15                                                        |
-| 20  | What `*.nsvcs.net` in the content policy is for; the Sentry build credentials; Netlify's Node version; the edge function deploy command.                                 | S19-F1 and F2 final versions                                   |
-| 21  | Phase 4 (ES modules and splits) with the decision to sell to schools.                                                                                                    | Track E                                                        |
-| 22  | Accept or drop each of the five `CLAUDE.md` edits in the S19-A14b draft, and say what has been released.                                                                 | S19-A14b                                                       |
-| 23  | Whether the `getUser()` sign-in re-check may run alongside the class load instead of before it.                                                                          | Faster first draw (Nov 2 Phase 2 #2)                           |
+| #   | Decision                                                                                                                                                                                                    | It blocks                                                      |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| 1   | Delete or keep `fullvision-user-inputs.xlsx` and `fullvision-documentation-inventory.xlsx`, and the two `_dev` scripts that build them (with the Apple design rulebook).                                    | The two `_dev` scripts and the rulebook (see the `.xlsx` rule) |
+| 2   | Keep or drop `fv_backup.orphan_student_20261012` and `points_zero_20261016` past this term. **Ruled Nov 12: keep.**                                                                                         | Any backup-table migration                                     |
+| 3   | Drop any of the unused server functions. Every candidate was refuted as a mechanical change; each needs its own check against the live database. **Ruled Nov 12: none without its own check.**              | Nov 2 item 11                                                  |
+| 4   | Staging: a Supabase branch or a small second project. **Ruled Nov 12: held.**                                                                                                                               | S19-D16, S19-F8, a rehearsed restore                           |
+| 5   | Keep the repo public or make it private.                                                                                                                                                                    | S19-F3; S19-F2; the held sections of S19-F1                    |
+| 6   | Turn on Sentry performance tracing. **Ruled Nov 12: no.**                                                                                                                                                   | S19-C11 (depends on 7)                                         |
+| 7   | Keep Sentry in the EU and disclose it, or keep error reports in Canada.                                                                                                                                     | S19-F5, the privacy impact answers in S19-F2                   |
+| 8   | Merge `bootstrap_teacher` and `list_teacher_courses` into one boot call.                                                                                                                                    | S19-C8                                                         |
+| 9   | The save guard report was wrong: Delete Assessment does not trip it. The two rare cases in which it drops a real mark get a fix that merges once an independent reviewer cannot break it. **Ruled Nov 12.** | S19-B3, then B4 and B5                                         |
+| 10  | Send an undone cell once instead of twice.                                                                                                                                                                  | S19-B4, B5                                                     |
+| 11  | Finish the review of `87ed0faa` (S0-F1e).                                                                                                                                                                   | S19-B6                                                         |
+| 12  | Keep `schema.sql` (the map says keep). **Ruled Nov 12: keep.**                                                                                                                                              | Closes S19-A10; the README's `schema.sql` line                 |
+| 13  | Drop the `curriculum_data.js` fallback, accepting that a failed JSON load then shows no courses. **Ruled Nov 12: keep.**                                                                                    | S19-A8                                                         |
+| 14  | Move the security headers, then check them with `curl` after the next release.                                                                                                                              | S19-A9, S19-C5                                                 |
+| 15  | Test-only and "needs Colin" dead code: keep as test seams, or delete with their tests.                                                                                                                      | S19-A40                                                        |
+| 16  | Does the phone get an Undo button for `undoLastScore`, or does it go with its tests?                                                                                                                        | Part of S19-A40                                                |
+| 17  | Which criterion level is right when keys are mixed: the desktop's or the phone's? And should the grading order match?                                                                                       | Sharing that code in Track E                                   |
+| 18  | Retire the April-era saved-copy readers.                                                                                                                                                                    | S19-B8                                                         |
+| 19  | When to make lint and `tsc` able to fail the build.                                                                                                                                                         | S19-D15                                                        |
+| 20  | What `*.nsvcs.net` in the content policy is for; the Sentry build credentials; Netlify's Node version; the edge function deploy command.                                                                    | S19-F1 and F2 final versions                                   |
+| 21  | Phase 4 (ES modules and splits) with the decision to sell to schools. **Ruled Nov 12: the split goes ahead, safe pieces first.**                                                                            | Track E                                                        |
+| 22  | Accept or drop each of the five `CLAUDE.md` edits in the S19-A14b draft, and say what has been released.                                                                                                    | S19-A14b                                                       |
+| 23  | Whether the `getUser()` sign-in re-check may run alongside the class load instead of before it.                                                                                                             | Faster first draw (Nov 2 Phase 2 #2)                           |
 
 ---
 
@@ -669,6 +677,6 @@ If an item's agent reports that the work needs more judgment than its model has,
 
 **The morning report.** After the last wave, or when the night ends early, the orchestrator writes one report for Colin as a local file (`~/reports/S19 overnight report.md`), not in the repo. Its first lines say: the next release carries every merge since #1182, all of tonight's work included, so releasing anything, a hotfix included, ships it. Then: every merged PR with its merge commit, in merge order, and the order to revert them (newest first); the draft PRs; every abandoned, held or skipped item and why; everything agents listed under "Kept" and "Seen while pinning"; the baseline and `main`'s last browser run, with links; and where the operations guide's held sections are.
 
-**In the morning.** Colin reads the morning report, the drafts (B1, F1, A14b) and the decisions in section 6. Decision 9 first: the guard bug can lose grades.
+**In the morning.** Colin reads the morning report, the drafts (B1, F1, A14b) and the decisions in section 6. Decision 9 first: the guard can drop a real mark in two rare cases.
 
 **Next.** The save-path fixes he approves (B3, B4, B5), then the speed work (C2 to C6), then Track E an area at a time, only as features need it, until the decision to sell.

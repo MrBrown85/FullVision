@@ -282,6 +282,7 @@ load('shared/phone-report-view.js');
 load('shared/loading-screen.js');
 load('teacher/phone-reports.js');
 load('shared/backup-restore.js');
+load('teacher/cm-roster-file.js');
 load('teacher/dash-class-manager.js');
 load('teacher/dash-overview.js');
 load('teacher/dash-observations.js');

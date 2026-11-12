@@ -102,17 +102,11 @@
     <script src="/teacher/report-scores.js"></script>
     <script src="/teacher/drafts-before-print.js"></script>
     <script src="/teacher/report-blocks.js"></script>
-    <script src="/teacher/report-sheets.js"></script>
-    <script src="/teacher/report-issues.js"></script>
     <script src="/teacher/comment-realiser.js"></script>
     <script src="/teacher/comment-lint.js"></script>
     <script src="/shared/bank-comment.js"></script>
     <script src="/teacher/comment-bank.js"></script>
     <script src="/teacher/comment-personal.js"></script>
-    <script src="/teacher/report-questionnaire.js"></script>
-    <script src="/teacher/report-studio.js"></script>
-    <script src="/teacher/grade-report.js"></script>
-    <script src="/teacher/report-preview.js"></script>
     <script src="/vendor/qrcode.js"></script>
     <script src="/shared/questionnaire-templates.js"></script>
     <script src="/teacher/questionnaires.js"></script>
@@ -123,9 +117,8 @@
     <script src="/teacher/cm-student-page.js"></script>
     <script src="/teacher/student-voice.js"></script>
     <script src="/teacher/learner-profile.js"></script>
-    <script src="/shared/phone-report-view.js"></script>
-    <script src="/teacher/phone-reports.js"></script>
     <script src="/shared/backup-restore.js"></script>
+    <script src="/teacher/cm-roster-file.js"></script>
     <script src="/teacher/dash-class-manager.js"></script>
     <script src="/teacher/dash-overview.js"></script>
     <script src="/teacher/dash-observations.js"></script>
@@ -145,8 +138,6 @@
     <script src="/teacher/student-overrides.js"></script>
     <script src="/teacher/rubric-print.js"></script>
     <script src="/teacher/competency-wording.js"></script>
-    <script src="/teacher/report-feedback.js"></script>
-    <script src="/teacher/report-feedback-cards.js"></script>
     <script src="/teacher/grades-print.js"></script>
     <script src="/teacher/rubric-library.js"></script>
     <script src="/teacher/rubric-bank.js"></script>
@@ -157,9 +148,11 @@
     <script src="/teacher/page-assignments.js"></script>
     <script src="/teacher/page-student.js"></script>
     <script src="/teacher/page-gradebook.js"></script>
+    <script src="/teacher/gradebook-csv.js"></script>
     <script src="/teacher/page-observations.js"></script>
     <script src="/teacher/page-starters.js"></script>
-    <script src="/teacher/page-reports.js"></script>
+    <!-- Reports and its own scripts (report-sheets.js to page-reports.js) load when
+         Reports is first opened: _onDemand in router.js. -->
     <script src="/teacher/router.js"></script>
     <script>
       if ('serviceWorker' in navigator) {

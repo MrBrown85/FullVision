@@ -110,7 +110,9 @@ window.PageReports = (function () {
       },
       resize: function () {
         clearTimeout(_resizeTimer);
-        _resizeTimer = setTimeout(renderReportPreview, 150);
+        _resizeTimer = setTimeout(function () {
+          if (_mounted) renderReportPreview();
+        }, 150);
       },
       pickStudent: function (sid) {
         selectedStudentIds = [sid];
@@ -549,7 +551,8 @@ window.PageReports = (function () {
       output.innerHTML =
         '<div class="empty-state"><div class="empty-state-text">Loading the sentence bank…</div></div>';
       CommentBank.loadBank().then(function (ok) {
-        if (activeTab !== 'questionnaire') return;
+        // The teacher may have left Reports while the bank loaded.
+        if (!_mounted || activeTab !== 'questionnaire') return;
         if (ok) renderReports();
         else
           output.innerHTML =
@@ -568,7 +571,7 @@ window.PageReports = (function () {
     // and again once it is here.
     if (window.RubricPrint && RubricPrint.classUsesBankLevels && RubricPrint.classUsesBankLevels(cid)) {
       RubricPrint.loadBankLevels().then(function (ok) {
-        if (ok && activeTab !== 'questionnaire' && activeCourse === cid) renderReports();
+        if (ok && _mounted && activeTab !== 'questionnaire' && activeCourse === cid) renderReports();
       });
     }
 
@@ -884,6 +887,7 @@ window.PageReports = (function () {
       return;
     }
     ReportIssues.load(id, activeCourse).then(function (rec) {
+      if (!_mounted) return;
       if (!rec) {
         viewingIssue = null;
         renderReports();
@@ -952,6 +956,7 @@ window.PageReports = (function () {
      canvas switches to Everyone for the print and back afterwards. */
   function _printNow() {
     ensureClassFresh(activeCourse).then(function (fresh) {
+      if (!_mounted) return;
       if (!(fresh || window.confirm("Couldn't confirm this class is up to date. Print the saved copy anyway?"))) return;
       var wasOne = studioView === 'one' || _restoreOneAfterPrint;
       _restoreOneAfterPrint = false;
@@ -1371,6 +1376,7 @@ window.PageReports = (function () {
       form: ReportSheets.normalizeForm(reportConfig.form),
       students: students,
     }).then(function (res) {
+      if (!_mounted) return;
       _populateCopies();
       if (res && res.entry) {
         var sel = document.getElementById('report-copy');
@@ -1792,7 +1798,7 @@ window.PageReports = (function () {
     }
     _classFitKey = key;
     setTimeout(function () {
-      if (key !== _classFitKey || activeTab !== 'progress') return;
+      if (!_mounted || key !== _classFitKey || activeTab !== 'progress') return;
       try {
         var students = sortStudents(getStudents(activeCourse), 'lastName');
         _classFit = _classSummary(students);
@@ -1823,7 +1829,7 @@ window.PageReports = (function () {
   function _syncTemplates() {
     if (typeof ReportSheets.syncTemplates !== 'function') return;
     ReportSheets.syncTemplates().then(function (changed) {
-      if (changed && studioTab === 'templates' && activeTab === 'progress') renderStudioPanels();
+      if (changed && _mounted && studioTab === 'templates' && activeTab === 'progress') renderStudioPanels();
     });
   }
 
@@ -2103,6 +2109,8 @@ window.PageReports = (function () {
     if (typeof dismissUndoToast === 'function') dismissUndoToast();
     activeCourse = cid;
     if (!(await switchActiveCourse(cid))) return;
+    // The teacher may have left Reports while the class loaded.
+    if (!_mounted) return;
     selectedStudentIds = null; // reset to all
     viewingIssue = null;
     reportPaper = _loadPaper(cid);
@@ -2582,7 +2590,7 @@ window.PageReports = (function () {
     // class; the reports redraw once when they do.
     if (typeof StudentVoice !== 'undefined' && !StudentVoice.loaded(cid)) {
       StudentVoice.load(cid, function () {
-        if (cid === activeCourse && activeTab === 'progress') renderReports();
+        if (_mounted && cid === activeCourse && activeTab === 'progress') renderReports();
       });
     }
     // Attendance totals are read here, not with the class, and redraw the
@@ -2590,12 +2598,12 @@ window.PageReports = (function () {
     if (typeof loadTermAttendance === 'function') {
       loadTermAttendance(cid).then(function (changed) {
         var typing = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.tqAtt;
-        if (changed && cid === activeCourse && !typing) renderReports();
+        if (changed && _mounted && cid === activeCourse && !typing) renderReports();
       });
     }
     if (typeof ReportIssues !== 'undefined' && typeof ReportIssues.sync === 'function') {
       ReportIssues.sync(cid).then(function (changed) {
-        if (changed && cid === activeCourse) _populateCopies();
+        if (changed && _mounted && cid === activeCourse) _populateCopies();
       });
     }
   }
@@ -2644,7 +2652,11 @@ window.PageReports = (function () {
   }
 
   /* -- init / destroy ------------------------------------- */
+  /* True from init to destroy: a load, save or timer that finishes after
+     the teacher has left Reports draws nothing (as page-gradebook.js). */
+  var _mounted = false;
   function init(params) {
+    _mounted = true;
     activeCourse = params.course || getActiveCourse();
     setActiveCourse(activeCourse);
     activeTab = _tabIdFor(TABS, params.tab);
@@ -2745,6 +2757,8 @@ window.PageReports = (function () {
   }
 
   function destroy() {
+    _mounted = false;
+    clearTimeout(_resizeTimer);
     TABS.forEach(function (t) {
       if (t.teardown) t.teardown();
     });

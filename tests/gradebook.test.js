@@ -183,6 +183,7 @@ describe('gradebook-letter-all-missing-average', () => {
       URL.revokeObjectURL = () => {};
       PageAssignments.graderOpen = () => false;
       runInThisContext(readFileSync('teacher/page-gradebook.js', 'utf-8'), { filename: 'teacher/page-gradebook.js' });
+      runInThisContext(readFileSync('teacher/gradebook-csv.js', 'utf-8'), { filename: 'teacher/gradebook-csv.js' });
       seed('letter');
       PageGradebook.init({ course: CID });
     });

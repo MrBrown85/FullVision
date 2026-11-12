@@ -1,6 +1,6 @@
 # Write-path rebuild plan
 
-Status: Phases 0–4 done (#118–#122); Phase 5 in review (2026-10-12). Replaces the whole-array save model in `shared/data.js` with a durable outbox of single-record operations.
+Status: Phases 0–4 done (#118–#122); Phase 5 done; Phase 6 re-checked 2026-11-12 (its list waits for Colin). Replaces the whole-array save model in `shared/data.js` with a durable outbox of single-record operations.
 
 ## Why
 
@@ -135,9 +135,27 @@ The original goal was to replace every `saveX(cid, wholeArray)` call with explic
 
 **Done:** tests cover the single-rubric save, unchanged categories and order, class-manager categories not being re-sent, and idempotent deletes. In a real browser, opening class-manager categories sent no writes, and a weight edit sent one `upsert_category`.
 
-### Phase 6: cleanup — small
+### Phase 6: cleanup — re-checked 2026-11-12, waiting for Colin
 
-Remove dead code left behind: `_DATA_KEYS` entries used only for diffing, `persistScoreDiffToCanonical`, the `saveScores` mass-loss guard (no longer reachable), and the remaining legacy comments. Update `docs/ARCHITECTURE.md` and the offline-sync design doc.
+The first plan was to remove four things as dead code: `_DATA_KEYS` entries used only for diffing, `persistScoreDiffToCanonical`, the `saveScores` mass-loss guard ("no longer reachable") and the remaining legacy comments, then update `docs/ARCHITECTURE.md` and the offline-sync design doc. A re-check against `main` on 2026-11-12 found that only the comments are dead, and that the guard is still needed.
+
+**What the re-check found**
+
+- **`_DATA_KEYS`: nothing to remove.** All 25 entries are live. Each one is the localStorage key of a cached field, read for cold boot, offline boot, re-keys, class moves and clearing a class, not only for diffing. About 30 test files also seed data through it.
+- **`persistScoreDiffToCanonical` is the live score send.** `saveScores` calls it to send every changed cell; that is how a score reaches the server. Three other places call it again right after `saveScores` has already sent the same cells: `restoreScoreCells` in `shared/data.js`, and `Grader.undoCell` and `Grader.undoOnPhone` in `shared/grader.js` (whose comment says "it goes up twice, as before"). So every undone cell is sent twice. The second send is harmless (the same upsert, or merged with the first if it is still queued), but it is not needed. The two grader undos also send even when `saveScores` refused the save; one undone cell cannot realistically trip the guard, so this is latent.
+- **The `saveScores` mass-loss guard stays.** It refuses a save that drops a class below 30% of its score entries (or below half its students), measured against the saved copy in localStorage. It still stops an empty score list passed by mistake from clearing every cell. A report on 2026-11-11 said it refuses saves after Delete Assessment; see the last numbered item below, which says why that could not be reproduced. No test checks the guard today.
+- **Stale comments in `shared/data.js`** (S19-B2 fixes them): the `_DATA_KEYS` comment "(and Supabase data_key)", since no `data_key` exists; "Realtime / cross-device sync removed … to be designed", since realtime refresh exists (`course_sync_cursor`); and "the legacy blob save machinery stays … until the UI is rewritten", since Phase 5 decided not to rewrite it.
+- **This plan's own references are stale.** The line numbers in "Why" (lines 7, 11, 25 and 39 of this file) no longer match `shared/data.js`, and `_replayCourseEntities` and `_patchLearningMapReferences` no longer exist. They are kept as the record of what was found in October.
+
+**Suggested order.** Each item is one small PR. Colin approves, changes or drops each one.
+
+1. **Drop the three extra sends. Needs Colin: save path.** Remove the extra `persistScoreDiffToCanonical` calls in `restoreScoreCells`, `Grader.undoCell` and `Grader.undoOnPhone`, and the "goes up twice" comment. Proving tests: the undo pin tests expect one send per undone cell, signed in and with no baseline.
+2. **Make the send private. Needs Colin: save path; after 1.** Rename it `_sendScoreDiff`, take it out of the export list and the `tests/grader-guard.test.js` allowlist, and point its dispatch test at `saveScores`.
+3. **Delete `_savedCopyHasLegacyRubricKeys`. After Colin's review of 87ed0faa,** which removed its last caller; only `tests/rubric.test.js` still calls it.
+4. **Fix the stale comments. S19-B2,** comments only.
+5. **Update the docs. After 1 and 2.** `docs/ARCHITECTURE.md` (every write goes through the outbox; saves diff against the server baseline; the live realtime refresh) and `docs/backend-design/offline-sync.md`, which is nearly all out of date (queue API, entry shape, ordering, retry policy, the removed badge and panel).
+6. **The April-era legacy readers. Colin's call, not now.** Old data shapes (assignment statuses, `gb-units-`, learning maps with sections, old student records) can still be on a device, because Demo Mode classes and saved copies with no bundle record are never purged.
+7. **The Delete Assessment guard report was wrong; the guard can still drop a mark in two rare cases.** A probe reported on 2026-11-11 that the guard refuses real saves after Delete Assessment and then every later score save in the class. On 2026-11-12 this could not be reproduced through the Gradebook or the Assignments page, signed in or in Demo Mode. Both delete paths (`_commitDeleteAssess` in `teacher/page-gradebook.js` and `_confirmDeleteAssess` in `teacher/page-assignments.js`) call `saveAssessments` with the shorter list before `Grader.deleteAssessmentScores`. `saveAssessments` then calls `_cleanOrphanedScores`, which removes the deleted work's marks from the cache and the saved copy, so the guard sees no drop. The probe called the delete without that first step. The browser test that pins "a mark saves after Delete Assessment" is on main: `e2e/pin-delete-assessment-then-grade.spec.js` (PR #1246). The testing found two rare cases in which the guard does block a real mark. (1) The storage case: if the browser refuses the saved-copy write at the moment of the delete (storage full or failing), the saved copy keeps the old marks, and the guard then blocks every later points or Complete mark with the red "Score save blocked" message. Those marks are lost if the teacher reloads before a level or comment save rewrites the saved copy. (2) The two-tab case: tab A uses Set Everyone To on a column; tab B, which saved something in the last two seconds and so has not yet reloaded the class, enters a mark. The guard blocks it, because it would otherwise overwrite tab A's fill, and that mark is gone after tab B reloads. In both cases "Retry Now" retries pending sends only; it does not save the blocked mark again. A fix for both is being built as its own PR (S19-B3 in `docs/plans/handoff-review-plan.md`): a blocked mark is kept and saved once the saved copy is fresh, never dropped.
 
 ## Out of scope
 
