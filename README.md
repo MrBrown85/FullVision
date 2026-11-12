@@ -2,18 +2,19 @@
 
 FullVision is a teacher-facing web application for standards-based grading, classroom observations, and report preparation in British Columbia classroom workflows.
 
-The repository ships two production runtimes:
+The repository ships three production runtimes:
 
 - a desktop single-page app at `teacher/app.html`
 - a mobile PWA at `teacher-mobile/index.html`
+- the student page at `s/index.html`
 
-Both surfaces share the same authentication, data, offline queue, and grading logic.
+The desktop and phone apps share the same authentication, data, offline queue, and grading logic. The student page has no sign-in of its own: a student opens it with a printed card, and it talks to the server through the `student-submit` edge function.
 
 Production is deployed at [fullvision.ca](https://fullvision.ca). For engineering work, treat local runs as the reliable verification path: the live site can temporarily return `503 usage_exceeded` when Netlify quota is exhausted.
 
 ## Product scope
 
-FullVision currently supports a teacher-owned workflow, not student or parent self-service.
+FullVision is a teacher-owned workflow. Students have no accounts: they open their own page (`s/`) with a printed card or slip. There is no parent portal.
 
 Core capabilities include:
 
@@ -27,12 +28,19 @@ Core capabilities include:
 - roster and course-management tools
 - mobile speed-grading and observation capture
 - offline-aware client behavior with queued retry
+- the student page (`s/`): assignments, feedback, My Learning, questionnaires and phone reports (behind a per-class build switch)
+- student cards and slips, printed from Class Settings › Student Page (behind a per-class build switch)
+- Send Work: students send photos or PDFs of their work (behind a per-class build switch)
+- Mark Up: the teacher draws on a student's work, on desktop and phone (behind a per-class build switch)
+- Preview as Student: the teacher sees what a student's page shows (behind a per-class build switch)
+- the help site at `fullvision.ca/help`, built from `help/articles/`
+- Download All My Data: one Excel workbook of every class, from the account menu
 
 ## Current application state
 
 - `main` is the source-of-truth branch.
 - The Supabase-backed v2 read/write architecture is the live application model.
-- Desktop and mobile both run against the shared runtime under `shared/`.
+- Desktop and mobile both run against the shared runtime under `shared/`. The student page reads some of it too.
 - The open-work list is [docs/ROADMAP.md](docs/ROADMAP.md); decisions and their reasons are in [docs/DECISIONS.md](docs/DECISIONS.md).
 - Rules for working in the repo are in [CLAUDE.md](CLAUDE.md).
 - [codex.md](codex.md) and [docs/backend-design/HANDOFF.md](docs/backend-design/HANDOFF.md) are history from the v2 rebuild and are no longer maintained.
@@ -65,6 +73,7 @@ Platform model:
 - static site deployment on Netlify
 - runtime environment injection through `netlify/edge-functions/inject-env.js`
 - Supabase Auth, Postgres, RLS, and public RPC surface for persistence
+- two Supabase edge functions, `supabase/functions/student-submit` (the student page's server) and `supabase/functions/teacher-cards` (makes student cards and slips); they deploy separately from Netlify
 - local cache plus `localStorage` fallback for responsiveness and offline safety
 - retry queue via `window.v2Queue`
 
@@ -145,12 +154,12 @@ Required Netlify environment variables:
 
 The live backend is Supabase Auth plus a public RPC surface over Postgres.
 
-Primary SQL mirrors:
+The exact schema is [docs/schema.generated.sql](docs/schema.generated.sql). CI fails when it no longer matches the live database.
+
+Other SQL:
 
 - [schema.sql](schema.sql)
-- [docs/backend-design/read-paths.sql](docs/backend-design/read-paths.sql)
-- [docs/backend-design/write-paths.sql](docs/backend-design/write-paths.sql)
-- [docs/backend-design/rls-policies.sql](docs/backend-design/rls-policies.sql)
+- [docs/backend-design/read-paths.sql](docs/backend-design/read-paths.sql), [docs/backend-design/write-paths.sql](docs/backend-design/write-paths.sql) and [docs/backend-design/rls-policies.sql](docs/backend-design/rls-policies.sql) are April design copies. They are missing most of today's functions.
 
 Primary backend-design references:
 
@@ -166,11 +175,20 @@ Primary backend-design references:
 FullVision/
 ├── teacher/                 desktop SPA
 ├── teacher-mobile/          mobile PWA
+├── s/                       student page
 ├── shared/                  shared runtime modules
+├── help/                    help site articles and images
+├── supabase/                edge functions (student-submit, teacher-cards)
+├── migrations/              database migrations, one file per change
+├── data/                    BC curriculum data files
+├── assets/                  icons, splash and sample-work images
+├── vendor/                  third-party libraries
 ├── docs/                    architecture, backend design, and reference assets
 ├── e2e/                     Playwright specs
+├── e2e-real/                Playwright specs against a real Supabase project
 ├── tests/                   Vitest specs
 ├── scripts/                 local/dev/build scripts
+├── .github/                 CI workflow
 ├── netlify/                 edge-function support
 ├── dist/                    generated static output
 ├── schema.sql               top-level schema mirror
@@ -196,7 +214,7 @@ Additional references:
 
 - Production availability can be affected by Netlify quota exhaustion.
 - Open work is in [docs/ROADMAP.md](docs/ROADMAP.md).
-- Teachers sign in. Students have no accounts: they answer questionnaires and read phone reports on the student page (`s/`) with a code from their slip. There is no parent portal.
+- Teachers sign in. Students have no accounts: they answer questionnaires and read phone reports on the student page (`s/`) with a printed card or slip. There is no parent portal.
 
 ## License
 
