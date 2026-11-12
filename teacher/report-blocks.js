@@ -1319,8 +1319,17 @@ window.ReportBlocks = (function () {
         };
         const hi = ties(ranked, ranked[0]);
         const lo = ties(ranked.slice().reverse(), ranked[ranked.length - 1]);
-        facts += `<div class="report-prof-fact"><b>Highest now:</b> ${esc(names(hi))} ${esc(studentLevelText(cid, hi[0].now))}.${work(hi, true)}</div>`;
-        if (ranked.length > 1 && !same(lo[0].now, hi[0].now)) {
+        // Highest Now and Lowest Now print together or not at all: only when
+        // the highest and lowest competencies print differently (two or more
+        // with a level, not all the same proficiency). With every competency
+        // at one word, "highest" would name a figure the report does not
+        // print (Colin, 2026-11-12: "go with your recommendations on all
+        // four"). A Letter class keeps Highest Now always, as before.
+        const differ = ranked.length > 1 && !same(lo[0].now, hi[0].now);
+        if (differ || mode === 'letter') {
+          facts += `<div class="report-prof-fact"><b>Highest now:</b> ${esc(names(hi))} ${esc(studentLevelText(cid, hi[0].now))}.${work(hi, true)}</div>`;
+        }
+        if (differ) {
           facts += `<div class="report-prof-fact"><b>Lowest now:</b> ${esc(names(lo))} ${esc(studentLevelText(cid, lo[0].now))}.${work(lo, false)}</div>`;
         }
       }

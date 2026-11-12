@@ -101,6 +101,22 @@ describe('report-academic-summary-letter', () => {
   });
 });
 
+/* A second competency at Emerging, on a piece of its own, so a class's
+   competencies do not all read one word and the Proficiency block prints
+   its Highest Now and Lowest Now lines (left off when they would name the
+   same word; Colin, 2026-11-12: "go with your recommendations on all four"). */
+function withLowCompetency(cid, sid) {
+  const map = _cache.learningMaps[cid];
+  map.sections = map.sections.concat([{ id: 'sec-low', name: 'Mapping', tags: [{ id: 't-low', label: 'Mapping' }] }]);
+  _cache.assessments[cid] = _cache.assessments[cid].concat([
+    { id: 'low', title: 'Map Check', date: '2026-09-01', tagIds: ['t-low'] },
+  ]);
+  _cache.scores[cid][sid] = _cache.scores[cid][sid].concat([
+    { assessmentId: 'low', tagId: 't-low', score: 1, date: '2026-09-01' },
+  ]);
+  clearProfCache();
+}
+
 describe('report-best-work-once', () => {
   /**
    * The Proficiency block's Best work names a piece once (Nov 3 bug sweep,
@@ -149,6 +165,7 @@ describe('report-best-work-once', () => {
         ],
         [sc('psa', 't1', 4), sc('psa', 't2', 4), sc('map', 't2', 4)],
       );
+      withLowCompetency(CID, SID);
       const prof = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}));
       expect(prof).toContain('Highest now: Evidence and Perspective');
       // The mark as a student reads it, no figure out of 4 (DECISIONS, "Student-facing levels are proficiencies").
@@ -160,6 +177,7 @@ describe('report-best-work-once', () => {
         [{ id: 'psa', title: 'Primary Source Analysis', date: '2026-10-02', tagIds: ['t1', 't2'] }],
         [sc('psa', 't1', 4), sc('psa', 't2', 4)],
       );
+      withLowCompetency(CID, SID);
       const prof = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}));
       expect(prof).toContain('Best work: Primary Source Analysis (Oct 2), Extending.');
     });
@@ -2536,11 +2554,13 @@ describe('report-points-own-percent', () => {
       expect(prof).toContain('Best work: Quiz Q (Oct 1), 85%.');
       // A Both class prints the % too, so it ranks the same way.
       seed('both', pieces, scores);
+      withLowCompetency(CID, SID);
       expect(text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}))).toContain(
         'Best work: Quiz Q (Oct 1), 17/20 · 85%.',
       );
       // A Proficiency class ranks by level: the 3+ is the best work.
       seed('proficiency', pieces, scores);
+      withLowCompetency(CID, SID);
       expect(text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}))).toContain(
         'Best work: Lab (Oct 5), Proficient +.',
       );
@@ -2548,6 +2568,7 @@ describe('report-points-own-percent', () => {
 
     it('a Proficiency class names points work at its points, as Assignment Grades prints it', () => {
       seed('proficiency', [quiz('A', '2026-10-01'), quiz('B', '2026-10-05')], [sc('A', 16), sc('B', 17)]);
+      withLowCompetency(CID, SID);
       const prof = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}));
       // Step 4 group 2 #3: the whole piece's mark, the higher of the two.
       expect(prof).toContain('Best work: Quiz B (Oct 5), 17/20.');
@@ -2829,6 +2850,7 @@ describe('report-rubric-competency-mark', () => {
 
     it('prints the lowest criterion when they disagree, as the gradebook does', () => {
       seed([sc('essay', 'crit-thesis', 4), sc('essay', 'crit-evidence', 1), sc('debate', 't1', 3)]);
+      withLowCompetency(CID, SID);
       expect(competencyLevelFromCriteria(CID, SID, essay, 't1')).toMatchObject({ score: 1, mixed: true });
       expect(tagMarksByAssessment(CID, SID, 't1').find(m => m.assessmentId === 'essay')).toMatchObject({
         score: 1,
