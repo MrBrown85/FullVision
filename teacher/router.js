@@ -421,6 +421,11 @@ window.Router = (function () {
     var legacy = _legacyUrl(location.pathname, location.search, location.hash);
     if (legacy) history.replaceState(null, '', legacy);
 
+    // The scripts of a page loaded on demand that the app opens on start
+    // loading now, beside sign-in and the class's data, not after them.
+    var startPath = _parseUrl(location.pathname, location.search).path;
+    if (_onDemand[startPath] && !_pageFor(startPath)) _loadPage(startPath).catch(function () {});
+
     await requireAuth();
     await initAllCourses();
     // Open the class a deep link names, not the last one used.
