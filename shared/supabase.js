@@ -85,15 +85,6 @@
   };
 
   /**
-   * Returns true if a user is logged in.
-   * @returns {Promise<boolean>} Whether a user is currently authenticated
-   */
-  window.isLoggedIn = async function () {
-    const user = await getCurrentUser();
-    return !!user;
-  };
-
-  /**
    * Creates a new account with Supabase auth.
    * @param {string} email - The user's email address
    * @param {string} password - The user's chosen password
@@ -520,7 +511,6 @@
         email: 'demo@fullvision.local',
         user_metadata: { display_name: 'Demo Teacher' },
       });
-      window.isLoggedIn = async () => true;
       return;
     }
     // Defence-in-depth: a stale gb-demo-mode=1 without the companion token
@@ -538,7 +528,6 @@
         email: 'dev@localhost',
         user_metadata: { display_name: 'Dev Teacher' },
       });
-      window.isLoggedIn = async () => true;
       return;
     }
     // Auth check

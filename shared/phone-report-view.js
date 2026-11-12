@@ -195,6 +195,6 @@ var PhoneReportView = (function () {
     );
   }
 
-  return { html: html, day: day, WORDS: WORDS, STEPS: STEPS };
+  return { html: html, day: day };
 })();
 if (typeof window !== 'undefined') window.PhoneReportView = PhoneReportView;

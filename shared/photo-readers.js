@@ -232,9 +232,7 @@ window.PhotoReaders = (function () {
   return {
     openPdf: openPdf,
     configure: configure,
-    library: library,
     loaded: loaded,
-    LIBRARY_URL: LIBRARY_URL,
     WORKER_URL: WORKER_URL,
     MAX_SCALE: MAX_SCALE,
   };
