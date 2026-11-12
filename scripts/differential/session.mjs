@@ -18,8 +18,10 @@ export const PHONE = { width: 390, height: 844 };
 
 /* How far the clock moves after an action, in steps, with the pages left to
    finish their real work (scripts loading, other tabs' messages) before
-   each: debounces first, then the longer waits, to one minute in all. */
-export const STEP_CHUNKS = [0, 100, 1000, 5000, 53900];
+   each: what the action set off at once, the short waits (debounces, the
+   outbox's first retry), then the rest of a minute (the outbox's periodic
+   send, the lease's heartbeat). */
+export const STEP_CHUNKS = [0, 2500, 57500];
 
 export async function newSession(browser, { url, mode, seed }) {
   const context = await browser.newContext({
@@ -30,6 +32,9 @@ export async function newSession(browser, { url, mode, seed }) {
     serviceWorkers: 'block',
     reducedMotion: 'reduce',
   });
+  // A click or wait that cannot happen in 5 seconds is the run's bug: it
+  // fails at once instead of waiting the default 30.
+  context.setDefaultTimeout(5000);
   const s = { context, url, mode, pages: [], errors: [] };
   // Before the clock, so it keeps the real setTimeout.
   await context.addInitScript({
@@ -87,8 +92,9 @@ export async function barrier(s) {
     }
     let delivered = 0;
     for (const p of tabs) {
-      delivered += await p.evaluate(() => (window.__diffDeliver ? window.__diffDeliver() : 0)).catch(() => 0);
-      await settle(p);
+      const n = await p.evaluate(() => (window.__diffDeliver ? window.__diffDeliver() : 0)).catch(() => 0);
+      if (n) await settle(p);
+      delivered += n;
     }
     if (!delivered) return;
   }

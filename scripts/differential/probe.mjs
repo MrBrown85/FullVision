@@ -72,7 +72,7 @@ export function takeCalls(page) {
    page's elements stay the same over `polls` looks `everyMs` apart, in real
    time. The app's own timers wait for the run's clock (session.mjs
    advance), so they do not count here. Answers false if it never settled. */
-export function settle(page, polls = 3, everyMs = 10, maxMs = 3000) {
+export function settle(page, polls = 2, everyMs = 8, maxMs = 3000) {
   return page
     .evaluate(
       ({ polls, everyMs, maxMs }) =>
@@ -167,6 +167,36 @@ export async function go(page, path) {
   await tick(page);
 }
 
+/* Close what could sit over a screen and take a click: the grader dialog,
+   a menu, Preview as Student. A toast is left: it is part of what the last
+   action did (its Undo, or its commit when it times out). */
+export async function closeOverlays(page) {
+  const open = await page.evaluate(() => {
+    const was = [];
+    const done = document.querySelector('.grader-dialog [data-grader="close"]');
+    if (done) {
+      done.click();
+      was.push('grader');
+    }
+    if (document.querySelector('.gb-ctx-menu')) {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      was.push('menu');
+    }
+    if (window.PreviewStudent && window.PreviewStudent.isOpen()) {
+      window.PreviewStudent.close();
+      was.push('preview');
+    }
+    const cancel = document.getElementById('confirm-cancel-btn');
+    if (cancel) {
+      cancel.click();
+      was.push('confirm');
+    }
+    return was;
+  });
+  if (open.length) await tick(page, 100);
+  return open.join(', ');
+}
+
 /* Let a screen draw: real work done, then the clock moved a little, the
    same in A and B. */
 export async function tick(page, ms = 500) {
@@ -195,10 +225,12 @@ function layoutText(page) {
    [sid, sid] }, picked by name by the runner. */
 export async function readScreens(page, cid, who) {
   const out = {};
+  const left = await closeOverlays(page);
+  if (left) out.leftOpen = left;
   await go(page, '/gradebook?course=' + cid);
-  const scoresTab = page.locator('[data-action="setView"][data-mode="scores"]');
-  if ((await scoresTab.count()) && (await scoresTab.getAttribute('aria-pressed')) !== 'true') {
-    await scoresTab.click();
+  if (!(await page.locator('#gb-data td.gb-scores-cell').count())) {
+    const scoresTab = page.locator('[data-action="setView"][data-mode="scores"]');
+    if (await scoresTab.count()) await scoresTab.click({ timeout: 5000 });
     await tick(page);
   }
   out.gradebook = await page.evaluate(() => {
@@ -221,8 +253,7 @@ export async function readScreens(page, cid, who) {
       await page.locator('.grader-dialog').waitFor({ timeout: 5000 });
       await tick(page);
       out.grader = await page.evaluate(() => document.querySelector('.grader-dialog').innerText);
-      await page.locator('.grader-dialog [data-grader="close"]').click();
-      await tick(page);
+      await closeOverlays(page);
     } else out.grader = '(no cell for the grader)';
   }
   await go(page, '/assignments?course=' + cid);

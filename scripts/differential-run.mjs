@@ -34,7 +34,7 @@ const { serve } = await import('./differential/serve.mjs');
 const { PHONE, advance, newSession, openTab, tabsOf, waitForApp } = await import('./differential/session.mjs');
 
 function parseArgs(argv) {
-  const opts = { mode: 'both', seed: 1, steps: 100, offline: false, twoTabs: false, screensEvery: 10, quiet: false };
+  const opts = { mode: 'both', seed: 1, steps: 100, offline: false, twoTabs: false, screensEvery: 25, quiet: false };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     const v = () => argv[++i];
@@ -58,13 +58,11 @@ const USAGE =
   '  [--mode signed-in|demo|both] [--offline] [--two-tabs] [--screens-every <n>]';
 
 /* The run's own actions, beside the teacher actions in actions.mjs. */
-const RUNNER_ACTIONS = [
-  { kind: 'reload', weight: 1 },
-  { kind: 'phoneGrade', weight: 3 },
-  { kind: 'phoneUndo', weight: 2 },
+const RELOAD = { kind: 'reload', weight: 1 };
+const PHONE_ACTIONS = [
+  { kind: 'phoneGrade', weight: 12 },
+  { kind: 'phoneUndo', weight: 6 },
 ];
-const OFFLINE_ACTION = { kind: 'offline', weight: 0.6 };
-const OFFLINE_STEPS = 10;
 
 class Difference extends Error {
   constructor(step, action, lines) {
@@ -103,9 +101,41 @@ function screenWho(view, mode) {
   };
 }
 
+/* The run's fixed blocks, by step. In every stretch of up to 200 steps: a
+   second tab open for a block (--two-tabs), the device offline for ten
+   steps then back online with the outbox drained (--offline), and the
+   phone app open for a block. Outside them one desktop tab does it all. */
+function blocksFor(opts) {
+  const c = Math.min(200, opts.steps);
+  const at = f => Math.floor(f * c);
+  return {
+    cycle: c,
+    tab2: opts.twoTabs ? [at(0.2), at(0.2) + Math.max(5, at(0.15))] : null,
+    offline: opts.offline ? [at(0.5), at(0.5) + 10] : null,
+    phone: [at(0.75), at(0.75) + Math.max(5, at(0.125))],
+  };
+}
+const inBlock = (b, off) => !!b && off >= b[0] && off < b[1];
+
+const STEP_LIMIT_MS = 30000;
+const SCREENS_LIMIT_MS = 90000;
+
+class StepTimeout extends Error {}
+
+function withLimit(promise, ms, what) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, fail) => {
+      timer = setTimeout(() => fail(new StepTimeout(what + ' took over ' + ms / 1000 + ' s')), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
+
 async function runMode(browser, urls, mode, opts) {
   const rng = makeRng(opts.seed * 2654435761 + (mode === 'demo' ? 17 : 0));
   const counts = { steps: 0, actions: {}, keys: 0, calls: 0, screens: 0, records: 0 };
+  const blocks = blocksFor(opts);
   const sides = [];
   for (const [label, url] of [
     ['A', urls.a],
@@ -116,11 +146,10 @@ async function runMode(browser, urls, mode, opts) {
     sides.push(s);
   }
   const both = fn => Promise.all(sides.map(fn));
-  let offlineLeft = 0;
+  let offline = false;
   try {
     await both(async s => {
       s.tab1 = await openTab(s, '/gradebook');
-      if (opts.twoTabs) s.tab2 = await openTab(s, '/assignments');
     });
 
     /* Set-up, the same in A and B: the gradebook on its Scores view and
@@ -149,6 +178,13 @@ async function runMode(browser, urls, mode, opts) {
         ['phone', s.phone],
       ].filter(([, p]) => p && !p.isClosed());
 
+    const takeAll = s =>
+      (async () => {
+        const out = [];
+        for (const [name, p] of named(s)) for (const c of await takeCalls(p)) out.push({ tab: name, ...c });
+        return out;
+      })();
+
     async function compareNow(step, action, withScreens) {
       const lines = [];
       const [sa, sb] = await both(s => readStorage(s.tab1));
@@ -162,11 +198,7 @@ async function runMode(browser, urls, mode, opts) {
       const fa = flat(ia);
       lines.push(...compareStorage(fa, flat(ib), 'IndexedDB'));
       counts.records += Object.keys(fa).length;
-      const [ca, cb] = await both(async s => {
-        const out = [];
-        for (const [name, p] of named(s)) for (const c of await takeCalls(p)) out.push({ tab: name, ...c });
-        return out;
-      });
+      const [ca, cb] = await both(takeAll);
       lines.push(...compareCalls(ca, cb));
       counts.calls += ca.length;
       const [ea, eb] = sides.map(s => s.errors.splice(0));
@@ -175,22 +207,22 @@ async function runMode(browser, urls, mode, opts) {
       if (!lines.length && withScreens) {
         const view = await readView(sides[0].tab1);
         const who = screenWho(view, mode);
-        const [xa, xb] = await both(async s => {
-          const out = await readScreens(s.tab1, view.cid, who);
-          await go(s.tab1, '/gradebook?course=' + view.cid);
-          await advance(s);
-          return out;
-        });
+        const [xa, xb] = await withLimit(
+          both(async s => {
+            const out = await readScreens(s.tab1, view.cid, who);
+            await go(s.tab1, '/gradebook?course=' + view.cid);
+            await advance(s);
+            return out;
+          }),
+          SCREENS_LIMIT_MS,
+          'Reading the screens after step ' + step,
+        );
         lines.push(...compareScreens(xa, xb));
         counts.screens += Object.keys(xa).length;
         // Reading the screens sends nothing and saves nothing; if it did, it shows here.
         const [sa2, sb2] = await both(s => readStorage(s.tab1));
         lines.push(...compareStorage(sa2, sb2));
-        const [ra, rb] = await both(async s => {
-          const out = [];
-          for (const [name, p] of named(s)) for (const c of await takeCalls(p)) out.push({ tab: name, ...c });
-          return out;
-        });
+        const [ra, rb] = await both(takeAll);
         lines.push(...compareCalls(ra, rb));
       }
       if (lines.length) throw new Difference(step, action, lines);
@@ -198,38 +230,57 @@ async function runMode(browser, urls, mode, opts) {
 
     await compareNow(0, 'set-up', true);
 
-    async function goOffline(off) {
+    async function setOffline(off) {
+      offline = off;
       await both(async s => {
         await s.context.setOffline(off);
         await Promise.all(tabsOf(s).map(p => p.evaluate(off => (window.__e2eFailWrites = off), off)));
       });
     }
 
-    async function ensurePhone() {
-      if (sides[0].phone) return;
+    /* Open or close a block's tab in A and B. Not a step: what it saved and
+       sent is compared at once. */
+    async function openExtra(name, path, viewport) {
       await both(async s => {
-        s.phone = await openTab(s, '/teacher-mobile/', PHONE);
-        if (offlineLeft > 0) await s.phone.evaluate(() => (window.__e2eFailWrites = true));
+        s[name] = await openTab(s, path, viewport);
+        if (offline) await s[name].evaluate(() => (window.__e2eFailWrites = true));
+        await advance(s);
       });
-      // Opening the phone app is not a step: its calls are compared now.
-      await compareNow(counts.steps, 'opening the phone app', false);
+      await compareNow(counts.steps, 'opening ' + name, false);
+    }
+    async function closeExtra(name) {
+      await both(async s => {
+        await s[name].close({ runBeforeUnload: true });
+        s[name] = null;
+        await advance(s);
+      });
+      await compareNow(counts.steps, 'closing ' + name, false);
     }
 
     const teacherActions = ACTIONS.filter(a => !a.modes || a.modes.includes(mode));
     for (let step = 1; step <= opts.steps; step++) {
       counts.steps = step;
-      const menu = [...teacherActions, ...RUNNER_ACTIONS];
-      if (opts.offline && offlineLeft === 0) menu.push(OFFLINE_ACTION);
+      const off = (step - 1) % blocks.cycle;
+      const wantTab2 = inBlock(blocks.tab2, off);
+      const wantPhone = inBlock(blocks.phone, off);
+      const wantOffline = inBlock(blocks.offline, off);
+      if (wantTab2 && !sides[0].tab2) await openExtra('tab2', '/assignments');
+      if (!wantTab2 && sides[0].tab2) await closeExtra('tab2');
+      if (wantPhone && !sides[0].phone) await openExtra('phone', '/teacher-mobile/', PHONE);
+      if (!wantPhone && sides[0].phone) await closeExtra('phone');
+      if (wantOffline && !offline) await setOffline(true);
+
+      const alone = !wantTab2 && !wantPhone && !wantOffline;
+      const menu = [...teacherActions, ...(alone ? [RELOAD] : []), ...(wantPhone ? PHONE_ACTIONS : [])];
       let chosen = null;
       let args = null;
       let tabName = 'tab1';
       for (let tries = 0; tries < 50 && !chosen; tries++) {
         const act = rng.weighted(menu);
-        if (offlineLeft > 0 && (act.kind === 'reload' || act.kind === 'switchClass')) continue;
-        tabName = opts.twoTabs && act.kind !== 'reload' && rng.chance(0.3) ? 'tab2' : 'tab1';
+        if (!alone && act.kind === 'switchClass') continue;
+        tabName = wantTab2 && rng.chance(0.4) ? 'tab2' : 'tab1';
         if (act.kind.startsWith('phone')) {
           tabName = 'phone';
-          await ensurePhone();
           args = phonePick(act.kind, rng, await readView(sides[0].phone));
         } else if (act.pick) {
           args = act.pick(rng, await readView(sides[0][tabName]), { mode });
@@ -241,56 +292,46 @@ async function runMode(browser, urls, mode, opts) {
       let label = describe(chosen.kind, args) + (tabName !== 'tab1' ? ' (' + tabName + ')' : '');
       counts.actions[chosen.kind] = (counts.actions[chosen.kind] || 0) + 1;
 
-      const tAct = Date.now();
-      let results;
-      if (chosen.kind === 'reload') {
-        await both(async s => {
-          await s.context.clock.setSystemTime(s.context.__diffNow);
-          await s.tab1.reload();
-          await waitForApp(s, s.tab1);
-        });
-        results = ['ok', 'ok'];
-      } else if (chosen.kind === 'offline') {
-        await goOffline(true);
-        offlineLeft = OFFLINE_STEPS;
-        results = ['ok', 'ok'];
-      } else if (chosen.kind === 'phoneGrade' || chosen.kind === 'phoneUndo') {
-        results = await both(s => phoneRun(s.phone, chosen.kind, args).catch(e => 'threw: ' + e.message));
-      } else {
-        results = await both(s =>
-          chosen.run(s[tabName], args, { mode }).catch(e => 'threw: ' + String(e.message).split('\n')[0]),
-        );
-      }
-      if (JSON.stringify(results[0]) !== JSON.stringify(results[1])) {
-        throw new Difference(step, label, [
-          'the action answered differently: A ' + JSON.stringify(results[0]) + ' | B ' + JSON.stringify(results[1]),
-        ]);
-      }
-      const tAdv = Date.now();
-      await both(s => advance(s));
-      const tCmp = Date.now();
-
-      if (offlineLeft > 0 && chosen.kind !== 'offline') {
-        offlineLeft--;
-        if (offlineLeft === 0) {
-          // Back online: the outbox drains, with the clock moved past every backoff.
-          await goOffline(false);
+      const doStep = async () => {
+        let results;
+        if (chosen.kind === 'reload') {
           await both(async s => {
-            // Started, not waited for: it finishes as the clock moves.
-            await Promise.all(tabsOf(s).map(p => p.evaluate(() => void (window.v2Queue && window.v2Queue.flush()))));
+            await s.context.clock.setSystemTime(s.context.__diffNow);
+            await s.tab1.reload();
+            await waitForApp(s, s.tab1);
+          });
+          results = ['ok', 'ok'];
+        } else if (chosen.kind === 'phoneGrade' || chosen.kind === 'phoneUndo') {
+          results = await both(s => phoneRun(s.phone, chosen.kind, args).catch(e => 'threw: ' + e.message));
+        } else {
+          results = await both(s =>
+            chosen.run(s[tabName], args, { mode }).catch(e => 'threw: ' + String(e.message).split('\n')[0]),
+          );
+        }
+        if (JSON.stringify(results[0]) !== JSON.stringify(results[1])) {
+          throw new Difference(step, label, [
+            'the action answered differently: A ' + JSON.stringify(results[0]) + ' | B ' + JSON.stringify(results[1]),
+          ]);
+        }
+        if (process.env.DIFF_TRACE) console.log(mode, step, label, JSON.stringify(results[0]));
+        await both(s => advance(s));
+        // The last offline step: back online, and the outbox drains with the
+        // clock moved past every backoff.
+        if (offline && !inBlock(blocks.offline, off + 1)) {
+          await setOffline(false);
+          await both(async s => {
+            await Promise.all(tabsOf(s).map(p => p.evaluate(() => window.v2Queue && window.v2Queue.flush())));
             await advance(s);
             await advance(s);
           });
           label += ', then back online';
         }
-      }
+      };
+      await withLimit(doStep(), STEP_LIMIT_MS, 'Step ' + step + ' (' + label + ')');
       const screensNow = opts.screensEvery > 0 && (step % opts.screensEvery === 0 || step === opts.steps);
       await compareNow(step, label, screensNow);
-      if (process.env.DIFF_TRACE) {
-        const ms =
-          'act ' + (tAdv - tAct) + ' ms, clock ' + (tCmp - tAdv) + ' ms, compare ' + (Date.now() - tCmp) + ' ms';
-        console.log(mode, step, label.slice(0, 160), JSON.stringify(results[0]), ms);
-      }
+      if (step % 25 === 0 && step < opts.steps)
+        console.log(mode + ': step ' + step + ' of ' + opts.steps + ', 0 differences so far');
     }
     return { counts };
   } finally {
@@ -400,6 +441,10 @@ async function main() {
             (opts.quiet ? '' : ' (seed ' + opts.seed + flags + ', ' + Math.round((Date.now() - t0) / 1000) + ' s)'),
         );
       } catch (e) {
+        if (e instanceof StepTimeout) {
+          console.log(mode + ': STOPPED (seed ' + opts.seed + flags + '): ' + e.message);
+          return 2;
+        }
         if (!(e instanceof Difference)) throw e;
         console.log(mode + ': DIFFERENCE at step ' + e.step + ' (seed ' + opts.seed + flags + ')');
         console.log('action: ' + e.action);

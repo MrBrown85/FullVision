@@ -16,7 +16,7 @@
  * switch. docs/differential-run.md lists which is which.
  */
 
-import { tick, until } from './probe.mjs';
+import { closeOverlays, tick, until } from './probe.mjs';
 
 const LEVELS = [1, 2, 3, 4];
 const MODS = [0, 0, 1, -1];
@@ -220,6 +220,7 @@ export const ACTIONS = [
     // The real screen: the gradebook's Scores cell opens the grader dialog,
     // a level is pressed, + or − after it, Late on or off, then Done.
     async run(page, a) {
+      await closeOverlays(page);
       const cid = await page.evaluate(() => getActiveCourse());
       if (!(await page.evaluate(() => location.pathname === '/gradebook'))) {
         await page.evaluate(p => window.Router.navigate(p), '/gradebook?course=' + cid);
@@ -233,6 +234,7 @@ export const ACTIONS = [
         await tick(page);
       }
       if (!(await cell.count())) return 'no cell';
+      await closeOverlays(page);
       await cell.scrollIntoViewIfNeeded();
       await cell.click();
       if (!(await until(page, () => !!document.querySelector('.grader-dialog')))) return 'no grader';
@@ -252,9 +254,10 @@ export const ACTIONS = [
         if ((await st.count()) && (await st.isEnabled())) await st.click();
         await tick(page, 100);
       }
-      await dlg.locator('[data-grader="close"]').click();
-      await until(page, () => !document.querySelector('.grader-dialog'));
-      return 'ok';
+      await dlg.locator('[data-grader="close"]').click({ timeout: 5000 });
+      await until(page, () => !document.querySelector('.grader-dialog'), null, 10);
+      const left = await closeOverlays(page);
+      return left ? 'ok, then closed the ' + left : 'ok';
     },
   },
   {
