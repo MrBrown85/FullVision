@@ -684,8 +684,30 @@ window.ReportOne = (function () {
         if (gone.indexOf(name) >= 0) row.remove();
         else row.setAttribute('data-row', name);
       });
+      if (gone.length) _tidy(tpl, gone);
     }
     return tpl.innerHTML;
+  }
+
+  /* After rows are left off a block: a folder's heading with no row left
+     under it goes too, and so does a line under the table that names a row
+     left off (Proficiency's Strongest Now and Next Focus). */
+  function _tidy(root, gone) {
+    Array.prototype.forEach.call(root.querySelectorAll('tr.report-ct-group'), function (g) {
+      var next = g.nextElementSibling;
+      if (!next || next.classList.contains('report-ct-group')) g.remove();
+    });
+    Array.prototype.forEach.call(root.querySelectorAll('.report-prof-fact'), function (line) {
+      var text = _text(line);
+      if (
+        gone.some(function (name) {
+          return text.indexOf(name) >= 0;
+        })
+      )
+        line.remove();
+    });
+    var facts = root.querySelector('.report-prof-facts');
+    if (facts && !facts.children.length) facts.remove();
   }
 
   /* The Assessments part's choices as GradeReport reads them, with the

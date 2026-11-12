@@ -6,6 +6,7 @@
  * docs/plans/one-report-build-plan.md.
  */
 import './setup.js';
+import { parseHTML } from 'linkedom';
 import { describe, expect, it } from 'vitest';
 
 const R = ReportOne;
@@ -187,6 +188,52 @@ describe('options for the panel', () => {
     expect(keys).toContain('blank');
     expect(keys).not.toContain('strength');
     expect(JSON.stringify(R.PARTS['self-assessment'])).not.toMatch(/rating|level/i);
+  });
+});
+
+describe('a block with rows left off', () => {
+  const html =
+    '<div class="report-block-box"><div class="report-block-title">Proficiency</div>' +
+    '<table class="report-ct report-prof"><tbody>' +
+    '<tr class="report-ct-group"><td colspan="3">Questioning</td></tr>' +
+    '<tr><td class="report-ct-name">Asking Questions</td><td>Proficient</td></tr>' +
+    '<tr class="report-ct-group"><td colspan="3">Planning</td></tr>' +
+    '<tr><td class="report-ct-name">Fair Tests<span class="report-prof-count"> · 2 competencies</span></td><td>Developing</td></tr>' +
+    '</tbody></table>' +
+    '<div class="report-prof-facts"><div class="report-prof-fact"><b>Strongest now:</b> Asking Questions Proficient.</div>' +
+    '<div class="report-prof-fact"><b>Next focus:</b> Fair Tests Developing.</div></div></div>';
+  // partHtml reads the block's rows in a detached element: a real document for it.
+  const draw = model => {
+    const real = ReportSheets.one.cellHtml;
+    const stub = globalThis.document;
+    const { document: doc } = parseHTML('<!doctype html><html><body></body></html>');
+    ReportSheets.one.cellHtml = () => html;
+    globalThis.document = doc;
+    try {
+      const root = doc.createElement('div');
+      root.innerHTML = R.partHtml(model, 'proficiency', 'c1', { id: 'st-1' }, {}, null);
+      return root;
+    } finally {
+      ReportSheets.one.cellHtml = real;
+      globalThis.document = stub;
+    }
+  };
+
+  it('each row is named by what it prints, without a folder’s count', () => {
+    const rows = [...draw(CARD()).querySelectorAll('[data-row]')].map(r => r.getAttribute('data-row'));
+    expect(rows).toEqual(['Asking Questions', 'Fair Tests']);
+  });
+
+  it('a row left off takes its folder’s heading and the line that names it with it', () => {
+    const root = draw(R.setRemoved(CARD(), 'proficiency', 'Fair Tests', true));
+    expect(root.textContent).not.toContain('Fair Tests');
+    expect(root.textContent).not.toContain('Planning');
+    expect(root.textContent).not.toContain('Next focus');
+    expect(root.textContent).toContain('Questioning');
+    expect(root.textContent).toContain('Strongest now');
+    // For one student only, the class's report is whole.
+    const one = R.setRemoved(CARD(), 'proficiency', 'Fair Tests', true, 'st-2');
+    expect(draw(one).textContent).toContain('Next focus');
   });
 });
 

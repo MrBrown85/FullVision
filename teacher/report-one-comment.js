@@ -157,8 +157,14 @@ window.ReportOneComment = (function () {
       split(_plain(r.narrative)).forEach(function (s) {
         had[s] = true;
       });
-      var mine = Array.isArray(meta.teacher_text) ? meta.teacher_text.slice() : [];
-      split(text).forEach(function (s) {
+      // The teacher's sentences are the ones still in the comment, and the
+      // new ones: a sentence deleted here is no longer kept as theirs (the
+      // questionnaire rebuilds the list on every save too).
+      var now = split(text);
+      var mine = (Array.isArray(meta.teacher_text) ? meta.teacher_text : []).filter(function (s) {
+        return now.indexOf(s) >= 0;
+      });
+      now.forEach(function (s) {
         if (!had[s] && mine.indexOf(s) < 0) mine.push(s);
       });
       if (mine.length || Array.isArray(meta.teacher_text)) {
@@ -452,7 +458,7 @@ window.ReportOneComment = (function () {
         _focusComment();
       }
     });
-    _ask = { el: el, sid: st.id, then: then || null };
+    _ask = { el: el, sid: st.id, key: _key(api.cid, _ctx(api).termId, st.id), then: then || null };
     _attach(el);
     _positionAsk();
     el.querySelector('[data-action="oneComSave"]').focus({ preventScroll: true });
@@ -477,7 +483,11 @@ window.ReportOneComment = (function () {
     if (draft == null) return;
     var cid = api.cid;
     var before = _rating(cid, sid, termId) || {};
-    var prev = { narrative: before.narrative || '', draftMeta: before.draftMeta || null };
+    var prev = {
+      narrative: before.narrative || '',
+      draftMeta: before.draftMeta || null,
+      approvedAt: before.approvedAt || null,
+    };
     _write(cid, sid, termId, draft);
     delete _drafts[key];
     var st = _studentById(api, sid);
@@ -486,10 +496,14 @@ window.ReportOneComment = (function () {
     _focusComment();
     if (typeof showUndoToast === 'function') {
       showUndoToast('Saved ' + _first(st) + '’s comment', function () {
-        // The comment as it was, written back the same way.
-        var data = { narrative: prev.narrative };
-        if (prev.draftMeta) data.draftMeta = prev.draftMeta;
-        upsertTermRating(cid, sid, termId, data);
+        // The comment as it was: its words, its record and its approval.
+        // (With approvedAt named, upsertTermRating keeps it; a comment with
+        // no record before goes back to an empty one.)
+        upsertTermRating(cid, sid, termId, {
+          narrative: prev.narrative,
+          draftMeta: prev.draftMeta || { v: 1, sentences: [] },
+          approvedAt: prev.approvedAt,
+        });
         var now = _api();
         if (now && String(now.cid) === String(cid)) now.redraw();
       });
@@ -599,6 +613,9 @@ window.ReportOneComment = (function () {
       else _drafts[ed.key] = v;
     }
     if (_ask && (!st || String(st.id) !== String(_ask.sid))) closeAsk();
+    // The question is about one report's comment: it closes when the report
+    // period changes (the change is kept, unsaved, under its own period).
+    if (_ask && _ask.key !== _key(api.cid, _ctx(api).termId, _ask.sid)) closeAsk();
     _paint(api);
     if (_ed) {
       _attach(_ed.el);

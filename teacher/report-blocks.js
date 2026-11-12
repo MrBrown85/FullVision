@@ -1488,8 +1488,12 @@ window.ReportBlocks = (function () {
   function _intro(text, student) {
     const teacher = (typeof getConfig === 'function' && getConfig().displayName) || '';
     return _say(text)
-      .replace(/\{name\}/g, esc(displayNameFirst(student)))
-      .replace(/\{teacher\}/g, esc(teacher));
+      .replace(/\{name\}/g, function () {
+        return esc(displayNameFirst(student));
+      })
+      .replace(/\{teacher\}/g, function () {
+        return esc(teacher);
+      });
   }
 
   /* ── Parent / Guardian Response ── */

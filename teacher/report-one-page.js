@@ -126,9 +126,9 @@ window.ReportOnePage = (function () {
     if (!api.scope()) return;
     var b = _el('div', MINE + ' no-print one-banner');
     b.setAttribute('role', 'status');
-    b.appendChild(document.createTextNode('Changes now apply to '));
+    b.appendChild(document.createTextNode('Parts and rows you switch off now apply to '));
     b.appendChild(_el('b', '', _first(student)));
-    b.appendChild(document.createTextNode(' only. '));
+    b.appendChild(document.createTextNode(' only. Options, headings and wording are the class’s. '));
     b.appendChild(_btn('one-banner-back', 'Back to the Class', 'oneScopeClass'));
     preview.insertBefore(b, preview.firstChild);
   }
@@ -758,15 +758,22 @@ window.ReportOnePage = (function () {
       }).length;
       next = [];
     } else {
-      var turnOff = rows.filter(function (x) {
-        return !x.removed;
-      });
-      n = turnOff.length;
-      next = (scope ? lists.own : lists.cls).concat(
-        turnOff.map(function (x) {
-          return x.key;
-        }),
-      );
+      var have = scope ? lists.own.concat(lists.cls) : lists.cls;
+      var keys = [];
+      var take = function (list) {
+        list.forEach(function (x) {
+          if (have.indexOf(x.key) < 0 && keys.indexOf(x.key) < 0) keys.push(x.key);
+        });
+      };
+      // For one student, that student's list; for the class, every
+      // student's (one may list work another has no mark for).
+      if (scope) take(rows);
+      else
+        api.students().forEach(function (st) {
+          take(ReportOne.rowsOf(m, K, api.cid, st, api.ctx()));
+        });
+      n = keys.length;
+      next = (scope ? lists.own : lists.cls).concat(keys);
     }
     if (!n) {
       api.announce('Nothing changed.');

@@ -111,7 +111,8 @@ describe('decorate', () => {
     ReportOnePage.decorate(preview, fakeApi({ scope: () => 's1' }));
     const banner = preview.querySelector('.one-banner');
     expect(banner.classList.contains('no-print')).toBe(true);
-    expect(banner.textContent).toContain('Changes now apply to Cece only.');
+    expect(banner.textContent).toContain('Parts and rows you switch off now apply to Cece only.');
+    expect(banner.textContent).toContain('Options, headings and wording are the class’s.');
   });
 });
 

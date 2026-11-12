@@ -140,9 +140,26 @@ describe('Save', () => {
     expect(api.redraw).toHaveBeenCalled();
     expect(api.announce).toHaveBeenCalledWith('Saved');
     expect(showUndoToast).toHaveBeenCalledWith('Saved Priya’s comment', expect.any(Function));
-    // Undo writes the comment as it was.
+    // Undo writes the comment as it was: its words, its record and its approval.
     showUndoToast.mock.calls[0][1]();
-    expect(getStudentTermRating(CID, PRI.id, TERM).narrative).toBe('Priya reads every day.');
+    const back = getStudentTermRating(CID, PRI.id, TERM);
+    expect(back.narrative).toBe('Priya reads every day.');
+    expect(back.approvedAt).toBe('2026-11-01T00:00:00.000Z');
+    expect(back.draftMeta.teacher_text).toEqual(['Priya reads every day.']);
+  });
+
+  it('a sentence the teacher deletes here is no longer kept as theirs', () => {
+    upsertTermRating(CID, PRI.id, TERM, {
+      narrative: 'Priya reads every day. She asks good questions.',
+      draftMeta: { v: 1, sentences: [], teacher_text: ['Priya reads every day.', 'She asks good questions.'] },
+    });
+    const api = makeApi(PRI);
+    T().setDraft(CID, TERM, PRI.id, 'Priya reads every day. She shares her ideas.');
+    T().save(api, PRI.id);
+    expect(getStudentTermRating(CID, PRI.id, TERM).draftMeta.teacher_text).toEqual([
+      'Priya reads every day.',
+      'She shares her ideas.',
+    ]);
   });
 
   it('uses the questionnaire’s own save when it offers one', () => {
