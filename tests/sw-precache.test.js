@@ -52,7 +52,7 @@ describe('service worker precache list', () => {
      Without it cached, an offline reload in Demo Mode opened with no class
      and Reports threw. The cached address must be the one data.js asks. */
   it('covers the Demo Mode class file at the address shared/data.js loads it from', () => {
-    const data = readFileSync(resolve(root, 'shared/data.js'), 'utf-8');
+    const data = readFileSync(resolve(root, 'shared/data-demo.js'), 'utf-8');
     const m = data.match(/function _loadSeedScript\(\)[\s\S]*?\.src = '([^']+)'/);
     expect(m).not.toBeNull();
     expect(m[1]).toMatch(/^\/shared\/seed-data\.js/);

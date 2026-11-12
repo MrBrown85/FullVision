@@ -1,11 +1,13 @@
 /**
  * Scripts the router loads on demand (teacher/router.js _onDemand).
  *
- * Reports' scripts are not tags in teacher/app.html, so
- * tests/sw-precache.test.js, which reads the page's tags, no longer covers
- * them. Each one must still be precached by sw.js (Reports opens offline
- * after a first visit that never opened it), exist on disk, and not also be
- * a tag in app.html (it would run twice).
+ * Reports' scripts, Assignments' rubric scripts, and the scripts one button
+ * uses (Print Grades, Copy Grading Setup, the QR maker for slips and cards)
+ * are not tags in teacher/app.html, so tests/sw-precache.test.js, which
+ * reads the page's tags, no longer covers them. Each one must still be
+ * precached by sw.js (each opens offline after a first visit that never
+ * used it), exist on disk, and not also be a tag in app.html (it would run
+ * twice).
  */
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'fs';
@@ -23,12 +25,16 @@ function precacheUrls() {
   return new Function('return ' + match[1])();
 }
 
-// Every script path named in the router's _onDemand table.
-function onDemandScripts() {
+// The router's _onDemand table.
+function onDemandTable() {
   const match = routerSource.match(/var _onDemand = (\{[\s\S]*?\n {2}\});/);
   expect(match).not.toBeNull();
-  const table = new Function('return ' + match[1])();
-  return Object.values(table).flatMap(spec => spec.scripts);
+  return new Function('return ' + match[1])();
+}
+
+// Every script path named in the router's _onDemand table.
+function onDemandScripts() {
+  return Object.values(onDemandTable()).flatMap(spec => spec.scripts);
 }
 
 describe('scripts loaded on demand', () => {
@@ -37,6 +43,34 @@ describe('scripts loaded on demand', () => {
   it('the router names Reports and its scripts', () => {
     expect(scripts).toContain('/teacher/page-reports.js');
     expect(scripts.length).toBeGreaterThan(1);
+  });
+
+  it('the router names the print, QR and rubric-bank scripts, each where it is used', () => {
+    const table = onDemandTable();
+    expect(table['/assignments'].scripts).toEqual(['/teacher/rubric-library.js', '/teacher/rubric-bank.js']);
+    expect(table.gradesPrint.scripts).toEqual(['/teacher/grades-print.js']);
+    expect(table.gradingSetupCopy.scripts).toEqual(['/teacher/grading-setup-copy.js']);
+    expect(table.qrcode.scripts).toEqual(['/vendor/qrcode.js']);
+    // Each entry names the globals that say its scripts have run, and each
+    // button's entry a title for its Could Not Open question.
+    Object.entries(table).forEach(([key, spec]) => {
+      expect(spec.needs || [spec.page], key).not.toContain(undefined);
+      if (key.charAt(0) !== '/') expect(typeof spec.title, key).toBe('string');
+    });
+  });
+
+  it('each button that uses one waits for it first', () => {
+    const read = rel => readFileSync(resolve(root, rel), 'utf-8');
+    expect(read('teacher/page-gradebook.js')).toMatch(
+      /Router\.withScripts\('gradesPrint', function \(\) \{\s+if \(window\.GradesPrint\) GradesPrint\.open\(/,
+    );
+    expect(read('teacher/dash-class-manager.js')).toMatch(
+      /Router\.withScripts\('gradingSetupCopy', function \(\) \{[\s\S]{0,400}GradingSetupCopy\.openDialog\(/,
+    );
+    // Every sheet of slips or cards prints through printSheet, the only caller of qrSvg's QR maker.
+    expect(read('teacher/qr-slips.js')).toMatch(
+      /function printSheet\(items, renderCell\) \{[\s\S]{0,200}Router\.withScripts\('qrcode', function \(\) \{/,
+    );
   });
 
   it('are each in the service worker precache list', () => {

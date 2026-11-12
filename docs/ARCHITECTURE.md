@@ -46,7 +46,7 @@ The app persists teacher data through Supabase Auth plus a public RPC surface. I
   - `page-reports.js`: Reports, with two tabs. The Term Questionnaire is `report-questionnaire.js` (one student at a time: the student strip, What FullVision Has, the Comment Bank and the Teacher Comment); its Comment Bank is data in `shared/comment-bank.js` and a pure engine in `teacher/comment-bank.js` (`facts` reads one student's term from the data layer; `context`, `fits`, `fill`, `parts` decide what is offered). Generate assembles a draft from the bank's sentences; no model writes text (docs/DECISIONS.md). Progress Reports are `report-studio.js`, `report-sheets.js` (forms, layout and fit) and `report-blocks.js` (one renderer per printed block). Every report surface (these, the Quick Report and its Feedback Pages, Sent to Phones, Print Grades, Export) reads grades through `report-scores.js` (`ReportScores`): one table says which set of scores each surface uses (all work today), `withReportScores` runs a report in it, and its readers are the only way a report file reads a score, comment, note, tick or status from the data layer. `tests/report-score-seam.test.js` holds that.
 - Shared desktop UI shell: `teacher/ui.js`
 
-The desktop app is a single-page app on real paths: `/dashboard`, `/assignments`, `/gradebook`, `/observations`, `/observations/starters`, `/reports` and `/student?id=…`. Netlify serves `teacher/app.html` at each of them and `teacher/router.js` draws the page with `history.pushState`; the list is repeated in `netlify.toml`, `sw.js`, `serve.json` and the local servers, and `tests/app-routes.test.js` keeps them in step. Old `/teacher/app.html#/…` links are rewritten to the clean address at boot. Page modules render into shared mount points for the dock, sidebar, page toolbar, and main content area. The Reports page's scripts (`report-sheets.js` to `page-reports.js`) are not in `teacher/app.html`: `teacher/router.js` loads them on demand, in order, the first time the Reports route opens (`_onDemand`), and `sw.js` precaches them so Reports still opens offline.
+The desktop app is a single-page app on real paths: `/dashboard`, `/assignments`, `/gradebook`, `/observations`, `/observations/starters`, `/reports` and `/student?id=…`. Netlify serves `teacher/app.html` at each of them and `teacher/router.js` draws the page with `history.pushState`; the list is repeated in `netlify.toml`, `sw.js`, `serve.json` and the local servers, and `tests/app-routes.test.js` keeps them in step. Old `/teacher/app.html#/…` links are rewritten to the clean address at boot. Page modules render into shared mount points for the dock, sidebar, page toolbar, and main content area. The Reports page's scripts (`report-sheets.js` to `page-reports.js`) are not in `teacher/app.html`: `teacher/router.js` loads them on demand, in order, the first time the Reports route opens (`_onDemand`), and `sw.js` precaches them so Reports still opens offline. Assignments' rubric scripts (`rubric-library.js`, `rubric-bank.js`) load the same way before Assignments first draws. Scripts one button uses load the first time it is pressed, through `Router.withScripts`: `grades-print.js` (Print Grades), `grading-setup-copy.js` (Copy Grading Setup) and `vendor/qrcode.js` (any sheet of QR slips or student cards, in `QrSlips.printSheet`); a file that cannot be fetched brings up a Try Again question. `tests/reports-on-demand.test.js` checks every on-demand file is precached, exists and is not also a tag.
 
 ### Mobile PWA
 
@@ -88,14 +88,17 @@ Shared runtime modules load before desktop or mobile page modules, in this order
 8. `shared/reporting-term-presets.js`
 9. `shared/data-utilities.js` (the small helpers every file uses: student names, dates, colours, ids and RPC results)
 10. `shared/data.js`
-11. `shared/data-curriculum-index.js` (the BC curriculum index and the learning map built from it)
-12. `shared/offline-queue.js`
-13. `shared/auto-update.js`
-14. `shared/calc.js`
-15. `shared/grade-state.js` (the Draft and Returned rule; a class whose student page is off returns every save at once)
-16. `shared/grader.js` (`Grader`, the one module a screen writes a grade through)
-17. `shared/rubric-draft.js`
-18. `shared/rubric-checks.js`
+11. `shared/data-student-records.js` (student records: flags, goals and goal dates, Core Competency self-assessments, reflections and notes; and the class's modules)
+12. `shared/data-student-cards.js` (student cards: the printed cards that open a student's page, and Cards Work Until)
+13. `shared/data-demo.js` (Demo Mode: the sample class's script, the student features switch, Reset Demo Data and Leave Demo Mode)
+14. `shared/data-curriculum-index.js` (the BC curriculum index and the learning map built from it)
+15. `shared/offline-queue.js`
+16. `shared/auto-update.js`
+17. `shared/calc.js`
+18. `shared/grade-state.js` (the Draft and Returned rule; a class whose student page is off returns every save at once)
+19. `shared/grader.js` (`Grader`, the one module a screen writes a grade through)
+20. `shared/rubric-draft.js`
+21. `shared/rubric-checks.js`
 
 The phone loads the same list with these differences: it leaves out `shared/link-nav.js` and `shared/reporting-term-presets.js`; it loads `shared/rubric-draft.js` later, after `teacher/student-voice.js` and before `teacher/competency-wording.js` (`teacher-mobile/index.html`), not in its place in the list; and it adds `shared/sign-in.js` right after `shared/supabase.js`.
 

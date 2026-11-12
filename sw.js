@@ -29,6 +29,9 @@ const PRECACHE_URLS = [
   '/shared/reporting-term-presets.js',
   '/shared/data-utilities.js',
   '/shared/data.js',
+  '/shared/data-student-records.js',
+  '/shared/data-student-cards.js',
+  '/shared/data-demo.js',
   '/shared/data-curriculum-index.js',
   '/shared/offline-queue.js',
   '/shared/photo-shrink.js',
@@ -85,7 +88,7 @@ const PRECACHE_URLS = [
   '/shared/comment-bank.js',
   // Demo Mode's sample class (DEFAULT_COURSES) is read from this file on
   // every start, never from the saved classes, so an offline start needs
-  // it. The address is exactly the one shared/data.js _loadSeedScript asks.
+  // it. The address is exactly the one shared/data-demo.js _loadSeedScript asks.
   '/shared/seed-data.js?v=46',
   '/teacher/comment-realiser.js',
   '/teacher/comment-lint.js',

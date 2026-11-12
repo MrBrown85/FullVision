@@ -17,7 +17,7 @@ const LAZY = {
     'shared/bank-sets.js', // teacher/comment-bank.js:1224
     'shared/comment-bank.js', // teacher/comment-bank.js:8244
     'curriculum_data.js', // shared/data-curriculum-index.js:23
-    'shared/seed-data.js', // shared/data.js:21400
+    'shared/seed-data.js', // shared/data-demo.js:12
     // Reports' own scripts, loaded the first time Reports opens (teacher/router.js _onDemand).
     'teacher/report-sheets.js',
     'teacher/report-issues.js',
@@ -30,6 +30,13 @@ const LAZY = {
     'teacher/report-feedback.js',
     'teacher/report-feedback-cards.js',
     'teacher/page-reports.js',
+    // Assignments' rubric scripts, loaded before Assignments first draws (teacher/router.js _onDemand).
+    'teacher/rubric-library.js',
+    'teacher/rubric-bank.js',
+    // Loaded the first time a button uses them (teacher/router.js withScripts).
+    'teacher/grades-print.js',
+    'teacher/grading-setup-copy.js',
+    'vendor/qrcode.js',
   ],
   phone: ['shared/bank-proficiency.js', 'shared/bank-comment.js', 'curriculum_data.js', 'shared/seed-data.js'],
   student: [

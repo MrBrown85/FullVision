@@ -7,7 +7,7 @@
  * Numbers: printed as a table, attached to the report, and written to
  * test-results/perf/<name>.json (and to $GITHUB_STEP_SUMMARY on CI).
  */
-import { test } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 import { mockAuth, seedCourse, seedStudents, seedAssessments, seedScores, TEST_STUDENTS } from '../e2e/helpers.js';
@@ -211,21 +211,70 @@ test('Phone grade tab', async ({ page }, testInfo) => {
     () => page.locator('#m-screen-grade-picker').waitFor(),
   );
   await page.locator('.m-seg-btn[data-val="all"]').click();
+  // Opening a task slides the grading screen in (0.35 s). openMs is the tap
+  // to the screen being there; openSettledMs is the tap to the screen at rest.
+  const swiper = page.locator('#m-screen-grade-swiper');
+  const t0 = await page.evaluate(() => performance.now());
   const open = await clickNumbers(
     page,
     () => page.locator('#m-grade-list .m-cell[data-aid="assess-030"]').click(),
-    () => page.locator('#m-screen-grade-swiper').waitFor(),
+    () => swiper.waitFor(),
   );
+  // Checked every frame, so the frame the slide ends on is the one counted.
+  const settled = await (
+    await page.waitForFunction(
+      () => {
+        const s = document.getElementById('m-screen-grade-swiper');
+        return s && !/m-push-enter/.test(s.className) && performance.now();
+      },
+      null,
+      { polling: 'raf' },
+    )
+  ).jsonValue();
+  // The tap is timed on a screen at rest. Timed during the slide, Playwright
+  // waits for the button to stop moving before it taps, so the slide was
+  // counted as the tap (it read about 395 ms; S19-C10). A finger does not
+  // wait: a tap during the slide scores at once.
+  // Student1 has a 2 on Task 30 (SCORES), so tapping 3 changes the mark, and
+  // the 3 itself must light up (any lit level was already there).
+  const card = page.locator('.m-swiper-card[data-sid="stu-001"]');
+  const level3 = card.locator('.m-score-btn[data-score="3"]');
+  const level4 = card.locator('.m-score-btn[data-score="4"]');
+  await expect(card.locator('.m-score-btn[data-score="2"]')).toHaveClass(/m-score-active/);
+  // In the page, from the click reaching it: drawnMs, the first frame that
+  // shows the 3 (its fill then fades in over 0.15 s, which blocks nothing);
+  // readyMs, the first moment after that frame the page is free to take the
+  // next tap.
+  await page.evaluate(() => {
+    const btn = document.querySelector('.m-swiper-card[data-sid="stu-001"] .m-score-btn[data-score="3"]');
+    const tap = (window.__tap = {});
+    document.addEventListener('click', e => (tap.at = e.timeStamp), { capture: true, once: true });
+    const watch = () => {
+      if (tap.at == null || !btn.classList.contains('m-score-active')) return requestAnimationFrame(watch);
+      tap.drawn = performance.now() - tap.at;
+      const ch = new MessageChannel();
+      ch.port1.onmessage = () => (tap.ready = performance.now() - tap.at);
+      ch.port2.postMessage(0);
+    };
+    requestAnimationFrame(watch);
+  });
   const score = await clickNumbers(
     page,
-    () => page.locator('.m-swiper-card').first().locator('.m-score-btn').first().click(),
-    () => page.locator('.m-swiper-card').first().locator('.m-score-btn.m-score-active').first().waitFor(),
+    () => level3.click(),
+    () => page.waitForFunction(() => window.__tap.ready != null, null, { polling: 'raf' }),
   );
+  const inPage = await page.evaluate(() => window.__tap);
+  // The next tap is taken: another level on the card can be tapped (seen,
+  // still, enabled, nothing over it). trial: true checks without tapping.
+  await level4.click({ trial: true });
   record(testInfo, 'Phone grade tab', {
     ...load,
     tabMs: tab.clickToDrawnMs,
     openMs: open.clickToDrawnMs,
+    openSettledMs: Math.round(settled - t0),
     scoreTapMs: score.clickToDrawnMs,
+    scoreTapDrawnMs: Math.round(inPage.drawn),
+    scoreTapReadyMs: Math.round(inPage.ready),
     scoreTapLongestEventMs: score.longestEventMs,
   });
 });

@@ -361,7 +361,7 @@ describe('Demo Mode: the same contract, on this device', () => {
     expect(storedCards('c-one').map(c => c.id)).toEqual(['a']);
     expect(storedCards('c-two').map(c => c.id)).toEqual(['b']);
     // shared/data.js does this as it loads.
-    const src = readFileSync(new URL('../shared/data.js', import.meta.url), 'utf-8');
+    const src = readFileSync(new URL('../shared/data-student-cards.js', import.meta.url), 'utf-8');
     expect(src).toMatch(/\n_dropOldCardCodes\(\);\n/);
   });
 
@@ -3137,7 +3137,7 @@ describe('what the files name', () => {
   });
 
   it('shared/data.js: the two card RPCs once each, teacher-cards once, and no RPC the migration drops', () => {
-    const src = source('shared/data.js');
+    const src = source('shared/data-student-cards.js');
     expect(src.match(/_callRpcWithAuthGuard\('list_student_cards'/g).length).toBe(1);
     expect(src.match(/_writeRpc\('mark_student_cards_printed'/g).length).toBe(1);
     expect(src.match(/functions\/v1\/teacher-cards\?forceFunctionRegion=ca-central-1/g).length).toBe(1);
@@ -3150,7 +3150,7 @@ describe('what the files name', () => {
 
   it('the database drift check sees every card RPC the client calls', async () => {
     const { extractRpcNames } = await import('../scripts/check-db-drift.mjs');
-    const names = extractRpcNames(source('shared/data.js'));
+    const names = extractRpcNames(source('shared/data-student-cards.js'));
     [
       'list_student_cards',
       'mark_student_cards_printed',
@@ -3161,7 +3161,7 @@ describe('what the files name', () => {
   });
 
   it('the card block keeps no reply anywhere: no storage, outbox or Sentry inside makeStudentCards', () => {
-    const src = source('shared/data.js');
+    const src = source('shared/data-student-cards.js');
     const block = src.slice(src.indexOf('function _teacherCardsUrl'), src.indexOf('function markStudentCardsPrinted'));
     expect(block).not.toMatch(/localStorage|sessionStorage|indexedDB|_safeLSSet|_writeRpc|v2Queue|Sentry|_cache\b/);
     // The only log line names the status and the refusal, never the reply.

@@ -63,6 +63,8 @@ test('the gradebook, the printed sheet and the CSV export show the same Class Av
 
   // Printed sheet: its own Class Average function, on its own columns,
   // printing scores as marked (points as points), as the gradebook shows them.
+  // grades-print.js loads when Print Grades is first pressed: wait for it as the button does.
+  await page.evaluate(() => new Promise(done => window.Router.withScripts('gradesPrint', done)));
   const printed = await page.evaluate(cid => {
     var opts = GradesPrint.normalizeOptions({ scoresAs: 'points' });
     var students = getStudents(cid);

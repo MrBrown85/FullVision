@@ -4358,7 +4358,10 @@ window.PageGradebook = (function () {
         exportScoresCSV();
       },
       printGrades: function () {
-        if (window.GradesPrint) GradesPrint.open(activeCourse, { shownIds: _printShownIds });
+        // grades-print.js loads the first time Print Grades is pressed (router.js _onDemand).
+        Router.withScripts('gradesPrint', function () {
+          if (window.GradesPrint) GradesPrint.open(activeCourse, { shownIds: _printShownIds });
+        });
       },
       stopPropOnly: function () {
         /* just stop propagation */
