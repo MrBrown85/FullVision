@@ -1962,16 +1962,6 @@
   background: rgba(0, 122, 255, 0.1);
   color: var(--sp-blue-text);
 }
-.sp-view .sp-send-closed {
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: var(--sp-fill);
-}
-.sp-view .sp-send-closed-title {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-}
 .sp-view .sp-send-closed-line,
 .sp-view .sp-send-line {
   margin: 0;
