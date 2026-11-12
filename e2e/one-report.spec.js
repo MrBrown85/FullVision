@@ -8,6 +8,13 @@ import { test, expect } from '@playwright/test';
 
 const NAME = 'Cece Adeyemi';
 
+/* Every change here lays the whole class out again (27 students, their
+   Feedback Pages too) for the fit line, and a GitHub runner is several
+   times slower than a teacher's machine: main's first run of this file
+   timed out at the default 30 seconds on tests that take 4 to 9 seconds
+   on a Mac (Nov 12). */
+test.setTimeout(120_000);
+
 /* A font wider than any a teacher's machine prints in (see
    e2e/quick-report-columns.spec.js): every layout check runs in the
    machine's fonts and again in this. */
