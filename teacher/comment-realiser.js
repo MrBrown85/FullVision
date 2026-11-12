@@ -407,7 +407,6 @@ window.CommentRealiser = (function () {
     TITLE_SLOTS: TITLE_SLOTS,
     numberWords: numberWords,
     numberIn: numberIn,
-    numberStart: numberStart,
     times: times,
     list: list,
     article: article,
