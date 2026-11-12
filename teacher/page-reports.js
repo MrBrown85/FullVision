@@ -682,9 +682,24 @@ window.PageReports = (function () {
       preview.classList.remove('studio-stacked');
       return;
     }
-    var z = ReportStudio.fitZoom(preview.clientWidth || 800, reportPaper);
+    var z = _isOne()
+      ? _oneZoom(preview.clientWidth || 800)
+      : ReportStudio.fitZoom(preview.clientWidth || 800, reportPaper);
     preview.style.setProperty('--sheet-zoom', String(z.zoom));
     preview.classList.toggle('studio-stacked', !!z.stacked);
+  }
+
+  /* One Report's pages are worked on directly (a row left off, a heading
+     renamed, the comment edited), so they are drawn at reading size: one
+     above the other at up to full size, or two side by side where the
+     canvas is wide enough for both at three quarters or more. */
+  function _oneZoom(canvasWidth) {
+    var sheetW = 8.5 * 96;
+    // The canvas pads 24px a side; two pages sit 22px apart.
+    var two = (canvasWidth - 48 - 22) / (2 * sheetW);
+    if (two >= 0.75) return { zoom: Math.round(Math.min(1, two) * 1000) / 1000, stacked: false };
+    var one = Math.min(1, Math.max(0.5, (canvasWidth - 48) / sheetW));
+    return { zoom: Math.round(one * 1000) / 1000, stacked: true };
   }
 
   /* + Page after the last side; Empty · Remove on an empty side past the
@@ -2052,6 +2067,10 @@ window.PageReports = (function () {
   function _mountStudioKeys() {
     if (_studioKeys) _studioKeys.destroy();
     if (_studioDrag) _studioDrag.destroy();
+    _studioKeys = _studioDrag = null;
+    // One Report's pages have their own controls; the old editor's keys
+    // and dragging would change the built form under them.
+    if (_isOne()) return;
     var root = document.getElementById('studio');
     if (!root) return;
     var fit = function () {

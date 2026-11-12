@@ -6660,3 +6660,7 @@ body.qn-roster #gb-sidebar .student-row-note {
 .one-assessments > .report-block-title {
   margin-bottom: 4px;
 }
+/* No inspector beside One Report's pages, so no gutter is kept for one. */
+.studio-one .rb-preview.studio-pages:not(.studio-all) .sheet-student {
+  padding-right: 0;
+}
