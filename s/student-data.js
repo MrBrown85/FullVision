@@ -441,6 +441,10 @@ var StudentData = (function () {
     page = p || null;
     byStudent = null;
     statuses = {};
+    // calc.js keeps its results by class id, and every class on this page has
+    // the same one ('class'): the last class's results go, as they go when
+    // the teacher's app changes class (shared/data.js calls clearProfCache).
+    if (typeof G.clearProfCache === 'function') G.clearProfCache();
     Object.keys(G.COURSES).forEach(function (id) {
       delete G.COURSES[id];
     });
@@ -619,6 +623,34 @@ var StudentData = (function () {
     },
     getCategories: function (cid) {
       return isThis(cid) && L() ? L().categories : [];
+    },
+    /* The class's rubrics, for calc.js to count each criterion's level toward
+       its competencies (_criterionIndex), as shared/data.js's getRubrics
+       does: the ones `page` sends, which are those of the work listed. */
+    getRubrics: function (cid) {
+      return isThis(cid) ? page.rubrics : [];
+    },
+    /* The class's reporting terms, as shared/data.js reads them from the
+       class's settings: by ordinal, each { ordinal, label, starts_on,
+       ends_on }. calc.js asks whether the last has ended (courseHasEnded:
+       F under 50% then, IE before). */
+    getReportingTerms: function (cid) {
+      var terms = isThis(cid) && L() && Array.isArray(L().config.reportingTerms) ? L().config.reportingTerms : [];
+      return terms
+        .filter(function (t) {
+          return t && typeof t === 'object';
+        })
+        .map(function (t) {
+          return {
+            ordinal: Number(t.ordinal),
+            label: str(t.label),
+            starts_on: str(t.starts_on || t.startsOn),
+            ends_on: str(t.ends_on || t.endsOn),
+          };
+        })
+        .sort(function (a, b) {
+          return a.ordinal - b.ordinal;
+        });
     },
     getCategoryById: function (cid, id) {
       if (!id) return null;
