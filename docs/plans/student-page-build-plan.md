@@ -1,6 +1,6 @@
 # Student page build plan (2026-11-09)
 
-This plans the build of everything on the "Photo Submissions" artboard (https://claude.ai/artifact/GhXQnhDhoxsdfbvVq8QfjF) and the backend behind it. Nothing here is built yet. It is a plan only: no app code changes with it.
+This plans the build of everything on the "Photo Submissions" artboard (https://claude.ai/artifact/GhXQnhDhoxsdfbvVq8QfjF) and the backend behind it. Built behind the build switch, except S15, S16 (paused), S17 (not in this build) and S18-F2; see the Status line of each slice.
 
 Sources: `CLAUDE.md`, `docs/DECISIONS.md` (to the Nov 8 entry), `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, `docs/STUDENT-VOICE-PLAN.md`, `docs/write-path-plan.md`, the artboard's 118 boards and its canvas notes, the kanban (cleanup card cp1), and a read of the code on `main` at `8dd4437f`. Where one of those did not say something, it was put to Colin as a question; his answers of Nov 9 are in section 6 and are written into the plan.
 
@@ -121,7 +121,7 @@ Every new screen gets a row here before it is built.
 
 A new file, `shared/grader.js`, becomes the only code that writes a grade from a screen. Desktop and phone keep their own layouts and call the same actions: set a level, + or −, points, Complete or Incomplete, a status, a checklist tick, a criterion comment, the Overall Comment, clear, fill, undo, Return, Return for Revision, Return N Graded. It also owns the rules that go with them (locks, the points limit, the state of a piece, the To Grade and To Return counts), so the gradebook filter, the dashboard cell and the phone tab cannot disagree.
 
-A guard test fails if any file but `shared/grader.js` calls the score writers in `data.js`. It starts with today's counts as caps and the caps go to zero as each screen moves over, the way `tests/grade-format-guard.test.js` works.
+A guard test fails if any file but `shared/grader.js` calls the score writers in `data.js`. It starts with today's counts as caps and the caps go to zero as each screen moves over, the way the `grade-format-guard` test in `tests/grade.test.js` works.
 
 ### 1.5 Student cards and sessions
 
@@ -208,7 +208,7 @@ The card's routes are in `supabase/functions/student-submit/card-routes.ts` (`S0
 | `shared/photo-queue.js`                                                                                                                                      | New            | Photos waiting to send, in IndexedDB. Used by the student page and both teacher apps.                                                                      |
 | `shared/student-view.js`                                                                                                                                     | New            | Builds what one student sees, from returned grades only. Used by the student page and by Preview as Student, so the two are the same by design.            |
 | `s/student-data.js`                                                                                                                                          | New            | Gives `calc.js` the few readers it needs from the student's own page data, the way the tests already swap those readers.                                   |
-| `s/app.js`, `s/assignments.js`, `s/send.js`, `s/feedback.js`, `s/reflect.js`, `s/learning.js`                                                                | New            | The student page's screens.                                                                                                                                |
+| `s/app.js`, `s/assignments.js`, `s/send.js`, `s/feedback.js`, `s/reflect.js`, `s/page-view.js`                                                               | New            | The student page's screens. My Learning is drawn by `s/page-view.js` and `shared/student-view.js`; there is no `s/learning.js`.                            |
 | `s/questionnaire.js`, `s/report.js`                                                                                                                          | Split out      | Today's questionnaire and phone-report screens, moved out of `s/student.js` unchanged.                                                                     |
 | `teacher/cm-student-page.js`, `teacher/student-cards.js`, `teacher/preview-student.js`, `teacher/markup.js`, `teacher/work-wall.js`, `teacher/myed-input.js` | New            | Teacher screens.                                                                                                                                           |
 | `teacher-mobile/grade-photos.js`, `teacher-mobile/add-work.js`                                                                                               | New            | Phone photo strip, Mark Up host and camera capture.                                                                                                        |
@@ -522,7 +522,7 @@ The wording above is proposed; Colin approves it in each PR, as usual.
 - `S9-F3` Student: See Your Work with Show Marks. Marks follow Students See Your Mark Up. Done (PR 1068).
 - `S9-W1` Wire. The teacher side is wired (Nov 11): in a signed-in class with Send Work on, Mark Up saves with `save_markup` through the outbox, the grader reads the marks (`list_course_feedback`, `list_assessment_markup`), and Return is `return_work`, which gives the marks. The student page asks `feedback`, `markup` and `file-links` from a real card (s/feedback.js) once the class's work is in and it takes work; it is wired in the second PR.
 
-**Status (Nov 11 morning).** Demo Mode only. Not built: the board's place labels beside each note ("Headline"); a note's words in a bubble on the photo (each note is a numbered pin, its words listed under the page). Waits for Colin: whether Mark Up counts as "started grading" (Batch B's rule does not count it, so once Mark Up exists a student could unsend a marked-up photo).
+**Status (Nov 11 morning).** Demo Mode first. Since then the signed-in wiring has merged (PR 1137, the teacher's side), and a real card opens Mark Up (PR 1141, the student's side). Not built: the board's place labels beside each note ("Headline"); a note's words in a bubble on the photo (each note is a numbered pin, its words listed under the page). Waits for Colin: whether Mark Up counts as "started grading" (Batch B's rule does not count it, so once Mark Up exists a student could unsend a marked-up photo).
 
 **Found while building.** For about an hour between the merges of PRs 1069 and 1078, Return on `main` went through the Demo-only `returnWork` for every class, which would have failed for a real class. It was never released, and it is fixed and pinned by a test: a signed-in class calls `returnGrades` as before. The `file-links` reply's shape is not written down in Batch B; the student page reads `{ ok, files: [ { file_id, page, url } ] }`. Where a mark sits on a page is not stated in Batch C's contract (Demo uses fractions from 0 to 1), and `given` is the marks in one function's answer and true or false in another's.
 
@@ -551,7 +551,7 @@ The wording above is proposed; Colin approves it in each PR, as usual.
 - `S10-W1` Wire. The teacher side is wired (Nov 11): Reflect on Feedback is read from the server, Send Answer is `answer_reflection`, the class switch is `set_course_feedback_options`. The student side (`reflect`, `reply`, `answer_seen`) waits for the edge routes. Left in held files: the Class Settings switch row, which still draws only in Demo Mode.
 - Not in the list above: the Reflect on Feedback switch in Class Settings › Student Page (PR 1085, Demo Mode only).
 
-**Status (Nov 11 morning).** Demo Mode only, behind Reflect on Feedback. Not built: Make My Plan after the teacher answers (Batch C's contract has nowhere for it); "Mr. Brown answered your question" in What Changed; the reflection rows on the Assignments page's one-student view; the board's Course Goal card; Read Aloud and voice input. Waits for Colin: whether a reflection saved as an observation may later be quoted in a report (the student is told "Only Mr. Brown sees this.").
+**Status (Nov 11 morning).** Demo Mode first, behind Reflect on Feedback. Since then the signed-in wiring has merged (PR 1137, the teacher's side), and a real card opens Reflect on Feedback (PR 1141, the student's side). Not built: Make My Plan after the teacher answers (Batch C's contract has nowhere for it); "Mr. Brown answered your question" in What Changed; the reflection rows on the Assignments page's one-student view; the board's Course Goal card; Read Aloud and voice input. Waits for Colin: whether a reflection saved as an observation may later be quoted in a report (the student is told "Only Mr. Brown sees this.").
 
 **Found while building.** S10-F4 also needs `teacher/page-student.js` (`_profileTabHtml` builds the section order), which the file list leaves out. Batch C's `reply` does not list `reflect_off`, and `list_course_feedback` returns reflections whatever the switch says; both go to Batch C's refresh.
 
@@ -621,7 +621,7 @@ The wording above is proposed; Colin approves it in each PR, as usual.
 
 **Found while building.** A student's own phone or Chromebook can never show My Learning until `student_submit.page` sends `show_my_learning`, the learning map, categories and the calculation settings; only Preview can show it now. "It counts as 0 until it's in." is true only in Letter and Both classes, so it is shown only there.
 
-**Files.** `shared/student-view.js`, `shared/calc.js` (only for what does not exist yet: "Up from Developing a month ago": returned work dated on or before 30 days ago, Q16), `s/learning.js`, `teacher/cm-student-page.js`, `teacher/comment-bank.js` and `shared/bank-comment.js` (read only, for Next Step).
+**Files.** `shared/student-view.js`, `shared/calc.js` (only for what does not exist yet: "Up from Developing a month ago": returned work dated on or before 30 days ago, Q16), `s/page-view.js`, `teacher/cm-student-page.js`, `teacher/comment-bank.js` and `shared/bank-comment.js` (read only, for Next Step).
 
 **Migrations.** The `show_my_learning` column (Batch C).
 
@@ -711,6 +711,8 @@ Colin, Nov 9 (Q25): not now. MyEdBC Input and the Export Sheet (S16) still ship.
 
 The rest of cleanup card cp1, after the build: what is still in `data.js` and the big page files, the write-path plan's Phase 6, dead code, and the docs. Not a phase of this build.
 
+The plan for S19, its slices and the decisions it needs are in [handoff-review-plan.md](handoff-review-plan.md).
+
 ### Where the cleanup card's items land
 
 | cp1 or kanban item                                    | Slice                |
@@ -767,7 +769,7 @@ The session that hands out the work keeps one list of who holds each of these fi
 - S8 before the release that opens Send Work.
 - S15 after S4 works.
 - S16 and S18 need only `S0-F1`.
-- The teacher student-page redesign (`docs/plans/teacher-student-page-redesign-plan.md`) is paused after R1 (PR 1015) by Colin, Nov 10. R2 to R7 are off until he says otherwise. So S10 no longer waits on R6, and S13 lands its own trend and Next Step helper in `calc.js`.
+- The teacher student-page redesign (`docs/plans/teacher-student-page-redesign-plan.md`) was paused after R1 (PR 1015) by Colin on Nov 10. It has since merged: R1 to R7 (PRs 1015, 1115, 1111, 1121, 1149, 1132). So S10 no longer waits on R6, and S13 lands its own trend and Next Step helper in `calc.js`.
 
 ### A first night, as an example
 

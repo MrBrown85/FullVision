@@ -2177,11 +2177,9 @@ window.ReportSheets = (function () {
   }
 
   return {
-    PAPER: PAPER,
     GAP: GAP,
     ROW_W: ROW_W,
     HALF_W: HALF_W,
-    LINE_PX: LINE_PX,
     form: form,
     BLOCKS: BLOCKS,
     PALETTE_GROUPS: PALETTE_GROUPS,

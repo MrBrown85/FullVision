@@ -8,13 +8,6 @@
 .page-main:has(.report-toolbar) {
   overflow-y: auto !important;
 }
-.report-toolbar-label {
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
-  color: var(--text-3);
-  font-weight: 500;
-  white-space: nowrap;
-}
 .report-toolbar input[type='text'] {
   font-family: var(--font-base);
   font-size: var(--text-base);
@@ -31,23 +24,6 @@
   background: var(--surface);
   border-color: var(--active);
   box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.12);
-}
-.report-print-btn {
-  padding: 5px 14px;
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  border-radius: 8px;
-  white-space: nowrap;
-  background: var(--active);
-  color: #fff;
-  border: none;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.report-print-btn:hover {
-  background: rgba(0, 100, 210, 1);
-  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.2);
 }
 
 /* Multi-select student picker */
@@ -156,13 +132,6 @@
   color: var(--text);
 }
 /* ── Student Progress Report ─────────────────────────────────── */
-.report-student {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 24px 28px;
-  margin-bottom: 16px;
-}
 /* Letterhead: school, class and block over the student's name on the left;
    the report, its dates, the teacher and the student number on the right. */
 .report-header {
@@ -270,18 +239,6 @@
   font-weight: 600;
 }
 
-/* ── Narrative ───────────────────────────────────────────────── */
-.report-narrative {
-  background: var(--bg);
-  border-left: 4px solid var(--active);
-  padding: 16px 20px;
-  margin-bottom: 24px;
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  font-size: var(--text-lg);
-  line-height: 1.7;
-  color: var(--text);
-}
-
 /* ── Proficiency Legend ───────────────────────────────────────── */
 .report-legend {
   display: flex;
@@ -304,17 +261,6 @@
 }
 .report-legend-item:last-child {
   border-right: none;
-}
-.report-legend-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.report-legend-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
 }
 .report-legend-word {
   font-family: var(--font-base);
@@ -377,61 +323,12 @@
 }
 
 /* ── Student Self-Reflection blocks ─────────────────────────── */
-.report-reflect-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-.report-reflect-card {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 12px 14px;
-  background: var(--surface);
-}
-.report-reflect-card-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-.report-reflect-card-icon {
-  font-size: var(--text-xl);
-}
-.report-reflect-card-label {
-  font-size: var(--text-base);
-  font-weight: 700;
-  color: var(--text);
-}
-.report-reflect-card-prompt {
-  font-size: var(--text-sm);
-  color: var(--text-2);
-  line-height: 1.35;
-  margin-bottom: 10px;
-  font-style: italic;
-}
-.report-reflect-scale {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  justify-content: space-between;
-}
-.report-reflect-bubble-group {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
 .report-reflect-bubble {
   width: 14px;
   height: 14px;
   border: 1.5px solid var(--text-3);
   border-radius: 50%;
   flex-shrink: 0;
-}
-.report-reflect-scale-label {
-  font-size: var(--text-xs);
-  color: var(--text-3);
-  font-weight: 600;
 }
 .report-reflect-open {
   margin-top: 6px;
@@ -597,79 +494,6 @@
   white-space: nowrap;
 }
 
-/* ── Enhanced Disposition Dimensions ─────────────────────────── */
-.report-dim-desc {
-  font-size: var(--text-sm);
-  color: var(--text-2);
-  line-height: 1.3;
-  margin-top: 1px;
-}
-
-/* ── Subject & Section blocks ────────────────────────────────── */
-.report-subject-title {
-  font-family: var(--font-base);
-  font-size: var(--text-2xl);
-  font-weight: 600;
-  color: var(--text);
-  margin: 28px 0 14px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
-}
-.report-section-block {
-  margin-bottom: 20px;
-  page-break-inside: avoid;
-}
-.report-section-header {
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  font-weight: 600;
-  color: var(--text);
-  padding: 8px 14px;
-  margin-bottom: 0;
-  border-left: 4px solid var(--text-3);
-  background: var(--report-block-bg);
-}
-.report-tag-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-.report-tag-table th {
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  color: var(--text-3);
-  padding: 8px 12px;
-  border-bottom: 2px solid var(--border);
-  text-align: left;
-  background: var(--bg);
-}
-.report-tag-table td {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--divider-subtle);
-  font-size: var(--text-md);
-  vertical-align: middle;
-  line-height: 1.55;
-}
-.report-tag-table tr:last-child td {
-  border-bottom: none;
-}
-.report-tag-statement {
-  color: var(--text);
-}
-.report-tag-prof {
-  font-weight: 600;
-  white-space: nowrap;
-  min-width: 90px;
-  font-size: var(--text-md);
-}
-.report-tag-evidence {
-  font-size: var(--text-md);
-  color: var(--text-2);
-  min-width: 170px;
-}
-.report-tag-evidence div {
-  margin-bottom: 3px;
-}
-
 /* ── Next Steps ──────────────────────────────────────────────── */
 .report-next-steps {
   background: var(--report-callout-bg);
@@ -677,13 +501,6 @@
   border-radius: var(--radius);
   padding: 18px 22px;
   margin: 24px 0;
-}
-.report-next-steps-title {
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  color: var(--late);
-  font-weight: 600;
-  margin-bottom: 10px;
 }
 .report-next-step-item {
   font-size: var(--text-md);
@@ -727,12 +544,6 @@
   padding: 12px 18px;
   border-top: 1px solid var(--border);
 }
-.report-obs-notes-title {
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  color: var(--text-3);
-  margin-bottom: 8px;
-}
 .report-obs-note {
   font-size: var(--text-md);
   color: var(--text);
@@ -745,68 +556,6 @@
   font-family: var(--font-base);
   font-size: var(--text-xs);
   color: var(--text-3);
-}
-
-/* ── Teacher Comments ────────────────────────────────────────── */
-.report-comments {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
-}
-.report-comments-title {
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  color: var(--text-3);
-  margin-bottom: 8px;
-}
-.report-comment {
-  font-size: var(--text-md);
-  color: var(--text);
-  line-height: 1.6;
-  margin-bottom: 8px;
-  padding-left: 12px;
-  border-left: 3px solid var(--border);
-}
-.report-comment-date {
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  color: var(--text-3);
-}
-
-/* ── Class Summary Table ─────────────────────────────────────── */
-.class-summary-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-.class-summary-table th {
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  background: var(--text);
-  color: #fff;
-  padding: 12px 14px;
-  text-align: left;
-}
-.class-summary-table td {
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-  font-size: var(--text-md);
-}
-.class-summary-table tr:nth-child(even) td {
-  background: var(--bg);
-}
-.class-summary-table tr:hover td {
-  background: var(--active-light);
-}
-.class-summary-name {
-  font-weight: 600;
-}
-.class-summary-name a:hover {
-  color: var(--link) !important;
-  text-decoration: underline;
 }
 
 /* ── Report block containers ── */
@@ -834,17 +583,6 @@
   padding: 20px 28px;
   overflow-y: auto;
 }
-.rb-drag-grip {
-  color: var(--text-3);
-  font-size: var(--text-sm);
-  cursor: grab;
-  user-select: none;
-  width: 14px;
-  text-align: center;
-  flex-shrink: 0;
-  display: inline-flex;
-  justify-content: center;
-}
 
 /* ══════════════════════════════════════════════════════════════
    PRINT STYLES — Letter, double-sided, B&W optimised
@@ -867,10 +605,7 @@
   #gb-sidebar,
   #sidebar-mount,
   .no-print,
-  .report-controls,
-  .report-type-tabs,
   .page-layout > aside,
-  .sidebar-toggle,
   .report-toolbar {
     display: none !important;
   }
@@ -905,18 +640,6 @@
     padding: 0 !important;
     max-width: none !important;
     overflow: visible !important;
-  }
-
-  .report-student {
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    max-width: none !important;
-    box-shadow: none !important;
-    page-break-after: always;
-  }
-  .report-student:last-child {
-    page-break-after: auto;
   }
 
   /* ── Print density — compact everything ── */
@@ -956,12 +679,6 @@
   .report-section-chip-value {
     font-size: var(--text-base) !important;
   }
-  .report-narrative {
-    padding: 10px 14px !important;
-    margin-bottom: 12px !important;
-    font-size: var(--text-md) !important;
-    line-height: 1.5 !important;
-  }
   .report-block-box {
     padding: 10px 14px !important;
     margin-bottom: 10px !important;
@@ -977,22 +694,12 @@
     font-size: var(--text-sm) !important;
     padding: 6px 14px !important;
   }
-  /* Three dimensions per row in print; two left a third of the width empty
-     and pushed the block onto a third page. The description line stays on
-     screen and is left off paper: with the wider fonts of Linux and Windows
-     it tipped three students onto a third page. */
-  .report-dim-desc {
-    display: none !important;
-  }
   .report-section-chart > div[style*='margin-top:12px'] {
     margin-top: 7px !important;
     padding-top: 6px !important;
   }
   .report-next-steps {
     margin-bottom: 10px !important;
-  }
-  .report-next-steps-title {
-    font-size: var(--text-sm) !important;
   }
   .report-legend {
     margin-bottom: 10px !important;
@@ -1002,40 +709,6 @@
   }
   .report-legend-desc {
     font-size: var(--text-xs) !important;
-  }
-  .report-legend-dot {
-    width: 8px !important;
-    height: 8px !important;
-  }
-  .report-tag-table th {
-    font-size: var(--text-xs) !important;
-    padding: 4px 8px !important;
-  }
-  .report-tag-table td {
-    font-size: var(--text-sm) !important;
-    padding: 4px 8px !important;
-  }
-  .report-subject-title {
-    font-size: var(--text-lg) !important;
-    margin: 16px 0 8px !important;
-  }
-  .report-section-header {
-    font-size: var(--text-sm) !important;
-    padding: 5px 10px !important;
-  }
-
-  /* Prevent orphaned section headers */
-  .report-section-block {
-    page-break-inside: avoid !important;
-  }
-  .report-section-header {
-    page-break-after: avoid !important;
-  }
-  .report-subject-title {
-    page-break-after: avoid !important;
-  }
-  .report-tag-table {
-    page-break-inside: avoid !important;
   }
 
   /* Short blocks stay whole; the section breakdown can run longer than a
@@ -1058,12 +731,6 @@
   }
   .report-next-step-item {
     page-break-inside: avoid;
-  }
-  .report-next-steps-title {
-    page-break-after: avoid;
-  }
-  .report-narrative {
-    page-break-inside: avoid !important;
   }
   .report-overall {
     page-break-inside: avoid !important;
@@ -1088,8 +755,7 @@
     border: 1px solid #000 !important;
     border-radius: 4px !important;
   }
-  .report-overall-main,
-  .class-summary-table th {
+  .report-overall-main {
     background: #000 !important;
     color: #fff !important;
     -webkit-print-color-adjust: exact !important;
@@ -1114,9 +780,6 @@
     background: #fff !important;
     border-color: #bbb !important;
   }
-  .report-next-steps-title {
-    color: #000 !important;
-  }
   [data-prof-stroke='1'] {
     stroke: #1a1a1a !important;
   }
@@ -1128,13 +791,6 @@
   }
   [data-prof-stroke='4'] {
     stroke: #c8c8c8 !important;
-  }
-
-  .class-summary-table {
-    page-break-inside: auto;
-  }
-  .class-summary-table tr {
-    page-break-inside: avoid;
   }
 }
 
@@ -1243,34 +899,6 @@
   font-size: var(--text-xs);
   color: #000;
 }
-.sheet-footer {
-  flex: 0 0 auto;
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 6px;
-  padding-top: 4px;
-  border-top: 1px solid #bbb;
-  font-family: var(--font-base);
-  font-size: 7.5pt;
-  color: #555;
-}
-.sheet-pair {
-  display: flex;
-  gap: 12px;
-  align-items: stretch;
-}
-.sheet-pair-cell {
-  flex: 1 1 0;
-  min-width: 0;
-}
-.sheet-pair-cell:first-child {
-  flex: 1.6 1 0;
-}
-.sheet-pair-cell > .report-block-box {
-  height: 100%;
-  box-sizing: border-box;
-}
 .sheet-blank {
   height: 100%;
   display: flex;
@@ -1281,10 +909,6 @@
 }
 .sheet-overflow {
   outline: 2px solid var(--score-2);
-}
-.sheet-room .report-block-box {
-  min-height: inherit;
-  box-sizing: border-box;
 }
 .report-ruled {
   background: repeating-linear-gradient(to bottom, transparent 0 21px, #bbb 21px 22px);
@@ -1349,8 +973,7 @@
     margin: 0 !important;
   }
   .sheet-label,
-  .sheet-student-head,
-  .sheet-note {
+  .sheet-student-head {
     display: none !important;
   }
   /* The blank back of a duplex sheet prints empty; the note is a screen hint. */
@@ -1434,19 +1057,6 @@
   background: var(--divider-subtle);
   color: var(--text-3);
 }
-.sheet-note {
-  width: 8.5in;
-  max-width: 100%;
-  margin: 0 auto 10px;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  color: var(--text-2);
-  line-height: 1.45;
-}
 
 /* Fit Map: every student's sheets at a glance. A CSS mode on the same
    render, so the thumbnails are the real sheets. */
@@ -1470,7 +1080,6 @@
   margin: 0 0 6px;
   font-size: var(--text-sm);
 }
-.report-fitmap .sheet-note,
 .report-fitmap .sheet-label {
   display: none;
 }
@@ -1535,9 +1144,6 @@
   padding: 10px 14px !important;
   margin: 0 0 10px !important;
 }
-.report-sheet .report-learner-profile {
-  margin-bottom: 10px !important;
-}
 
 /* Print sizes inside a sheet, on screen as well as on paper. Generated from
    the @media print block above: every compaction rule, scoped to .report-sheet,
@@ -1575,12 +1181,6 @@
 .report-sheet .report-section-chip-value {
   font-size: var(--text-base) !important;
 }
-.report-sheet .report-narrative {
-  padding: 10px 14px !important;
-  margin-bottom: 12px !important;
-  font-size: var(--text-md) !important;
-  line-height: 1.5 !important;
-}
 .report-sheet .report-block-box {
   padding: 10px 14px !important;
   margin-bottom: 10px !important;
@@ -1596,18 +1196,12 @@
   font-size: var(--text-sm) !important;
   padding: 6px 14px !important;
 }
-.report-sheet .report-dim-desc {
-  display: none !important;
-}
 .report-sheet .report-section-chart > div[style*='margin-top:12px'] {
   margin-top: 7px !important;
   padding-top: 6px !important;
 }
 .report-sheet .report-next-steps {
   margin-bottom: 10px !important;
-}
-.report-sheet .report-next-steps-title {
-  font-size: var(--text-sm) !important;
 }
 .report-sheet .report-legend {
   margin-bottom: 10px !important;
@@ -1617,38 +1211,6 @@
 }
 .report-sheet .report-legend-desc {
   font-size: var(--text-xs) !important;
-}
-.report-sheet .report-legend-dot {
-  width: 8px !important;
-  height: 8px !important;
-}
-.report-sheet .report-tag-table th {
-  font-size: var(--text-xs) !important;
-  padding: 4px 8px !important;
-}
-.report-sheet .report-tag-table td {
-  font-size: var(--text-sm) !important;
-  padding: 4px 8px !important;
-}
-.report-sheet .report-subject-title {
-  font-size: var(--text-lg) !important;
-  margin: 16px 0 8px !important;
-}
-.report-sheet .report-section-header {
-  font-size: var(--text-sm) !important;
-  padding: 5px 10px !important;
-}
-.report-sheet .report-section-block {
-  page-break-inside: avoid !important;
-}
-.report-sheet .report-section-header {
-  page-break-after: avoid !important;
-}
-.report-sheet .report-subject-title {
-  page-break-after: avoid !important;
-}
-.report-sheet .report-tag-table {
-  page-break-inside: avoid !important;
 }
 .report-sheet .report-block-box {
   page-break-inside: avoid !important;
@@ -1665,12 +1227,6 @@
 }
 .report-sheet .report-next-step-item {
   page-break-inside: avoid;
-}
-.report-sheet .report-next-steps-title {
-  page-break-after: avoid;
-}
-.report-sheet .report-narrative {
-  page-break-inside: avoid !important;
 }
 .report-sheet .report-overall {
   page-break-inside: avoid !important;
@@ -1692,8 +1248,7 @@
   border: 1px solid #000 !important;
   border-radius: 4px !important;
 }
-.report-sheet .report-overall-main,
-.report-sheet .class-summary-table th {
+.report-sheet .report-overall-main {
   background: #000 !important;
   color: #fff !important;
   -webkit-print-color-adjust: exact !important;
@@ -1718,9 +1273,6 @@
   background: #fff !important;
   border-color: #bbb !important;
 }
-.report-sheet .report-next-steps-title {
-  color: #000 !important;
-}
 .report-sheet [data-prof-stroke='1'] {
   stroke: #1a1a1a !important;
 }
@@ -1743,19 +1295,6 @@
   --text-base: 0.75rem;
   --text-md: 0.8125rem;
   font-size: 8.75pt;
-}
-
-/* Edit Layout: the banner over the preview and the rail's controls. */
-.rb-preview-wrap {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-.rb-preview-wrap > .rb-preview {
-  flex: 1;
-  min-height: 0;
 }
 
 /* The rail widens while editing so a block's name and its controls share a
@@ -2099,24 +1638,12 @@
 .studio-blk.placed:hover {
   opacity: 0.75;
 }
-.studio-grip {
-  color: #b4bcc7;
-  font-size: 14px;
-  width: 12px;
-  flex: 0 0 12px;
-}
 .studio-blk-name {
   flex: 1;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.studio-sz {
-  margin-left: auto;
-  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
-  font-size: 11px;
-  color: var(--text-3);
 }
 .studio-empty {
   font-size: 12px;
@@ -2202,8 +1729,7 @@
   transform: scale(var(--sheet-zoom));
   transform-origin: top left;
 }
-.rb-preview.studio-pages:not(.studio-all) .sheet-student-head,
-.rb-preview.studio-pages .sheet-note {
+.rb-preview.studio-pages:not(.studio-all) .sheet-student-head {
   display: none;
 }
 .rb-preview.studio-pages .sheet-label {
@@ -2279,10 +1805,6 @@
   color: var(--text-2);
   font-weight: 600;
   margin-bottom: 5px;
-}
-.studio-field-note {
-  font-weight: 400;
-  color: var(--text-3);
 }
 .report-text-body {
   font-size: var(--text-base);
@@ -2735,30 +2257,6 @@
   line-height: 1.35;
   margin-top: 1px;
 }
-.report-dim-note {
-  font-size: 7.5pt;
-  color: #444;
-  line-height: 1.35;
-  margin-top: 1px;
-}
-.report-dim-example {
-  font-style: italic;
-}
-.sheet-capped {
-  position: absolute;
-  left: 0.5in;
-  right: 0.5in;
-  bottom: calc(0.5in + 28px);
-  z-index: 2;
-  padding: 6px 10px;
-  border: 1.5px dashed var(--danger);
-  border-radius: 6px;
-  background: #fdecea;
-  color: var(--danger);
-  font-family: var(--font-base);
-  font-size: 8pt;
-  font-weight: 600;
-}
 .studio-checks {
   display: flex;
   flex-direction: column;
@@ -2938,9 +2436,6 @@ textarea.studio-text {
   }
 }
 @container (width < 460px) {
-  .report-grade-table .col-area {
-    display: none;
-  }
   .report-sheet .report-overall {
     flex-wrap: wrap;
   }
@@ -2953,12 +2448,6 @@ textarea.studio-text {
     box-sizing: border-box;
   }
 }
-@container (width < 380px) {
-  .report-grade-table .col-category,
-  .report-grade-table .col-score {
-    display: none;
-  }
-}
 @container (width < 320px) {
   .report-ct .report-ct-evidence,
   .report-ct-legend {
@@ -2966,7 +2455,6 @@ textarea.studio-text {
   }
 }
 @container (width < 300px) {
-  .report-grade-table .col-date,
   .report-growth .col-before {
     display: none;
   }
@@ -3415,12 +2903,6 @@ textarea.studio-text {
 }
 
 /* ── Page Studio stage 3: the new blocks and their shapes ──────── */
-.report-support-list {
-  margin: 2px 0 0;
-  padding-left: 18px;
-  font-size: var(--text-base);
-  line-height: 1.5;
-}
 .report-glance {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
@@ -3458,10 +2940,6 @@ textarea.studio-text {
 }
 .report-attendance td {
   font-size: var(--text-sm);
-}
-.report-attendance .col-num {
-  width: 6.5em;
-  text-align: right;
 }
 @container (width < 460px) {
   /* Two levels side by side: the word goes under its dots. */
@@ -4125,7 +3603,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   flex: 1;
   min-width: 0;
 }
-.qn-tag,
 .qn-chip-quoted,
 .qn-chip-private {
   flex: none;
@@ -4137,7 +3614,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   color: var(--qn-dim);
   white-space: nowrap;
 }
-.qn-tag.strongest,
 .qn-chip-quoted {
   background: var(--score-4-bg);
   color: var(--score-4-text);
@@ -5695,7 +5171,6 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 
 /* At a Glance: "No note for the report yet · Add one" under the best piece. */
-.qn-note-nudge,
 .qn-note-line {
   font-size: 12px;
 }

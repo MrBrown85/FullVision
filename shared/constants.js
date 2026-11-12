@@ -1,3 +1,4 @@
+// @ts-check
 /* gb-constants.js — Shared constants for FullVision */
 
 /**
@@ -517,7 +518,6 @@ const CATEGORY_REQUIRED_HINT = 'This class has categories, so each assignment ne
 const NEEDS_CATEGORY_LABEL = 'Needs a Category';
 const NEEDS_CATEGORY_TIP = 'This class has categories, so this work needs one. Edit the assignment to choose one.';
 if (typeof window !== 'undefined') {
-  window.CATEGORY_PALETTE = CATEGORY_PALETTE;
   window.categoryTintByIndex = categoryTintByIndex;
 }
 const PROF_COLORS = { 0: '#bbb', 1: 'var(--score-1)', 2: 'var(--score-2)', 3: 'var(--score-3)', 4: 'var(--score-4)' };

@@ -1962,16 +1962,6 @@
   background: rgba(0, 122, 255, 0.1);
   color: var(--sp-blue-text);
 }
-.sp-view .sp-send-closed {
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: var(--sp-fill);
-}
-.sp-view .sp-send-closed-title {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-}
 .sp-view .sp-send-closed-line,
 .sp-view .sp-send-line {
   margin: 0;
@@ -2221,6 +2211,87 @@
 }
 .sp-view .sp-work {
   max-width: 620px;
+}
+
+/* For This Assignment (Handouts and Links; the board "What the Student
+   Sees (Phone)"): the teacher's handout and links under the Description,
+   in a grey box on the card. A handout opens in the page; a link in a new
+   tab. */
+.sp-view .sp-res {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 12px;
+  border-radius: 14px;
+  background: var(--sp-bg);
+}
+.sp-view .sp-res-head {
+  margin: 0;
+  padding-top: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #3a3a3c;
+}
+.sp-view .sp-res-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 6px 2px;
+  border: 0;
+  border-bottom: 1px solid var(--sp-fill);
+  background: transparent;
+  color: var(--sp-text);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity 150ms ease-out;
+}
+.sp-view .sp-res-row:last-child {
+  border-bottom: 0;
+}
+.sp-view .sp-res-row:active {
+  opacity: 0.6;
+}
+.sp-view .sp-res-row:hover .sp-res-name {
+  text-decoration: underline;
+}
+.sp-view .sp-res-icon {
+  flex: none;
+}
+.sp-view .sp-res-icon-doc,
+.sp-view .sp-res-icon-video {
+  color: #c62828;
+}
+.sp-view .sp-res-icon-link {
+  color: var(--sp-blue-text);
+}
+.sp-view .sp-res-words {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.sp-view .sp-res-name {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+.sp-view .sp-res-line {
+  font-size: 13px;
+  color: var(--sp-text-2);
+  overflow-wrap: anywhere;
+}
+.sp-view .sp-res-go {
+  flex: none;
+  color: #8e8e93;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-view .sp-res-row {
+    transition: none;
+  }
 }
 
 /* Reflect on Feedback (S10): its button under Your Feedback, and Your Plan

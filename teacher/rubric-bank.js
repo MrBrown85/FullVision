@@ -1490,7 +1490,6 @@ window.RubricBank = (function () {
     refresh: refresh,
     isOpen: isOpen,
     usesOf: usesOf,
-    matches: matches,
     groups: groups,
     otherClasses: otherClasses,
     rowMeta: rowMeta,

@@ -50,7 +50,7 @@ describe('ui-account-menu', () => {
 
 describe('ui-birthdays', () => {
   /**
-   * Birthday calculation tests — gb-ui.js :: getUpcomingBirthdays()
+   * Birthday calculation tests — teacher/ui.js :: getUpcomingBirthdays()
    */
 
   const CID = 'test';

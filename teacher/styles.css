@@ -69,10 +69,6 @@
   --priority: #ff3b30;
   --priority-light: rgba(255, 59, 48, 0.08);
 
-  /* Toolbar */
-  --toolbar-bg-start: #f6f6f6;
-  --toolbar-bg-end: #ececec;
-
   /* Interactive states */
   --btn-hover-blue: #0066dd;
   --toggle-hover-dark: #1a1a2e;
@@ -146,19 +142,6 @@
   --text-xl: 1.125rem; /* 18px — page headings */
   --text-2xl: 1.5rem; /* 24px — large display numbers */
   --text-3xl: 1.75rem; /* 28px — hero stat values */
-  --text-4xl: 2.25rem; /* 36px — jumbo display */
-
-  /* ── Spacing (4px grid) ──────────────────────────────────── */
-  --space-0: 0;
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-8: 32px;
-  --space-10: 40px;
-  --space-12: 48px;
 
   /* ── Border Radius ───────────────────────────────────────── */
   /* Down chevron for every custom dropdown (class picker, term, sort).
@@ -186,7 +169,6 @@
 
   /* ── Letter Spacing ──────────────────────────────────────── */
   --tracking-tight: -0.01em;
-  --tracking-normal: 0;
   --tracking-wide: 0.04em;
 
   /* ── Layout ──────────────────────────────────────────────── */
@@ -238,16 +220,13 @@ textarea:focus {
 }
 /* Focus ring for custom interactive elements */
 .gb-score:focus-visible,
-.score-val:focus-visible,
 .score-opt:focus-visible,
 .gb-filter-chip:focus-visible,
-.gb-type-chip:focus-visible,
 .tb-btn:focus-visible,
 .tb-action-btn:focus-visible,
 .tb-toggle-btn:focus-visible,
 .student-row:focus-visible,
 .dash-card:focus-visible,
-.tag-select-item:focus-visible,
 .assess-header:focus-visible,
 .rsg-level:focus-visible {
   outline: 2px solid var(--active);
@@ -335,13 +314,10 @@ body.offline-active {
 }
 
 /* ── Course-switch input lock (P7.3) ────────────────────────── */
-body.fv-switching-course #app-table,
 body.fv-switching-course #sidebar-mount,
 body.fv-switching-course .gb-course-select,
 body.fv-switching-course #gb-course-select,
 body.fv-switching-course [data-action='switchCourse'],
-body.fv-switching-course .gb-grade-cell,
-body.fv-switching-course .score-val,
 body.fv-switching-course [data-action='openScoreEditor'] {
   pointer-events: none;
   opacity: 0.55;
@@ -1419,19 +1395,6 @@ body.offline-active #app-dock {
   border-bottom: 1px solid var(--divider-subtle);
   flex-shrink: 0;
 }
-.sb-header-label {
-  font-family: var(--font-base);
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  color: var(--text-3);
-  margin-bottom: 2px;
-}
-.sb-header-course {
-  font-size: var(--text-md);
-  font-weight: 600;
-  color: var(--text);
-  margin-bottom: 8px;
-}
 #gb-course-select {
   width: 100%;
   margin-bottom: 8px;
@@ -1660,16 +1623,6 @@ body.offline-active #app-dock {
   border-radius: var(--radius-xs);
   flex-shrink: 0;
 }
-/* Legacy compat */
-#gb-roster-count {
-  padding: 5px 10px;
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
-  color: var(--text-3);
-  border-top: 1px solid var(--border);
-  flex-shrink: 0;
-  display: none;
-}
 
 /* ── Collapsible sidebar ───────────────────────────────────── */
 .page-layout.sidebar-hidden #sidebar-mount {
@@ -1710,9 +1663,6 @@ body.offline-active #app-dock {
   }
 }
 
-.sidebar-toggle {
-  display: none; /* Now handled by tb-btn in toolbar */
-}
 /* ── Main ───────────────────────────────────────────────────── */
 .page-main {
   flex: 1;
@@ -2035,17 +1985,6 @@ body.offline-active #app-dock {
   background: var(--score-4);
 }
 
-/* Label-style proficiency badges (text instead of number) */
-.prof-label {
-  display: inline-block;
-  font-family: var(--font-base);
-  font-weight: 600;
-  font-size: var(--text-xs);
-  padding: 3px 8px;
-  border-radius: var(--radius-sm);
-  color: #fff;
-}
-
 /* ── Prof bar ───────────────────────────────────────────────── */
 .prof-bar {
   height: 6px;
@@ -2059,18 +1998,6 @@ body.offline-active #app-dock {
   transition: width 0.3s;
 }
 
-/* ── Section label ──────────────────────────────────────────── */
-.section-label {
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
-  color: var(--text-3);
-  margin-bottom: 8px;
-  margin-top: 18px;
-}
-.section-label:first-child {
-  margin-top: 0;
-}
-
 /* ── Cards ──────────────────────────────────────────────────── */
 .card {
   background: var(--surface);
@@ -2080,55 +2007,12 @@ body.offline-active #app-dock {
   margin-bottom: 12px;
   box-shadow: var(--shadow-sm);
 }
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-.card-title {
-  font-family: var(--font-base);
-  font-size: var(--text-md);
-  font-weight: 600;
-  color: var(--text);
-}
 
 /* ── Heatmap ────────────────────────────────────────────────── */
 
 /* ── Heatmap row actions (edit/delete) ─────────────────────── */
 
 /* ── Focus areas callout ───────────────────────────────────── */
-
-/* ── Stats dashboard ───────────────────────────────────────── */
-.stats-row {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
-}
-.stat-card {
-  background: var(--surface);
-  border: 1px solid var(--overlay-hover);
-  border-radius: var(--radius);
-  padding: 14px 20px;
-  text-align: center;
-  min-width: 100px;
-  box-shadow: var(--shadow-sm);
-}
-.stat-card-accent {
-  border-top: 3px solid;
-}
-.stat-val {
-  font-family: var(--font-base);
-  font-weight: 600;
-  line-height: 1;
-}
-.stat-label {
-  font-family: var(--font-base);
-  font-size: var(--text-2xs);
-  color: var(--text-3);
-  margin-top: 4px;
-}
 
 /* Completion ring */
 .completion-ring {
@@ -2167,29 +2051,11 @@ body.offline-active #app-dock {
   overflow: hidden;
   box-shadow: var(--shadow-sm);
 }
-.dash-section-stripe {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-}
-.dash-section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
 .dash-section-title {
   font-family: var(--font-base);
   font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text);
-}
-.dash-section-subject {
-  font-family: var(--font-base);
-  font-size: var(--text-2xs);
-  color: var(--text-3);
 }
 .dash-tag-row {
   display: flex;
@@ -2209,16 +2075,6 @@ body.offline-active #app-dock {
   padding-left: 8px;
   padding-right: 8px;
   border-radius: var(--radius-sm);
-}
-.dash-tag-label {
-  flex: 1;
-  min-width: 0;
-  font-size: var(--text-base);
-  color: var(--text);
-}
-.dash-tag-bar {
-  width: 100px;
-  flex-shrink: 0;
 }
 .dash-tag-evidence {
   font-family: var(--font-base);
@@ -2322,17 +2178,6 @@ body.offline-active #app-dock {
   padding-top: 8px;
   border-top: 1px dashed var(--border);
 }
-.section-goal-label,
-.section-reflection-label {
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
-  color: var(--text-3);
-  margin-bottom: 3px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
 .section-goal-text,
 .section-reflection-text {
   font-size: var(--text-base);
@@ -2354,19 +2199,6 @@ body.offline-active #app-dock {
   padding: 1px 6px;
   border-radius: var(--radius-xs);
   color: #fff;
-}
-.edit-btn-inline {
-  font-size: var(--text-sm);
-  color: var(--link);
-  cursor: pointer;
-  border: none;
-  background: none;
-  padding: 0 4px;
-  font-family: var(--font-base);
-}
-.edit-btn-inline:hover {
-  color: var(--text);
-  text-decoration: underline;
 }
 .inline-edit-area {
   margin-top: 4px;
@@ -2409,127 +2241,7 @@ body.offline-active #app-dock {
   padding: 3px 10px;
 }
 
-/* ── Report goal/reflection rows ──────────────────────────── */
-.report-goal-row,
-.report-reflection-row {
-  padding: 10px 14px;
-  font-size: var(--text-md);
-  color: var(--text);
-  background: var(--bg);
-  border-bottom: 1px solid var(--divider-subtle);
-  line-height: 1.55;
-}
-.report-goal-row strong,
-.report-reflection-row strong {
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  color: var(--text-3);
-  margin-right: 8px;
-}
-.report-completion-statement {
-  font-size: var(--text-md);
-  color: var(--text-2);
-  margin: 20px 0;
-  padding: 12px 18px;
-  background: var(--bg);
-  border-radius: var(--radius-sm);
-  border-left: 3px solid var(--active);
-  line-height: 1.5;
-  font-family: var(--font-base);
-}
-
-/* ── Student header ─────────────────────────────────────────── */
-.student-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 20px;
-  margin-bottom: 20px;
-}
-.student-avatar-lg {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
-  background: var(--active);
-  color: #fff;
-  font-family: var(--font-mono);
-  font-size: var(--text-xl);
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.student-name-lg {
-  font-family: var(--font-base);
-  font-size: var(--text-2xl);
-  font-weight: 600;
-  color: var(--text);
-  line-height: 1.2;
-}
-.student-sub-lg {
-  font-size: var(--text-md);
-  color: var(--text-2);
-}
-
 /* ── Evidence list ──────────────────────────────────────────── */
-
-/* ── Teacher notes ──────────────────────────────────────────── */
-.note-add textarea {
-  width: 100%;
-  font-family: var(--font-base);
-  font-size: var(--text-md);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 8px 10px;
-  resize: none;
-  min-height: 70px;
-  outline: none;
-  margin-bottom: 6px;
-}
-.note-add textarea:focus {
-  border-color: var(--active);
-}
-.note-card {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 8px 10px;
-  margin-bottom: 6px;
-}
-.note-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
-}
-.note-date {
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
-  color: var(--text-3);
-}
-.note-delete {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--text-3);
-  font-size: var(--text-sm);
-}
-.note-delete:hover {
-  color: var(--priority);
-}
-.note-body {
-  font-size: var(--text-md);
-  color: var(--text);
-  line-height: 1.5;
-  outline: none;
-}
-.note-body:focus {
-  background: var(--active-light);
-  padding: 3px;
-  margin: -3px;
-  border-radius: var(--radius-xs);
-}
 
 /* ── Assessment badges ──────────────────────────────────────── */
 .type-badge {
@@ -2562,19 +2274,6 @@ body.offline-active #app-dock {
 .gb-needs-category {
   color: var(--score-2-text);
   font-weight: 600;
-}
-
-/* ── Tags ───────────────────────────────────────────────────── */
-.tag-chip {
-  display: inline-block;
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
-  padding: 2px 7px;
-  border-radius: var(--radius-xl);
-  margin-right: 3px;
-  margin-bottom: 3px;
-  background: var(--surface-2);
-  color: var(--text-2);
 }
 
 /* ── Buttons — 3-tier system ────────────────────────────────── */
@@ -2626,19 +2325,6 @@ body.offline-active #app-dock {
 }
 .btn-danger:hover {
   filter: brightness(0.92);
-}
-.btn-back {
-  font-family: inherit;
-  font-size: var(--text-base);
-  color: var(--text-3);
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 0;
-}
-.btn-back:hover {
-  color: var(--link);
 }
 
 /* ── Points-mode cells (shared: assignments + gradebook) ── */
@@ -2720,8 +2406,7 @@ body.offline-active #app-dock {
   border-bottom-color: var(--text-3);
   cursor: not-allowed;
 }
-.score-row.has-status .pts-input-cell .gb-pts-max,
-.score-row.has-status .pts-pct-cell .gb-pts-live-pct {
+.score-row.has-status .pts-input-cell .gb-pts-max {
   opacity: 0.35;
 }
 .gb-pts-input::-webkit-outer-spin-button,
@@ -2769,149 +2454,6 @@ body.offline-active #app-dock {
   color: var(--text-3);
   font-weight: 400;
 }
-.pts-pct-cell {
-  text-align: center;
-}
-.pts-pct-cell .gb-pts-live-pct {
-  font-size: var(--text-base);
-  min-height: auto;
-}
-.pts-bulk-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  border-top: 1px solid var(--border);
-}
-.pts-bulk-bar .gb-pts-input {
-  width: 60px;
-  font-size: var(--text-md);
-  padding: 4px 0 3px;
-}
-.pts-bulk-bar .gb-pts-max {
-  font-family: var(--font-mono);
-  font-size: var(--text-base);
-  color: var(--text-3);
-}
-
-/* ── Form elements ──────────────────────────────────────────── */
-.form-group {
-  margin-bottom: 12px;
-}
-.form-group label {
-  display: block;
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
-  color: var(--text-3);
-  margin-bottom: 3px;
-}
-.form-input {
-  width: 100%;
-  font-family: var(--font-base);
-  font-size: var(--text-md);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 6px 10px;
-  color: var(--text);
-  outline: none;
-}
-.form-input:focus {
-  border-color: var(--active);
-}
-.tag-select-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.tag-select-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: var(--text-base);
-  cursor: pointer;
-  padding: 3px 8px;
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--border);
-  transition: all var(--duration-micro);
-}
-.tag-select-item:hover {
-  border-color: var(--active);
-}
-.tag-select-item.checked {
-  background: var(--text);
-  border-color: var(--text);
-  color: #fff;
-}
-.tag-select-item.checked span {
-  color: #fff !important;
-}
-.tag-select-item.checked::before {
-  content: '\2713 ';
-  font-weight: 700;
-  margin-right: 2px;
-}
-.tag-select-item input {
-  display: none;
-}
-
-/* ── Settings ───────────────────────────────────────────────── */
-.settings-card {
-  background: var(--surface);
-  border: 1px solid var(--overlay-hover);
-  border-radius: var(--radius);
-  padding: 16px;
-  margin-bottom: 12px;
-  box-shadow: var(--shadow-sm);
-}
-.settings-title {
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  color: var(--text-3);
-  margin-bottom: 10px;
-}
-.settings-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-  gap: 12px;
-}
-.settings-row label {
-  font-size: var(--text-md);
-  color: var(--text);
-}
-
-/* Collapsible Advanced section */
-.advanced-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 14px 16px;
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  color: var(--text-3);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: color var(--duration-micro);
-  text-align: left;
-}
-.advanced-toggle:hover {
-  color: var(--text-2);
-}
-.advanced-chevron {
-  display: inline-block;
-  transition: transform 0.2s ease;
-  font-size: var(--text-xs);
-}
-.advanced-chevron.open {
-  transform: rotate(90deg);
-}
-.advanced-body {
-  border-top: 0.5px solid var(--divider-subtle);
-}
 
 /* ── Assessment cards (settings page) ──────────────────────── */
 .assess-card {
@@ -2955,12 +2497,6 @@ body.offline-active #app-dock {
 .assess-card.open .assess-body {
   display: block;
 }
-.assess-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin: 10px 0;
-}
 .score-row {
   display: flex;
   align-items: center;
@@ -2970,92 +2506,6 @@ body.offline-active #app-dock {
 }
 .score-row:last-child {
   border-bottom: none;
-}
-.score-name {
-  width: 130px;
-  font-size: var(--text-md);
-  font-weight: 500;
-  flex-shrink: 0;
-}
-.score-tags {
-  display: flex;
-  gap: 3px;
-  flex: 1;
-  flex-wrap: wrap;
-}
-.score-tag-cell {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 80px;
-}
-.score-tag-label {
-  font-family: var(--font-base);
-  font-size: var(--text-2xs);
-  color: var(--text-3);
-  width: 28px;
-  flex-shrink: 0;
-}
-.score-val {
-  width: 32px;
-  height: 28px;
-  border-radius: var(--radius-xs);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-mono);
-  font-size: var(--text-base);
-  font-weight: 700;
-  color: #fff;
-  cursor: pointer;
-  user-select: none;
-  transition: all 0.1s;
-}
-.score-val:hover {
-  opacity: 0.8;
-}
-.score-val.s0 {
-  background: var(--surface-2);
-  color: var(--text-3);
-}
-.score-val.s1 {
-  background: var(--score-1);
-}
-.score-val.s2 {
-  background: var(--score-2);
-}
-.score-val.s3 {
-  background: var(--score-3);
-}
-.score-val.s4 {
-  background: var(--score-4);
-}
-.assess-actions {
-  display: flex;
-  gap: 6px;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
-}
-
-/* ── Report tables ──────────────────────────────────────────── */
-.report-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 20px;
-}
-.report-table th,
-.report-table td {
-  padding: 6px 8px;
-  border: 1px solid var(--border);
-  font-size: var(--text-base);
-  text-align: left;
-}
-.report-table th {
-  background: var(--surface);
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  color: var(--text-2);
 }
 
 /* ── Modal ──────────────────────────────────────────────────── */
@@ -3081,21 +2531,9 @@ body.offline-active #app-dock {
 }
 
 /* ── Assessment title links ─────────────────────────────────── */
-.gb-assess-group a:hover,
 .tag-assess-title:hover {
   text-decoration: underline;
   color: var(--link) !important;
-}
-
-.module-badge {
-  display: inline-block;
-  font-family: var(--font-base);
-  font-size: var(--text-2xs);
-  padding: 1px 7px;
-  border-radius: var(--radius);
-  color: #fff;
-  font-weight: 600;
-  margin-left: 6px;
 }
 
 /* ── Learning Outcomes Editor ──────────────────────────────── */
@@ -3246,13 +2684,6 @@ body.offline-active #app-dock {
   color: var(--text-2);
   line-height: 1.5;
   margin-bottom: 20px;
-}
-.confirm-help {
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  color: var(--text-3);
-  line-height: 1.5;
-  margin: -8px 0 16px;
 }
 .confirm-form {
   display: flex;
@@ -3457,8 +2888,7 @@ body.offline-active #app-dock {
   .offline-banner,
   .undo-toast,
   .sync-toast,
-  .tb-user-menu,
-  .sidebar-toggle {
+  .tb-user-menu {
     display: none !important;
   }
 
@@ -3487,15 +2917,6 @@ body.offline-active #app-dock {
   }
   tr {
     page-break-inside: avoid;
-  }
-
-  /* Reports: page breaks between students */
-  .report-student-section {
-    page-break-inside: avoid;
-    page-break-after: always;
-  }
-  .report-student-section:last-child {
-    page-break-after: auto;
   }
 }
 
@@ -3534,9 +2955,6 @@ body.offline-active #app-dock {
     max-width: calc(100vw - 48px);
     box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
   }
-  .sidebar-toggle {
-    display: flex !important;
-  }
   .page-main {
     padding: 16px;
   }
@@ -3557,15 +2975,6 @@ body.offline-active #app-dock {
 
   /* Heatmap: make horizontally scrollable */
 
-  /* Score grid: horizontally scrollable with sticky names */
-  .score-name {
-    position: sticky;
-    left: 0;
-    z-index: 1;
-    background: var(--surface);
-    min-width: 100px;
-  }
-
   /* Buttons: larger touch targets */
   .btn,
   .btn-primary,
@@ -3584,19 +2993,6 @@ body.offline-active #app-dock {
   .confirm-card {
     max-width: 95%;
     padding: 20px;
-  }
-
-  /* Student stats bar: wrap on mobile */
-  .student-stats-bar {
-    flex-wrap: wrap;
-  }
-  .section-mini-card {
-    min-width: 120px;
-  }
-
-  /* Insights grid: single column */
-  .insights-grid {
-    grid-template-columns: 1fr !important;
   }
 
   /* Dashboard grid: single column */
@@ -3798,8 +3194,6 @@ body.offline-active #app-dock {
     --obs-note-on: #1d1d1f;
     --obs-note-text: #ffd60a;
     --obs-note-edge: #ffd60a;
-    --toolbar-bg-start: #2c2c2e;
-    --toolbar-bg-end: #1c1c1e;
     --btn-hover-blue: #409cff;
     --toggle-hover-dark: #4a4a4e;
     --danger: #ff453a;
@@ -3975,9 +3369,6 @@ body.offline-active #app-dock {
 /* ── Utility classes (CSP: replace inline style attrs) ──────── */
 .u-hidden {
   display: none;
-}
-.u-text-center {
-  text-align: center;
 }
 .u-flex-col-fill {
   display: flex;

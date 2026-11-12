@@ -1359,41 +1359,6 @@ window.DashOverview = (function () {
     return _dayNum(todayStr) - _dayNum(last) >= OBS_OVERDUE_DAYS;
   }
 
-  function renderBirthdayWidget(cid) {
-    var upcomingBdays = getUpcomingBirthdays(cid);
-    if (upcomingBdays.length === 0) return '';
-    var html = '<div class="dash-birthday-box">' + '<div class="dash-section-title">Upcoming Birthdays</div>';
-    upcomingBdays.forEach(function (b) {
-      var dob = parseLocalDate(b.student.dateOfBirth);
-      var monthDay = dob.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-      var countdown =
-        b.daysUntil === 0
-          ? '<span class="bday-today">Today!</span>'
-          : b.daysUntil === 1
-            ? '<span class="bday-soon">Tomorrow</span>'
-            : '<span class="bday-days">in ' + b.daysUntil + ' days</span>';
-      html +=
-        '<div class="bday-row">' +
-        '<div class="bday-avatar">' +
-        esc(initials(b.student)) +
-        '</div>' +
-        '<div class="bday-info">' +
-        '<div class="bday-name">' +
-        esc(displayName(b.student)) +
-        '</div>' +
-        '<div class="bday-date">' +
-        monthDay +
-        '</div>' +
-        '</div>' +
-        '<div class="bday-countdown">' +
-        countdown +
-        '</div>' +
-        '</div>';
-    });
-    html += '</div>';
-    return html;
-  }
-
   return {
     renderDashToolbar: renderDashToolbar,
     studentControlsHtml: studentControlsHtml,
@@ -1410,7 +1375,6 @@ window.DashOverview = (function () {
     compFilterHtml: compFilterHtml,
     coreCardHtml: coreCardHtml,
     coreView: coreView,
-    renderBirthdayWidget: renderBirthdayWidget,
     obsWeekStart: obsWeekStart,
     obsCoverageWeeks: obsCoverageWeeks,
     obsLastDate: obsLastDate,

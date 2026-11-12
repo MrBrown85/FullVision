@@ -70,6 +70,20 @@ describe('scheduled-sweep: the database timer runs the removal worker', () => {
     expect(t.logs).toContainEqual({ route: 'scheduled-sweep', worker: 'ran', removed: 3, skipped: 0, left: 0 });
   });
 
+  it('a removed handout’s queued pages are deleted too (Handouts and Links); any other shape stays queued', async () => {
+    const t = setup();
+    const R = 'a2a2a2a2-0000-4000-8000-000000000002';
+    t.world.queue.push({ id: 1, bucket: 'student-photos', path: `${C1}/handouts/${R}/1.jpg`, done: false });
+    t.world.queue.push({ id: 2, bucket: 'student-photos', path: `${C1}/handouts/${R}/2.jpg`, done: false });
+    t.world.queue.push({ id: 3, bucket: 'student-photos', path: `${C1}/handouts/${R}/../x.jpg`, done: false });
+    await t.send({ route: 'scheduled-sweep', secret: SECRET });
+    expect(t.world.storeCalls.filter(c => c[0] === 'remove').flatMap(c => c[1])).toEqual([
+      `${C1}/handouts/${R}/1.jpg`,
+      `${C1}/handouts/${R}/2.jpg`,
+    ]);
+    expect(t.world.queue.map(q => q.done)).toEqual([true, true, false]);
+  });
+
   it('nothing else in the body is read: no path, class or limit a caller sends is used', async () => {
     const t = setup();
     queueSome(t.world, 1);

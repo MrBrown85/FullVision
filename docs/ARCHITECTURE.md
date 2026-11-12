@@ -7,17 +7,20 @@ Use the backend-design docs for implementation detail and the live handoff/backl
 
 ## System overview
 
-FullVision is a teacher-facing web application with two shipped runtime surfaces:
+FullVision is a teacher-facing web application with three shipped runtime surfaces:
 
 - Desktop SPA at `teacher/app.html`
 - Mobile PWA at `teacher-mobile/index.html`
+- The student page at `s/index.html`, which students open with a printed card (students have no logins; see Runtime surfaces)
 
-Both surfaces share the same core client runtime:
+The two teacher surfaces share the same core client runtime:
 
 - authentication in `shared/supabase.js`
 - local cache and data orchestration in `shared/data.js`
 - offline retry infrastructure in `shared/offline-queue.js`
 - grading and reporting calculations in `shared/calc.js`
+
+The student page loads its own smaller set (see Student page): it has no sign-in, no data layer and no cache, and it reads `shared/calc.js` and `shared/constants.js` only through `s/student-data.js`.
 
 The app persists teacher data through Supabase Auth plus a public RPC surface. It is deployed as a static site on Netlify, with environment values injected into HTML at request time by an edge function.
 
@@ -27,7 +30,7 @@ The app persists teacher data through Supabase Auth plus a public RPC surface. I
 
 - `login.html` and `login-auth.js` handle sign-in, sign-up, password reset, and Demo Mode entry.
 - Authenticated users are routed into the teacher experience.
-- Teachers are the only accounts. Students answer questionnaires and read phone reports on the student page (`s/index.html`; `s/student.js`, the shell, then its screens in `s/questionnaire.js` and `s/report.js`; `shared/phone-report-view.js`) with a code from their slip, through the `student-submit` Supabase edge function. A student card's screens are `s/app.js` (the card, Is This You?, After Done, Switching Classes, the page's frame and its four tabs) and `s/assignments.js` (To Do, Sent, Back and All Assignments), drawn from `shared/student-view.js` (the one builder the student page and Preview as Student share), with `s/student-data.js` feeding `shared/calc.js` from the student's own page (`calc.js` and `constants.js` are fetched only when the list is about to open, so a slip never loads them); they run in Demo Mode only (`/s/#demo-card`) until the card routes exist. There is no parent portal.
+- Teachers are the only accounts. Students have no logins: they open the student page (`s/index.html`) with a code, either from a questionnaire or report slip or from a printed student card, through the `student-submit` Supabase edge function. See Student page below. There is no parent portal.
 
 ### Desktop SPA
 
@@ -58,6 +61,15 @@ The desktop app is a single-page app on real paths: `/dashboard`, `/assignments`
 
 The mobile experience reuses the same shared auth, data, queue, and calculation layers as desktop, but presents them through a separate shell and touch-first UI.
 
+### Student page
+
+- Entry point: `s/index.html`. A student reaches it with a code from a slip (one questionnaire or one phone report) or from a printed student card (the student's page for a class). The server answers every request through the `student-submit` edge function (`supabase/functions/student-submit/`); a teacher's browser has slips and cards made through the `teacher-cards` edge function (`supabase/functions/teacher-cards/`), which draws each code once and keeps nothing.
+- A slip is `s/student.js` (the shell), then `s/questionnaire.js` and `s/report.js`, with `shared/phone-report-view.js`.
+- A card is `s/app.js` (the card, Is This You?, After Done, Switching Classes, the page's frame and its four tabs) and `s/assignments.js` (To Do, Sent, Back and All Assignments). Both draw from `shared/student-view.js`, the one builder the student page and Preview as Student share, and from `s/page-view.js`, the one drawing of a class's page (a pure function of the view, with its look in `s/page-view.css`), which Preview as Student loads too.
+- Card screens that come with a piece of work: `s/send.js` (Check and Send: photographing and sending work, Unsend or Replace), `s/feedback.js` (See Your Work, with the teacher's marks and Show Marks), `s/handouts.js` (a teacher's handout, one page at a time) and `s/reflect.js` (Reflect on Feedback and the teacher's answer).
+- `s/student-data.js` turns the student's page reply into the shape `shared/calc.js` reads, so a result on the student page is worked out by the same code as the teacher's gradebook cell. `calc.js` and `constants.js` are fetched only when the list is about to open, so a slip never loads them.
+- A real card asks the student-submit routes: `card-routes.ts` (card, verify, add-card, page, seen, done), `forms-routes.ts` (the Questionnaires and My Reports tabs), `send-routes.ts`, `feedback-routes.ts`, `handout-routes.ts` and `revision-routes.ts`; a slip uses `slip-routes.ts` and `handler.ts`. Demo Mode (`/s/#demo-card`, with variants such as `#demo-card-send`) answers the same routes on the device and sends nothing. Send Work, Reflect on Feedback and the rest of the page sit behind the per-class build switch (`course.student_page_enabled`) described below, and a class's page is drawn exactly as before when they are off.
+
 ## Shared client architecture
 
 ### Script and module model
@@ -83,9 +95,23 @@ Shared runtime modules load before desktop or mobile page modules, in this order
 15. `shared/rubric-draft.js`
 16. `shared/rubric-checks.js`
 
-The phone loads the same list without `link-nav.js`, `reporting-term-presets.js` and `rubric-draft.js`.
+The phone loads the same list with these differences: it leaves out `shared/link-nav.js` and `shared/reporting-term-presets.js`; it loads `shared/rubric-draft.js` later, after `teacher/student-voice.js` and before `teacher/competency-wording.js` (`teacher-mobile/index.html`), not in its place in the list; and it adds `shared/sign-in.js` right after `shared/supabase.js`.
 
 Desktop or mobile modules then layer on top of that shared runtime.
+
+### Other shared modules
+
+Modules in `shared/` that are not in the boot list above, each loaded by the page that needs it:
+
+- `shared/sign-in.js`: what the two sign-in screens (`login.html` and the phone's sign-in card) share: Try Demo Mode, the Restore Account prompt, where a password reset link lands, Check Your Inbox after Create Account.
+- `shared/device.js`: tells a phone from a desktop (`isPhone`, `prefersMobileApp`, `teacherAppPath`), so a teacher lands in the right app; loaded by `login.html` and `launch.html`.
+- `shared/core-self.js`: which reporting term the Core Competency self-assessments are read for, and each student's step in it (the teacher's student page, `teacher/page-student.js`, and the dashboard's Core Competencies card read it, so they agree on the term).
+- `shared/questionnaire-templates.js`: the questionnaire templates the database seeds, generated by `scripts/questionnaire_templates.py --js`; Demo Mode and a signed-out page read them from here. Do not edit it by hand.
+- `shared/photo-shrink.js`: every photo is made smaller before it uploads (type check, shrink to a JPEG, upright orientation, GPS and camera details dropped); it builds no HTML and sends nothing.
+- `shared/photo-readers.js`: the PDF reader `shared/photo-shrink.js` asks for, backed by pdf.js in `vendor/pdfjs/`, fetched only when a PDF is first opened.
+- `shared/photo-queue.js`: photos waiting to send, kept in IndexedDB until the server has them (the outbox in `shared/offline-queue.js` holds JSON and cannot hold a photo); it has no network code, the caller supplies the upload. The student page and both teacher apps use it.
+- `shared/markup-draw.js`: Mark Up's drawing and hit-testing, plain functions over a page's marks, so the desktop's Mark Up and the phone's draw and erase the same way (`window.MarkupDraw`).
+- `shared/bank-comment.js`, `shared/bank-proficiency.js`, `shared/bank-core-competencies.js` and `shared/bank-sets.js`: slices of the BC curriculum bank, built by `scripts/build-curriculum-bank.mjs` from `data/bc-*.json` (do not edit). They are the wording Generate uses to name a competency and its next step, the four level descriptors for printed Tag Rubrics (loaded when a rubric is printed), each Core Competency's name and description (loaded the first time the assessment form's hover shows) and the per-course-set wording.
 
 ### Static and lazy-loaded assets
 
@@ -238,7 +264,7 @@ FullVision is organized around a teacher-owned data model:
 - term/report artifacts (`term_rating`: the comment as plain text, the six work habits, approval, attendance totals)
 - preferences and report configuration
 
-The app is designed around teacher-owned classroom workflows rather than student or parent self-service access.
+The app is designed around teacher-owned classroom workflows. Students have no logins and there is no parent portal: a student opens the student page with a printed card or a slip, and sees only what the teacher has returned.
 
 ### Grading model
 

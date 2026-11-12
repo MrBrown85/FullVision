@@ -1177,15 +1177,12 @@ window.MObserve = (function () {
     filterPicker: filterPicker,
     flagFromSheet: flagFromSheet,
     flagDone: flagDone,
-    shortName: shortName,
     presentQuickMenu: presentQuickMenu,
     quickPost: quickPost,
     quickStarters: quickStarters,
     typePill: typePill,
-    typeBlock: typeBlock,
     tagChips: tagChips,
     cardHtml: cardHtml,
-    dayLabel: dayLabel,
     refreshFeed: function (cid) {
       _refreshFeed(cid, false);
     },

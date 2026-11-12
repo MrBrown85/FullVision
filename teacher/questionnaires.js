@@ -312,7 +312,6 @@ var Questionnaires = (function () {
   }
 
   return {
-    templates: templates,
     template: template,
     reflectionTemplate: reflectionTemplate,
     courseGrade: courseGrade,
@@ -321,7 +320,6 @@ var Questionnaires = (function () {
     loaded: loaded,
     load: load,
     find: find,
-    age: age,
     refreshIfStale: refreshIfStale,
     save: save,
     turnOn: turnOn,

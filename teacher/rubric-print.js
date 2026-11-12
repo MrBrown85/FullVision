@@ -1924,7 +1924,6 @@
   window.RubricPrint = {
     printLabel: printLabel,
     LAYOUTS: LAYOUTS,
-    LAYOUT_ORDER: LAYOUT_ORDER,
     DEFAULT_OPTIONS: DEFAULT_OPTIONS,
     criterionLevel: criterionLevel,
     defaultRubric: defaultRubric,
@@ -1953,14 +1952,6 @@
     renderSheet: renderSheet,
     shrinkSteps: shrinkSteps,
     renderPages: renderPages,
-    stage: stage,
-    unstage: function () {
-      _deactivatePrintMode();
-      var root = document.getElementById(ROOT_ID);
-      if (root) root.innerHTML = '';
-    },
-    activatePrintMode: _activatePrintMode,
-    print: print,
     open: open,
     close: close,
     destroy: destroy,

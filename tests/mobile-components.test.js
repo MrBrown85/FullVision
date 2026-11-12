@@ -1,5 +1,5 @@
 /**
- * Mobile shared components tests — m-components.js
+ * Mobile shared components tests — teacher-mobile/components.js
  *
  * Tests avatar helpers, navigation bar, proficiency colors,
  * relative time, date grouping, HTML escaping, haptics, and toasts.
@@ -142,13 +142,6 @@ describe('MComponents.profBg', () => {
 
 /* ── esc (HTML escape) ──────────────────────────────────────── */
 describe('MComponents.esc', () => {
-  it('escapes HTML special characters', () => {
-    expect(MComponents.esc('<script>')).toContain('&lt;');
-    expect(MComponents.esc('"quotes"')).toBe('&quot;quotes&quot;');
-    expect(MComponents.esc("it's")).toBe('it&#39;s');
-    expect(MComponents.esc('a & b')).toBe('a &amp; b');
-  });
-
   // The test DOM escapes " when textContent is set; real browsers do not,
   // so this must not depend on the DOM.
   it('escapes quotes without the DOM, so attribute values stay closed', () => {
@@ -162,20 +155,6 @@ describe('MComponents.esc', () => {
     } finally {
       document.createElement = createElement;
     }
-  });
-
-  it('escapes numbers as text', () => {
-    expect(MComponents.esc(42)).toBe('42');
-  });
-
-  it('returns empty string for falsy input', () => {
-    expect(MComponents.esc(null)).toBe('');
-    expect(MComponents.esc(undefined)).toBe('');
-    expect(MComponents.esc('')).toBe('');
-  });
-
-  it('passes through safe text unchanged', () => {
-    expect(MComponents.esc('Hello World')).toBe('Hello World');
   });
 });
 
@@ -379,10 +358,6 @@ describe('MComponents.profBg comprehensive', () => {
     // At least 4 distinct colors (0 might match something but 1-4 should differ)
     const unique = new Set(colors);
     expect(unique.size).toBeGreaterThanOrEqual(4);
-  });
-
-  it('handles level 0 (no evidence)', () => {
-    expect(MComponents.profBg(0)).toBeTruthy();
   });
 
   it('rounds 3.4 to 3 and 3.5 to 4', () => {

@@ -32,6 +32,10 @@ if (existsSync(envPath)) {
  *
  * Run with: npm run test:e2e:real
  */
+// PORT moves the server if 8347 is taken. This suite must still never run twice
+// at once: every run uses the one shared live test account.
+const PORT = Number(process.env.PORT) || 8347;
+
 export default defineConfig({
   // testDir points at the per-entity persistence specs.
   // The legacy e2e-real/persistence.spec.js has been retired; keeping the
@@ -48,7 +52,7 @@ export default defineConfig({
   // parallel runs would race on cleanup.
   workers: 1,
   use: {
-    baseURL: 'http://localhost:8347',
+    baseURL: 'http://localhost:' + PORT,
     headless: true,
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
@@ -56,7 +60,7 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
   webServer: {
     command: 'npm run dev:local',
-    port: 8347,
+    port: PORT,
     reuseExistingServer: true,
     timeout: 30_000,
   },

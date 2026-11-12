@@ -967,11 +967,6 @@ window.AssessmentCopy = (function () {
     return html;
   }
 
-  /* Kept for callers from before the chips. */
-  function renderAlsoAddTo(cid, assess) {
-    return renderClassesField(cid, assess);
-  }
-
   function _activeChips() {
     return Array.from(document.querySelectorAll('.af-copy-chip.active[data-cid]'));
   }
@@ -1318,10 +1313,8 @@ window.AssessmentCopy = (function () {
     findCopies: findCopies,
     planLinkedEdit: planLinkedEdit,
     applyLinkedEdit: applyLinkedEdit,
-    reviewPlans: reviewPlans,
     copyToClasses: copyToClasses,
     offerLinkedEdit: offerLinkedEdit,
-    renderAlsoAddTo: renderAlsoAddTo,
     renderClassesField: renderClassesField,
     markExistingCopies: markExistingCopies,
     onTargetsChanged: onTargetsChanged,

@@ -142,7 +142,6 @@ window.MStudentsList = (function () {
   }
 
   return {
-    buildCells: buildCells,
     renderList: renderList,
     renderAllStudentsSheet: renderAllStudentsSheet,
   };

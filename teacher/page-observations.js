@@ -1430,7 +1430,6 @@ window.PageObservations = (function () {
     init: init,
     destroy: destroy,
     render: render,
-    switchCourse: switchCourse,
     openEditor: openEditor,
     _helpers: {
       weekRange: weekRange,

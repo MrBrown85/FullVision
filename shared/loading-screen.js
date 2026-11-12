@@ -121,6 +121,6 @@
     }
   }
 
-  window.FVLoading = { html: html, start: start, mount: mount, LINES: LINES };
+  window.FVLoading = { html: html, start: start, LINES: LINES };
   if (typeof document !== 'undefined' && document.querySelectorAll) mount();
 })();

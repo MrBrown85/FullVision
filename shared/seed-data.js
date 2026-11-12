@@ -1341,7 +1341,7 @@ function seedIfNeeded() {
       {
         id: 'rub_sci8_lab',
         name: 'Lab Investigation Rubric',
-        // An Advanced Rubric: a checklist inside each level (seedLabChecks).
+        // An Advanced Rubric: a checklist inside each level (the checks on each criterion below).
         style: 'advanced',
         criteria: [
           {

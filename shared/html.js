@@ -1,3 +1,4 @@
+// @ts-check
 /* Text into HTML: the one escape helper every page loads first (desktop,
    phone, the student page and sign-in). Safe in element content and in a
    quoted attribute value; not for a URL, a script or a style. Nothing

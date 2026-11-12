@@ -2407,16 +2407,6 @@ window.PageGradebook = (function () {
   }
 
   /* ── Always-visible Overall column ──────────────────────── */
-  function renderOverallHeader(rowspan) {
-    var rs = rowspan ? ' rowspan="' + rowspan + '"' : '';
-    return (
-      '<th class="gb-overall-col-header gb-sortable"' +
-      rs +
-      ' data-action="toggleSort" data-sortkey="overall">Overall' +
-      sortArrow('overall') +
-      '</th>'
-    );
-  }
   // The overall grade as the class is set to grade: the level out of 4 in a
   // Proficiency or Both class (Both adds a Grade column), the letter and %
   // in a Letter class.
@@ -4870,6 +4860,5 @@ window.PageGradebook = (function () {
     init: init,
     destroy: destroy,
     render: render,
-    switchCourse: switchCourse,
   };
 })();

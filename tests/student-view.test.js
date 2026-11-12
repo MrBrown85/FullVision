@@ -287,6 +287,8 @@ function serverPage(gradingSystem) {
         category_name: null,
         category_percent: null,
         core_competencies: [],
+        // Handouts and Links: the ready ones (handouts-links-contract.md); none here.
+        resources: [],
         status: null,
         returned_at: null,
         updated_at: null,

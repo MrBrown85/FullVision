@@ -314,6 +314,7 @@ window.StudentView = (function () {
         category_name: category && category.name != null ? str(category.name) : null,
         category_percent: categoryPercent(cid, a, category),
         core_competencies: coreCompetenciesOf(a),
+        resources: resourcesReply(cid, a.id),
         status: status,
         returned_at: returnedAt,
         updated_at: (row && row.updated_at) || null,
@@ -545,6 +546,62 @@ window.StudentView = (function () {
       });
   }
 
+  /* A piece's handouts and links as the server's page sends them
+     (Handouts and Links): those ready for students, in the order added,
+     [ { id, kind: 'pdf' | 'link', title, url, page_count } ]. A handout
+     still uploading is not sent. From the data layer's store
+     (getAssessmentResources), [] without it. */
+  function resourcesReply(cid, aid) {
+    if (typeof getAssessmentResources !== 'function') return [];
+    return getAssessmentResources(cid, aid, { ready: true }).map(function (r) {
+      return {
+        id: str(r.id),
+        kind: r.kind,
+        title: str(r.title),
+        url: r.kind === 'link' ? str(r.url) : null,
+        page_count: r.kind === 'pdf' ? r.pageCount : null,
+      };
+    });
+  }
+
+  // A link a student may open: http:// or https:// only, as text.
+  var WEB = /^https?:\/\/[^\s"'<>]+$/i;
+  function hostOf(url) {
+    var m = /^https?:\/\/([^/?#:]+)/i.exec(url);
+    return m ? m[1].toLowerCase().replace(/^www\./, '') : '';
+  }
+
+  /* The reply's handouts and links for one piece (Handouts and Links), each
+     checked as the contract types it: a handout with 1 to 20 pages, a link
+     with an http(s) address; anything else is left out. [ { id, kind:
+     'handout' | 'link', title, pages (a handout's), url and host (a
+     link's) } ]. */
+  function resourcesOf(v) {
+    var seen = {};
+    return list(v)
+      .filter(function (r) {
+        if (!r || typeof r !== 'object' || !text(r.id) || seen[r.id]) return false;
+        seen[r.id] = true;
+        return true;
+      })
+      .map(function (r) {
+        var title = text(r.title).trim();
+        if (r.kind === 'pdf') {
+          var n = typeof r.page_count === 'number' && isFinite(r.page_count) ? Math.floor(r.page_count) : 0;
+          return n >= 1 && n <= 20 ? { id: r.id, kind: 'handout', title: title || 'Handout', pages: n } : null;
+        }
+        if (r.kind === 'link') {
+          var url = text(r.url).trim();
+          if (!WEB.test(url) || url.length > 2000) return null;
+          var host = hostOf(url);
+          return host ? { id: r.id, kind: 'link', title: title || host, url: url, host: host } : null;
+        }
+        return null;
+      })
+      .filter(Boolean)
+      .slice(0, 50);
+  }
+
   /* What the reply says about a piece beyond its grade (S4-M1; each is
      left out while the server does not send it, and a value of the wrong
      type is read as none): its unit, its category and what that counts
@@ -558,6 +615,7 @@ window.StudentView = (function () {
         ? { name: name, percent: typeof percent === 'number' && isFinite(percent) && percent >= 0 ? percent : null }
         : null,
       description: text(row.description),
+      resources: resourcesOf(row.resources),
       coreCompetencies: list(row.core_competencies)
         .filter(function (c) {
           return c && typeof c === 'object' && text(c.id) && text(c.name);
@@ -596,6 +654,8 @@ window.StudentView = (function () {
               updatedAt (when updated), and on a row that moved, was,
               marks: null | { pages, notes } (the teacher's Mark Up given
               on returned work, from the `feedback` reply),
+              resources: [ { id, kind: 'handout' | 'link', title, pages,
+              url, host } ] (Handouts and Links, resourcesOf),
               rubric: null | { id, name, style, rows: [ row + beyond,
               descriptors, checks, levelName, descriptor, shown, next,
               goal, whole ] } }

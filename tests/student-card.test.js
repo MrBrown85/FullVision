@@ -60,6 +60,8 @@ describe('the student page fetches calc.js only when a grade is about to show', 
       's/send.js',
       // The teacher's Mark Up on returned work (S9-F3), Demo Mode's answers until Batch C.
       's/feedback.js',
+      // Handouts and Links: a handout's pages, opened in the page (2026111170).
+      's/handouts.js',
       // Reflect on Feedback (S10-F1 and F2), Demo Mode only until Batch C.
       's/reflect.js',
     ]);

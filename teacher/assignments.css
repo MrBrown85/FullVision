@@ -130,13 +130,6 @@
 .assess-header-actions:focus-within > * {
   pointer-events: auto;
 }
-/* Grade By and Checklists change the open grader only, so a closed card
-   leaves them out. */
-.assess-card:not(.open) .assess-header-actions .rubric-view-toggle,
-.assess-card:not(.open) .assess-header-actions .rsg-checklist-mode-label,
-.assess-card:not(.open) .assess-header-actions .rsg-checklist-mode {
-  display: none;
-}
 /* A touch screen has no hover to show them: open the card for them. */
 @media (hover: none) {
   .assess-card:not(.open) .assess-header-actions {
@@ -172,29 +165,6 @@
 .assess-card.open .assess-chevron {
   transform: rotate(90deg);
 }
-.assess-header-action-btn {
-  width: 30px;
-  height: 30px;
-  border: none;
-  background: rgba(118, 118, 128, 0.12);
-  border-radius: 8px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--text-base);
-  color: var(--text);
-  transition: all 0.12s var(--ease-out);
-}
-.assess-header-action-btn:hover {
-  background: rgba(118, 118, 128, 0.2);
-}
-.assess-header-action-btn.action-delete {
-  color: var(--score-1-dark);
-}
-.assess-header-action-btn.action-delete:hover {
-  background: var(--priority-light);
-}
 .assess-body {
   display: none;
   padding: 0 16px 16px;
@@ -216,19 +186,6 @@
   font-size: var(--text-md);
   color: var(--text-1);
 }
-.focus-banner-btn {
-  background: none;
-  border: 1px solid var(--active);
-  color: var(--link);
-  padding: 4px 12px;
-  border-radius: var(--radius);
-  cursor: pointer;
-  font-size: var(--text-base);
-}
-.focus-banner-btn:hover {
-  background: var(--active);
-  color: #fff;
-}
 /* Score grid */
 .score-col-header {
   flex: 1;
@@ -242,22 +199,6 @@
 }
 .score-col-header:hover {
   background: rgba(0, 122, 255, 0.12);
-}
-.score-col-header-id {
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  display: block;
-  line-height: 1.3;
-}
-.score-col-header-name {
-  font-size: var(--text-sm);
-  color: var(--text-3);
-  display: block;
-  line-height: 1.3;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .score-row-action {
   width: 36px;
@@ -327,31 +268,8 @@
   padding-right: 8px;
   border-radius: 4px;
 }
-.score-name {
-  width: 140px;
-  font-size: var(--text-md);
-  font-weight: 500;
-  flex-shrink: 0;
-  padding-top: 2px;
-}
-.score-tags {
-  display: flex;
-  gap: 0;
-  flex: 1;
-}
-.score-tag-cell {
-  flex: 1;
-  min-width: 90px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 
 /* Multi-option score picker */
-.score-group {
-  display: flex;
-  gap: 3px;
-}
 .score-opt {
   width: 28px;
   height: 26px;
@@ -450,51 +368,6 @@
   border-color: var(--active);
   color: var(--link);
   background: var(--surface);
-}
-
-/* Bulk actions bar */
-.bulk-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 0;
-  margin-bottom: 6px;
-}
-.bulk-bar-label {
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
-  color: var(--text-3);
-  font-weight: 600;
-}
-.bulk-fill-btn {
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  padding: 4px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg);
-  cursor: pointer;
-  color: var(--text-2);
-  transition: all 0.1s;
-  font-weight: 500;
-}
-.bulk-fill-btn:hover {
-  border-color: var(--active);
-  color: var(--text);
-  background: var(--surface);
-}
-.bulk-fill-btn.active {
-  background: var(--text);
-  color: #fff;
-  border-color: var(--text);
-}
-
-.assess-actions {
-  display: flex;
-  gap: 6px;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
 }
 
 /* ── Collaboration badge on assessment card ────────────────────── */
@@ -892,11 +765,6 @@
 }
 
 /* Pairs / Groups: grouping UI */
-.collab-mode-toggle {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 12px;
-}
 .collab-groups-container {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -1052,23 +920,6 @@
 .af-section-header:hover {
   background: var(--section-hover);
 }
-.af-section-chevron {
-  font-size: var(--text-2xs);
-  color: var(--text-3);
-  transition: transform 0.15s;
-  width: 12px;
-  flex-shrink: 0;
-  text-align: center;
-}
-.af-section-open .af-section-chevron {
-  transform: rotate(90deg);
-}
-.af-section-name {
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  flex: 1;
-}
 .af-section-badge {
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
@@ -1079,12 +930,6 @@
   min-width: 18px;
   text-align: center;
   flex-shrink: 0;
-}
-.af-section-tags {
-  display: none;
-}
-.af-section-open .af-section-tags {
-  display: block;
 }
 .af-select-all {
   font-family: var(--font-base);
@@ -1994,7 +1839,6 @@ body:has(.af-comp-overlay:not([hidden])) #gb-tooltip {
   --af-grey-quiet: #f8f8fa;
   --af-line: #c7c7cc;
   --af-code: #0e7490;
-  --af-cell-edge: #e0e0e5;
   --af-card-edge: rgba(0, 0, 0, 0.1);
 }
 @media (prefers-color-scheme: dark) {
@@ -2003,7 +1847,6 @@ body:has(.af-comp-overlay:not([hidden])) #gb-tooltip {
     --af-grey-quiet: #242426;
     --af-line: #636366;
     --af-code: #5ec4d8;
-    --af-cell-edge: #48484a;
     --af-card-edge: rgba(255, 255, 255, 0.12);
   }
 }
@@ -2243,13 +2086,6 @@ body:has(.af-comp-overlay:not([hidden])) #gb-tooltip {
 }
 
 /* ── Assignment toolbar ─────────────────────────────────────── */
-.assess-toolbar-count {
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
-  color: var(--text-3);
-  font-weight: 500;
-  white-space: nowrap;
-}
 .assess-toolbar-actions {
   display: flex;
   align-items: center;
@@ -2295,32 +2131,6 @@ body:has(.af-comp-overlay:not([hidden])) #gb-tooltip {
 }
 .assess-search-input::placeholder {
   color: var(--text-3);
-}
-/* + New button — solid primary */
-.assess-add-btn {
-  padding: 5px 14px;
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  border-radius: 8px;
-  white-space: nowrap;
-  flex-shrink: 0;
-  background: var(--active);
-  color: #fff;
-  border: none;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.assess-add-btn:hover {
-  background: rgba(0, 100, 210, 1);
-  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.2);
-}
-
-/* Bigger module badge in assess header */
-.assess-meta .module-badge {
-  font-size: var(--text-sm);
-  padding: 2px 10px;
-  margin-left: 0;
 }
 
 /* ── Module panels (plan PR 8) ────────────────────────────
@@ -2635,19 +2445,6 @@ body:has(.af-comp-overlay:not([hidden])) #gb-tooltip {
 }
 .assess-card.drop-after::after {
   bottom: -8px;
-}
-.mod-folder-drop-zone {
-  border: 2px dashed var(--active);
-  border-radius: var(--radius-sm);
-  padding: 12px;
-  text-align: center;
-  color: var(--link);
-  font-size: var(--text-base);
-  margin: 4px 0;
-  display: none;
-}
-.mod-folder.drag-over .mod-folder-drop-zone {
-  display: block;
 }
 /* Module drag grip */
 .mod-folder-grip {
@@ -4279,70 +4076,9 @@ body:has(.af-comp-overlay:not([hidden])) #gb-tooltip {
   background: transparent;
 }
 
-/* Rubric grading view toggle in the assessment header */
-.rubric-view-toggle {
-  margin-right: 4px;
-}
-
 /* ── Rubric Speedgrader ──────────────────────────────────── */
 .rsg-grid {
   margin: 0 -16px;
-}
-
-/* "Set Everyone To" and a capsule per level (fill-all), with the hover
-   hint for the rubric wording. */
-.rsg-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px 10px;
-  box-shadow: inset 0 -0.5px 0 var(--divider-heavy);
-}
-.rsg-header-label {
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--text);
-}
-.rsg-header-levels {
-  display: flex;
-  gap: 8px;
-}
-.rsg-header-level {
-  height: 24px;
-  padding: 0 10px;
-  border-radius: 12px;
-  background: rgba(118, 118, 128, 0.12);
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--text);
-  cursor: pointer;
-  user-select: none;
-  transition: background 0.12s var(--ease-out);
-}
-.rsg-header-level::before {
-  content: '';
-  width: 7px;
-  height: 7px;
-  border-radius: 4px;
-  background: currentColor;
-}
-.rsg-header-level:hover {
-  background: rgba(118, 118, 128, 0.2);
-}
-.rsg-header-level.hl1::before {
-  background: var(--score-1);
-}
-.rsg-header-level.hl2::before {
-  background: var(--score-2);
-}
-.rsg-header-level.hl3::before {
-  background: var(--score-3);
-}
-.rsg-header-level.hl4::before {
-  background: var(--score-4);
 }
 
 /* A student: the name at 21px with status and Comment beside it, and the
@@ -4978,7 +4714,6 @@ body:has(.af-comp-overlay:not([hidden])) #gb-tooltip {
   border-left: 3px solid var(--score-2);
 }
 /* Dim scores when student has a status */
-.score-row.has-status .score-tags,
 .rsg-student.has-status .rsg-criteria {
   opacity: 0.2;
   pointer-events: none;
@@ -5315,11 +5050,6 @@ body:has(#page-layout.sidebar-hidden) .rsg-descriptor-bar {
 }
 
 /* ── Keyboard Navigation Focus ──────────────────────────── */
-.score-group.kb-focus {
-  outline: 2px solid var(--active);
-  outline-offset: 1px;
-  border-radius: 4px;
-}
 .rsg-criterion-row.kb-focus {
   outline: 2px solid var(--active);
   outline-offset: 1px;
@@ -5779,26 +5509,6 @@ body:has(#page-layout.sidebar-hidden) .rsg-descriptor-bar {
   cursor: default;
   filter: none;
 }
-.rubric-print-btn {
-  padding: 3px 9px;
-  margin-right: 4px;
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
-  font-weight: 510;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--text-2);
-  cursor: pointer;
-  line-height: 1.2;
-  letter-spacing: var(--tracking-tight);
-  white-space: nowrap;
-  transition: all 0.15s;
-}
-.rubric-print-btn:hover {
-  color: var(--text);
-  border-color: var(--text-3);
-}
 
 /* Rubric copy dialogs: a class or rubric row with its match summary under it. */
 .rubric-copy-row {
@@ -6070,12 +5780,6 @@ body:has(#page-layout.sidebar-hidden) .rsg-descriptor-bar {
 }
 .rsg-checklist-col.l1 .rsg-check input {
   accent-color: var(--score-1);
-}
-.rsg-checklist-mode-label {
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--text);
-  white-space: nowrap;
 }
 
 /* ── Grader dialog: the gradebook's cell editor ─────────────
@@ -6623,7 +6327,6 @@ button.grader-member-name {
 }
 /* The column header's levels and the Set Unmarked buttons fill every
    student, and the stats row is the class's; the dialog grades one. */
-.grader-body .rsg-header,
 .grader-body .ldg-bar,
 .grader-body .ldg-stats {
   display: none;
@@ -7681,26 +7384,6 @@ button.grader-member-name {
 .assess-meta .copy-badge:hover {
   background: rgba(118, 118, 128, 0.2);
   color: var(--text);
-}
-.assess-header-actions .rubric-print-btn {
-  height: 30px;
-  margin-right: 0;
-  padding: 0 11px;
-  border: none;
-  border-radius: 8px;
-  background: rgba(118, 118, 128, 0.12);
-  color: var(--text);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-.assess-header-actions .rubric-print-btn:hover {
-  background: rgba(118, 118, 128, 0.2);
-}
-.assess-header-actions .rubric-view-toggle {
-  margin-right: 0;
 }
 
 /* ── Single-point rubrics (plan PR 16) ───────────────────────
@@ -8794,12 +8477,9 @@ button.grader-member-name {
     grid-template-columns: minmax(0, 1fr) !important;
   }
   .assess-header-actions,
-  .rsg-header,
-  .rsg-header-levels,
   .rsg-student-head {
     flex-wrap: wrap;
   }
-  .rsg-header,
   .rsg-student {
     padding-left: 12px;
     padding-right: 12px;
@@ -8891,40 +8571,8 @@ button.grader-member-name {
   }
 }
 
-/* Class Results (teacher/class-results.js): the card header's button and
-   the class line's link under the scores. */
-.cr-card-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 30px;
-  padding: 0 11px;
-  border: none;
-  border-radius: 8px;
-  background: rgba(118, 118, 128, 0.12);
-  color: var(--text);
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.cr-card-btn:hover {
-  background: rgba(118, 118, 128, 0.2);
-}
-/* A closed card's hidden actions sit over the end of its header; the icon
-   alone keeps them clear of the chips, so a click there opens the card. */
-.assess-card:not(.open) .cr-card-btn {
-  width: 30px;
-  padding: 0;
-  justify-content: center;
-}
-.assess-card:not(.open) .cr-card-label {
-  display: none;
-}
-.cr-card-btn.cr-is-open {
-  box-shadow: inset 0 0 0 2px var(--active);
-}
+/* Class Results (teacher/class-results.js): the class line's link under the
+   scores. */
 .cr-ldg-link {
   padding: 0;
   border: 0;
@@ -10501,4 +10149,160 @@ button.grader-member-name {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 16px;
+}
+
+/* ── Handouts and Links (the assessment form, board "3a. A Handout and
+   Two Links, Adding a Link"): the items in two columns, the link row while
+   a link is being added, then + Add a PDF and + Add a Link. ── */
+.af-res-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.af-res-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  height: 44px;
+  padding: 0 6px 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+/* Only the one just added, or the link row as it opens, comes in. */
+.af-res-in {
+  animation: af-res-in 180ms var(--ease-out);
+}
+@keyframes af-res-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+.af-res-icon {
+  flex: none;
+}
+.af-res-icon-doc,
+.af-res-icon-video {
+  color: var(--danger);
+}
+.af-res-icon-link {
+  color: var(--link);
+}
+.af-res-name {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-md);
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.af-res-meta {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.af-res-remove {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background-color 150ms var(--ease-out);
+}
+.af-res-remove:hover {
+  background: var(--overlay-hover);
+  color: var(--text);
+}
+.af-res-linkrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--bg);
+}
+.af-res-linkrow .af-input {
+  width: auto;
+  height: 40px;
+}
+.af-res-url {
+  flex: 1.4 1 260px;
+}
+.af-res-title {
+  flex: 1 1 200px;
+}
+.af-res-linkrow .btn {
+  height: 40px;
+  padding: 0 18px;
+}
+.af-res-adds {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.af-label + .af-res-adds,
+.af-label + .af-res-linkrow {
+  margin-top: 0;
+}
+.af-res-add {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--active);
+  cursor: pointer;
+  transition:
+    background-color 150ms var(--ease-out),
+    border-color 150ms var(--ease-out);
+}
+.af-res-add:hover:not(:disabled) {
+  border-color: var(--active);
+  background: var(--active-light);
+}
+.af-res-add:disabled {
+  color: var(--text-2);
+  cursor: default;
+}
+.af-res-hint {
+  margin-left: 4px;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.af-res-msg {
+  margin: 6px 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.af-res-msg[hidden] {
+  display: none;
+}
+@media (max-width: 640px) {
+  .af-res-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .af-res-in {
+    animation: none;
+  }
 }

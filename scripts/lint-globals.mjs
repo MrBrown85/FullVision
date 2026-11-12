@@ -1,0 +1,112 @@
+// scripts/lint-globals.mjs (proposed): the globals each page defines, read from
+// its <script src> tags plus the files it lazy-loads. Used by eslint.config.mjs.
+import fs from 'node:fs';
+import path from 'node:path';
+import * as acorn from 'acorn';
+import * as walk from 'acorn-walk';
+
+let root;
+
+// Files a page fetches later with document.createElement('script').
+// Found with: rg -n "createElement\(['\"]script" shared teacher teacher-mobile s
+const LAZY = {
+  desktop: [
+    'shared/bank-core-competencies.js', // teacher/page-assignments.js:2298
+    'shared/bank-proficiency.js', // teacher/rubric-print.js:225, teacher/competency-wording.js:77
+    'shared/bank-comment.js', // teacher/competency-wording.js:80
+    'shared/bank-sets.js', // teacher/comment-bank.js:1224
+    'shared/comment-bank.js', // teacher/comment-bank.js:8244
+    'curriculum_data.js', // shared/data.js:7228
+    'shared/seed-data.js', // shared/data.js:21400
+  ],
+  phone: ['shared/bank-proficiency.js', 'shared/bank-comment.js', 'curriculum_data.js', 'shared/seed-data.js'],
+  student: [
+    'shared/constants.js', // s/app.js:2072 (GRADE_FILES)
+    'shared/calc.js', // s/app.js:2078
+    'shared/photo-shrink.js', // s/send.js
+    'shared/photo-readers.js', // s/send.js
+    'shared/photo-queue.js', // s/send.js:813
+    'shared/questionnaire-templates.js', // s/student.js:635
+  ],
+  login: [],
+};
+const PAGES = {
+  desktop: 'teacher/app.html',
+  phone: 'teacher-mobile/index.html',
+  student: 's/index.html',
+  login: 'login.html',
+};
+const VENDOR_GLOBALS = {
+  'vendor/supabase.min.js': ['supabase'],
+  'vendor/qrcode.js': ['qrcode', 'QRCode'],
+};
+
+function scriptsOf(htmlRel) {
+  const html = fs.readFileSync(path.join(root, htmlRel), 'utf8');
+  const dir = path.posix.dirname(htmlRel);
+  const out = [];
+  for (const m of html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g)) {
+    let src = m[1].split('?')[0];
+    if (/^https?:/.test(src)) continue;
+    src = src.startsWith('/') ? src.slice(1) : path.posix.normalize(path.posix.join(dir, src));
+    out.push(src);
+  }
+  return out;
+}
+
+function definedBy(rel) {
+  if (VENDOR_GLOBALS[rel]) return VENDOR_GLOBALS[rel];
+  const file = path.join(root, rel);
+  if (!fs.existsSync(file)) return [];
+  const src = fs.readFileSync(file, 'utf8');
+  let ast;
+  try {
+    ast = acorn.parse(src, { ecmaVersion: 'latest', sourceType: 'script', allowHashBang: true });
+  } catch (e) {
+    console.error('parse failed', rel, e.message);
+    return [];
+  }
+  const names = new Set();
+  for (const node of ast.body) {
+    if (node.type === 'VariableDeclaration') {
+      for (const d of node.declarations) if (d.id.type === 'Identifier') names.add(d.id.name);
+    } else if ((node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') && node.id) {
+      names.add(node.id.name);
+    }
+  }
+  walk.simple(ast, {
+    AssignmentExpression(n) {
+      const l = n.left;
+      if (
+        l.type === 'MemberExpression' &&
+        !l.computed &&
+        l.object.type === 'Identifier' &&
+        ['window', 'globalThis', 'self'].includes(l.object.name) &&
+        l.property.type === 'Identifier'
+      ) {
+        names.add(l.property.name);
+      }
+    },
+  });
+  return [...names];
+}
+
+export function pageGlobals(rootDir) {
+  root = path.resolve(rootDir);
+  const result = { pages: {}, fileToPages: {} };
+  for (const [page, html] of Object.entries(PAGES)) {
+    const tagged = scriptsOf(html);
+    const lazy = LAZY[page];
+    const globals = {};
+    const definedIn = {};
+    for (const rel of [...tagged, ...lazy]) {
+      for (const g of definedBy(rel)) {
+        globals[g] = 'writable';
+        (definedIn[g] ||= []).push(rel);
+      }
+      (result.fileToPages[rel] ||= []).includes(page) || result.fileToPages[rel].push(page);
+    }
+    result.pages[page] = { html, scripts: tagged, lazy, count: Object.keys(globals).length, globals, definedIn };
+  }
+  return { pages: result.pages, byFile: result.fileToPages };
+}

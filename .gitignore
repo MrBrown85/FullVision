@@ -17,6 +17,8 @@ dist/
 !.claude/settings.json
 mockups/
 test-*.html
+scratchpad/
+supabase/.temp/
 
 # Environment
 .env

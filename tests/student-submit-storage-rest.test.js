@@ -10,7 +10,14 @@
  * those are the questions in the pull request for the reviewer.
  */
 import { describe, expect, it } from 'vitest';
-import { BUCKET, PATH, pathParts, storageRest } from '../supabase/functions/_shared/storage-rest.ts';
+import {
+  BUCKET,
+  HANDOUT_PATH,
+  PATH,
+  handoutPathParts,
+  pathParts,
+  storageRest,
+} from '../supabase/functions/_shared/storage-rest.ts';
 import { authUser, tokenShape } from '../supabase/functions/_shared/teacher-auth.ts';
 
 const URL_ = 'https://proj.supabase.co/';
@@ -229,6 +236,61 @@ describe('storageRest', () => {
       await expect(step()).rejects.toThrow('storage path');
     }
     expect(f.sent).toEqual([]);
+  });
+});
+
+/* Handouts and Links (migrations/2026111170_handouts_links.sql): a teacher's
+   handout page, <course>/handouts/<resource>/<n>.jpg, is signed for a
+   student and removed by the removal worker; nothing else takes one. */
+describe('a teacher’s handout page', () => {
+  const R = 'a2a2a2a2-0000-4000-8000-000000000002';
+  const HANDOUT = `${C}/handouts/${R}/3.jpg`;
+
+  it('is its own shape, pages 1 to 20, and never a student’s', () => {
+    expect(handoutPathParts(HANDOUT)).toEqual({ course: C, resource: R, page: 3 });
+    expect(handoutPathParts(`${C}/handouts/${R}/20.jpg`)).toMatchObject({ page: 20 });
+    expect(pathParts(HANDOUT)).toBe(null);
+    for (const bad of [
+      `${C}/handouts/${R}/0.jpg`,
+      `${C}/handouts/${R}/21.jpg`,
+      `${C}/handouts/${R}/03.jpg`,
+      `${C}/handouts/${R}/3-thumb.jpg`,
+      `${C}/handouts/../${R}/3.jpg`,
+      `${C}/Handouts/${R}/3.jpg`,
+      `/${HANDOUT}`,
+      HANDOUT + '?x',
+      PAGE,
+      null,
+    ]) {
+      expect(handoutPathParts(bad), String(bad)).toBe(null);
+    }
+    expect(HANDOUT_PATH.source.startsWith('^')).toBe(true);
+  });
+
+  it('signDownloads and remove take one; signUpload, read and overwrite do not', async () => {
+    const f = fakeFetch((url, init) =>
+      init.method === 'POST' && /object\/sign\/student-photos$/.test(url)
+        ? json(
+            200,
+            JSON.parse(init.body).paths.map(p => ({ path: p, signedURL: `/object/sign/student-photos/${p}?t=1` })),
+          )
+        : json(200, []),
+    );
+    const store = storageRest(f.fetcher, URL_, KEY);
+    expect(await store.signDownloads([HANDOUT], 60)).toEqual({
+      [HANDOUT]: `https://proj.supabase.co/storage/v1/object/sign/student-photos/${HANDOUT}?t=1`,
+    });
+    await store.remove([HANDOUT]);
+    expect(f.sent[1]).toMatchObject({ method: 'DELETE', body: JSON.stringify({ prefixes: [HANDOUT] }) });
+    const asked = f.sent.length;
+    for (const step of [
+      () => store.signUpload(HANDOUT),
+      () => store.read(HANDOUT, 10),
+      () => store.overwrite(HANDOUT, new Uint8Array(1)),
+    ]) {
+      await expect(step()).rejects.toThrow('storage path');
+    }
+    expect(f.sent.length).toBe(asked);
   });
 });
 
