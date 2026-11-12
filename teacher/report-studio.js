@@ -534,8 +534,19 @@ window.ReportStudio = (function () {
           esc(opts[o.key] || '') +
           '"></div></div>';
       });
+    // An option a class's grading style does not use is not offered
+    // (hideIn), and one it reads differently says so (labelIn): a
+    // Proficiency class prints the proficiency, never "Score out of 4"
+    // (ReportSheets.BLOCKS.proficiency).
+    var mode =
+      typeof courseGradeMode === 'function' && typeof getActiveCourse === 'function'
+        ? courseGradeMode(getActiveCourse())
+        : '';
+    var labelOf = function (o) {
+      return (o.labelIn && o.labelIn[mode]) || o.label;
+    };
     var bools = (def.options || []).filter(function (o) {
-      return !o.choices && !o.text;
+      return !o.choices && !o.text && !(o.hideIn && o.hideIn.indexOf(mode) >= 0);
     });
     if (bools.length) {
       var auto = bools.some(function (o) {
@@ -551,7 +562,7 @@ window.ReportStudio = (function () {
           '"' +
           (opts[o.key] && opts[o.key] !== 'auto' ? ' checked' : '') +
           '> ' +
-          esc(o.label) +
+          esc(labelOf(o)) +
           '</label>';
       });
       html += '</div>';
@@ -563,9 +574,7 @@ window.ReportStudio = (function () {
               .filter(function (o) {
                 return o.def === 'auto';
               })
-              .map(function (o) {
-                return o.label;
-              })
+              .map(labelOf)
               .join(' and '),
           ) +
           ' start from the class grading setting.</div>';

@@ -70,7 +70,8 @@ describe('what each report surface gives for the Demo class', { timeout: 60000 }
     expect(bySurface.progress).toBeGreaterThan(150);
     // A grade is in there: the output is not a page of dashes.
     const one = Object.keys(drawn).find(k => k.indexOf('year › phones › ') === 0);
-    expect(JSON.parse(drawn[one]).overall.text).toMatch(/\d/);
+    // A phone copy reads the proficiency, not a figure (DECISIONS, "Student-facing levels are proficiencies").
+    expect(JSON.parse(drawn[one]).overall.text).toMatch(/^(Emerging|Developing|Proficient|Extending)$/);
     expect(drawn['year › printGrades › {}']).toMatch(/\d/);
     expect(drawn['year › export › workbook'].length).toBeGreaterThan(50000);
   });

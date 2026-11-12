@@ -5,12 +5,12 @@
  * same HTML from the same replies.
  *
  * The board's worked example (Socials 10, graded by both): the first
- * version is Developing + and Proficient, 2.7 · 67%; the revision is
- * Proficient and Proficient, 3.0 · 75%.
+ * version is Developing + and Proficient, Proficient − · 67%; the revision is
+ * Proficient and Proficient, Proficient · 75%.
  * - Needs Revision while nothing is in, the grade kept (there is no Hide in
  *   this build: Colin, Nov 11);
  * - Sent again once the revision is in; a draft regrade changes nothing a
- *   student sees, and the grade they have is still 2.7 · 67%;
+ *   student sees, and the grade they have is still Proficient − · 67%;
  * - once returned the new grade replaces the old, and Before and After
  *   shows both;
  * - Take Back gives the grade back and the revision is gone.
@@ -186,13 +186,13 @@ afterEach(() => {
 });
 
 describe('the loop in Preview as Student, and the same HTML on the student’s device', () => {
-  it('Needs Revision with the grade kept: What to Fix and the date, the grade still 2.7 · 67%', async () => {
+  it('Needs Revision with the grade kept: What to Fix and the date, the grade still Proficient − · 67%', async () => {
     gradeFirstVersion();
     expect((await askForRevision()).result).toBe('made');
     const { view } = sameOnBoth();
     const p = pieceIn(view);
     expect(p.kind).toBe('revise');
-    expect(p.result.text).toBe('2.7 · 67%');
+    expect(p.result.text).toBe('Proficient − · 67%');
     expect(p.revision).toMatchObject({ state: 'open', whatToFix: FIX, reviseBy: '2026-11-10' });
     expect(view.counts.toDo).toBe(1);
     const box = drawn(view, UIS[0]);
@@ -203,7 +203,7 @@ describe('the loop in Preview as Student, and the same HTML on the student’s d
     expect(box.innerHTML).not.toMatch(/Colin|Brown/);
   });
 
-  it('sent, then a draft regrade: Sent again, and the student still has 2.7 · 67%', async () => {
+  it('sent, then a draft regrade: Sent again, and the student still has Proficient − · 67%', async () => {
     gradeFirstVersion();
     await askForRevision();
     expect(sendRevision().ok).toBe(true);
@@ -216,11 +216,11 @@ describe('the loop in Preview as Student, and the same HTML on the student’s d
     // A draft is never the student's: grading reads as sent, and the result is the grade they were given.
     expect(feedback.assessments[0].revision.state).toBe('sent');
     expect(p.kind).toBe('sent');
-    expect(p.result.text).toBe('2.7 · 67%');
+    expect(p.result.text).toBe('Proficient − · 67%');
     expect(p.revision.before).toBeNull();
   });
 
-  it('returned: 3.0 · 75% replaces 2.7 · 67%, and Before and After shows both, row by row', async () => {
+  it('returned: Proficient · 75% replaces Proficient − · 67%, and Before and After shows both, row by row', async () => {
     gradeFirstVersion();
     await askForRevision();
     sendRevision();
@@ -229,10 +229,14 @@ describe('the loop in Preview as Student, and the same HTML on the student’s d
     const { view } = sameOnBoth();
     const p = pieceIn(view);
     expect(p.kind).toBe('back');
-    expect(p.result.text).toBe('3.0 · 75%');
+    expect(p.result.text).toBe('Proficient · 75%');
     const box = drawn(view, UIS[7]);
     expect(words(box.querySelector('.sp-fb-sub'))).toBe('Science 8 · Revision returned Nov 10');
-    expect(parts(box.querySelector('.sp-ba-result .sp-ba-row'))).toEqual(['Your Result', '2.7 · 67%', '3.0 · 75%']);
+    expect(parts(box.querySelector('.sp-ba-result .sp-ba-row'))).toEqual([
+      'Your Result',
+      'Proficient − · 67%',
+      'Proficient · 75%',
+    ]);
     expect([...box.querySelectorAll('.sp-ba-rows:not(.sp-ba-result) .sp-ba-row')].map(parts)).toEqual([
       // In the page's own order of competencies (the reply sends them sorted).
       ['Support and Opposition', 'No change', 'Proficient'],
@@ -251,7 +255,7 @@ describe('the loop in Preview as Student, and the same HTML on the student’s d
     const p = pieceIn(sameOnBoth().view);
     expect(p.revision).toBeNull();
     expect(p.kind).toBe('back');
-    expect(p.result.text).toBe('2.7 · 67%');
+    expect(p.result.text).toBe('Proficient − · 67%');
   });
 
   it('with Send Work off nothing about revisions shows, and the page is as it was', async () => {

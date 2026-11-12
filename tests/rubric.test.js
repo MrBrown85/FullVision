@@ -1386,8 +1386,8 @@ describe('rubric-mixed-mark-blocks', () => {
         mixed: true,
       });
       const out = text(ReportBlocks.renderBlockNextSteps(CID, STUDENT, {}, {}));
-      expect(out).toContain('Latest: Causes of the War');
-      expect(out).toContain('1.0 / 4');
+      // The gradebook's mark, 1, as a student reads it (DECISIONS, "Student-facing levels are proficiencies").
+      expect(out).toContain('Latest: Causes of the War, Oct 12 · Emerging');
       expect(out).not.toContain('2.5');
     });
 
@@ -1395,8 +1395,8 @@ describe('rubric-mixed-mark-blocks', () => {
       seed();
       const out = text(ReportBlocks.renderBlockProgress(CID, STUDENT, {}, {}));
       expect(out).toContain('Causes of the War');
-      expect(out).toContain('1.0 / 4');
-      expect(out).not.toContain('2.5 / 4');
+      expect(out).toContain('Latest Causes of the War, Oct 12 · Emerging');
+      expect(out).not.toMatch(/\d\.\d/);
     });
 
     it('steady essays whose criteria disagree show no change from Start of Term', () => {
@@ -1416,11 +1416,12 @@ describe('rubric-mixed-mark-blocks', () => {
       clearProfCache();
       expect(getSectionProficiency(CID, SID, 'sec-1')).toBe(2.5);
       const out = text(ReportBlocks.renderBlockProgress(CID, STUDENT, {}, {}));
-      expect(out).toContain('Start of term 2.5 Proficient Now 2.5 Proficient (0.0 this term)');
-      expect(out).toContain('Latest Essay 4, Sep 28 · 1.0 / 4');
+      // Words, not figures (DECISIONS, "Student-facing levels are proficiencies").
+      expect(out).toContain('Start of term Proficient Now Proficient (Same this term)');
+      expect(out).toContain('Latest Essay 4, Sep 28 · Emerging');
       // The Proficiency block's Start of Term agrees.
       expect(text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, { compare: 'start' }))).toContain(
-        'Significance 2.5 Proficient 2.5 Proficient 0.0',
+        'Significance Proficient Proficient Same',
       );
     });
 
@@ -2070,7 +2071,9 @@ describe('rubric-print', () => {
     it('shows the overall level through calc.js and hides it when not included', () => {
       const data = RubricPrint.sheetData(CID, AID, SID);
       expect(data.overall).not.toBeNull();
-      expect(data.overall.text).toBe(formatLevel(CID, data.overall.value));
+      // The handout goes to the student: the level with its ±, no figure (DECISIONS, "Student-facing levels are proficiencies").
+      expect(data.overall.text).toBe(nearestScoreLevelName(data.overall.value));
+      expect(data.overall.text).not.toMatch(/\d/);
       const html = RubricPrint.renderSheet(data, { include });
       expect(html).toContain('rubric-overall-value');
       expect(RubricPrint.renderSheet(data, { include: Object.assign({}, include, { overall: false }) })).not.toContain(

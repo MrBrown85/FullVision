@@ -114,7 +114,7 @@ describe('the cards of Back', () => {
     // Updated, with the day it was updated (S4-F5), in place of Returned.
     expect(tags(card(page, 'Lab Safety Contract'))[0]).toMatch(/^Updated \S+ \d+$/);
     const essay = card(page, 'Ecosystem Connections Essay');
-    expect(rowsOf(essay)[0]).toEqual(['Your Result', '2.0']);
+    expect(rowsOf(essay)[0]).toEqual(['Your Result', 'Developing']);
     expect(essay.textContent).not.toContain('much clearer after your rewrite');
     expect(essay.querySelector('.sp-piece-comment').textContent).toBe(
       'Explain how the food web changes when one species goes.',

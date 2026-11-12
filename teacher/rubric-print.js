@@ -409,13 +409,24 @@
     if (scored && typeof getAssessmentOverallScore === 'function') {
       var value = getAssessmentOverallScore(cid, sid, aid);
       if (value > 0) {
-        overall = {
-          value: value,
-          // As the gradebook cell shows it: in a Letter or Both class, the %
-          // the piece counts as in its category (Colin, 2026-11-03).
-          text: typeof assessmentCellValue === 'function' ? assessmentCellValue(cid, sid, assessment).text : '',
-          word: typeof levelWord === 'function' ? levelWord(cid, value) : '',
-        };
+        // As the gradebook cell shows it: in a Letter or Both class, the %
+        // the piece counts as in its category (Colin, 2026-11-03).
+        var cell = typeof assessmentCellValue === 'function' ? assessmentCellValue(cid, sid, assessment) : null;
+        overall =
+          typeof courseGradeMode === 'function' && courseGradeMode(cid) !== 'letter'
+            ? {
+                value: value,
+                // The handout goes to the student: its proficiency with its +
+                // or −, and a Both class's %, never a figure out of 4 (DECISIONS,
+                // "Student-facing levels are proficiencies", 2026-11-12).
+                text: studentMarkText(cid, value, cell ? cell.percentText : ''),
+                word: '',
+              }
+            : {
+                value: value,
+                text: cell ? cell.text : '',
+                word: typeof levelWord === 'function' ? levelWord(cid, value) : '',
+              };
       }
     }
     return {

@@ -120,13 +120,13 @@ describe('the student page fetches calc.js only when a grade is about to show', 
     await page.click('[data-act="card-yes"]');
     expect(page.fetched).toEqual(CALC);
     expect(page.run(GRADES_IN)).toBe('object function function');
-    expect(row(page, 'Energy Transfer Investigation').result).toBe('4.0');
+    expect(row(page, 'Energy Transfer Investigation').result).toBe('Extending');
     // The card opened again on this device: nothing is fetched a second time.
     page.T.openCard('P3R-8WD');
     await page.settle();
     page.type('#sp-ident', page.T.DEMO.number);
     await page.click('[data-act="card-yes"]');
-    expect(row(page, 'Energy Transfer Investigation').result).toBe('4.0');
+    expect(row(page, 'Energy Transfer Investigation').result).toBe('Extending');
     expect(page.fetched).toEqual(CALC);
   });
 
@@ -148,7 +148,7 @@ describe('the student page fetches calc.js only when a grade is about to show', 
     expect(page.root().querySelector('#sp-ident').getAttribute('value')).toBe(page.T.DEMO.number);
     await page.settle();
     expect(page.root().querySelector('.sp-page-title').textContent).toBe('Assignments');
-    expect(row(page, 'Cell Microscope Lab').result).toBe('2.7');
+    expect(row(page, 'Cell Microscope Lab').result).toBe('Proficient −');
   });
 
   it('with calc.js out of reach the list opens without results and says so; Try Again brings them', async () => {
@@ -177,7 +177,7 @@ describe('the student page fetches calc.js only when a grade is about to show', 
     await page.click('[data-act="grades-retry"]');
     expect(page.fetched).toEqual([...CALC, '../shared/calc.js']);
     expect(page.root().querySelector('.sp-no-results')).toBeNull();
-    expect(row(page, 'Energy Transfer Investigation').result).toBe('4.0 · 100%');
+    expect(row(page, 'Energy Transfer Investigation').result).toBe('Extending · 100%');
     expect(row(page, 'Cell Structure Quiz').result).toBe('8 / 10');
     expect(page.calls).toHaveLength(0);
   });
@@ -350,15 +350,16 @@ describe('student card: wrong tries', () => {
 
 describe('student card: a returned result follows the class’s grading style', () => {
   const STYLES = [
-    // hash, a level of 4, the rubric's 3 and 2+ (2.67), a level of 2, a level of 3
-    ['#demo-card', '4.0', '2.7', '2.0', '3.0'],
+    // hash, a level of 4, the rubric's 3 and 2+ (2.67), a level of 2, a level of 3. A student reads a
+    // proficiency, never a figure out of 4 (DECISIONS, "Student-facing levels are proficiencies"); a Letter class reads the % as before.
+    ['#demo-card', 'Extending', 'Proficient −', 'Developing', 'Proficient'],
     ['#demo-card-letter', '100%', '67%', '50%', '75%'],
-    ['#demo-card-both', '4.0 · 100%', '2.7 · 67%', '2.0 · 50%', '3.0 · 75%'],
+    ['#demo-card-both', 'Extending · 100%', 'Proficient − · 67%', 'Developing · 50%', 'Proficient · 75%'],
   ];
 
-  it.each(STYLES)('%s shows what formatLevel gives', async (hash, four, rubric, two, three) => {
+  it.each(STYLES)('%s shows what studentMarkText gives', async (hash, four, rubric, two, three) => {
     const page = await walk(hash);
-    const format = v => page.run('formatLevel(' + JSON.stringify(CID) + ', ' + v + ')');
+    const format = v => page.run('studentMarkText(' + JSON.stringify(CID) + ', ' + v + ')');
     // The text on the page is calc.js's own, and is the text pinned here.
     expect(format(4)).toBe(four);
     expect(format((3 + 7 / 3) / 2)).toBe(rubric);
@@ -373,15 +374,17 @@ describe('student card: a returned result follows the class’s grading style', 
     expect(row(page, 'Lab Safety Contract').result).toBe('Complete');
   });
 
-  it('names the level beside the date, except in a Letter class', async () => {
+  it('names the level once, in the result, not again beside the date; a Letter class names none', async () => {
     const day = (page, iso) => page.run('StudentPage.fmtDate')(iso, { month: 'short', day: 'numeric' });
     const prof = await walk('#demo-card');
     const back = title => prof.T.state().page.assessments.find(a => a.title === title).returnedAt;
+    // The result is the proficiency itself (DECISIONS, "Student-facing levels are proficiencies"), so the date line does not say it again.
     expect(row(prof, 'Energy Transfer Investigation').sub).toBe(
-      'Back ' + day(prof, back('Energy Transfer Investigation')) + ' · Extending',
+      'Back ' + day(prof, back('Energy Transfer Investigation')),
     );
-    expect(row(prof, 'Cell Microscope Lab').sub).toMatch(/^Back \S+ \d+ · Proficient$/);
-    expect(row(prof, 'KMT & States of Matter Lab').sub).toMatch(/^Back \S+ \d+ · Proficient · Late$/);
+    expect(row(prof, 'Energy Transfer Investigation').result).toBe('Extending');
+    expect(row(prof, 'Cell Microscope Lab').sub).toMatch(/^Back \S+ \d+$/);
+    expect(row(prof, 'KMT & States of Matter Lab').sub).toMatch(/^Back \S+ \d+ · Late$/);
     expect(row(prof, 'Cell Structure Quiz').sub).toMatch(/^Back \S+ \d+$/);
     expect(row(prof, 'Energy Transfer Investigation').dot).toContain('sp-dot-back');
 
@@ -478,8 +481,8 @@ describe('student card: a draft is nowhere on the page', () => {
     expect(shape(li('Disease Research Poster'))).toBe(shape(li('Science Fair Proposal')));
     // A returned grade with a newer draft over it keeps what was returned.
     const essay = row(page, 'Ecosystem Connections Essay');
-    expect(essay.result).toBe('2.0');
-    expect(essay.sub).toMatch(/· Developing$/);
+    expect(essay.result).toBe('Developing');
+    expect(essay.sub).toMatch(/^Back \S+ \d+$/);
   });
 });
 
@@ -578,12 +581,12 @@ describe('student-data.js: the one adapter', () => {
     await page.settle();
     const v = page.T.viewOf({ page: read, reply: REPLY });
     const view = id => page.T.rowView(v.work.find(p => p.id === id));
-    expect(view('a1')).toMatchObject({ kind: 'back', result: '3.3 · 83%' });
-    expect(view('a1').sub).toMatch(/^Back \S+ \d+ · Proficient$/);
+    expect(view('a1')).toMatchObject({ kind: 'back', result: 'Proficient + · 83%' });
+    expect(view('a1').sub).toMatch(/^Back \S+ \d+$/);
     expect(view('a2')).toMatchObject({ kind: 'due', result: '' });
     expect(view('a3')).toMatchObject({ kind: 'excused', result: '' });
     expect(view('a3').sub).toMatch(/^Excused · Due \S+ \S+ \d+$/);
-    expect(view('a5')).toMatchObject({ kind: 'back', result: '2.0 · 50%' });
+    expect(view('a5')).toMatchObject({ kind: 'back', result: 'Developing · 50%' });
     expect(view('a6')).toMatchObject({ kind: 'back', result: '0 / 5' });
     expect(view('a7')).toMatchObject({ kind: 'due', result: '' });
     expect(view('a7').sub).toMatch(/^Late · Due \S+ \S+ \d+$/);
@@ -877,8 +880,9 @@ describe('calc.js on the student page reads only what student-data.js gives it',
 
       // The list really did work each kind out.
       expect(demo.html).toContain('Energy Transfer Investigation');
-      expect(kinds.comp.result).toBe(page.run('formatLevel("c1", ' + (10 / 3 + 5 / 3) / 2 + ')'));
-      expect(kinds.unlinked.result).toBe(page.run('formatLevel("c1", 4)'));
+      // As a student reads a level (DECISIONS, "Student-facing levels are proficiencies").
+      expect(kinds.comp.result).toBe(page.run('studentMarkText("c1", ' + (10 / 3 + 5 / 3) / 2 + ')'));
+      expect(kinds.unlinked.result).toBe(page.run('studentMarkText("c1", 4)'));
       expect(kinds.rubric.kind).toBe('back');
       expect(kinds.rubric.result).not.toBe('');
       expect(kinds.points.result).toBe('17.5 / 20');
@@ -888,7 +892,7 @@ describe('calc.js on the student page reads only what student-data.js gives it',
       expect(kinds.missing2).toMatchObject({ kind: 'missing', result: '' });
       expect(kinds.excused).toMatchObject({ kind: 'excused', result: '' });
       expect(kinds.excused2).toMatchObject({ kind: 'excused', result: '' });
-      expect(kinds.late.result).toBe(page.run('formatLevel("c1", 3)'));
+      expect(kinds.late.result).toBe(page.run('studentMarkText("c1", 3)'));
       expect(kinds.late.sub).toMatch(/ · Late$/);
       expect(kinds.late2).toMatchObject({ kind: 'due', result: '' });
       expect(kinds.late2.sub).toMatch(/^Late · Due /);

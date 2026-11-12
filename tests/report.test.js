@@ -151,7 +151,8 @@ describe('report-best-work-once', () => {
       );
       const prof = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}));
       expect(prof).toContain('Highest now: Evidence and Perspective');
-      expect(prof).toContain('Best work: Primary Source Analysis (Oct 2) and Map Study (Oct 6), 4.0 / 4.');
+      // The mark as a student reads it, no figure out of 4 (DECISIONS, "Student-facing levels are proficiencies").
+      expect(prof).toContain('Best work: Primary Source Analysis (Oct 2) and Map Study (Oct 6), Extending.');
     });
 
     it('names it once when it is the only piece', () => {
@@ -160,7 +161,7 @@ describe('report-best-work-once', () => {
         [sc('psa', 't1', 4), sc('psa', 't2', 4)],
       );
       const prof = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}));
-      expect(prof).toContain('Best work: Primary Source Analysis (Oct 2), 4.0 / 4.');
+      expect(prof).toContain('Best work: Primary Source Analysis (Oct 2), Extending.');
     });
   });
 });
@@ -227,8 +228,9 @@ describe('report-blocks-calc', () => {
         scores: [sc('a', 2), sc('b', 4), sc('c', 1)],
         statuses: { [SID + ':c']: 'EXC' },
       });
-      // (2 × 3 + 4) / 4 = 2.5: a 62.5% bar
-      expect(ctRow(ReportBlocks.renderBlockCoreCompetencies(CID, STUDENT))).toContain('width:62.5%');
+      // (2 × 3 + 4) / 4 = 2.5, Proficient: a Proficiency class's bar steps by whole proficiency, 75%,
+      // so its length shows no figure behind the word (DECISIONS, "Student-facing levels are proficiencies").
+      expect(ctRow(ReportBlocks.renderBlockCoreCompetencies(CID, STUDENT))).toContain('width:75%');
     });
 
     it('leaves 0% category work out and counts only work with a level', () => {
@@ -273,7 +275,17 @@ describe('report-blocks-calc', () => {
       // (3 × 54 + 4 × 46) / 100 = 3.46, printed 3.5: Extending, as printed
       // (DECISIONS, "A level reads as it is printed", 2026-11-11).
       expect(getSectionProficiencyRaw(CID, SID, 'sec-1')).toBeCloseTo(3.46, 9);
-      expect(ReportBlocks.renderBlockSectionOutcomes(CID, STUDENT)).toContain('calculated: 3.5 Extending');
+      // A Letter class still notes it; a Proficiency class prints only the teacher's level, nothing
+      // calculated beside it (Colin, 2026-11-12: "they only see the proficiency, because teachers may override it").
+      COURSES[CID].gradingSystem = 'letter';
+      expect(ReportBlocks.renderBlockSectionOutcomes(CID, STUDENT)).toContain(
+        'Teacher override (calculated: 87%): Conference',
+      );
+      COURSES[CID].gradingSystem = 'proficiency';
+      const html = ReportBlocks.renderBlockSectionOutcomes(CID, STUDENT);
+      expect(html).not.toContain('calculated');
+      expect(html).not.toContain('Extending');
+      expect(html).toContain('Developing');
     });
   });
 
@@ -332,9 +344,10 @@ describe('report-blocks-calc', () => {
     it('prints the Mean level, not the last weeks’ mean', () => {
       const r = run();
       expect(r.level).toBe(3);
-      expect(r.prof).toContain('3.0 Proficient');
-      expect(r.prog).toContain('Now 3.0 Proficient (+1.0 this term)');
-      expect(r.prog).not.toContain('Extending');
+      // Words, not figures (DECISIONS, "Student-facing levels are proficiencies").
+      expect(r.prof).toContain('Inquiry Developing Proficient ↑ Up');
+      expect(r.prog).toContain('Now Proficient (↑ Up this term)');
+      expect(r.prog).not.toContain('Now Extending');
       // The comment works from the same level; its trend stays the trend.
       expect(r.comp.level).toBe(3);
       expect(r.comp.now).toBe(4);
@@ -343,7 +356,7 @@ describe('report-blocks-calc', () => {
     it('prints the teacher’s override', () => {
       const r = run({ [SID]: { 'sec-1': { level: 2, reason: 'Conference' } } });
       expect(r.level).toBe(2);
-      expect(r.prog).toContain('Now 2.0 Developing');
+      expect(r.prog).toContain('Now Developing');
       expect(r.comp.level).toBe(2);
     });
   });
@@ -489,6 +502,13 @@ describe('report-calc-callers', () => {
     'wholePercent',
     'oneDecimal',
     'nearestScoreLevelName',
+    // A level it is given, as a student reads it (calc.js; DECISIONS, "Student-facing levels are proficiencies").
+    'studentLevelText',
+    'studentMarkText',
+    'studentLevelChange',
+    'studentGroupGradeText',
+    'studentLevelBarPercent',
+    'studentLevelStep',
   ]);
   const CALC = new Set(Object.keys(Calc).filter(name => !NO_SCORE.has(name)));
 
@@ -1914,7 +1934,7 @@ describe('report-grades-competency-range', () => {
       ['all', 'last10'].forEach(range => {
         const out = grades(range);
         ['Work A', 'Work B', 'Work C', 'Work D'].forEach(t => expect(out).toContain(t));
-        expect(out).toContain('Work A 2.0 / 4');
+        expect(out).toContain('Work A Developing');
       });
       const term = grades('term');
       expect(term).toContain('Work C');
@@ -2486,9 +2506,10 @@ describe('report-points-own-percent', () => {
     it('prints its own % beside the level in a Both class', () => {
       seed('both', [quiz('A', '2026-10-01')], [sc('A', 17)]);
       const byComp = text(ReportBlocks.renderBlockGradeTable(CID, STUDENT, { organize: 'competency' }));
-      expect(byComp).toContain('3.0 / 4 · 85%');
+      // The level as its proficiency beside the piece's own %, no figure out of 4 (DECISIONS, "Student-facing levels are proficiencies").
+      expect(byComp).toContain('Quiz A Proficient · 85%');
       const steps = text(ReportBlocks.renderBlockNextSteps(CID, STUDENT, {}, {}));
-      expect(steps).toContain('Latest: Quiz A, Oct 1 · 3.0 / 4 · 85% Proficient');
+      expect(steps).toContain('Latest: Quiz A, Oct 1 · Proficient · 85%');
     });
 
     it('names only the pieces at the % it prints when two share a level', () => {
@@ -2521,7 +2542,7 @@ describe('report-points-own-percent', () => {
       // A Proficiency class ranks by level: the 3+ is the best work.
       seed('proficiency', pieces, scores);
       expect(text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}))).toContain(
-        'Best work: Lab (Oct 5), 3.3 / 4.',
+        'Best work: Lab (Oct 5), Proficient +.',
       );
     });
 
@@ -2680,13 +2701,17 @@ describe('report-proficiency-one-figure', () => {
     it('a Both class prints the level and the course grade, as the Back does', () => {
       seed('both');
       const html = ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, { word: false });
-      expect(overallRow(html)).toContain(studentGradeSummary(CID, SID).text);
+      // The proficiency leads, not its figure (DECISIONS, "Student-facing levels are proficiencies").
+      expect(overallRow(html)).toContain(studentGradeText(CID, SID).text);
+      expect(studentGradeText(CID, SID).text).toMatch(/^(Emerging|Developing|Proficient|Extending) · /);
     });
 
     it('a Proficiency class still rolls its competencies up', () => {
       seed('proficiency');
       const html = ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, { word: false });
-      expect(overallRow(html)).toContain(formatLevel(CID, getOverallProficiency(CID, SID)));
+      // As its proficiency, Word off or not (DECISIONS, "Student-facing levels are proficiencies").
+      expect(overallRow(html)).toContain(levelWord(CID, getOverallProficiency(CID, SID)));
+      expect(overallRow(html)).not.toContain(formatLevel(CID, getOverallProficiency(CID, SID)));
     });
 
     it('a Letter class legend gives each level as a % and does not say out of 4', () => {
@@ -2695,9 +2720,10 @@ describe('report-proficiency-one-figure', () => {
       expect(t).not.toContain('out of 4');
       expect(t).toContain(formatLevel(CID, 3) + ' · Proficient');
       seed('proficiency');
-      expect(text(ReportBlocks.renderReportBlock('legend', CID, STUDENT, {}, {}))).toContain(
-        'BC Proficiency Scale, out of 4',
-      );
+      // A Proficiency class names the levels, with no number and no "out of 4" (DECISIONS, "Student-facing levels are proficiencies").
+      const prof = text(ReportBlocks.renderReportBlock('legend', CID, STUDENT, {}, {}));
+      expect(prof).toContain('BC Proficiency Scale Emerging');
+      expect(prof).not.toMatch(/out of 4|\d/);
     });
 
     it('a piece named as best work is not named as lowest work too', () => {
@@ -2729,10 +2755,10 @@ describe('report-proficiency-one-figure', () => {
       const t = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}));
       const back = text(ReportBlocks.renderBlockGradeTable(CID, STUDENT, { word: false }, {}));
       // The Inquiry is 4 on Evidence and 2 on Inquiry: 3.0 as a whole.
-      expect(back).toContain('Local History Inquiry 3.0 / 4');
-      expect(t).toMatch(/Best work: Local History Inquiry \(Oct 20\)( and Unit Quiz \(Oct 21\))?, 3\.0 \/ 4\./);
+      expect(back).toContain('Local History Inquiry Proficient');
+      expect(t).toMatch(/Best work: Local History Inquiry \(Oct 20\)( and Unit Quiz \(Oct 21\))?, Proficient\./);
       expect(t).not.toContain('Safety Contract');
-      expect(t).not.toContain('4.0 / 4');
+      expect(t).not.toMatch(/Best work: [^.]*Extending/);
     });
 
     it('a Letter class names a piece at the % Assignment Grades prints', () => {
@@ -2810,17 +2836,17 @@ describe('report-rubric-competency-mark', () => {
       });
 
       const grades = text(ReportBlocks.renderBlockGradeTable(CID, STUDENT, { organize: 'competency' }));
-      expect(grades).toContain('Causes of the War 1.0 / 4 Emerging');
-      expect(grades).not.toContain('4.0 / 4');
+      expect(grades).toContain('Causes of the War Emerging');
+      expect(grades).not.toContain('Causes of the War Extending');
 
       const prof = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}));
-      expect(prof).toContain('Best work: Treaty Debate (Oct 9), 3.0 / 4.');
+      expect(prof).toContain('Best work: Treaty Debate (Oct 9), Proficient.');
     });
 
     it('prints the one level, with its ±, when they agree', () => {
       seed([sc('essay', 'crit-thesis', 3, { mod: 1 }), sc('essay', 'crit-evidence', 3, { mod: 1 })]);
       const grades = text(ReportBlocks.renderBlockGradeTable(CID, STUDENT, { organize: 'competency' }));
-      expect(grades).toContain('Causes of the War 3.3 / 4 Proficient');
+      expect(grades).toContain('Causes of the War Proficient +');
     });
   });
 });
@@ -3266,9 +3292,10 @@ describe('report-studio-words', () => {
     it('the Proficiency table starts a competency where Progress in One Area does', () => {
       seed();
       const prog = text(ReportBlocks.renderBlockProgress(CID, STUDENT, {}, {}));
-      const start = prog.match(/Start of term (\d\.\d)/)[1];
+      // As words (DECISIONS, "Student-facing levels are proficiencies").
+      const start = prog.match(/Start of term (\w+)/)[1];
       const table = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, { word: false }));
-      expect(table).toMatch(new RegExp('Questioning ' + start.replace('.', '\\.') + ' '));
+      expect(table).toMatch(new RegExp('Questioning ' + start + ' '));
       expect(table).not.toMatch(/Questioning — /);
     });
 
@@ -3463,7 +3490,17 @@ describe('report-studio', () => {
       const table = ReportStudio.blockToolbarHtml(f, 'proficiency', null);
       expect(table).toContain('role="region"');
       expect(table).toContain('aria-label="Proficiency Settings"');
-      expect(table).toContain('data-key="score"');
+      // A Proficiency class prints the proficiency whatever Score says, so Score out of 4 is not offered
+      // (DECISIONS, "Student-facing levels are proficiencies"); a Letter class still has it.
+      expect(table).not.toContain('data-key="score"');
+      expect(table).not.toContain('Score out of 4');
+      const cid = getActiveCourse();
+      const was = COURSES[cid].gradingSystem;
+      COURSES[cid].gradingSystem = 'letter';
+      expect(ReportStudio.blockToolbarHtml(f, 'proficiency', null)).toContain('data-key="score"');
+      COURSES[cid].gradingSystem = 'both';
+      expect(ReportStudio.blockToolbarHtml(f, 'proficiency', null)).toMatch(/data-key="score"[^>]*>\s*Percent</);
+      COURSES[cid].gradingSystem = was;
       // No Compare With: the first report compares with the start of the
       // term, every later one with the last report (2026-11-03).
       expect(table).not.toContain('aria-label="Compare With"');

@@ -70,9 +70,16 @@ describe('phone-reports', () => {
     it('takes every grade from the app, as the class shows it', () => {
       const d = PhoneReports.snapshot(CID, st, { termId: 'term-1', termLabel: 'Report 1' });
       expect(d).toMatchObject({ name: 'Cece Okafor', first: 'Cece', course: 'Science 8', report: 'Report 1' });
-      expect(d.overall).toEqual({ mode: 'proficiency', text: '2.9', level: 3, word: 'Proficient' });
+      // Words, not figures (DECISIONS, "Student-facing levels are proficiencies").
+      expect(d.overall).toEqual({ mode: 'proficiency', text: 'Proficient', level: 3, word: 'Proficient' });
       expect(d.skills).toEqual([
-        { name: 'Questioning', line: 'I can ask questions I can test.', text: '3.2', word: 'Proficient', level: 3 },
+        {
+          name: 'Questioning',
+          line: 'I can ask questions I can test.',
+          text: 'Proficient',
+          word: 'Proficient',
+          level: 3,
+        },
         { name: 'Communicating', line: '', text: '', word: '', level: 0 },
       ]);
       expect(d.attendance).toEqual({ absent: 3, late: 0 });

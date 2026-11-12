@@ -81,11 +81,9 @@ for (const size of SIZES) {
       await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
       await showAll(page);
       const row = title => page.locator('.sp-row', { hasText: title });
-      await expect(row('Energy Transfer Investigation').locator('.sp-row-result')).toHaveText('4.0 · 100%');
-      await expect(row('Energy Transfer Investigation').locator('.sp-row-sub')).toHaveText(
-        /^Back \S+ \d+ · Extending$/,
-      );
-      await expect(row('Cell Microscope Lab').locator('.sp-row-result')).toHaveText('2.7 · 67%');
+      await expect(row('Energy Transfer Investigation').locator('.sp-row-result')).toHaveText('Extending · 100%');
+      await expect(row('Energy Transfer Investigation').locator('.sp-row-sub')).toHaveText(/^Back \S+ \d+$/);
+      await expect(row('Cell Microscope Lab').locator('.sp-row-result')).toHaveText('Proficient − · 67%');
       await expect(row('Cell Structure Quiz').locator('.sp-row-result')).toHaveText('8 / 10');
       await expect(row('Lab Safety Contract').locator('.sp-row-result')).toHaveText('Complete');
       await expect(row('Immune System Quick Check').locator('.sp-row-sub')).toHaveText(/^Missing · Due /);
@@ -94,7 +92,7 @@ for (const size of SIZES) {
       await expect(row('Disease Research Poster').locator('.sp-row-result')).toHaveCount(0);
       await expect(row('Science Fair Proposal').locator('.sp-row-result')).toHaveCount(0);
       // A returned grade with a newer draft over it keeps what was returned.
-      await expect(row('Ecosystem Connections Essay').locator('.sp-row-result')).toHaveText('2.0 · 50%');
+      await expect(row('Ecosystem Connections Essay').locator('.sp-row-result')).toHaveText('Developing · 50%');
       const html = await page.locator('#app').innerHTML();
       expect(html).not.toMatch(/draft/i);
       expect(html).not.toContain('sources are missing');
@@ -204,7 +202,7 @@ test.describe('student card: the card’s password and the lock', () => {
     await page.getByRole('button', { name: 'Try Again' }).tap();
     await expect(
       page.locator('.sp-row', { hasText: 'Energy Transfer Investigation' }).locator('.sp-row-result'),
-    ).toHaveText('4.0');
+    ).toHaveText('Extending');
     await expect(page.getByRole('status')).toHaveCount(0);
     expect(errors).toEqual([]);
   });

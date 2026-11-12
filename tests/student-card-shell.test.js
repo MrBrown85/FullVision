@@ -142,7 +142,7 @@ describe('To Do, Sent and Back', () => {
     expect(titles(page)).toEqual(back.map(p => p.title));
     expect(results(page)).toEqual(Object.fromEntries(back.map(p => [p.title, p.result.text])));
     expect(results(page)['Cell Structure Quiz']).toBe('8 / 10');
-    expect(results(page)['Ecosystem Connections Essay']).toBe('2.0');
+    expect(results(page)['Ecosystem Connections Essay']).toBe('Developing');
   });
 
   it('Sent is empty until students can send work', async () => {

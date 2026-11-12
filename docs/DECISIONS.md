@@ -2,6 +2,21 @@
 
 Settled product decisions. Add a dated entry when one is made; don't reopen one without a new entry that supersedes it.
 
+## Student-facing levels are proficiencies (2026-11-12)
+
+Context: Colin printed a Quick Report for a student and saw a level as a number. "when i print a quick report for students, it gives a score (1.8 out of 4) - that's not the bc provincial reporting order. students receive proficiencies. all student-facing scores need to be a proficiency" (Colin, 2026-11-12). Later the same day: "students don't see numbers-as-proficiencies. they only see the proficiency, because teachers may override it." A figure beside the level the teacher set by hand would contradict the teacher.
+
+- **Rule:** in a class graded by Proficiency, nothing a student or family reads shows a level as a number: no "1.8", no "1.8 / 4", no "out of 4", in a cell, a heading, a legend, a caption, a tooltip or a label read aloud. They read the proficiency: Emerging, Developing, Proficient, Extending. One piece of work's mark carries its + or − ("Proficient +", the step the grader names); a student's, a competency's or a category's level reads as its word alone. The word follows "A level reads as it is printed": it comes from `levelWord` and `nearestScoreLevelName`, with no new thresholds.
+- **The level shown is the teacher's.** Every surface reads the level through the same `calc.js` function the teacher's report uses, so a competency the teacher set by hand reads the teacher's level, and nothing beside it shows the calculated one. On Learning Outcomes and Section Proficiency Breakdown the rows under a competency set by hand read the teacher's level too, and the "Teacher override (calculated: …)" note no longer prints.
+- **No length, position or order gives the figure away.** A bar for a level steps by whole proficiency (a quarter a level); a dot on How It's Going sits at the step it is named by; Lowest First and the Highest and Lowest lines go by the proficiency, ties in report order; a change reads "↑ Up", "↓ Down" or "Same", not "+0.3".
+- **Surfaces:** the Quick Report (the grade sheet, the summary by category, the Course Grade and its Feedback Pages); every Progress Reports block on Page Studio (Proficiency, Progress in One Area, Next Steps, Ways to Support at Home, Assignment Grades, Learning Outcomes, Section Proficiency Breakdown, Core Competencies, the BC Proficiency Scale legend and the rest); the graded rubric handout from Print Rubrics; Sent to Phones and the phone report on the student page (`shared/phone-report-view.js`); the student page (`s/`: the Assignments list, Your Result and Your Feedback, Before and After a revision, My Learning) and Preview as Student, which shows what the student page shows. The Term Questionnaire's Generate already wrote words in a Proficiency class and is unchanged.
+- **Score out of 4 is gone from what students read.** The Proficiency block no longer offers Score out of 4 or Proficiency Word in a Proficiency class: it prints the proficiency whatever a saved form says, so a saved report or template with Score on prints the proficiency without being edited (read where the form is read; no saved form is rewritten). In a Both class its Score is called Percent. Assignment Grades prints a level's proficiency in its Score column and no % for a level in a Proficiency class; its legend reads "Points shown as scored; other work shown as its proficiency."
+- **A Both class** shows the proficiency and the percent, without the figure: "Proficient · 80%", "Proficient · B 82%". **A Letter class** (grades 10 to 12) is exactly as before: letters and percents are the provincial order there.
+- **Teacher screens keep their figures:** the gradebook, the dashboard, the teacher's own student page, the Term Questionnaire screen, the printed class grade sheet and Download All My Data.
+- **Points and Complete/Incomplete work stay as they are** (Colin, 2026-11-12: "points and complete/incomplete should remain as is"): "7/10", "70%", "Complete". A points score is never printed beside a level out of 4.
+- What was saved before is not rewritten: an issued report's fixed copy reprints as it was, and a phone report sent before today shows its letter and % without the figure (the view drops it). Every Progress Report issued before shows as changed since its last issue, because its text changed.
+- `studentLevelText`, `studentMarkText`, `studentGradeText`, `studentGroupGradeText`, `studentLevelChange`, `studentLevelBarPercent` and `studentLevelStep` in `shared/calc.js` only format; no grade is computed differently. `tests/student-facing-proficiency.test.js` holds the student-facing files to them.
+
 ## Handoff review rulings (2026-11-12)
 
 Context: after the overnight run of the handoff review (S19; 50 PRs merged, see [`plans/handoff-review-plan.md`](plans/handoff-review-plan.md)), Colin ruled on what comes next. The numbers in brackets are the plan's section 6 decisions.
@@ -101,7 +116,7 @@ Rubric work counts as the sum of its criteria's points, so a 5-criterion rubric 
 Colin: "Rubric row %: match the category. A rubric piece's row on the Quick Report and Grade Breakdown uses the same math as its category, so a piece alone in its category shows the category's %." (Colin, 2026-11-03.) Zoe's Local History Inquiry, alone in Projects on the BC Letter Bands, has criteria at 3− and 4: Projects counts (73 + 100) / 2 = 86.5%, "A 87%", but her row averaged the levels first (3.33 = 3+ = 86%).
 
 - **A rubric piece's % is its criteria's percents, by weight**, as its category counts it (`assessmentCellValue` `percent` and `percentText`, from `getAssessmentGroupPercentage` of the piece alone). The Quick Report row, Assignment Grades, the gradebook cell in a Letter or Both class, the printed grade sheet's Percent, the graded rubric handout's Overall and Generate's best and weakest piece in a Letter class all print it. Other proficiency work keeps the % its level counts as, which is the same math.
-- The level beside it (3.3 / 4) doesn't change, nor does any category, course % or competency.
+- The level beside it (3.3 / 4) doesn't change, nor does any category, course % or competency. _2026-11-12: students and families read that level as its proficiency, "Proficient +", not 3.3 / 4; see "Student-facing levels are proficiencies"._
 
 ## Proficiency percents (2026-10-29)
 
@@ -246,7 +261,7 @@ Context: the student page designed on Nov 6–7 (photo submissions, feedback, re
 1. **The student page can show My Learning** (Colin, 2026-11-07): the student's own skill levels, their grade and how it changes over the term. It is a per-class switch, Show My Learning in Class Settings › Student Page, off until the teacher turns it on.
 2. **This reverses two earlier lines for a class that turns it on:** "no grades" on the student page (`STUDENT-VOICE-PLAN.md`, Screens) and "not a portal" (Product shape). A class with the switch off keeps both.
 3. **Only returned work counts.** A student never sees a level before the teacher returns that piece.
-4. **Grades as shown.** Every level, letter and % comes from `shared/calc.js` and follows the class's grading style.
+4. **Grades as shown.** Every level, letter and % comes from `shared/calc.js` and follows the class's grading style. _2026-11-12: a level reads as its proficiency, never a figure; see "Student-facing levels are proficiencies"._
 5. **Next steps come from the comment bank; I Can statements from the curriculum bank.** Nothing is written for the student page alone.
 6. **No class averages and no comparisons** with other students.
 7. **Preview as Student shows exactly what one student sees.**
@@ -632,7 +647,7 @@ Context: rubric scores are stored per criterion and projected onto the criterion
 Context: every gradebook compared in the rubrics review returns the rubric to the student; FullVision's scoring grid shows only the four level buttons. `migrations/20261018_rubric_score_comment.sql`; `teacher/rubric-print.js`.
 
 1. **Descriptors stay off the scoring grid.** Teachers grade for speed and know their rubrics; the descriptor belongs on the thing the student gets. Hover still shows it.
-2. **The handout is the feedback.** "Print rubrics" on a rubric assessment prints one student-facing rubric per student: the descriptors, the chosen level in grey with a heavy border and its ± mark (black and white only: the sheets are photocopied), a short comment per criterion, the assessment comments and the overall level. The teacher scores once, prints, staples it to the work; the score still feeds the student profile.
+2. **The handout is the feedback.** "Print rubrics" on a rubric assessment prints one student-facing rubric per student: the descriptors, the chosen level in grey with a heavy border and its ± mark (black and white only: the sheets are photocopied), a short comment per criterion, the assessment comments and the overall level (_2026-11-12: as its proficiency, "Proficient −", not 2.7; see "Student-facing levels are proficiencies"_). The teacher scores once, prints, staples it to the work; the score still feeds the student profile.
 3. **Three layouts:** full page, half sheet (two per landscape page) and quarter sheet (four per page), cut lines between. Text shrinks by layout, and shrinks further by steps to fit; a sheet that still does not fit is clipped and the dialog says so before printing.
 4. **One comment per criterion**, stored on `rubric_score.comment`, entered from an icon on the criterion row. It cannot exist without a level on the server, so a comment typed first waits on the device and goes up with the level.
 5. **Unscored students print a blank rubric.** Not submitted and Excused print as such in place of the overall level.

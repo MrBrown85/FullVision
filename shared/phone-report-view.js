@@ -71,13 +71,26 @@ var PhoneReportView = (function () {
     html += '<div class="pr-big pr-big-' + n + '">' + esc(o.word) + '</div>';
     html +=
       '<div class="pr-scale" role="img" aria-label="' +
-      esc(o.word + ', the ' + ['', 'first', 'second', 'third', 'fourth'][n] + ' of four levels') +
+      esc(
+        o.word +
+          ' on the scale ' +
+          [1, 2, 3, 4]
+            .map(function (i) {
+              return WORDS[i];
+            })
+            .join(', '),
+      ) +
       '">';
     for (var i = 1; i <= 4; i++) html += '<span' + (i === n ? ' class="on pr-on-' + n + '"' : '') + '></span>';
     html += '</div><div class="pr-scale-words" aria-hidden="true">';
     for (var j = 1; j <= 4; j++) html += '<span' + (j === n ? ' class="on"' : '') + '>' + WORDS[j] + '</span>';
     html += '</div>';
-    if (o.mode === 'both' && o.text) html += '<div class="pr-also">' + esc(o.text) + '</div>';
+    // A Both class's letter and % under the word. A report sent before
+    // 2026-11-12 holds "3.2 · B 82%": its last part is shown, so a level
+    // never reads as a figure (DECISIONS, "Student-facing levels are
+    // proficiencies"); the saved report is not changed.
+    if (o.mode === 'both' && o.text)
+      html += '<div class="pr-also">' + esc(String(o.text).split(' \u00B7 ').pop()) + '</div>';
     return html + '<p class="pr-note">' + esc(MEANS[n]) + '</p></section>';
   }
 
