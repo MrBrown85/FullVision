@@ -2,12 +2,17 @@ import { test, expect } from '@playwright/test';
 
 /* S2-F2: in a class whose student page is on (the hidden build switch) and
    that returns grades When I Return Them, the Term Questionnaire and Sent
-   to Phones show what a family reads: returned grades only. Cece's lab is
-   changed to Emerging on every criterion and left as a draft. Her
-   questionnaire's grade and the phone copy sent keep the grade she was
-   given, while the same copy drawn on all work has moved. In an As Soon As
-   I Save class the copy moves at once. (Returning it is held in
-   tests/questionnaire-holds-drafts.test.js.) Demo Mode's Science 8. */
+   to Phones show what a family reads: returned grades only. Each piece of
+   Cece's rubric work is changed to Emerging on every criterion and left as
+   a draft. Her questionnaire's grade and the phone copy sent keep the grade
+   she was given, while the same copy drawn on all work has moved. In an As
+   Soon As I Save class the copy moves at once. A family reads the
+   proficiency word, not a figure (DECISIONS, "Student-facing levels are
+   proficiencies"), so the drafts must move the word: one lab's draft moves
+   her figure but leaves her Proficient, and the copy could not show whether
+   a draft got in; all of them take her to Developing. (Returning it
+   is held in tests/questionnaire-holds-drafts.test.js.) Demo Mode's
+   Science 8. */
 test.use({ viewport: { width: 1440, height: 900 } });
 
 async function demoWithDraft(page, config) {
@@ -27,11 +32,13 @@ async function demoWithDraft(page, config) {
       return s.id === 'st1';
     });
     var before = PhoneReports.snapshot(cid, st, { termId: 'term-1', termLabel: 'Report 1' }).overall.text;
-    var lab = getAssessments(cid).find(function (a) {
-      return a.id === 'sci8a4';
+    var work = getAssessments(cid).filter(function (a) {
+      return a.rubricId && getRubricById(cid, a.rubricId);
     });
-    getRubricById(cid, lab.rubricId).criteria.forEach(function (c) {
-      Grader.setLevel(cid, 'st1', lab.id, c.id, 1, 0);
+    work.forEach(function (a) {
+      getRubricById(cid, a.rubricId).criteria.forEach(function (c) {
+        Grader.setLevel(cid, 'st1', a.id, c.id, 1, 0);
+      });
     });
     clearProfCache();
     return {
@@ -40,7 +47,14 @@ async function demoWithDraft(page, config) {
       now: ReportScores.withReportScores('grader', function () {
         return PhoneReports.snapshot(cid, st, { termId: 'term-1', termLabel: 'Report 1' }).overall.text;
       }),
-      state: GradeState.stateOf(cid, 'st1', lab.id),
+      // One state for all of it: 'draft' or 'returned'.
+      state: Array.from(
+        new Set(
+          work.map(function (a) {
+            return GradeState.stateOf(cid, 'st1', a.id);
+          }),
+        ),
+      ).join(),
     };
   }, config);
 }
@@ -82,8 +96,9 @@ test('the questionnaire and the phone copy keep the grade Cece was given until h
 
   const at = await demoWithDraft(page, { student_page_enabled: true, return_grades: 'on_return' });
   expect(at.state).toBe('draft');
-  // The teacher's own number has moved; what a family reads has not.
-  expect(at.now).not.toBe(at.before);
+  // The teacher's own grade has moved; what a family reads has not.
+  expect(at.before).toBe('Proficient');
+  expect(at.now).toBe('Developing');
   await page.evaluate(r => window.Router.navigate(r), '/reports?tab=questionnaire&student=st1');
   await expect(page.locator('.qn-name')).toHaveText('Cece Adeyemi');
   await expect(page.locator('.qn-grade-big')).toHaveText(given);
@@ -93,5 +108,6 @@ test('the questionnaire and the phone copy keep the grade Cece was given until h
 test('in an As Soon As I Save class they show the change at once', async ({ page }) => {
   const at = await demoWithDraft(page, { student_page_enabled: true, return_grades: 'on_save' });
   expect(at.state).toBe('returned');
-  expect(await readPhoneCopy(page)).not.toBe(at.before);
+  expect(at.before).toBe('Proficient');
+  expect(await readPhoneCopy(page)).toBe('Developing');
 });

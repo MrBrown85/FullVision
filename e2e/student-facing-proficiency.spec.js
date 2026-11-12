@@ -58,6 +58,24 @@ async function demo(page) {
   return { at, errors };
 }
 
+/* The Progress Report canvas showing this student alone, as the teacher
+   picks one in Select Students. In One Student view the canvas otherwise
+   moves to whichever report the class fit finds longest; with the same
+   blocks for everyone that depends on how the machine's fonts wrap (on this
+   Mac every report ties and the first stays; on CI's Linux fonts Hannah
+   Berg's ran longer, and the test read her report instead). */
+async function sheetOf(page, name) {
+  await page.getByRole('button', { name: 'Select students' }).click();
+  const list = page.locator('#picker-dropdown');
+  await list.getByRole('button', { name: 'Deselect All' }).click();
+  await list.locator('.student-picker-item', { hasText: name }).click();
+  await page.getByRole('button', { name: 'Select students' }).click();
+  await expect(list).not.toHaveClass(/open/);
+  const sheet = page.locator('.report-sheet').first();
+  await expect(sheet).toContainText(name);
+  return sheet;
+}
+
 const noFigure = text => {
   const m = String(text).match(FIGURE);
   return m ? '…' + text.slice(Math.max(0, m.index - 40), m.index + 10) : null;
@@ -149,7 +167,7 @@ test('the student page and the reports say the same for the same student', async
   await page.evaluate(r => window.Router.navigate(r), '/reports');
   await page.getByRole('tab', { name: 'Progress Reports' }).click();
   await expect(page.locator('.report-sheet').first()).toBeVisible();
-  const course = (await page.locator('.report-sheet').first().locator('.gr-term-grade').innerText()).trim();
+  const course = (await (await sheetOf(page, at.name)).locator('.gr-term-grade').innerText()).trim();
   expect(course).toMatch(WORD);
   await page.evaluate(layout => saveReportConfig('sci8', layout), ONE_BLOCK);
   await page.reload();
@@ -160,9 +178,7 @@ test('the student page and the reports say the same for the same student', async
     id => ReportBlocks.competencyLabel(getSections('sci8').find(s => s.id === id)),
     at.sec,
   );
-  const row = page
-    .locator('.report-sheet')
-    .first()
+  const row = (await sheetOf(page, at.name))
     .locator('tr', { has: page.locator('.report-ct-name', { hasText: label }) })
     .first();
   const now = (await row.locator('td').nth(2).innerText()).trim();
