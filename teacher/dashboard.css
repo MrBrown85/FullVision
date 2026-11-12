@@ -5655,35 +5655,656 @@ a.dash-ins-name:hover {
   right: 0;
   left: auto;
 }
-/* Import review */
-.cm-import-columns .cm-import-col-grid {
+/* Import Roster (board: Import Roster canvas, Nov 11 2026) */
+.cm-import-empty {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 6px 16px;
-  margin: 6px 0;
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  gap: 28px;
+  padding: 24px;
 }
-.cm-import-col {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 170px;
+.cm-import-drop {
+  border: 2px dashed var(--border-2, var(--border));
+  border-radius: var(--radius);
+  background: var(--bg);
+  font-family: var(--font-base);
+  transition:
+    border-color 0.12s,
+    background 0.12s;
+}
+.cm-import-drop.is-over {
+  border-color: var(--active);
+  background: var(--active-light);
+}
+.cm-import-drop-big {
+  min-height: 320px;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  font-size: var(--text-sm);
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
 }
-.cm-import-col-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
+.cm-import-file-icon {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  color: var(--link);
+}
+.cm-import-drop-title {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.cm-import-drop-text {
+  margin: 0;
+  max-width: 440px;
+  font-size: var(--text-base);
+  color: var(--text);
+  line-height: 1.45;
+}
+.cm-import-drop-big .btn {
+  margin-top: 4px;
+}
+.cm-import-drop-big .cm-hint {
+  margin: 4px 0 0;
+  max-width: 420px;
+}
+.cm-import-side {
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  color: var(--text);
+}
+.cm-import-side-part {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 16px 0;
+  border-top: 1px solid var(--divider-subtle);
+}
+.cm-import-side-part:first-child {
+  padding-top: 4px;
+  border-top: none;
+}
+.cm-import-side-part h3 {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 700;
+}
+.cm-import-side-part p {
+  margin: 0;
+  line-height: 1.45;
+}
+.cm-import-side-part a {
+  color: var(--link);
+  font-weight: 600;
+}
+.cm-import-side-part a.cm-action-btn {
+  display: inline-flex;
+  color: var(--text);
+  text-decoration: none;
+}
+.cm-import-side-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.cm-import-steps {
+  margin: 0;
+  padding-left: 1.4em;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  line-height: 1.4;
+}
+.cm-import-strip {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  background: var(--surface);
+}
+.cm-import-strip .cm-import-file-icon {
+  width: 30px;
+  height: 30px;
+}
+.cm-import-strip-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--text-base);
+  color: var(--text);
+}
+.cm-import-strip-text a {
+  color: var(--link);
+  font-weight: 600;
+}
+.cm-import-link {
+  border: none;
+  background: none;
+  padding: 0;
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--link);
+  cursor: pointer;
+  text-decoration: none;
   white-space: nowrap;
 }
-.cm-import-col select {
-  padding: 4px 8px;
-  font-size: var(--text-sm);
+.cm-import-link:hover {
+  text-decoration: underline;
+}
+.cm-import-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 720px;
+  font-family: var(--font-base);
+}
+.cm-import-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.cm-import-card-head h2 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.cm-import-card-mark {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--notice-bg);
+  color: var(--notice-text);
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cm-import-card-text {
+  margin: 0;
+  font-size: var(--text-base);
+  color: var(--text);
+}
+.cm-import-card .cm-hint {
+  margin: 0;
+}
+.cm-import-card .cm-import-buttons {
+  margin-top: 6px;
 }
 
 .cm-import-review {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  font-family: var(--font-base);
 }
+.cm-import-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.cm-import-head .cm-grade-title {
+  margin: 0;
+}
+.cm-import-head .cm-grade-title:focus {
+  outline: none;
+}
+.cm-import-sub {
+  margin-top: 4px;
+  font-size: var(--text-base);
+  color: var(--text-2);
+}
+.cm-import-sub strong {
+  color: var(--text);
+}
+.cm-import-file-line {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-sm);
+}
+.cm-import-band {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--ok-bg);
+  color: var(--ok-text);
+  font-size: var(--text-base);
+}
+.cm-import-band > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cm-import-band .cm-import-link {
+  color: inherit;
+  text-decoration: underline;
+}
+.cm-import-band-mark {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--ok-bg);
+  color: var(--ok-text);
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cm-import-band .cm-import-band-mark {
+  width: auto;
+  height: auto;
+  background: none;
+}
+.cm-import-needs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.cm-import-need {
+  padding: 6px 12px;
+  border-radius: 16px;
+  background: var(--bg);
+  color: var(--text-2);
+  font-size: var(--text-sm);
+}
+.cm-import-need strong {
+  color: var(--text);
+}
+.cm-import-need.is-ok {
+  background: var(--ok-bg);
+  color: var(--ok-text);
+}
+.cm-import-need.is-ok strong {
+  color: inherit;
+}
+.cm-import-need.is-missing {
+  background: var(--notice-bg);
+  color: var(--notice-text);
+}
+.cm-import-need.is-missing strong {
+  color: inherit;
+}
+.cm-import-cols-scroll {
+  border: 1px solid var(--divider-subtle);
+  border-radius: 10px;
+  overflow-x: auto;
+}
+.cm-import-cols {
+  display: grid;
+}
+.cm-import-col-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px 10px 12px;
+  background: var(--bg);
+  border-right: 1px solid var(--divider-subtle);
+  border-bottom: 1px solid var(--divider-subtle);
+  min-width: 0;
+}
+.cm-import-col-head.is-out {
+  background: var(--bg-secondary, var(--bg));
+}
+.cm-import-col-name {
+  font-size: var(--text-sm);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.cm-import-field-wrap {
+  position: relative;
+  align-self: stretch;
+}
+.cm-import-field-btn {
+  width: 100%;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border-2, var(--border));
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.cm-import-col-head.is-out .cm-import-field-btn {
+  color: var(--text-2);
+  font-weight: 500;
+}
+.cm-import-field-btn[aria-expanded='true'] {
+  border-color: var(--active);
+  box-shadow: 0 0 0 1px var(--active);
+}
+.cm-import-field-menu {
+  left: 0;
+  right: auto;
+  width: 360px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+.cm-import-menu-group {
+  padding: 8px 10px 2px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--text-2);
+}
+.cm-import-field-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.cm-import-field-item.is-on {
+  background: var(--active-light);
+  font-weight: 600;
+}
+.cm-import-item-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+.cm-import-item-used {
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--text-2);
+}
+.cm-import-item-guess {
+  font-size: var(--text-sm);
+  color: var(--notice-text);
+}
+.cm-import-item-hint {
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--text-2);
+}
+.cm-import-tag {
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.cm-import-tag.is-read {
+  background: var(--ok-bg);
+  color: var(--ok-text);
+}
+.cm-import-tag.is-guess {
+  border: 1px dashed var(--notice-text);
+  background: var(--notice-bg);
+  color: var(--notice-text);
+}
+.cm-import-col-note {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  line-height: 1.35;
+}
+.cm-import-col-issue {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--notice-text);
+}
+.cm-import-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--text-sm);
+  color: var(--notice-text);
+  font-weight: 600;
+}
+.cm-import-ask-btns {
+  display: flex;
+  gap: 6px;
+}
+.cm-import-ask .cm-action-btn {
+  padding: 3px 12px;
+}
+.cm-import-suggest {
+  padding: 4px 10px;
+  border: none;
+  border-radius: 13px;
+  background: var(--active-light);
+  color: var(--link);
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.cm-import-cell {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--divider-subtle);
+  font-size: var(--text-sm);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cm-import-cell.is-out {
+  background: var(--bg);
+  color: var(--text-2);
+}
+.cm-import-more {
+  padding: 8px 10px;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.cm-import-problems-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.cm-import-problems-head h3 {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--text);
+}
+.cm-import-problems {
+  border: 1px solid var(--notice-edge);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.cm-import-problem {
+  display: grid;
+  grid-template-columns: 72px minmax(120px, 170px) minmax(0, 1fr) 240px;
+  gap: 14px;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--notice-bg);
+  border-top: 1px solid var(--notice-edge);
+  font-size: var(--text-base);
+  color: var(--text);
+}
+.cm-import-problem:first-child {
+  border-top: none;
+}
+.cm-import-problem .cm-hint {
+  display: inline;
+}
+.cm-import-problem-name.is-missing {
+  color: var(--notice-text);
+}
+.cm-import-rownum {
+  justify-self: start;
+  padding: 1px 10px;
+  border: 1px solid var(--notice-edge);
+  border-radius: 11px;
+  background: var(--surface);
+  color: var(--notice-text);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.cm-import-fix {
+  grid-column: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--text-xs);
+  color: var(--text-2);
+}
+.cm-import-fix .cm-input {
+  padding: 5px 10px;
+  font-size: var(--text-base);
+}
+.cm-import-list {
+  border-top: 1px solid var(--divider-subtle);
+}
+.cm-import-list-row {
+  display: grid;
+  grid-template-columns: var(--cm-import-cols);
+  align-items: center;
+  min-height: 40px;
+  padding: 0 4px;
+  border-bottom: 1px solid var(--divider-subtle);
+  font-size: var(--text-base);
+  color: var(--text);
+  cursor: pointer;
+}
+.cm-import-list-row > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 10px;
+}
+.cm-import-list-row.is-head {
+  min-height: 36px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text-2);
+  cursor: default;
+}
+.cm-import-list-row .is-name {
+  font-weight: 600;
+}
+.cm-import-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+.cm-import-groups > div {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.cm-import-changes {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--text-sm);
+}
+/* The Done panel, above the roster after an import */
+.cm-import-done {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+  font-family: var(--font-base);
+}
+.cm-import-done-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cm-import-done-body h2 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.cm-import-done-body h2:focus {
+  outline: none;
+}
+.cm-import-done-body p {
+  margin: 0;
+  font-size: var(--text-base);
+  color: var(--text);
+}
+.cm-import-next-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+.cm-import-next {
+  padding: 6px 14px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--active-light);
+  color: var(--link);
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+}
+.cm-import-done-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.cm-import-close {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--text-2);
+  font-size: 1rem;
+  cursor: pointer;
+}
+.cm-rs-new {
+  background: linear-gradient(var(--active-light), var(--active-light)), var(--surface);
+}
+.cm-rs-new-tag {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 1px 7px;
+  border-radius: 9px;
+  background: var(--active-light);
+  color: var(--link);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  pointer-events: none;
+}
+@media (max-width: 900px) {
+  .cm-import-empty,
+  .cm-import-groups {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cm-import-strip {
+    flex-wrap: wrap;
+  }
+  .cm-import-problem {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .cm-import-problem > span:nth-of-type(2),
+  .cm-import-fix {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Import review groups (also Re-link's review) */
 .cm-import-group {
   display: flex;
   flex-direction: column;
@@ -5696,7 +6317,13 @@ a.dash-ins-name:hover {
   align-items: baseline;
   font-family: var(--font-base);
 }
-.cm-import-group h3 {
+.cm-import-same {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+.cm-import-group h3,
+.cm-import-same h3 {
   margin: 0;
   font-size: var(--text-md);
   font-weight: 700;
@@ -5739,28 +6366,6 @@ a.dash-ins-name:hover {
 .cm-import-buttons {
   display: flex;
   gap: 8px;
-}
-/* Import Roster's format panel, shown before the file picker */
-.cm-import-format {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.cm-import-format .cm-section-title {
-  margin-bottom: 2px;
-}
-.cm-import-format .cm-hint {
-  margin: 0;
-  line-height: 1.45;
-}
-.cm-import-format .cm-import-buttons {
-  justify-content: flex-end;
-  margin-top: 8px;
-}
-.cm-import-format a.cm-action-btn {
-  display: inline-flex;
-  align-items: center;
-  text-decoration: none;
 }
 /* Keep a copy first, in the permanent-delete dialog */
 .cm-keep-copy {

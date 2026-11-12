@@ -109,6 +109,13 @@
   --report-callout-border: #e8d5a8;
   --toast-error: #c0392b;
   --toast-success: #1a7a34;
+  /* Import Roster: a row or column that needs a look (amber), and a file
+     read in full or an import done (green). Not the level colours. */
+  --notice-bg: #fff6e8;
+  --notice-text: #8a4b00;
+  --notice-edge: #e0b875;
+  --ok-bg: #e9f7ee;
+  --ok-text: #14532d;
 
   /* Z-index scale — use these instead of magic numbers */
   --z-navbar: 50; /* fixed nav bars */
@@ -3823,6 +3830,11 @@ body.offline-active #app-dock {
     --report-callout-border: rgba(255, 159, 10, 0.25);
     --toast-error: #b52a20;
     --toast-success: #166534;
+    --notice-bg: rgba(255, 159, 10, 0.12);
+    --notice-text: #ffb340;
+    --notice-edge: rgba(255, 159, 10, 0.35);
+    --ok-bg: rgba(48, 209, 88, 0.12);
+    --ok-text: #6fdc8c;
   }
 
   .offline-banner {

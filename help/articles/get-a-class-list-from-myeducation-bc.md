@@ -13,7 +13,7 @@ keywords:
   - roster
   - export
   - download
-checked: 2026-11-10
+checked: 2026-11-11
 pages:
   - /dashboard
 demo: /dashboard
@@ -22,8 +22,9 @@ labels:
   - Students
   - Import Roster
   - Choose File
-  - 'Import Roster: Review Changes'
-  - Import
+  - Add Your Students
+  - What This File Will Change
+  - Save Changes
 next:
   - add-your-students
   - set-up-grading
@@ -45,9 +46,9 @@ Only the columns on the screen go into the file. To add columns such as date of 
 ## Step 2: Import It Into FullVision
 
 1. Open **Class Settings**, select the class, then open the **Students** tab.
-2. Choose **Import Roster**, then **Choose File**, and select the file from the Downloads folder. There is no need to open it in Excel first.
-3. **Import Roster: Review Changes** lists every student in the file. MyEd column names, such as Legal Surname, Usual First Name and Pupil #, are read as they are.
-4. Check the list, then choose **Import**.
+2. In a new class, choose **Choose File** under **Add Your Students**, or drop the file there. In a class that has students, choose **Import Roster** first. Select the file from the Downloads folder. There is no need to open it in Excel first.
+3. MyEd column names, such as Legal Surname, Usual First Name and Pupil #, are read as they are, so a MyEd class list goes straight to Ready to Add with nothing to match. Grade, Homeroom and Gender are left out.
+4. Check the list, then choose the button that adds the students. In a class that has students, check **What This File Will Change**, then choose **Save Changes**.
 
 Repeat both steps for each class.
 
@@ -56,4 +57,4 @@ Repeat both steps for each class.
 - If a column is missing, choose a field set in MyEd that shows it, then download the file again. Importing the new file updates the same students; it does not add them twice.
 - If designations do not appear, the district may hide them from the teacher's roster in MyEd. The school office or learning support team can supply them, and they can be typed into the student table.
 - If students from other classes appear, the file came from the _Student_ tab instead of the class's _Roster_. Download it again from _Gradebook_, then _Roster_.
-- If the file will not import, it was probably saved as Excel or text. Download it again and choose _CSV_.
+- If FullVision says the file is an Excel file, download it again and choose _CSV_.

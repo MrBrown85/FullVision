@@ -103,7 +103,10 @@ window.DashClassManager = (function () {
 
   // Import preview
   var cmPendingImport = null;
-  var cmImportFormatOpen = false; // Import Roster's format panel, before the file picker
+  var cmImportFormatOpen = false; // Import Roster's strip, for a class with students
+  var cmImportError = null; // { kind: 'excel' | 'empty', fileName }
+  var cmImportDone = null; // the Done panel: { cid, added, blanks, counts, undone }
+  var cmRosterOnly = null; // Show Them: the roster shows only these students
 
   // Relink
   var cmRelinkCid = null;
@@ -846,6 +849,55 @@ window.DashClassManager = (function () {
   function _initCmStdDrag() {
     _addDocListener('click', function (e) {
       if (!e.target.closest || !e.target.closest('.cm-std-menu-wrap')) _cmCloseStdMenus();
+    });
+    // A class list dropped on Import Roster's drop place reads like Choose
+    // File. Files dropped anywhere else are left to the browser.
+    var dropZone = function (e) {
+      var files = e.dataTransfer && e.dataTransfer.types;
+      if (!files || Array.prototype.indexOf.call(files, 'Files') < 0) return null;
+      return e.target.closest ? e.target.closest('.cm-import-drop') : null;
+    };
+    _addDocListener('dragover', function (e) {
+      var zone = dropZone(e);
+      if (!zone) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      zone.classList.add('is-over');
+    });
+    _addDocListener('dragleave', function (e) {
+      var zone = e.target.closest && e.target.closest('.cm-import-drop');
+      if (zone && !zone.contains(e.relatedTarget)) zone.classList.remove('is-over');
+    });
+    _addDocListener('drop', function (e) {
+      var zone = dropZone(e);
+      if (!zone) return;
+      e.preventDefault();
+      zone.classList.remove('is-over');
+      var file = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (file) cmHandleCSV({ files: [file], value: '' });
+    });
+    // The column menu: ↑ ↓ move through the choices, Escape closes it.
+    _addDocListener('keydown', function (e) {
+      var menu = e.target.closest && e.target.closest('.cm-import-field-menu');
+      if (!menu) return;
+      var items = Array.prototype.slice.call(menu.querySelectorAll('.cm-std-menu-item'));
+      var at = items.indexOf(e.target);
+      var to = -1;
+      if (e.key === 'ArrowDown') to = (at + 1) % items.length;
+      else if (e.key === 'ArrowUp') to = (at - 1 + items.length) % items.length;
+      else if (e.key === 'Home') to = 0;
+      else if (e.key === 'End') to = items.length - 1;
+      else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        var btn = menu.parentElement.querySelector('[aria-haspopup="menu"]');
+        _cmCloseStdMenus();
+        if (btn) btn.focus();
+        return;
+      }
+      if (to < 0) return;
+      e.preventDefault();
+      items[to].focus();
     });
     _addDocListener('dragstart', function (e) {
       // An I Can statement's grip reorders it within its own card.
@@ -1616,22 +1668,27 @@ window.DashClassManager = (function () {
     );
   }
 
-  function _cmRosterRowHtml(cid, st, i) {
+  function _cmRosterRowHtml(cid, st, i, marks) {
     var g = _cmGuardiansFor(cid, st.id);
     var ell = (st.designations || []).indexOf('ELL') >= 0;
     var name = ((st.firstName || '') + ' ' + (st.lastName || '') + ' ' + (st.preferred || '')).toLowerCase();
+    marks = marks || {};
+    var isNew = marks.added && marks.added[st.id];
+    var out = marks.only && !marks.only[st.id];
     return (
       '<div class="cm-rs-grid cm-rs-row' +
       (i % 2 ? ' cm-rs-alt' : '') +
+      (isNew ? ' cm-rs-new' : '') +
       '" data-sid="' +
       esc(st.id) +
       '" data-name="' +
       esc(name) +
       '"' +
-      (cmRosterQuery && name.indexOf(cmRosterQuery) < 0 ? ' hidden' : '') +
+      (out || (cmRosterQuery && name.indexOf(cmRosterQuery) < 0) ? ' hidden' : '') +
       '>' +
       '<span class="cm-rs-stick1">' +
       _cmRosterInput(st, 'last', st.lastName, 'Last name') +
+      (isNew ? '<span class="cm-rs-new-tag">New</span>' : '') +
       '</span>' +
       '<span class="cm-rs-stick2">' +
       _cmRosterInput(st, 'first', st.firstName, 'First name', ' required') +
@@ -1702,8 +1759,11 @@ window.DashClassManager = (function () {
       '<span>Student Email</span><span>Parent Email</span><span>Parent Email 2</span><span>Designations</span>' +
       '<span>ELL</span><span></span>' +
       '</div>';
-    students.forEach(function (st, i) {
-      html += _cmRosterRowHtml(cid, st, i);
+    var marks = { added: _cmImportNewIds(cid), only: _cmRosterOnlyIds() };
+    var shown = 0;
+    students.forEach(function (st) {
+      var hide = marks.only && !marks.only[st.id];
+      html += _cmRosterRowHtml(cid, st, hide ? 0 : shown++, marks);
     });
     html += '</div></div>';
     return html;
@@ -1720,7 +1780,9 @@ window.DashClassManager = (function () {
       .toLowerCase();
     var n = 0;
     document.querySelectorAll('.cm-rs-row').forEach(function (row) {
-      var hit = !cmRosterQuery || (row.dataset.name || '').indexOf(cmRosterQuery) >= 0;
+      var only = _cmRosterOnlyIds();
+      var hit =
+        (!only || only[row.dataset.sid]) && (!cmRosterQuery || (row.dataset.name || '').indexOf(cmRosterQuery) >= 0);
       row.hidden = !hit;
       if (hit) row.classList.toggle('cm-rs-alt', n++ % 2 === 1);
     });
@@ -2002,7 +2064,7 @@ window.DashClassManager = (function () {
      off by it, so it floats over the page under its button instead, and
      closes if the table or page scrolls. */
   function _cmFloatOverScroll(menu, btn) {
-    var box = btn.closest('.cm-rs-scroll');
+    var box = btn.closest('.cm-rs-scroll, .cm-import-cols-scroll');
     if (!box) return;
     var r = btn.getBoundingClientRect();
     menu.style.position = 'fixed';
@@ -2048,18 +2110,34 @@ window.DashClassManager = (function () {
     Router.navigate('/student?course=' + encodeURIComponent(cid) + '&id=' + encodeURIComponent(sid));
   }
 
-  /* Import Roster first shows what the file needs (cmImportFormatHtml);
-     Choose File opens the picker. With a review already open it goes
-     straight to the picker, as before. */
+  /* ── Import Roster ───────────────────────────────────────────
+     Board: Import Roster (canvas, Nov 11 2026). An empty class's Students
+     tab is the place to drop a class list; a class with students opens a
+     one-line strip from Import Roster. Choose File reads the file on this
+     computer (nothing is uploaded), then:
+       - a file whose every column is recognised (a MyEd class list, the
+         template) goes straight to Ready to Add, with no matching;
+       - any other file opens Check How Your File Was Read: FullVision's
+         choice above each column's first rows, best guesses marked, and the
+         rows that need a look;
+       - a class with students sees What This File Will Change.
+     Problems never block: a student is added with that field blank and the
+     Done panel names who to fill in. A row with no name stays out until a
+     name is typed. Nothing changes until the teacher adds or saves. */
   function cmImportRoster() {
-    if (cmPendingImport) {
+    if (cmPendingImport || !cmSelectedCourse || !getStudents(cmSelectedCourse).length) {
       cmChooseRosterFile();
       return;
     }
     cmImportFormatOpen = true;
+    cmImportError = null;
     renderClassManager();
     var choose = document.querySelector('[data-action="cmChooseRosterFile"]');
-    if (choose) choose.focus();
+    _cmFocus(choose);
+  }
+
+  function _cmFocus(el) {
+    if (el && typeof el.focus === 'function') el.focus();
   }
 
   function cmChooseRosterFile() {
@@ -2069,38 +2147,106 @@ window.DashClassManager = (function () {
 
   function cmCloseImportFormat() {
     cmImportFormatOpen = false;
+    cmImportError = null;
     renderClassManager();
     var btn = document.querySelector('[data-action="cmImportRoster"]');
-    if (btn) btn.focus();
+    _cmFocus(btn);
   }
 
-  /* The format the reader below takes: a header row, columns named as in
-     ROSTER_HEADER_ALIASES, in any order. roster-template.csv has them all. */
+  var _CM_FILE_ICON =
+    '<svg class="cm-import-file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5"></path><path d="M12 17v-6"></path><path d="M9.5 13.5 12 11l2.5 2.5"></path></svg>';
+
+  /* The empty class: drop the class list here, with MyEd's three steps. */
+  function cmImportEmptyHtml() {
+    return (
+      '<div class="cm-section cm-import-empty" role="region" aria-labelledby="cm-import-empty-title">' +
+      '<div class="cm-import-drop cm-import-drop-big">' +
+      _CM_FILE_ICON +
+      '<h2 class="cm-import-drop-title" id="cm-import-empty-title">Add Your Students</h2>' +
+      '<p class="cm-import-drop-text">Drop your class list here. A class list from MyEducation BC goes in as it is, and so does any spreadsheet saved as CSV.</p>' +
+      '<button type="button" class="btn btn-primary" data-action="cmChooseRosterFile">Choose File</button>' +
+      '<p class="cm-hint">The file isn\'t uploaded. FullVision reads it on this computer and saves only the students you add.</p>' +
+      '</div>' +
+      '<div class="cm-import-side">' +
+      '<div class="cm-import-side-part">' +
+      '<h3>Get the List From MyEducation BC</h3>' +
+      '<ol class="cm-import-steps">' +
+      '<li>In MyEd, open <strong>Gradebook</strong> and choose this class.</li>' +
+      '<li>Choose <strong>Roster</strong> on the left.</li>' +
+      '<li>Select the printer icon, then <strong>CSV</strong>. It goes to your Downloads folder.</li>' +
+      '</ol>' +
+      '<a href="/help/get-a-class-list-from-myeducation-bc" data-action="openHelpArticle" data-slug="get-a-class-list-from-myeducation-bc">Show Me With Pictures</a>' +
+      '</div>' +
+      '<div class="cm-import-side-part">' +
+      '<h3>No Class List?</h3>' +
+      '<p>Start from the template: a blank spreadsheet with a column for everything FullVision keeps.</p>' +
+      '<a class="cm-action-btn" href="/roster-template.csv" download="roster-template.csv">Download Template</a>' +
+      '</div>' +
+      '<div class="cm-import-side-part cm-import-side-row">' +
+      '<span>Only a few students? Type them in.</span>' +
+      '<button type="button" class="cm-action-btn cm-roster-add" data-action="cmShowAddStudent">Add Student</button>' +
+      '</div>' +
+      '</div>' +
+      '</div>'
+    );
+  }
+
+  /* A class with students: Import Roster opens this strip. */
   function cmImportFormatHtml() {
     return (
-      '<div class="cm-section cm-import-format" role="region" aria-labelledby="cm-import-format-title">' +
-      '<div class="cm-section-title" id="cm-import-format-title">Import Roster</div>' +
-      '<p class="cm-hint">The file is a CSV file with a header row and one row per student.</p>' +
-      '<p class="cm-hint">Name columns: Last Name and First Name, or Full Name (read as Last, First or First Last).</p>' +
-      '<p class="cm-hint">Other columns: Preferred Name, Pronouns, Student Number, Date of Birth (year first, as 2012-05-15), Student Email, Parent Email, Parent Email 2, Designations (BC letter codes), ELL (Yes or blank).</p>' +
-      '<p class="cm-hint">Columns can be in any order. Columns with other names are ignored. MyEducation BC column names, such as Legal Surname and Pupil #, are recognized.</p>' +
-      '<p class="cm-hint">A class list from MyEducation BC imports as it is. <a href="/help/get-a-class-list-from-myeducation-bc" data-action="openHelpArticle" data-slug="get-a-class-list-from-myeducation-bc">Get a Class List From MyEducation BC</a> shows where to find it.</p>' +
-      '<div class="cm-import-buttons">' +
+      '<div class="cm-section cm-import-drop cm-import-strip" role="region" aria-label="Import Roster">' +
+      _CM_FILE_ICON +
+      '<div class="cm-import-strip-text"><strong>Drop a class list here to update this class</strong>' +
+      '<span class="cm-hint">Students already here are matched by student number, so no one is added twice. You\'ll see every change before anything is saved. ' +
+      '<a href="/help/get-a-class-list-from-myeducation-bc" data-action="openHelpArticle" data-slug="get-a-class-list-from-myeducation-bc">Get a Class List From MyEducation BC</a></span></div>' +
+      '<a class="cm-import-link" href="/roster-template.csv" download="roster-template.csv">Download Template</a>' +
       '<button type="button" class="cm-action-btn" data-action="cmCloseImportFormat">Cancel</button>' +
-      '<a class="cm-action-btn" href="/roster-template.csv" download="roster-template.csv">Download Template</a>' +
       '<button type="button" class="btn btn-primary" data-action="cmChooseRosterFile">Choose File</button>' +
-      '</div>' +
+      '</div>'
+    );
+  }
+
+  /* An Excel file, or a file with nothing in it. */
+  function _cmImportErrorHtml(err) {
+    var title, text, hint;
+    if (err.kind === 'excel') {
+      title = 'This Is an Excel File';
+      text =
+        '<strong>' +
+        esc(err.fileName) +
+        '</strong> needs to be saved as CSV first. In Excel, choose File, then Save As, and pick CSV.';
+      hint = 'Downloading from MyEd? Choose CSV, not Excel, after the printer icon.';
+    } else {
+      title = 'This File Is Empty';
+      text = '<strong>' + esc(err.fileName) + '</strong> has no rows to read.';
+      hint = 'Choose the class list again, or another file.';
+    }
+    return (
+      '<div class="cm-section cm-import-card" role="alert">' +
+      '<div class="cm-import-card-head"><span class="cm-import-card-mark" aria-hidden="true">!</span><h2>' +
+      title +
+      '</h2></div>' +
+      '<p class="cm-import-card-text">' +
+      text +
+      '</p><p class="cm-hint">' +
+      esc(hint) +
+      '</p>' +
+      '<div class="cm-import-buttons"><button type="button" class="btn btn-primary" data-action="cmChooseRosterFile">Choose Another File</button>' +
+      '<button type="button" class="cm-action-btn" data-action="cmCloseImportFormat">Cancel</button></div>' +
       '</div>'
     );
   }
 
   /* ── Import Roster: reading the file ────────────────────────
      Columns are read by their header, so a MyEd export or a spreadsheet in
-     any column order lands in the right fields. Quoted cells may hold commas
-     ("Okafor, Cecilia"). A file with no header the importer knows is read in
-     the old fixed order: First, Last, Preferred, Pronouns, Student Number,
-     Date of Birth, Email; or Name, Preferred, Pronouns with fewer than four
-     columns. The review lets the teacher change what each column means. */
+     any column order lands in the right fields. A column whose header isn't
+     known is guessed from its values (every cell an email address, a
+     student number, a date, a name), and the guess is marked. A column that
+     looks like designations is only suggested: designations are never
+     imported unless the teacher chooses them. A file with no header the
+     importer knows is read in the old fixed order: First, Last, Preferred,
+     Pronouns, Student Number, Date of Birth, Email; or Name, Preferred,
+     Pronouns with fewer than four columns. */
   var ROSTER_IMPORT_FIELDS = [
     ['', 'Ignore'],
     ['lastName', 'Last Name'],
@@ -2115,6 +2261,42 @@ window.DashClassManager = (function () {
     ['parentEmail2', 'Parent Email 2'],
     ['designations', 'Designations'],
     ['ell', 'ELL'],
+  ];
+  /* The column menu: each choice says what it takes, so there are no rules
+     to read up front. */
+  var ROSTER_FIELD_MENU = [
+    [
+      'Name',
+      [
+        ['fullName', 'Last, First or First Last, in one column.'],
+        ['lastName', 'When the file has names in two columns.'],
+        ['firstName', 'When the file has names in two columns.'],
+        ['preferred', 'The name they go by. MyEd calls it Usual First Name.'],
+      ],
+    ],
+    [
+      'About the Student',
+      [
+        ['studentNumber', "MyEd's Pupil #. Matches students when you import again."],
+        ['dateOfBirth', '2012-05-15, May 15 2012, or 5/15/2012.'],
+        ['pronouns', 'As written, like she/her.'],
+        ['email', 'Their school address.'],
+      ],
+    ],
+    [
+      'Family',
+      [
+        ['parentEmail', 'One or two addresses in a cell.'],
+        ['parentEmail2', "A second parent's address, in its own column."],
+      ],
+    ],
+    [
+      'Support',
+      [
+        ['designations', 'BC letter codes, like P or Q.'],
+        ['ell', 'Yes, or blank.'],
+      ],
+    ],
   ];
   var ROSTER_HEADER_ALIASES = {
     lastName: ['last', 'last name', 'lastname', 'surname', 'legal surname', 'legal last name', 'family name'],
@@ -2148,13 +2330,52 @@ window.DashClassManager = (function () {
     designations: ['designation', 'designations', 'special ed', 'special education', 'special ed category'],
     ell: ['ell', 'esl', 'ell status', 'esl status', 'english language learner'],
   };
+  /* Columns a class list often has that FullVision doesn't keep. They are
+     left out on purpose, so a file with them still goes straight through. */
+  var ROSTER_SKIPPED_HEADERS = [
+    'grade',
+    'grade level',
+    'gr',
+    'homeroom',
+    'hr',
+    'gender',
+    'sex',
+    'yog',
+    'year of graduation',
+    'block',
+    'period',
+    'class',
+    'course',
+    'section',
+    'term',
+    'school',
+    'teacher',
+    'room',
+    'status',
+    'age',
+  ];
+  var ROSTER_MYED_HEADERS = [
+    'legal surname',
+    'legal first name',
+    'legal last name',
+    'legal given name',
+    'usual first name',
+    'usual surname',
+    'pupil #',
+    'pupil number',
+    'pupil no',
+  ];
 
-  function rosterFieldFor(header) {
-    var k = String(header || '')
+  function _rosterHeaderKey(header) {
+    return String(header || '')
       .trim()
       .toLowerCase()
       .replace(/[_.]+/g, ' ')
       .replace(/\s+/g, ' ');
+  }
+
+  function rosterFieldFor(header) {
+    var k = _rosterHeaderKey(header);
     var found = '';
     Object.keys(ROSTER_HEADER_ALIASES).some(function (field) {
       if (ROSTER_HEADER_ALIASES[field].indexOf(k) >= 0) found = field;
@@ -2164,7 +2385,9 @@ window.DashClassManager = (function () {
   }
 
   /* Rows of cells. Commas or tabs (whichever the first line has more of),
-     "quoted, cells", "" for a quote inside one, CRLF or LF, a leading BOM. */
+     "quoted, cells", "" for a quote inside one, CRLF or LF, a leading BOM.
+     Each row remembers its place in the file (row.line, 1 for the first),
+     so a problem can say "Row 6", as the spreadsheet does. */
   function parseRosterCsv(text) {
     text = String(text || '').replace(/^﻿/, '');
     var first = text.split(/\r?\n/)[0] || '';
@@ -2199,63 +2422,305 @@ window.DashClassManager = (function () {
       row.push(cell);
       rows.push(row);
     }
-    return rows
-      .map(function (r) {
-        return r.map(function (s) {
-          return s.trim();
-        });
-      })
-      .filter(function (r) {
-        return r.some(Boolean);
+    var out = [];
+    rows.forEach(function (r, n) {
+      var cells = r.map(function (s) {
+        return s.trim();
       });
+      if (!cells.some(Boolean)) return;
+      Object.defineProperty(cells, 'line', { value: n + 1, enumerable: false });
+      out.push(cells);
+    });
+    return out;
   }
 
-  /* The file as { headers, body, map }: map[i] is the field column i fills. */
-  function rosterImportTable(text) {
-    var rows = parseRosterCsv(text);
-    if (!rows.length) return { headers: [], body: [], map: [] };
-    var map = rows[0].map(rosterFieldFor);
-    if (map.some(Boolean)) return { headers: rows[0], body: rows.slice(1), map: map };
-    var width = Math.max.apply(
-      null,
-      rows.map(function (r) {
-        return r.length;
-      }),
-    );
-    var order =
-      width >= 4
-        ? ['firstName', 'lastName', 'preferred', 'pronouns', 'studentNumber', 'dateOfBirth', 'email']
-        : ['fullName', 'preferred', 'pronouns'];
-    return {
-      headers: order.slice(0, width).map(function () {
-        return '';
-      }),
-      body: rows,
-      map: order.slice(0, width),
-    };
+  var _ROSTER_MONTHS = {
+    jan: 1,
+    feb: 2,
+    mar: 3,
+    apr: 4,
+    may: 5,
+    jun: 6,
+    jul: 7,
+    aug: 8,
+    sep: 9,
+    oct: 10,
+    nov: 11,
+    dec: 12,
+  };
+  var _ROSTER_NUM_DATE = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})$/;
+
+  function _rosterYmd(y, mo, d) {
+    var t = new Date(Date.UTC(y, mo - 1, d));
+    if (t.getUTCFullYear() !== y || t.getUTCMonth() !== mo - 1 || t.getUTCDate() !== d) return '';
+    return y + '-' + (mo < 10 ? '0' : '') + mo + '-' + (d < 10 ? '0' : '') + d;
+  }
+
+  function _rosterYear(y) {
+    if (y.length === 4) return +y;
+    var yy = +y;
+    return yy <= new Date().getFullYear() % 100 ? 2000 + yy : 1900 + yy;
+  }
+
+  /* A date as YYYY-MM-DD, or '' when it can't be read or isn't a real date.
+     Year first (2012-05-15, 2012/5/15) and written dates (May 15, 2012;
+     15 May 2012; Sept 30 2012) are read as they are. A number date with the
+     year last is read in the column's order: 'mdy' or 'dmy'. Without one,
+     it is read only when a part over 12 says which is the day. */
+  function _rosterDate(v, order) {
+    v = String(v || '').trim();
+    var m = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/.exec(v);
+    if (m) return _rosterYmd(+m[1], +m[2], +m[3]);
+    m = _ROSTER_NUM_DATE.exec(v);
+    if (m) {
+      var a = +m[1],
+        b = +m[2],
+        y = _rosterYear(m[3]);
+      var o = order === 'mdy' || order === 'dmy' ? order : a > 12 ? 'dmy' : b > 12 ? 'mdy' : '';
+      if (!o) return '';
+      return o === 'mdy' ? _rosterYmd(y, a, b) : _rosterYmd(y, b, a);
+    }
+    m = /^([a-z]+)\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})$/i.exec(v);
+    if (m && _ROSTER_MONTHS[m[1].slice(0, 3).toLowerCase()])
+      return _rosterYmd(+m[3], _ROSTER_MONTHS[m[1].slice(0, 3).toLowerCase()], +m[2]);
+    m = /^(\d{1,2})(?:st|nd|rd|th)?\s+([a-z]+)\.?,?\s+(\d{4})$/i.exec(v);
+    if (m && _ROSTER_MONTHS[m[2].slice(0, 3).toLowerCase()])
+      return _rosterYmd(+m[3], _ROSTER_MONTHS[m[2].slice(0, 3).toLowerCase()], +m[1]);
+    return '';
+  }
+
+  /* Which way a column's number dates run, from all of them together:
+     'mdy' when some second part is over 12 (5/22/2012 can only be May 22),
+     'dmy' when some first part is, 'ask' when every one could go either
+     way, '' when the column has no number dates with the year last. */
+  function rosterDateOrder(values) {
+    var mdy = false,
+      dmy = false,
+      any = false;
+    values.forEach(function (v) {
+      var m = _ROSTER_NUM_DATE.exec(String(v || '').trim());
+      if (!m) return;
+      any = true;
+      if (+m[1] > 12) dmy = true;
+      if (+m[2] > 12) mdy = true;
+    });
+    if (!any) return '';
+    if (mdy && !dmy) return 'mdy';
+    if (dmy && !mdy) return 'dmy';
+    return 'ask';
   }
 
   function _rosterEmailOk(v) {
     return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
   }
 
-  /* 2012-05-15, 2012/5/15, or a written date like May 15, 2012. A
-     day-first or month-first number date can't be told apart, so it's
-     left out rather than guessed. */
-  function _rosterDate(v) {
-    var m = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/.exec(v);
-    var pad = function (n) {
-      return (n < 10 ? '0' : '') + n;
+  var _ROSTER_HOME_MAIL = /@(gmail|hotmail|outlook|live|yahoo|icloud|me|shaw|telus|msn|aol|protonmail|mail)\./i;
+
+  function _rosterCodes(v) {
+    return String(v || '')
+      .toUpperCase()
+      .split(/[\s,;/]+/)
+      .filter(Boolean);
+  }
+
+  function _rosterIsCode(code) {
+    return !!(BC_DESIGNATIONS[code] || SUPPORT_FLAGS[code]);
+  }
+
+  /* A field for a column with no header FullVision knows, from its values,
+     or '' for none. `used` holds the fields other columns already fill. */
+  function _rosterGuess(values, used, header) {
+    if (!values.length) return { field: '' };
+    var all = function (test) {
+      return values.every(test);
     };
-    if (m) {
-      var y = +m[1],
-        mo = +m[2],
-        d = +m[3];
-      return mo >= 1 && mo <= 12 && d >= 1 && d <= 31 ? y + '-' + pad(mo) + '-' + pad(d) : '';
+    if (all(_rosterEmailOk)) {
+      var domains = {};
+      values.forEach(function (v) {
+        domains[v.split('@')[1].toLowerCase()] = true;
+      });
+      var school = Object.keys(domains).length === 1 && !values.some(v => _ROSTER_HOME_MAIL.test(v));
+      if (school && !used.email && !/parent|guardian|family|home|contact/.test(header)) return { field: 'email' };
+      if (!used.parentEmail) return { field: 'parentEmail' };
+      if (!used.parentEmail2) return { field: 'parentEmail2' };
+      return { field: '' };
     }
-    if (!/[a-z]/i.test(v)) return '';
-    var t = new Date(v + ' 12:00');
-    return isNaN(t) ? '' : t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate());
+    if (
+      all(function (v) {
+        return v.split(/[\s,;]+/).every(_rosterEmailOk);
+      })
+    )
+      return { field: used.parentEmail ? (used.parentEmail2 ? '' : 'parentEmail2') : 'parentEmail' };
+    if (
+      all(function (v) {
+        return /^[A-Z]{0,4}-?\d{3,10}$/i.test(v);
+      })
+    ) {
+      var seen = {};
+      values.forEach(function (v) {
+        seen[v.toLowerCase()] = true;
+      });
+      if (Object.keys(seen).length >= values.length * 0.75 && !used.studentNumber) return { field: 'studentNumber' };
+    }
+    if (
+      !used.dateOfBirth &&
+      all(function (v) {
+        return /\d{4}|\d{1,2}[/.-]\d{1,2}[/.-]\d{2}/.test(v) && /^[\w ,./-]+$/.test(v) && v.length <= 20;
+      })
+    )
+      return { field: 'dateOfBirth' };
+    if (
+      all(function (v) {
+        return _rosterCodes(v).every(_rosterIsCode);
+      })
+    )
+      return { field: '', suggest: 'designations' };
+    if (
+      !used.pronouns &&
+      all(function (v) {
+        return /^(she|he|they|ze|xe|any)\s*\/\s*\w+$/i.test(v);
+      })
+    )
+      return { field: 'pronouns' };
+    if (
+      !used.firstName &&
+      !used.lastName &&
+      !used.fullName &&
+      all(function (v) {
+        return /[a-z]/i.test(v) && !/[@\d]/.test(v) && v.length <= 60;
+      }) &&
+      values.filter(function (v) {
+        return /,/.test(v) || /\s/.test(v);
+      }).length >=
+        values.length * 0.8
+    )
+      return { field: 'fullName' };
+    return { field: '' };
+  }
+
+  /* The file as { headers, body, map, how, suggest, dateOrder, myEd }.
+     map[i] is the field column i fills; how[i] is 'header' (its header is
+     a known name), 'guess' (read from its values), 'order' (the old fixed
+     order, no headers) or 'chosen' (the teacher chose it); suggest[i] is a
+     field offered but not chosen; dateOrder[i] is a date column's order. */
+  function rosterImportTable(text) {
+    var rows = parseRosterCsv(text);
+    var table = { headers: [], body: [], map: [], how: [], suggest: [], dateOrder: [], myEd: false };
+    if (!rows.length) return table;
+    var map = rows[0].map(rosterFieldFor);
+    var known = map.some(Boolean);
+    if (!known) {
+      var width = Math.max.apply(
+        null,
+        rows.map(function (r) {
+          return r.length;
+        }),
+      );
+      // Headers FullVision doesn't know (words over columns of numbers,
+      // dates or addresses): guess every column from its values.
+      var wordsOnly = function (v) {
+        return !v || (/[a-z]/i.test(v) && v.indexOf('@') < 0);
+      };
+      var looksLikeHeader =
+        rows.length > 1 &&
+        rows[0].every(wordsOnly) &&
+        rows.slice(1).some(function (r) {
+          return r.some(function (v, i) {
+            return rows[0][i] && /[@\d]/.test(v);
+          });
+        });
+      if (looksLikeHeader) {
+        table.headers = rows[0];
+        table.body = rows.slice(1);
+      } else {
+        var order =
+          width >= 4
+            ? ['firstName', 'lastName', 'preferred', 'pronouns', 'studentNumber', 'dateOfBirth', 'email']
+            : ['fullName', 'preferred', 'pronouns'];
+        table.headers = order.slice(0, width).map(function () {
+          return '';
+        });
+        table.body = rows;
+        table.map = order.slice(0, width);
+        table.how = table.map.map(function () {
+          return 'order';
+        });
+        table.suggest = table.map.map(function () {
+          return '';
+        });
+        table.dateOrder = table.map.map(function (f, i) {
+          return f === 'dateOfBirth' ? rosterDateOrder(_rosterColumn(table, i)) : '';
+        });
+        return table;
+      }
+    } else {
+      table.headers = rows[0];
+      table.body = rows.slice(1);
+    }
+    var used = {};
+    table.map = table.headers.map(function (h) {
+      return rosterFieldFor(h);
+    });
+    table.map.forEach(function (f) {
+      if (f) used[f] = true;
+    });
+    if (used.firstName || used.lastName) used.fullName = true;
+    table.how = table.map.map(function (f) {
+      return f ? 'header' : '';
+    });
+    table.suggest = table.map.map(function () {
+      return '';
+    });
+    table.headers.forEach(function (h, i) {
+      if (table.map[i] || ROSTER_SKIPPED_HEADERS.indexOf(_rosterHeaderKey(h)) >= 0) return;
+      var g = _rosterGuess(_rosterColumn(table, i), used, _rosterHeaderKey(h));
+      if (g.field) {
+        table.map[i] = g.field;
+        table.how[i] = 'guess';
+        used[g.field] = true;
+        if (g.field === 'fullName') used.firstName = used.lastName = true;
+      } else if (g.suggest) {
+        // One code in every row is a column of something else (a block).
+        var vals = _rosterColumn(table, i);
+        var same = vals.every(function (v) {
+          return v === vals[0];
+        });
+        if (!(same && vals.length === table.body.length && vals.length > 1)) table.suggest[i] = g.suggest;
+      }
+    });
+    table.dateOrder = table.map.map(function (f, i) {
+      return f === 'dateOfBirth' ? rosterDateOrder(_rosterColumn(table, i)) : '';
+    });
+    table.myEd = table.headers.some(function (h) {
+      return ROSTER_MYED_HEADERS.indexOf(_rosterHeaderKey(h)) >= 0;
+    });
+    return table;
+  }
+
+  /* Column i's filled-in cells. */
+  function _rosterColumn(table, i) {
+    return table.body
+      .map(function (r) {
+        return (r[i] || '').trim();
+      })
+      .filter(Boolean);
+  }
+
+  /* Every column read by its header (or one FullVision leaves out on
+     purpose), a name among them, and no date order to ask about: the file
+     goes straight to Ready to Add with nothing to match. */
+  function rosterImportReady(table) {
+    if (!table || !table.headers.some(Boolean)) return false;
+    var named = false;
+    var ok = table.headers.every(function (h, i) {
+      var f = table.map[i];
+      if (f === 'firstName' || f === 'lastName' || f === 'fullName') named = true;
+      if (table.dateOrder[i] === 'ask') return false;
+      if (table.suggest[i]) return false;
+      if (f) return table.how[i] === 'header';
+      return !h || ROSTER_SKIPPED_HEADERS.indexOf(_rosterHeaderKey(h)) >= 0 || !_rosterColumn(table, i).length;
+    });
+    return ok && named;
   }
 
   function _rosterSplitName(v) {
@@ -2267,53 +2732,120 @@ window.DashClassManager = (function () {
     return { first: words[0] || '', last: words.slice(1).join(' ') };
   }
 
-  /* The table's rows as students, and what couldn't be read. A blank cell
-     never clears anything; codes that aren't BC designations are left out. */
-  function rosterRowsFromTable(table) {
+  /* The table's rows as students, and what needs a look. `fixes` holds what
+     the teacher typed for a row: { line: { dateOfBirth, studentNumber,
+     name } }. Returns
+       rows      students, each with .line (its row in the file)
+       problems  [{ kind, line, field, value, otherLine }] kinds: 'date' (left
+                 blank), 'number' (the same number as an earlier row: left
+                 blank), 'email' and 'code' (left out)
+       unnamed   [{ line, cells }] rows with no name, left out
+       waiting   { column: count } number dates waiting for the column's
+                 order to be chosen
+       skipped   { dates, emails, codes } counts, as before.
+     A blank cell never clears anything; codes that aren't BC designations
+     are left out. */
+  function rosterRowsFromTable(table, fixes) {
+    fixes = fixes || {};
     var out = [];
+    var problems = [];
+    var unnamed = [];
+    var waiting = {};
     var skipped = { dates: 0, emails: 0, codes: 0 };
+    var named = !table.headers.length || table.headers.some(Boolean);
     var addCode = function (p, code) {
       p.designations = p.designations || [];
       if (p.designations.indexOf(code) < 0) p.designations.push(code);
     };
-    table.body.forEach(function (r) {
+    table.body.forEach(function (r, idx) {
+      var line = r.line || idx + (named ? 2 : 1);
+      var fix = fixes[line] || {};
       var p = { parentEmails: [] };
+      Object.defineProperty(p, 'line', { value: line, enumerable: false, writable: true });
       table.map.forEach(function (field, i) {
         var v = (r[i] || '').trim();
+        if (field === 'dateOfBirth' && fix.dateOfBirth) v = fix.dateOfBirth;
+        if (field === 'studentNumber' && fix.studentNumber) v = fix.studentNumber;
         if (!field || !v) return;
         if (field === 'fullName') {
           var nm = _rosterSplitName(v);
           if (!p.firstName) p.firstName = nm.first;
           if (!p.lastName) p.lastName = nm.last;
         } else if (field === 'dateOfBirth') {
-          var d = _rosterDate(v);
+          var order = fix.dateOfBirth ? '' : table.dateOrder[i];
+          if (order === 'ask' && _ROSTER_NUM_DATE.test(v) && !_rosterDate(v)) {
+            waiting[i] = (waiting[i] || 0) + 1;
+            return;
+          }
+          var d = _rosterDate(v, order);
           if (d) p.dateOfBirth = d;
-          else skipped.dates++;
+          else {
+            skipped.dates++;
+            problems.push({ kind: 'date', line: line, field: 'dateOfBirth', value: v, p: p });
+          }
         } else if (field === 'email') {
           if (_rosterEmailOk(v)) p.email = v;
-          else skipped.emails++;
+          else {
+            skipped.emails++;
+            problems.push({ kind: 'email', line: line, value: v, p: p });
+          }
         } else if (field === 'parentEmail' || field === 'parentEmail2') {
           v.split(/[;,\s]+/)
             .filter(Boolean)
             .forEach(function (e) {
-              if (!_rosterEmailOk(e)) skipped.emails++;
-              else if (p.parentEmails.indexOf(e) < 0) p.parentEmails.push(e);
+              if (!_rosterEmailOk(e)) {
+                skipped.emails++;
+                problems.push({ kind: 'email', line: line, value: e, p: p });
+              } else if (p.parentEmails.indexOf(e) < 0) p.parentEmails.push(e);
             });
         } else if (field === 'designations') {
-          v.toUpperCase()
-            .split(/[\s,;/]+/)
-            .filter(Boolean)
-            .forEach(function (code) {
-              if (BC_DESIGNATIONS[code] || SUPPORT_FLAGS[code]) addCode(p, code);
-              else skipped.codes++;
-            });
+          _rosterCodes(v).forEach(function (code) {
+            if (_rosterIsCode(code)) addCode(p, code);
+            else {
+              skipped.codes++;
+              problems.push({ kind: 'code', line: line, value: code, p: p });
+            }
+          });
         } else if (field === 'ell') {
           if (/^(y|yes|true|1|x|ell|esl)$/i.test(v)) addCode(p, 'ELL');
         } else p[field] = v;
       });
+      if (fix.name) {
+        var typed = _rosterSplitName(fix.name.trim());
+        p.firstName = typed.first;
+        p.lastName = typed.last;
+      }
       if (p.firstName || p.lastName) out.push(p);
+      else
+        unnamed.push({
+          line: line,
+          cells: r.filter(Boolean).slice(0, 4),
+        });
     });
-    return { rows: out, skipped: skipped };
+    // The same student number twice: the first row keeps it, later ones go
+    // in without a number until it's fixed (MyEd has the right one).
+    var byNumber = {};
+    out.forEach(function (p) {
+      var key = String(p.studentNumber || '')
+        .trim()
+        .toLowerCase();
+      if (!key) return;
+      if (byNumber[key]) {
+        problems.push({
+          kind: 'number',
+          line: p.line,
+          field: 'studentNumber',
+          value: p.studentNumber,
+          other: byNumber[key],
+          p: p,
+        });
+        delete p.studentNumber;
+      } else byNumber[key] = p;
+    });
+    problems.sort(function (a, b) {
+      return a.line - b.line;
+    });
+    return { rows: out, skipped: skipped, problems: problems, unnamed: unnamed, waiting: waiting };
   }
 
   /* ── Guardian addresses from the roster and the import ──────
@@ -2369,39 +2901,79 @@ window.DashClassManager = (function () {
   function cmHandleCSV(input) {
     var file = input.files[0];
     if (!file) return;
+    var name = file.name || 'the file';
+    cmImportDone = null;
+    cmRosterOnly = null;
+    if (/\.(xlsx|xlsm|xls|ods|numbers)$/i.test(name)) {
+      input.value = '';
+      _cmImportFail('excel', name);
+      return;
+    }
     var reader = new FileReader();
     reader.onload = function (e) {
+      var text = String(e.target.result || '');
+      if (/^PK\u0003\u0004/.test(text) || text.indexOf('\u0000') >= 0) {
+        _cmImportFail('excel', name);
+        return;
+      }
+      var table = rosterImportTable(text);
+      if (!table.body.length) {
+        _cmImportFail('empty', name);
+        return;
+      }
       cmImportFormatOpen = false;
-      var table = rosterImportTable(e.target.result);
-      var read = rosterRowsFromTable(table);
-      cmShowImportPreview(read.rows, file.name, table, read.skipped);
+      cmImportError = null;
+      cmStartImport(table, name);
     };
     reader.readAsText(file);
     input.value = '';
   }
 
-  /* A column's meaning changed in the review: read the file again. */
-  function cmImportMap(col, field) {
-    var plan = cmPendingImport;
-    if (!plan || !plan.table) return;
-    plan.table.map[Number(col)] = field;
-    var read = rosterRowsFromTable(plan.table);
-    cmShowImportPreview(read.rows, plan.fileName, plan.table, read.skipped);
+  function _cmImportFail(kind, fileName) {
+    cmPendingImport = null;
+    cmImportFormatOpen = false;
+    cmImportError = { kind: kind, fileName: fileName };
+    renderClassManager();
+    var btn = document.querySelector('.cm-import-card [data-action="cmChooseRosterFile"]');
+    _cmFocus(btn);
+  }
+
+  /* A file read: plan it. A file with no column of names asks first. */
+  function cmStartImport(table, fileName) {
+    cmImportError = null;
+    cmImportFormatOpen = false;
+    var plan = { fileName: fileName || '', table: table, fixes: {}, keep: {}, showColumns: false, showAll: false };
+    plan.nonames = !table.map.some(_cmIsNameField);
+    _cmPlanImport(plan);
+    var head = document.getElementById('cm-import-title');
+    _cmFocus(head);
+  }
+
+  function _cmIsNameField(f) {
+    return f === 'firstName' || f === 'lastName' || f === 'fullName';
+  }
+
+  /* For tests and callers with rows already read. */
+  function cmShowImportPreview(parsed, fileName, table, skipped) {
+    var plan = { fileName: fileName || '', table: table || null, fixes: {}, keep: {}, showColumns: false };
+    if (!table) plan.parsed = { rows: parsed || [], problems: [], unnamed: [], waiting: {}, skipped: skipped || {} };
+    _cmPlanImport(plan);
   }
 
   /* Import review. Rows are matched to the roster by student number, then
      by name: a matched number with a different name is a name change, and a
      student the file leaves out is offered for withdrawal (off by default).
-     Nothing changes until Import. */
+     What the teacher ticked stays ticked when the file is read again. */
   function _cmImportKey(v) {
     return String(v || '')
       .trim()
       .toLowerCase();
   }
 
-  function cmShowImportPreview(parsed, fileName, table, skipped) {
+  function _cmPlanImport(plan) {
     var cid = cmSelectedCourse;
     if (!cid) return;
+    var read = plan.table ? rosterRowsFromTable(plan.table, plan.fixes) : plan.parsed;
     var roster = getStudents(cid);
     var byNum = {};
     var byName = {};
@@ -2409,44 +2981,49 @@ window.DashClassManager = (function () {
       if (_cmImportKey(s.studentNumber)) byNum[_cmImportKey(s.studentNumber)] = s;
       byName[_cmImportKey(fullName(s))] = s;
     });
-    var matched = {};
-    var plan = {
-      fileName: fileName || '',
-      total: parsed.length,
-      added: [],
-      renamed: [],
-      updated: [],
-      missing: [],
-      same: 0,
-      table: table || null,
-      skipped: skipped || null,
+    var on = function (key, dflt) {
+      return plan.keep[key] === undefined ? dflt : plan.keep[key];
     };
-    parsed.forEach(function (p) {
+    var matched = {};
+    plan.read = read;
+    plan.total = read.rows.length;
+    plan.added = [];
+    plan.renamed = [];
+    plan.updated = [];
+    plan.missing = [];
+    plan.same = 0;
+    read.rows.forEach(function (p, i) {
       var name = _cmImportKey((p.firstName || '') + ' ' + (p.lastName || ''));
       var hit = (_cmImportKey(p.studentNumber) && byNum[_cmImportKey(p.studentNumber)]) || byName[name];
       if (!hit || matched[hit.id]) {
-        if (!hit) plan.added.push({ row: p, on: true });
+        if (!hit) {
+          var key = 'a' + (p.line || 'i' + i);
+          plan.added.push({ row: p, key: key, on: on(key, true) });
+        }
         return;
       }
       matched[hit.id] = true;
       var sameName =
         _cmImportKey(hit.firstName) === _cmImportKey(p.firstName) &&
         _cmImportKey(hit.lastName) === _cmImportKey(p.lastName);
-      if (!sameName && p.firstName) plan.renamed.push({ sid: hit.id, row: p, on: true });
+      if (!sameName && p.firstName)
+        plan.renamed.push({ sid: hit.id, row: p, key: 'r' + hit.id, on: on('r' + hit.id, true) });
       var fields = _cmImportChanges(cid, hit, p);
-      if (fields.length) plan.updated.push({ sid: hit.id, row: p, fields: fields, on: true });
+      if (fields.length)
+        plan.updated.push({ sid: hit.id, row: p, fields: fields, key: 'u' + hit.id, on: on('u' + hit.id, true) });
       else if (sameName || !p.firstName) plan.same++;
     });
     sortStudents(roster, 'lastName').forEach(function (s) {
-      if (!matched[s.id]) plan.missing.push({ sid: s.id, on: false });
+      if (!matched[s.id]) plan.missing.push({ sid: s.id, key: 'm' + s.id, on: on('m' + s.id, false) });
     });
     cmPendingImport = plan;
     renderClassManager();
   }
 
-  /* What a matched row would change: a field the file fills and the roster
-     has differently, a designation the student doesn't have yet, a parent
-     email not on file. Blank cells change nothing. */
+  /* What a matched row would change, as [{ label, from, to }]: a field the
+     file fills and the roster has differently, a designation the student
+     doesn't have yet, a parent email not on file. Blank cells change
+     nothing. */
   var IMPORT_FIELD_LABELS = {
     preferred: 'Preferred Name',
     pronouns: 'Pronouns',
@@ -2457,31 +3034,522 @@ window.DashClassManager = (function () {
   function _cmImportChanges(cid, st, p) {
     var out = [];
     Object.keys(IMPORT_FIELD_LABELS).forEach(function (k) {
-      if (p[k] && String(p[k]) !== String(st[k] || '')) out.push(IMPORT_FIELD_LABELS[k]);
+      if (p[k] && String(p[k]) !== String(st[k] || ''))
+        out.push({ label: IMPORT_FIELD_LABELS[k], from: st[k] || '', to: String(p[k]) });
     });
     var have = st.designations || [];
     var newCodes = (p.designations || []).filter(function (c) {
       return have.indexOf(c) < 0;
     });
-    if (newCodes.length) out.push(newCodes.join(', '));
+    if (newCodes.length) out.push({ label: 'Designations', from: '', to: '+ ' + newCodes.join(', '), add: true });
     var known = _cmGuardiansFor(cid, st.id).map(function (g) {
       return (g.email || '').toLowerCase();
     });
     var newParents = (p.parentEmails || []).filter(function (e) {
       return known.indexOf(e.toLowerCase()) < 0;
     });
-    if (newParents.length) out.push(newParents.length === 1 ? 'Parent Email' : newParents.length + ' Parent Emails');
+    if (newParents.length)
+      out.push({
+        label: newParents.length === 1 ? 'Parent Email' : 'Parent Emails',
+        from: '',
+        to: '+ ' + newParents.join(', '),
+        add: true,
+      });
     return out;
   }
 
-  function _cmRenderImportReview(cid) {
-    var plan = cmPendingImport;
-    if (!plan) return '';
+  var _CM_FIELD_LABEL = {};
+  ROSTER_IMPORT_FIELDS.forEach(function (f) {
+    _CM_FIELD_LABEL[f[0]] = f[1];
+  });
+
+  function _cmRowName(p) {
+    return ((p.firstName || '') + ' ' + (p.lastName || '')).trim();
+  }
+
+  function _cmJoinWords(list) {
+    if (list.length < 2) return list.join('');
+    return list.slice(0, -1).join(', ') + ' and ' + list[list.length - 1];
+  }
+
+  function _cmPlural(n, one, many) {
+    return n + ' ' + (n === 1 ? one : many);
+  }
+
+  /* What a column holds, in a line under its choice. */
+  function _cmColumnNote(t, i) {
+    var f = t.map[i];
+    var vals = _rosterColumn(t, i);
+    var header = _rosterHeaderKey(t.headers[i]);
+    if (!f) {
+      if (t.suggest[i] === 'designations') {
+        var codes = {};
+        vals.forEach(function (v) {
+          _rosterCodes(v).forEach(function (c) {
+            codes[c] = true;
+          });
+        });
+        return (
+          'Looks like designations (' + _cmJoinWords(Object.keys(codes).slice(0, 3)) + '). Left out unless you choose.'
+        );
+      }
+      if (!vals.length) return 'Empty.';
+      if (ROSTER_SKIPPED_HEADERS.indexOf(header) >= 0) return "FullVision doesn't keep this.";
+      if (/note|comment/.test(header)) return 'FullVision has no place for notes. Add them as observations.';
+      var distinct = {};
+      vals.forEach(function (v) {
+        distinct[v] = true;
+      });
+      var one = Object.keys(distinct);
+      if (one.length === 1 && vals.length > 1) return one[0] + ' in every row.';
+      return 'FullVision leaves this column out.';
+    }
+    if (f === 'fullName') {
+      var commas = vals.filter(function (v) {
+        return v.indexOf(',') >= 0;
+      }).length;
+      return commas >= vals.length / 2 ? 'Read as Last, First.' : 'Read as First Last.';
+    }
+    if (f === 'dateOfBirth') {
+      var order = t.dateOrder[i];
+      var sample = vals.find(function (v) {
+        var m = _ROSTER_NUM_DATE.exec(v);
+        return m && (order === 'mdy' ? +m[2] > 12 : +m[1] > 12);
+      });
+      if (order === 'mdy')
+        return (
+          'Read as month/day/year' + (sample ? ': ' + sample + ' can only be ' + _cmSayDate(sample, 'mdy') + '.' : '.')
+        );
+      if (order === 'dmy')
+        return (
+          'Read as day/month/year' + (sample ? ': ' + sample + ' can only be ' + _cmSayDate(sample, 'dmy') + '.' : '.')
+        );
+      if (order === 'ask') return '';
+      return 'Year first, or written out.';
+    }
+    if (t.how[i] !== 'guess') return '';
+    if (f === 'studentNumber') {
+      var lens = {};
+      vals.forEach(function (v) {
+        lens[v.replace(/\D/g, '').length] = true;
+      });
+      var k = Object.keys(lens);
+      return (k.length === 1 ? k[0] + '-digit numbers' : 'Numbers') + ", like MyEd's Pupil #.";
+    }
+    if (f === 'parentEmail' || f === 'parentEmail2')
+      return 'Every cell is an email address. Kept for you; FullVision never emails families.';
+    if (f === 'email') return 'Every cell is an address at ' + (vals[0] || '').split('@')[1] + '.';
+    if (f === 'pronouns') return 'Every cell is pronouns.';
+    return '';
+  }
+
+  function _cmSayDate(v, order) {
+    var d = _rosterDate(v, order);
+    if (!d) return v;
+    var p = d.split('-');
+    var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return months[+p[1] - 1] + ' ' + +p[2];
+  }
+
+  /* A column's problems, said once on the column. */
+  function _cmColumnIssue(plan, i) {
+    var t = plan.table;
+    var f = t.map[i];
+    var read = plan.read;
+    var count = function (kind) {
+      return read.problems.filter(function (pr) {
+        return pr.kind === kind;
+      }).length;
+    };
+    if (_cmIsNameField(f) && read.unnamed.length)
+      return _cmPlural(read.unnamed.length, 'row has', 'rows have') + ' no name';
+    if (f === 'studentNumber' && count('number'))
+      return _cmPlural(count('number'), 'number is', 'numbers are') + ' used twice';
+    if (f === 'dateOfBirth' && count('date')) return _cmPlural(count('date'), "date isn't real", "dates can't be read");
+    if ((f === 'email' || f === 'parentEmail' || f === 'parentEmail2') && count('email'))
+      return _cmPlural(count('email'), "cell isn't an email address", "cells aren't email addresses");
+    if (f === 'designations' && count('code'))
+      return _cmPlural(count('code'), "code isn't a BC code", "codes aren't BC codes");
+    return '';
+  }
+
+  /* The column menu, on the column's button: each choice says what it takes
+     and which column already uses it (choosing it swaps the two). */
+  function _cmFieldMenuHtml(t, i) {
+    var cur = t.map[i] || '';
+    var usedBy = {};
+    t.map.forEach(function (f, j) {
+      if (f && j !== i && !usedBy[f]) usedBy[f] = t.headers[j] || 'Column ' + (j + 1);
+    });
+    var item = function (field, hint) {
+      var on = field === cur;
+      return (
+        '<button type="button" role="menuitemradio" aria-checked="' +
+        on +
+        '" class="cm-std-menu-item cm-import-field-item' +
+        (on ? ' is-on' : '') +
+        '" data-action="cmImportPick" data-col="' +
+        i +
+        '" data-field="' +
+        field +
+        '"><span class="cm-import-item-top"><span>' +
+        (on ? '✓ ' : '') +
+        esc(field ? _CM_FIELD_LABEL[field] : "Don't Import") +
+        '</span>' +
+        (on && t.how[i] === 'guess'
+          ? '<span class="cm-import-item-guess">Best Guess</span>'
+          : usedBy[field]
+            ? '<span class="cm-import-item-used">Used by ' + esc(usedBy[field]) + '</span>'
+            : '') +
+        '</span><span class="cm-import-item-hint">' +
+        esc(hint) +
+        '</span></button>'
+      );
+    };
+    return (
+      '<div class="cm-std-menu cm-import-field-menu" role="menu" aria-label="' +
+      esc('What ' + (t.headers[i] || 'column ' + (i + 1)) + ' holds') +
+      '" hidden>' +
+      ROSTER_FIELD_MENU.map(function (g) {
+        return (
+          '<div role="group" aria-label="' +
+          esc(g[0]) +
+          '"><div class="cm-import-menu-group" aria-hidden="true">' +
+          esc(g[0]) +
+          '</div>' +
+          g[1]
+            .map(function (it) {
+              return item(it[0], it[1]);
+            })
+            .join('') +
+          '</div>'
+        );
+      }).join('') +
+      '<div role="group" aria-label="Leave Out">' +
+      item('', 'FullVision leaves this column out.') +
+      '</div></div>'
+    );
+  }
+
+  /* The columns, each with FullVision's choice above the first rows. */
+  function _cmImportColumnsHtml(plan) {
+    var t = plan.table;
+    var cols = t.headers.map(function (h, i) {
+      return i;
+    });
+    var tracks = cols
+      .map(function (i) {
+        return t.map[i] ? 'minmax(150px, 1.4fr)' : 'minmax(132px, 0.9fr)';
+      })
+      .join(' ');
+    var head = cols
+      .map(function (i) {
+        var f = t.map[i] || '';
+        var label = t.headers[i] || 'Column ' + (i + 1);
+        var tag =
+          t.how[i] === 'header'
+            ? '<span class="cm-import-tag is-read">Read</span>'
+            : t.how[i] === 'guess' || t.how[i] === 'order'
+              ? '<span class="cm-import-tag is-guess">Best Guess</span>'
+              : '';
+        var note = _cmColumnNote(t, i);
+        var issue = _cmColumnIssue(plan, i);
+        var ask =
+          t.dateOrder[i] === 'ask'
+            ? '<div class="cm-import-ask" role="group" aria-label="' +
+              esc('Which comes first in ' + label) +
+              '"><span>Which comes first? Every date here could be either.</span>' +
+              '<span class="cm-import-ask-btns"><button type="button" class="cm-action-btn" data-action="cmImportDateOrder" data-col="' +
+              i +
+              '" data-order="mdy">Month</button><button type="button" class="cm-action-btn" data-action="cmImportDateOrder" data-col="' +
+              i +
+              '" data-order="dmy">Day</button></span></div>'
+            : '';
+        var suggest =
+          !f && t.suggest[i]
+            ? '<button type="button" class="cm-import-suggest" data-action="cmImportPick" data-col="' +
+              i +
+              '" data-field="' +
+              t.suggest[i] +
+              '">Import as ' +
+              esc(_CM_FIELD_LABEL[t.suggest[i]]) +
+              '</button>'
+            : '';
+        return (
+          '<div class="cm-import-col-head' +
+          (f ? '' : ' is-out') +
+          '"><strong class="cm-import-col-name">' +
+          esc(label) +
+          '</strong>' +
+          '<span class="cm-std-menu-wrap cm-import-field-wrap">' +
+          '<button type="button" class="cm-import-field-btn" data-action="cmStdMenu" data-col="' +
+          i +
+          '" aria-haspopup="menu" aria-expanded="false" aria-label="' +
+          esc('What ' + label + ' holds: ' + (f ? _CM_FIELD_LABEL[f] : "Don't Import")) +
+          '">' +
+          esc(f ? _CM_FIELD_LABEL[f] : "Don't Import") +
+          '<span aria-hidden="true">▾</span></button>' +
+          _cmFieldMenuHtml(t, i) +
+          '</span>' +
+          tag +
+          (note ? '<span class="cm-import-col-note">' + esc(note) + '</span>' : '') +
+          ask +
+          (issue ? '<span class="cm-import-col-issue">' + esc(issue) + '</span>' : '') +
+          suggest +
+          '</div>'
+        );
+      })
+      .join('');
+    var rows = t.body
+      .slice(0, 4)
+      .map(function (r) {
+        return cols
+          .map(function (i) {
+            return '<span class="cm-import-cell' + (t.map[i] ? '' : ' is-out') + '">' + esc(r[i] || '') + '</span>';
+          })
+          .join('');
+      })
+      .join('');
+    var more =
+      t.body.length > 4
+        ? '<div class="cm-import-more">and ' + _cmPlural(t.body.length - 4, 'more row', 'more rows') + '</div>'
+        : '';
+    return (
+      '<div class="cm-import-cols-scroll">' +
+      '<div class="cm-import-cols" style="grid-template-columns:' +
+      tracks +
+      '">' +
+      head +
+      rows +
+      '</div>' +
+      more +
+      '</div>'
+    );
+  }
+
+  /* What FullVision needs from the file: names, and student numbers so a
+     second import updates instead of adding everyone again. */
+  function _cmImportNeedsHtml(t) {
+    var from = function (test) {
+      return t.headers
+        .map(function (h, i) {
+          return test(t.map[i]) ? h || 'Column ' + (i + 1) : '';
+        })
+        .filter(Boolean);
+    };
+    var names = from(_cmIsNameField);
+    var nums = from(function (f) {
+      return f === 'studentNumber';
+    });
+    return (
+      '<div class="cm-import-needs">' +
+      (names.length
+        ? '<span class="cm-import-need is-ok"><strong>✓ Names</strong> from ' +
+          esc(_cmJoinWords(names)) +
+          ' · needed</span>'
+        : '<span class="cm-import-need is-missing"><strong>Names</strong> · choose the column that holds them</span>') +
+      (nums.length
+        ? '<span class="cm-import-need is-ok"><strong>✓ Student Numbers</strong> from ' +
+          esc(_cmJoinWords(nums)) +
+          ' · so importing again updates students instead of adding them twice</span>'
+        : '<span class="cm-import-need"><strong>No Student Numbers</strong> · importing again will match students by name</span>') +
+      '</div>'
+    );
+  }
+
+  /* The rows that need a look, each with what will happen and a box to fix
+     it. Nothing here stops the import. */
+  function _cmImportProblemsHtml(plan) {
+    var read = plan.read;
+    var addedRows = plan.added.map(function (a) {
+      return a.row;
+    });
+    var items = read.problems
+      .map(function (pr) {
+        return { line: pr.line, pr: pr };
+      })
+      .concat(
+        read.unnamed.map(function (u) {
+          return { line: u.line, unnamed: u };
+        }),
+      )
+      .sort(function (a, b) {
+        return a.line - b.line;
+      });
+    if (!items.length) return '';
+    var lines = {};
+    items.forEach(function (it) {
+      lines[it.line] = true;
+    });
+    var count = Object.keys(lines).length;
+    var fix = function (line, field, label, placeholder, value) {
+      return (
+        '<label class="cm-import-fix"><span>' +
+        esc(label) +
+        '</span><input class="cm-input" type="text" data-action-change="cmImportFix" data-line="' +
+        line +
+        '" data-field="' +
+        field +
+        '" placeholder="' +
+        esc(placeholder) +
+        '" value="' +
+        esc(value || '') +
+        '"></label>'
+      );
+    };
+    var html = items
+      .map(function (it) {
+        var line = it.line;
+        var typed = plan.fixes[line] || {};
+        var label = '<span class="cm-import-rownum">Row ' + line + '</span>';
+        if (it.unnamed) {
+          return (
+            '<div class="cm-import-problem">' +
+            label +
+            '<strong class="cm-import-problem-name is-missing">No name</strong>' +
+            '<span>This row has no name, so it will be left out. <span class="cm-hint">' +
+            esc(it.unnamed.cells.join(' · ')) +
+            '</span></span>' +
+            fix(line, 'name', 'Type a name to add them', 'Last, First', typed.name) +
+            '</div>'
+          );
+        }
+        var pr = it.pr;
+        var p = pr.p;
+        var first = p.preferred || p.firstName || _cmRowName(p);
+        var isNew = addedRows.indexOf(p) >= 0;
+        var text, then, box;
+        if (pr.kind === 'date') {
+          text = _rosterYmdLike(pr.value)
+            ? 'Birthday “' + pr.value + "” isn't a real date."
+            : 'Birthday “' + pr.value + "” can't be read.";
+          then = isNew ? first + ' will be added without a birthday.' : first + "'s birthday isn't changed.";
+          box = fix(line, 'dateOfBirth', 'Birthday', 'Like 2012-09-30', typed.dateOfBirth);
+        } else if (pr.kind === 'number') {
+          text =
+            'Student number ' + pr.value + ' is also ' + _cmRowName(pr.other) + "'s, in row " + pr.other.line + '.';
+          then = isNew
+            ? first + ' will be added without one. MyEd has the right number.'
+            : first + "'s number isn't changed.";
+          box = fix(line, 'studentNumber', 'Student Number', 'Their number', typed.studentNumber);
+        } else if (pr.kind === 'email') {
+          text = '“' + pr.value + "” isn't an email address, so it's left out.";
+          then = '';
+          box = '';
+        } else {
+          text = '“' + pr.value + "” isn't a BC designation code, so it's left out.";
+          then = '';
+          box = '';
+        }
+        return (
+          '<div class="cm-import-problem">' +
+          label +
+          '<strong class="cm-import-problem-name">' +
+          esc(_cmRowName(p)) +
+          '</strong><span>' +
+          esc(text) +
+          (then ? ' <span class="cm-hint">' + esc(then) + '</span>' : '') +
+          '</span>' +
+          box +
+          '</div>'
+        );
+      })
+      .join('');
+    return (
+      '<div class="cm-import-problems-head"><h3>' +
+      (count === 1 ? '1 Row Needs a Look' : count + ' Rows Need a Look') +
+      '</h3><span class="cm-hint">Nothing here stops the import. Fix what you can now, or later in the student table.</span></div>' +
+      '<div class="cm-import-problems">' +
+      html +
+      '</div>'
+    );
+  }
+
+  function _rosterYmdLike(v) {
+    return /^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}$/.test(v) || _ROSTER_NUM_DATE.test(v) || /[a-z]{3}/i.test(v);
+  }
+
+  /* The students a first import adds, under FullVision's column names. */
+  function _cmImportStudentListHtml(plan) {
+    var t = plan.table;
+    var cols = [
+      ['lastName', 'Last Name'],
+      ['firstName', 'First Name'],
+    ];
+    ['preferred', 'pronouns', 'studentNumber', 'dateOfBirth', 'email'].forEach(function (f) {
+      if (
+        !t ||
+        plan.added.some(function (a) {
+          return a.row[f];
+        })
+      )
+        cols.push([f, f === 'preferred' ? 'Preferred' : _CM_FIELD_LABEL[f]]);
+    });
+    var shown = plan.showAll ? plan.added : plan.added.slice(0, 10);
+    var allOn = plan.added.every(function (a) {
+      return a.on;
+    });
+    var tracks =
+      '36px ' +
+      cols
+        .map(function (c) {
+          return c[0] === 'email' ? 'minmax(0, 2fr)' : 'minmax(0, 1fr)';
+        })
+        .join(' ');
+    return (
+      '<div class="cm-import-list" style="--cm-import-cols:' +
+      tracks +
+      '">' +
+      '<div class="cm-import-list-row is-head"><input type="checkbox" data-action-change="cmImportToggleAll"' +
+      (allOn ? ' checked' : '') +
+      ' aria-label="All students in the file">' +
+      cols
+        .map(function (c) {
+          return '<span>' + esc(c[1]) + '</span>';
+        })
+        .join('') +
+      '</div>' +
+      shown
+        .map(function (a, i) {
+          return (
+            '<label class="cm-import-list-row"><input type="checkbox" data-action-change="cmImportToggle" data-kind="added" data-idx="' +
+            i +
+            '"' +
+            (a.on ? ' checked' : '') +
+            ' aria-label="' +
+            esc('Add ' + _cmRowName(a.row)) +
+            '">' +
+            cols
+              .map(function (c) {
+                return (
+                  '<span' +
+                  (c[0] === 'lastName' || c[0] === 'firstName' ? ' class="is-name"' : '') +
+                  '>' +
+                  esc(a.row[c[0]] || '') +
+                  '</span>'
+                );
+              })
+              .join('') +
+            '</label>'
+          );
+        })
+        .join('') +
+      '</div>' +
+      (plan.added.length > shown.length
+        ? '<button type="button" class="cm-import-link" data-action="cmImportShowAll">Show All ' +
+          plan.added.length +
+          '</button>'
+        : '')
+    );
+  }
+
+  /* A class with students: what the file will change, in groups. */
+  function _cmImportGroupsHtml(cid, plan) {
     var byId = {};
     getStudents(cid).forEach(function (s) {
       byId[s.id] = s;
     });
-    function group(title, items, render, note) {
+    function group(title, kind, items, render, note) {
       if (!items.length) return '';
       return (
         '<div class="cm-import-group"><div class="cm-import-group-head"><h3>' +
@@ -2489,192 +3557,381 @@ window.DashClassManager = (function () {
         '</h3><span>' +
         items.length +
         '</span></div>' +
-        items.map(render).join('') +
+        items
+          .map(function (it, i) {
+            return (
+              '<label class="cm-import-row"><input type="checkbox"' +
+              (it.on ? ' checked' : '') +
+              ' data-action-change="cmImportToggle" data-kind="' +
+              kind +
+              '" data-idx="' +
+              i +
+              '">' +
+              render(it) +
+              '</label>'
+            );
+          })
+          .join('') +
         (note ? '<div class="cm-hint">' + note + '</div>' : '') +
         '</div>'
       );
     }
-    function check(kind, i, on, body) {
-      return (
-        '<label class="cm-import-row"><input type="checkbox"' +
-        (on ? ' checked' : '') +
-        ' data-action-change="cmImportToggle" data-kind="' +
-        kind +
-        '" data-idx="' +
-        i +
-        '">' +
-        body +
-        '</label>'
-      );
-    }
-    var added = plan.added.filter(function (a) {
-      return a.on;
-    }).length;
-    var renamed = plan.renamed.filter(function (r) {
-      return r.on;
-    }).length;
-    var withdrawn = plan.missing.filter(function (m) {
-      return m.on;
-    }).length;
-    var updated = (plan.updated || []).filter(function (u) {
-      return u.on;
-    }).length;
-    var summary = [];
-    if (added) summary.push('Add ' + added);
-    if (renamed) summary.push('rename ' + renamed);
-    if (updated) summary.push('update ' + updated);
-    if (withdrawn) summary.push('withdraw ' + withdrawn);
-    if (summary.length) summary[0] = summary[0].charAt(0).toUpperCase() + summary[0].slice(1);
-    var columns = '';
-    if (plan.table && plan.table.headers.some(Boolean)) {
-      columns =
-        '<div class="cm-import-group cm-import-columns"><div class="cm-import-group-head"><h3>Columns in This File</h3></div>' +
-        '<div class="cm-import-col-grid">' +
-        plan.table.headers
-          .map(function (h, i) {
-            var field = plan.table.map[i] || '';
-            return (
-              '<label class="cm-import-col"><span class="cm-import-col-name">' +
-              esc(h || 'Column ' + (i + 1)) +
-              '</span><select class="cm-input" data-action-change="cmImportMap" data-col="' +
-              i +
-              '" aria-label="What ' +
-              esc(h || 'column ' + (i + 1)) +
-              ' holds">' +
-              ROSTER_IMPORT_FIELDS.map(function (f) {
-                return '<option value="' + f[0] + '"' + (f[0] === field ? ' selected' : '') + '>' + f[1] + '</option>';
-              }).join('') +
-              '</select></label>'
-            );
-          })
-          .join('') +
-        '</div>' +
-        '<div class="cm-hint">Change a column if it was matched to the wrong field. Ignored columns aren\'t imported.</div>' +
-        '</div>';
-    }
-    var sk = plan.skipped || {};
-    var skippedParts = [];
-    if (sk.dates) skippedParts.push(sk.dates + (sk.dates === 1 ? ' date' : ' dates'));
-    if (sk.emails) skippedParts.push(sk.emails + (sk.emails === 1 ? ' email' : ' emails'));
-    if (sk.codes) skippedParts.push(sk.codes + (sk.codes === 1 ? ' designation code' : ' designation codes'));
-    var skippedNote = skippedParts.length
-      ? '<div class="cm-hint cm-import-skipped">' +
-        esc(skippedParts.join(', ')) +
-        " couldn't be read and will be left out. Dates need to look like 2012-05-15.</div>"
-      : '';
-    return (
-      '<div class="cm-section cm-import-review">' +
-      '<h2 class="cm-grade-title">Import Roster: Review Changes</h2>' +
-      '<div class="cm-hint">' +
-      (plan.fileName ? '<strong>' + esc(plan.fileName) + '</strong> · ' : '') +
-      plan.total +
-      (plan.total === 1 ? ' student' : ' students') +
-      '. Students are matched by student number, then by name. Nothing changes until you press Import.</div>' +
-      skippedNote +
-      columns +
-      group('New to This Class', plan.added, function (a, i) {
-        var r = a.row;
-        return check(
-          'added',
-          i,
-          a.on,
-          '<span class="cm-import-name">' +
-            esc(((r.firstName || '') + ' ' + (r.lastName || '')).trim()) +
-            '</span><span class="cm-student-pronouns">' +
-            esc(r.pronouns || '') +
-            '</span><span class="cm-roster-num">' +
-            esc(r.studentNumber || '') +
-            '</span>',
+    var num = function (n) {
+      return '<span class="cm-roster-num">' + esc(n || '') + '</span>';
+    };
+    var left =
+      group('New to This Class', 'added', plan.added, function (a) {
+        return (
+          '<span class="cm-import-name"><strong>' +
+          esc(_cmRowName(a.row)) +
+          '</strong></span>' +
+          num(a.row.studentNumber)
         );
       }) +
       group(
         'Name Changed',
+        'renamed',
         plan.renamed,
-        function (r, i) {
+        function (r) {
           var st = byId[r.sid] || {};
-          return check(
-            'renamed',
-            i,
-            r.on,
+          return (
             '<span class="cm-import-name"><span class="cm-import-old">' +
-              esc(fullName(st)) +
-              '</span> → <strong>' +
-              esc(((r.row.firstName || '') + ' ' + (r.row.lastName || '')).trim()) +
-              '</strong></span><span class="cm-roster-num">' +
-              esc(st.studentNumber || '') +
-              '</span>',
+            esc(fullName(st)) +
+            '</span> → <strong>' +
+            esc(_cmRowName(r.row)) +
+            '</strong></span>' +
+            num(st.studentNumber)
           );
         },
         'Same student number, so their scores and observations stay with them.',
       ) +
       group(
-        'Details Updated',
-        plan.updated || [],
-        function (u, i) {
-          var st = byId[u.sid] || {};
-          return check(
-            'updated',
-            i,
-            u.on,
-            '<span class="cm-import-name"><strong>' +
-              esc(fullName(st)) +
-              '</strong> · ' +
-              esc(u.fields.join(', ')) +
-              '</span><span class="cm-roster-num">' +
-              esc(st.studentNumber || '') +
-              '</span>',
-          );
-        },
-        'Only filled-in cells change anything. Designations and parent emails are added, never removed.',
-      ) +
-      group(
         'In Your Class, Not in This File',
+        'missing',
         plan.missing,
-        function (m, i) {
+        function (m) {
           var st = byId[m.sid] || {};
-          return check(
-            'missing',
-            i,
-            m.on,
+          return (
             '<span class="cm-import-name"><strong>' +
-              esc(fullName(st)) +
-              '</strong> · Withdraw from this class</span><span class="cm-roster-num">' +
-              esc(st.studentNumber || '') +
-              '</span>',
+            esc(fullName(st)) +
+            '</strong> · Withdraw from this class</span>' +
+            num(st.studentNumber)
           );
         },
-        'Left unticked, they stay enrolled. Withdrawn students keep their scores.',
+        'Left unticked, they stay. A withdrawn student keeps their scores and can be enrolled again.',
+      );
+    var right =
+      group(
+        'Details Updated',
+        'updated',
+        plan.updated,
+        function (u) {
+          var st = byId[u.sid] || {};
+          return (
+            '<span class="cm-import-name"><strong>' +
+            esc(fullName(st)) +
+            '</strong></span><span class="cm-import-changes">' +
+            u.fields
+              .map(function (c) {
+                return (
+                  '<span>' +
+                  esc(c.label) +
+                  ' ' +
+                  (c.add
+                    ? esc(c.to)
+                    : '<span class="cm-import-old">' + esc(c.from || 'blank') + ' →</span> ' + esc(c.to)) +
+                  '</span>'
+                );
+              })
+              .join('') +
+            '</span>'
+          );
+        },
+        'A blank cell never clears anything. Designations and parent emails are added, never removed.',
       ) +
       (plan.same
-        ? '<div class="cm-import-group cm-import-same"><h3>Already in Your Class</h3><span>' +
-          plan.same +
-          ' · no changes</span></div>'
-        : '') +
+        ? '<div class="cm-import-group cm-import-same"><h3>Already Up to Date</h3><span>' +
+          _cmPlural(plan.same, 'student', 'students') +
+          ', no changes</span></div>'
+        : '');
+    return '<div class="cm-import-groups"><div>' + left + '</div><div>' + right + '</div></div>';
+  }
+
+  function _cmImportCounts(plan) {
+    var n = function (list) {
+      return list.filter(function (x) {
+        return x.on;
+      }).length;
+    };
+    return { added: n(plan.added), renamed: n(plan.renamed), updated: n(plan.updated), withdrawn: n(plan.missing) };
+  }
+
+  /* Rows added with a blank to fill in: a date or number that needs a look. */
+  function _cmImportBlanks(plan) {
+    var rows = plan.added
+      .filter(function (a) {
+        return a.on;
+      })
+      .map(function (a) {
+        return a.row;
+      });
+    return plan.read.problems.filter(function (pr) {
+      return (pr.kind === 'date' || pr.kind === 'number') && rows.indexOf(pr.p) >= 0;
+    });
+  }
+
+  function _cmRenderImportReview(cid) {
+    var plan = cmPendingImport;
+    if (!plan) return '';
+    var t = plan.table;
+    if (plan.nonames && t) {
+      var heads = t.headers.filter(Boolean);
+      return (
+        '<div class="cm-section cm-import-card" role="region" aria-labelledby="cm-import-title">' +
+        '<div class="cm-import-card-head"><span class="cm-import-card-mark" aria-hidden="true">!</span><h2 id="cm-import-title" tabindex="-1">No Names Found</h2></div>' +
+        '<p class="cm-import-card-text">FullVision couldn\'t find a column of student names in <strong>' +
+        esc(plan.fileName) +
+        '</strong>.' +
+        (heads.length ? ' Its columns are ' + esc(_cmJoinWords(heads)) + '.' : '') +
+        '</p><p class="cm-hint">If one of them holds the names, choose it. If this is the wrong file, choose another.</p>' +
+        '<div class="cm-import-buttons"><button type="button" class="btn btn-primary" data-action="cmImportChooseNames">Choose the Name Column</button>' +
+        '<button type="button" class="cm-action-btn" data-action="cmChooseRosterFile">Choose Another File</button>' +
+        '<button type="button" class="cm-action-btn" data-action="cmCancelImport">Cancel</button></div>' +
+        '</div>'
+      );
+    }
+    var course = (typeof COURSES !== 'undefined' && COURSES[cid]) || {};
+    var className = course.name || 'this class';
+    var first = !getStudents(cid).length;
+    var ready = !plan.showColumns && (!t || rosterImportReady(t));
+    var counts = _cmImportCounts(plan);
+    var left = t
+      ? t.headers.filter(function (h, i) {
+          return h && !t.map[i] && _rosterColumn(t, i).length;
+        })
+      : [];
+    var title, sub;
+    if (first) {
+      title = ready
+        ? 'Ready to Add ' + _cmPlural(plan.added.length, 'Student', 'Students')
+        : 'Check How Your File Was Read';
+      sub = ready
+        ? 'From <strong>' + esc(plan.fileName) + '</strong>'
+        : '<strong>' +
+          esc(plan.fileName) +
+          '</strong> · ' +
+          _cmPlural(t ? t.body.length : plan.total, 'row', 'rows') +
+          ". Above each of your columns is what FullVision will do with it. Change any that's wrong.";
+    } else {
+      title = 'What This File Will Change';
+      var said = [];
+      if (plan.added.length) said.push(_cmPlural(plan.added.length, 'new student', 'new students'));
+      if (plan.renamed.length) said.push(_cmPlural(plan.renamed.length, 'new name', 'new names'));
+      if (plan.updated.length) said.push(_cmPlural(plan.updated.length, 'updated detail', 'updated details'));
+      sub =
+        '<strong>' +
+        esc(said.length ? _cmJoinWords(said) + '.' : 'No changes.') +
+        '</strong>' +
+        (plan.missing.length
+          ? ' ' +
+            esc(
+              _cmPlural(plan.missing.length, 'student', 'students') +
+                " in your class aren't in the file; they stay unless you tick them.",
+            )
+          : '') +
+        '<span class="cm-import-file-line"><strong>' +
+        esc(plan.fileName) +
+        '</strong>' +
+        (ready && t && t.myEd
+          ? ' · a MyEducation BC class list, every column read'
+          : ready && t
+            ? ' · every column read'
+            : '') +
+        ' · matched by student number, then by name</span>';
+    }
+    var band =
+      ready && t && first
+        ? '<div class="cm-import-band"><span class="cm-import-band-mark" aria-hidden="true">✓</span><div><strong>' +
+          (t.myEd
+            ? "This is a class list from MyEducation BC. Every column was read, so there's nothing to match."
+            : "Every column was read, so there's nothing to match.") +
+          '</strong><span>' +
+          (left.length ? esc('Left out: ' + _cmJoinWords(left) + ". FullVision doesn't keep them.") + ' ' : '') +
+          '<button type="button" class="cm-import-link" data-action="cmImportShowColumns">Change What\'s Kept</button></span></div></div>'
+        : '';
+    var columns = !ready && t ? _cmImportNeedsHtml(t) + _cmImportColumnsHtml(plan) : '';
+    var named = !t || t.map.some(_cmIsNameField);
+    var body = first ? (ready ? _cmImportStudentListHtml(plan) : '') : _cmImportGroupsHtml(cid, plan);
+    var foot, button, canGo;
+    if (first) {
+      var blanks = _cmImportBlanks(plan).length;
+      var unnamed = plan.read.unnamed.length;
+      foot =
+        '<strong>' +
+        esc(_cmPlural(counts.added, 'student', 'students') + ' will be added to ' + className + '.') +
+        '</strong>' +
+        (blanks
+          ? ' ' + esc(_cmPlural(blanks, 'with a blank birthday or number.', 'with a blank birthday or number.'))
+          : '') +
+        (unnamed
+          ? ' ' +
+            esc(
+              unnamed === 1
+                ? 'Row ' + plan.read.unnamed[0].line + ' is left out until it has a name.'
+                : unnamed + ' rows are left out until they have names.',
+            )
+          : '') +
+        (ready && counts.added ? ' <span class="cm-hint">Untick anyone who isn\'t in this class.</span>' : '');
+      button = 'Add ' + _cmPlural(counts.added, 'Student', 'Students');
+      canGo = counts.added > 0 && named;
+    } else {
+      var parts = [];
+      if (counts.added) parts.push('add ' + counts.added);
+      if (counts.renamed) parts.push('rename ' + counts.renamed);
+      if (counts.updated) parts.push('update ' + counts.updated);
+      if (counts.withdrawn) parts.push('withdraw ' + counts.withdrawn);
+      var sentence = parts.join(', ');
+      foot = parts.length
+        ? '<strong>' +
+          esc(sentence.charAt(0).toUpperCase() + sentence.slice(1) + '.') +
+          '</strong>' +
+          (counts.withdrawn ? '' : ' No one is withdrawn.') +
+          ' Nothing changes until you choose Save Changes.'
+        : 'Nothing to change.';
+      button = 'Save Changes';
+      canGo = parts.length > 0 && named;
+    }
+    return (
+      '<div class="cm-section cm-import-review" role="region" aria-labelledby="cm-import-title">' +
+      '<div class="cm-import-head"><div><h2 class="cm-grade-title" id="cm-import-title" tabindex="-1">' +
+      esc(title) +
+      '</h2><div class="cm-import-sub">' +
+      sub +
+      '</div></div>' +
+      '<button type="button" class="cm-import-link" data-action="cmChooseRosterFile">Choose a Different File</button></div>' +
+      band +
+      columns +
+      _cmImportProblemsHtml(plan) +
+      body +
       '<div class="cm-import-foot"><span>' +
-      (summary.length ? '<strong>' + esc(summary.join(', ')) + '.</strong>' : 'Nothing to change.') +
-      (withdrawn ? '' : ' No one is withdrawn.') +
+      foot +
       '</span>' +
       '<span class="cm-import-buttons"><button type="button" class="cm-action-btn" data-action="cmCancelImport">Cancel</button>' +
       '<button type="button" class="btn btn-primary" data-action="cmConfirmImport"' +
-      (summary.length ? '' : ' disabled') +
-      '>Import</button></span></div>' +
+      (canGo ? '' : ' disabled') +
+      '>' +
+      esc(button) +
+      '</button></span></div>' +
       '</div>'
     );
   }
 
   function cmImportToggle(kind, idx, on) {
-    var list = cmPendingImport && cmPendingImport[kind];
+    var plan = cmPendingImport;
+    var list = plan && plan[kind];
     if (!list || !list[idx]) return;
     list[idx].on = !!on;
+    plan.keep[list[idx].key] = !!on;
     _cmRenderAndFocus(
       '[data-action-change="cmImportToggle"][data-kind=' + _cmAttr(kind) + '][data-idx=' + _cmAttr(idx) + ']',
     );
+  }
+
+  function cmImportToggleAll(on) {
+    var plan = cmPendingImport;
+    if (!plan) return;
+    plan.added.forEach(function (a) {
+      a.on = !!on;
+      plan.keep[a.key] = !!on;
+    });
+    _cmRenderAndFocus('[data-action-change="cmImportToggleAll"]');
+  }
+
+  /* A column's choice changed: read the file again. Choosing a field
+     another column has swaps the two. */
+  function cmImportPick(col, field) {
+    var plan = cmPendingImport;
+    if (!plan || !plan.table) return;
+    var t = plan.table;
+    col = Number(col);
+    field = field || '';
+    var old = t.map[col] || '';
+    if (field) {
+      t.map.forEach(function (f, j) {
+        if (j === col || f !== field) return;
+        t.map[j] = old;
+        t.how[j] = old ? 'chosen' : '';
+        t.dateOrder[j] = old === 'dateOfBirth' ? rosterDateOrder(_rosterColumn(t, j)) : '';
+      });
+      t.suggest[col] = '';
+    }
+    t.map[col] = field;
+    t.how[col] = field ? 'chosen' : '';
+    t.dateOrder[col] = field === 'dateOfBirth' ? rosterDateOrder(_rosterColumn(t, col)) : '';
+    plan.showColumns = true;
+    _cmPlanImport(plan);
+    var btn = document.querySelector('.cm-import-field-btn[data-col="' + col + '"]');
+    _cmFocus(btn);
+  }
+
+  function cmImportMap(col, field) {
+    cmImportPick(col, field);
+  }
+
+  function cmImportDateOrder(col, order) {
+    var plan = cmPendingImport;
+    if (!plan || !plan.table) return;
+    plan.table.dateOrder[Number(col)] = order === 'dmy' ? 'dmy' : 'mdy';
+    plan.showColumns = true;
+    _cmPlanImport(plan);
+    var btn = document.querySelector('.cm-import-field-btn[data-col="' + Number(col) + '"]');
+    _cmFocus(btn);
+  }
+
+  /* A fix typed on a row: read the file again with it. Focus goes to the
+     next row's box. */
+  function cmImportFix(line, field, value) {
+    var plan = cmPendingImport;
+    if (!plan || !plan.table || ['dateOfBirth', 'studentNumber', 'name'].indexOf(field) < 0) return;
+    line = Number(line);
+    var fix = (plan.fixes[line] = plan.fixes[line] || {});
+    var v = String(value || '').trim();
+    if (v) fix[field] = v;
+    else delete fix[field];
+    _cmPlanImport(plan);
+    var boxes = Array.prototype.slice.call(document.querySelectorAll('[data-action-change="cmImportFix"]'));
+    var next = boxes.find(function (b) {
+      return Number(b.dataset.line) > line || (Number(b.dataset.line) === line && b.dataset.field !== field);
+    });
+    var target = next || document.querySelector('[data-action="cmConfirmImport"]');
+    _cmFocus(target);
+  }
+
+  function cmImportShowColumns() {
+    if (!cmPendingImport) return;
+    cmPendingImport.showColumns = true;
+    _cmRenderAndFocus('.cm-import-field-btn');
+  }
+
+  function cmImportShowAll() {
+    if (!cmPendingImport) return;
+    cmPendingImport.showAll = true;
+    _cmRenderAndFocus('.cm-import-list-row:nth-child(12) input');
+  }
+
+  function cmImportChooseNames() {
+    if (!cmPendingImport) return;
+    cmPendingImport.nonames = false;
+    cmPendingImport.showColumns = true;
+    _cmRenderAndFocus('.cm-import-field-btn');
   }
 
   function cmConfirmImport() {
     var plan = cmPendingImport;
     var cid = cmSelectedCourse;
     if (!plan || !cid) return;
+    var counts = _cmImportCounts(plan);
+    var blanks = plan.read ? _cmImportBlanks(plan) : [];
     var students = getStudents(cid);
     plan.renamed.forEach(function (r) {
       if (!r.on) return;
@@ -2704,6 +3961,8 @@ window.DashClassManager = (function () {
       });
     });
     var newGuardians = [];
+    var addedIds = [];
+    var blankIds = [];
     plan.added.forEach(function (a) {
       if (!a.on) return;
       var p = a.row;
@@ -2722,6 +3981,15 @@ window.DashClassManager = (function () {
         enrolledDate: new Date().toISOString().slice(0, 10),
       };
       students.push(fresh);
+      addedIds.push(fresh.id);
+      blanks.forEach(function (pr) {
+        if (pr.p === p)
+          blankIds.push({
+            sid: fresh.id,
+            name: _cmRowName(p),
+            what: pr.kind === 'date' ? 'birthday' : 'student number',
+          });
+      });
       (p.parentEmails || []).forEach(function (e) {
         newGuardians.push([fresh, e]);
       });
@@ -2742,12 +4010,225 @@ window.DashClassManager = (function () {
       if (m.on) withdrawStudent(cid, m.sid);
     });
     cmPendingImport = null;
+    cmImportDone = { cid: cid, added: addedIds, blanks: blankIds, counts: counts, undone: null };
+    cmRosterOnly = null;
     renderClassManager();
+    var head = document.getElementById('cm-import-done-title');
+    _cmFocus(head);
   }
 
   function cmCancelImport() {
     cmPendingImport = null;
+    cmImportError = null;
     renderClassManager();
+    var btn = document.querySelector(
+      '[data-action="cmImportRoster"], .cm-import-empty [data-action="cmChooseRosterFile"]',
+    );
+    _cmFocus(btn);
+  }
+
+  /* ── After an import: the Done panel ────────────────────────
+     It says what happened, names the students left with a blank (Show Them
+     filters the roster to them), offers the next step, and marks the new
+     rows New until the teacher leaves Class Settings or the class. Undo This
+     Import deletes the students it added, for good: only while this panel
+     is open, and only students with nothing recorded yet (no scores,
+     observations, notes, goals, reflections or ratings). Renames and
+     updated details stay as they are. */
+  function _cmStudentIdNow(id) {
+    return typeof _resolveKnownId === 'function' ? _resolveKnownId('student', id) || id : id;
+  }
+
+  function _cmImportNewIds(cid) {
+    var done = cmImportDone;
+    var ids = {};
+    if (!done || done.cid !== cid || done.undone) return ids;
+    done.added.forEach(function (id) {
+      ids[id] = true;
+      ids[_cmStudentIdNow(id)] = true;
+    });
+    return ids;
+  }
+
+  function _cmRosterOnlyIds() {
+    if (!cmRosterOnly) return null;
+    var ids = {};
+    cmRosterOnly.forEach(function (id) {
+      ids[id] = true;
+      ids[_cmStudentIdNow(id)] = true;
+    });
+    return ids;
+  }
+
+  var _CM_RECORD_GETTERS = [
+    'getScores',
+    'getQuickObs',
+    'getNotes',
+    'getGoals',
+    'getReflections',
+    'getFlags',
+    'getTermRatings',
+    'getOverrides',
+    'getStudentProfileSummaries',
+  ];
+
+  /* Anything recorded for this student in this class yet. */
+  function _cmStudentHasWork(cid, sid) {
+    var has = _CM_RECORD_GETTERS.some(function (name) {
+      var get = typeof globalThis !== 'undefined' ? globalThis[name] : undefined;
+      if (typeof get !== 'function') return false;
+      var v = (get(cid) || {})[sid];
+      if (v === undefined || v === null || v === '') return false;
+      if (Array.isArray(v)) return v.length > 0;
+      if (typeof v === 'object') return Object.keys(v).length > 0;
+      return true;
+    });
+    if (has) return true;
+    var statuses = typeof getAssignmentStatuses === 'function' ? getAssignmentStatuses(cid) || {} : {};
+    return Object.keys(statuses).some(function (k) {
+      return k.indexOf(sid + ':') === 0;
+    });
+  }
+
+  function _cmImportDoneHtml(cid) {
+    var done = cmImportDone;
+    if (!done || done.cid !== cid) return '';
+    var course = (typeof COURSES !== 'undefined' && COURSES[cid]) || {};
+    var c = done.counts;
+    var title,
+      lines = '';
+    if (done.undone) {
+      title = 'Import Undone';
+      lines =
+        '<p>' +
+        esc(
+          _cmPlural(done.undone.removed, 'student was', 'students were') +
+            ' removed.' +
+            (done.undone.kept.length
+              ? ' ' +
+                _cmJoinWords(done.undone.kept) +
+                (done.undone.kept.length === 1 ? ' stays: they already have' : ' stay: they already have') +
+                ' scores or observations.'
+              : ''),
+        ) +
+        '</p>';
+    } else {
+      var only = c.added && !c.renamed && !c.updated && !c.withdrawn;
+      if (only) title = _cmPlural(c.added, 'Student', 'Students') + ' Added to ' + (course.name || 'This Class');
+      else {
+        title = 'Roster Updated';
+        var said = [];
+        if (c.added) said.push(c.added + ' added');
+        if (c.renamed) said.push(c.renamed + ' renamed');
+        if (c.updated) said.push(c.updated + ' updated');
+        if (c.withdrawn) said.push(c.withdrawn + ' withdrawn');
+        lines += '<p>' + esc(said.length ? said.join(', ') + '.' : 'Nothing changed.') + '</p>';
+      }
+      var roster = getStudents(cid);
+      var here = {};
+      roster.forEach(function (s) {
+        here[s.id] = true;
+      });
+      var blanks = done.blanks.filter(function (b) {
+        return here[_cmStudentIdNow(b.sid)] || here[b.sid];
+      });
+      if (blanks.length) {
+        var who = {};
+        blanks.forEach(function (b) {
+          who[b.sid] = true;
+        });
+        var n = Object.keys(who).length;
+        var detail =
+          blanks.length <= 3
+            ? ': ' +
+              _cmJoinWords(
+                blanks.map(function (b) {
+                  return b.name + "'s " + b.what;
+                }),
+              ) +
+              '.'
+            : '.';
+        lines +=
+          '<p>' +
+          esc((n === 1 ? '1 has a blank' : n + ' have a blank') + ' to fill in' + detail) +
+          ' <button type="button" class="cm-import-link" data-action="cmImportShowBlanks">' +
+          (cmRosterOnly ? 'Show All Students' : 'Show Them') +
+          '</button></p>';
+      }
+      var next = [];
+      if (_cmTabShown('student-page', cid))
+        next.push(
+          '<button type="button" class="cm-import-next" data-action="cmSetTab" data-tab="student-page">Print Student Cards</button>',
+        );
+      next.push(
+        '<button type="button" class="cm-import-next" data-action="cmSetTab" data-tab="grading">Set Up Grading</button>',
+      );
+      lines += '<div class="cm-import-next-row"><span class="cm-hint">Next:</span>' + next.join('') + '</div>';
+    }
+    return (
+      '<div class="cm-section cm-import-done" role="region" aria-labelledby="cm-import-done-title">' +
+      '<span class="cm-import-band-mark" aria-hidden="true">✓</span>' +
+      '<div class="cm-import-done-body"><h2 id="cm-import-done-title" tabindex="-1">' +
+      esc(title) +
+      '</h2>' +
+      lines +
+      '</div>' +
+      '<div class="cm-import-done-actions">' +
+      (!done.undone && done.added.length
+        ? '<button type="button" class="cm-import-link" data-action="cmUndoImport">Undo This Import</button>'
+        : '') +
+      '<button type="button" class="cm-import-close" data-action="cmCloseImportDone" aria-label="Close">×</button>' +
+      '</div></div>'
+    );
+  }
+
+  function cmImportShowBlanks() {
+    var done = cmImportDone;
+    if (!done) return;
+    cmRosterOnly = cmRosterOnly
+      ? null
+      : done.blanks.map(function (b) {
+          return b.sid;
+        });
+    _cmRenderAndFocus('[data-action="cmImportShowBlanks"]');
+  }
+
+  function cmCloseImportDone() {
+    cmImportDone = null;
+    cmRosterOnly = null;
+    renderClassManager();
+    var btn = document.querySelector('[data-action="cmImportRoster"]');
+    _cmFocus(btn);
+  }
+
+  /* Delete the students this import added, for good, unless something has
+     been recorded for them. Renames and details stay. */
+  function cmUndoImport() {
+    var done = cmImportDone;
+    var cid = cmSelectedCourse;
+    if (!done || done.cid !== cid || done.undone) return;
+    var removed = 0;
+    var kept = [];
+    done.added.forEach(function (id) {
+      var sid = _cmStudentIdNow(id);
+      var st = getStudents(cid).find(function (s) {
+        return s.id === sid || s.id === id;
+      });
+      if (!st) return;
+      if (_cmStudentHasWork(cid, st.id)) {
+        kept.push(fullName(st));
+        return;
+      }
+      if (withdrawStudent(cid, st.id) && deleteWithdrawnStudent(cid, st.id)) {
+        removed++;
+        if (_cmGuardians[cid]) delete _cmGuardians[cid][st.id];
+      }
+    });
+    done.undone = { removed: removed, kept: kept };
+    cmRosterOnly = null;
+    renderClassManager();
+    var head = document.getElementById('cm-import-done-title');
+    _cmFocus(head);
   }
 
   /* ── Other classes' data ─────────────────────────────────────
@@ -2826,6 +4307,9 @@ window.DashClassManager = (function () {
 
   function closeClassManager() {
     classManagerOpen = false;
+    // The Done panel and its New marks last until Class Settings closes.
+    cmImportDone = null;
+    cmRosterOnly = null;
     closeColorPop();
     if (typeof Router !== 'undefined' && Router.setUrl && location.pathname === '/dashboard') {
       Router.setUrl('/dashboard');
@@ -3237,11 +4721,14 @@ window.DashClassManager = (function () {
     // Students tab: a toolbar, the roster edited in place, then Withdrawn
     var students = getStudents(cid);
     _cmLoadGuardians(cid);
+    // An empty class shows where the class list goes (cmImportEmptyHtml)
+    // in place of the toolbar.
     html +=
-      '<div class="cm-roster-bar">' +
-      '<div class="cm-rs-tools">' +
+      _cmImportDoneHtml(cid) +
       (students.length
-        ? '<label class="cm-rs-search"><span class="cm-rs-sr">Find a student</span>' +
+        ? '<div class="cm-roster-bar">' +
+          '<div class="cm-rs-tools">' +
+          '<label class="cm-rs-search"><span class="cm-rs-sr">Find a student</span>' +
           '<input class="cm-input" type="search" placeholder="Find a student" data-action-input="cmRosterSearch" value="' +
           esc(cmRosterQuery) +
           '"></label>' +
@@ -3249,17 +4736,25 @@ window.DashClassManager = (function () {
           '<span id="cm-rs-more" hidden> Scroll sideways for more columns.</span></span>' +
           '<span class="cm-hint cm-rs-summary" id="cm-rs-summary">' +
           esc(_cmRosterSummary(cid)) +
-          '</span>'
-        : '<span class="cm-hint">No students yet. Add students one at a time or import a CSV roster.</span>') +
-      '</div>' +
-      '<div class="cm-roster-buttons">' +
-      '<button type="button" class="cm-action-btn" data-action="cmImportRoster">Import Roster</button>' +
-      '<button type="button" class="btn btn-primary cm-roster-add" data-action="cmShowAddStudent">Add Student</button>' +
-      '<input type="file" id="cm-csv-input" accept=".csv,.txt" style="display:none" data-action-change="cmCSV">' +
-      '</div>' +
-      '</div>' +
+          '</span>' +
+          '</div>' +
+          '<div class="cm-roster-buttons">' +
+          '<button type="button" class="cm-action-btn" data-action="cmImportRoster">Import Roster</button>' +
+          '<button type="button" class="btn btn-primary cm-roster-add" data-action="cmShowAddStudent">Add Student</button>' +
+          '</div>' +
+          '</div>'
+        : '') +
+      '<input type="file" id="cm-csv-input" accept=".csv,.txt,.tsv,.xlsx,.xls" hidden data-action-change="cmCSV">' +
       '<div id="cm-import-preview">' +
-      (cmPendingImport ? _cmRenderImportReview(cid) : cmImportFormatOpen ? cmImportFormatHtml() : '') +
+      (cmImportError
+        ? _cmImportErrorHtml(cmImportError)
+        : cmPendingImport
+          ? _cmRenderImportReview(cid)
+          : cmImportFormatOpen && students.length
+            ? cmImportFormatHtml()
+            : !students.length
+              ? cmImportEmptyHtml()
+              : '') +
       '</div>';
     var rosterHtml = students.length ? _cmRosterHtml(cid) : '';
     // Add/Edit student form
@@ -5796,6 +7291,9 @@ window.DashClassManager = (function () {
       // A review or a selection belongs to its class.
       cmPendingImport = null;
       cmImportFormatOpen = false;
+      cmImportError = null;
+      cmImportDone = null;
+      cmRosterOnly = null;
       if (cmCompReview && cmCompReview.kind === 'file') cmCompReview = null;
       cmCompSelect = false;
       cmCompSelected = {};
@@ -10479,7 +11977,8 @@ window.DashClassManager = (function () {
       menu.hidden = false;
       btn.setAttribute('aria-expanded', 'true');
       _cmFloatOverScroll(menu, btn);
-      var first = menu.querySelector('.cm-std-menu-item');
+      var first =
+        menu.querySelector('.cm-std-menu-item[aria-checked="true"]') || menu.querySelector('.cm-std-menu-item');
       if (first) first.focus();
     }
   }
@@ -10672,6 +12171,31 @@ window.DashClassManager = (function () {
       },
       cmCancelImport: function () {
         cmCancelImport();
+      },
+      cmImportPick: function () {
+        _cmCloseStdMenus();
+        cmImportPick(el.dataset.col, el.dataset.field);
+      },
+      cmImportDateOrder: function () {
+        cmImportDateOrder(el.dataset.col, el.dataset.order);
+      },
+      cmImportShowColumns: function () {
+        cmImportShowColumns();
+      },
+      cmImportShowAll: function () {
+        cmImportShowAll();
+      },
+      cmImportChooseNames: function () {
+        cmImportChooseNames();
+      },
+      cmImportShowBlanks: function () {
+        cmImportShowBlanks();
+      },
+      cmCloseImportDone: function () {
+        cmCloseImportDone();
+      },
+      cmUndoImport: function () {
+        cmUndoImport();
       },
       cmSetGradingSystem: function () {
         cmSetGradingSystem(el.dataset.value);
@@ -11056,6 +12580,14 @@ window.DashClassManager = (function () {
       cmImportToggle(el.dataset.kind, Number(el.dataset.idx), el.checked);
       return true;
     }
+    if (el.dataset.actionChange === 'cmImportToggleAll') {
+      cmImportToggleAll(el.checked);
+      return true;
+    }
+    if (el.dataset.actionChange === 'cmImportFix') {
+      cmImportFix(el.dataset.line, el.dataset.field, el.value);
+      return true;
+    }
     if (el.dataset.actionChange === 'cmCheckStudent') {
       cmCheckStudent(el.value);
       return true;
@@ -11301,9 +12833,13 @@ window.DashClassManager = (function () {
     // The reporting terms draft as the editor holds it (tests).
     // For tests: the import review a CSV file opens.
     cmShowImportPreview: cmShowImportPreview,
+    cmStartImport: cmStartImport,
     parseRosterCsv: parseRosterCsv,
     rosterImportTable: rosterImportTable,
     rosterRowsFromTable: rosterRowsFromTable,
+    rosterImportReady: rosterImportReady,
+    rosterDateOrder: rosterDateOrder,
+    rosterDate: _rosterDate,
     cmCompRowsFromCsv: cmCompRowsFromCsv,
     withdrawnRecordRows: _cmWithdrawnRecordRows,
     // The Edit Student dialog's Parent Email and Parent Email 2.
@@ -11353,6 +12889,9 @@ window.DashClassManager = (function () {
       _cmGuardiansLoading = {};
       cmPendingImport = null;
       cmImportFormatOpen = false;
+      cmImportError = null;
+      cmImportDone = null;
+      cmRosterOnly = null;
       cmCompSelect = false;
       cmCompSelected = {};
       cmCompReview = null;
