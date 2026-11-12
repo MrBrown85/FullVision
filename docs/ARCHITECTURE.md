@@ -86,15 +86,16 @@ Shared runtime modules load before desktop or mobile page modules, in this order
 6. `shared/supabase.js`
 7. `shared/constants.js`
 8. `shared/reporting-term-presets.js`
-9. `shared/data.js`
-10. `shared/data-curriculum-index.js` (the BC curriculum index and the learning map built from it)
-11. `shared/offline-queue.js`
-12. `shared/auto-update.js`
-13. `shared/calc.js`
-14. `shared/grade-state.js` (the Draft and Returned rule; a class whose student page is off returns every save at once)
-15. `shared/grader.js` (`Grader`, the one module a screen writes a grade through)
-16. `shared/rubric-draft.js`
-17. `shared/rubric-checks.js`
+9. `shared/data-utilities.js` (the small helpers every file uses: student names, dates, colours, ids and RPC results)
+10. `shared/data.js`
+11. `shared/data-curriculum-index.js` (the BC curriculum index and the learning map built from it)
+12. `shared/offline-queue.js`
+13. `shared/auto-update.js`
+14. `shared/calc.js`
+15. `shared/grade-state.js` (the Draft and Returned rule; a class whose student page is off returns every save at once)
+16. `shared/grader.js` (`Grader`, the one module a screen writes a grade through)
+17. `shared/rubric-draft.js`
+18. `shared/rubric-checks.js`
 
 The phone loads the same list with these differences: it leaves out `shared/link-nav.js` and `shared/reporting-term-presets.js`; it loads `shared/rubric-draft.js` later, after `teacher/student-voice.js` and before `teacher/competency-wording.js` (`teacher-mobile/index.html`), not in its place in the list; and it adds `shared/sign-in.js` right after `shared/supabase.js`.
 

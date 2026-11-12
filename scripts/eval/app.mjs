@@ -43,6 +43,7 @@ const FILES = [
   'shared/html.js',
   'shared/constants.js',
   'shared/reporting-term-presets.js',
+  'shared/data-utilities.js',
   'shared/data.js',
   'shared/data-curriculum-index.js',
   'shared/calc.js',
