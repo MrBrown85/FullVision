@@ -50,6 +50,7 @@ const FILES = [
   'shared/data-student-records.js',
   'shared/data-student-cards.js',
   'shared/data-student-work.js',
+  'shared/data-feedback-live.js',
   'shared/data-reflect.js',
   'shared/data-demo.js',
   'shared/data-curriculum-index.js',

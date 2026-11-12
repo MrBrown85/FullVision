@@ -239,6 +239,7 @@ load('shared/data-term-ratings.js');
 load('shared/data-student-records.js');
 load('shared/data-student-cards.js');
 load('shared/data-student-work.js');
+load('shared/data-feedback-live.js');
 load('shared/data-reflect.js');
 load('shared/data-demo.js');
 load('shared/data-curriculum-index.js');
