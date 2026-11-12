@@ -208,7 +208,7 @@ Use the docs in this order if you need to understand the current repository quic
 
 Additional references:
 
-- [docs/diagrams/README.md](docs/diagrams/README.md) for reference-only visual assets
+- [docs/history/diagrams/README.md](docs/history/diagrams/README.md) for the April 2026 diagrams, kept for history
 
 ## Operational notes
 
