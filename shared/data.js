@@ -21472,6 +21472,19 @@ function applyDemoStudentPage() {
   return true;
 }
 
+/* Whether this Demo Mode began at the front page's Try Demo Mode link, so
+   Class Settings offers the Student Page tab (cm-student-page.js asks here
+   rather than reading storage itself). */
+function demoShowsStudentPage() {
+  if (!_isDemoSession()) return false;
+  try {
+    var mark = localStorage.getItem(DEMO_STUDENT_KEY);
+    return mark === 'pending' || mark === 'on';
+  } catch (e) {
+    return false;
+  }
+}
+
 /* Reset Demo Data: every class goes back to the sample Science 8 class.
    Demo Mode only, since it deletes every class before reseeding. The
    desktop account menu, the desktop Demo Mode pill and the phone's Demo

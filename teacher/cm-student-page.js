@@ -90,16 +90,10 @@ var CmStudentPage = (function () {
   }
 
   // A Demo Mode that began at the front page's Try Demo Mode link (data.js,
-  // applyDemoStudentPage) offers the tab the way the build address does, and
+  // demoShowsStudentPage) offers the tab the way the build address does, and
   // keeps offering it when the page is reloaded.
   function _demoShowsStudentPage() {
-    try {
-      var on = typeof isDemoMode === 'function' && isDemoMode();
-      var mark = on && localStorage.getItem('gb-demo-student-page');
-      return mark === 'pending' || mark === 'on';
-    } catch (e) {
-      return false;
-    }
+    return typeof demoShowsStudentPage === 'function' && demoShowsStudentPage();
   }
   var _buildFlag = _addressHasBuildFlag();
 
