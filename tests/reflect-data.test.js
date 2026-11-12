@@ -383,8 +383,9 @@ describe('a class the server keeps no student-page rows for', () => {
 
   it('data.js names the Reflect on Feedback functions at call sites the drift check can read (S10-W1)', () => {
     const src = readFileSync('shared/data.js', 'utf-8');
-    expect(src.match(/_writeRpc\(\s*'set_course_feedback_options'/g).length).toBe(1);
-    expect(src.match(/_writeRpc\(\s*'answer_reflection'/g).length).toBe(1);
+    const reflect = readFileSync('shared/data-reflect.js', 'utf-8');
+    expect(reflect.match(/_writeRpc\(\s*'set_course_feedback_options'/g).length).toBe(1);
+    expect(reflect.match(/_writeRpc\(\s*'answer_reflection'/g).length).toBe(1);
     expect(src.match(/_callRpcWithAuthGuard\(\s*'list_course_feedback'/g).length).toBe(1);
   });
 });
