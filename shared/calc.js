@@ -1,3 +1,4 @@
+// @ts-check
 /* gb-calc.js — Proficiency calculation engine for FullVision */
 
 /**
@@ -778,13 +779,14 @@ function _rubricCriterionWeight(criterion) {
   return isFinite(weight) && weight >= 0 ? weight : 1;
 }
 
-/* A rubric assessment's scored criteria: { value, max, weight } each, where
+/** A rubric assessment's scored criteria: { value, max, weight } each, where
    value is the average of the criterion's competency scores in its own
    points. Undefined when the assessment isn't rubric-scored, null when no
    criterion is scored. When every criterion weighs 0 they count equally.
    `forPercent`: for the course %, a criterion on the standard 1–4 values
    counts each level as its Counts As percent of 4 points; a criterion with
-   its own point values keeps them. */
+   its own point values keeps them.
+   @returns {Array<{ value: number, max: number, weight: number }> | null | undefined} */
 function _rubricScoredCriteria(cid, assessment, entries, forPercent) {
   var rubricId = assessment && (assessment.rubricId || assessment.rubric_id);
   if (!rubricId || isPointsScored(assessment) || typeof getRubricById !== 'function') return undefined;
@@ -827,7 +829,7 @@ function _rubricScoredCriteria(cid, assessment, entries, forPercent) {
   return scored;
 }
 
-/* A rubric assessment's overall on the 0–4 scale (read-paths §1.1,
+/** A rubric assessment's overall on the 0–4 scale (read-paths §1.1,
    fv_assessment_overall on the server). Scores are stored per competency,
    so each criterion is the average of its competencies' scores and counts
    once, as a share of its top value (6 of 10 points = 2.4). Criteria combine
@@ -835,9 +837,11 @@ function _rubricScoredCriteria(cid, assessment, entries, forPercent) {
    scored criteria at 0 count equally). `entries` may hold the student's
    other scores too. Statuses are not applied. Returns null when no criterion
    is scored, and undefined when the assessment isn't rubric-scored, so the
-   caller averages its entries as before. */
+   caller averages its entries as before.
+   @returns {number | null | undefined} */
 function getRubricAssessmentScore(cid, assessment, entries) {
   var scored = _rubricScoredCriteria(cid, assessment, entries);
+  // @ts-expect-error -- here scored is null or undefined (no strictNullChecks)
   if (!scored) return scored;
   var totalWeight = 0;
   var weightedSum = 0;
@@ -1940,6 +1944,7 @@ function _lastScoredEntries(scores, n) {
  * @param {Object} [opts.categoryWeights] - { summative: number, formative: number }
  * @param {Object} [opts.assessmentWeights] - Map of assessmentId to weight multiplier
  * @param {number} [opts.recentLimit] - Count only the last N scored entries (any method but Most Recent)
+ * @param {(entry: Score) => string} [opts.getScoreBucket] - The category bucket an entry counts in
  * @returns {number} Proficiency level (0-4)
  */
 function calcProficiency(scores, method, decayWeight, opts) {
@@ -1969,12 +1974,6 @@ function calcProficiency(scores, method, decayWeight, opts) {
   return Math.min(4, raw);
 }
 
-/** Get all score entries for a student on a specific tag, excluding excused and converting points-mode scores.
- * @param {string} cid - Course ID
- * @param {string} studentId - Student ID
- * @param {string} tagId - Learning tag ID
- * @returns {Score[]} Filtered and converted score entries
- */
 /* The course's rubric criteria by id: { tagIds, name, rubricId }, for
    rolling a criterion's score up to its competencies. */
 function _criterionIndex(cid) {
@@ -2847,10 +2846,6 @@ function getSectionGrowthData(cid, studentId, sectionId) {
   return points;
 }
 
-/** Render a CSS-only sparkline as colored dots connected by lines.
- * @param {Array<{date: string, prof: number}>} points - Growth data from getSectionGrowthData
- * @returns {string} HTML string for the sparkline element
- */
 /* ── Showing grades the way the class is set to grade ─────────────────
    A class grades by Proficiency (levels out of 4), Letter (letter grade and
    course %), or Both. Every screen shows grades through these helpers, so a
