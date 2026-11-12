@@ -540,11 +540,6 @@ window.CommentLint = (function () {
   }
 
   return {
-    PHRASAL: PHRASAL,
-    IDIOMS: IDIOMS,
-    PRAISE: PRAISE,
-    COMPARISONS: COMPARISONS,
-    SHAME: SHAME,
     EVALUATIVE: EVALUATIVE,
     CONTROLLED: CONTROLLED,
     plain: plain,
