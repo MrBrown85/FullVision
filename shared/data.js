@@ -10694,6 +10694,48 @@ function getScores(cid) {
     return {};
   }
 }
+/* The data-loss guard's rule, as saveScores applies it below: saving `next`
+   over `prev` (the saved copy) drops more than half the students or more
+   than 70% of the entries. */
+function _scoreGuardDrop(prev, next, fillUndone) {
+  var prevCount = prev ? Object.keys(prev).length : 0;
+  var newCount = next ? Object.keys(next).length : 0;
+  if (prevCount > 2 && newCount < prevCount * 0.5) return true;
+  var prevEntries = 0,
+    newEntries = 0;
+  if (prev) for (var _ps in prev) prevEntries += (prev[_ps] || []).length;
+  if (next) for (var _ns in next) newEntries += (next[_ns] || []).length;
+  return prevEntries > 10 && newEntries + (fillUndone || 0) < prevEntries * 0.3;
+}
+
+/* The saved copy without the marks of work and students that are gone: on
+   neither this tab's list nor the saved list. Delete Assessment takes them
+   out of the saved copy, but that write can fail (storage full). Null while
+   either list is empty or not loaded: then nothing counts as gone. */
+function _scoresOfLiveRows(cid, prev) {
+  function ids(field) {
+    var mine = _cache[field][cid];
+    var saved = _safeParseLS('gb-' + _DATA_KEYS[field] + '-' + cid, null);
+    if (!Array.isArray(mine) || !mine.length || !Array.isArray(saved) || !saved.length) return null;
+    var out = {};
+    mine.concat(saved).forEach(function (row) {
+      if (row && row.id) out[row.id] = true;
+    });
+    return out;
+  }
+  var work = ids('assessments');
+  var roster = ids('students');
+  if (!work || !roster) return null;
+  var out = {};
+  Object.keys(prev).forEach(function (sid) {
+    if (!roster[sid]) return;
+    out[sid] = (prev[sid] || []).filter(function (e) {
+      return e && work[e.assessmentId];
+    });
+  });
+  return out;
+}
+
 // fillUndone: how many entries restoreScoreCells took out because the fill
 // it undoes added them. Only those may take the entry count past the guard.
 function saveScores(cid, obj, fillUndone) {
@@ -10705,6 +10747,12 @@ function saveScores(cid, obj, fillUndone) {
     cid,
     _loadPersistedCourseFieldSnapshot('scores', cid, (_cache.scores && _cache.scores[cid]) || {}),
   );
+  // Delete Assessment and Withdraw take their marks out of the saved copy,
+  // but that write can fail (storage full). Marks of work and students that
+  // are gone then do not count toward the guard, and are not sent as clears.
+  var gone = _scoreGuardDrop(prev, obj, fillUndone) && _scoresOfLiveRows(cid, prev);
+  if (gone && !_scoreGuardDrop(gone, obj, fillUndone)) prev = gone;
+  else gone = null;
   var prevCount = prev ? Object.keys(prev).length : 0;
   var newCount = obj ? Object.keys(obj).length : 0;
   // Group work: which linked members' grades this save changes (Group grading).
@@ -10747,6 +10795,7 @@ function saveScores(cid, obj, fillUndone) {
   if (_writesEnabled()) {
     var refusals = _writeRefusals;
     var baseline = _migrateRubricScoreKeys(cid, _serverStateOr('scores', cid, prev));
+    if (gone) baseline = _scoresOfLiveRows(cid, baseline) || baseline;
     persistScoreDiffToCanonical(cid, baseline, obj || {});
     _dismissOverriddenScoreWrites(cid, baseline, obj || {});
     _rememberServerState('scores', cid, obj || {});
