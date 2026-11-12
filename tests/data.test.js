@@ -3655,7 +3655,7 @@ describe('data-observations', () => {
 
     it('no-op if student has no observations', () => {
       saveQuickObs(CID, {});
-      deleteQuickOb(CID, 'nobody', 'ob1'); // should not throw
+      expect(() => deleteQuickOb(CID, 'nobody', 'ob1')).not.toThrow();
     });
   });
 
