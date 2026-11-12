@@ -140,11 +140,6 @@ button {
   gap: 10px;
   box-shadow: var(--sp-shadow);
 }
-.sp-card.sp-focus {
-  box-shadow:
-    0 0 0 2px var(--sp-blue),
-    var(--sp-shadow);
-}
 .sp-card-private {
   background: #fef9f0;
   border: 1px solid #e8d5a8;
@@ -1554,10 +1549,6 @@ label.sp-btn:focus-within {
 }
 .sp-send-ask .sp-btn:disabled {
   opacity: 0.6;
-}
-.sp-btn-danger {
-  background: #c62828;
-  color: #fff;
 }
 .sp-send-head .sp-head-icon {
   display: flex;
