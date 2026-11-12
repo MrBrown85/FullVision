@@ -1,42 +1,71 @@
 /* login.css — Login page styles */
 
 /* ── Login page styles ─────────────────────────────────────── */
-/* A soft wash of colour behind the card: four faint glows (blue, lilac,
-   peach, mint) over a pale base, tuned down for dark mode. */
+/* FullVision blue across the top of the page, with the logo's rising bars
+   drawn large and faint in it, over a plain neutral. The card sits across
+   the band's lower edge. */
 :root {
-  --auth-base: #f3f5fa;
-  --auth-glow:
-    radial-gradient(60% 55% at 12% 10%, rgba(0, 122, 255, 0.16), transparent 70%),
-    radial-gradient(50% 50% at 88% 14%, rgba(175, 82, 222, 0.13), transparent 70%),
-    radial-gradient(55% 50% at 85% 92%, rgba(255, 149, 0, 0.11), transparent 70%),
-    radial-gradient(50% 45% at 10% 90%, rgba(52, 199, 89, 0.1), transparent 70%);
-  --auth-card-border: rgba(255, 255, 255, 0.7);
-  --auth-card-shadow: 0 24px 60px rgba(31, 45, 90, 0.12), 0 2px 6px rgba(31, 45, 90, 0.05);
+  --auth-base: #f2f4f8;
+  --auth-band-top: #0a4fa8;
+  --auth-band-bottom: #0071e3;
+  --auth-bars-opacity: 0.09;
+  --auth-card-border: rgba(15, 30, 60, 0.06);
+  --auth-card-shadow: 0 30px 70px rgba(10, 40, 90, 0.18), 0 2px 6px rgba(10, 40, 90, 0.06);
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --auth-base: var(--bg);
-    --auth-glow:
-      radial-gradient(60% 55% at 12% 10%, rgba(10, 132, 255, 0.2), transparent 70%),
-      radial-gradient(50% 50% at 88% 14%, rgba(191, 90, 242, 0.15), transparent 70%),
-      radial-gradient(55% 50% at 85% 92%, rgba(255, 159, 10, 0.1), transparent 70%),
-      radial-gradient(50% 45% at 10% 90%, rgba(48, 209, 88, 0.08), transparent 70%);
+    --auth-band-top: #08213f;
+    --auth-band-bottom: #0b3a75;
+    --auth-bars-opacity: 0.07;
     --auth-card-border: rgba(255, 255, 255, 0.08);
-    --auth-card-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.25);
+    --auth-card-shadow: 0 30px 70px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.25);
   }
 }
 
 body {
   margin: 0;
   padding: 0;
+  position: relative;
   background-color: var(--auth-base);
-  background-image: var(--auth-glow);
-  background-attachment: fixed;
   font-family: var(--font-base);
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
+}
+body::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 46vh;
+  min-height: 300px;
+  background: linear-gradient(160deg, var(--auth-band-top), var(--auth-band-bottom));
+  z-index: 0;
+}
+body::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 4vw;
+  width: min(46vh, 520px);
+  height: min(46vh, 520px);
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cg fill='%23ffffff'%3E%3Crect x='13' y='38' width='8' height='10' rx='2' opacity='.35'/%3E%3Crect x='23' y='31' width='8' height='17' rx='2' opacity='.5'/%3E%3Crect x='33' y='24' width='8' height='24' rx='2' opacity='.7'/%3E%3Crect x='43' y='17' width='8' height='31' rx='2'/%3E%3C/g%3E%3C/svg%3E")
+    center / contain no-repeat;
+  opacity: var(--auth-bars-opacity);
+  z-index: 0;
+  pointer-events: none;
+}
+main.auth-card {
+  position: relative;
+  z-index: 1;
+}
+
+.auth-mark {
+  display: block;
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 14px;
 }
 
 .auth-card {
@@ -379,4 +408,16 @@ body {
 }
 .auth-inbox .auth-reset-title:focus {
   outline: none;
+}
+
+/* The Privacy Policy link under Try Demo Mode: the app's blue in both modes,
+   not the browser's default link colour. */
+.auth-demo-hint a {
+  color: var(--active);
+  text-decoration: none;
+  font-weight: 500;
+  cursor: pointer;
+}
+.auth-demo-hint a:hover {
+  text-decoration: underline;
 }

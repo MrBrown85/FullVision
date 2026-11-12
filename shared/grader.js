@@ -532,6 +532,11 @@ window.Grader = (function () {
   /* How many grades on the class's pieces were returned in the 7 days to
      `today` (the class's own date when left out): the dashboard's "27
      Returned This Week". A student's grade on a piece counts once. */
+  function _dayOf(cid, at) {
+    if (typeof courseDayOf === 'function') return courseDayOf(cid, at);
+    return String(at).slice(0, 10);
+  }
+
   function returnedThisWeek(cid, today) {
     var day = today || courseToday(cid);
     var since = new Date(Date.parse(day) - 6 * 86400000).toISOString().slice(0, 10);
@@ -542,7 +547,9 @@ window.Grader = (function () {
       students.forEach(function (st) {
         if (GradeState.stateOf(cid, st.id, a.id) !== GradeState.RETURNED) return;
         var row = typeof getGradeReturn === 'function' ? getGradeReturn(cid, st.id, a.id) : null;
-        var on = row && row.returned_at ? String(row.returned_at).slice(0, 10) : '';
+        // The day it was returned in the class's timezone, as `day` is: a return
+        // made after 4 pm in Vancouver is already tomorrow in UTC.
+        var on = row && row.returned_at ? _dayOf(cid, row.returned_at) : '';
         if (on && on >= since && on <= day) n++;
       });
     });

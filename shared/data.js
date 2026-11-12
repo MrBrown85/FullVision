@@ -1696,7 +1696,11 @@ function _localDayOf(value) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
-/* Returns today's date in YYYY-MM-DD format, computed in the course's
+/* courseDayOf(cid, when): the calendar date of `when` (a Date or an ISO
+ * timestamp) in the course's timezone, YYYY-MM-DD; '' for no valid time.
+ * courseToday(cid) is the same for now.
+ *
+ * Returns the date in YYYY-MM-DD format, computed in the course's
  * timezone (not the browser's). This matters for reports: a Vancouver
  * teacher grading at 11 pm PST would see UTC midnight fall on the next
  * calendar day if we used `new Date().toISOString().slice(0, 10)`, so the
@@ -1706,7 +1710,9 @@ function _localDayOf(value) {
  * T-UI-03 default 'America/Vancouver'). Callers pass the course id; we
  * look up the timezone, fall back to the course default, fall back again
  * to UTC. Intl.DateTimeFormat is used because it handles DST correctly. */
-function courseToday(cid) {
+function courseDayOf(cid, when) {
+  var at = when instanceof Date ? when : new Date(when);
+  if (isNaN(at.getTime())) return '';
   var tz = 'America/Vancouver';
   try {
     var c = (typeof COURSES !== 'undefined' && cid && COURSES[cid]) || null;
@@ -1721,7 +1727,7 @@ function courseToday(cid) {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
-    }).formatToParts(new Date());
+    }).formatToParts(at);
     var y = '',
       m = '',
       d = '';
@@ -1735,7 +1741,12 @@ function courseToday(cid) {
   } catch (e) {
     // Fall through to UTC fallback.
   }
-  return new Date().toISOString().slice(0, 10);
+  return at.toISOString().slice(0, 10);
+}
+
+/* Today, in the course's timezone. */
+function courseToday(cid) {
+  return courseDayOf(cid, new Date());
 }
 
 function _plainObject(value) {
