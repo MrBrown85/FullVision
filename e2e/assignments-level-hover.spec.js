@@ -12,6 +12,7 @@ async function open(page) {
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   // The demo class seeds after the curriculum bank loads.
   await page.waitForFunction(() => getAssessments('sci8').length > 0);
+  await page.evaluate(() => saveDashboardPrefs({ closedModules: { sci8: [] } })); // these checks want every unit folder open
   await page.evaluate(() => {
     // A competency without a bank id, for the general wording.
     getTagById('sci8', 'CM1').bank_id = null;
