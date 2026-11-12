@@ -114,6 +114,8 @@ test('hidden buttons take no clicks: a click there opens the card', async ({ pag
     const lab = page.locator('.assess-card', { hasText: 'Chemical Reactions Lab' }).first();
     if (await lab.evaluate(c => c.classList.contains('open'))) await lab.locator('.assess-title').click();
     await expect(lab).not.toHaveClass(/open/);
+    // The card sits in a unit folder, further down the page: bring it into view.
+    await lab.scrollIntoViewIfNeeded();
     // With the mouse away, nothing hidden sits under the ⋯ button's spot.
     await page.mouse.move(5, 5);
     const hit = await lab.evaluate(c => {

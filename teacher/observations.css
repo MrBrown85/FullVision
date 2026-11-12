@@ -577,6 +577,7 @@
   justify-content: center;
   padding: 24px;
   opacity: 0;
+  transition: opacity 0.15s;
 }
 .obs-focus-backdrop.open {
   opacity: 1;
@@ -596,6 +597,9 @@
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.16);
   opacity: 0;
   transform: scale(0.96);
+  transition:
+    opacity 0.15s,
+    transform 0.15s;
 }
 .obs-focus-card.open {
   opacity: 1;

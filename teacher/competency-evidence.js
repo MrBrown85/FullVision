@@ -27,6 +27,9 @@ window.CompetencyEvidence = (function () {
      "No evidence yet" when there is neither. */
   function countLabel(scoreCount, obsCount) {
     if (!scoreCount && !obsCount) return 'No evidence yet';
+    // No "0 observations" on every row: the observations show when there are some.
+    if (!obsCount) return plural(scoreCount, 'score', 'scores');
+    if (!scoreCount) return plural(obsCount, 'observation', 'observations');
     return plural(scoreCount, 'score', 'scores') + ' · ' + plural(obsCount, 'observation', 'observations');
   }
 

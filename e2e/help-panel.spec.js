@@ -7,7 +7,9 @@
 import { test, expect } from '@playwright/test';
 
 // The service worker would fetch the help files itself, past the fixtures.
-test.use({ viewport: { width: 1440, height: 900 }, serviceWorkers: 'block' });
+// The panel slides in the real app; these specs measure the end state at once
+// (e2e/panel-motion.spec.js covers the slide).
+test.use({ viewport: { width: 1440, height: 900 }, serviceWorkers: 'block', reducedMotion: 'reduce' });
 
 const INDEX = [
   {
@@ -104,6 +106,7 @@ test('the Help button sits between the sync dot and the account button; the rest
 // The bar's three groups never overlap, from a narrow window up. One page,
 // resized through each width.
 test("the top bar's groups do not overlap at any width from 700 up", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.setViewportSize({ width: 700, height: 800 });
   await page.addInitScript(() => localStorage.setItem('td-mobile-pref', 'desktop'));
   await serveHelp(page);

@@ -109,6 +109,13 @@
   --report-callout-border: #e8d5a8;
   --toast-error: #c0392b;
   --toast-success: #1a7a34;
+  /* Import Roster: a row or column that needs a look (amber), and a file
+     read in full or an import done (green). Not the level colours. */
+  --notice-bg: #fff6e8;
+  --notice-text: #8a4b00;
+  --notice-edge: #e0b875;
+  --ok-bg: #e9f7ee;
+  --ok-text: #14532d;
 
   /* Z-index scale — use these instead of magic numbers */
   --z-navbar: 50; /* fixed nav bars */
@@ -169,6 +176,13 @@
   --duration-micro: 0.15s;
   --duration-fast: 0.25s;
   --duration-normal: 0.35s;
+  /* Motion (one set for every screen; see "Motion" below). Nothing moves
+     under reduced motion, on a page draw, or in print. */
+  --motion-fast: 150ms;
+  --motion-base: 220ms;
+  --motion-panel: 240ms;
+  --motion-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --motion-ease-in: cubic-bezier(0.4, 0, 1, 1);
 
   /* ── Letter Spacing ──────────────────────────────────────── */
   --tracking-tight: -0.01em;
@@ -691,6 +705,27 @@ body.offline-active #app-dock {
   border-left: 1px solid var(--divider-medium);
   font-family: var(--font-base);
   color: var(--text);
+}
+/* Panel motion: the width runs between 0 and 400px while the content keeps
+   its full width, so it slides in from the edge instead of squashing. */
+@media (prefers-reduced-motion: no-preference) {
+  .help-panel.help-sliding {
+    overflow: hidden;
+    transition: width var(--motion-panel) var(--motion-ease);
+  }
+  .help-panel.help-sliding.help-closing {
+    transition-duration: 200ms;
+    transition-timing-function: var(--motion-ease-in);
+  }
+  .help-panel.help-sliding > * {
+    width: 399px;
+    flex-shrink: 0;
+  }
+}
+@media print {
+  .help-panel.help-sliding {
+    transition: none;
+  }
 }
 .help-head {
   display: flex;
@@ -1643,6 +1678,36 @@ body.offline-active #app-dock {
 }
 .page-layout.sidebar-hidden #sidebar-mount #gb-sidebar {
   display: none;
+}
+
+/* ── Panel motion ──────────────────────────────────────────────
+   Only while ui.js has set a class for a button press: the student list and
+   the Help panel slide, and the page beside them resizes with them. */
+@media (prefers-reduced-motion: no-preference) {
+  .page-layout.sidebar-sliding #sidebar-mount {
+    overflow: hidden;
+    transition: width var(--motion-panel) var(--motion-ease);
+  }
+  .page-layout.sidebar-sliding.sidebar-hidden #sidebar-mount {
+    transition-timing-function: var(--motion-ease-in);
+    transition-duration: 200ms;
+  }
+  .page-layout.sidebar-sliding #sidebar-mount #gb-sidebar {
+    display: flex;
+    transform: translateX(0);
+    transition: transform var(--motion-panel) var(--motion-ease);
+  }
+  .page-layout.sidebar-sliding.sidebar-hidden #sidebar-mount #gb-sidebar {
+    transform: translateX(-100%);
+    transition-timing-function: var(--motion-ease-in);
+    transition-duration: 200ms;
+  }
+}
+@media print {
+  .page-layout.sidebar-sliding #sidebar-mount,
+  .page-layout.sidebar-sliding #sidebar-mount #gb-sidebar {
+    transition: none;
+  }
 }
 
 .sidebar-toggle {
@@ -3167,7 +3232,6 @@ body.offline-active #app-dock {
   max-width: 380px;
   width: 90%;
   box-shadow: var(--shadow-lg);
-  animation: slide-up var(--duration-normal) var(--ease-spring);
 }
 .confirm-title {
   font-family: var(--font-base);
@@ -3766,6 +3830,11 @@ body.offline-active #app-dock {
     --report-callout-border: rgba(255, 159, 10, 0.25);
     --toast-error: #b52a20;
     --toast-success: #166534;
+    --notice-bg: rgba(255, 159, 10, 0.12);
+    --notice-text: #ffb340;
+    --notice-edge: rgba(255, 159, 10, 0.35);
+    --ok-bg: rgba(48, 209, 88, 0.12);
+    --ok-text: #6fdc8c;
   }
 
   .offline-banner {
@@ -3784,6 +3853,122 @@ body.offline-active #app-dock {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ── Motion ────────────────────────────────────────────────────
+   Quick, ease-out, no bounce. Screen only and never under reduced motion, so
+   print and the reduced-motion rule above are untouched. Each effect plays
+   when something is shown (a menu opens, a dialog appears), never on a
+   keystroke and never on numbers or grades. */
+@keyframes fv-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fv-fade-in-soft {
+  from {
+    opacity: 0.45;
+  }
+}
+@keyframes fv-pop-in {
+  from {
+    opacity: 0;
+    scale: 0.98;
+  }
+}
+@keyframes fv-menu-in {
+  from {
+    opacity: 0;
+    translate: 0 -4px;
+  }
+}
+@media screen and (prefers-reduced-motion: no-preference) {
+  :root {
+    interpolate-size: allow-keywords;
+  }
+  /* Dialogs: the backdrop fades, the dialog settles in from 98%. */
+  .modal-overlay.open,
+  .pp-overlay,
+  .edit-modal-overlay,
+  .obsc-dialog-overlay,
+  .af-comp-overlay:not([hidden]),
+  .wv-overlay,
+  .grader-overlay {
+    animation: fv-fade-in var(--motion-base) var(--motion-ease);
+  }
+  .modal-overlay.open > :first-child,
+  .pp-overlay > :first-child,
+  .edit-modal-overlay > :first-child,
+  .obsc-dialog-overlay > :first-child,
+  .af-comp-overlay > :first-child,
+  .rb-overlay > :first-child,
+  .rubric-modal-overlay > :first-child,
+  .confirm-card,
+  .grader-dialog {
+    animation: fv-pop-in var(--motion-base) var(--motion-ease);
+  }
+  /* Menus: fade and drop 4px. */
+  .tb-user-menu.open .tb-user-dropdown,
+  .assess-filter-wrap.open .assess-filter-menu,
+  .sb-sort-menu:not([hidden]),
+  .gb-ctx-menu,
+  .grader-member-menu,
+  .grader-setto-menu {
+    animation: fv-menu-in var(--motion-fast) var(--motion-ease);
+  }
+  /* Sections that open and close (details): the height runs. */
+  details.gl-rest::details-content,
+  details.lp-calib-more::details-content {
+    block-size: 0;
+    overflow: hidden;
+    transition:
+      block-size var(--motion-base) var(--motion-ease),
+      content-visibility var(--motion-base) allow-discrete;
+  }
+  details.gl-rest[open]::details-content,
+  details.lp-calib-more[open]::details-content {
+    block-size: auto;
+  }
+  /* Press: a 1px push on buttons. */
+  .btn:active,
+  .tb-btn:active,
+  .seg-btn:active,
+  .grdl-level:active {
+    transform: translateY(1px);
+  }
+  .tb-btn {
+    transition:
+      background var(--duration-micro),
+      transform var(--motion-fast) var(--motion-ease);
+  }
+  /* A segmented control's chosen pill glides to its new place (ui.js,
+     segSelect). The real pill hides for the glide, then is back. */
+  .seg.seg-gliding:not(.tb-seg) {
+    position: relative;
+  }
+  .seg.seg-gliding > .seg-btn {
+    position: relative;
+    z-index: 1;
+    background: transparent;
+    box-shadow: none;
+  }
+  .seg-glide {
+    position: absolute;
+    z-index: 0;
+    background: var(--seg-thumb);
+    border-radius: 6px;
+    box-shadow: var(--shadow-sm);
+    pointer-events: none;
+  }
+  /* Class picker: gone while the list slides, then fades in. */
+  .page-layout.sidebar-sliding .assess-course-select,
+  .page-layout.sidebar-sliding .dash-course-select {
+    display: none;
+  }
+  .page-layout.sidebar-settled .assess-course-select,
+  .page-layout.sidebar-settled .dash-course-select {
+    animation: fv-fade-in var(--motion-base) var(--motion-ease);
   }
 }
 

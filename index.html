@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="FullVision is a gradebook and report writer for BC teachers: grade on the Provincial Proficiency Scale, write report comments from the evidence, and hear from students without student accounts."
+      content="FullVision is a gradebook and report writer for BC teachers: assess on the Provincial Proficiency Scale, write report comments from the evidence, and hear from students without student accounts."
     />
     <title>FullVision — Gradebook and Report Cards for BC Teachers</title>
     <meta name="theme-color" content="#0071e3" />
@@ -18,7 +18,7 @@
     <meta property="og:title" content="FullVision — Gradebook and Report Cards for BC Teachers" />
     <meta
       property="og:description"
-      content="Grade on the Provincial Proficiency Scale, write report comments from the evidence, and hear from students without student accounts."
+      content="Assess on the Provincial Proficiency Scale, write report comments from the evidence, and hear from students without student accounts."
     />
     <meta property="og:image" content="https://fullvision.ca/assets/splash/og.png" />
     <meta property="og:image:width" content="1200" />
@@ -635,15 +635,17 @@
             <span>FullVision</span>
           </a>
           <nav class="navlinks" aria-label="Main">
-            <a class="navlink" href="#grading">Grading</a>
+            <a class="navlink" href="#grading">Assessment</a>
             <a class="navlink" href="#student-work">Student Work</a>
             <a class="navlink" href="#reports">Reports</a>
-            <a class="navlink" href="#schools">For Schools</a>
+            <a class="navlink" href="#schools">Privacy</a>
             <a class="navlink" href="#questions">Questions</a>
           </nav>
           <div style="display: flex; gap: 10px; align-items: center">
             <a class="btn btn-plain btn-sm" href="/login.html" data-link="signin">Sign In</a>
-            <a class="btn btn-solid btn-sm navcta-demo" href="/login.html?demo=1" data-link="demo">Try Demo Mode</a>
+            <a class="btn btn-solid btn-sm navcta-demo" href="/login.html?demo=1&amp;student=1" data-link="demo"
+              >Try Demo Mode</a
+            >
           </div>
         </div>
       </header>
@@ -653,26 +655,26 @@
           <div class="wrap hero-grid">
             <div class="stack" style="gap: 24px">
               <p class="eyebrow">The Gradebook for Communicating Student Learning in BC</p>
-              <h1 class="h1">Make Every Student’s Growth Visible</h1>
+              <h1 class="h1">Assess, Give Feedback, Write Reports</h1>
               <p class="lede">
-                Grade on the Provincial Proficiency Scale, write report comments from the evidence you’ve gathered, and
-                give every student a clear picture of where they are and what comes next.
+                Assess on the Provincial Proficiency Scale, keep your classroom observations, and write report comments
+                from what you have recorded. Students see their feedback on their own page.
               </p>
               <div style="display: flex; flex-wrap: wrap; gap: 12px; padding-top: 4px">
-                <a class="btn btn-solid" href="/login.html?demo=1" data-link="demo">Try Demo Mode</a>
+                <a class="btn btn-solid" href="/login.html?demo=1&amp;student=1" data-link="demo">Try Demo Mode</a>
                 <a class="btn btn-plain" href="/login.html#signup">Create an Account</a>
               </div>
               <ul class="minis">
                 <li>BC curriculum built in</li>
                 <li>Stored in Canada</li>
-                <li>No AI</li>
+                <li>No AI writes about students</li>
               </ul>
             </div>
             <div class="collage">
               <img
                 class="shot"
                 src="/assets/splash/grader.jpg"
-                alt="Grading a student’s handwritten lab beside the rubric. FullVision suggests Proficient from the boxes ticked."
+                alt="Assessing a student’s handwritten lab beside the rubric. FullVision suggests Proficient from the boxes ticked."
               />
               <div class="phone-wrap">
                 <img
@@ -693,14 +695,14 @@
             </div>
             <div class="fact">
               <b>Canada</b>
-              <span>Where class lists, marks and comments are stored, under FOIPPA.</span>
+              <span>Where class lists, assessments and comments are stored.</span>
             </div>
             <div class="fact">
               <b>Offline</b>
-              <span>Grade and observe on your phone without Wi-Fi. It sends when you reconnect.</span>
+              <span>Assess and observe on your phone without Wi-Fi. It sends when you reconnect.</span>
             </div>
             <div class="fact">
-              <b>No AI</b>
+              <b>No AI Writing</b>
               <span>Every comment is built from sentences you wrote and can read.</span>
             </div>
           </div>
@@ -709,15 +711,16 @@
         <section id="grading" class="band band-white">
           <div class="wrap feat">
             <div class="feat-text stack">
-              <p class="eyebrow">Grading</p>
-              <h2 class="h2">Score What You See, Criterion by Criterion</h2>
+              <p class="eyebrow">Assessment</p>
+              <h2 class="h2">Assess With a Rubric, One Criterion at a Time</h2>
               <p class="lede">
-                Tick what the student showed on the rubric and FullVision suggests the level. You choose the final one.
+                Tick the descriptors the student met and FullVision suggests a level for that criterion. You set the
+                final level.
               </p>
               <ul class="ticks">
                 <li>The Proficiency Scale with + and −, points, or letter grades for 10 to 12</li>
-                <li>Pair and group work, graded together or one by one</li>
-                <li>Suggested levels you can always overrule</li>
+                <li>Pair and group work, assessed together or one by one</li>
+                <li>A comment on any criterion, and one for the whole piece</li>
               </ul>
             </div>
             <img
@@ -730,7 +733,7 @@
           <div class="wrap feat flip">
             <div class="feat-text stack">
               <p class="eyebrow">Printing</p>
-              <h2 class="h2">Hand Back a Graded Rubric</h2>
+              <h2 class="h2">Hand Back a Completed Rubric</h2>
               <p class="lede">
                 Print Rubrics makes a sheet for every student: the level you chose on each criterion, their overall
                 level and room for your feedback.
@@ -745,7 +748,7 @@
               <img
                 loading="lazy"
                 src="/assets/splash/rubric-print.jpg"
-                alt="One printed page of four graded rubrics, each with a student’s name, the level chosen on every criterion and their overall level."
+                alt="One printed page of four completed rubrics, each with a student’s name, the level chosen on every criterion and their overall level."
               />
             </div>
           </div>
@@ -755,10 +758,10 @@
           <div class="wrap feat flip">
             <div class="feat-text stack">
               <p class="eyebrow">Gradebook</p>
-              <h2 class="h2">The Whole Year in One Grid</h2>
+              <h2 class="h2">Every Assignment for the Year in One Table</h2>
               <p class="lede">
-                Grades build across the year, so each Learning Update shows the year to date. Missing work counts no
-                level, so one zero never drags down what a student has shown.
+                Each student’s overall level sits beside their scores, newest first, so a Learning Update shows the year
+                to date. Missing work is recorded as Missing and is never averaged in as a zero.
               </p>
             </div>
             <img
@@ -773,17 +776,20 @@
         <section id="student-work" class="band band-white">
           <div class="wrap stack" style="gap: 48px">
             <div class="stack" style="max-width: 760px">
-              <h2 class="h2">Paper Work In, Feedback Back, No Student Accounts</h2>
+              <h2 class="h2">Students Hand In Work and Read Your Feedback, With No Accounts</h2>
               <p class="lede">
-                Each student gets a printed card. It opens their own page: no email, no password, nothing to install.
+                Each student gets a printed card with a code. It opens their own page in a browser: no email, no
+                password, nothing to install.
               </p>
             </div>
             <ol class="steps">
-              <li><b>They Send It</b>Students photograph their page, or upload a PDF, from their own page.</li>
-              <li><b>You Mark It Up</b>Tick, circle and leave notes on the page, then score the rubric beside it.</li>
               <li>
-                <b>They Act On It</b>Students read your marks, say whether the feedback made sense, and ask you a
-                question.
+                <b>Students Send Their Work</b>Students photograph their page, or upload a PDF, from their own page.
+              </li>
+              <li><b>You Assess It</b>Tick, circle and leave notes on the page, then score the rubric beside it.</li>
+              <li>
+                <b>Students Read Your Feedback</b>Students read your notes, say whether the feedback made sense, and ask
+                you a question.
               </li>
             </ol>
             <div class="work">
@@ -791,7 +797,7 @@
                 class="shot"
                 loading="lazy"
                 src="/assets/splash/markup.jpg"
-                alt="Marking up a student’s lab: green ticks, a circled angle and a note asking why light bends."
+                alt="Assessing a student’s lab on the page: green ticks, a circled angle and a note asking why light bends."
               />
               <div class="phone-col">
                 <img
@@ -811,13 +817,13 @@
               class="shot"
               loading="lazy"
               src="/assets/splash/dashboard.jpg"
-              alt="The dashboard: a student’s question, work to grade, missing work and the class’s competencies."
+              alt="The dashboard: a student’s question, work to assess, missing work and the class’s competencies."
             />
             <div class="feat-text stack">
               <p class="eyebrow">Dashboard</p>
-              <h2 class="h2">Know Who Needs You Today</h2>
+              <h2 class="h2">What Needs Your Attention, on One Screen</h2>
               <p class="lede">
-                Questions from students, work waiting to be graded, and missing work, across every class you teach.
+                Questions from students, work waiting to be assessed, and missing work, across every class you teach.
               </p>
             </div>
           </div>
@@ -827,15 +833,15 @@
           <div class="wrap feat flip">
             <div class="feat-text stack">
               <p class="eyebrow">Report Comments</p>
-              <h2 class="h2">Comments Written From the Evidence</h2>
+              <h2 class="h2">Write Report Comments From Your Own Records</h2>
               <p class="lede">
-                The student’s year, your observations and their own self-assessment sit beside the comment you are
-                writing.
+                While you write a comment, the student’s grades, your observations and their self-assessment are on the
+                same screen.
               </p>
               <ul class="ticks">
-                <li>A Comment Bank in BC’s four parts, filled in for each student</li>
-                <li>Generate puts your own sentences together into a draft</li>
-                <li>Approve and Next moves through the class</li>
+                <li>A Comment Bank of written sentences, filled in from each student’s grades and work habits</li>
+                <li>Generate drafts a comment, using a sentence only when the student’s record supports it</li>
+                <li>Approve and Next opens the next student</li>
               </ul>
             </div>
             <img
@@ -896,7 +902,10 @@
                 Pick a course when you make a class. Its competencies arrive word for word, with an I Can statement for
                 each one, 5,029 in all.
               </p>
-              <p class="lede">New to proficiency grading or years into it, grade in as much detail as you like.</p>
+              <p class="lede">
+                It suits a teacher new to proficiency-based assessment and one who has used it for years: assess in as
+                much detail as you want.
+              </p>
               <div class="choices">
                 <div class="choice">
                   <b>Line by Line</b>
@@ -906,7 +915,7 @@
                   >
                 </div>
                 <div class="choice">
-                  <b>One Mark for the Piece</b>
+                  <b>One Level for the Piece</b>
                   <span
                     >Or give the whole piece a single level, points or a letter grade. It still counts toward the
                     competencies you chose.</span
@@ -927,10 +936,10 @@
           <div class="wrap feat phone-row">
             <div class="feat-text stack">
               <p class="eyebrow">On Your Phone</p>
-              <h2 class="h2">Write Down What You See, As It Happens</h2>
+              <h2 class="h2">Record Observations on Your Phone</h2>
               <p class="lede">
-                Record a Strength, Growth or Concern from the lab bench or the field trip. Each note lands on the
-                student’s profile, ready for the next report.
+                Record a Strength, Growth or Concern during class, in the lab or on a field trip. Each note is saved to
+                the student’s profile and is there when you write their report.
               </p>
             </div>
             <div class="phone-col">
@@ -947,9 +956,11 @@
         <section id="schools" class="schools">
           <div class="wrap stack" style="gap: 48px">
             <div class="stack" style="max-width: 720px">
-              <p class="eyebrow">For Schools and Districts</p>
+              <p class="eyebrow">Policy and Privacy</p>
               <h2 class="h2">Built Around BC’s Reporting Policy</h2>
-              <p class="lede">What a principal, a superintendent or a privacy officer will ask, answered up front.</p>
+              <p class="lede">
+                How FullVision follows the provincial reporting policy and looks after student information.
+              </p>
             </div>
             <div class="cards">
               <div class="card">
@@ -961,7 +972,7 @@
               </div>
               <div class="card">
                 <h3>Student Records Stay in Canada</h3>
-                <p>Stored in Canada under FOIPPA and seen only by the teacher who owns the class.</p>
+                <p>Stored in Canada and seen only by the teacher who owns the class.</p>
               </div>
               <div class="card">
                 <h3>No Student Accounts</h3>
@@ -976,8 +987,11 @@
                 <p>Photos of student work are deleted on a date the teacher sets, with a reminder a week before.</p>
               </div>
               <div class="card">
-                <h3>Every Learner Seen</h3>
-                <p>Designations on the roster, Missing that never counts as a zero, and next steps for each student.</p>
+                <h3>Designations and Missing Work</h3>
+                <p>
+                  A student’s designation shows on the class list. Missing work is never counted as a zero. Each student
+                  gets a next step.
+                </p>
               </div>
             </div>
             <a href="/privacy.html" style="color: #7cb8ff; font-size: 17px; font-weight: 600; text-decoration: none"
@@ -1046,10 +1060,14 @@
             >
               <h2 class="h2" style="color: #ffffff">Try It With a Sample Class</h2>
               <p style="margin: 0; font-size: 18px; line-height: 1.5; color: #dbe9ff; max-width: 560px">
-                Grade, write comments and print a report card in a few minutes. Nothing you change is saved.
+                Assess, write comments and print a report card in a few minutes. Nothing you change is saved.
               </p>
               <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; padding-top: 8px">
-                <a class="btn btn-plain" href="/login.html?demo=1" data-link="demo" style="box-shadow: none"
+                <a
+                  class="btn btn-plain"
+                  href="/login.html?demo=1&amp;student=1"
+                  data-link="demo"
+                  style="box-shadow: none"
                   >Try Demo Mode</a
                 >
                 <a
@@ -1122,7 +1140,7 @@
           a.href = '/dashboard';
         });
         document.querySelectorAll('[data-link="demo"]').forEach(function (a) {
-          a.href = '/login.html';
+          a.href = '/login.html?student=1';
         });
       })();
     </script>

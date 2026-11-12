@@ -5,8 +5,12 @@ order: 3
 summary: What's New lists changes to FullVision by release date, newest first.
 keywords:
   - Class Management
-checked: 2026-11-05
+checked: 2026-11-11
 labels:
+  - Add Your Students
+  - Check How Your File Was Read
+  - Best Guess
+  - Undo This Import
   - Download All My Data
   - Class Results
   - View Class Results
@@ -40,6 +44,10 @@ next:
   - create-a-class
   - add-your-students
 ---
+
+## Nov 11, 2026: Import Roster
+
+A new class's Students tab now shows **Add Your Students**: drop a class list there or choose **Choose File**, with MyEd's three steps beside it. A MyEd class list goes straight to Ready to Add with nothing to match. Any other file opens **Check How Your File Was Read**, with each column's choice above its first rows and the guesses marked **Best Guess**. Birthdays like 5/22/2012 are read the way the column shows them. A date that isn't real, a student number used twice or a row with no name is listed on its row, and never stops the import. Afterwards a panel says what was added, and **Undo This Import** takes the new students back out.
 
 ## Nov 6, 2026: Download All My Data
 
