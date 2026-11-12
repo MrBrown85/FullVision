@@ -878,7 +878,6 @@ window.GradingSetupCopy = (function () {
   }
 
   return {
-    GROUPS: GROUPS,
     describeSource: describeSource,
     planCategories: planCategories,
     planSetup: planSetup,

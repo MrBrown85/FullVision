@@ -385,11 +385,8 @@ window.CompetencyEvidence = (function () {
   return {
     drawerHtml: drawerHtml,
     rowCount: rowCount,
-    evidenceFor: evidenceFor,
     mount: mount,
     refresh: refresh,
-    openCapture: openCapture,
-    closeCapture: closeCapture,
     destroy: destroy,
     _helpers: {
       countLabel: countLabel,

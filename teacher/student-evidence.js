@@ -933,13 +933,9 @@ window.StudentEvidence = (function () {
     panelHtml: panelHtml,
     mount: mount,
     mountCapture: mountCapture,
-    destroyCapture: destroyCapture,
     destroy: destroy,
     refresh: refresh,
-    deleteOb: deleteOb,
     jumpTo: jumpTo,
-    setType: setType,
-    setComp: setComp,
     isPending: isPending,
     _helpers: {
       timelineLayout: timelineLayout,
