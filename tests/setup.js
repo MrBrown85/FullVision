@@ -283,6 +283,7 @@ load('shared/loading-screen.js');
 load('teacher/phone-reports.js');
 load('shared/backup-restore.js');
 load('teacher/cm-roster-file.js');
+load('teacher/cm-block-picker.js');
 load('teacher/dash-class-manager.js');
 load('teacher/dash-overview.js');
 load('teacher/dash-observations.js');
@@ -306,6 +307,9 @@ load('teacher/grades-print.js');
 load('teacher/rubric-library.js');
 load('teacher/rubric-bank.js');
 load('teacher/grading-setup-copy.js');
+load('teacher/assign-competency-picker.js');
+load('teacher/student-edit-dialog.js');
+load('teacher/student-groups.js');
 load('teacher/router.js');
 
 // Restore real setTimeout after loading (tests may need it)

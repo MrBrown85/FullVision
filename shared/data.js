@@ -395,7 +395,7 @@ function _photoQueueDotState() {
    photos that could not go in as asked and were let go. The sync dot is
    the only place this shows (CLAUDE.md rule 5). */
 function _workUploadDotState() {
-  if (typeof _workUploads !== 'function' || _isDemoSession()) return null;
+  if (_isDemoSession()) return null;
   var all = _workUploads();
   var held = Object.keys(all).some(function (k) {
     return all[k] && all[k].held;
@@ -1674,28 +1674,6 @@ function _hasLocalCopy(cid) {
   }
 }
 
-function _dateOnly(value) {
-  if (!value) return '';
-  if (typeof value === 'string') return value.slice(0, 10);
-  try {
-    return new Date(value).toISOString().slice(0, 10);
-  } catch (e) {
-    return '';
-  }
-}
-
-/* The local calendar day of a server timestamp. created_at is UTC, so
- * slicing it gives tomorrow's date for anything written after 5 pm
- * Pacific; observations created on this device get getTodayStr() (local),
- * and hydrated rows must agree. A date-only string passes through as is. */
-function _localDayOf(value) {
-  if (!value) return '';
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  var d = new Date(value);
-  if (isNaN(d)) return '';
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-}
-
 /* courseDayOf(cid, when): the calendar date of `when` (a Date or an ISO
  * timestamp) in the course's timezone, YYYY-MM-DD; '' for no valid time.
  * courseToday(cid) is the same for now.
@@ -1747,42 +1725,6 @@ function courseDayOf(cid, when) {
 /* Today, in the course's timezone. */
 function courseToday(cid) {
   return courseDayOf(cid, new Date());
-}
-
-function _plainObject(value) {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
-
-function _rpcRows(data) {
-  if (data == null) return [];
-  if (typeof data === 'string') {
-    try {
-      data = JSON.parse(data);
-    } catch (e) {
-      return [];
-    }
-  }
-  if (Array.isArray(data)) return data;
-  if (_plainObject(data)) {
-    if (Array.isArray(data.items)) return data.items;
-    if (Array.isArray(data.rows)) return data.rows;
-    if (Array.isArray(data.data)) return data.data;
-  }
-  return [];
-}
-
-function _rpcObject(data) {
-  if (data == null) return null;
-  if (typeof data === 'string') {
-    try {
-      data = JSON.parse(data);
-    } catch (e) {
-      return null;
-    }
-  }
-  if (Array.isArray(data)) return data[0] || null;
-  if (_plainObject(data) && _plainObject(data.data)) return data.data;
-  return _plainObject(data) ? data : null;
 }
 
 /* Fill a course field from this device's saved copy, or a default, without
@@ -3423,7 +3365,7 @@ async function _loadStudentProfileSummariesIndividually(cid) {
     var batch = students.slice(i, i + batchSize);
     var results = await Promise.all(
       batch.map(function (student) {
-        if (!student || !_isUuid(student.id) || !window.v2 || typeof window.v2.getStudentProfile !== 'function') {
+        if (!student || !_isUuid(student.id)) {
           return Promise.resolve(null);
         }
         return _withTimeout(
@@ -3890,7 +3832,6 @@ async function _hydrateAssessmentDetails(cid) {
 }
 
 async function _hydrateLearningMap(cid) {
-  if (!window.v2 || typeof window.v2.getLearningMap !== 'function') return;
   try {
     var res = await window.v2.getLearningMap(cid);
     if (res && res.error) throw res.error;
@@ -3998,7 +3939,6 @@ async function _fetchObservationPages(cid, firstPage) {
 }
 
 async function _hydrateObservations(cid) {
-  if (!window.v2 || typeof window.v2.getObservations !== 'function') return;
   try {
     var rows = await _fetchObservationPages(cid, 1);
     _persistLoadedField(cid, 'observations', _observationsPayloadToBlob({ observations: rows }, cid));
@@ -4012,7 +3952,7 @@ async function _hydrateObservations(cid) {
    there, so an observation written in the meantime is kept. */
 var _olderObservationsLoading = {};
 function _loadOlderObservations(cid, loadedCount) {
-  if (_olderObservationsLoading[cid] || !window.v2 || typeof window.v2.getObservations !== 'function') return;
+  if (_olderObservationsLoading[cid]) return;
   var firstPage = Math.floor(loadedCount / _OBSERVATION_PAGE) + 1;
   _olderObservationsLoading[cid] = _fetchObservationPages(cid, firstPage)
     .then(function (rows) {
@@ -5216,14 +5156,14 @@ function _clearLoadError(cid) {
 
 /* The sync dot's words while the open class couldn't load, or null. */
 function _loadProblem() {
-  var cid = typeof getActiveCourse === 'function' ? getActiveCourse() : null;
+  var cid = getActiveCourse();
   if (!cid || !_loadError[cid]) return null;
   var text = "Couldn't load the latest data for this class. " + _savedCopyDescription(cid);
   return window.__MOBILE ? text + ' Pull down to try again.' : text + ' Click the dot to try again.';
 }
 
 function _savedCopyDescription(cid) {
-  var meta = typeof _classMeta === 'function' ? _classMeta(cid) : null;
+  var meta = _classMeta(cid);
   if (!meta || !meta.savedAt) return 'Showing your saved copy.';
   var saved = new Date(meta.savedAt);
   var sameDay = saved.toDateString() === new Date().toDateString();
@@ -6255,72 +6195,6 @@ function printedStudentName(st, style) {
   return (first + ' ' + last).trim();
 }
 
-function sortStudents(arr, mode, cid) {
-  var c = arr.slice();
-  if (mode === 'firstName') {
-    return c.sort(function (a, b) {
-      return (a.firstName || '').localeCompare(b.firstName || '') || (a.lastName || '').localeCompare(b.lastName || '');
-    });
-  }
-  if (mode === 'proficiency' && cid) {
-    var profMap = {};
-    c.forEach(function (st) {
-      profMap[st.id] = getOverallProficiency(cid, st.id) || 0;
-    });
-    return c.sort(function (a, b) {
-      return profMap[b.id] - profMap[a.id];
-    });
-  }
-  if (mode === 'missing' && cid) {
-    var statuses = getAssignmentStatuses(cid);
-    var assessments = getAssessments(cid);
-    var missingMap = {};
-    c.forEach(function (st) {
-      missingMap[st.id] = assessments.filter(function (a) {
-        return statuses[st.id + ':' + a.id] === 'NS';
-      }).length;
-    });
-    return c.sort(function (a, b) {
-      return missingMap[b.id] - missingMap[a.id];
-    });
-  }
-  // Lowest grade first, as the class is set to grade: percent for a Letter
-  // class, proficiency otherwise. Students with no grade yet go last.
-  if (mode === 'gradeLow' && cid) {
-    var letter = courseGradeMode(cid) === 'letter';
-    var gradeMap = {};
-    c.forEach(function (st) {
-      var v = letter ? getCourseLetterData(cid, st.id).R : getOverallProficiency(cid, st.id);
-      gradeMap[st.id] = v > 0 ? v : null;
-    });
-    return c.sort(function (a, b) {
-      var va = gradeMap[a.id];
-      var vb = gradeMap[b.id];
-      if (va === null || vb === null) return (va === null) - (vb === null);
-      return va - vb;
-    });
-  }
-  if (mode === 'flagged' && cid) {
-    var flags = getFlags(cid);
-    return c.sort(function (a, b) {
-      return (flags[b.id] ? 1 : 0) - (flags[a.id] ? 1 : 0);
-    });
-  }
-  if (mode === 'lastObserved' && cid) {
-    var lastObsMap = {};
-    c.forEach(function (st) {
-      var obs = getStudentQuickObs(cid, st.id);
-      lastObsMap[st.id] = obs.length ? obs[0].created : '';
-    });
-    return c.sort(function (a, b) {
-      return (lastObsMap[b.id] || '').localeCompare(lastObsMap[a.id] || '');
-    });
-  }
-  return c.sort(function (a, b) {
-    return (a.lastName || '').localeCompare(b.lastName || '') || (a.firstName || '').localeCompare(b.firstName || '');
-  });
-}
-
 function anonymizeStudents(students) {
   var shuffled = students.slice();
   for (var i = shuffled.length - 1; i > 0; i--) {
@@ -6334,124 +6208,6 @@ function anonymizeStudents(students) {
   });
 }
 
-/* ── Learning Map Migration — flatten section/tag hierarchy ── */
-function _backupBeforeMigration(cid, field) {
-  var current = _cache[field] && _cache[field][cid];
-  if (current) {
-    _safeLSSet('gb-mig-bak-' + field + '-' + cid, JSON.stringify({ data: current, ts: Date.now() }));
-  }
-}
-
-function migrateLearningMap(map) {
-  if (!map || !map.sections || map._flatVersion >= 2) return map;
-  // Build sectionId → tagId mapping for override/goal/reflection migration
-  var sectionToTag = {};
-  map.sections.forEach(function (sec) {
-    if (!sec.tags || sec.tags.length === 0) return;
-    var tag = sec.tags[0];
-    // Promote section properties onto the tag
-    tag.color = sec.color;
-    tag.subject = sec.subject;
-    tag.shortName = sec.shortName;
-    tag.name = sec.name;
-    tag._legacySectionId = sec.id;
-    // Record mapping before changing section ID
-    sectionToTag[sec.id] = tag.id;
-    // Section ID becomes tag ID
-    sec.id = tag.id;
-  });
-  map._flatVersion = 2;
-  map._sectionToTagMap = sectionToTag;
-  return map;
-}
-
-function migrateOverridesForFlatMap(cid, sectionToTag) {
-  if (!sectionToTag || Object.keys(sectionToTag).length === 0) return;
-  var overrides = getOverrides(cid);
-  var changed = false;
-  Object.keys(overrides).forEach(function (studentId) {
-    var studentOverrides = overrides[studentId];
-    if (!studentOverrides) return;
-    Object.keys(studentOverrides).forEach(function (key) {
-      if (sectionToTag[key] && key !== sectionToTag[key]) {
-        studentOverrides[sectionToTag[key]] = studentOverrides[key];
-        delete studentOverrides[key];
-        changed = true;
-      }
-    });
-  });
-  if (changed) saveOverrides(cid, overrides);
-}
-
-function migrateGoalsForFlatMap(cid, sectionToTag) {
-  if (!sectionToTag || Object.keys(sectionToTag).length === 0) return;
-  var goals = getGoals(cid);
-  var changed = false;
-  Object.keys(goals).forEach(function (studentId) {
-    var studentGoals = goals[studentId];
-    if (!studentGoals || typeof studentGoals !== 'object') return;
-    Object.keys(studentGoals).forEach(function (key) {
-      if (sectionToTag[key] && key !== sectionToTag[key]) {
-        studentGoals[sectionToTag[key]] = studentGoals[key];
-        delete studentGoals[key];
-        changed = true;
-      }
-    });
-  });
-  if (changed) saveGoals(cid, goals);
-}
-
-function migrateReflectionsForFlatMap(cid, sectionToTag) {
-  if (!sectionToTag || Object.keys(sectionToTag).length === 0) return;
-  var reflections = getReflections(cid);
-  var changed = false;
-  Object.keys(reflections).forEach(function (studentId) {
-    var studentRefs = reflections[studentId];
-    if (!studentRefs || typeof studentRefs !== 'object') return;
-    Object.keys(studentRefs).forEach(function (key) {
-      if (sectionToTag[key] && key !== sectionToTag[key]) {
-        studentRefs[sectionToTag[key]] = studentRefs[key];
-        delete studentRefs[key];
-        changed = true;
-      }
-    });
-  });
-  if (changed) saveReflections(cid, reflections);
-}
-
-/* ── Student Migration ─────────────────────────────────────── */
-function migrateStudent(st) {
-  if (typeof st.designation === 'string' && st.designation) {
-    st.designations = [st.designation];
-    delete st.designation;
-  }
-  st.designations = st.designations || [];
-  if (st.firstName !== undefined) return st;
-  var parts = (st.name || '').trim().split(/\s+/);
-  st.firstName = parts[0] || '';
-  st.lastName = parts.slice(1).join(' ') || '';
-  st.sortName = (st.lastName + ' ' + st.firstName).trim();
-  st.studentNumber = st.studentNumber || '';
-  st.dateOfBirth = st.dateOfBirth || '';
-  st.email = st.email || '';
-  st.attendance = st.attendance || [];
-  delete st.name;
-  return st;
-}
-function migrateAllStudents() {
-  Object.keys(COURSES).forEach(function (cid) {
-    var students = getStudents(cid);
-    if (
-      students.length &&
-      students.some(function (s) {
-        return s.firstName === undefined;
-      })
-    ) {
-      _backupBeforeMigration(cid, 'students');
-      saveStudents(cid, students.map(migrateStudent));
-    }
-  });
-}
 /* Parse a date-only 'YYYY-MM-DD' string as a local calendar date.
    new Date('YYYY-MM-DD') is read as UTC midnight, which lands on the
    previous day in Pacific time. Anything else goes to new Date as-is. */
@@ -6531,6 +6287,70 @@ function _stampIdempotencyKey(name, params) {
 function getTodayStr() {
   const d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function _dateOnly(value) {
+  if (!value) return '';
+  if (typeof value === 'string') return value.slice(0, 10);
+  try {
+    return new Date(value).toISOString().slice(0, 10);
+  } catch (e) {
+    return '';
+  }
+}
+
+/* The local calendar day of a server timestamp. created_at is UTC, so
+ * slicing it gives tomorrow's date for anything written after 5 pm
+ * Pacific; observations created on this device get getTodayStr() (local),
+ * and hydrated rows must agree. A date-only string passes through as is. */
+function _localDayOf(value) {
+  if (!value) return '';
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  var d = new Date(value);
+  if (isNaN(d)) return '';
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function _plainObject(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function _rpcRows(data) {
+  if (data == null) return [];
+  if (typeof data === 'string') {
+    try {
+      data = JSON.parse(data);
+    } catch (e) {
+      return [];
+    }
+  }
+  if (Array.isArray(data)) return data;
+  if (_plainObject(data)) {
+    if (Array.isArray(data.items)) return data.items;
+    if (Array.isArray(data.rows)) return data.rows;
+    if (Array.isArray(data.data)) return data.data;
+  }
+  return [];
+}
+
+function _rpcObject(data) {
+  if (data == null) return null;
+  if (typeof data === 'string') {
+    try {
+      data = JSON.parse(data);
+    } catch (e) {
+      return null;
+    }
+  }
+  if (Array.isArray(data)) return data[0] || null;
+  if (_plainObject(data) && _plainObject(data.data)) return data.data;
+  return _plainObject(data) ? data : null;
+}
+
+/* UUID detection — distinguishes canonical enrollment_ids from local uid()s */
+var _UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function _isUuid(v) {
+  return typeof v === 'string' && _UUID_RE.test(v);
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -7219,6 +7039,91 @@ function _curriculumCategoryShortName(name) {
 /* ══════════════════════════════════════════════════════════════════
    Learning Map — cache-through
    ══════════════════════════════════════════════════════════════════ */
+/* ── Learning Map Migration — flatten section/tag hierarchy ── */
+function _backupBeforeMigration(cid, field) {
+  var current = _cache[field] && _cache[field][cid];
+  if (current) {
+    _safeLSSet('gb-mig-bak-' + field + '-' + cid, JSON.stringify({ data: current, ts: Date.now() }));
+  }
+}
+
+function migrateLearningMap(map) {
+  if (!map || !map.sections || map._flatVersion >= 2) return map;
+  // Build sectionId → tagId mapping for override/goal/reflection migration
+  var sectionToTag = {};
+  map.sections.forEach(function (sec) {
+    if (!sec.tags || sec.tags.length === 0) return;
+    var tag = sec.tags[0];
+    // Promote section properties onto the tag
+    tag.color = sec.color;
+    tag.subject = sec.subject;
+    tag.shortName = sec.shortName;
+    tag.name = sec.name;
+    tag._legacySectionId = sec.id;
+    // Record mapping before changing section ID
+    sectionToTag[sec.id] = tag.id;
+    // Section ID becomes tag ID
+    sec.id = tag.id;
+  });
+  map._flatVersion = 2;
+  map._sectionToTagMap = sectionToTag;
+  return map;
+}
+
+function migrateOverridesForFlatMap(cid, sectionToTag) {
+  if (!sectionToTag || Object.keys(sectionToTag).length === 0) return;
+  var overrides = getOverrides(cid);
+  var changed = false;
+  Object.keys(overrides).forEach(function (studentId) {
+    var studentOverrides = overrides[studentId];
+    if (!studentOverrides) return;
+    Object.keys(studentOverrides).forEach(function (key) {
+      if (sectionToTag[key] && key !== sectionToTag[key]) {
+        studentOverrides[sectionToTag[key]] = studentOverrides[key];
+        delete studentOverrides[key];
+        changed = true;
+      }
+    });
+  });
+  if (changed) saveOverrides(cid, overrides);
+}
+
+function migrateGoalsForFlatMap(cid, sectionToTag) {
+  if (!sectionToTag || Object.keys(sectionToTag).length === 0) return;
+  var goals = getGoals(cid);
+  var changed = false;
+  Object.keys(goals).forEach(function (studentId) {
+    var studentGoals = goals[studentId];
+    if (!studentGoals || typeof studentGoals !== 'object') return;
+    Object.keys(studentGoals).forEach(function (key) {
+      if (sectionToTag[key] && key !== sectionToTag[key]) {
+        studentGoals[sectionToTag[key]] = studentGoals[key];
+        delete studentGoals[key];
+        changed = true;
+      }
+    });
+  });
+  if (changed) saveGoals(cid, goals);
+}
+
+function migrateReflectionsForFlatMap(cid, sectionToTag) {
+  if (!sectionToTag || Object.keys(sectionToTag).length === 0) return;
+  var reflections = getReflections(cid);
+  var changed = false;
+  Object.keys(reflections).forEach(function (studentId) {
+    var studentRefs = reflections[studentId];
+    if (!studentRefs || typeof studentRefs !== 'object') return;
+    Object.keys(studentRefs).forEach(function (key) {
+      if (sectionToTag[key] && key !== sectionToTag[key]) {
+        studentRefs[sectionToTag[key]] = studentRefs[key];
+        delete studentRefs[key];
+        changed = true;
+      }
+    });
+  });
+  if (changed) saveReflections(cid, reflections);
+}
+
 function getLearningMap(cid) {
   if (_cache.learningMaps[cid]) return _cache.learningMaps[cid];
   // Not yet loaded into cache — read from localStorage as fallback
@@ -9405,6 +9310,107 @@ function _settingsNotSent(cid, columns, before) {
     else delete base[field];
   });
 }
+
+/* ── Student Migration ─────────────────────────────────────── */
+function migrateStudent(st) {
+  if (typeof st.designation === 'string' && st.designation) {
+    st.designations = [st.designation];
+    delete st.designation;
+  }
+  st.designations = st.designations || [];
+  if (st.firstName !== undefined) return st;
+  var parts = (st.name || '').trim().split(/\s+/);
+  st.firstName = parts[0] || '';
+  st.lastName = parts.slice(1).join(' ') || '';
+  st.sortName = (st.lastName + ' ' + st.firstName).trim();
+  st.studentNumber = st.studentNumber || '';
+  st.dateOfBirth = st.dateOfBirth || '';
+  st.email = st.email || '';
+  st.attendance = st.attendance || [];
+  delete st.name;
+  return st;
+}
+function migrateAllStudents() {
+  Object.keys(COURSES).forEach(function (cid) {
+    var students = getStudents(cid);
+    if (
+      students.length &&
+      students.some(function (s) {
+        return s.firstName === undefined;
+      })
+    ) {
+      _backupBeforeMigration(cid, 'students');
+      saveStudents(cid, students.map(migrateStudent));
+    }
+  });
+}
+
+function sortStudents(arr, mode, cid) {
+  var c = arr.slice();
+  if (mode === 'firstName') {
+    return c.sort(function (a, b) {
+      return (a.firstName || '').localeCompare(b.firstName || '') || (a.lastName || '').localeCompare(b.lastName || '');
+    });
+  }
+  if (mode === 'proficiency' && cid) {
+    var profMap = {};
+    c.forEach(function (st) {
+      profMap[st.id] = getOverallProficiency(cid, st.id) || 0;
+    });
+    return c.sort(function (a, b) {
+      return profMap[b.id] - profMap[a.id];
+    });
+  }
+  if (mode === 'missing' && cid) {
+    var statuses = getAssignmentStatuses(cid);
+    var assessments = getAssessments(cid);
+    var missingMap = {};
+    c.forEach(function (st) {
+      missingMap[st.id] = assessments.filter(function (a) {
+        return statuses[st.id + ':' + a.id] === 'NS';
+      }).length;
+    });
+    return c.sort(function (a, b) {
+      return missingMap[b.id] - missingMap[a.id];
+    });
+  }
+  // Lowest grade first, as the class is set to grade: percent for a Letter
+  // class, proficiency otherwise. Students with no grade yet go last.
+  if (mode === 'gradeLow' && cid) {
+    var letter = courseGradeMode(cid) === 'letter';
+    var gradeMap = {};
+    c.forEach(function (st) {
+      var v = letter ? getCourseLetterData(cid, st.id).R : getOverallProficiency(cid, st.id);
+      gradeMap[st.id] = v > 0 ? v : null;
+    });
+    return c.sort(function (a, b) {
+      var va = gradeMap[a.id];
+      var vb = gradeMap[b.id];
+      if (va === null || vb === null) return (va === null) - (vb === null);
+      return va - vb;
+    });
+  }
+  if (mode === 'flagged' && cid) {
+    var flags = getFlags(cid);
+    return c.sort(function (a, b) {
+      return (flags[b.id] ? 1 : 0) - (flags[a.id] ? 1 : 0);
+    });
+  }
+  if (mode === 'lastObserved' && cid) {
+    var lastObsMap = {};
+    c.forEach(function (st) {
+      var obs = getStudentQuickObs(cid, st.id);
+      lastObsMap[st.id] = obs.length ? obs[0].created : '';
+    });
+    return c.sort(function (a, b) {
+      return (lastObsMap[b.id] || '').localeCompare(lastObsMap[a.id] || '');
+    });
+  }
+  return c.sort(function (a, b) {
+    return (a.lastName || '').localeCompare(b.lastName || '') || (a.firstName || '').localeCompare(b.firstName || '');
+  });
+}
+
 function getStudents(cid) {
   if (_cache.students[cid] !== undefined) return _cache.students[cid];
   try {
@@ -9425,12 +9431,6 @@ function saveStudents(cid, arr) {
   // entered before the enrol is even pushed already waits on it.
   _registerLocalRows(cid, 'student', arr, 'create_student_and_enroll');
   return _persistStudentsToCanonical(cid, prev, arr);
-}
-
-/* UUID detection — distinguishes canonical enrollment_ids from local uid()s */
-var _UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-function _isUuid(v) {
-  return typeof v === 'string' && _UUID_RE.test(v);
 }
 
 /* Per-course save lock so rapid saves don't double-enroll the same student.
@@ -9803,7 +9803,6 @@ function _categoryListKept(rows) {
    read order; null when they could not be read. Never throws. */
 async function _readServerCategories(cid) {
   try {
-    if (!window.v2 || typeof window.v2.listCategories !== 'function') return null;
     var res = await window.v2.listCategories(cid);
     if (!res || res.error || !Array.isArray(res.data)) return null;
     return res.data
@@ -10695,6 +10694,48 @@ function getScores(cid) {
     return {};
   }
 }
+/* The data-loss guard's rule, as saveScores applies it below: saving `next`
+   over `prev` (the saved copy) drops more than half the students or more
+   than 70% of the entries. */
+function _scoreGuardDrop(prev, next, fillUndone) {
+  var prevCount = prev ? Object.keys(prev).length : 0;
+  var newCount = next ? Object.keys(next).length : 0;
+  if (prevCount > 2 && newCount < prevCount * 0.5) return true;
+  var prevEntries = 0,
+    newEntries = 0;
+  if (prev) for (var _ps in prev) prevEntries += (prev[_ps] || []).length;
+  if (next) for (var _ns in next) newEntries += (next[_ns] || []).length;
+  return prevEntries > 10 && newEntries + (fillUndone || 0) < prevEntries * 0.3;
+}
+
+/* The saved copy without the marks of work and students that are gone: on
+   neither this tab's list nor the saved list. Delete Assessment takes them
+   out of the saved copy, but that write can fail (storage full). Null while
+   either list is empty or not loaded: then nothing counts as gone. */
+function _scoresOfLiveRows(cid, prev) {
+  function ids(field) {
+    var mine = _cache[field][cid];
+    var saved = _safeParseLS('gb-' + _DATA_KEYS[field] + '-' + cid, null);
+    if (!Array.isArray(mine) || !mine.length || !Array.isArray(saved) || !saved.length) return null;
+    var out = {};
+    mine.concat(saved).forEach(function (row) {
+      if (row && row.id) out[row.id] = true;
+    });
+    return out;
+  }
+  var work = ids('assessments');
+  var roster = ids('students');
+  if (!work || !roster) return null;
+  var out = {};
+  Object.keys(prev).forEach(function (sid) {
+    if (!roster[sid]) return;
+    out[sid] = (prev[sid] || []).filter(function (e) {
+      return e && work[e.assessmentId];
+    });
+  });
+  return out;
+}
+
 // fillUndone: how many entries restoreScoreCells took out because the fill
 // it undoes added them. Only those may take the entry count past the guard.
 function saveScores(cid, obj, fillUndone) {
@@ -10706,6 +10747,12 @@ function saveScores(cid, obj, fillUndone) {
     cid,
     _loadPersistedCourseFieldSnapshot('scores', cid, (_cache.scores && _cache.scores[cid]) || {}),
   );
+  // Delete Assessment and Withdraw take their marks out of the saved copy,
+  // but that write can fail (storage full). Marks of work and students that
+  // are gone then do not count toward the guard, and are not sent as clears.
+  var gone = _scoreGuardDrop(prev, obj, fillUndone) && _scoresOfLiveRows(cid, prev);
+  if (gone && !_scoreGuardDrop(gone, obj, fillUndone)) prev = gone;
+  else gone = null;
   var prevCount = prev ? Object.keys(prev).length : 0;
   var newCount = obj ? Object.keys(obj).length : 0;
   // Group work: which linked members' grades this save changes (Group grading).
@@ -10748,6 +10795,7 @@ function saveScores(cid, obj, fillUndone) {
   if (_writesEnabled()) {
     var refusals = _writeRefusals;
     var baseline = _migrateRubricScoreKeys(cid, _serverStateOr('scores', cid, prev));
+    if (gone) baseline = _scoresOfLiveRows(cid, baseline) || baseline;
     persistScoreDiffToCanonical(cid, baseline, obj || {});
     _dismissOverriddenScoreWrites(cid, baseline, obj || {});
     _rememberServerState('scores', cid, obj || {});
@@ -15745,8 +15793,6 @@ window.createCustomTag = function (cid, label) {
   });
 };
 
-window.v2 = window.v2 || {};
-
 function getQuickObsByDim(cid, sid, dim) {
   return getStudentQuickObs(cid, sid).filter(o => (o.dims || []).includes(dim));
 }
@@ -16560,7 +16606,7 @@ function getStudentSubmission(cid, sid, aid) {
 }
 
 function studentWorkGradingStarted(cid, sid, aid) {
-  var row = typeof getGradeReturn === 'function' ? getGradeReturn(cid, sid, aid) : null;
+  var row = getGradeReturn(cid, sid, aid);
   if (row && row.is_draft) return true;
   if (hasScoreOrFeedback(cid, sid, aid)) return true;
   return getRubricCheckIds(cid, sid, aid).length > 0;
@@ -20921,8 +20967,7 @@ window.loadSeedIfNeeded = function () {
   // Already loaded this session — call directly (handles re-seed after data reset)
   // The demo class is built from the curriculum bank, so it loads first; a
   // failed load seeds the old built-in map instead.
-  var bank =
-    typeof loadCurriculumIndex === 'function' ? loadCurriculumIndex().catch(function () {}) : Promise.resolve();
+  var bank = loadCurriculumIndex().catch(function () {});
   if (typeof seedIfNeeded === 'function') {
     return bank.then(function () {
       seedIfNeeded();
@@ -21652,7 +21697,7 @@ function _handoutGiveUp(rec, refused) {
     return r.id !== rec.rid;
   });
   _resWrite(rec.cid, draft);
-  if (refused && typeof _workNoteDropped === 'function') _workNoteDropped();
+  if (refused) _workNoteDropped();
   _resChanged(rec.cid);
   return _teacherWorkForget(rec.ids || []).then(function () {
     return null;
