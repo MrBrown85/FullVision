@@ -115,18 +115,20 @@ for (const wide of [false, true]) {
     expect(rows).toBe(listed);
   });
 
-  test('the response slip docks at the foot of a side whose other face is clear' + font, async ({ page }) => {
+  test('the response slip docks at the foot of the report’s last side' + font, async ({ page }) => {
     await openOne(page, 'report-card', wide);
     const s = await sides(page);
-    const at = s.findIndex(x => x.parts.includes('parent-response'));
-    expect(at).toBeGreaterThanOrEqual(0);
-    // The other face of the slip's sheet: the side before a back, the side after a front.
-    const mate = at % 2 ? s[at - 1] : s[at + 1];
-    const reserved = await page.locator('#rb-preview .one-reserve').count();
-    expect(mate.blank || reserved > 0 || mate === undefined).toBe(true);
-    // And it is the last part of the report itself.
-    const last = s.filter(x => x.parts.length).pop();
+    const report = s.filter(x => x.parts.length);
+    const last = report[report.length - 1];
     expect(last.parts[last.parts.length - 1]).toBe('parent-response');
+    // At the foot: nothing prints under it, and it reaches the foot of its side.
+    const gap = await page.locator('#rb-preview .sheet-row.sheet-pinned').evaluate(row => {
+      const body = row.closest('.sheet-body').getBoundingClientRect();
+      return Math.round(body.bottom - row.getBoundingClientRect().bottom);
+    });
+    expect(Math.abs(gap)).toBeLessThanOrEqual(1);
+    // No side is left blank for it: only the last side of the last sheet may be.
+    s.slice(0, -1).forEach(x => expect(x.blank, x.label).toBe(false));
   });
 }
 

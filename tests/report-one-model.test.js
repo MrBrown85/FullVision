@@ -1,8 +1,8 @@
 /**
  * One Report's model (teacher/report-one.js): the parts in print order,
  * what is kept for one student, the readers that turn a class's Quick
- * Report choices or built form into a model, and the two things the form
- * engine learned for it (ReportSheets.pack: caps and fill).
+ * Report choices or built form into a model, and the one thing the form
+ * engine learned for it (ReportSheets.pack: fill).
  * docs/plans/one-report-build-plan.md.
  */
 import './setup.js';
@@ -209,17 +209,8 @@ describe('ReportSheets.pack for One Report', () => {
     filled.sides.forEach(sd => sd.rows.forEach(r => expect(r.y + r.h).toBeLessThanOrEqual(H)));
   });
 
-  it('caps: room kept free at the foot of a side moves what would have sat there to the next', () => {
-    const rows = [[c('header', 300)], [c('a', 300)], [c('b', 300)]];
-    expect(P(rows).sides).toHaveLength(1);
-    const capped = P(rows, { caps: { 0: 200 } });
-    expect(capped.sides).toHaveLength(2);
-    expect(capped.sides[0].rows.map(r => r.cells[0].id)).toEqual(['header', 'a']);
-    capped.sides[0].rows.forEach(r => expect(r.y + r.h).toBeLessThanOrEqual(H - 200));
-  });
-
-  it('neither changes a layout that does not ask for it', () => {
+  it('changes no layout that does not ask for it', () => {
     const rows = [[c('header', 300)], [table('list', 60, 20)], [c('b', 300)]];
-    expect(P(rows, { caps: null, fill: false })).toEqual(P(rows));
+    expect(P(rows, { fill: false })).toEqual(P(rows));
   });
 });

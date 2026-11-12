@@ -37,8 +37,8 @@ saved form is rewritten. A class with no `one` yet gets one read from what it ha
 1. Pinned already: `tests/report-surfaces-output.test.js` (every block, every surface, Demo class),
    the Quick Report fixtures, the saved-forms and issued-copy specs. Add: saved forms and Quick
    Report choices read into a model keep their parts and order; no model change moves a grade.
-2. `ReportOne`: model, Setups, readers, layout. `pack` gains `caps` (room kept free at the foot of
-   a side, for the back of the response slip); nothing else in the two engines changes behaviour.
+2. `ReportOne`: model, Setups, readers, layout. `pack` gains `fill` (a table starts in the room left
+   and goes on); nothing else in the two engines changes behaviour.
 3. Blocks gain options, off by default so no built report changes: reworded reflections and
    response, the legend's descriptors, family wording on Proficiency, a blank Core Competency form.
 4. The panel and the page, behind a switch (`?onereport=1`, remembered on the device). Demo Mode

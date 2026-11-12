@@ -906,54 +906,32 @@ window.ReportOne = (function () {
         });
       }),
     ];
-    var run = function (caps) {
-      return sheetsApi.pack(packRows, { H: H, gap: GAP, head: headPx, caps: caps, fill: true });
-    };
-    var r = run(null);
+    var r = sheetsApi.pack(packRows, { H: H, gap: GAP, head: headPx, fill: true });
     var sides = r.sides;
-    // The response slip docks at the foot of the last side of the report.
-    // When that side is a back, the foot of the front before it is kept
-    // blank, so tearing the slip off takes nothing from the report.
-    var slipAt = -1;
-    var reserve = {};
+    // The response slip docks at the foot of the last side of the report,
+    // or on a side of its own when there is no room left there.
     if (slip) {
       var ph = Math.min(slip.px, H - headPx - GAP);
-      var where = function (list) {
-        var n = list.length;
-        while (n > 0 && list[n - 1].kind === 'after') n--;
-        if (!n) return 0;
-        var last = list[n - 1];
-        var bottom = last.rows.reduce(
-          function (y, row) {
-            return Math.max(y, row.y + row.h);
-          },
-          last.head ? headPx : 0,
-        );
-        return bottom + GAP + ph <= H ? n - 1 : n;
-      };
-      slipAt = where(sides);
-      if (slipAt % 2 === 1) {
-        var caps = {};
-        caps[slipAt - 1] = ph + GAP;
-        var capped = run(caps);
-        if (where(capped.sides) === slipAt) {
-          r = capped;
-          sides = r.sides;
-          reserve[slipAt - 1] = ph;
-        } else {
-          // Keeping the front clear moved the slip: it starts the next sheet.
-          slipAt = where(sides);
-          slipAt += slipAt % 2;
-        }
-      }
       var afters = sides.filter(function (sd) {
         return sd.kind === 'after';
       });
       sides = sides.filter(function (sd) {
         return sd.kind !== 'after';
       });
-      while (sides.length <= slipAt) sides.push({ rows: [], kind: 'continued', from: 0, head: sides.length > 0 });
-      sides[slipAt].pinned = { id: PINNED, size: 'row', h: ph, y: H - ph };
+      var last = sides[sides.length - 1];
+      var bottom = last
+        ? last.rows.reduce(
+            function (y, row) {
+              return Math.max(y, row.y + row.h);
+            },
+            last.head ? headPx : 0,
+          )
+        : 0;
+      if (!last || bottom + GAP + ph > H) {
+        last = { rows: [], kind: 'continued', from: 0, head: sides.length > 0 };
+        sides.push(last);
+      }
+      last.pinned = { id: PINNED, size: 'row', h: ph, y: H - ph };
       sides = sides.concat(afters);
     }
     sides.forEach(function (sd) {
@@ -987,10 +965,6 @@ window.ReportOne = (function () {
         H,
       );
     }
-    // The slip on a front with Feedback Pages after it: its back is left
-    // blank, so the feedback starts on the next sheet and tearing the slip
-    // off takes nothing from it.
-    if (fb && slipAt >= 0 && slipAt % 2 === 0 && slipAt === sides.length - 1) sides.push({ blank: true, rows: [] });
     var bodySides = sides.length;
     var fbBodies = fb ? fb.body(bodySides + 1, bodySides + fb.count) : [];
     var sideCount = bodySides + fbBodies.length;
@@ -1030,7 +1004,7 @@ window.ReportOne = (function () {
       html += '<div class="sheet-zoom" data-side="' + s + '"><div class="sheet-label no-print">';
       if (fbHtml) {
         html += _sideLabel(s, sheetCount, 'Feedback') + '</div>' + G().sideHtml(fbHtml, paper, 'side', s, 'fb-sheet');
-      } else if (side && !side.blank) {
+      } else if (side) {
         var prints =
           side.pinned ||
           side.rows.some(function (row) {
@@ -1051,11 +1025,6 @@ window.ReportOne = (function () {
               return _rowTag(row, htmlOf, '');
             })
             .join('') +
-          (reserve[s]
-            ? '<div class="one-reserve no-print" style="height:' +
-              reserve[s] +
-              'px">Kept blank: the back of the response slip</div>'
-            : '') +
           (side.pinned
             ? _rowTag(
                 { h: side.pinned.h, cells: [{ id: PINNED, size: 'row', h: side.pinned.h }] },
