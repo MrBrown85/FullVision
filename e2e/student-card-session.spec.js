@@ -299,8 +299,10 @@ test.describe('before the page knows whether a code is a card or a slip', () => 
     await page.keyboard.press('Enter');
     await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
     await showAll(page);
-    // One wrong try was counted, not two.
-    await expect.poll(() => fn.logs.map(l => l.outcome)).toEqual(['ok', 'wrong_identity', 'ok', 'ok', 'ok']);
+    // Every call the page makes on opening has been answered (questionnaires, `forms`, come last).
+    await expect.poll(() => fn.logs.map(l => l.route)).toContain('forms');
+    // One wrong try was counted, not two; every other call was answered.
+    expect(fn.logs.map(l => l.outcome).filter(o => o !== 'ok')).toEqual(['wrong_identity']);
   });
 
   test('a card that asks for its password opens with the password box in focus', async ({ page }) => {
@@ -756,7 +758,8 @@ test.describe('"opened" means the row was on screen', () => {
     await expect(page.locator('.sp-row')).toHaveCount(6);
     await expect(page.locator('#app')).toHaveCSS('visibility', 'hidden');
     await page.waitForTimeout(1500);
-    expect(routes(posts)).toEqual(['page', 'work']);
+    // Only the page's reads (its questionnaires and reports come in `forms`); no "opened" mark yet.
+    expect(routes(posts)).toEqual(['page', 'work', 'forms']);
     // It is switched to.
     await page.evaluate(() => {
       window.__hidden = false;

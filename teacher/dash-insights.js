@@ -561,7 +561,9 @@ window.DashInsights = (function () {
   }
 
   /* ── Students: Cards | Grid ─────────────────────────────── */
-  function studentsHeaderHtml(view, controlsHtml) {
+  /* The title and count, Cards | Grid beside them, then the controls
+     (search, sort, Flagged) on the right. */
+  function studentsHeaderHtml(view, controlsHtml, count) {
     var seg = function (id, label) {
       var on = view === id;
       return (
@@ -576,12 +578,14 @@ window.DashInsights = (function () {
     };
     return (
       '<div class="dash-students-head">' +
-      '<h2 class="dash-students-title">Students</h2>' +
-      (controlsHtml || '') +
+      '<h2 class="dash-students-title">Students' +
+      (count > 0 ? ' <span class="dash-students-count">' + count + '</span>' : '') +
+      '</h2>' +
       '<div class="seg dash-view-toggle" role="group" aria-label="Show students as">' +
       seg('cards', 'Cards') +
       seg('grid', 'Grid') +
       '</div>' +
+      (controlsHtml || '') +
       '</div>'
     );
   }
