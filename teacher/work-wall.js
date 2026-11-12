@@ -29,7 +29,7 @@
                                   of PageAssignments.openGrader.
    WorkWall.close(), WorkWall.isOpen()
    WorkWall.tabOn(cid)            whether the student page shows a Work tab.
-   WorkWall.tabSummary(cid, sid)  { stat, sub } for the tab's tile.
+   WorkWall.tabSummary(cid, sid)  { stat } or { badge, tone } for the tab.
    WorkWall.tabHtml(cid, sid)     the tab's panel.
    WorkWall.mountTab(panel, cid, sid, { onChange })  pictures and clicks.
    WorkWall.unmountTab()          lets the tab's pictures go. */
@@ -799,10 +799,9 @@ window.WorkWall = (function () {
     var waiting = list.filter(function (p) {
       return GraderWork.workStateOf(cid, p.a.id, sid) === 'tograde';
     }).length;
-    return {
-      stat: list.length + (list.length === 1 ? ' Piece' : ' Pieces'),
-      sub: waiting ? waiting + ' to grade' : 'None to grade',
-    };
+    // Work to grade takes the figure's place as a blue badge.
+    if (waiting) return { badge: waiting + ' to Grade', tone: 'todo' };
+    return { stat: list.length + (list.length === 1 ? ' Piece' : ' Pieces') };
   }
 
   function _tabModel(cid, sid) {

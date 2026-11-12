@@ -281,7 +281,9 @@ describe('the dashboard: Questions From Students', () => {
 describe('the Learner Profile', () => {
   it('Jordan: the tile, the jump link, and his question with Answer in the Grader', () => {
     profileHtml(on, JORDAN, doc => {
-      expect(text($(doc, '#stu-tab-profile'))).toBe('Learner Profile1 Reflection1 question to answer');
+      // A question waiting is the tab's blue badge, in place of its figure.
+      expect(text($(doc, '#stu-tab-profile'))).toBe('Learner Profile1 to Answer');
+      expect($(doc, '#stu-tab-profile .stu-tab-badge.todo')).not.toBeNull();
       // A question waiting puts Reflections on Feedback first, under the card.
       expect($(doc, '.lp2 > section').id).toBe('lp-feedback');
       const so = $$(doc, '.lp-so-far li').map(text);
@@ -318,9 +320,7 @@ describe('the Learner Profile', () => {
       expect(text(card.querySelector('.rf-next'))).toBe('Not yet shown');
       expect(card.querySelector('.rf-answer')).toBeNull();
       expect(text($(doc, '#stu-tab-profile .stu-tab-stat'))).toBe('1 Reflection');
-      expect(text($(doc, '#stu-tab-profile .stu-tab-sub'))).toBe(
-        'Last reflection ' + LearnerProfile.day(getStudentLastPlan(CID, LIAM).sent_at),
-      );
+      expect($(doc, '#stu-tab-profile .stu-tab-badge')).toBeNull();
     });
   });
 
@@ -365,7 +365,7 @@ describe('the Learner Profile', () => {
         ]);
         expect(text(card.querySelector('.rf-wait span'))).toBe('Not answered yet');
         expect(text(card.querySelector('.rf-wait .rf-answer'))).toBe('Answer in the Grader');
-        expect(text($(doc, '#stu-tab-profile .stu-tab-sub'))).toBe('1 question to answer');
+        expect(text($(doc, '#stu-tab-profile .stu-tab-badge'))).toBe('1 to Answer');
       },
     );
   });
@@ -383,7 +383,7 @@ describe('the Learner Profile', () => {
       main.innerHTML = kept;
       close();
       expect($(doc, '.rf-answer')).toBeNull();
-      expect(text($(doc, '#stu-tab-profile .stu-tab-sub'))).not.toBe('1 question to answer');
+      expect($(doc, '#stu-tab-profile .stu-tab-badge')).toBeNull();
     });
   });
 });
@@ -404,7 +404,7 @@ describe('one answer clears all three', () => {
     });
     dashboardHtml(answered, doc => expect($(doc, '#dash-questions')).toBeNull());
     profileHtml(answered, JORDAN, doc => {
-      expect(text($(doc, '#stu-tab-profile .stu-tab-sub'))).not.toMatch(/question/);
+      expect($(doc, '#stu-tab-profile .stu-tab-badge')).toBeNull();
       expect($(doc, '.rf-answer')).toBeNull();
       expect($(doc, '.lp-so-far-ask')).toBeNull();
       expect($(doc, '#lp-feedback .qw-b').textContent).toBe(

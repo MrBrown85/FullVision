@@ -568,17 +568,6 @@ window.PageStudent = (function () {
     return isNaN(d) ? '' : d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
   }
 
-  function _daysAgo(dateStr) {
-    var today = typeof getTodayStr === 'function' ? getTodayStr() : new Date().toISOString().slice(0, 10);
-    var n = Math.round((new Date(today + 'T00:00:00') - new Date(String(dateStr).slice(0, 10) + 'T00:00:00')) / 864e5);
-    if (!(n >= 0)) return _shortDay(dateStr);
-    return n === 0 ? 'today' : n === 1 ? 'yesterday' : n + ' days ago';
-  }
-
-  function _obDay(ob) {
-    return (ob && (ob.date || (ob.created || '').slice(0, 10))) || '';
-  }
-
   /* A level as the class shows it, with its proficiency word unless the
      class is Letter, tinted by its level. */
   function _levelPill(cid, v) {
@@ -625,21 +614,17 @@ window.PageStudent = (function () {
     return _entryText(last, a) + (a ? ' on ' + a.title : '') + ', ' + _shortDay(last.date);
   }
 
-  /* The Observations tile: the term's observations, less any deleted one
-     still waiting on its Undo. */
-  function _evidenceSummary(obs, scope) {
+  /* The Observations tab's figure: the observations shown, less any deleted
+     one still waiting on its Undo. */
+  function _evidenceSummary(obs) {
     var shown = obs.filter(function (o) {
       return !Evidence.isPending(o.id);
     });
-    var lastOb = shown[0];
-    return {
-      stat: _plural(shown.length, 'Note', 'Notes'),
-      sub: scope + (lastOb ? ' · Latest ' + _daysAgo(_obDay(lastOb)) : ' · None yet'),
-    };
+    return { stat: _plural(shown.length, 'Note', 'Notes') };
   }
 
   /* After an observation is added, deleted or put back on this page, the
-     tile counts it at once (not at the next full redraw). */
+     tab counts it at once (not at the next full redraw). */
   function _refreshEvidenceTile() {
     var tile = document.getElementById('stu-tab-evidence');
     if (!tile) return;
@@ -648,21 +633,20 @@ window.PageStudent = (function () {
     var obs = getStudentQuickObs(cid, studentId).filter(function (o) {
       return CompetencyEvidence._helpers.obsInTerm(o, term);
     });
-    var sm = _evidenceSummary(obs, term ? term.label || 'This term' : 'All time');
     var stat = tile.querySelector('.stu-tab-stat');
-    var sub = tile.querySelector('.stu-tab-sub');
-    if (stat) stat.textContent = sm.stat;
-    if (sub) sub.textContent = sm.sub;
+    if (stat) stat.textContent = _evidenceSummary(obs).stat;
   }
 
+  /* Each tab's one figure under its name (canvas "Student Page Tabs", option
+     2, Colin 2026-11-11). A badge takes the figure's place only when
+     something needs the teacher: work missing (orange), work to grade or a
+     question to answer (blue). The grade itself is in the header's pill. */
   function _tabSummaries(ctx) {
     var cid = ctx.cid;
     var out = {};
     var ov = _overviewModel(ctx);
-    out.overview = {
-      stat: ov.now.text + ' · ' + ov.missing.length + ' Missing',
-      sub: ov.proj ? ov.proj.text + ' if handed in' : ov.missing.length ? 'Missing work to hand in' : 'Nothing missing',
-    };
+    var nMiss = ov.missing.length;
+    out.overview = nMiss ? { badge: nMiss + ' Missing', tone: 'miss' } : { stat: '0 Missing' };
     var profs = ctx.sections
       .map(function (sec) {
         return getSectionProficiency(cid, studentId, sec.id);
@@ -670,54 +654,21 @@ window.PageStudent = (function () {
       .filter(function (v) {
         return v > 0;
       });
-    if (!profs.length)
-      out.comps = { stat: 'Not Scored', sub: _plural(ctx.sections.length, 'competency', 'competencies') };
-    else {
-      var lo = Math.min.apply(null, profs);
-      var hi = Math.max.apply(null, profs);
-      var atProf = profs.filter(function (v) {
-        return roundLevel(v) >= 3;
-      }).length;
-      out.comps = {
-        stat:
-          courseGradeMode(cid) === 'letter'
-            ? profs.length + ' of ' + ctx.sections.length + ' Scored'
-            : atProf + ' of ' + ctx.sections.length + ' Proficient',
-        sub:
-          lo === hi
-            ? 'All at ' + formatLevel(cid, lo)
-            : 'Range: ' + formatLevel(cid, lo) + ' to ' + formatLevel(cid, hi),
-      };
-    }
-    var scope = ctx.term ? ctx.term.label || 'This term' : 'All time';
-    var scored = ctx.cells.filter(function (c) {
-      return c.cell.kind === 'points' || c.cell.kind === 'level' || c.cell.kind === 'complete';
-    });
-    var unscored = ctx.cells.filter(function (c) {
-      return c.cell.kind === 'none';
+    var atProf = profs.filter(function (v) {
+      return roundLevel(v) >= 3;
     }).length;
-    var latestA = scored.reduce(function (m, c) {
-      return (c.a.date || '') > m ? c.a.date : m;
-    }, '');
-    out.evidence = _evidenceSummary(ctx.obs, scope);
-    var cats = _assessGroups(cid, ctx.assessments, 'category').filter(function (g) {
-      return !!g.key;
-    });
-    out.grades = {
-      stat:
-        _plural(ctx.assessments.length, 'Piece', 'Pieces') +
-        (cats.length ? ' · ' + _plural(cats.length, 'Category', 'Categories') : ''),
-      sub:
-        scope +
-        ' · ' +
-        scored.length +
-        ' assessed' +
-        (latestA ? ' · Latest ' + _shortDay(latestA) : '') +
-        (unscored ? ' · ' + unscored + ' not assessed yet' : ''),
+    out.comps = {
+      stat: !profs.length
+        ? 'Not Scored'
+        : courseGradeMode(cid) === 'letter'
+          ? profs.length + ' of ' + ctx.sections.length + ' Scored'
+          : atProf + ' of ' + ctx.sections.length + ' Proficient',
     };
+    out.grades = { stat: _plural(ctx.assessments.length, 'Piece', 'Pieces') };
     if (window.WorkWall && WorkWall.tabOn(cid)) out.work = WorkWall.tabSummary(cid, studentId);
+    out.evidence = _evidenceSummary(ctx.obs);
     // The Learner Profile: goals set (the student's own and the competency
-    // goals) and when the student last answered.
+    // goals), or the feedback reflections once there are any (S10-F4).
     var voice = _voiceModel(cid);
     var goals = getGoals(cid)[studentId] || {};
     var goalCount =
@@ -725,19 +676,10 @@ window.PageStudent = (function () {
       ctx.sections.filter(function (sec) {
         return !!(goals[sec.id] || '').trim();
       }).length;
-    var lastWords = _latest(voice.last, _compReflections(cid, ctx.sections).last);
-    out.profile = {
-      stat: _plural(goalCount, 'Goal', 'Goals'),
-      sub: lastWords ? 'Last answer ' + LearnerProfile.day(lastWords) : 'No answers yet',
-    };
-    // Reflect on Feedback (S10-F4): the reflections, and a question to answer.
+    out.profile = { stat: _plural(goalCount, 'Goal', 'Goals') };
     var fb = LearnerProfile.feedbackOf(cid, studentId);
-    if (fb && fb.list.length) {
-      out.profile.stat = _plural(fb.list.length, 'Reflection', 'Reflections');
-      out.profile.sub = fb.waiting
-        ? _plural(fb.waiting, 'question to answer', 'questions to answer')
-        : 'Last reflection ' + LearnerProfile.day(fb.list[0].sent_at);
-    }
+    if (fb && fb.list.length) out.profile = { stat: _plural(fb.list.length, 'Reflection', 'Reflections') };
+    if (fb && fb.waiting) out.profile = { badge: fb.waiting + ' to Answer', tone: 'todo' };
     return out;
   }
 
@@ -761,11 +703,11 @@ window.PageStudent = (function () {
           (on ? '0' : '-1') +
           '"><span class="stu-tab-label">' +
           esc(t.label) +
-          '</span><span class="stu-tab-stat">' +
-          esc(sm.stat) +
-          '</span><span class="stu-tab-sub">' +
-          esc(sm.sub) +
-          '</span></button>'
+          '</span>' +
+          (sm.badge
+            ? '<span class="stu-tab-badge ' + (sm.tone === 'miss' ? 'miss' : 'todo') + '">' + esc(sm.badge) + '</span>'
+            : '<span class="stu-tab-stat">' + esc(sm.stat) + '</span>') +
+          '</button>'
         );
       }).join('') +
       '</div>'
@@ -1012,6 +954,12 @@ window.PageStudent = (function () {
       ov.missing.length +
       '</div>' +
       (ov.proj ? '<div class="stu-ov-miss-cost">Costing you ' + ov.proj.cost + '%</div>' : '') +
+      // Missing counts as 0 (D7): said where it applies, as the student page says it.
+      (ov.now.hasPct && ov.missing.length
+        ? '<div class="stu-ov-sub">' +
+          (ov.missing.length === 1 ? 'It counts as 0 until it’s in.' : 'Each counts as 0 until it’s in.') +
+          '</div>'
+        : '') +
       '<div class="stu-ov-sub">' +
       ov.handedIn +
       ' of ' +
@@ -1319,16 +1267,11 @@ window.PageStudent = (function () {
   function _overviewTabHtml(ctx) {
     var ov = _overviewModel(ctx);
     var first = displayNameFirst(ctx.student);
-    var today = typeof getTodayStr === 'function' ? getTodayStr() : new Date().toISOString().slice(0, 10);
-    var lede = [ov.course.name || '', 'The year so far, as of ' + _shortDay(today)];
-    if (ov.now.hasPct) lede.push('Missing work counts as 0 until it is handed in.');
     return (
       '<div class="stu-ov">' +
       '<div class="stu-ov-head"><div><h2 class="stu-ov-title">' +
       esc(first + '’s Overview') +
-      '</h2><p class="stu-ov-lede">' +
-      esc(lede.filter(Boolean).join(' · ')) +
-      '</p></div><button type="button" class="stu-ov-btn" data-action="stuOvFull">Full Screen</button></div>' +
+      '</h2></div><button type="button" class="stu-ov-btn" data-action="stuOvFull">Full Screen</button></div>' +
       '<div class="stu-ov-top">' +
       _ovGradeHtml(ov) +
       _ovMissingTileHtml(ov) +
@@ -2112,13 +2055,10 @@ window.PageStudent = (function () {
 
   function _gradesTabHtml(ctx) {
     var ov = _overviewModel(ctx);
-    var first = displayNameFirst(ctx.student);
     return (
       '<div class="stu-gr">' +
       '<div class="stu-gr-head"><div class="stu-gr-head-text"><h2 class="stu-gr-title">Grades</h2>' +
-      '<p class="stu-gr-lede">Every piece of ' +
-      esc(first) +
-      '’s work and how it adds up.</p></div>' +
+      '</div>' +
       '<a class="stu-gr-open" role="link" tabindex="0" data-href="/gradebook?course=' +
       ctx.cid +
       '">Open in Gradebook</a></div>' +
