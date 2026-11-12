@@ -39,7 +39,7 @@ The app persists teacher data through Supabase Auth plus a public RPC surface. I
 - Main page modules:
   - `page-dashboard.js`; its Class Settings screen is `dash-class-manager.js`, which reads a roster file a teacher imports (CSV or tab text, column matching, dates) through `cm-roster-file.js`
   - `page-assignments.js`
-  - `page-student.js`; its Work tab, and the Work Wall (one assessment's work side by side), are `work-wall.js`, with every picture of student work loaded through `shared/work-thumbs.js`
+  - `page-student.js`; its Work tab, and the Work Wall (one assessment's work side by side), are `work-wall.js`, with every picture of student work loaded through `shared/work-thumbs.js`; the Grades tab's Group By (which assessments fall in each category, unit, type or rubric) is `student-groups.js`
   - `page-gradebook.js`; its Export CSV is `gradebook-csv.js`
   - `page-observations.js`
   - `page-starters.js`: Observations › Starters (`/observations/starters`)
