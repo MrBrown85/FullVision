@@ -135,6 +135,7 @@ const PRECACHE_URLS = [
   '/teacher/page-assignments.js',
   '/teacher/page-student.js',
   '/teacher/page-gradebook.js',
+  '/teacher/gradebook-csv.js',
   '/teacher/page-observations.js',
   '/teacher/page-starters.js',
   '/teacher/page-reports.js',
