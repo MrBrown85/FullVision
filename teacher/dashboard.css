@@ -33,26 +33,6 @@ body:has(.cm-toolbar) #app-dock [data-action='toggleSidebar'] {
   border-radius: 0;
   box-shadow: none;
 }
-.page-dashboard .dash-section-header {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 14px 0 8px;
-}
-.dash-section-heading {
-  font-family: var(--font-base);
-  font-size: var(--text-xl);
-  font-weight: 700;
-  color: var(--text);
-  letter-spacing: var(--tracking-tight);
-}
-.dash-section-count {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--text-3);
-  font-weight: 500;
-  letter-spacing: var(--tracking-wide);
-}
 
 /* ── Class Overview Panel ──────────────────────────────────── */
 /* The top bar (Class Average, Missing and Late, Upcoming Birthdays); then
@@ -278,43 +258,6 @@ a.dash-glance-cell:hover {
 /* The seven Core Competencies take two lines at most. Where the card is too
    narrow for that, they take a four-column grid and a long name ends in an
    ellipsis (the full name is in its hover card or title). */
-/* Tighter spacing in Core Competencies, so Next Steps shows its first item
-   in full at that height; further items scroll. */
-.dash-overview-second .dash-next-steps {
-  margin-top: 6px;
-}
-.dash-overview-second .dash-next-steps .dash-section-title {
-  margin-bottom: 4px;
-}
-.dash-overview-second .dash-action-list {
-  margin-top: 0;
-}
-.dash-overview-second .dash-action-item {
-  padding: 5px 12px;
-}
-/* One line each, the full text in its title, so a narrow card still shows
-   the first in full. */
-.dash-overview-second .dash-action-text {
-  -webkit-line-clamp: 1;
-  line-clamp: 1;
-}
-.dash-overview-second.is-single {
-  grid-template-columns: minmax(0, 1fr);
-}
-@media (max-width: 768px) {
-  .dash-overview-top,
-  .dash-overview-second {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  /* Stacked, each card keeps the row's height. */
-  .dash-overview-second {
-    height: auto;
-    grid-template-rows: none;
-  }
-  .dash-overview-second > .dash-overview-section {
-    height: var(--dash-row2-h);
-  }
-}
 .dash-overview-section {
   padding: 16px 20px;
   background: var(--surface);
@@ -1393,12 +1336,6 @@ button.dash-comp-cell:hover {
 .dash-ins-link:hover {
   text-decoration: underline;
 }
-.dash-ins-empty {
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  color: var(--text-3);
-  padding: 8px 0;
-}
 a.dash-ins-name {
   color: var(--text);
   font-weight: 600;
@@ -2243,23 +2180,6 @@ a.dash-ins-name:hover {
   color: #fff;
   border-color: var(--priority);
 }
-.dash-import-btn {
-  padding: 6px 14px;
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  font-weight: 500;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text-2);
-  cursor: pointer;
-  transition: all 0.15s;
-  white-space: nowrap;
-}
-.dash-import-btn:hover {
-  border-color: var(--text-3);
-  color: var(--text);
-}
 /* Class Settings is settings, so it is a secondary (outline) button:
    solid blue is kept for a screen's main action (docs/DECISIONS.md). */
 .dash-toolbar-spacer {
@@ -2787,26 +2707,6 @@ a.dash-ins-name:hover {
 }
 
 /* ── Class Manager ──────────────────────────────────────────── */
-.dash-class-mgr-btn {
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-2);
-  transition: all 0.12s;
-  flex-shrink: 0;
-  font-size: var(--text-base);
-}
-.dash-class-mgr-btn:hover {
-  border-color: var(--text-3);
-  color: var(--text);
-  background: var(--bg);
-}
 
 .cm-toolbar-detail {
   font-size: var(--text-sm);
@@ -2997,23 +2897,6 @@ a.dash-ins-name:hover {
   grid-template-columns: 1fr 2fr;
   gap: 16px;
   max-width: 1400px;
-}
-.cm-col {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-width: 0;
-}
-.cm-col-curriculum {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-width: 0;
-  align-self: start;
-}
-.cm-actions-row,
-.cm-danger-zone {
-  grid-column: 1 / -1;
 }
 
 /* Tabbed class view: a header, one row of tabs, then the open tab. */
@@ -3514,14 +3397,6 @@ a.dash-ins-name:hover {
   outline: none;
 }
 
-.cm-row {
-  display: flex;
-  gap: 12px;
-}
-.cm-row > .cm-field {
-  flex: 1;
-}
-
 /* Class Settings segments (.seg) sit in a narrow column: they wrap
    onto a second row instead of pushing the last segment out of view. */
 .cm-seg {
@@ -3530,12 +3405,6 @@ a.dash-ins-name:hover {
 }
 .cm-seg .seg-btn {
   white-space: normal;
-}
-.cm-seg-hint-locked {
-  color: var(--text-3);
-  font-size: var(--text-xs);
-  margin-top: 4px;
-  font-style: italic;
 }
 
 /* T-UI-12 · Category management inline row */
@@ -4046,17 +3915,6 @@ a.dash-ins-name:hover {
   border-radius: 2px;
   flex-shrink: 0;
 }
-.cm-std-tag {
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--text-2);
-  padding: 1px 6px;
-  border-radius: var(--radius-sm);
-  background: var(--overlay-hover);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
 .cm-std-label {
   font-size: var(--text-base);
   font-weight: 600;
@@ -4066,22 +3924,6 @@ a.dash-ins-name:hover {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.cm-std-subject {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: var(--text-xs);
-  color: var(--text-3);
-  padding: 1px 8px;
-  border-radius: var(--radius);
-  background: var(--overlay-hover);
-}
-.cm-std-subject-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  flex-shrink: 0;
 }
 .cm-std-chevron {
   font-size: var(--text-xs);
@@ -4623,18 +4465,6 @@ a.dash-ins-name:hover {
     flex-shrink: 0;
   }
 }
-.cm-std-edit-row {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-.cm-std-edit-row-wide {
-  display: flex;
-  gap: 12px;
-  align-items: flex-end;
-  margin-bottom: 8px;
-}
 
 .cw-empty-msg {
   text-align: center;
@@ -4692,16 +4522,6 @@ a.dash-ins-name:hover {
   background: var(--active);
   color: #fff;
 }
-.cm-relink-warning {
-  font-size: var(--text-sm);
-  color: var(--score-2);
-  line-height: 1.35;
-  padding: 8px 12px;
-  background: rgba(224, 134, 0, 0.06);
-  border: 1px solid rgba(224, 134, 0, 0.15);
-  border-radius: var(--radius-sm);
-  margin-top: 8px;
-}
 .cm-relink-actions {
   display: flex;
   gap: 8px;
@@ -4748,144 +4568,6 @@ a.dash-ins-name:hover {
   height: auto;
 }
 
-.cm-sec-group {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  margin-bottom: 6px;
-  overflow: hidden;
-  transition: border-color 0.15s;
-}
-.cm-sec-group.open {
-  border-color: var(--divider-strong);
-}
-.cm-sec-header {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 10px 12px;
-  background: var(--bg);
-  cursor: pointer;
-  transition: background 0.1s;
-}
-.cm-sec-header:hover {
-  background: var(--overlay-hover);
-}
-.cm-sec-header-top {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.cm-sec-chevron {
-  font-size: var(--text-2xs);
-  color: var(--text-3);
-  transition: transform 0.15s;
-  flex-shrink: 0;
-  width: 14px;
-  text-align: center;
-}
-.cm-sec-group.open .cm-sec-chevron {
-  transform: rotate(90deg);
-}
-.cm-sec-color-bar {
-  width: 3px;
-  height: 16px;
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-.cm-sec-name-display {
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  font-weight: 600;
-  color: var(--text);
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.cm-sec-count {
-  font-family: var(--font-base);
-  font-size: var(--text-2xs);
-  color: var(--text-3);
-  flex-shrink: 0;
-  padding: 2px 6px;
-  background: var(--overlay-hover);
-  border-radius: 4px;
-}
-.cm-sec-header-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding-left: 22px;
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  color: var(--text-3);
-}
-.cm-sec-subject-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 8px;
-  border-radius: var(--radius);
-  background: var(--overlay-hover);
-  font-size: var(--text-sm);
-  color: var(--text-2);
-}
-.cm-sec-subject-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.cm-sec-body {
-  display: none;
-  padding: 12px 14px 14px;
-  border-top: 1px solid var(--border);
-  background: var(--surface);
-}
-.cm-sec-group.open .cm-sec-body {
-  display: block;
-}
-.cm-sec-edit-row {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 8px;
-  margin-bottom: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--divider-subtle);
-}
-.cm-sec-edit-row .cm-sec-edit-name {
-  grid-column: 1 / -1;
-}
-.cm-sec-edit-row .cm-sec-edit-subject {
-  min-width: 0;
-}
-
-.cm-tag-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--overlay-hover);
-}
-.cm-tag-row:last-of-type {
-  border-bottom: none;
-}
-.cm-tag-id {
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  font-weight: 700;
-  min-width: 32px;
-  flex-shrink: 0;
-  padding-top: 8px;
-}
-.cm-tag-fields {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
 .cm-delete-mini {
   width: 24px;
   height: 24px;
@@ -4925,9 +4607,6 @@ a.dash-ins-name:hover {
 .cm-section-count {
   font-weight: 400;
   color: var(--text-3);
-}
-.cm-starter-intro {
-  margin: 0 0 10px;
 }
 .cm-starter-list {
   display: flex;
@@ -4969,12 +4648,6 @@ a.dash-ins-name:hover {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  flex-shrink: 0;
-}
-.cm-starter-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
   flex-shrink: 0;
 }
 .cm-starter-btn {
@@ -5074,39 +4747,6 @@ a.dash-ins-name:hover {
   .cm-starter-row {
     flex-direction: column;
   }
-  .cm-starter-actions {
-    align-self: flex-end;
-  }
-}
-
-.cm-danger-zone {
-  background: var(--surface);
-  border-radius: var(--radius);
-  border: 0.5px solid rgba(255, 59, 48, 0.12);
-  padding: 16px 20px;
-  margin-top: 8px;
-}
-.cm-danger-btn {
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  font-weight: 500;
-  color: var(--priority);
-  background: none;
-  border: 1px solid rgba(255, 59, 48, 0.25);
-  border-radius: var(--radius-sm);
-  padding: 7px 16px;
-  cursor: pointer;
-  transition: all 0.12s;
-}
-.cm-danger-btn:hover {
-  background: rgba(255, 59, 48, 0.06);
-  border-color: var(--priority);
-}
-
-.cm-actions-row {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
 }
 .cm-action-btn {
   font-family: var(--font-base);
@@ -5127,15 +4767,6 @@ a.dash-ins-name:hover {
   border-color: var(--text-3);
   color: var(--text);
 }
-.cm-action-btn-danger {
-  color: var(--priority);
-  border-color: rgba(255, 59, 48, 0.25);
-}
-.cm-action-btn-danger:hover {
-  background: rgba(255, 59, 48, 0.06);
-  border-color: var(--priority);
-  color: var(--priority);
-}
 
 .cm-empty {
   display: flex;
@@ -5151,12 +4782,6 @@ a.dash-ins-name:hover {
   font-weight: 600;
   color: var(--text);
   margin-bottom: 4px;
-}
-.cm-empty-text {
-  font-size: var(--text-base);
-  color: var(--text-3);
-  max-width: 300px;
-  line-height: 1.4;
 }
 
 /* The first screen with no classes: two cards side by side, under the
@@ -5222,16 +4847,6 @@ a.dash-ins-name:hover {
 }
 .cm-empty-help:hover {
   filter: brightness(0.8);
-}
-
-.cm-sec-color-dot {
-  flex-shrink: 0;
-  position: relative;
-  z-index: 1;
-  background: none !important;
-  border: none;
-  width: auto;
-  height: auto;
 }
 
 .cm-color-swatch-selected {
@@ -5315,29 +4930,6 @@ a.dash-ins-name:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.cm-student-pronouns {
-  color: var(--text-3);
-  font-size: var(--text-sm);
-  flex-shrink: 0;
-}
-.cm-desig-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 1px 7px;
-  border-radius: 4px;
-  flex-shrink: 0;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  background: rgba(0, 122, 255, 0.08);
-  color: var(--link);
-  cursor: default;
-}
-.cm-desig-badge.low-inc {
-  background: var(--accent-purple-light);
-  color: var(--accent-purple);
 }
 .cm-iep-tag,
 .cm-mod-tag {
@@ -6479,7 +6071,6 @@ a.dash-ins-name:hover {
 .desig-check-item:hover {
   background: var(--overlay-hover);
 }
-.desig-check,
 .cm-desig-check {
   margin: 0;
   flex-shrink: 0;
@@ -6497,12 +6088,6 @@ a.dash-ins-name:hover {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.cm-roster-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin-top: 8px;
 }
 
 /* New class empty curriculum hint */
