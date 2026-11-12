@@ -324,10 +324,11 @@ window.PageAssignments = (function () {
     var sc = _grader && _grader.overlay.querySelector('.grader-scroll');
     if (sc) {
       sc.scrollTop = 0;
-      // The next student comes in with a short fade (styles.css, Motion).
-      sc.classList.remove('grader-swap');
-      void sc.offsetWidth;
-      sc.classList.add('grader-swap');
+      // The next student comes in with a short fade. A script-driven fade
+      // leaves no class or attribute behind in the page's markup.
+      if (sc.animate && window.matchMedia && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        sc.animate([{ opacity: 0.45 }, { opacity: 1 }], { duration: 150, easing: 'cubic-bezier(0.2, 0.7, 0.2, 1)' });
+      }
     }
   }
 

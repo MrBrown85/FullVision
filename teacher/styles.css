@@ -3989,10 +3989,6 @@ body.offline-active #app-dock {
   .page-layout.sidebar-settled .dash-course-select {
     animation: fv-fade-in var(--motion-base) var(--motion-ease);
   }
-  /* Moving to the next student: the page comes in rather than flashing. */
-  .grader-scroll.grader-swap {
-    animation: fv-fade-in-soft var(--motion-fast) var(--motion-ease);
-  }
 }
 
 /* ── Utility classes (CSP: replace inline style attrs) ──────── */
