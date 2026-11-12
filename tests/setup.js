@@ -180,7 +180,7 @@ globalThis.showSyncToast = () => {};
 // Tests mock the separate reads; tests/data-class-bundle.test.js turns the
 // single get_class_bundle request on.
 globalThis.__FV_CLASS_BUNDLE = false;
-// Override setTimeout to prevent gb-ui.js _populateDockUser from firing
+// Override setTimeout to prevent teacher/ui.js _populateDockUser from firing
 const _realSetTimeout = globalThis.setTimeout;
 globalThis.setTimeout = (fn, ms) => {
   /* no-op during setup */
@@ -197,12 +197,12 @@ globalThis.addEventListener = () => {};
 globalThis.history = { replaceState() {}, pushState() {} };
 globalThis.location = { hash: '', href: '', pathname: '', search: '' };
 
-// Page module stubs (required by gb-router.js)
+// Page module stubs (required by teacher/router.js)
 ['PageDashboard', 'PageAssignments', 'PageStudent', 'PageGradebook', 'PageObservations', 'PageReports'].forEach(p => {
   globalThis[p] = { init() {}, destroy() {} };
 });
 
-// Boot dependency stubs (required by gb-router.js boot())
+// Boot dependency stubs (required by teacher/router.js boot())
 globalThis.requireAuth = () => {};
 globalThis.initAllCourses = async () => {};
 globalThis.initData = async () => {};

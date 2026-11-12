@@ -6,8 +6,8 @@
  *
  * What the actions end up writing and sending is pinned from the dialog
  * itself (tests/pin-grader-dialog-writes.test.js and
- * tests/pin-grader-dialog-dibels-groups.test.js). This holds the wiring:
- * which writer, which arguments, what comes back.
+ * describe('pin-grader-dialog-dibels-groups') in tests/pin.test.js). This
+ * holds the wiring: which writer, which arguments, what comes back.
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';

@@ -1,5 +1,5 @@
 /**
- * Mobile Speed Grader tests — m-grade.js
+ * Mobile Speed Grader tests — teacher-mobile/tab-grade.js
  *
  * Tests assessment picker, student card rendering, score saving,
  * undo stack, status toggles, and performance safeguards.

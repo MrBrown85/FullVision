@@ -464,7 +464,7 @@ describe('report-calc-callers', () => {
    * inside withReportScores (one of the file's doors, or reached only from
    * them), and is added here with that said in review.
    *
-   *   UPDATE_REPORT_CALC_CALLERS=1 npx vitest run tests/report-calc-callers.test.js
+   *   UPDATE_REPORT_CALC_CALLERS=1 npx vitest run tests/report.test.js -t report-calc-callers
    *   prints the list as it is now.
    */
 

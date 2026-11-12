@@ -1,5 +1,5 @@
 /**
- * Mobile Observations Notepad tests — m-observe.js
+ * Mobile Observations Notepad tests — teacher-mobile/tab-observe.js
  *
  * Tests observation feed rendering, filtering, form state management,
  * sentiment ARIA labels, and save/delete flows.
