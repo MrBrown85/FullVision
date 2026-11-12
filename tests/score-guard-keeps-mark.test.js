@@ -350,6 +350,136 @@ describe('(c) the guard still blocks a real mass loss', () => {
   });
 });
 
+// Review round 2 (A1): a mostly empty save in a tab behind the saved copy.
+// The merge must judge this tab's own loss, not what another tab added.
+describe('(e) a mostly empty save in a tab behind the saved copy is still refused', () => {
+  function expectRefused(before) {
+    expect(guardLogs.length).toBeGreaterThan(0);
+    expect(toasts.filter(t => /blocked/i.test(t)).length).toBeGreaterThan(0);
+    expect(saved()).toEqual(before);
+    expect(scoreCalls(fake)).toEqual([]);
+  }
+  // Tab B loads Old Lab's 40 marks; tab A fills Lab, so the saved copy has 70.
+  function staleAfterFill() {
+    signIn();
+    loadClass([work[OLD], work[PTS], work[FILL]], oldLabScores());
+    otherTabFills(oldLabScores());
+    expect(count(saved())).toBe(70);
+    return saved();
+  }
+
+  it('an empty marks object', async () => {
+    var before = staleAfterFill();
+    expect(saveScores(CID, {})).toBe(false);
+    await settle();
+    expectRefused(before);
+    expect(count(getScores(CID))).toBe(40);
+  });
+
+  it('only one student’s marks passed in', async () => {
+    var before = staleAfterFill();
+    expect(saveScores(CID, { [SIDS[0]]: structuredClone(getScores(CID)[SIDS[0]]) })).toBe(false);
+    await settle();
+    expectRefused(before);
+  });
+
+  it('memory emptied with the baseline intact, then one points mark', async () => {
+    var before = staleAfterFill();
+    _cache.scores[CID] = {};
+    setPointsScore(CID, SIDS[0], PTS, 7);
+    await settle();
+    expectRefused(before);
+  });
+
+  it('a save that drops most of this tab’s own marks while adding one', async () => {
+    var before = staleAfterFill();
+    var next = { [SIDS[0]]: [entry(SIDS[0], PTS, T[0], 5)] };
+    SIDS.slice(1, 3).forEach(sid => (next[sid] = structuredClone(getScores(CID)[sid])));
+    expect(saveScores(CID, next)).toBe(false);
+    await settle();
+    expectRefused(before);
+  });
+
+  it('one tab whose baseline holds only 2 of 10 students, then an empty save', async () => {
+    signIn();
+    loadClass([work[OLD], work[PTS]], oldLabScores());
+    var part = {};
+    SIDS.slice(0, 2).forEach(sid => (part[sid] = structuredClone(oldLabScores()[sid])));
+    _rememberServerState('scores', CID, part);
+    var before = saved();
+    expect(saveScores(CID, {})).toBe(false);
+    await settle();
+    expectRefused(before);
+  });
+});
+
+describe('(f) the merge keeps small real changes and follows the saved copy otherwise', () => {
+  it('one mark and two cells cleared in tab B: all kept with the fill, those three cells sent', async () => {
+    signIn();
+    loadClass([work[QUIZ], work[PTS], work[FILL]], quizScores());
+    otherTabFills(quizScores());
+    var scores = getScores(CID);
+    scores[SIDS[0]] = [];
+    scores[SIDS[1]] = [];
+    setPointsScore(CID, SIDS[7], PTS, 9);
+    await settle();
+
+    expect(guardLogs).toEqual([]);
+    expect(toasts.filter(t => /blocked/i.test(t))).toEqual([]);
+    [saved(), getScores(CID)].forEach(blob => {
+      expect(
+        Object.values(blob)
+          .flat()
+          .filter(e => e.assessmentId === FILL),
+      ).toHaveLength(30);
+      expect(has(blob, SIDS[0], QUIZ, T[0], 2)).toBe(false);
+      expect(has(blob, SIDS[1], QUIZ, T[0], 2)).toBe(false);
+      SIDS.slice(2, 6).forEach(sid => expect(has(blob, sid, QUIZ, T[0], 2)).toBe(true));
+      expect(has(blob, SIDS[7], PTS, null, 9)).toBe(true);
+    });
+    var cells = scoreCalls(fake).map(c => c.params.p_enrollment_id + ':' + c.params.p_assessment_id);
+    expect(cells.sort()).toEqual([SIDS[0] + ':' + QUIZ, SIDS[1] + ':' + QUIZ, SIDS[7] + ':' + PTS].sort());
+  });
+
+  it('a cell tab B holds with only a different date does not undo tab A’s newer value', async () => {
+    signIn();
+    loadClass([work[QUIZ], work[PTS], work[FILL]], quizScores());
+    var theirs = quizScores();
+    theirs[SIDS[0]][0].score = 4;
+    otherTabFills(theirs);
+    getScores(CID)[SIDS[0]][0].date = '2026-11-05';
+    setPointsScore(CID, SIDS[7], PTS, 9);
+    await settle();
+
+    expect(guardLogs).toEqual([]);
+    expect(has(saved(), SIDS[0], QUIZ, T[0], 4)).toBe(true);
+    expect(has(saved(), SIDS[0], QUIZ, T[0], 2)).toBe(false);
+    expect(has(saved(), SIDS[7], PTS, null, 9)).toBe(true);
+    expect(scoreCalls(fake).map(c => c.params.p_enrollment_id)).toEqual([SIDS[7]]);
+  });
+
+  // The saved copy can lack a mark this tab holds for two reasons that look
+  // the same here: tab A cleared it, or tab A's own stale save left it out
+  // (the browser spec's case). The mark is kept, so a mark the teacher typed
+  // never vanishes from this tab, and it is not sent again; a reload from
+  // the server settles it.
+  it('a mark tab B holds that the saved copy lacks is kept, and not sent again', async () => {
+    signIn();
+    loadClass([work[QUIZ], work[PTS], work[FILL]], quizScores());
+    var theirs = quizScores();
+    delete theirs[SIDS[1]];
+    otherTabFills(theirs);
+    setPointsScore(CID, SIDS[7], PTS, 9);
+    await settle();
+
+    expect(guardLogs).toEqual([]);
+    expect(has(saved(), SIDS[1], QUIZ, T[0], 2)).toBe(true);
+    expect(has(getScores(CID), SIDS[1], QUIZ, T[0], 2)).toBe(true);
+    expect(has(saved(), SIDS[7], PTS, null, 9)).toBe(true);
+    expect(scoreCalls(fake).map(c => c.params.p_enrollment_id)).toEqual([SIDS[7]]);
+  });
+});
+
 describe('(d) ordinary saves behave as before', () => {
   it('a single points mark is saved and sent once', async () => {
     signIn();
