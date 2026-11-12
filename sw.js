@@ -105,6 +105,7 @@ const PRECACHE_URLS = [
   '/shared/phone-report-view.js',
   '/teacher/phone-reports.js',
   '/shared/backup-restore.js',
+  '/teacher/cm-roster-file.js',
   '/teacher/dash-class-manager.js',
   '/teacher/dash-overview.js',
   '/teacher/dash-observations.js',
