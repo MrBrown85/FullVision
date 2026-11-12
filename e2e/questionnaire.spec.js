@@ -9,6 +9,11 @@ async function open(page, student = 'st1') {
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   // The demo class seeds after the curriculum bank loads.
   await page.waitForFunction(() => getAssessments('sci8').length > 0);
+  // Reports' scripts load when Reports first opens: open it, then go back to the Dashboard.
+  await page.evaluate(r => window.Router.navigate(r), '/reports');
+  // Drawn in full (its sentence bank loaded too) before it is left.
+  await page.locator('#tq-narrative').waitFor();
+  await page.evaluate(r => window.Router.navigate(r), '/dashboard');
   // On the Report Card: a new report has no Teacher Comment block.
   await page.evaluate(() => {
     const cfg = getReportConfig('sci8') || {};

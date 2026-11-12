@@ -53,8 +53,13 @@ const loaded = page =>
   });
 
 /* Every address to walk: each route, and each of Reports' tabs. */
-const addresses = page =>
-  page.evaluate(() => {
+const addresses = async page => {
+  // Reports' tabs come from its own scripts, which load when Reports first opens: open it, then go back to the Dashboard.
+  await page.evaluate(r => window.Router.navigate(r), '/reports');
+  // Drawn in full (its sentence bank loaded too) before it is left.
+  await page.locator('#tq-narrative').waitFor();
+  await page.evaluate(r => window.Router.navigate(r), '/dashboard');
+  return page.evaluate(() => {
     const out = [];
     Router.routes().forEach(route => {
       if (route === '/reports') {
@@ -68,6 +73,7 @@ const addresses = page =>
     });
     return out;
   });
+};
 
 const go = async (page, address) => {
   await page.evaluate(a => window.Router.navigate(a), address);

@@ -18,6 +18,18 @@ const LAZY = {
     'shared/comment-bank.js', // teacher/comment-bank.js:8244
     'curriculum_data.js', // shared/data.js:7228
     'shared/seed-data.js', // shared/data.js:21400
+    // Reports' own scripts, loaded the first time Reports opens (teacher/router.js _onDemand).
+    'teacher/report-sheets.js',
+    'teacher/report-issues.js',
+    'teacher/report-questionnaire.js',
+    'teacher/report-studio.js',
+    'teacher/grade-report.js',
+    'teacher/report-preview.js',
+    'shared/phone-report-view.js',
+    'teacher/phone-reports.js',
+    'teacher/report-feedback.js',
+    'teacher/report-feedback-cards.js',
+    'teacher/page-reports.js',
   ],
   phone: ['shared/bank-proficiency.js', 'shared/bank-comment.js', 'curriculum_data.js', 'shared/seed-data.js'],
   student: [

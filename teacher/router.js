@@ -22,6 +22,34 @@ window.Router = (function () {
     '/reports': 'Reports',
   };
 
+  /* Pages whose scripts load the first time the page is opened, not with
+     the app. Reports' scripts (about 740 KB) are used by no other page.
+     They run in the order app.html had them, each once; page-reports.js
+     comes last because it reads ReportPreview and ReportQuestionnaire as
+     it loads. comment-realiser.js stays in app.html: comment-bank.js reads
+     it as it loads. sw.js precaches every file here, so Reports opens
+     offline too (e2e/loading-on-demand.spec.js). */
+  var _onDemand = {
+    '/reports': {
+      page: 'PageReports',
+      scripts: [
+        '/teacher/report-sheets.js',
+        '/teacher/report-issues.js',
+        '/teacher/report-questionnaire.js',
+        '/teacher/report-studio.js',
+        '/teacher/grade-report.js',
+        '/teacher/report-preview.js',
+        '/shared/phone-report-view.js',
+        '/teacher/phone-reports.js',
+        '/teacher/report-feedback.js',
+        '/teacher/report-feedback-cards.js',
+        '/teacher/page-reports.js',
+      ],
+    },
+  };
+  var _ran = {}; // src → true once the script has run
+  var _pageLoads = {}; // path → the load in progress
+
   var _currentPage = null;
   var _currentUrl = null;
   var _routeSeq = 0;
@@ -106,6 +134,104 @@ window.Router = (function () {
     if (window.UI && typeof window.UI.refreshSyncStatusUI === 'function') window.UI.refreshSyncStatusUI();
   }
 
+  /* ── Pages loaded on demand ──────────────────────────────── */
+  // The page module for a path, once its scripts have run.
+  function _pageFor(path) {
+    if (!_routes[path] && _onDemand[path]) _routes[path] = window[_onDemand[path].page];
+    return _routes[path];
+  }
+
+  function _runScript(src) {
+    return new Promise(function (resolve, reject) {
+      var el = document.createElement('script');
+      el.src = src;
+      el.onload = function () {
+        _ran[src] = true;
+        resolve();
+      };
+      el.onerror = function () {
+        if (el.parentNode) el.parentNode.removeChild(el);
+        reject(new Error('Could not load ' + src));
+      };
+      document.head.appendChild(el);
+    });
+  }
+
+  /* Fetches every script the page still needs side by side (preload), then
+     runs them one at a time in order, so one that fails stops the rest. A
+     failed load is forgotten, so Try Again starts from the file that
+     failed. */
+  function _loadPage(path) {
+    if (_pageLoads[path]) return _pageLoads[path];
+    var spec = _onDemand[path];
+    var todo = spec.scripts.filter(function (src) {
+      return !_ran[src];
+    });
+    var hints = todo.map(function (src) {
+      var link = document.createElement('link');
+      link.rel = 'preload';
+      link.as = 'script';
+      link.href = src;
+      document.head.appendChild(link);
+      return link;
+    });
+    var load = todo
+      .reduce(function (chain, src) {
+        return chain.then(function () {
+          return _runScript(src);
+        });
+      }, Promise.resolve())
+      .then(function () {
+        if (!_pageFor(path)) throw new Error(spec.page + ' did not load');
+      });
+    _pageLoads[path] = load;
+    function settle() {
+      hints.forEach(function (link) {
+        if (link.parentNode) link.parentNode.removeChild(link);
+      });
+      _pageLoads[path] = null;
+    }
+    load.then(settle, settle);
+    return load;
+  }
+
+  // While a page's scripts load: the app's loading screen, in the page.
+  function _showPageLoading(title) {
+    var main = document.getElementById('main');
+    // html-safe: FVLoading.html is fixed markup; the label goes through esc.
+    main.innerHTML = FVLoading.html('teacher', 'Opening ' + title, true);
+    FVLoading.start(main, 'teacher');
+  }
+
+  // A page's scripts could not be fetched (offline before the app was
+  // ever cached, or the connection dropped): say so, with Try Again.
+  function _showPageLoadFailed(title) {
+    var main = document.getElementById('main');
+    main.innerHTML = '';
+    var box = document.createElement('div');
+    box.className = 'empty-state';
+    box.setAttribute('role', 'alert');
+    var head = document.createElement('div');
+    head.className = 'empty-state-title';
+    head.textContent = title + ' Could Not Open';
+    var text = document.createElement('div');
+    text.className = 'empty-state-text';
+    text.textContent = 'FullVision could not load this page. Check your internet connection, then try again.';
+    var retry = document.createElement('button');
+    retry.type = 'button';
+    retry.className = 'btn btn-primary';
+    retry.style.marginTop = '16px';
+    retry.textContent = 'Try Again';
+    retry.addEventListener('click', function () {
+      _onRoute();
+    });
+    box.appendChild(head);
+    box.appendChild(text);
+    box.appendChild(retry);
+    main.appendChild(box);
+    retry.focus();
+  }
+
   function _needsCourseLoad(cid) {
     // getActiveCourse() never returns an archived class, so one is never
     // "loaded" and would loop here.
@@ -148,13 +274,14 @@ window.Router = (function () {
       history.replaceState(null, '', '/dashboard');
     }
 
-    var module = _routes[path];
+    var module = _pageFor(path);
     _currentUrl = location.pathname + location.search;
 
     // Destroy previous page
     if (_currentPage && _currentPage.destroy) {
       _currentPage.destroy();
     }
+    _currentPage = null;
 
     // Clear DOM mounts
     document.getElementById('main').innerHTML = '';
@@ -165,6 +292,22 @@ window.Router = (function () {
 
     // Re-render dock on every route change
     _renderDock(dockPage);
+
+    // A page whose scripts have not loaded yet: the loading screen until
+    // they have, then this route again (unless the teacher has moved on).
+    if (!module && _onDemand[path]) {
+      var title = _titles[path];
+      document.title = 'FullVision — ' + title;
+      _showPageLoading(title);
+      return _loadPage(path).then(
+        function () {
+          if (seq === _routeSeq) _onRoute();
+        },
+        function () {
+          if (seq === _routeSeq) _showPageLoadFailed(title);
+        },
+      );
+    }
 
     // Init new page
     _currentPage = module;
@@ -250,7 +393,9 @@ window.Router = (function () {
       navigate(url.pathname + url.search);
     });
 
-    _onRoute();
+    // A page loaded on demand keeps the loading screen up until it draws.
+    var drawing = _onRoute();
+    if (drawing) await drawing;
     _hideLoading();
     // Then the teacher's other classes, in the background once the first
     // page is up, so each is ready before it is opened.
