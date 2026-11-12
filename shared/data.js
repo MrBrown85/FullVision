@@ -22217,6 +22217,15 @@ async function _handoutCommit(batch) {
     _resReadAfterWrite({ p_course_id: cid });
     return { error: null };
   }
+  /* A page the server refused (row.bad) cannot be sent again: no teacher
+     may replace a file in storage. The handout is removed here and on the
+     server, and the sync dot says pages were dropped (independent review,
+     Nov 11). */
+  if (row.status === 'uploading' && Array.isArray(row.bad) && row.bad.length) {
+    if (cid) removeAssessmentResource(cid, rid);
+    if (rec) await _handoutGiveUp(rec, true);
+    return { error: null };
+  }
   if (row.status === 'uploading') {
     // Still missing a page (row.missing names them by number): those go again.
     var q = window.PhotoQueue;
