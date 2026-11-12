@@ -75,8 +75,9 @@ describe('a report reads the year to date as of its end (decision 15)', () => {
     setActiveTerm(CID, 2);
     const t = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, { termId: 'term-2' }, {}));
     // Then: Report 1, the year to date to Nov 27. Now: the year to date to Jan 29.
-    expect(t).toContain('Questioning 2.0 · 50% Developing 3.0 · 75% Proficient +1.0');
-    expect(t).toContain('Overall 2.0 · C- 50% Developing 3.0 · B 75% Proficient');
+    // A Both class: the proficiency and the %, no figure out of 4 (DECISIONS, "Student-facing levels are proficiencies").
+    expect(t).toContain('Questioning Developing · 50% Proficient · 75% ↑ Up');
+    expect(t).toContain('Overall Developing · C- 50% Proficient · B 75%');
   });
 
   it('Assignment Grades: the Course Grade and the category grade are the year to date, matching the list', () => {
@@ -84,8 +85,8 @@ describe('a report reads the year to date as of its end (decision 15)', () => {
     const t = text(
       ReportBlocks.renderBlockGradeTable(CID, STUDENT, { organize: 'category', range: 'all' }, { termId: 'term-2' }),
     );
-    expect(t).toContain('Course Grade 3.0 · B 75%');
-    expect(t).toContain('Labs 100% of grade · 3.0 · B 75%');
+    expect(t).toContain('Course Grade Proficient · B 75%');
+    expect(t).toContain('Labs 100% of grade · Proficient · B 75%');
     expect(t).toContain('October Lab');
     expect(t).toContain('December Lab');
   });
@@ -95,7 +96,7 @@ describe('a report reads the year to date as of its end (decision 15)', () => {
     const t = text(ReportBlocks.renderBlockGradeTable(CID, STUDENT, { range: 'all' }, { termId: 'term-1' }));
     expect(t).toContain('October Lab');
     expect(t).not.toContain('December Lab');
-    expect(t).toContain('Course Grade 2.0 · C- 50%');
+    expect(t).toContain('Course Grade Developing · C- 50%');
   });
 
   it('the Quick Report lists the year to date and prints its Course Grade', () => {
@@ -121,8 +122,9 @@ describe('a report reads the year to date as of its end (decision 15)', () => {
   it('the phone report sent to the student carries the year-to-date grade', () => {
     setActiveTerm(CID, 2);
     const snap = PhoneReports.snapshot(CID, STUDENT, { termId: 'term-2', termLabel: 'Report 2' });
-    expect(snap.overall.text).toBe('3.0 · B 75%');
-    expect(snap.skills[0].text).toBe('3.0 · 75%');
+    // The word is the copy's own line; the text is the letter and %, no figure out of 4 (DECISIONS, "Student-facing levels are proficiencies").
+    expect(snap.overall).toMatchObject({ word: 'Proficient', text: 'B 75%' });
+    expect(snap.skills[0].text).toBe('Proficient · 75%');
   });
 
   it('the final report is the whole year, and its F is decided on the whole year', () => {
@@ -221,8 +223,8 @@ describe('growth compares the year to date at the last report with now (decision
     const prof = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, { termId: 'term-2' }, {}));
     expect(prof).toContain('Competency Report 1 Now');
     const progress = text(ReportBlocks.renderBlockProgress(CID, STUDENT, { termId: 'term-2' }, {}));
-    expect(progress).toContain('Report 1 2.0 Developing');
-    expect(progress).toContain('Now 3.0 Proficient (+1.0 since Report 1)');
+    expect(progress).toContain('Report 1 Developing');
+    expect(progress).toContain('Now Proficient (↑ Up since Report 1)');
   });
 
   it("Start of Term is measured inside the report's own term", () => {
@@ -236,7 +238,7 @@ describe('growth compares the year to date at the last report with now (decision
     setActiveTerm(CID, 2);
     const r2 = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, { termId: 'term-2' }, { compare: 'start' }));
     expect(r2).toContain('Competency Report 1 Now');
-    expect(r2).toContain('Questioning 2.0 Developing 3.0 Proficient +1.0');
+    expect(r2).toContain('Questioning Developing Proficient ↑ Up');
   });
 
   it('the dashboard arrow: the year to date at Report 1 beside the year so far', () => {
@@ -344,9 +346,9 @@ describe('review follow-ups', () => {
   it('4. Start of Term on a later report compares with the last report', () => {
     setActiveTerm(CID, 2);
     const t = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, { termId: 'term-2' }, { compare: 'start' }));
-    expect(t).toContain('Questioning 2.0 Developing 3.0 Proficient +1.0');
+    expect(t).toContain('Questioning Developing Proficient ↑ Up');
     expect(text(ReportBlocks.renderBlockProgress(CID, STUDENT, { termId: 'term-2' }, {}))).toContain(
-      '(+1.0 since Report 1)',
+      '(↑ Up since Report 1)',
     );
   });
 
@@ -367,7 +369,7 @@ describe('review follow-ups', () => {
     setActiveTerm(CID, 2);
     const t = text(ReportBlocks.renderBlockProgress(CID, STUDENT, { termId: 'term-2' }, { area: 'lowest' }));
     expect(t).toContain('Progress: Planning');
-    expect(t).toContain('Start of term 2.0 Developing');
+    expect(t).toContain('Start of term Developing');
     expect(t).not.toContain('since Report 1');
     expect(t).not.toContain('—');
   });

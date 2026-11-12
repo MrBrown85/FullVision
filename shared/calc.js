@@ -3063,6 +3063,106 @@ function levelText(cid, value, empty) {
   return levelWord(cid, value) || formatLevel(cid, value);
 }
 
+/* ── What a student or family reads for a level ──────────────────
+   DECISIONS, "Student-facing levels are proficiencies" (2026-11-12). Colin:
+   "students don't see numbers-as-proficiencies. they only see the
+   proficiency, because teachers may override it." Everything printed for,
+   sent to or shown to a student or family reads a level through these:
+   - a Proficiency class: the proficiency only ("Proficient"), never "3.2",
+     "3.2 / 4" or "out of 4";
+   - a Both class: the proficiency and the percent ("Proficient · 80%");
+   - a Letter class: exactly what formatLevel and studentGradeSummary give,
+     the provincial order for grades 10 to 12.
+   They only format. Each takes a level calc.js has already worked out (a
+   teacher's override is in getSectionProficiency, the folder and the
+   overall), and the word is levelWord's or nearestScoreLevelName's, so it
+   follows "a level reads as it is printed". No grade changes by any amount.
+   Teacher screens keep their figures (formatLevel). */
+
+/* An average (a student's, a competency's, a folder's), as a student reads
+   it: the proficiency word; with its % in a Both class; the % in a Letter
+   class (formatLevel). `empty` (default "—") with none. */
+function studentLevelText(cid, value, empty) {
+  if (!(value > 0)) return empty === undefined ? '—' : empty;
+  var mode = courseGradeMode(cid);
+  if (mode === 'letter') return formatLevel(cid, value);
+  var word = levelWord(cid, value);
+  if (mode === 'both') return word + ' · ' + _wholePercent(levelToPercent(cid, value)) + '%';
+  return word;
+}
+
+/* One piece of work's mark on a level, as a student reads it: the level
+   with its + or − (nearestScoreLevelName, as the grader names it,
+   "Proficient +"); in a Both class with the piece's % (`percentText`, else
+   the % its level counts as); a Letter class's %, as before. `empty`
+   (default "—") with none. Points and Complete/Incomplete work keep their
+   own wording (Colin, 2026-11-12: "points and complete/incomplete should
+   remain as is"). */
+function studentMarkText(cid, value, percentText, empty) {
+  if (!(value > 0)) return empty === undefined ? '—' : empty;
+  var mode = courseGradeMode(cid);
+  var pct = percentText || _wholePercent(levelToPercent(cid, value)) + '%';
+  if (mode === 'letter') return pct;
+  var name = nearestScoreLevelName(value);
+  return mode === 'both' ? name + ' · ' + pct : name;
+}
+
+/* The change between two levels as a student reads it, in words: "↑ Up",
+   "↓ Down" or "Same", by the proficiency each reads as (the whole level its
+   word comes from), so no figure shows. A Letter class keeps
+   levelChangeAs's % ("+5%"). "—" when either side has no level. */
+function studentLevelChange(cid, before, after) {
+  if (!(before > 0 && after > 0)) return '—';
+  if (courseGradeMode(cid) === 'letter') return levelChangeAs(cid, before, after);
+  var d = _wordLevel(after) - _wordLevel(before);
+  return d > 0 ? '↑ Up' : d < 0 ? '↓ Down' : 'Same';
+}
+
+/* A student's overall grade as a student or family reads it: { text,
+   level }. A Proficiency class: the proficiency word; a Both class: the
+   word and the letter and % ("Proficient · B 82%"); a Letter class:
+   studentGradeSummary as it is. The overall is getOverallProficiency's,
+   the teacher's overrides in it. */
+function studentGradeText(cid, sid, termId) {
+  var summary = studentGradeSummary(cid, sid, termId);
+  var mode = courseGradeMode(cid);
+  if (mode === 'letter') return summary;
+  var b = studentGradeBadges(cid, sid, termId);
+  var word = b.prof ? levelWord(cid, getOverallProficiency(cid, sid)) : '';
+  var parts = [word, mode === 'both' && b.letter ? b.letter.text : ''].filter(Boolean);
+  return { text: parts.join(' · '), level: summary.level };
+}
+
+/* A group grade (assessmentGroupGrade: a category's) as a student reads
+   it: the word; the word and the letter and % in a Both class; its own
+   text in a Letter class. '' with none. */
+function studentGroupGradeText(cid, g) {
+  if (!g) return '';
+  var mode = courseGradeMode(cid);
+  if (mode === 'letter') return g.text || '';
+  var word = g.prof > 0 ? levelWord(cid, g.prof) : '';
+  return [word, mode === 'both' ? g.letter : ''].filter(Boolean).join(' · ');
+}
+
+/* How full a bar for a level is (0–100) on a page a student reads: in a
+   Proficiency class by whole proficiency (a quarter a level), so its
+   length never shows the figure behind the word; levelBarPercent in a
+   Letter or Both class, whose % is printed beside it. */
+function studentLevelBarPercent(cid, value) {
+  if (!(value > 0)) return 0;
+  if (courseGradeMode(cid) !== 'proficiency') return levelBarPercent(cid, value);
+  return _wordLevel(value) * 25;
+}
+
+/* A level placed on a chart a student reads: the step it is named by (a
+   whole level, a + or − a third of one), as nearestScoreLevelName names
+   it, so a dot's height says no more than its name. */
+function studentLevelStep(value) {
+  if (!(value > 0)) return 0;
+  var near = _nearestStep(value);
+  return near.level + normalizeScoreMod(near.level, near.mod) * SCORE_MOD_STEP;
+}
+
 /* ── What a report prints for the grade ──────────────────────────
    Per student and report, the teacher can report something other than the
    letter (term_rating.reporting_basis; Generate plan PR 3, approved by
@@ -4346,6 +4446,13 @@ window.Calc = {
   oneDecimal,
   assessmentCellValue,
   levelWord,
+  studentLevelText,
+  studentMarkText,
+  studentLevelChange,
+  studentGradeText,
+  studentGroupGradeText,
+  studentLevelBarPercent,
+  studentLevelStep,
   studentGradeBadges,
   reportingBasis,
   viewedReportTerm,

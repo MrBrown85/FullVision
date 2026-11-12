@@ -81,10 +81,13 @@ window.GradeReport = (function () {
   }
 
   /* Which mark columns the class shows: the percent in a Letter or Both
-     class. The assignments are the point, so no proficiency words. */
+     class. byName: a Proficiency or Both class prints a level as its
+     proficiency ("Proficient +"), never a figure out of 4 (DECISIONS,
+     "Student-facing levels are proficiencies", 2026-11-12), so its Score
+     column is wide enough for the word. */
   function columnsFor(cid) {
     var mode = typeof courseGradeMode === 'function' ? courseGradeMode(cid) : 'proficiency';
-    return { percent: mode !== 'proficiency' };
+    return { percent: mode !== 'proficiency', byName: mode !== 'letter' };
   }
 
   function _when(d) {
@@ -145,8 +148,16 @@ window.GradeReport = (function () {
         row.outOf = formatPoints(max);
         row.percent = formatPointsPercent(cv.value, max);
       } else if (cv.kind === 'level' && cv.value > 0) {
-        row.score = levelFigure(cv.value);
-        row.outOf = '4';
+        // A Letter class prints the level out of 4 as it always has; a
+        // Proficiency or Both class prints its name with its + or −
+        // (calc.js nearestScoreLevelName), the Both class's % in its own
+        // column.
+        if (courseGradeMode(cid) === 'letter') {
+          row.score = levelFigure(cv.value);
+          row.outOf = '4';
+        } else {
+          row.score = nearestScoreLevelName(cv.value);
+        }
         row.percent = cv.percentText;
       } else return;
       out.push(row);
@@ -178,7 +189,14 @@ window.GradeReport = (function () {
         var count = work.filter(function (a) {
           return shown[a.id];
         }).length;
-        return { name: c.name, weight: Number(c.weight || 0), count: count, grade: (g && g.text) || '—' };
+        // As a student reads it (calc.js studentGroupGradeText): the
+        // proficiency in a Proficiency class, never its figure.
+        return {
+          name: c.name,
+          weight: Number(c.weight || 0),
+          count: count,
+          grade: studentGroupGradeText(cid, g) || '—',
+        };
       })
       .filter(Boolean);
   }
@@ -204,7 +222,8 @@ window.GradeReport = (function () {
     cols.push(['date', 'Date', '42px', ''], ['title', 'Assignment', 'minmax(0,1fr)', '']);
     if (!two) cols.push(['category', 'Category', null, '']);
     // Score holds "Incomplete"; the note "Excused" in bold.
-    cols.push(['score', 'Score', two ? '54px' : '64px', 'r']);
+    // A proficiency ("Developing −") needs more room than a figure.
+    cols.push(['score', 'Score', show.byName ? (two ? '66px' : '80px') : two ? '54px' : '64px', 'r']);
     cols.push(['outOf', 'Out Of', two ? '34px' : '40px', 'r']);
     if (show.percent) cols.push(['percent', '%', two ? '32px' : '36px', 'r']);
     cols.push(['note', '', two ? '46px' : '52px', '']);
@@ -392,7 +411,7 @@ window.GradeReport = (function () {
      and the missing work count. */
   function _tailHtml(cid, student, opts, ctx) {
     var html = '';
-    var term = studentGradeSummary(cid, student.id, ctx && ctx.termId).text;
+    var term = studentGradeText(cid, student.id, ctx && ctx.termId).text;
     if (opts.summary) {
       var cats = categorySummary(cid, student, opts);
       if (cats.length) {

@@ -148,7 +148,8 @@ describe.each(['proficiency', 'letter', 'both'])('a %s class', system => {
 
   it('the overall grade is calc.js’s on returned work', () => {
     const l = learningOf();
-    const want = withReturnedOnly(() => studentGradeSummary(CID, S1));
+    // As a student reads it: the proficiency, no figure out of 4 (DECISIONS, "Student-facing levels are proficiencies").
+    const want = withReturnedOnly(() => studentGradeText(CID, S1));
     expect(l.mode).toBe(system);
     expect(l.overall.text).toBe(want.text);
     expect(l.overall.level).toBe(want.level);

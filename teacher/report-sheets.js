@@ -199,8 +199,13 @@ window.ReportSheets = (function () {
           ],
           groups: true,
         },
-        { key: 'score', label: 'Score out of 4', def: true },
-        { key: 'word', label: 'Proficiency Word', def: 'auto' },
+        // Students and families read a proficiency, never a figure out of
+        // 4 (DECISIONS, "Student-facing levels are proficiencies",
+        // 2026-11-12): a Proficiency class prints the word whatever these
+        // say, so neither is offered there; a Both class's Score is its %.
+        // hideIn and labelIn are read by the Studio's inspector.
+        { key: 'score', label: 'Score out of 4', def: true, hideIn: ['proficiency'], labelIn: { both: 'Percent' } },
+        { key: 'word', label: 'Proficiency Word', def: 'auto', hideIn: ['proficiency', 'both'] },
         { key: 'change', label: 'Change', def: true },
         { key: 'assessed', label: 'Assessed Count', def: true },
         { key: 'overall', label: 'Overall', def: true },

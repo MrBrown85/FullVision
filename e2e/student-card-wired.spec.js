@@ -76,18 +76,16 @@ for (const size of [
       // The Assignments list: returned results only.
       await expect(page.getByRole('heading', { name: 'Assignments' })).toBeAttached();
       await showAll(page);
-      await expect(row(page, 'Energy Transfer Investigation').locator('.sp-row-result')).toHaveText('4.0');
-      await expect(row(page, 'Energy Transfer Investigation').locator('.sp-row-sub')).toHaveText(
-        /^Back \S+ \d+ · Extending$/,
-      );
-      await expect(row(page, 'Cell Microscope Lab').locator('.sp-row-result')).toHaveText('2.7');
+      await expect(row(page, 'Energy Transfer Investigation').locator('.sp-row-result')).toHaveText('Extending');
+      await expect(row(page, 'Energy Transfer Investigation').locator('.sp-row-sub')).toHaveText(/^Back \S+ \d+$/);
+      await expect(row(page, 'Cell Microscope Lab').locator('.sp-row-result')).toHaveText('Proficient −');
       await expect(row(page, 'Cell Structure Quiz').locator('.sp-row-result')).toHaveText('8 / 10');
       await expect(row(page, 'Lab Safety Contract').locator('.sp-row-result')).toHaveText('Complete');
       await expect(row(page, 'Lab Safety Contract').locator('.sp-row-sub')).toHaveText(/^Back \S+ \d+ · Updated$/);
       await expect(row(page, 'Immune System Quick Check').locator('.sp-row-sub')).toHaveText(/^Missing · Due /);
       await expect(row(page, 'Immune System Quick Check').locator('.sp-row-result')).toHaveCount(0);
       await expect(row(page, 'Disease Research Poster').locator('.sp-row-result')).toHaveCount(0);
-      await expect(row(page, 'Ecosystem Connections Essay').locator('.sp-row-result')).toHaveText('2.0');
+      await expect(row(page, 'Ecosystem Connections Essay').locator('.sp-row-result')).toHaveText('Developing');
       expect(await page.locator('#app').innerHTML()).not.toMatch(/draft|Demo Mode/i);
       await expect(page.getByRole('button', { name: 'Done' })).toBeVisible();
       await expect(page.getByRole('heading', { name: 'Assignments' })).toBeFocused();
@@ -414,7 +412,7 @@ test.describe('a real card: a class graded by letter, and by both', () => {
 
   for (const [system, four, quiz] of [
     ['letter', '100%', '8 / 10'],
-    ['both', '4.0 · 100%', '8 / 10'],
+    ['both', 'Extending · 100%', '8 / 10'],
   ]) {
     test(`a ${system} class reads as its teacher’s gradebook does`, async ({ page }) => {
       const fn = school({ page: samplePage(TODAY, system) });

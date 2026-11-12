@@ -271,7 +271,7 @@ describe('Send My Revision, with Unsend and Replace until grading starts', () =>
 });
 
 describe('Before and After (the boards "Before and After a Revision" and "… on a Chromebook")', () => {
-  it('the board’s worked example: 2.7 · 67% before, 3.0 · 75% after, with each row and both versions', async () => {
+  it('the board’s worked example: Proficient − · 67% before, Proficient · 75% after, with each row and both versions', async () => {
     const page = await demo();
     await page.click('[data-segment="back"]');
     const card = cardOf(page, 'demo-vaccine');
@@ -292,17 +292,21 @@ describe('Before and After (the boards "Before and After a Revision" and "… on
       ['Communicating', 'Developing +', 'Proficient'],
       ['Questioning and Predicting', 'No change', 'Proficient'],
     ]);
-    expect(parts(q(page, '.sp-ba-result .sp-ba-row'))).toEqual(['Your Result', '2.7 · 67%', '3.0 · 75%']);
+    expect(parts(q(page, '.sp-ba-result .sp-ba-row'))).toEqual([
+      'Your Result',
+      'Proficient − · 67%',
+      'Proficient · 75%',
+    ]);
     expect(qa(page, '.sp-ba-said-title').map(words)).toEqual(['Your Teacher Asked', 'You Did']);
     expect(qa(page, '.sp-ba-words').map(words)).toEqual([
       'Add a third example of how the body remembers a germ.',
       'I added how a booster shot reminds the body about a germ it has met before.',
     ]);
     // The grade now is the new one, everywhere on the page.
-    expect(piece(page, 'demo-vaccine').result.text).toBe('3.0 · 75%');
+    expect(piece(page, 'demo-vaccine').result.text).toBe('Proficient · 75%');
     await page.click('.sp-ba [data-act="feedback"]');
     expect(page.T.state().compare).toBe(false);
-    expect(text(page, '.sp-fb-big')).toBe('Proficient');
+    expect(text(page, '.sp-fb-big')).toBe('Proficient · 75%');
     expect(page.root().innerHTML).not.toMatch(/Rivera/);
   });
 

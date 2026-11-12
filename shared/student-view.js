@@ -356,9 +356,20 @@ window.StudentView = (function () {
     var out = { kind: 'none', text: '', word: '' };
     if (!cell) return out;
     if (cell.kind === 'level') {
+      // A level reads as its proficiency with its + or − (calc.js
+      // studentMarkText), never a figure out of 4 (DECISIONS,
+      // "Student-facing levels are proficiencies", 2026-11-12):
+      // "Proficient +" in a Proficiency class, "Proficient + · 83%" in a
+      // Both class (the piece's %), the gradebook cell's % in a Letter
+      // class. The word is in the text, so it is not said again beside it.
       out.kind = 'level';
-      out.text = str(cell.text);
-      out.word = levelWord(cid, cell.value) || '';
+      if (courseGradeMode(cid) === 'letter') {
+        out.text = str(cell.text);
+        out.word = levelWord(cid, cell.value) || '';
+      } else {
+        out.text = studentMarkText(cid, cell.value, cell.percentText);
+        out.word = '';
+      }
       out.level = num(cell.level) || 0;
     } else if (cell.kind === 'points') {
       var max = num(a.max_points) || 100;
@@ -1240,7 +1251,9 @@ window.StudentView = (function () {
       id: p.id,
       title: p.title,
       date: p.dueDate || p.date || '',
-      value: value,
+      // Placed by the step it is named by, so the dot's height says no
+      // more than its name (calc.js studentLevelStep).
+      value: letter ? value : studentLevelStep(value),
       level: bandOf(value),
       text: letter ? formatLevel(cid, value) : scoreLevelText(whole, e.mod) || levelText(cid, value),
       code: letter ? '' : levelCode(value),
@@ -1456,7 +1469,8 @@ window.StudentView = (function () {
       var badges = studentGradeBadges(cid, sid);
       var summary = studentGradeSummary(cid, sid);
       var overall = {
-        text: summary.text,
+        // No figure out of 4 (calc.js studentGradeText).
+        text: studentGradeText(cid, sid).text,
         level: summary.level,
         word: badges.prof ? levelWord(cid, getOverallProficiency(cid, sid)) : '',
         letter: badges.letter ? { grade: str(badges.letter.grade), pct: str(badges.letter.pct) } : null,

@@ -719,6 +719,13 @@ const NO_SCORE = new Set([
   'wholePercent',
   'oneDecimal',
   'nearestScoreLevelName',
+  // A level it is given, as a student reads it (calc.js; DECISIONS, "Student-facing levels are proficiencies").
+  'studentLevelText',
+  'studentMarkText',
+  'studentLevelChange',
+  'studentGroupGradeText',
+  'studentLevelBarPercent',
+  'studentLevelStep',
 ]);
 
 // Each drawing of the class takes a few seconds; a slow runner gets a minute.

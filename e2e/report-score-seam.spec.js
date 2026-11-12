@@ -54,6 +54,13 @@ async function watch(page) {
       'wholePercent',
       'oneDecimal',
       'nearestScoreLevelName',
+      // A level it is given, as a student reads it (calc.js; DECISIONS, "Student-facing levels are proficiencies").
+      'studentLevelText',
+      'studentMarkText',
+      'studentLevelChange',
+      'studentGroupGradeText',
+      'studentLevelBarPercent',
+      'studentLevelStep',
     ];
     Object.keys(Calc)
       .filter(name => typeof window[name] === 'function' && NO_SCORE.indexOf(name) < 0)

@@ -558,7 +558,8 @@ describe('grade-report', () => {
         percent: '80%',
         note: 'Late',
       });
-      expect(rows[1]).toMatchObject({ category: 'Labs', score: '3.3', outOf: '4', note: '' });
+      // A level reads as its proficiency, no figure out of 4 (DECISIONS, "Student-facing levels are proficiencies").
+      expect(rows[1]).toMatchObject({ category: 'Labs', score: 'Proficient +', outOf: '', note: '' });
       expect(rows[0]).not.toHaveProperty('word');
       expect(rows[2]).toMatchObject({ score: '', outOf: '', note: 'Missing' });
       expect(rows[3]).toMatchObject({ score: 'Complete', outOf: '' });
@@ -613,11 +614,11 @@ describe('grade-report', () => {
 
     it('shows the percent in a Letter or Both class, and never a proficiency word', () => {
       seed('letter');
-      expect(G.columnsFor(CID)).toEqual({ percent: true });
+      expect(G.columnsFor(CID)).toEqual({ percent: true, byName: false });
       seed('proficiency');
-      expect(G.columnsFor(CID)).toEqual({ percent: false });
+      expect(G.columnsFor(CID)).toEqual({ percent: false, byName: true });
       seed('both');
-      expect(G.columnsFor(CID)).toEqual({ percent: true });
+      expect(G.columnsFor(CID)).toEqual({ percent: true, byName: true });
     });
   });
 

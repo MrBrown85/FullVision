@@ -62,6 +62,16 @@ function ungradedCell(cid) {
 const student = (cid, sid) => getStudents(cid).find(s => s.id === sid);
 const ctx = { termId: 'term-1', termLabel: 'Report 1' };
 
+/* The phone copy reads words, not figures (DECISIONS, "Student-facing levels
+   are proficiencies"), so a word may not move when a level does: what the
+   copy is built from is the overall level in Sent to Phones' set of scores,
+   with the copy's own overall beside it. */
+const phoneReads = (cid, st, ctx) =>
+  JSON.stringify([
+    ReportScores.withReportScores('phones', () => getOverallProficiency(cid, st.id)),
+    PhoneReports.snapshot(cid, st, ctx).overall,
+  ]);
+
 describe('the Term Questionnaire and Sent to Phones in a class that holds grades', { timeout: 120000 }, () => {
   let wasDemo;
   beforeAll(() => {
@@ -90,7 +100,7 @@ describe('the Term Questionnaire and Sent to Phones in a class that holds grades
     const st = student(cid, sid);
     const before = {
       overall: getOverallProficiency(cid, sid),
-      phone: PhoneReports.snapshot(cid, st, ctx).overall.text,
+      phone: phoneReads(cid, st, ctx),
       facts: JSON.stringify(CommentBank.facts(cid, st, ctx.termId)),
     };
     crits.forEach(c => Grader.setLevel(cid, sid, lab.id, c.id, 1, 0));
@@ -100,14 +110,14 @@ describe('the Term Questionnaire and Sent to Phones in a class that holds grades
     // The teacher's own number moved.
     expect(getOverallProficiency(cid, sid)).not.toBe(before.overall);
     // What a family reads did not.
-    expect(PhoneReports.snapshot(cid, st, ctx).overall.text).toBe(before.phone);
+    expect(phoneReads(cid, st, ctx)).toBe(before.phone);
     expect(JSON.stringify(CommentBank.facts(cid, st, ctx.termId))).toBe(before.facts);
     // Returned, it moves there too.
     Grader.returnGrades(cid, lab.id, [sid]);
     clearProfCache();
     freshGenerate();
     expect(JSON.stringify(CommentBank.facts(cid, st, ctx.termId))).not.toBe(before.facts);
-    expect(PhoneReports.snapshot(cid, st, ctx).overall.text).not.toBe(before.phone);
+    expect(phoneReads(cid, st, ctx)).not.toBe(before.phone);
   });
 
   it('a class with drafts: no questionnaire part, Generate draft or phone copy holds a draft’s value until it is returned', () => {

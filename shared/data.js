@@ -2409,7 +2409,7 @@ function _rekeyField(field, cid, transform) {
     }
   }
   if (_hasServerState(field, cid)) transform(_serverState[field][cid]);
-  if (field === 'statuses' || _WITHDRAWN_RECORD_FIELDS[field]) _rekeyWithdrawnRecords(field, cid, transform);
+  if (field === 'statuses' || _withdrawnRecordFields()[field]) _rekeyWithdrawnRecords(field, cid, transform);
 }
 
 /* A withdrawn student's records (getWithdrawnStudents) hold the same values
@@ -15428,18 +15428,23 @@ window.v2.getAssessmentDetail = function (assessmentId) {
                re-enrol brings them back.
 
    Permanent delete (delete_withdrawn_student) is the second step and only
-   takes a withdrawn student. */
-var _WITHDRAWN_RECORD_FIELDS = {
-  scores: getScores,
-  goals: getGoals,
-  reflections: getReflections,
-  notes: getNotes,
-  flags: getFlags,
-  observations: getQuickObs,
-  termRatings: getTermRatings,
-  overrides: getOverrides,
-  studentProfileSummaries: getStudentProfileSummaries,
-};
+   takes a withdrawn student.
+
+   The table is built when it is read, not while this file loads, so a
+   getter can live in a file that loads later. */
+function _withdrawnRecordFields() {
+  return {
+    scores: getScores,
+    goals: getGoals,
+    reflections: getReflections,
+    notes: getNotes,
+    flags: getFlags,
+    observations: getQuickObs,
+    termRatings: getTermRatings,
+    overrides: getOverrides,
+    studentProfileSummaries: getStudentProfileSummaries,
+  };
+}
 
 function getWithdrawnStudents(cid) {
   if (_cache.withdrawn[cid] !== undefined) return _cache.withdrawn[cid];
@@ -15464,8 +15469,9 @@ function _withdrawnIds(cid) {
    baselines keeps a later save from clearing their scores on the server. */
 function _takeStudentRecords(cid, sid) {
   var records = {};
-  Object.keys(_WITHDRAWN_RECORD_FIELDS).forEach(function (field) {
-    var all = _WITHDRAWN_RECORD_FIELDS[field](cid) || {};
+  var fields = _withdrawnRecordFields();
+  Object.keys(fields).forEach(function (field) {
+    var all = fields[field](cid) || {};
     if (all[sid] === undefined) return;
     records[field] = _cloneValue(all[sid]);
     delete all[sid];
@@ -15491,9 +15497,10 @@ function _takeStudentRecords(cid, sid) {
    so the baselines get them too. */
 function _putStudentRecords(cid, sid, records) {
   records = records || {};
-  Object.keys(_WITHDRAWN_RECORD_FIELDS).forEach(function (field) {
+  var fields = _withdrawnRecordFields();
+  Object.keys(fields).forEach(function (field) {
     if (records[field] === undefined) return;
-    var all = _WITHDRAWN_RECORD_FIELDS[field](cid) || {};
+    var all = fields[field](cid) || {};
     if (all[sid] !== undefined) return;
     all[sid] = records[field];
     _saveCourseField(field, cid, all);

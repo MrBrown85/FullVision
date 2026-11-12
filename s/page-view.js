@@ -2122,6 +2122,22 @@ window.StudentPageView = (function () {
     return '<span class="sp-ml-level">' + miniBarsHtml(s.level) + chipHtml(s.text, s.level) + '</span>';
   }
 
+  /* What a ladder says to a screen reader: the proficiency and the four
+     names, no number for a level (DECISIONS, "Student-facing levels are
+     proficiencies", 2026-11-12). */
+  function ladderLabel(l, level) {
+    return (
+      'You are at ' +
+      stepName(l, level) +
+      ', on the steps ' +
+      l.steps
+        .map(function (st) {
+          return st.name;
+        })
+        .join(', ')
+    );
+  }
+
   /* The four steps, Emerging to Extending, rising, every step reached in
      the student's own level's colour, You outlined on the one reached.
      `label` names the ladder for a screen reader; `named` writes each
@@ -2226,7 +2242,7 @@ window.StudentPageView = (function () {
       '</span></p>' +
       trendHtml(l) +
       '</div>' +
-      ladderHtml(l.steps, o.level, 'Step ' + o.level + ' of 4: ' + stepName(l, o.level), false) +
+      ladderHtml(l.steps, o.level, ladderLabel(l, o.level), false) +
       '</section>'
     );
   }
@@ -2524,9 +2540,7 @@ window.StudentPageView = (function () {
     var where = '';
     if (levels && s.level) {
       where =
-        '<section class="sp-ml-card">' +
-        ladderHtml(l.steps, s.level, 'You are at ' + stepName(l, s.level) + ', step ' + s.level + ' of 4', true) +
-        '</section>';
+        '<section class="sp-ml-card">' + ladderHtml(l.steps, s.level, ladderLabel(l, s.level), true) + '</section>';
     } else if (s.text) {
       where = '<section class="sp-ml-card"><ul class="sp-ml-rows">' + skillRowHtml(s) + '</ul></section>';
     }

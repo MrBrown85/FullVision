@@ -576,7 +576,8 @@ describe('stage 3 blocks', () => {
     focusClass();
     const html = ReportBlocks.renderReportBlock('next-steps', CID, CECE, {}, {});
     expect(text(html)).toBe(
-      'Next Steps Share “I can explain my thinking to myself and others” Latest: Poster, Oct 20 · 2.7 / 4 Proficient',
+      // The mark as a student reads it: the level with its ± (DECISIONS, "Student-facing levels are proficiencies").
+      'Next Steps Share “I can explain my thinking to myself and others” Latest: Poster, Oct 20 · Proficient −',
     );
     expect(html).not.toMatch(/[●○]/);
     const two = text(ReportBlocks.renderReportBlock('next-steps', CID, CECE, {}, { areas: 'two', latest: false }));
@@ -615,9 +616,9 @@ describe('stage 3 blocks', () => {
       expect(prof).toMatch(/Plan \d+% 83% [+−]?\d+% 3/);
       COURSES[CID].gradingSystem = 'both';
       expect(text(ReportBlocks.renderReportBlock('next-steps', CID, CECE, {}, {}))).toContain(
-        'Latest: Poster, Oct 20 · 2.7 / 4 · 67% Proficient',
+        'Latest: Poster, Oct 20 · Proficient − · 67%',
       );
-      // Both: Proficiency shows the level and the %, and the change in levels.
+      // Both: Proficiency shows the proficiency and the %, and the change in words, no figure out of 4.
       const both = text(
         ReportBlocks.renderReportBlock(
           'proficiency',
@@ -627,9 +628,10 @@ describe('stage 3 blocks', () => {
           S.optionsFor({ block: 'proficiency' }, ReportBlocks.showDefaults(CID)),
         ),
       );
-      expect(both).toMatch(/Plan [\d.]+ · \d+% Proficient 3\.3 · 83% Proficient [+−]?\d\.\d 3/);
+      expect(both).toMatch(/Plan \w+ · \d+% Proficient · 83% (Same|↑ Up|↓ Down) 3/);
+      expect(both).not.toMatch(/\d\.\d/);
       expect(text(ReportBlocks.renderReportBlock('progress', CID, CECE, {}, {}))).toContain(
-        'Now 2.7 · 68% Proficient (−0.3 this term)',
+        'Now Proficient · 68% (Same this term)',
       );
     } finally {
       COURSES[CID].gradingSystem = 'proficiency';
@@ -640,10 +642,10 @@ describe('stage 3 blocks', () => {
     focusClass();
     const html = ReportBlocks.renderReportBlock('support-home', CID, CECE, {}, { note: 'Read together each night.' });
     expect(text(html)).toBe(
-      'Ways to Support at Home Ask to see Lab Report, Sep 10 · 3.0 / 4 Proficient Ask about Poster, Oct 20 · 2.7 / 4 Proficient, her lowest this term Read together each night.',
+      'Ways to Support at Home Ask to see Lab Report, Sep 10 · Proficient Ask about Poster, Oct 20 · Proficient −, her lowest this term Read together each night.',
     );
     expect(text(ReportBlocks.renderReportBlock('support-home', CID, CECE, {}, { about: false }))).toBe(
-      'Ways to Support at Home Ask to see Lab Report, Sep 10 · 3.0 / 4 Proficient',
+      'Ways to Support at Home Ask to see Lab Report, Sep 10 · Proficient',
     );
     stub('getTagScores', () => []);
     expect(ReportBlocks.renderReportBlock('support-home', CID, CECE, {}, {})).toBe('');
@@ -654,17 +656,20 @@ describe('stage 3 blocks', () => {
     const html = ReportBlocks.renderReportBlock('progress', CID, CECE, {}, {});
     const t = text(html);
     expect(t).toContain('Progress: Share · Communicating Focus area (biggest change)');
-    expect(t).toContain('Start of term 3.0 Proficient Now 2.7 Proficient (−0.3 this term)');
-    expect(t).toContain('Best Lab Report, Sep 10 · 3.0 / 4');
-    expect(t).toContain('Latest Poster, Oct 20 · 2.7 / 4');
+    // Words, not figures: 3.0 to 2.7 is Proficient both times (DECISIONS, "Student-facing levels are proficiencies").
+    expect(t).toContain('Start of term Proficient Now Proficient (Same this term)');
+    expect(t).toContain('Best Lab Report, Sep 10 · Proficient');
+    expect(t).toContain('Latest Poster, Oct 20 · Proficient −');
     expect(t).toContain('Working toward “I can explain my thinking to myself and others”');
-    expect(t).toContain('Date Every score this term Score Sep 10 Lab Report 3.0 Oct 5 Quiz 2.7 Oct 20 Poster 2.7');
+    expect(t).toContain(
+      'Date Every score this term Score Sep 10 Lab Report Proficient Oct 5 Quiz Proficient − Oct 20 Poster Proficient −',
+    );
     expect(html).not.toMatch(/[●○]/);
     const high = text(
       ReportBlocks.renderReportBlock('progress', CID, CECE, {}, { area: 'highest', list: false, toward: false }),
     );
     expect(high).toContain('Progress: Plan · Planning Highest now');
-    expect(high).toContain('Now 3.3 Proficient (+0.3 this term)');
+    expect(high).toContain('Now Proficient (Same this term)');
     expect(high).not.toContain('Every score');
     expect(high).not.toContain('Working toward');
     expect(ReportBlocks.renderReportBlock('progress', CID, CECE, {}, { size: 'half' })).toContain(
@@ -960,12 +965,18 @@ describe('stage 3 blocks', () => {
     // Assessed counts each assessment once, however many competencies it scored.
     // A competency with too few dated scores starts at its first piece, as
     // Progress in One Area prints it (step 4 group 3 #63).
-    expect(t).toContain('Overall 3.5 Extending 3.3 Proficient −0.2 2');
-    expect(t).toContain('Question and Predict 3.0 Proficient 3.2 Proficient +0.2 2');
-    expect(t).toContain('Plan Investigations 4.0 Extending 3.4 Proficient −0.6 1');
+    // A Proficiency class prints each level as its proficiency and the change in words, never a figure
+    // (DECISIONS, "Student-facing levels are proficiencies"): 3.5 to 3.3 is Extending to Proficient.
+    expect(t).toContain('Overall Extending Proficient ↓ Down 2');
+    expect(t).toContain('Question and Predict Proficient Proficient Same 2');
+    expect(t).toContain('Plan Investigations Extending Proficient ↓ Down 1');
     expect(t).toContain('Evaluate Methods — — — 0');
-    expect(t).toContain('Highest now: Plan Investigations 3.4. Best work: Quiz (Oct 5), 3.7 / 4.');
-    expect(t).toContain('Lowest now: Question and Predict 3.2. Lowest work: Lab Report (Sep 10), 3.0 / 4.');
+    // 3.2 and 3.4 both read Proficient: one Highest line names both, in report order, and no Lowest line.
+    expect(t).toContain(
+      'Highest now: Question and Predict and Plan Investigations Proficient. Best work: Quiz (Oct 5), Extending −.',
+    );
+    expect(t).not.toContain('Lowest now');
+    expect(t).not.toMatch(/\d\.\d|\/ 4/);
     expect(html).not.toMatch(/[●○]/);
     // Options: no word, no facts, hide empty rows, lowest first, no overall.
     const bare = text(
@@ -981,11 +992,12 @@ describe('stage 3 blocks', () => {
     expect(bare).not.toContain('Overall');
     expect(bare).not.toContain('Highest now');
     expect(bare.indexOf('Question and Predict')).toBeLessThan(bare.indexOf('Plan Investigations'));
-    expect(bare).toContain('Question and Predict 3.0 3.2 +0.2 2');
-    // Side by Side: short headings, no word.
+    expect(bare).toContain('Question and Predict Proficient Proficient Same 2');
+    // Side by Side: short headings; a Proficiency class still prints the proficiency, as it has no figure.
     const half = text(ReportBlocks.renderReportBlock('proficiency', CID, CECE, {}, { size: 'half' }));
     expect(half).toContain('Competency Start Now Change Ev.');
-    expect(half).not.toContain('Proficient');
+    expect(half).toContain('Overall Extending Proficient ↓ Down 2');
+    expect(half).not.toMatch(/\d\.\d/);
     // Folders. As Graded (the default) prints a folder the grade counts as
     // one as one row, averaged as calc.js does; the rest print one by one
     // under Other Competencies. Each Competency puts a heading over each
@@ -996,16 +1008,16 @@ describe('stage 3 blocks', () => {
     }));
     stub('getGroupProficiency', () => 3.3);
     const asGraded = text(ReportBlocks.renderReportBlock('proficiency', CID, CECE, {}, {}));
-    expect(asGraded).toContain('Inquiry · 2 competencies 3.5 Extending 3.3 Proficient −0.2 2');
+    expect(asGraded).toContain('Inquiry · 2 competencies Extending Proficient ↓ Down 2');
     expect(asGraded).not.toContain('Inquiry Question and Predict');
     expect(asGraded).toContain('Other Competencies Evaluate Methods');
     // The highest and lowest lines name what the report prints: the folder.
-    expect(asGraded).toContain('Highest now: Inquiry 3.3.');
+    expect(asGraded).toContain('Highest now: Inquiry Proficient.');
     const each = text(ReportBlocks.renderReportBlock('proficiency', CID, CECE, {}, { rows: 'each' }));
     expect(each).toContain('Inquiry Question and Predict');
     expect(each).toContain('Other Competencies Evaluate Methods');
     const byGroup = text(ReportBlocks.renderReportBlock('proficiency', CID, CECE, {}, { rows: 'group' }));
-    expect(byGroup).toContain('Inquiry · 2 competencies 3.5 Extending 3.3 Proficient −0.2 2');
+    expect(byGroup).toContain('Inquiry · 2 competencies Extending Proficient ↓ Down 2');
     expect(byGroup).toContain('Other Competencies Evaluate Methods');
     // A folder the grade doesn't count as one (Folders Count as One off, or
     // the folder's own switch off) prints its competencies under its name.
@@ -1033,7 +1045,8 @@ describe('stage 3 blocks', () => {
   it('the legend is one strip of four figures and words, two by two at Side by Side', () => {
     const row = ReportBlocks.renderReportBlock('legend', CID, CECE, {}, { size: 'row' });
     expect(text(row)).toBe(
-      'BC Proficiency Scale, out of 4 1 · Emerging Initial understanding 2 · Developing Partial understanding 3 · Proficient Complete understanding 4 · Extending Sophisticated understanding',
+      // Each level by its name, no number and no "out of 4" (DECISIONS, "Student-facing levels are proficiencies").
+      'BC Proficiency Scale Emerging Initial understanding Developing Partial understanding Proficient Complete understanding Extending Sophisticated understanding',
     );
     expect(row).not.toMatch(/[●○]/);
     expect(ReportBlocks.renderReportBlock('legend', CID, CECE, {}, { size: 'half' })).toContain('report-legend-half');
@@ -1075,7 +1088,10 @@ describe('stage 3 blocks', () => {
       { id: 'c2', name: 'Quizzes', weight: 60 },
     ]);
     stub('studentGradeSummary', () => ({ text: '3.1 · B 78%', level: 3 }));
-    stub('assessmentGroupGrade', (cid, sid, list) => ({ text: list.map(a => a.id).join('+') + ' grade' }));
+    // What a student reads of the course grade and a category's: the proficiency (calc.js studentGradeText,
+    // studentGroupGradeText; DECISIONS, "Student-facing levels are proficiencies").
+    stub('studentGradeText', () => ({ text: 'Proficient', level: 3 }));
+    stub('assessmentGroupGrade', (cid, sid, list) => ({ text: list.map(a => a.id).join('+') + ' grade', prof: 3.1 }));
     stub('getGroupedSections', () => ({ groups: [], ungrouped: [] }));
     stub('getSections', () => [
       { id: 'q', name: 'Questioning', tags: [{ id: 't1', label: 'Question and Predict' }] },
@@ -1107,11 +1123,13 @@ describe('stage 3 blocks', () => {
     // A proficiency class: score and word, no percent; newest first, by category.
     // The course grade sits in the title row; each category heading carries
     // its weight and the student's grade in it.
-    expect(t).toContain('Assignment Grades Course Grade 3.1 · B 78% This term · 3 assessments');
-    expect(t).toContain('Labs 40% of grade · a2 grade Oct 5 Plate Tectonics Presentation 3.3 / 4 Proficient');
+    // A level reads as its proficiency with its ±, once; points work is as it was.
+    expect(t).toContain('Assignment Grades Course Grade Proficient This term · 3 assessments');
+    expect(t).toContain('Labs 40% of grade · Proficient Oct 5 Plate Tectonics Presentation Proficient +');
     expect(t).toContain(
-      'Quizzes 60% of grade · a1+a3 grade Oct 12 Energy Forms Quiz Missing Sep 10 Chemical Formulas Quiz 12/15 Proficient',
+      'Quizzes 60% of grade · Proficient Oct 12 Energy Forms Quiz Missing Sep 10 Chemical Formulas Quiz 12/15 Proficient',
     );
+    expect(t).not.toMatch(/\d\.\d|\/ 4|out of 4/);
     const bare = text(
       ReportBlocks.renderReportBlock(
         'grade-table',
@@ -1123,7 +1141,7 @@ describe('stage 3 blocks', () => {
     );
     expect(bare).toContain('Assignment Grades This term · 3 assessments');
     expect(bare).toContain('Labs Oct 5 Plate Tectonics');
-    expect(t).toContain('Points shown as scored; other work scored out of 4.');
+    expect(t).toContain('Points shown as scored; other work shown as its proficiency.');
     expect(html).not.toMatch(/[●○]/);
     expect(html).toContain('report-grades-cols');
     expect(
@@ -1156,9 +1174,10 @@ describe('stage 3 blocks', () => {
       ),
     );
     expect(pct).toContain(
-      'September Sep 10 Chemical Formulas Quiz 12/15 · 80% October Oct 5 Plate Tectonics Presentation 3.3 / 4 · 83% Oct 12 Energy Forms Quiz Missing',
+      'September Sep 10 Chemical Formulas Quiz 12/15 · 80% October Oct 5 Plate Tectonics Presentation Proficient + Oct 12 Energy Forms Quiz Missing',
     );
-    expect(pct).not.toContain('Proficient');
+    // Word off still prints a level's proficiency, and a Proficiency class prints no % for a level.
+    expect(pct).not.toContain('83%');
     // By competency: the latest few pieces of work under each, marked on that competency.
     const comp = text(
       ReportBlocks.renderReportBlock(
@@ -1171,7 +1190,7 @@ describe('stage 3 blocks', () => {
     );
     expect(comp).toContain('This term · latest 1 for each competency');
     expect(comp).toContain(
-      'Question and Predict Oct 5 Plate Tectonics Presentation 3.3 / 4 Proficient Plan Investigations Oct 5 Plate Tectonics Presentation 3.3 / 4 Proficient',
+      'Question and Predict Oct 5 Plate Tectonics Presentation Proficient + Plan Investigations Oct 5 Plate Tectonics Presentation Proficient +',
     );
     expect(comp).toContain('Each mark is for that competency.');
     // Side by Side: one column, the last 10, never by competency.
@@ -1182,7 +1201,7 @@ describe('stage 3 blocks', () => {
       {},
       opts({ organize: 'competency', size: 'half' }),
     );
-    expect(text(half)).toContain('Assignment Grades Course Grade 3.1 · B 78% Last 10 Labs 40% of grade');
+    expect(text(half)).toContain('Assignment Grades Course Grade Proficient Last 10 Labs 40% of grade');
     expect(half).not.toContain('report-grades-cols');
     // A letter class starts with score and percent, no word.
     COURSES[CID].gradingSystem = 'letter';

@@ -307,9 +307,11 @@ load('teacher/grades-print.js');
 load('teacher/rubric-library.js');
 load('teacher/rubric-bank.js');
 load('teacher/grading-setup-copy.js');
+load('teacher/assign-descriptor-bar.js');
 load('teacher/assign-competency-picker.js');
 load('teacher/student-edit-dialog.js');
 load('teacher/student-groups.js');
+load('teacher/gradebook-chrome.js');
 load('teacher/router.js');
 
 // Restore real setTimeout after loading (tests may need it)

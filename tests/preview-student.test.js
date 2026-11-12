@@ -261,9 +261,12 @@ describe('the preview', () => {
     expect(rows.find(r => r.title === 'Draft Poster').result).toBe('');
     // The changed reflection shows the grade returned, not the draft.
     const reflect = getAssessments(CID).find(a => a.id === 'reflect');
-    const returned = withReturnedOnly(() => assessmentCellValue(CID, S1, reflect)).text;
+    // A Both class: the proficiency and the piece's %, never "3.0 · 75%"
+    // (DECISIONS, "Student-facing levels are proficiencies").
+    const shown = cell => studentMarkText(CID, cell.value, cell.percentText);
+    const returned = shown(withReturnedOnly(() => assessmentCellValue(CID, S1, reflect)));
     expect(rows.find(r => r.title === 'Changed Reflection').result).toBe(returned);
-    expect(assessmentCellValue(CID, S1, reflect).text).not.toBe(returned);
+    expect(shown(assessmentCellValue(CID, S1, reflect))).not.toBe(returned);
     expect(el.innerHTML).not.toMatch(SECRET);
     expect(text(el.querySelector('.sp-head-title'))).toBe('Socials 10');
     expect(text(el.querySelector('.sp-pill'))).toBe('Block C');

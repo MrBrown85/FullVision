@@ -160,7 +160,11 @@ var PhoneReports = (function () {
     var mode = courseGradeMode(cid);
     var overallV = getOverallProficiency(cid, st.id);
     // With the report's reporting basis: IE, or No Letter Grade for goals.
-    var summary = studentGradeSummary(cid, st.id, ctx.termId);
+    // As a student reads it (calc.js studentGradeText): no figure out of 4
+    // (DECISIONS, "Student-facing levels are proficiencies", 2026-11-12).
+    // A Both class's text is its letter and % alone: the word is above it.
+    var summary = studentGradeText(cid, st.id, ctx.termId);
+    var badges = mode === 'both' ? studentGradeBadges(cid, st.id, ctx.termId) : null;
     // The comment as the report card prints it: no [date], no passed deadline.
     var rating = getStudentTermRating(cid, st.id, ctx.termId) || {};
     var term = termNumber(ctx.termId);
@@ -174,7 +178,7 @@ var PhoneReports = (function () {
       issued: ctx.issued || new Date().toISOString(),
       overall: {
         mode: mode,
-        text: summary.text || '',
+        text: (badges ? badges.letter && badges.letter.text : summary.text) || '',
         level: summary.level || 0,
         word: levelWord(cid, overallV) || '',
       },
@@ -184,7 +188,7 @@ var PhoneReports = (function () {
         return {
           name: sec.shortName || sec.name,
           line: (tag && (tag.i_can_statements || [])[0]) || '',
-          text: formatLevel(cid, sp, ''),
+          text: studentLevelText(cid, sp, ''),
           word: levelWord(cid, sp) || '',
           level: sp > 0 ? roundLevel(sp) : 0,
         };
