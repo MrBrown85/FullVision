@@ -295,9 +295,17 @@ var StudentData = (function () {
         sensitive: x.sensitive === true,
       };
     });
+    // The competencies each rubric scores as a whole (rubric id → tag ids), and the class's grade level (2026111201).
+    var rubricTags = {};
+    var rt = obj(l.rubric_tags) || {};
+    Object.keys(rt).forEach(function (id) {
+      if (Array.isArray(rt[id])) rubricTags[id] = rt[id].map(str).filter(Boolean);
+    });
     return {
       overrides: overrides,
       nextSteps: steps,
+      rubricTags: rubricTags,
+      gradeLevel: text(c.grade_level),
       config: config,
       calcMethod: config.calcMethod,
       decayWeight: config.decayWeight,
@@ -380,6 +388,13 @@ var StudentData = (function () {
         return r && r.id;
       })
       .map(rubricFrom);
+    var learning = res.show_my_learning === true && obj(res.learning) ? learningFrom(res.learning) : null;
+    // A rubric that scores competencies as a whole names them, as the teacher's rubrics do (tagIds).
+    if (learning) {
+      rubrics.forEach(function (r) {
+        if (learning.rubricTags[r.id]) r.tagIds = learning.rubricTags[r.id].slice();
+      });
+    }
     var assessments = [];
     var grades = {};
     (res.assessments || []).forEach(function (row) {
@@ -417,7 +432,7 @@ var StudentData = (function () {
         // teacher (Colin's ruling 112, "Leave the name off.").
       },
       // My Learning (S13-W1): only when the class shows it and the server sent what it needs.
-      learning: res.show_my_learning === true && obj(res.learning) ? learningFrom(res.learning) : null,
+      learning: learning,
       // The class's competencies: name, code and I Can statements (blanks kept, as sent).
       tags: tagsFrom(res.tags),
       assessments: assessments,
@@ -472,6 +487,8 @@ var StudentData = (function () {
       G.COURSES[page.course.id].calcMethod = page.learning.calcMethod;
       if (page.learning.decayWeight != null) G.COURSES[page.course.id].decayWeight = page.learning.decayWeight;
       G.COURSES[page.course.id].timezone = page.learning.timezone;
+      // The grade level: unset, calc.js shows a whole % in grades 10 to 12 (getRoundWholePercent).
+      if (page.learning.gradeLevel) G.COURSES[page.course.id].gradeLevel = page.learning.gradeLevel;
     }
   }
 
