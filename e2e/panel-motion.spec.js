@@ -40,8 +40,11 @@ test.describe('with motion', () => {
     expect(mid).toBeLessThan(full);
     const mainMid = await mainWidth(page);
     expect(mainMid).toBeGreaterThan(mainFull);
+    // The toolbar's own class picker waits until the list is gone.
+    await expect(page.locator('.assess-course-select')).toBeHidden();
     await expect.poll(() => sidebarWidth(page)).toBe(0);
     await expect(page.locator('#page-layout')).not.toHaveClass(/sidebar-sliding/);
+    await expect(page.locator('.assess-course-select')).toBeVisible();
     await expect(page.locator('#gb-sidebar')).toBeHidden();
     await page.click('[data-action="toggleSidebar"]');
     await expect.poll(() => sidebarWidth(page)).toBe(full);
@@ -95,5 +98,19 @@ test.describe('with reduced motion', () => {
     expect(await helpWidth(page)).toBe(400);
     await page.click('[data-action="toggleHelp"]');
     await expect(page.locator('#help-panel')).toHaveCount(0);
+  });
+});
+
+test.describe('quick exits', () => {
+  test.use({ reducedMotion: 'no-preference' });
+
+  test('a dialog leaves at once and its copy fades away', async ({ page }) => {
+    await openDemo(page);
+    await page.evaluate(() => window.showConfirm('Delete?', 'Sure?', 'Delete', 'danger', () => {}));
+    await expect(page.locator('.confirm-overlay')).toHaveCount(1);
+    await page.keyboard.press('Escape');
+    // The real dialog is gone now; only a see-through copy is left.
+    expect(await page.locator('.confirm-overlay:not(.fv-leaving)').count()).toBe(0);
+    await expect(page.locator('.confirm-overlay')).toHaveCount(0);
   });
 });
