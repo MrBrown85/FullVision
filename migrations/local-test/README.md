@@ -2562,3 +2562,21 @@ Scenarios: `teacher` (the five functions: answers, refusals, a request sent twic
 Results (2026-11-11, PostgreSQL 17.11, embedded-postgres): `handouts_links.py` 285 of 285, of which 7 ran on the database without the file and 1 of those is the check the file must change (it failed there, as required); `mutate` 26 wrong versions, 26 noticed; `fingerprints check` every list current. The 31 functions the file calls or replaces have, on the local build, the md5 read from gradebook-prod (PostgreSQL 17.6) on Nov 11.
 
 Not verified here: the Storage service itself (`submissions_common.py` plays its part, written from its source), that the applying role may alter a policy on `storage.objects` (live's `supautils.policy_grants` lists the table for `postgres`; the pre-check reads it), pg_cron, the edge function, gradebook-prod.
+
+## My Learning sends the rest (2026111201)
+
+`my_learning_rest.py` exercises `../2026111201_my_learning_page_sends_rest.sql` on live as it is after Handouts and Links (`handouts_links.py`'s template with `2026111170` applied):
+
+```bash
+PGDATABASE=mlr python3 batch_c_common.py build
+PGDATABASE=mlr python3 my_learning_rest.py            # off, on, apply, undo
+```
+
+- `off`: with Show My Learning off, page's answer is the same text before and after the file.
+- `on`: `learning.course.grade_level` and `learning.rubric_tags` are added (only listed rubrics, only competencies still on the class, never another class's). With the two taken out, the answer is page's before the file.
+- `apply`: the guard, a second run, grants and attributes, and the md5 the header records.
+- `undo`: `my-learning-rest-undo.sql` restores the md5 the file found.
+
+The two fingerprints in the file were not read from a database. `8d8e3f9a…` is page as `2026111170` left it, from that file's own list. Rebuilding `pg_get_functiondef`'s text from the file gives the same md5, so `b460f6f2…` (page as this file leaves it) was worked out the same way.
+
+Result: **not run yet.** The machine this was written on has no PostgreSQL. Run it on a throwaway PostgreSQL 17 before the apply.

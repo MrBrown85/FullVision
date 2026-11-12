@@ -332,3 +332,50 @@ describe('student-submit: My Learning on the page (E9)', () => {
     expect(page.assessments[0].category_id).toBeNull();
   });
 });
+
+/* 2026111201: with Show My Learning on, page also sends the class's grade
+   level (learning.course.grade_level) and the competencies each rubric
+   scores as a whole (learning.rubric_tags). The edge hands both on, each as
+   its type, and only when the database sends them. */
+describe('student-submit: the grade level and whole-rubric competencies (2026111201)', () => {
+  const RUBRIC = '99999999-9999-4999-8999-999999999999';
+  const withRest = () => {
+    const r = clone(FROM_DB_ON);
+    r.learning.course.grade_level = '12';
+    r.learning.rubric_tags = { [RUBRIC]: [TAG, TAG_2], 'not-a-rubric-id': [TAG] };
+    return r;
+  };
+
+  it('handed on when sent: the grade level as text, each rubric id with its tag ids', async () => {
+    const page = JSON.parse(await phone(withRest()));
+    expect(page.learning.course.grade_level).toBe('12');
+    expect(page.learning.rubric_tags).toEqual({ [RUBRIC]: [TAG, TAG_2] });
+    // The rest of the page is E9's, unchanged.
+    delete page.learning.course.grade_level;
+    delete page.learning.rubric_tags;
+    expect(page).toEqual(ON);
+  });
+
+  it('a wrong type reads as none: a grade level not text is null, a tag that is not an id is left out', async () => {
+    const odd = withRest();
+    odd.learning.course.grade_level = 12;
+    odd.learning.rubric_tags = { [RUBRIC]: [TAG, 'x', 7, { id: TAG_2 }] };
+    const page = JSON.parse(await phone(odd));
+    expect(page.learning.course.grade_level).toBeNull();
+    expect(page.learning.rubric_tags).toEqual({ [RUBRIC]: [TAG] });
+  });
+
+  it('not sent (the database before the file): the page is E9’s, byte for byte', async () => {
+    const text = await phone(FROM_DB_ON);
+    expect(text).not.toContain('grade_level');
+    expect(text).not.toContain('rubric_tags');
+    expect(JSON.parse(text)).toEqual(ON);
+  });
+
+  it('off: neither is handed on, even if the database sent them', async () => {
+    const off = clone(FROM_DB_OFF);
+    off.learning_extra = { grade_level: '12' };
+    off.rubric_tags = { [RUBRIC]: [TAG] };
+    expect(await phone(off)).toBe(JSON.stringify(TODAY));
+  });
+});

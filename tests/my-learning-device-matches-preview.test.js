@@ -17,10 +17,9 @@
  *   s/student-data.js and drawn by shared/student-view.js in a context of
  *   their own, as on a phone.
  *
- * Every figure, word and list My Learning holds must be equal. A case that
- * fails only because the server does not send something yet is marked
- * it.fails, with what the server must send; when that change lands the case
- * passes, and the marker comes off.
+ * Every figure, word and list My Learning holds must be equal. `learning` is
+ * written as 2026111201's SQL builds it (E9 with grade_level and
+ * rubric_tags).
  */
 import './setup.js';
 import { readFileSync } from 'node:fs';
@@ -392,9 +391,16 @@ function databaseReply(klass) {
       timezone: 'America/Vancouver',
       folders_count_as_one: true,
       courses_count_equally: false,
+      // 2026111201: the class's grade level.
+      grade_level: o.gradeLevel,
       // Not on E9's list: the edge drops it.
       teacher_id: u(900),
     },
+    // 2026111201: the competencies each listed rubric scores as a whole.
+    rubric_tags: klass.rubric.rubricTags.reduce((out, x) => {
+      (out[x.rubric_id] = out[x.rubric_id] || []).push(x.tag_id);
+      return out;
+    }, {}),
     categories: CATEGORIES.map(k => Object.assign({ course_id: CID }, k)),
     section_overrides: Object.fromEntries(
       Object.entries(o.overrides).map(([sec, x]) => [sec, { level: x.level, date: x.date, reason: x.reason }]),
@@ -552,21 +558,18 @@ describe('My Learning on a student’s device equals Preview as Student', () => 
       expect(got).toEqual(want);
     });
 
-    // F2. Waits for the server: with rounding never chosen, a grade 10–12 class
-    // shows a whole %, which the device can only know from the class's grade
-    // level. student_submit.page must send learning.course.grade_level.
-    it.fails('a ' + system + ' class at grade 12 whose rounding was never chosen', async () => {
+    // F2: with rounding never chosen, a grade 10–12 class shows a whole %, which
+    // the device knows from learning.course.grade_level (2026111201).
+    it('a ' + system + ' class at grade 12 whose rounding was never chosen', async () => {
       const { want, got } = await compare({ system, gradeLevel: '12', roundPercent: null });
       expect(want.overall.text).toMatch(/\d%$/);
       expect(got).toEqual(want);
     });
   }
 
-  // Waits for the server: a rubric that scores a competency as a whole
-  // (rubric_tag) counts toward it only when the device knows which. page's
-  // rubrics send each criterion's tag_ids but not the whole rubric's:
-  // student_submit.page must send learning.rubric_tags (rubric id → tag ids).
-  it.fails('a rubric that scores a competency as a whole', async () => {
+  // A rubric that scores a competency as a whole (rubric_tag) counts toward it
+  // on the device from learning.rubric_tags (2026111201).
+  it('a rubric that scores a competency as a whole', async () => {
     const { want, got } = await compare({ system: 'letter', wholeRubric: true });
     expect(want.groups.flatMap(g => g.skills).find(s => s.id === SEC2).pieces.length).toBeGreaterThan(0);
     expect(got).toEqual(want);
