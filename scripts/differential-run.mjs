@@ -230,6 +230,10 @@ async function runMode(browser, urls, mode, opts) {
     }
 
     await compareNow(0, 'set-up', true);
+    // The students whose screens are read, for actions that want them.
+    const startView = await readView(sides[0].tab1);
+    const firstWho = screenWho(startView, mode);
+    const focus = [firstWho.student, ...firstWho.preview].filter(Boolean);
 
     async function setOffline(off) {
       offline = off;
@@ -290,7 +294,7 @@ async function runMode(browser, urls, mode, opts) {
           tabName = 'phone';
           args = phonePick(act.kind, rng, await readView(sides[0].phone));
         } else if (act.pick) {
-          args = act.pick(rng, await readView(sides[0][tabName]), { mode });
+          args = act.pick(rng, await readView(sides[0][tabName]), { mode, focus });
           if (!args) continue;
         } else args = {};
         chosen = act;

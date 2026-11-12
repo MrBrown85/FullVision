@@ -394,8 +394,11 @@ export const ACTIONS = [
   {
     kind: 'override',
     weight: 3,
-    pick(rng, view) {
-      const s = rng.pick(view.students);
+    pick(rng, view, ctx) {
+      // Half the time one of the students whose screens are read, so a
+      // hand-set level that does not reach a screen is seen.
+      const focus = view.students.filter(s => (ctx.focus || []).includes(s.id));
+      const s = focus.length && rng.chance(0.5) ? rng.pick(focus) : rng.pick(view.students);
       const sec = rng.pick(view.sections);
       return s && sec && { sid: s.id, sec, level: rng.pick([0, 1, 2, 3, 4]) };
     },

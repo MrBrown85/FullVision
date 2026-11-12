@@ -249,10 +249,13 @@ export async function readScreens(page, cid, who) {
     const [sid, aid] = who.grader;
     const cell = page.locator('#gb-data td.gb-scores-cell[data-sid="' + sid + '"][data-aid="' + aid + '"]');
     if (await cell.count()) {
+      await cell.scrollIntoViewIfNeeded();
       await cell.click();
-      await page.locator('.grader-dialog').waitFor({ timeout: 5000 });
-      await tick(page);
-      out.grader = await page.evaluate(() => document.querySelector('.grader-dialog').innerText);
+      // The grader can open on a timer, which waits for the run's clock.
+      if (await until(page, () => !!document.querySelector('.grader-dialog'))) {
+        await tick(page);
+        out.grader = await page.evaluate(() => document.querySelector('.grader-dialog').innerText);
+      } else out.grader = '(the grader did not open)';
       await closeOverlays(page);
     } else out.grader = '(no cell for the grader)';
   }
