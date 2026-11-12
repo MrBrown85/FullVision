@@ -1864,7 +1864,16 @@ describe('the page is redrawn only when the server’s rows would look different
 });
 
 describe('what the client names', () => {
-  const src = readFileSync(resolve(root, 'shared/data.js'), 'utf-8');
+  const src = [
+    'shared/data.js',
+    'shared/data-student-work.js',
+    'shared/data-feedback-live.js',
+    'shared/data-markup.js',
+    'shared/data-reflect.js',
+    'shared/data-revisions.js',
+  ]
+    .map(f => readFileSync(resolve(root, f), 'utf-8'))
+    .join('\n');
 
   it('the server’s return and its list of rows, each at one call site the drift check can read', () => {
     expect(src.match(/_writeRpc\('return_grades'/g).length).toBe(1);

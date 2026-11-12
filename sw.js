@@ -37,6 +37,7 @@ const PRECACHE_URLS = [
   '/shared/data-feedback-live.js',
   '/shared/data-markup.js',
   '/shared/data-reflect.js',
+  '/shared/data-revisions.js',
   '/shared/data-demo.js',
   '/shared/data-curriculum-index.js',
   '/shared/offline-queue.js',

@@ -273,7 +273,16 @@ describe('a class the server keeps no student-page rows for', () => {
   });
 
   it('data.js names the Mark Up functions at call sites the drift check can read (S9-W1)', () => {
-    const src = readFileSync('shared/data.js', 'utf-8') + readFileSync('shared/data-feedback-live.js', 'utf-8');
+    const src = [
+      'shared/data.js',
+      'shared/data-student-work.js',
+      'shared/data-feedback-live.js',
+      'shared/data-markup.js',
+      'shared/data-reflect.js',
+      'shared/data-revisions.js',
+    ]
+      .map(f => readFileSync(f, 'utf-8'))
+      .join('\n');
     expect(src.match(/_writeRpc\(\s*'save_markup'/g).length).toBe(1);
     expect(src.match(/_writeRpc\('return_work'/g).length).toBe(2);
     expect(src.match(/_callRpcWithAuthGuard\(\s*'list_assessment_markup'/g).length).toBe(1);

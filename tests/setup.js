@@ -242,6 +242,7 @@ load('shared/data-student-work.js');
 load('shared/data-feedback-live.js');
 load('shared/data-markup.js');
 load('shared/data-reflect.js');
+load('shared/data-revisions.js');
 load('shared/data-demo.js');
 load('shared/data-curriculum-index.js');
 load('shared/calc.js');

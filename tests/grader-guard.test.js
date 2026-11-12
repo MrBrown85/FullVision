@@ -57,8 +57,11 @@ const WRITERS = [
 // builds the Demo class by saving whole lists, before any screen is open.
 const EXEMPT = new Set([
   'shared/data.js',
+  'shared/data-student-work.js',
   'shared/data-feedback-live.js',
   'shared/data-markup.js',
+  'shared/data-reflect.js',
+  'shared/data-revisions.js',
   'shared/grader.js',
   'shared/seed-data.js',
 ]);
@@ -85,8 +88,16 @@ function count(src) {
 
 describe('grades are written only through shared/grader.js', () => {
   it('every writer in the list is a function in shared/data.js', () => {
-    const data =
-      readFileSync(join(ROOT, 'shared/data.js'), 'utf-8') + readFileSync(join(ROOT, 'shared/data-markup.js'), 'utf-8');
+    const data = [
+      'shared/data.js',
+      'shared/data-student-work.js',
+      'shared/data-feedback-live.js',
+      'shared/data-markup.js',
+      'shared/data-reflect.js',
+      'shared/data-revisions.js',
+    ]
+      .map(f => readFileSync(join(ROOT, f), 'utf-8'))
+      .join('\n');
     const missing = WRITERS.filter(name => !new RegExp('^function ' + name + '\\(', 'm').test(data));
     expect(missing).toEqual([]);
   });
