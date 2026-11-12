@@ -21427,6 +21427,7 @@ window.loadSeedIfNeeded = function () {
   if (typeof seedIfNeeded === 'function') {
     return bank.then(function () {
       seedIfNeeded();
+      applyDemoStudentPage();
     });
   }
   // User deliberately wiped all data — never auto-seed
@@ -21434,8 +21435,42 @@ window.loadSeedIfNeeded = function () {
   // Lazy-load the script, then seed
   return Promise.all([_loadSeedScript(), bank]).then(function () {
     if (typeof seedIfNeeded === 'function') seedIfNeeded();
+    applyDemoStudentPage();
   });
 };
+
+/* The front page's Try Demo Mode link starts Demo Mode with the student
+   features showing (login-auth.js sets DEMO_STUDENT_KEY to 'pending'). Once
+   the sample class is there, this turns on for it, through the same writers
+   Class Settings uses: the Student Page switch, Return Grades set to When I
+   Return Them, Send Work, Reflect on Feedback and Show My Learning. It does
+   this once; the key then reads 'on', so a visitor's own changes stick, and
+   Class Settings keeps offering the Student Page tab (cm-student-page.js).
+   Any other way into Demo Mode never sets the key and nothing changes. */
+var DEMO_STUDENT_KEY = 'gb-demo-student-page';
+var DEMO_STUDENT_CLASS = 'sci8';
+function applyDemoStudentPage() {
+  if (!_isDemoSession()) return false;
+  var mark = null;
+  try {
+    mark = localStorage.getItem(DEMO_STUDENT_KEY);
+  } catch (e) {
+    return false;
+  }
+  if (mark !== 'pending' || !COURSES[DEMO_STUDENT_CLASS]) return false;
+  var cid = DEMO_STUDENT_CLASS;
+  saveReturnSettings(cid, { student_page_enabled: true });
+  saveReturnSettings(cid, { return_grades: 'on_return' });
+  setCourseSendWork(cid, { send_work: true });
+  setCourseFeedbackOptions(cid, { reflect_on_feedback: true }, _newEntryId());
+  setCourseFeedbackOptions(cid, { show_my_learning: true }, _newEntryId());
+  try {
+    localStorage.setItem(DEMO_STUDENT_KEY, 'on');
+  } catch (e) {
+    /* storage blocked: it applies again next load, harmlessly */
+  }
+  return true;
+}
 
 /* Reset Demo Data: every class goes back to the sample Science 8 class.
    Demo Mode only, since it deletes every class before reseeding. The
@@ -21464,6 +21499,12 @@ window.resetDemoData = async function () {
     } catch (e) {
       console.warn('Could not clear waiting photos:', e);
     }
+  }
+  // A demo that began with the student features showing gets them back.
+  try {
+    if (localStorage.getItem(DEMO_STUDENT_KEY) === 'on') localStorage.setItem(DEMO_STUDENT_KEY, 'pending');
+  } catch (e) {
+    /* storage blocked */
   }
   await window.loadSeedIfNeeded();
 };

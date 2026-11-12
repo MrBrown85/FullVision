@@ -208,6 +208,7 @@ async function goIn(user) {
   // Useful for testing and for sharing a "just works" local link.
   if (new URLSearchParams(location.search).get('demo') === '1') {
     startDemoMode();
+    markStudentDemo();
     window.location.href = teacherAppPath();
     return;
   }
@@ -406,8 +407,21 @@ document.addEventListener('click', function (e) {
 });
 
 /* ── Demo mode — bypass Supabase auth, run local-only with seeded data ── */
+/* The front page's Try Demo Mode link adds student=1: that Demo Mode starts
+   with the student features showing (data.js, applyDemoStudentPage). Any
+   other way into Demo Mode leaves them off. */
+function markStudentDemo() {
+  if (new URLSearchParams(location.search).get('student') !== '1') return;
+  try {
+    localStorage.setItem('gb-demo-student-page', 'pending');
+  } catch (e) {
+    /* storage blocked: Demo Mode starts as usual */
+  }
+}
+
 function enterDemoMode() {
   if (!startDemoMode({ confirm: true })) return;
+  markStudentDemo();
   // A phone opens the phone app; anything bigger, the desktop app.
   window.location.href = teacherAppPath();
 }

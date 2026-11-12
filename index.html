@@ -643,7 +643,9 @@
           </nav>
           <div style="display: flex; gap: 10px; align-items: center">
             <a class="btn btn-plain btn-sm" href="/login.html" data-link="signin">Sign In</a>
-            <a class="btn btn-solid btn-sm navcta-demo" href="/login.html?demo=1" data-link="demo">Try Demo Mode</a>
+            <a class="btn btn-solid btn-sm navcta-demo" href="/login.html?demo=1&amp;student=1" data-link="demo"
+              >Try Demo Mode</a
+            >
           </div>
         </div>
       </header>
@@ -659,7 +661,7 @@
                 give every student a clear picture of where they are and what comes next.
               </p>
               <div style="display: flex; flex-wrap: wrap; gap: 12px; padding-top: 4px">
-                <a class="btn btn-solid" href="/login.html?demo=1" data-link="demo">Try Demo Mode</a>
+                <a class="btn btn-solid" href="/login.html?demo=1&amp;student=1" data-link="demo">Try Demo Mode</a>
                 <a class="btn btn-plain" href="/login.html#signup">Create an Account</a>
               </div>
               <ul class="minis">
@@ -1049,7 +1051,11 @@
                 Grade, write comments and print a report card in a few minutes. Nothing you change is saved.
               </p>
               <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; padding-top: 8px">
-                <a class="btn btn-plain" href="/login.html?demo=1" data-link="demo" style="box-shadow: none"
+                <a
+                  class="btn btn-plain"
+                  href="/login.html?demo=1&amp;student=1"
+                  data-link="demo"
+                  style="box-shadow: none"
                   >Try Demo Mode</a
                 >
                 <a
@@ -1122,7 +1128,7 @@
           a.href = '/dashboard';
         });
         document.querySelectorAll('[data-link="demo"]').forEach(function (a) {
-          a.href = '/login.html';
+          a.href = '/login.html?student=1';
         });
       })();
     </script>

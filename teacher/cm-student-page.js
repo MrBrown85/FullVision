@@ -44,7 +44,8 @@
      they were.
 
    THE BUILD SWITCH is the class's student_page_enabled, off for every class
-   until its teacher turns it on. Nothing in the app offers it. It shows, as
+   until its teacher turns it on. Nothing in the app offers it, except in a
+   Demo Mode begun at the front page's Try Demo Mode link (below). It shows, as
    a Student Page switch in a card of its own above the rest, only when the
    app was opened at an address that carries ?build=student-page, for
    example
@@ -81,7 +82,21 @@ var CmStudentPage = (function () {
   // True when the app was opened at the build address (see the top).
   function _addressHasBuildFlag() {
     try {
-      return new URLSearchParams(window.location.search).get('build') === 'student-page';
+      if (new URLSearchParams(window.location.search).get('build') === 'student-page') return true;
+    } catch (e) {
+      return false;
+    }
+    return _demoShowsStudentPage();
+  }
+
+  // A Demo Mode that began at the front page's Try Demo Mode link (data.js,
+  // applyDemoStudentPage) offers the tab the way the build address does, and
+  // keeps offering it when the page is reloaded.
+  function _demoShowsStudentPage() {
+    try {
+      var on = typeof isDemoMode === 'function' && isDemoMode();
+      var mark = on && localStorage.getItem('gb-demo-student-page');
+      return mark === 'pending' || mark === 'on';
     } catch (e) {
       return false;
     }
