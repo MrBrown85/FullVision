@@ -1158,8 +1158,6 @@ window.GradeReport = (function () {
   }
 
   return {
-    DEFAULTS: DEFAULTS,
-    TIERS: TIERS,
     options: options,
     columnsFor: columnsFor,
     rows: rows,
@@ -1170,7 +1168,6 @@ window.GradeReport = (function () {
     feedbackItems: feedbackItems,
     extraCards: extraCards,
     extraHtml: _extraHtml,
-    FB_COL_W: FB_COL_W,
     layoutStudent: layoutStudent,
     layoutWith: layoutWith,
   };
