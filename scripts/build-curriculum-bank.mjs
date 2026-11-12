@@ -17,7 +17,7 @@
  * that becomes a folder at import; folder: false holds competencies with no
  * folder (Social Studies, Philosophy, a one-competency heading). path is the
  * Ministry's headings above the competencies, for the card's source line.
- * The shape is what buildLearningMapFromTags (shared/data.js) and the New
+ * The shape is what buildLearningMapFromTags (shared/data-curriculum-index.js) and the New
  * Class wizard read; tests/helpers/bc-bank-fixture.js reads it back.
  *
  * It also builds shared/bank-comment.js, what Generate names a bank

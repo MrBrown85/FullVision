@@ -22,7 +22,8 @@
    - S5-F1: Send Work and Keep Photos Until, in Demo Mode (below).
    - S8-F1: the "photos go for good" line on Keep Photos Until, and the
      one-week reminder (below), here and on the Dashboard.
-   - S13-F1: Show My Learning and See What They'd See, in Demo Mode (below).
+   - S13-F1: Show My Learning and See What They'd See (below), in Demo
+     Mode and, since S13-W2, for a signed-in class.
    - S10 follow-up: the Reflect on Feedback switch, in Demo Mode (below).
 
    DashClassManager asks isShown(cid) before it draws the tab, opens it or
@@ -703,31 +704,34 @@ var CmStudentPage = (function () {
     setCourseFeedbackOptions(cid, { reflect_on_feedback: on }, key).then(done, done);
   }
 
-  /* ── Show My Learning (S13-F1) ─────────────────────────────────
+  /* ── Show My Learning (S13-F1, S13-W2) ────────────────────────
      Show My Learning is the class's switch for the student page's My
      Learning tab (DECISIONS, My Learning on the student page 1), off until
-     the teacher turns it on. The screens read courseConfig.show_my_learning
-     (StudentView.learningOn); this row is its one writer.
+     the teacher turns it on: course.show_my_learning (Batch C), which
+     student_submit.page reads to send a student's card My Learning
+     (Batch E, E9).
 
-     Demo Mode first, as Send Work: the server's column comes with Batch C,
-     which is not applied. So the row is drawn in Demo Mode only; for a
-     signed-in teacher it is not drawn and nothing is asked of the server.
-     It is kept in the class's settings on this device (saveCourseConfig,
-     which sends nothing in Demo Mode).
+     Offered where Reflect on Feedback is, under the same rule: Demo Mode,
+     or a signed-in class the server keeps student-page rows for
+     (studentWorkLive), with the student page on. Its one writer is
+     setCourseFeedbackOptions, as Reflect's is: in Demo Mode it keeps the
+     switch in the class's settings and sends nothing; signed in it is
+     set_course_feedback_options through the outbox, and
+     getCourseFeedbackOptions reads it. A save the server refuses puts the
+     switch back when the row is drawn again; the sync dot says the rest.
 
      See What They'd See opens Preview as Student on My Learning for the
      student chosen under Preview as Student (the first by last name until
      one is chosen), as My Learning would be with the switch on. Nothing is
-     saved. A student's own device cannot show My Learning yet (the server
-     does not send what the calculation needs), and a line says so. */
+     saved. A student's card shows the same: page sends this student's own
+     hand-set levels with the rest (E9), and the edge function adds the
+     Next Step sentences. */
   var STYLE_NAMES = { proficiency: 'Proficiency', letter: 'Letter', both: 'Both' };
 
-  // { offered, on }: offered only in Demo Mode with the student page on; on only where offered.
+  // { offered, on }: offered where Reflect on Feedback is (reflectSettings); on only where offered.
   function learningSettings(cid) {
-    var s = _settings(cid);
-    var offered = !!s && s.student_page === true && _demo() && typeof saveCourseConfig === 'function';
-    var cfg = offered ? getCourseConfig(cid) || {} : {};
-    return { offered: offered, on: offered && cfg.show_my_learning === true };
+    var offered = reflectSettings(cid).offered;
+    return { offered: offered, on: offered && getCourseFeedbackOptions(cid).show_my_learning === true };
   }
 
   function _learningRow(cid) {
@@ -759,11 +763,6 @@ var CmStudentPage = (function () {
       esc("See What They'd See") +
       '</button>' +
       '</div>' +
-      '<div class="cm-hint" id="sp-learning-device">' +
-      esc(
-        "Students' own phones and Chromebooks can't show My Learning yet, even with this on. For now only Preview as Student shows it.",
-      ) +
-      '</div>' +
       '</div>'
     );
   }
@@ -772,9 +771,21 @@ var CmStudentPage = (function () {
     if (!cid || !learningSettings(cid).offered) return;
     var on = !!(el && el.checked);
     if (on === learningSettings(cid).on) return;
-    saveCourseConfig(cid, Object.assign({}, getCourseConfig(cid) || {}, { show_my_learning: on }));
+    var key =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : 'ml-' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+    var done = function () {
+      // Drawn again only while Class Settings is still on this class: a refused save shows the switch back as it was.
+      if (!_stillHere(cid)) return;
+      _rerender();
+      _focus('sp-learning-switch');
+    };
+    var sent = setCourseFeedbackOptions(cid, { show_my_learning: on }, key);
+    // The change shows at once (Demo Mode keeps it; signed in it is laid over the server's until answered).
     _rerender();
     _focus('sp-learning-switch');
+    sent.then(done, done);
   }
 
   // The student Preview as Student's list shows: the one chosen there, else the first.

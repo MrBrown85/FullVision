@@ -324,6 +324,8 @@ function learning(v: unknown): Json {
       grading_scale: jsonObject(c.grading_scale),
       category_weights: jsonObject(c.category_weights),
       reporting_terms: Array.isArray(c.reporting_terms) ? c.reporting_terms : null,
+      // The class's grade level (2026111201), for the device's whole-% default in grades 10 to 12.
+      ...typed(c, ['grade_level'], textOrNull),
     },
     categories: list(l.categories).map(k => pick(k, ['id', 'name', 'weight', 'display_order', 'calc_mode'])),
     competency_groups: list(l.competency_groups).map(g =>
@@ -331,6 +333,8 @@ function learning(v: unknown): Json {
     ),
     // This student's own hand-set levels, by section: the level and its date (no reason is sent).
     section_overrides: byId(l.section_overrides, o => pick(o, ['level', 'date'])),
+    // The competencies each rubric scores as a whole (2026111201): rubric id → tag ids.
+    ...typed(l, ['rubric_tags'], v => byId(v, ids)),
     subjects,
     next_steps: nextSteps(subjects),
   };

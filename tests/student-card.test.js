@@ -459,9 +459,11 @@ describe('student card: a draft is nowhere on the page', () => {
     expect(page.T.state().page.grades['demo-poster']).toBeUndefined();
     const scores = page.run('getScores(' + JSON.stringify(CID) + ')')[SID];
     expect(scores.filter(s => s.assessmentId === 'demo-poster')).toEqual([]);
-    // The essay's only score is the one that was returned.
+    // The essay's only score is the one that was returned, dated by the piece as the teacher's are.
+    const essayDate = JSON.parse(reply).assessments.find(a => a.id === 'demo-essay').date;
+    expect(essayDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(scores.filter(s => s.assessmentId === 'demo-essay')).toEqual([
-      { assessmentId: 'demo-essay', tagId: 'demo-com', score: 2, note: expect.any(String) },
+      { assessmentId: 'demo-essay', tagId: 'demo-com', score: 2, date: essayDate, note: expect.any(String) },
     ]);
   });
 
@@ -609,10 +611,12 @@ describe('student-data.js: the one adapter', () => {
     await page.settle();
     expect(page.run('courseGradeMode("c1")')).toBe('both');
     expect(page.run('getScores("c1").e1.length')).toBe(3);
+    // Dated by the piece, as shared/data.js dates a loaded score: calc.js weighs evidence by it.
     expect(page.run('getScores("c1").e1[0]')).toEqual({
       assessmentId: 'a1',
       tagId: 't1',
       score: 3,
+      date: REPLY.assessments.find(a => a.id === 'a1').date,
       note: 'Good.',
       mod: 1,
     });

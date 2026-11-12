@@ -2562,3 +2562,23 @@ Scenarios: `teacher` (the five functions: answers, refusals, a request sent twic
 Results (2026-11-11, PostgreSQL 17.11, embedded-postgres): `handouts_links.py` 285 of 285, of which 7 ran on the database without the file and 1 of those is the check the file must change (it failed there, as required); `mutate` 26 wrong versions, 26 noticed; `fingerprints check` every list current. The 31 functions the file calls or replaces have, on the local build, the md5 read from gradebook-prod (PostgreSQL 17.6) on Nov 11.
 
 Not verified here: the Storage service itself (`submissions_common.py` plays its part, written from its source), that the applying role may alter a policy on `storage.objects` (live's `supautils.policy_grants` lists the table for `postgres`; the pre-check reads it), pg_cron, the edge function, gradebook-prod.
+
+## My Learning sends the rest (2026111201)
+
+`my_learning_rest.py` exercises `../2026111201_my_learning_page_sends_rest.sql` on live as it is after Handouts and Links (`handouts_links.py`'s template with `2026111170` applied):
+
+```bash
+PGDATABASE=mlr python3 batch_c_common.py build
+PGDATABASE=mlr python3 my_learning_rest.py            # off, on, apply, undo
+```
+
+- `off`: with Show My Learning off, page's answer is the same text before and after the file.
+- `on`: `learning.course.grade_level` and `learning.rubric_tags` are added (only listed rubrics, only competencies still on the class, never another class's). With the two taken out, the answer is page's before the file.
+- `apply`: the guard, a second run, grants and attributes, and the md5 the header records.
+- `undo`: `my-learning-rest-undo.sql` restores the md5 the file found.
+
+Result on 2026-11-12, PostgreSQL 17.12, local (port 54329), from empty databases: **32 of 32**: off 5/5, on 12/12, apply 9/9, undo 6/6.
+
+- The md5 of `student_submit.page` on this build before the file is `8d8e3f9aa91e43b0163cb3189430b758`, the same as the header's "Before" and 2026111170's own list. After the file it is `b460f6f2753ad24317ad2d1f2f4149ce`, the same as the header's "After".
+- A wrong version of the file, with the removed-section filter taken out of `rubric_tags`, fails 2 checks of `on`.
+- Sanity check on the same server: `batch_e_e9.py` 32 of 32.

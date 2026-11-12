@@ -233,6 +233,7 @@ Object.assign(
 );
 load('shared/reporting-term-presets.js');
 load('shared/data.js');
+load('shared/data-curriculum-index.js');
 load('shared/calc.js');
 load('shared/grade-state.js');
 load('shared/grader.js');

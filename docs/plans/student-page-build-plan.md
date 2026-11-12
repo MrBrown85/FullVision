@@ -619,7 +619,16 @@ The wording above is proposed; Colin approves it in each PR, as usual.
 
 **Status (Nov 11 morning).** `S13-T1` Done (PR 1039). `S13-F1` Done (PR 1054, Demo Mode only; follow-up PR 1059). `S13-F2` and `S13-F3` Done (PR 1041; shown only in Preview as Student and only when Show My Learning is on). Open: "S13 math" (PR 1081, `shared/calc.js`: the month-ago level from returned work and which Next Step applies), not merged; it waits for Colin's Math review 3 and an independent review. Not built: "Up from Developing a month ago" and Next Step on the page (they wait for PR 1081); "All 8 Skills"; Read Aloud; Send It on Missing work. The `show_my_learning` column is in Batch C.
 
-**Found while building.** A student's own phone or Chromebook can never show My Learning until `student_submit.page` sends `show_my_learning`, the learning map, categories and the calculation settings; only Preview can show it now. "It counts as 0 until it's in." is true only in Letter and Both classes, so it is shown only there.
+**Status (Nov 12).** Done for a real class.
+
+- `S13-W1`: a student's own phone or Chromebook shows My Learning. Batch E (E9, PR 1150) has `student_submit.page` send it, with the student's own hand-set levels, and the edge function adds the Next Step sentences.
+- `S13-W2`: Show My Learning is offered for a signed-in class where Reflect on Feedback is: the student page is on and the server keeps its rows (`studentWorkLive`). It is read from the class's server options, written with `set_course_feedback_options` (PR 1264), and Preview as Student follows it.
+- My Learning on the device matches Preview as Student, proved over a matrix of classes by `tests/my-learning-device-matches-preview.test.js`:
+  - PR 1268: switching classes, rubric work, and the end of the course.
+  - PR 1273: work weighed by its date; Preview leaves out work dated after today.
+  - PR 1270: the grade level and whole-rubric competencies. Migration `2026111201_my_learning_page_sends_rest.sql` was applied, and student-submit v17 deployed, on 2026-11-12.
+
+**Found while building.** A student's own phone or Chromebook could not show My Learning until `student_submit.page` sent `show_my_learning`, the learning map, categories and the calculation settings (Batch E, E9). "It counts as 0 until it's in." is true only in Letter and Both classes, so it is shown only there.
 
 **Files.** `shared/student-view.js`, `shared/calc.js` (only for what does not exist yet: "Up from Developing a month ago": returned work dated on or before 30 days ago, Q16), `s/page-view.js`, `teacher/cm-student-page.js`, `teacher/comment-bank.js` and `shared/bank-comment.js` (read only, for Next Step).
 

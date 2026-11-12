@@ -44,6 +44,7 @@ const FILES = [
   'shared/constants.js',
   'shared/reporting-term-presets.js',
   'shared/data.js',
+  'shared/data-curriculum-index.js',
   'shared/calc.js',
   'shared/rubric-draft.js',
   'shared/rubric-checks.js',
