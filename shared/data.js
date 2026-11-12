@@ -1674,28 +1674,6 @@ function _hasLocalCopy(cid) {
   }
 }
 
-function _dateOnly(value) {
-  if (!value) return '';
-  if (typeof value === 'string') return value.slice(0, 10);
-  try {
-    return new Date(value).toISOString().slice(0, 10);
-  } catch (e) {
-    return '';
-  }
-}
-
-/* The local calendar day of a server timestamp. created_at is UTC, so
- * slicing it gives tomorrow's date for anything written after 5 pm
- * Pacific; observations created on this device get getTodayStr() (local),
- * and hydrated rows must agree. A date-only string passes through as is. */
-function _localDayOf(value) {
-  if (!value) return '';
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  var d = new Date(value);
-  if (isNaN(d)) return '';
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-}
-
 /* courseDayOf(cid, when): the calendar date of `when` (a Date or an ISO
  * timestamp) in the course's timezone, YYYY-MM-DD; '' for no valid time.
  * courseToday(cid) is the same for now.
@@ -1747,42 +1725,6 @@ function courseDayOf(cid, when) {
 /* Today, in the course's timezone. */
 function courseToday(cid) {
   return courseDayOf(cid, new Date());
-}
-
-function _plainObject(value) {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
-
-function _rpcRows(data) {
-  if (data == null) return [];
-  if (typeof data === 'string') {
-    try {
-      data = JSON.parse(data);
-    } catch (e) {
-      return [];
-    }
-  }
-  if (Array.isArray(data)) return data;
-  if (_plainObject(data)) {
-    if (Array.isArray(data.items)) return data.items;
-    if (Array.isArray(data.rows)) return data.rows;
-    if (Array.isArray(data.data)) return data.data;
-  }
-  return [];
-}
-
-function _rpcObject(data) {
-  if (data == null) return null;
-  if (typeof data === 'string') {
-    try {
-      data = JSON.parse(data);
-    } catch (e) {
-      return null;
-    }
-  }
-  if (Array.isArray(data)) return data[0] || null;
-  if (_plainObject(data) && _plainObject(data.data)) return data.data;
-  return _plainObject(data) ? data : null;
 }
 
 /* Fill a course field from this device's saved copy, or a default, without
@@ -6253,72 +6195,6 @@ function printedStudentName(st, style) {
   return (first + ' ' + last).trim();
 }
 
-function sortStudents(arr, mode, cid) {
-  var c = arr.slice();
-  if (mode === 'firstName') {
-    return c.sort(function (a, b) {
-      return (a.firstName || '').localeCompare(b.firstName || '') || (a.lastName || '').localeCompare(b.lastName || '');
-    });
-  }
-  if (mode === 'proficiency' && cid) {
-    var profMap = {};
-    c.forEach(function (st) {
-      profMap[st.id] = getOverallProficiency(cid, st.id) || 0;
-    });
-    return c.sort(function (a, b) {
-      return profMap[b.id] - profMap[a.id];
-    });
-  }
-  if (mode === 'missing' && cid) {
-    var statuses = getAssignmentStatuses(cid);
-    var assessments = getAssessments(cid);
-    var missingMap = {};
-    c.forEach(function (st) {
-      missingMap[st.id] = assessments.filter(function (a) {
-        return statuses[st.id + ':' + a.id] === 'NS';
-      }).length;
-    });
-    return c.sort(function (a, b) {
-      return missingMap[b.id] - missingMap[a.id];
-    });
-  }
-  // Lowest grade first, as the class is set to grade: percent for a Letter
-  // class, proficiency otherwise. Students with no grade yet go last.
-  if (mode === 'gradeLow' && cid) {
-    var letter = courseGradeMode(cid) === 'letter';
-    var gradeMap = {};
-    c.forEach(function (st) {
-      var v = letter ? getCourseLetterData(cid, st.id).R : getOverallProficiency(cid, st.id);
-      gradeMap[st.id] = v > 0 ? v : null;
-    });
-    return c.sort(function (a, b) {
-      var va = gradeMap[a.id];
-      var vb = gradeMap[b.id];
-      if (va === null || vb === null) return (va === null) - (vb === null);
-      return va - vb;
-    });
-  }
-  if (mode === 'flagged' && cid) {
-    var flags = getFlags(cid);
-    return c.sort(function (a, b) {
-      return (flags[b.id] ? 1 : 0) - (flags[a.id] ? 1 : 0);
-    });
-  }
-  if (mode === 'lastObserved' && cid) {
-    var lastObsMap = {};
-    c.forEach(function (st) {
-      var obs = getStudentQuickObs(cid, st.id);
-      lastObsMap[st.id] = obs.length ? obs[0].created : '';
-    });
-    return c.sort(function (a, b) {
-      return (lastObsMap[b.id] || '').localeCompare(lastObsMap[a.id] || '');
-    });
-  }
-  return c.sort(function (a, b) {
-    return (a.lastName || '').localeCompare(b.lastName || '') || (a.firstName || '').localeCompare(b.firstName || '');
-  });
-}
-
 function anonymizeStudents(students) {
   var shuffled = students.slice();
   for (var i = shuffled.length - 1; i > 0; i--) {
@@ -6332,124 +6208,6 @@ function anonymizeStudents(students) {
   });
 }
 
-/* ── Learning Map Migration — flatten section/tag hierarchy ── */
-function _backupBeforeMigration(cid, field) {
-  var current = _cache[field] && _cache[field][cid];
-  if (current) {
-    _safeLSSet('gb-mig-bak-' + field + '-' + cid, JSON.stringify({ data: current, ts: Date.now() }));
-  }
-}
-
-function migrateLearningMap(map) {
-  if (!map || !map.sections || map._flatVersion >= 2) return map;
-  // Build sectionId → tagId mapping for override/goal/reflection migration
-  var sectionToTag = {};
-  map.sections.forEach(function (sec) {
-    if (!sec.tags || sec.tags.length === 0) return;
-    var tag = sec.tags[0];
-    // Promote section properties onto the tag
-    tag.color = sec.color;
-    tag.subject = sec.subject;
-    tag.shortName = sec.shortName;
-    tag.name = sec.name;
-    tag._legacySectionId = sec.id;
-    // Record mapping before changing section ID
-    sectionToTag[sec.id] = tag.id;
-    // Section ID becomes tag ID
-    sec.id = tag.id;
-  });
-  map._flatVersion = 2;
-  map._sectionToTagMap = sectionToTag;
-  return map;
-}
-
-function migrateOverridesForFlatMap(cid, sectionToTag) {
-  if (!sectionToTag || Object.keys(sectionToTag).length === 0) return;
-  var overrides = getOverrides(cid);
-  var changed = false;
-  Object.keys(overrides).forEach(function (studentId) {
-    var studentOverrides = overrides[studentId];
-    if (!studentOverrides) return;
-    Object.keys(studentOverrides).forEach(function (key) {
-      if (sectionToTag[key] && key !== sectionToTag[key]) {
-        studentOverrides[sectionToTag[key]] = studentOverrides[key];
-        delete studentOverrides[key];
-        changed = true;
-      }
-    });
-  });
-  if (changed) saveOverrides(cid, overrides);
-}
-
-function migrateGoalsForFlatMap(cid, sectionToTag) {
-  if (!sectionToTag || Object.keys(sectionToTag).length === 0) return;
-  var goals = getGoals(cid);
-  var changed = false;
-  Object.keys(goals).forEach(function (studentId) {
-    var studentGoals = goals[studentId];
-    if (!studentGoals || typeof studentGoals !== 'object') return;
-    Object.keys(studentGoals).forEach(function (key) {
-      if (sectionToTag[key] && key !== sectionToTag[key]) {
-        studentGoals[sectionToTag[key]] = studentGoals[key];
-        delete studentGoals[key];
-        changed = true;
-      }
-    });
-  });
-  if (changed) saveGoals(cid, goals);
-}
-
-function migrateReflectionsForFlatMap(cid, sectionToTag) {
-  if (!sectionToTag || Object.keys(sectionToTag).length === 0) return;
-  var reflections = getReflections(cid);
-  var changed = false;
-  Object.keys(reflections).forEach(function (studentId) {
-    var studentRefs = reflections[studentId];
-    if (!studentRefs || typeof studentRefs !== 'object') return;
-    Object.keys(studentRefs).forEach(function (key) {
-      if (sectionToTag[key] && key !== sectionToTag[key]) {
-        studentRefs[sectionToTag[key]] = studentRefs[key];
-        delete studentRefs[key];
-        changed = true;
-      }
-    });
-  });
-  if (changed) saveReflections(cid, reflections);
-}
-
-/* ── Student Migration ─────────────────────────────────────── */
-function migrateStudent(st) {
-  if (typeof st.designation === 'string' && st.designation) {
-    st.designations = [st.designation];
-    delete st.designation;
-  }
-  st.designations = st.designations || [];
-  if (st.firstName !== undefined) return st;
-  var parts = (st.name || '').trim().split(/\s+/);
-  st.firstName = parts[0] || '';
-  st.lastName = parts.slice(1).join(' ') || '';
-  st.sortName = (st.lastName + ' ' + st.firstName).trim();
-  st.studentNumber = st.studentNumber || '';
-  st.dateOfBirth = st.dateOfBirth || '';
-  st.email = st.email || '';
-  st.attendance = st.attendance || [];
-  delete st.name;
-  return st;
-}
-function migrateAllStudents() {
-  Object.keys(COURSES).forEach(function (cid) {
-    var students = getStudents(cid);
-    if (
-      students.length &&
-      students.some(function (s) {
-        return s.firstName === undefined;
-      })
-    ) {
-      _backupBeforeMigration(cid, 'students');
-      saveStudents(cid, students.map(migrateStudent));
-    }
-  });
-}
 /* Parse a date-only 'YYYY-MM-DD' string as a local calendar date.
    new Date('YYYY-MM-DD') is read as UTC midnight, which lands on the
    previous day in Pacific time. Anything else goes to new Date as-is. */
@@ -6529,6 +6287,70 @@ function _stampIdempotencyKey(name, params) {
 function getTodayStr() {
   const d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function _dateOnly(value) {
+  if (!value) return '';
+  if (typeof value === 'string') return value.slice(0, 10);
+  try {
+    return new Date(value).toISOString().slice(0, 10);
+  } catch (e) {
+    return '';
+  }
+}
+
+/* The local calendar day of a server timestamp. created_at is UTC, so
+ * slicing it gives tomorrow's date for anything written after 5 pm
+ * Pacific; observations created on this device get getTodayStr() (local),
+ * and hydrated rows must agree. A date-only string passes through as is. */
+function _localDayOf(value) {
+  if (!value) return '';
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  var d = new Date(value);
+  if (isNaN(d)) return '';
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function _plainObject(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function _rpcRows(data) {
+  if (data == null) return [];
+  if (typeof data === 'string') {
+    try {
+      data = JSON.parse(data);
+    } catch (e) {
+      return [];
+    }
+  }
+  if (Array.isArray(data)) return data;
+  if (_plainObject(data)) {
+    if (Array.isArray(data.items)) return data.items;
+    if (Array.isArray(data.rows)) return data.rows;
+    if (Array.isArray(data.data)) return data.data;
+  }
+  return [];
+}
+
+function _rpcObject(data) {
+  if (data == null) return null;
+  if (typeof data === 'string') {
+    try {
+      data = JSON.parse(data);
+    } catch (e) {
+      return null;
+    }
+  }
+  if (Array.isArray(data)) return data[0] || null;
+  if (_plainObject(data) && _plainObject(data.data)) return data.data;
+  return _plainObject(data) ? data : null;
+}
+
+/* UUID detection — distinguishes canonical enrollment_ids from local uid()s */
+var _UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function _isUuid(v) {
+  return typeof v === 'string' && _UUID_RE.test(v);
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -7217,6 +7039,91 @@ function _curriculumCategoryShortName(name) {
 /* ══════════════════════════════════════════════════════════════════
    Learning Map — cache-through
    ══════════════════════════════════════════════════════════════════ */
+/* ── Learning Map Migration — flatten section/tag hierarchy ── */
+function _backupBeforeMigration(cid, field) {
+  var current = _cache[field] && _cache[field][cid];
+  if (current) {
+    _safeLSSet('gb-mig-bak-' + field + '-' + cid, JSON.stringify({ data: current, ts: Date.now() }));
+  }
+}
+
+function migrateLearningMap(map) {
+  if (!map || !map.sections || map._flatVersion >= 2) return map;
+  // Build sectionId → tagId mapping for override/goal/reflection migration
+  var sectionToTag = {};
+  map.sections.forEach(function (sec) {
+    if (!sec.tags || sec.tags.length === 0) return;
+    var tag = sec.tags[0];
+    // Promote section properties onto the tag
+    tag.color = sec.color;
+    tag.subject = sec.subject;
+    tag.shortName = sec.shortName;
+    tag.name = sec.name;
+    tag._legacySectionId = sec.id;
+    // Record mapping before changing section ID
+    sectionToTag[sec.id] = tag.id;
+    // Section ID becomes tag ID
+    sec.id = tag.id;
+  });
+  map._flatVersion = 2;
+  map._sectionToTagMap = sectionToTag;
+  return map;
+}
+
+function migrateOverridesForFlatMap(cid, sectionToTag) {
+  if (!sectionToTag || Object.keys(sectionToTag).length === 0) return;
+  var overrides = getOverrides(cid);
+  var changed = false;
+  Object.keys(overrides).forEach(function (studentId) {
+    var studentOverrides = overrides[studentId];
+    if (!studentOverrides) return;
+    Object.keys(studentOverrides).forEach(function (key) {
+      if (sectionToTag[key] && key !== sectionToTag[key]) {
+        studentOverrides[sectionToTag[key]] = studentOverrides[key];
+        delete studentOverrides[key];
+        changed = true;
+      }
+    });
+  });
+  if (changed) saveOverrides(cid, overrides);
+}
+
+function migrateGoalsForFlatMap(cid, sectionToTag) {
+  if (!sectionToTag || Object.keys(sectionToTag).length === 0) return;
+  var goals = getGoals(cid);
+  var changed = false;
+  Object.keys(goals).forEach(function (studentId) {
+    var studentGoals = goals[studentId];
+    if (!studentGoals || typeof studentGoals !== 'object') return;
+    Object.keys(studentGoals).forEach(function (key) {
+      if (sectionToTag[key] && key !== sectionToTag[key]) {
+        studentGoals[sectionToTag[key]] = studentGoals[key];
+        delete studentGoals[key];
+        changed = true;
+      }
+    });
+  });
+  if (changed) saveGoals(cid, goals);
+}
+
+function migrateReflectionsForFlatMap(cid, sectionToTag) {
+  if (!sectionToTag || Object.keys(sectionToTag).length === 0) return;
+  var reflections = getReflections(cid);
+  var changed = false;
+  Object.keys(reflections).forEach(function (studentId) {
+    var studentRefs = reflections[studentId];
+    if (!studentRefs || typeof studentRefs !== 'object') return;
+    Object.keys(studentRefs).forEach(function (key) {
+      if (sectionToTag[key] && key !== sectionToTag[key]) {
+        studentRefs[sectionToTag[key]] = studentRefs[key];
+        delete studentRefs[key];
+        changed = true;
+      }
+    });
+  });
+  if (changed) saveReflections(cid, reflections);
+}
+
 function getLearningMap(cid) {
   if (_cache.learningMaps[cid]) return _cache.learningMaps[cid];
   // Not yet loaded into cache — read from localStorage as fallback
@@ -9403,6 +9310,107 @@ function _settingsNotSent(cid, columns, before) {
     else delete base[field];
   });
 }
+
+/* ── Student Migration ─────────────────────────────────────── */
+function migrateStudent(st) {
+  if (typeof st.designation === 'string' && st.designation) {
+    st.designations = [st.designation];
+    delete st.designation;
+  }
+  st.designations = st.designations || [];
+  if (st.firstName !== undefined) return st;
+  var parts = (st.name || '').trim().split(/\s+/);
+  st.firstName = parts[0] || '';
+  st.lastName = parts.slice(1).join(' ') || '';
+  st.sortName = (st.lastName + ' ' + st.firstName).trim();
+  st.studentNumber = st.studentNumber || '';
+  st.dateOfBirth = st.dateOfBirth || '';
+  st.email = st.email || '';
+  st.attendance = st.attendance || [];
+  delete st.name;
+  return st;
+}
+function migrateAllStudents() {
+  Object.keys(COURSES).forEach(function (cid) {
+    var students = getStudents(cid);
+    if (
+      students.length &&
+      students.some(function (s) {
+        return s.firstName === undefined;
+      })
+    ) {
+      _backupBeforeMigration(cid, 'students');
+      saveStudents(cid, students.map(migrateStudent));
+    }
+  });
+}
+
+function sortStudents(arr, mode, cid) {
+  var c = arr.slice();
+  if (mode === 'firstName') {
+    return c.sort(function (a, b) {
+      return (a.firstName || '').localeCompare(b.firstName || '') || (a.lastName || '').localeCompare(b.lastName || '');
+    });
+  }
+  if (mode === 'proficiency' && cid) {
+    var profMap = {};
+    c.forEach(function (st) {
+      profMap[st.id] = getOverallProficiency(cid, st.id) || 0;
+    });
+    return c.sort(function (a, b) {
+      return profMap[b.id] - profMap[a.id];
+    });
+  }
+  if (mode === 'missing' && cid) {
+    var statuses = getAssignmentStatuses(cid);
+    var assessments = getAssessments(cid);
+    var missingMap = {};
+    c.forEach(function (st) {
+      missingMap[st.id] = assessments.filter(function (a) {
+        return statuses[st.id + ':' + a.id] === 'NS';
+      }).length;
+    });
+    return c.sort(function (a, b) {
+      return missingMap[b.id] - missingMap[a.id];
+    });
+  }
+  // Lowest grade first, as the class is set to grade: percent for a Letter
+  // class, proficiency otherwise. Students with no grade yet go last.
+  if (mode === 'gradeLow' && cid) {
+    var letter = courseGradeMode(cid) === 'letter';
+    var gradeMap = {};
+    c.forEach(function (st) {
+      var v = letter ? getCourseLetterData(cid, st.id).R : getOverallProficiency(cid, st.id);
+      gradeMap[st.id] = v > 0 ? v : null;
+    });
+    return c.sort(function (a, b) {
+      var va = gradeMap[a.id];
+      var vb = gradeMap[b.id];
+      if (va === null || vb === null) return (va === null) - (vb === null);
+      return va - vb;
+    });
+  }
+  if (mode === 'flagged' && cid) {
+    var flags = getFlags(cid);
+    return c.sort(function (a, b) {
+      return (flags[b.id] ? 1 : 0) - (flags[a.id] ? 1 : 0);
+    });
+  }
+  if (mode === 'lastObserved' && cid) {
+    var lastObsMap = {};
+    c.forEach(function (st) {
+      var obs = getStudentQuickObs(cid, st.id);
+      lastObsMap[st.id] = obs.length ? obs[0].created : '';
+    });
+    return c.sort(function (a, b) {
+      return (lastObsMap[b.id] || '').localeCompare(lastObsMap[a.id] || '');
+    });
+  }
+  return c.sort(function (a, b) {
+    return (a.lastName || '').localeCompare(b.lastName || '') || (a.firstName || '').localeCompare(b.firstName || '');
+  });
+}
+
 function getStudents(cid) {
   if (_cache.students[cid] !== undefined) return _cache.students[cid];
   try {
@@ -9423,12 +9431,6 @@ function saveStudents(cid, arr) {
   // entered before the enrol is even pushed already waits on it.
   _registerLocalRows(cid, 'student', arr, 'create_student_and_enroll');
   return _persistStudentsToCanonical(cid, prev, arr);
-}
-
-/* UUID detection — distinguishes canonical enrollment_ids from local uid()s */
-var _UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-function _isUuid(v) {
-  return typeof v === 'string' && _UUID_RE.test(v);
 }
 
 /* Per-course save lock so rapid saves don't double-enroll the same student.
