@@ -8,8 +8,7 @@
  * scripts/help-shots.mjs does for the help site.
  *
  * Shots of the student's side and of sent work turn the class's Student Page
- * on first, through the build address, as a tester would. Those screens are
- * the January pilot's; the splash page labels them so.
+ * on first, through the build address, as a tester would.
  *
  * Run by hand after a UI change, not in CI:
  *   node scripts/splash-shots.mjs            every picture
@@ -97,7 +96,60 @@ async function openPreview(page, base) {
   await pause(page, 1500);
 }
 
+// Print Rubrics set to four per page, and page 1 of what it will print, drawn
+// as a sheet of paper: the dialog's own preview page, at a readable size.
+async function printedRubrics(page, base) {
+  await page.goto(base + '/assignments');
+  await pause(page, 1500);
+  // The Science Fair Proposal: an Advanced Rubric scored for the whole class.
+  await page.evaluate(() => document.querySelector('[data-action=printRubrics][data-aid="sci8a20"]').click());
+  await page.waitForSelector('#rp-preview', { timeout: 10000 });
+  await pause(page, 800);
+  await page.locator('input[name="rp-layout"][value="quarter"]').evaluate(el => el.click());
+  await pause(page, 1500);
+  await page.evaluate(() => {
+    const src = document.querySelector('#rp-preview .rubric-page');
+    const w = parseFloat(src.style.width);
+    const h = parseFloat(src.style.height);
+    const scale = 1.18;
+    const m = 24 * scale; // the quarter-inch print margin
+    const paper = document.createElement('div');
+    paper.id = 'splash-paper';
+    paper.style.cssText =
+      'position:fixed;left:0;top:0;z-index:2147483647;background:#fff;overflow:hidden;width:' +
+      Math.round(w * scale + 2 * m) +
+      'px;height:' +
+      Math.round(h * scale + 2 * m) +
+      'px';
+    const clone = src.cloneNode(true);
+    clone.style.cssText +=
+      ';position:absolute;left:' +
+      m +
+      'px;top:' +
+      m +
+      'px;transform:scale(' +
+      scale +
+      ');transform-origin:0 0;width:' +
+      w +
+      'px;height:' +
+      h +
+      'px';
+    paper.appendChild(clone);
+    document.body.appendChild(paper);
+  });
+  await pause(page, 400);
+}
+
 const SHOTS = [
+  {
+    file: 'rubric-print.jpg',
+    width: 1100,
+    height: 1340,
+    async run(page, base) {
+      await printedRubrics(page, base);
+      return page.locator('#splash-paper');
+    },
+  },
   {
     file: 'grader.jpg',
     async run(page, base) {

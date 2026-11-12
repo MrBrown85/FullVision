@@ -367,6 +367,100 @@
         border-radius: 8px 8px 0 0;
         box-shadow: 0 18px 50px rgba(29, 29, 31, 0.14);
       }
+      /* Two ways to do the same job, side by side in the text column */
+      .choices {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding-top: 4px;
+      }
+      .choice {
+        background: var(--paper);
+        border-radius: 14px;
+        padding: 16px 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        box-shadow: 0 0 0 1px rgba(29, 29, 31, 0.06);
+      }
+      .band-white .choice {
+        background: var(--mist);
+        box-shadow: none;
+      }
+      .choice b {
+        font-size: 16px;
+        letter-spacing: -0.01em;
+      }
+      .choice span {
+        font-size: 15px;
+        line-height: 1.45;
+        color: var(--ink-2);
+      }
+      .feat + .feat {
+        margin-top: 96px;
+      }
+      /* Type: headings break into even lines, and no paragraph ends on one
+         stranded word. A long lede stops at a readable measure. */
+      .h1,
+      .h2,
+      .card h3,
+      .fact b,
+      .choice b {
+        text-wrap: balance;
+      }
+      .lede,
+      .ticks li,
+      .steps li,
+      .card p,
+      .fact span,
+      .choice span {
+        text-wrap: pretty;
+      }
+      .lede {
+        max-width: 34em;
+      }
+      /* Motion: small and quiet, and none at all for a visitor who asks for
+         less. Buttons and links ease on hover; the hero settles in once; each
+         block rises a few pixels as it scrolls into view (only where the
+         browser can tie it to the scroll, so nothing is ever left hidden). */
+      .btn,
+      .navlink {
+        transition:
+          color 0.15s ease,
+          background-color 0.15s ease,
+          filter 0.15s ease;
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        @keyframes fv-rise {
+          from {
+            opacity: 0;
+            transform: translateY(16px);
+          }
+          to {
+            opacity: 1;
+            transform: none;
+          }
+        }
+        .hero .hero-grid > * {
+          animation: fv-rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+        }
+        .hero .hero-grid > :nth-child(2) {
+          animation-delay: 0.12s;
+        }
+        @supports (animation-timeline: view()) {
+          .band .feat-text,
+          .band .shot,
+          .band .phone-col,
+          .band .sheet-wrap,
+          .fact,
+          .card,
+          .steps li {
+            animation: fv-rise linear both;
+            animation-timeline: view();
+            animation-range: entry 5% entry 45%;
+          }
+        }
+      }
       /* For schools */
       .schools {
         background: var(--night);
@@ -559,9 +653,9 @@
           <div class="wrap hero-grid">
             <div class="stack" style="gap: 24px">
               <p class="eyebrow">The Gradebook for Communicating Student Learning in BC</p>
-              <h1 class="h1">Make Every Student's Growth Visible</h1>
+              <h1 class="h1">Make Every Student’s Growth Visible</h1>
               <p class="lede">
-                Grade on the Provincial Proficiency Scale, write report comments from the evidence you've gathered, and
+                Grade on the Provincial Proficiency Scale, write report comments from the evidence you’ve gathered, and
                 give every student a clear picture of where they are and what comes next.
               </p>
               <div style="display: flex; flex-wrap: wrap; gap: 12px; padding-top: 4px">
@@ -578,13 +672,13 @@
               <img
                 class="shot"
                 src="/assets/splash/grader.jpg"
-                alt="Grading a student's handwritten lab beside the rubric. FullVision suggests Proficient from the boxes ticked."
+                alt="Grading a student’s handwritten lab beside the rubric. FullVision suggests Proficient from the boxes ticked."
               />
               <div class="phone-wrap">
                 <img
                   class="phone"
                   src="/assets/splash/student-learning.jpg"
-                  alt="A student's My Learning page: Proficient, with a next step and her strongest skill."
+                  alt="A student’s My Learning page: Proficient, with a next step and her strongest skill."
                 />
               </div>
             </div>
@@ -595,7 +689,7 @@
           <div class="wrap facts">
             <div class="fact">
               <b>226</b>
-              <span>BC courses, grades 8 to 12, with every competency in the Ministry's own words.</span>
+              <span>BC courses, grades 8 to 12, with every competency in the Ministry’s own words.</span>
             </div>
             <div class="fact">
               <b>Canada</b>
@@ -623,7 +717,7 @@
               <ul class="ticks">
                 <li>The Proficiency Scale with + and −, points, or letter grades for 10 to 12</li>
                 <li>Pair and group work, graded together or one by one</li>
-                <li>A graded rubric printed for every student</li>
+                <li>Suggested levels you can always overrule</li>
               </ul>
             </div>
             <img
@@ -632,6 +726,28 @@
               src="/assets/splash/rubric.jpg"
               alt="Rubric criteria with the boxes a teacher ticked and Suggested: Proficient beside each."
             />
+          </div>
+          <div class="wrap feat flip">
+            <div class="feat-text stack">
+              <p class="eyebrow">Printing</p>
+              <h2 class="h2">Hand Back a Graded Rubric</h2>
+              <p class="lede">
+                Print Rubrics makes a sheet for every student: the level you chose on each criterion, their overall
+                level and room for your feedback.
+              </p>
+              <ul class="ticks">
+                <li>One, two or four to a page, with cut lines</li>
+                <li>Black and white, ready for the photocopier</li>
+                <li>Blank copies to hand out before the work begins</li>
+              </ul>
+            </div>
+            <div class="sheet-wrap">
+              <img
+                loading="lazy"
+                src="/assets/splash/rubric-print.jpg"
+                alt="One printed page of four graded rubrics, each with a student’s name, the level chosen on every criterion and their overall level."
+              />
+            </div>
           </div>
         </section>
 
@@ -649,7 +765,7 @@
               class="shot"
               loading="lazy"
               src="/assets/splash/gradebook.jpg"
-              alt="The gradebook: each student's overall level beside their scores, newest first."
+              alt="The gradebook: each student’s overall level beside their scores, newest first."
             />
           </div>
         </section>
@@ -675,14 +791,14 @@
                 class="shot"
                 loading="lazy"
                 src="/assets/splash/markup.jpg"
-                alt="Marking up a student's lab: green ticks, a circled angle and a note asking why light bends."
+                alt="Marking up a student’s lab: green ticks, a circled angle and a note asking why light bends."
               />
               <div class="phone-col">
                 <img
                   class="phone"
                   loading="lazy"
                   src="/assets/splash/student-feedback.jpg"
-                  alt="A returned piece on a student's phone: Proficient on each criterion, with what the levels mean."
+                  alt="A returned piece on a student’s phone: Proficient on each criterion, with what the levels mean."
                 />
               </div>
             </div>
@@ -695,7 +811,7 @@
               class="shot"
               loading="lazy"
               src="/assets/splash/dashboard.jpg"
-              alt="The dashboard: a student's question, work to grade, missing work and the class's competencies."
+              alt="The dashboard: a student’s question, work to grade, missing work and the class’s competencies."
             />
             <div class="feat-text stack">
               <p class="eyebrow">Dashboard</p>
@@ -713,11 +829,11 @@
               <p class="eyebrow">Report Comments</p>
               <h2 class="h2">Comments Written From the Evidence</h2>
               <p class="lede">
-                The student's year, your observations and their own self-assessment sit beside the comment you are
+                The student’s year, your observations and their own self-assessment sit beside the comment you are
                 writing.
               </p>
               <ul class="ticks">
-                <li>A Comment Bank in BC's four parts, filled in for each student</li>
+                <li>A Comment Bank in BC’s four parts, filled in for each student</li>
                 <li>Generate puts your own sentences together into a draft</li>
                 <li>Approve and Next moves through the class</li>
               </ul>
@@ -726,7 +842,7 @@
               class="shot"
               loading="lazy"
               src="/assets/splash/questionnaire.jpg"
-              alt="The Term Questionnaire: work habits, the student's year at a glance, and the teacher comment."
+              alt="The Term Questionnaire: work habits, the student’s year at a glance, and the teacher comment."
             />
           </div>
         </section>
@@ -735,15 +851,30 @@
           <div class="wrap feat">
             <div class="feat-text stack">
               <p class="eyebrow">Reports</p>
-              <h2 class="h2">Report Cards That Fill In for You</h2>
+              <h2 class="h2">A Quick Report, or One You Design</h2>
               <p class="lede">
-                Start from a Report Card, Interim Update or Conference Pack. Every block fills in from your gradebook
-                for the whole class.
+                Every report fills in from your gradebook for the whole class. You choose how much to set up.
               </p>
+              <div class="choices">
+                <div class="choice">
+                  <b>Quick Report</b>
+                  <span
+                    >A grade sheet for each student: every assignment with its score, and a summary by category. Nothing
+                    to set up.</span
+                  >
+                </div>
+                <div class="choice">
+                  <b>Custom</b>
+                  <span
+                    >Start from a Report Card, Interim Update or Conference Pack, then add, move or remove blocks such
+                    as Proficiency and Teacher Comment. Save it as your own template.</span
+                  >
+                </div>
+              </div>
               <ul class="ticks">
                 <li>Each competency group, and its change since the last report</li>
                 <li>Black and white, on Letter or Legal</li>
-                <li>Send a copy to each student's phone</li>
+                <li>Send a copy to each student’s phone</li>
               </ul>
             </div>
             <div class="sheet-wrap">
@@ -760,11 +891,28 @@
           <div class="wrap feat flip">
             <div class="feat-text stack">
               <p class="eyebrow">BC Curriculum</p>
-              <h2 class="h2">The Curriculum in the Ministry's Own Words</h2>
+              <h2 class="h2">The Curriculum in the Ministry’s Own Words</h2>
               <p class="lede">
                 Pick a course when you make a class. Its competencies arrive word for word, with an I Can statement for
                 each one, 5,029 in all.
               </p>
+              <p class="lede">New to proficiency grading or years into it, grade in as much detail as you like.</p>
+              <div class="choices">
+                <div class="choice">
+                  <b>Line by Line</b>
+                  <span
+                    >Tie each line of a rubric to a competency and score them one at a time. Every line counts toward
+                    its own competency.</span
+                  >
+                </div>
+                <div class="choice">
+                  <b>One Mark for the Piece</b>
+                  <span
+                    >Or give the whole piece a single level, points or a letter grade. It still counts toward the
+                    competencies you chose.</span
+                  >
+                </div>
+              </div>
             </div>
             <img
               class="shot"
@@ -782,7 +930,7 @@
               <h2 class="h2">Write Down What You See, As It Happens</h2>
               <p class="lede">
                 Record a Strength, Growth or Concern from the lab bench or the field trip. Each note lands on the
-                student's profile, ready for the next report.
+                student’s profile, ready for the next report.
               </p>
             </div>
             <div class="phone-col">
@@ -800,7 +948,7 @@
           <div class="wrap stack" style="gap: 48px">
             <div class="stack" style="max-width: 720px">
               <p class="eyebrow">For Schools and Districts</p>
-              <h2 class="h2">Built Around BC's Reporting Policy</h2>
+              <h2 class="h2">Built Around BC’s Reporting Policy</h2>
               <p class="lede">What a principal, a superintendent or a privacy officer will ask, answered up front.</p>
             </div>
             <div class="cards">
@@ -821,7 +969,7 @@
               </div>
               <div class="card">
                 <h3>No AI Writing About Students</h3>
-                <p>Nothing is sent to an AI service. Every comment is the teacher's own words.</p>
+                <p>Nothing is sent to an AI service. Every comment is the teacher’s own words.</p>
               </div>
               <div class="card">
                 <h3>Photos Deleted on Schedule</h3>
