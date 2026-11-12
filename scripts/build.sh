@@ -6,8 +6,7 @@ mkdir -p dist
 # Root-level public files
 cp index.html launch.html login.html login.css login-auth.js privacy.html dist/
 cp manifest.json sw.js dist/
-[ -f favicon.svg ] && cp favicon.svg dist/ || true
-[ -f robots.txt ] && cp robots.txt dist/ || true
+cp favicon.svg dist/
 cp curriculum_data.js curriculum_by_course.json curriculum_crosswalk.json dist/
 cp roster-template.csv _headers dist/
 
@@ -25,10 +24,6 @@ cp -r s dist/
 node scripts/build-help.mjs
 mkdir -p dist/help
 cp -r help/img help/fragments help/*.html help/index.json dist/help/
-
-# Future portals (copy if they exist)
-[ -d student ] && cp -r student dist/ || true
-[ -d parent ] && cp -r parent dist/ || true
 
 # A fresh service-worker cache per deploy: name it after the commit Netlify
 # is building (COMMIT_REF), falling back to the build time elsewhere.
