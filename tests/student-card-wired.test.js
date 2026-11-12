@@ -105,7 +105,11 @@ describe('a real card: the code, Is This You?, the Assignments list', () => {
     expect(page.calls[2].body).toEqual({ route: 'page', session: token, enrollment_id: CECE });
     // Every request passed the handler's own checks.
     expect(dev.fn.logs.map(l => l.outcome)).toEqual(['ok', 'ok', 'ok', 'ok', 'ok', 'ok']);
-    expect(dev.fn.sql.map(q => q.fn)).toEqual(['card', 'verify_card', 'page', 'work', 'forms', 'seen']);
+    // `work` and `forms` are asked at once, so the server may finish either first.
+    const fns = dev.fn.sql.map(q => q.fn);
+    expect(fns.slice(0, 3)).toEqual(['card', 'verify_card', 'page']);
+    expect(fns.slice(3, 5).sort()).toEqual(['forms', 'work']);
+    expect(fns[5]).toBe('seen');
     expect(dev.fn.sql[1].add).toBe(false);
 
     expect(page.root().querySelector('.sp-page-title').textContent).toMatch(/^(All )?Assignments$/);
