@@ -10692,29 +10692,18 @@ function getScores(cid) {
     return {};
   }
 }
-/* The data-loss guard's rule: why saving `next` over `prev` (the saved
-   copy) would lose too much, or '' when it would not. More than half the
-   students, or more than 70% of the entries. */
+/* The data-loss guard's rule, as saveScores applies it below: saving `next`
+   over `prev` (the saved copy) drops more than half the students or more
+   than 70% of the entries. */
 function _scoreGuardDrop(prev, next, fillUndone) {
   var prevCount = prev ? Object.keys(prev).length : 0;
   var newCount = next ? Object.keys(next).length : 0;
-  if (prevCount > 2 && newCount < prevCount * 0.5) {
-    return (
-      'student-count dropped from ' +
-      prevCount +
-      ' to ' +
-      newCount +
-      ' (>50% loss). This likely indicates a bug or corrupted state.'
-    );
-  }
+  if (prevCount > 2 && newCount < prevCount * 0.5) return true;
   var prevEntries = 0,
     newEntries = 0;
   if (prev) for (var _ps in prev) prevEntries += (prev[_ps] || []).length;
   if (next) for (var _ns in next) newEntries += (next[_ns] || []).length;
-  if (prevEntries > 10 && newEntries + (fillUndone || 0) < prevEntries * 0.3) {
-    return 'entry-count dropped from ' + prevEntries + ' to ' + newEntries + ' (>70% loss).';
-  }
-  return '';
+  return prevEntries > 10 && newEntries + (fillUndone || 0) < prevEntries * 0.3;
 }
 
 /* The saved copy without the marks of work and students that are gone: on
@@ -10745,50 +10734,6 @@ function _scoresOfLiveRows(cid, prev) {
   return out;
 }
 
-/* This tab's memory is behind the saved copy: another tab saved since this
-   one last loaded the class. The saved copy, with only the cells whose
-   value this save changes against the baseline (what this tab last loaded
-   or saved, the test persistScoreDiffToCanonical sends by) put on it. Every
-   other cell is as the saved copy has it, or as memory has it when the
-   saved copy lacks it. A student this save leaves with
-   no marks is taken out, so the guard counts them. Null, so the save is
-   blocked, with no baseline (Demo Mode: which cells changed is not known),
-   or when this save itself loses too much against the baseline: a drop the
-   guard's rule sees, or more than two cells cleared beyond an Undo's own. */
-function _scoresMergedOntoSaved(cid, saved, next, fillUndone) {
-  if (!_hasServerState('scores', cid)) return null;
-  var base = _migrateRubricScoreKeys(cid, _serverState.scores[cid]);
-  if (_scoreGuardDrop(base, next, fillUndone)) return null;
-  var was = _scoreEntriesByKey(base);
-  var now = _scoreEntriesByKey(next);
-  var entered = function (x) {
-    return isScoreEntered(_assessmentById(cid, x.entry.assessmentId), x.entry);
-  };
-  var out = _cloneValue(saved);
-  var have = _scoreEntriesByKey(out);
-  var cleared = 0;
-  var changed = Object.keys(Object.assign({}, was, now)).filter(function (key) {
-    var a = was[key];
-    var b = now[key];
-    // Unchanged here: the saved copy's value stands, and a cell it lacks is
-    // kept as memory has it (another tab's stale save can leave it out).
-    if (a && b && !_scoreEntryRemoteChanged(a.entry, b.entry)) return !have[key];
-    if (a && (!b || (entered(a) && !entered(b)))) cleared++;
-    return true;
-  });
-  if (cleared > (fillUndone || 0) + 2) return null;
-  changed.forEach(function (key) {
-    var b = now[key];
-    var sid = (b || was[key]).sid;
-    var list = out[sid] || (out[sid] = []);
-    var at = have[key] ? list.indexOf(have[key].entry) : -1;
-    if (b) list.splice(at < 0 ? list.length : at, at < 0 ? 0 : 1, _cloneValue(b.entry));
-    else if (at >= 0) list.splice(at, 1);
-    if (!list.length && (saved[sid] || []).length) delete out[sid];
-  });
-  return out;
-}
-
 // fillUndone: how many entries restoreScoreCells took out because the fill
 // it undoes added them. Only those may take the entry count past the guard.
 function saveScores(cid, obj, fillUndone) {
@@ -10800,33 +10745,47 @@ function saveScores(cid, obj, fillUndone) {
     cid,
     _loadPersistedCourseFieldSnapshot('scores', cid, (_cache.scores && _cache.scores[cid]) || {}),
   );
-  // Block catastrophic saves: a drop against the saved copy beyond the rule
-  // in _scoreGuardDrop is refused. This prevents empty/partial objects from
-  // wiping all grades. When the saved copy and memory disagree, the drop
-  // may not be a loss: the saved copy can still hold deleted work's marks,
-  // or another tab's marks this tab has not loaded. Then the save goes
-  // ahead against the saved copy without the gone marks, or, when this
-  // save's own change against its baseline is small, as the saved copy with
-  // this save's cells put on it; it is still refused if that would drop too
-  // much. Only the cells this save changed are sent.
-  var sent = obj;
-  var drop = _scoreGuardDrop(prev, obj, fillUndone);
-  if (drop) {
-    var live = _scoresOfLiveRows(cid, prev) || prev;
-    var merged = _scoreGuardDrop(live, obj, fillUndone) ? _scoresMergedOntoSaved(cid, live, obj, fillUndone) : obj;
-    if (merged && !_scoreGuardDrop(live, merged, fillUndone)) {
-      prev = live;
-      obj = merged;
-      drop = '';
-    }
-  }
-  if (drop) {
-    console.error('[GUARD] BLOCKED scores save — ' + drop + ' Stack:', new Error().stack);
+  // Delete Assessment and Withdraw take their marks out of the saved copy,
+  // but that write can fail (storage full). Marks of work and students that
+  // are gone then do not count toward the guard, and are not sent as clears.
+  var gone = _scoreGuardDrop(prev, obj, fillUndone) && _scoresOfLiveRows(cid, prev);
+  if (gone && !_scoreGuardDrop(gone, obj, fillUndone)) prev = gone;
+  else gone = null;
+  var prevCount = prev ? Object.keys(prev).length : 0;
+  var newCount = obj ? Object.keys(obj).length : 0;
+  // Group work: which linked members' grades this save changes (Group grading).
+  var groupBefore = _groupWriteDepth ? null : _groupGradesIn(cid, prev);
+  // Block catastrophic saves: if student-count drops >50%, refuse to save.
+  // This prevents empty/partial objects from wiping all grades.
+  if (prevCount > 2 && newCount < prevCount * 0.5) {
+    console.error(
+      '[GUARD] BLOCKED scores save — student-count dropped from',
+      prevCount,
+      'to',
+      newCount,
+      '(>50% loss). This likely indicates a bug or corrupted state. Stack:',
+      new Error().stack,
+    );
     if (typeof showSyncToast === 'function') showSyncToast('Score save blocked — data loss prevented', 'error');
     return false;
   }
-  // Group work: which linked members' grades this save changes (Group grading).
-  var groupBefore = _groupWriteDepth ? null : _groupGradesIn(cid, prev);
+  // Also count total score entries for a more granular check
+  var prevEntries = 0,
+    newEntries = 0;
+  if (prev) for (var _ps in prev) prevEntries += (prev[_ps] || []).length;
+  if (obj) for (var _ns in obj) newEntries += (obj[_ns] || []).length;
+  if (prevEntries > 10 && newEntries + (fillUndone || 0) < prevEntries * 0.3) {
+    console.error(
+      '[GUARD] BLOCKED scores save — entry-count dropped from',
+      prevEntries,
+      'to',
+      newEntries,
+      '(>70% loss). Stack:',
+      new Error().stack,
+    );
+    if (typeof showSyncToast === 'function') showSyncToast('Score save blocked — data loss prevented', 'error');
+    return false;
+  }
   var gradesWere = _gradeBefore(cid, 'scores');
   var lsOk = _saveCourseField('scores', cid, obj);
   _gradeAfter(cid, gradesWere, obj);
@@ -10834,8 +10793,9 @@ function saveScores(cid, obj, fillUndone) {
   if (_writesEnabled()) {
     var refusals = _writeRefusals;
     var baseline = _migrateRubricScoreKeys(cid, _serverStateOr('scores', cid, prev));
-    persistScoreDiffToCanonical(cid, baseline, sent || {});
-    _dismissOverriddenScoreWrites(cid, baseline, sent || {});
+    if (gone) baseline = _scoresOfLiveRows(cid, baseline) || baseline;
+    persistScoreDiffToCanonical(cid, baseline, obj || {});
+    _dismissOverriddenScoreWrites(cid, baseline, obj || {});
     _rememberServerState('scores', cid, obj || {});
     // A refused write's cell goes back in the baseline (_onWriteRefused).
     refused = _writeRefusals !== refusals;
