@@ -20,16 +20,20 @@ import { isPage, precacheUrls } from '../scripts/sw-fingerprints.mjs';
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
-const URLS = precacheUrls(distSw());
-const PAGES = URLS.filter(isPage);
+// Read from dist/ once the test server has built it (listing the tests, as
+// CI does to split them, happens before the build).
+let URLS, ALWAYS;
 const RECORD = '/__sw-precache-fingerprints.json';
 const CHANGED = 'teacher/page-gradebook.js';
 const changedBody = name => readFileSync(join(DIST, CHANGED), 'utf-8') + `\nwindow.__fvRelease = '${name}';\n`;
 const sorted = list => [...list].sort();
-// What every update fetches whatever changed: the new sw.js and the pages.
-const ALWAYS = ['/sw.js', ...PAGES];
 
 let server;
+test.beforeAll(() => {
+  URLS = precacheUrls(distSw());
+  // What every update fetches whatever changed: the new sw.js and the pages.
+  ALWAYS = ['/sw.js', ...URLS.filter(isPage)];
+});
 test.beforeEach(async () => {
   server = await startServer();
 });
