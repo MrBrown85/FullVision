@@ -35,13 +35,6 @@ BEFORE_MD5, AFTER_MD5 = re.search(r"Before: ([0-9a-f]{32})\. After: ([0-9a-f]{32
 
 def md5(d): return d.one('select md5(pg_get_functiondef(to_regprocedure(:f)))', f=SIG)
 def text(d, t, e=ENR1): return d.service("student_submit.page(:t, :e, 'ip-1')::text", t=t, e=e)
-def strip(p):
-    p = json.loads(json.dumps(p))
-    if 'learning' in p:
-        p['learning']['course'].pop('grade_level', None)
-        p['learning'].pop('rubric_tags', None)
-    return p
-
 def world(tag):
     """Live as the file meets it, with Teacher A's class: a map of three sections (one removed later),
     two rubrics used by work and one not, whole-rubric competencies on each, and Teacher B's rubric."""
@@ -80,7 +73,9 @@ def world(tag):
 def scen_off():
     d, k, t1, t2 = world('off')
     try:
-        ok('(setup) page is as 2026111170 left it', md5(d) == BEFORE_MD5, md5(d))
+        found = md5(d)
+        print('md5 of page before the file, on this build: %s (header: %s)' % (found, BEFORE_MD5))
+        ok('(setup) page is as 2026111170 left it: the md5 the header records', found == BEFORE_MD5, found)
         before1, before2 = text(d, t1), text(d, t2, ENR2)
         ok('(setup) the file applies', d.file(FILE) == 'ok')
         ok('off: page is the same text as before the file (Cece)', text(d, t1) == before1)
@@ -94,6 +89,8 @@ def scen_on():
     try:
         d.run('update course set show_my_learning = true where id = :c', c=COURSE_A)
         before = json.loads(text(d, t1)); before_text = text(d, t1)
+        ok('(before the file) neither key is sent with Show My Learning on',
+           'grade_level' not in before_text and 'rubric_tags' not in before_text and 'learning' in before)
         ok('(setup) the file applies', d.file(FILE) == 'ok')
         on_text = text(d, t1); p = json.loads(on_text); L = p['learning']
         ok("on: learning.course.grade_level is the course row's", L['course'].get('grade_level') == '12', L['course'])
@@ -103,8 +100,9 @@ def scen_on():
         ok('on: a rubric no listed work uses is left out, and one with no whole-rubric competencies',
            k['r_unused'] not in json.dumps(L['rubric_tags']) and k['r_none'] not in json.dumps(L['rubric_tags']))
         ok("on: another class's rubric and tag are absent", all(x not in on_text for x in (k['b_rub'], k['b_tag'], COURSE_B)))
-        ok('on: taking the two keys out gives page before the file, to the byte',
-           json.dumps(strip(p), sort_keys=True) == json.dumps(before, sort_keys=True))
+        cut = d.service("(student_submit.page(:t, :e, 'ip-1') #- '{learning,course,grade_level}' #- '{learning,rubric_tags}')::text",
+                        t=t1, e=ENR1)
+        ok('on: taking the two keys out gives page before the file, to the byte', cut == before_text, (len(cut), len(before_text)))
         ok('on: no descriptor beyond what page already sent, nothing of another student',
            on_text.count('DESCRIPTOR-SECRET') == before_text.count('DESCRIPTOR-SECRET') and ENR2 not in on_text and STU2 not in on_text)
         p2 = json.loads(text(d, t2, ENR2))
@@ -128,10 +126,20 @@ def scen_apply():
         ok('apply: and changed nothing', d.one("select prosrc like '%{}%' from pg_proc where oid = to_regprocedure(:f)", f=SIG))
     finally:
         d.close()
+    d, k, t1, _ = world('apply1')
+    try:
+        d.run('drop table public.assessment_resource cascade')
+        r = d.file(FILE)
+        ok('apply: refuses without Handouts and Links', r.startswith('STOPPED') and 'Handouts and Links' in r, r)
+        ok('apply: and changed nothing', md5(d) == BEFORE_MD5, md5(d))
+    finally:
+        d.close()
     d, k, t1, _ = world('apply2')
     try:
         ok('apply: the file applies', d.file(FILE) == 'ok')
-        ok('apply: md5 after is the one the header records', md5(d) == AFTER_MD5, md5(d))
+        after = md5(d)
+        print('md5 of page after the file, on this build: %s (header: %s)' % (after, AFTER_MD5))
+        ok('apply: md5 after is the one the header records', after == AFTER_MD5, after)
         once = text(d, t1)
         ok('apply: a second run applies and changes nothing', d.file(FILE) == 'ok' and md5(d) == AFTER_MD5 and text(d, t1) == once)
         g = d.all("select has_function_privilege('anon', :f, 'execute'), has_function_privilege('authenticated', :f, 'execute'), "

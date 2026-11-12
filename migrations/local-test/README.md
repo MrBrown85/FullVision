@@ -2577,6 +2577,7 @@ PGDATABASE=mlr python3 my_learning_rest.py            # off, on, apply, undo
 - `apply`: the guard, a second run, grants and attributes, and the md5 the header records.
 - `undo`: `my-learning-rest-undo.sql` restores the md5 the file found.
 
-The two fingerprints in the file were not read from a database. `8d8e3f9a…` is page as `2026111170` left it, from that file's own list. Rebuilding `pg_get_functiondef`'s text from the file gives the same md5, so `b460f6f2…` (page as this file leaves it) was worked out the same way.
-
-Result: **not run yet.** The machine this was written on has no PostgreSQL. Run it on a throwaway PostgreSQL 17 before the apply.
+Result on 2026-11-12, PostgreSQL 17.12, local (port 54329), from empty databases: **32 of 32**: off 5/5, on 12/12, apply 9/9, undo 6/6.
+- The md5 of `student_submit.page` on this build before the file is `8d8e3f9aa91e43b0163cb3189430b758`, the same as the header's "Before" and 2026111170's own list. After the file it is `b460f6f2753ad24317ad2d1f2f4149ce`, the same as the header's "After".
+- A wrong version of the file, with the removed-section filter taken out of `rubric_tags`, fails 2 checks of `on`.
+- Sanity check on the same server: `batch_e_e9.py` 32 of 32.
