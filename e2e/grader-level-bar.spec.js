@@ -13,12 +13,21 @@ async function open(page) {
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   // The demo class seeds after the curriculum bank loads.
   await page.waitForFunction(() => getAssessments('sci8').length > 0);
-  await page.evaluate(() => saveDashboardPrefs({ closedModules: { sci8: [] } })); // these checks want every unit folder open
   await page.evaluate(() => window.Router.navigate('/assignments'));
   await page.locator('#ac-sci8a2').waitFor();
   await page.evaluate(() => PageAssignments.openGrader('sci8', 'sci8a2', 'st1'));
   const dlg = page.locator('.grader-dialog');
   await dlg.waitFor();
+  // The dialog grows in from 98%; measure it once it has opened.
+  await dlg.evaluate(el =>
+    Promise.all(
+      el
+        .closest('.grader-overlay')
+        .getAnimations({ subtree: true })
+        .filter(a => a.effect && a.effect.getTiming().iterations !== Infinity)
+        .map(a => a.finished),
+    ),
+  );
   return dlg;
 }
 

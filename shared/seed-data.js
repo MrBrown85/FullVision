@@ -1332,13 +1332,7 @@ function seedIfNeeded() {
         created: new Date('2025-09-01').toISOString(),
       })),
     );
-    // A first visit shows the unit with the Light Refraction Lab open and the
-    // four earlier units closed, in the page's own closed-folder memory.
-    {
-      const closedByClass = Object.assign({}, (getDashboardPrefs() || {}).closedModules || {});
-      closedByClass.sci8 = sci8Units.filter(u => u.id !== 'sci8-mod-energy').map(u => u.id);
-      saveDashboardPrefs({ closedModules: closedByClass });
-    }
+    // Every unit folder starts open (Colin, Nov 11: "the demo units can be open").
     const sci8SeedAssessments = normalizeSci8Assessments(sci8Assessments);
     saveAssessments('sci8', current(sci8SeedAssessments));
 

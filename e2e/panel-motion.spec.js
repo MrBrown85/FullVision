@@ -32,16 +32,32 @@ test.describe('with motion', () => {
     const full = await sidebarWidth(page);
     const mainFull = await mainWidth(page);
     expect(full).toBeGreaterThan(100);
+    // Every frame of the slide, from the press: some frame is between open
+    // and shut, with the page between its two widths. (A fixed wait missed
+    // the middle on a busy machine.)
+    const frames = page.evaluate(
+      () =>
+        new Promise(resolve => {
+          const out = [];
+          const start = performance.now();
+          const tick = () => {
+            out.push([
+              document.getElementById('sidebar-mount').getBoundingClientRect().width,
+              document.querySelector('.page-main').getBoundingClientRect().width,
+              getComputedStyle(document.querySelector('.assess-course-select')).display !== 'none',
+            ]);
+            if (performance.now() - start < 600) requestAnimationFrame(tick);
+            else resolve(out);
+          };
+          requestAnimationFrame(tick);
+        }),
+    );
     await page.click('[data-action="toggleSidebar"]');
-    // Mid-slide: between open and shut, and the page is between its two widths.
-    await page.waitForTimeout(60);
-    const mid = await sidebarWidth(page);
-    expect(mid).toBeGreaterThan(0);
-    expect(mid).toBeLessThan(full);
-    const mainMid = await mainWidth(page);
-    expect(mainMid).toBeGreaterThan(mainFull);
+    const mid = (await frames).filter(([w]) => w > 0 && w < full);
+    expect(mid.length).toBeGreaterThan(0);
+    expect(mid.every(([, m]) => m > mainFull)).toBe(true);
     // The toolbar's own class picker waits until the list is gone.
-    await expect(page.locator('.assess-course-select')).toBeHidden();
+    expect(mid.some(([, , picker]) => picker)).toBe(false);
     await expect.poll(() => sidebarWidth(page)).toBe(0);
     await expect(page.locator('#page-layout')).not.toHaveClass(/sidebar-sliding/);
     await expect(page.locator('.assess-course-select')).toBeVisible();
@@ -101,16 +117,16 @@ test.describe('with reduced motion', () => {
   });
 });
 
-test.describe('quick exits', () => {
+test.describe('closing', () => {
   test.use({ reducedMotion: 'no-preference' });
 
-  test('a dialog leaves at once and its copy fades away', async ({ page }) => {
+  // Dialogs and menus close at once, with nothing left fading in the page
+  // (Colin, Nov 11: "Close instantly").
+  test('a dialog closes at once, even with motion on', async ({ page }) => {
     await openDemo(page);
     await page.evaluate(() => window.showConfirm('Delete?', 'Sure?', 'Delete', 'danger', () => {}));
     await expect(page.locator('.confirm-overlay')).toHaveCount(1);
     await page.keyboard.press('Escape');
-    // The real dialog is gone now; only a see-through copy is left.
-    expect(await page.locator('.confirm-overlay:not(.fv-leaving)').count()).toBe(0);
-    await expect(page.locator('.confirm-overlay')).toHaveCount(0);
+    expect(await page.locator('.confirm-overlay').count()).toBe(0);
   });
 });

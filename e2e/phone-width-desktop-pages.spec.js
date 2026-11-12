@@ -86,8 +86,10 @@ test('Class Settings class list works on a phone', async ({ page }) => {
 // names don't overlap, and + New Assessment stays on screen.
 test('Assignments rubric grid fits a phone', async ({ page }) => {
   await openDesktop(page, '/assignments');
-  await page.locator('.assess-card', { hasText: 'Science Fair Proposal' }).first().locator('.assess-header').click();
-  await expect(page.locator('.rsg-levels').first()).toBeVisible();
+  const card = page.locator('.assess-card', { hasText: 'Science Fair Proposal' }).first();
+  await card.locator('.assess-header').click();
+  // Every unit folder is open, so other rubric cards (closed) come before it.
+  await expect(card.locator('.rsg-levels').first()).toBeVisible();
   const r = await page.evaluate(() => {
     const main = document.getElementById('main');
     const levels = [...document.querySelectorAll('.rsg-level')].filter(l => l.getBoundingClientRect().width > 0);

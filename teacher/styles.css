@@ -3877,23 +3877,6 @@ body.offline-active #app-dock {
     scale: 0.98;
   }
 }
-@keyframes fv-fade-out {
-  to {
-    opacity: 0;
-  }
-}
-@keyframes fv-pop-out {
-  to {
-    opacity: 0;
-    scale: 0.98;
-  }
-}
-@keyframes fv-menu-out {
-  to {
-    opacity: 0;
-    translate: 0 -4px;
-  }
-}
 @keyframes fv-menu-in {
   from {
     opacity: 0;
@@ -3977,20 +3960,6 @@ body.offline-active #app-dock {
     border-radius: 6px;
     box-shadow: var(--shadow-sm);
     pointer-events: none;
-  }
-  /* Quick exits (ui.js, "Quick exits"): a copy fades where the dialog or
-     menu was, shorter than the open. */
-  .fv-leaving {
-    pointer-events: none;
-  }
-  .fv-leaving.fv-leave-dialog {
-    animation: fv-fade-out 130ms var(--motion-ease-in) forwards !important;
-  }
-  .fv-leaving.fv-leave-dialog > :first-child {
-    animation: fv-pop-out 130ms var(--motion-ease-in) forwards !important;
-  }
-  .fv-leaving.fv-leave-menu {
-    animation: fv-menu-out 120ms var(--motion-ease-in) forwards !important;
   }
   /* Class picker: gone while the list slides, then fades in. */
   .page-layout.sidebar-sliding .assess-course-select,
