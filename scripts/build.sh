@@ -31,3 +31,8 @@ CACHE_ID="${COMMIT_REF:-$(date +%s)}"
 sed -i.bak "s/const CACHE_NAME = '[^']*';/const CACHE_NAME = 'fullvision-${CACHE_ID:0:12}';/" dist/sw.js
 rm -f dist/sw.js.bak
 grep -q "const CACHE_NAME = 'fullvision-${CACHE_ID:0:12}';" dist/sw.js
+
+# Each precached file's fingerprint, so the new worker copies unchanged files
+# from the previous cache instead of downloading them (scripts/sw-fingerprints.mjs).
+node scripts/sw-fingerprints.mjs dist
+grep -q "^const PRECACHE_FINGERPRINTS = {" dist/sw.js

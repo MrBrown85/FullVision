@@ -317,6 +317,7 @@ Demo Mode is the only sample data. `shared/seed-data.js` builds the Science 8 sa
 
 - `sw.js` is registered by both desktop and mobile entry points
 - the manifest and service worker provide installability and cached asset behavior
+- each release gives `sw.js` a new cache name and, from `scripts/sw-fingerprints.mjs`, a SHA-256 for every precached file but the HTML pages; the new worker's install copies a file from the previous cache only when the old version recorded the same fingerprint and the stored bytes hash to it, and downloads the rest (`docs/plans/caching-plan.md`, step 3). The source `sw.js` has no fingerprints and downloads everything
 
 ## Source-of-truth documents
 

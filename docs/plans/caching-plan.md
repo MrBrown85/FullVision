@@ -1,6 +1,6 @@
 # Caching: a fast repeat visit, and no one left on old code (2026-11-12)
 
-The plan for S19-C5, C6 and C7 in `docs/plans/handoff-review-plan.md` (Track C). Design only; nothing here is built yet. Measured on the live site (fullvision.ca, release `dce10ed6`) and checked against `origin/main` at `9eddcecb`.
+The plan for S19-C5, C6 and C7 in `docs/plans/handoff-review-plan.md` (Track C). Step 3, option (d), is built (S19-C6); the rest is design only. Measured on the live site (fullvision.ca, release `dce10ed6`) and checked against `origin/main` at `9eddcecb`.
 
 ## 1. What a visit and a release cost today
 
@@ -70,7 +70,13 @@ Do (e), then (d), then (a) with the guard. Leave (b) and (c). Each step is one s
 
 1. **A read-only live check** (`scripts/check-live-caching.mjs`): the `curl` and browser measurements in this plan as one command, printing requests, 304s, bytes and time for a first and repeat visit, plus the headers on each page. No decision needed. Proof: it reproduces section 1's numbers today.
 2. **(e)** `excludedPath` on the edge function, and a unit test that every page address still runs it. Needs Colin. Release it alone. Proof: step 1 before and after, with 304s on files and an unchanged content policy on pages.
-3. **(d)** fingerprints in `dist/sw.js` and an install that copies unchanged files. Proof: the browser test in section 2, `tests/sw-precache.test.js`, and offline and Demo Mode runs. After the release, step 1 shows the update's size.
+3. **Done: (d)** fingerprints in `dist/sw.js` and an install that copies unchanged files. Proof: the browser test in section 2, `tests/sw-precache.test.js`, and offline and Demo Mode runs. After the release, step 1 shows the update's size. Built as planned (`scripts/sw-fingerprints.mjs`, `sw.js` `precacheKeepingUnchanged`; tests `tests/sw-fingerprints.test.js` and `e2e/sw-keep-unchanged.spec.js`). Learned while building it:
+   - A copy is kept only when the old version recorded the same fingerprint **and** the stored bytes hash to it. The second check is needed, not belt and braces: the running worker stores every good network answer in its own cache (`cacheIfGood`), so a tab left open across a release can put newer bytes under an old fingerprint.
+   - The fingerprints are SHA-256 in base64. The finished install stores them in its own cache at `/__sw-precache-fingerprints.json`, written last, so a cache without it (today's, or an install that failed) is never copied from.
+   - HTML pages get no fingerprint and are always downloaded: the edge function gives each HTML response its own nonce, so a stored page never matches the file. An update with nothing changed is `sw.js` and the five pages, 67 KB raw (22 KB gzipped) instead of 154 requests and 13.6 MB.
+   - Hashing every precached file (13.5 MB) took 14 ms in Chrome on an M-series Mac, 62 ms with the CPU slowed four times (measured in a page; Chrome cannot slow a worker's CPU).
+   - A copied response keeps its original headers. Only HTML carries a content policy, and HTML is never copied; a header change in `netlify.toml` for scripts or styles reaches the offline copy only when the file itself changes.
+   - The first release with this downloads everything once (the old cache has no fingerprints); every release after it downloads only the changed files and the pages.
 4. Once (e) works, the install can also use `cache: 'no-cache'` instead of `'reload'`, so a file missing from the old cache becomes a 304, not a download. Proof: as in step 3.
 5. **Close the on-demand mix.** When `auto-update.js` already knows a newer version has taken over, opening Reports does a full page load instead of fetching scripts, if it is a safe moment; otherwise it behaves as today. Needs Colin. Proof: a browser test that releases a new build while a tab is open and checks that Reports runs one version.
 6. **(a) with the guard.** Needs Colin. Proof: the browser tests in section 2; after the release, step 1 shows no file requests on a repeat visit.
