@@ -57,11 +57,13 @@ test.describe('A category on every assessment', () => {
     const hint = page.locator('#af-category-hint');
     await expect(category).toHaveValue('');
     await expect(category.locator('option').first()).toHaveText('Choose a Category');
-    await expect(hint).toBeVisible();
-    await expect(hint).toHaveText(HINT);
+    // The footer says it; the line under the field waits for a stopped save (Nov 11).
+    await expect(hint).toBeHidden();
 
     await page.locator('#af-title').fill('Chapter 3 Quiz');
     await page.locator('[data-action="saveNewAssess"]').click();
+    await expect(hint).toBeVisible();
+    await expect(hint).toHaveText(HINT);
     // Not saved: the form stays open on the Category field.
     await expect(page.locator('#af-title')).toBeVisible();
     await expect(category).toHaveAttribute('aria-invalid', 'true');
@@ -109,9 +111,10 @@ test.describe('A category on every assessment', () => {
     await (await cardMenuItem(page.locator('#ac-assess-001'), 'editAssess')).click();
     const category = page.locator('#af-category');
     await expect(category).toHaveValue('');
-    await expect(page.locator('#af-category-hint')).toBeVisible();
+    await expect(page.locator('#af-category-hint')).toBeHidden();
     await page.locator('[data-action="saveEditAssess"]').click();
     await expect(category).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.locator('#af-category-hint')).toBeVisible();
     expect((await savedAssessments(page))[0].categoryId).toBe(null);
 
     await category.selectOption('k-tests');

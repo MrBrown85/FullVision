@@ -86,8 +86,8 @@ test('the student page has no term picker and counts the year so far', async ({ 
   await openCece(page);
   await expect(page.locator('select.term-select')).toHaveCount(0);
   const n = await page.evaluate(() => getAssessments(getActiveCourse()).length);
-  await expect(page.locator('#stu-tab-grades .stu-tab-sub')).toContainText(/all time/i);
-  expect(n).toBeGreaterThan(0);
+  expect(n).toBeGreaterThan(1);
+  await expect(page.locator('#stu-tab-grades .stu-tab-stat')).toHaveText(n + ' Pieces');
 });
 
 test('a Letter class shows percents, not proficiency words', async ({ page }) => {
@@ -185,7 +185,7 @@ test('the Competencies tab has no Competency Profile list', async ({ page }) => 
 test('Grades builds the course grade by category, and Group By groups the work', async ({ page }) => {
   await openCece(page);
   await page.locator('#stu-tab-grades').click();
-  await expect(page.locator('#stu-tab-grades .stu-tab-stat')).toHaveText(/ · 3 Categories$/);
+  await expect(page.locator('#stu-tab-grades .stu-tab-stat')).toHaveText(/^\d+ Pieces$/);
   await expect(page.locator('.stu-gr-seg')).toHaveCount(3);
   await expect(page.locator('.stu-gr-group')).toHaveCount(3);
   await expect(page.locator('.stu-gr-group-meta').first()).toContainText('40% of the grade');

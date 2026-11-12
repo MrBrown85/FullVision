@@ -96,9 +96,11 @@ test('Remove Goal takes a goal away with an Undo that puts it back', async ({ pa
   await expect(page.locator('#undo-toast')).toContainText('Goal removed');
 });
 
-test('a saved reflection counts on the ID card, in Reflections and on the tab', async ({ page }) => {
+// The tab shows one figure, its goals; the grey "Last answer" line went with
+// the folder tabs (Colin, 2026-11-11).
+test('a saved reflection counts on the ID card and in Reflections; the tab keeps its one figure', async ({ page }) => {
   await openStudent(page, 'Liam');
-  await expect(page.locator('#stu-tab-profile .stu-tab-sub')).toHaveText('No answers yet');
+  await expect(page.locator('#stu-tab-profile .stu-tab-stat')).toHaveText(/^\d+ Goals?$/);
   const row = page.locator('.gl-row').first();
   await row.getByRole('button', { name: '+ Reflection' }).click();
   await page.keyboard.type('I can plan a fair test now.');
@@ -107,7 +109,8 @@ test('a saved reflection counts on the ID card, in Reflections and on the tab', 
   await expect(page.locator('#lp-refl .lp-none')).toHaveText(
     'No questionnaire reflections from Liam yet. 1 competency reflection is under Competency Goals.',
   );
-  await expect(page.locator('#stu-tab-profile .stu-tab-sub')).toContainText('Last answer');
+  await expect(page.locator('#stu-tab-profile .stu-tab-stat')).toHaveText(/^\d+ Goals?$/);
+  await expect(page.locator('#stu-tab-profile .stu-tab-sub')).toHaveCount(0);
 });
 
 test("Core Competencies in Cece's Words shows what she answered, without retyping", async ({ page }) => {
@@ -197,9 +200,9 @@ test("Cece's answers reach the profile, laid out as the redesign's board", async
   await expect(page.locator('#lp-core .stu-core-table')).toBeVisible();
 });
 
-test('a student with no answers gets no private note and a "No answers yet" tab', async ({ page }) => {
+test('a student with no answers gets no private note, and the tab no badge', async ({ page }) => {
   await openStudent(page, 'Liam');
   await expect(page.locator('#lp-about')).toContainText('Liam hasn’t answered About Me yet.');
   await expect(page.locator('.id-private')).toHaveCount(0);
-  await expect(page.locator('#stu-tab-profile .stu-tab-sub')).toHaveText('No answers yet');
+  await expect(page.locator('#stu-tab-profile .stu-tab-badge')).toHaveCount(0);
 });

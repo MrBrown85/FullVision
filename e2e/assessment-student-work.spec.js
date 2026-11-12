@@ -48,20 +48,27 @@ test('with Send Work off the form has no Student Work card; on, it does, and its
   const card = page.locator('.af-card-work');
   await expect(card).toBeVisible();
   await expect(card.locator('.af-card-title')).toHaveText('Student Work');
-  await expect(card.locator('.af-work-label')).toHaveText([
-    'Students Send',
-    'After the Due Date',
-    'Group Work',
-    'Students See Your Mark Up',
-  ]);
+  // One question until students send something (Colin, Nov 11).
+  await expect(card.locator('.af-work-q')).toHaveText(['Do Students Send You Their Work?']);
   const on = field => card.locator(`[data-field="${field}"][aria-checked="true"]`);
-  await expect(on('students_send')).toHaveText('Nothing');
-  await expect(on('after_due')).toHaveText('Keep Accepting');
-  await expect(on('group_work')).toHaveText('Each Student');
-  await expect(on('students_see_markup')).toHaveText('Yes');
+  await expect(on('students_send')).toHaveText('No');
   await expect(card).not.toContainText('Keep Photos Until');
+  await expect(card.locator('.af-work-peek')).toContainText('Science Fair Proposal');
 
+  // The late question needs a due date to ask about.
+  await page.locator('#af-due').fill('2026-11-20');
+  await page.locator('#af-due').dispatchEvent('change');
   await card.locator('[data-field="students_send"][data-value="photos_files"]').click();
+  await expect(card.locator('.af-work-q')).toHaveText([
+    'Do Students Send You Their Work?',
+    /^Can Students Send After /,
+    'Do Students See What You Write on Their Work?',
+  ]);
+  // Who Sends the Work? is for pairs and groups only.
+  await expect(card.locator('[data-field="group_work"]')).toHaveCount(0);
+  await expect(on('after_due')).toHaveText('Yes, Marked Late');
+  await expect(on('students_see_markup')).toHaveText('Yes, When You Return It');
+  await expect(card.locator('.af-work-peek')).toContainText('Choose a File');
   await card.locator('[data-field="after_due"][data-value="until"]').click();
   await expect(card.locator('#af-accept-until')).toBeVisible();
   await card.locator('#af-accept-until').fill('2026-12-04');

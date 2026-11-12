@@ -169,6 +169,25 @@ describe('the Overview tab', () => {
     expect(main.querySelector('.stu-tab').textContent).toContain('2 Missing');
   });
 
+  it('folder tabs: a name and one figure each; missing work is an orange badge', () => {
+    const main = open();
+    const tab = main.querySelector('#stu-tab-overview');
+    expect(tab.querySelector('.stu-tab-label').textContent).toBe('Overview');
+    expect(tab.querySelector('.stu-tab-badge.miss').textContent).toBe('2 Missing');
+    expect(tab.querySelector('.stu-tab-stat')).toBeNull();
+    // No grey second line on any tab, and none under the panel's heading.
+    expect(main.querySelector('.stu-tab-sub')).toBeNull();
+    expect(main.querySelector('.stu-ov-head p')).toBeNull();
+    Array.from(main.querySelectorAll('.stu-tab')).forEach(t => {
+      expect(t.querySelectorAll('.stu-tab-stat, .stu-tab-badge').length).toBe(1);
+    });
+  });
+
+  it('says missing work counts as 0 in the Missing tile, where it applies', () => {
+    const main = open();
+    expect(main.querySelector('.stu-ov-miss').textContent).toContain('Each counts as 0 until it’s in.');
+  });
+
   it('lists the missing work by what handing it in adds', () => {
     const main = open();
     const titles = Array.from(main.querySelectorAll('.stu-ov-todo-title')).map(n => n.textContent);
@@ -198,6 +217,6 @@ describe('the Overview tab', () => {
     seed('proficiency');
     const main = open();
     expect(main.querySelector('.stu-ov-proj')).toBeNull();
-    expect(main.querySelector('.stu-ov-lede').textContent).not.toContain('counts as 0');
+    expect(main.querySelector('.stu-ov').textContent).not.toContain('counts as 0');
   });
 });

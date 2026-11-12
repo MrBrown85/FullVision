@@ -84,7 +84,7 @@ test('a question shows in three places and one answer clears all three', async (
 
   // The Learner Profile.
   await page.goto('/student?id=' + JORDAN + '&course=' + cid + '&tab=profile');
-  await expect(page.locator('#stu-tab-profile .stu-tab-sub')).toHaveText('1 question to answer');
+  await expect(page.locator('#stu-tab-profile .stu-tab-badge.todo')).toHaveText('1 to Answer');
   const refl = page.locator('#lp-feedback');
   await expect(refl.locator('.rf-card .qw-b').first()).toHaveText(question);
   await shot(page, 'S10-F4-profile-question-1366');
@@ -100,7 +100,7 @@ test('a question shows in three places and one answer clears all three', async (
   await dialog.locator('[data-grader="close"]').click();
   await expect(refl.locator('.rf-answer')).toHaveCount(0);
   await expect(refl.locator('.rf-you')).toContainText('The onion cells sit in rows, like bricks.');
-  await expect(page.locator('#stu-tab-profile .stu-tab-sub')).not.toHaveText('1 question to answer');
+  await expect(page.locator('#stu-tab-profile .stu-tab-badge')).toHaveCount(0);
   await shot(page, 'S10-F4-profile-answered-1366');
 
   await gradebook(page);
