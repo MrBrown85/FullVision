@@ -193,13 +193,108 @@ function isAppRoute(url) {
   return url.origin === self.location.origin && APP_ROUTES.includes(path);
 }
 
-// Install: pre-cache all app files
+// scripts/build.sh replaces this line in dist/sw.js with each precached
+// file's fingerprint (scripts/sw-fingerprints.mjs): { address: SHA-256 of the
+// file in base64 }. HTML pages have none. null (the source, served directly
+// in development and by tests) installs exactly as before fingerprints.
+const PRECACHE_FINGERPRINTS = null;
+
+// Where a finished install records the fingerprints it was built with, inside
+// its own cache, for the next version's install to read. Written last, so a
+// cache that has it is complete.
+const FINGERPRINTS_KEY = '/__sw-precache-fingerprints.json';
+
+function downloadAll(cache, urls) {
+  // addAll fails, and stores nothing, if any download fails or is not a 200.
+  return cache.addAll(urls.map(url => new Request(url, { cache: 'reload' })));
+}
+
+async function sha256(buffer) {
+  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', buffer));
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+// The other versions' caches that finished an install with fingerprints,
+// newest first. A cache from a worker without fingerprints, or one whose
+// install never finished, has no record and is never copied from.
+async function previousCaches() {
+  const found = [];
+  for (const name of (await caches.keys()).filter(key => key !== CACHE_NAME).reverse()) {
+    try {
+      const cache = await caches.open(name);
+      const record = await cache.match(FINGERPRINTS_KEY);
+      const files = record && (await record.json()).files;
+      if (files && typeof files === 'object') found.push({ cache, files });
+    } catch {
+      // An unreadable record: that cache is not used.
+    }
+  }
+  return found;
+}
+
+// A stored copy fit to keep: a complete 200 from this site for exactly this
+// address (query string included), not opaque, partial or redirected.
+function isWholeCopy(response, url) {
+  return (
+    !!response &&
+    response.status === 200 &&
+    response.type === 'basic' &&
+    !response.redirected &&
+    response.url === new URL(url, self.location.origin).href
+  );
+}
+
+// Copy url from a previous cache when the old version recorded the same
+// fingerprint and the stored bytes themselves hash to it. True when copied;
+// false sends the address to the download list.
+async function keepUnchanged(cache, sources, url) {
+  const want = PRECACHE_FINGERPRINTS[url];
+  if (!want) return false;
+  for (const source of sources) {
+    if (source.files[url] !== want) continue;
+    try {
+      const stored = await source.cache.match(url);
+      if (!isWholeCopy(stored, url)) continue;
+      // The copy put in the cache is the same stream as the bytes hashed.
+      const copy = stored.clone();
+      if ((await sha256(await stored.arrayBuffer())) !== want) continue;
+      await cache.put(url, copy);
+      return true;
+    } catch {
+      // Any error: download it instead.
+    }
+  }
+  return false;
+}
+
+async function precacheKeepingUnchanged() {
+  const cache = await caches.open(CACHE_NAME);
+  const sources = await previousCaches();
+  const kept = await Promise.all(PRECACHE_URLS.map(url => keepUnchanged(cache, sources, url)));
+  await downloadAll(
+    cache,
+    PRECACHE_URLS.filter((url, i) => !kept[i]),
+  );
+  await cache.put(
+    FINGERPRINTS_KEY,
+    new Response(JSON.stringify({ files: PRECACHE_FINGERPRINTS }), {
+      headers: { 'Content-Type': 'application/json' },
+    }),
+  );
+}
+
+// Install: pre-cache all app files. Built, it copies the files that did not
+// change from the previous version's cache and downloads the rest; any failed
+// download fails the install, so this version never takes over with a partial
+// cache and the previous one keeps working.
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches
-      .open(CACHE_NAME)
-      .then(cache => cache.addAll(PRECACHE_URLS.map(url => new Request(url, { cache: 'reload' }))))
-      .then(() => self.skipWaiting()),
+    (PRECACHE_FINGERPRINTS
+      ? precacheKeepingUnchanged()
+      : caches.open(CACHE_NAME).then(cache => downloadAll(cache, PRECACHE_URLS))
+    ).then(() => self.skipWaiting()),
   );
 });
 
