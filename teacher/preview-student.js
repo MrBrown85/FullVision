@@ -526,7 +526,6 @@ window.PreviewStudent = (function () {
     open: open,
     close: close,
     refresh: refresh,
-    setDevice: setDevice,
     isOpen: function () {
       return !!_open;
     },

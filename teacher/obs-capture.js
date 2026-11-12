@@ -1822,7 +1822,6 @@ window.ObsCapture = (function () {
     competencyItems: competencyItems,
     competencyLabel: competencyLabel,
     levelLabel: levelLabel,
-    starterList: starterList,
     _helpers: {
       starterText: starterText,
       matchStarters: matchStarters,

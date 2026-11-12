@@ -389,7 +389,6 @@ window.ObsCard = (function () {
     typeBlockHtml: typeBlockHtml,
     dayHeaderHtml: dayHeaderHtml,
     parts: parts,
-    metaHtml: metaHtml,
     cardTime: cardTime,
     cardWhen: cardWhen,
     assessmentTitle: assessmentTitle,
