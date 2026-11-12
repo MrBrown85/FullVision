@@ -369,8 +369,7 @@ window.StudentEvidence = (function () {
   function panelHtml() {
     return (
       '<section class="ev-panel" id="ev-panel" aria-labelledby="ev-title">' +
-      '<div class="ev-head"><h2 class="ev-title" id="ev-title">Observations</h2>' +
-      '<p class="ev-lede">What you saw and heard, beside the work handed in. A note linked to a competency counts as evidence there.</p></div>' +
+      '<div class="ev-head"><h2 class="ev-title" id="ev-title">Observations</h2></div>' +
       '<div class="note-capture" id="note-capture"></div>' +
       '<div class="ev-timeline" id="ev-timeline"></div>' +
       '<div class="ev-seen" id="ev-seen"></div>' +

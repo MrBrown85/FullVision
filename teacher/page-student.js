@@ -711,9 +711,9 @@ window.PageStudent = (function () {
         scope +
         ' · ' +
         scored.length +
-        ' marked' +
+        ' assessed' +
         (latestA ? ' · Latest ' + _shortDay(latestA) : '') +
-        (unscored ? ' · ' + unscored + ' not marked' : ''),
+        (unscored ? ' · ' + unscored + ' not assessed yet' : ''),
     };
     if (window.WorkWall && WorkWall.tabOn(cid)) out.work = WorkWall.tabSummary(cid, studentId);
     // The Learner Profile: goals set (the student's own and the competency
@@ -988,7 +988,7 @@ window.PageStudent = (function () {
         ov.marked.length +
         ' of ' +
         ov.assigned.length +
-        ' pieces are marked so far.</div></div>';
+        ' pieces are assessed so far.</div></div>';
     }
     html += '</div>';
     if (now.hasPct) html += _ovStripHtml(ov);
@@ -1053,7 +1053,7 @@ window.PageStudent = (function () {
     var b = ov.better;
     if (!b) return '';
     return (
-      '<div class="stu-ov-card stu-ov-better"><div class="stu-ov-label">To Get Better</div>' +
+      '<div class="stu-ov-card stu-ov-better"><div class="stu-ov-label">Next to Work On</div>' +
       '<div class="stu-ov-better-name">' +
       esc(b.name) +
       ' ' +
@@ -1077,7 +1077,7 @@ window.PageStudent = (function () {
     var cell = ov.cellOf[a.id];
     if (st === 'NS') return { main: ov.now.hasPct ? '0%' : 'Missing', sub: 'Not in yet', cls: 'miss' };
     if (st === 'EXC') return { main: 'Doesn’t count', sub: '', cls: 'quiet' };
-    if (!cell || cell.kind === 'none') return { main: 'Not marked', sub: '', cls: 'quiet' };
+    if (!cell || cell.kind === 'none') return { main: 'Not assessed yet', sub: '', cls: 'quiet' };
     // A marked score wears its level's colour (calc.js gives the level).
     var lv = cell.level > 0 ? roundLevel(cell.level) : 0;
     if (cell.kind === 'points') {
@@ -1281,7 +1281,7 @@ window.PageStudent = (function () {
       '<div class="stu-ov-chips" role="group" aria-label="Show">' +
       [
         ['all', 'All'],
-        ['marked', 'Marked'],
+        ['marked', 'Assessed'],
         ['missing', 'Missing'],
       ]
         .map(function (f) {
@@ -1609,8 +1609,9 @@ window.PageStudent = (function () {
     return html + '</div>';
   }
 
-  /* The three facts over the list: how many are assessed, the strongest,
-     and the one to get better at (the lowest, orange as attention). */
+  /* One quiet line over the list: how many are assessed, the strongest and
+     the one to work on next, each with its level as the app shows levels,
+     and where the class's calculation is set. */
   function _cpSummaryHtml(ctx) {
     var cid = ctx.cid;
     var scored = [];
@@ -1618,13 +1619,15 @@ window.PageStudent = (function () {
       var v = getSectionProficiency(cid, studentId, sec.id);
       if (v > 0) scored.push({ sec: sec, v: v });
     });
-    var html =
-      '<div class="stu-cp-facts3"><div class="stu-cp-tile"><div class="stu-cp-tile-label">Assessed</div>' +
-      '<div class="stu-cp-tile-v">' +
-      scored.length +
-      ' of ' +
-      _plural(ctx.sections.length, 'competency', 'competencies') +
-      '</div></div>';
+    var parts = [
+      '<span class="stu-cp-sum-item"><strong>' +
+        scored.length +
+        ' of ' +
+        ctx.sections.length +
+        '</strong> ' +
+        (ctx.sections.length === 1 ? 'Competency' : 'Competencies') +
+        ' Assessed</span>',
+    ];
     if (scored.length >= 2) {
       var hi = scored.reduce(function (m, x) {
         return x.v > m.v ? x : m;
@@ -1632,21 +1635,30 @@ window.PageStudent = (function () {
       var lo = scored.reduce(function (m, x) {
         return x.v < m.v ? x : m;
       }, scored[0]);
-      var loTr = _cpTrend(cid, _compEntries(cid, lo.sec));
-      html +=
-        '<div class="stu-cp-tile"><div class="stu-cp-tile-label">Strongest</div><div class="stu-cp-tile-v">' +
-        esc(hi.sec.name) +
-        ' <span class="stu-cp-tile-lv">' +
-        esc(formatLevel(cid, hi.v)) +
-        '</span></div></div>' +
-        '<div class="stu-cp-tile att"><div class="stu-cp-tile-label">To Get Better</div><div class="stu-cp-tile-v">' +
-        esc(lo.sec.name) +
-        ' <span class="stu-cp-tile-lv">' +
-        esc(formatLevel(cid, lo.v)) +
-        (loTr.dir === 'down' ? ' ↓' : '') +
-        '</span></div></div>';
+      parts.push(
+        '<span class="stu-cp-sum-item"><span class="stu-cp-sum-label">Strongest</span> ' +
+          esc(hi.sec.name) +
+          ' ' +
+          _levelPill(cid, hi.v) +
+          '</span>',
+      );
+      parts.push(
+        '<span class="stu-cp-sum-item"><span class="stu-cp-sum-label">Next to Work On</span> ' +
+          esc(lo.sec.name) +
+          ' ' +
+          _levelPill(cid, lo.v) +
+          '</span>',
+      );
     }
-    return html + '</div>';
+    return (
+      '<div class="stu-cp-summary">' +
+      parts.join('') +
+      '<a class="stu-cp-how" role="link" tabindex="0" data-href="/dashboard?course=' +
+      esc(encodeURIComponent(cid)) +
+      '&amp;manage=grading" title="' +
+      esc(describeCalcMethod(cid)) +
+      '">How Levels Are Worked Out</a></div>'
+    );
   }
 
   var CP_FOOT =
@@ -1660,10 +1672,7 @@ window.PageStudent = (function () {
     ];
     var html =
       '<div class="stu-cp">' +
-      '<div class="stu-cp-head"><div class="stu-cp-head-text"><h2 class="stu-cp-title">Competencies</h2>' +
-      '<p class="stu-cp-lede">Each level is worked out as: ' +
-      esc(describeCalcMethod(cid).toLowerCase()) +
-      ' (set in Grading). The ring shows where the first scores started.</p></div>' +
+      '<div class="stu-cp-head"><div class="stu-cp-head-text"><h2 class="stu-cp-title">Competencies</h2></div>' +
       '<div class="stu-cp-sortbox"><span class="stu-cp-sort-label" id="stu-cp-sort-label">Sort</span>' +
       '<div class="seg seg-sm stu-cp-sort" role="radiogroup" aria-labelledby="stu-cp-sort-label">' +
       sorts
@@ -1688,7 +1697,7 @@ window.PageStudent = (function () {
     html +=
       '<div class="stu-cp-list"><div class="stu-cp-colhead" aria-hidden="true"><span>Competency</span>' +
       '<span class="stu-cp-colscale"><span>1</span><span>2</span><span>3</span><span>4</span></span>' +
-      '<span>Level</span><span>Since the Start</span><span>Evidence</span><span></span></div>';
+      '<span>Level</span><span class="stu-cp-ringkey"><i></i>Since the Start</span><span>Evidence</span><span></span></div>';
     if (_compSort === 'lowest') {
       ctx.sections
         .map(function (sec, i) {
@@ -1947,7 +1956,7 @@ window.PageStudent = (function () {
       '<div class="stu-ov-chips" role="group" aria-label="Show">' +
       [
         ['all', 'All'],
-        ['marked', 'Marked'],
+        ['marked', 'Assessed'],
         ['missing', 'Missing'],
       ]
         .map(function (f) {
