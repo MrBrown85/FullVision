@@ -2540,3 +2540,25 @@ PGPORT=54331 PGDATABASE=fv_be python3 batch_e.py fingerprints check
 
 `batch_c_route_statements.py` and `batch_c_route_refusals.py` now run on top of Batch D and Batch E too; the three
 checks that were the review of PR 1138's KNOWN gaps (S3, S4) check Batch E's fix.
+
+## Handouts and Links (2026111170, 2026-11-11)
+
+One file, `../2026111170_handouts_links.sql`, **not applied**. **Apply order:** after everything through `2026111160_slips_keyed.sql` (all on live). It adds `assessment_resource`, sixteen functions, two triggers on `assessment` and two on its own table, and two storage policies (`fv_handouts_read`, `fv_handouts_upload`). It replaces two functions, each guarded by the md5 read from live on Nov 11: `student_submit.page` (each assessment gains `resources`) and `public._photo_strays` (it now knows a handout page's name). It widens one policy, `fv_student_photos_fence`, to let through what the two new policies allow. It changes no row and no file. The contract is `handouts-links-contract.md`.
+
+- **The table has no foreign key to `assessment`,** for the reason `submission` has none: every write is under the class's lock, taken first, and a foreign-key check would take the assessment's row lock in the other order. Triggers delete the rows when their assessment goes.
+- **A handout's pages** are JPEGs in `student-photos` at `<class>/handouts/<resource>/<n>.jpg`. When a row goes, by any path, its trigger writes every page to `submission_file_removal`, the queue the students' photos use; the same worker deletes them.
+- **Keep Photos Until never touches a handout** (it deletes `submission_file` rows; a handout has none). The nightly stray check leaves a handout page with its row alone, queues one with no row after 24 hours, and drops an upload not finished in two hours.
+- **Known, for the edge function:** `supabase/functions/_shared/storage-rest.ts` accepts only the students' path shape, so the deployed worker skips a queued handout page, and nothing calls `handout_links` yet. Both must change before a screen ships. The `lifecycle` scenario keeps a check that says so.
+
+```bash
+PGPORT=54877 PGDATABASE=hl python3 batch_c_common.py build         # an empty database: live with Batch B and the fixes
+PGPORT=54877 PGDATABASE=hl python3 handouts_links.py               # every scenario
+PGPORT=54877 PGDATABASE=hl python3 handouts_links.py mutate        # wrong versions of the file
+PGPORT=54877 PGDATABASE=hl python3 handouts_links.py fingerprints check
+```
+
+Scenarios: `teacher` (the five functions: answers, refusals, a request sent twice, another teacher, nobody signed in, the table's own checks, 50 at most, a class in the trash, the two hours), `storage` (which exact names a teacher may upload and when, who reads, nothing changed or deleted, Batch B's rules for students' photos unchanged, and both restricting policies holding with a careless allow-everything policy added), `student` (`page` is the same answer as before but for `resources`; ready only, in order, only on pieces the page shows; `handout_links` and each refusal), `lifecycle` (Keep Photos Until, the stray check, an abandoned upload; the same files on the database without the file are reported as strange names, as required), `deletes` (Remove, `delete_assessment`, the 30-day class purge, the 30-day teacher purge, a `clear_data()` stand-in, TRUNCATE and a plain delete each queue every page, and the worker deletes them; the queue's two looks), `race` (on connections of their own, twelve rounds each: the same start twice, two adds, finish against remove, two finishes, two removes, and start, finish and Add a Link against `delete_assessment`: no deadlock, no row left without its assessment, every page queued), `apply` (eleven guards, each also named by the pre-check; a database in use; no row of any table changes; a second run; grants; the pre-check and post-check), `undo` (PART 1 stops adding; PART 2 refuses while rows are held; the catalog and every row come back exactly).
+
+Results (2026-11-11, PostgreSQL 17.11, embedded-postgres): `handouts_links.py` 285 of 285, of which 7 ran on the database without the file and 1 of those is the check the file must change (it failed there, as required); `mutate` 26 wrong versions, 26 noticed; `fingerprints check` every list current. The 31 functions the file calls or replaces have, on the local build, the md5 read from gradebook-prod (PostgreSQL 17.6) on Nov 11.
+
+Not verified here: the Storage service itself (`submissions_common.py` plays its part, written from its source), that the applying role may alter a policy on `storage.objects` (live's `supautils.policy_grants` lists the table for `postgres`; the pre-check reads it), pg_cron, the edge function, gradebook-prod.
