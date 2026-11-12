@@ -785,7 +785,6 @@ window.DashInsights = (function () {
     belowLists: belowLists,
     helpGroups: helpGroups,
     missingItems: missingItems,
-    missingCounts: missingCounts,
     missingGlanceHtml: missingGlanceHtml,
     attentionModel: attentionModel,
     belowCounts: belowCounts,

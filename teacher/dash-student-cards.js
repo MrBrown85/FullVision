@@ -441,7 +441,5 @@ window.DashStudentCards = (function () {
     renderStudentCards: renderStudentCards,
     obsSummary: obsSummary,
     obsWhenText: obsWhenText,
-    stripTipLines: stripTipLines,
-    CHIP_MAX: CHIP_MAX,
   };
 })();

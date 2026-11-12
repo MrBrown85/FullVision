@@ -8551,30 +8551,6 @@ window.DashClassManager = (function () {
     renderClassManager();
   }
 
-  // D6: the course % as a whole number or to one decimal. The letter always
-  // comes from the % shown.
-  function _cmRenderRoundPercentField(cid) {
-    var whole = getRoundWholePercent(cid);
-    return (
-      '<div class="cm-field">' +
-      '<label class="cm-label">Course %</label>' +
-      '<div class="seg cm-seg" role="radiogroup" aria-label="Course percentage">' +
-      '<button class="seg-btn cm-seg-btn' +
-      (whole ? ' active' : '') +
-      '" role="radio" aria-checked="' +
-      whole +
-      '" data-action="cmSetRoundPercent" data-value="whole">Whole number (86%)</button>' +
-      '<button class="seg-btn cm-seg-btn' +
-      (whole ? '' : ' active') +
-      '" role="radio" aria-checked="' +
-      !whole +
-      '" data-action="cmSetRoundPercent" data-value="decimal">One decimal (85.9%)</button>' +
-      '</div>' +
-      '<div class="cm-hint" style="margin-top:6px">BC report cards show a whole %. Grades 10\u201312 start with whole numbers.</div>' +
-      '</div>'
-    );
-  }
-
   function cmSetRoundPercent(val) {
     if (!cmSelectedCourse) return;
     var cc = getCourseConfig(cmSelectedCourse);
@@ -12815,7 +12791,6 @@ window.DashClassManager = (function () {
   /* ── Namespace ──────────────────────────────────────────── */
   return {
     configure: configure,
-    setActiveCourse: _setActiveCourse,
     get classManagerOpen() {
       return classManagerOpen;
     },
