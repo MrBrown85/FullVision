@@ -111,7 +111,8 @@
     <script src="/shared/bank-comment.js"></script>
     <script src="/teacher/comment-bank.js"></script>
     <script src="/teacher/comment-personal.js"></script>
-    <script src="/vendor/qrcode.js"></script>
+    <!-- vendor/qrcode.js loads the first time slips or cards are printed:
+         QrSlips.printSheet waits for it (withScripts in router.js). -->
     <script src="/shared/questionnaire-templates.js"></script>
     <script src="/teacher/questionnaires.js"></script>
     <script src="/teacher/qr-slips.js"></script>
@@ -143,10 +144,9 @@
     <script src="/teacher/student-overrides.js"></script>
     <script src="/teacher/rubric-print.js"></script>
     <script src="/teacher/competency-wording.js"></script>
-    <script src="/teacher/grades-print.js"></script>
-    <script src="/teacher/rubric-library.js"></script>
-    <script src="/teacher/rubric-bank.js"></script>
-    <script src="/teacher/grading-setup-copy.js"></script>
+    <!-- grades-print.js and grading-setup-copy.js load the first time Print Grades
+         or Copy Grading Setup is pressed, rubric-library.js and rubric-bank.js
+         when Assignments is first opened: _onDemand in router.js. -->
     <!-- Page modules -->
     <script src="/teacher/page-dashboard.js"></script>
     <script src="/teacher/markup.js"></script>

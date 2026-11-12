@@ -30,6 +30,13 @@ const LAZY = {
     'teacher/report-feedback.js',
     'teacher/report-feedback-cards.js',
     'teacher/page-reports.js',
+    // Assignments' rubric scripts, loaded before Assignments first draws (teacher/router.js _onDemand).
+    'teacher/rubric-library.js',
+    'teacher/rubric-bank.js',
+    // Loaded the first time a button uses them (teacher/router.js withScripts).
+    'teacher/grades-print.js',
+    'teacher/grading-setup-copy.js',
+    'vendor/qrcode.js',
   ],
   phone: ['shared/bank-proficiency.js', 'shared/bank-comment.js', 'curriculum_data.js', 'shared/seed-data.js'],
   student: [
