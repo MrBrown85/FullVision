@@ -244,21 +244,6 @@ function printThen(cleanup) {
   setTimeout(done, 0);
 }
 
-/* ── Course-switch input lock (P7.3) ───────────────────────── */
-/* While a class loads, the previous class is still on screen. setPageLock
-   (shared/data.js) makes the page inert, which blocks the keyboard as well
-   as the mouse, so nothing can be typed into the old class while
-   activeCourse already names the new one. */
-async function withSwitchingLock(fn) {
-  setPageLock('switching', true);
-  try {
-    return await fn();
-  } finally {
-    setPageLock('switching', false);
-  }
-}
-window.withSwitchingLock = withSwitchingLock;
-
 /* ── Shared HTML: Unified Toolbar ──────────────────────────── */
 const OFFLINE_BANNER_COPY = "You're offline. Changes will sync when connection returns.";
 let _syncUIBound = false;
@@ -2873,29 +2858,11 @@ window.addEventListener('unhandledrejection', function (event) {
 
 /* ── Namespace ──────────────────────────────────────────────── */
 window.UI = {
-  renderDock,
-  getUpcomingBirthdays,
-  renderStudentHeader,
-  renderSidebar,
-  fillSidebarBadges,
-  refreshSidebarGrades,
-  filterRoster,
   profBadge,
   profBar,
-  refreshSidebar,
-  toggleSidebar,
-  applySidebarState,
-  initSidebarToggle,
-  showUndoToast,
-  executeUndo,
-  dismissUndoToast,
-  showSyncToast,
-  dismissSyncToast,
-  showConfirm,
   refreshSyncStatusUI,
   retrySyncQueue,
   queueSessionExpiredRetry,
   copyTextToClipboard,
-  copyStudentEmail,
 };
 window.copyTextToClipboard = copyTextToClipboard;
