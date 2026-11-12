@@ -96,6 +96,15 @@ const PRECACHE_URLS = [
   '/teacher/comment-lint.js',
   '/shared/bank-comment.js',
   '/shared/bank-core-competencies.js',
+  // Loaded on demand, never by a page's tags, and needed offline: without
+  // them an offline teacher gets other words, not an error. Generate drafts
+  // from each course set's wording (comment-bank.js loadSets); printed Tag
+  // Rubrics and the level hovers on both apps use the bank's four
+  // descriptors (competency-wording.js loadBank); the class's Excel export
+  // needs its library (export-all.js).
+  '/shared/bank-sets.js',
+  '/shared/bank-proficiency.js',
+  '/vendor/exceljs.min.js',
   '/teacher/comment-bank.js',
   '/teacher/comment-personal.js',
   '/teacher/report-questionnaire.js',
@@ -199,6 +208,19 @@ const APP_ROUTES = [
 function isAppRoute(url) {
   const path = url.pathname.length > 1 ? url.pathname.replace(/\/$/, '') : url.pathname;
   return url.origin === self.location.origin && APP_ROUTES.includes(path);
+}
+
+// The address a page of this site is cached under, the one PRECACHE_URLS
+// names: the desktop app's routes share app.html; a folder is its
+// index.html (/teacher-mobile/ is /teacher-mobile/index.html, as the server
+// serves it); the query string is dropped, since the server sends the same
+// page for any query (/login.html?demo=1 is /login.html). Without this, the
+// phone app, opened as /teacher-mobile/, and Demo Mode, opened as
+// /login.html?demo=1, missed the precached copies offline.
+function pageKey(url) {
+  if (url.origin !== self.location.origin) return url.href;
+  if (isAppRoute(url)) return APP_SHELL;
+  return url.pathname.length > 1 && url.pathname.endsWith('/') ? url.pathname + 'index.html' : url.pathname;
 }
 
 // scripts/build.sh replaces this line in dist/sw.js with each precached
@@ -348,7 +370,7 @@ self.addEventListener('fetch', event => {
     event.request.mode === 'navigate' ||
     (event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html'))
   ) {
-    const cacheKey = isAppRoute(url) ? APP_SHELL : event.request;
+    const cacheKey = pageKey(url);
     event.respondWith(
       fetch(event.request)
         .then(response => {
