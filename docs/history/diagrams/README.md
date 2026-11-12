@@ -1,3 +1,5 @@
+> Drawn in April 2026 (03 and 04 updated Oct 27). Kept for history. How the app is built today: [ARCHITECTURE.md](../../ARCHITECTURE.md).
+
 # FullVision Diagram Reference Assets
 
 Open any `.drawio` file in:
@@ -8,11 +10,10 @@ Open any `.drawio` file in:
 
 These files are preserved reference material from the reconciliation, debugging, and user-flow mapping passes. They are useful background, but they are **not** part of the active documentation path.
 
-For current architecture and live execution state, read:
+For current architecture and what comes next, read:
 
-1. [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md)
-2. [`docs/backend-design/HANDOFF.md`](../backend-design/HANDOFF.md)
-3. [`codex.md`](../../codex.md)
+1. [`docs/ARCHITECTURE.md`](../../ARCHITECTURE.md)
+2. [`docs/ROADMAP.md`](../../ROADMAP.md)
 
 ## System and runtime diagrams
 
@@ -33,11 +34,12 @@ For current architecture and live execution state, read:
 
 These user-flow files are also reference-only and were produced for diagramming/delivery work rather than as live operating docs:
 
-- [`../lucidchart-user-flows.drawio`](../lucidchart-user-flows.drawio)
-- [`../lucidchart-first-time-report-flow.mmd`](../lucidchart-first-time-report-flow.mmd)
-- [`../lucidchart-teacher-assignment-comment-grade-flow.mmd`](../lucidchart-teacher-assignment-comment-grade-flow.mmd)
+- [`lucidchart-user-flows.drawio`](lucidchart-user-flows.drawio)
+- [`lucidchart-first-time-report-flow.mmd`](lucidchart-first-time-report-flow.mmd)
+- [`lucidchart-teacher-assignment-comment-grade-flow.mmd`](lucidchart-teacher-assignment-comment-grade-flow.mmd)
 
 ## Notes
 
+- 03-frontend-module-map names `teams-import.js`, which no longer exists.
 - Some diagrams predate the current RPC naming, category-grading rollout, or other current-state cleanup work.
 - Treat the `.drawio` and `.mmd` files as preserved source assets, not as authoritative status documents.
