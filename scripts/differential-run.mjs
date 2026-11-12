@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* global Grader, PageTransitionEvent, getActiveCourse, getAssessments, getScores, scoreTagIds, window -- page.evaluate code runs in the app page. */
 /**
  * The differential run: proves two builds of FullVision behave the same for
  * a teacher. It drives build A and build B with the same seeded sequence of

@@ -1,3 +1,4 @@
+/* global KeyboardEvent, document, getActiveCourse, getAssessments, getCategories, getCourseConfig, getRubrics, getSections, getStudents, getWithdrawnStudents, indexedDB, isDemoMode, loadCourses, window -- page.evaluate code runs in the app page. */
 /**
  * What a differential run reads from a page: the device's saved copy, the
  * calls the fake server was sent, the state the next action is picked from,

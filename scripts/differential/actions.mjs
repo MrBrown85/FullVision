@@ -1,3 +1,4 @@
+/* global document, getActiveCourse, getStudents, location, setActiveCourse, window -- page.evaluate code runs in the app page. */
 /**
  * The teacher actions a differential run takes, each picked with the run's
  * seeded sequence (prng.mjs) from the state build A shows (probe.mjs

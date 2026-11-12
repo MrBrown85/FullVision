@@ -1,3 +1,4 @@
+/* global MutationObserver, document, window -- runs in the app page. */
 /**
  * Runs in every page of a differential run before any of the app's scripts
  * (an init script), so build A and build B make the same ids and keys.

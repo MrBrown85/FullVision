@@ -1,3 +1,4 @@
+/* global window -- page.evaluate code runs in the app page. */
 /**
  * The signed-in class a differential run grades: the speed recorder's class
  * (e2e-perf/speed.spec.js: 30 students by 60 pieces, every cell scored),

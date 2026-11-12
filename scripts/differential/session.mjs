@@ -1,3 +1,4 @@
+/* global document, getActiveCourse, getAssessments, window -- page.evaluate code runs in the app page. */
 /**
  * One build's browser session for a differential run: a fresh browser
  * context, the deterministic page set-up (page-init.js and Playwright's fake
