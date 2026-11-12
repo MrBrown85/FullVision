@@ -74,7 +74,8 @@ const toolbarInset = (page, selector) =>
 test('Assignments: 12px edges, 12px between cards, toolbar in line', async ({ page }) => {
   await open(page, '/assignments');
   await page.locator('.assess-card').first().waitFor();
-  const m = await measure(page, '.assess-card');
+  // Science 8's work sits in unit folders: the folders are the page's boxes.
+  const m = await measure(page, '.mod-folder');
   expect([m.left, m.right]).toEqual([12, 12]);
   expect(m.gaps).toEqual([12]);
   expect(await toolbarInset(page, '.assess-toolbar')).toBe(12);

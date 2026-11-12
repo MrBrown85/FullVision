@@ -11,7 +11,6 @@ async function demo(page) {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.waitForFunction(() => getAssessments('sci8').length > 0);
-  await page.evaluate(() => saveDashboardPrefs({ closedModules: { sci8: [] } })); // these checks want every unit folder open
 }
 const ticks = page => page.evaluate(() => getRubricCheckIds('sci8', 'st1', 'sci8a19').length);
 

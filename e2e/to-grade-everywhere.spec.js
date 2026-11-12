@@ -21,7 +21,6 @@ async function openDemo(page, { on = true, clear = [] } = {}) {
     var cid = typeof getActiveCourse === 'function' && getActiveCourse();
     return !!cid && getAssessments(cid).some(a => a.id === 'sci8a1');
   });
-  await page.evaluate(() => saveDashboardPrefs({ closedModules: { sci8: [] } })); // these checks want every unit folder open
   return page.evaluate(
     ({ on, clear, LAB }) => {
       const cid = getActiveCourse();
