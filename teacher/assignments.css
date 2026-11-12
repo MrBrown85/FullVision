@@ -10502,3 +10502,159 @@ button.grader-member-name {
   gap: 8px;
   margin-top: 16px;
 }
+
+/* ── Handouts and Links (the assessment form, board "3a. A Handout and
+   Two Links, Adding a Link"): the items in two columns, the link row while
+   a link is being added, then + Add a PDF and + Add a Link. ── */
+.af-res-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.af-res-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  height: 44px;
+  padding: 0 6px 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+/* Only the one just added, or the link row as it opens, comes in. */
+.af-res-in {
+  animation: af-res-in 180ms var(--ease-out);
+}
+@keyframes af-res-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+.af-res-icon {
+  flex: none;
+}
+.af-res-icon-doc,
+.af-res-icon-video {
+  color: var(--danger);
+}
+.af-res-icon-link {
+  color: var(--link);
+}
+.af-res-name {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-md);
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.af-res-meta {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.af-res-remove {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background-color 150ms var(--ease-out);
+}
+.af-res-remove:hover {
+  background: var(--overlay-hover);
+  color: var(--text);
+}
+.af-res-linkrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--bg);
+}
+.af-res-linkrow .af-input {
+  width: auto;
+  height: 40px;
+}
+.af-res-url {
+  flex: 1.4 1 260px;
+}
+.af-res-title {
+  flex: 1 1 200px;
+}
+.af-res-linkrow .btn {
+  height: 40px;
+  padding: 0 18px;
+}
+.af-res-adds {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.af-label + .af-res-adds,
+.af-label + .af-res-linkrow {
+  margin-top: 0;
+}
+.af-res-add {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--active);
+  cursor: pointer;
+  transition:
+    background-color 150ms var(--ease-out),
+    border-color 150ms var(--ease-out);
+}
+.af-res-add:hover:not(:disabled) {
+  border-color: var(--active);
+  background: var(--active-light);
+}
+.af-res-add:disabled {
+  color: var(--text-2);
+  cursor: default;
+}
+.af-res-hint {
+  margin-left: 4px;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.af-res-msg {
+  margin: 6px 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.af-res-msg[hidden] {
+  display: none;
+}
+@media (max-width: 640px) {
+  .af-res-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .af-res-in {
+    animation: none;
+  }
+}

@@ -58,7 +58,7 @@
 //
 // Kept free of Deno and database imports, as handler.ts is.
 import { inspectJpeg, sha256Hex, type JpegOk } from '../_shared/jpeg-check.ts';
-import { BUCKET, pathParts, type Store } from '../_shared/storage-rest.ts';
+import { BUCKET, handoutPathParts, pathParts, type Store } from '../_shared/storage-rest.ts';
 import { tokenShape } from '../_shared/teacher-auth.ts';
 
 type Json = Record<string, unknown>;
@@ -447,8 +447,10 @@ export function makeRemoval(opts: Pick<SendOptions, 'db' | 'store' | 'log' | 'no
         for (const it of list(r.items)) {
           const x = isObject(it) ? it : {};
           const id = typeof x.id === 'number' && Number.isSafeInteger(x.id) && x.id > 0 ? String(x.id) : null;
-          if (id && x.bucket === BUCKET && pathParts(x.path)) items.push({ id, path: x.path as string });
-          else skipped++;
+          // A teacher's handout page is queued the same way when it is removed (Handouts and Links).
+          if (id && x.bucket === BUCKET && (pathParts(x.path) || handoutPathParts(x.path))) {
+            items.push({ id, path: x.path as string });
+          } else skipped++;
         }
         if (items.length) {
           await store.remove(items.map(i => i.path));

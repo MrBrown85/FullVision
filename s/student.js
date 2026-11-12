@@ -133,6 +133,10 @@ var StudentPage = (function () {
       workPage: 0, // See Your Work: the page showing, from 0
       marksOff: false, // See Your Work: Show Marks is off
       workPages: null, // See Your Work: the pages fetched, { id, state, pages } (s/feedback.js)
+      handout: '', // the Assignments tab: the handout open in the page (Handouts and Links)
+      handoutPiece: '', // the piece that handout is on
+      handoutPage: 0, // the handout: the page showing, from 0
+      handoutPages: null, // the handout: the pages fetched, { id, state, pages, asked } (s/handouts.js)
       form: '', // Questionnaires and My Reports: the one picked on a Chromebook
       back: '', // a questionnaire or report opened from a card's page: the tab to go back to
       realForms: null, // a real card: { student, questionnaires, reports }, the `forms` reply (app.js)

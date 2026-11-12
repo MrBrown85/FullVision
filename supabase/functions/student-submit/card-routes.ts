@@ -137,6 +137,36 @@ const named = (v: unknown): Json[] =>
     .filter(x => isObject(x) && typeof x.id === 'string' && typeof x.name === 'string')
     .map(x => ({ id: (x as Json).id, name: (x as Json).name }));
 
+/* Handouts and Links (handouts-links-contract.md): a piece's handout and
+   links, [ { id, kind, title, url, page_count } ], ready ones only (the
+   database sends no other). Each is copied as the contract types it: an
+   id, kind 'pdf' with 1 to 20 pages and no address, or kind 'link' with
+   an http(s) address of at most 2,000 characters and no page count; a
+   title of 1 to 200 characters. Anything else is left behind, so nothing
+   but a web address reaches the phone as a link. */
+const WEB = /^https?:\/\/[^\s"'<>]+$/i;
+const resources = (v: unknown): Json[] =>
+  list(v)
+    .filter(isObject)
+    .filter(r => typeof r.id === 'string' && UUID.test(r.id))
+    .filter(r => typeof r.title === 'string' && r.title.length >= 1 && r.title.length <= 200)
+    .map(r => {
+      if (r.kind === 'pdf') {
+        const n = r.page_count;
+        return typeof n === 'number' && Number.isSafeInteger(n) && n >= 1 && n <= 20
+          ? { id: r.id, kind: 'pdf', title: r.title, url: null, page_count: n }
+          : null;
+      }
+      if (r.kind === 'link') {
+        const url = r.url;
+        return typeof url === 'string' && url.length <= 2000 && WEB.test(url)
+          ? { id: r.id, kind: 'link', title: r.title, url, page_count: null }
+          : null;
+      }
+      return null;
+    })
+    .filter((r): r is Json => r !== null);
+
 /* An object keyed by id, each value copied by `each`. A key that is not an
    id is left behind. */
 function byId(from: unknown, each: (v: unknown) => Json): Json {
@@ -213,6 +243,7 @@ function assessment(v: unknown, withCategory: boolean): Json {
     ...typed(a, ['description', 'module_name', 'category_name'], textOrNull),
     ...typed(a, ['category_percent'], numberOrNull),
     ...typed(a, ['core_competencies'], named),
+    ...typed(a, ['resources'], resources),
     ...pick(a, RETURN),
     grade: returned ? gradeCopy(a.grade) : null,
     previous: returned ? gradeCopy(a.previous) : null,

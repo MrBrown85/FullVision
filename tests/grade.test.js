@@ -266,6 +266,7 @@ describe('grade-format-guard', () => {
    like a level or a % and is not one: 'file kind argument' → why. */
   const NOT_A_GRADE = {
     'shared/backup-restore.js floor v': 'a whole-number check on a restored setting',
+    'shared/student-view.js floor r.page_count': 'how many pages a handout has',
     'shared/constants.js round v * 100': 'formatPoints: points to two decimals',
     'shared/constants.js round n * 100': 'a points score as saved, to two decimals',
     'teacher/class-results.js round (n / total) * 100': 'a share of students',

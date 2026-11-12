@@ -269,6 +269,7 @@
     var questionnaires = [];
     var goals = [];
     var overrides = [];
+    var resources = [];
     var taken = { contents: true, summary: true };
 
     cids.forEach(function (cid) {
@@ -280,6 +281,21 @@
       assessments.forEach(function (a) {
         byId[a.id] = a;
       });
+
+      // Handouts and Links: the links, and each handout's name and pages
+      // (a handout's pages are pictures, kept out like photos of student work).
+      if (typeof getAssessmentResources === 'function')
+        assessments.forEach(function (a) {
+          getAssessmentResources(cid, a.id, { ready: true }).forEach(function (r) {
+            resources.push([
+              cname,
+              text(a.title),
+              r.kind === 'pdf' ? 'Handout' : 'Link',
+              text(r.title),
+              r.kind === 'pdf' ? r.pageCount + (r.pageCount === 1 ? ' page' : ' pages') : text(r.url),
+            ]);
+          });
+        });
 
       // Summary
       students.forEach(function (st) {
@@ -640,6 +656,18 @@
           COL.date,
         ],
         rows: overrides,
+      },
+      {
+        name: 'Handouts and Links',
+        about: 'The handouts and links on each assessment. A handout’s pages are pictures and are not in this file.',
+        columns: [
+          COL.classCol,
+          COL.assessment,
+          COL.short('Kind', 10),
+          COL.short('Name', 32),
+          COL.long('Address or Pages'),
+        ],
+        rows: resources,
       },
     ];
     list.forEach(function (s) {
