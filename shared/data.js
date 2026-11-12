@@ -7942,6 +7942,22 @@ function _persistStatusDiffToCanonical(prev, next) {
 
 /* ── Assignment Statuses (excused / not-submitted) ─────────── */
 function getAssignmentStatuses(cid) {
+  var seen = _studentsTodayScope;
+  if (seen && seen.cid === cid) {
+    _studentsTodayScope = null;
+    var all;
+    try {
+      all = getAssignmentStatuses(cid) || {};
+    } finally {
+      _studentsTodayScope = seen;
+    }
+    var shown = {};
+    Object.keys(all).forEach(function (key) {
+      var aid = key.slice(key.indexOf(':') + 1);
+      if (!seen.later[aid]) shown[key] = all[key];
+    });
+    return shown;
+  }
   if (_cache.statuses[cid] !== undefined) return _cache.statuses[cid];
   try {
     return JSON.parse(localStorage.getItem('gb-statuses-' + cid)) || {};
@@ -11959,6 +11975,24 @@ function _pointsScoreKeys(a, own, working, loadedKey) {
    waits out (ReportScores.ready). Any other error is a fault. */
 var RETURNED_NOT_LOADED = 'RETURNED_NOT_LOADED';
 window.getReturnedScores = function getReturnedScores(cid) {
+  // Preview as Student only (withStudentsToday): work dated after the class's today is left out.
+  var seen = _studentsTodayScope;
+  if (seen && seen.cid === cid) {
+    _studentsTodayScope = null;
+    var all;
+    try {
+      all = getReturnedScores(cid);
+    } finally {
+      _studentsTodayScope = seen;
+    }
+    var shown = {};
+    Object.keys(all).forEach(function (sid) {
+      shown[sid] = (all[sid] || []).filter(function (e) {
+        return !(e && seen.later[e.assessmentId]);
+      });
+    });
+    return shown;
+  }
   // Revisions (S11): inside getRevisionFirstCell only, one student's piece
   // is read as its first version's grade. Never kept; every other call is
   // as below.
@@ -20084,6 +20118,36 @@ function saveDemoReflections(cid, list) {
    (a real student sends through the revision routes: S11-W1, student side). */
 var REVISION_FIX_MAX = 2000;
 var _firstVersionScope = null; // { cid, sid, aid, entries } while getRevisionFirstCell reads
+
+/* Preview as Student shows what the student's page shows. The page lists,
+   and the server sends, only work whose date has come in the class's time
+   zone, or that has no date (student_submit.page: date_assigned is null or
+   on or before today). So while Preview works a student's grades out
+   (shared/student-view.js fromCache), a returned grade or a status on work
+   dated after today is not read: getReturnedScores and getAssignmentStatuses
+   leave it out for that class, and only inside `fn`. calc.js's caches are
+   cleared before and after, so nothing worked out inside is kept for the
+   teacher's own screens, and nothing of theirs is read inside. `fn` must
+   finish at once. */
+var _studentsTodayScope = null; // { cid, later: { aid: true } } while Preview as Student works grades out
+function withStudentsToday(cid, fn) {
+  var today = courseToday(cid);
+  var later = {};
+  (getAssessments(cid) || []).forEach(function (a) {
+    var d = a && a.date ? String(a.date).slice(0, 10) : '';
+    if (a && a.id && d && d > today) later[a.id] = true;
+  });
+  if (!Object.keys(later).length) return fn();
+  var was = _studentsTodayScope;
+  _studentsTodayScope = { cid: cid, later: later };
+  if (typeof clearProfCache === 'function') clearProfCache();
+  try {
+    return fn();
+  } finally {
+    _studentsTodayScope = was;
+    if (typeof clearProfCache === 'function') clearProfCache();
+  }
+}
 
 /* True when the class's revisions show: Demo Mode, or a signed-in class the
    server keeps rows for, with the build switch and Send Work on. */
