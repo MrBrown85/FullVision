@@ -1076,6 +1076,10 @@ window.ReportBlocks = (function () {
     const showWord = (options.word === 'auto' || options.word == null ? autoWord : options.word !== false) && !half;
     const showChange = options.change !== false;
     const showAssessed = options.assessed !== false;
+    // Family wording (One Report): the count is Pieces of Work, and the two
+    // facts are the strongest competency and the next focus.
+    const family = options.family === true;
+    const assessedHead = family ? ['Pieces of Work', 'Work'] : ['Assessed', 'Ev.'];
     const hideEmpty = options.noEvidence === 'hide';
     const lowestFirst = options.order === 'lowest';
     const mode = courseGradeMode(cid);
@@ -1118,7 +1122,7 @@ window.ReportBlocks = (function () {
     const change = (a, b) => studentLevelChange(cid, a, b);
     const colCount = 2 + (showChange ? 1 : 0) + (showAssessed ? 1 : 0) + 1;
     const head = (nameLabel, short) =>
-      `<tr><th>${nameLabel}</th><th class="report-prof-n">${esc(short ? thenLabel.replace(/^(Term|Start of Term)$/, m => (m === 'Start of Term' ? 'Start' : m)) : thenLabel)}</th><th class="report-prof-n">${nowLabel}</th>${showChange ? '<th class="report-prof-n">Change</th>' : ''}${showAssessed ? `<th class="report-prof-n">${short ? 'Ev.' : 'Assessed'}</th>` : ''}</tr>`;
+      `<tr><th>${nameLabel}</th><th class="report-prof-n">${esc(short ? thenLabel.replace(/^(Term|Start of Term)$/, m => (m === 'Start of Term' ? 'Start' : m)) : thenLabel)}</th><th class="report-prof-n">${nowLabel}</th>${showChange ? '<th class="report-prof-n">Change</th>' : ''}${showAssessed ? `<th class="report-prof-n">${assessedHead[short ? 1 : 0]}</th>` : ''}</tr>`;
     const tr = (name, then, now, n, cls, count) =>
       `<tr${cls ? ` class="${cls}"` : ''}><td class="report-ct-name">${esc(name)}${count ? `<span class="report-prof-count"> · ${count} competenc${count === 1 ? 'y' : 'ies'}</span>` : ''}</td><td class="report-prof-n">${fig(then)}</td><td class="report-prof-n">${fig(now)}</td>${showChange ? `<td class="report-prof-n">${esc(change(then, now))}</td>` : ''}${showAssessed ? `<td class="report-prof-n report-prof-ev">${n}</td>` : ''}</tr>`;
     const headRow = name => `<tr class="report-ct-group"><td colspan="${colCount}">${esc(name)}</td></tr>`;
@@ -1327,10 +1331,10 @@ window.ReportBlocks = (function () {
         // four"). A Letter class keeps Highest Now always, as before.
         const differ = ranked.length > 1 && !same(lo[0].now, hi[0].now);
         if (differ || mode === 'letter') {
-          facts += `<div class="report-prof-fact"><b>Highest now:</b> ${esc(names(hi))} ${esc(studentLevelText(cid, hi[0].now))}.${work(hi, true)}</div>`;
+          facts += `<div class="report-prof-fact"><b>${family ? 'Strongest now:' : 'Highest now:'}</b> ${esc(names(hi))} ${esc(studentLevelText(cid, hi[0].now))}.${work(hi, true)}</div>`;
         }
         if (differ) {
-          facts += `<div class="report-prof-fact"><b>Lowest now:</b> ${esc(names(lo))} ${esc(studentLevelText(cid, lo[0].now))}.${work(lo, false)}</div>`;
+          facts += `<div class="report-prof-fact"><b>${family ? 'Next focus:' : 'Lowest now:'}</b> ${esc(names(lo))} ${esc(studentLevelText(cid, lo[0].now))}.${work(lo, false)}</div>`;
         }
       }
     }
@@ -1356,12 +1360,22 @@ window.ReportBlocks = (function () {
      group 2 #2). A Proficiency or Both class prints each level by its name
      alone: students and families read proficiencies, not numbers
      (DECISIONS, "Student-facing levels are proficiencies", 2026-11-12). */
+  /* options.descriptors (One Report): each level's full Ministry statement
+     in place of its few words, in a Proficiency or Both class. A Letter
+     class prints its legend as before. */
+  const LEGEND_MINISTRY = {
+    1: 'Initial understanding of the concepts and competencies relevant to the expected learning',
+    2: 'Partial understanding of the concepts and competencies relevant to the expected learning',
+    3: 'Complete understanding of the concepts and competencies relevant to the expected learning',
+    4: 'Sophisticated understanding of the concepts and competencies relevant to the expected learning',
+  };
   function renderBlockLegend(options, cid) {
     const half = options && options.size === 'half';
     const asPct = cid != null && courseGradeMode(cid) === 'letter';
+    const ministry = !!(options && options.descriptors === true) && !asPct;
     const items = LEGEND_LEVELS.map(
       ([n, word, what]) =>
-        `<div class="report-legend-item"><div class="report-legend-word">${asPct ? esc(formatLevel(cid, n)) + ' \u00B7 ' : ''}${word}</div><div class="report-legend-desc">${what}</div></div>`,
+        `<div class="report-legend-item"><div class="report-legend-word">${asPct ? esc(formatLevel(cid, n)) + ' \u00B7 ' : ''}${word}</div><div class="report-legend-desc">${ministry ? LEGEND_MINISTRY[n] : what}</div></div>`,
     ).join('');
     return `<div class="report-block-box report-legend${half ? ' report-legend-half' : ''}">
     <div class="report-legend-title">BC Proficiency Scale</div>
@@ -1369,114 +1383,210 @@ window.ReportBlocks = (function () {
   </div>`;
   }
 
+  /* ── Reworded questions (One Report) ─────────────────────────────
+     The two reflections and the response slip print fixed wording unless
+     options.wording gives the class's own. A field left out prints
+     today's text. wordingOf(blockId) gives today's wording in the same
+     shape, so a block drawn with wordingOf(id) is the block drawn with
+     none, character for character. The shapes:
+       student-reflection-learning: { title, intro, scale: [..],
+         items: [{ label, prompt, group } | 'label'], open: [..] }
+         An item's prompt prints under its label; consecutive items with
+         the same group print under that group's name; a plain string is a
+         label with no prompt and no group.
+       student-reflection-habits: { title, intro, scale: [..], items: [..],
+         checkHead, checks: [..], open: [..] }
+       parent-response: { title, intro, fields: [..], checks: [..], open: [..] }
+         fields are the labelled lines (Signature, Date, …), two to a row;
+         open the write-in headings, each with its box.
+     In intro, {name} prints the student's first name and {teacher} the
+     teacher's name. A teacher's text is escaped; today's own text prints
+     as it always has (it is the file's own, and escaping it would change
+     an & or an apostrophe in today's output). */
+  const _LEARNING_GROUPS = () => [
+    ['Learning Dispositions', LEARNING_DIMS],
+    ['Relational & Identity', RELATIONAL_DIMS],
+  ];
+  const WORDING = {
+    'student-reflection-learning': () => ({
+      title: 'How I See Myself as a Learner',
+      intro: '{name}, rate yourself honestly on each learning disposition. Fill in one circle per row.',
+      scale: ['Rarely', 'Sometimes', 'Usually', 'Consistently'],
+      items: _LEARNING_GROUPS().flatMap(([group, dims]) =>
+        dims.map(dim => ({ label: OBS_LABELS[dim], prompt: OBS_DESCRIPTORS[dim].prompt, group })),
+      ),
+      open: ['My biggest strength as a learner:', 'One thing I want to work on:', 'What helps me learn best:'],
+    }),
+    'student-reflection-habits': () => ({
+      title: 'My Classroom Habits & Responsibilities',
+      intro: '{name}, think honestly about your habits this term. Fill in one circle per row.',
+      scale: ['Needs Work', 'Getting There', 'Good', 'Great'],
+      items: [
+        'I arrive to class on time',
+        'I come prepared with materials',
+        'I participate in class discussions',
+        'I hand in assignments on time',
+        'When I miss class, I check in and catch up',
+        'I am respectful to classmates and teachers',
+        'I manage distractions (phone, talking, etc.)',
+        'I put my best effort into my work',
+      ],
+      checkHead: 'This term, I…',
+      checks: [
+        'Missed more than 3 classes',
+        'Was late more than 3 times',
+        'Had missing assignments',
+        'Asked for help when I needed it',
+        'Used feedback to improve my work',
+        'Set a goal and worked toward it',
+      ],
+      open: ["One habit I'm proud of:", 'One habit I want to improve:'],
+    }),
+    'parent-response': () => ({
+      title: 'Parent / Guardian Response',
+      intro: 'Please review this report with your child and return this section to the school.',
+      fields: ['Signature', 'Date', 'Phone', 'Email'],
+      checks: [
+        'I have reviewed this report with my child',
+        'I would like to schedule a meeting with the teacher',
+        "I have questions about my child's progress",
+      ],
+      open: ['Comments or Questions'],
+    }),
+  };
+  /** Today's wording for a block, fresh each call; null for a block without wording. */
+  function wordingOf(blockId) {
+    return WORDING[blockId] ? WORDING[blockId]() : null;
+  }
+  // Every string of today's wording: these print as they always have.
+  let _ownText = null;
+  function _say(s) {
+    if (!_ownText) {
+      _ownText = new Set();
+      const add = v => {
+        if (typeof v === 'string') _ownText.add(v);
+        else if (Array.isArray(v)) v.forEach(add);
+        else if (v && typeof v === 'object') Object.keys(v).forEach(k => add(v[k]));
+      };
+      Object.keys(WORDING).forEach(id => add(WORDING[id]()));
+    }
+    s = s == null ? '' : String(s);
+    return _ownText.has(s) ? s : esc(s);
+  }
+  /* The block's wording: options.wording over today's, field by field. */
+  function _wording(blockId, options) {
+    const own = WORDING[blockId]();
+    const w = (options && options.wording) || {};
+    Object.keys(own).forEach(k => {
+      if (w[k] == null) return;
+      if (Array.isArray(own[k])) {
+        if (Array.isArray(w[k])) own[k] = w[k];
+      } else own[k] = w[k];
+    });
+    return own;
+  }
+  function _intro(text, student) {
+    const teacher = (typeof getConfig === 'function' && getConfig().displayName) || '';
+    return _say(text)
+      .replace(/\{name\}/g, esc(displayNameFirst(student)))
+      .replace(/\{teacher\}/g, esc(teacher));
+  }
+
   /* ── Parent / Guardian Response ── */
-  /* options.lines: the comments box's writing room, from the form. */
+  /* options.lines: the comments box's writing room, from the form.
+     options.wording: the class's wording (above). */
   function renderBlockParentResponse(cid, student, options) {
     const lines = Math.max(1, Number((options && options.lines) || 3));
-    const name = esc(displayNameFirst(student));
+    const w = _wording('parent-response', options);
     let html = `<div class="report-block-box report-parent-response">`;
-    html += `<div class="report-block-title">Parent / Guardian Response</div>`;
-    html += `<div class="report-parent-intro" style="font-size:0.78rem;color:var(--text-2);margin-bottom:14px;line-height:1.5">Please review this report with your child and return this section to the school.</div>`;
-    // Signature + Date
-    html += `<div class="report-parent-lines">
-    <div class="report-parent-line"><span class="report-parent-label">Signature</span><span class="report-parent-field"></span></div>
-    <div class="report-parent-line" style="max-width:180px"><span class="report-parent-label">Date</span><span class="report-parent-field"></span></div>
+    html += `<div class="report-block-title">${_say(w.title)}</div>`;
+    html += `<div class="report-parent-intro" style="font-size:0.78rem;color:var(--text-2);margin-bottom:14px;line-height:1.5">${_intro(w.intro, student)}</div>`;
+    // The labelled lines, two to a row: Signature + Date, Phone + Email
+    const field = f =>
+      `<div class="report-parent-line"${f === 'Date' ? ' style="max-width:180px"' : ''}><span class="report-parent-label">${_say(f)}</span><span class="report-parent-field"></span></div>`;
+    for (let i = 0; i < w.fields.length; i += 2) {
+      html += `<div class="report-parent-lines">
+    ${w.fields
+      .slice(i, i + 2)
+      .map(field)
+      .join('\n    ')}
   </div>`;
-    // Phone + Email
-    html += `<div class="report-parent-lines">
-    <div class="report-parent-line"><span class="report-parent-label">Phone</span><span class="report-parent-field"></span></div>
-    <div class="report-parent-line"><span class="report-parent-label">Email</span><span class="report-parent-field"></span></div>
-  </div>`;
+    }
     // Checkboxes
-    html += `<div class="report-parent-checks">
-    <div class="report-parent-check"><span class="report-parent-checkbox"></span> I have reviewed this report with my child</div>
-    <div class="report-parent-check"><span class="report-parent-checkbox"></span> I would like to schedule a meeting with the teacher</div>
-    <div class="report-parent-check"><span class="report-parent-checkbox"></span> I have questions about my child's progress</div>
+    if (w.checks.length) {
+      html += `<div class="report-parent-checks">
+    ${w.checks.map(c => `<div class="report-parent-check"><span class="report-parent-checkbox"></span> ${_say(c)}</div>`).join('\n    ')}
   </div>`;
+    }
     // Comments
-    html += `<div class="report-parent-comments" style="margin-top:14px">
-    <div class="report-parent-label" style="margin-bottom:6px">Comments or Questions</div>
+    w.open.forEach(label => {
+      html += `<div class="report-parent-comments" style="margin-top:14px">
+    <div class="report-parent-label" style="margin-bottom:6px">${_say(label)}</div>
     <div class="report-parent-comments-box" style="border:1.5px solid var(--border);border-radius:8px;min-height:${lines * 22 + 16}px;padding:8px"></div>
   </div>`;
+    });
     html += `</div>`;
     return html;
   }
 
   /* ── Student Self-Reflection: My Learning ── */
-  function renderBlockStudentReflectionLearning(cid, student) {
-    const name = esc(displayNameFirst(student));
-    const scale = ['Rarely', 'Sometimes', 'Usually', 'Consistently'];
+  function renderBlockStudentReflectionLearning(cid, student, options) {
+    const w = _wording('student-reflection-learning', options);
+    const scale = w.scale;
     let html = `<div class="report-block-box" style="page-break-inside:avoid">`;
-    html += `<div class="report-block-title">How I See Myself as a Learner</div>`;
-    html += `<div style="font-size:0.76rem;color:var(--text-2);margin-bottom:12px">${name}, rate yourself honestly on each learning disposition. Fill in one circle per row.</div>`;
+    html += `<div class="report-block-title">${_say(w.title)}</div>`;
+    html += `<div style="font-size:0.76rem;color:var(--text-2);margin-bottom:12px">${_intro(w.intro, student)}</div>`;
     // Scale header
     html += `<div style="display:flex;justify-content:flex-end;gap:0;margin-bottom:4px;padding-right:4px">`;
     scale.forEach(s => {
-      html += `<span style="width:68px;text-align:center;font-size:0.56rem;font-weight:700;color:var(--text-3)">${s}</span>`;
+      html += `<span style="width:68px;text-align:center;font-size:0.56rem;font-weight:700;color:var(--text-3)">${_say(s)}</span>`;
     });
     html += `</div>`;
-    // Disposition rows — grouped
-    const _reflectGroup = (dims, title) => {
-      html += `<div style="font-size:0.72rem;font-weight:700;color:var(--text-2);padding:10px 0 2px;border-top:1.5px solid var(--border)">${title}</div>`;
-      dims.forEach(dim => {
-        const info = OBS_DESCRIPTORS[dim];
-        html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--divider-subtle)">
+    // Disposition rows, under their group's name
+    let group = null;
+    w.items.forEach(it => {
+      const item = typeof it === 'string' ? { label: it } : it || {};
+      const g = item.group == null ? '' : String(item.group);
+      if (g !== group && g) {
+        html += `<div style="font-size:0.72rem;font-weight:700;color:var(--text-2);padding:10px 0 2px;border-top:1.5px solid var(--border)">${_say(g)}</div>`;
+      }
+      group = g;
+      const prompt = item.prompt == null ? '' : String(item.prompt);
+      html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--divider-subtle)">
         <div style="flex:1;min-width:0">
-          <div style="font-size:0.82rem;font-weight:700;color:var(--text)">${OBS_LABELS[dim]}</div>
-          <div style="font-size:0.7rem;color:var(--text-2);font-style:italic;line-height:1.3">${info.prompt}</div>
-        </div>
+          <div style="font-size:0.82rem;font-weight:700;color:var(--text)">${_say(item.label)}</div>
+          ${prompt ? `<div style="font-size:0.7rem;color:var(--text-2);font-style:italic;line-height:1.3">${_say(prompt)}</div>\n        ` : ''}</div>
         <div style="display:flex;gap:0;flex-shrink:0">`;
-        scale.forEach(() => {
-          html += `<span style="width:68px;display:flex;justify-content:center"><span class="report-reflect-bubble"></span></span>`;
-        });
-        html += `</div></div>`;
+      scale.forEach(() => {
+        html += `<span style="width:68px;display:flex;justify-content:center"><span class="report-reflect-bubble"></span></span>`;
       });
-    };
-    _reflectGroup(LEARNING_DIMS, 'Learning Dispositions');
-    _reflectGroup(RELATIONAL_DIMS, 'Relational & Identity');
+      html += `</div></div>`;
+    });
     // Open response
-    html += `<div class="report-reflect-open" style="margin-top:16px;padding-top:14px;border-top:1.5px solid var(--border)">
-    <div class="report-reflect-open-line"><span class="report-reflect-open-label">My biggest strength as a learner:</span><span class="report-reflect-open-field"></span></div>
-    <div class="report-reflect-open-line"><span class="report-reflect-open-label">One thing I want to work on:</span><span class="report-reflect-open-field"></span></div>
-    <div class="report-reflect-open-line"><span class="report-reflect-open-label">What helps me learn best:</span><span class="report-reflect-open-field"></span></div>
+    if (w.open.length) {
+      html += `<div class="report-reflect-open" style="margin-top:16px;padding-top:14px;border-top:1.5px solid var(--border)">
+    ${w.open.map(o => `<div class="report-reflect-open-line"><span class="report-reflect-open-label">${_say(o)}</span><span class="report-reflect-open-field"></span></div>`).join('\n    ')}
   </div>`;
+    }
     html += `</div>`;
     return html;
   }
 
   /* ── Student Self-Reflection: My Habits ── */
-  function renderBlockStudentReflectionHabits(cid, student) {
-    const name = esc(displayNameFirst(student));
-    const habits = [
-      { text: 'I arrive to class on time' },
-      { text: 'I come prepared with materials' },
-      { text: 'I participate in class discussions' },
-      { text: 'I hand in assignments on time' },
-      { text: 'When I miss class, I check in and catch up' },
-      { text: 'I am respectful to classmates and teachers' },
-      { text: 'I manage distractions (phone, talking, etc.)' },
-      { text: 'I put my best effort into my work' },
-    ];
-    const scale = ['Needs Work', 'Getting There', 'Good', 'Great'];
-    const checks = [
-      { text: 'Missed more than 3 classes' },
-      { text: 'Was late more than 3 times' },
-      { text: 'Had missing assignments' },
-      { text: 'Asked for help when I needed it' },
-      { text: 'Used feedback to improve my work' },
-      { text: 'Set a goal and worked toward it' },
-    ];
+  function renderBlockStudentReflectionHabits(cid, student, options) {
+    const w = _wording('student-reflection-habits', options);
+    const scale = w.scale;
     let html = `<div class="report-block-box" style="page-break-inside:avoid">`;
-    html += `<div class="report-block-title">My Classroom Habits & Responsibilities</div>`;
-    html += `<div style="font-size:0.76rem;color:var(--text-2);margin-bottom:12px">${name}, think honestly about your habits this term. Fill in one circle per row.</div>`;
+    html += `<div class="report-block-title">${_say(w.title)}</div>`;
+    html += `<div style="font-size:0.76rem;color:var(--text-2);margin-bottom:12px">${_intro(w.intro, student)}</div>`;
     // Rating table
     html += `<table class="report-habits-table"><thead><tr><th></th>`;
     scale.forEach(s => {
-      html += `<th>${s}</th>`;
+      html += `<th>${_say(s)}</th>`;
     });
     html += `</tr></thead><tbody>`;
-    habits.forEach(h => {
-      html += `<tr><td>${h.text}</td>`;
+    w.items.forEach(h => {
+      html += `<tr><td>${_say(typeof h === 'string' ? h : h && h.label)}</td>`;
       scale.forEach(() => {
         html += `<td><span class="report-habits-bubble"></span></td>`;
       });
@@ -1484,18 +1594,21 @@ window.ReportBlocks = (function () {
     });
     html += `</tbody></table>`;
     // Quick-check section
-    html += `<div style="margin-top:14px;padding-top:12px;border-top:1.5px solid var(--border)">
-    <div style="font-size:0.72rem;font-weight:700;color:var(--text-2);margin-bottom:10px">This term, I…</div>
+    if (w.checks.length) {
+      html += `<div style="margin-top:14px;padding-top:12px;border-top:1.5px solid var(--border)">
+    <div style="font-size:0.72rem;font-weight:700;color:var(--text-2);margin-bottom:10px">${_say(w.checkHead)}</div>
     <div class="report-habits-checks">`;
-    checks.forEach(c => {
-      html += `<div class="report-parent-check"><span class="report-parent-checkbox"></span> ${c.text}</div>`;
-    });
-    html += `</div></div>`;
+      w.checks.forEach(c => {
+        html += `<div class="report-parent-check"><span class="report-parent-checkbox"></span> ${_say(c)}</div>`;
+      });
+      html += `</div></div>`;
+    }
     // Open response
-    html += `<div style="margin-top:14px;padding-top:12px;border-top:1.5px solid var(--border)">
-    <div class="report-reflect-open-line"><span class="report-reflect-open-label">One habit I'm proud of:</span><span class="report-reflect-open-field"></span></div>
-    <div class="report-reflect-open-line"><span class="report-reflect-open-label">One habit I want to improve:</span><span class="report-reflect-open-field"></span></div>
+    if (w.open.length) {
+      html += `<div style="margin-top:14px;padding-top:12px;border-top:1.5px solid var(--border)">
+    ${w.open.map(o => `<div class="report-reflect-open-line"><span class="report-reflect-open-label">${_say(o)}</span><span class="report-reflect-open-field"></span></div>`).join('\n    ')}
   </div>`;
+    }
     html += `</div>`;
     return html;
   }
@@ -2443,10 +2556,30 @@ window.ReportBlocks = (function () {
     if (Array.isArray(v.json)) return v.json.filter(Boolean).join(', ');
     return '';
   }
+  /* options.blank (One Report): a form the student fills in by hand, one
+     write-in of two lines for each BC Core Competency and, unless
+     options.goal is false, a line for next term's goal. The teacher never
+     rates a Core Competency, in either form. options.title: the block's
+     title in place of Self-Assessment and Goal. */
+  const BLANK_CORE = ['Communication', 'Thinking', 'Personal and Social'];
+  function _blankSelfAssessment(student, options, title, half) {
+    const line = label =>
+      `<div class="report-reflect-open-line">${label ? `<span class="report-reflect-open-label">${label}</span>` : ''}<span class="report-reflect-open-field"></span></div>`;
+    const rows = BLANK_CORE.map(c => line(esc(c) + ':') + line(''));
+    if (options.goal !== false) rows.push(line('My goal for next term:'));
+    return `<div class="report-block-box report-self report-self-blank${half ? ' report-self-half' : ''}">
+    <div class="report-prof-head report-self-head"><div class="report-block-title">${title}</div></div>
+    <div style="font-size:0.76rem;color:var(--text-2);margin-bottom:12px">${esc(displayNameFirst(student))}, describe one example from this term for each Core Competency.</div>
+    <div class="report-reflect-open">${rows.join('')}</div>
+  </div>`;
+  }
   function renderBlockSelfAssessment(cid, student, ctx, options) {
     options = options || {};
-    if (typeof StudentVoice === 'undefined') return '';
     const half = options.size === 'half';
+    const ownTitle = typeof options.title === 'string' && options.title.trim();
+    const title = ownTitle ? esc(ownTitle) : 'Self-Assessment and Goal';
+    if (options.blank === true) return _blankSelfAssessment(student, options, title, half);
+    if (typeof StudentVoice === 'undefined') return '';
     const list = StudentVoice.entries(cid, student.id);
     if (!list.length) return '';
     const profile = StudentVoice.profile(list);
@@ -2495,7 +2628,7 @@ window.ReportBlocks = (function () {
     const uniq = sources.filter((x, i) => sources.indexOf(x) === i);
     const sub = `In ${esc(first)}'s own words` + (uniq.length ? ', ' + esc(uniq.join(' and ')) : '');
     return `<div class="report-block-box report-self${half ? ' report-self-half' : ''}">
-    <div class="report-prof-head report-self-head"><div class="report-block-title">Self-Assessment and Goal</div><div class="report-prof-meta">${sub}</div></div>
+    <div class="report-prof-head report-self-head"><div class="report-block-title">${title}</div><div class="report-prof-meta">${sub}</div></div>
     <div class="report-self-body"><div class="report-self-col">${left.join('')}</div>${right.length ? `<div class="report-self-col report-self-right">${right.join('')}</div>` : ''}</div>
   </div>`;
   }
@@ -2554,9 +2687,9 @@ window.ReportBlocks = (function () {
       case 'parent-response':
         return renderBlockParentResponse(cid, student, options);
       case 'student-reflection-learning':
-        return renderBlockStudentReflectionLearning(cid, student);
+        return renderBlockStudentReflectionLearning(cid, student, options);
       case 'student-reflection-habits':
-        return renderBlockStudentReflectionHabits(cid, student);
+        return renderBlockStudentReflectionHabits(cid, student, options);
       case 'support-home':
         return renderBlockSupportHome(cid, student, ctx, options);
       case 'term-glance':
@@ -2616,6 +2749,7 @@ window.ReportBlocks = (function () {
     renderBlockMissingWork: renderBlockMissingWork,
     renderBlockAttendance: renderBlockAttendance,
     attendanceSentence: attendanceSentence,
+    wordingOf: wordingOf,
     renderReportBlock: renderReportBlock,
   };
 })();

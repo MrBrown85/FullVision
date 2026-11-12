@@ -1276,6 +1276,11 @@ window.ReportSheets = (function () {
     var over = false;
     var top = opts.head ? opts.head + gap : 0;
     var full = H - top;
+    // opts.caps (One Report): { n: px } keeps px free at the foot of the
+    // n-th side laid out, for the back of the response slip.
+    var capOf = function (sd) {
+      return opts.caps ? opts.caps[out.indexOf(sd)] || 0 : 0;
+    };
     var rowOf = function (cells, from) {
       var live = cells.filter(function (c) {
         return !c.empty;
@@ -1359,7 +1364,7 @@ window.ReportSheets = (function () {
       // of the form takes the rest, or the table's length when it is done.
       var flow = function (c, start, from) {
         while (start < c.rows.length) {
-          var lim = cur === side ? limit : H;
+          var lim = (cur === side ? limit : H) - capOf(cur);
           var room = lim - y - shown - c.chrome - 1;
           var take = 0;
           var used = 0;
@@ -1418,7 +1423,7 @@ window.ReportSheets = (function () {
         }
         // Fits a side: under the line, or where it is on the Front.
         var fits = function (h) {
-          return h <= full || (cur === side && s === 0 && y + h <= limit);
+          return h <= full || (cur === side && s === 0 && y + h <= limit - capOf(cur));
         };
         var from = r.from;
         var tables = [];
@@ -1434,7 +1439,7 @@ window.ReportSheets = (function () {
           });
           r = short.length ? rowOf(short, from) : null;
         }
-        var lim = cur === side ? limit : H;
+        var lim = (cur === side ? limit : H) - capOf(cur);
         var lone = !!r && r.live.length === 1 && isTable(r.live[0]);
         if (lone && y + shown + r.h > lim && (y + shown > y0 || cur === side)) {
           // A table that fits a side but not the room left here goes whole
@@ -2239,5 +2244,14 @@ window.ReportSheets = (function () {
     renderPreview: renderPreview,
     clearPageStyle: clearPageStyle,
     setPageStyle: _setPageStyle,
+    // One Report (report-one.js) lays its own cells out with these.
+    one: {
+      ROW_W: ROW_W,
+      PAPER: PAPER,
+      cellHtml: _cellHtml,
+      emptyCommentBox: _emptyCommentBox,
+      measureGradeRows: _measureGradeRows,
+      gradesPartHtml: _gradesPartHtml,
+    },
   };
 })();

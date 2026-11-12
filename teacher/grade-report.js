@@ -41,6 +41,11 @@ window.GradeReport = (function () {
   feedbackItems = _inReportScores(feedbackItems);
   extraCards = _inReportScores(extraCards);
   layoutStudent = _inReportScores(layoutStudent);
+  // The pieces One Report (report-one.js) draws its parts with.
+  listPart = _inReportScores(listPart);
+  _summaryHtml = _inReportScores(_summaryHtml);
+  _termHtml = _inReportScores(_termHtml);
+  _feedbackPages = _inReportScores(_feedbackPages);
 
   var PX_PER_IN = 96;
   var GAP = 12;
@@ -242,8 +247,11 @@ window.GradeReport = (function () {
     // Assignment Numbers: a narrow bold column, wide enough for the
     // highest number (show.numPx, set in layoutStudent).
     if (show.numbers) cols.push(['n', '#', (show.numPx || 22) + 'px', 'r']);
-    cols.push(['date', 'Date', px('date', 42), ''], ['title', 'Assignment', 'minmax(0,1fr)', '']);
-    if (!two) cols.push(['category', 'Category', null, '']);
+    // One Report can leave the Date or the Category column off (show.hide).
+    var hide = show.hide || {};
+    if (!hide.date) cols.push(['date', 'Date', px('date', 42), '']);
+    cols.push(['title', show.titleHead || 'Assignment', 'minmax(0,1fr)', '']);
+    if (!two && !hide.category) cols.push(['category', 'Category', null, '']);
     if (show.byName) {
       // A Proficiency or Both class: one Result column, wide enough for
       // "Developing +", "Incomplete" and "Missing" in bold, read left to
@@ -580,105 +588,164 @@ window.GradeReport = (function () {
      Proficiency (Colin, 2026-11-12). A Both class keeps Weight, Grade and
      Course Grade, its grade column wider; a Letter class's is as it was. */
   function _tailHtml(cid, student, opts, ctx, stage) {
-    var html = '';
-    var term = studentGradeText(cid, student.id, ctx && ctx.termId).text;
-    var show = columnsFor(cid);
-    var prof = show.byName && !show.percent;
-    if (opts.summary) {
-      var cats = categorySummary(cid, student, opts);
-      // Each column at least its usual width, and wider when its header or
-      // widest text needs it in this machine's fonts (_fitPx; no stage,
-      // the usual widths).
-      var need = function (min, head, texts) {
-        if (!stage) return min + 'px';
-        return Math.max(min, _fitPx(stage, 'regular', [head], true), _fitPx(stage, 'regular', texts, false)) + 'px';
-      };
-      var counts = cats.map(function (c) {
-        return String(c.count);
-      });
-      var grades = cats.map(function (c) {
-        return c.grade;
-      });
-      var grid;
-      if (cats.length && prof) {
-        grid =
-          'minmax(0,1fr) ' +
-          need(90, 'Assessments', counts) +
-          ' ' +
-          need(110, 'Proficiency', _fitCanon().levels.concat(grades));
-        html +=
-          '<div class="gr-summary"><div class="gr-row gr-head" style="--gr-cols:' +
-          grid +
-          '"><span class="gr-c">Category</span><span class="gr-c gr-r">Assessments</span><span class="gr-c gr-r">Proficiency</span></div>' +
-          cats
-            .map(function (c) {
-              return (
-                '<div class="gr-row" style="--gr-cols:' +
-                grid +
-                '"><span class="gr-c">' +
-                esc(c.name) +
-                '</span><span class="gr-c gr-r">' +
-                c.count +
-                '</span><span class="gr-c gr-r">' +
-                esc(c.grade) +
-                '</span></div>'
-              );
-            })
-            .join('') +
-          '</div>';
-      } else if (cats.length) {
-        // A Both class's grade reads "Developing · C- 55.4%": wider than a
-        // Letter class's "C- 55.4%", which keeps its 110px.
-        grid =
-          'minmax(0,1fr) ' +
-          need(
-            70,
-            'Weight',
-            ['100%'].concat(
-              cats.map(function (c) {
-                return c.weight + '%';
-              }),
-            ),
-          ) +
-          ' ' +
-          need(90, 'Assessments', counts) +
-          ' ' +
-          need(show.byName ? 170 : 110, 'Grade', grades);
-        html +=
-          '<div class="gr-summary"><div class="gr-row gr-head" style="--gr-cols:' +
-          grid +
-          '"><span class="gr-c">Category</span><span class="gr-c gr-r">Weight</span><span class="gr-c gr-r">Assessments</span><span class="gr-c gr-r">Grade</span></div>' +
-          cats
-            .map(function (c) {
-              return (
-                '<div class="gr-row" style="--gr-cols:' +
-                grid +
-                '"><span class="gr-c">' +
-                esc(c.name) +
-                '</span><span class="gr-c gr-r">' +
-                c.weight +
-                '%</span><span class="gr-c gr-r">' +
-                c.count +
-                '</span><span class="gr-c gr-r">' +
-                esc(c.grade) +
-                '</span></div>'
-              );
-            })
-            .join('') +
-          '</div>';
-      }
-    }
-    html +=
-      '<div class="gr-term"><span>' +
-      (prof ? 'Overall Proficiency' : 'Course Grade') +
-      '</span><span class="gr-term-grade">' +
-      esc(term || '—') +
-      '</span></div>';
+    var html = opts.summary ? _summaryHtml(cid, student, opts, stage) : '';
+    html += _termHtml(cid, student, ctx);
     var missing = rows(cid, student, opts).filter(function (r) {
       return r.note === 'Missing';
     }).length;
     html += '<div class="gr-facts">Missing Assignments: ' + missing + '</div>';
     return '<div class="gr-tail">' + html + '</div>';
+  }
+
+  /* The course grade's line: Overall Proficiency in a Proficiency class. */
+  function _termHtml(cid, student, ctx) {
+    var term = studentGradeText(cid, student.id, ctx && ctx.termId).text;
+    var show = columnsFor(cid);
+    var prof = show.byName && !show.percent;
+    return (
+      '<div class="gr-term"><span>' +
+      (prof ? 'Overall Proficiency' : 'Course Grade') +
+      '</span><span class="gr-term-grade">' +
+      esc(term || '—') +
+      '</span></div>'
+    );
+  }
+
+  /* The summary by category. */
+  function _summaryHtml(cid, student, opts, stage) {
+    var html = '';
+    var show = columnsFor(cid);
+    var prof = show.byName && !show.percent;
+    var cats = categorySummary(cid, student, opts);
+    // Each column at least its usual width, and wider when its header or
+    // widest text needs it in this machine's fonts (_fitPx; no stage,
+    // the usual widths).
+    var need = function (min, head, texts) {
+      if (!stage) return min + 'px';
+      return Math.max(min, _fitPx(stage, 'regular', [head], true), _fitPx(stage, 'regular', texts, false)) + 'px';
+    };
+    var counts = cats.map(function (c) {
+      return String(c.count);
+    });
+    var grades = cats.map(function (c) {
+      return c.grade;
+    });
+    var grid;
+    if (cats.length && prof) {
+      grid =
+        'minmax(0,1fr) ' +
+        need(90, 'Assessments', counts) +
+        ' ' +
+        need(110, 'Proficiency', _fitCanon().levels.concat(grades));
+      html +=
+        '<div class="gr-summary"><div class="gr-row gr-head" style="--gr-cols:' +
+        grid +
+        '"><span class="gr-c">Category</span><span class="gr-c gr-r">Assessments</span><span class="gr-c gr-r">Proficiency</span></div>' +
+        cats
+          .map(function (c) {
+            return (
+              '<div class="gr-row" style="--gr-cols:' +
+              grid +
+              '"><span class="gr-c">' +
+              esc(c.name) +
+              '</span><span class="gr-c gr-r">' +
+              c.count +
+              '</span><span class="gr-c gr-r">' +
+              esc(c.grade) +
+              '</span></div>'
+            );
+          })
+          .join('') +
+        '</div>';
+    } else if (cats.length) {
+      // A Both class's grade reads "Developing · C- 55.4%": wider than a
+      // Letter class's "C- 55.4%", which keeps its 110px.
+      grid =
+        'minmax(0,1fr) ' +
+        need(
+          70,
+          'Weight',
+          ['100%'].concat(
+            cats.map(function (c) {
+              return c.weight + '%';
+            }),
+          ),
+        ) +
+        ' ' +
+        need(90, 'Assessments', counts) +
+        ' ' +
+        need(show.byName ? 170 : 110, 'Grade', grades);
+      html +=
+        '<div class="gr-summary"><div class="gr-row gr-head" style="--gr-cols:' +
+        grid +
+        '"><span class="gr-c">Category</span><span class="gr-c gr-r">Weight</span><span class="gr-c gr-r">Assessments</span><span class="gr-c gr-r">Grade</span></div>' +
+        cats
+          .map(function (c) {
+            return (
+              '<div class="gr-row" style="--gr-cols:' +
+              grid +
+              '"><span class="gr-c">' +
+              esc(c.name) +
+              '</span><span class="gr-c gr-r">' +
+              c.weight +
+              '%</span><span class="gr-c gr-r">' +
+              c.count +
+              '</span><span class="gr-c gr-r">' +
+              esc(c.grade) +
+              '</span></div>'
+            );
+          })
+          .join('') +
+        '</div>';
+    }
+    return html;
+  }
+
+  /* One Report's Assessments part: the student's rows as one table at the
+     regular size, with the rows too long for one line marked, and the rows
+     themselves. o.omit: { id: true } for the assessments left off the list.
+     The rows are numbered as they print. */
+  function listPart(cid, student, o, stage) {
+    var show = columnsFor(cid);
+    var omit = o.omit || {};
+    var list = rows(cid, student, o).filter(function (r) {
+      return !omit[r.id];
+    });
+    list.forEach(function (r, i) {
+      r.n = i + 1;
+    });
+    show.hide = o.hide || null;
+    show.titleHead = 'Assessment';
+    if (o.numbers) {
+      show.numbers = true;
+      show.numPx = 8 + 7 * String(Math.max(1, list.length)).length;
+    }
+    show.fit = _fitColumns(stage, show, list);
+    if (show.numbers) show.numPx = Math.max(show.numPx, _fitPx(stage, 'regular', ['#', String(list.length)], true));
+    var titles = list.map(function (r) {
+      return r.title;
+    });
+    var cats = list.map(function (r) {
+      return r.category;
+    });
+    show.catPx = _textPx(stage, ['Category'].concat(cats));
+    show.titlePx = _textPx(stage, ['Assessment'].concat(titles));
+    var tier = Object.assign({}, TIERS[0]);
+    var one = _measure(stage, _tableHtml(list.slice(0, 1).concat(list.slice(0, 1)), show, tier));
+    var head = _measure(stage, _tableHtml([], show, tier));
+    if (list.length) tier.rowPx = Math.max(tier.rowPx, (one - head) / 2);
+    var cw = _cellWidths(show, tier);
+    var tw = _textWidthsMemo(stage, titles, 'regular');
+    var cwid = _textWidthsMemo(stage, cats, 'regular');
+    var tall = list.map(function (r, i) {
+      return (tw[i] || 0) > cw.title || (cw.category > 0 && (cwid[i] || 0) > cw.category);
+    });
+    if (tall.indexOf(true) >= 0) {
+      var sample = Object.assign({}, list[0], { title: new Array(80).join('Assignment ') });
+      var two = _measure(stage, _tableHtml([sample, sample], show, tier, [true, true]));
+      tier.row2Px = Math.max(tier.rowPx + 10, Math.ceil((two - head) / 2));
+    }
+    return { list: list, html: list.length ? _tableHtml(list, show, tier, tall) : '' };
   }
 
   /* ── Fitting ───────────────────────────────────────────────── */
@@ -883,6 +950,11 @@ window.GradeReport = (function () {
       })
       .filter(function (x) {
         return !!x.rubric || (x.feedback && x.feedback.length > 0);
+      })
+      .filter(function (x) {
+        // One Report: a card goes with its assessment when that is left
+        // off the list, or when the card itself is removed (o.omit).
+        return !(o.omit && o.omit[x.id]);
       });
   }
 
@@ -1430,6 +1502,12 @@ window.GradeReport = (function () {
     feedbackItems: feedbackItems,
     extraCards: extraCards,
     extraHtml: _extraHtml,
+    // One Report (report-one.js) draws its parts with these.
+    listPart: listPart,
+    summaryHtml: _summaryHtml,
+    termHtml: _termHtml,
+    feedbackPages: _feedbackPages,
+    sideHtml: _sideHtml,
     layoutStudent: layoutStudent,
     layoutWith: layoutWith,
   };
