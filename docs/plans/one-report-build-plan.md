@@ -57,22 +57,22 @@ word, as always.
 
 A part's key is its block id where a block exists.
 
-| Key                                                      | Prints as                       | Drawn by                                            |
-| -------------------------------------------------------- | ------------------------------- | --------------------------------------------------- |
-| `header`                                                 | the letterhead                  | block                                               |
-| `proficiency`                                            | Proficiency                     | block, `family: true`                               |
-| `legend`                                                 | Proficiency Legend              | block, `descriptors: true`                          |
-| `assessments`                                            | Assessments                     | `GradeReport` rows and table                        |
-| `category-summary`                                       | Categories                      | `GradeReport` summary                               |
-| `course-grade`                                           | Overall Proficiency / Course Grade | `GradeReport` term line                          |
-| `grade-table`                                            | Assignment Grades               | block (kept for reports built with it)              |
-| `missing-work`, `term-attendance`, `progress`, `next-steps` | as today                     | block                                               |
-| `teacher-narrative`                                      | Teacher Comment                 | block                                               |
-| `self-assessment`                                        | Core Competency Self-Assessment | block (`blank: true` for a form to fill in)         |
-| `learner-dimensions`                                     | Work Habits                     | block                                               |
-| `student-reflection-learning`, `student-reflection-habits`, `parent-response` | as today, or the class's wording | block, `wording` |
-| `support-home`, `text-block`                             | as today                        | block                                               |
-| `fb-rubrics`, `fb-comments`, `fb-observations`           | Feedback Pages                  | `GradeReport` Feedback Pages                        |
+| Key                                                                           | Prints as                          | Drawn by                                    |
+| ----------------------------------------------------------------------------- | ---------------------------------- | ------------------------------------------- |
+| `header`                                                                      | the letterhead                     | block                                       |
+| `proficiency`                                                                 | Proficiency                        | block, `family: true`                       |
+| `legend`                                                                      | Proficiency Legend                 | block, `descriptors: true`                  |
+| `assessments`                                                                 | Assessments                        | `GradeReport` rows and table                |
+| `category-summary`                                                            | Categories                         | `GradeReport` summary                       |
+| `course-grade`                                                                | Overall Proficiency / Course Grade | `GradeReport` term line                     |
+| `grade-table`                                                                 | Assignment Grades                  | block (kept for reports built with it)      |
+| `missing-work`, `term-attendance`, `progress`, `next-steps`                   | as today                           | block                                       |
+| `teacher-narrative`                                                           | Teacher Comment                    | block                                       |
+| `self-assessment`                                                             | Core Competency Self-Assessment    | block (`blank: true` for a form to fill in) |
+| `learner-dimensions`                                                          | Work Habits                        | block                                       |
+| `student-reflection-learning`, `student-reflection-habits`, `parent-response` | as today, or the class's wording   | block, `wording`                            |
+| `support-home`, `text-block`                                                  | as today                           | block                                       |
+| `fb-rubrics`, `fb-comments`, `fb-observations`                                | Feedback Pages                     | `GradeReport` Feedback Pages                |
 
 Already-retired blocks stay retired (the mockup's "Evidence by Competency" was one).
 

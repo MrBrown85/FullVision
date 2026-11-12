@@ -274,6 +274,7 @@ load('teacher/comment-personal.js');
 load('teacher/report-questionnaire.js');
 load('teacher/report-studio.js');
 load('teacher/grade-report.js');
+load('teacher/report-one.js');
 load('teacher/report-preview.js');
 load('vendor/qrcode.js');
 load('shared/questionnaire-templates.js');

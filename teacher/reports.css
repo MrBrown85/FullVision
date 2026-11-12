@@ -6645,3 +6645,35 @@ body.qn-roster #gb-sidebar .student-row-note {
     max-width: 100%;
   }
 }
+
+/* ── One Report (report-one.js): its parts on the sheet ────────── */
+/* The legend's descriptors are a sentence each: they wrap under the word. */
+.report-sheet.one-sheet .report-legend-desc {
+  white-space: normal;
+}
+/* The Assessments table, the Categories summary and the grade line are the
+   Quick Report's own, each a part here. */
+.one-part {
+  width: 100%;
+}
+.one-assessments > .report-block-title {
+  margin-bottom: 4px;
+}
+/* The foot of a front kept blank: the back of the response slip. Screen
+   only; on paper the room is simply empty. */
+.one-reserve {
+  flex: 0 0 auto;
+  align-self: stretch;
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--border-2);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-base);
+  font-size: var(--text-xs);
+  color: var(--text-3);
+}
+.one-reserve + .sheet-pinned {
+  margin-top: 0;
+}
