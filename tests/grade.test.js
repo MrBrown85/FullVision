@@ -278,7 +278,7 @@ describe('grade-format-guard', () => {
     'teacher/rubric-print.js round (f - 0.05) * 100': 'a print scale',
     'teacher/rubric-print.js round out.scale * 100': 'a print scale',
     'shared/data.js floor Number(v)': 'a whole-number setting',
-    'shared/data.js floor v': 'a whole-number check (a habit rating, a count)',
+    'shared/data-term-ratings.js floor v': 'a whole-number check (a habit rating, a count)',
     'shared/phone-report-view.js round Number(level) || 0':
       'the phone report’s level is already whole: phone-reports.js sends roundLevel’s',
     'shared/student-view.js floor v': 'a count or an index',

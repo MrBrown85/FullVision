@@ -1804,8 +1804,9 @@ window.ReportBlocks = (function () {
      One row per assessment: the date, the full title, and the marks the
      teacher picks under Show: the Score (12 / 15; work scored on
      proficiency as its proficiency, or 3.3 / 4 in a Letter class; blank
-     with no mark yet), the Percent and the Proficiency Word. Percent and the
-     word start from the class grading setting (showDefaults). Organized by
+     with no mark yet), the Percent and, in a Letter class, the Proficiency
+     Word. Percent and the word start from the class grading setting
+     (showDefaults). Organized by
      Category, by Date (a heading per month) or by Competency (a heading per
      competency over its latest few pieces of work, each row the mark on
      that competency). Newest or oldest first; one column or two, a
@@ -1880,6 +1881,64 @@ window.ReportBlocks = (function () {
     };
   }
 
+  /* The width in px the mark column needs for texts (this student's
+     marks): each measured in the sheet's type, at the size it prints at
+     (11px: the sheet sets --text-xs itself, reports.css .report-sheet, and
+     the stage is a .report-sheet), in the font the page shows it in and in
+     the one it prints in (reports.css .gr-print-font), the wider kept, with
+     4% and 2px of headroom, as the Quick Report sizes its columns
+     (grade-report.js _fitPx). 0 where nothing can be measured (no layout): the column keeps
+     its usual width. A fixed 90px cut off a Both class's "Proficient − ·
+     67%" (Nov 12). */
+  const MARK_ROOM = 1.04;
+  const _markMemo = {};
+  function _gradesMarkNeeds(texts) {
+    if (typeof document === 'undefined' || !document.body || typeof getComputedStyle !== 'function') return {};
+    const names = texts.filter((t, i, all) => t && all.indexOf(t) === i);
+    if (!names.length) return {};
+    // A stage on <body> for this call only, as ReportSheets measures.
+    const stage = document.createElement('div');
+    stage.className = 'report-sheet report-sheet-measure';
+    stage.setAttribute('aria-hidden', 'true');
+    stage.style.cssText =
+      'position:absolute;left:-10000px;top:0;width:auto;height:auto;min-height:0;padding:0;margin:0;box-shadow:none;display:block;visibility:hidden;overflow:visible';
+    // html-safe: fixed markup, no data
+    stage.innerHTML =
+      '<div class="report-grades"><div class="report-grades-row" style="display:block"></div><div class="report-grades-row gr-print-font" style="display:block"></div></div>';
+    document.body.appendChild(stage);
+    let memo;
+    try {
+      const rows = stage.querySelectorAll('.report-grades-row');
+      // The widths hold for this type: a font put on the sheet later is measured afresh.
+      const cs = getComputedStyle(rows[0]);
+      const key = [cs.fontSize, cs.fontFamily, cs.letterSpacing, getComputedStyle(rows[1]).fontFamily].join('|');
+      memo = _markMemo[key] || (_markMemo[key] = {});
+      const todo = names.filter(n => !Object.prototype.hasOwnProperty.call(memo, n));
+      if (todo.length) {
+        const spans = todo
+          .map(n => `<span class="report-grades-figs" style="display:inline-block">${esc(n)}</span>`)
+          .join('');
+        // html-safe: every name goes through esc
+        rows[0].innerHTML = spans;
+        // html-safe: every name goes through esc
+        rows[1].innerHTML = spans;
+        todo.forEach((n, i) => {
+          const px = Math.max(
+            rows[0].children[i].getBoundingClientRect().width,
+            rows[1].children[i].getBoundingClientRect().width,
+          );
+          // Nothing measured (no layout): kept out of the memo.
+          if (px > 0) memo[n] = px;
+        });
+      }
+    } finally {
+      stage.remove();
+    }
+    const need = {};
+    names.forEach(n => (need[n] = memo[n] > 0 ? Math.ceil(memo[n] * MARK_ROOM) + 2 : 0));
+    return need;
+  }
+
   /* The Assignment Grades groups ({ name, grade?, rows: [row html] }) laid
      in one column or two. Also lays out each part of a table too long for
      one side (ReportSheets cuts it at its rows), so a part reads as the
@@ -1916,7 +1975,16 @@ window.ReportBlocks = (function () {
     const pick = (k, dflt) => (options[k] === 'auto' || options[k] == null ? dflt : options[k] !== false);
     const showScore = pick('score', true);
     const showPct = pick('percent', autos.percent);
-    const showWord = pick('word', autos.word);
+    // A Proficiency or Both class names its levels, with no number for one.
+    const byName = courseGradeMode(cid) !== 'letter';
+    // There a level's mark is its proficiency and points carry no word
+    // (DECISIONS, "Student-facing levels are proficiencies", 2026-11-12),
+    // so the Proficiency Word column would be empty: it is not printed,
+    // and a saved form's Word is read as the class's default, which prints
+    // the legend's scale line (ReportSheets.BLOCKS hides the option there).
+    // A Letter class prints the word beside a mark when Word is on.
+    const showWord = !byName && pick('word', autos.word);
+    const showScale = byName || showWord;
     const showCourse = pick('course', true);
     const showCatGrade = pick('categoryGrade', true);
     const organize = half && options.organize === 'competency' ? 'category' : options.organize || 'date';
@@ -1944,8 +2012,15 @@ window.ReportBlocks = (function () {
 
     const figs = m => [showScore && m.score, showPct && m.percent].filter(Boolean).join(' · ') || m.score;
     const when = d => (d ? parseLocalDate(d).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }) : '—');
-    const rowHtml = (x, marks) =>
-      `<div class="report-grades-row"><span class="report-grades-date">${esc(when(x.d))}</span><span class="report-grades-title">${esc(x.a.title || '')}</span><span class="report-grades-figs">${esc(figs(marks))}</span>${showWord ? `<span class="report-grades-word">${esc(marks.word)}</span>` : ''}</div>`;
+    // Every mark printed, for sizing the mark column (_gradesMarkPx).
+    // Each row's mark, for the room a wide one needs (below); the row and
+    // its title carry the mark's number until then.
+    const printed = [];
+    const rowHtml = (x, marks) => {
+      const mark = figs(marks);
+      const slot = '\u0000' + printed.push(mark) + '\u0000';
+      return `<div class="report-grades-row"${slot}><span class="report-grades-date">${esc(when(x.d))}</span><span class="report-grades-title">${esc(x.a.title || '')}${slot}</span><span class="report-grades-figs">${esc(mark)}</span>${showWord ? `<span class="report-grades-word">${esc(marks.word)}</span>` : ''}</div>`;
+    };
 
     // The groups: a heading and its rows, in the order they print.
     const groups = [];
@@ -2031,15 +2106,13 @@ window.ReportBlocks = (function () {
     const courseHtml = course
       ? `<div class="report-grades-course">Course Grade <strong>${esc(course)}</strong></div>`
       : '';
-    // A Proficiency or Both class names its levels, with no number for one.
-    const byName = courseGradeMode(cid) !== 'letter';
     const legend = [
       showScore
         ? byName
           ? 'Points shown as scored; other work shown as its proficiency.'
           : 'Points shown as scored; other work scored out of 4.'
         : '',
-      showWord
+      showScale
         ? byName
           ? 'Proficiency: Emerging · Developing · Proficient · Extending.'
           : 'Proficiency: 1 Emerging · 2 Developing · 3 Proficient · 4 Extending.'
@@ -2048,9 +2121,27 @@ window.ReportBlocks = (function () {
     ]
       .filter(Boolean)
       .join(' ');
+    // A mark wider than its column, in a Proficiency or Both class ("Proficient
+    // − · 67%"), reaches left past it onto the title's last line: the row
+    // carries the width it needs (--grades-mark, measured in the sheet's
+    // fonts) and the title ends in a spacer that wide less the column
+    // (reports.css), which drops to a line of its own only when the last
+    // line has no room. The columns keep their widths, so a title wraps
+    // where it did. A Letter class is as it was: none of its marks was ever
+    // cut off, and nothing is measured.
+    const needs = byName ? _gradesMarkNeeds(printed) : {};
+    const html = body.replace(
+      /<div class="report-grades-row"\u0000(\d+)\u0000([\s\S]*?)\u0000\1\u0000/g,
+      (m, i, mid) => {
+        const need = needs[printed[i - 1]] || 0;
+        // 90px, the narrowest the column is, holds it: nothing added.
+        if (need <= 90) return '<div class="report-grades-row"' + mid;
+        return `<div class="report-grades-row report-grades-wide" style="--grades-mark:${need}px"${mid}<span class="report-grades-room" aria-hidden="true"></span>`;
+      },
+    );
     return `<div class="report-block-box report-grades${half ? ' report-grades-half' : ''}${showWord ? '' : ' report-grades-noword'}">
     <div class="report-prof-head"><div class="report-block-title">Assignment Grades</div>${courseHtml}<div class="report-prof-meta">${esc(meta)}</div></div>
-    ${body}
+    ${html}
     <div class="report-grades-legend">${legend}</div>
   </div>`;
   }
