@@ -86,3 +86,49 @@ Expected result: a repeat visit on slow Wi-Fi drops from about 8 s to under 1 s,
 - The phone app's and the student page's time to usable. The student page needs a card code.
 - How Safari on an iPad treats the worker's copy over days of disuse.
 - Which of `_headers` and `netlify.toml` wins when both set the same header.
+
+## 7. The live check (step 1)
+
+`scripts/check-live-caching.mjs` asks a site how it caches eight files and how it protects every page, and changes nothing. It sends only GET requests, with a generic User-Agent, no cookies and no sign-in, and never prints page content or the Supabase values the edge function puts in.
+
+```bash
+node scripts/check-live-caching.mjs                        # fullvision.ca
+node scripts/check-live-caching.mjs http://localhost:8347  # a local build
+node scripts/check-live-caching.mjs --expect-304 --expect-pages-ok
+```
+
+For each file it prints the answer to a plain GET (status, bytes, Cache-Control, ETag) and to a second GET sent with `If-None-Match` set to that ETag: 304 means "not changed", 200 means the whole file came again. For each page address (`/`, `/login.html`, every route in `teacher/router.js`, `/s/`, `/teacher-mobile/`, `/launch.html`, `/privacy.html`, `/help/`) it prints the status, whether a content policy with a nonce came, whether the nonce is new on a second request, how many script tags carry it, whether the Supabase placeholders are gone, and the four security headers. It ends each group with a verdict line. It exits 0, unless `--expect-304` is passed and a file did not answer 304, or `--expect-pages-ok` is passed and a page lacks its policy, a fresh nonce on every script, the Supabase address or a security header.
+
+Today's output from the live site (2026-11-12), matching section 1: every file answers 200 to a conditional request, and every page has its policy.
+
+```text
+Caching and page protection on https://fullvision.ca (2026-11-12T20:15:30.070Z)
+
+Files: plain GET, then GET with If-None-Match: <its ETag> (bytes after decompression)
+  /shared/calc.js              200    187355 B  cache-control: public,max-age=0,must-revalidate  etag: W/"59b72606002299f9b1bd4bf8bb26c36d-ssl"  ->  200 187355 B
+  /shared/data.js              200    877502 B  cache-control: public,max-age=0,must-revalidate  etag: W/"465b2b8e4b3c6ac04165f8a8623cce83-ssl"  ->  200 877502 B
+  /teacher/styles.css          200     83274 B  cache-control: public,max-age=0,must-revalidate  etag: W/"f3ac328c9795aa56e40e9a3c8745d1e9-ssl"  ->  200 83274 B
+  /sw.js                       200      9247 B  cache-control: public,max-age=0,must-revalidate  etag: W/"f62b9fbeaa5bd416c9d790793b287263-ssl"  ->  200 9247 B
+  /manifest.json               200      1052 B  cache-control: public,max-age=0,must-revalidate  etag: W/"d9ec129192787391f7c1bcb5f04281c3-ssl"  ->  200 1052 B
+  /curriculum_by_course.json   200   2800070 B  cache-control: public,max-age=86400  etag: W/"a37a03a5e63d497f695a44cc7ebed2f8-ssl"  ->  200 2800070 B
+  /favicon.svg                 200       412 B  cache-control: public,max-age=0,must-revalidate  etag: W/"e7c0a42afd65626817685b79722707b9-ssl"  ->  200 412 B
+  /assets/icons/icon-192.png   200      3196 B  cache-control: public,max-age=0,must-revalidate  etag: "0d5513a7ebcce6a326e70edd4b4c83d4-ssl"  ->  200 3196 B
+Files verdict: 0 of 8 answered 304 Not Modified; the rest sent the whole file again.
+
+Pages: two GETs each
+  /                        200  policy yes  nonce yes  new nonce each time yes  scripts with nonce 4/4  placeholders gone yes  X-Frame-Options=yes X-Content-Type-Options=yes Referrer-Policy=yes Strict-Transport-Security=yes
+  /login.html              200  policy yes  nonce yes  new nonce each time yes  scripts with nonce 11/11  placeholders gone yes  X-Frame-Options=yes X-Content-Type-Options=yes Referrer-Policy=yes Strict-Transport-Security=yes
+  /dashboard               200  policy yes  nonce yes  new nonce each time yes  scripts with nonce 88/88  placeholders gone yes  X-Frame-Options=yes X-Content-Type-Options=yes Referrer-Policy=yes Strict-Transport-Security=yes
+  /assignments             200  policy yes  nonce yes  new nonce each time yes  scripts with nonce 88/88  placeholders gone yes  X-Frame-Options=yes X-Content-Type-Options=yes Referrer-Policy=yes Strict-Transport-Security=yes
+  /student                 200  policy yes  nonce yes  new nonce each time yes  scripts with nonce 88/88  placeholders gone yes  X-Frame-Options=yes X-Content-Type-Options=yes Referrer-Policy=yes Strict-Transport-Security=yes
+  /gradebook               200  policy yes  nonce yes  new nonce each time yes  scripts with nonce 88/88  placeholders gone yes  X-Frame-Options=yes X-Content-Type-Options=yes Referrer-Policy=yes Strict-Transport-Security=yes
+  /observations            200  policy yes  nonce yes  new nonce each time yes  scripts with nonce 88/88  placeholders gone yes  X-Frame-Options=yes X-Content-Type-Options=yes Referrer-Policy=yes Strict-Transport-Security=yes
+  /observations/starters   200  policy yes  nonce yes  new nonce each time yes  scripts with nonce 88/88  placeholders gone yes  X-Frame-Options=yes X-Content-Type-Options=yes Referrer-Policy=yes Strict-Transport-Security=yes
+  /reports                 200  policy yes  nonce yes  new nonce each time yes  scripts with nonce 88/88  placeholders gone yes  X-Frame-Options=yes X-Content-Type-Options=yes Referrer-Policy=yes Strict-Transport-Security=yes
+  /s/                      200  policy yes  nonce yes  new nonce each time yes  scripts with nonce 17/17  placeholders gone yes  X-Frame-Options=yes X-Content-Type-Options=yes Referrer-Policy=yes Strict-Transport-Security=yes
+  /teacher-mobile/         200  policy yes  nonce yes  new nonce each time yes  scripts with nonce 46/46  placeholders gone yes  X-Frame-Options=yes X-Content-Type-Options=yes Referrer-Policy=yes Strict-Transport-Security=yes
+  /launch.html             200  policy yes  nonce yes  new nonce each time yes  scripts with nonce 3/3  placeholders gone yes  X-Frame-Options=yes X-Content-Type-Options=yes Referrer-Policy=yes Strict-Transport-Security=yes
+  /privacy.html            200  policy yes  nonce yes  new nonce each time yes  scripts with nonce 2/2  placeholders gone yes  X-Frame-Options=yes X-Content-Type-Options=yes Referrer-Policy=yes Strict-Transport-Security=yes
+  /help/                   200  policy yes  nonce yes  new nonce each time yes  scripts with nonce 5/5  placeholders gone yes  X-Frame-Options=yes X-Content-Type-Options=yes Referrer-Policy=yes Strict-Transport-Security=yes
+Pages verdict: all 14 pages have their policy, a fresh nonce on every script and the Supabase address.
+```
