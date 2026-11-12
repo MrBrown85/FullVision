@@ -1,5 +1,5 @@
 /**
- * Utility function tests — pure helpers from gb-data.js.
+ * Utility function tests — pure helpers from shared/data.js.
  */
 
 /* ── esc (HTML escaping) ──────────────────────────────────── */

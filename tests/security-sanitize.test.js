@@ -1,5 +1,5 @@
 /**
- * HTML sanitizer security tests — gb-ui.js :: sanitizeHtml()
+ * HTML sanitizer security tests — teacher/ui.js :: sanitizeHtml()
  * Uses linkedom for real DOM parsing since sanitizeHtml walks childNodes.
  */
 import { parseHTML } from 'linkedom';

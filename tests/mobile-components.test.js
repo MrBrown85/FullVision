@@ -1,5 +1,5 @@
 /**
- * Mobile shared components tests — m-components.js
+ * Mobile shared components tests — teacher-mobile/components.js
  *
  * Tests avatar helpers, navigation bar, proficiency colors,
  * relative time, date grouping, HTML escaping, haptics, and toasts.

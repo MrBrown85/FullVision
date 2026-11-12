@@ -1,7 +1,7 @@
 /**
  * Mobile test setup — extends base setup with mobile module loading.
- * Loads m-components.js, m-students.js, m-observe.js, m-grade.js
- * so their window.MComponents / MStudents / MObserve / MGrade are available.
+ * Loads teacher-mobile/components.js, tab-students.js, tab-observe.js and
+ * tab-grade.js so their window.MComponents / MStudents / MObserve / MGrade are available.
  */
 import './setup.js';
 import { readFileSync } from 'fs';

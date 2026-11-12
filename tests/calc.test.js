@@ -1411,7 +1411,7 @@ describe('calc-month-ago', () => {
 
 describe('calc-pure', () => {
   /**
-   * Pure calculation tests — gb-calc.js core math functions.
+   * Pure calculation tests — shared/calc.js core math functions.
    * These need no mocking — they take arguments and return results.
    */
 

@@ -1,5 +1,5 @@
 /**
- * Mobile Student Quick-Look tests — m-students.js
+ * Mobile Student Quick-Look tests — teacher-mobile/tab-students.js
  *
  * Tests the student list rendering, detail screen data,
  * trend display, evidence counting, and search filtering.

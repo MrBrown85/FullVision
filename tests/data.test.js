@@ -707,7 +707,7 @@ describe('data-cache-first', () => {
 
 describe('data-competency-groups', () => {
   /**
-   * Competency group data layer tests — gb-data.js
+   * Competency group data layer tests — shared/data.js
    * Tests getCompetencyGroups, saveCompetencyGroups, getCompetencyGroupById,
    * and course isolation.
    */
@@ -1046,7 +1046,7 @@ describe('data-course-config-sync', () => {
 
 describe('data-course-isolation', () => {
   /**
-   * Multi-course data isolation tests — gb-data.js
+   * Multi-course data isolation tests — shared/data.js
    * Verifies that students, assessments, scores, and learning maps
    * for one course do not leak into another.
    */
@@ -1065,7 +1065,7 @@ describe('data-course-isolation', () => {
     _cache.learningMaps[B] = undefined;
     _cache.config = {};
     localStorage.clear();
-    // Use saveCourses to update the internal COURSES variable (let-scoped in gb-data.js)
+    // Use saveCourses to update the internal COURSES variable (let-scoped in shared/data.js)
     saveCourses({
       courseA: { id: 'courseA', name: 'Course A', calcMethod: 'mostRecent', decayWeight: 0.65 },
       courseB: { id: 'courseB', name: 'Course B', calcMethod: 'highest', decayWeight: 0.65 },
@@ -1466,7 +1466,7 @@ describe('data-dead-bridge-removed', () => {
 
 describe('data-deletion', () => {
   /**
-   * Deletion and cascade tests — gb-data.js
+   * Deletion and cascade tests — shared/data.js
    * Tests withdrawStudent taking a student out of the class, deleteRubric on
    * nonexistent,
    * and clearing data via save with empty values.
@@ -1613,7 +1613,7 @@ describe('data-deletion', () => {
 
 describe('data-display', () => {
   /**
-   * Display name and sorting tests — gb-data.js
+   * Display name and sorting tests — shared/data.js
    */
 
   describe('fullName', () => {
@@ -2021,7 +2021,7 @@ describe('data-init-invokes-canonical-reads', () => {
 
 describe('data-learningmap', () => {
   /**
-   * Learning map accessor tests — gb-data.js
+   * Learning map accessor tests — shared/data.js
    * Uses flat format (1:1 section-to-tag, section.id = tag.id)
    */
 
@@ -2704,7 +2704,7 @@ describe('data-load-safety', () => {
 
 describe('data-localstorage', () => {
   /**
-   * localStorage safety layer tests — gb-data.js
+   * localStorage safety layer tests — shared/data.js
    * Tests _safeLSSet, _safeParseLS, and localStorage persistence.
    */
 
@@ -3539,7 +3539,7 @@ describe('data-observations-v2-dispatch', () => {
 
 describe('data-observations', () => {
   /**
-   * Observation function tests — gb-data.js
+   * Observation function tests — shared/data.js
    * Tests CRUD and filtering for quick observations.
    */
 
@@ -5361,7 +5361,7 @@ describe('data-rubrics', () => {
 
 describe('data-scores-write', () => {
   /**
-   * Score write operations and rubric cascade tests — gb-data.js
+   * Score write operations and rubric cascade tests — shared/data.js
    */
 
   const CID = 'test';
@@ -6478,7 +6478,7 @@ describe('data-students-v2-dispatch', () => {
 
 describe('data-tags', () => {
   /**
-   * Tag resolution and custom tag tests — gb-data.js
+   * Tag resolution and custom tag tests — shared/data.js
    */
 
   const CID = 'test';
@@ -6699,7 +6699,7 @@ describe('data-term-rating-v2-dispatch', () => {
 
 describe('data-term-ratings', () => {
   /**
-   * Term rating tests — gb-data.js
+   * Term rating tests — shared/data.js
    */
 
   const CID = 'test';
