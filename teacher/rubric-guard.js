@@ -121,7 +121,6 @@
   }
 
   window.RubricGuard = {
-    rubricAssessments: rubricAssessments,
     scoredStudentsByCriterion: scoredStudentsByCriterion,
     topValue: topValue,
     reviewEdit: reviewEdit,

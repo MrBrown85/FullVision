@@ -671,76 +671,6 @@ window.RubricLibrary = (function () {
     });
   }
 
-  /* ── Assessment form: From another class ───────────────────── */
-  function openPickDialog(dstCid, onPicked) {
-    var targets = AssessmentCopy.copyTargets(dstCid);
-    var classes = targets.sameCourse.concat(targets.other);
-    if (!classes.length) {
-      _toast('You have no other classes to copy from.');
-      return;
-    }
-    var html =
-      '<label class="copy-review-field">From <select class="af-input" id="rubric-pick-class">' +
-      classes
-        .map(function (c) {
-          return '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>';
-        })
-        .join('') +
-      '</select></label>' +
-      '<div id="rubric-pick-list" class="copy-from-list">Loading…</div>';
-
-    function fillList(root, srcCid) {
-      var list = root.querySelector('#rubric-pick-list');
-      list.textContent = 'Loading…';
-      loadClass(srcCid).then(function () {
-        var rows = getRubrics(srcCid) || [];
-        if (!rows.length) {
-          list.textContent = 'That class has no rubrics yet.';
-          return;
-        }
-        list.innerHTML = rows
-          .map(function (r) {
-            var plan = planCopy(srcCid, r, dstCid);
-            return (
-              '<label class="copy-review-check rubric-copy-row"><input type="radio" name="rubric-pick" value="' +
-              esc(r.id) +
-              '"> <span class="rubric-copy-row-name">' +
-              esc(r.name) +
-              '</span></label>' +
-              '<div class="rubric-copy-summary">' +
-              _lines(summaryLines(plan)) +
-              '</div>'
-            );
-          })
-          .join('');
-      });
-    }
-
-    AssessmentCopy.dialog({
-      title: 'Use a rubric from another class',
-      html: html,
-      okLabel: 'Use in this class',
-      onOpen: function (root) {
-        var sel = root.querySelector('#rubric-pick-class');
-        fillList(root, sel.value);
-        sel.addEventListener('change', function () {
-          fillList(root, sel.value);
-        });
-      },
-      onOk: function (root) {
-        var srcCid = root.querySelector('#rubric-pick-class').value;
-        var picked = root.querySelector('input[name="rubric-pick"]:checked');
-        if (!picked) return false;
-        var rubric = getRubricById(srcCid, picked.value);
-        if (!rubric) return true;
-        copyTo(srcCid, rubric, [dstCid]).then(function (done) {
-          if (onPicked && done[0]) onPicked(done[0].rubric);
-        });
-        return true;
-      },
-    });
-  }
-
   return {
     uniqueName: uniqueName,
     loadClass: loadClass,
@@ -757,6 +687,5 @@ window.RubricLibrary = (function () {
     renderCopies: renderCopies,
     deleteNote: deleteNote,
     openCopyDialog: openCopyDialog,
-    openPickDialog: openPickDialog,
   };
 })();
