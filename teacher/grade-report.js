@@ -1,10 +1,16 @@
 /* grade-report.js — the Grade Report: a ready-made progress report that
    reads like the student printout from the old gradebook programs. The
    letterhead, one row per assessment in the year to date as of the
-   report's end (date, title, category, score, out of, percent in a Letter
-   or Both class, and Missing, Late or Excused), then a summary by
-   category, the course grade and the missing work. Grades
-   only: no comment, attendance or other feedback.
+   report's end, then a summary by category, the course grade (Overall
+   Proficiency in a Proficiency class) and the missing work. Grades only:
+   no comment, attendance or other feedback.
+
+   A row's columns follow the class's grading style (DECISIONS, "The
+   Quick Report's columns", 2026-11-12): in a Proficiency class Date,
+   Assignment, Category and Result, the Result what the piece was marked
+   in ("Developing +", "8 / 10", Complete, Missing, Excused); a Both class
+   adds Percent; a Letter class prints Score, Out Of, % and the note, as it
+   always has. Work with no mark yet leaves its Result (or Score) blank.
 
    Every student gets one sheet: the front, and the back when the front is
    full. When the rows don't fit, the table steps down to smaller rows, then
@@ -39,8 +45,9 @@ window.GradeReport = (function () {
   var PX_PER_IN = 96;
   var GAP = 12;
   var ROW_W = 720;
-  // ungraded: list the year's work with no mark yet, a dash for its score
-  // (Colin, Oct 29: leaving it off can mislead), up to today.
+  // ungraded: list the year's work with no mark yet, up to today (Colin,
+  // Oct 29: leaving it off can mislead), its score blank (Colin,
+  // 2026-11-12: no dash, no words).
   // numbers: a "#" column numbering the rows in the order they print, off
   // until the teacher ticks Assignment Numbers.
   // feedback: the Feedback Pages after the grade sheet, off until the
@@ -83,8 +90,8 @@ window.GradeReport = (function () {
   /* Which mark columns the class shows: the percent in a Letter or Both
      class. byName: a Proficiency or Both class prints a level as its
      proficiency ("Proficient +"), never a figure out of 4 (DECISIONS,
-     "Student-facing levels are proficiencies", 2026-11-12), so its Score
-     column is wide enough for the word. */
+     "Student-facing levels are proficiencies", 2026-11-12), and one Result
+     column in place of Score and Out Of (resultText). */
   function columnsFor(cid) {
     var mode = typeof courseGradeMode === 'function' ? courseGradeMode(cid) : 'proficiency';
     return { percent: mode !== 'proficiency', byName: mode !== 'letter' };
@@ -98,7 +105,7 @@ window.GradeReport = (function () {
   /* One student's rows: the assessments in the year to date as of the
      report's end (Colin, 2026-11-03) that have a mark or are
      Missing or Excused, and with Ungraded Assignments on, the work dated up
-     to today with no mark yet, its score a dash. Work not yet due is left
+     to today with no mark yet, its score blank. Work not yet due is left
      off. { n, date, title, category, score, outOf, percent, note }, n the
      row's number, 1, 2, 3 in the order the rows print. */
   function rows(cid, student, opts) {
@@ -137,7 +144,6 @@ window.GradeReport = (function () {
       var ungraded = cv.kind === 'none' || (cv.kind === 'level' && !(cv.value > 0));
       if (ungraded) {
         if (!opts.ungraded || (x.d && x.d > today)) return;
-        row.score = '\u2014';
       } else if (cv.kind === 'status') {
         row.note = cv.status === 'EXC' ? 'Excused' : 'Missing';
       } else if (cv.kind === 'complete') {
@@ -166,6 +172,16 @@ window.GradeReport = (function () {
       r.n = i + 1;
     });
     return out;
+  }
+
+  /* A row's Result in a Proficiency or Both class: what the piece was
+     marked in. Missing or Excused; points as "8 / 10" (the Score and Out Of
+     a Letter class prints, joined); a level's proficiency, Complete or
+     Incomplete as rows() wrote it; no mark yet, blank. */
+  function resultText(r) {
+    if (r.note === 'Missing' || r.note === 'Excused') return r.note;
+    if (r.score && r.outOf) return r.score + ' / ' + r.outOf;
+    return r.score || '';
   }
 
   /* The categories in the year to date: weight, how many of the rows above are in
@@ -221,12 +237,21 @@ window.GradeReport = (function () {
     if (show.numbers) cols.push(['n', '#', (show.numPx || 22) + 'px', 'r']);
     cols.push(['date', 'Date', '42px', ''], ['title', 'Assignment', 'minmax(0,1fr)', '']);
     if (!two) cols.push(['category', 'Category', null, '']);
-    // Score holds "Incomplete"; the note "Excused" in bold.
-    // A proficiency ("Developing −") needs more room than a figure.
-    cols.push(['score', 'Score', show.byName ? (two ? '66px' : '80px') : two ? '54px' : '64px', 'r']);
-    cols.push(['outOf', 'Out Of', two ? '34px' : '40px', 'r']);
-    if (show.percent) cols.push(['percent', '%', two ? '32px' : '36px', 'r']);
-    cols.push(['note', '', two ? '46px' : '52px', '']);
+    if (show.byName) {
+      // A Proficiency or Both class: one Result column, wide enough for
+      // "Developing +", "Incomplete" and "Missing" in bold, read left to
+      // right like the title beside it; Percent in a Both class; the note
+      // holds only Late. The width Out Of had goes to the title.
+      cols.push(['result', 'Result', two ? '66px' : '80px', '']);
+      if (show.percent) cols.push(['percent', 'Percent', two ? '40px' : '48px', 'r']);
+      cols.push(['note', '', two ? '28px' : '32px', '']);
+    } else {
+      // Score holds "Incomplete"; the note "Excused" in bold.
+      cols.push(['score', 'Score', two ? '54px' : '64px', 'r']);
+      cols.push(['outOf', 'Out Of', two ? '34px' : '40px', 'r']);
+      if (show.percent) cols.push(['percent', '%', two ? '32px' : '36px', 'r']);
+      cols.push(['note', '', two ? '46px' : '52px', '']);
+    }
     if (!two) {
       var fixed = cols.reduce(function (sum, c) {
         return sum + (c[2] && /px$/.test(c[2]) ? parseFloat(c[2]) : 0);
@@ -341,13 +366,25 @@ window.GradeReport = (function () {
         return c[2];
       })
       .join(' ');
+    // A Proficiency or Both class: the Result is resultText, Missing and
+    // Excused in it in bold (gr-flag) as the note printed them; the note
+    // is only Late.
+    var text = function (c, v) {
+      if (!show.byName) return String(v[c[0]] || '');
+      if (c[0] === 'result') return resultText(v);
+      if (c[0] === 'note') return v.note === 'Late' ? 'Late' : '';
+      return String(v[c[0]] || '');
+    };
     var cell = function (c, v, head) {
+      var t = head ? c[1] : text(c, v);
+      var flag = !head && c[0] === 'result' && (t === 'Missing' || t === 'Excused');
       return (
         '<span class="gr-c gr-' +
         c[0] +
         (c[3] ? ' gr-' + c[3] : '') +
+        (flag ? ' gr-flag' : '') +
         '">' +
-        (head ? c[1] : esc(String(v[c[0]] || ''))) +
+        (head ? c[1] : esc(t)) +
         '</span>'
       );
     };
@@ -408,19 +445,48 @@ window.GradeReport = (function () {
 
   /* Everything after the table: the summary by category, the course grade
      (with the report's reporting basis: IE, or No Letter Grade for goals)
-     and the missing work count. */
+     and the missing work count. A Proficiency class's summary has no
+     Weight and calls its grade Proficiency, and its last line is Overall
+     Proficiency (Colin, 2026-11-12). A Both class keeps Weight, Grade and
+     Course Grade, its grade column wider; a Letter class's is as it was. */
   function _tailHtml(cid, student, opts, ctx) {
     var html = '';
     var term = studentGradeText(cid, student.id, ctx && ctx.termId).text;
+    var show = columnsFor(cid);
+    var prof = show.byName && !show.percent;
     if (opts.summary) {
       var cats = categorySummary(cid, student, opts);
-      if (cats.length) {
+      if (cats.length && prof) {
         html +=
-          '<div class="gr-summary"><div class="gr-row gr-head" style="--gr-cols:minmax(0,1fr) 70px 90px 110px"><span class="gr-c">Category</span><span class="gr-c gr-r">Weight</span><span class="gr-c gr-r">Assessments</span><span class="gr-c gr-r">Grade</span></div>' +
+          '<div class="gr-summary"><div class="gr-row gr-head" style="--gr-cols:minmax(0,1fr) 90px 110px"><span class="gr-c">Category</span><span class="gr-c gr-r">Assessments</span><span class="gr-c gr-r">Proficiency</span></div>' +
           cats
             .map(function (c) {
               return (
-                '<div class="gr-row" style="--gr-cols:minmax(0,1fr) 70px 90px 110px"><span class="gr-c">' +
+                '<div class="gr-row" style="--gr-cols:minmax(0,1fr) 90px 110px"><span class="gr-c">' +
+                esc(c.name) +
+                '</span><span class="gr-c gr-r">' +
+                c.count +
+                '</span><span class="gr-c gr-r">' +
+                esc(c.grade) +
+                '</span></div>'
+              );
+            })
+            .join('') +
+          '</div>';
+      } else if (cats.length) {
+        // A Both class's grade reads "Developing · C- 55.4%": wider than a
+        // Letter class's "C- 55.4%", which keeps its 110px.
+        var grid = 'minmax(0,1fr) 70px 90px ' + (show.byName ? '170px' : '110px');
+        html +=
+          '<div class="gr-summary"><div class="gr-row gr-head" style="--gr-cols:' +
+          grid +
+          '"><span class="gr-c">Category</span><span class="gr-c gr-r">Weight</span><span class="gr-c gr-r">Assessments</span><span class="gr-c gr-r">Grade</span></div>' +
+          cats
+            .map(function (c) {
+              return (
+                '<div class="gr-row" style="--gr-cols:' +
+                grid +
+                '"><span class="gr-c">' +
                 esc(c.name) +
                 '</span><span class="gr-c gr-r">' +
                 c.weight +
@@ -436,7 +502,11 @@ window.GradeReport = (function () {
       }
     }
     html +=
-      '<div class="gr-term"><span>Course Grade</span><span class="gr-term-grade">' + esc(term || '—') + '</span></div>';
+      '<div class="gr-term"><span>' +
+      (prof ? 'Overall Proficiency' : 'Course Grade') +
+      '</span><span class="gr-term-grade">' +
+      esc(term || '—') +
+      '</span></div>';
     var missing = rows(cid, student, opts).filter(function (r) {
       return r.note === 'Missing';
     }).length;
@@ -1180,6 +1250,7 @@ window.GradeReport = (function () {
     options: options,
     columnsFor: columnsFor,
     rows: rows,
+    resultText: resultText,
     categorySummary: categorySummary,
     plan: plan,
     packColumns: packColumns,

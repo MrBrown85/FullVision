@@ -23,6 +23,14 @@ Context: Colin printed a Quick Report for a student and saw a level as a number.
   4. Every report issued before 2026-11-12 showing "changed since last issue" is accepted.
 - **For Colin's eyes** (flagged in review): a points piece's competency band in Next Steps, Ways to Support at Home and Progress in One Area now reads as the proficiency (it read "2.8 / 4 Proficient"); the points score itself ("7/10", "70%") is unchanged everywhere else. The Proficiency block's Change column reads "Up", "Down" or "Same" (with an arrow) in a Proficiency or Both class, not "+0.3".
 - **Known gap, not fixed here:** a scored piece marked Late shows "Late" on the student page but no Late note on the Quick Report.
+- **The Quick Report's columns (2026-11-12, later).** Colin, on seeing the sheet after the change above: "update the printed report, now that students only see the proficincey, the columns don't make a lot of sense." His rulings, from four choices:
+  1. One column, called **Result**, replaces Score and Out Of. It holds whatever the piece was marked in: the proficiency ("Developing +"), points written as "8 / 10", Complete or Incomplete, Missing, Excused. Late stays in the narrow column after it.
+  2. A piece with no mark yet leaves its Result cell blank: no dash, no words. This holds in every grading style (a Letter class's Score cell is blank too).
+  3. In a Proficiency class the summary by category drops its Weight column: Category, Assessments, Proficiency.
+  4. In a Proficiency class the last line is **Overall Proficiency**, not Course Grade.
+  - **A Both class** has Result and Percent (the % column as it was, now headed Percent); its summary keeps Weight and Grade, and its last line stays Course Grade, which is right for "Proficient · B 80%". Its summary's grade column is wider, so "Developing · C- 55.4%" is no longer cut off.
+  - **A Letter class** (grades 10 to 12) keeps Score, Out Of, %, its summary and Course Grade; the blank cell for no mark is its only change.
+  - Only the layout changes: no grade is computed differently, nothing saved changes, and an issued copy reprints as it went home. The width Out Of had goes to the Assignment column. `tests/quick-report-columns.test.js` holds it, and a Letter class to what main printed.
 
 ## Handoff review rulings (2026-11-12)
 

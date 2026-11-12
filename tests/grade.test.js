@@ -540,7 +540,7 @@ describe('grade-report', () => {
   });
 
   describe('rows', () => {
-    it('lists this term’s marked, missing and excused work, oldest first, and unmarked work with a dash', () => {
+    it('lists this term’s marked, missing and excused work, oldest first, and unmarked work with its score blank', () => {
       seed();
       stub('courseToday', () => '2026-10-29');
       const rows = G.rows(CID, ST, { ungraded: false });
@@ -565,7 +565,8 @@ describe('grade-report', () => {
       expect(rows[3]).toMatchObject({ score: 'Complete', outOf: '' });
       expect(rows[4]).toMatchObject({ score: '', note: 'Excused' });
       // Ungraded Assignments (on by default): work up to today with no mark
-      // shows with a dash; work not yet due stays off.
+      // shows with its score blank, no dash (Colin, 2026-11-12); work not
+      // yet due stays off.
       const all = G.rows(CID, ST);
       expect(all.map(r => r.title)).toEqual([
         'Formulas Quiz',
@@ -575,7 +576,7 @@ describe('grade-report', () => {
         'Field Trip Form',
         'Next Week',
       ]);
-      expect(all[5]).toMatchObject({ score: '\u2014', outOf: '', percent: '', note: '' });
+      expect(all[5]).toMatchObject({ score: '', outOf: '', percent: '', note: '' });
       stub('courseToday', () => '2026-10-18');
       expect(G.rows(CID, ST).map(r => r.title)).not.toContain('Next Week');
     });

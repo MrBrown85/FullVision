@@ -1,0 +1,120 @@
+import { test, expect } from '@playwright/test';
+
+/* The Quick Report's columns in a Proficiency class (DECISIONS, "The Quick
+   Report's columns", 2026-11-12). Colin: "now that students only see the
+   proficincey, the columns don't make a lot of sense." Demo Mode's Science
+   8 is a Proficiency class. Ethan Dubois has a Missing piece and work with
+   no mark yet; one of his levels is marked Late and one piece with no mark
+   Excused here, so his sheet has a row of every kind. His sheet is picked by
+   name: in One Student view the canvas otherwise moves to whichever report
+   the class fit finds longest, and that depends on the machine's fonts. */
+
+const NAME = 'Ethan Dubois';
+const LEVEL = /^(Emerging|Developing|Proficient|Extending)( [+−])?$/;
+
+async function openQuickReportFor(page) {
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  await page.goto('/login.html?demo=1');
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await page.waitForFunction(() => getStudents('sci8').length > 0 && getAssessments('sci8').length > 0);
+  await page.evaluate(r => window.Router.navigate(r), '/reports');
+  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await expect(page.locator('#studio')).toBeVisible();
+  await expect(page.getByRole('radio', { name: 'Quick Report' })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.locator('#studio-fit')).not.toBeEmpty();
+  // GradeReport loads with the Reports page.
+  const marked = await page.evaluate(name => {
+    const cid = 'sci8';
+    const st = getStudents(cid).find(s => s.firstName + ' ' + s.lastName === name);
+    const rows = GradeReport.rows(cid, st, GradeReport.options({}));
+    const level = rows.find(r => r.note === '' && r.score && !r.outOf && !/Complete/.test(r.score));
+    // He has two pieces with no mark yet: one is excused, one stays blank.
+    const none = rows.filter(r => r.note === '' && !r.score);
+    Grader.setStatus(cid, st.id, level.id, 'LATE');
+    Grader.setStatus(cid, st.id, none[0].id, 'EXC');
+    return { mode: courseGradeMode(cid), late: level.title, excused: none[0].title, blank: none.length };
+  }, NAME);
+  expect(marked.mode).toBe('proficiency');
+  expect(marked.blank).toBe(2);
+  await page.getByRole('button', { name: 'Select students' }).click();
+  const list = page.locator('#picker-dropdown');
+  await list.getByRole('button', { name: 'Deselect All' }).click();
+  await list.locator('.student-picker-item', { hasText: NAME }).click();
+  await page.getByRole('button', { name: 'Select students' }).click();
+  await expect(list).not.toHaveClass(/open/);
+  const sheet = page.locator('.gr-sheet').first();
+  await expect(sheet).toContainText(NAME);
+  return { sheet, marked, errors };
+}
+
+/* Every row printed on the student's grade sheet, front and back, as
+   { cell class: text }. */
+async function printedRows(page) {
+  return page.locator('.sheet-student .gr-sheet .gr-table .gr-row:not(.gr-head)').evaluateAll(rows =>
+    rows.map(r => {
+      const o = { missing: r.classList.contains('gr-missing') };
+      r.querySelectorAll('.gr-c').forEach(c => {
+        const k = [...c.classList].find(x => x !== 'gr-c' && x !== 'gr-r' && x !== 'gr-flag').slice(3);
+        o[k] = c.textContent;
+      });
+      return o;
+    }),
+  );
+}
+
+test('a Proficiency class prints Date, Assignment, Category and Result, the summary and Overall Proficiency', async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  const { sheet, marked, errors } = await openQuickReportFor(page);
+
+  const head = await sheet.locator('.gr-table .gr-head').first().locator('.gr-c').allTextContents();
+  expect(head).toEqual(['Date', 'Assignment', 'Category', 'Result', '']);
+  await expect(page.locator('.gr-sheet .gr-head')).not.toContainText(['Score']);
+
+  const rows = await printedRows(page);
+  expect(rows.length).toBeGreaterThan(30);
+  const by = title => rows.find(r => r.title === title);
+  // A level, and a level marked Late.
+  const level = rows.find(r => LEVEL.test(r.result) && r.note === '');
+  expect(level).toBeTruthy();
+  expect(by(marked.late)).toMatchObject({ note: 'Late' });
+  expect(by(marked.late).result).toMatch(LEVEL);
+  // Points as "8 / 10", never beside a figure out of 4.
+  const points = rows.find(r => /^\d+(\.\d+)? \/ \d+(\.\d+)?$/.test(r.result));
+  expect(points).toBeTruthy();
+  expect(rows.filter(r => / \/ 4$/.test(r.result))).toEqual([]);
+  // Complete or Incomplete, Missing, Excused.
+  expect(rows.some(r => r.result === 'Complete' || r.result === 'Incomplete')).toBe(true);
+  expect(rows.find(r => r.result === 'Missing')).toMatchObject({ missing: true, note: '' });
+  expect(by(marked.excused)).toMatchObject({ result: 'Excused', note: '' });
+  // No mark yet: the cell is blank. No dash anywhere in the table.
+  expect(rows.filter(r => r.result === '').length).toBeGreaterThan(0);
+  expect(rows.filter(r => /—|-$/.test(r.result))).toEqual([]);
+  // Missing and Excused print in bold, as the note did.
+  const bold = await page
+    .locator('.gr-sheet .gr-result.gr-flag')
+    .first()
+    .evaluate(el => getComputedStyle(el).fontWeight);
+  expect(Number(bold)).toBeGreaterThanOrEqual(700);
+
+  // The summary: Category, Assessments, Proficiency; no Weight.
+  const sum = await page.locator('.gr-summary .gr-head .gr-c').allTextContents();
+  expect(sum).toEqual(['Category', 'Assessments', 'Proficiency']);
+  await expect(page.locator('.gr-term > span').first()).toHaveText('Overall Proficiency');
+  await expect(page.locator('.gr-term-grade')).toHaveText(LEVEL);
+  await expect(page.locator('.gr-facts')).toHaveText('Missing Assignments: 1');
+
+  // It still fits: one sheet, nothing cut off in a cell, nothing past the page.
+  await expect(page.locator('.sheet-student .sheet-badge')).toHaveText('1 sheet');
+  const cut = await page
+    .locator('.gr-sheet .gr-row .gr-c')
+    .evaluateAll(cells => cells.filter(c => c.scrollWidth > c.clientWidth + 1).map(c => c.textContent));
+  expect(cut).toEqual([]);
+  const over = await page
+    .locator('.sheet-student .report-sheet .sheet-body')
+    .evaluateAll(bodies => bodies.filter(b => b.scrollHeight > b.clientHeight + 1).length);
+  expect(over).toBe(0);
+  expect(errors).toEqual([]);
+});

@@ -11,6 +11,13 @@ labels:
   - Reports
   - Progress Reports
   - Quick Report
+  - Result
+  - Assessments
+  - Overall Proficiency
+  - Percent
+  - Course Grade
+  - Score
+  - Out Of
   - Custom
   - Templates
   - Report Card
@@ -56,9 +63,9 @@ shots:
 ## Steps
 
 1. Open **Reports** and choose **Progress Reports**. Choose the report period in the list beside it.
-2. Choose **Quick Report** for a grade sheet: every assignment with its score, and the category summary. Choose **Custom** to build a report card instead.
+2. Choose **Quick Report** for a grade sheet: every assignment with its result, the summary by category and the overall grade. Choose **Custom** to build a report card instead.
 
-   In a Proficiency class, every report shows a level as its proficiency, such as Proficient or Developing +, never as a number out of 4. A Both class adds the percent. Points and Complete/Incomplete work show as scored.
+   In a Proficiency class, every report shows a level as its proficiency, such as Proficient or Developing +, never as a number out of 4. On the Quick Report each assignment has one **Result**: its proficiency, its points such as 8 / 10, Complete or Incomplete, Missing or Excused. Work with no mark yet is left blank. The summary lists each category's **Assessments** and **Proficiency**, and the last line is **Overall Proficiency**. A Both class adds a **Percent** column and keeps each category's weight and the **Course Grade**. A Letter class shows **Score**, **Out Of** and %.
 
 3. In **Custom**, open **Templates** and choose a starter: **Report Card**, **Interim Update** or **Conference Pack**. To change it, open **Blocks** and choose a block to add, such as **Proficiency**, **Teacher Comment** or **Missing Work**.
 
