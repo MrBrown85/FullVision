@@ -4790,7 +4790,8 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 .gr-n,
 .gr-missing .gr-note,
-.gr-note {
+.gr-note,
+.gr-flag {
   font-weight: 700;
 }
 .gr-split {
