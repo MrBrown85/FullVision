@@ -77,6 +77,7 @@ const A = {
   overall: u(111),
   quiz2: u(112),
   future: u(113),
+  entered: u(114),
 };
 
 // A skill from the BC bank, so the edge's Next Step sentences are in play.
@@ -200,9 +201,33 @@ function rubricRows(opts) {
   };
 }
 
+/* When the teacher made each piece (assessment.created_at, the server's clock,
+   to the microsecond as the route sends it). Most pieces were made a few days
+   before their date; some were entered late (Field Trip Form, Changed
+   Reflection, Primary Source Analysis) and some early (Overall Piece, Future
+   Quiz), so the order they were made in is not the order of their dates. */
+const MADE = {
+  [A.essay]: '2026-09-28T16:02:11.123456+00:00',
+  [A.lab]: '2026-10-01T15:40:00.5+00:00',
+  [A.quick]: '2026-10-10T19:12:45.000001+00:00',
+  [A.contract]: '2026-09-02T14:00:00+00:00',
+  [A.missing]: '2026-10-12T17:30:00+00:00',
+  [A.excused]: '2026-10-20T21:05:00+00:00',
+  [A.late]: '2026-10-14T16:00:00+00:00',
+  [A.micro]: '2026-10-15T16:00:00+00:00',
+  [A.draft]: '2026-10-19T16:00:00+00:00',
+  [A.reflect]: '2026-11-01T18:20:00+00:00',
+  [A.overall]: '2026-08-30T12:00:00+00:00',
+  [A.quiz2]: '2026-10-22T15:00:00+00:00',
+  [A.future]: '2026-11-05T15:00:00+00:00',
+  [A.entered]: '2026-11-01T18:45:30.25+00:00',
+};
 // The teacher's assessments (the client's shape, as a class load leaves them).
 const piece = (id, title, date, extra) =>
-  Object.assign({ id, title, date, dueDate: date, type: 'summative', weight: 1, tagIds: [] }, extra);
+  Object.assign(
+    { id, title, date, dueDate: date, type: 'summative', weight: 1, tagIds: [], created_at: MADE[id] || null },
+    extra,
+  );
 const FULL = [
   piece(A.essay, 'DBQ Essay', '2026-10-01', { tagIds: [T1, T2], categoryId: CAT_PROJ, moduleId: MOD }),
   piece(A.lab, 'Source Analysis 1', '2026-10-05', { tagIds: [T1, T3], rubricId: R1, categoryId: CAT_PROJ }),
@@ -227,6 +252,8 @@ const FULL = [
   piece(A.overall, 'Overall Piece', '2026-10-03', { categoryId: CAT_PRAC }),
   piece(A.quiz2, 'Map Quiz', '2026-10-22', { scoreMode: 'points', maxPoints: 10, tagIds: [T1], categoryId: CAT_TESTS }),
   piece(A.future, 'Future Quiz', '2026-12-01', { tagIds: [T1], categoryId: CAT_TESTS }),
+  // Dated Oct 10, the same day as Quick Check, but entered on Nov 1: it counts by its date.
+  piece(A.entered, 'Primary Source Analysis', '2026-10-10', { tagIds: [T1], categoryId: CAT_PROJ }),
 ];
 
 const lv = (value, modifier, comment) => ({ value, modifier: modifier || 0, comment: comment || null });
@@ -247,7 +274,8 @@ const WORKING = {
   [A.draft]: { comment: 'DRAFT-SECRET poster', tags: { [T1]: lv(1), [T2]: lv(1) } },
   [A.reflect]: { comment: 'DRAFT-SECRET reflection', tags: { [T2]: lv(1) } },
   [A.overall]: { value: 3, comment: 'A solid piece.' },
-  [A.quiz2]: { value: 4 },
+  [A.quiz2]: { value: 9 },
+  [A.entered]: { comment: 'Good use of the letter.', tags: { [T1]: lv(2) } },
 };
 const OTHER = {
   [A.essay]: { tags: { [T1]: lv(1), [T2]: lv(1) } },
@@ -273,6 +301,7 @@ const ROWS = {
   },
   [A.overall]: { is_draft: false, returned_at: '2026-10-22T18:00:00Z' },
   [A.quiz2]: { is_draft: false, returned_at: '2026-10-23T18:00:00Z' },
+  [A.entered]: { is_draft: false, returned_at: '2026-11-02T18:00:00Z' },
 };
 const NONE_BACK = Object.fromEntries(Object.keys(ROWS).map(k => [k, { is_draft: true }]));
 
@@ -567,11 +596,12 @@ describe('My Learning on a student’s device equals Preview as Student', () => 
     // the device knows from learning.course.grade_level (2026111201).
     it('a ' + system + ' class at grade 12 whose rounding was never chosen', async () => {
       const { want, got } = await compare({ system, gradeLevel: '12', roundPercent: null });
-      expect(got.categories.find(k => k.id === CAT_PROJ).text).toBe('B 73%');
+      expect(got.categories.find(k => k.id === CAT_PROJ).text).toBe('C+ 69%');
       expect(got).toEqual(want);
     });
 
     // The same class with page as live is today (no grade_level): the device shows one decimal (Projects).
+    // Projects holds Primary Source Analysis (entered late, PR 1273), so it reads C+ 69%, not the B 73% it read before.
     it(
       'a ' +
         system +
@@ -579,8 +609,8 @@ describe('My Learning on a student’s device equals Preview as Student', () => 
       async () => {
         const { want, got } = await compare({ system, gradeLevel: '12', roundPercent: null }, null, 'live');
         const projects = view => view.categories.find(k => k.id === CAT_PROJ).text;
-        expect(projects(want)).toBe('B 73%');
-        expect(projects(got)).toBe('B 73.3%');
+        expect(projects(want)).toBe('C+ 69%');
+        expect(projects(got)).toBe('C+ 69.4%');
         expect(got).not.toEqual(want);
       },
     );
@@ -600,6 +630,48 @@ describe('My Learning on a student’s device equals Preview as Student', () => 
     const titles = skills => skills.find(s => s.id === SEC2).pieces.map(p => p.title);
     expect(titles(want.groups.flatMap(g => g.skills))).toContain('Argument Paragraph');
     expect(titles(got.groups.flatMap(g => g.skills))).not.toContain('Argument Paragraph');
+  });
+
+  /* The review of PR 1268: a piece dated Oct 10 but entered on Nov 1 (Primary
+     Source Analysis, Developing) counts by its date, before the Map Quiz of
+     Oct 22, not as the newest piece. Most Recent reads the skill from the Map
+     Quiz on both sides. Before the device's score entries carried the piece's
+     date, the device read it from the piece entered last. */
+  it('a Letter class with a piece entered late: Most Recent goes by its date, as in Preview', async () => {
+    const { want, got } = await compare({ system: 'letter' });
+    const evidence = want.groups.flatMap(g => g.skills).find(s => s.id === SEC1);
+    expect(evidence.pieces[0].title).toBe('Map Quiz');
+    expect(evidence.text).not.toBe('50%');
+    expect(got).toEqual(want);
+  });
+
+  it('a Proficiency class with a piece entered late: the same level and Next Step as in Preview', async () => {
+    const { want, got } = await compare({ system: 'proficiency' });
+    const evidence = want.groups.flatMap(g => g.skills).find(s => s.id === SEC1);
+    expect(evidence.level).toBe(4);
+    expect(evidence.text).toBe('Extending');
+    expect(got.groups.flatMap(g => g.skills).find(s => s.id === SEC1)).toEqual(evidence);
+    expect(got.next).toEqual(want.next);
+    expect(got).toEqual(want);
+  });
+
+  /* The review of PR 1268, minor: a grade returned on work dated after today.
+     The server's page leaves that work out (date_assigned on or before the
+     class's today), so the student does not see it; Preview as Student now
+     leaves it out too. The teacher's own grade, outside Preview, still counts it. */
+  it('a returned grade on work dated after today: Preview leaves it out, as the student’s page does', async () => {
+    const working = Object.assign({}, WORKING, { [A.future]: { tags: { [T1]: lv(1) } } });
+    const rows = Object.assign({}, ROWS, { [A.future]: { is_draft: false, returned_at: '2026-11-10T18:00:00Z' } });
+    const { want, got, text } = await compare({ system: 'letter', working, rows });
+    expect(text).not.toContain(A.future);
+    expect(got).toEqual(want);
+    // Outside Preview the teacher's returned-only grade still counts the piece, before and after Preview ran.
+    const teacher = withReturnedOnly(() => studentGradeSummary(CID, S1));
+    // The same class with no grade on that piece: what the student sees.
+    makeClass({ system: 'letter' });
+    const without = withReturnedOnly(() => studentGradeSummary(CID, S1)).text;
+    expect(teacher.text).not.toBe(without);
+    expect(want.overall.text).toBe(without);
   });
 
   it('switching classes in one tab: the second class reads as in a fresh tab', async () => {

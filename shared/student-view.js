@@ -1539,25 +1539,34 @@ window.StudentView = (function () {
     var page = unopened(reply(cid, sid));
     if (!page) return { ready: false };
     var feedback = feedbackReply(cid, sid, page);
-    var view = withReturnedOnly(function () {
-      var v = build(
-        page,
-        cid,
-        function (aid, firstGrade) {
-          // Before and After's first version (S11-F2): the data layer's own reading of it, for the student.
-          if (firstGrade) {
-            return typeof getRevisionFirstCell === 'function' ? getRevisionFirstCell(cid, sid, aid, true) : null;
-          }
-          var a = pieceOf(cid, aid);
-          return a ? assessmentCellValue(cid, sid, a) : null;
-        },
-        null,
-        feedback,
-        // Group work from the cache (S12-T1's reader), counts only, as the student's page gets it.
-        typeof getStudentGroupWork === 'function' ? getStudentGroupWork(cid, sid) : null,
-      );
-      v.learning = showLearning ? learning(cid, sid, v) : null;
-      return v;
+    // As the student's page: work dated after the class's today is not counted (shared/data.js).
+    var asStudent =
+      typeof withStudentsToday === 'function'
+        ? withStudentsToday
+        : function (c, fn) {
+            return fn();
+          };
+    var view = asStudent(cid, function () {
+      return withReturnedOnly(function () {
+        var v = build(
+          page,
+          cid,
+          function (aid, firstGrade) {
+            // Before and After's first version (S11-F2): the data layer's own reading of it, for the student.
+            if (firstGrade) {
+              return typeof getRevisionFirstCell === 'function' ? getRevisionFirstCell(cid, sid, aid, true) : null;
+            }
+            var a = pieceOf(cid, aid);
+            return a ? assessmentCellValue(cid, sid, a) : null;
+          },
+          null,
+          feedback,
+          // Group work from the cache (S12-T1's reader), counts only, as the student's page gets it.
+          typeof getStudentGroupWork === 'function' ? getStudentGroupWork(cid, sid) : null,
+        );
+        v.learning = showLearning ? learning(cid, sid, v) : null;
+        return v;
+      });
     });
     return { ready: true, reply: page, feedback: feedback, view: view };
   }

@@ -346,7 +346,17 @@ var StudentData = (function () {
      calc.js's readers, so constants.js is in by then. */
   function entriesFrom(a, grade) {
     function entry(tagId, value, modifier) {
-      var e = { assessmentId: a.id, tagId: tagId, score: value, note: grade.comment };
+      // Dated as shared/data.js dates a loaded score (_scoreEntryFromCanonical): the piece's
+      // date, or today in the class's time zone for a piece with none. calc.js weighs a
+      // student's evidence by this date (Most Recent, Decaying Average); pieces that share a
+      // date then go by when they were made (the piece's created_at, _sameDatePieceOrder).
+      var e = {
+        assessmentId: a.id,
+        tagId: tagId,
+        score: value,
+        date: a.date || LEARNING_READERS.courseToday(page.course.id),
+        note: grade.comment,
+      };
       var mod = normalizeScoreMod(value, modifier);
       if (mod) e.mod = mod;
       return e;
