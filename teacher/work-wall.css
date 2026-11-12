@@ -429,11 +429,6 @@
   font-size: 11px;
   border-radius: 5px;
 }
-@media (max-width: 900px) {
-  .stu-tabs:has(#stu-tab-work) {
-    grid-template-columns: repeat(7, minmax(150px, 1fr));
-  }
-}
 
 /* A page full size, over the wall or the student page. */
 .wv-overlay {

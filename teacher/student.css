@@ -1814,62 +1814,100 @@ button.ced-obs-row {
   cursor: default;
   opacity: 0.6;
 }
+/* Folder tabs (canvas "Student Page Tabs", option 2, Colin 2026-11-11):
+   six equal tabs, the chosen one white and joined to the panel below. Each
+   names its place, with one figure or a badge under the name. */
 .stu-tabs {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
   gap: 4px;
-  padding: 4px;
-  margin: 12px 0;
-  background: var(--seg-track);
-  border-radius: 12px;
+  margin: 12px 0 0;
 }
 .stu-tab {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  padding: 10px 14px;
-  border: none;
-  border-radius: 9px;
-  background: transparent;
+  align-items: center;
+  gap: 3px;
+  padding: 9px 12px 10px;
+  border: 0.5px solid transparent;
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+  background: var(--seg-track);
   font: inherit;
-  text-align: left;
   color: var(--text);
+  white-space: nowrap;
   cursor: pointer;
 }
 .stu-tab:hover:not(.active) {
-  background: var(--overlay-hover);
+  background-image: linear-gradient(var(--overlay-pressed), var(--overlay-pressed));
 }
+/* One pixel lower than the rest, over the panel's top edge, so the two read
+   as one piece. */
 .stu-tab.active {
-  background: var(--seg-thumb);
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.14),
-    0 0 0 0.5px rgba(0, 0, 0, 0.06);
+  z-index: 2;
+  margin-bottom: -1px;
+  padding-bottom: 11px;
+  border-color: var(--divider-medium);
+  background: var(--surface);
 }
 .stu-tab:focus-visible {
   outline: 2px solid var(--active);
-  outline-offset: 1px;
+  outline-offset: -2px;
 }
 .stu-tab-label {
-  font-size: var(--text-sm);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--text-lg);
+  line-height: 1.25;
   font-weight: 600;
-  color: var(--text-2);
-}
-.stu-tab.active .stu-tab-label {
   color: var(--text);
 }
-.stu-tab-stat {
-  font-size: 1.05rem;
+.stu-tab.active .stu-tab-label {
   font-weight: 700;
 }
-/* --link is the blue that reads on both themes' thumbs. */
+.stu-tab-stat {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--text-sm);
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--text-2);
+}
 .stu-tab.active .stu-tab-stat {
+  font-weight: 600;
   color: var(--link);
 }
-.stu-tab-sub {
+/* Only for what needs the teacher: orange for missing work, blue (the Work
+   wall's To Grade chip) for work to grade or a question to answer. */
+.stu-tab-badge {
   font-size: var(--text-xs);
-  /* --text-3 on the dark track is just under 4.5:1. */
-  color: var(--text-2);
+  line-height: 18px;
+  font-weight: 600;
+  padding: 0 7px;
+  border-radius: 9px;
+}
+.stu-tab-badge.miss {
+  background: var(--notice-bg);
+  color: var(--notice-text);
+  box-shadow: inset 0 0 0 1px var(--notice-edge);
+}
+.stu-tab-badge.todo {
+  background: var(--active-light);
+  color: var(--link);
+}
+/* The panel's top corner under a chosen end tab is square. */
+.stu-tabs:has(.stu-tab:first-child.active) + .stu-panel {
+  border-top-left-radius: 0;
+}
+.stu-tabs:has(.stu-tab:last-child.active) + .stu-panel {
+  border-top-right-radius: 0;
 }
 .stu-panel {
   background: var(--surface);
@@ -2427,11 +2465,15 @@ button.ced-obs-row {
 }
 
 @media (max-width: 900px) {
+  /* Too narrow for six: the tabs scroll sideways. The pixel of padding keeps
+     the chosen tab's overlap inside the scroller. */
   .stu-tabs {
-    grid-template-columns: none;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(150px, 1fr);
     overflow-x: auto;
+    padding-bottom: 1px;
+    margin-bottom: -1px;
+  }
+  .stu-tab {
+    flex: 1 0 140px;
   }
   .stu-comp button.dash-tag-row.stu-comp-row,
   .stu-comp-row-static {
@@ -2490,12 +2532,6 @@ button.ced-obs-row {
   .stu-assess-class {
     grid-area: class;
     justify-self: end;
-  }
-}
-@media (prefers-color-scheme: dark) {
-  /* The dark thumb is mid-grey; white reads on it, blue doesn't. */
-  .stu-tab.active .stu-tab-stat {
-    color: var(--text);
   }
 }
 
@@ -3817,11 +3853,6 @@ button.stu-bd-row:focus-visible {
   font-size: 1.75rem;
   line-height: 1.15;
 }
-.stu-ov-lede {
-  margin: 8px 0 0;
-  font-size: 1rem;
-  color: var(--text-2);
-}
 .stu-ov-btn {
   min-height: 32px;
   padding: 0 12px;
@@ -4884,11 +4915,6 @@ button.stu-bd-row:focus-visible {
   line-height: 1.15;
   font-weight: 700;
   color: var(--text);
-}
-.stu-gr-lede {
-  margin: 8px 0 0;
-  font-size: var(--text-md);
-  color: var(--text-2);
 }
 .stu-gr-open {
   display: inline-flex;

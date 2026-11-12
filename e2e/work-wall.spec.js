@@ -141,8 +141,8 @@ test("the Work tab: one student's work, thumbnails only", async ({ page }) => {
   await page.goto('/student?id=st2&course=' + at.cid + '&tab=work');
   const tile = page.locator('#stu-tab-work');
   await expect(tile).toHaveAttribute('aria-selected', 'true');
-  await expect(tile).toContainText('1 Piece');
-  await expect(tile).toContainText('1 to grade');
+  // A piece to grade is the tab's blue badge, in place of its count.
+  await expect(tile.locator('.stu-tab-badge.todo')).toHaveText('1 to Grade');
   const card = page.locator('.sw-card');
   await expect(card).toHaveCount(1);
   await expect(card.locator('.sw-title')).toHaveText('Cell Microscope Lab');

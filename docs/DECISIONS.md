@@ -186,6 +186,14 @@ Colin chose option A on Kanban card t4. Microsoft Teams Assignments requires a c
 - **Sync failures show only on the sync dot.** No banners or toasts. No count of unsynced changes either (2026-10-27): the dot's colour and tooltip are the whole sync display.
 - **Plain language in the UI:** no jargon without a legend. Casing: see "Text size and casing" (2026-10-19).
 
+## The teacher's student page tabs (2026-11-11)
+
+Colin: the summary cards "look a bit cluttered and it's not clear it's a slider". He chose Folder Tabs from four options on the "Student Page Tabs" canvas (https://claude.ai/artifact/KbLY48zZ5yQyU7g7t8kfWr).
+
+1. **Six equal folder tabs on the panel they open.** The chosen tab is white and joined to the panel. Each tab shows its name, then one figure under it: 0 Missing, 19 of 27 Proficient, 38 Pieces, 4 Pieces, 5 Notes, 0 Goals. The grey second line is gone, because each panel opens with the same facts. The grade is not repeated: it is in the header's pill.
+2. **A badge replaces the figure only when something needs the teacher:** orange for missing work (3 Missing), blue for work to grade or a reflection question to answer (2 to Grade, 1 to Answer).
+3. **No grey line under a panel's heading** ("this type of grey text is annoying"). Overview's "Missing work counts as 0 until it is handed in" moved into the Missing tile, shown only when something is missing, as the student page says it.
+
 ## Student voice (2026-10-17)
 
 Context: `STUDENT-VOICE-PLAN.md`.

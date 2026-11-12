@@ -463,8 +463,9 @@ describe("the Work tab on the teacher's student page", () => {
     seed();
     const main = openStudent(IDS[0]);
     const tile = main.querySelector('#stu-tab-work');
-    // Vimy Ridge came in and is not graded yet.
-    expect(text(tile)).toBe('Work2 Pieces1 to grade');
+    // Vimy Ridge came in and is not graded yet: a blue badge in place of the count.
+    expect(text(tile)).toBe('Work1 to Grade');
+    expect(tile.querySelector('.stu-tab-badge.todo')).not.toBeNull();
     expect(tile.getAttribute('aria-selected')).toBe('true');
     expect($$('.sw-card .sw-title').map(text)).toEqual(['Conscription', 'Vimy Ridge']);
     expect($$('.sw-card .sw-date').map(text)).toEqual(['Oct 30', 'Oct 16']);
@@ -476,7 +477,7 @@ describe("the Work tab on the teacher's student page", () => {
   it('a piece waiting shows To Grade, and the tile counts it', () => {
     seed();
     const main = openStudent(TO_GRADE[0]);
-    expect(text(main.querySelector('#stu-tab-work'))).toBe('Work1 Piece1 to grade');
+    expect(text(main.querySelector('#stu-tab-work'))).toBe('Work1 to Grade');
     expect(text($('.sw-card .ww-chip'))).toBe('To Grade');
   });
 

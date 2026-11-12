@@ -123,13 +123,14 @@ test('Dashboard: the toolbar is in line with the boxes', async ({ page }) => {
 });
 
 // The student page's header card has no counts (Colin, 2026-10-24). The Term
-// Questionnaire has its own strip since DECISIONS 14.
-test('Student page: 12px edges and gaps; no counts in its header', async ({ page }) => {
+// Questionnaire has its own strip since DECISIONS 14. The folder tabs sit on
+// the panel they open, with no gap (Colin, 2026-11-11).
+test('Student page: 12px edges and gaps; no counts in its header; tabs on the panel', async ({ page }) => {
   await open(page, '/student?id=st27&tab=comps');
   await page.locator('.stu-panel').waitFor();
   const m = await measure(page, '.student-header-top, .stu-tabs, .stu-panel');
   expect([m.left, m.right]).toEqual([12, 12]);
-  expect(m.gaps).toEqual([12]);
+  expect(m.gaps).toEqual([12, 0]);
   expect(await toolbarInset(page, '.student-toolbar')).toBe(12);
   await expect(page.locator('.student-header-top .sh-stat')).toHaveCount(0);
 });
