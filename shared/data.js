@@ -395,7 +395,7 @@ function _photoQueueDotState() {
    photos that could not go in as asked and were let go. The sync dot is
    the only place this shows (CLAUDE.md rule 5). */
 function _workUploadDotState() {
-  if (typeof _workUploads !== 'function' || _isDemoSession()) return null;
+  if (_isDemoSession()) return null;
   var all = _workUploads();
   var held = Object.keys(all).some(function (k) {
     return all[k] && all[k].held;
@@ -3423,7 +3423,7 @@ async function _loadStudentProfileSummariesIndividually(cid) {
     var batch = students.slice(i, i + batchSize);
     var results = await Promise.all(
       batch.map(function (student) {
-        if (!student || !_isUuid(student.id) || !window.v2 || typeof window.v2.getStudentProfile !== 'function') {
+        if (!student || !_isUuid(student.id)) {
           return Promise.resolve(null);
         }
         return _withTimeout(
@@ -3890,7 +3890,6 @@ async function _hydrateAssessmentDetails(cid) {
 }
 
 async function _hydrateLearningMap(cid) {
-  if (!window.v2 || typeof window.v2.getLearningMap !== 'function') return;
   try {
     var res = await window.v2.getLearningMap(cid);
     if (res && res.error) throw res.error;
@@ -3998,7 +3997,6 @@ async function _fetchObservationPages(cid, firstPage) {
 }
 
 async function _hydrateObservations(cid) {
-  if (!window.v2 || typeof window.v2.getObservations !== 'function') return;
   try {
     var rows = await _fetchObservationPages(cid, 1);
     _persistLoadedField(cid, 'observations', _observationsPayloadToBlob({ observations: rows }, cid));
@@ -4012,7 +4010,7 @@ async function _hydrateObservations(cid) {
    there, so an observation written in the meantime is kept. */
 var _olderObservationsLoading = {};
 function _loadOlderObservations(cid, loadedCount) {
-  if (_olderObservationsLoading[cid] || !window.v2 || typeof window.v2.getObservations !== 'function') return;
+  if (_olderObservationsLoading[cid]) return;
   var firstPage = Math.floor(loadedCount / _OBSERVATION_PAGE) + 1;
   _olderObservationsLoading[cid] = _fetchObservationPages(cid, firstPage)
     .then(function (rows) {
@@ -5216,14 +5214,14 @@ function _clearLoadError(cid) {
 
 /* The sync dot's words while the open class couldn't load, or null. */
 function _loadProblem() {
-  var cid = typeof getActiveCourse === 'function' ? getActiveCourse() : null;
+  var cid = getActiveCourse();
   if (!cid || !_loadError[cid]) return null;
   var text = "Couldn't load the latest data for this class. " + _savedCopyDescription(cid);
   return window.__MOBILE ? text + ' Pull down to try again.' : text + ' Click the dot to try again.';
 }
 
 function _savedCopyDescription(cid) {
-  var meta = typeof _classMeta === 'function' ? _classMeta(cid) : null;
+  var meta = _classMeta(cid);
   if (!meta || !meta.savedAt) return 'Showing your saved copy.';
   var saved = new Date(meta.savedAt);
   var sameDay = saved.toDateString() === new Date().toDateString();
@@ -9803,7 +9801,6 @@ function _categoryListKept(rows) {
    read order; null when they could not be read. Never throws. */
 async function _readServerCategories(cid) {
   try {
-    if (!window.v2 || typeof window.v2.listCategories !== 'function') return null;
     var res = await window.v2.listCategories(cid);
     if (!res || res.error || !Array.isArray(res.data)) return null;
     return res.data
@@ -15745,8 +15742,6 @@ window.createCustomTag = function (cid, label) {
   });
 };
 
-window.v2 = window.v2 || {};
-
 function getQuickObsByDim(cid, sid, dim) {
   return getStudentQuickObs(cid, sid).filter(o => (o.dims || []).includes(dim));
 }
@@ -16560,7 +16555,7 @@ function getStudentSubmission(cid, sid, aid) {
 }
 
 function studentWorkGradingStarted(cid, sid, aid) {
-  var row = typeof getGradeReturn === 'function' ? getGradeReturn(cid, sid, aid) : null;
+  var row = getGradeReturn(cid, sid, aid);
   if (row && row.is_draft) return true;
   if (hasScoreOrFeedback(cid, sid, aid)) return true;
   return getRubricCheckIds(cid, sid, aid).length > 0;
@@ -20921,8 +20916,7 @@ window.loadSeedIfNeeded = function () {
   // Already loaded this session — call directly (handles re-seed after data reset)
   // The demo class is built from the curriculum bank, so it loads first; a
   // failed load seeds the old built-in map instead.
-  var bank =
-    typeof loadCurriculumIndex === 'function' ? loadCurriculumIndex().catch(function () {}) : Promise.resolve();
+  var bank = loadCurriculumIndex().catch(function () {});
   if (typeof seedIfNeeded === 'function') {
     return bank.then(function () {
       seedIfNeeded();
@@ -21652,7 +21646,7 @@ function _handoutGiveUp(rec, refused) {
     return r.id !== rec.rid;
   });
   _resWrite(rec.cid, draft);
-  if (refused && typeof _workNoteDropped === 'function') _workNoteDropped();
+  if (refused) _workNoteDropped();
   _resChanged(rec.cid);
   return _teacherWorkForget(rec.ids || []).then(function () {
     return null;
